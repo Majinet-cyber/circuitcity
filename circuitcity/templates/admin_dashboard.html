@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+{% block title %}Admin · Circuit City{% endblock %}
+
+{% block body %}
+<div class="bg" style="min-height:100dvh;padding:2rem">
+  <div class="card" style="max-width:1000px;margin:auto;padding:1.5rem">
+    <h2 class="brand" style="margin:0 0 1rem">Admin Dashboard</h2>
+    <p>Here you’ll see sales KPIs, restock alerts, and all locations.</p>
+
+    <!-- KPI Cards (Optional – show data at a glance) -->
+    {% if in_stock or sold or sales_value or commission_total %}
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:1rem;margin-bottom:1.5rem">
+      <div class="card" style="padding:1rem"><div class="brand">In Stock</div><div style="font-size:1.6rem">{{ in_stock }}</div></div>
+      <div class="card" style="padding:1rem"><div class="brand">Sold</div><div style="font-size:1.6rem">{{ sold }}</div></div>
+      <div class="card" style="padding:1rem"><div class="brand">Sales Value</div><div style="font-size:1.4rem">{{ sales_value }}</div></div>
+      <div class="card" style="padding:1rem"><div class="brand">Commission</div><div style="font-size:1.4rem">{{ commission_total }}</div></div>
+    </div>
+    {% endif %}
+
+    <!-- Navigation Buttons -->
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:.75rem;margin-bottom:1.5rem">
+      <a class="btn" href="{% url 'inventory:inventory_dashboard' %}">📊 Inventory Dashboard</a>
+      <a class="btn" href="{% url 'inventory:scan_in' %}">➕ Scan Stock IN</a>
+      <a class="btn" href="{% url 'inventory:scan_sold' %}">✔ Scan SOLD</a>
+      <a class="btn" href="{% url 'inventory:stock_list' %}">📦 Stock List</a>
+      <a class="btn" href="/admin/">⚙ Django Admin</a>
+    </div>
+
+    <!-- Logout -->
+    <div style="margin-top:1rem">
+      <a class="btn" href="{% url 'logout' %}" style="background:#ef4444">Log out</a>
+    </div>
+  </div>
+</div>
+{% endblock %}

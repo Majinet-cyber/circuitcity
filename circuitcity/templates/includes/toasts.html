@@ -1,0 +1,9 @@
+<div class="toasts" aria-live="polite" aria-atomic="true">
+  {% if messages %}
+    {% for message in messages %}
+      <div class="toast {{ message.tags }}" role="status">
+        {{ message }}
+      </div>
+    {% endfor %}
+  {% endif %}
+</div>

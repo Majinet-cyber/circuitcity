@@ -1,0 +1,285 @@
+﻿{% extends "base.html" %}
+{% load static humanize %}
+{% block title %}Dashboard · Circuit City{% endblock %}
+
+{% block extra_css %}
+<style>
+  /* Match Stock List palette (light & dark) */
+  :root[data-theme="light"]{
+    --deep-bg:#eef5ff;
+    --deep-panel:#ffffff;
+    --deep-panel-2:#f2f7ff;
+    --deep-border:#cfe0ff;
+    --deep-accent:#2f6df6;
+    --deep-accent-2:#46c0ff;
+    --cc-text:#0e1320;
+    --cc-muted:#566181;
+  }
+  :root[data-theme="dark"]{
+    --deep-bg:#0a1222;
+    --deep-panel:#0d162b;
+    --deep-panel-2:#0f1b33;
+    --deep-border:#21375c;
+    --deep-accent:#76a9ff;
+    --deep-accent-2:#4ecbff;
+    --cc-text:#e8ecf8;
+    --cc-muted:#aab7d6;
+  }
+
+  .dash{padding:1rem 1rem 2rem}
+  .h2{margin:.2rem 0 1rem;font-weight:800}
+  .pillrow{display:flex;gap:.5rem;flex-wrap:wrap;margin:0 0 .75rem}
+  .pill{display:inline-flex;align-items:center;gap:.4rem;padding:.45rem .7rem;border-radius:.6rem;background:var(--deep-panel-2);border:1px solid var(--deep-border);font-weight:700;color:var(--cc-text)}
+  .pill strong{font-weight:800}
+
+  .cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px}
+  .card{background:var(--deep-panel);border:1px solid var(--deep-border);border-radius:14px;padding:14px}
+  .muted{color:var(--cc-muted)}
+  .big{font-size:1.6rem;font-weight:800;letter-spacing:.2px}
+
+  .grid-2{display:grid;grid-template-columns:2fr 1.2fr;gap:14px;margin-top:12px}
+  @media (max-width:980px){.grid-2{grid-template-columns:1fr}}
+
+  .meter{height:12px;background:var(--deep-panel-2);border:1px solid var(--deep-border);border-radius:999px;position:relative;overflow:hidden}
+  .meter > i{position:absolute;top:0;left:0;height:100%;border-radius:999px;background:var(--deep-accent)}
+
+  .charts{display:grid;grid-template-columns:1.4fr 1fr;gap:14px;margin-top:14px}
+  @media (max-width:980px){.charts{grid-template-columns:1fr}}
+  .chart-card{background:var(--deep-panel-2);border:1px solid var(--deep-border);border-radius:14px;padding:12px}
+  .chart-card h3{margin:.25rem 0 .6rem;font-size:.95rem;color:var(--cc-muted)}
+  .toolbar{display:flex;gap:.5rem;align-items:center;justify-content:flex-end}
+  select{padding:.45rem .55rem;border-radius:.45rem;border:1px solid var(--deep-border);background:var(--deep-panel);color:var(--cc-text)}
+</style>
+{% endblock %}
+
+{% block body %}
+<div class="dash">
+  <h2 class="h2">Key metrics</h2>
+
+  <!-- KPI pills (matches Stock List look) -->
+  <div class="pillrow">
+    <span class="pill">Scope: <strong>{{ kpis.scope|default:"—" }}</strong></span>
+    <span class="pill">Today: <strong>{{ kpis.today_count|default:0|intcomma }}</strong></span>
+    <span class="pill">MTD: <strong>{{ kpis.month_count|default:0|intcomma }}</strong></span>
+    <span class="pill">All-time: <strong>{{ kpis.all_count|default:0|intcomma }}</strong></span>
+    {% if staff_view %}
+      <span class="pill">In stock: <strong>{{ in_stock_total|default:0|intcomma }}</strong></span>
+    {% else %}
+      <span class="pill">In stock: <strong>{{ agent_battery.count|default:0|intcomma }}</strong></span>
+    {% endif %}
+  </div>
+
+  <!-- Battery + Wallet row -->
+  <div class="grid-2">
+    <!-- Battery -->
+    <div class="card">
+      <div class="muted" style="font-weight:800;margin:0 0 .4rem">
+        {% if staff_view %}Global stock battery{% else %}My stock battery{% endif %}
+      </div>
+      {% if staff_view %}
+        {% with pct=battery.pct|default:0 label=battery.label|default:"" count=battery.count|default:0 max=battery.max|default:100 %}
+          <div class="meter" aria-label="Stock meter">
+            <i style="width:{{ pct }}%; background:{% if pct < 20 %}#ef4444{% elif pct < 60 %}#f59e0b{% else %}#22c55e{% endif %}"></i>
+          </div>
+          <div class="muted" style="margin-top:.4rem">{{ count|intcomma }} / {{ max|intcomma }} ({{ pct }}%) · {{ label }}</div>
+        {% endwith %}
+      {% else %}
+        {% with pct=agent_battery.pct|default:0 label=agent_battery.label|default:"" count=agent_battery.count|default:0 max=agent_battery.max|default:20 %}
+          <div class="meter" aria-label="Stock meter">
+            <i style="width:{{ pct }}%; background:{% if pct < 20 %}#ef4444{% elif pct < 60 %}#f59e0b{% else %}#22c55e{% endif %}"></i>
+          </div>
+          <div class="muted" style="margin-top:.4rem">{{ count|intcomma }} / {{ max|intcomma }} ({{ pct }}%) · {{ label }}</div>
+        {% endwith %}
+      {% endif %}
+    </div>
+
+    <!-- Wallet -->
+    {% if wallet %}
+    <div class="card">
+      <div class="muted" style="font-weight:800;margin:0 0 .4rem">My wallet</div>
+      <div class="big">MK {{ wallet.balance|floatformat:0|intcomma }}</div>
+      <div class="muted" style="margin-top:.35rem">
+        {{ wallet.month_label|default:"This month" }} ·
+        Comm {{ wallet.month.commission|floatformat:0|intcomma }}
+        {% if wallet.month.advance %} · Adv {{ wallet.month.advance|floatformat:0|intcomma }}{% endif %}
+        {% if wallet.month.adjustment %} · Adj {{ wallet.month.adjustment|floatformat:0|intcomma }}{% endif %}
+        · <strong>Total {{ wallet.month.total|floatformat:0|intcomma }}</strong>
+      </div>
+      {% if wallet_url %}
+        <div style="margin-top:.6rem">
+          <a href="{{ wallet_url }}" class="muted" style="text-decoration:underline">Open wallet →</a>
+        </div>
+      {% endif %}
+    </div>
+    {% endif %}
+  </div>
+
+  {% if staff_view %}
+    <!-- Monthly profit (admin only) -->
+    <div class="card" style="margin-top:14px">
+      <div class="muted" style="font-weight:800;margin:0 0 .4rem">Monthly profit</div>
+      <div class="big">MK {{ monthly_profit|floatformat:0|intcomma }}</div>
+    </div>
+
+    <!-- Active agents -->
+    <div class="card" style="margin-top:14px">
+      <div class="muted" style="font-weight:800;margin:0 0 .4rem">Active agents</div>
+      <div class="cards">
+        {% for a in agents %}
+          <a href="{{ a.url }}" class="card" style="text-decoration:none;color:inherit">
+            <div style="display:flex;align-items:center;gap:.6rem">
+              <div style="width:36px;height:36px;border-radius:999px;background:var(--deep-panel-2);border:1px solid var(--deep-border);display:grid;place-items:center;font-weight:800">{{ a.initials }}</div>
+              <div>
+                <div style="font-weight:700">{{ a.name }}</div>
+                <div class="muted">MTD: {{ a.mtd_amount|floatformat:0|intcomma }} · Sales: {{ a.mtd_count|intcomma }}</div>
+              </div>
+            </div>
+          </a>
+        {% empty %}
+          <div class="muted">No agents yet.</div>
+        {% endfor %}
+      </div>
+    </div>
+  {% endif %}
+
+  <!-- Charts (profit stays below battery, like you asked) -->
+  <div class="charts">
+    <div class="chart-card">
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <h3>Profits</h3>
+        <div class="toolbar">
+          <select id="profitMonth">
+            <option value="">This month</option>
+          </select>
+          <select id="profitGroup">
+            <option value="">By month</option>
+            <option value="model">By model (this month)</option>
+          </select>
+        </div>
+      </div>
+      <canvas id="profitChart" height="120" aria-label="Profits chart" role="img"></canvas>
+    </div>
+
+    <div class="chart-card">
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <h3>Agent performance trend</h3>
+        <div class="toolbar">
+          <select id="trendMetric">
+            <option value="sales" selected>Sales</option>
+            <option value="profit">Profit</option>
+          </select>
+          <select id="trendMonths">
+            <option value="3">Last 3 months</option>
+            <option value="6" selected>Last 6 months</option>
+            <option value="12">Last 12 months</option>
+          </select>
+        </div>
+      </div>
+      <canvas id="agentTrend" height="120" aria-label="Agent trend chart" role="img"></canvas>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+(function(){
+  // Pull colors from CSS variables so gridlines match light/dark
+  const cs = getComputedStyle(document.documentElement);
+  const css = (v, fb) => (cs.getPropertyValue(v) || fb).trim();
+  const GRID   = css('--deep-border', '#d1d5db');
+  const TICK   = css('--cc-muted',    '#6b7280');
+  const TEXT   = css('--cc-text',     '#111827');
+  const ACCENT = css('--deep-accent', '#3b82f6');
+
+  // Reusable chart options with visible gridlines
+  const baseOptions = {
+    responsive: true,
+    maintainAspectRatio: false,
+    interaction: { mode: 'index', intersect: false },
+    elements: { line: { tension: .25, borderWidth: 2 }, point: { radius: 2, hitRadius: 8 } },
+    scales: {
+      x: {
+        grid:  { display: true, color: GRID, borderColor: GRID, tickColor: TICK },
+        ticks: { color: TICK, autoSkip: true, maxRotation: 0 }
+      },
+      y: {
+        beginAtZero: true,
+        grid:  { display: true, color: GRID, borderColor: GRID, tickColor: TICK },
+        ticks: { color: TICK }
+      }
+    },
+    plugins: {
+      legend:  { labels: { color: TEXT } },
+      tooltip: { titleColor: TEXT, bodyColor: TEXT }
+    }
+  };
+
+  // Profit chart
+  const profitCtx = document.getElementById('profitChart').getContext('2d');
+  let profitChart = null;
+
+  async function loadProfit(){
+    const month = document.getElementById('profitMonth').value;
+    const group = document.getElementById('profitGroup').value;
+    const url = "{% url 'dashboard:profit_data' %}" +
+                `?${month ? 'month='+encodeURIComponent(month)+'&' : ''}${group ? 'group_by='+encodeURIComponent(group) : ''}`;
+    const res = await fetch(url);
+    const data = await res.json();
+
+    const options = JSON.parse(JSON.stringify(baseOptions));
+
+    profitChart && profitChart.destroy();
+    profitChart = new Chart(profitCtx, {
+      type: group ? 'bar' : 'line',
+      data: {
+        labels: data.labels,
+        datasets: [{
+          label: 'Profit',
+          data: data.data,
+          borderColor: ACCENT,
+          backgroundColor: group ? ACCENT : undefined
+        }]
+      },
+      options
+    });
+  }
+
+  // Agent trend chart
+  const trendCtx = document.getElementById('agentTrend').getContext('2d');
+  let trendChart = null;
+
+  async function loadTrend(){
+    const metric = document.getElementById('trendMetric').value;
+    const months = document.getElementById('trendMonths').value;
+    const url = "{% url 'dashboard:agent_trend_data' %}" + `?metric=${metric}&months=${months}`;
+    const res = await fetch(url);
+    const data = await res.json();
+
+    const options = JSON.parse(JSON.stringify(baseOptions));
+
+    trendChart && trendChart.destroy();
+    trendChart = new Chart(trendCtx, {
+      type: 'line',
+      data: {
+        labels: data.labels,
+        datasets: [{
+          label: metric === 'profit' ? 'Profit' : 'Trend',
+          data: data.data,
+          borderColor: ACCENT
+        }]
+      },
+      options
+    });
+  }
+
+  document.getElementById('profitGroup').addEventListener('change', loadProfit);
+  document.getElementById('profitMonth').addEventListener('change', loadProfit);
+  document.getElementById('trendMetric').addEventListener('change', loadTrend);
+  document.getElementById('trendMonths').addEventListener('change', loadTrend);
+
+  loadProfit(); loadTrend();
+})();
+</script>
+{% endblock %}

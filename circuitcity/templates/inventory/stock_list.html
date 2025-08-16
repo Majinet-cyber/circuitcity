@@ -1,0 +1,275 @@
+{% extends "base.html" %}
+{% load humanize static %}
+
+{% block title %}Stock List · Circuit City{% endblock %}
+
+{% block extra_css %}
+<style>
+  :root[data-theme="light"]{--deep-bg:#eef5ff;--deep-panel:#ffffff;--deep-panel-2:#f2f7ff;--deep-border:#cfe0ff;--deep-accent:#2f6df6;--deep-accent-2:#46c0ff}
+  :root[data-theme="dark"]{--deep-bg:#0a1222;--deep-panel:#0d162b;--deep-panel-2:#0f1b33;--deep-border:#21375c;--deep-accent:#76a9ff;--deep-accent-2:#4ecbff}
+  .stock-head{display:flex;justify-content:space-between;align-items:center;margin:0 0 .75rem}
+  .stock-actions{display:flex;gap:.5rem;align-items:center;flex-wrap:wrap}
+  .pill{display:inline-flex;align-items:center;gap:.4rem;padding:.45rem .7rem;border-radius:.6rem;background:var(--deep-panel-2);border:1px solid var(--deep-border);font-weight:700;color:var(--cc-text)}
+  .pill strong{font-weight:800}
+  .filters{display:flex;gap:.5rem;align-items:center;flex-wrap:wrap;margin:.5rem 0 .75rem}
+  .filters input[type="text"], .filters select, .filters input[type="number"]{padding:.45rem .55rem;border-radius:.45rem;border:1px solid var(--deep-border);background:var(--deep-panel)}
+  .filters .btn-deep{margin-left:.25rem}
+  .ticker{background:var(--deep-panel-2);border:1px solid var(--deep-border);border-radius:14px;padding:12px}
+  .ticker-row{display:grid;grid-template-columns:1.2fr 1fr .8fr .8fr .8fr 1fr 120px;gap:12px;align-items:center}
+  .ticker-row > div{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .ticker-controls{display:flex;gap:.4rem;margin-top:.6rem;flex-wrap:wrap}
+  .btn-deep{background:linear-gradient(180deg, rgba(255,255,255,.18), rgba(255,255,255,.06));border:1px solid var(--deep-border);border-radius:.5rem;padding:.45rem .65rem;font-weight:700;color:var(--cc-text);text-decoration:none}
+  .btn-deep:hover{background:var(--deep-panel)}
+  .btn-deep.active{outline:2px solid var(--deep-accent); box-shadow:0 0 0 2px rgba(47,109,246,.15) inset}
+  #stockTableWrap{margin-top:12px}
+  #stockTable{width:100%;border-collapse:collapse;background:var(--deep-panel);border:1px solid var(--deep-border);border-radius:12px;overflow:hidden}
+  #stockTable thead th{font-weight:700;color:var(--cc-muted);background:var(--deep-panel-2)}
+  #stockTable th,#stockTable td{padding:.6rem .65rem;border-bottom:1px solid var(--deep-border);vertical-align:middle}
+  #stockTable tbody tr:hover td{background:rgba(80,120,220,.08)}
+  #stockTable td.num{text-align:right;font-variant-numeric:tabular-nums}
+  .charts{display:grid;grid-template-columns:1.4fr 1fr;gap:14px;margin-top:14px}
+  .chart-card{background:var(--deep-panel-2);border:1px solid var(--deep-border);border-radius:14px;padding:12px}
+  .chart-card h3{margin:.25rem 0 .6rem;font-size:.95rem;color:var(--cc-muted)}
+  .chart-toolbar{display:flex;gap:.5rem;align-items:center;justify-content:flex-end}
+  .badge{display:inline-block;padding:.2rem .5rem;border-radius:999px;border:1px solid var(--deep-border)}
+  .badge.green{background:#eafff4;color:#0b6b3a}
+  .badge.red{background:#ffecec;color:#9f1c1c}
+  nav.pager{display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;margin-top:.75rem}
+  nav.pager .info{color:var(--cc-muted)}
+  @media (max-width: 900px){.ticker-row{grid-template-columns:1fr .9fr .6fr .7fr .7fr .8fr .9fr}.charts{grid-template-columns:1fr}}
+</style>
+{% endblock %}
+
+{% block body %}
+<section aria-labelledby="stock">
+  <div class="stock-head">
+    <h2 id="stock" style="margin:0">Stock List</h2>
+    <div class="stock-actions">
+      <span class="pill">In stock: <strong>{{ in_stock|default:0|intcomma }}</strong></span>
+      <span class="pill">Sold: <strong>{{ sold_count|default:0|intcomma }}</strong></span>
+      <span class="pill">Sum order: <strong>{{ sum_order|default:0|floatformat:0|intcomma }}</strong></span>
+      <span class="pill">Sum selling: <strong>{{ sum_selling|default:0|floatformat:0|intcomma }}</strong></span>
+    </div>
+  </div>
+
+  <form class="filters" method="get" action="{% url 'inventory:stock_list' %}">
+    <input type="hidden" name="view" value="{{ request.GET.view|default:'all' }}">
+    <input type="text" name="q" placeholder="Search IMEI/brand/model…" value="{{ q }}">
+    <label>Status:
+      <select name="status">
+        <option value="" {% if not status %}selected{% endif %}>All</option>
+        <option value="in_stock" {% if status == 'in_stock' %}selected{% endif %}>In stock</option>
+        <option value="sold" {% if status == 'sold' %}selected{% endif %}>Sold</option>
+      </select>
+    </label>
+    <label>
+      <input type="checkbox" name="archived" value="1" {% if show_archived %}checked{% endif %}>
+      Include archived
+    </label>
+    <label>Rows/page:
+      <input type="number" name="page_size" min="10" max="200" value="{{ request.GET.page_size|default:50 }}">
+    </label>
+    <button class="btn-deep" type="submit">Apply</button>
+
+    <a class="btn-deep" href="{% url 'inventory:export_csv' %}?{% for k,v in request.GET.items %}{% if k != 'export' %}{{k}}={{v|urlencode}}&{% endif %}{% endfor %}export=csv">Download CSV</a>
+  </form>
+
+  <div id="ticker" class="ticker" role="region" aria-live="polite" aria-label="Rotating stock">
+    <div class="ticker-row" id="tickerRow">
+      <div>IMEI</div><div>Product</div><div>Status</div><div>Order Price</div><div>Selling Price</div><div>Location</div><div>Agent</div>
+    </div>
+    <div class="ticker-controls">
+      <button class="btn-deep" id="prevRow" type="button" aria-label="Previous">◀ Prev</button>
+      <button class="btn-deep" id="nextRow" type="button" aria-label="Next">Next ▶</button>
+      <a class="btn-deep" id="viewAllBtn"
+         href="{% url 'inventory:stock_list' %}?view=all{% if q %}&q={{ q|urlencode }}{% endif %}{% if status %}&status={{ status }}{% endif %}{% if show_archived %}&archived=1{% endif %}">
+         View all stock
+      </a>
+    </div>
+  </div>
+
+  <div id="stockTableWrap" hidden>
+    <div style="display:flex;justify-content:space-between;align-items:center;margin:.5rem 0 .75rem">
+      <div style="font-weight:700;color:var(--cc-muted)">All stock</div>
+      <a class="btn-deep" href="{{ request.path }}">Hide table</a>
+    </div>
+
+    <table id="stockTable">
+      <thead>
+        <tr>
+          <th>IMEI</th><th>Product</th><th>Status</th><th>Order Price</th><th>Selling Price</th><th>Location</th><th>Agent</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% if page_obj %}
+          {% for it in page_obj.object_list %}
+            <tr>
+              <td>{{ it.imei|default:"" }}</td>
+              <td>{{ it.product }}</td>
+              <td>
+                {% if it.status == 'SOLD' %}
+                  <span class="badge red">Sold</span>
+                {% else %}
+                  <span class="badge green">In stock</span>
+                {% endif %}
+              </td>
+              <td class="num">{% if it.order_price is not None %}{{ it.order_price|floatformat:0 }}{% else %}—{% endif %}</td>
+              <td class="num">{% if it.selling_price is not None %}{{ it.selling_price|floatformat:0 }}{% else %}—{% endif %}</td>
+              <td>{% if it.current_location_id %}{{ it.current_location.name }}{% else %}—{% endif %}</td>
+              <td>{% if it.assigned_agent_id %}{{ it.assigned_agent.username }}{% else %}—{% endif %}</td>
+            </tr>
+          {% empty %}
+            <tr><td colspan="7" style="text-align:center;color:var(--cc-muted)">No stock yet.</td></tr>
+          {% endfor %}
+        {% else %}
+          {% for row in rows %}
+          <tr>
+            <td>{{ row.imei }}</td>
+            <td>{{ row.product }}</td>
+            <td>
+              {% if row.status == 'SOLD' %}
+                <span class="badge red">Sold</span>
+              {% else %}
+                <span class="badge green">In stock</span>
+              {% endif %}
+            </td>
+            <td class="num">{{ row.order_price }}</td>
+            <td class="num">{{ row.selling_price|default:"—" }}</td>
+            <td>{{ row.location }}</td>
+            <td>{{ row.agent }}</td>
+          </tr>
+          {% empty %}
+          <tr><td colspan="7" style="text-align:center;color:var(--cc-muted)">No stock yet.</td></tr>
+          {% endfor %}
+        {% endif %}
+      </tbody>
+    </table>
+
+    {% if page_obj %}
+      <nav class="pager">
+        {% if page_obj.has_previous %}
+          <a class="btn-deep" href="{% url 'inventory:stock_list' %}?view=all{% if q %}&q={{ q|urlencode }}{% endif %}{% if status %}&status={{ status }}{% endif %}{% if show_archived %}&archived=1{% endif %}{% if request.GET.page_size %}&page_size={{ request.GET.page_size }}{% endif %}&page={{ page_obj.previous_page_number }}">Prev</a>
+        {% endif %}
+        <span class="info">Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span>
+        {% if page_obj.has_next %}
+          <a class="btn-deep" href="{% url 'inventory:stock_list' %}?view=all{% if q %}&q={{ q|urlencode }}{% endif %}{% if status %}&status={{ status }}{% endif %}{% if show_archived %}&archived=1{% endif %}{% if request.GET.page_size %}&page_size={{ request.GET.page_size }}{% endif %}&page={{ page_obj.next_page_number }}">Next</a>
+        {% endif %}
+      </nav>
+    {% endif %}
+  </div>
+
+  <div class="charts">
+    <div class="chart-card">
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <h3>Sales trend (daily)</h3>
+        <div class="chart-toolbar">
+          <label for="trendPeriod" class="sr-only">Period</label>
+          <select id="trendPeriod" class="input">
+            <option value="month" selected>This month</option>
+            <option value="7d">Last 7 days</option>
+          </select>
+          <label for="trendMetric" class="sr-only">Metric</label>
+          <select id="trendMetric" class="input">
+            <option value="amount" selected>Amount</option>
+            <option value="count">Count</option>
+          </select>
+        </div>
+      </div>
+      <canvas id="salesTrend" height="120" aria-label="Sales trend line chart" role="img"></canvas>
+    </div>
+
+    <div class="chart-card">
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <h3>Top models</h3>
+        <div class="chart-toolbar">
+          <label for="topPeriod" class="sr-only">Period</label>
+          <select id="topPeriod" class="input">
+            <option value="today" selected>Today</option>
+            <option value="month">This month</option>
+          </select>
+        </div>
+      </div>
+      <canvas id="topModels" height="120" aria-label="Top models pie chart" role="img"></canvas>
+    </div>
+  </div>
+</section>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+(function(){
+  const params   = new URLSearchParams(location.search);
+  const showAll  = params.get('view') === 'all';
+  const tableWrap= document.getElementById('stockTableWrap');
+  const ticker   = document.getElementById('ticker');
+  if (showAll){ tableWrap.hidden = false; ticker.hidden = true; }
+
+  const tbody = document.querySelector('#stockTable tbody');
+  const rows  = Array.from((tbody || {}).rows || []).map(tr => {
+    const td = tr.querySelectorAll('td');
+    return {
+      imei: (td[0]?.textContent || '').trim(),
+      product: (td[1]?.textContent || '').trim(),
+      status: (td[2]?.textContent || '').trim(),
+      order_price: (td[3]?.textContent || '').trim(),
+      selling_price: (td[4]?.textContent || '').trim(),
+      location: (td[5]?.textContent || '').trim(),
+      agent: (td[6]?.textContent || '').trim()
+    };
+  });
+
+  const tickerRow = document.getElementById('tickerRow');
+  function renderTicker(i){
+    if (!rows.length) { tickerRow.innerHTML = '<div>No stock yet</div>'; return; }
+    const r = rows[i % rows.length];
+    tickerRow.innerHTML = `
+      <div title="${r.imei}">${r.imei}</div>
+      <div title="${r.product}">${r.product}</div>
+      <div>${r.status}</div>
+      <div class="num">${r.order_price}</div>
+      <div class="num">${r.selling_price || '—'}</div>
+      <div>${r.location}</div>
+      <div>${r.agent}</div>
+    `;
+  }
+  let idx = 0;
+  renderTicker(idx);
+  setInterval(()=>{ idx = (idx+1) % (rows.length || 1); renderTicker(idx); }, 5000);
+  document.getElementById('nextRow').addEventListener('click', ()=>{ idx = (idx+1) % (rows.length||1); renderTicker(idx); });
+  document.getElementById('prevRow').addEventListener('click', ()=>{ idx = (idx-1+rows.length) % (rows.length||1); renderTicker(idx); });
+
+  const $ = sel => document.querySelector(sel);
+  const salesCtx = document.getElementById('salesTrend').getContext('2d');
+  const topCtx   = document.getElementById('topModels').getContext('2d');
+  let salesChart = null, topChart = null;
+
+  async function loadTrend(){
+    const period = $('#trendPeriod').value;
+    const metric = $('#trendMetric').value;
+    const url = "{% url 'inventory:api_sales_trend' %}" + `?period=${period}&metric=${metric}`;
+    const res = await fetch(url); const data = await res.json();
+    const cfg = {
+      type:'line',
+      data:{ labels:data.labels, datasets:[{ label: metric==='amount'?'Sales (MK)':'Sales (count)', data:data.values }]},
+      options:{ responsive:true, maintainAspectRatio:false, elements:{ line:{ tension:.3 }}, scales:{ y:{ beginAtZero:true } } }
+    };
+    salesChart && salesChart.destroy(); salesChart = new Chart(salesCtx, cfg);
+  }
+
+  async function loadTop(){
+    const period = $('#topPeriod').value;
+    const url = "{% url 'inventory:api_top_models' %}" + `?period=${period}`;
+    const res = await fetch(url); const data = await res.json();
+    const cfg = { type:'pie', data:{ labels:data.labels, datasets:[{ data:data.values }] }, options:{ responsive:true, maintainAspectRatio:false } };
+    topChart && topChart.destroy(); topChart = new Chart(topCtx, cfg);
+  }
+
+  $('#trendPeriod').addEventListener('change', loadTrend);
+  $('#trendMetric').addEventListener('change', loadTrend);
+  $('#topPeriod').addEventListener('change', loadTop);
+
+  loadTrend(); loadTop();
+})();
+</script>
+{% endblock %}

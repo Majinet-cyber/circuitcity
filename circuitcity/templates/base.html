@@ -1,0 +1,292 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>{% block title %}Circuit City{% endblock %}</title>
+
+  <!-- Your CSS bundles -->
+  <link rel="stylesheet" href="{% static 'css/tokens.css' %}?v={% now 'U' %}">
+  <link rel="stylesheet" href="{% static 'css/app.css' %}?v={% now 'U' %}">
+
+  <meta name="color-scheme" content="dark light">
+  <meta name="theme-color" content="#0b5bd3">
+  <link rel="icon" href="{% static 'favicon.ico' %}">
+  <!-- Beta: keep search engines out (you also serve robots.txt = Disallow) -->
+  <meta name="robots" content="noindex, nofollow">
+
+  {% block extra_css %}{% endblock %}
+
+  <!-- Fallback design tokens + layout if app.css is missing/partial -->
+  <style>
+    :root[data-theme="light"]{
+      --cc-bg:#f7fbff; --cc-panel:#ffffff; --cc-panel-2:#f2f7ff; --cc-border:#d6e4ff;
+      --cc-text:#0b1533; --cc-muted:#4c5e85; --cc-accent:#0b5bd3;
+    }
+    :root[data-theme="dark"]{
+      --cc-bg:#0b1220; --cc-panel:#0e1629; --cc-panel-2:#0f1b33; --cc-border:#20324d;
+      --cc-text:#e5e7eb; --cc-muted:#a8b3cf; --cc-accent:#76a9ff;
+    }
+
+    html, body { height:100% }
+    body { background:var(--cc-bg); color:var(--cc-text) }
+    a { color:var(--cc-accent); text-decoration:none }
+    a:hover { text-decoration:underline }
+
+    .btn{display:inline-flex;align-items:center;gap:.45rem;padding:.5rem .75rem;
+         border:1px solid var(--cc-border);border-radius:.55rem;background:var(--cc-panel);
+         color:var(--cc-text);font-weight:600;cursor:pointer;text-decoration:none}
+    .btn:hover{background:var(--cc-panel-2)}
+    .btn-primary{background:#e7f0ff}
+    .btn-green{background:#eafff7;border-color:#88e0c1}
+    .cc-topbtn{white-space:nowrap}
+
+    .cc-alert{border:1px solid transparent;border-radius:.6rem;padding:.75rem 1rem;margin:.5rem 0;display:flex;gap:.6rem;align-items:flex-start}
+    .cc-alert-success{background:#0a3323;color:#c7f0da;border-color:#187a54}
+    .cc-alert-error{background:#3a0a0a;color:#ffd7d7;border-color:#a33a3a}
+    .cc-alert-info{background:#0b2638;color:#cfe9ff;border-color:#2a6ea7}
+    .cc-alert .close{margin-left:auto;opacity:.7;cursor:pointer;border:0;background:transparent;color:inherit}
+
+    .skip-link{position:absolute;left:-9999px;top:auto;width:1px;height:1px;overflow:hidden}
+    .skip-link:focus{left:1rem;top:1rem;width:auto;height:auto;padding:.5rem .75rem;background:#111827;color:#fff;border-radius:.5rem;z-index:1000}
+
+    .cc-topnav{position:sticky;top:0;z-index:30;background:var(--cc-panel);border-bottom:1px solid var(--cc-border)}
+    .topbar{display:flex;gap:.75rem;align-items:center;justify-content:space-between;padding:.6rem 1rem;max-width:1200px;margin:0 auto}
+    .cc-brand{display:flex;align-items:center;gap:.5rem;color:var(--cc-text);font-weight:800}
+    .cc-logo{font-size:1.2rem}
+
+    .cc-shell{display:grid;grid-template-columns:260px 1fr;min-height:calc(100vh - 56px)}
+    .cc-shell.no-sidebar{grid-template-columns:1fr}
+    .cc-sidebar{background:var(--cc-panel);border-right:1px solid var(--cc-border);padding:1rem .75rem}
+    .cc-sidebar-group{font-size:.8rem;color:var(--cc-muted);text-transform:uppercase;letter-spacing:.05em;margin:.75rem .25rem}
+    .cc-sideitem{display:block;padding:.55rem .65rem;border-radius:.5rem;color:var(--cc-text)}
+    .cc-sideitem:hover{background:var(--cc-panel-2)}
+    .cc-sideitem.active{background:#e7f0ff;border:1px solid var(--cc-border)}
+    [data-theme="dark"] .cc-sideitem.active{background:#142447;border-color:#2a4a9c}
+    .cc-overlay{position:fixed;inset:0;background:rgba(0,0,0,.35)}
+    .cc-main{padding:1rem}
+    .cc-container{max-width:1200px;margin:0 auto}
+
+    @media (max-width:1024px){
+      .cc-shell{grid-template-columns:1fr}
+      .cc-sidebar{position:fixed;left:0;top:56px;bottom:0;width:280px;transform:translateX(-102%);transition:transform .2s ease;box-shadow:0 10px 30px rgba(0,0,0,.25);z-index:40}
+      .cc-sidebar.open{transform:translateX(0)}
+      .cc-overlay[aria-hidden="true"]{display:none}
+      .no-scroll{overflow:hidden}
+    }
+
+    table{width:100%;border-collapse:collapse}
+    th,td{padding:.6rem .65rem;border-bottom:1px solid var(--cc-border);color:var(--cc-text)}
+    thead th{font-weight:700;color:var(--cc-muted)}
+    tbody tr:hover td{background:var(--cc-panel-2)}
+  </style>
+</head>
+<body class="cc-body">
+  <a href="#main" class="skip-link">Skip to content</a>
+
+  <!-- Hidden CSRF token for JS -->
+  <form id="__csrf__" style="display:none">{% csrf_token %}</form>
+
+  <!-- Top Nav -->
+  <header class="cc-topnav" role="banner">
+    <div class="actions-row topbar">
+      {% if request.user.is_authenticated %}
+        <button class="cc-burger btn" id="ccBurger"
+                aria-label="Toggle menu" aria-controls="ccSidebar" aria-expanded="false">☰</button>
+      {% endif %}
+
+      <a class="cc-brand" href="{% url 'inventory:stock_list' %}">
+        <span class="cc-logo" aria-hidden="true">📱</span>
+        <span> Circuit City</span>
+      </a>
+
+      {% comment %} Top-right actions {% endcomment %}
+      {% if request.user.is_authenticated %}
+        <nav class="cc-topnav-actions actions-row" aria-label="Primary actions" style="display:flex;gap:.5rem;align-items:center">
+          <a class="cc-topbtn btn btn-primary" href="{% url 'inventory:scan_in' %}">+ Stock IN</a>
+          <a class="cc-topbtn btn btn-green"   href="{% url 'inventory:scan_sold' %}">✔ Scan SOLD</a>
+          <a class="cc-topbtn btn"             href="{% url 'inventory:scan_web' %}">📷 Scan (Web)</a>
+          <a class="cc-topbtn btn"             href="{% url 'inventory:time_checkin_page' %}">⏱ Time Check-in</a>
+
+          <!-- Phase 7: Send Feedback (prefilled mailto with context) -->
+          <a class="cc-topbtn btn"
+             aria-label="Send beta feedback"
+             href="mailto:beta@circuitcity.example?subject=Beta%20Feedback%20on%20Circuit%20City
+&body=User:%20{{ request.user.username|default:'anon' }}
+%0APath:%20{{ request.path }}
+%0AUA:%20{{ request.META.HTTP_USER_AGENT|default:'n/a' }}
+%0ATime:%20{% now 'c' %}">
+            ✉ Feedback
+          </a>
+
+          <div class="cc-user" style="display:flex;align-items:center;gap:.5rem">
+            <button id="ccTheme" class="cc-topbtn btn cc-theme-toggle" title="Toggle theme" aria-label="Toggle theme">🌓</button>
+            <span class="cc-user-name">{{ request.user.username }}</span>
+            <a class="cc-logout" href="{% url 'logout' %}">Logout</a>
+          </div>
+        </nav>
+      {% else %}
+        <nav class="cc-topnav-actions" aria-label="Session" style="display:flex;gap:.5rem;align-items:center">
+          <!-- Phase 7: Feedback available even for anon (context still useful) -->
+          <a class="cc-topbtn btn"
+             aria-label="Send beta feedback"
+             href="mailto:beta@circuitcity.example?subject=Beta%20Feedback%20on%20Circuit%20City
+&body=User:%20anon
+%0APath:%20{{ request.path }}
+%0AUA:%20{{ request.META.HTTP_USER_AGENT|default:'n/a' }}
+%0ATime:%20{% now 'c' %}">
+            ✉ Feedback
+          </a>
+          <a class="cc-topbtn btn" href="{% url 'login' %}">Sign in</a>
+          <button id="ccTheme" class="cc-topbtn btn cc-theme-toggle" title="Toggle theme" aria-label="Toggle theme">🌓</button>
+        </nav>
+      {% endif %}
+    </div>
+  </header>
+
+  <!-- Shell -->
+  <div class="cc-shell{% if not request.user.is_authenticated %} no-sidebar{% endif %}">
+    {% if request.user.is_authenticated %}
+      <!-- Sidebar -->
+      <aside class="cc-sidebar" id="ccSidebar" role="navigation" aria-label="Sidebar">
+        <div class="cc-sidebar-group">Inventory</div>
+        {% with n=request.resolver_match.url_name %}
+          <a class="cc-sideitem {% if n == 'stock_list' %}active{% endif %}"
+             {% if n == 'stock_list' %}aria-current="page"{% endif %}
+             href="{% url 'inventory:stock_list' %}">📦 Stock List</a>
+
+          <a class="cc-sideitem {% if n == 'scan_in' %}active{% endif %}"
+             {% if n == 'scan_in' %}aria-current="page"{% endif %}
+             href="{% url 'inventory:scan_in' %}">➕ Scan IN</a>
+
+          <a class="cc-sideitem {% if n == 'scan_sold' %}active{% endif %}"
+             {% if n == 'scan_sold' %}aria-current="page"{% endif %}
+             href="{% url 'inventory:scan_sold' %}">✔ Scan SOLD</a>
+
+          <a class="cc-sideitem {% if n == 'scan_web' %}active{% endif %}"
+             {% if n == 'scan_web' %}aria-current="page"{% endif %}
+             href="{% url 'inventory:scan_web' %}">📷 Scan (Web)</a>
+
+          <a class="cc-sideitem {% if n == 'time_checkin_page' %}active{% endif %}"
+             {% if n == 'time_checkin_page' %}aria-current="page"{% endif %}
+             href="{% url 'inventory:time_checkin_page' %}">⏱ Time Check-in</a>
+
+          <a class="cc-sideitem {% if n == 'time_logs' %}active{% endif %}"
+             {% if n == 'time_logs' %}aria-current="page"{% endif %}
+             href="{% url 'inventory:time_logs' %}">🗓 Time Logs</a>
+
+          {% if request.user.is_staff %}
+            <a class="cc-sideitem {% if n == 'dashboard' %}active{% endif %}"
+               {% if n == 'dashboard' %}aria-current="page"{% endif %}
+               href="{% url 'dashboard:dashboard' %}">📊 Dashboard</a>
+          {% else %}
+            <a class="cc-sideitem {% if n == 'agent_dashboard' %}active{% endif %}"
+               {% if n == 'agent_dashboard' %}aria-current="page"{% endif %}
+               href="{% url 'dashboard:agent_dashboard' %}">📊 Dashboard</a>
+          {% endif %}
+        {% endwith %}
+
+        {% if request.user.is_staff %}
+          <div class="cc-sidebar-group">Admin</div>
+          <a class="cc-sideitem" href="{% url 'admin:index' %}">⚙️ Django Admin</a>
+          <a class="cc-sideitem" href="#">🧾 Reports (soon)</a>
+          <a class="cc-sideitem" href="#">🔧 Settings (soon)</a>
+        {% endif %}
+      </aside>
+
+      <!-- Backdrop for mobile -->
+      <div class="cc-overlay" id="ccOverlay" aria-hidden="true" hidden></div>
+    {% endif %}
+
+    <!-- Main -->
+    <main id="main" class="cc-main" role="main" tabindex="-1" aria-live="polite">
+      <div class="cc-container">
+        {% if messages %}
+          <div role="region" aria-live="polite" aria-label="Notifications">
+            {% for message in messages %}
+              <div class="cc-alert
+                          {% if message.tags == 'success' %}cc-alert-success
+                          {% elif message.tags == 'error' %}cc-alert-error
+                          {% else %}cc-alert-info{% endif %}">
+                <div>{{ message }}</div>
+                <button class="close" aria-label="Dismiss">✕</button>
+              </div>
+            {% endfor %}
+          </div>
+        {% endif %}
+
+        {% block body %}{% block content %}{% endblock %}{% endblock %}
+      </div>
+    </main>
+  </div>
+
+  <!-- Sidebar + Theme + Alerts + CSRF-safe fetch -->
+  <script>
+    (function () {
+      const root = document.documentElement;
+      const key  = 'cc-theme';
+      const saved = localStorage.getItem(key);
+      const initial = saved || 'light';
+      root.setAttribute('data-theme', initial);
+
+      const themeMeta = document.querySelector('meta[name="theme-color"]');
+      function setTheme(t){
+        root.setAttribute('data-theme', t);
+        localStorage.setItem(key, t);
+        if (themeMeta) themeMeta.setAttribute('content', t === 'dark' ? '#0f172a' : '#0b5bd3');
+      }
+      const btn = document.getElementById('ccTheme');
+      if (btn){ btn.addEventListener('click', () => setTheme(root.getAttribute('data-theme') === 'dark' ? 'light' : 'dark')); }
+
+      const burger  = document.getElementById('ccBurger');
+      const sidebar = document.getElementById('ccSidebar');
+      const overlay = document.getElementById('ccOverlay');
+      function openSidebar(){
+        if(!sidebar) return;
+        sidebar.classList.add('open');
+        if (overlay){ overlay.hidden=false; overlay.setAttribute('aria-hidden','false'); }
+        document.body.classList.add('no-scroll');
+        if (burger) burger.setAttribute('aria-expanded','true');
+      }
+      function closeSidebar(){
+        if(!sidebar) return;
+        sidebar.classList.remove('open');
+        if (overlay){ overlay.hidden=true; overlay.setAttribute('aria-hidden','true'); }
+        document.body.classList.remove('no-scroll');
+        if (burger) burger.setAttribute('aria-expanded','false');
+      }
+      if (burger && sidebar){
+        burger.addEventListener('click', ()=> sidebar.classList.contains('open') ? closeSidebar() : openSidebar());
+        if (overlay) overlay.addEventListener('click', closeSidebar);
+        sidebar.addEventListener('click', (e)=>{ if (e.target.closest('a')) closeSidebar(); });
+        document.addEventListener('keydown', (e)=>{ if (e.key === 'Escape') closeSidebar(); });
+        const mq = window.matchMedia('(min-width: 1025px)');
+        mq.addEventListener('change', closeSidebar);
+      }
+
+      document.querySelectorAll('.cc-alert .close').forEach(btn=>btn.addEventListener('click', ()=> btn.parentElement.remove()));
+      setTimeout(()=>{ document.querySelectorAll('.cc-alert').forEach(el=>el.remove()); }, 4500);
+
+      const csrfEl = document.querySelector('#__csrf__ input[name=csrfmiddlewaretoken]');
+      const CSRF_TOKEN = csrfEl ? csrfEl.value : null;
+      const SAFE_METHODS = new Set(['GET','HEAD','OPTIONS','TRACE']);
+      const origFetch = window.fetch;
+      window.fetch = function(input, init){
+        init = init || {};
+        const method = (init.method || 'GET').toUpperCase();
+        const url = (typeof input === 'string') ? input : input.url;
+        const sameOrigin = url.startsWith('/') || url.startsWith(location.origin);
+        if (!SAFE_METHODS.has(method) && sameOrigin){
+          const headers = new Headers(init.headers || {});
+          if (CSRF_TOKEN && !headers.has('X-CSRFToken')) headers.set('X-CSRFToken', CSRF_TOKEN);
+          init.headers = headers;
+        }
+        return origFetch(input, init);
+      };
+    })();
+  </script>
+
+  {% block extra_js %}{% endblock %}
+</body>
+</html>

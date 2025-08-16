@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+{% block title %}Reset Password{% endblock %}
+{% block body %}
+<div class="bg" style="min-height:100dvh;padding:2rem">
+  <div class="card" style="padding:1.25rem;max-width:480px;margin-inline:auto">
+    <h2 class="brand" style="margin:0 0 1rem">Enter Code & New Password</h2>
+    <form method="post">
+      {% csrf_token %}
+      {{ form.as_p }}
+      <button class="btn" type="submit">Reset Password</button>
+      <a class="btn" href="{% url 'login' %}" style="background:#64748b">Back to login</a>
+    </form>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,99 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Time check-in</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <style>
+    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; margin: 24px; }
+    button { padding: 12px 16px; border-radius: 10px; border: 1px solid #ddd; font-size: 16px; }
+    .ok { color: #0a7f2e; } .err { color: #b00020; } .muted { color: #666; }
+    .card { border: 1px solid #eee; padding: 16px; border-radius: 12px; max-width: 520px; }
+    select, textarea { width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 8px; }
+  </style>
+</head>
+<body>
+  <h2>Time check-in</h2>
+  {% if pref_loc_name %}
+    <p class="muted">Store: <strong>{{ pref_loc_name }}</strong></p>
+  {% else %}
+    <p class="muted">No home store set on your profile. Admin should set it in Agent Profiles.</p>
+  {% endif %}
+
+  <div class="card">
+    <label>Type</label>
+    <select id="type">
+      <option value="ARRIVAL">ARRIVAL</option>
+      <option value="DEPARTURE">DEPARTURE</option>
+    </select>
+
+    <label style="margin-top:12px;">Note (optional)</label>
+    <textarea id="note" rows="2" placeholder="e.g., opening shift"></textarea>
+
+    <div style="margin-top:16px;">
+      <button id="btn">I'm at the store</button>
+    </div>
+
+    <p id="status" class="muted" style="margin-top:10px;"></p>
+  </div>
+
+  <script>
+    function getCookie(name) {
+      const m = document.cookie.match('(^|;)\\s*' + name + '\\s*=\\s*([^;]+)');
+      return m ? m.pop() : '';
+    }
+
+    const btn = document.getElementById('btn');
+    const status = document.getElementById('status');
+
+    btn.addEventListener('click', function () {
+      status.textContent = 'Getting your location…';
+      if (!navigator.geolocation) {
+        status.textContent = 'Your device does not support geolocation.';
+        status.className = 'err';
+        return;
+      }
+
+      navigator.geolocation.getCurrentPosition(async function (pos) {
+        const lat = pos.coords.latitude;
+        const lon = pos.coords.longitude;
+        const accuracy = pos.coords.accuracy;
+        const payload = {
+          type: document.getElementById('type').value,
+          lat: lat,
+          lon: lon,
+          accuracy_m: Math.round(accuracy),
+          note: document.getElementById('note').value || ''
+        };
+
+        status.textContent = 'Submitting…';
+        try {
+          const res = await fetch("/inventory/api/time-checkin/", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "X-CSRFToken": getCookie("csrftoken")
+            },
+            body: JSON.stringify(payload)
+          });
+          const data = await res.json();
+          if (res.ok && data.ok) {
+            status.className = 'ok';
+            const gf = data.within_geofence ? 'within store geofence ✅' : 'outside store geofence ⚠️';
+            status.textContent = `Saved: ${data.type} at ${data.logged_at}. Distance ≈ ${data.distance_m}m, ${gf}.`;
+          } else {
+            status.className = 'err';
+            status.textContent = data.error || 'Failed to save.';
+          }
+        } catch (e) {
+          status.className = 'err';
+          status.textContent = 'Network error.';
+        }
+      }, function (err) {
+        status.className = 'err';
+        status.textContent = 'Location error: ' + err.message;
+      }, { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 });
+    });
+  </script>
+</body>
+</html>
