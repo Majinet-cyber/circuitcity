@@ -9,3 +9,4 @@ argon2-cffi
 sentry-sdk
 python-json-logger
 Pillow
+argon2-cffi>=21.3.0
