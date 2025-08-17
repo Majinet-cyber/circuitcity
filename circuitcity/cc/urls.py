@@ -8,9 +8,9 @@ from django.views.generic import RedirectView
 from django.http import HttpResponse
 from django.shortcuts import redirect
 
-from cc import views as core_views  # home + healthz (+ optional legacy)
+from cc import views as core_views  # healthz, logout, etc.
 
-# ---- Exports & import (Phase 6/7) ----
+# ---- Exports & import ----
 from inventory.views_export import export_inventory_csv, export_audits_csv
 from inventory.views_import import import_opening_stock
 
@@ -18,20 +18,18 @@ from inventory.views_import import import_opening_stock
 try:
     from sales.views_export import export_sales_csv  # optional
 except Exception:
-    export_sales_csv = None  # route added only if available
+    export_sales_csv = None
 
 
 def robots_txt(_request):
-    """
-    Disallow indexing during beta. If you later want indexing, swap this to allow.
-    """
+    """Disallow indexing during beta."""
     return HttpResponse("User-agent: *\nDisallow: /", content_type="text/plain")
 
 
 def root_redirect(_request):
     """
-    Be robust: try inventory dashboard first (primary app), then dashboard app,
-    then inventory stock list, then admin, then login.
+    Try these in order; redirect to the first route that exists.
+    LOGIN_URL will handle auth bounce if needed.
     """
     candidates = (
         "inventory:inventory_dashboard",
@@ -62,49 +60,41 @@ urlpatterns = [
         ),
         name="login",
     ),
-    # you use a custom logout view in cc.views
     path("logout/", core_views.logout_view, name="logout"),
     path("accounts/logout/", core_views.logout_view, name="accounts_logout"),
 
-    # ---- Health / Ops ----
+    # ---- Health / robots / favicon ----
     path("healthz/", core_views.healthz, name="healthz"),
     path("robots.txt", robots_txt, name="robots_txt"),
-
-    # Serve favicon from STATIC (nice for browsers and uptime tools)
     path("favicon.ico", RedirectView.as_view(url=f"{settings.STATIC_URL}favicon.ico", permanent=False)),
 
-    # ---- Landing → robust redirect (requires auth; LOGIN_URL will handle bounce) ----
+    # ---- Landing → robust redirect ----
     path("", root_redirect, name="root"),
-]
 
-# ---- Feature: CSV exports & import helpers ----
-urlpatterns += [
+    # ---- CSV exports & import helpers ----
     path("exports/inventory.csv", export_inventory_csv, name="export_inventory_csv"),
-    path("exports/audits.csv", export_audits_csv, name="export_audits_csv"),
+    path("exports/audits.csv",    export_audits_csv,    name="export_audits_csv"),
     path("imports/opening-stock/", import_opening_stock, name="import_opening_stock"),
 ]
+
+# Optional sales export
 if export_sales_csv:
     urlpatterns.append(path("exports/sales.csv", export_sales_csv, name="export_sales_csv"))
 
 # ---- App URLConfs (namespaced) ----
-# Include only if the apps have urls.py; wrap in try/except so missing modules don't break prod.
-try:
-    urlpatterns.append(path("dashboard/", include(("dashboard.urls", "dashboard"), namespace="dashboard")))
-except Exception:
-    pass
+# Make dashboard & inventory REQUIRED so their namespaces are registered.
+urlpatterns += [
+    path("dashboard/", include(("dashboard.urls", "dashboard"), namespace="dashboard")),
+    path("inventory/", include(("inventory.urls", "inventory"), namespace="inventory")),
+]
 
-try:
-    urlpatterns.append(path("inventory/", include(("inventory.urls", "inventory"), namespace="inventory")))
-except Exception:
-    pass
-
+# Keep sales optional if that app isn’t present yet
 try:
     urlpatterns.append(path("sales/", include(("sales.urls", "sales"), namespace="sales")))
 except Exception:
     pass
 
-# ---- Static & media in DEBUG (prod handled by Nginx/Whitenoise) ----
+# ---- Static & media in DEBUG (prod served by Whitenoise) ----
 if settings.DEBUG:
     urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
-    # Serving STATIC_URL via Django in DEBUG is fine; Whitenoise handles it too.
     urlpatterns += static(settings.STATIC_URL, document_root=settings.STATIC_ROOT)
