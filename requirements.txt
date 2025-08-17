@@ -1,0 +1,11 @@
+Django>=4.2,<5
+gunicorn
+whitenoise
+dj-database-url
+psycopg2-binary
+python-dotenv
+django-redis
+argon2-cffi
+sentry-sdk
+python-json-logger
+Pillow
