@@ -1,18 +1,20 @@
-# inventory/urls.py
+# circuitcity/inventory/urls.py
 from django.urls import path
 from django.views.generic import RedirectView
 from . import views
 
+# Namespace so {% url 'inventory:...' %} works
 app_name = "inventory"
 
 urlpatterns = [
-    # Dashboard
+    # ---------- Dashboard ----------
     path("dashboard/", views.inventory_dashboard, name="inventory_dashboard"),
+    # default to dashboard
     path("", RedirectView.as_view(pattern_name="inventory:inventory_dashboard", permanent=False)),
-    # Back-compat alias so reverse('inventory:dashboard') still works
+    # back-compat alias so reverse('inventory:dashboard') still works
     path("dash/", RedirectView.as_view(pattern_name="inventory:inventory_dashboard", permanent=False), name="dashboard"),
 
-    # Stock scanning
+    # ---------- Stock scanning ----------
     path("scan-in/",   views.scan_in,   name="scan_in"),
     path("scan-sold/", views.scan_sold, name="scan_sold"),
     path("scan-web/",  views.scan_web,  name="scan_web"),  # desktop-first scanner page
@@ -22,19 +24,19 @@ urlpatterns = [
     path("sold/", RedirectView.as_view(pattern_name="inventory:scan_sold", permanent=False), name="short_sold"),
     path("scan/", RedirectView.as_view(pattern_name="inventory:scan_sold", permanent=False), name="short_scan"),
 
-    # Stock viewing
+    # ---------- Stock viewing ----------
     path("list/",   views.stock_list, name="stock_list"),
     path("stocks/", RedirectView.as_view(pattern_name="inventory:stock_list", permanent=False)),
 
-    # CSV export
+    # ---------- CSV export ----------
     path("export/", views.export_csv, name="export_csv"),
 
-    # Stock management (edit / delete / restore)
+    # ---------- Stock management ----------
     path("update/<int:pk>/",  views.update_stock,  name="update_stock"),
     path("delete/<int:pk>/",  views.delete_stock,  name="delete_stock"),
     path("restore/<int:pk>/", views.restore_stock, name="restore_stock"),
 
-    # Agent-only password reset placeholders
+    # ---------- Agent-only password reset placeholders ----------
     path("forgot/",             views.agent_forgot_password, name="agent_forgot_password"),
     path("reset/",              views.agent_reset_confirm,   name="agent_reset_confirm"),
     path("reset/<slug:token>/", views.agent_reset_confirm,   name="agent_reset_confirm_token"),
