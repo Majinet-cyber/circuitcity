@@ -3,6 +3,7 @@ Django settings for cc project.
 """
 
 from pathlib import Path
+from urllib.parse import urlparse
 import os
 import re
 import logging
@@ -17,9 +18,11 @@ def env_bool(key: str, default: bool = False) -> bool:
         return default
     return v.strip().lower() in ("1", "true", "yes", "on")
 
+
 def env_csv(key: str, default: str = "") -> list[str]:
     raw = os.environ.get(key, default)
     return [x.strip() for x in raw.split(",") if x.strip()]
+
 
 # -------------------------------------------------
 # Base paths
@@ -40,16 +43,28 @@ except Exception:
 # -------------------------------------------------
 SECRET_KEY = os.environ.get(
     "DJANGO_SECRET_KEY",
-    "django-insecure-w#o#i4apw-$iz-3sivw57n=2j6fgku@1pfqfs76@3@7)a0h$ys"  # dev fallback
+    "django-insecure-w#o#i4apw-$iz-3sivw57n=2j6fgku@1pfqfs76@3@7)a0h$ys",  # dev fallback
 )
 
-# Support both DEBUG and DJANGO_DEBUG; default True in dev
 DEBUG = env_bool("DEBUG", env_bool("DJANGO_DEBUG", True))
 TESTING = any(arg in sys.argv for arg in ("test", "pytest"))
 
-# Hosts (env override supported; support both names)
-_default_hosts = "localhost,127.0.0.1,0.0.0.0,192.168.1.104,.ngrok-free.app,.trycloudflare.com"
+# Detect Render & its external URL (available on the platform)
+RENDER = bool(os.environ.get("RENDER") or os.environ.get("RENDER_EXTERNAL_URL"))
+RENDER_EXTERNAL_URL = os.environ.get("RENDER_EXTERNAL_URL", "")
+
+# Hosts (env override supported)
+_default_hosts = "localhost,127.0.0.1,0.0.0.0,192.168.1.104,.ngrok-free.app,.trycloudflare.com,.onrender.com"
 ALLOWED_HOSTS = env_csv("ALLOWED_HOSTS", os.environ.get("DJANGO_ALLOWED_HOSTS", _default_hosts))
+
+# If Render gives us the full external URL, add its hostname explicitly
+if RENDER_EXTERNAL_URL:
+    parsed = urlparse(RENDER_EXTERNAL_URL)
+    host = parsed.netloc
+    if host and host not in ALLOWED_HOSTS:
+        ALLOWED_HOSTS.append(host)
+if ".onrender.com" not in ALLOWED_HOSTS:
+    ALLOWED_HOSTS.append(".onrender.com")
 
 # Force-SSL toggle (lets you run DEBUG=False on HTTP during LAN pilots)
 FORCE_SSL = env_bool("FORCE_SSL", env_bool("DJANGO_FORCE_SSL", False))
@@ -90,28 +105,35 @@ CSRF_COOKIE_NAME = os.environ.get("CSRF_COOKIE_NAME", "cc_csrftoken")
 CSRF_COOKIE_HTTPONLY = True
 SESSION_COOKIE_HTTPONLY = True
 SESSION_EXPIRE_AT_BROWSER_CLOSE = True
-SESSION_COOKIE_SAMESITE = "Lax"
-CSRF_COOKIE_SAMESITE = "Lax"
+SESSION_COOKIE_SAMESITE = os.environ.get("SESSION_COOKIE_SAMESITE", "Lax")
+CSRF_COOKIE_SAMESITE = os.environ.get("CSRF_COOKIE_SAMESITE", "Lax")
 SESSION_COOKIE_AGE = 60 * 60 * 4  # 4 hours
 
 # CSRF Trusted Origins (Django 4+ requires scheme prefixes)
-_default_csrf = ",".join([
-    "http://localhost",
-    "http://127.0.0.1",
-    "http://0.0.0.0",
-    "http://192.168.1.104",
-    "https://*.ngrok-free.app",
-    "https://*.trycloudflare.com",
-])
+_default_csrf = ",".join(
+    [
+        "http://localhost",
+        "http://127.0.0.1",
+        "http://0.0.0.0",
+        "http://192.168.1.104",
+        "https://*.ngrok-free.app",
+        "https://*.trycloudflare.com",
+        "https://*.onrender.com",
+    ]
+)
 _csrf_from_primary = os.environ.get("CSRF_TRUSTED_ORIGINS")
 _csrf_from_legacy = os.environ.get("DJANGO_CSRF_TRUSTED_ORIGINS", _default_csrf)
 CSRF_TRUSTED_ORIGINS = env_csv("CSRF_TRUSTED_ORIGINS", _csrf_from_primary or _csrf_from_legacy)
+
+# Include full external URL if provided (must be a full scheme URL)
+if RENDER_EXTERNAL_URL and RENDER_EXTERNAL_URL not in CSRF_TRUSTED_ORIGINS:
+    CSRF_TRUSTED_ORIGINS.append(RENDER_EXTERNAL_URL)
 
 # -------------------------------------------------
 # Safer uploads & request size limits
 # -------------------------------------------------
 DATA_UPLOAD_MAX_MEMORY_SIZE = 10 * 1024 * 1024  # 10 MB
-FILE_UPLOAD_MAX_MEMORY_SIZE = 5 * 1024 * 1024   # 5 MB
+FILE_UPLOAD_MAX_MEMORY_SIZE = 5 * 1024 * 1024  # 5 MB
 FILE_UPLOAD_HANDLERS = [
     "django.core.files.uploadhandler.MemoryFileUploadHandler",
     "django.core.files.uploadhandler.TemporaryFileUploadHandler",
@@ -130,14 +152,12 @@ INSTALLED_APPS = [
     "django.contrib.sessions",
     "django.contrib.messages",
     "django.contrib.staticfiles",
-
     # Helpful (optional)
     "django.contrib.humanize",
-
     # Your apps
-    "inventory",   # (Once you add apps.py, you can switch to "inventory.apps.InventoryConfig")
-    "sales",       # (…and "sales.apps.SalesConfig")
-    "dashboard",   # dashboards (admin + agent)
+    "inventory",
+    "sales",
+    "dashboard",
     # 'reports' is a plain Python package (helpers only).
 ]
 
@@ -149,18 +169,14 @@ MIDDLEWARE = [
     # WhiteNoise: serve versioned static files when DEBUG=False
     "whitenoise.middleware.WhiteNoiseMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
-
     # ---- Observability middlewares (you created cc/middleware.py) ----
     "cc.middleware.RequestIDMiddleware",
     "cc.middleware.AccessLogMiddleware",
-
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
-
     # ---- Phase 6: enforce Auditor read-only on POST/PUT/PATCH/DELETE ----
     "inventory.middleware.AuditorReadOnlyMiddleware",
-
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
 ]
@@ -190,8 +206,9 @@ WSGI_APPLICATION = "cc.wsgi.application"
 # -------------------------------------------------
 # Database
 # -------------------------------------------------
-# Prefer DATABASE_URL (PaaS), then POSTGRES_*/DB_* fallbacks, else SQLite
-DATABASES = {}
+# Prefer DATABASE_URL (PaaS), then POSTGRES_*/DB_* fallbacks, else SQLite.
+# On Render, put SQLite in /var/tmp so it's writable (code dir is read-only).
+DATABASES: dict = {}
 
 _db_from_url = os.environ.get("DATABASE_URL", "")
 if _db_from_url:
@@ -199,11 +216,10 @@ if _db_from_url:
         import dj_database_url  # type: ignore
         DATABASES["default"] = dj_database_url.parse(
             _db_from_url,
-            conn_max_age=60,
-            ssl_require=USE_SSL,
+            conn_max_age=600,
+            ssl_require=False,  # Render internal Postgres is on private network
         )
     except Exception:
-        # fall through to manual envs if package not installed or parse fails
         pass
 
 if "default" not in DATABASES:
@@ -216,25 +232,21 @@ if "default" not in DATABASES:
         HOST = os.environ.get("POSTGRES_HOST") or os.environ.get("DB_HOST", "127.0.0.1")
         PORT = os.environ.get("POSTGRES_PORT") or os.environ.get("DB_PORT", "5432")
 
-        DATABASES = {
-            "default": {
-                "ENGINE": "django.db.backends.postgresql",
-                "NAME": NAME,
-                "USER": USER,
-                "PASSWORD": PASSWORD,
-                "HOST": HOST,
-                "PORT": PORT,
-                "CONN_MAX_AGE": 60,
-                # Optionally enforce TLS to DB in prod environments that support it
-                "OPTIONS": {"sslmode": "require"} if USE_SSL and HOST not in ("localhost", "127.0.0.1") else {},
-            }
+        DATABASES["default"] = {
+            "ENGINE": "django.db.backends.postgresql",
+            "NAME": NAME,
+            "USER": USER,
+            "PASSWORD": PASSWORD,
+            "HOST": HOST,
+            "PORT": PORT,
+            "CONN_MAX_AGE": 600,
+            "OPTIONS": {"sslmode": "require"} if USE_SSL and HOST not in ("localhost", "127.0.0.1") else {},
         }
     else:
-        DATABASES = {
-            "default": {
-                "ENGINE": "django.db.backends.sqlite3",
-                "NAME": BASE_DIR / "db.sqlite3",
-            }
+        sqlite_path = "/var/tmp/db.sqlite3" if RENDER else str(BASE_DIR / "db.sqlite3")
+        DATABASES["default"] = {
+            "ENGINE": "django.db.backends.sqlite3",
+            "NAME": sqlite_path,
         }
 
 # -------------------------------------------------
@@ -272,9 +284,14 @@ AUTH_PASSWORD_VALIDATORS = [
     {"NAME": "django.contrib.auth.password_validation.NumericPasswordValidator"},
 ]
 
+# TEMPORARILY force PBKDF2 only (avoid Argon2 env/package mismatch while fixing login)
 PASSWORD_HASHERS = [
-    "django.contrib.auth.hashers.Argon2PasswordHasher",
     "django.contrib.auth.hashers.PBKDF2PasswordHasher",
+]
+
+# Be explicit (default backend) to avoid surprises
+AUTHENTICATION_BACKENDS = [
+    "django.contrib.auth.backends.ModelBackend",
 ]
 
 # -------------------------------------------------
@@ -313,7 +330,7 @@ WHITENOISE_AUTOREFRESH = DEBUG
 # Auth redirects
 # -------------------------------------------------
 LOGIN_URL = "login"
-LOGIN_REDIRECT_URL = "dashboard:agent_dashboard"   # namespaced url name
+LOGIN_REDIRECT_URL = "dashboard:agent_dashboard"  # namespaced url name
 LOGOUT_REDIRECT_URL = "login"
 
 # -------------------------------------------------
@@ -362,10 +379,11 @@ class RedactIMEIFilter(logging.Filter):
             pass
         return True
 
+
 USE_JSON_LOGS = env_bool("USE_JSON_LOGS", True) and not DEBUG
 
 _json_formatter = {
-    "()" : "pythonjsonlogger.jsonlogger.JsonFormatter",
+    "()": "pythonjsonlogger.jsonlogger.JsonFormatter",
     "fmt": "%(asctime)s %(levelname)s %(name)s %(message)s",
 }
 

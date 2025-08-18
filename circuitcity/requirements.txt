@@ -34,4 +34,6 @@ whitenoise==6.9.0
 xyzservices==2025.1.0
 requests>=2.31,<3
 beautifulsoup4>=4.12,<5
+dj-database-url>=2.1
+psycopg2-binary>=2.9
 
