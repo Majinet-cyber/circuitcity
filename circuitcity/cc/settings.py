@@ -53,6 +53,10 @@ TESTING = any(arg in sys.argv for arg in ("test", "pytest"))
 RENDER = bool(os.environ.get("RENDER") or os.environ.get("RENDER_EXTERNAL_URL"))
 RENDER_EXTERNAL_URL = os.environ.get("RENDER_EXTERNAL_URL", "")
 
+# Optional: custom domain + explicit live host (to be safe with CSRF)
+APP_DOMAIN = os.environ.get("APP_DOMAIN", "").strip()            # e.g. app.circuitcity.mw
+LIVE_HOST = os.environ.get("LIVE_HOST", "").strip()              # e.g. circuitcity-main.onrender.com
+
 # Hosts (env override supported)
 _default_hosts = "localhost,127.0.0.1,0.0.0.0,192.168.1.104,.ngrok-free.app,.trycloudflare.com,.onrender.com"
 ALLOWED_HOSTS = env_csv("ALLOWED_HOSTS", os.environ.get("DJANGO_ALLOWED_HOSTS", _default_hosts))
@@ -63,8 +67,16 @@ if RENDER_EXTERNAL_URL:
     host = parsed.netloc
     if host and host not in ALLOWED_HOSTS:
         ALLOWED_HOSTS.append(host)
+
+# Always include the Render wildcard too
 if ".onrender.com" not in ALLOWED_HOSTS:
     ALLOWED_HOSTS.append(".onrender.com")
+
+# Optional explicit hosts (handy if envs are set)
+if LIVE_HOST and LIVE_HOST not in ALLOWED_HOSTS:
+    ALLOWED_HOSTS.append(LIVE_HOST)
+if APP_DOMAIN and APP_DOMAIN not in ALLOWED_HOSTS:
+    ALLOWED_HOSTS.append(APP_DOMAIN)
 
 # Force-SSL toggle (lets you run DEBUG=False on HTTP during LAN pilots)
 FORCE_SSL = env_bool("FORCE_SSL", env_bool("DJANGO_FORCE_SSL", False))
@@ -109,7 +121,7 @@ SESSION_COOKIE_SAMESITE = os.environ.get("SESSION_COOKIE_SAMESITE", "Lax")
 CSRF_COOKIE_SAMESITE = os.environ.get("CSRF_COOKIE_SAMESITE", "Lax")
 SESSION_COOKIE_AGE = 60 * 60 * 4  # 4 hours
 
-# CSRF Trusted Origins (Django 4+ requires scheme prefixes)
+# ---- CSRF Trusted Origins (must include scheme) ----
 _default_csrf = ",".join(
     [
         "http://localhost",
@@ -125,9 +137,24 @@ _csrf_from_primary = os.environ.get("CSRF_TRUSTED_ORIGINS")
 _csrf_from_legacy = os.environ.get("DJANGO_CSRF_TRUSTED_ORIGINS", _default_csrf)
 CSRF_TRUSTED_ORIGINS = env_csv("CSRF_TRUSTED_ORIGINS", _csrf_from_primary or _csrf_from_legacy)
 
-# Include full external URL if provided (must be a full scheme URL)
-if RENDER_EXTERNAL_URL and RENDER_EXTERNAL_URL not in CSRF_TRUSTED_ORIGINS:
-    CSRF_TRUSTED_ORIGINS.append(RENDER_EXTERNAL_URL)
+# Helper to append an origin safely
+def _add_origin(url: str):
+    if url and url not in CSRF_TRUSTED_ORIGINS:
+        CSRF_TRUSTED_ORIGINS.append(url)
+
+# 1) Add the Render external origin (scheme + host) if present
+if RENDER_EXTERNAL_URL:
+    parsed = urlparse(RENDER_EXTERNAL_URL)
+    if parsed.scheme and parsed.netloc:
+        _add_origin(f"{parsed.scheme}://{parsed.netloc}")
+
+# 2) Explicitly add your live host (e.g., circuitcity-main.onrender.com) if provided
+if LIVE_HOST:
+    _add_origin(f"https://{LIVE_HOST}")
+
+# 3) Add custom domain origin if provided
+if APP_DOMAIN:
+    _add_origin(f"https://{APP_DOMAIN}")
 
 # -------------------------------------------------
 # Safer uploads & request size limits
