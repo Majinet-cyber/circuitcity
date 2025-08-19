@@ -46,6 +46,15 @@ from sales.models import Sale
 # Optional Carlcare client (guarded by feature flag)
 from .warranty import CarlcareClient
 
+# ---- Dashboard cache version (signals should bump this).
+# If you created inventory/cache_utils.py with a proper counter, we'll use it.
+# Otherwise this fallback keeps the code working.
+try:
+    from .cache_utils import get_dashboard_cache_version
+except Exception:
+    def get_dashboard_cache_version() -> int:
+        return 1
+
 User = get_user_model()
 
 # -----------------------
@@ -478,7 +487,9 @@ def inventory_dashboard(request):
     today = timezone.localdate()
     month_start = today.replace(day=1)
 
-    cache_key = f"dash:v1:u{request.user.id}:p:{period}:m:{model_id or 'all'}"
+    # include cache version so numbers refresh after signals bump it
+    ver = get_dashboard_cache_version()
+    cache_key = f"dash:v{ver}:u{request.user.id}:p:{period}:m:{model_id or 'all'}"
     cached = cache.get(cache_key)
     if cached:
         return render(request, "inventory/dashboard.html", cached)
@@ -496,6 +507,11 @@ def inventory_dashboard(request):
     if model_id:
         sales_qs = sales_qs.filter(item__product_id=model_id)
         items_qs = items_qs.filter(product_id=model_id)
+
+    # Header chip counts
+    today_count    = sales_qs.filter(sold_at__date=today).count()
+    mtd_count      = sales_qs.filter(sold_at__date__gte=month_start, sold_at__date__lte=today).count()
+    all_time_count = sales_qs.count()
 
     commission_expr = ExpressionWrapper(
         F("price") * (F("commission_pct") / 100.0),
@@ -664,6 +680,11 @@ def inventory_dashboard(request):
         "jug_fill_pct": jug_fill_pct,
         "jug_color": jug_color,
         "is_manager_or_admin": _is_manager_or_admin(request.user),
+
+        # Header chips
+        "today_count": today_count,
+        "mtd_count": mtd_count,
+        "all_time_count": all_time_count,
 
         # Wallet chip (current user)
         "wallet": {
@@ -895,7 +916,8 @@ def api_sales_trend(request):
     period = request.GET.get("period", "month")
     metric = request.GET.get("metric", "amount")  # amount|count
 
-    key = f"api:sales_trend:v1:u{request.user.id}:p:{period}:m:{metric}"
+    ver = get_dashboard_cache_version()
+    key = f"api:sales_trend:v{ver}:u{request.user.id}:p:{period}:m:{metric}"
 
     def _build():
         today = timezone.localdate()
@@ -933,7 +955,8 @@ def api_top_models(request):
     Query: ?period=today|month
     """
     period = request.GET.get("period", "today")
-    key = f"api:top_models:v1:u{request.user.id}:p:{period}"
+    ver = get_dashboard_cache_version()
+    key = f"api:top_models:v{ver}:u{request.user.id}:p:{period}"
 
     def _build():
         today = timezone.localdate()
@@ -971,7 +994,8 @@ def api_profit_bar(request):
     """
     month_str = request.GET.get("month")
     group_by = request.GET.get("group_by")  # 'model' or None
-    key = f"api:profit_bar:v1:u{request.user.id}:m:{month_str or 'curr'}:g:{group_by or 'none'}"
+    ver = get_dashboard_cache_version()
+    key = f"api:profit_bar:v{ver}:u{request.user.id}:m:{month_str or 'curr'}:g:{group_by or 'none'}"
 
     def _build():
         today = timezone.localdate()
@@ -1026,7 +1050,8 @@ def api_agent_trend(request):
     months = int(request.GET.get("months", 6))
     metric = request.GET.get("metric", "sales")
     agent_id = request.GET.get("agent")
-    key = f"api:agent_trend:v1:u{request.user.id}:mo:{months}:met:{metric}:a:{agent_id or 'all'}"
+    ver = get_dashboard_cache_version()
+    key = f"api:agent_trend:v{ver}:u{request.user.id}:mo:{months}:met:{metric}:a:{agent_id or 'all'}"
 
     def _build():
         base = Sale.objects.select_related("agent", "item")
