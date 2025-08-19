@@ -28,8 +28,8 @@ from .forms import (
     ScanInForm,
     ScanSoldForm,
     InventoryItemForm,
-    AgentForgotForm,
-    AgentResetConfirmForm,
+    AgentForgotForm,        # placeholders so URLs resolve
+    AgentResetConfirmForm,  # placeholders so URLs resolve
 )
 from .models import (
     InventoryItem,
@@ -53,7 +53,7 @@ User = get_user_model()
 # -----------------------
 def _user_home_location(user):
     """Preselect the user's home location if they have an AgentProfile."""
-    prof = getattr(user, "agent_profile", None)
+    prof = getattr(user, "agent_profile", None)  # NOTE: your model uses agent_profile
     return getattr(prof, "location", None)
 
 
@@ -66,7 +66,8 @@ def _is_admin(user):
 
 
 def _is_auditor(user):
-    return user.groups.filter(name="Auditor").exists()
+    # Support both 'Auditor' and 'Auditors' group names
+    return user.groups.filter(name__in=["Auditor", "Auditors"]).exists()
 
 
 def _can_view_all(user):
@@ -79,7 +80,12 @@ def _can_edit_inventory(user):
 
 
 def _audit(item, user, action: str, details: str = ""):
-    """Create an audit row."""
+    """
+    Create an audit row if we have an item.
+    (Some callers pass item=None, e.g., wallet admin ops.)
+    """
+    if not item:
+        return
     InventoryAudit.objects.create(item=item, by_user=user, action=action, details=details or "")
 
 
@@ -121,9 +127,7 @@ def _paginate_qs(request, qs, default_per_page=50, max_per_page=200):
 
 
 def _cache_get_set(key: str, builder, ttl: int = 60):
-    """
-    Small helper for 60s server-side caching.
-    """
+    """Small helper for 60s server-side caching."""
     data = cache.get(key)
     if data is None:
         data = builder()
@@ -309,20 +313,30 @@ def scan_sold(request):
             messages.error(request, "Price must be a non-negative amount.")
             return render(request, "inventory/scan_sold.html", {"form": form})
 
-        # Persist sale
+        # Persist sale (and give audits visibility)
+        item._actor = request.user
         item.status = "SOLD"
         item.selling_price = data.get("price")
         item.current_location = data["location"]
         item.sold_at = data.get("sold_at") or timezone.now()
+
+        # If your model has sold_by, set it for clarity
+        if hasattr(item, "sold_by") and getattr(item, "sold_by", None) is None:
+            try:
+                item.sold_by = request.user
+            except Exception:
+                pass
+
         item.save()
 
+        # Create Sale; commission handling & wallet credit happen in signals
         Sale.objects.create(
             item=item,
             agent=request.user,
             location=data["location"],
             sold_at=item.sold_at,
             price=item.selling_price or 0,
-            commission_pct=data["commission_pct"],
+            commission_pct=data.get("commission_pct"),
         )
 
         _audit(item, request.user, "SOLD_FORM", "V1 flow")
@@ -386,7 +400,7 @@ def api_mark_sold(request):
         return JsonResponse({"ok": False, "error": "Item not found."}, status=404)
 
     # Idempotency: already sold → acknowledge
-    if getattr(item, "status", "") == "SOLD":
+    if str(getattr(item, "status", "")) == "SOLD":
         _audit(item, request.user, "SOLD_API_DUP", f"Duplicate mark-sold via API. Comment: {comment}")
         return JsonResponse({"ok": True, "imei": imei, "already_sold": True})
 
@@ -403,6 +417,7 @@ def api_mark_sold(request):
 
     # Update item
     updates = {"status": "SOLD"}
+    item._actor = request.user
     item.status = "SOLD"
 
     if hasattr(item, "sold_at") and not item.sold_at:
@@ -420,12 +435,19 @@ def api_mark_sold(request):
         except Exception:
             return JsonResponse({"ok": False, "error": "Invalid location id."}, status=400)
 
+    # Optional sold_by field
+    if hasattr(item, "sold_by") and getattr(item, "sold_by", None) is None:
+        try:
+            item.sold_by = request.user
+        except Exception:
+            pass
+
     item.save()
 
     # Audit trail
     _audit(item, request.user, "SOLD_API", f"via scan_web; comment={comment}")
 
-    # Create a Sale when possible (best-effort)
+    # Create a Sale when possible (best-effort); wallet handled in signals
     try:
         sale_kwargs = {
             "item": item,
@@ -723,8 +745,8 @@ def stock_list(request):
         response.write("\ufeff")
         writer = csv.writer(response)
         writer.writerow([
-            "IMEI","Product","Status","Order Price","Selling Price","Location",
-            "Agent","Received","Archived","Has Sales",
+            "IMEI", "Product", "Status", "Order Price", "Selling Price", "Location",
+            "Agent", "Received", "Archived", "Has Sales",
         ])
         for it in qs.iterator():
             product_str = str(it.product) if it.product else ""
@@ -1233,9 +1255,8 @@ def api_wallet_add_txn(request):
     memo = (payload.get("memo") or "").strip()[:200]
 
     txn = WalletTxn.objects.create(user=target, amount=amount, reason=reason, memo=memo)
-    _audit(item=None, user=request.user, action="UPDATE",
-           details=f"WALLET_TXN {txn.id} -> user {target.id}, amount={amount}, reason={reason}")
 
+    # Note: _audit requires an item, so we skip it here (admin wallet op)
     new_balance = WalletTxn.balance_for(target)
     return JsonResponse({"ok": True, "txn_id": txn.id, "balance": new_balance})
 
@@ -1291,7 +1312,7 @@ def wallet_page(request):
 
 
 # -----------------------
-# Stock management (Edit / Delete / Restore) — MISSING BEFORE
+# Stock management (Edit / Delete / Restore)
 # -----------------------
 @never_cache
 @login_required

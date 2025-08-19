@@ -1,6 +1,7 @@
 # inventory/apps.py
 import importlib
 import logging
+import os
 from django.apps import AppConfig, apps
 from django.conf import settings
 
@@ -12,14 +13,26 @@ class InventoryConfig(AppConfig):
     name = "inventory"
     verbose_name = "Inventory"
 
+    # guard to avoid accidental double-wiring if ready() is called twice
+    _signals_loaded = False
+
     def ready(self):
         """
         Wire up signal handlers if enabled.
 
         - Respects AUDIT_LOG_SETTINGS.ENABLED (defaults True).
         - Skips if the 'sales' app isn't installed (signals import depends on it).
+        - Supports env kill-switch INVENTORY_DISABLE_SIGNALS=1.
         - Never blocks app startup; logs details instead.
         """
+        if self.__class__._signals_loaded:
+            return
+
+        # Env kill-switch for ops
+        if os.environ.get("INVENTORY_DISABLE_SIGNALS") == "1":
+            logger.info("Inventory signals disabled via INVENTORY_DISABLE_SIGNALS=1.")
+            return
+
         # Feature flag
         try:
             audit_enabled = bool(getattr(settings, "AUDIT_LOG_SETTINGS", {}).get("ENABLED", True))
@@ -35,10 +48,18 @@ class InventoryConfig(AppConfig):
             logger.warning("'sales' app not installed; skipping inventory signal wiring.")
             return
 
+        # Optional: verify the Sale model is available (post-migrate ready)
+        try:
+            apps.get_model("sales", "Sale")
+        except Exception:
+            logger.warning("sales.Sale model not ready; deferring inventory signal wiring.")
+            return
+
         # Import signals (idempotent)
         try:
             importlib.import_module("inventory.signals")
             logger.debug("inventory.signals loaded successfully.")
+            self.__class__._signals_loaded = True
         except ModuleNotFoundError:
             # OK in early dev; don't crash
             if getattr(settings, "DEBUG", False):

@@ -2,23 +2,25 @@
 {% load static %}
 {% block title %}Scan IN · Inventory{% endblock %}
 
-{# Minimal fallback styles in case app.css doesn't have these #}
 {% block extra_css %}
 <style>
-  .form{display:grid;gap:14px;max-width:720px}
-  .row{display:grid;grid-template-columns:1fr auto;gap:10px;align-items:center}
+  .form{display:grid;gap:14px;max-width:880px}
+  .row{display:grid;grid-template-columns:1fr 1fr;gap:12px}
   .field{position:relative;background:#0b1020;border:1px solid var(--border,#1f2937);border-radius:12px;display:flex;align-items:center}
-  .input, .field input, .field select{flex:1;background:transparent;color:var(--text,#e5e7eb);border:0;padding:12px 14px;outline:none;font-size:16px}
-  label{font-weight:600;margin-bottom:4px;display:inline-block}
+  .field > input,
+  .field > select,
+  .field > .form-control{flex:1;background:transparent;color:var(--text,#e5e7eb);border:0;padding:12px 14px;outline:none;font-size:16px;width:100%}
+  label{font-weight:600;margin-bottom:6px;display:inline-block}
   .btn{appearance:none;border:1px solid var(--border,#1f2937);color:#fff;background:#0a1020;border-radius:10px;padding:10px 14px;cursor:pointer;font-weight:600;font-size:14px}
   .btn:hover{border-color:#2a364d}
   .btn[disabled]{opacity:.5;cursor:not-allowed}
   .btn-primary{background:linear-gradient(135deg,#22c55e,#16a34a);border-color:#065f46}
   .btn-secondary{background:#0c1430}
   .btn-sky{background:linear-gradient(135deg,#38bdf8,#0ea5e9);border-color:#075985}
-  .hint,.help-error{font-size:12px;color:#94a3b8}
+  .hint{font-size:12px;color:#94a3b8}
+  .help-error{font-size:12px;color:#fca5a5}
   .help-error[hidden]{display:none}
-  .pill{font-size:12px;color:#a7f3d0;background:rgba(16,185,129,.12);border:1px solid rgba(16,185,129,.35);padding:4px 8px;border-radius:999px}
+  .pill{font-size:12px;color:#a7f3d0;background:rgba(56,189,248,.12);border:1px solid rgba(56,189,248,.35);padding:4px 8px;border-radius:999px}
   .kbd{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;background:#0b1020;border:1px solid #1f2937;color:#cbd5e1;padding:2px 6px;border-radius:6px}
   .flex{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
   #cameraBox{margin-top:8px;display:none;background:#060a15;border:1px dashed #1e293b;border-radius:14px;padding:12px}
@@ -38,15 +40,18 @@
 
   <form method="post" novalidate class="form" data-validate>
     {% csrf_token %}
+    {% if form.non_field_errors %}
+      <div class="help-error">{{ form.non_field_errors }}</div>
+    {% endif %}
 
+    <!-- IMEI -->
     <div>
       <label for="id_imei">IMEI</label>
       <div class="field">
-        <input id="id_imei" name="imei" inputmode="numeric" autocomplete="off"
-               required minlength="12" maxlength="18" pattern="[0-9]{12,18}"
-               placeholder="Paste/scan IMEI (12–18 digits)" />
+        {{ form.imei }}
       </div>
-      <div id="imeiHelp" class="help-error" hidden>Enter a valid IMEI (12–18 digits, digits only)</div>
+      {% if form.imei.errors %}<div class="help-error">{{ form.imei.errors|striptags }}</div>{% endif %}
+      <div id="imeiHelp" class="help-error" hidden>Enter a valid IMEI (12–18 digits, digits only).</div>
       <div class="flex" style="margin-top:6px">
         <button type="button" id="pasteBtn" class="btn btn-secondary">Paste from Clipboard</button>
         <button type="button" id="camToggle" class="btn btn-sky">Start Camera</button>
@@ -65,17 +70,55 @@
       </div>
     </div>
 
-    <div>
-      <label for="id_product">Product</label>
-      <select id="id_product" name="product" class="input" required>
-        <option value="">Choose product</option>
-        {% for p in products %}
-          <option value="{{ p.id }}">{{ p.name }}</option>
-        {% endfor %}
-      </select>
-      <div class="help-error" hidden>Product is required.</div>
+    <!-- Product / Location -->
+    <div class="row">
+      <div>
+        <label for="id_product">Product</label>
+        <div class="field">
+          {{ form.product }}
+        </div>
+        {% if form.product.errors %}<div class="help-error">{{ form.product.errors|striptags }}</div>{% endif %}
+        <div class="hint">Pick the exact model.</div>
+      </div>
+
+      <div>
+        <label for="id_location">Location</label>
+        <div class="field">
+          {{ form.location }}
+        </div>
+        {% if form.location.errors %}<div class="help-error">{{ form.location.errors|striptags }}</div>{% endif %}
+        <div class="hint">Defaults to your home store if set.</div>
+      </div>
     </div>
 
+    <!-- Order price / Received date -->
+    <div class="row">
+      <div>
+        <label for="id_order_price">Order price</label>
+        <div class="field">
+          {{ form.order_price }}
+        </div>
+        {% if form.order_price.errors %}<div class="help-error">{{ form.order_price.errors|striptags }}</div>{% endif %}
+      </div>
+
+      <div>
+        <label for="id_received_at">Received date</label>
+        <div class="field">
+          {{ form.received_at }}
+        </div>
+        {% if form.received_at.errors %}<div class="help-error">{{ form.received_at.errors|striptags }}</div>{% endif %}
+      </div>
+    </div>
+
+    <!-- Assign toggle -->
+    <div class="flex">
+      <label style="display:flex;align-items:center;gap:10px;">
+        {{ form.assigned_to_me }} Assign this device to me
+      </label>
+      {% if form.assigned_to_me.errors %}<div class="help-error">{{ form.assigned_to_me.errors|striptags }}</div>{% endif %}
+    </div>
+
+    <!-- Actions -->
     <div class="flex" style="margin-top:.25rem">
       <button type="submit" id="submitBtn" class="btn btn-primary" disabled>Save</button>
       <a class="btn btn-secondary" href="{% url 'inventory:stock_list' %}">Cancel</a>
@@ -86,11 +129,11 @@
 <!-- Toast -->
 <div id="toast" class="toast" role="status" aria-live="polite"></div>
 
-{# QuaggaJS: optional barcode scanning for IMEI labels #}
+<!-- Optional: QuaggaJS for barcode scanning -->
 <script src="https://unpkg.com/quagga@0.12.1/dist/quagga.min.js"></script>
 
 <script>
-  // --- Elements
+  // Elements
   const form      = document.querySelector('form[data-validate]');
   const imeiEl    = document.getElementById('id_imei');
   const prodEl    = document.getElementById('id_product');
@@ -103,80 +146,94 @@
   const camSelect = document.getElementById('cameraSelect');
   const toast     = document.getElementById('toast');
 
-  // --- Helpers
+  // Helpers
   function showToast(msg, ok=true){
     toast.textContent = msg;
     toast.className = 'toast ' + (ok ? 'ok' : 'err');
     toast.style.display = 'block';
     setTimeout(()=> toast.style.display = 'none', 3000);
   }
-  function digitsOnly(s){ return (s||'').replace(/\\D/g,''); }
-  function isValidIMEI(s){
+  function digitsOnly(s){ return (s||'').replace(/\D/g,''); }
+  function looksLikeIMEI(s){
     s = digitsOnly(s);
-    return /^\\d{12,18}$/.test(s);
+    return /^\d{12,18}$/.test(s);
   }
   function updateValidity(){
-    const imeiValid = isValidIMEI(imeiEl.value);
-    document.getElementById('imeiHelp').hidden = imeiValid;
-    const prodValid = !!prodEl.value;
-    submitBtn.disabled = !(imeiValid && prodValid);
+    // If user typed something that isn't 12–18 digits, show a hint
+    if (imeiEl){
+      const v = digitsOnly(imeiEl.value || '');
+      const hasValue = (imeiEl.value || '').length > 0;
+      const good = looksLikeIMEI(imeiEl.value || '');
+      const help = document.getElementById('imeiHelp');
+      if (help) help.hidden = (!hasValue || good);
+    }
+    // Only block Save if Product is missing (server will double-check the rest)
+    submitBtn && (submitBtn.disabled = !(prodEl && prodEl.value));
   }
 
-  // --- Events (inline validation + keyboard UX)
-  imeiEl.addEventListener('input', (e)=>{
-    const v = digitsOnly(e.target.value);
-    e.target.value = v; // keep digits only
-    updateValidity();
-  });
-  prodEl.addEventListener('change', updateValidity);
+  // Wire up basic UX
+  if (imeiEl) {
+    imeiEl.addEventListener('input', (e)=>{
+      const v = digitsOnly(e.target.value);
+      const pos = e.target.selectionStart;
+      e.target.value = v;
+      try{ e.target.setSelectionRange(pos, pos);}catch(_){}
+      updateValidity();
+    });
+    imeiEl.addEventListener('keydown', (e)=>{
+      if(e.key==='Enter'){ e.preventDefault(); if(submitBtn && !submitBtn.disabled){ form.submit(); } }
+    });
+  }
+  if (prodEl) prodEl.addEventListener('change', updateValidity);
 
-  // Submit on Enter when focused in IMEI
-  imeiEl.addEventListener('keydown', (e)=>{ if(e.key==='Enter'){ e.preventDefault(); if(!submitBtn.disabled) form.submit(); }});
-  document.addEventListener('keydown', (e)=>{ if(e.key==='F2'){ e.preventDefault(); imeiEl.focus(); }});
-  window.addEventListener('load', ()=>{ imeiEl.focus(); updateValidity(); });
+  document.addEventListener('keydown', (e)=>{ if(e.key==='F2'){ e.preventDefault(); imeiEl && imeiEl.focus(); }});
+  window.addEventListener('load', ()=>{ imeiEl && imeiEl.focus(); updateValidity(); });
 
   // Clipboard helper
-  pasteBtn.addEventListener('click', async ()=>{
+  pasteBtn && pasteBtn.addEventListener('click', async ()=>{
     try{
       const txt = await navigator.clipboard.readText();
-      imeiEl.value = digitsOnly(txt);
-      updateValidity();
-      if(isValidIMEI(imeiEl.value) && !submitBtn.disabled){ form.submit(); }
-      else { showToast('Pasted. Press Save to submit.', true); }
+      if(!txt){ showToast('Clipboard is empty.', false); return; }
+      if (imeiEl){
+        imeiEl.value = digitsOnly(txt).slice(0,18);
+        updateValidity();
+        if(looksLikeIMEI(imeiEl.value) && submitBtn && !submitBtn.disabled){ form.submit(); }
+        else { showToast('Pasted. Press Save to submit.', true); }
+      }
     }catch{
       showToast('Clipboard blocked. Paste manually (Ctrl+V).', false);
-      imeiEl.focus();
+      imeiEl && imeiEl.focus();
     }
   });
 
-  // --- Camera / QuaggaJS (optional)
+  // Camera / QuaggaJS (optional)
   let quaggaRunning = false;
 
   async function listCameras(){
     try{
       const devices = await navigator.mediaDevices.enumerateDevices();
       const cams = devices.filter(d=> d.kind==='videoinput');
-      camSelect.innerHTML = '';
-      cams.forEach((c,i)=>{
-        const opt = document.createElement('option');
-        opt.value = c.deviceId; opt.textContent = c.label || \`Camera \${i+1}\`;
-        camSelect.appendChild(opt);
-      });
+      if (camSelect){
+        camSelect.innerHTML = '';
+        cams.forEach((c,i)=>{
+          const opt = document.createElement('option');
+          opt.value = c.deviceId; opt.textContent = c.label || `Camera ${i+1}`;
+          camSelect.appendChild(opt);
+        });
+      }
       return cams;
     }catch{return [];}
   }
 
   function startQuagga(deviceId){
-    if(quaggaRunning) return;
+    if(quaggaRunning || !window.Quagga) return;
     Quagga.init({
       inputStream: {
         type: 'LiveStream',
         target: camNode,
         constraints: { facingMode: 'environment', deviceId: deviceId || undefined, width:{ideal:1280}, height:{ideal:720} }
       },
-      decoder: {
-        readers: ['code_128_reader','ean_reader','ean_8_reader','code_39_reader','upc_reader','upc_e_reader']
-      },
+      decoder: { readers: ['code_128_reader','ean_reader','ean_8_reader','code_39_reader','upc_reader','upc_e_reader'] },
       locate: true,
       numOfWorkers: navigator.hardwareConcurrency ? Math.min(4, navigator.hardwareConcurrency) : 2
     }, (err)=>{
@@ -190,37 +247,37 @@
       if(!code || code===lastDetected) return;
       lastDetected = code;
       const numeric = digitsOnly(code);
-      if(numeric.length >= 12){
-        imeiEl.value = numeric.slice(0, 18); // accept up to 18
+      if(numeric.length >= 12 && imeiEl){
+        imeiEl.value = numeric.slice(0, 18);
         showToast('Scanned: ' + imeiEl.value, true);
         updateValidity();
-        if(isValidIMEI(imeiEl.value) && !submitBtn.disabled){ form.submit(); }
+        if(looksLikeIMEI(imeiEl.value) && submitBtn && !submitBtn.disabled){ form.submit(); }
       }
     });
   }
 
   function stopQuagga(){
-    if(!quaggaRunning) return;
+    if(!quaggaRunning || !window.Quagga) return;
     Quagga.stop(); quaggaRunning=false;
   }
 
-  camToggle.addEventListener('click', async ()=>{
+  camToggle && camToggle.addEventListener('click', async ()=>{
+    if(!camBox) return;
     if(camBox.style.display==='none' || camBox.style.display===''){
       camBox.style.display='block';
       const cams = await listCameras();
       startQuagga(cams[0] && cams[0].deviceId);
       camToggle.textContent='Restart Camera';
     }else{
-      // restart with selected camera
       stopQuagga();
-      startQuagga(camSelect.value || undefined);
+      startQuagga(camSelect && camSelect.value || undefined);
     }
   });
 
-  camStop.addEventListener('click', ()=>{
+  camStop && camStop.addEventListener('click', ()=>{
     stopQuagga();
-    camBox.style.display='none';
-    camToggle.textContent='Start Camera';
+    if (camBox) camBox.style.display='none';
+    if (camToggle) camToggle.textContent='Start Camera';
   });
 </script>
 {% endblock %}
