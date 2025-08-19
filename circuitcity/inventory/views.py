@@ -12,7 +12,7 @@ from django.db.models import (
 )
 from django.db.models.deletion import ProtectedError
 from django.db.models.functions import TruncMonth, TruncDate
-from django.http import HttpResponse, JsonResponse
+from django.http import HttpResponse, JsonResponse, HttpResponseForbidden
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 from django.views.decorators.http import require_POST, require_http_methods
@@ -477,11 +477,29 @@ def api_mark_sold(request):
 # Inventory dashboard & list
 # -----------------------
 @login_required
-def inventory_dashboard(request):
+def inventory_dashboard(request, *args, **kwargs):
     """
     Cached (60s) heavy aggregates for the dashboard.
-    Cache key includes user + filters so no cross-user leakage.
+    Supports optional agent scope via path kwarg (agent_id|user_id|pk) or ?agent_id=
+    Cache key includes user + filters + scope so no cross-user leakage.
     """
+    # ---- Scope detection (allow /dashboard/agents/<id>/ to reuse this view) ----
+    scope_id = (
+        kwargs.get("agent_id")
+        or kwargs.get("user_id")
+        or kwargs.get("pk")
+        or request.GET.get("agent_id")
+    )
+    scope_user = None
+    if scope_id:
+        try:
+            scope_user = User.objects.get(pk=int(scope_id))
+        except Exception:
+            scope_user = None
+        # Permission: only admins/managers can view others; users can view self
+        if scope_user and scope_user != request.user and not _can_view_all(request.user):
+            return HttpResponseForbidden("You do not have permission to view this dashboard.")
+
     period = request.GET.get("period", "month")
     model_id = request.GET.get("model") or None
     today = timezone.localdate()
@@ -489,40 +507,52 @@ def inventory_dashboard(request):
 
     # include cache version so numbers refresh after signals bump it
     ver = get_dashboard_cache_version()
-    cache_key = f"dash:v{ver}:u{request.user.id}:p:{period}:m:{model_id or 'all'}"
+    scope_tag = f":a:{scope_user.id}" if scope_user else ":a:self" if not _can_view_all(request.user) else ":a:all"
+    cache_key = f"dash:v{ver}{scope_tag}:u{request.user.id}:p:{period}:m:{model_id or 'all'}"
     cached = cache.get(cache_key)
     if cached:
         return render(request, "inventory/dashboard.html", cached)
 
-    if _can_view_all(request.user):
-        sales_qs = Sale.objects.select_related("item", "agent", "item__product")
-        items_qs = InventoryItem.objects.select_related("product", "assigned_agent", "current_location")
+    # ---- Base querysets (respect scope & permissions) ----
+    if scope_user:
+        base_sales = Sale.objects.select_related("item", "agent", "item__product").filter(agent=scope_user)
+        items_qs = InventoryItem.objects.select_related("product", "assigned_agent", "current_location") \
+                                        .filter(assigned_agent=scope_user)
     else:
-        sales_qs = Sale.objects.filter(agent=request.user).select_related("item", "agent", "item__product")
-        items_qs = InventoryItem.objects.filter(assigned_agent=request.user).select_related("product", "assigned_agent", "current_location")
-
-    if period == "month":
-        sales_qs = sales_qs.filter(sold_at__gte=month_start)
+        if _can_view_all(request.user):
+            base_sales = Sale.objects.select_related("item", "agent", "item__product")
+            items_qs = InventoryItem.objects.select_related("product", "assigned_agent", "current_location")
+        else:
+            base_sales = Sale.objects.select_related("item", "agent", "item__product").filter(agent=request.user)
+            items_qs = InventoryItem.objects.select_related("product", "assigned_agent", "current_location") \
+                                            .filter(assigned_agent=request.user)
 
     if model_id:
-        sales_qs = sales_qs.filter(item__product_id=model_id)
+        base_sales = base_sales.filter(item__product_id=model_id)
         items_qs = items_qs.filter(product_id=model_id)
 
-    # Header chip counts
-    today_count    = sales_qs.filter(sold_at__date=today).count()
-    mtd_count      = sales_qs.filter(sold_at__date__gte=month_start, sold_at__date__lte=today).count()
-    all_time_count = sales_qs.count()
+    # Period-filtered sales for some widgets
+    if period == "month":
+        sales_qs = base_sales.filter(sold_at__date__gte=month_start, sold_at__date__lte=today)
+    else:
+        sales_qs = base_sales
 
+    # ----- KPI counters (use base_sales, not period-filtered) -----
+    today_count    = base_sales.filter(sold_at__date=today).count()
+    mtd_count      = base_sales.filter(sold_at__date__gte=month_start, sold_at__date__lte=today).count()
+    all_time_count = base_sales.count()
+
+    # ----- Agent ranking (MTD by default) -----
     commission_expr = ExpressionWrapper(
         F("price") * (F("commission_pct") / 100.0),
         output_field=DecimalField(max_digits=14, decimal_places=2),
     )
-    agent_rank_qs = (
-        sales_qs.values("agent_id", "agent__username")
-        .annotate(total_sales=Count("id"), earnings=Sum(commission_expr), revenue=Sum("price"))
-        .order_by("-earnings", "-total_sales")
+    rank_source = base_sales.filter(sold_at__date__gte=month_start, sold_at__date__lte=today)
+    agent_rank = list(
+        rank_source.values("agent_id", "agent__username")
+                   .annotate(total_sales=Count("id"), earnings=Sum(commission_expr), revenue=Sum("price"))
+                   .order_by("-earnings", "-total_sales")
     )
-    agent_rank = list(agent_rank_qs)
 
     # ---- Wallet: per-agent aggregates for admin (balance + monthly + lifetime COM/ADV/ADJ) ----
     agent_wallet_summaries = {}
@@ -537,25 +567,25 @@ def inventory_dashboard(request):
                  lifetime_commission=Sum(Case(When(reason="COMMISSION", then="amount"),
                                               default=0, output_field=DecimalField(max_digits=14, decimal_places=2))),
                  lifetime_advance=Sum(Case(When(reason="ADVANCE", then="amount"),
-                                           default=0, output_field=DecimalField(max_digits=14, decimal_places=2))),
+                                           default=0, output_field=DecimalField(max_digits=14, decimal_places=2)))),
                  lifetime_adjustment=Sum(Case(When(reason="ADJUSTMENT", then="amount"),
-                                              default=0, output_field=DecimalField(max_digits=14, decimal_places=2))),
+                                              default=0, output_field=DecimalField(max_digits=14, decimal_places=2)))),
                  # Month per reason
                  month_commission=Sum(Case(When(reason="COMMISSION",
                                                 created_at__date__gte=month_start,
                                                 created_at__date__lte=today,
                                                 then="amount"),
-                                           default=0, output_field=DecimalField(max_digits=14, decimal_places=2))),
+                                           default=0, output_field=DecimalField(max_digits=14, decimal_places=2)))),
                  month_advance=Sum(Case(When(reason="ADVANCE",
                                              created_at__date__gte=month_start,
                                              created_at__date__lte=today,
                                              then="amount"),
-                                        default=0, output_field=DecimalField(max_digits=14, decimal_places=2))),
+                                        default=0, output_field=DecimalField(max_digits=14, decimal_places=2)))),
                  month_adjustment=Sum(Case(When(reason="ADJUSTMENT",
                                                 created_at__date__gte=month_start,
                                                 created_at__date__lte=today,
                                                 then="amount"),
-                                           default=0, output_field=DecimalField(max_digits=14, decimal_places=2))),
+                                           default=0, output_field=DecimalField(max_digits=14, decimal_places=2)))),
              )
         )
         for r in agent_wallet_rows:
@@ -578,13 +608,9 @@ def inventory_dashboard(request):
                 },
             }
 
+    # ---- Trends (last 12 months; respect scope) ----
     last_12_start = month_start - timedelta(days=365)
-    rev_qs = Sale.objects.select_related("item").filter(sold_at__gte=last_12_start)
-    if not _can_view_all(request.user):
-        rev_qs = rev_qs.filter(agent=request.user)
-    if model_id:
-        rev_qs = rev_qs.filter(item__product_id=model_id)
-
+    rev_qs = base_sales.filter(sold_at__date__gte=last_12_start, sold_at__date__lte=today)
     rev_by_month = (
         rev_qs.annotate(m=TruncMonth("sold_at")).values("m").annotate(total=Sum("price")).order_by("m")
     )
@@ -607,12 +633,13 @@ def inventory_dashboard(request):
     prof_map = {r["m"].strftime("%Y-%m"): float(r["total"] or 0) for r in prof_by_month if r["m"]}
     profit_points = [prof_map.get(lbl, 0.0) for lbl in labels]
 
+    # ---- Assigned vs sold (table) ----
     total_assigned = (
         items_qs.values("assigned_agent_id", "assigned_agent__username")
         .annotate(total_stock=Count("id"))
         .order_by("assigned_agent__username")
     )
-    sold_units = sales_qs.values("agent_id").annotate(sold=Count("id"))
+    sold_units = base_sales.values("agent_id").annotate(sold=Count("id"))
     sold_map = {r["agent_id"]: r["sold"] for r in sold_units}
     agent_rows = []
     for row in total_assigned:
@@ -623,12 +650,14 @@ def inventory_dashboard(request):
             "sold_units": sold_map.get(row["assigned_agent_id"], 0),
         })
 
+    # ---- Pie (revenue/cost/profit for selected period) ----
     cost_expr = ExpressionWrapper(F("item__order_price"), output_field=DecimalField(max_digits=14, decimal_places=2))
     totals = sales_qs.aggregate(revenue=Sum("price"), cost=Sum(cost_expr), profit=Sum(profit_expr))
     pie_revenue = float(totals.get("revenue") or 0)
     pie_cost = float(totals.get("cost") or 0)
     pie_profit = float(totals.get("profit") or 0)
 
+    # ---- Jug / battery ----
     in_stock_qs = items_qs.filter(status="IN_STOCK")
     jug_count = in_stock_qs.count()
     jug_fill_pct = min(100, int(round((jug_count / 100.0) * 100))) if jug_count > 0 else 0
@@ -669,16 +698,26 @@ def inventory_dashboard(request):
         "period": period,
         "model_id": int(model_id) if model_id else None,
         "products": list(products),
+
+        # Agent scope (optional)
+        "scope_user": scope_user,
+
+        # Rankings & tables
         "agent_rank": agent_rank,
         "agent_wallet_summaries": agent_wallet_summaries,  # per-agent wallet (admin use)
+
+        # Charts
         "labels_json": json.dumps(labels),
         "revenue_points_json": json.dumps(revenue_points),
         "profit_points_json": json.dumps(profit_points),
         "agent_rows": agent_rows,
         "pie_data_json": json.dumps([pie_cost, pie_revenue, pie_profit]),
+
+        # Stock jug
         "jug_count": jug_count,
         "jug_fill_pct": jug_fill_pct,
         "jug_color": jug_color,
+
         "is_manager_or_admin": _is_manager_or_admin(request.user),
 
         # Header chips
