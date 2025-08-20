@@ -9,13 +9,18 @@ app_name = "inventory"
 urlpatterns = [
     # ---------- Dashboard ----------
     path("dashboard/", views.inventory_dashboard, name="inventory_dashboard"),
-    # default to dashboard
+
+    # Aliases / legacy
     path("", RedirectView.as_view(pattern_name="inventory:inventory_dashboard", permanent=False)),
-    # back-compat alias so reverse('inventory:dashboard') still works
     path("dash/", RedirectView.as_view(pattern_name="inventory:inventory_dashboard", permanent=False), name="dashboard"),
+    # Handle old links like /dashboard/agent/ → main dashboard
+    path("dashboard/agent/", RedirectView.as_view(pattern_name="inventory:inventory_dashboard", permanent=False),
+         name="inventory_dashboard_agent"),
+    path("dashboard/agents/", RedirectView.as_view(pattern_name="inventory:inventory_dashboard", permanent=False)),
 
     # ---------- Stock scanning ----------
-    path("scan-in/",   views.scan_in,   name="scan_in"),
+    path("scan-in/",   views.scan_in,   name="scan_in")
+,
     path("scan-sold/", views.scan_sold, name="scan_sold"),
     path("scan-web/",  views.scan_web,  name="scan_web"),  # desktop-first scanner page
 
@@ -50,12 +55,12 @@ urlpatterns = [
 
 # ---------- API: Time, Wallet, Charts ----------
 urlpatterns += [
-    path("api/mark-sold/",       views.api_mark_sold,       name="api_mark_sold"),
-    path("api/sales-trend/",     views.api_sales_trend,     name="api_sales_trend"),
-    path("api/top-models/",      views.api_top_models,      name="api_top_models"),
-    path("api/profit-bar/",      views.api_profit_bar,      name="api_profit_bar"),
-    path("api/agent-trend/",     views.api_agent_trend,     name="api_agent_trend"),
-    path("api/time-checkin/",    views.api_time_checkin,    name="api_time_checkin"),
-    path("api/wallet-summary/",  views.api_wallet_balance,  name="api_wallet_summary"),
-    path("api/wallet-txn/",      views.api_wallet_txn,      name="api_wallet_add_txn"),
+    path("api/mark-sold/",       views.api_mark_sold,        name="api_mark_sold"),
+    path("api/sales-trend/",     views.api_sales_trend,      name="api_sales_trend"),
+    path("api/top-models/",      views.api_top_models,       name="api_top_models"),
+    path("api/profit-bar/",      views.api_profit_bar,       name="api_profit_bar"),
+    path("api/agent-trend/",     views.api_agent_trend,      name="api_agent_trend"),
+    path("api/time-checkin/",    views.api_time_checkin,     name="api_time_checkin"),
+    path("api/wallet-summary/",  views.api_wallet_summary,   name="api_wallet_summary"),
+    path("api/wallet-txn/",      views.api_wallet_add_txn,   name="api_wallet_add_txn"),
 ]
