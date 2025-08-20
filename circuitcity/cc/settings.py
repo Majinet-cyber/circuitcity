@@ -24,6 +24,13 @@ def env_csv(key: str, default: str = "") -> list[str]:
     return [x.strip() for x in raw.split(",") if x.strip()]
 
 
+def env_int(key: str, default: int) -> int:
+    try:
+        return int(os.environ.get(key, "").strip())
+    except Exception:
+        return default
+
+
 # -------------------------------------------------
 # Base paths
 # -------------------------------------------------
@@ -99,7 +106,7 @@ SESSION_COOKIE_SECURE = USE_SSL
 CSRF_COOKIE_SECURE = USE_SSL
 
 if USE_SSL:
-    SECURE_HSTS_SECONDS = int(os.environ.get("SECURE_HSTS_SECONDS", 31536000))  # 1 year
+    SECURE_HSTS_SECONDS = env_int("SECURE_HSTS_SECONDS", 31536000)  # 1 year
     SECURE_HSTS_INCLUDE_SUBDOMAINS = True
     SECURE_HSTS_PRELOAD = True
 
@@ -231,34 +238,39 @@ TEMPLATES = [
 WSGI_APPLICATION = "cc.wsgi.application"
 
 # -------------------------------------------------
-# Database
+# Database — final, no-more-circles version
 # -------------------------------------------------
-# Prefer DATABASE_URL (PaaS), then POSTGRES_*/DB_* fallbacks, else SQLite.
-# On Render, put SQLite in /var/tmp so it's writable (code dir is read-only).
+# Rules:
+#  - If USE_LOCAL_SQLITE=1 (or DEBUG=True by default): SQLite.
+#  - Else if DATABASE_URL present: use it.
+#  - Else if Postgres env provided (and FORCE_POSTGRES=1 or not DEBUG): use Postgres.
+#  - Else: SQLite.
 DATABASES: dict = {}
 
-_db_from_url = os.environ.get("DATABASE_URL", "")
-if _db_from_url:
-    try:
-        import dj_database_url  # type: ignore
-        DATABASES["default"] = dj_database_url.parse(
-            _db_from_url,
-            conn_max_age=600,
-            ssl_require=False,  # Render internal Postgres is on private network
-        )
-    except Exception:
-        pass
+USE_LOCAL_SQLITE = env_bool("USE_LOCAL_SQLITE", default=DEBUG)
+FORCE_POSTGRES = env_bool("FORCE_POSTGRES", default=False)
+DATABASE_URL = os.environ.get("DATABASE_URL", "")
 
-if "default" not in DATABASES:
-    if os.environ.get("DB_ENGINE", "").lower() == "postgres" or (
-        os.environ.get("POSTGRES_DB") or os.environ.get("DB_NAME")
-    ):
+if USE_LOCAL_SQLITE:
+    sqlite_path = "/var/tmp/db.sqlite3" if RENDER else str(BASE_DIR / "db.sqlite3")
+    DATABASES["default"] = {"ENGINE": "django.db.backends.sqlite3", "NAME": sqlite_path}
+else:
+    if DATABASE_URL:
+        try:
+            import dj_database_url  # type: ignore
+            DATABASES["default"] = dj_database_url.parse(
+                DATABASE_URL, conn_max_age=600, ssl_require=False
+            )
+        except Exception:
+            # Fallback if dj-database-url not installed
+            pass
+
+    if "default" not in DATABASES and (FORCE_POSTGRES or os.environ.get("POSTGRES_DB") or os.environ.get("DB_NAME")):
         NAME = os.environ.get("POSTGRES_DB") or os.environ.get("DB_NAME", "circuitcity")
         USER = os.environ.get("POSTGRES_USER") or os.environ.get("DB_USER", "ccuser")
         PASSWORD = os.environ.get("POSTGRES_PASSWORD") or os.environ.get("DB_PASSWORD", "")
         HOST = os.environ.get("POSTGRES_HOST") or os.environ.get("DB_HOST", "127.0.0.1")
         PORT = os.environ.get("POSTGRES_PORT") or os.environ.get("DB_PORT", "5432")
-
         DATABASES["default"] = {
             "ENGINE": "django.db.backends.postgresql",
             "NAME": NAME,
@@ -267,27 +279,24 @@ if "default" not in DATABASES:
             "HOST": HOST,
             "PORT": PORT,
             "CONN_MAX_AGE": 600,
-            "OPTIONS": {"sslmode": "require"} if USE_SSL and HOST not in ("localhost", "127.0.0.1") else {},
+            "OPTIONS": {"connect_timeout": 5, **({"sslmode": "require"} if USE_SSL and HOST not in ("localhost","127.0.0.1") else {})},
         }
-    else:
+
+    if "default" not in DATABASES:
         sqlite_path = "/var/tmp/db.sqlite3" if RENDER else str(BASE_DIR / "db.sqlite3")
-        DATABASES["default"] = {
-            "ENGINE": "django.db.backends.sqlite3",
-            "NAME": sqlite_path,
-        }
+        DATABASES["default"] = {"ENGINE": "django.db.backends.sqlite3", "NAME": sqlite_path}
 
 # -------------------------------------------------
 # Caching (60s default; Redis if REDIS_URL provided)
 # -------------------------------------------------
-CACHE_TTL_DEFAULT = int(os.environ.get("CACHE_TTL_DEFAULT", 60))
+CACHE_TTL_DEFAULT = env_int("CACHE_TTL_DEFAULT", 60)
 REDIS_URL = os.environ.get("REDIS_URL", "")
 
 if REDIS_URL:
-    # pip install django-redis
     CACHES = {
         "default": {
             "BACKEND": "django_redis.cache.RedisCache",
-            "LOCATION": REDIS_URL,  # e.g. redis://127.0.0.1:6379/1
+            "LOCATION": REDIS_URL,
             "OPTIONS": {"CLIENT_CLASS": "django_redis.client.DefaultClient"},
             "TIMEOUT": CACHE_TTL_DEFAULT,
         }
@@ -374,12 +383,12 @@ if DEBUG and not USE_SMTP_IN_DEBUG:
 else:
     EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
     EMAIL_HOST = os.environ.get("EMAIL_HOST", "smtp.gmail.com")
-    EMAIL_PORT = int(os.environ.get("EMAIL_PORT", 587))
+    EMAIL_PORT = env_int("EMAIL_PORT", 587)
     EMAIL_USE_TLS = env_bool("EMAIL_USE_TLS", True)
     EMAIL_HOST_USER = os.environ.get("EMAIL_HOST_USER", "")
     EMAIL_HOST_PASSWORD = os.environ.get("EMAIL_HOST_PASSWORD", "")
     DEFAULT_FROM_EMAIL = os.environ.get("DEFAULT_FROM_EMAIL", EMAIL_HOST_USER or "noreply@example.com")
-    EMAIL_TIMEOUT = int(os.environ.get("EMAIL_TIMEOUT", 10))
+    EMAIL_TIMEOUT = env_int("EMAIL_TIMEOUT", 10)
 
 # Recipients for the daily low-stock digest (Phase 6)
 LOW_STOCK_ALERT_RECIPIENTS = [
@@ -473,8 +482,8 @@ V1_SIMPLE_DASHBOARD = True
 WARRANTY_CHECK_ENABLED = env_bool("WARRANTY_CHECK_ENABLED", False)
 
 WARRANTY_ENFORCE_COUNTRY = env_bool("WARRANTY_ENFORCE_COUNTRY", True)
-ACTIVATION_ALERT_MINUTES = int(os.environ.get("ACTIVATION_ALERT_MINUTES", 15))
-WARRANTY_REQUEST_TIMEOUT = int(os.environ.get("WARRANTY_REQUEST_TIMEOUT", 12))
+ACTIVATION_ALERT_MINUTES = env_int("ACTIVATION_ALERT_MINUTES", 15)
+WARRANTY_REQUEST_TIMEOUT = env_int("WARRANTY_REQUEST_TIMEOUT", 12)
 
 # ---- Phase 6 feature toggles (optional; handy for pilots) ----
 FEATURES = {
@@ -485,7 +494,7 @@ FEATURES = {
 }
 
 # Max safe expansion (units) per CSV row when quantity is given without serials
-DATA_IMPORT_MAX_EXPANSION = int(os.environ.get("DATA_IMPORT_MAX_EXPANSION", 5000))
+DATA_IMPORT_MAX_EXPANSION = env_int("DATA_IMPORT_MAX_EXPANSION", 5000)
 
 # -------------------------------------------------
 # Sentry (optional; enabled only if SENTRY_DSN is set)

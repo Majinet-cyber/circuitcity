@@ -26,7 +26,13 @@
           </label>
           <input class="input" id="username-input" name="username" type="text"
                  required autocomplete="username" autofocus
-                 value="{{ form.username.value|default_if_none:'' }}">
+                 value="{{ form.username.value|default_if_none:'' }}"
+                 aria-invalid="{{ form.username.errors|yesno:'true,false' }}">
+          {% if form.username.errors %}
+            <div class="small" style="color:#b91c1c;margin-top:.25rem;">
+              {{ form.username.errors.0 }}
+            </div>
+          {% endif %}
         </div>
 
         <!-- Password + show/hide -->
@@ -36,11 +42,17 @@
           </label>
           <div style="display:flex;gap:.5rem;align-items:center">
             <input class="input" id="password-input" name="password" type="password"
-                   required autocomplete="current-password">
+                   required autocomplete="current-password"
+                   aria-invalid="{{ form.password.errors|yesno:'true,false' }}">
             <button type="button" class="btn" id="toggle-pass" aria-controls="password-input" aria-pressed="false">
               Show
             </button>
           </div>
+          {% if form.password.errors %}
+            <div class="small" style="color:#b91c1c;margin-top:.25rem;">
+              {{ form.password.errors.0 }}
+            </div>
+          {% endif %}
           <div style="margin-top:.35rem">
             <a href="{% url 'inventory:agent_forgot_password' %}" style="font-size:.95rem;text-decoration:none;color:#2563eb">
               Forgot your password?
@@ -48,9 +60,9 @@
           </div>
         </div>
 
-        <!-- Stay signed in -->
+        <!-- Stay signed in (requires server-side support to change session expiry) -->
         <div style="display:flex;gap:.5rem;align-items:center">
-          <input type="checkbox" id="remember" name="remember" value="1">
+          <input type="checkbox" id="remember" name="remember" value="1" {% if request.POST.remember %}checked{% endif %}>
           <label for="remember" style="color:#334155;">Stay signed in for 14 days</label>
         </div>
 
