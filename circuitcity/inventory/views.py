@@ -10,7 +10,7 @@ from django.db import transaction, connection
 from django.db.models import (
     Sum, Q, Exists, OuterRef, Count, F, DecimalField, ExpressionWrapper, Case, When, Value
 )
-from django.db.models.functions import TruncMonth, TruncDate, Cast
+from django.db.models.functions import TruncMonth, TruncDate, Cast, Coalesce  # ← added Coalesce
 from django.http import HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.template.exceptions import TemplateDoesNotExist
@@ -21,7 +21,7 @@ from django.views.decorators.http import require_POST, require_http_methods
 import csv
 import json
 import math
-from datetime import timedelta, datetime
+from datetime import timedelta, datetime, date
 from urllib.parse import urlencode
 
 # Forms
@@ -434,6 +434,7 @@ def inventory_dashboard(request):
             request, cached, today, cached.get("mtd_count", 0), cached.get("all_time_count", 0)
         )
 
+    # Scope for KPIs and stock widgets (respect permissions)
     if _can_view_all(request.user):
         sales_qs_all = Sale.objects.select_related("item", "agent", "item__product")
         items_qs = InventoryItem.objects.select_related("product", "assigned_agent", "current_location")
@@ -455,24 +456,35 @@ def inventory_dashboard(request):
     mtd_count = sales_qs_all.filter(sold_at__gte=month_start, sold_at__lt=tomorrow).count()
     all_time_count = sales_qs_all.count()
 
-    # ---- commission & revenue summaries (decimal-safe) ----
+    # ---- Agent ranking (ALL agents, ordered by earnings desc then sales desc) ----
     dec2 = DecimalField(max_digits=14, decimal_places=2)
     pct_dec = DecimalField(max_digits=5, decimal_places=2)
 
+    rank_base = Sale.objects.select_related("agent")
+    if model_id:
+        rank_base = rank_base.filter(item__product_id=model_id)
+    if period == "month":
+        rank_base = rank_base.filter(sold_at__gte=month_start)
+
     commission_pct_dec = Cast(F("commission_pct"), pct_dec)
     commission_expr = ExpressionWrapper(
-        F("price") * (commission_pct_dec / Value(100, output_field=pct_dec)),
+        Coalesce(F("price"), Value(0), output_field=dec2) *
+        (Coalesce(commission_pct_dec, Value(0), output_field=pct_dec) / Value(100, output_field=pct_dec)),
         output_field=dec2,
     )
 
     agent_rank_qs = (
-        sales_qs_period.values("agent_id", "agent__username")
-        .annotate(total_sales=Count("id"), earnings=Sum(commission_expr), revenue=Sum("price"))
-        .order_by("-earnings", "-total_sales")
+        rank_base.values("agent_id", "agent__username")
+        .annotate(
+            total_sales=Count("id"),
+            earnings=Coalesce(Sum(commission_expr), Value(0), output_field=dec2),
+            revenue=Coalesce(Sum("price"), Value(0), output_field=dec2),
+        )
+        .order_by("-earnings", "-total_sales", "agent__username")
     )
     agent_rank = list(agent_rank_qs)
 
-    # Wallet summaries (decimal-safe defaults)
+    # Wallet summaries (decimal-safe defaults) for the agents present in ranking
     agent_wallet_summaries = {}
     agent_ids = [row["agent_id"] for row in agent_rank if row.get("agent_id")]
     if agent_ids:
@@ -530,52 +542,79 @@ def inventory_dashboard(request):
                 },
             }
 
-    last_12_start = month_start - timedelta(days=365)
-    rev_qs = Sale.objects.select_related("item").filter(sold_at__gte=last_12_start)
+    # ===== Revenue/Profit last 12 months =====
+    def back_n_months(d: date, n: int) -> date:
+        y = d.year
+        m = d.month - n
+        while m <= 0:
+            m += 12
+            y -= 1
+        return date(y, m, 1)
+
+    last_12_labels = [back_n_months(month_start, n).strftime("%Y-%m") for n in range(11, -1, -1)]
+
+    rev_qs = Sale.objects.select_related("item").filter(
+        sold_at__gte=back_n_months(month_start, 11)
+    )
     if not _can_view_all(request.user):
         rev_qs = rev_qs.filter(agent=request.user)
     if model_id:
         rev_qs = rev_qs.filter(item__product_id=model_id)
 
-    rev_by_month = rev_qs.annotate(m=TruncMonth("sold_at")).values("m").annotate(total=Sum("price")).order_by("m")
-    labels = []
+    rev_by_month = (
+        rev_qs.annotate(m=TruncMonth("sold_at"))
+        .values("m")
+        .annotate(total=Coalesce(Sum("price"), Value(0), output_field=dec2))
+        .order_by("m")
+    )
     totals_map = {r["m"].strftime("%Y-%m"): float(r["total"] or 0) for r in rev_by_month if r["m"]}
 
-    for i in range(11, -1, -1):
-        y = (month_start.year * 12 + month_start.month - 1 - i) // 12
-        m = (month_start.year * 12 + month_start.month - 1 - i) % 12 + 1
-        labels.append(f"{y}-{m:02d}")
-    revenue_points = [totals_map.get(lbl, 0.0) for lbl in labels]
-
-    profit_expr = ExpressionWrapper(F("price") - F("item__order_price"), output_field=dec2)
-    prof_by_month = rev_qs.annotate(m=TruncMonth("sold_at")).values("m").annotate(total=Sum(profit_expr)).order_by("m")
+    # Profit uses Coalesce so NULL order prices don't nuke a month
+    profit_expr_month = ExpressionWrapper(
+        Coalesce(F("price"), Value(0), output_field=dec2) -
+        Coalesce(F("item__order_price"), Value(0), output_field=dec2),
+        output_field=dec2,
+    )
+    prof_by_month = (
+        rev_qs.annotate(m=TruncMonth("sold_at"))
+        .values("m")
+        .annotate(total=Coalesce(Sum(profit_expr_month), Value(0), output_field=dec2))
+        .order_by("m")
+    )
     prof_map = {r["m"].strftime("%Y-%m"): float(r["total"] or 0) for r in prof_by_month if r["m"]}
-    profit_points = [prof_map.get(lbl, 0.0) for lbl in labels]
 
+    revenue_points = [totals_map.get(lbl, 0.0) for lbl in last_12_labels]
+    profit_points = [prof_map.get(lbl, 0.0) for lbl in last_12_labels]
+
+    # ===== Agents: total stock vs sold units (period filter applied) =====
     total_assigned = (
-        items_qs.values("assigned_agent_id", "assigned_agent__username").annotate(total_stock=Count("id")).order_by(
-            "assigned_agent__username"
-        )
+        items_qs.values("assigned_agent_id", "assigned_agent__username")
+        .annotate(total_stock=Count("id"))
+        .order_by("assigned_agent__username")
     )
     sold_units = sales_qs_period.values("agent_id").annotate(sold=Count("id"))
     sold_map = {r["agent_id"]: r["sold"] for r in sold_units}
-    agent_rows = []
-    for row in total_assigned:
-        agent_rows.append(
-            {
-                "agent_id": row["assigned_agent_id"],
-                "agent": row["assigned_agent__username"] or "—",
-                "total_stock": row["total_stock"],
-                "sold_units": sold_map.get(row["assigned_agent_id"], 0),
-            }
-        )
+    agent_rows = [
+        {
+            "agent_id": row["assigned_agent_id"],
+            "agent": row["assigned_agent__username"] or "—",
+            "total_stock": row["total_stock"],
+            "sold_units": sold_map.get(row["assigned_agent_id"], 0),
+        }
+        for row in total_assigned
+    ]
 
-    cost_expr = ExpressionWrapper(F("item__order_price"), output_field=dec2)
-    totals = sales_qs_period.aggregate(revenue=Sum("price"), cost=Sum(cost_expr), profit=Sum(profit_expr))
+    # ===== Cost vs Revenue vs Profit (period/model filtered, decimal-safe) =====
+    totals = sales_qs_period.aggregate(
+        revenue=Coalesce(Sum("price"), Value(0), output_field=dec2),
+        cost=Coalesce(Sum(Coalesce(F("item__order_price"), Value(0), output_field=dec2)), Value(0), output_field=dec2),
+        profit=Coalesce(Sum(profit_expr_month), Value(0), output_field=dec2),
+    )
     pie_revenue = float(totals.get("revenue") or 0)
     pie_cost = float(totals.get("cost") or 0)
     pie_profit = float(totals.get("profit") or 0)
 
+    # ===== Battery =====
     in_stock_qs = items_qs.filter(status="IN_STOCK")
     jug_count = in_stock_qs.count()
     jug_fill_pct = min(100, int(round((jug_count / 100.0) * 100))) if jug_count > 0 else 0
@@ -590,13 +629,14 @@ def inventory_dashboard(request):
 
     products = Product.objects.order_by("brand", "model", "variant").values("id", "brand", "model", "variant")
 
+    # ===== Wallet (current user) =====
     def _sum(qs):
         return qs.aggregate(s=Sum("amount"))["s"] or 0
 
     my_balance = _wallet_balance(request.user)
-    today = timezone.localdate()
-    month_start = today.replace(day=1)
-    month_qs = WalletTxn.objects.filter(user=request.user, created_at__date__gte=month_start, created_at__date__lte=today)
+    today_local = timezone.localdate()
+    month_start_local = today_local.replace(day=1)
+    month_qs = WalletTxn.objects.filter(user=request.user, created_at__date__gte=month_start_local, created_at__date__lte=today_local)
     my_month_commission = _sum(month_qs.filter(reason="COMMISSION"))
     my_month_advance = _sum(month_qs.filter(reason="ADVANCE"))
     my_month_adjustment = _sum(month_qs.filter(reason="ADJUSTMENT"))
@@ -612,20 +652,32 @@ def inventory_dashboard(request):
         "period": period,
         "model_id": int(model_id) if model_id else None,
         "products": list(products),
+
+        # Leaderboard + wallet chips
         "agent_rank": agent_rank,
         "agent_wallet_summaries": agent_wallet_summaries,
-        "labels_json": json.dumps(labels),
+
+        # Charts
+        "labels_json": json.dumps(last_12_labels),
         "revenue_points_json": json.dumps(revenue_points),
         "profit_points_json": json.dumps(profit_points),
-        "agent_rows": agent_rows,
         "pie_data_json": json.dumps([pie_cost, pie_revenue, pie_profit]),
+
+        # Agent stock table
+        "agent_rows": agent_rows,
+
+        # Battery
         "jug_count": jug_count,
         "jug_fill_pct": jug_fill_pct,
         "jug_color": jug_color,
+
+        # KPIs
         "is_manager_or_admin": _is_manager_or_admin(request.user),
         "today_count": today_count,
         "mtd_count": mtd_count,
         "all_time_count": all_time_count,
+
+        # My wallet (summary)
         "wallet": {
             "balance": my_balance,
             "month": {
@@ -633,7 +685,7 @@ def inventory_dashboard(request):
                 "advance": my_month_advance,
                 "adjustment": my_month_adjustment,
                 "total": my_month_total,
-                "month_label": month_start.strftime("%b %Y"),
+                "month_label": month_start_local.strftime("%b %Y"),
             },
             "lifetime": {
                 "commission": my_life_commission,
@@ -1286,7 +1338,10 @@ def api_profit_bar(request):
 
         base = base.filter(sold_at__gte=start, sold_at__lt=end_excl)
 
-        profit_expr = ExpressionWrapper(F("price") - F("item__order_price"), output_field=DecimalField(max_digits=14, decimal_places=2))
+        profit_expr = ExpressionWrapper(
+            Coalesce(F("price"), Value(0)) - Coalesce(F("item__order_price"), Value(0)),
+            output_field=DecimalField(max_digits=14, decimal_places=2),
+        )
 
         if group_by == "model":
             rows = base.values("item__product__brand", "item__product__model").annotate(v=Sum(profit_expr)).order_by("-v")[:20]
@@ -1329,7 +1384,7 @@ def api_agent_trend(request):
         base = base.filter(sold_at__gte=start, sold_at__lt=end_excl)
 
         if metric == "profit":
-            agg = Sum(F("price") - F("item__order_price"))
+            agg = Sum(Coalesce(F("price"), Value(0)) - Coalesce(F("item__order_price"), Value(0)))
         else:
             agg = Count("id")
 

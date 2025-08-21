@@ -49,6 +49,16 @@
   .chart-card h3{margin:.25rem 0 .6rem;font-size:.95rem;color:var(--cc-muted)}
   .toolbar{display:flex;gap:.5rem;align-items:center;justify-content:flex-end}
   select{padding:.45rem .55rem;border-radius:.45rem;border:1px solid var(--deep-border);background:var(--deep-panel);color:var(--cc-text)}
+
+  /* NEW: reliable canvas height + empty state (no visual change otherwise) */
+  .chart-holder{position:relative;height:260px}
+  .chart-empty{
+    position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+    color:var(--cc-muted);font-weight:700;pointer-events:none
+  }
+  @media (max-width:980px){
+    .chart-holder{height:240px}
+  }
 </style>
 {% endblock %}
 
@@ -157,7 +167,10 @@
           </select>
         </div>
       </div>
-      <canvas id="profitChart" height="120" aria-label="Profits chart" role="img"></canvas>
+      <div class="chart-holder">
+        <canvas id="profitChart" height="120" aria-label="Profits chart" role="img"></canvas>
+        <div id="profitEmpty" class="chart-empty" hidden>No data yet</div>
+      </div>
     </div>
 
     <div class="chart-card">
@@ -175,7 +188,10 @@
           </select>
         </div>
       </div>
-      <canvas id="agentTrend" height="120" aria-label="Agent trend chart" role="img"></canvas>
+      <div class="chart-holder">
+        <canvas id="agentTrend" height="120" aria-label="Agent trend chart" role="img"></canvas>
+        <div id="trendEmpty" class="chart-empty" hidden>No data yet</div>
+      </div>
     </div>
   </div>
 </div>
@@ -216,9 +232,15 @@
     }
   };
 
-  // Profit chart
   const profitCtx = document.getElementById('profitChart').getContext('2d');
-  let profitChart = null;
+  const trendCtx  = document.getElementById('agentTrend').getContext('2d');
+  let profitChart = null, trendChart = null;
+
+  function showEmpty(id, show){
+    const el = document.getElementById(id);
+    if (el) el.hidden = !show;
+  }
+  const sum = (arr)=> (arr||[]).reduce((a,b)=>a+(+b||0),0);
 
   async function loadProfit(){
     const month = document.getElementById('profitMonth').value;
@@ -228,16 +250,18 @@
     const res = await fetch(url);
     const data = await res.json();
 
-    const options = JSON.parse(JSON.stringify(baseOptions));
+    const values = (data.data||[]).map(v=>+v||0);
+    showEmpty('profitEmpty', !data.labels?.length || sum(values) === 0);
 
+    const options = JSON.parse(JSON.stringify(baseOptions));
     profitChart && profitChart.destroy();
     profitChart = new Chart(profitCtx, {
       type: group ? 'bar' : 'line',
       data: {
-        labels: data.labels,
+        labels: data.labels || [],
         datasets: [{
           label: 'Profit',
-          data: data.data,
+          data: values,
           borderColor: ACCENT,
           backgroundColor: group ? ACCENT : undefined
         }]
@@ -246,10 +270,6 @@
     });
   }
 
-  // Agent trend chart
-  const trendCtx = document.getElementById('agentTrend').getContext('2d');
-  let trendChart = null;
-
   async function loadTrend(){
     const metric = document.getElementById('trendMetric').value;
     const months = document.getElementById('trendMonths').value;
@@ -257,16 +277,18 @@
     const res = await fetch(url);
     const data = await res.json();
 
-    const options = JSON.parse(JSON.stringify(baseOptions));
+    const values = (data.data||[]).map(v=>+v||0);
+    showEmpty('trendEmpty', !data.labels?.length || sum(values) === 0);
 
+    const options = JSON.parse(JSON.stringify(baseOptions));
     trendChart && trendChart.destroy();
     trendChart = new Chart(trendCtx, {
       type: 'line',
       data: {
-        labels: data.labels,
+        labels: data.labels || [],
         datasets: [{
           label: metric === 'profit' ? 'Profit' : 'Trend',
-          data: data.data,
+          data: values,
           borderColor: ACCENT
         }]
       },
@@ -279,7 +301,11 @@
   document.getElementById('trendMetric').addEventListener('change', loadTrend);
   document.getElementById('trendMonths').addEventListener('change', loadTrend);
 
-  loadProfit(); loadTrend();
+  // Build charts after full load so mobile canvas sizes are final
+  window.addEventListener('load', () => {
+    loadProfit();
+    loadTrend();
+  });
 })();
 </script>
 {% endblock %}
