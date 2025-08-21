@@ -54,11 +54,14 @@ User = get_user_model()
 # -------------------------------------------------
 _WARRANTY_CLIENT_AVAILABLE = False
 
+
 class CarlcareClient:  # shim kept only so type references don't blow up
     def __init__(self, *args, **kwargs):
         self._shim = True
+
     def check(self, imei: str):
         return type("WarrantyResult", (), {"status": "SKIPPED", "expires_at": None})()
+
 
 def _get_warranty_client():
     """
@@ -113,7 +116,7 @@ def _haversine_meters(lat1, lon1, lat2, lon2):
     phi2 = math.radians(float(lat2))
     dphi = math.radians(float(lat2) - float(lat1))
     dlmb = math.radians(float(lon2) - float(lon1))
-    a = math.sin(dphi/2)**2 + math.cos(phi1)*math.cos(phi2)*math.sin(dlmb/2)**2
+    a = math.sin(dphi/2) ** 2 + math.cos(phi1) * math.cos(phi2) * math.sin(dlmb/2) ** 2
     c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
     return R * c
 
@@ -163,9 +166,12 @@ def _wallet_month_sum(user, year: int, month: int):
     try:
         return WalletTxn.month_sum_for(user, year, month)
     except Exception:
-        return (WalletTxn.objects
-                .filter(user=user, created_at__year=year, created_at__month=month)
-                .aggregate(s=Sum("amount"))["s"] or 0)
+        return (
+            WalletTxn.objects.filter(user=user, created_at__year=year, created_at__month=month).aggregate(s=Sum("amount"))[
+                "s"
+            ]
+            or 0
+        )
 
 
 def _inv_base(show_archived: bool):
@@ -189,7 +195,7 @@ def _render_dashboard_safe(request, context, today, mtd_count, all_time_count):
             f"<h1>Inventory Dashboard</h1>"
             f"<p>Template <code>inventory/dashboard.html</code> not found.</p>"
             f"<pre>today={today}  mtd={mtd_count}  all_time={all_time_count}</pre>",
-            content_type="text/html"
+            content_type="text/html",
         )
 
 
@@ -271,7 +277,7 @@ def scan_in(request):
             return render(
                 request,
                 "inventory/scan_in.html",
-                {"form": form, "warranty": None, "blocked": True}
+                {"form": form, "warranty": None, "blocked": True},
             )
 
         item = InventoryItem.objects.create(
@@ -365,7 +371,7 @@ def scan_sold(request):
         _audit(item, request.user, "SOLD_FORM", "V1 flow")
         messages.success(
             request,
-            f"Marked SOLD: {item.imei}{' at ' + str(item.selling_price) if item.selling_price else ''}"
+            f"Marked SOLD: {item.imei}{' at ' + str(item.selling_price) if item.selling_price else ''}",
         )
         return redirect("inventory:scan_sold")
 
@@ -492,7 +498,9 @@ def inventory_dashboard(request):
     cache_key = f"dash:v{ver}:u{request.user.id}:p:{period}:m:{model_id or 'all'}"
     cached = cache.get(cache_key)
     if cached:
-        return _render_dashboard_safe(request, cached, today, cached.get("mtd_count", 0), cached.get("all_time_count", 0))
+        return _render_dashboard_safe(
+            request, cached, today, cached.get("mtd_count", 0), cached.get("all_time_count", 0)
+        )
 
     # Base querysets according to permissions
     if _can_view_all(request.user):
@@ -500,7 +508,9 @@ def inventory_dashboard(request):
         items_qs = InventoryItem.objects.select_related("product", "assigned_agent", "current_location")
     else:
         sales_qs_all = Sale.objects.filter(agent=request.user).select_related("item", "agent", "item__product")
-        items_qs = InventoryItem.objects.filter(assigned_agent=request.user).select_related("product", "assigned_agent", "current_location")
+        items_qs = InventoryItem.objects.filter(assigned_agent=request.user).select_related(
+            "product", "assigned_agent", "current_location"
+        )
 
     if model_id:
         sales_qs_all = sales_qs_all.filter(item__product_id=model_id)
@@ -512,14 +522,13 @@ def inventory_dashboard(request):
         sales_qs_period = sales_qs_all.filter(sold_at__gte=month_start)
 
     # Header chip counts (corrected):
-    today_count    = sales_qs_all.filter(sold_at__gte=today, sold_at__lt=tomorrow).count()
-    mtd_count      = sales_qs_all.filter(sold_at__gte=month_start, sold_at__lt=tomorrow).count()
+    today_count = sales_qs_all.filter(sold_at__gte=today, sold_at__lt=tomorrow).count()
+    mtd_count = sales_qs_all.filter(sold_at__gte=month_start, sold_at__lt=tomorrow).count()
     all_time_count = sales_qs_all.count()  # <-- all-time must ignore the month filter
 
     # Ranking (use selected period so it matches the dashboard view)
     commission_expr = ExpressionWrapper(
-        F("price") * (F("commission_pct") / 100.0),
-        output_field=DecimalField(max_digits=14, decimal_places=2),
+        F("price") * (F("commission_pct") / 100.0), output_field=DecimalField(max_digits=14, decimal_places=2)
     )
     agent_rank_qs = (
         sales_qs_period.values("agent_id", "agent__username")
@@ -535,31 +544,66 @@ def inventory_dashboard(request):
         w = WalletTxn.objects.filter(user_id__in=agent_ids)
         agent_wallet_rows = (
             w.values("user_id")
-             .annotate(
-                 balance=Sum("amount"),
-                 lifetime_commission=Sum(Case(When(reason="COMMISSION", then="amount"), default=Value(0),
-                                               output_field=DecimalField(max_digits=14, decimal_places=2))),
-                 lifetime_advance=Sum(Case(When(reason="ADVANCE", then="amount"), default=Value(0),
-                                            output_field=DecimalField(max_digits=14, decimal_places=2)))),
-
-                 lifetime_adjustment=Sum(Case(When(reason="ADJUSTMENT", then="amount"), default=Value(0),
-                                               output_field=DecimalField(max_digits=14, decimal_places=2))),
-                 month_commission=Sum(Case(When(reason="COMMISSION",
-                                                created_at__date__gte=month_start, created_at__date__lte=today,
-                                                then="amount"),
-                                           default=Value(0),
-                                           output_field=DecimalField(max_digits=14, decimal_places=2))),
-                 month_advance=Sum(Case(When(reason="ADVANCE",
-                                             created_at__date__gte=month_start, created_at__date__lte=today,
-                                             then="amount"),
-                                        default=Value(0),
-                                        output_field=DecimalField(max_digits=14, decimal_places=2))),
-                 month_adjustment=Sum(Case(When(reason="ADJUSTMENT",
-                                                created_at__date__gte=month_start, created_at__date__lte=today,
-                                                then="amount"),
-                                           default=Value(0),
-                                           output_field=DecimalField(max_digits=14, decimal_places=2))),
-             )
+            .annotate(
+                balance=Sum("amount"),
+                lifetime_commission=Sum(
+                    Case(
+                        When(reason="COMMISSION", then="amount"),
+                        default=Value(0),
+                        output_field=DecimalField(max_digits=14, decimal_places=2),
+                    )
+                ),
+                lifetime_advance=Sum(
+                    Case(
+                        When(reason="ADVANCE", then="amount"),
+                        default=Value(0),
+                        output_field=DecimalField(max_digits=14, decimal_places=2),
+                    )
+                ),
+                lifetime_adjustment=Sum(
+                    Case(
+                        When(reason="ADJUSTMENT", then="amount"),
+                        default=Value(0),
+                        output_field=DecimalField(max_digits=14, decimal_places=2),
+                    )
+                ),
+                month_commission=Sum(
+                    Case(
+                        When(
+                            reason="COMMISSION",
+                            created_at__date__gte=month_start,
+                            created_at__date__lte=today,
+                            then="amount",
+                        ),
+                        default=Value(0),
+                        output_field=DecimalField(max_digits=14, decimal_places=2),
+                    )
+                ),
+                month_advance=Sum(
+                    Case(
+                        When(
+                            reason="ADVANCE",
+                            created_at__date__gte=month_start,
+                            created_at__date__lte=today,
+                            then="amount",
+                        ),
+                        default=Value(0),
+                        output_field=DecimalField(max_digits=14, decimal_places=2),
+                    )
+                ),
+                month_adjustment=Sum(
+                    Case(
+                        When(
+                            reason="ADJUSTMENT",
+                            created_at__date__gte=month_start,
+                            created_at__date__lte=today,
+                            then="amount",
+                        ),
+                        default=Value(0),
+                        output_field=DecimalField(max_digits=14, decimal_places=2),
+                    )
+                ),
+            )
         )
         for r in agent_wallet_rows:
             uid = r["user_id"]
@@ -589,9 +633,7 @@ def inventory_dashboard(request):
     if model_id:
         rev_qs = rev_qs.filter(item__product_id=model_id)
 
-    rev_by_month = (
-        rev_qs.annotate(m=TruncMonth("sold_at")).values("m").annotate(total=Sum("price")).order_by("m")
-    )
+    rev_by_month = rev_qs.annotate(m=TruncMonth("sold_at")).values("m").annotate(total=Sum("price")).order_by("m")
 
     labels = []
     totals_map = {r["m"].strftime("%Y-%m"): float(r["total"] or 0) for r in rev_by_month if r["m"]}
@@ -602,10 +644,7 @@ def inventory_dashboard(request):
         labels.append(f"{y}-{m:02d}")
     revenue_points = [totals_map.get(lbl, 0.0) for lbl in labels]
 
-    profit_expr = ExpressionWrapper(
-        F("price") - F("item__order_price"),
-        output_field=DecimalField(max_digits=14, decimal_places=2),
-    )
+    profit_expr = ExpressionWrapper(F("price") - F("item__order_price"), output_field=DecimalField(max_digits=14, decimal_places=2))
     prof_by_month = (
         rev_qs.annotate(m=TruncMonth("sold_at")).values("m").annotate(total=Sum(profit_expr)).order_by("m")
     )
@@ -614,20 +653,22 @@ def inventory_dashboard(request):
 
     # Agent stock vs sold (sold respects selected period)
     total_assigned = (
-        items_qs.values("assigned_agent_id", "assigned_agent__username")
-        .annotate(total_stock=Count("id"))
-        .order_by("assigned_agent__username")
+        items_qs.values("assigned_agent_id", "assigned_agent__username").annotate(total_stock=Count("id")).order_by(
+            "assigned_agent__username"
+        )
     )
     sold_units = sales_qs_period.values("agent_id").annotate(sold=Count("id"))
     sold_map = {r["agent_id"]: r["sold"] for r in sold_units}
     agent_rows = []
     for row in total_assigned:
-        agent_rows.append({
-            "agent_id": row["assigned_agent_id"],
-            "agent": row["assigned_agent__username"] or "—",
-            "total_stock": row["total_stock"],
-            "sold_units": sold_map.get(row["assigned_agent_id"], 0),
-        })
+        agent_rows.append(
+            {
+                "agent_id": row["assigned_agent_id"],
+                "agent": row["assigned_agent__username"] or "—",
+                "total_stock": row["total_stock"],
+                "sold_units": sold_map.get(row["assigned_agent_id"], 0),
+            }
+        )
 
     # Cost/Revenue/Profit pie (respects selected period)
     cost_expr = ExpressionWrapper(F("item__order_price"), output_field=DecimalField(max_digits=14, decimal_places=2))
@@ -657,11 +698,7 @@ def inventory_dashboard(request):
         return qs.aggregate(s=Sum("amount"))["s"] or 0
 
     my_balance = _wallet_balance(request.user)
-    month_qs = WalletTxn.objects.filter(
-        user=request.user,
-        created_at__date__gte=month_start,
-        created_at__date__lte=today,
-    )
+    month_qs = WalletTxn.objects.filter(user=request.user, created_at__date__gte=month_start, created_at__date__lte=today)
     my_month_commission = _sum(month_qs.filter(reason="COMMISSION"))
     my_month_advance = _sum(month_qs.filter(reason="ADVANCE"))
     my_month_adjustment = _sum(month_qs.filter(reason="ADJUSTMENT"))
@@ -688,12 +725,10 @@ def inventory_dashboard(request):
         "jug_fill_pct": jug_fill_pct,
         "jug_color": jug_color,
         "is_manager_or_admin": _is_manager_or_admin(request.user),
-
         # Header chips
         "today_count": today_count,
         "mtd_count": mtd_count,
         "all_time_count": all_time_count,
-
         # Wallet chip (current user)
         "wallet": {
             "balance": my_balance,
@@ -733,9 +768,8 @@ def stock_list(request):
     has_sales_subq = Sale.objects.filter(item=OuterRef("pk"))
     base = _inv_base(show_archived)
 
-    base_qs = (
-        base.select_related("product", "current_location", "assigned_agent")
-            .annotate(has_sales=Exists(has_sales_subq))
+    base_qs = base.select_related("product", "current_location", "assigned_agent").annotate(
+        has_sales=Exists(has_sales_subq)
     )
 
     if _can_view_all(request.user):
@@ -767,42 +801,61 @@ def stock_list(request):
         response["Pragma"] = "no-cache"
         response.write("\ufeff")  # BOM for Excel UTF-8
         writer = csv.writer(response)
-        writer.writerow([
-            "IMEI", "Product", "Status", "Order Price", "Selling Price", "Location",
-            "Agent", "Received", "Archived", "Has Sales",
-        ])
+        writer.writerow(
+            [
+                "IMEI",
+                "Product",
+                "Status",
+                "Order Price",
+                "Selling Price",
+                "Location",
+                "Agent",
+                "Received",
+                "Archived",
+                "Has Sales",
+            ]
+        )
         for it in qs.iterator():
             product_str = str(it.product) if it.product else ""
             location_str = it.current_location.name if it.current_location_id else ""
             agent_str = it.assigned_agent.get_username() if it.assigned_agent_id else ""
             received_str = it.received_at.strftime("%Y-%m-%d") if it.received_at else ""
-            writer.writerow([
-                it.imei or "", product_str, it.status,
-                f"{it.order_price:.2f}" if it.order_price is not None else "",
-                f"{it.selling_price:.2f}" if it.selling_price is not None else "",
-                location_str, agent_str, received_str,
-                "No" if getattr(it, "is_active", True) else "Yes",
-                "Yes" if getattr(it, "has_sales", False) else "No",
-            ])
+            writer.writerow(
+                [
+                    it.imei or "",
+                    product_str,
+                    it.status,
+                    f"{it.order_price:.2f}" if it.order_price is not None else "",
+                    f"{it.selling_price:.2f}" if it.selling_price is not None else "",
+                    location_str,
+                    agent_str,
+                    received_str,
+                    "No" if getattr(it, "is_active", True) else "Yes",
+                    "Yes" if getattr(it, "has_sales", False) else "No",
+                ]
+            )
         return response
 
     # Header metrics for filtered set
-    in_stock    = qs.filter(status="IN_STOCK").count()
-    sold_count  = qs.filter(status="SOLD").count()
-    sum_order   = qs.aggregate(s=Sum("order_price"))["s"] or 0
+    in_stock = qs.filter(status="IN_STOCK").count()
+    sold_count = qs.filter(status="SOLD").count()
+    sum_order = qs.aggregate(s=Sum("order_price"))["s"] or 0
     sum_selling = qs.aggregate(s=Sum("selling_price"))["s"] or 0
 
     page_obj, url_for = _paginate_qs(request, qs, default_per_page=50, max_per_page=200)
 
-    rows = [{
-        "imei": (it.imei or ""),
-        "product": str(it.product) if it.product else "",
-        "status": ("SOLD" if it.status == "SOLD" else "In stock"),
-        "order_price": f"{(it.order_price or 0):,.0f}",
-        "selling_price": ("" if it.selling_price is None else f"{float(it.selling_price):,.0f}"),
-        "location": it.current_location.name if it.current_location_id else "—",
-        "agent": it.assigned_agent.get_username() if it.assigned_agent_id else "—",
-    } for it in page_obj.object_list]
+    rows = [
+        {
+            "imei": (it.imei or ""),
+            "product": str(it.product) if it.product else "",
+            "status": ("SOLD" if it.status == "SOLD" else "In stock"),
+            "order_price": f"{(it.order_price or 0):,.0f}",
+            "selling_price": ("" if it.selling_price is None else f"{float(it.selling_price):,.0f}"),
+            "location": it.current_location.name if it.current_location_id else "—",
+            "agent": it.assigned_agent.get_username() if it.assigned_agent_id else "—",
+        }
+        for it in page_obj.object_list
+    ]
 
     context = {
         "items": page_obj.object_list,
@@ -838,9 +891,8 @@ def export_csv(request):
     has_sales_subq = Sale.objects.filter(item=OuterRef("pk"))
     base = _inv_base(show_archived)
 
-    qs = (
-        base.select_related("product", "current_location", "assigned_agent")
-            .annotate(has_sales=Exists(has_sales_subq))
+    qs = base.select_related("product", "current_location", "assigned_agent").annotate(
+        has_sales=Exists(has_sales_subq)
     )
     if not _can_view_all(request.user):
         qs = qs.filter(assigned_agent=request.user)
@@ -862,32 +914,33 @@ def export_csv(request):
 
     filename = f"stock_export_{timezone.now():%Y%m%d_%H%M}.csv"
     response = HttpResponse(content_type="text/csv; charset=utf-8")
-    response["Content-Disposition"] = f'attachment; filename="{filename}""
+    response["Content-Disposition"] = f'attachment; filename="{filename}"'
     response["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
     response["Pragma"] = "no-cache"
     response.write("\ufeff")
     writer = csv.writer(response)
-    writer.writerow([
-        "IMEI", "Product", "Status", "Order Price", "Selling Price",
-        "Location", "Agent", "Received", "Archived", "Has Sales",
-    ])
+    writer.writerow(
+        ["IMEI", "Product", "Status", "Order Price", "Selling Price", "Location", "Agent", "Received", "Archived", "Has Sales"]
+    )
     for it in qs.iterator():
         product_str = str(it.product) if it.product else ""
         location_str = it.current_location.name if it.current_location_id else ""
         agent_str = it.assigned_agent.get_username() if it.assigned_agent_id else ""
         received_str = it.received_at.strftime("%Y-%m-%d") if it.received_at else ""
-        writer.writerow([
-            it.imei or "",
-            product_str,
-            it.status,
-            f"{it.order_price:.2f}"   if it.order_price  is not None else "",
-            f"{it.selling_price:.2f}" if it.selling_price is not None else "",
-            location_str,
-            agent_str,
-            received_str,
-            "No" if getattr(it, "is_active", True) else "Yes",
-            "Yes" if getattr(it, "has_sales", False) else "No",
-        ])
+        writer.writerow(
+            [
+                it.imei or "",
+                product_str,
+                it.status,
+                f"{it.order_price:.2f}" if it.order_price is not None else "",
+                f"{it.selling_price:.2f}" if it.selling_price is not None else "",
+                location_str,
+                agent_str,
+                received_str,
+                "No" if getattr(it, "is_active", True) else "Yes",
+                "Yes" if getattr(it, "has_sales", False) else "No",
+            ]
+        )
     return response
 
 
@@ -965,10 +1018,12 @@ def api_top_models(request):
         else:
             qs = Sale.objects.select_related("item__product").filter(agent=request.user)
 
-        qs = (qs.filter(sold_at__gte=start, sold_at__lt=end_excl)
-                .values("item__product__brand", "item__product__model")
-                .annotate(c=Count("id"))
-                .order_by("-c")[:8])
+        qs = (
+            qs.filter(sold_at__gte=start, sold_at__lt=end_excl)
+            .values("item__product__brand", "item__product__model")
+            .annotate(c=Count("id"))
+            .order_by("-c")[:8]
+        )
 
         labels = [f'{r["item__product__brand"]} {r["item__product__model"]}' for r in qs]
         values = [r["c"] for r in qs]
@@ -1018,14 +1073,13 @@ def api_profit_bar(request):
         profit_expr = F("price") - F("item__order_price")
 
         if group_by == "model":
-            rows = (base.values("item__product__brand", "item__product__model")
-                        .annotate(v=Sum(profit_expr))
-                        .order_by("-v"))[:20]
+            rows = base.values("item__product__brand", "item__product__model").annotate(v=Sum(profit_expr)).order_by("-v")[
+                :20
+            ]
             labels = [f"{r['item__product__brand']} {r['item__product__model']}" for r in rows]
             data = [float(r["v"] or 0) for r in rows]
         else:
-            monthly = (base.annotate(m=TruncMonth("sold_at"))
-                            .values("m").annotate(v=Sum(profit_expr)).order_by("m"))
+            monthly = base.annotate(m=TruncMonth("sold_at")).values("m").annotate(v=Sum(profit_expr)).order_by("m")
             labels = [r["m"].strftime("%b %Y") for r in monthly]
             data = [float(r["v"] or 0) for r in monthly]
 
@@ -1060,7 +1114,7 @@ def api_agent_trend(request):
 
         today = timezone.localdate()
         end_excl = today + timedelta(days=1)
-        start = (today - timedelta(days=months * 31))
+        start = today - timedelta(days=months * 31)
 
         base = base.filter(sold_at__gte=start, sold_at__lt=end_excl)
 
@@ -1069,10 +1123,7 @@ def api_agent_trend(request):
         else:
             agg = Count("id")
 
-        rows = (base.annotate(m=TruncMonth("sold_at"))
-                     .values("m")
-                     .annotate(v=agg)
-                     .order_by("m"))
+        rows = base.annotate(m=TruncMonth("sold_at")).values("m").annotate(v=agg).order_by("m")
 
         labels = [r["m"].strftime("%b %Y") for r in rows]
         data = [float(r["v"] or 0) for r in rows]
@@ -1132,9 +1183,9 @@ def api_time_checkin(request):
     acc_raw = payload.get("accuracy_m", payload.get("accuracy"))
 
     try:
-        lat = float(lat_raw) if lat_raw not in (None, "",) else None
-        lon = float(lon_raw) if lon_raw not in (None, "",) else None
-        acc = int(acc_raw) if acc_raw not in (None, "",) else None
+        lat = float(lat_raw) if lat_raw not in (None, "") else None
+        lon = float(lon_raw) if lon_raw not in (None, "") else None
+        acc = int(acc_raw) if acc_raw not in (None, "") else None
     except Exception:
         return JsonResponse({"ok": False, "error": "Invalid lat/lon/accuracy."}, status=400)
 
@@ -1167,15 +1218,17 @@ def api_time_checkin(request):
         note=(payload.get("note") or "").strip()[:200],
     )
 
-    return JsonResponse({
-        "ok": True,
-        "id": tl.id,
-        "logged_at": tl.logged_at.isoformat(),
-        "location": (loc.name if loc else None),
-        "distance_m": dist,
-        "within_geofence": within,
-        "checkin_type": checkin_type,
-    })
+    return JsonResponse(
+        {
+            "ok": True,
+            "id": tl.id,
+            "logged_at": tl.logged_at.isoformat(),
+            "location": (loc.name if loc else None),
+            "distance_m": dist,
+            "within_geofence": within,
+            "checkin_type": checkin_type,
+        }
+    )
 
 
 @never_cache
@@ -1230,6 +1283,7 @@ def api_wallet_summary(request):
             data["month_sum"] = None
     return JsonResponse(data)
 
+
 api_wallet_balance = api_wallet_summary  # back-compat alias
 
 
@@ -1281,6 +1335,7 @@ def api_wallet_add_txn(request):
     new_balance = _wallet_balance(target)
     return JsonResponse({"ok": True, "txn_id": txn.id, "balance": new_balance})
 
+
 api_wallet_txn = api_wallet_add_txn  # alias
 
 
@@ -1305,10 +1360,7 @@ def wallet_page(request):
     balance = _wallet_balance(target)
     month_sum = _wallet_month_sum(target, today.year, today.month)
 
-    recent_txns = (WalletTxn.objects
-                   .select_related("user")
-                   .filter(user=target)
-                   .order_by("-created_at")[:50])
+    recent_txns = WalletTxn.objects.select_related("user").filter(user=target).order_by("-created_at")[:50]
 
     agents = []
     if _is_manager_or_admin(request.user):
@@ -1377,8 +1429,9 @@ def update_stock(request, pk):
                     bulk_updates["selling_price"] = form.cleaned_data.get("selling_price")
 
                 if bulk_updates:
-                    base_mgr = (InventoryItem.active if hasattr(InventoryItem, "active")
-                                else InventoryItem.objects.filter(is_active=True))
+                    base_mgr = (
+                        InventoryItem.active if hasattr(InventoryItem, "active") else InventoryItem.objects.filter(is_active=True)
+                    )
                     qs = base_mgr.filter(product=saved_item.product).exclude(pk=saved_item.pk)
                     updated = qs.update(**bulk_updates)
                     if updated:
@@ -1386,16 +1439,16 @@ def update_stock(request, pk):
                             saved_item,
                             request.user,
                             "BULK_PRICE_UPDATE",
-                            f"Updated {updated} items for product '{saved_item.product}'. Fields: {bulk_updates}"
+                            f"Updated {updated} items for product '{saved_item.product}'. Fields: {bulk_updates}",
                         )
                         messages.info(
-                            request,
-                            f"Applied {', '.join(bulk_updates.keys())} to {updated} other '{saved_item.product}' item(s)."
+                            request, f"Applied {', '.join(bulk_updates.keys())} to {updated} other '{saved_item.product}' item(s)."
                         )
 
             details = "Changed fields:\n" + (
                 "\n".join([f"{k}: {old_vals.get(k)} → {getattr(saved_item, k)}" for k in changed_fields])
-                if changed_fields else "No field changes"
+                if changed_fields
+                else "No field changes"
             )
             _audit(saved_item, request.user, "EDIT", details)
 
