@@ -50,36 +50,22 @@ except Exception:
 User = get_user_model()
 
 # -------------------------------------------------
-# SAFE warranty import + client getter
-# (keeps the import, but never fails app start)
+# Warranty client: fully disabled (no imports from warranty.py)
 # -------------------------------------------------
-try:
-    # If dependencies like `requests`/`bs4` are present this will succeed.
-    from .warranty import CarlcareClient  # noqa: F401
-    _WARRANTY_CLIENT_AVAILABLE = True
-except Exception:
-    # Import failed (e.g., requests missing). Provide a tiny shim so imports succeed.
-    _WARRANTY_CLIENT_AVAILABLE = False
+_WARRANTY_CLIENT_AVAILABLE = False
 
-    class CarlcareClient:  # type: ignore
-        def __init__(self, *args, **kwargs):
-            self._shim = True
-        def check(self, imei: str):
-            # Looks like the real object your code expects: .status, .expires_at
-            return type("WarrantyResult", (), {"status": "SKIPPED", "expires_at": None})()
+class CarlcareClient:  # shim kept only so type references don't blow up
+    def __init__(self, *args, **kwargs):
+        self._shim = True
+    def check(self, imei: str):
+        return type("WarrantyResult", (), {"status": "SKIPPED", "expires_at": None})()
 
 def _get_warranty_client():
     """
-    Return a CarlcareClient instance if enabled & available, else None.
+    Always return None so no warranty lookups are attempted
+    (avoids importing warranty.py and any external deps).
     """
-    if not getattr(settings, "WARRANTY_CHECK_ENABLED", False):
-        return None
-    if not _WARRANTY_CLIENT_AVAILABLE:
-        return None
-    try:
-        return CarlcareClient()
-    except Exception:
-        return None
+    return None
 
 
 # -----------------------
@@ -219,6 +205,7 @@ def scan_in(request):
     Invariants:
       - No orphan items: product & location required.
       - Unique IMEI enforced.
+      - Warranty lookup is disabled; we always record SKIPPED.
     """
     if _is_auditor(request.user) and request.method == "POST":
         messages.error(request, "Auditors cannot stock-in devices.")
@@ -254,57 +241,37 @@ def scan_in(request):
             messages.error(request, f"Item with IMEI {imei} already exists.")
             return render(request, "inventory/scan_in.html", {"form": form})
 
-        # Warranty (optional & safe)
-        w = None
-        client = _get_warranty_client()
-        if imei and client:
-            try:
-                w = client.check(imei)
-            except Exception:
-                w = None  # fail-open
-
-        # Default result based on settings and client availability
-        default_status = "UNKNOWN"
-        if not getattr(settings, "WARRANTY_CHECK_ENABLED", False) or not _WARRANTY_CLIENT_AVAILABLE:
-            default_status = "SKIPPED"
+        # Warranty is disabled: record SKIPPED (no external calls / imports)
+        warranty_status = "SKIPPED"
+        warranty_expires_at = None
+        warranty_checked_at = None
+        activation_at = None
 
         WarrantyCheckLog.objects.create(
             imei=imei or "",
-            result=getattr(w, "status", default_status),
-            expires_at=getattr(w, "expires_at", None),
-            notes="scan_in",
+            result=warranty_status,
+            expires_at=warranty_expires_at,
+            notes="scan_in (warranty disabled)",
             by_user=request.user,
         )
 
-        # V1 acceptance rules
+        # Acceptance rules (simplified — no warranty gating)
         allow, reason = True, None
-        if imei and getattr(settings, "WARRANTY_CHECK_ENABLED", False) and _WARRANTY_CLIENT_AVAILABLE:
-            if w and w.status in ("UNDER_WARRANTY", "WAITING_ACTIVATION"):
-                allow = True
-            elif w and w.status == "NOT_IN_COUNTRY":
-                allow = request.user.is_staff
-                if not allow:
-                    reason = "Device may not be for this country. Ask an admin to override."
-            else:
-                allow = request.user.is_staff
-                if not allow:
-                    reason = "Warranty could not be verified. Ask an admin to override."
-        else:
-            if not imei and not _is_manager_or_admin(request.user):
-                allow = False
-                reason = "IMEI is required."
+        if not imei and not _is_manager_or_admin(request.user):
+            allow = False
+            reason = "IMEI is required."
 
         if not allow:
             mail_admins(
                 subject="Stock-in blocked",
-                message=f"User {request.user} attempted to stock IMEI {imei} (status={getattr(w,'status','UNKNOWN')}).",
+                message=f"User {request.user} attempted to stock IMEI {imei} (warranty disabled).",
                 fail_silently=True,
             )
             messages.error(request, reason or "Stock-in blocked.")
             return render(
                 request,
                 "inventory/scan_in.html",
-                {"form": form, "warranty": w, "blocked": True}
+                {"form": form, "warranty": None, "blocked": True}
             )
 
         item = InventoryItem.objects.create(
@@ -314,16 +281,13 @@ def scan_in(request):
             order_price=data["order_price"],
             current_location=data["location"],
             assigned_agent=request.user if data.get("assigned_to_me") else None,
-            warranty_status=getattr(
-                w, "status",
-                "UNKNOWN" if getattr(settings, "WARRANTY_CHECK_ENABLED", False) and _WARRANTY_CLIENT_AVAILABLE else "SKIPPED"
-            ),
-            warranty_expires_at=getattr(w, "expires_at", None),
-            warranty_last_checked_at=timezone.now() if w else None,
-            activation_detected_at=timezone.now() if (w and w.status == "UNDER_WARRANTY" and w.expires_at) else None,
+            warranty_status=warranty_status,
+            warranty_expires_at=warranty_expires_at,
+            warranty_last_checked_at=warranty_checked_at,
+            activation_detected_at=activation_at,
         )
 
-        _audit(item, request.user, "STOCK_IN", "V1 flow")
+        _audit(item, request.user, "STOCK_IN", "Warranty disabled")
         messages.success(request, f"Stocked: {imei or data['product']}")
         return redirect("inventory:scan_in")
 
@@ -577,6 +541,7 @@ def inventory_dashboard(request):
                                                output_field=DecimalField(max_digits=14, decimal_places=2))),
                  lifetime_advance=Sum(Case(When(reason="ADVANCE", then="amount"), default=Value(0),
                                             output_field=DecimalField(max_digits=14, decimal_places=2)))),
+
                  lifetime_adjustment=Sum(Case(When(reason="ADJUSTMENT", then="amount"), default=Value(0),
                                                output_field=DecimalField(max_digits=14, decimal_places=2))),
                  month_commission=Sum(Case(When(reason="COMMISSION",
@@ -897,7 +862,7 @@ def export_csv(request):
 
     filename = f"stock_export_{timezone.now():%Y%m%d_%H%M}.csv"
     response = HttpResponse(content_type="text/csv; charset=utf-8")
-    response["Content-Disposition"] = f'attachment; filename="{filename}"'
+    response["Content-Disposition"] = f'attachment; filename="{filename}""
     response["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
     response["Pragma"] = "no-cache"
     response.write("\ufeff")

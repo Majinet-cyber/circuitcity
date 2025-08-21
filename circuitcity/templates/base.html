@@ -1,25 +1,31 @@
 {% load static %}
-<link rel="icon" href="{% static 'favicon.ico' %}" type="image/x-icon">
 <!DOCTYPE html>
 <html lang="en" data-theme="light">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <title>{% block title %}Circuit City{% endblock %}</title>
 
-  <!-- Your CSS bundles -->
+  <link rel="icon" href="{% static 'favicon.ico' %}" type="image/x-icon">
+
+  <!-- Fonts (crisp UI like your reference dashboards) -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+
+  <!-- CSS bundles -->
   <link rel="stylesheet" href="{% static 'css/tokens.css' %}?v={% now 'U' %}">
   <link rel="stylesheet" href="{% static 'css/app.css' %}?v={% now 'U' %}">
+  <!-- NEW: Polished buttons/cards/mobile styles -->
+  <link rel="stylesheet" href="{% static 'css/polish.css' %}?v={% now 'U' %}">
 
   <meta name="color-scheme" content="dark light">
   <meta name="theme-color" content="#0b5bd3">
-  <link rel="icon" href="{% static 'favicon.ico' %}">
-  <!-- Beta: keep search engines out (you also serve robots.txt = Disallow) -->
   <meta name="robots" content="noindex, nofollow">
 
   {% block extra_css %}{% endblock %}
 
-  <!-- Fallback design tokens + layout if app.css is missing/partial -->
+  <!-- Fallback tokens/layout if CSS isn't loaded (keeps UI usable) -->
   <style>
     :root[data-theme="light"]{
       --cc-bg:#f7fbff; --cc-panel:#ffffff; --cc-panel-2:#f2f7ff; --cc-border:#d6e4ff;
@@ -31,37 +37,49 @@
     }
 
     html, body { height:100% }
-    body { background:var(--cc-bg); color:var(--cc-text) }
+    body.cc-body {
+      margin:0; background:var(--cc-bg); color:var(--cc-text);
+      font:14px/1.45 "Inter", system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Cantarell,"Helvetica Neue",Arial,"Noto Sans","Apple Color Emoji","Segoe UI Emoji";
+      -webkit-font-smoothing:antialiased; text-rendering:optimizeLegibility;
+    }
+
+    /* Prevent mobile auto-zoom; comfy tap targets */
+    input, select, textarea, button { font-size:16px }
+    button, .btn, .touch { min-height:44px }
+
     a { color:var(--cc-accent); text-decoration:none }
     a:hover { text-decoration:underline }
 
-    .btn{display:inline-flex;align-items:center;gap:.45rem;padding:.5rem .75rem;
-         border:1px solid var(--cc-border);border-radius:.55rem;background:var(--cc-panel);
-         color:var(--cc-text);font-weight:600;cursor:pointer;text-decoration:none}
+    /* Utilities / a11y */
+    .sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+    :focus-visible { outline:2px solid var(--cc-accent); outline-offset:2px; border-radius:.4rem; }
+
+    /* Buttons (fallback only; polished styles come from polish.css) */
+    .btn{display:inline-flex;align-items:center;gap:.45rem;padding:.6rem .9rem;border:1px solid var(--cc-border);
+         border-radius:.65rem;background:var(--cc-panel);color:var(--cc-text);font-weight:700;cursor:pointer;text-decoration:none}
     .btn:hover{background:var(--cc-panel-2)}
     .btn-primary{background:#e7f0ff}
     .btn-green{background:#eafff7;border-color:#88e0c1}
     .cc-topbtn{white-space:nowrap}
 
+    /* Alerts */
     .cc-alert{border:1px solid transparent;border-radius:.6rem;padding:.75rem 1rem;margin:.5rem 0;display:flex;gap:.6rem;align-items:flex-start}
     .cc-alert-success{background:#0a3323;color:#c7f0da;border-color:#187a54}
     .cc-alert-error{background:#3a0a0a;color:#ffd7d7;border-color:#a33a3a}
     .cc-alert-info{background:#0b2638;color:#cfe9ff;border-color:#2a6ea7}
     .cc-alert .close{margin-left:auto;opacity:.7;cursor:pointer;border:0;background:transparent;color:inherit}
 
-    .skip-link{position:absolute;left:-9999px;top:auto;width:1px;height:1px;overflow:hidden}
-    .skip-link:focus{left:1rem;top:1rem;width:auto;height:auto;padding:.5rem .75rem;background:#111827;color:#fff;border-radius:.5rem;z-index:1000}
-
+    /* Topbar / shell */
     .cc-topnav{position:sticky;top:0;z-index:30;background:var(--cc-panel);border-bottom:1px solid var(--cc-border)}
     .topbar{display:flex;gap:.75rem;align-items:center;justify-content:space-between;padding:.6rem 1rem;max-width:1200px;margin:0 auto}
-    .cc-brand{display:flex;align-items:center;gap:.5rem;color:var(--cc-text);font-weight:800}
+    .cc-brand{display:flex;align-items:center;gap:.5rem;color:var(--cc-text);font-weight:800;text-decoration:none}
     .cc-logo{font-size:1.2rem}
 
     .cc-shell{display:grid;grid-template-columns:260px 1fr;min-height:calc(100vh - 56px)}
     .cc-shell.no-sidebar{grid-template-columns:1fr}
     .cc-sidebar{background:var(--cc-panel);border-right:1px solid var(--cc-border);padding:1rem .75rem}
     .cc-sidebar-group{font-size:.8rem;color:var(--cc-muted);text-transform:uppercase;letter-spacing:.05em;margin:.75rem .25rem}
-    .cc-sideitem{display:block;padding:.55rem .65rem;border-radius:.5rem;color:var(--cc-text)}
+    .cc-sideitem{display:block;padding:.55rem .65rem;border-radius:.5rem;color:var(--cc-text);text-decoration:none}
     .cc-sideitem:hover{background:var(--cc-panel-2)}
     .cc-sideitem.active{background:#e7f0ff;border:1px solid var(--cc-border)}
     [data-theme="dark"] .cc-sideitem.active{background:#142447;border-color:#2a4a9c}
@@ -69,6 +87,20 @@
     .cc-main{padding:1rem}
     .cc-container{max-width:1200px;margin:0 auto}
 
+    /* Tables (fallback) */
+    table{width:100%;border-collapse:collapse}
+    th,td{padding:.6rem .65rem;border-bottom:1px solid var(--cc-border);color:var(--cc-text)}
+    thead th{font-weight:700;color:var(--cc-muted)}
+    tbody tr:hover td{background:var(--cc-panel-2)}
+    .table-wrap{width:100%;overflow-x:auto;-webkit-overflow-scrolling:touch}
+    .table-wrap table{min-width:720px}
+
+    /* Responsive charts (fallback) */
+    .cc-chart-wrap{position:relative;width:100%;aspect-ratio:16/9}
+    .cc-chart{display:block;width:100%;height:100%}
+    @media (max-width:768px){ .cc-chart-wrap{aspect-ratio:4/3} }
+
+    /* Mobile shell behavior */
     @media (max-width:1024px){
       .cc-shell{grid-template-columns:1fr}
       .cc-sidebar{position:fixed;left:0;top:56px;bottom:0;width:280px;transform:translateX(-102%);transition:transform .2s ease;box-shadow:0 10px 30px rgba(0,0,0,.25);z-index:40}
@@ -76,15 +108,10 @@
       .cc-overlay[aria-hidden="true"]{display:none}
       .no-scroll{overflow:hidden}
     }
-
-    table{width:100%;border-collapse:collapse}
-    th,td{padding:.6rem .65rem;border-bottom:1px solid var(--cc-border);color:var(--cc-text)}
-    thead th{font-weight:700;color:var(--cc-muted)}
-    tbody tr:hover td{background:var(--cc-panel-2)}
   </style>
 </head>
 <body class="cc-body">
-  <a href="#main" class="skip-link">Skip to content</a>
+  <a href="#main" class="sr-only">Skip to content</a>
 
   <!-- Hidden CSRF token for JS -->
   <form id="__csrf__" style="display:none">{% csrf_token %}</form>
@@ -99,10 +126,9 @@
 
       <a class="cc-brand" href="{% url 'inventory:stock_list' %}">
         <span class="cc-logo" aria-hidden="true">📱</span>
-        <span> Circuit City</span>
+        <span>Circuit City</span>
       </a>
 
-      {% comment %} Top-right actions {% endcomment %}
       {% if request.user.is_authenticated %}
         <nav class="cc-topnav-actions actions-row" aria-label="Primary actions" style="display:flex;gap:.5rem;align-items:center">
           <a class="cc-topbtn btn btn-primary" href="{% url 'inventory:scan_in' %}">+ Stock IN</a>
@@ -110,16 +136,13 @@
           <a class="cc-topbtn btn"             href="{% url 'inventory:scan_web' %}">📷 Scan (Web)</a>
           <a class="cc-topbtn btn"             href="{% url 'inventory:time_checkin_page' %}">⏱ Time Check-in</a>
 
-          <!-- Phase 7: Send Feedback (prefilled mailto with context) -->
           <a class="cc-topbtn btn"
              aria-label="Send beta feedback"
              href="mailto:beta@circuitcity.example?subject=Beta%20Feedback%20on%20Circuit%20City
 &body=User:%20{{ request.user.username|default:'anon' }}
 %0APath:%20{{ request.path }}
 %0AUA:%20{{ request.META.HTTP_USER_AGENT|default:'n/a' }}
-%0ATime:%20{% now 'c' %}">
-            ✉ Feedback
-          </a>
+%0ATime:%20{% now 'c' %}">✉ Feedback</a>
 
           <div class="cc-user" style="display:flex;align-items:center;gap:.5rem">
             <button id="ccTheme" class="cc-topbtn btn cc-theme-toggle" title="Toggle theme" aria-label="Toggle theme">🌓</button>
@@ -129,16 +152,13 @@
         </nav>
       {% else %}
         <nav class="cc-topnav-actions" aria-label="Session" style="display:flex;gap:.5rem;align-items:center">
-          <!-- Phase 7: Feedback available even for anon (context still useful) -->
           <a class="cc-topbtn btn"
              aria-label="Send beta feedback"
              href="mailto:beta@circuitcity.example?subject=Beta%20Feedback%20on%20Circuit%20City
 &body=User:%20anon
 %0APath:%20{{ request.path }}
 %0AUA:%20{{ request.META.HTTP_USER_AGENT|default:'n/a' }}
-%0ATime:%20{% now 'c' %}">
-            ✉ Feedback
-          </a>
+%0ATime:%20{% now 'c' %}">✉ Feedback</a>
           <a class="cc-topbtn btn" href="{% url 'login' %}">Sign in</a>
           <button id="ccTheme" class="cc-topbtn btn cc-theme-toggle" title="Toggle theme" aria-label="Toggle theme">🌓</button>
         </nav>
@@ -177,15 +197,10 @@
              {% if n == 'time_logs' %}aria-current="page"{% endif %}
              href="{% url 'inventory:time_logs' %}">🗓 Time Logs</a>
 
-          {% if request.user.is_staff %}
-            <a class="cc-sideitem {% if n == 'dashboard' %}active{% endif %}"
-               {% if n == 'dashboard' %}aria-current="page"{% endif %}
-               href="{% url 'dashboard:dashboard' %}">📊 Dashboard</a>
-          {% else %}
-            <a class="cc-sideitem {% if n == 'agent_dashboard' %}active{% endif %}"
-               {% if n == 'agent_dashboard' %}aria-current="page"{% endif %}
-               href="{% url 'dashboard:agent_dashboard' %}">📊 Dashboard</a>
-          {% endif %}
+          <!-- Unified Dashboard link (prevents NoReverseMatch) -->
+          <a class="cc-sideitem {% if n == 'inventory_dashboard' %}active{% endif %}"
+             {% if n == 'inventory_dashboard' %}aria-current="page"{% endif %}
+             href="{% url 'inventory:inventory_dashboard' %}">📊 Dashboard</a>
         {% endwith %}
 
         {% if request.user.is_staff %}
@@ -266,9 +281,11 @@
         mq.addEventListener('change', closeSidebar);
       }
 
+      // Dismiss alerts
       document.querySelectorAll('.cc-alert .close').forEach(btn=>btn.addEventListener('click', ()=> btn.parentElement.remove()));
       setTimeout(()=>{ document.querySelectorAll('.cc-alert').forEach(el=>el.remove()); }, 4500);
 
+      // CSRF wrapper for same-origin POST/PUT/PATCH/DELETE
       const csrfEl = document.querySelector('#__csrf__ input[name=csrfmiddlewaretoken]');
       const CSRF_TOKEN = csrfEl ? csrfEl.value : null;
       const SAFE_METHODS = new Set(['GET','HEAD','OPTIONS','TRACE']);

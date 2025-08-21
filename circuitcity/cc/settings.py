@@ -128,6 +128,9 @@ SESSION_COOKIE_SAMESITE = os.environ.get("SESSION_COOKIE_SAMESITE", "Lax")
 CSRF_COOKIE_SAMESITE = os.environ.get("CSRF_COOKIE_SAMESITE", "Lax")
 SESSION_COOKIE_AGE = 60 * 60 * 4  # 4 hours
 
+# Explicit default session engine (DB-backed)
+SESSION_ENGINE = "django.contrib.sessions.backends.db"
+
 # ---- CSRF Trusted Origins (must include scheme) ----
 _default_csrf = ",".join(
     [
@@ -238,53 +241,54 @@ TEMPLATES = [
 WSGI_APPLICATION = "cc.wsgi.application"
 
 # -------------------------------------------------
-# Database — final, no-more-circles version
+# Database — production requires Postgres via DATABASE_URL
 # -------------------------------------------------
-# Rules:
-#  - If USE_LOCAL_SQLITE=1 (or DEBUG=True by default): SQLite.
-#  - Else if DATABASE_URL present: use it.
-#  - Else if Postgres env provided (and FORCE_POSTGRES=1 or not DEBUG): use Postgres.
-#  - Else: SQLite.
 DATABASES: dict = {}
 
+DATABASE_URL = os.environ.get("DATABASE_URL", "").strip()
 USE_LOCAL_SQLITE = env_bool("USE_LOCAL_SQLITE", default=DEBUG)
-FORCE_POSTGRES = env_bool("FORCE_POSTGRES", default=False)
-DATABASE_URL = os.environ.get("DATABASE_URL", "")
 
-if USE_LOCAL_SQLITE:
-    sqlite_path = "/var/tmp/db.sqlite3" if RENDER else str(BASE_DIR / "db.sqlite3")
+# In production (Render or DEBUG=False), require DATABASE_URL so we never fall back to SQLite.
+REQUIRE_DATABASE_URL = env_bool("REQUIRE_DATABASE_URL", (RENDER or not DEBUG))
+
+if DATABASE_URL:
+    try:
+        import dj_database_url  # type: ignore
+    except Exception as e:
+        raise RuntimeError("dj-database-url must be installed to use DATABASE_URL") from e
+
+    DATABASES["default"] = dj_database_url.parse(
+        DATABASE_URL,
+        conn_max_age=600,
+        ssl_require=USE_SSL,  # enforce SSL in prod
+    )
+elif REQUIRE_DATABASE_URL and not USE_LOCAL_SQLITE:
+    # Hard fail to avoid ephemeral SQLite in prod
+    raise RuntimeError("DATABASE_URL must be set in production (Render/DEBUG=False).")
+elif USE_LOCAL_SQLITE:
+    # Local dev default
+    sqlite_path = str(BASE_DIR / "db.sqlite3")
     DATABASES["default"] = {"ENGINE": "django.db.backends.sqlite3", "NAME": sqlite_path}
 else:
-    if DATABASE_URL:
-        try:
-            import dj_database_url  # type: ignore
-            DATABASES["default"] = dj_database_url.parse(
-                DATABASE_URL, conn_max_age=600, ssl_require=False
-            )
-        except Exception:
-            # Fallback if dj-database-url not installed
-            pass
-
-    if "default" not in DATABASES and (FORCE_POSTGRES or os.environ.get("POSTGRES_DB") or os.environ.get("DB_NAME")):
-        NAME = os.environ.get("POSTGRES_DB") or os.environ.get("DB_NAME", "circuitcity")
-        USER = os.environ.get("POSTGRES_USER") or os.environ.get("DB_USER", "ccuser")
-        PASSWORD = os.environ.get("POSTGRES_PASSWORD") or os.environ.get("DB_PASSWORD", "")
-        HOST = os.environ.get("POSTGRES_HOST") or os.environ.get("DB_HOST", "127.0.0.1")
-        PORT = os.environ.get("POSTGRES_PORT") or os.environ.get("DB_PORT", "5432")
-        DATABASES["default"] = {
-            "ENGINE": "django.db.backends.postgresql",
-            "NAME": NAME,
-            "USER": USER,
-            "PASSWORD": PASSWORD,
-            "HOST": HOST,
-            "PORT": PORT,
-            "CONN_MAX_AGE": 600,
-            "OPTIONS": {"connect_timeout": 5, **({"sslmode": "require"} if USE_SSL and HOST not in ("localhost","127.0.0.1") else {})},
-        }
-
-    if "default" not in DATABASES:
-        sqlite_path = "/var/tmp/db.sqlite3" if RENDER else str(BASE_DIR / "db.sqlite3")
-        DATABASES["default"] = {"ENGINE": "django.db.backends.sqlite3", "NAME": sqlite_path}
+    # Optional: discrete Postgres vars (rarely used now that we require DATABASE_URL)
+    NAME = os.environ.get("POSTGRES_DB") or os.environ.get("DB_NAME", "circuitcity")
+    USER = os.environ.get("POSTGRES_USER") or os.environ.get("DB_USER", "ccuser")
+    PASSWORD = os.environ.get("POSTGRES_PASSWORD") or os.environ.get("DB_PASSWORD", "")
+    HOST = os.environ.get("POSTGRES_HOST") or os.environ.get("DB_HOST", "127.0.0.1")
+    PORT = os.environ.get("POSTGRES_PORT") or os.environ.get("DB_PORT", "5432")
+    DATABASES["default"] = {
+        "ENGINE": "django.db.backends.postgresql",
+        "NAME": NAME,
+        "USER": USER,
+        "PASSWORD": PASSWORD,
+        "HOST": HOST,
+        "PORT": PORT,
+        "CONN_MAX_AGE": 600,
+        "OPTIONS": {
+            "connect_timeout": 5,
+            **({"sslmode": "require"} if USE_SSL and HOST not in ("localhost", "127.0.0.1") else {}),
+        },
+    }
 
 # -------------------------------------------------
 # Caching (60s default; Redis if REDIS_URL provided)

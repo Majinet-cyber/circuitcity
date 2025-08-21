@@ -120,11 +120,21 @@ body.cc-body {
 .table-wrap { width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; }
 .table-wrap table { min-width: 700px; }
 
-/* Make charts/images responsive */
-canvas, img, svg { max-width: 100%; height: auto; }
+/* ====== Chart sizing helpers (prevents over-stretch) ====== */
+.cc-chart-wrap { position: relative; width: 100%; max-width: 100%; }
+.cc-chart { display: block; width: 100% !important; height: 260px !important; }
+
+/* Make images/SVG responsive without forcing canvas height */
+img, svg { max-width: 100%; height: auto; }
+canvas { width: 100%; }
 
 /* Center the login card on desktops */
 .login-page .card { max-width: 520px; margin: 3rem auto; }
+
+/* Slightly tighter big-screen max width so charts/tables don't look too wide */
+@media (min-width: 1440px){
+  .cc-container { max-width: 1200px; }
+}
 
 /* ====== Mobile / Tablet (<= 1024px) ====== */
 @media (max-width: 1024px) {
@@ -164,4 +174,31 @@ canvas, img, svg { max-width: 100%; height: auto; }
   /* Slightly tighter top bar and table padding on small screens */
   .cc-topnav { padding: .5rem .75rem; }
   .table th, .table td { padding: .6rem; }
+
+  /* Charts: shorter height on phones */
+  .cc-chart { height: 200px !important; }
+}
+
+/* ====== Touch/Coarse pointer enhancements ====== */
+@media (pointer: coarse){
+  .cc-sideitem, .btn { min-height: 44px; }
+}
+
+/* ====== Subtle scrollbar polish (WebKit) ====== */
+.cc-sidebar::-webkit-scrollbar,
+.table-wrap::-webkit-scrollbar {
+  height: 10px; width: 10px;
+}
+.cc-sidebar::-webkit-scrollbar-thumb,
+.table-wrap::-webkit-scrollbar-thumb {
+  background: #cbd5e1; border-radius: 8px;
+}
+.cc-sidebar::-webkit-scrollbar-track,
+.table-wrap::-webkit-scrollbar-track {
+  background: #eff4ff;
+}
+
+/* ====== Reduced motion ====== */
+@media (prefers-reduced-motion: reduce){
+  .cc-sidebar { transition: none; }
 }

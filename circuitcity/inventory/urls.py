@@ -9,25 +9,21 @@ app_name = "inventory"
 urlpatterns = [
     # ---------- Dashboard ----------
     path("dashboard/", views.inventory_dashboard, name="inventory_dashboard"),
-
-    # Aliases / legacy
-    path("", RedirectView.as_view(pattern_name="inventory:inventory_dashboard", permanent=False)),
-    path("dash/", RedirectView.as_view(pattern_name="inventory:inventory_dashboard", permanent=False), name="dashboard"),
-    # Handle old links like /dashboard/agent/ → main dashboard
-    path("dashboard/agent/", RedirectView.as_view(pattern_name="inventory:inventory_dashboard", permanent=False),
-         name="inventory_dashboard_agent"),
+    # Home in this app → dashboard
+    path("", RedirectView.as_view(pattern_name="inventory:inventory_dashboard", permanent=False), name="home"),
+    path("dash/", RedirectView.as_view(pattern_name="inventory:inventory_dashboard", permanent=False)),
+    # Old links
+    path("dashboard/agent/",  RedirectView.as_view(pattern_name="inventory:inventory_dashboard", permanent=False)),
     path("dashboard/agents/", RedirectView.as_view(pattern_name="inventory:inventory_dashboard", permanent=False)),
 
     # ---------- Stock scanning ----------
-    path("scan-in/",   views.scan_in,   name="scan_in")
-,
+    path("scan-in/",   views.scan_in,   name="scan_in"),
     path("scan-sold/", views.scan_sold, name="scan_sold"),
     path("scan-web/",  views.scan_web,  name="scan_web"),  # desktop-first scanner page
-
     # Short mobile-friendly aliases (optional)
     path("in/",   RedirectView.as_view(pattern_name="inventory:scan_in",   permanent=False), name="short_in"),
     path("sold/", RedirectView.as_view(pattern_name="inventory:scan_sold", permanent=False), name="short_sold"),
-    path("scan/", RedirectView.as_view(pattern_name="inventory:scan_sold", permanent=False), name="short_scan"),
+    path("scan/", RedirectView.as_view(pattern_name="inventory:scan_web",  permanent=False), name="short_scan"),
 
     # ---------- Stock viewing ----------
     path("list/",   views.stock_list, name="stock_list"),
@@ -51,6 +47,9 @@ urlpatterns = [
     path("time/logs/",    views.time_logs,         name="time_logs"),
     path("wallet/",       views.wallet_page,       name="wallet"),
     path("time/", RedirectView.as_view(pattern_name="inventory:time_checkin_page", permanent=False)),
+
+    # (Optional) App-local health check
+    path("healthz/", views.healthz, name="healthz"),
 ]
 
 # ---------- API: Time, Wallet, Charts ----------

@@ -5,38 +5,72 @@
 
 {% block extra_css %}
 <style>
-  :root[data-theme="light"]{--deep-bg:#eef5ff;--deep-panel:#ffffff;--deep-panel-2:#f2f7ff;--deep-border:#cfe0ff;--deep-accent:#2f6df6;--deep-accent-2:#46c0ff}
-  :root[data-theme="dark"]{--deep-bg:#0a1222;--deep-panel:#0d162b;--deep-panel-2:#0f1b33;--deep-border:#21375c;--deep-accent:#76a9ff;--deep-accent-2:#4ecbff}
+  /* ===== Blue theme (auto light/dark) ===== */
+  :root[data-theme="light"]{
+    --deep-bg:#eef5ff; --deep-panel:#ffffff; --deep-panel-2:#f2f7ff;
+    --deep-border:#cfe0ff; --deep-accent:#2f6df6; --deep-accent-2:#46c0ff;
+    --cc-text:#0f172a; --cc-muted:#64748b;
+  }
+  :root[data-theme="dark"]{
+    --deep-bg:#0a1222; --deep-panel:#0d162b; --deep-panel-2:#0f1b33;
+    --deep-border:#21375c; --deep-accent:#76a9ff; --deep-accent-2:#4ecbff;
+    --cc-text:#e5edff; --cc-muted:#9db4d6;
+  }
+
+  .sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+
+  section{max-width:1200px;margin-inline:auto}
   .stock-head{display:flex;justify-content:space-between;align-items:center;margin:0 0 .75rem}
   .stock-actions{display:flex;gap:.5rem;align-items:center;flex-wrap:wrap}
   .pill{display:inline-flex;align-items:center;gap:.4rem;padding:.45rem .7rem;border-radius:.6rem;background:var(--deep-panel-2);border:1px solid var(--deep-border);font-weight:700;color:var(--cc-text)}
   .pill strong{font-weight:800}
+
   .filters{display:flex;gap:.5rem;align-items:center;flex-wrap:wrap;margin:.5rem 0 .75rem}
-  .filters input[type="text"], .filters select, .filters input[type="number"]{padding:.45rem .55rem;border-radius:.45rem;border:1px solid var(--deep-border);background:var(--deep-panel)}
-  .filters .btn-deep{margin-left:.25rem}
-  .ticker{background:var(--deep-panel-2);border:1px solid var(--deep-border);border-radius:14px;padding:12px}
-  .ticker-row{display:grid;grid-template-columns:1.2fr 1fr .8fr .8fr .8fr 1fr 120px;gap:12px;align-items:center}
-  .ticker-row > div{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-  .ticker-controls{display:flex;gap:.4rem;margin-top:.6rem;flex-wrap:wrap}
-  .btn-deep{background:linear-gradient(180deg, rgba(255,255,255,.18), rgba(255,255,255,.06));border:1px solid var(--deep-border);border-radius:.5rem;padding:.45rem .65rem;font-weight:700;color:var(--cc-text);text-decoration:none}
+  .filters input[type="text"], .filters select, .filters input[type="number"]{
+    padding:.45rem .55rem;border-radius:.45rem;border:1px solid var(--deep-border);background:var(--deep-panel)
+  }
+  .btn-deep{
+    background:linear-gradient(180deg, rgba(255,255,255,.18), rgba(255,255,255,.06));
+    border:1px solid var(--deep-border);border-radius:.5rem;padding:.45rem .65rem;
+    font-weight:700;color:var(--cc-text);text-decoration:none
+  }
   .btn-deep:hover{background:var(--deep-panel)}
   .btn-deep.active{outline:2px solid var(--deep-accent); box-shadow:0 0 0 2px rgba(47,109,246,.15) inset}
+
+  /* ===== Ticker ===== */
+  .ticker{background:var(--deep-panel-2);border:1px solid var(--deep-border);border-radius:14px;padding:12px}
+  .ticker-row{display:grid;grid-template-columns:1.2fr 1fr .8fr .8fr .8fr 1fr 1fr;gap:12px;align-items:center}
+  .ticker-row > div{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .ticker-controls{display:flex;gap:.4rem;margin-top:.6rem;flex-wrap:wrap}
+
+  /* ===== Table ===== */
   #stockTableWrap{margin-top:12px}
   #stockTable{width:100%;border-collapse:collapse;background:var(--deep-panel);border:1px solid var(--deep-border);border-radius:12px;overflow:hidden}
-  #stockTable thead th{font-weight:700;color:var(--cc-muted);background:var(--deep-panel-2)}
+  #stockTable thead th{position:sticky;top:0;z-index:1;font-weight:700;color:var(--cc-muted);background:var(--deep-panel-2)}
   #stockTable th,#stockTable td{padding:.6rem .65rem;border-bottom:1px solid var(--deep-border);vertical-align:middle}
-  #stockTable tbody tr:hover td{background:rgba(80,120,220,.08)}
+  #stockTable tbody tr:hover td{background:rgba(47,109,246,.08)}
   #stockTable td.num{text-align:right;font-variant-numeric:tabular-nums}
+
+  .badge{display:inline-block;padding:.2rem .5rem;border-radius:999px;border:1px solid var(--deep-border)}
+  .badge.green{background:#eafff4;color:#0b6b3a}
+  .badge.red{background:#ffecec;color:#9f1c1c}
+
+  nav.pager{display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;margin-top:.75rem}
+  nav.pager .info{color:var(--cc-muted)}
+
+  /* ===== Charts (no stretching) ===== */
   .charts{display:grid;grid-template-columns:1.4fr 1fr;gap:14px;margin-top:14px}
   .chart-card{background:var(--deep-panel-2);border:1px solid var(--deep-border);border-radius:14px;padding:12px}
   .chart-card h3{margin:.25rem 0 .6rem;font-size:.95rem;color:var(--cc-muted)}
   .chart-toolbar{display:flex;gap:.5rem;align-items:center;justify-content:flex-end}
-  .badge{display:inline-block;padding:.2rem .5rem;border-radius:999px;border:1px solid var(--deep-border)}
-  .badge.green{background:#eafff4;color:#0b6b3a}
-  .badge.red{background:#ffecec;color:#9f1c1c}
-  nav.pager{display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;margin-top:.75rem}
-  nav.pager .info{color:var(--cc-muted)}
-  @media (max-width: 900px){.ticker-row{grid-template-columns:1fr .9fr .6fr .7fr .7fr .8fr .9fr}.charts{grid-template-columns:1fr}}
+  .chart-canvas{width:100% !important;max-width:100%;height:240px !important}         /* <- cap height */
+  .chart-canvas--sm{height:200px !important}
+
+  @media (max-width: 900px){
+    .ticker-row{grid-template-columns:1fr .9fr .7fr .8fr .8fr .9fr 1fr}
+    .charts{grid-template-columns:1fr}
+    .chart-canvas{height:220px !important}
+  }
 </style>
 {% endblock %}
 
@@ -74,6 +108,7 @@
     <a class="btn-deep" href="{% url 'inventory:export_csv' %}?{% for k,v in request.GET.items %}{% if k != 'export' %}{{k}}={{v|urlencode}}&{% endif %}{% endfor %}export=csv">Download CSV</a>
   </form>
 
+  <!-- ========== Ticker / Preview ========== -->
   <div id="ticker" class="ticker" role="region" aria-live="polite" aria-label="Rotating stock">
     <div class="ticker-row" id="tickerRow">
       <div>IMEI</div><div>Product</div><div>Status</div><div>Order Price</div><div>Selling Price</div><div>Location</div><div>Agent</div>
@@ -88,62 +123,65 @@
     </div>
   </div>
 
+  <!-- ========== Full Table ========== -->
   <div id="stockTableWrap" hidden>
     <div style="display:flex;justify-content:space-between;align-items:center;margin:.5rem 0 .75rem">
       <div style="font-weight:700;color:var(--cc-muted)">All stock</div>
       <a class="btn-deep" href="{{ request.path }}">Hide table</a>
     </div>
 
-    <table id="stockTable">
-      <thead>
-        <tr>
-          <th>IMEI</th><th>Product</th><th>Status</th><th>Order Price</th><th>Selling Price</th><th>Location</th><th>Agent</th>
-        </tr>
-      </thead>
-      <tbody>
-        {% if page_obj %}
-          {% for it in page_obj.object_list %}
+    <div class="table-responsive">
+      <table id="stockTable">
+        <thead>
+          <tr>
+            <th>IMEI</th><th>Product</th><th>Status</th><th>Order Price</th><th>Selling Price</th><th>Location</th><th>Agent</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% if page_obj %}
+            {% for it in page_obj.object_list %}
+              <tr>
+                <td>{{ it.imei|default:"" }}</td>
+                <td>{{ it.product }}</td>
+                <td>
+                  {% if it.status == 'SOLD' %}
+                    <span class="badge red">Sold</span>
+                  {% else %}
+                    <span class="badge green">In stock</span>
+                  {% endif %}
+                </td>
+                <td class="num">{% if it.order_price is not None %}{{ it.order_price|floatformat:0|intcomma }}{% else %}—{% endif %}</td>
+                <td class="num">{% if it.selling_price is not None %}{{ it.selling_price|floatformat:0|intcomma }}{% else %}—{% endif %}</td>
+                <td>{% if it.current_location_id %}{{ it.current_location.name }}{% else %}—{% endif %}</td>
+                <td>{% if it.assigned_agent_id %}{{ it.assigned_agent.username }}{% else %}—{% endif %}</td>
+              </tr>
+            {% empty %}
+              <tr><td colspan="7" style="text-align:center;color:var(--cc-muted)">No stock yet.</td></tr>
+            {% endfor %}
+          {% else %}
+            {% for row in rows %}
             <tr>
-              <td>{{ it.imei|default:"" }}</td>
-              <td>{{ it.product }}</td>
+              <td>{{ row.imei }}</td>
+              <td>{{ row.product }}</td>
               <td>
-                {% if it.status == 'SOLD' %}
+                {% if row.status == 'SOLD' %}
                   <span class="badge red">Sold</span>
                 {% else %}
                   <span class="badge green">In stock</span>
                 {% endif %}
               </td>
-              <td class="num">{% if it.order_price is not None %}{{ it.order_price|floatformat:0 }}{% else %}—{% endif %}</td>
-              <td class="num">{% if it.selling_price is not None %}{{ it.selling_price|floatformat:0 }}{% else %}—{% endif %}</td>
-              <td>{% if it.current_location_id %}{{ it.current_location.name }}{% else %}—{% endif %}</td>
-              <td>{% if it.assigned_agent_id %}{{ it.assigned_agent.username }}{% else %}—{% endif %}</td>
+              <td class="num">{{ row.order_price }}</td>
+              <td class="num">{{ row.selling_price|default:"—" }}</td>
+              <td>{{ row.location }}</td>
+              <td>{{ row.agent }}</td>
             </tr>
-          {% empty %}
+            {% empty %}
             <tr><td colspan="7" style="text-align:center;color:var(--cc-muted)">No stock yet.</td></tr>
-          {% endfor %}
-        {% else %}
-          {% for row in rows %}
-          <tr>
-            <td>{{ row.imei }}</td>
-            <td>{{ row.product }}</td>
-            <td>
-              {% if row.status == 'SOLD' %}
-                <span class="badge red">Sold</span>
-              {% else %}
-                <span class="badge green">In stock</span>
-              {% endif %}
-            </td>
-            <td class="num">{{ row.order_price }}</td>
-            <td class="num">{{ row.selling_price|default:"—" }}</td>
-            <td>{{ row.location }}</td>
-            <td>{{ row.agent }}</td>
-          </tr>
-          {% empty %}
-          <tr><td colspan="7" style="text-align:center;color:var(--cc-muted)">No stock yet.</td></tr>
-          {% endfor %}
-        {% endif %}
-      </tbody>
-    </table>
+            {% endfor %}
+          {% endif %}
+        </tbody>
+      </table>
+    </div>
 
     {% if page_obj %}
       <nav class="pager">
@@ -158,6 +196,7 @@
     {% endif %}
   </div>
 
+  <!-- ========== Charts ========== -->
   <div class="charts">
     <div class="chart-card">
       <div style="display:flex;justify-content:space-between;align-items:center">
@@ -175,7 +214,9 @@
           </select>
         </div>
       </div>
-      <canvas id="salesTrend" height="120" aria-label="Sales trend line chart" role="img"></canvas>
+      <div style="position:relative">
+        <canvas id="salesTrend" class="chart-canvas" aria-label="Sales trend line chart" role="img"></canvas>
+      </div>
     </div>
 
     <div class="chart-card">
@@ -189,7 +230,9 @@
           </select>
         </div>
       </div>
-      <canvas id="topModels" height="120" aria-label="Top models pie chart" role="img"></canvas>
+      <div style="position:relative">
+        <canvas id="topModels" class="chart-canvas chart-canvas--sm" aria-label="Top models pie chart" role="img"></canvas>
+      </div>
     </div>
   </div>
 </section>
@@ -205,6 +248,7 @@
   const ticker   = document.getElementById('ticker');
   if (showAll){ tableWrap.hidden = false; ticker.hidden = true; }
 
+  /* ===== Build ticker data from table (server-paginated or injected rows) ===== */
   const tbody = document.querySelector('#stockTable tbody');
   const rows  = Array.from((tbody || {}).rows || []).map(tr => {
     const td = tr.querySelectorAll('td');
@@ -221,7 +265,10 @@
 
   const tickerRow = document.getElementById('tickerRow');
   function renderTicker(i){
-    if (!rows.length) { tickerRow.innerHTML = '<div>No stock yet</div>'; return; }
+    if (!rows.length) {
+      tickerRow.innerHTML = '<div style="grid-column:1/-1;color:var(--cc-muted)">No stock yet</div>';
+      return;
+    }
     const r = rows[i % rows.length];
     tickerRow.innerHTML = `
       <div title="${r.imei}">${r.imei}</div>
@@ -235,39 +282,72 @@
   }
   let idx = 0;
   renderTicker(idx);
-  setInterval(()=>{ idx = (idx+1) % (rows.length || 1); renderTicker(idx); }, 5000);
+  const tickerTimer = setInterval(()=>{ idx = (idx+1) % (rows.length || 1); renderTicker(idx); }, 5000);
   document.getElementById('nextRow').addEventListener('click', ()=>{ idx = (idx+1) % (rows.length||1); renderTicker(idx); });
   document.getElementById('prevRow').addEventListener('click', ()=>{ idx = (idx-1+rows.length) % (rows.length||1); renderTicker(idx); });
 
-  const $ = sel => document.querySelector(sel);
+  /* ===== Charts (fixed heights, no stretch) ===== */
+  const BLUE = 'rgba(59,130,246,0.9)';   // blue fun
+  const BLUE_SOFT = 'rgba(59,130,246,0.2)';
+  const GREEN = 'rgba(16,185,129,0.9)';
+  const GRAY = '#94a3b8';
+
   const salesCtx = document.getElementById('salesTrend').getContext('2d');
   const topCtx   = document.getElementById('topModels').getContext('2d');
   let salesChart = null, topChart = null;
 
+  function scaleOpts(){
+    return {
+      x: { ticks:{ maxTicksLimit: 10, color:'var(--cc-muted)' }, grid:{ color:'rgba(148,163,184,.25)' } },
+      y: { beginAtZero:true, ticks:{ maxTicksLimit: 6, color:'var(--cc-muted)' }, grid:{ color:'rgba(148,163,184,.25)' } }
+    };
+  }
+
   async function loadTrend(){
-    const period = $('#trendPeriod').value;
-    const metric = $('#trendMetric').value;
+    const period = document.getElementById('trendPeriod').value;
+    const metric = document.getElementById('trendMetric').value;
     const url = "{% url 'inventory:api_sales_trend' %}" + `?period=${period}&metric=${metric}`;
-    const res = await fetch(url); const data = await res.json();
+    const res = await fetch(url);
+    const data = await res.json();
+
     const cfg = {
       type:'line',
-      data:{ labels:data.labels, datasets:[{ label: metric==='amount'?'Sales (MK)':'Sales (count)', data:data.values }]},
-      options:{ responsive:true, maintainAspectRatio:false, elements:{ line:{ tension:.3 }}, scales:{ y:{ beginAtZero:true } } }
+      data:{
+        labels:data.labels,
+        datasets:[{
+          label: metric==='amount'?'Sales (MK)':'Sales (count)',
+          data:data.values,
+          borderColor:BLUE, backgroundColor:BLUE_SOFT,
+          fill:true, pointRadius:2, tension:.35
+        }]
+      },
+      options:{
+        responsive:true, maintainAspectRatio:false,
+        plugins:{ legend:{ display:false }, tooltip:{ mode:'index', intersect:false } },
+        scales: scaleOpts()
+      }
     };
-    salesChart && salesChart.destroy(); salesChart = new Chart(salesCtx, cfg);
+    if(salesChart) salesChart.destroy();
+    salesChart = new Chart(salesCtx, cfg);
   }
 
   async function loadTop(){
-    const period = $('#topPeriod').value;
+    const period = document.getElementById('topPeriod').value;
     const url = "{% url 'inventory:api_top_models' %}" + `?period=${period}`;
-    const res = await fetch(url); const data = await res.json();
-    const cfg = { type:'pie', data:{ labels:data.labels, datasets:[{ data:data.values }] }, options:{ responsive:true, maintainAspectRatio:false } };
-    topChart && topChart.destroy(); topChart = new Chart(topCtx, cfg);
+    const res = await fetch(url);
+    const data = await res.json();
+    const cfg = {
+      type:'pie',
+      data:{ labels:data.labels, datasets:[{ data:data.values, backgroundColor:[BLUE, GREEN, GRAY, '#60a5fa', '#86efac'] }] },
+      options:{ responsive:true, maintainAspectRatio:false, plugins:{ legend:{ position:'bottom' } } }
+    };
+    if(topChart) topChart.destroy();
+    topChart = new Chart(topCtx, cfg);
   }
 
-  $('#trendPeriod').addEventListener('change', loadTrend);
-  $('#trendMetric').addEventListener('change', loadTrend);
-  $('#topPeriod').addEventListener('change', loadTop);
+  document.getElementById('trendPeriod').addEventListener('change', loadTrend);
+  document.getElementById('trendMetric').addEventListener('change', loadTrend);
+  document.getElementById('topPeriod').addEventListener('change', loadTop);
 
   loadTrend(); loadTop();
 })();

@@ -1,0 +1,75 @@
+{% extends "base.html" %}
+{% load static %}
+{% block content %}
+<div class="container">
+
+  <!-- HERO WALLET -->
+  <section class="wallet-hero">
+    <div class="wallet-balance">
+      <div class="label">Net Wallet Value – Last 30 Days</div>
+      <div class="amount">{{ last30_value|default:"15 323 092" }}</div>
+      <div class="wallet-actions mt-4">
+        <button class="btn btn-success">
+          <span class="chip">✓</span> View Dashboard
+        </button>
+        <a href="{% url 'contracts:list' %}" class="btn btn-primary">Per Contract Summary</a>
+        <button class="btn btn-outline">Export CSV</button>
+      </div>
+    </div>
+
+    <div class="grid grid-sm-2">
+      <div class="card">
+        <div class="card-header">Current Wallet – Unpaid</div>
+        <div class="card-value">{{ unpaid_balance|default:"14 529 459" }}</div>
+        <div class="card-sub"><span class="badge badge-neg">NEGATIVE</span> unpaid impact</div>
+        <div id="chart-unpaid" class="chart mt-4"></div>
+      </div>
+
+      <div class="card">
+        <div class="card-header">MBO Wallet Transactions by Type – L30D</div>
+        <div class="card-sub">
+          <span class="badge badge-neg">NEGATIVE</span>
+          <span class="badge badge-pos">POSITIVE</span>
+        </div>
+        <div id="chart-l30d" class="chart mt-4"></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header">Lifetime Wallet Balance</div>
+      <div class="card-value">{{ lifetime_balance|default:"75 423 963" }}</div>
+    </div>
+  </section>
+
+  <!-- OPTIONAL: recent transactions table -->
+  {% if transactions %}
+  <section class="mt-6 card">
+    <div class="card-header">Recent Transactions</div>
+    <div class="table-wrap">
+      <table class="table">
+        <thead>
+          <tr><th>Date</th><th>Type</th><th>Amount</th><th>Status</th></tr>
+        </thead>
+        <tbody>
+          {% for tx in transactions %}
+            <tr>
+              <td>{{ tx.date }}</td>
+              <td>{{ tx.kind }}</td>
+              <td>{{ tx.amount|floatformat:0 }}</td>
+              <td>
+                {% if tx.amount|floatformat:0|add:'0'|floatformat >= 0 %}
+                  <span class="badge badge-pos">POSITIVE</span>
+                {% else %}
+                  <span class="badge badge-neg">NEGATIVE</span>
+                {% endif %}
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+  {% endif %}
+
+</div>
+{% endblock %}
