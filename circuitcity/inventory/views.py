@@ -25,9 +25,10 @@ import math
 from datetime import timedelta, datetime
 from urllib.parse import urlencode
 
-# Forms that actually exist
+# Forms
 from .forms import ScanInForm, ScanSoldForm, InventoryItemForm
 
+# Models
 from .models import (
     InventoryItem,
     Product,
@@ -40,7 +41,7 @@ from .models import (
 )
 from sales.models import Sale
 
-# Dashboard cache version (signals may bump this). Safe fallback.
+# Cache version (signals may bump this). Safe fallback.
 try:
     from .cache_utils import get_dashboard_cache_version
 except Exception:
@@ -50,7 +51,7 @@ except Exception:
 User = get_user_model()
 
 # ------------------------------------------------------------------
-# Warranty lookups DISABLED: no import of warranty.py or requests.
+# Warranty lookups DISABLED: do NOT import warranty.py or requests.
 # ------------------------------------------------------------------
 _WARRANTY_LOOKUPS_DISABLED = True
 

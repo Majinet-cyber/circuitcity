@@ -4,21 +4,26 @@ databases:
 
 services:
   - type: web
-    name: django-app
+    name: circuitcity-main
     env: python
     plan: free
+    autoDeploy: true
+
     buildCommand: |
       pip install --upgrade pip
       pip install -r requirements.txt
-      python manage.py collectstatic --noinput
+      python manage.py collectstatic --noinput --settings=cc.settings
+      python manage.py migrate --noinput --settings=cc.settings
+
+    # Force working dir to the folder that has manage.py and the cc/ package
     startCommand: >
-      bash -lc "python manage.py migrate --noinput &&
-      gunicorn YOUR_PROJECT_PACKAGE.wsgi:application
-      --workers=${WEB_CONCURRENCY:-2} --threads=4 --timeout=120 --log-file -"
-    autoDeploy: true
+      gunicorn --chdir /opt/render/project/src/circuicity
+      cc.wsgi:application
+      --workers=${WEB_CONCURRENCY:-2} --threads=4 --timeout=120 --log-file -
+
     envVars:
       - key: DJANGO_SETTINGS_MODULE
-        value: circuitcity.settings
+        value: cc.settings
       - key: SECRET_KEY
         generateValue: true
       - key: PYTHON_VERSION
