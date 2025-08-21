@@ -7,7 +7,7 @@
 
   <!-- Bootstrap / Chart.js -->
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
   <style>
     /* ===== Blue theme ===== */
@@ -23,22 +23,17 @@
       --chip:#f1f5f9;
       --ring:0 0 0 .25rem rgba(59,130,246,.25);
     }
-
     body{ background:#f6f9ff; }
-
-    /* Page wrapper */
     .cc-page{ max-width:1200px; margin:0 auto; padding:1rem; }
 
-    /* Top bar */
     .cc-title{ font-weight:800; letter-spacing:.2px; }
     .cc-title .emoji{ filter: drop-shadow(0 6px 10px rgba(37,99,235,.25)); }
 
-    /* Buttons / inputs */
     .btn-primary{ background:var(--blue-600); border-color:var(--blue-600); }
     .btn-primary:hover{ background:var(--blue-700); border-color:var(--blue-700); }
     .form-select:focus{ box-shadow:var(--ring); border-color:var(--blue-500); }
 
-    /* ===== KPI cards ===== */
+    /* KPI cards */
     .kpi-card{
       background:linear-gradient(135deg, var(--blue-600), var(--blue-400));
       color:#fff;
@@ -59,7 +54,7 @@
     }
     .cc-card h5{ margin-bottom:.75rem; font-weight:700; }
 
-    /* Wallet chips (table) */
+    /* Wallet chips */
     .wallet-chip{
       display:inline-block;
       font-weight:700; font-size:.85rem;
@@ -98,15 +93,10 @@
     .sortable::after{ content:' ↕'; opacity:.35; font-weight:normal }
     .table>tbody>tr>td{ vertical-align:middle }
 
-    /* Charts: cap height so they don't stretch */
+    /* Charts */
     .chart-canvas{ width:100% !important; max-width:100%; height:260px !important }
     .chart-canvas--sm{ height:200px !important }
 
-    /* Misc */
-    .agent-link{ text-decoration:none }
-    .agent-link:hover{ text-decoration:underline }
-
-    /* Mobile tweaks */
     @media (max-width: 992px){
       .cc-page{ padding:.75rem }
       .kpi-card .value{ font-size:1.45rem }
@@ -206,9 +196,10 @@
                           {{ r.agent__username }}
                         {% endif %}
                       </td>
-                      <td class="text-end">{{ r.earnings|default:0 }}</td>
-                      <td class="text-end">{{ r.total_sales|default:0 }}</td>
-                      <td class="text-end">{{ r.revenue|default:0 }}</td>
+                      <!-- number spans use JS to add thousand separators without needing {% load humanize %} -->
+                      <td class="text-end"><span class="num" data-value="{{ r.earnings|default:0 }}"></span></td>
+                      <td class="text-end"><span class="num" data-value="{{ r.total_sales|default:0 }}"></span></td>
+                      <td class="text-end"><span class="num" data-value="{{ r.revenue|default:0 }}"></span></td>
                       <td class="text-end">
                         <span class="wallet-chip loading" data-user-id="{{ r.agent_id }}" data-username="{{ r.agent__username }}">…</span>
                       </td>
@@ -290,8 +281,8 @@
               {% for row in agent_rows %}
               <tr>
                 <td>{{ row.agent }}</td>
-                <td class="text-end">{{ row.total_stock }}</td>
-                <td class="text-end">{{ row.sold_units }}</td>
+                <td class="text-end"><span class="num" data-value="{{ row.total_stock|default:0 }}"></span></td>
+                <td class="text-end"><span class="num" data-value="{{ row.sold_units|default:0 }}"></span></td>
               </tr>
               {% endfor %}
             </tbody>
@@ -360,8 +351,15 @@
     makeSortable('tblAgents');
     makeSortable('tblAgentStock');
 
+    /* ===== number formatter (adds thousand separators) ===== */
+    const nf = new Intl.NumberFormat();
+    document.querySelectorAll('.num').forEach(el=>{
+      const v = Number(el.getAttribute('data-value') || '0');
+      el.textContent = nf.format(v);
+    });
+
     /* ===== formatters ===== */
-    function fmtnum(n){ const s=n<0?'-':''; const x=Math.abs(n||0); return s + x.toLocaleString(); }
+    function fmtnum(n){ return (new Intl.NumberFormat()).format(n||0); }
     function mk(n){ return 'MK ' + fmtnum(n); }
 
     /* ===== wallet chips ===== */
@@ -422,7 +420,7 @@
       wm.show();
     }
 
-    /* ===== charts ===== */
+    /* ===== charts (guarded) ===== */
     const labels         = {{ labels_json|safe }};
     const revenuePoints  = {{ revenue_points_json|safe }};
     const profitPoints   = {{ profit_points_json|safe }};
@@ -430,23 +428,32 @@
     const colorRevenue   = 'rgba(59,130,246,0.85)';  /* blue */
     const colorProfit    = 'rgba(16,185,129,0.85)';  /* green */
 
-    new Chart(document.getElementById('barRevenue'), {
-      type:'bar',
-      data:{ labels, datasets:[{ label:'Revenue', data:revenuePoints, backgroundColor:colorRevenue }] },
-      options:{ responsive:true, plugins:{ legend:{ display:false } }, scales:{ y:{ beginAtZero:true } } }
-    });
+    function makeBar(id, label, data, color){
+      const el = document.getElementById(id);
+      if(!el) return;
+      new Chart(el, {
+        type:'bar',
+        data:{ labels, datasets:[{ label, data, backgroundColor:color }] },
+        options:{
+          responsive:true,
+          plugins:{ legend:{ display:false }, tooltip:{ callbacks:{ label:(ctx)=> mk(ctx.parsed.y) } } },
+          scales:{ y:{ beginAtZero:true, ticks:{ callback:(v)=> fmtnum(v) } } }
+        }
+      });
+    }
+    function makePie(id, data){
+      const el = document.getElementById(id);
+      if(!el) return;
+      new Chart(el, {
+        type:'pie',
+        data:{ labels:['Cost','Revenue','Profit'], datasets:[{ data, backgroundColor:['#94a3b8', colorRevenue, colorProfit] }] },
+        options:{ responsive:true, plugins:{ legend:{ position:'bottom' }, tooltip:{ callbacks:{ label:(ctx)=> `${ctx.label}: ${mk(ctx.parsed)}` } } } }
+      });
+    }
 
-    new Chart(document.getElementById('barProfit'), {
-      type:'bar',
-      data:{ labels, datasets:[{ label:'Profit', data:profitPoints, backgroundColor:colorProfit }] },
-      options:{ responsive:true, plugins:{ legend:{ display:false } }, scales:{ y:{ beginAtZero:true } } }
-    });
-
-    new Chart(document.getElementById('pieCRP'), {
-      type:'pie',
-      data:{ labels:['Cost','Revenue','Profit'], datasets:[{ data:pieData, backgroundColor:['#94a3b8', colorRevenue, colorProfit] }] },
-      options:{ responsive:true, plugins:{ legend:{ position:'bottom' } } }
-    });
+    makeBar('barRevenue', 'Revenue', revenuePoints, colorRevenue);
+    makeBar('barProfit',  'Profit',  profitPoints,  colorProfit);
+    makePie('pieCRP', pieData);
     {% endif %}
   </script>
 </body>
