@@ -22,8 +22,13 @@
   section{max-width:1200px;margin-inline:auto}
   .stock-head{display:flex;justify-content:space-between;align-items:center;margin:0 0 .75rem}
   .stock-actions{display:flex;gap:.5rem;align-items:center;flex-wrap:wrap}
+  /* NEW: make action row nicely scroll on mobile */
+  .stock-actions{overflow-x:auto;-webkit-overflow-scrolling:touch;padding-bottom:.25rem}
   .pill{display:inline-flex;align-items:center;gap:.4rem;padding:.45rem .7rem;border-radius:.6rem;background:var(--deep-panel-2);border:1px solid var(--deep-border);font-weight:700;color:var(--cc-text)}
   .pill strong{font-weight:800}
+
+  /* NEW: collapsible wrapper for the filters (used only on phones) */
+  .filters-wrap.collapsed{display:none}
 
   .filters{display:flex;gap:.5rem;align-items:center;flex-wrap:wrap;margin:.5rem 0 .75rem}
   .filters input[type="text"], .filters select, .filters input[type="number"]{
@@ -63,8 +68,15 @@
   .chart-card{background:var(--deep-panel-2);border:1px solid var(--deep-border);border-radius:14px;padding:12px}
   .chart-card h3{margin:.25rem 0 .6rem;font-size:.95rem;color:var(--cc-muted)}
   .chart-toolbar{display:flex;gap:.5rem;align-items:center;justify-content:flex-end}
-  .chart-canvas{width:100% !important;max-width:100%;height:240px !important}         /* <- cap height */
+  .chart-canvas{width:100% !important;max-width:100%;height:240px !important}
   .chart-canvas--sm{height:200px !important}
+
+  /* NEW: mobile "card table" */
+  .table-mobile{width:100%;border:1px solid var(--deep-border);border-radius:12px;background:var(--deep-panel)}
+  .table-mobile tbody tr{border-bottom:1px solid var(--deep-border)}
+  .table-mobile td{display:block;padding:.55rem .65rem}
+  .table-mobile td::before{content:attr(data-label);font-size:.75rem;color:var(--cc-muted);display:block;margin-bottom:.15rem}
+  .table-mobile .num{text-align:right;font-variant-numeric:tabular-nums}
 
   @media (max-width: 900px){
     .ticker-row{grid-template-columns:1fr .9fr .7fr .8fr .8fr .9fr 1fr}
@@ -79,6 +91,9 @@
   <div class="stock-head">
     <h2 id="stock" style="margin:0">Stock List</h2>
     <div class="stock-actions">
+      <!-- NEW: quick Home button (keeps your style) -->
+      <a href="/" class="btn-deep">Home</a>
+
       <span class="pill">In stock: <strong>{{ in_stock|default:0|intcomma }}</strong></span>
       <span class="pill">Sold: <strong>{{ sold_count|default:0|intcomma }}</strong></span>
       <span class="pill">Sum order: <strong>{{ sum_order|default:0|floatformat:0|intcomma }}</strong></span>
@@ -86,27 +101,33 @@
     </div>
   </div>
 
-  <form class="filters" method="get" action="{% url 'inventory:stock_list' %}">
-    <input type="hidden" name="view" value="{{ request.GET.view|default:'all' }}">
-    <input type="text" name="q" placeholder="Search IMEI/brand/model…" value="{{ q }}">
-    <label>Status:
-      <select name="status">
-        <option value="" {% if not status %}selected{% endif %}>All</option>
-        <option value="in_stock" {% if status == 'in_stock' %}selected{% endif %}>In stock</option>
-        <option value="sold" {% if status == 'sold' %}selected{% endif %}>Sold</option>
-      </select>
-    </label>
-    <label>
-      <input type="checkbox" name="archived" value="1" {% if show_archived %}checked{% endif %}>
-      Include archived
-    </label>
-    <label>Rows/page:
-      <input type="number" name="page_size" min="10" max="200" value="{{ request.GET.page_size|default:50 }}">
-    </label>
-    <button class="btn-deep" type="submit">Apply</button>
+  <!-- NEW: mobile Filters toggle button -->
+  <button class="btn-deep d-sm-none w-100 mb-2" type="button" id="filtersToggle">Filters</button>
 
-    <a class="btn-deep" href="{% url 'inventory:export_csv' %}?{% for k,v in request.GET.items %}{% if k != 'export' %}{{k}}={{v|urlencode}}&{% endif %}{% endfor %}export=csv">Download CSV</a>
-  </form>
+  <!-- NEW: collapsible wrapper (desktop always open; phone can collapse) -->
+  <div id="filtersWrap" class="filters-wrap">
+    <form class="filters" method="get" action="{% url 'inventory:stock_list' %}">
+      <input type="hidden" name="view" value="{{ request.GET.view|default:'all' }}">
+      <input type="text" name="q" placeholder="Search IMEI/brand/model…" value="{{ q }}">
+      <label>Status:
+        <select name="status">
+          <option value="" {% if not status %}selected{% endif %}>All</option>
+          <option value="in_stock" {% if status == 'in_stock' %}selected{% endif %}>In stock</option>
+          <option value="sold" {% if status == 'sold' %}selected{% endif %}>Sold</option>
+        </select>
+      </label>
+      <label>
+        <input type="checkbox" name="archived" value="1" {% if show_archived %}checked{% endif %}>
+        Include archived
+      </label>
+      <label>Rows/page:
+        <input type="number" name="page_size" min="10" max="200" value="{{ request.GET.page_size|default:50 }}">
+      </label>
+      <button class="btn-deep" type="submit">Apply</button>
+
+      <a class="btn-deep" href="{% url 'inventory:export_csv' %}?{% for k,v in request.GET.items %}{% if k != 'export' %}{{k}}={{v|urlencode}}&{% endif %}{% endfor %}export=csv">Download CSV</a>
+    </form>
+  </div>
 
   <!-- ========== Ticker / Preview ========== -->
   <div id="ticker" class="ticker" role="region" aria-live="polite" aria-label="Rotating stock">
@@ -130,7 +151,8 @@
       <a class="btn-deep" href="{{ request.path }}">Hide table</a>
     </div>
 
-    <div class="table-responsive">
+    <!-- Original desktop table (unchanged) -->
+    <div class="table-responsive d-none d-lg-block">
       <table id="stockTable">
         <thead>
           <tr>
@@ -177,6 +199,51 @@
             </tr>
             {% empty %}
             <tr><td colspan="7" style="text-align:center;color:var(--cc-muted)">No stock yet.</td></tr>
+            {% endfor %}
+          {% endif %}
+        </tbody>
+      </table>
+    </div>
+
+    <!-- NEW: Mobile card table (shows only on small screens) -->
+    <div class="d-lg-none" style="margin-top:8px">
+      <table class="table-mobile">
+        <tbody>
+          {% if page_obj %}
+            {% for it in page_obj.object_list %}
+            <tr>
+              <td data-label="IMEI">{{ it.imei|default:"" }}</td>
+              <td data-label="Product">{{ it.product }}</td>
+              <td data-label="Status">
+                {% if it.status == 'SOLD' %}
+                  <span class="badge red">Sold</span>
+                {% else %}
+                  <span class="badge green">In stock</span>
+                {% endif %}
+              </td>
+              <td data-label="Order Price" class="num">{% if it.order_price is not None %}{{ it.order_price|floatformat:0|intcomma }}{% else %}—{% endif %}</td>
+              <td data-label="Selling Price" class="num">{% if it.selling_price is not None %}{{ it.selling_price|floatformat:0|intcomma }}{% else %}—{% endif %}</td>
+              <td data-label="Location">{% if it.current_location_id %}{{ it.current_location.name }}{% else %}—{% endif %}</td>
+              <td data-label="Agent">{% if it.assigned_agent_id %}{{ it.assigned_agent.username }}{% else %}—{% endif %}</td>
+            </tr>
+            {% endfor %}
+          {% else %}
+            {% for row in rows %}
+            <tr>
+              <td data-label="IMEI">{{ row.imei }}</td>
+              <td data-label="Product">{{ row.product }}</td>
+              <td data-label="Status">
+                {% if row.status == 'SOLD' %}
+                  <span class="badge red">Sold</span>
+                {% else %}
+                  <span class="badge green">In stock</span>
+                {% endif %}
+              </td>
+              <td data-label="Order Price" class="num">{{ row.order_price }}</td>
+              <td data-label="Selling Price" class="num">{{ row.selling_price|default:"—" }}</td>
+              <td data-label="Location">{{ row.location }}</td>
+              <td data-label="Agent">{{ row.agent }}</td>
+            </tr>
             {% endfor %}
           {% endif %}
         </tbody>
@@ -233,6 +300,16 @@
       <div style="position:relative">
         <canvas id="topModels" class="chart-canvas chart-canvas--sm" aria-label="Top models pie chart" role="img"></canvas>
       </div>
+    </div>
+  </div>
+
+  <!-- NEW: tiny sticky quick-nav for phones -->
+  <div class="d-lg-none" style="position:sticky;bottom:0;left:0;right:0;background:var(--deep-panel);border-top:1px solid var(--deep-border);z-index:1030;margin-top:10px">
+    <div class="d-flex text-center">
+      <a href="/" class="flex-fill py-2 text-decoration-none">Home</a>
+      <a href="{% url 'inventory:stock_list' %}" class="flex-fill py-2 text-decoration-none">Stock</a>
+      <a href="{% url 'inventory:scan_sold' %}" class="flex-fill py-2 text-decoration-none">Scan SOLD</a>
+      <a href="{% url 'inventory:inventory_dashboard' %}" class="flex-fill py-2 text-decoration-none">Dashboard</a>
     </div>
   </div>
 </section>
@@ -350,6 +427,18 @@
   document.getElementById('topPeriod').addEventListener('change', loadTop);
 
   loadTrend(); loadTop();
+
+  /* ===== NEW: mobile Filters collapse logic ===== */
+  const fw = document.getElementById('filtersWrap');
+  const ft = document.getElementById('filtersToggle');
+  if (fw && ft){
+    const mq = window.matchMedia('(max-width: 576px)');
+    const applyState = ()=>{ if(mq.matches){ fw.classList.add('collapsed'); } else { fw.classList.remove('collapsed'); } };
+    applyState();
+    if (mq.addEventListener) mq.addEventListener('change', applyState);
+    else mq.addListener(applyState); // older Safari
+    ft.addEventListener('click', ()=> fw.classList.toggle('collapsed'));
+  }
 })();
 </script>
 {% endblock %}
