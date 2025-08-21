@@ -1,4 +1,4 @@
-# inventory/views.py
+# circuitcity/inventory/views.py
 from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth import get_user_model
@@ -8,10 +8,9 @@ from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
 from django.core.cache import cache
 from django.db import transaction, connection
 from django.db.models import (
-    Sum, Q, Exists, OuterRef, Count, F, DecimalField, ExpressionWrapper, Case, When, Value, Cast
+    Sum, Q, Exists, OuterRef, Count, F, DecimalField, ExpressionWrapper, Case, When, Value
 )
-from django.db.models.deletion import ProtectedError
-from django.db.models.functions import TruncMonth, TruncDate, Coalesce
+from django.db.models.functions import TruncMonth, TruncDate, Cast
 from django.http import HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.template.exceptions import TemplateDoesNotExist
@@ -22,7 +21,6 @@ from django.views.decorators.http import require_POST, require_http_methods
 import csv
 import json
 import math
-from decimal import Decimal
 from datetime import timedelta, datetime
 from urllib.parse import urlencode
 
@@ -457,12 +455,14 @@ def inventory_dashboard(request):
     mtd_count = sales_qs_all.filter(sold_at__gte=month_start, sold_at__lt=tomorrow).count()
     all_time_count = sales_qs_all.count()
 
-    # ---- FIX: keep all math in Decimal land
-    DECIMAL_F = DecimalField(max_digits=14, decimal_places=2)
-    HUNDRED = Value(Decimal("100.00"), output_field=DECIMAL_F)
+    # ---- commission & revenue summaries (decimal-safe) ----
+    dec2 = DecimalField(max_digits=14, decimal_places=2)
+    pct_dec = DecimalField(max_digits=5, decimal_places=2)
+
+    commission_pct_dec = Cast(F("commission_pct"), pct_dec)
     commission_expr = ExpressionWrapper(
-        F("price") * (Cast(F("commission_pct"), DECIMAL_F) / HUNDRED),
-        output_field=DECIMAL_F,
+        F("price") * (commission_pct_dec / Value(100, output_field=pct_dec)),
+        output_field=dec2,
     )
 
     agent_rank_qs = (
@@ -472,57 +472,41 @@ def inventory_dashboard(request):
     )
     agent_rank = list(agent_rank_qs)
 
-    # ---- FIX: avoid int defaults; use Decimal defaults with output_field
+    # Wallet summaries (decimal-safe defaults)
     agent_wallet_summaries = {}
     agent_ids = [row["agent_id"] for row in agent_rank if row.get("agent_id")]
     if agent_ids:
         w = WalletTxn.objects.filter(user_id__in=agent_ids)
-        D0 = Value(Decimal("0.00"), output_field=DECIMAL_F)
         agent_wallet_rows = w.values("user_id").annotate(
             balance=Sum("amount"),
-            lifetime_commission=Sum(
-                Case(When(reason="COMMISSION", then=F("amount")), default=D0, output_field=DECIMAL_F)
-            ),
-            lifetime_advance=Sum(
-                Case(When(reason="ADVANCE", then=F("amount")), default=D0, output_field=DECIMAL_F)
-            ),
-            lifetime_adjustment=Sum(
-                Case(When(reason="ADJUSTMENT", then=F("amount")), default=D0, output_field=DECIMAL_F)
-            ),
+            lifetime_commission=Sum(Case(When(reason="COMMISSION", then="amount"),
+                                         default=Value(0, output_field=dec2))),
+            lifetime_advance=Sum(Case(When(reason="ADVANCE", then="amount"),
+                                      default=Value(0, output_field=dec2))),
+            lifetime_adjustment=Sum(Case(When(reason="ADJUSTMENT", then="amount"),
+                                         default=Value(0, output_field=dec2))),
             month_commission=Sum(
                 Case(
-                    When(
-                        reason="COMMISSION",
-                        created_at__date__gte=month_start,
-                        created_at__date__lte=today,
-                        then=F("amount"),
-                    ),
-                    default=D0,
-                    output_field=DECIMAL_F,
+                    When(reason="COMMISSION",
+                         created_at__date__gte=month_start, created_at__date__lte=today,
+                         then="amount"),
+                    default=Value(0, output_field=dec2),
                 )
             ),
             month_advance=Sum(
                 Case(
-                    When(
-                        reason="ADVANCE",
-                        created_at__date__gte=month_start,
-                        created_at__date__lte=today,
-                        then=F("amount"),
-                    ),
-                    default=D0,
-                    output_field=DECIMAL_F,
+                    When(reason="ADVANCE",
+                         created_at__date__gte=month_start, created_at__date__lte=today,
+                         then="amount"),
+                    default=Value(0, output_field=dec2),
                 )
             ),
             month_adjustment=Sum(
                 Case(
-                    When(
-                        reason="ADJUSTMENT",
-                        created_at__date__gte=month_start,
-                        created_at__date__lte=today,
-                        then=F("amount"),
-                    ),
-                    default=D0,
-                    output_field=DECIMAL_F,
+                    When(reason="ADJUSTMENT",
+                         created_at__date__gte=month_start, created_at__date__lte=today,
+                         then="amount"),
+                    default=Value(0, output_field=dec2),
                 )
             ),
         )
@@ -563,10 +547,7 @@ def inventory_dashboard(request):
         labels.append(f"{y}-{m:02d}")
     revenue_points = [totals_map.get(lbl, 0.0) for lbl in labels]
 
-    profit_expr = ExpressionWrapper(
-        F("price") - F("item__order_price"),
-        output_field=DECIMAL_F
-    )
+    profit_expr = ExpressionWrapper(F("price") - F("item__order_price"), output_field=dec2)
     prof_by_month = rev_qs.annotate(m=TruncMonth("sold_at")).values("m").annotate(total=Sum(profit_expr)).order_by("m")
     prof_map = {r["m"].strftime("%Y-%m"): float(r["total"] or 0) for r in prof_by_month if r["m"]}
     profit_points = [prof_map.get(lbl, 0.0) for lbl in labels]
@@ -589,7 +570,7 @@ def inventory_dashboard(request):
             }
         )
 
-    cost_expr = ExpressionWrapper(F("item__order_price"), output_field=DECIMAL_F)
+    cost_expr = ExpressionWrapper(F("item__order_price"), output_field=dec2)
     totals = sales_qs_period.aggregate(revenue=Sum("price"), cost=Sum(cost_expr), profit=Sum(profit_expr))
     pie_revenue = float(totals.get("revenue") or 0)
     pie_cost = float(totals.get("cost") or 0)
@@ -1305,7 +1286,7 @@ def api_profit_bar(request):
 
         base = base.filter(sold_at__gte=start, sold_at__lt=end_excl)
 
-        profit_expr = F("price") - F("item__order_price")
+        profit_expr = ExpressionWrapper(F("price") - F("item__order_price"), output_field=DecimalField(max_digits=14, decimal_places=2))
 
         if group_by == "model":
             rows = base.values("item__product__brand", "item__product__model").annotate(v=Sum(profit_expr)).order_by("-v")[:20]
