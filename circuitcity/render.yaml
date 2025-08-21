@@ -1,0 +1,33 @@
+databases:
+  - name: django-db
+    plan: free
+
+services:
+  - type: web
+    name: django-app
+    env: python
+    plan: free
+    buildCommand: |
+      pip install --upgrade pip
+      pip install -r requirements.txt
+      python manage.py collectstatic --noinput
+    startCommand: >
+      bash -lc "python manage.py migrate --noinput &&
+      gunicorn YOUR_PROJECT_PACKAGE.wsgi:application
+      --workers=${WEB_CONCURRENCY:-2} --threads=4 --timeout=120 --log-file -"
+    autoDeploy: true
+    envVars:
+      - key: DJANGO_SETTINGS_MODULE
+        value: circuitcity.settings
+      - key: SECRET_KEY
+        generateValue: true
+      - key: PYTHON_VERSION
+        value: 3.11.9
+      - key: WEB_CONCURRENCY
+        value: 2
+      - key: DATABASE_URL
+        fromDatabase:
+          name: django-db
+          property: connectionString
+      - key: ALLOWED_HOSTS
+        value: .onrender.com,localhost,127.0.0.1
