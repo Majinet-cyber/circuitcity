@@ -64,10 +64,7 @@ class CarlcareClient:  # shim kept only so type references don't blow up
 
 
 def _get_warranty_client():
-    """
-    Always return None so no warranty lookups are attempted
-    (avoids importing warranty.py and any external deps).
-    """
+    """Always return None so no warranty lookups are attempted."""
     return None
 
 
@@ -116,7 +113,7 @@ def _haversine_meters(lat1, lon1, lat2, lon2):
     phi2 = math.radians(float(lat2))
     dphi = math.radians(float(lat2) - float(lat1))
     dlmb = math.radians(float(lon2) - float(lon1))
-    a = math.sin(dphi/2) ** 2 + math.cos(phi1) * math.cos(phi2) * math.sin(dlmb/2) ** 2
+    a = math.sin(dphi / 2) ** 2 + math.cos(phi1) * math.cos(phi2) * math.sin(dlmb / 2) ** 2
     c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
     return R * c
 
@@ -261,7 +258,6 @@ def scan_in(request):
             by_user=request.user,
         )
 
-        # Acceptance rules (simplified — no warranty gating)
         allow, reason = True, None
         if not imei and not _is_manager_or_admin(request.user):
             allow = False
@@ -274,11 +270,7 @@ def scan_in(request):
                 fail_silently=True,
             )
             messages.error(request, reason or "Stock-in blocked.")
-            return render(
-                request,
-                "inventory/scan_in.html",
-                {"form": form, "warranty": None, "blocked": True},
-            )
+            return render(request, "inventory/scan_in.html", {"form": form, "warranty": None, "blocked": True})
 
         item = InventoryItem.objects.create(
             imei=imei or None,
@@ -369,10 +361,7 @@ def scan_sold(request):
         )
 
         _audit(item, request.user, "SOLD_FORM", "V1 flow")
-        messages.success(
-            request,
-            f"Marked SOLD: {item.imei}{' at ' + str(item.selling_price) if item.selling_price else ''}",
-        )
+        messages.success(request, f"Marked SOLD: {item.imei}{' at ' + str(item.selling_price) if item.selling_price else ''}")
         return redirect("inventory:scan_sold")
 
     form = ScanSoldForm(initial=initial)
@@ -524,11 +513,12 @@ def inventory_dashboard(request):
     # Header chip counts (corrected):
     today_count = sales_qs_all.filter(sold_at__gte=today, sold_at__lt=tomorrow).count()
     mtd_count = sales_qs_all.filter(sold_at__gte=month_start, sold_at__lt=tomorrow).count()
-    all_time_count = sales_qs_all.count()  # <-- all-time must ignore the month filter
+    all_time_count = sales_qs_all.count()
 
     # Ranking (use selected period so it matches the dashboard view)
     commission_expr = ExpressionWrapper(
-        F("price") * (F("commission_pct") / 100.0), output_field=DecimalField(max_digits=14, decimal_places=2)
+        F("price") * (F("commission_pct") / 100.0),
+        output_field=DecimalField(max_digits=14, decimal_places=2),
     )
     agent_rank_qs = (
         sales_qs_period.values("agent_id", "agent__username")
@@ -542,69 +532,43 @@ def inventory_dashboard(request):
     agent_ids = [row["agent_id"] for row in agent_rank if row.get("agent_id")]
     if agent_ids:
         w = WalletTxn.objects.filter(user_id__in=agent_ids)
-        agent_wallet_rows = (
-            w.values("user_id")
-            .annotate(
-                balance=Sum("amount"),
-                lifetime_commission=Sum(
-                    Case(
-                        When(reason="COMMISSION", then="amount"),
-                        default=Value(0),
-                        output_field=DecimalField(max_digits=14, decimal_places=2),
-                    )
+        agent_wallet_rows = w.values("user_id").annotate(
+            balance=Sum("amount"),
+            lifetime_commission=Sum(
+                Case(When(reason="COMMISSION", then="amount"), default=Value(0)),
+                output_field=DecimalField(max_digits=14, decimal_places=2),
+            ),
+            lifetime_advance=Sum(
+                Case(When(reason="ADVANCE", then="amount"), default=Value(0)),
+                output_field=DecimalField(max_digits=14, decimal_places=2),
+            ),
+            lifetime_adjustment=Sum(
+                Case(When(reason="ADJUSTMENT", then="amount"), default=Value(0)),
+                output_field=DecimalField(max_digits=14, decimal_places=2),
+            ),
+            month_commission=Sum(
+                Case(
+                    When(reason="COMMISSION", created_at__date__gte=month_start, created_at__date__lte=today, then="amount"),
+                    default=Value(0),
                 ),
-                lifetime_advance=Sum(
-                    Case(
-                        When(reason="ADVANCE", then="amount"),
-                        default=Value(0),
-                        output_field=DecimalField(max_digits=14, decimal_places=2),
-                    )
+                output_field=DecimalField(max_digits=14, decimal_places=2),
+            ),
+            month_advance=Sum(
+                Case(
+                    When(reason="ADVANCE", created_at__date__gte=month_start, created_at__date__lte=today, then="amount"),
+                    default=Value(0),
                 ),
-                lifetime_adjustment=Sum(
-                    Case(
-                        When(reason="ADJUSTMENT", then="amount"),
-                        default=Value(0),
-                        output_field=DecimalField(max_digits=14, decimal_places=2),
-                    )
+                output_field=DecimalField(max_digits=14, decimal_places=2),
+            ),
+            month_adjustment=Sum(
+                Case(
+                    When(reason="ADJUSTMENT", created_at__date__gte=month_start, created_at__date__lte=today, then="amount"),
+                    default=Value(0),
                 ),
-                month_commission=Sum(
-                    Case(
-                        When(
-                            reason="COMMISSION",
-                            created_at__date__gte=month_start,
-                            created_at__date__lte=today,
-                            then="amount",
-                        ),
-                        default=Value(0),
-                        output_field=DecimalField(max_digits=14, decimal_places=2),
-                    )
-                ),
-                month_advance=Sum(
-                    Case(
-                        When(
-                            reason="ADVANCE",
-                            created_at__date__gte=month_start,
-                            created_at__date__lte=today,
-                            then="amount",
-                        ),
-                        default=Value(0),
-                        output_field=DecimalField(max_digits=14, decimal_places=2),
-                    )
-                ),
-                month_adjustment=Sum(
-                    Case(
-                        When(
-                            reason="ADJUSTMENT",
-                            created_at__date__gte=month_start,
-                            created_at__date__lte=today,
-                            then="amount",
-                        ),
-                        default=Value(0),
-                        output_field=DecimalField(max_digits=14, decimal_places=2),
-                    )
-                ),
-            )
+                output_field=DecimalField(max_digits=14, decimal_places=2),
+            ),
         )
+
         for r in agent_wallet_rows:
             uid = r["user_id"]
             m_total = (r["month_commission"] or 0) + (r["month_advance"] or 0) + (r["month_adjustment"] or 0)
@@ -644,12 +608,13 @@ def inventory_dashboard(request):
         labels.append(f"{y}-{m:02d}")
     revenue_points = [totals_map.get(lbl, 0.0) for lbl in labels]
 
-    profit_expr = ExpressionWrapper(F("price") - F("item__order_price"), output_field=DecimalField(max_digits=14, decimal_places=2))
-    prof_by_month = (
-        rev_qs.annotate(m=TruncMonth("sold_at")).values("m").annotate(total=Sum(profit_expr)).order_by("m")
+    profit_expr = ExpressionWrapper(
+        F("price") - F("item__order_price"),
+        output_field=DecimalField(max_digits=14, decimal_places=2),
     )
+    prof_by_month = rev_qs.annotate(m=TruncMonth("sold_at")).values("m").annotate(total=Sum(profit_expr)).order_by("m")
     prof_map = {r["m"].strftime("%Y-%m"): float(r["total"] or 0) for r in prof_by_month if r["m"]}
-    profit_points = [prof_map.get(lbl, 0.0) for lbl in labels]
+    profit_points = [prof_map.get(lbl, 0.0) for r in labels for lbl in [r]]
 
     # Agent stock vs sold (sold respects selected period)
     total_assigned = (
@@ -725,11 +690,9 @@ def inventory_dashboard(request):
         "jug_fill_pct": jug_fill_pct,
         "jug_color": jug_color,
         "is_manager_or_admin": _is_manager_or_admin(request.user),
-        # Header chips
         "today_count": today_count,
         "mtd_count": mtd_count,
         "all_time_count": all_time_count,
-        # Wallet chip (current user)
         "wallet": {
             "balance": my_balance,
             "month": {
@@ -802,18 +765,7 @@ def stock_list(request):
         response.write("\ufeff")  # BOM for Excel UTF-8
         writer = csv.writer(response)
         writer.writerow(
-            [
-                "IMEI",
-                "Product",
-                "Status",
-                "Order Price",
-                "Selling Price",
-                "Location",
-                "Agent",
-                "Received",
-                "Archived",
-                "Has Sales",
-            ]
+            ["IMEI", "Product", "Status", "Order Price", "Selling Price", "Location", "Agent", "Received", "Archived", "Has Sales"]
         )
         for it in qs.iterator():
             product_str = str(it.product) if it.product else ""
@@ -891,9 +843,7 @@ def export_csv(request):
     has_sales_subq = Sale.objects.filter(item=OuterRef("pk"))
     base = _inv_base(show_archived)
 
-    qs = base.select_related("product", "current_location", "assigned_agent").annotate(
-        has_sales=Exists(has_sales_subq)
-    )
+    qs = base.select_related("product", "current_location", "assigned_agent").annotate(has_sales=Exists(has_sales_subq))
     if not _can_view_all(request.user):
         qs = qs.filter(assigned_agent=request.user)
 
@@ -1245,7 +1195,9 @@ def time_logs(request):
         qs = TimeLog.objects.select_related("user", "location").filter(user=request.user).order_by("-logged_at")
 
     page_obj, url_for = _paginate_qs(request, qs, default_per_page=50, max_per_page=200)
-    return render(request, "inventory/time_logs.html", {"logs": page_obj.object_list, "page_obj": page_obj, "url_for": url_for})
+    return render(
+        request, "inventory/time_logs.html", {"logs": page_obj.object_list, "page_obj": page_obj, "url_for": url_for}
+    )
 
 
 @never_cache
@@ -1324,7 +1276,12 @@ def api_wallet_add_txn(request):
         return JsonResponse({"ok": False, "error": "Invalid amount."}, status=400)
 
     reason = (payload.get("reason") or "ADJUSTMENT").upper()
-    allowed = {k for k, _ in getattr(WalletTxn, "REASON_CHOICES", [])} or {"ADJUSTMENT", "ADVANCE", "COMMISSION", "PAYOUT"}
+    allowed = {k for k, _ in getattr(WalletTxn, "REASON_CHOICES", [])} or {
+        "ADJUSTMENT",
+        "ADVANCE",
+        "COMMISSION",
+        "PAYOUT",
+    }
     if reason not in allowed:
         return JsonResponse({"ok": False, "error": f"Invalid reason. Allowed: {sorted(list(allowed))}"}, status=400)
 
@@ -1482,7 +1439,12 @@ def delete_stock(request, pk):
 
     item_repr = f"{item.imei or item.pk} ({item.product})"
     try:
-        _audit(item, request.user, "DELETE", f"Attempt by {request.user.username} at {timezone.now():%Y-%m-%d %H:%M}. Item: {item_repr}")
+        _audit(
+            item,
+            request.user,
+            "DELETE",
+            f"Attempt by {request.user.username} at {timezone.now():%Y-%m-%d %H:%M}. Item: {item_repr}",
+        )
         item.delete()
         messages.success(request, "Item deleted.")
     except ProtectedError:
@@ -1541,6 +1503,7 @@ def agent_reset_confirm(request, token=None):
 def healthz(request):
     """Simple DB-backed health check."""
     from django.db import connection
+
     db_ok, err = True, None
     try:
         with connection.cursor() as c:
