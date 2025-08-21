@@ -1,12 +1,12 @@
 # inventory/views.py
 from django.conf import settings
 from django.contrib import messages
-from django.contrib.auth.decorators import login_required
 from django.contrib.auth import get_user_model
+from django.contrib.auth.decorators import login_required
 from django.core.mail import mail_admins
 from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
 from django.core.cache import cache
-from django.db import transaction
+from django.db import transaction, connection
 from django.db.models import (
     Sum, Q, Exists, OuterRef, Count, F, DecimalField, ExpressionWrapper, Case, When, Value
 )
@@ -16,8 +16,8 @@ from django.http import HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.template.exceptions import TemplateDoesNotExist
 from django.utils import timezone
-from django.views.decorators.http import require_POST, require_http_methods
 from django.views.decorators.cache import never_cache
+from django.views.decorators.http import require_POST, require_http_methods
 
 import csv
 import json
@@ -25,7 +25,7 @@ import math
 from datetime import timedelta, datetime
 from urllib.parse import urlencode
 
-# Forms (only real ones)
+# Forms that actually exist
 from .forms import ScanInForm, ScanSoldForm, InventoryItemForm
 
 from .models import (
@@ -40,7 +40,7 @@ from .models import (
 )
 from sales.models import Sale
 
-# ---- Dashboard cache version (signals can bump this)
+# Dashboard cache version (signals may bump this). Safe fallback.
 try:
     from .cache_utils import get_dashboard_cache_version
 except Exception:
@@ -49,23 +49,10 @@ except Exception:
 
 User = get_user_model()
 
-# -------------------------------------------------
-# Warranty client: fully disabled (no external deps)
-# -------------------------------------------------
-_WARRANTY_CLIENT_AVAILABLE = False
-
-
-class CarlcareClient:  # shim so type references don't explode
-    def __init__(self, *args, **kwargs):
-        self._shim = True
-
-    def check(self, imei: str):
-        return type("WarrantyResult", (), {"status": "SKIPPED", "expires_at": None})()
-
-
-def _get_warranty_client():
-    """Always return None so no warranty lookups are attempted."""
-    return None
+# ------------------------------------------------------------------
+# Warranty lookups DISABLED: no import of warranty.py or requests.
+# ------------------------------------------------------------------
+_WARRANTY_LOOKUPS_DISABLED = True
 
 
 # -----------------------
@@ -102,8 +89,7 @@ def _audit(item, user, action: str, details: str = ""):
     InventoryAudit.objects.create(item=item, by_user=user, action=action, details=details or "")
 
 
-def _haversine_meters(lat1, lon1, lat2, lon2):
-    """Great-circle distance in meters."""
+def _haversine_m(lat1, lon1, lat2, lon2):
     if None in (lat1, lon1, lat2, lon2):
         return None
     R = 6371000.0
@@ -113,11 +99,10 @@ def _haversine_meters(lat1, lon1, lat2, lon2):
     dlmb = math.radians(float(lon2) - float(lon1))
     a = math.sin(dphi / 2) ** 2 + math.cos(phi1) * math.cos(phi2) * math.sin(dlmb / 2) ** 2
     c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
-    return R * c
+    return int(round(R * c))
 
 
 def _paginate_qs(request, qs, default_per_page=50, max_per_page=200):
-    """Uniform paginator with a hard cap of 200 rows/page. Supports ?page & ?page_size=."""
     try:
         per_page = int(request.GET.get("page_size", default_per_page))
     except (TypeError, ValueError):
@@ -139,14 +124,6 @@ def _paginate_qs(request, qs, default_per_page=50, max_per_page=200):
     return page_obj, url_for
 
 
-def _cache_get_set(key: str, builder, ttl: int = 60):
-    data = cache.get(key)
-    if data is None:
-        data = builder()
-        cache.set(key, data, ttl)
-    return data
-
-
 def _wallet_balance(user):
     try:
         return WalletTxn.balance_for(user)
@@ -160,13 +137,11 @@ def _wallet_month_sum(user, year: int, month: int):
     except Exception:
         return (
             WalletTxn.objects.filter(user=user, created_at__year=year, created_at__month=month)
-            .aggregate(s=Sum("amount"))["s"]
-            or 0
+            .aggregate(s=Sum("amount"))["s"] or 0
         )
 
 
 def _inv_base(show_archived: bool):
-    """InventoryItem.active when present; else .objects (and is_active=True when possible)."""
     if show_archived:
         return InventoryItem.objects
     if hasattr(InventoryItem, "active"):
@@ -197,9 +172,6 @@ def _render_dashboard_safe(request, context, today, mtd_count, all_time_count):
 @require_http_methods(["GET", "POST"])
 @transaction.atomic
 def scan_in(request):
-    """
-    Stock-in flow (warranty disabled).
-    """
     if _is_auditor(request.user) and request.method == "POST":
         messages.error(request, "Auditors cannot stock-in devices.")
         return redirect("inventory:stock_list")
@@ -234,24 +206,18 @@ def scan_in(request):
             messages.error(request, f"Item with IMEI {imei} already exists.")
             return render(request, "inventory/scan_in.html", {"form": form})
 
-        # Warranty is disabled: record SKIPPED
-        warranty_status = "SKIPPED"
-        warranty_expires_at = None
-        warranty_checked_at = None
-        activation_at = None
-
+        # Warranty checks are disabled
         WarrantyCheckLog.objects.create(
             imei=imei or "",
-            result=warranty_status,
-            expires_at=warranty_expires_at,
+            result="SKIPPED",
+            expires_at=None,
             notes="scan_in (warranty disabled)",
             by_user=request.user,
         )
 
-        allow, reason = True, None
+        allow = True
         if not imei and not _is_manager_or_admin(request.user):
             allow = False
-            reason = "IMEI is required."
 
         if not allow:
             mail_admins(
@@ -259,8 +225,8 @@ def scan_in(request):
                 message=f"User {request.user} attempted to stock IMEI {imei} (warranty disabled).",
                 fail_silently=True,
             )
-            messages.error(request, reason or "Stock-in blocked.")
-            return render(request, "inventory/scan_in.html", {"form": form, "warranty": None, "blocked": True})
+            messages.error(request, "IMEI is required.")
+            return render(request, "inventory/scan_in.html", {"form": form, "blocked": True})
 
         item = InventoryItem.objects.create(
             imei=imei or None,
@@ -269,10 +235,10 @@ def scan_in(request):
             order_price=data["order_price"],
             current_location=data["location"],
             assigned_agent=request.user if data.get("assigned_to_me") else None,
-            warranty_status=warranty_status,
-            warranty_expires_at=warranty_expires_at,
-            warranty_last_checked_at=warranty_checked_at,
-            activation_detected_at=activation_at,
+            warranty_status="SKIPPED",
+            warranty_expires_at=None,
+            warranty_last_checked_at=None,
+            activation_detected_at=None,
         )
 
         _audit(item, request.user, "STOCK_IN", "Warranty disabled")
@@ -288,9 +254,6 @@ def scan_in(request):
 @require_http_methods(["GET", "POST"])
 @transaction.atomic
 def scan_sold(request):
-    """
-    Simple mark-sold flow.
-    """
     if _is_auditor(request.user) and request.method == "POST":
         messages.error(request, "Auditors cannot mark items as SOLD.")
         return redirect("inventory:stock_list")
@@ -316,7 +279,7 @@ def scan_sold(request):
             messages.error(request, "Item not found. Check the IMEI and try again.")
             return render(request, "inventory/scan_sold.html", {"form": form})
 
-        if item.status == "SOLD":
+        if str(getattr(item, "status", "")) == "SOLD":
             messages.error(request, f"Item {item.imei} is already sold.")
             return render(request, "inventory/scan_sold.html", {"form": form})
 
@@ -348,7 +311,10 @@ def scan_sold(request):
         )
 
         _audit(item, request.user, "SOLD_FORM", "V1 flow")
-        messages.success(request, f"Marked SOLD: {item.imei}{' at ' + str(item.selling_price) if item.selling_price else ''}")
+        messages.success(
+            request,
+            f"Marked SOLD: {item.imei}{' at ' + str(item.selling_price) if item.selling_price else ''}",
+        )
         return redirect("inventory:scan_sold")
 
     form = ScanSoldForm(initial=initial)
@@ -359,7 +325,6 @@ def scan_sold(request):
 @login_required
 @require_http_methods(["GET"])
 def scan_web(request):
-    """Desktop-friendly scanner page."""
     return render(request, "inventory/scan_web.html", {})
 
 
@@ -368,10 +333,6 @@ def scan_web(request):
 @require_POST
 @transaction.atomic
 def api_mark_sold(request):
-    """
-    JSON/form: { imei, comment?, price?, location_id? }
-    Idempotent on already SOLD.
-    """
     if _is_auditor(request.user):
         return JsonResponse({"ok": False, "error": "Auditors cannot modify inventory."}, status=403)
 
@@ -455,7 +416,7 @@ def api_mark_sold(request):
 
 
 # -----------------------
-# Inventory dashboard & list
+# Dashboard & list
 # -----------------------
 @login_required
 def inventory_dashboard(request):
@@ -473,7 +434,6 @@ def inventory_dashboard(request):
             request, cached, today, cached.get("mtd_count", 0), cached.get("all_time_count", 0)
         )
 
-    # Permissioned bases
     if _can_view_all(request.user):
         sales_qs_all = Sale.objects.select_related("item", "agent", "item__product")
         items_qs = InventoryItem.objects.select_related("product", "assigned_agent", "current_location")
@@ -491,12 +451,10 @@ def inventory_dashboard(request):
     if period == "month":
         sales_qs_period = sales_qs_all.filter(sold_at__gte=month_start)
 
-    # Header counts
     today_count = sales_qs_all.filter(sold_at__gte=today, sold_at__lt=tomorrow).count()
     mtd_count = sales_qs_all.filter(sold_at__gte=month_start, sold_at__lt=tomorrow).count()
     all_time_count = sales_qs_all.count()
 
-    # Agent ranking (period-aware)
     commission_expr = ExpressionWrapper(
         F("price") * (F("commission_pct") / 100.0),
         output_field=DecimalField(max_digits=14, decimal_places=2),
@@ -508,48 +466,34 @@ def inventory_dashboard(request):
     )
     agent_rank = list(agent_rank_qs)
 
-    # Wallet aggregates for agents in ranking
     agent_wallet_summaries = {}
     agent_ids = [row["agent_id"] for row in agent_rank if row.get("agent_id")]
     if agent_ids:
         w = WalletTxn.objects.filter(user_id__in=agent_ids)
         agent_wallet_rows = w.values("user_id").annotate(
             balance=Sum("amount"),
-            lifetime_commission=Sum(
-                Case(When(reason="COMMISSION", then="amount"), default=Value(0)),
-                output_field=DecimalField(max_digits=14, decimal_places=2),
-            ),
-            lifetime_advance=Sum(
-                Case(When(reason="ADVANCE", then="amount"), default=Value(0)),
-                output_field=DecimalField(max_digits=14, decimal_places=2),
-            ),
-            lifetime_adjustment=Sum(
-                Case(When(reason="ADJUSTMENT", then="amount"), default=Value(0)),
-                output_field=DecimalField(max_digits=14, decimal_places=2),
-            ),
+            lifetime_commission=Sum(Case(When(reason="COMMISSION", then="amount"), default=Value(0))),
+            lifetime_advance=Sum(Case(When(reason="ADVANCE", then="amount"), default=Value(0))),
+            lifetime_adjustment=Sum(Case(When(reason="ADJUSTMENT", then="amount"), default=Value(0))),
             month_commission=Sum(
                 Case(
                     When(reason="COMMISSION", created_at__date__gte=month_start, created_at__date__lte=today, then="amount"),
                     default=Value(0),
-                ),
-                output_field=DecimalField(max_digits=14, decimal_places=2),
+                )
             ),
             month_advance=Sum(
                 Case(
                     When(reason="ADVANCE", created_at__date__gte=month_start, created_at__date__lte=today, then="amount"),
                     default=Value(0),
-                ),
-                output_field=DecimalField(max_digits=14, decimal_places=2),
+                )
             ),
             month_adjustment=Sum(
                 Case(
                     When(reason="ADJUSTMENT", created_at__date__gte=month_start, created_at__date__lte=today, then="amount"),
                     default=Value(0),
-                ),
-                output_field=DecimalField(max_digits=14, decimal_places=2),
+                )
             ),
         )
-
         for r in agent_wallet_rows:
             uid = r["user_id"]
             m_total = (r["month_commission"] or 0) + (r["month_advance"] or 0) + (r["month_adjustment"] or 0)
@@ -570,7 +514,6 @@ def inventory_dashboard(request):
                 },
             }
 
-    # Last 12 months revenue & profit
     last_12_start = month_start - timedelta(days=365)
     rev_qs = Sale.objects.select_related("item").filter(sold_at__gte=last_12_start)
     if not _can_view_all(request.user):
@@ -579,7 +522,6 @@ def inventory_dashboard(request):
         rev_qs = rev_qs.filter(item__product_id=model_id)
 
     rev_by_month = rev_qs.annotate(m=TruncMonth("sold_at")).values("m").annotate(total=Sum("price")).order_by("m")
-
     labels = []
     totals_map = {r["m"].strftime("%Y-%m"): float(r["total"] or 0) for r in rev_by_month if r["m"]}
 
@@ -589,15 +531,11 @@ def inventory_dashboard(request):
         labels.append(f"{y}-{m:02d}")
     revenue_points = [totals_map.get(lbl, 0.0) for lbl in labels]
 
-    profit_expr = ExpressionWrapper(
-        F("price") - F("item__order_price"),
-        output_field=DecimalField(max_digits=14, decimal_places=2),
-    )
+    profit_expr = ExpressionWrapper(F("price") - F("item__order_price"), output_field=DecimalField(max_digits=14, decimal_places=2))
     prof_by_month = rev_qs.annotate(m=TruncMonth("sold_at")).values("m").annotate(total=Sum(profit_expr)).order_by("m")
     prof_map = {r["m"].strftime("%Y-%m"): float(r["total"] or 0) for r in prof_by_month if r["m"]}
-    profit_points = [prof_map.get(lbl, 0.0) for lbl in labels]  # fixed
+    profit_points = [prof_map.get(lbl, 0.0) for lbl in labels]
 
-    # Agent stock vs sold (period-aware)
     total_assigned = (
         items_qs.values("assigned_agent_id", "assigned_agent__username").annotate(total_stock=Count("id")).order_by(
             "assigned_agent__username"
@@ -616,18 +554,15 @@ def inventory_dashboard(request):
             }
         )
 
-    # Cost/Revenue/Profit pie (period-aware)
     cost_expr = ExpressionWrapper(F("item__order_price"), output_field=DecimalField(max_digits=14, decimal_places=2))
     totals = sales_qs_period.aggregate(revenue=Sum("price"), cost=Sum(cost_expr), profit=Sum(profit_expr))
     pie_revenue = float(totals.get("revenue") or 0)
     pie_cost = float(totals.get("cost") or 0)
     pie_profit = float(totals.get("profit") or 0)
 
-    # Stock level battery
     in_stock_qs = items_qs.filter(status="IN_STOCK")
     jug_count = in_stock_qs.count()
     jug_fill_pct = min(100, int(round((jug_count / 100.0) * 100))) if jug_count > 0 else 0
-
     if jug_count <= 20:
         jug_color = "red"
     elif 21 <= jug_count <= 50:
@@ -639,11 +574,12 @@ def inventory_dashboard(request):
 
     products = Product.objects.order_by("brand", "model", "variant").values("id", "brand", "model", "variant")
 
-    # Current user's wallet (chip)
     def _sum(qs):
         return qs.aggregate(s=Sum("amount"))["s"] or 0
 
     my_balance = _wallet_balance(request.user)
+    today = timezone.localdate()
+    month_start = today.replace(day=1)
     month_qs = WalletTxn.objects.filter(user=request.user, created_at__date__gte=month_start, created_at__date__lte=today)
     my_month_commission = _sum(month_qs.filter(reason="COMMISSION"))
     my_month_advance = _sum(month_qs.filter(reason="ADVANCE"))
@@ -697,13 +633,8 @@ def inventory_dashboard(request):
 
 @never_cache
 @login_required
-@require_http_methods(["GET"])  # list/export is GET-only
+@require_http_methods(["GET"])
 def stock_list(request):
-    """
-    Stock list with optional search by IMEI/brand/model/variant.
-    Managers/Admins/Auditors see all; Agents see only their own assigned items.
-    Adds pagination (cap 200/pg) and header metrics. CSV via ?export=csv.
-    """
     q = request.GET.get("q", "").strip()
     show_archived = request.GET.get("archived") == "1"
     want_csv = request.GET.get("export") == "csv"
@@ -736,14 +667,13 @@ def stock_list(request):
 
     qs = qs.order_by("-received_at", "product__model")
 
-    # CSV export
     if want_csv:
         filename = f"stock_export_{timezone.now():%Y%m%d_%H%M}.csv"
         response = HttpResponse(content_type="text/csv; charset=utf-8")
         response["Content-Disposition"] = f'attachment; filename="{filename}"'
         response["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
         response["Pragma"] = "no-cache"
-        response.write("\ufeff")  # BOM for Excel UTF-8
+        response.write("\ufeff")  # BOM for Excel
         writer = csv.writer(response)
         writer.writerow(
             ["IMEI", "Product", "Status", "Order Price", "Selling Price", "Location", "Agent", "Received", "Archived", "Has Sales"]
@@ -769,7 +699,6 @@ def stock_list(request):
             )
         return response
 
-    # Header metrics
     in_stock = qs.filter(status="IN_STOCK").count()
     sold_count = qs.filter(status="SOLD").count()
     sum_order = qs.aggregate(s=Sum("order_price"))["s"] or 0
@@ -816,7 +745,7 @@ def stock_list(request):
 @login_required
 @require_http_methods(["GET"])
 def export_csv(request):
-    """Export filtered stock as CSV (same filters/permissions as list)."""
+    # Same filters/permissions as stock_list, but always returns CSV
     q = request.GET.get("q", "").strip()
     show_archived = request.GET.get("archived") == "1"
     status = (request.GET.get("status") or "").lower()
@@ -876,192 +805,12 @@ def export_csv(request):
 
 
 # -----------------------
-# Charts JSON
-# -----------------------
-@never_cache
-@login_required
-def api_sales_trend(request):
-    """
-    JSON for the line chart — cached for 60s per-user + params.
-    Query: ?period=month|7d & metric=amount|count
-    """
-    period = request.GET.get("period", "month")
-    metric = request.GET.get("metric", "amount")  # amount|count
-
-    ver = get_dashboard_cache_version()
-    key = f"api:sales_trend:v{ver}:u{request.user.id}:p:{period}:m:{metric}"
-
-    def _build():
-        today = timezone.localdate()
-        end_excl = today + timedelta(days=1)
-        if period == "7d":
-            start = today - timedelta(days=6)
-        else:
-            start = today.replace(day=1)
-
-        if _can_view_all(request.user):
-            qs = Sale.objects.all()
-        else:
-            qs = Sale.objects.filter(agent=request.user)
-
-        qs = qs.filter(sold_at__gte=start, sold_at__lt=end_excl)
-        qs = qs.annotate(d=TruncDate("sold_at")).values("d").order_by("d")
-
-        if metric == "count":
-            agg = qs.annotate(v=Count("id"))
-        else:
-            agg = qs.annotate(v=Sum("price"))
-        raw = {row["d"]: float(row["v"] or 0) for row in agg}
-
-        labels, values = [], []
-        cur = start
-        while cur < end_excl:
-            labels.append(cur.strftime("%b %d"))
-            values.append(raw.get(cur, 0.0))
-            cur += timedelta(days=1)
-        return {"labels": labels, "values": values}
-
-    data = _cache_get_set(key, _build, 60)
-    return JsonResponse(data)
-
-
-@never_cache
-@login_required
-def api_top_models(request):
-    """
-    JSON for the pie chart of best sellers — cached 60s per-user + period.
-    Query: ?period=today|month
-    """
-    period = request.GET.get("period", "today")
-    ver = get_dashboard_cache_version()
-    key = f"api:top_models:v{ver}:u{request.user.id}:p:{period}"
-
-    def _build():
-        today = timezone.localdate()
-        end_excl = today + timedelta(days=1)
-        start = today if period == "today" else today.replace(day=1)
-
-        if _can_view_all(request.user):
-            qs = Sale.objects.select_related("item__product")
-        else:
-            qs = Sale.objects.select_related("item__product").filter(agent=request.user)
-
-        qs = (
-            qs.filter(sold_at__gte=start, sold_at__lt=end_excl)
-            .values("item__product__brand", "item__product__model")
-            .annotate(c=Count("id"))
-            .order_by("-c")[:8]
-        )
-
-        labels = [f'{r["item__product__brand"]} {r["item__product__model"]}' for r in qs]
-        values = [r["c"] for r in qs]
-        return {"labels": labels, "values": values}
-
-    data = _cache_get_set(key, _build, 60)
-    return JsonResponse(data)
-
-
-@never_cache
-@login_required
-def api_profit_bar(request):
-    """
-    Bar data for profits — cached 60s per-user + params.
-    Params: month=YYYY-MM (optional), group_by=model (optional)
-    """
-    month_str = request.GET.get("month")
-    group_by = request.GET.get("group_by")  # 'model' or None
-    ver = get_dashboard_cache_version()
-    key = f"api:profit_bar:v{ver}:u{request.user.id}:m:{month_str or 'curr'}:g:{group_by or 'none'}"
-
-    def _build():
-        today = timezone.localdate()
-        if month_str:
-            dt = datetime.strptime(month_str, "%Y-%m")
-            start = dt.replace(day=1)
-        else:
-            start = today.replace(day=1)
-
-        if month_str and (start.year != today.year or start.month != today.month):
-            end = (start.replace(day=28) + timedelta(days=4)).replace(day=1) - timedelta(days=1)
-        else:
-            end = today
-        end_excl = end + timedelta(days=1)
-
-        base = Sale.objects.select_related("item__product")
-        if not _can_view_all(request.user):
-            base = base.filter(agent=request.user)
-
-        base = base.filter(sold_at__gte=start, sold_at__lt=end_excl)
-
-        profit_expr = F("price") - F("item__order_price")
-
-        if group_by == "model":
-            rows = base.values("item__product__brand", "item__product__model").annotate(v=Sum(profit_expr)).order_by("-v")[:20]
-            labels = [f"{r['item__product__brand']} {r['item__product__model']}" for r in rows]
-            data = [float(r["v"] or 0) for r in rows]
-        else:
-            monthly = base.annotate(m=TruncMonth("sold_at")).values("m").annotate(v=Sum(profit_expr)).order_by("m")
-            labels = [r["m"].strftime("%b %Y") for r in monthly]
-            data = [float(r["v"] or 0) for r in monthly]
-
-        return {"labels": labels, "data": data}
-
-    data = _cache_get_set(key, _build, 60)
-    return JsonResponse(data)
-
-
-@never_cache
-@login_required
-def api_agent_trend(request):
-    """
-    Agent performance trend — cached 60s per-user + params.
-    Params:
-      - months=6 (default)
-      - metric=sales|profit (default sales)
-      - agent=<id> (optional)
-    """
-    months = int(request.GET.get("months", 6))
-    metric = request.GET.get("metric", "sales")
-    agent_id = request.GET.get("agent")
-    ver = get_dashboard_cache_version()
-    key = f"api:agent_trend:v{ver}:u{request.user.id}:mo:{months}:met:{metric}:a:{agent_id or 'all'}"
-
-    def _build():
-        base = Sale.objects.select_related("agent", "item")
-        if not _can_view_all(request.user):
-            base = base.filter(agent=request.user)
-        if agent_id:
-            base = base.filter(agent_id=agent_id)
-
-        today = timezone.localdate()
-        end_excl = today + timedelta(days=1)
-        start = today - timedelta(days=months * 31)
-
-        base = base.filter(sold_at__gte=start, sold_at__lt=end_excl)
-
-        if metric == "profit":
-            agg = Sum(F("price") - F("item__order_price"))
-        else:
-            agg = Count("id")
-
-        rows = base.annotate(m=TruncMonth("sold_at")).values("m").annotate(v=agg).order_by("m")
-
-        labels = [r["m"].strftime("%b %Y") for r in rows]
-        data = [float(r["v"] or 0) for r in rows]
-        return {"labels": labels, "data": data}
-
-    data = _cache_get_set(key, _build, 60)
-    return JsonResponse(data)
-
-
-# -----------------------
-# Time logging (page + API) & Wallet APIs
+# Time logging & Wallet
 # -----------------------
 @never_cache
 @login_required
 @require_http_methods(["GET"])
 def time_checkin_page(request):
-    """Simple page for agents to perform a GPS check-in/out."""
     prof = getattr(request.user, "agent_profile", None)
     pref_loc = getattr(prof, "location", None)
     return render(
@@ -1075,18 +824,6 @@ def time_checkin_page(request):
 @login_required
 @require_POST
 def api_time_checkin(request):
-    """
-    Body (JSON or form):
-      {
-        "checkin_type" | "type": "ARRIVAL" | "DEPARTURE",
-        "latitude" | "lat": -13.9621,
-        "longitude" | "lon": 33.7745,
-        "accuracy_m" | "accuracy": 25,
-        "location_id": 3,
-        "note": "optional"
-      }
-    Computes distance to store (if store has lat/lon) and flags within_geofence.
-    """
     try:
         if request.content_type and "application/json" in request.content_type.lower():
             payload = json.loads(request.body or "{}")
@@ -1123,7 +860,7 @@ def api_time_checkin(request):
     dist = None
     within = False
     if loc and loc.latitude is not None and loc.longitude is not None and lat is not None and lon is not None:
-        dist = int(round(_haversine_meters(lat, lon, float(loc.latitude), float(loc.longitude))))
+        dist = _haversine_m(lat, lon, float(loc.latitude), float(loc.longitude))
         radius = (loc.geofence_radius_m or 150) + (acc or 0)
         within = dist <= radius
 
@@ -1156,10 +893,6 @@ def api_time_checkin(request):
 @login_required
 @require_http_methods(["GET"])
 def time_logs(request):
-    """
-    Simple page to view recent time logs.
-    Managers/Admins see all, others see their own.
-    """
     if _can_view_all(request.user):
         qs = TimeLog.objects.select_related("user", "location").order_by("-logged_at")
     else:
@@ -1175,10 +908,6 @@ def time_logs(request):
 @login_required
 @require_http_methods(["GET"])
 def api_wallet_summary(request):
-    """
-    Returns wallet balance (and optional month sum).
-    Params: user_id (admin/manager), year, month
-    """
     target = request.user
     user_id = request.GET.get("user_id")
     if user_id:
@@ -1205,17 +934,13 @@ def api_wallet_summary(request):
     return JsonResponse(data)
 
 
-api_wallet_balance = api_wallet_summary  # back-compat alias
+api_wallet_balance = api_wallet_summary
 
 
 @never_cache
 @login_required
 @require_POST
 def api_wallet_add_txn(request):
-    """
-    Admin-only: create a wallet transaction for an agent.
-    Body: { user_id, amount, reason, memo? }
-    """
     if not _is_admin(request.user):
         return JsonResponse({"ok": False, "error": "Admin only."}, status=403)
 
@@ -1238,12 +963,7 @@ def api_wallet_add_txn(request):
         return JsonResponse({"ok": False, "error": "Invalid amount."}, status=400)
 
     reason = (payload.get("reason") or "ADJUSTMENT").upper()
-    allowed = {k for k, _ in getattr(WalletTxn, "REASON_CHOICES", [])} or {
-        "ADJUSTMENT",
-        "ADVANCE",
-        "COMMISSION",
-        "PAYOUT",
-    }
+    allowed = {k for k, _ in getattr(WalletTxn, "REASON_CHOICES", [])} or {"ADJUSTMENT", "ADVANCE", "COMMISSION", "PAYOUT"}
     if reason not in allowed:
         return JsonResponse({"ok": False, "error": f"Invalid reason. Allowed: {sorted(list(allowed))}"}, status=400)
 
@@ -1255,18 +975,13 @@ def api_wallet_add_txn(request):
     return JsonResponse({"ok": True, "txn_id": txn.id, "balance": new_balance})
 
 
-api_wallet_txn = api_wallet_add_txn  # alias
+api_wallet_txn = api_wallet_add_txn
 
 
 @never_cache
 @login_required
 @require_http_methods(["GET"])
 def wallet_page(request):
-    """
-    Wallet page:
-      - Agents see their own balance & recent transactions.
-      - Admins/Managers can pick any user via ?user_id=
-    """
     target = request.user
     user_id = request.GET.get("user_id")
     if user_id and _is_manager_or_admin(request.user):
@@ -1301,17 +1016,12 @@ def wallet_page(request):
 
 
 # -----------------------
-# Stock management (Edit / Delete / Restore)
+# Stock management
 # -----------------------
 @never_cache
 @login_required
 @require_http_methods(["GET", "POST"])
 def update_stock(request, pk):
-    """
-    Edit an inventory item.
-    Admins/Managers can edit; Agents/Auditors cannot.
-    Admin-only rule for price changes; bulk update same product.
-    """
     item = get_object_or_404(InventoryItem, pk=pk)
 
     if not _can_edit_inventory(request.user):
@@ -1328,8 +1038,6 @@ def update_stock(request, pk):
         form = InventoryItemForm(request.POST, instance=item, user=request.user)
         if form.is_valid():
             changed_fields = list(form.changed_data)
-
-            # Guard: only admins can change prices
             price_fields = {"order_price", "selling_price"}
             if (price_fields & set(changed_fields)) and not _is_admin(request.user):
                 messages.error(request, "Only admins can edit order/selling prices.")
@@ -1338,7 +1046,6 @@ def update_stock(request, pk):
             old_vals = {name: getattr(item, name) for name in changed_fields}
             saved_item = form.save()
 
-            # Bulk propagate price changes to same product (active items only)
             if _is_admin(request.user):
                 bulk_updates = {}
                 if "order_price" in changed_fields:
@@ -1382,10 +1089,6 @@ def update_stock(request, pk):
 @never_cache
 @login_required
 def delete_stock(request, pk):
-    """
-    Only admins can delete. If the item has related sales and the FK is PROTECT,
-    archive (soft-delete) instead of crashing; always audit the attempt.
-    """
     item = get_object_or_404(InventoryItem, pk=pk)
 
     if not _is_admin(request.user):
@@ -1420,7 +1123,6 @@ def delete_stock(request, pk):
 @never_cache
 @login_required
 def restore_stock(request, pk):
-    """Admin-only: restore a previously archived (soft-deleted) item."""
     item = get_object_or_404(InventoryItem, pk=pk)
 
     if not _is_admin(request.user):
@@ -1457,22 +1159,192 @@ def agent_reset_confirm(request, token=None):
 
 
 # -----------------------
-# Health check (for Render)
+# Charts APIs
+# -----------------------
+@never_cache
+@login_required
+def api_sales_trend(request):
+    period = request.GET.get("period", "month")
+    metric = request.GET.get("metric", "amount")  # amount|count
+
+    ver = get_dashboard_cache_version()
+    key = f"api:sales_trend:v{ver}:u{request.user.id}:p:{period}:m:{metric}"
+
+    def _build():
+        today = timezone.localdate()
+        end_excl = today + timedelta(days=1)
+        if period == "7d":
+            start = today - timedelta(days=6)
+        else:
+            start = today.replace(day=1)
+
+        if _can_view_all(request.user):
+            qs = Sale.objects.all()
+        else:
+            qs = Sale.objects.filter(agent=request.user)
+
+        qs = qs.filter(sold_at__gte=start, sold_at__lt=end_excl)
+        qs = qs.annotate(d=TruncDate("sold_at")).values("d").order_by("d")
+
+        if metric == "count":
+            agg = qs.annotate(v=Count("id"))
+        else:
+            agg = qs.annotate(v=Sum("price"))
+        raw = {row["d"]: float(row["v"] or 0) for row in agg}
+
+        labels, values = [], []
+        cur = start
+        while cur < end_excl:
+            labels.append(cur.strftime("%b %d"))
+            values.append(raw.get(cur, 0.0))
+            cur += timedelta(days=1)
+        return {"labels": labels, "values": values}
+
+    data = cache.get(key)
+    if data is None:
+        data = _build()
+        cache.set(key, data, 60)
+    return JsonResponse(data)
+
+
+@never_cache
+@login_required
+def api_top_models(request):
+    period = request.GET.get("period", "today")
+    ver = get_dashboard_cache_version()
+    key = f"api:top_models:v{ver}:u{request.user.id}:p:{period}"
+
+    def _build():
+        today = timezone.localdate()
+        end_excl = today + timedelta(days=1)
+        start = today if period == "today" else today.replace(day=1)
+
+        if _can_view_all(request.user):
+            qs = Sale.objects.select_related("item__product")
+        else:
+            qs = Sale.objects.select_related("item__product").filter(agent=request.user)
+
+        qs = (
+            qs.filter(sold_at__gte=start, sold_at__lt=end_excl)
+            .values("item__product__brand", "item__product__model")
+            .annotate(c=Count("id"))
+            .order_by("-c")[:8]
+        )
+
+        labels = [f'{r["item__product__brand"]} {r["item__product__model"]}' for r in qs]
+        values = [r["c"] for r in qs]
+        return {"labels": labels, "values": values}
+
+    data = cache.get(key)
+    if data is None:
+        data = _build()
+        cache.set(key, data, 60)
+    return JsonResponse(data)
+
+
+@never_cache
+@login_required
+def api_profit_bar(request):
+    month_str = request.GET.get("month")
+    group_by = request.GET.get("group_by")  # 'model' or None
+    ver = get_dashboard_cache_version()
+    key = f"api:profit_bar:v{ver}:u{request.user.id}:m:{month_str or 'curr'}:g:{group_by or 'none'}"
+
+    def _build():
+        today = timezone.localdate()
+        if month_str:
+            dt = datetime.strptime(month_str, "%Y-%m")
+            start = dt.replace(day=1)
+        else:
+            start = today.replace(day=1)
+
+        if month_str and (start.year != today.year or start.month != today.month):
+            end = (start.replace(day=28) + timedelta(days=4)).replace(day=1) - timedelta(days=1)
+        else:
+            end = today
+        end_excl = end + timedelta(days=1)
+
+        base = Sale.objects.select_related("item__product")
+        if not _can_view_all(request.user):
+            base = base.filter(agent=request.user)
+
+        base = base.filter(sold_at__gte=start, sold_at__lt=end_excl)
+
+        profit_expr = F("price") - F("item__order_price")
+
+        if group_by == "model":
+            rows = base.values("item__product__brand", "item__product__model").annotate(v=Sum(profit_expr)).order_by("-v")[:20]
+            labels = [f"{r['item__product__brand']} {r['item__product__model']}" for r in rows]
+            data = [float(r["v"] or 0) for r in rows]
+        else:
+            monthly = base.annotate(m=TruncMonth("sold_at")).values("m").annotate(v=Sum(profit_expr)).order_by("m")
+            labels = [r["m"].strftime("%b %Y") for r in monthly]
+            data = [float(r["v"] or 0) for r in monthly]
+
+        return {"labels": labels, "data": data}
+
+    data = cache.get(key)
+    if data is None:
+        data = _build()
+        cache.set(key, data, 60)
+    return JsonResponse(data)
+
+
+@never_cache
+@login_required
+def api_agent_trend(request):
+    months = int(request.GET.get("months", 6))
+    metric = request.GET.get("metric", "sales")
+    agent_id = request.GET.get("agent")
+    ver = get_dashboard_cache_version()
+    key = f"api:agent_trend:v{ver}:u{request.user.id}:mo:{months}:met:{metric}:a:{agent_id or 'all'}"
+
+    def _build():
+        base = Sale.objects.select_related("agent", "item")
+        if not _can_view_all(request.user):
+            base = base.filter(agent=request.user)
+        if agent_id:
+            base = base.filter(agent_id=agent_id)
+
+        today = timezone.localdate()
+        end_excl = today + timedelta(days=1)
+        start = today - timedelta(days=months * 31)
+
+        base = base.filter(sold_at__gte=start, sold_at__lt=end_excl)
+
+        if metric == "profit":
+            agg = Sum(F("price") - F("item__order_price"))
+        else:
+            agg = Count("id")
+
+        rows = base.annotate(m=TruncMonth("sold_at")).values("m").annotate(v=agg).order_by("m")
+
+        labels = [r["m"].strftime("%b %Y") for r in rows]
+        data = [float(r["v"] or 0) for r in rows]
+        return {"labels": labels, "data": data}
+
+    data = cache.get(key)
+    if data is None:
+        data = _build()
+        cache.set(key, data, 60)
+    return JsonResponse(data)
+
+
+# -----------------------
+# Health check (Render)
 # -----------------------
 @never_cache
 @require_http_methods(["GET"])
 def healthz(request):
-    """Simple DB-backed health check."""
-    from django.db import connection
-
-    db_ok, err = True, None
+    ok = True
+    err = None
     try:
         with connection.cursor() as c:
             c.execute("SELECT 1")
     except Exception as e:
-        db_ok, err = False, str(e)
-
-    payload = {"ok": db_ok, "time": timezone.now().isoformat()}
+        ok = False
+        err = str(e)
+    payload = {"ok": ok, "time": timezone.now().isoformat()}
     if err:
         payload["error"] = err
-    return JsonResponse(payload, status=200 if db_ok else 500)
+    return JsonResponse(payload, status=200 if ok else 500)
