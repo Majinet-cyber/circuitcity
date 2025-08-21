@@ -8,10 +8,10 @@ from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
 from django.core.cache import cache
 from django.db import transaction, connection
 from django.db.models import (
-    Sum, Q, Exists, OuterRef, Count, F, DecimalField, ExpressionWrapper, Case, When, Value
+    Sum, Q, Exists, OuterRef, Count, F, DecimalField, ExpressionWrapper, Case, When, Value, Cast
 )
 from django.db.models.deletion import ProtectedError
-from django.db.models.functions import TruncMonth, TruncDate
+from django.db.models.functions import TruncMonth, TruncDate, Coalesce
 from django.http import HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.template.exceptions import TemplateDoesNotExist
@@ -22,6 +22,7 @@ from django.views.decorators.http import require_POST, require_http_methods
 import csv
 import json
 import math
+from decimal import Decimal
 from datetime import timedelta, datetime
 from urllib.parse import urlencode
 
@@ -456,10 +457,14 @@ def inventory_dashboard(request):
     mtd_count = sales_qs_all.filter(sold_at__gte=month_start, sold_at__lt=tomorrow).count()
     all_time_count = sales_qs_all.count()
 
+    # ---- FIX: keep all math in Decimal land
+    DECIMAL_F = DecimalField(max_digits=14, decimal_places=2)
+    HUNDRED = Value(Decimal("100.00"), output_field=DECIMAL_F)
     commission_expr = ExpressionWrapper(
-        F("price") * (F("commission_pct") / 100.0),
-        output_field=DecimalField(max_digits=14, decimal_places=2),
+        F("price") * (Cast(F("commission_pct"), DECIMAL_F) / HUNDRED),
+        output_field=DECIMAL_F,
     )
+
     agent_rank_qs = (
         sales_qs_period.values("agent_id", "agent__username")
         .annotate(total_sales=Count("id"), earnings=Sum(commission_expr), revenue=Sum("price"))
@@ -467,31 +472,57 @@ def inventory_dashboard(request):
     )
     agent_rank = list(agent_rank_qs)
 
+    # ---- FIX: avoid int defaults; use Decimal defaults with output_field
     agent_wallet_summaries = {}
     agent_ids = [row["agent_id"] for row in agent_rank if row.get("agent_id")]
     if agent_ids:
         w = WalletTxn.objects.filter(user_id__in=agent_ids)
+        D0 = Value(Decimal("0.00"), output_field=DECIMAL_F)
         agent_wallet_rows = w.values("user_id").annotate(
             balance=Sum("amount"),
-            lifetime_commission=Sum(Case(When(reason="COMMISSION", then="amount"), default=Value(0))),
-            lifetime_advance=Sum(Case(When(reason="ADVANCE", then="amount"), default=Value(0))),
-            lifetime_adjustment=Sum(Case(When(reason="ADJUSTMENT", then="amount"), default=Value(0))),
+            lifetime_commission=Sum(
+                Case(When(reason="COMMISSION", then=F("amount")), default=D0, output_field=DECIMAL_F)
+            ),
+            lifetime_advance=Sum(
+                Case(When(reason="ADVANCE", then=F("amount")), default=D0, output_field=DECIMAL_F)
+            ),
+            lifetime_adjustment=Sum(
+                Case(When(reason="ADJUSTMENT", then=F("amount")), default=D0, output_field=DECIMAL_F)
+            ),
             month_commission=Sum(
                 Case(
-                    When(reason="COMMISSION", created_at__date__gte=month_start, created_at__date__lte=today, then="amount"),
-                    default=Value(0),
+                    When(
+                        reason="COMMISSION",
+                        created_at__date__gte=month_start,
+                        created_at__date__lte=today,
+                        then=F("amount"),
+                    ),
+                    default=D0,
+                    output_field=DECIMAL_F,
                 )
             ),
             month_advance=Sum(
                 Case(
-                    When(reason="ADVANCE", created_at__date__gte=month_start, created_at__date__lte=today, then="amount"),
-                    default=Value(0),
+                    When(
+                        reason="ADVANCE",
+                        created_at__date__gte=month_start,
+                        created_at__date__lte=today,
+                        then=F("amount"),
+                    ),
+                    default=D0,
+                    output_field=DECIMAL_F,
                 )
             ),
             month_adjustment=Sum(
                 Case(
-                    When(reason="ADJUSTMENT", created_at__date__gte=month_start, created_at__date__lte=today, then="amount"),
-                    default=Value(0),
+                    When(
+                        reason="ADJUSTMENT",
+                        created_at__date__gte=month_start,
+                        created_at__date__lte=today,
+                        then=F("amount"),
+                    ),
+                    default=D0,
+                    output_field=DECIMAL_F,
                 )
             ),
         )
@@ -532,7 +563,10 @@ def inventory_dashboard(request):
         labels.append(f"{y}-{m:02d}")
     revenue_points = [totals_map.get(lbl, 0.0) for lbl in labels]
 
-    profit_expr = ExpressionWrapper(F("price") - F("item__order_price"), output_field=DecimalField(max_digits=14, decimal_places=2))
+    profit_expr = ExpressionWrapper(
+        F("price") - F("item__order_price"),
+        output_field=DECIMAL_F
+    )
     prof_by_month = rev_qs.annotate(m=TruncMonth("sold_at")).values("m").annotate(total=Sum(profit_expr)).order_by("m")
     prof_map = {r["m"].strftime("%Y-%m"): float(r["total"] or 0) for r in prof_by_month if r["m"]}
     profit_points = [prof_map.get(lbl, 0.0) for lbl in labels]
@@ -555,7 +589,7 @@ def inventory_dashboard(request):
             }
         )
 
-    cost_expr = ExpressionWrapper(F("item__order_price"), output_field=DecimalField(max_digits=14, decimal_places=2))
+    cost_expr = ExpressionWrapper(F("item__order_price"), output_field=DECIMAL_F)
     totals = sales_qs_period.aggregate(revenue=Sum("price"), cost=Sum(cost_expr), profit=Sum(profit_expr))
     pie_revenue = float(totals.get("revenue") or 0)
     pie_cost = float(totals.get("cost") or 0)
@@ -762,7 +796,7 @@ def export_csv(request):
         qs = qs.filter(
             Q(imei__icontains=q)
             | Q(product__model__icontains=q)
-            | Q(product__brand__icontains=q)   # <-- fixed here
+            | Q(product__brand__icontains=q)
             | Q(product__variant__icontains=q)
         )
 
