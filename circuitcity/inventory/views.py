@@ -24,6 +24,32 @@ import json
 import math
 from datetime import timedelta, datetime
 from urllib.parse import urlencode
+import logging
+
+# ---------------------------------------------------------------------
+# SAFETY HEADER: never import third-party libs or local warranty module
+# at module import time (this killed deploys on Render).
+# ---------------------------------------------------------------------
+logger = logging.getLogger(__name__)
+
+# Optional stub so any accidental "requests" usage fails clearly at runtime,
+# not at import time during deploy/migration.
+class _RequestsStub:
+    def __getattr__(self, name):
+        raise RuntimeError(
+            "requests is not available on the server; warranty/network calls are disabled."
+        )
+requests = _RequestsStub()  # noqa: F401  (not used, but here as a guard)
+
+# Warranty client is disabled; keep a shim to satisfy type/attr references.
+class CarlcareClient:
+    def __init__(self, *_, **__):
+        logger.info("CarlcareClient shim in use (warranty disabled).")
+    def check(self, *_args, **_kwargs):
+        return type("WarrantyResult", (), {"status": "SKIPPED", "expires_at": None})()
+
+def _get_warranty_client():
+    return None
 
 # FORMS — keep only the ones that exist
 from .forms import ScanInForm, ScanSoldForm, InventoryItemForm
@@ -49,63 +75,34 @@ except Exception:
 
 User = get_user_model()
 
-# -------------------------------------------------
-# Warranty client: fully disabled (no imports from warranty.py)
-# -------------------------------------------------
-_WARRANTY_CLIENT_AVAILABLE = False
-
-
-class CarlcareClient:  # shim kept only so type references don't blow up
-    def __init__(self, *args, **kwargs):
-        self._shim = True
-
-    def check(self, imei: str):
-        return type("WarrantyResult", (), {"status": "SKIPPED", "expires_at": None})()
-
-
-def _get_warranty_client():
-    """Always return None so no warranty lookups are attempted."""
-    return None
-
-
 # -----------------------
 # Helpers
 # -----------------------
 def _user_home_location(user):
-    """Preselect the user's home location if they have an AgentProfile."""
     prof = getattr(user, "agent_profile", None)
     return getattr(prof, "location", None)
-
 
 def _is_manager_or_admin(user):
     return user.is_staff or user.groups.filter(name__in=["Admin", "Manager"]).exists()
 
-
 def _is_admin(user):
     return user.is_staff or user.groups.filter(name="Admin").exists()
-
 
 def _is_auditor(user):
     return user.groups.filter(name__in=["Auditor", "Auditors"]).exists()
 
-
 def _can_view_all(user):
     return _is_manager_or_admin(user) or _is_auditor(user)
-
 
 def _can_edit_inventory(user):
     return _is_manager_or_admin(user)
 
-
 def _audit(item, user, action: str, details: str = ""):
-    """Create an audit row if we have an item."""
     if not item:
         return
     InventoryAudit.objects.create(item=item, by_user=user, action=action, details=details or "")
 
-
 def _haversine_meters(lat1, lon1, lat2, lon2):
-    """Great-circle distance in meters."""
     if None in (lat1, lon1, lat2, lon2):
         return None
     R = 6371000.0
@@ -117,9 +114,7 @@ def _haversine_meters(lat1, lon1, lat2, lon2):
     c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
     return R * c
 
-
 def _paginate_qs(request, qs, default_per_page=50, max_per_page=200):
-    """Uniform paginator with a hard cap of 200 rows/page. Supports ?page & ?page_size=."""
     try:
         per_page = int(request.GET.get("page_size", default_per_page))
     except (TypeError, ValueError):
@@ -140,39 +135,29 @@ def _paginate_qs(request, qs, default_per_page=50, max_per_page=200):
 
     return page_obj, url_for
 
-
 def _cache_get_set(key: str, builder, ttl: int = 60):
-    """Small helper for 60s server-side caching."""
     data = cache.get(key)
     if data is None:
         data = builder()
         cache.set(key, data, ttl)
     return data
 
-
 def _wallet_balance(user):
-    """Safe wallet balance even if custom helper is missing."""
     try:
         return WalletTxn.balance_for(user)
     except Exception:
         return WalletTxn.objects.filter(user=user).aggregate(s=Sum("amount"))["s"] or 0
 
-
 def _wallet_month_sum(user, year: int, month: int):
-    """Safe month sum even if custom helper is missing."""
     try:
         return WalletTxn.month_sum_for(user, year, month)
     except Exception:
         return (
-            WalletTxn.objects.filter(user=user, created_at__year=year, created_at__month=month).aggregate(s=Sum("amount"))[
-                "s"
-            ]
-            or 0
+            WalletTxn.objects.filter(user=user, created_at__year=year, created_at__month=month)
+            .aggregate(s=Sum("amount"))["s"] or 0
         )
 
-
 def _inv_base(show_archived: bool):
-    """InventoryItem.active when present; else .objects (and is_active=True when possible)."""
     if show_archived:
         return InventoryItem.objects
     if hasattr(InventoryItem, "active"):
@@ -182,9 +167,7 @@ def _inv_base(show_archived: bool):
     except Exception:
         return InventoryItem.objects
 
-
 def _render_dashboard_safe(request, context, today, mtd_count, all_time_count):
-    """Render dashboard with a fallback if the template is missing."""
     try:
         return render(request, "inventory/dashboard.html", context)
     except TemplateDoesNotExist:
@@ -195,7 +178,6 @@ def _render_dashboard_safe(request, context, today, mtd_count, all_time_count):
             content_type="text/html",
         )
 
-
 # -----------------------
 # Scan pages
 # -----------------------
@@ -205,10 +187,7 @@ def _render_dashboard_safe(request, context, today, mtd_count, all_time_count):
 @transaction.atomic
 def scan_in(request):
     """
-    Invariants:
-      - No orphan items: product & location required.
-      - Unique IMEI enforced.
-      - Warranty lookup is disabled; we always record SKIPPED.
+    Warranty lookup is disabled; we always record SKIPPED.
     """
     if _is_auditor(request.user) and request.method == "POST":
         messages.error(request, "Auditors cannot stock-in devices.")
@@ -244,16 +223,11 @@ def scan_in(request):
             messages.error(request, f"Item with IMEI {imei} already exists.")
             return render(request, "inventory/scan_in.html", {"form": form})
 
-        # Warranty is disabled: record SKIPPED (no external calls / imports)
-        warranty_status = "SKIPPED"
-        warranty_expires_at = None
-        warranty_checked_at = None
-        activation_at = None
-
+        # Warranty disabled
         WarrantyCheckLog.objects.create(
             imei=imei or "",
-            result=warranty_status,
-            expires_at=warranty_expires_at,
+            result="SKIPPED",
+            expires_at=None,
             notes="scan_in (warranty disabled)",
             by_user=request.user,
         )
@@ -279,10 +253,10 @@ def scan_in(request):
             order_price=data["order_price"],
             current_location=data["location"],
             assigned_agent=request.user if data.get("assigned_to_me") else None,
-            warranty_status=warranty_status,
-            warranty_expires_at=warranty_expires_at,
-            warranty_last_checked_at=warranty_checked_at,
-            activation_detected_at=activation_at,
+            warranty_status="SKIPPED",
+            warranty_expires_at=None,
+            warranty_last_checked_at=None,
+            activation_detected_at=None,
         )
 
         _audit(item, request.user, "STOCK_IN", "Warranty disabled")
@@ -292,17 +266,13 @@ def scan_in(request):
     form = ScanInForm(initial=initial)
     return render(request, "inventory/scan_in.html", {"form": form})
 
-
 @never_cache
 @login_required
 @require_http_methods(["GET", "POST"])
 @transaction.atomic
 def scan_sold(request):
     """
-    Invariants:
-      - Only IN_STOCK items can be sold (row lock prevents race).
-      - No negative/invalid price accepted.
-    Writes: InventoryItem(status→SOLD), Sale, InventoryAudit
+    Mark item SOLD and create Sale row.
     """
     if _is_auditor(request.user) and request.method == "POST":
         messages.error(request, "Auditors cannot mark items as SOLD.")
@@ -367,25 +337,17 @@ def scan_sold(request):
     form = ScanSoldForm(initial=initial)
     return render(request, "inventory/scan_sold.html", {"form": form})
 
-
 @never_cache
 @login_required
 @require_http_methods(["GET"])
 def scan_web(request):
-    """Desktop-friendly scanner page (paste/type IMEI; webcam optional)."""
     return render(request, "inventory/scan_web.html", {})
-
 
 @never_cache
 @login_required
 @require_POST
 @transaction.atomic
 def api_mark_sold(request):
-    """
-    Accepts JSON or form data.
-    Body (JSON): { "imei": "15-digit", "comment": "optional", "price": 123.45, "location_id": 1 }
-    Idempotent on already SOLD items.
-    """
     if _is_auditor(request.user):
         return JsonResponse({"ok": False, "error": "Auditors cannot modify inventory."}, status=403)
 
@@ -467,15 +429,13 @@ def api_mark_sold(request):
 
     return JsonResponse({"ok": True, "imei": imei, "updates": updates})
 
-
 # -----------------------
 # Inventory dashboard & list
 # -----------------------
 @login_required
 def inventory_dashboard(request):
     """
-    Cached (60s) heavy aggregates for the dashboard.
-    Cache key includes user + filters so no cross-user leakage.
+    Cached (60s) aggregates for the dashboard.
     """
     period = request.GET.get("period", "month")
     model_id = request.GET.get("model") or None
@@ -510,12 +470,12 @@ def inventory_dashboard(request):
     if period == "month":
         sales_qs_period = sales_qs_all.filter(sold_at__gte=month_start)
 
-    # Header chip counts (corrected):
+    # Header chip counts
     today_count = sales_qs_all.filter(sold_at__gte=today, sold_at__lt=tomorrow).count()
     mtd_count = sales_qs_all.filter(sold_at__gte=month_start, sold_at__lt=tomorrow).count()
     all_time_count = sales_qs_all.count()
 
-    # Ranking (use selected period so it matches the dashboard view)
+    # Ranking
     commission_expr = ExpressionWrapper(
         F("price") * (F("commission_pct") / 100.0),
         output_field=DecimalField(max_digits=14, decimal_places=2),
@@ -527,7 +487,7 @@ def inventory_dashboard(request):
     )
     agent_rank = list(agent_rank_qs)
 
-    # ---- Wallet aggregates for admins (lifetime & month breakdown) ----
+    # ---- Wallet aggregates for admins ----
     agent_wallet_summaries = {}
     agent_ids = [row["agent_id"] for row in agent_rank if row.get("agent_id")]
     if agent_ids:
@@ -589,7 +549,7 @@ def inventory_dashboard(request):
                 },
             }
 
-    # Last 12 months revenue & profit (permission + model respected)
+    # Last 12 months revenue & profit (respect permissions/model)
     last_12_start = month_start - timedelta(days=365)
     rev_qs = Sale.objects.select_related("item").filter(sold_at__gte=last_12_start)
     if not _can_view_all(request.user):
@@ -614,7 +574,8 @@ def inventory_dashboard(request):
     )
     prof_by_month = rev_qs.annotate(m=TruncMonth("sold_at")).values("m").annotate(total=Sum(profit_expr)).order_by("m")
     prof_map = {r["m"].strftime("%Y-%m"): float(r["total"] or 0) for r in prof_by_month if r["m"]}
-    profit_points = [prof_map.get(lbl, 0.0) for r in labels for lbl in [r]]
+    # FIX: correct comprehension
+    profit_points = [prof_map.get(lbl, 0.0) for lbl in labels]
 
     # Agent stock vs sold (sold respects selected period)
     total_assigned = (
@@ -713,15 +674,12 @@ def inventory_dashboard(request):
     cache.set(cache_key, context, 60)
     return _render_dashboard_safe(request, context, today, mtd_count, all_time_count)
 
-
 @never_cache
 @login_required
 @require_http_methods(["GET"])  # list/export is GET-only
 def stock_list(request):
     """
-    Stock list with optional search by IMEI/brand/model/variant.
-    Managers/Admins/Auditors see all; Agents see only their own assigned items.
-    Adds pagination (cap 200/pg) and header metrics. CSV via ?export=csv.
+    Stock list with search, pagination, CSV.
     """
     q = request.GET.get("q", "").strip()
     show_archived = request.GET.get("archived") == "1"
@@ -830,7 +788,6 @@ def stock_list(request):
     }
     return render(request, "inventory/stock_list.html", context)
 
-
 @never_cache
 @login_required
 @require_http_methods(["GET"])
@@ -893,18 +850,12 @@ def export_csv(request):
         )
     return response
 
-
 # -----------------------
-# JSON endpoints for charts (trend + top models)
+# JSON endpoints (trend, top models, profits, agent trend)
 # -----------------------
 @never_cache
 @login_required
 def api_sales_trend(request):
-    """
-    JSON for the line chart — cached for 60s per-user + params.
-    Query: ?period=month|7d & metric=amount|count
-    Fills missing days with zeroes so the chart scales nicely.
-    """
     period = request.GET.get("period", "month")
     metric = request.GET.get("metric", "amount")  # amount|count
 
@@ -927,14 +878,12 @@ def api_sales_trend(request):
         qs = qs.filter(sold_at__gte=start, sold_at__lt=end_excl)
         qs = qs.annotate(d=TruncDate("sold_at")).values("d").order_by("d")
 
-        # Aggregate raw
         if metric == "count":
             agg = qs.annotate(v=Count("id"))
         else:
             agg = qs.annotate(v=Sum("price"))
         raw = {row["d"]: float(row["v"] or 0) for row in agg}
 
-        # Build full date range with zero fill
         labels, values = [], []
         cur = start
         while cur < end_excl:
@@ -946,14 +895,9 @@ def api_sales_trend(request):
     data = _cache_get_set(key, _build, 60)
     return JsonResponse(data)
 
-
 @never_cache
 @login_required
 def api_top_models(request):
-    """
-    JSON for the pie chart of best sellers — cached 60s per-user + period.
-    Query: ?period=today|month
-    """
     period = request.GET.get("period", "today")
     ver = get_dashboard_cache_version()
     key = f"api:top_models:v{ver}:u{request.user.id}:p:{period}"
@@ -982,19 +926,9 @@ def api_top_models(request):
     data = _cache_get_set(key, _build, 60)
     return JsonResponse(data)
 
-
-# -----------------------
-# New JSON endpoints for profits + agent trend
-# -----------------------
 @never_cache
 @login_required
 def api_profit_bar(request):
-    """
-    Bar data for profits — cached 60s per-user + params.
-    Params:
-      - month=YYYY-MM  (optional; default current month)
-      - group_by=model (optional; if present, group profits by product model)
-    """
     month_str = request.GET.get("month")
     group_by = request.GET.get("group_by")  # 'model' or None
     ver = get_dashboard_cache_version()
@@ -1023,9 +957,7 @@ def api_profit_bar(request):
         profit_expr = F("price") - F("item__order_price")
 
         if group_by == "model":
-            rows = base.values("item__product__brand", "item__product__model").annotate(v=Sum(profit_expr)).order_by("-v")[
-                :20
-            ]
+            rows = base.values("item__product__brand", "item__product__model").annotate(v=Sum(profit_expr)).order_by("-v")[:20]
             labels = [f"{r['item__product__brand']} {r['item__product__model']}" for r in rows]
             data = [float(r["v"] or 0) for r in rows]
         else:
@@ -1038,17 +970,9 @@ def api_profit_bar(request):
     data = _cache_get_set(key, _build, 60)
     return JsonResponse(data)
 
-
 @never_cache
 @login_required
 def api_agent_trend(request):
-    """
-    Agent performance trend — cached 60s per-user + params.
-    Params:
-      - months=6 (default)
-      - metric=sales|profit (default sales)
-      - agent=<id> (optional)
-    """
     months = int(request.GET.get("months", 6))
     metric = request.GET.get("metric", "sales")
     agent_id = request.GET.get("agent")
@@ -1082,7 +1006,6 @@ def api_agent_trend(request):
     data = _cache_get_set(key, _build, 60)
     return JsonResponse(data)
 
-
 # -----------------------
 # Time logging (page + API) & Wallet APIs
 # -----------------------
@@ -1090,7 +1013,6 @@ def api_agent_trend(request):
 @login_required
 @require_http_methods(["GET"])
 def time_checkin_page(request):
-    """Simple page for agents to perform a GPS check-in/out."""
     prof = getattr(request.user, "agent_profile", None)
     pref_loc = getattr(prof, "location", None)
     return render(
@@ -1099,23 +1021,10 @@ def time_checkin_page(request):
         {"pref_loc_id": pref_loc.id if pref_loc else "", "pref_loc_name": pref_loc.name if pref_loc else ""},
     )
 
-
 @never_cache
 @login_required
 @require_POST
 def api_time_checkin(request):
-    """
-    Body (JSON or form):
-      {
-        "checkin_type" | "type": "ARRIVAL" | "DEPARTURE",
-        "latitude" | "lat": -13.9621,
-        "longitude" | "lon": 33.7745,
-        "accuracy_m" | "accuracy": 25,
-        "location_id": 3,
-        "note": "optional"
-      }
-    Computes distance to store (if store has lat/lon) and flags within_geofence.
-    """
     try:
         if request.content_type and "application/json" in request.content_type.lower():
             payload = json.loads(request.body or "{}")
@@ -1180,36 +1089,10 @@ def api_time_checkin(request):
         }
     )
 
-
-@never_cache
-@login_required
-@require_http_methods(["GET"])
-def time_logs(request):
-    """
-    Simple page to view recent time logs.
-    Managers/Admins see all, others see their own.
-    """
-    if _can_view_all(request.user):
-        qs = TimeLog.objects.select_related("user", "location").order_by("-logged_at")
-    else:
-        qs = TimeLog.objects.select_related("user", "location").filter(user=request.user).order_by("-logged_at")
-
-    page_obj, url_for = _paginate_qs(request, qs, default_per_page=50, max_per_page=200)
-    return render(
-        request, "inventory/time_logs.html", {"logs": page_obj.object_list, "page_obj": page_obj, "url_for": url_for}
-    )
-
-
 @never_cache
 @login_required
 @require_http_methods(["GET"])
 def api_wallet_summary(request):
-    """
-    Returns wallet balance (and optional month sum).
-    Params:
-      - user_id (admins/managers only; default self)
-      - year, month (optional; if provided, also returns month_sum)
-    """
     target = request.user
     user_id = request.GET.get("user_id")
     if user_id:
@@ -1235,25 +1118,12 @@ def api_wallet_summary(request):
             data["month_sum"] = None
     return JsonResponse(data)
 
-
 api_wallet_balance = api_wallet_summary  # back-compat alias
-
 
 @never_cache
 @login_required
 @require_POST
 def api_wallet_add_txn(request):
-    """
-    Admin-only: create a wallet transaction for an agent.
-    Body (JSON or form):
-      {
-        "user_id": 12,
-        "amount": 5000.00,
-        "reason": "ADVANCE"|"PAYOUT"|...,
-        "memo": "optional note"
-      }
-    Returns new balance.
-    """
     if not _is_admin(request.user):
         return JsonResponse({"ok": False, "error": "Admin only."}, status=403)
 
@@ -1292,19 +1162,12 @@ def api_wallet_add_txn(request):
     new_balance = _wallet_balance(target)
     return JsonResponse({"ok": True, "txn_id": txn.id, "balance": new_balance})
 
-
 api_wallet_txn = api_wallet_add_txn  # alias
-
 
 @never_cache
 @login_required
 @require_http_methods(["GET"])
 def wallet_page(request):
-    """
-    Wallet page:
-      - Agents see their own balance & recent transactions.
-      - Admins/Managers can pick any user via ?user_id= and add transactions via API.
-    """
     target = request.user
     user_id = request.GET.get("user_id")
     if user_id and _is_manager_or_admin(request.user):
@@ -1337,7 +1200,6 @@ def wallet_page(request):
     }
     return render(request, "inventory/wallet.html", context)
 
-
 # -----------------------
 # Stock management (Edit / Delete / Restore)
 # -----------------------
@@ -1345,12 +1207,6 @@ def wallet_page(request):
 @login_required
 @require_http_methods(["GET", "POST"])
 def update_stock(request, pk):
-    """
-    Edit an inventory item.
-    Admins/Managers can edit; Agents/Auditors cannot.
-    Admin-only rule for price changes. When an admin changes price(s), the same
-    field is bulk-updated for ALL active items with the same Product.
-    """
     item = get_object_or_404(InventoryItem, pk=pk)
 
     if not _can_edit_inventory(request.user):
@@ -1416,15 +1272,10 @@ def update_stock(request, pk):
 
     return render(request, "inventory/edit_stock.html", {"form": form, "item": item})
 
-
 @require_POST
 @never_cache
 @login_required
 def delete_stock(request, pk):
-    """
-    Only admins can delete. If the item has related sales and the FK is PROTECT,
-    archive (soft-delete) instead of crashing; always audit the attempt.
-    """
     item = get_object_or_404(InventoryItem, pk=pk)
 
     if not _is_admin(request.user):
@@ -1454,12 +1305,10 @@ def delete_stock(request, pk):
         messages.info(request, "This item has sales, so it was archived instead of deleted.")
     return redirect("inventory:stock_list")
 
-
 @require_POST
 @never_cache
 @login_required
 def restore_stock(request, pk):
-    """Admin-only: restore a previously archived (soft-deleted) item."""
     item = get_object_or_404(InventoryItem, pk=pk)
 
     if not _is_admin(request.user):
@@ -1481,19 +1330,16 @@ def restore_stock(request, pk):
     messages.success(request, "Item restored.")
     return redirect("inventory:stock_list")
 
-
 # -----------------------
-# Auth: Forgot / Reset (placeholders)
+# Auth placeholders
 # -----------------------
 @never_cache
 def agent_forgot_password(request):
     return HttpResponse("Forgot password page – not implemented yet.")
 
-
 @never_cache
 def agent_reset_confirm(request, token=None):
     return HttpResponse(f"Reset confirm – token received: {token}")
-
 
 # -----------------------
 # Health check (for Render)
@@ -1501,7 +1347,6 @@ def agent_reset_confirm(request, token=None):
 @never_cache
 @require_http_methods(["GET"])
 def healthz(request):
-    """Simple DB-backed health check."""
     from django.db import connection
 
     db_ok, err = True, None
