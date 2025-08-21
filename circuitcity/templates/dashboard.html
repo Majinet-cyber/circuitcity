@@ -50,7 +50,7 @@
   .toolbar{display:flex;gap:.5rem;align-items:center;justify-content:flex-end}
   select{padding:.45rem .55rem;border-radius:.45rem;border:1px solid var(--deep-border);background:var(--deep-panel);color:var(--cc-text)}
 
-  /* NEW: reliable canvas height + empty state (no visual change otherwise) */
+  /* reliable canvas height + empty state */
   .chart-holder{position:relative;height:260px}
   .chart-empty{
     position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
@@ -66,7 +66,7 @@
 <div class="dash">
   <h2 class="h2">Key metrics</h2>
 
-  <!-- KPI pills (matches Stock List look) -->
+  <!-- KPI pills -->
   <div class="pillrow">
     <span class="pill">Scope: <strong>{{ kpis.scope|default:"—" }}</strong></span>
     <span class="pill">Today: <strong>{{ kpis.today_count|default:0|intcomma }}</strong></span>
@@ -152,7 +152,7 @@
     </div>
   {% endif %}
 
-  <!-- Charts (profit stays below battery, like you asked) -->
+  <!-- Charts -->
   <div class="charts">
     <div class="chart-card">
       <div style="display:flex;justify-content:space-between;align-items:center">
@@ -245,7 +245,7 @@
   async function loadProfit(){
     const month = document.getElementById('profitMonth').value;
     const group = document.getElementById('profitGroup').value;
-    const url = "{% url 'dashboard:profit_data' %}" +
+    const url = "{% url 'inventory:api_profit_bar' %}" +
                 `?${month ? 'month='+encodeURIComponent(month)+'&' : ''}${group ? 'group_by='+encodeURIComponent(group) : ''}`;
     const res = await fetch(url);
     const data = await res.json();
@@ -273,7 +273,7 @@
   async function loadTrend(){
     const metric = document.getElementById('trendMetric').value;
     const months = document.getElementById('trendMonths').value;
-    const url = "{% url 'dashboard:agent_trend_data' %}" + `?metric=${metric}&months=${months}`;
+    const url = "{% url 'inventory:api_agent_trend' %}" + `?metric=${metric}&months=${months}`;
     const res = await fetch(url);
     const data = await res.json();
 
