@@ -50,3 +50,6 @@ sortedcontainers==2.4.0
 websocket-client==1.8.0
 xyzservices==2025.1.0
 sentry-sdk==2.35.0
+requests>=2.31
+beautifulsoup4>=4.12  # if your warranty.py uses bs4
+
