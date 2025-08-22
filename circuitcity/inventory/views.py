@@ -10,7 +10,8 @@ from django.db import transaction, connection
 from django.db.models import (
     Sum, Q, Exists, OuterRef, Count, F, DecimalField, ExpressionWrapper, Case, When, Value
 )
-from django.db.models.functions import TruncMonth, TruncDate, Cast, Coalesce  # ← added Coalesce
+from django.db.models.deletion import ProtectedError
+from django.db.models.functions import TruncMonth, TruncDate, Cast, Coalesce
 from django.http import HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.template.exceptions import TemplateDoesNotExist
@@ -438,11 +439,13 @@ def inventory_dashboard(request):
     if _can_view_all(request.user):
         sales_qs_all = Sale.objects.select_related("item", "agent", "item__product")
         items_qs = InventoryItem.objects.select_related("product", "assigned_agent", "current_location")
+        scope_label = "All agents"
     else:
         sales_qs_all = Sale.objects.filter(agent=request.user).select_related("item", "agent", "item__product")
         items_qs = InventoryItem.objects.filter(assigned_agent=request.user).select_related(
             "product", "assigned_agent", "current_location"
         )
+        scope_label = "My sales"
 
     if model_id:
         sales_qs_all = sales_qs_all.filter(item__product_id=model_id)
@@ -671,11 +674,17 @@ def inventory_dashboard(request):
         "jug_fill_pct": jug_fill_pct,
         "jug_color": jug_color,
 
-        # KPIs
+        # KPIs (also expose legacy 'kpis' bag used in some templates)
         "is_manager_or_admin": _is_manager_or_admin(request.user),
         "today_count": today_count,
         "mtd_count": mtd_count,
         "all_time_count": all_time_count,
+        "kpis": {
+            "scope": scope_label,
+            "today_count": today_count,
+            "month_count": mtd_count,
+            "all_count": all_time_count,
+        },
 
         # My wallet (summary)
         "wallet": {

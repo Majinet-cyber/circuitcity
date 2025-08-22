@@ -89,14 +89,14 @@
       {% if staff_view %}
         {% with pct=battery.pct|default:0 label=battery.label|default:"" count=battery.count|default:0 max=battery.max|default:100 %}
           <div class="meter" aria-label="Stock meter">
-            <i style="width:{{ pct }}%; background:{% if pct < 20 %}#ef4444{% elif pct < 60 %}#f59e0b{% else %}#22c55e{% endif %}"></i>
+            <i style="width:{% firstof pct 0 %}%; background:{% if pct < 20 %}#ef4444{% elif pct < 60 %}#f59e0b{% else %}#22c55e{% endif %}"></i>
           </div>
           <div class="muted" style="margin-top:.4rem">{{ count|intcomma }} / {{ max|intcomma }} ({{ pct }}%) · {{ label }}</div>
         {% endwith %}
       {% else %}
         {% with pct=agent_battery.pct|default:0 label=agent_battery.label|default:"" count=agent_battery.count|default:0 max=agent_battery.max|default:20 %}
           <div class="meter" aria-label="Stock meter">
-            <i style="width:{{ pct }}%; background:{% if pct < 20 %}#ef4444{% elif pct < 60 %}#f59e0b{% else %}#22c55e{% endif %}"></i>
+            <i style="width:{% firstof pct 0 %}%; background:{% if pct < 20 %}#ef4444{% elif pct < 60 %}#f59e0b{% else %}#22c55e{% endif %}"></i>
           </div>
           <div class="muted" style="margin-top:.4rem">{{ count|intcomma }} / {{ max|intcomma }} ({{ pct }}%) · {{ label }}</div>
         {% endwith %}
@@ -201,18 +201,20 @@
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
 (function(){
-  // Pull colors from CSS variables so gridlines match light/dark
+  // Colors from CSS variables
   const cs = getComputedStyle(document.documentElement);
   const css = (v, fb) => (cs.getPropertyValue(v) || fb).trim();
   const GRID   = css('--deep-border', '#d1d5db');
   const TICK   = css('--cc-muted',    '#6b7280');
   const TEXT   = css('--cc-text',     '#111827');
   const ACCENT = css('--deep-accent', '#3b82f6');
+  const ACCENT_BG = 'rgba(47,109,246,0.15)'; // soft fill, blue-consistent
 
-  // Reusable chart options with visible gridlines
+  // Base chart options (visible gridlines)
   const baseOptions = {
     responsive: true,
     maintainAspectRatio: false,
+    animation: false,
     interaction: { mode: 'index', intersect: false },
     elements: { line: { tension: .25, borderWidth: 2 }, point: { radius: 2, hitRadius: 8 } },
     scales: {
@@ -232,8 +234,8 @@
     }
   };
 
-  const profitCtx = document.getElementById('profitChart').getContext('2d');
-  const trendCtx  = document.getElementById('agentTrend').getContext('2d');
+  const profitCtx = document.getElementById('profitChart')?.getContext('2d');
+  const trendCtx  = document.getElementById('agentTrend')?.getContext('2d');
   let profitChart = null, trendChart = null;
 
   function showEmpty(id, show){
@@ -241,12 +243,14 @@
     if (el) el.hidden = !show;
   }
   const sum = (arr)=> (arr||[]).reduce((a,b)=>a+(+b||0),0);
+  const nocache = () => `&_=${Date.now()}`;
 
   async function loadProfit(){
+    if (!profitCtx) return;
     const month = document.getElementById('profitMonth').value;
     const group = document.getElementById('profitGroup').value;
-    const url = "{% url 'inventory:api_profit_bar' %}" +
-                `?${month ? 'month='+encodeURIComponent(month)+'&' : ''}${group ? 'group_by='+encodeURIComponent(group) : ''}`;
+    const base  = "{% url 'inventory:api_profit_bar' %}";
+    const url   = base + `?${month ? 'month='+encodeURIComponent(month)+'&' : ''}${group ? 'group_by='+encodeURIComponent(group) : ''}${nocache()}`;
     const res = await fetch(url);
     const data = await res.json();
 
@@ -263,7 +267,8 @@
           label: 'Profit',
           data: values,
           borderColor: ACCENT,
-          backgroundColor: group ? ACCENT : undefined
+          backgroundColor: group ? ACCENT : ACCENT_BG,
+          fill: !group
         }]
       },
       options
@@ -271,9 +276,11 @@
   }
 
   async function loadTrend(){
+    if (!trendCtx) return;
     const metric = document.getElementById('trendMetric').value;
     const months = document.getElementById('trendMonths').value;
-    const url = "{% url 'inventory:api_agent_trend' %}" + `?metric=${metric}&months=${months}`;
+    const base   = "{% url 'inventory:api_agent_trend' %}";
+    const url    = base + `?metric=${metric}&months=${months}${nocache()}`;
     const res = await fetch(url);
     const data = await res.json();
 
@@ -289,7 +296,9 @@
         datasets: [{
           label: metric === 'profit' ? 'Profit' : 'Trend',
           data: values,
-          borderColor: ACCENT
+          borderColor: ACCENT,
+          backgroundColor: ACCENT_BG,
+          fill: true
         }]
       },
       options
@@ -303,6 +312,7 @@
 
   // Build charts after full load so mobile canvas sizes are final
   window.addEventListener('load', () => {
+    if (typeof Chart === 'undefined') return;
     loadProfit();
     loadTrend();
   });
