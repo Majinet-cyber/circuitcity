@@ -23,6 +23,10 @@ python-json-logger==3.3.0
 pytz==2025.1
 sentry-sdk==2.35.0
 six==1.17.0
+# DB helpers
+dj-database-url>=2.1.0
+psycopg[binary]>=3.2
+
 sniffio==1.3.1
 sortedcontainers==2.4.0
 soupsieve==2.7
