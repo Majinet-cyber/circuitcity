@@ -1,0 +1,78 @@
+{% extends "base.html" %}
+{% block title %}Sales · Circuit City{% endblock %}
+{% block content %}
+
+<div class="table-wrap" role="region" aria-labelledby="salesTableLabel">
+  <div class="table-toolbar">
+    <h2 id="salesTableLabel" style="margin:0;">Sales</h2>
+
+    <form method="get" class="filters" onsubmit="return true" aria-label="Filters" style="display:flex;gap:.5rem;flex-wrap:wrap;">
+      <input class="input" type="search" name="q" value="{{ request.GET.q }}" placeholder="Search IMEI, product, agent…" aria-label="Search sales" />
+      <select class="input" name="product" aria-label="Filter by product" onchange="this.form.submit()">
+        <option value="">All products</option>
+        {% for p in products %}
+          <option value="{{ p.id }}" {% if request.GET.product == p.id|stringformat:'s' %}selected{% endif %}>{{ p.name }}</option>
+        {% endfor %}
+      </select>
+      <select class="input" name="location" aria-label="Filter by location" onchange="this.form.submit()">
+        <option value="">All locations</option>
+        {% for l in locations %}
+          <option value="{{ l.id }}" {% if request.GET.location == l.id|stringformat:'s' %}selected{% endif %}>{{ l.name }}</option>
+        {% endfor %}
+      </select>
+      <select class="input" name="agent" aria-label="Filter by agent" onchange="this.form.submit()">
+        <option value="">All agents</option>
+        {% for a in agents %}
+          <option value="{{ a.id }}" {% if request.GET.agent == a.id|stringformat:'s' %}selected{% endif %}>{{ a.get_full_name|default:a.username }}</option>
+        {% endfor %}
+      </select>
+      <button class="btn btn-secondary" type="submit">Apply</button>
+      <a class="btn" href="{% url 'sales:list' %}">Reset</a>
+    </form>
+  </div>
+
+  {% if page_obj.paginator.count == 0 %}
+    {% include "includes/empty_state.html" with
+      title="No sales yet"
+      subtitle="Scan an item to get started."
+      cta_label="Scan item"
+      cta_url=scan_url %}
+  {% else %}
+    <div style="overflow:auto;max-height:70vh;">
+      <table class="table" aria-describedby="salesTableLabel">
+        <thead>
+          <tr>
+            <th>Time</th><th>Agent</th><th>Product</th><th>IMEI</th><th>Price</th><th>Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for s in page_obj.object_list %}
+          <tr>
+            <td>{{ s.created_at|date:"Y-m-d H:i" }}</td>
+            <td>{{ s.agent.get_full_name|default:s.agent.username }}</td>
+            <td>{{ s.product.name }}</td>
+            <td><code>{{ s.imei }}</code></td>
+            <td>{{ s.price|floatformat:0 }}</td>
+            <td><span class="badge">{{ s.get_status_display }}</span></td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Pagination -->
+    <nav class="pagination" aria-label="Pagination" style="display:flex;gap:.5rem;justify-content:flex-end;padding:var(--sp-3);">
+      {% if page_obj.has_previous %}
+        <a class="btn" href="?{% querystring request.GET 'page'=(page_obj.previous_page_number) %}" aria-label="Previous page">‹ Prev</a>
+      {% else %}<span class="btn" aria-disabled="true">‹ Prev</span>{% endif %}
+
+      <span aria-current="page" style="align-self:center;">Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span>
+
+      {% if page_obj.has_next %}
+        <a class="btn" href="?{% querystring request.GET 'page'=(page_obj.next_page_number) %}" aria-label="Next page">Next ›</a>
+      {% else %}<span class="btn" aria-disabled="true">Next ›</span>{% endif %}
+    </nav>
+  {% endif %}
+</div>
+
+{% endblock %}

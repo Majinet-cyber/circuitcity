@@ -1,0 +1,106 @@
+{% extends "base.html" %}
+{% block title %}Scan Sold · Circuit City{% endblock %}
+
+{% block body %}
+<div class="bg" style="min-height:100dvh;padding:2rem;display:grid;place-items:start">
+  <div class="card" style="max-width:680px;width:100%;padding:1.5rem">
+    <h2 class="brand" style="margin:0 0 1rem">Mark Item as SOLD</h2>
+
+    {# flash messages #}
+    {% if messages %}
+      {% for message in messages %}
+        <div style="margin:.5rem 0;padding:.75rem 1rem;border-radius:.75rem;
+                    {% if message.tags == 'error' %}
+                      background:#fee2e2;border:1px solid #fecaca;color:#7f1d1d;
+                    {% else %}
+                      background:#e7f1ff;border:1px solid #cfe2ff;color:#102a7a;
+                    {% endif %}">
+          {{ message }}
+        </div>
+      {% endfor %}
+    {% endif %}
+
+    {# non-field errors #}
+    {% if form.non_field_errors %}
+      <div style="margin:.5rem 0;padding:.75rem 1rem;border-radius:.75rem;
+                  background:#fee2e2;border:1px solid #fecaca;color:#7f1d1d;">
+        {{ form.non_field_errors }}
+      </div>
+    {% endif %}
+
+    <form method="post" novalidate style="display:grid;gap:1rem" autocomplete="off">
+      {% csrf_token %}
+
+      <div>
+        <label for="{{ form.imei.id_for_label }}" style="display:block;margin:0 0 .35rem;color:#334155;font-weight:600">
+          IMEI / Barcode
+        </label>
+        {{ form.imei }}
+        {% if form.imei.errors %}
+          <div style="color:#b91c1c;margin-top:.25rem;font-size:.95rem;">
+            {{ form.imei.errors|striptags }}
+          </div>
+        {% endif %}
+      </div>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem">
+        <div>
+          <label for="{{ form.sold_at.id_for_label }}" style="display:block;margin:0 0 .35rem;color:#334155;font-weight:600">
+            Sold date
+          </label>
+          {{ form.sold_at }}
+          {% if form.sold_at.errors %}
+            <div style="color:#b91c1c;margin-top:.25rem;font-size:.95rem;">
+              {{ form.sold_at.errors|striptags }}
+            </div>
+          {% endif %}
+        </div>
+
+        <div>
+          <label for="{{ form.price.id_for_label }}" style="display:block;margin:0 0 .35rem;color:#334155;font-weight:600">
+            Price
+          </label>
+          {{ form.price }}
+          {% if form.price.errors %}
+            <div style="color:#b91c1c;margin-top:.25rem;font-size:.95rem;">
+              {{ form.price.errors|striptags }}
+            </div>
+          {% endif %}
+        </div>
+      </div>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem">
+        <div>
+          <label for="{{ form.commission_pct.id_for_label }}" style="display:block;margin:0 0 .35rem;color:#334155;font-weight:600">
+            Commission %
+          </label>
+          {{ form.commission_pct }}
+          {% if form.commission_pct.errors %}
+            <div style="color:#b91c1c;margin-top:.25rem;font-size:.95rem;">
+              {{ form.commission_pct.errors|striptags }}
+            </div>
+          {% endif %}
+        </div>
+
+        <div>
+          <label for="{{ form.location.id_for_label }}" style="display:block;margin:0 0 .35rem;color:#334155;font-weight:600">
+            Location
+          </label>
+          {{ form.location }}
+          {% if form.location.errors %}
+            <div style="color:#b91c1c;margin-top:.25rem;font-size:.95rem;">
+              {{ form.location.errors|striptags }}
+            </div>
+          {% endif %}
+        </div>
+      </div>
+
+      <div style="display:flex;gap:.6rem;flex-wrap:wrap">
+        <button class="btn" type="submit">Mark as SOLD</button>
+        <a class="btn" href="{% url 'stock_list' %}" style="background:#64748b">Stock list</a>
+        <a class="btn" href="{% url 'scan_in' %}" style="background:#2563eb">← Back to Scan In</a>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}

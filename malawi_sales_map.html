@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html>
+<head>
+    
+    <meta http-equiv="content-type" content="text/html; charset=UTF-8" />
+    
+        <script>
+            L_NO_TOUCH = false;
+            L_DISABLE_3D = false;
+        </script>
+    
+    <style>html, body {width: 100%;height: 100%;margin: 0;padding: 0;}</style>
+    <style>#map {position:absolute;top:0;bottom:0;right:0;left:0;}</style>
+    <script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.3/dist/leaflet.js"></script>
+    <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.2.2/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Leaflet.awesome-markers/2.0.2/leaflet.awesome-markers.js"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.3/dist/leaflet.css"/>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.2.2/dist/css/bootstrap.min.css"/>
+    <link rel="stylesheet" href="https://netdna.bootstrapcdn.com/bootstrap/3.0.0/css/bootstrap-glyphicons.css"/>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.2.0/css/all.min.css"/>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/Leaflet.awesome-markers/2.0.2/leaflet.awesome-markers.css"/>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/python-visualization/folium/folium/templates/leaflet.awesome.rotate.min.css"/>
+    
+            <meta name="viewport" content="width=device-width,
+                initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+            <style>
+                #map_208fd3cdc5ac54a171c62c1d8b4a845f {
+                    position: relative;
+                    width: 100.0%;
+                    height: 100.0%;
+                    left: 0.0%;
+                    top: 0.0%;
+                }
+                .leaflet-container { font-size: 1rem; }
+            </style>
+        
+</head>
+<body>
+    
+    
+            <div class="folium-map" id="map_208fd3cdc5ac54a171c62c1d8b4a845f" ></div>
+        
+</body>
+<script>
+    
+    
+            var map_208fd3cdc5ac54a171c62c1d8b4a845f = L.map(
+                "map_208fd3cdc5ac54a171c62c1d8b4a845f",
+                {
+                    center: [-13.5, 34.0],
+                    crs: L.CRS.EPSG3857,
+                    ...{
+  "zoom": 6,
+  "zoomControl": true,
+  "preferCanvas": false,
+}
+
+                }
+            );
+
+            
+
+        
+    
+            var tile_layer_96cb72761847187bdf0fc54ec9888d68 = L.tileLayer(
+                "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
+                {
+  "minZoom": 0,
+  "maxZoom": 19,
+  "maxNativeZoom": 19,
+  "noWrap": false,
+  "attribution": "\u0026copy; \u003ca href=\"https://www.openstreetmap.org/copyright\"\u003eOpenStreetMap\u003c/a\u003e contributors",
+  "subdomains": "abc",
+  "detectRetina": false,
+  "tms": false,
+  "opacity": 1,
+}
+
+            );
+        
+    
+            tile_layer_96cb72761847187bdf0fc54ec9888d68.addTo(map_208fd3cdc5ac54a171c62c1d8b4a845f);
+        
+    
+            var marker_9208986bb1ceab6676a4da5c0efa5a41 = L.marker(
+                [-13.9833, 33.7833],
+                {
+}
+            ).addTo(map_208fd3cdc5ac54a171c62c1d8b4a845f);
+        
+    
+        var popup_4e703ab16253e3be61fcbd043b2978ad = L.popup({
+  "maxWidth": "100%",
+});
+
+        
+            
+                var html_778f9c9c8c560374f7315d1f467fd9ec = $(`<div id="html_778f9c9c8c560374f7315d1f467fd9ec" style="width: 100.0%; height: 100.0%;">Lilongwe: 4619 sales</div>`)[0];
+                popup_4e703ab16253e3be61fcbd043b2978ad.setContent(html_778f9c9c8c560374f7315d1f467fd9ec);
+            
+        
+
+        marker_9208986bb1ceab6676a4da5c0efa5a41.bindPopup(popup_4e703ab16253e3be61fcbd043b2978ad)
+        ;
+
+        
+    
+    
+            marker_9208986bb1ceab6676a4da5c0efa5a41.bindTooltip(
+                `<div>
+                     Lilongwe
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+            var marker_d37e59ae47cb8cd422b4ac3b52870382 = L.marker(
+                [-15.7861, 35.0058],
+                {
+}
+            ).addTo(map_208fd3cdc5ac54a171c62c1d8b4a845f);
+        
+    
+        var popup_6671319fefd4a1fd5722e356d0d7a95e = L.popup({
+  "maxWidth": "100%",
+});
+
+        
+            
+                var html_037db6d481b62c2968c66fdfb3274a45 = $(`<div id="html_037db6d481b62c2968c66fdfb3274a45" style="width: 100.0%; height: 100.0%;">Blantyre: 5167 sales</div>`)[0];
+                popup_6671319fefd4a1fd5722e356d0d7a95e.setContent(html_037db6d481b62c2968c66fdfb3274a45);
+            
+        
+
+        marker_d37e59ae47cb8cd422b4ac3b52870382.bindPopup(popup_6671319fefd4a1fd5722e356d0d7a95e)
+        ;
+
+        
+    
+    
+            marker_d37e59ae47cb8cd422b4ac3b52870382.bindTooltip(
+                `<div>
+                     Blantyre
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+            var marker_e2c5d2aba10f2d76d07aa3dcc5d7649c = L.marker(
+                [-11.45, 34.0333],
+                {
+}
+            ).addTo(map_208fd3cdc5ac54a171c62c1d8b4a845f);
+        
+    
+        var popup_43627e8a6ebdd9afda3f04534c05da16 = L.popup({
+  "maxWidth": "100%",
+});
+
+        
+            
+                var html_940db3c478e1249ccc3c8b405728f5f6 = $(`<div id="html_940db3c478e1249ccc3c8b405728f5f6" style="width: 100.0%; height: 100.0%;">Mzuzu: 5126 sales</div>`)[0];
+                popup_43627e8a6ebdd9afda3f04534c05da16.setContent(html_940db3c478e1249ccc3c8b405728f5f6);
+            
+        
+
+        marker_e2c5d2aba10f2d76d07aa3dcc5d7649c.bindPopup(popup_43627e8a6ebdd9afda3f04534c05da16)
+        ;
+
+        
+    
+    
+            marker_e2c5d2aba10f2d76d07aa3dcc5d7649c.bindTooltip(
+                `<div>
+                     Mzuzu
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+            var marker_da76bbede03defd4db95317ae402bd06 = L.marker(
+                [-15.385, 35.318],
+                {
+}
+            ).addTo(map_208fd3cdc5ac54a171c62c1d8b4a845f);
+        
+    
+        var popup_09f21c2d707cb211facdb407511de710 = L.popup({
+  "maxWidth": "100%",
+});
+
+        
+            
+                var html_aa4c03813ea06ae6a4f86f73267b0251 = $(`<div id="html_aa4c03813ea06ae6a4f86f73267b0251" style="width: 100.0%; height: 100.0%;">Zomba: 4965 sales</div>`)[0];
+                popup_09f21c2d707cb211facdb407511de710.setContent(html_aa4c03813ea06ae6a4f86f73267b0251);
+            
+        
+
+        marker_da76bbede03defd4db95317ae402bd06.bindPopup(popup_09f21c2d707cb211facdb407511de710)
+        ;
+
+        
+    
+    
+            marker_da76bbede03defd4db95317ae402bd06.bindTooltip(
+                `<div>
+                     Zomba
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+            var marker_ea31162175e7e194edfeebba461318b8 = L.marker(
+                [-14.4781, 35.2645],
+                {
+}
+            ).addTo(map_208fd3cdc5ac54a171c62c1d8b4a845f);
+        
+    
+        var popup_71145303d99198e5c71190a8ae463d79 = L.popup({
+  "maxWidth": "100%",
+});
+
+        
+            
+                var html_a90ab0a07cecf6310d7b776947201c5e = $(`<div id="html_a90ab0a07cecf6310d7b776947201c5e" style="width: 100.0%; height: 100.0%;">Mangochi: 4860 sales</div>`)[0];
+                popup_71145303d99198e5c71190a8ae463d79.setContent(html_a90ab0a07cecf6310d7b776947201c5e);
+            
+        
+
+        marker_ea31162175e7e194edfeebba461318b8.bindPopup(popup_71145303d99198e5c71190a8ae463d79)
+        ;
+
+        
+    
+    
+            marker_ea31162175e7e194edfeebba461318b8.bindTooltip(
+                `<div>
+                     Mangochi
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+            var marker_cc3c79423d203a93350f3a5dfe397fb6 = L.marker(
+                [-13.0333, 33.4833],
+                {
+}
+            ).addTo(map_208fd3cdc5ac54a171c62c1d8b4a845f);
+        
+    
+        var popup_c8a8e861d957add0dcc8d5f01410d6ce = L.popup({
+  "maxWidth": "100%",
+});
+
+        
+            
+                var html_df3694af14970d3b46d0a736e00e1210 = $(`<div id="html_df3694af14970d3b46d0a736e00e1210" style="width: 100.0%; height: 100.0%;">Kasungu: 4901 sales</div>`)[0];
+                popup_c8a8e861d957add0dcc8d5f01410d6ce.setContent(html_df3694af14970d3b46d0a736e00e1210);
+            
+        
+
+        marker_cc3c79423d203a93350f3a5dfe397fb6.bindPopup(popup_c8a8e861d957add0dcc8d5f01410d6ce)
+        ;
+
+        
+    
+    
+            marker_cc3c79423d203a93350f3a5dfe397fb6.bindTooltip(
+                `<div>
+                     Kasungu
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+</script>
+</html>

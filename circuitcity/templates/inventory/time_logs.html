@@ -1,0 +1,73 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Time Logs · Circuit City{% endblock %}
+
+{% block content %}
+<div class="cc-container">
+  <h1 style="margin:.5rem 0 1rem;">Time Logs</h1>
+
+  <div class="cc-panel" style="padding:1rem;border:1px solid var(--cc-border);border-radius:.75rem;background:var(--cc-panel);">
+    <div style="overflow:auto">
+      <table aria-label="Recent time logs">
+        <thead>
+          <tr>
+            <th>User</th>
+            <th>Logged at</th>
+            <th>Type</th>
+            <th>Location</th>
+            <th>Lat</th>
+            <th>Lon</th>
+            <th>Accuracy (m)</th>
+            <th>Distance (m)</th>
+            <th>Geofence</th>
+            <th>Note</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for l in logs %}
+            <tr>
+              <td>{{ l.user.username }}</td>
+              <td>
+                <time datetime="{{ l.logged_at|date:'c' }}">
+                  {{ l.logged_at|date:"Y-m-d H:i:s" }}
+                </time>
+              </td>
+              <td>
+                {% if l.checkin_type == 'ARRIVAL' %}
+                  Arrival
+                {% else %}
+                  Departure
+                {% endif %}
+              </td>
+              <td>
+                {% if l.location %}
+                  {{ l.location.name }}
+                {% else %}
+                  —
+                {% endif %}
+              </td>
+              <td>{{ l.latitude|default:"" }}</td>
+              <td>{{ l.longitude|default:"" }}</td>
+              <td>{{ l.accuracy_m|default:"" }}</td>
+              <td>{{ l.distance_m|default:"" }}</td>
+              <td>
+                {% if l.within_geofence %}
+                  <span style="padding:.15rem .45rem;border-radius:.5rem;background:#eafff7;border:1px solid #88e0c1;">Inside</span>
+                {% else %}
+                  <span style="padding:.15rem .45rem;border-radius:.5rem;background:#fff1f2;border:1px solid #fecdd3;">Outside</span>
+                {% endif %}
+              </td>
+              <td>{{ l.note|default:"" }}</td>
+            </tr>
+          {% empty %}
+            <tr>
+              <td colspan="10" style="text-align:center;color:var(--cc-muted);padding:1rem;">No logs yet.</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endblock %}

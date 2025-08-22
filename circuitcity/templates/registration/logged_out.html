@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+{% block title %}Signed out · Circuit City{% endblock %}
+
+{% block body %}
+<div class="bg" style="min-height:100dvh;padding:2rem;display:grid;place-items:start">
+  <div class="card" style="max-width:480px;width:100%;padding:1.25rem">
+    <h2 class="brand" style="margin:0 0 .75rem">You’ve been signed out</h2>
+    <p>Thanks for visiting.</p>
+    <div style="display:flex;gap:.5rem;flex-wrap:wrap">
+      <a class="btn" href="{% url 'login' %}">Sign in again</a>
+      <a class="btn" href="{% url 'home' %}" style="background:#64748b">Go to home</a>
+    </div>
+  </div>
+</div>
+{% endblock %}

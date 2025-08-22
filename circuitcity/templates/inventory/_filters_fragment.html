@@ -1,0 +1,28 @@
+<!-- Top actions -->
+<div class="d-flex align-items-center justify-content-between mb-2">
+  <a href="/" class="btn btn-outline-primary btn-sm">Home</a>
+</div>
+
+<div class="cc-actions mb-3">
+  <a href="{% url 'inventory:scan_in' %}"  class="btn btn-light btn-sm">+ Stock IN</a>
+  <a href="{% url 'inventory:scan_sold' %}" class="btn btn-success btn-sm">✔ Scan SOLD</a>
+  <a href="{% url 'inventory:scan_web' %}"  class="btn btn-light btn-sm">📷 Scan (Web)</a>
+  <a href="{% url 'inventory:time_checkin' %}" class="btn btn-light btn-sm">⏱ Time Check-in</a>
+  <a href="#" class="btn btn-light btn-sm">💬 Feedback</a>
+  <a href="{% url 'logout' %}" class="btn btn-outline-danger btn-sm">Logout</a>
+</div>
+
+<!-- Filters (collapsible on phones) -->
+<div class="mb-3">
+  <div class="d-sm-none">
+    <button class="btn btn-outline-secondary btn-sm w-100 mb-2" data-bs-toggle="collapse" data-bs-target="#filtersMob">
+      Filters
+    </button>
+    <div id="filtersMob" class="collapse cc-filter-card p-2">
+      {% include "inventory/_filters_fragment.html" %}
+    </div>
+  </div>
+  <div class="d-none d-sm-block">
+    {% include "inventory/_filters_fragment.html" %}
+  </div>
+</div>

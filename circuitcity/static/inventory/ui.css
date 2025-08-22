@@ -1,0 +1,46 @@
+/* Cards */
+.card {
+  background: var(--tw-bg-opacity,1) linear-gradient(180deg, rgba(255,255,255,.85), rgba(255,255,255,.75));
+  border: 1px solid rgba(30,41,59,.08);
+  border-radius: 1rem; /* 16px */
+  box-shadow: 0 6px 30px rgba(2,8,23,.06);
+}
+
+/* Buttons */
+.btn-primary {
+  @apply inline-flex items-center gap-2 rounded-xl px-4 py-2 bg-brand text-white hover:bg-brand/90 shadow-soft;
+}
+.btn-subtle {
+  @apply inline-flex items-center gap-2 rounded-xl px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-800;
+}
+
+/* Sidebar links */
+.navlink {
+  @apply block px-3 py-2 rounded-lg text-slate-700 hover:bg-slate-100;
+}
+
+/* Pills / small stat chips */
+.pill {
+  @apply flex items-center justify-between bg-slate-50 rounded-lg px-3 py-2 border border-slate-200;
+}
+
+/* Segment control */
+.seg { @apply px-3 py-1.5 text-sm rounded-lg hover:bg-slate-100; }
+.seg.active { @apply bg-slate-900 text-white; }
+
+/* Badge */
+.badge { @apply inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium; }
+
+/* Toasts */
+.toast { @apply bg-white/90 backdrop-blur px-4 py-3 rounded-xl border border-slate-200 shadow-soft; }
+.toast.error { @apply border-rose-200 text-rose-700 bg-rose-50;}
+.toast.success { @apply border-emerald-200 text-emerald-700 bg-emerald-50;}
+.toast.info { @apply border-sky-200 text-sky-700 bg-sky-50;}
+.toast.warning { @apply border-amber-200 text-amber-800 bg-amber-50; }
+
+/* htmx indicator */
+.htmx-indicator { @apply inline-flex items-center justify-center; }
+
+/* Utility @apply requires Tailwind; if your pipeline doesn't process it,
+   replace these with plain CSS equivalents or keep the provided classes
+   directly in your HTML. */
