@@ -545,6 +545,20 @@ def inventory_dashboard(request):
                 },
             }
 
+    # >>> Rank agents by WALLET BALANCE (desc). Tie-breakers keep original intent.
+    for row in agent_rank:
+        uid = row.get("agent_id")
+        row["wallet_balance"] = float(agent_wallet_summaries.get(uid, {}).get("balance", 0.0))
+    agent_rank.sort(
+        key=lambda r: (
+            r.get("wallet_balance", 0.0),
+            float(r.get("earnings") or 0.0),
+            int(r.get("total_sales") or 0),
+        ),
+        reverse=True,
+    )
+    # <<< End wallet-based ranking
+
     # ===== Revenue/Profit last 12 months =====
     def back_n_months(d: date, n: int) -> date:
         y = d.year
