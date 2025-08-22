@@ -1,0 +1,8 @@
+{% extends "base.html" %}
+{% block body %}
+  <div style="padding:2rem">
+    <h2 class="brand">Welcome, {{ request.user.get_username }}</h2>
+    <p>This is your placeholder home page. We’ll put the dashboards here later.</p>
+    <p><a class="btn" href="{% url 'logout' %}">Log out</a></p>
+  </div>
+{% endblock %}

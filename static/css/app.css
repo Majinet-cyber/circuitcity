@@ -1,0 +1,340 @@
+/* circuitcity/static/css/app.css */
+
+/* ====== Base ====== */
+:root{
+  --cc-bg: #f6f7fb;
+  --cc-card: #ffffff;
+  --cc-border: #e5e7eb;
+  --cc-text: #0f172a;
+  --cc-muted: #64748b;
+  --cc-brand: #2563eb;
+  --cc-brand-dark: #1d4ed8;
+  --cc-ok: #10b981;
+  --cc-ok-dark: #059669;
+  --cc-danger: #ef4444;
+  --cc-shadow: 0 6px 24px rgba(2,6,23,.06), 0 2px 6px rgba(2,6,23,.08);
+}
+
+/* === Dark theme palette (activated by <html data-theme="dark">) === */
+:root[data-theme="dark"]{
+  --cc-bg: #0b1220;
+  --cc-card: #0e1629;
+  --cc-border: #20324d;
+  --cc-text: #e5e7eb;
+  --cc-muted: #9aa4b2;
+  --cc-brand: #3b82f6;          /* a touch lighter for contrast on dark */
+  --cc-brand-dark: #2563eb;
+  --cc-ok: #22c55e;
+  --cc-ok-dark: #16a34a;
+  --cc-danger: #ef4444;
+}
+
+* { box-sizing: border-box; }
+html, body { height: 100%; }
+body.cc-body {
+  margin: 0;
+  background: var(--cc-bg);
+  color: var(--cc-text);
+  font: 14px/1.45 system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, "Helvetica Neue", Arial, "Noto Sans", "Apple Color Emoji", "Segoe UI Emoji";
+}
+
+/* Better focus for accessibility */
+:focus-visible {
+  outline: 2px solid var(--cc-brand);
+  outline-offset: 2px;
+  border-radius: .4rem;
+}
+
+/* ====== Top nav ====== */
+.cc-topnav {
+  position: sticky; top: 0; z-index: 40;
+  display: flex; align-items: center; gap: .75rem;
+  padding: .6rem .9rem;
+  background: #fff; border-bottom: 1px solid var(--cc-border);
+  box-shadow: 0 2px 12px rgba(2,6,23,.04);
+}
+/* Dark override (non-destructive) */
+[data-theme="dark"] .cc-topnav{
+  background: var(--cc-card);
+  border-bottom-color: var(--cc-border);
+  box-shadow: 0 2px 12px rgba(0,0,0,.35);
+}
+
+.cc-burger {
+  border: 1px solid var(--cc-border);
+  background: #fff;
+  border-radius: .5rem; padding: .4rem .6rem; cursor: pointer;
+  display: none; /* shown on small screens below */
+}
+[data-theme="dark"] .cc-burger{
+  background: var(--cc-card);
+  border-color: var(--cc-border);
+  color: var(--cc-text);
+}
+
+.cc-brand {
+  display: inline-flex; align-items: center; gap: .5rem;
+  text-decoration: none; font-weight: 700; color: var(--cc-text);
+}
+.cc-logo { font-size: 1.2rem; }
+
+.cc-topnav-actions {
+  margin-left: auto; display: flex; align-items: center; gap: .5rem; flex-wrap: wrap;
+}
+.cc-topbtn {
+  background: linear-gradient(90deg, var(--cc-brand), var(--cc-brand-dark));
+  color: #fff; padding: .45rem .75rem; border-radius: .55rem; text-decoration: none;
+  box-shadow: var(--cc-shadow);
+}
+.cc-topbtn:hover { filter: brightness(0.96); }
+.cc-user { display: inline-flex; align-items: center; gap: .65rem; color: var(--cc-muted); }
+.cc-logout { color: var(--cc-danger); text-decoration: none; }
+
+.actions-row { display: flex; gap: .5rem; align-items: center; }
+
+/* ====== Shell / Sidebar ====== */
+.cc-shell { display: grid; grid-template-columns: 240px 1fr; min-height: calc(100dvh - 56px); }
+.cc-shell.no-sidebar { grid-template-columns: 1fr; }
+
+.cc-sidebar {
+  background: #fff; border-right: 1px solid var(--cc-border);
+  padding: .8rem; position: sticky; top: 56px; height: calc(100dvh - 56px);
+  overflow: auto;
+}
+[data-theme="dark"] .cc-sidebar{
+  background: var(--cc-card);
+  border-right-color: var(--cc-border);
+}
+.cc-sidebar-group {
+  font-size: .78rem; color: var(--cc-muted); text-transform: uppercase; letter-spacing: .06em;
+  padding: .5rem .6rem; margin-top: .35rem;
+}
+.cc-sideitem {
+  display: block; text-decoration: none; color: var(--cc-text);
+  padding: .52rem .6rem; border-radius: .5rem; margin: .15rem 0;
+}
+.cc-sideitem:hover { background: #f1f5f9; }
+.cc-sideitem.active { background: #e0ecff; color: var(--cc-brand-dark); font-weight: 600; }
+
+[data-theme="dark"] .cc-sideitem:hover{ background: #0f1b33; }
+[data-theme="dark"] .cc-sideitem.active{
+  background: #142447; color: #dbeafe; font-weight: 700; border: 1px solid #2a4a9c;
+}
+
+.cc-overlay[hidden]{ display: none !important; }
+
+/* ====== Main content container ====== */
+.cc-main { padding: 1rem; }
+.cc-container { max-width: 1280px; margin: 0 auto; }
+
+/* ====== Utility styles ====== */
+.bg { background: transparent !important; padding: 0 !important; }
+.card {
+  background: var(--cc-card); border: 1px solid var(--cc-border); border-radius: .9rem;
+  box-shadow: var(--cc-shadow);
+}
+.btn {
+  background: linear-gradient(90deg, var(--cc-brand), var(--cc-brand-dark));
+  color: white; padding: .45rem .75rem; border-radius: .55rem; text-decoration: none;
+  border: 0; cursor: pointer; display: inline-flex; align-items: center; gap: .4rem;
+  box-shadow: var(--cc-shadow);
+}
+.btn:hover { filter: brightness(.96); }
+
+.btn-primary { background: linear-gradient(90deg, var(--cc-brand), var(--cc-brand-dark)); }
+.btn-green   { background: linear-gradient(90deg, var(--cc-ok), var(--cc-ok-dark)); }
+.btn-danger  { background: linear-gradient(90deg, #ef4444, #dc2626); }
+
+.input {
+  border: 1px solid var(--cc-border); border-radius: .55rem; padding: .55rem .75rem;
+  outline: none; min-width: 220px; box-shadow: 0 1px 2px rgba(2,6,23,.04) inset;
+  background: var(--cc-card); color: var(--cc-text);
+}
+.table { border-radius: .75rem; border: 1px solid var(--cc-border); overflow: hidden; }
+
+/* Allow horizontal scroll for wide tables on small screens */
+.table-wrap { width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+.table-wrap table { min-width: 700px; }
+
+/* ====== Chart sizing helpers (prevents over-stretch) ====== */
+.cc-chart-wrap { position: relative; width: 100%; max-width: 100%; }
+.cc-chart { display: block; width: 100% !important; height: 260px !important; }
+
+/* Make images/SVG responsive without forcing canvas height */
+img, svg { max-width: 100%; height: auto; }
+canvas { width: 100%; }
+
+/* Center the login card on desktops */
+.login-page .card { max-width: 520px; margin: 3rem auto; }
+
+/* Slightly tighter big-screen max width so charts/tables don't look too wide */
+@media (min-width: 1440px){
+  .cc-container { max-width: 1200px; }
+}
+
+/* ====== Mobile / Tablet (<= 1024px) ====== */
+@media (max-width: 1024px) {
+
+  .cc-burger { display: inline-block; }
+
+  .cc-shell { grid-template-columns: 1fr; }
+
+  /* Off-canvas sidebar */
+  .cc-sidebar {
+    position: fixed; left: 0; top: 56px; bottom: 0; width: 280px;
+    height: auto;
+    transform: translateX(-100%);
+    transition: transform .25s ease-in-out;
+    box-shadow: 0 20px 60px rgba(2,6,23,.18);
+    z-index: 1000;
+    overflow-y: auto;
+    background: #fff;
+    padding: 1rem .75rem;
+  }
+  [data-theme="dark"] .cc-sidebar{
+    background: var(--cc-card);
+    box-shadow: 0 20px 60px rgba(0,0,0,.4);
+  }
+  .cc-sidebar.open { transform: translateX(0); }
+
+  /* Dim the page behind the open sidebar */
+  .cc-overlay {
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,.35);
+    z-index: 900;
+  }
+
+  /* Lock page scroll when menu is open */
+  body.no-scroll { overflow: hidden; touch-action: none; }
+
+  /* Header buttons wrap nicely on phones */
+  .actions-row { flex-wrap: wrap; }
+  .cc-topbtn, .btn { min-height: 44px; padding: .6rem .9rem; }
+
+  /* Slightly tighter top bar and table padding on small screens */
+  .cc-topnav { padding: .5rem .75rem; }
+  .table th, .table td { padding: .6rem; }
+
+  /* Charts: shorter height on phones */
+  .cc-chart { height: 200px !important; }
+}
+
+/* ====== Touch/Coarse pointer enhancements ====== */
+@media (pointer: coarse){
+  .cc-sideitem, .btn { min-height: 44px; }
+}
+
+/* ====== Subtle scrollbar polish (WebKit) ====== */
+.cc-sidebar::-webkit-scrollbar,
+.table-wrap::-webkit-scrollbar {
+  height: 10px; width: 10px;
+}
+.cc-sidebar::-webkit-scrollbar-thumb,
+.table-wrap::-webkit-scrollbar-thumb {
+  background: #cbd5e1; border-radius: 8px;
+}
+.cc-sidebar::-webkit-scrollbar-track,
+.table-wrap::-webkit-scrollbar-track {
+  background: #eff4ff;
+}
+/* Dark scrollbar tint */
+[data-theme="dark"] .cc-sidebar::-webkit-scrollbar-thumb,
+[data-theme="dark"] .table-wrap::-webkit-scrollbar-thumb { background: #475569; }
+[data-theme="dark"] .cc-sidebar::-webkit-scrollbar-track,
+[data-theme="dark"] .table-wrap::-webkit-scrollbar-track { background: #0f1b33; }
+
+/* ====== Reduced motion ====== */
+@media (prefers-reduced-motion: reduce){
+  .cc-sidebar { transition: none; }
+}
+
+/* ===================================================================== */
+/* =========================  NEW POLISH ADDITIONS  ===================== */
+/* ===================================================================== */
+
+/* === 1) Mobile bottom tabs + FAB (mirrors base.html fallback) === */
+.cc-bottom-nav{
+  position:fixed; left:0; right:0; bottom:0; z-index:32;
+  display:none; /* enabled via JS on phones */
+  background: color-mix(in oklab, var(--cc-card) 92%, transparent);
+  border-top:1px solid var(--cc-border);
+  backdrop-filter: blur(10px);
+  padding:.35rem .5rem calc(.35rem + env(safe-area-inset-bottom));
+}
+.cc-bottom-row{ display:flex; align-items:center; gap:.25rem; }
+.cc-bottom-tab{
+  flex:1; text-align:center; font-size:.8rem; color:var(--cc-text); text-decoration:none;
+  padding:.35rem .25rem; border-radius:.65rem; transition:background .15s ease, transform .05s ease;
+  display:flex; flex-direction:column; gap:.2rem; align-items:center; justify-content:center;
+}
+.cc-bottom-tab:active{ transform:translateY(1px) }
+.cc-bottom-tab .ico{ font-size:1.2rem; line-height:1 }
+.cc-bottom-tab.active{ background: #eef2ff; font-weight:700; }
+[data-theme="dark"] .cc-bottom-nav{
+  background: color-mix(in oklab, var(--cc-card) 95%, transparent);
+}
+[data-theme="dark"] .cc-bottom-tab.active{ background:#142447; }
+
+.cc-fab{
+  position:fixed; right:16px; bottom:76px; z-index:33;
+  display:none; /* enabled via JS on phones */
+  width:56px; height:56px; border-radius:16px; border:0;
+  background: var(--cc-brand); color:#fff; box-shadow: 0 10px 25px rgba(0,0,0,.15);
+  font-size:1.35rem; cursor:pointer;
+}
+.cc-fab:hover{ filter: brightness(.96); }
+body.has-bottom-nav .cc-main{ padding-bottom: calc(80px + env(safe-area-inset-bottom)); }
+
+/* === 2) Skeleton shimmer (use .skeleton on any loading card/section) === */
+.skeleton{ position:relative; overflow:hidden; background:var(--cc-card) }
+.skeleton::after{
+  content:""; position:absolute; inset:0;
+  background: linear-gradient(90deg, transparent, rgba(148,163,184,.18), transparent);
+  transform: translateX(-100%); animation: cc-shimmer 1.2s infinite;
+}
+@keyframes cc-shimmer{ 100%{ transform: translateX(100%); } }
+@media (prefers-reduced-motion: reduce){
+  .skeleton::after{ animation: none; }
+}
+
+/* === 3) Animate-in utility (add .will-animate; JS adds .in) === */
+.will-animate{ transform: translateY(8px); opacity:0; transition: transform .5s ease, opacity .5s ease; }
+.will-animate.in{ transform: none; opacity: 1; }
+
+/* === 4) Compact stacked tables for phones (toggle .cc-stack on .table) === */
+@media (max-width: 576px){
+  .table.cc-stack thead{ display:none; }
+  .table.cc-stack tbody tr{
+    display:block; border:1px solid var(--cc-border); border-radius:12px;
+    padding:.5rem; margin-bottom:.5rem; background: var(--cc-card);
+  }
+  .table.cc-stack tbody td{
+    display:flex; justify-content:space-between; border:0; padding:.25rem .25rem;
+  }
+  .table.cc-stack tbody td::before{
+    content: attr(data-label); font-weight:600; color: var(--cc-muted); margin-right:1rem;
+  }
+}
+
+/* === 5) Chips / badges (for wallet, statuses) === */
+.chip{
+  display:inline-flex; align-items:center; gap:.35rem; font-weight:700; font-size:.85rem;
+  border-radius:999px; padding:.22rem .6rem; border:1px solid var(--cc-border); background:#f8fafc; color:var(--cc-text);
+}
+[data-theme="dark"] .chip{ background:#0f1b33; border-color:#20324d; color:var(--cc-text); }
+.chip--ok{ background:#ecfdf5; border-color:#a7f3d0; color:#065f46 }
+.chip--bad{ background:#fef2f2; border-color:#fecaca; color:#991b1b }
+
+/* === 6) Toast baseline (used by window.ccToast helper) === */
+.toast{
+  background: var(--cc-card); color: var(--cc-text);
+  border: 1px solid var(--cc-border); border-radius: 10px;
+  box-shadow: 0 10px 25px rgba(0,0,0,.15);
+}
+
+/* === 7) Minor helpers === */
+.hidden-sm{ display:none !important; }
+@media (min-width: 577px){ .hidden-sm{ display:initial !important; } }
+
+.only-mobile{ display:none !important; }
+@media (max-width: 1024px){ .only-mobile{ display:initial !important; } }

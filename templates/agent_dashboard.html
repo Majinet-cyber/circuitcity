@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% block title %}Agent · Circuit City{% endblock %}
+
+{% block body %}
+<div class="bg" style="min-height:100dvh;padding:2rem">
+  <div class="card" style="max-width:900px;margin:auto;padding:1.5rem">
+    <h2 class="brand" style="margin:0 0 1rem">Agent Dashboard</h2>
+
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:1rem;margin-bottom:1rem">
+      <div class="card" style="padding:1rem">
+        <div class="brand">My In Stock</div>
+        <div style="font-size:1.8rem">{{ in_stock }}</div>
+      </div>
+      <div class="card" style="padding:1rem">
+        <div class="brand">My Sold</div>
+        <div style="font-size:1.8rem">{{ sold }}</div>
+      </div>
+      <div class="card" style="padding:1rem">
+        <div class="brand">My Sales Value</div>
+        <div style="font-size:1.4rem">{{ sales_value }}</div>
+      </div>
+      <div class="card" style="padding:1rem">
+        <div class="brand">My Commission</div>
+        <div style="font-size:1.4rem">{{ commission_total }}</div>
+      </div>
+    </div>
+
+    <div style="display:flex;gap:.75rem;flex-wrap:wrap">
+      <a class="btn" href="{% url 'inventory:scan_in' %}">Scan In</a>
+      <a class="btn" href="{% url 'inventory:scan_sold' %}">Scan Sold</a>
+      <a class="btn" href="{% url 'inventory:stock_list' %}">My Stock</a>
+      <form action="{% url 'logout' %}" method="post" style="display:inline">
+        {% csrf_token %}
+        <button type="submit" class="btn" style="background:#e11d48">Log out</button>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}

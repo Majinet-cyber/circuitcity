@@ -1,0 +1,106 @@
+{% extends "base.html" %}
+{% block title %}Wallet · Circuit City{% endblock %}
+
+{% block body %}
+<div class="card" style="background:var(--cc-panel);border:1px solid var(--cc-border);border-radius:12px;padding:1rem;">
+  <h2 style="margin:0 0 .75rem 0;">Wallet</h2>
+
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;">
+    <section style="border:1px dashed var(--cc-border);border-radius:10px;padding:.75rem;">
+      <h3 style="margin:.25rem 0 .5rem 0;font-size:1rem;color:var(--cc-muted)">Balance</h3>
+
+      {% if users and users|length %}
+        <label for="walUser" style="display:block;margin:.25rem 0 .5rem 0;font-weight:600;">User</label>
+        <select id="walUser" class="btn" style="width:100%;">
+          {% for u in users %}
+            <option value="{{ u.id }}">{{ u.username }}</option>
+          {% endfor %}
+        </select>
+      {% else %}
+        <input type="hidden" id="walUser" value="{{ request.user.id }}">
+        <div style="color:var(--cc-muted)">User: <strong>{{ request.user.username }}</strong></div>
+      {% endif %}
+
+      <div style="margin-top:.75rem;font-size:2rem;font-weight:800;">
+        <span id="bal">—</span>
+      </div>
+      <button id="refresh" class="btn" style="margin-top:.5rem;">↻ Refresh</button>
+    </section>
+
+    <section style="border:1px dashed var(--cc-border);border-radius:10px;padding:.75rem;">
+      <h3 style="margin:.25rem 0 .5rem 0;font-size:1rem;color:var(--cc-muted)">Add transaction</h3>
+      {% if request.user.is_staff %}
+        <label class="block" style="display:block;margin:.25rem 0 .25rem 0;font-weight:600;">Amount</label>
+        <input id="amt" type="number" step="0.01" class="btn" style="width:100%;" placeholder="e.g. 50000">
+
+        <label class="block" style="display:block;margin:.6rem 0 .25rem 0;font-weight:600;">Reason</label>
+        <select id="reason" class="btn" style="width:100%;">
+          {% for r in reasons %}
+            <option value="{{ r.key }}">{{ r.label }}</option>
+          {% endfor %}
+        </select>
+
+        <label class="block" style="display:block;margin:.6rem 0 .25rem 0;font-weight:600;">Memo (optional)</label>
+        <input id="memo" class="btn" style="width:100%;" placeholder="note">
+
+        <button id="addTxn" class="btn btn-green" style="margin-top:.75rem;">➕ Save</button>
+        <div id="txnMsg" style="margin-top:.5rem;"></div>
+      {% else %}
+        <div class="cc-alert cc-alert-info">Only admins/managers can add transactions.</div>
+      {% endif %}
+    </section>
+  </div>
+</div>
+
+<script>
+(function(){
+  const $ = s => document.querySelector(s);
+  const bal = $('#bal');
+  const userSel = $('#walUser');
+  const refresh = $('#refresh');
+  const addBtn = $('#addTxn');
+  const amt = $('#amt');
+  const reason = $('#reason');
+  const memo = $('#memo');
+  const msg = $('#txnMsg');
+
+  async function fetchBalance() {
+    const uid = userSel?.value;
+    const url = new URL("{% url 'inventory:api_wallet_summary' %}", location.origin);
+    if (uid) url.searchParams.set('user_id', uid);
+    const res = await fetch(url, { method: 'GET' });
+    const data = await res.json();
+    bal.textContent = data.ok ? Number(data.balance).toLocaleString() : '—';
+  }
+
+  refresh?.addEventListener('click', fetchBalance);
+  userSel?.addEventListener('change', fetchBalance);
+  document.addEventListener('DOMContentLoaded', fetchBalance);
+
+  addBtn?.addEventListener('click', async ()=>{
+    msg.innerHTML = '';
+    const body = {
+      user_id: userSel?.value,
+      amount: amt.value,
+      reason: reason.value,
+      memo: memo.value
+    };
+    try{
+      const res = await fetch("{% url 'inventory:api_wallet_add_txn' %}", {
+        method: 'POST',
+        headers: {'Content-Type':'application/json'},
+        body: JSON.stringify(body)
+      });
+      const data = await res.json();
+      if (!data.ok) throw new Error(data.error || 'Failed');
+      msg.innerHTML = '<div class="cc-alert cc-alert-success"><div>Saved. New balance: '
+        + Number(data.balance).toLocaleString() + '</div></div>';
+      amt.value = ''; memo.value = '';
+      fetchBalance();
+    }catch(e){
+      msg.innerHTML = '<div class="cc-alert cc-alert-error"><div>'+ e.message +'</div></div>';
+    }
+  });
+})();
+</script>
+{% endblock %}

@@ -1,0 +1,285 @@
+{# templates/dashboard/admin_agent_detail.html #}
+{% extends "base.html" %}
+{% load humanize %}
+{% block title %}Agent · {{ agent.get_username }} · Circuit City{% endblock %}
+
+{% block body %}
+<style>
+  :root{
+    --bg:#f6f7fb; --panel:#ffffff; --panel-2:#f3f6ff;
+    --text:#0f1222; --muted:#525d79;
+    --brand:#3757ff; --brand-2:#2446ff;
+    --ok:#16a34a; --warn:#d97706; --bad:#dc2626;
+    --ring: rgba(55,87,255,.25);
+    --br: 14px;
+  }
+  .bg{background:var(--bg)}
+  .card{background:var(--panel); border:1px solid #e6ebff; border-radius:var(--br)}
+  .brand{font-weight:800; letter-spacing:.2px}
+  .muted{color:var(--muted)}
+  .input, select{background:var(--panel-2); border:1px solid #dbe3ff; border-radius:10px; padding:.55rem .7rem}
+  .btn{background:var(--brand); color:#fff; border:0; padding:.55rem .85rem; border-radius:10px; font-weight:700; text-decoration:none}
+  .btn.ghost{background:transparent; color:var(--text); border:1px solid #dbe3ff}
+  .tiles{display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:1rem; margin-bottom:1rem}
+  .tile{padding:1rem}
+  .tile .k{font-size:.85rem; color:var(--muted); font-weight:700}
+  .tile .v{font-size:1.35rem; font-weight:800}
+  .table-wrap{overflow:auto; border-radius:.75rem; border:1px solid #e5e7eb}
+  table{border-collapse:separate; border-spacing:0; width:100%}
+  thead{background:#f8fafc}
+  th,td{padding:.6rem .9rem; text-align:left}
+  tr+tr td{border-top:1px solid #eef2f7}
+  .amt{text-align:right; white-space:nowrap}
+  .pos{color:var(--ok); font-weight:700}
+  .neg{color:var(--bad); font-weight:700}
+  .row{display:flex; gap:.6rem; align-items:center; flex-wrap:wrap}
+  .section-title{margin:.2rem 0 .6rem; font-weight:800}
+  .note{font-size:.9rem; color:var(--muted)}
+</style>
+
+<div class="bg" style="min-height:100dvh; padding:2rem">
+  <div class="card" style="max-width:1100px; margin:auto; padding:1.5rem">
+    <div class="row" style="justify-content:space-between; margin-bottom:1rem">
+      <h2 class="brand" style="margin:0">Agent: {{ agent.get_username }}</h2>
+      <div class="row">
+        <a class="btn ghost" href="{% url 'admin_dashboard' %}">← Back to Admin</a>
+      </div>
+    </div>
+
+    <!-- KPI tiles (wallet tiles auto-fill via API on load) -->
+    <div class="tiles">
+      <div class="card tile">
+        <div class="k">Joined</div>
+        <div class="v">{{ agent.date_joined|date:"Y-m-d" }}</div>
+      </div>
+      <div class="card tile">
+        <div class="k">Total Sales</div>
+        <div class="v">{{ total_sales|intcomma }}</div>
+      </div>
+      <div class="card tile">
+        <div class="k">Sales (This month)</div>
+        <div class="v">{{ monthly_sales|intcomma }}</div>
+      </div>
+
+      <div class="card tile">
+        <div class="k">Wallet balance</div>
+        <div class="v" id="walletBalance">—</div>
+        <div class="note">Live · updates after new txns</div>
+      </div>
+
+      <div class="card tile">
+        <div class="k">Wallet (This month, net)</div>
+        <div class="v" id="walletMonthNet">—</div>
+        <div class="note" id="walletMonthLabel">This month</div>
+      </div>
+
+      <div class="card tile">
+        <div class="k">Wallet (Lifetime, net)</div>
+        <div class="v">MK {{ lifetime_net|floatformat:0|intcomma }}</div>
+      </div>
+      <div class="card tile">
+        <div class="k">Advances (All time)</div>
+        <div class="v">MK {{ advances_total|floatformat:0|intcomma }}</div>
+      </div>
+    </div>
+
+    <!-- Quick wallet transaction (Admin) -->
+    <div class="card" style="padding:1rem; margin-bottom:1rem">
+      <div class="brand" style="margin-bottom:.5rem">Wallet: add a transaction</div>
+      <form id="txnForm" class="row" onsubmit="return false;">
+        <input type="hidden" id="userId" value="{{ agent.id }}">
+        <label>Amount (MK)
+          <input class="input" id="txnAmount" type="number" step="0.01" min="0" required style="max-width:200px">
+        </label>
+        <label>Reason
+          <select class="input" id="txnReason">
+            <option value="ADVANCE" selected>Advance (debit)</option>
+            <option value="COMMISSION">Commission (credit)</option>
+            <option value="ADJUSTMENT">Adjustment (+/−)</option>
+            <option value="PAYOUT">Payout (debit)</option>
+          </select>
+        </label>
+        <label id="adjSignWrap" hidden>
+          Sign
+          <select class="input" id="txnSign">
+            <option value="+">+</option>
+            <option value="-" selected>−</option>
+          </select>
+        </label>
+        <input class="input" id="txnMemo" type="text" placeholder="Optional memo" style="min-width:240px">
+        <button class="btn" id="txnSubmit">Add</button>
+        <span class="note" id="txnMsg" aria-live="polite"></span>
+      </form>
+      <div class="note" style="margin-top:.4rem">
+        • ADVANCE & PAYOUT reduce balance. COMMISSION increases balance. ADJUSTMENT uses the sign you choose.
+      </div>
+    </div>
+
+    <!-- Recent arrival logs -->
+    <div class="card" style="padding:1rem; margin-bottom:1rem">
+      <div class="brand section-title">Recent arrival logs</div>
+      <ul style="margin:0; padding-left:1.2rem">
+        {% for log in arrival_logs %}
+          <li>{{ log.logged_at|date:"Y-m-d H:i" }} — {{ log.note|default:"(no note)" }}</li>
+        {% empty %}
+          <li>None</li>
+        {% endfor %}
+      </ul>
+    </div>
+
+    <!-- Recent wallet transactions -->
+    <div class="card" style="padding:1rem">
+      <div class="brand section-title">Recent wallet transactions</div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>When</th>
+              <th>Reason</th>
+              <th class="amt">Amount</th>
+              <th>Kind</th>
+            </tr>
+          </thead>
+          <tbody id="txnTableBody">
+            {% for tx in wallet_txns %}
+              {% with a=tx.amount %}
+              <tr>
+                <td>{{ tx.created_at|date:"Y-m-d H:i" }}</td>
+                <td>{{ tx.reason }}</td>
+                <td class="amt">
+                  {% if a >= 0 %}
+                    <span class="pos">MK {{ a|floatformat:0|intcomma }}</span>
+                  {% else %}
+                    <span class="neg">MK {{ a|floatformat:0|intcomma }}</span>
+                  {% endif %}
+                </td>
+                <td>{{ tx.kind }}</td>
+              </tr>
+              {% endwith %}
+            {% empty %}
+              <tr><td colspan="4">No transactions yet.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+(function(){
+  // --- Helpers ---
+  function getCookie(name){
+    const m = document.cookie.match('(^|;)\\s*' + name + '\\s*=\\s*([^;]+)');
+    return m ? m.pop() : '';
+  }
+  function mk(n){ // format MK amounts with commas
+    if(n === null || n === undefined || isNaN(n)) return '—';
+    return 'MK ' + Number(n).toLocaleString();
+  }
+
+  const uid = document.getElementById('userId').value;
+  const balEl = document.getElementById('walletBalance');
+  const moEl  = document.getElementById('walletMonthNet');
+  const moLbl = document.getElementById('walletMonthLabel');
+  const tbody = document.getElementById('txnTableBody');
+
+  // --- Load wallet summary (balance + this-month net) ---
+  async function loadSummary(){
+    try{
+      const now = new Date();
+      const year = now.getFullYear();
+      const month = now.getMonth()+1; // 1..12
+      const u = "{% url 'inventory:api_wallet_summary' %}" + `?user_id=${uid}&year=${year}&month=${month}`;
+      const res = await fetch(u, {headers:{'Accept':'application/json'}});
+      const data = await res.json();
+      if(data && data.ok){
+        balEl.textContent = mk(data.balance);
+        if('month_sum' in data){
+          moEl.textContent = mk(data.month_sum);
+          const d = new Date(year, month-1, 1);
+          const label = d.toLocaleString(undefined, {month:'short', year:'numeric'});
+          moLbl.textContent = label;
+        }
+      }
+    }catch(e){
+      // soft fail
+    }
+  }
+
+  // --- Transaction form ---
+  const reasonSel = document.getElementById('txnReason');
+  const signWrap  = document.getElementById('adjSignWrap');
+  const signSel   = document.getElementById('txnSign');
+  reasonSel.addEventListener('change', ()=>{
+    signWrap.hidden = reasonSel.value !== 'ADJUSTMENT';
+  });
+
+  document.getElementById('txnSubmit').addEventListener('click', async ()=>{
+    const amountRaw = parseFloat(document.getElementById('txnAmount').value);
+    const reason = reasonSel.value;
+    const memo = document.getElementById('txnMemo').value || '';
+    const msg = document.getElementById('txnMsg');
+
+    if(isNaN(amountRaw) || amountRaw <= 0){
+      msg.textContent = 'Enter a valid amount > 0';
+      return;
+    }
+
+    // Sign rules:
+    // COMMISSION: +amount
+    // ADVANCE: -amount
+    // PAYOUT:  -amount
+    // ADJUSTMENT: sign-controlled
+    let amt = amountRaw;
+    if(reason === 'ADVANCE' || reason === 'PAYOUT'){ amt = -Math.abs(amt); }
+    if(reason === 'ADJUSTMENT'){ amt = (signSel.value === '+' ? Math.abs(amt) : -Math.abs(amt)); }
+
+    msg.textContent = 'Saving…';
+    try{
+      const res = await fetch("{% url 'inventory:api_wallet_add_txn' %}", {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-CSRFToken': getCookie('csrftoken'),
+          'Accept': 'application/json'
+        },
+        body: JSON.stringify({ user_id: uid, amount: amt, reason: reason, memo: memo })
+      });
+      const data = await res.json();
+      if(!res.ok || !data.ok){
+        msg.textContent = data && data.error ? data.error : 'Failed to save.';
+        return;
+      }
+      msg.textContent = 'Saved.';
+      // Refresh balance/month net
+      loadSummary();
+      // Prepend a new row to recent txns table (lightweight optimistic UI)
+      const tr = document.createElement('tr');
+      const klass = (amt >= 0) ? 'pos' : 'neg';
+      const when = new Date().toISOString().slice(0,16).replace('T',' ');
+      tr.innerHTML = `
+        <td>${when}</td>
+        <td>${reason}</td>
+        <td class="amt"><span class="${klass}">${mk(amt)}</span></td>
+        <td>MANUAL</td>
+      `;
+      tbody.prepend(tr);
+      // Reset form
+      document.getElementById('txnAmount').value = '';
+      document.getElementById('txnMemo').value = '';
+      if(reason === 'ADJUSTMENT'){ signSel.value='-'; }
+      reasonSel.value = 'ADVANCE';
+      signWrap.hidden = true;
+      setTimeout(()=>{ msg.textContent=''; }, 1500);
+    }catch(e){
+      msg.textContent = 'Error saving.';
+    }
+  });
+
+  // Kickoff
+  loadSummary();
+})();
+</script>
+{% endblock %}

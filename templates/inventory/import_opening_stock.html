@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% block title %}Import Opening Stock · Circuit City{% endblock %}
+{% block body %}
+<div class="bg" style="min-height:100dvh;padding:2rem">
+  <div class="card" style="max-width:900px;margin:auto;padding:1.25rem">
+    <h2 class="brand" style="margin-top:0">Import Products & Opening Stock (CSV)</h2>
+    <p>Required headers: <code>product_code, product_name, location, quantity</code></p>
+    <p>Optional: <code>serial_or_imei, cost_price, sale_price</code></p>
+
+    <form method="post" enctype="multipart/form-data" style="display:grid;gap:1rem">
+      {% csrf_token %}
+      {{ form.as_p }}
+      <button class="btn">Upload</button>
+    </form>
+
+    <details style="margin-top:1rem">
+      <summary>Sample CSV</summary>
+      <pre style="white-space:pre-wrap;background:#f8fafc;padding:.75rem;border-radius:.5rem;">
+product_code,product_name,location,quantity,serial_or_imei,cost_price,sale_price
+A14-64,Galaxy A14 64GB,Blantyre,5,,120000,155000
+A14-64,Galaxy A14 64GB,Lilongwe,0,356789112233445,120000,155000
+IP11-128,iPhone 11 128GB,Blantyre,2,,450000,520000
+      </pre>
+    </details>
+  </div>
+</div>
+{% endblock %}

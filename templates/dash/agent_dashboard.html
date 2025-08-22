@@ -1,0 +1,240 @@
+{# templates/dashboard/agent.html #}
+{% extends "base.html" %}
+{% load static humanize %}
+{% block title %}Agent · Circuit City{% endblock %}
+
+{% block body %}
+<style>
+  :root{
+    --bg:#0b1020; --panel:#0e1530; --panel-2:#121a3d;
+    --text:#e9ecf7; --muted:#a9b1c6;
+    --brand:#5b8cff; --brand-2:#7aa2ff;
+    --ok:#22c55e; --warn:#f59e0b; --bad:#ef4444;
+    --ring: rgba(91,140,255,.35);
+    --shadow: 0 10px 24px rgba(2,8,23,.35), inset 0 1px 0 rgba(255,255,255,.05);
+    --br: 16px; --sidebar-w: 240px; --sidebar-w-collapsed: 76px;
+  }
+  .light{
+    --bg:#f6f7fb; --panel:#ffffff; --panel-2:#f3f6ff;
+    --text:#0f1222; --muted:#525d79;
+    --brand:#3757ff; --brand-2:#2446ff;
+    --ok:#16a34a; --warn:#d97706; --bad:#dc2626;
+    --ring: rgba(55,87,255,.25);
+    --shadow: 0 8px 20px rgba(0,0,0,.06), inset 0 1px 0 rgba(255,255,255,.6);
+  }
+  html,body{background:var(--bg);color:var(--text)}
+  .layout{display:grid;grid-template-columns:var(--sidebar-w) 1fr;min-height:100dvh}
+  .layout.collapsed{grid-template-columns:var(--sidebar-w-collapsed) 1fr}
+  .sidebar{position:sticky;top:0;height:100dvh;display:flex;flex-direction:column;background:var(--panel);border-right:1px solid rgba(255,255,255,.08)}
+  .brandbar{display:flex;align-items:center;gap:.6rem;padding:.9rem}
+  .brandlogo{width:32px;height:32px;border-radius:8px;background:linear-gradient(135deg,var(--brand),var(--brand-2))}
+  .brandname{font-weight:800;letter-spacing:.3px;white-space:nowrap}
+  .collapse-btn{margin-left:auto;width:38px;height:32px;border-radius:10px;background:var(--panel-2);border:1px solid rgba(255,255,255,.12);display:grid;place-items:center;cursor:pointer}
+  .collapse-btn:hover{box-shadow:0 0 0 6px var(--ring)}
+  .menu{padding:.5rem}
+  .menu a{display:flex;align-items:center;gap:.8rem;padding:.6rem .7rem;margin:.2rem 0;border-radius:10px;color:var(--text);text-decoration:none;font-weight:650}
+  .menu a .mi{width:22px;height:22px;display:grid;place-items:center;border-radius:8px;background:var(--panel-2);border:1px solid rgba(255,255,255,.1)}
+  .menu a:hover{background:rgba(255,255,255,.06)}
+  .menu a.active{background:linear-gradient(180deg,var(--panel-2),var(--panel));border:1px solid rgba(255,255,255,.16)}
+  .menu .section{margin:.75rem .5rem .35rem;color:var(--muted);font-size:.8rem;text-transform:uppercase;letter-spacing:.12rem}
+  .layout.collapsed .label,.layout.collapsed .section{display:none}
+
+  .content{padding:1.25rem}
+  .container{max-width:1100px;margin:auto}
+  .card{background:var(--panel);border-radius:16px;box-shadow:var(--shadow)}
+  .row{display:flex;gap:.75rem;align-items:center;flex-wrap:wrap}
+  .muted{color:var(--muted)}
+  .brand{font-weight:800;letter-spacing:.2px}
+  .toolbar{display:flex;gap:.5rem;align-items:center;padding:.6rem .75rem;background:var(--panel-2);border-radius:12px}
+  .input,select,textarea{background:var(--panel-2);color:var(--text);border:1px solid rgba(255,255,255,.12);padding:.55rem .7rem;border-radius:10px;outline:0}
+  .input:focus,select:focus,textarea:focus{box-shadow:0 0 0 6px var(--ring)}
+  .grid{display:grid;gap:.75rem}
+  .grid-auto{grid-template-columns:repeat(auto-fit,minmax(240px,1fr))}
+  .stat{padding:1rem;background:linear-gradient(180deg,var(--panel),var(--panel-2));border:1px solid rgba(255,255,255,.06);border-radius:16px}
+  .stat h4{margin:0 0 .25rem;font-size:.9rem;color:var(--muted);font-weight:700}
+  .stat .big{font-size:1.8rem;font-weight:800;letter-spacing:.3px}
+  .btn{--b:var(--brand);display:inline-flex;align-items:center;gap:.45rem;background:var(--b);color:#fff;font-weight:700;border:0;padding:.6rem .9rem;border-radius:10px;box-shadow:0 4px 12px var(--ring);text-decoration:none}
+  .btn.ghost{background:transparent;color:var(--text);border:1px solid rgba(255,255,255,.16);box-shadow:none}
+  .badge{border-radius:999px;padding:.18rem .55rem;font-weight:800;border:1px solid rgba(255,255,255,.14);background:rgba(255,255,255,.06)}
+  .divider{height:1px;background:rgba(255,255,255,.08);margin:1rem 0}
+  .toggle{width:42px;height:26px;background:var(--panel-2);border-radius:999px;border:1px solid rgba(255,255,255,.12);position:relative;cursor:pointer}
+  .toggle i{position:absolute;top:2px;left:2px;width:22px;height:22px;border-radius:999px;background:var(--brand);transition:transform .25s ease}
+  .toggle.on i{transform:translateX(16px)}
+  .avatar{width:36px;height:36px;border-radius:50%;display:inline-grid;place-items:center;font-weight:800;color:#fff;overflow:hidden;background:linear-gradient(135deg,var(--brand),var(--brand-2))}
+  .avatar img{width:100%;height:100%;object-fit:cover;display:block}
+  @media(max-width:960px){.layout{grid-template-columns:var(--sidebar-w-collapsed) 1fr}}
+</style>
+
+<div id="rootLayout" class="layout">
+  <!-- Sidebar -->
+  <aside class="sidebar" aria-label="Main">
+    <div class="brandbar">
+      <div class="brandlogo" aria-hidden="true"></div>
+      <div class="brandname label">Circuit City</div>
+      <button id="collapseBtn" class="collapse-btn" aria-pressed="false" title="Collapse sidebar">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M4 7h16M4 12h16M4 17h16" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+      </button>
+    </div>
+    {% with current=request.resolver_match.url_name %}
+    <nav class="menu">
+      <div class="section">General</div>
+      <a href="{% url 'agent_dashboard' %}" class="{% if current == 'agent_dashboard' %}active{% endif %}">
+        <span class="mi">🏠</span><span class="label">My Dashboard</span>
+      </a>
+      <a href="{% url 'inventory:stock_list' %}">
+        <span class="mi">📋</span><span class="label">Stock List</span>
+      </a>
+      <a href="{% url 'inventory:scan_in' %}">
+        <span class="mi">➕</span><span class="label">Scan Stock IN</span>
+      </a>
+      <a href="{% url 'inventory:scan_sold' %}">
+        <span class="mi">✅</span><span class="label">Scan SOLD</span>
+      </a>
+
+      <div class="section">Account</div>
+      <a href="{% url 'logout' %}">
+        <span class="mi">🚪</span><span class="label">Logout</span>
+      </a>
+    </nav>
+    {% endwith %}
+  </aside>
+
+  <!-- Content -->
+  <main class="content">
+    <div class="container card" style="padding:1.1rem">
+      <!-- Header -->
+      <div class="row" style="justify-content:space-between;margin-bottom:1rem">
+        <h2 class="brand" style="margin:0">Agent Dashboard</h2>
+        <div class="row">
+          <label class="row" style="gap:.4rem">
+            <span class="muted">Theme</span>
+            <button id="themeToggle" class="toggle" aria-pressed="false"><i></i></button>
+          </label>
+          <span class="avatar" title="{{ request.user.get_username }}">
+            {% if request.user.agent_profile and request.user.agent_profile.photo_url %}
+              <img src="{{ request.user.agent_profile.photo_url }}" alt="Me">
+            {% elif request.user.profile and request.user.profile.avatar %}
+              <img src="{{ request.user.profile.avatar.url }}" alt="Me">
+            {% else %}
+              {{ request.user.first_name|default:request.user.username|first|upper }}
+            {% endif %}
+          </span>
+        </div>
+      </div>
+
+      <!-- Tiles -->
+      {% with b=agent_battery w=wallet %}
+      <div class="grid grid-auto" style="margin-bottom:.9rem">
+        <div class="stat">
+          <h4>My In Stock</h4>
+          <div class="big">{{ b.count|default:0|intcomma }}</div>
+        </div>
+
+        <div class="stat">
+          <h4>My Sold</h4>
+          <div class="big">{{ kpis.mtd_count|default:0|intcomma }}</div>
+        </div>
+
+        <div class="stat">
+          <h4>My Commission</h4>
+          <div class="big">MK {{ w.month.commission|default:0|floatformat:0|intcomma }}</div>
+        </div>
+
+        <div class="stat">
+          <h4>Stock Status</h4>
+          <div class="row">
+            <span class="badge">{{ b.label|default:"—" }}</span>
+            <div class="muted">{{ b.count|default:0|intcomma }}/{{ b.max|default:0|intcomma }} ({{ b.pct|default:0 }}%)</div>
+          </div>
+        </div>
+
+        {# Wallet tile next to battery #}
+        <div class="stat">
+          <h4>My Wallet</h4>
+          <div class="big">
+            MK {{ w.balance|default:0|floatformat:0|intcomma }}
+          </div>
+          <div class="muted" style="font-size:.85rem;margin-top:.25rem">
+            {{ w.month.month_label|default:"This month" }} ·
+            Comm {{ w.month.commission|default:0|floatformat:0|intcomma }}
+            {% if w.month.advance %} · Adv {{ w.month.advance|floatformat:0|intcomma }}{% endif %}
+            {% if w.month.adjustment %} · Adj {{ w.month.adjustment|floatformat:0|intcomma }}{% endif %}
+            · <strong>Total {{ w.month.total|default:0|floatformat:0|intcomma }}</strong>
+          </div>
+        </div>
+      </div>
+      {% endwith %}
+
+      <!-- Log arrival -->
+      <div class="card" style="padding:1rem;margin-bottom:1rem">
+        <form method="post" class="grid" style="grid-template-columns:1fr auto;gap:.6rem;align-items:center">
+          {% csrf_token %}
+          <input type="hidden" name="action" value="log_time">
+          {% now "Y-m-d\\TH:i" as _now_val %}
+          <input class="input" type="datetime-local" name="logged_at" value="{{ _now_val }}" />
+          <button class="btn" type="submit">Log arrival ({% now "M. d, Y" %})</button>
+          <textarea class="input" name="note" placeholder="Optional note (e.g., opening)"></textarea>
+        </form>
+        <div class="muted" style="margin-top:.4rem;font-size:.9rem">
+          • Sunday logs: +MK15,000 bonus • ≤08:00: +MK5,000 • After 08:00: −MK5,000 per 30 minutes late.
+        </div>
+      </div>
+
+      <!-- Wallet tiles -->
+      <div class="grid grid-auto" style="margin-bottom:1rem">
+        <div class="stat"><h4>Base salary</h4><div class="big">MK {{ base_salary|default:0|floatformat:0|intcomma }}</div></div>
+        <div class="stat"><h4>Monthly commission</h4><div class="big">MK {{ wallet.month.commission|default:0|floatformat:0|intcomma }}</div></div>
+        <div class="stat"><h4>Bonuses/Deductions (This month)</h4><div class="big">MK {{ month_txn_total|default:0|floatformat:0|intcomma }}</div></div>
+        <div class="stat"><h4>Deductions (This month)</h4><div class="big">MK {{ month_deductions|default:0|floatformat:0|intcomma }}</div></div>
+      </div>
+
+      <div class="divider"></div>
+
+      <!-- Recent logs -->
+      <h3 class="brand" style="margin:.2rem 0 .6rem">Recent Time Logs</h3>
+      <div class="table-wrap" style="overflow:auto;border:1px solid rgba(255,255,255,.12);border-radius:14px">
+        <table class="data" style="min-width:560px">
+          <thead>
+            <tr><th>Date</th><th>Local Time</th><th>Note</th></tr>
+          </thead>
+          <tbody>
+            {% for l in last_logs %}
+              <tr>
+                <td>{{ l.logged_at|date:"Y-m-d" }}</td>
+                <td>{{ l.logged_at|date:"H:i" }}</td>
+                <td class="muted">{{ l.note }}</td>
+              </tr>
+            {% empty %}
+              <tr><td colspan="3" class="muted">No logs yet.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </main>
+</div>
+
+<script>
+/* Sidebar collapse (persist) */
+(function(){
+  const key='cc-sidebar';
+  const layout=document.getElementById('rootLayout');
+  const btn=document.getElementById('collapseBtn');
+  function apply(state){layout.classList.toggle('collapsed',state==='collapsed');btn.setAttribute('aria-pressed',state==='collapsed');}
+  const saved=localStorage.getItem(key)||'expanded';apply(saved);
+  btn.addEventListener('click',()=>{const next=layout.classList.contains('collapsed')?'expanded':'collapsed';localStorage.setItem(key,next);apply(next);});
+})();
+
+/* Theme toggle (persist) */
+(function(){
+  const root=document.documentElement; const key="cc-theme"; const btn=document.getElementById('themeToggle');
+  function apply(mode){
+    if(mode==='light'){root.classList.add('light');btn.classList.add('on');btn.setAttribute('aria-pressed','true');}
+    else {root.classList.remove('light');btn.classList.remove('on');btn.setAttribute('aria-pressed','false');}
+  }
+  const saved=localStorage.getItem(key)||'dark'; apply(saved);
+  btn.addEventListener('click',()=>{const next=root.classList.contains('light')?'dark':'light'; localStorage.setItem(key,next); apply(next);});
+  if(!localStorage.getItem(key)){ if(window.matchMedia('(prefers-color-scheme: light)').matches){ localStorage.setItem(key,'light'); apply('light'); } }
+})();
+</script>
+{% endblock %}

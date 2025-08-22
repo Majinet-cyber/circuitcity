@@ -1,22 +1,20 @@
 # scripts/create_superuser.py
-import os
-import django
-
-os.environ.setdefault("DJANGO_SETTINGS_MODULE", "cc.settings")  # keep if your project module is 'cc'
+import os, django
+os.environ.setdefault("DJANGO_SETTINGS_MODULE", "cc.settings")  # change if your settings module is not cc.settings
 django.setup()
 
 from django.contrib.auth import get_user_model
 User = get_user_model()
 
-username = os.getenv("DJANGO_SUPERUSER_USERNAME")
-password = os.getenv("DJANGO_SUPERUSER_PASSWORD")
-email    = os.getenv("DJANGO_SUPERUSER_EMAIL", "")
+u = os.getenv("DJANGO_SUPERUSER_USERNAME")
+p = os.getenv("DJANGO_SUPERUSER_PASSWORD")
+e = os.getenv("DJANGO_SUPERUSER_EMAIL", "")
 
-if username and password:
-    if not User.objects.filter(username=username).exists():
-        User.objects.create_superuser(username, email, password)
-        print(f"Created superuser {username}")
+if u and p:
+    if not User.objects.filter(username=u).exists():
+        User.objects.create_superuser(u, e, p)
+        print(f"Created superuser {u}")
     else:
-        print(f"Superuser {username} already exists; skipping")
+        print(f"Superuser {u} already exists; skipping")
 else:
     print("DJANGO_SUPERUSER_USERNAME/PASSWORD not set; skipping")
