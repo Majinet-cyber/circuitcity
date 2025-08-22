@@ -50,10 +50,12 @@ except Exception:
 # -------------------------------------------------
 SECRET_KEY = os.environ.get(
     "DJANGO_SECRET_KEY",
-    "django-insecure-w#o#i4apw-$iz-3sivw57n=2j6fgku@1pfqfs76@3@7)a0h$ys",  # dev fallback
+    # dev fallback (keeps builds from failing; override in prod via env)
+    "django-insecure-w#o#i4apw-$iz-3sivw57n=2j6fgku@1pfqfs76@3@7)a0h$ys",
 )
 
-DEBUG = env_bool("DEBUG", env_bool("DJANGO_DEBUG", True))
+# Prefer DJANGO_DEBUG env; default True for local, False on Render unless overridden
+DEBUG = env_bool("DJANGO_DEBUG", env_bool("DEBUG", True))
 TESTING = any(arg in sys.argv for arg in ("test", "pytest"))
 
 # Detect Render & its external URL (available on the platform)
@@ -192,7 +194,7 @@ INSTALLED_APPS = [
     # Helpful (optional)
     "django.contrib.humanize",
     # Your apps
-    "accounts",  # ← added
+    "accounts",
     "inventory",
     "sales",
     "dashboard",
@@ -227,7 +229,10 @@ ROOT_URLCONF = "cc.urls"
 TEMPLATES = [
     {
         "BACKEND": "django.template.backends.django.DjangoTemplates",
-        "DIRS": [BASE_DIR / "templates"],
+        "DIRS": [
+            # include both roots if they exist (prevents missing templates in prod)
+            *(p for p in [BASE_DIR / "templates", BASE_DIR / "circuitcity" / "templates"] if p.exists())
+        ],
         "APP_DIRS": True,
         "OPTIONS": {
             "context_processors": [
@@ -242,14 +247,15 @@ TEMPLATES = [
 WSGI_APPLICATION = "cc.wsgi.application"
 
 # -------------------------------------------------
-# Database — production requires Postgres via DATABASE_URL
+# Database — production prefers Postgres via DATABASE_URL
 # -------------------------------------------------
 DATABASES: dict = {}
 
 DATABASE_URL = os.environ.get("DATABASE_URL", "").strip()
 USE_LOCAL_SQLITE = env_bool("USE_LOCAL_SQLITE", default=DEBUG)
 
-# In production (Render or DEBUG=False), require DATABASE_URL so we never fall back to SQLite.
+# In true production (Render or DEBUG=False), require DATABASE_URL unless
+# you explicitly set USE_LOCAL_SQLITE=1.
 REQUIRE_DATABASE_URL = env_bool("REQUIRE_DATABASE_URL", (RENDER or not DEBUG))
 
 if DATABASE_URL:
@@ -267,7 +273,7 @@ elif REQUIRE_DATABASE_URL and not USE_LOCAL_SQLITE:
     # Hard fail to avoid ephemeral SQLite in prod
     raise RuntimeError("DATABASE_URL must be set in production (Render/DEBUG=False).")
 elif USE_LOCAL_SQLITE:
-    # Local dev default
+    # Local dev default (also allowed on Render if you explicitly set USE_LOCAL_SQLITE=1)
     sqlite_path = str(BASE_DIR / "db.sqlite3")
     DATABASES["default"] = {"ENGINE": "django.db.backends.sqlite3", "NAME": sqlite_path}
 else:
@@ -347,18 +353,23 @@ USE_TZ = True
 # Static / Media files
 # -------------------------------------------------
 STATIC_URL = "/static/"
-STATICFILES_DIRS = [BASE_DIR / "static"]
+STATICFILES_DIRS = [
+    *(p for p in [BASE_DIR / "static", BASE_DIR / "circuitcity" / "static"] if p.exists())
+]
 STATIC_ROOT = BASE_DIR / "staticfiles"
 
 MEDIA_URL = "/media/"
 MEDIA_ROOT = BASE_DIR / "media"
 
 # WhiteNoise storages: manifest only in prod/tests off
-_static_backend = (
-    "django.contrib.staticfiles.storage.StaticFilesStorage"
-    if (DEBUG or TESTING)
-    else "whitenoise.storage.CompressedManifestStaticFilesStorage"
-)
+try:
+    _static_backend = (
+        "django.contrib.staticfiles.storage.StaticFilesStorage"
+        if (DEBUG or TESTING)
+        else "whitenoise.storage.CompressedManifestStaticFilesStorage"
+    )
+except Exception:
+    _static_backend = "django.contrib.staticfiles.storage.StaticFilesStorage"
 
 STORAGES = {
     "default": {"BACKEND": "django.core.files.storage.FileSystemStorage"},
@@ -386,7 +397,7 @@ if DEBUG and not USE_SMTP_IN_DEBUG:
     EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"
     DEFAULT_FROM_EMAIL = os.environ.get("DEFAULT_FROM_EMAIL", "noreply@example.com")
 else:
-    EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
+    EMAIL_BACKEND = os.environ.get("EMAIL_BACKEND", "django.core.mail.backends.smtp.EmailBackend")
     EMAIL_HOST = os.environ.get("EMAIL_HOST", "smtp.gmail.com")
     EMAIL_PORT = env_int("EMAIL_PORT", 587)
     EMAIL_USE_TLS = env_bool("EMAIL_USE_TLS", True)
@@ -403,7 +414,7 @@ LOW_STOCK_ALERT_RECIPIENTS = [
 ]
 
 # -------------------------------------------------
-# Logging (with IMEI redaction) — JSON logs in prod
+# Logging (with IMEI redaction) — JSON logs in prod (if available)
 # -------------------------------------------------
 class RedactIMEIFilter(logging.Filter):
     """Scrub 15-digit sequences that look like IMEIs from log messages."""
@@ -420,8 +431,14 @@ class RedactIMEIFilter(logging.Filter):
             pass
         return True
 
+# only use python-json-logger if installed
+try:
+    import pythonjsonlogger  # type: ignore
+    _have_json_logger = True
+except Exception:
+    _have_json_logger = False
 
-USE_JSON_LOGS = env_bool("USE_JSON_LOGS", True) and not DEBUG
+USE_JSON_LOGS = env_bool("USE_JSON_LOGS", True) and not DEBUG and _have_json_logger
 
 _json_formatter = {
     "()": "pythonjsonlogger.jsonlogger.JsonFormatter",
