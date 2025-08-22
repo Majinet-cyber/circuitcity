@@ -8,10 +8,9 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
   <meta name="color-scheme" content="light dark" />
 
-  <!-- Bootstrap / Icons / Chart.js -->
+  <!-- Bootstrap / Icons -->
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
   <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
-  <script defer src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
   <style>
     /* ===== Theme ===== */
@@ -28,22 +27,48 @@
       --ring:0 0 0 .25rem rgba(59,130,246,.25);
     }
     body{ background:#f6f9ff; -webkit-tap-highlight-color:transparent; }
-    /* Prevent iOS zoom on inputs */
     input, select, textarea, button { font-size:16px; }
 
     .cc-shell { min-height:100dvh; display:flex; flex-direction:column; }
     .cc-page{ max-width:1200px; width:100%; margin:0 auto; padding:0.75rem; padding-bottom:calc(76px + env(safe-area-inset-bottom)); }
 
-    /* Sticky translucent header */
+    /* --- header / top spacing (fixes blank area on right) --- */
     .cc-header {
       position:sticky; top:0; z-index:1030;
       backdrop-filter:blur(10px);
       background:rgba(255,255,255,.7);
       border-bottom:1px solid var(--line);
     }
+    .cc-header .cc-page{ padding-top:.5rem; padding-bottom:.25rem; }
 
-    .cc-title{ font-weight:800; letter-spacing:.2px; }
+    .cc-title{ font-weight:800; letter-spacing:.2px; margin:0; }
     .cc-title .emoji{ filter: drop-shadow(0 6px 10px rgba(37,99,235,.25)); }
+
+    /* Toolbar makes the header content fit perfectly on mobile */
+    .cc-toolbar{
+      display:grid; grid-template-columns:1fr auto; gap:.5rem; align-items:center;
+    }
+    .cc-toolbar .actions{ display:flex; flex-wrap:wrap; gap:.5rem; align-items:center; justify-content:flex-end; }
+    @media (max-width:576px){
+      .cc-toolbar{ grid-template-columns:1fr; }
+      .cc-toolbar .actions{ justify-content:flex-start; }
+    }
+
+    /* Premium chips for quick links (“Home”, “Dashboard”) */
+    .crumbs{ display:flex; flex-wrap:wrap; gap:.5rem; margin-top:.5rem; }
+    .crumbs a{
+      text-decoration:none; font-weight:700; color:#0f172a;
+      background:#fff; border:1px solid var(--line); border-radius:999px;
+      padding:.45rem .8rem; display:inline-flex; align-items:center; gap:.5rem;
+      box-shadow:0 6px 18px rgba(16,24,40,.06);
+    }
+    .crumbs a:hover{ filter:brightness(1.03); transform:translateY(-1px); transition:all .12s ease; }
+
+    /* Small menu chip */
+    .cc-menu-btn{
+      width:42px; height:42px; border-radius:12px; display:grid; place-items:center;
+      border:1px solid var(--line); background:#fff; box-shadow:0 6px 18px rgba(16,24,40,.06);
+    }
 
     .btn-primary{ background:var(--blue-600); border-color:var(--blue-600); }
     .btn-primary:hover{ background:var(--blue-700); border-color:var(--blue-700); }
@@ -51,7 +76,6 @@
     .btn-outline-primary:hover{ color:#fff; background:var(--blue-600); border-color:var(--blue-600); }
     .form-select:focus{ box-shadow:var(--ring); border-color:var(--blue-500); }
 
-    /* KPI cards */
     .kpi-card{
       background:linear-gradient(135deg, var(--blue-600), var(--blue-400));
       color:#fff; border:0; border-radius:16px;
@@ -65,7 +89,6 @@
     .kpi-card .label{ font-size:.9rem; opacity:.9 }
     .kpi-card .value{ font-size:1.65rem; font-weight:800; line-height:1; }
 
-    /* Normal cards */
     .cc-card{
       background:var(--card);
       border:1px solid var(--line);
@@ -77,7 +100,6 @@
     .cc-card.in { transform:translateY(0); opacity:1; }
     .cc-card h5{ margin-bottom:.75rem; font-weight:700; }
 
-    /* Wallet chips */
     .wallet-chip{
       display:inline-block;
       font-weight:700; font-size:.85rem;
@@ -91,7 +113,6 @@
     .wallet-chip.negative{ background:#fef2f2; border-color:#fecaca; color:#991b1b }
     .wallet-chip:active { transform:scale(.98); }
 
-    /* Battery stock */
     .battery-wrap{ position:relative; width:90px; }
     .battery{
       height:180px; width:90px;
@@ -113,16 +134,13 @@
     .fill-mildgreen{ background:#22c55e }
     .fill-lightgreen{ background:#86efac }
 
-    /* Tables */
     .table thead th{ white-space:nowrap; cursor:pointer }
     .sortable::after{ content:' ↕'; opacity:.35; font-weight:normal }
     .table>tbody>tr>td{ vertical-align:middle }
 
-    /* Charts */
     .chart-canvas{ width:100% !important; max-width:100%; height:260px !important }
     .chart-canvas--sm{ height:200px !important }
 
-    /* Bottom tab bar (mobile) */
     .cc-bottom-nav{
       position:fixed; left:0; right:0; bottom:0; z-index:1030;
       background:rgba(255,255,255,.95);
@@ -136,7 +154,6 @@
     .cc-bottom-nav .tab .bi{ font-size:1.35rem; display:block; line-height:1; }
     .cc-bottom-nav .tab.active{ color:var(--blue-600); font-weight:600; }
 
-    /* Floating Action Button */
     .cc-fab{
       position:fixed; right:18px; bottom:88px; z-index:1031;
       width:56px; height:56px; border-radius:16px;
@@ -151,11 +168,13 @@
       .cc-page{ padding: .75rem; }
     }
 
-    /* Reduced motion */
     @media (prefers-reduced-motion: reduce) {
       .kpi-card, .cc-card { transition:none; }
       .battery-fill{ transition:none; }
     }
+
+    /* Prevent any sideways scroll on small screens */
+    html, body { max-width:100%; overflow-x:hidden; }
   </style>
 </head>
 <body>
@@ -163,22 +182,33 @@
 
     <!-- Sticky Header -->
     <header class="cc-header">
-      <div class="cc-page d-flex flex-wrap align-items-center justify-content-between" style="padding-bottom:0;">
-        <h1 class="cc-title text-primary mb-2"><span class="emoji">📊</span> Dashboard</h1>
+      <div class="cc-page">
+        <div class="cc-toolbar">
+          <h1 class="cc-title text-primary"><span class="emoji">📊</span> Dashboard</h1>
 
-        <div class="d-flex align-items-center gap-2 mb-2">
-          <!-- Menu (offcanvas) -->
-          <button class="btn btn-outline-primary btn-sm" type="button"
-                  data-bs-toggle="offcanvas" data-bs-target="#ccMenu" aria-controls="ccMenu">
-            <i class="bi bi-list"></i> Menu
-          </button>
-          <!-- Home -->
-          <a class="btn btn-outline-primary btn-sm" href="/inventory/list/" title="Go to Stock List">
-            <i class="bi bi-house"></i> Home
-          </a>
+          <!-- Actions: collapsible menu + Home -->
+          <div class="actions">
+            <!-- Collapsible offcanvas trigger -->
+            <button class="cc-menu-btn" type="button"
+                    data-bs-toggle="offcanvas" data-bs-target="#ccMenu" aria-controls="ccMenu" aria-label="Menu">
+              <i class="bi bi-list fs-5"></i>
+            </button>
+
+            <!-- Home button -->
+            <a class="btn btn-outline-primary btn-sm" href="/inventory/list/" title="Go to Stock List">
+              <i class="bi bi-house"></i><span class="d-none d-sm-inline"> Home</span>
+            </a>
+          </div>
         </div>
 
-        <form method="get" class="d-flex gap-2 align-items-center flex-wrap mb-2">
+        <!-- premium “chips” quick links -->
+        <nav class="crumbs" aria-label="Quick links">
+          <a href="/inventory/list/"><i class="bi bi-house-door"></i> Home</a>
+          <a href="/inventory/dashboard/"><i class="bi bi-speedometer2"></i> Dashboard</a>
+        </nav>
+
+        <!-- filters -->
+        <form method="get" class="d-flex gap-2 align-items-center flex-wrap mt-2">
           <select name="period" class="form-select form-select-sm" style="width:auto">
             <option value="month" {% if period == "month" %}selected{% endif %}>This month</option>
             <option value="all" {% if period == "all" %}selected{% endif %}>All time</option>
@@ -433,7 +463,22 @@
     </button>
   </div>
 
+  <!-- Bootstrap JS -->
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+
+  <!-- Chart.js loaded at the bottom so it's definitely ready for our inline script -->
+  {% if is_manager_or_admin %}
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script id="chart-payload" type="application/json">
+  {
+    "labels": {{ labels_json|default:"[]"|safe }},
+    "revenue": {{ revenue_points_json|default:"[]"|safe }},
+    "profit": {{ profit_points_json|default:"[]"|safe }},
+    "crp": {{ pie_data_json|default:"[]"|safe }}
+  }
+  </script>
+  {% endif %}
+
   <script>
     /* ===== tiny table sorter ===== */
     function makeSortable(tableId){
@@ -538,55 +583,66 @@
       wm.show();
     }
 
-    /* ===== Charts (guarded) ===== */
-    const labels         = {{ labels_json|safe }};
-    const revenuePoints  = {{ revenue_points_json|safe }};
-    const profitPoints   = {{ profit_points_json|safe }};
-    const pieData        = {{ pie_data_json|safe }};
-    const colorRevenue   = 'rgba(59,130,246,0.85)';  /* blue */
-    const colorProfit    = 'rgba(16,185,129,0.85)';  /* green */
+    /* ===== Charts: safe init after everything is ready ===== */
+    function initChartsSafely(){
+      if(!window.Chart) { console.warn('Chart.js not ready'); return; }
 
-    function makeBar(id, label, data, color){
-      const el = document.getElementById(id);
-      if(!el) return;
-      new Chart(el, {
-        type:'bar',
-        data:{ labels, datasets:[{ label, data, backgroundColor:color, borderColor:color, borderWidth:1 }] },
-        options:{
-          responsive:true,
-          maintainAspectRatio:false,
-          plugins:{ legend:{ display:false }, tooltip:{ callbacks:{ label:(ctx)=> 'MK ' + nf.format(ctx.parsed.y) } } },
-          scales:{
-            x:{ ticks:{ maxRotation:0, autoSkip:true }, grid:{ display:false } },
-            y:{ beginAtZero:true, ticks:{ callback:(v)=> nf.format(v) }, grid:{ color:'rgba(2,6,23,.06)' } }
-          },
-          animation:{ duration:700, easing:'easeOutQuart' }
-        }
-      });
+      let payload = {labels:[], revenue:[], profit:[], crp:[]};
+      try{
+        const el = document.getElementById('chart-payload');
+        if(el) payload = JSON.parse(el.textContent || '{}');
+      }catch(e){ console.warn('Bad chart payload', e); }
+
+      const labels        = Array.isArray(payload.labels) ? payload.labels : [];
+      const revenuePoints = (payload.revenue || []).map(v=>Number(v)||0);
+      const profitPoints  = (payload.profit  || []).map(v=>Number(v)||0);
+      const pieData       = (payload.crp     || []).map(v=>Number(v)||0);
+
+      const nf = new Intl.NumberFormat();
+      const colorRevenue = 'rgba(59,130,246,0.85)';
+      const colorProfit  = 'rgba(16,185,129,0.85)';
+
+      function makeBar(id,label,data,color){
+        const el = document.getElementById(id);
+        if(!el || !labels.length) return;
+        new Chart(el,{
+          type:'bar',
+          data:{ labels, datasets:[{ label, data, backgroundColor:color, borderColor:color, borderWidth:1 }] },
+          options:{
+            responsive:true, maintainAspectRatio:false,
+            plugins:{ legend:{ display:false }, tooltip:{ callbacks:{ label:(ctx)=>'MK '+nf.format(ctx.parsed.y) } } },
+            scales:{
+              x:{ ticks:{ maxRotation:0, autoSkip:true }, grid:{ display:false } },
+              y:{ beginAtZero:true, ticks:{ callback:(v)=> nf.format(v) }, grid:{ color:'rgba(2,6,23,.06)' } }
+            },
+            animation:{ duration:700, easing:'easeOutQuart' }
+          }
+        });
+      }
+      function makePie(id,data){
+        const el = document.getElementById(id);
+        if(!el || !data.length) return;
+        new Chart(el,{
+          type:'pie',
+          data:{ labels:['Cost','Revenue','Profit'], datasets:[{ data, backgroundColor:['#94a3b8', colorRevenue, colorProfit] }] },
+          options:{
+            responsive:true, maintainAspectRatio:false,
+            plugins:{ legend:{ position:'bottom' }, tooltip:{ callbacks:{ label:(ctx)=>`${ctx.label}: MK ${nf.format(ctx.parsed)}` } } },
+            animation:{ duration:700, easing:'easeOutQuart' }
+          }
+        });
+      }
+
+      if(labels.length && (revenuePoints.length || profitPoints.length)){
+        makeBar('barRevenue','Revenue',revenuePoints,colorRevenue);
+        makeBar('barProfit','Profit',profitPoints,colorProfit);
+      }
+      if(pieData.length){ makePie('pieCRP',pieData); }
     }
-    function makePie(id, data){
-      const el = document.getElementById(id);
-      if(!el) return;
-      new Chart(el, {
-        type:'pie',
-        data:{ labels:['Cost','Revenue','Profit'], datasets:[{ data, backgroundColor:['#94a3b8', colorRevenue, colorProfit] }] },
-        options:{
-          responsive:true,
-          maintainAspectRatio:false,
-          plugins:{
-            legend:{ position:'bottom' },
-            tooltip:{ callbacks:{ label:(ctx)=> `${ctx.label}: MK ${nf.format(ctx.parsed)}` } }
-          },
-          animation:{ duration:700, easing:'easeOutQuart' }
-        }
-      });
-    }
-    makeBar('barRevenue', 'Revenue', revenuePoints, colorRevenue);
-    makeBar('barProfit',  'Profit',  profitPoints,  colorProfit);
-    makePie('pieCRP', pieData);
+    window.addEventListener('load', initChartsSafely);
     {% endif %}
 
-    /* ===== Animate in on scroll (cards & KPIs) ===== */
+    /* Animate in on scroll (cards & KPIs) */
     const io = new IntersectionObserver((entries)=>{
       entries.forEach(e=>{
         if(e.isIntersecting){
@@ -597,7 +653,7 @@
     }, { threshold:.1 });
     document.querySelectorAll('.will-animate, .kpi-card, .cc-card').forEach(el=>io.observe(el));
 
-    /* ===== Animate battery fill after paint ===== */
+    /* Animate battery fill after paint */
     window.requestAnimationFrame(()=>{
       const fill = document.getElementById('batteryFill');
       if(fill){
@@ -606,7 +662,7 @@
       }
     });
 
-    /* Optional: register SW if not already (safe no-op if present) */
+    /* Optional: register SW (safe no-op if already registered) */
     if('serviceWorker' in navigator){
       try{ navigator.serviceWorker.register('/static/sw.js'); }catch(e){}
     }

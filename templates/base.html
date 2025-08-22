@@ -36,7 +36,7 @@
       --cc-text:#e5e7eb; --cc-muted:#a8b3cf; --cc-accent:#76a9ff;
     }
 
-    html, body { height:100% }
+    html, body { height:100%; max-width:100%; overflow-x:hidden; } /* no sideways scroll */
     body.cc-body {
       margin:0; background:var(--cc-bg); color:var(--cc-text);
       font:14px/1.45 "Inter", system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Cantarell,"Helvetica Neue",Arial,"Noto Sans","Apple Color Emoji","Segoe UI Emoji";
@@ -71,7 +71,12 @@
 
     /* Topbar / shell */
     .cc-topnav{position:sticky;top:0;z-index:30;background:var(--cc-panel);border-bottom:1px solid var(--cc-border)}
-    .topbar{display:flex;gap:.75rem;align-items:center;justify-content:space-between;padding:.6rem 1rem;max-width:1200px;margin:0 auto}
+    /* NEW: grid layout fills width and kills the “empty right” look */
+    .topbar{
+      display:grid; grid-template-columns:auto 1fr auto; align-items:center;
+      gap:.75rem; padding:.6rem 1rem; max-width:1200px; margin:0 auto;
+      padding-right:calc(1rem + env(safe-area-inset-right)); /* notch-friendly */
+    }
     .cc-brand{display:flex;align-items:center;gap:.5rem;color:var(--cc-text);font-weight:800;text-decoration:none}
     .cc-logo{font-size:1.2rem}
 
@@ -86,6 +91,13 @@
     .cc-overlay{position:fixed;inset:0;background:rgba(0,0,0,.35)}
     .cc-main{padding:1rem}
     .cc-container{max-width:1200px;margin:0 auto}
+
+    /* NEW: actions row scroll on small screens (no need to zoom out) */
+    .cc-topnav-actions{display:flex;gap:.5rem;align-items:center;justify-content:flex-end;overflow-x:auto;max-width:100%;}
+    .cc-topnav-actions::-webkit-scrollbar{display:none}
+    .cc-topnav-actions .cc-topbtn{flex:0 0 auto}
+    /* burger sized better for touch */
+    #ccBurger{min-width:44px;min-height:44px;padding:.25rem .6rem}
 
     /* Tables (fallback) */
     table{width:100%;border-collapse:collapse}
@@ -137,6 +149,11 @@
 
     /* Ensure main content isn't hidden behind bottom nav on phones */
     body.has-bottom-nav .cc-main{ padding-bottom:calc(80px + env(safe-area-inset-bottom)); }
+
+    /* Compact buttons on very small screens (keeps everything fitting) */
+    @media (max-width:420px){
+      .cc-topbtn{padding:.5rem .6rem;font-size:.9rem}
+    }
   </style>
 </head>
 <body class="cc-body">
