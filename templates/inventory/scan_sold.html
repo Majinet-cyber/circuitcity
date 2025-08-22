@@ -1,0 +1,260 @@
+{% extends "base.html" %}
+{% block title %}Scan Sold · Circuit City{% endblock %}
+
+{% block body %}
+<div class="bg" style="min-height:100dvh;padding:2rem;display:grid;place-items:start">
+  <div class="card" style="max-width:680px;width:100%;padding:1.5rem">
+    <h2 class="brand" style="margin:0 0 1rem">Mark Item as SOLD</h2>
+
+    {# flash messages #}
+    {% if messages %}
+      {% for message in messages %}
+        <div style="margin:.5rem 0;padding:.75rem 1rem;border-radius:.75rem;
+                    {% if message.tags == 'error' %}
+                      background:#fee2e2;border:1px solid #fecaca;color:#7f1d1d;
+                    {% else %}
+                      background:#e7f1ff;border:1px solid #cfe2ff;color:#102a7a;
+                    {% endif %}">
+          {{ message }}
+        </div>
+      {% endfor %}
+    {% endif %}
+
+    {# non-field errors #}
+    {% if form.non_field_errors %}
+      <div style="margin:.5rem 0;padding:.75rem 1rem;border-radius:.75rem;
+                  background:#fee2e2;border:1px solid #fecaca;color:#7f1d1d;">
+        {{ form.non_field_errors }}
+      </div>
+    {% endif %}
+
+    <form method="post" novalidate style="display:grid;gap:1rem" autocomplete="off">
+      {% csrf_token %}
+
+      <!-- IMEI field + scan/paste/clear -->
+      <div>
+        <label for="{{ form.imei.id_for_label }}" style="display:block;margin:0 0 .35rem;color:#334155;font-weight:600">
+          IMEI / Barcode
+        </label>
+        {{ form.imei }}
+        <div style="display:flex;gap:.5rem;margin-top:.5rem;flex-wrap:wrap">
+          <button class="btn" type="button" id="btnOpenScanner">📷 Scan with camera</button>
+          <button class="btn" type="button" id="btnPaste">📋 Paste</button>
+          <button class="btn" type="button" id="btnClear">✖ Clear</button>
+        </div>
+        <div id="imeiHint" style="color:#64748b;font-size:.9rem;margin-top:.35rem">
+          Tip: You can type, paste, or scan. IMEI must be exactly 15 digits.
+        </div>
+        {% if form.imei.errors %}
+          <div style="color:#b91c1c;margin-top:.25rem;font-size:.95rem;">
+            {{ form.imei.errors|striptags }}
+          </div>
+        {% endif %}
+      </div>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem">
+        <div>
+          <label for="{{ form.sold_at.id_for_label }}" style="display:block;margin:0 0 .35rem;color:#334155;font-weight:600">
+            Sold date
+          </label>
+          {{ form.sold_at }}
+          {% if form.sold_at.errors %}
+            <div style="color:#b91c1c;margin-top:.25rem;font-size:.95rem;">
+              {{ form.sold_at.errors|striptags }}
+            </div>
+          {% endif %}
+        </div>
+
+        <div>
+          <label for="{{ form.price.id_for_label }}" style="display:block;margin:0 0 .35rem;color:#334155;font-weight:600">
+            Price
+          </label>
+          {{ form.price }}
+          {% if form.price.errors %}
+            <div style="color:#b91c1c;margin-top:.25rem;font-size:.95rem;">
+              {{ form.price.errors|striptags }}
+            </div>
+          {% endif %}
+        </div>
+      </div>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem">
+        <div>
+          <label for="{{ form.commission_pct.id_for_label }}" style="display:block;margin:0 0 .35rem;color:#334155;font-weight:600">
+            Commission %
+          </label>
+          {{ form.commission_pct }}
+          {% if form.commission_pct.errors %}
+            <div style="color:#b91c1c;margin-top:.25rem;font-size:.95rem;">
+              {{ form.commission_pct.errors|striptags }}
+            </div>
+          {% endif %}
+        </div>
+
+        <div>
+          <label for="{{ form.location.id_for_label }}" style="display:block;margin:0 0 .35rem;color:#334155;font-weight:600">
+            Location
+          </label>
+          {{ form.location }}
+          {% if form.location.errors %}
+            <div style="color:#b91c1c;margin-top:.25rem;font-size:.95rem;">
+              {{ form.location.errors|striptags }}
+            </div>
+          {% endif %}
+        </div>
+      </div>
+
+      <div style="display:flex;gap:.6rem;flex-wrap:wrap">
+        <button class="btn" type="submit">Mark as SOLD</button>
+        <a class="btn" href="{% url 'inventory:stock_list' %}" style="background:#64748b">Stock list</a>
+        <a class="btn" href="{% url 'inventory:scan_in' %}" style="background:#2563eb">← Back to Scan In</a>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Scanner Modal -->
+<div id="scanModal" style="position:fixed;inset:0;background:rgba(0,0,0,.6);display:none;align-items:center;justify-content:center;z-index:9999">
+  <div class="card" style="width:min(95vw,700px);padding:0;overflow:hidden">
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:.75rem 1rem;border-bottom:1px solid #e5e7eb">
+      <strong>Scan barcode</strong>
+      <button class="btn" id="btnCloseScanner" type="button">Close</button>
+    </div>
+    <div style="position:relative;background:#000">
+      <video id="scanVideo" playsinline style="width:100%;height:auto"></video>
+      <div style="position:absolute;inset:0;border:2px dashed rgba(255,255,255,.5);margin:10%"></div>
+    </div>
+    <div style="padding:.75rem 1rem;border-top:1px solid #e5e7eb;display:flex;gap:.5rem;flex-wrap:wrap;align-items:center">
+      <button class="btn" id="btnSwapCamera" type="button">🔁 Switch camera</button>
+      <span id="scanStatus" style="color:#64748b">Align barcode within the frame…</span>
+    </div>
+  </div>
+</div>
+
+<!-- Quagga2 (barcode scanner) -->
+<script src="https://unpkg.com/@ericblade/quagga2/dist/quagga.js"></script>
+<script>
+  // Ensure the IMEI input has styling class if needed
+  (function ensureInputClass() {
+    const imei = document.getElementById("id_imei");
+    if (imei && !imei.classList.contains("input")) imei.classList.add("input");
+  })();
+
+  // Helpers for IMEI normalization (digits only, max 15)
+  const imeiInput = document.getElementById("id_imei");
+  function setImei(val) {
+    const digits = (val || "").replace(/\D+/g, "").slice(0, 15);
+    imeiInput.value = digits;
+    imeiInput.setCustomValidity(digits.length === 15 ? "" : "IMEI must be exactly 15 digits.");
+  }
+  const cap15 = (e) => setImei(e.target.value);
+  if (imeiInput) {
+    imeiInput.addEventListener("input", cap15);
+    imeiInput.addEventListener("blur", cap15);
+    // init on load
+    setImei(imeiInput.value || "");
+  }
+
+  // Paste / Clear buttons
+  document.getElementById("btnPaste").onclick = async () => {
+    try {
+      const text = await navigator.clipboard.readText();
+      setImei(text);
+    } catch {
+      alert("Clipboard access is blocked by the browser.");
+    }
+  };
+  document.getElementById("btnClear").onclick = () => setImei("");
+
+  // Scanner controls
+  const scanModal = document.getElementById("scanModal");
+  const btnOpen = document.getElementById("btnOpenScanner");
+  const btnClose = document.getElementById("btnCloseScanner");
+  const btnSwap = document.getElementById("btnSwapCamera");
+  const statusEl = document.getElementById("scanStatus");
+
+  let currentDeviceId = null;
+  let devices = [];
+
+  btnOpen.addEventListener("click", openScanner);
+  btnClose.addEventListener("click", closeScanner);
+  btnSwap.addEventListener("click", async () => {
+    if (!devices.length) return;
+    const idx = devices.findIndex(d => d.deviceId === currentDeviceId);
+    const next = devices[(idx + 1) % devices.length];
+    currentDeviceId = next.deviceId;
+    await startQuagga();
+  });
+
+  async function openScanner() {
+    scanModal.style.display = "flex";
+    statusEl.textContent = "Starting camera…";
+    await initDevices();
+    await startQuagga();
+  }
+
+  async function closeScanner() {
+    scanModal.style.display = "none";
+    try { Quagga.stop(); } catch(e) {}
+  }
+
+  async function initDevices() {
+    const all = await navigator.mediaDevices.enumerateDevices();
+    devices = all.filter(d => d.kind === "videoinput");
+    if (!devices.length) {
+      statusEl.textContent = "No camera found.";
+      return;
+    }
+    const back = devices.find(d => /back|rear|environment/i.test(d.label));
+    currentDeviceId = (back || devices[0]).deviceId;
+  }
+
+  async function startQuagga() {
+    try { Quagga.stop(); } catch(e) {}
+    const constraints = {
+      width: { ideal: 1280 },
+      height: { ideal: 720 },
+      facingMode: "environment",
+      deviceId: currentDeviceId ? { exact: currentDeviceId } : undefined
+    };
+    Quagga.init({
+      inputStream: {
+        type: "LiveStream",
+        target: document.querySelector("#scanVideo"),
+        constraints
+      },
+      locator: { patchSize: "medium", halfSample: true },
+      numOfWorkers: navigator.hardwareConcurrency ? Math.min(navigator.hardwareConcurrency, 4) : 2,
+      frequency: 10,
+      decoder: {
+        readers: [
+          "code_128_reader",
+          "ean_reader",
+          "ean_8_reader",
+          "upc_reader",
+          "upc_e_reader"
+        ]
+      }
+    }, (err) => {
+      if (err) {
+        statusEl.textContent = "Camera error: " + err;
+        return;
+      }
+      Quagga.start();
+      statusEl.textContent = "Align barcode within the frame…";
+      Quagga.offDetected(handleDetected);
+      Quagga.onDetected(handleDetected);
+    });
+  }
+
+  function handleDetected(result) {
+    const code = (result && result.codeResult && result.codeResult.code) || "";
+    if (!code) return;
+    const digits = code.replace(/\D+/g, "").slice(0, 15);
+    if (!digits) return;
+    setImei(digits);
+    statusEl.textContent = "Scanned: " + digits;
+    setTimeout(() => { try { Quagga.stop(); } catch(e) {}; scanModal.style.display = "none"; }, 400);
+  }
+</script>
+{% endblock %}

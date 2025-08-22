@@ -1,0 +1,329 @@
+{# templates/dash/admin.html #}
+{% extends "base.html" %}
+{% load static %}
+{% block title %}Admin · Circuit City{% endblock %}
+
+{% block body %}
+<style>
+  /* (styles unchanged) */
+  :root{ --bg:#0b1020; --panel:#0e1530; --panel-2:#121a3d; --text:#e9ecf7; --muted:#a9b1c6; --brand:#5b8cff; --brand-2:#7aa2ff; --ok:#22c55e; --warn:#f59e0b; --bad:#ef4444; --ring: rgba(91,140,255,.35); --shadow: 0 10px 24px rgba(2,8,23,.35), inset 0 1px 0 rgba(255,255,255,.05); --br:16px; --sidebar-w:240px; --sidebar-w-collapsed:76px }
+  .light{ --bg:#f6f7fb; --panel:#fff; --panel-2:#f3f6ff; --text:#0f1222; --muted:#525d79; --brand:#3757ff; --brand-2:#2446ff; --ok:#16a34a; --warn:#d97706; --bad:#dc2626; --ring: rgba(55,87,255,.25); --shadow:0 8px 20px rgba(0,0,0,.06), inset 0 1px 0 rgba(255,255,255,.6) }
+  html,body{background:var(--bg);color:var(--text)}
+  .layout{display:grid;grid-template-columns:var(--sidebar-w) 1fr;min-height:100dvh}
+  .layout.collapsed{grid-template-columns:var(--sidebar-w-collapsed) 1fr}
+  .sidebar{position:sticky;top:0;height:100dvh;display:flex;flex-direction:column;background:var(--panel);border-right:1px solid rgba(255,255,255,.08)}
+  .brandbar{display:flex;align-items:center;gap:.6rem;padding:.9rem}
+  .brandlogo{width:32px;height:32px;border-radius:8px;background:linear-gradient(135deg,var(--brand),var(--brand-2))}
+  .brandname{font-weight:800;letter-spacing:.3px;white-space:nowrap}
+  .collapse-btn{margin-left:auto;width:38px;height:32px;border-radius:10px;background:var(--panel-2);border:1px solid rgba(255,255,255,.12);display:grid;place-items:center;cursor:pointer}
+  .collapse-btn:hover{box-shadow:0 0 0 6px var(--ring)}
+  .menu{padding:.5rem}
+  .menu a{display:flex;align-items:center;gap:.8rem;padding:.6rem .7rem;margin:.2rem 0;border-radius:10px;color:var(--text);text-decoration:none;font-weight:650}
+  .menu a .mi{width:22px;height:22px;display:grid;place-items:center;border-radius:8px;background:var(--panel-2);border:1px solid rgba(255,255,255,.1)}
+  .menu a:hover{background:rgba(255,255,255,.06)}
+  .menu a.active{background:linear-gradient(180deg,var(--panel-2),var(--panel));border:1px solid rgba(255,255,255,.16)}
+  .menu .section{margin:.75rem .5rem .35rem;color:var(--muted);font-size:.8rem;text-transform:uppercase;letter-spacing:.12rem}
+  .layout.collapsed .label,.layout.collapsed .section{display:none}
+  .content{padding:1.25rem}
+  .container{max-width:1200px;margin:auto}
+  .card{background:var(--panel);border-radius:var(--br);box-shadow:var(--shadow)}
+  .row{display:flex;gap:.75rem;align-items:center;flex-wrap:wrap}
+  .muted{color:var(--muted)}
+  .brand{font-weight:800;letter-spacing:.2px}
+  .toolbar{display:flex;gap:.5rem;align-items:center;padding:.6rem .75rem;background:var(--panel-2);border-radius:12px}
+  .input, select{background:var(--panel-2);color:var(--text);border:1px solid rgba(255,255,255,.12);padding:.55rem .7rem;border-radius:10px;outline:0}
+  .input:focus, select:focus{box-shadow:0 0 0 6px var(--ring)}
+  .btn{--b:var(--brand);display:inline-flex;align-items:center;gap:.5rem;background:var(--b);color:#fff;font-weight:700;border:0;padding:.55rem .9rem;border-radius:10px;box-shadow:0 4px 12px var(--ring);text-decoration:none;line-height:1}
+  .btn:hover{filter:brightness(1.05)} .btn.ok{--b:var(--ok)} .btn.ghost{background:transparent;color:var(--text);border:1px solid rgba(255,255,255,.16);box-shadow:none}
+  .btn.icon svg{width:18px;height:18px} .btn-group{display:flex;gap:.5rem;flex-wrap:wrap}
+  .chip{background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.14);color:var(--text);padding:.35rem .7rem;border-radius:999px;font-weight:600;cursor:pointer}
+  .grid{display:grid;gap:.75rem} .grid-auto{grid-template-columns:repeat(auto-fit,minmax(220px,1fr))}
+  .stat{padding:1rem;background:linear-gradient(180deg,var(--panel),var(--panel-2));border:1px solid rgba(255,255,255,.06);border-radius:var(--br)}
+  .stat h4{margin:0 0 .25rem;font-size:.9rem;color:var(--muted);font-weight:700}
+  .stat .big{font-size:1.8rem;font-weight:800;letter-spacing:.3px}
+  .table-wrap{overflow:auto;border:1px solid rgba(255,255,255,.12);border-radius:14px}
+  table.data{width:100%;border-collapse:separate;border-spacing:0;min-width:720px;background:linear-gradient(180deg,var(--panel),var(--panel-2))}
+  .data th,.data td{padding:.75rem .85rem;border-bottom:1px solid rgba(255,255,255,.08);text-align:left;white-space:nowrap}
+  .data thead th{font-size:.8rem;text-transform:uppercase;letter-spacing:.12rem;color:var(--muted);background:rgba(255,255,255,.02);cursor:pointer}
+  .data tbody tr:hover{background:rgba(255,255,255,.05)}
+  .pill{border-radius:999px;padding:.12rem .55rem;font-size:.85rem;font-weight:700;border:1px solid}
+  .pill.good{color:#0f5132;background:rgba(34,197,94,.18);border-color:rgba(34,197,94,.35)}
+  .pill.mid{color:#7c3a02;background:rgba(245,158,11,.18);border-color:rgba(245,158,11,.35)}
+  .pill.low{color:#7f1d1d;background:rgba(239,68,68,.18);border-color:rgba(239,68,68,.35)}
+  .toggle{width:42px;height:26px;background:var(--panel-2);border-radius:999px;border:1px solid rgba(255,255,255,.12);position:relative;cursor:pointer}
+  .toggle i{position:absolute;top:2px;left:2px;width:22px;height:22px;border-radius:999px;background:var(--brand);transition:transform .25s ease}
+  .toggle.on i{transform:translateX(16px)}
+  .avatar{width:36px;height:36px;border-radius:50%;display:inline-grid;place-items:center;font-weight:800;color:#fff;overflow:hidden;background:linear-gradient(135deg,var(--brand),var(--brand-2))}
+  .avatar img{width:100%;height:100%;object-fit:cover;display:block}
+  .avatar-lg{width:48px;height:48px}
+  .avatar-uploader{position:relative;cursor:pointer}
+  .avatar-uploader input[type=file]{position:absolute;inset:0;opacity:0;cursor:pointer}
+  .icon-btn{background:transparent;border:1px solid rgba(255,255,255,.16);color:var(--text);border-radius:8px;padding:.2rem .45rem;font-size:.75rem;line-height:1;display:inline-flex;align-items:center;gap:.35rem}
+  .icon-btn:hover{box-shadow:0 0 0 6px var(--ring)}
+  .name-cell{display:flex;align-items:center;gap:.5rem} .name-extras{display:flex;align-items:center;gap:.4rem}
+  @media (max-width:960px){ .layout{grid-template-columns:var(--sidebar-w-collapsed) 1fr} }
+</style>
+
+<div id="rootLayout" class="layout">
+  <!-- Sidebar -->
+  <aside class="sidebar" aria-label="Main">
+    <div class="brandbar">
+      <div class="brandlogo" aria-hidden="true"></div>
+      <div class="brandname label">Circuit City</div>
+      <button id="collapseBtn" class="collapse-btn" aria-pressed="false" title="Collapse sidebar">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M4 7h16M4 12h16M4 17h16" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+      </button>
+    </div>
+
+    {% with current=request.resolver_match.url_name %}
+    <nav class="menu">
+      <div class="section">General</div>
+      <a href="{% url 'inventory:dashboard' %}" class="{% if current == 'dashboard' %}active{% endif %}">
+        <span class="mi">🏠</span><span class="label">Dashboard</span>
+      </a>
+      <a href="{% url 'inventory:stock_list' %}" class="{% if current == 'stock_list' %}active{% endif %}">
+        <span class="mi">📋</span><span class="label">Stock List</span>
+      </a>
+      <a href="{% url 'inventory:scan_in' %}" class="{% if current == 'scan_in' %}active{% endif %}">
+        <span class="mi">➕</span><span class="label">Scan Stock IN</span>
+      </a>
+      <a href="{% url 'inventory:scan_sold' %}" class="{% if current == 'scan_sold' %}active{% endif %}">
+        <span class="mi">✅</span><span class="label">Scan SOLD</span>
+      </a>
+
+      <div class="section">Admin</div>
+      <a href="{% url 'admin:index' %}">
+        <span class="mi">⚙️</span><span class="label">Django Admin</span>
+      </a>
+      <a href="#" onclick="alert('Reports coming soon')" aria-disabled="true">
+        <span class="mi">📈</span><span class="label">Reports (soon)</span>
+      </a>
+      <a href="#" onclick="alert('Settings coming soon')" aria-disabled="true">
+        <span class="mi">🔧</span><span class="label">Settings (soon)</span>
+      </a>
+    </nav>
+    {% endwith %}
+  </aside>
+
+  <!-- Content -->
+  <main class="content">
+    <div class="container card">
+      <!-- Header -->
+      <div class="row" style="justify-content:space-between; margin-bottom:1rem">
+        <h2 class="brand" style="margin:0">Admin Dashboard</h2>
+        <div class="row">
+          <label class="row" style="gap:.4rem">
+            <span class="muted">Theme</span>
+            <button id="themeToggle" class="toggle" aria-pressed="false"><i></i></button>
+          </label>
+
+          <!-- Period filter -->
+          <form id="periodForm" method="get" class="toolbar">
+            <label for="period" class="muted" style="font-weight:700">Period</label>
+            <select id="period" name="period">
+              <option value="month" {% if period == "month" or not period %}selected{% endif %}>This month</option>
+              <option value="all" {% if period == "all" %}selected{% endif %}>All time</option>
+            </select>
+            <button class="btn" type="submit">Apply</button>
+          </form>
+
+          {# ---------- SAFE current-user avatar uploader ---------- #}
+          {% url 'upload_my_avatar' as upload_my_avatar_url %}
+          {% if upload_my_avatar_url %}
+            <form action="{{ upload_my_avatar_url }}" method="post" enctype="multipart/form-data" class="row">
+              {% csrf_token %}
+              <label class="avatar avatar-lg avatar-uploader" title="Click to change photo">
+                {% if request.user.profile.avatar %}
+                  <img src="{{ request.user.profile.avatar.url }}" alt="Avatar">
+                {% else %}
+                  {{ request.user.first_name|default:request.user.username|first|upper }}
+                {% endif %}
+                <input type="file" name="avatar" accept="image/*">
+              </label>
+              <input type="hidden" name="next" value="{{ request.path }}">
+              <button type="submit" class="btn ghost">Upload</button>
+            </form>
+          {% else %}
+            <span class="avatar avatar-lg" title="Avatar">
+              {{ request.user.first_name|default:request.user.username|first|upper }}
+            </span>
+          {% endif %}
+        </div>
+      </div>
+
+      <!-- Quick chips -->
+      <div class="row" style="margin-bottom:.75rem">
+        <button class="chip" data-period="month">This month</button>
+        <button class="chip" data-period="all">All time</button>
+        <span class="muted">Tip: press <span class="kbd">/</span> to focus table search</span>
+      </div>
+
+      <!-- Summary tiles -->
+      <div class="grid grid-auto" style="margin-bottom:1rem">
+        <div class="stat">
+          <h4>In Stock</h4>
+          <div class="row" style="gap:.6rem">
+            <span class="pill mid">{{ in_stock|default:"0" }}</span>
+            <div class="big">{{ in_stock|default:"0" }}</div>
+          </div>
+        </div>
+        <div class="stat">
+          <h4>Sold</h4>
+          <div class="big">{{ sold|default:"0" }}</div>
+        </div>
+        <div class="stat">
+          <h4>Sales Value</h4>
+          <div class="big">MK {{ sales_value|default:0|floatformat:0 }}</div>
+        </div>
+        <div class="stat">
+          <h4>Profit {% if period == "all" %}(All time){% else %}(This month){% endif %}</h4>
+          <div class="big">MK {{ profit_value|default:0|floatformat:0 }}</div>
+        </div>
+      </div>
+
+      <!-- Clean action bar -->
+      <div class="btn-group" style="margin-bottom:1rem">
+        <a class="btn icon" href="{% url 'inventory:dashboard' %}">
+          <svg viewBox="0 0 24 24" fill="none"><path d="M3 3h8v8H3zM13 3h8v8h-8zM3 13h8v8H3zM13 13h8v8h-8z" fill="currentColor"/></svg>
+          Inventory
+        </a>
+        <a class="btn icon" href="{% url 'inventory:scan_in' %}">
+          <svg viewBox="0 0 24 24" fill="none"><path d="M4 6h16M6 12h12M9 18h6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+          Scan IN
+        </a>
+        <a class="btn ok icon" href="{% url 'inventory:scan_sold' %}">
+          <svg viewBox="0 0 24 24" fill="none"><path d="M9 12l2 2 4-4" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><rect x="3" y="4" width="18" height="16" rx="3" stroke="white" stroke-width="2"/></svg>
+          Scan SOLD
+        </a>
+        <a class="btn ghost icon" href="{% url 'inventory:stock_list' %}">
+          <svg viewBox="0 0 24 24" fill="none"><path d="M4 6h16M4 12h16M4 18h16" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+          Stock List
+        </a>
+        <a class="btn ghost icon" href="{% url 'admin:index' %}">
+          <svg viewBox="0 0 24 24" fill="none"><path d="M3 21h18M12 3l9 9-9 9-9-9 9-9z" stroke="currentColor" stroke-width="2"/></svg>
+          Django Admin
+        </a>
+      </div>
+
+      <div class="divider"></div>
+
+      <!-- Agent performance -->
+      <div class="row" style="justify-content:space-between; margin-bottom:.5rem">
+        <h3 class="brand" style="margin:0">Agent Performance</h3>
+        <div class="row">
+          <input id="agentSearch" class="input" placeholder="Search agent… ( / )" aria-label="Search agents">
+          <button id="clearSearch" class="btn ghost" type="button">Clear</button>
+        </div>
+      </div>
+
+      <div class="table-wrap">
+        <table id="agentTable" class="data" role="table" aria-label="Agent performance">
+          <thead>
+            <tr>
+              <th data-sort="text">Agent</th>
+              <th data-sort="num">Total Sales</th>
+              <th data-sort="num">Current Stock</th>
+              <th data-sort="text">Last Arrival Log</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for agent in agents %}
+              <tr>
+                <td>
+                  <div class="name-cell">
+                    <span class="avatar">
+                      {% if agent.avatar %}
+                        <img src="{{ agent.avatar.url }}" alt="{{ agent.name }} avatar">
+                      {% else %}
+                        {{ agent.name|first|upper }}
+                      {% endif %}
+                    </span>
+                    {% if agent.id %}
+                      <a href="{% url 'admin_agent_detail' agent.id %}" style="text-decoration:none; color:#7aa2ff">{{ agent.name }}</a>
+                    {% else %} {{ agent.name }} {% endif %}
+
+                    <span class="name-extras">
+                      {# ---------- SAFE per-agent uploader ---------- #}
+                      {% url 'upload_agent_avatar' agent.id as agent_upload_url %}
+                      {% if agent_upload_url %}
+                        <form action="{{ agent_upload_url }}" method="post" enctype="multipart/form-data">
+                          {% csrf_token %}
+                          <label class="icon-btn" title="Upload photo">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                              <path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                            </svg>
+                            Upload
+                            <input type="file" name="avatar" accept="image/*" style="position:absolute;opacity:0;width:0;height:0">
+                          </label>
+                          <input type="hidden" name="next" value="{{ request.path }}">
+                          <button type="submit" class="sr-only">Save</button>
+                        </form>
+                      {% endif %}
+                    </span>
+                  </div>
+                </td>
+                <td>{{ agent.total_sales|default:"0" }}</td>
+                <td>
+                  {% if agent.stock_level >= 12 %}
+                    <span class="pill good">{{ agent.stock_level }}</span>
+                  {% elif agent.stock_level >= 10 %}
+                    <span class="pill mid">{{ agent.stock_level }}</span>
+                  {% else %}
+                    <span class="pill low">{{ agent.stock_level }}</span>
+                  {% endif %}
+                </td>
+                <td class="muted">{{ agent.last_log|default:"—"|date:"Y-m-d H:i" }}</td>
+              </tr>
+            {% empty %}
+              <tr><td colspan="4" class="muted">No agent data available.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {# Projections chart removed for a cleaner UI #}
+    </div>
+  </main>
+</div>
+
+<script>
+/* Sidebar collapse (persist) */
+(function(){
+  const key='cc-sidebar', layout=document.getElementById('rootLayout'), btn=document.getElementById('collapseBtn');
+  function apply(state){ layout.classList.toggle('collapsed',state==='collapsed'); btn.setAttribute('aria-pressed',state==='collapsed'); }
+  const saved=localStorage.getItem(key)||'expanded'; apply(saved);
+  btn.addEventListener('click',()=>{ const next=layout.classList.contains('collapsed')?'expanded':'collapsed'; localStorage.setItem(key,next); apply(next); });
+})();
+
+/* Theme toggle (persist) */
+(function(){
+  const root=document.documentElement, key="cc-theme", btn=document.getElementById('themeToggle');
+  function apply(mode){ if(mode==='light'){ root.classList.add('light'); btn.classList.add('on'); btn.setAttribute('aria-pressed','true'); } else { root.classList.remove('light'); btn.classList.remove('on'); btn.setAttribute('aria-pressed','false'); } }
+  const saved=localStorage.getItem(key)||'dark'; apply(saved);
+  btn.addEventListener('click',()=>{ const next=root.classList.contains('light')?'dark':'light'; localStorage.setItem(key,next); apply(next); });
+  if(!localStorage.getItem(key)){ if(window.matchMedia('(prefers-color-scheme: light)').matches){ localStorage.setItem(key,'light'); apply('light'); } }
+})();
+
+/* Period quick chips */
+document.querySelectorAll('[data-period]').forEach(chip=>{
+  chip.addEventListener('click',()=>{
+    const v=chip.getAttribute('data-period'); const sel=document.getElementById('period'); sel.value=v; document.getElementById('periodForm').submit();
+  });
+});
+
+/* Agent table: search & sort */
+(function(){
+  const table=document.getElementById('agentTable'), tbody=table.querySelector('tbody'), rows=Array.from(tbody.querySelectorAll('tr'));
+  const search=document.getElementById('agentSearch'), clear=document.getElementById('clearSearch');
+  function filter(){ const q=search.value.trim().toLowerCase(); rows.forEach(r=>{ r.style.display=r.innerText.toLowerCase().includes(q)?'':'none'; }); }
+  search.addEventListener('input',filter); clear.addEventListener('click',()=>{ search.value=''; filter(); search.focus(); });
+  window.addEventListener('keydown',e=>{ if(e.key==='/'){ e.preventDefault(); search.focus(); } });
+  let state={idx:0,dir:1};
+  table.querySelectorAll('thead th').forEach((th,idx)=>{ th.title='Click to sort'; th.addEventListener('click',()=>{ const type=th.dataset.sort||'text'; const dir=(state.idx===idx?-state.dir:1); state={idx,dir};
+    const visible=rows.filter(r=>r.style.display!=='none');
+    visible.sort((a,b)=>{ const A=a.children[idx].innerText.trim(); const B=b.children[idx].innerText.trim();
+      if(type==='num'){ const nA=parseFloat(A.replace(/[^\d.-]/g,''))||0; const nB=parseFloat(B.replace(/[^\d.-]/g,''))||0; return (nA-nB)*dir; }
+      return A.localeCompare(B)*dir; });
+    visible.forEach(r=>tbody.appendChild(r)); }); });
+})();
+</script>
+{% endblock %}

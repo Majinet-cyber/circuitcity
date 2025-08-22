@@ -1,0 +1,98 @@
+{% comment %}
+Sales list with search and pagination (cap 200 via view).
+Expected context:
+- page_obj (paginated queryset of Sale), url_for (helper), or items fallback
+Fields used: item (-> imei), agent, location, sold_at, price, commission_pct, created_at
+{% endcomment %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Sales</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <style>
+    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; margin: 16px; }
+    header { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+    form.filters { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin: 12px 0; }
+    form.filters input, form.filters select { padding: 6px 8px; }
+    .btn { padding: 6px 10px; border-radius: 8px; border: 1px solid #d1d5db; background: #fff; cursor: pointer; }
+    .btn.primary { background: #111827; color: #fff; border-color: #111827; }
+    table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 14px; }
+    th, td { padding: 8px 10px; border-bottom: 1px solid #eee; vertical-align: middle; }
+    th { text-align: left; background: #fafafa; position: sticky; top: 0; z-index: 1; }
+    .right { text-align: right; }
+    nav.pager { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-top: 12px; }
+    .muted { color: #6b7280; }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1 style="margin:0">Sales</h1>
+</header>
+
+<form class="filters" method="get">
+  <input type="text" name="q" placeholder="Search by IMEI…" value="{{ request.GET.q }}">
+  <label>Rows/page:
+    <input type="number" name="page_size" min="1" max="200"
+           value="{{ page_obj.paginator.per_page if page_obj else 50 }}">
+  </label>
+  <button class="btn primary" type="submit">Apply</button>
+</form>
+
+<table>
+  <thead>
+    <tr>
+      <th>ID</th>
+      <th>IMEI</th>
+      <th>Agent</th>
+      <th>Location</th>
+      <th>Sold at</th>
+      <th class="right">Price</th>
+      <th class="right">Commission %</th>
+      <th class="right">Commission</th>
+      <th>Created</th>
+    </tr>
+  </thead>
+  <tbody>
+  {% with rows=page_obj.object_list|default:items %}
+    {% for s in rows %}
+      <tr>
+        <td>{{ s.id }}</td>
+        <td>{{ s.item.imei }}</td>
+        <td>{{ s.agent.username }}</td>
+        <td>{{ s.location.name }}</td>
+        <td>{{ s.sold_at|date:"Y-m-d" }}</td>
+        <td class="right">{{ s.price|floatformat:0 }}</td>
+        <td class="right">{{ s.commission_pct|floatformat:2 }}</td>
+        <td class="right">
+          {% if s._commission %}{{ s._commission|floatformat:2 }}
+          {% else %}{{ s.commission_amount|floatformat:2 }}{% endif %}
+        </td>
+        <td>{{ s.created_at|date:"Y-m-d H:i" }}</td>
+      </tr>
+    {% empty %}
+      <tr><td colspan="9" class="muted">No sales found.</td></tr>
+    {% endfor %}
+  {% endwith %}
+  </tbody>
+</table>
+
+{% if page_obj %}
+  <nav class="pager">
+    {% if url_for %}
+      {% if page_obj.has_previous %}
+        <a class="btn" href="{{ url_for(page_obj.previous_page_number) }}">Prev</a>
+      {% endif %}
+      <span>Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span>
+      {% if page_obj.has_next %}
+        <a class="btn" href="{{ url_for(page_obj.next_page_number) }}">Next</a>
+      {% endif %}
+    {% else %}
+      <span>Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span>
+    {% endif %}
+  </nav>
+{% endif %}
+
+</body>
+</html>

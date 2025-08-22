@@ -1,0 +1,136 @@
+{% extends "base.html" %}
+{% load static %}
+{% block title %}Time Check-in · Circuit City{% endblock %}
+
+{% block body %}
+<div class="card" style="background:var(--cc-panel);border:1px solid var(--cc-border);border-radius:12px;padding:1rem;">
+  <h2 style="margin:0 0 .75rem 0;">Time Check-in</h2>
+
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;">
+    <section style="border:1px dashed var(--cc-border);border-radius:10px;padding:.75rem;">
+      <h3 style="margin:.25rem 0 .5rem 0;font-size:1rem;color:var(--cc-muted)">Store target</h3>
+      <div><strong>Name:</strong> {{ home_loc.name|default:"(home location not set)" }}</div>
+      <div><strong>Lat/Lon:</strong>
+        {% if home_loc.latitude and home_loc.longitude %}
+          {{ home_loc.latitude }}, {{ home_loc.longitude }}
+        {% else %}
+          —
+        {% endif %}
+      </div>
+      <div><strong>Geofence radius:</strong> {{ home_loc.geofence_radius_m|default:150 }} m</div>
+    </section>
+
+    <section style="border:1px dashed var(--cc-border);border-radius:10px;padding:.75rem;">
+      <h3 style="margin:.25rem 0 .5rem 0;font-size:1rem;color:var(--cc-muted)">Options</h3>
+      <label for="chkType" style="display:block;margin-bottom:.5rem;font-weight:600;">Check-in type</label>
+      <select id="chkType" class="btn" style="width:100%;">
+        <option value="ARRIVAL">Arrival</option>
+        <option value="DEPARTURE">Departure</option>
+      </select>
+      {% if locations %}
+        <label for="locSel" style="display:block;margin:.75rem 0 .5rem 0;font-weight:600;">Location</label>
+        <select id="locSel" class="btn" style="width:100%;">
+          {% for l in locations %}
+            <option value="{{ l.id }}" {% if home_loc and l.id == home_loc.id %}selected{% endif %}>
+              {{ l.name }}{% if l.city %} — {{ l.city }}{% endif %}
+            </option>
+          {% endfor %}
+        </select>
+      {% endif %}
+    </section>
+  </div>
+
+  <div style="display:flex;gap:.75rem;align-items:center;margin-top:1rem;">
+    <button id="doCheckin" class="btn btn-green" style="font-size:1.05rem;padding:.7rem 1.1rem;">⏱ Check-in now</button>
+    <span id="spin" hidden aria-live="polite">Getting GPS…</span>
+  </div>
+
+  <div id="result" style="margin-top:1rem;"></div>
+
+  <details style="margin-top:1rem;">
+    <summary>What happens?</summary>
+    <p>We grab your device GPS (with permission), then send it to
+      <code>/inventory/api/time-checkin/</code>. If your distance to the store is within the
+      geofence, it’s flagged as “on-site”.</p>
+  </details>
+</div>
+
+<script>
+(function(){
+  const $ = (sel)=>document.querySelector(sel);
+  const btn   = $('#doCheckin');
+  const spin  = $('#spin');
+  const out   = $('#result');
+  const type  = $('#chkType');
+  const locSel= $('#locSel');
+
+  function line(label, value){
+    return `<div style="padding:.35rem 0;border-bottom:1px solid var(--cc-border)">
+              <strong>${label}:</strong> ${value}
+            </div>`;
+  }
+
+  async function postCheckin(pos){
+    const body = {
+      checkin_type: (type?.value || 'ARRIVAL'),
+      latitude: pos?.coords?.latitude ?? null,
+      longitude: pos?.coords?.longitude ?? null,
+      accuracy_m: pos?.coords?.accuracy ? Math.round(pos.coords.accuracy) : null
+    };
+    if (locSel) body.location_id = locSel.value;
+
+    const res = await fetch("{% url 'inventory:api_time_checkin' %}", {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body)
+    });
+    return await res.json();
+  }
+
+  function renderResult(data){
+    if (!data.ok){
+      out.innerHTML = `<div class="cc-alert cc-alert-error">
+        <div><strong>Check-in failed:</strong> ${data.error || 'Unknown error'}</div>
+      </div>`;
+      return;
+    }
+    const badge = data.within_geofence
+      ? '<span style="background:#eafff7;border:1px solid #88e0c1;border-radius:999px;padding:.2rem .5rem;">Within geofence</span>'
+      : '<span style="background:#fff3cd;border:1px solid #ffe69c;border-radius:999px;padding:.2rem .5rem;">Outside geofence</span>';
+
+    out.innerHTML = `
+      <div class="cc-alert cc-alert-success">
+        <div><strong>Check-in saved.</strong> ${badge}</div>
+      </div>
+      <div style="border:1px solid var(--cc-border);border-radius:10px;padding:.6rem;">
+        ${line('Logged at', new Date(data.logged_at).toLocaleString())}
+        ${line('Type', data.checkin_type)}
+        ${line('Location', data.location || '—')}
+        ${line('Distance', (data.distance_m ?? '—') + (data.distance_m !== null ? ' m' : ''))}
+      </div>
+    `;
+  }
+
+  btn?.addEventListener('click', ()=>{
+    out.textContent = '';
+    spin.hidden = false;
+    if (!navigator.geolocation){
+      spin.hidden = true;
+      out.innerHTML = '<div class="cc-alert cc-alert-error"><div>GPS not supported in this browser.</div></div>';
+      return;
+    }
+    navigator.geolocation.getCurrentPosition(async (pos)=>{
+      try{
+        const data = await postCheckin(pos);
+        renderResult(data);
+      } catch(e){
+        out.innerHTML = '<div class="cc-alert cc-alert-error"><div>Network error while saving.</div></div>';
+      } finally { spin.hidden = true; }
+    }, (err)=>{
+      spin.hidden = true;
+      out.innerHTML = `<div class="cc-alert cc-alert-error"><div>GPS error: ${err.message}</div></div>`;
+    }, { enableHighAccuracy:true, maximumAge:0, timeout:12000 });
+  });
+})();
+</script>
+{% endblock %}

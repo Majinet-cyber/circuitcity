@@ -1,0 +1,88 @@
+{% extends "base.html" %}
+{% block title %}Edit Stock · Circuit City{% endblock %}
+
+{% block body %}
+<div class="bg" style="min-height:100dvh;padding:2rem">
+  <div class="card" style="max-width:720px;width:100%;margin-inline:auto;padding:1.25rem">
+    <h2 class="brand" style="margin:0 0 1rem">Edit Stock Item</h2>
+
+    {% if messages %}
+      {% for message in messages %}
+        <div style="margin:.5rem 0;padding:.7rem 1rem;border-radius:.75rem;
+                    {% if message.tags == 'error' %}
+                      background:#fee2e2;border:1px solid #fecaca;color:#7f1d1d;
+                    {% else %}
+                      background:#e7f1ff;border:1px solid #cfe2ff;color:#102a7a;
+                    {% endif %}">
+          {{ message }}
+        </div>
+      {% endfor %}
+    {% endif %}
+
+    <p style="margin:.25rem 0 1rem;color:#475569">
+      <strong>IMEI:</strong> {{ item.imei }} &nbsp;·&nbsp;
+      <strong>Product:</strong> {{ item.product }}
+    </p>
+
+    {# Non-field errors #}
+    {% if form.non_field_errors %}
+      <div style="margin:.5rem 0;padding:.7rem 1rem;border-radius:.75rem;background:#fee2e2;border:1px solid #fecaca;color:#7f1d1d;">
+        {{ form.non_field_errors }}
+      </div>
+    {% endif %}
+
+    <form method="post" novalidate style="display:grid;gap:1rem">
+      {% csrf_token %}
+
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem">
+        <div>
+          <label style="display:block;margin-bottom:.35rem;color:#334155;font-weight:600">Status</label>
+          {{ form.status }}
+          {% if form.status.errors %}<div style="color:#b91c1c">{{ form.status.errors|striptags }}</div>{% endif %}
+        </div>
+        <div>
+          <label style="display:block;margin-bottom:.35rem;color:#334155;font-weight:600">Received at</label>
+          {{ form.received_at }}
+          {% if form.received_at.errors %}<div style="color:#b91c1c">{{ form.received_at.errors|striptags }}</div>{% endif %}
+        </div>
+      </div>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem">
+        <div>
+          <label style="display:block;margin-bottom:.35rem;color:#334155;font-weight:600">Order price</label>
+          {{ form.order_price }}
+          {% if form.order_price.errors %}<div style="color:#b91c1c">{{ form.order_price.errors|striptags }}</div>{% endif %}
+        </div>
+        <div>
+          <label style="display:block;margin-bottom:.35rem;color:#334155;font-weight:600">Selling price</label>
+          {{ form.selling_price }}
+          {% if form.selling_price.errors %}<div style="color:#b91c1c">{{ form.selling_price.errors|striptags }}</div>{% endif %}
+        </div>
+      </div>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem">
+        <div>
+          <label style="display:block;margin-bottom:.35rem;color:#334155;font-weight:600">Location</label>
+          {{ form.current_location }}
+          {% if form.current_location.errors %}<div style="color:#b91c1c">{{ form.current_location.errors|striptags }}</div>{% endif %}
+        </div>
+        <div>
+          <label style="display:block;margin-bottom:.35rem;color:#334155;font-weight:600">Assigned agent</label>
+          {{ form.assigned_agent }}
+          {% if form.assigned_agent.errors %}<div style="color:#b91c1c">{{ form.assigned_agent.errors|striptags }}</div>{% endif %}
+        </div>
+      </div>
+
+      {# Keep read-only fields in the form (disabled in ModelForm) #}
+      <div style="display:none">
+        {{ form.imei }} {{ form.product }}
+      </div>
+
+      <div style="display:flex;gap:.6rem;flex-wrap:wrap;margin-top:.25rem">
+        <button class="btn" type="submit">Save changes</button>
+        <a class="btn" href="{% url 'stock_list' %}" style="background:#64748b">Cancel</a>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}
