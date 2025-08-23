@@ -2,6 +2,8 @@
 from django.urls import path
 from django.views.generic import RedirectView
 from . import views
+# ADDED: lightweight API module for predictions
+from . import api  # make sure inventory/api.py defines predictions_summary
 
 # Namespace so {% url 'inventory:...' %} works
 app_name = "inventory"
@@ -52,7 +54,7 @@ urlpatterns = [
     path("healthz/", views.healthz, name="healthz"),
 ]
 
-# ---------- API: Time, Wallet, Charts ----------
+# ---------- API: Time, Wallet, Charts, Predictions ----------
 urlpatterns += [
     path("api/mark-sold/",       views.api_mark_sold,        name="api_mark_sold"),
     path("api/sales-trend/",     views.api_sales_trend,      name="api_sales_trend"),
@@ -62,4 +64,7 @@ urlpatterns += [
     path("api/time-checkin/",    views.api_time_checkin,     name="api_time_checkin"),
     path("api/wallet-summary/",  views.api_wallet_summary,   name="api_wallet_summary"),
     path("api/wallet-txn/",      views.api_wallet_add_txn,   name="api_wallet_add_txn"),
+
+    # ADDED: Predictive analytics endpoint used by the dashboard AI card
+    path("api/predictions/",     api.predictions_summary,    name="api_predictions"),
 ]

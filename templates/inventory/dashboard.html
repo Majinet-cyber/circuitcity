@@ -1,20 +1,25 @@
 <!DOCTYPE html>
-<html lang="en">
+<!-- ADDED: start on rotating theme system -->
+<html lang="en" data-theme="style-1">
 <head>
   <meta charset="UTF-8" />
   <title>Dashboard · Circuit City</title>
 
-  <!-- Mobile-friendly viewport (prevents iOS zoom on inputs) -->
+  <!-- Mobile-friendly viewport -->
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
   <meta name="color-scheme" content="light dark" />
+  <!-- ADDED: browser toolbar color per theme -->
+  <meta name="theme-color" content="#0b5bd3" />
 
   <!-- Bootstrap / Icons -->
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
   <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
 
   <style>
-    /* ===== Theme ===== */
+    /* ===== Themeable design tokens ===== */
     :root{
+      /* base (fallbacks) */
+      --bg:#f6f9ff;
       --blue-700:#1d4ed8;
       --blue-600:#2563eb;
       --blue-500:#3b82f6;
@@ -25,62 +30,89 @@
       --line:#e2e8f0;
       --chip:#f1f5f9;
       --ring:0 0 0 .25rem rgba(59,130,246,.25);
+      --chart-grid: rgba(2,6,23,.06);
     }
-    body{ background:#f6f9ff; -webkit-tap-highlight-color:transparent; }
+
+    /* ADDED: 3 themes (style-1 light, style-2 dark, style-3 midnight) */
+    html[data-theme="style-1"]{
+      --bg:#f6f9ff;
+      --card:#ffffff;
+      --line:#e2e8f0;
+      --ink:#0f172a; --muted:#64748b;
+      --blue-700:#1d4ed8; --blue-600:#2563eb; --blue-500:#3b82f6; --blue-400:#60a5fa;
+      --chart-grid: rgba(2,6,23,.06);
+    }
+    html[data-theme="style-2"]{
+      --bg:#0b1220;
+      --card:#0e1629;
+      --line:#20324d;
+      --ink:#e5e7eb; --muted:#a8b3cf;
+      --blue-700:#1342b8; --blue-600:#3c82ff; --blue-500:#5aa0ff; --blue-400:#8fc3ff;
+      --ring:0 0 0 .25rem rgba(90,160,255,.28);
+      --chart-grid: #1a2a45;
+    }
+    html[data-theme="style-3"]{
+      --bg:#0b1222;
+      --card:#0f1b30;
+      --line:#223454;
+      --ink:#e7ecfb; --muted:#9fb0cf;
+      --blue-700:#0e7a63; --blue-600:#10b981; --blue-500:#34d399; --blue-400:#6ee7b7; /* teal accent theme */
+      --ring:0 0 0 .25rem rgba(16,185,129,.28);
+      --chart-grid: #1b2b48;
+    }
+
+    body{ background:var(--bg); color:var(--ink); -webkit-tap-highlight-color:transparent; }
     input, select, textarea, button { font-size:16px; }
 
     .cc-shell { min-height:100dvh; display:flex; flex-direction:column; }
     .cc-page{ max-width:1200px; width:100%; margin:0 auto; padding:0.75rem; padding-bottom:calc(76px + env(safe-area-inset-bottom)); }
 
-    /* --- header / top spacing (fixes blank area on right) --- */
+    /* header / top spacing */
     .cc-header {
       position:sticky; top:0; z-index:1030;
       backdrop-filter:blur(10px);
-      background:rgba(255,255,255,.7);
+      background:color-mix(in oklab, var(--card) 85%, transparent);
       border-bottom:1px solid var(--line);
     }
     .cc-header .cc-page{ padding-top:.5rem; padding-bottom:.25rem; }
 
-    .cc-title{ font-weight:800; letter-spacing:.2px; margin:0; }
-    .cc-title .emoji{ filter: drop-shadow(0 6px 10px rgba(37,99,235,.25)); }
+    .cc-title{ font-weight:800; letter-spacing:.2px; margin:0; color:var(--blue-600); }
+    .cc-title .emoji{ filter: drop-shadow(0 6px 10px color-mix(in oklab, var(--blue-600) 25%, transparent)); }
 
-    /* Toolbar makes the header content fit perfectly on mobile */
-    .cc-toolbar{
-      display:grid; grid-template-columns:1fr auto; gap:.5rem; align-items:center;
-    }
+    .cc-toolbar{ display:grid; grid-template-columns:1fr auto; gap:.5rem; align-items:center; }
     .cc-toolbar .actions{ display:flex; flex-wrap:wrap; gap:.5rem; align-items:center; justify-content:flex-end; }
     @media (max-width:576px){
       .cc-toolbar{ grid-template-columns:1fr; }
       .cc-toolbar .actions{ justify-content:flex-start; }
     }
 
-    /* Premium chips for quick links (“Home”, “Dashboard”) */
     .crumbs{ display:flex; flex-wrap:wrap; gap:.5rem; margin-top:.5rem; }
     .crumbs a{
-      text-decoration:none; font-weight:700; color:#0f172a;
-      background:#fff; border:1px solid var(--line); border-radius:999px;
+      text-decoration:none; font-weight:700; color:var(--ink);
+      background:var(--card); border:1px solid var(--line); border-radius:999px;
       padding:.45rem .8rem; display:inline-flex; align-items:center; gap:.5rem;
       box-shadow:0 6px 18px rgba(16,24,40,.06);
     }
     .crumbs a:hover{ filter:brightness(1.03); transform:translateY(-1px); transition:all .12s ease; }
 
-    /* Small menu chip */
     .cc-menu-btn{
       width:42px; height:42px; border-radius:12px; display:grid; place-items:center;
-      border:1px solid var(--line); background:#fff; box-shadow:0 6px 18px rgba(16,24,40,.06);
+      border:1px solid var(--line); background:var(--card); box-shadow:0 6px 18px rgba(16,24,40,.06);
+      color:var(--ink);
     }
 
     .btn-primary{ background:var(--blue-600); border-color:var(--blue-600); }
     .btn-primary:hover{ background:var(--blue-700); border-color:var(--blue-700); }
     .btn-outline-primary{ color:var(--blue-600); border-color:var(--blue-600); }
     .btn-outline-primary:hover{ color:#fff; background:var(--blue-600); border-color:var(--blue-600); }
+    .form-select{ background:var(--card); color:var(--ink); border-color:var(--line); }
     .form-select:focus{ box-shadow:var(--ring); border-color:var(--blue-500); }
 
     .kpi-card{
       background:linear-gradient(135deg, var(--blue-600), var(--blue-400));
       color:#fff; border:0; border-radius:16px;
       padding:1rem 1.1rem;
-      box-shadow:0 10px 25px rgba(37,99,235,.25);
+      box-shadow:0 10px 25px color-mix(in oklab, var(--blue-600) 30%, transparent);
       min-height:92px;
       transform:translateY(6px); opacity:0;
       transition:transform .5s ease, opacity .5s ease;
@@ -95,18 +127,17 @@
       border-radius:16px;
       box-shadow:0 6px 18px rgba(16,24,40,.06);
       transform:translateY(8px); opacity:0;
-      transition:transform .55s ease, opacity .55s ease;
+      transition:transform .55s ease, opacity .55s ease, background-color .25s linear, border-color .25s linear;
+      color:var(--ink);
     }
     .cc-card.in { transform:translateY(0); opacity:1; }
-    .cc-card h5{ margin-bottom:.75rem; font-weight:700; }
+    .cc-card h5{ margin-bottom:.75rem; font-weight:700; color:var(--ink); }
 
     .wallet-chip{
-      display:inline-block;
-      font-weight:700; font-size:.85rem;
+      display:inline-block; font-weight:700; font-size:.85rem;
       border-radius:999px; padding:.2rem .55rem;
       background:var(--chip); border:1px solid var(--line); color:var(--ink);
-      white-space:nowrap;
-      transition:transform .15s ease;
+      white-space:nowrap; transition:transform .15s ease;
     }
     .wallet-chip.loading{ color:var(--muted) }
     .wallet-chip.positive{ background:#ecfdf5; border-color:#a7f3d0; color:#065f46 }
@@ -134,23 +165,21 @@
     .fill-mildgreen{ background:#22c55e }
     .fill-lightgreen{ background:#86efac }
 
-    .table thead th{ white-space:nowrap; cursor:pointer }
+    .table thead th{ white-space:nowrap; cursor:pointer; color:var(--muted); }
     .sortable::after{ content:' ↕'; opacity:.35; font-weight:normal }
-    .table>tbody>tr>td{ vertical-align:middle }
+    .table>tbody>tr>td{ vertical-align:middle; color:var(--ink); }
 
     .chart-canvas{ width:100% !important; max-width:100%; height:260px !important }
     .chart-canvas--sm{ height:200px !important }
 
     .cc-bottom-nav{
       position:fixed; left:0; right:0; bottom:0; z-index:1030;
-      background:rgba(255,255,255,.95);
+      background:color-mix(in oklab, var(--card) 95%, transparent);
       border-top:1px solid var(--line);
       backdrop-filter:blur(10px);
       padding: .35rem .5rem calc(.35rem + env(safe-area-inset-bottom));
     }
-    .cc-bottom-nav .tab{
-      flex:1; text-align:center; font-size:.8rem; color:#334155; text-decoration:none;
-    }
+    .cc-bottom-nav .tab{ flex:1; text-align:center; font-size:.8rem; color:#334155; text-decoration:none; }
     .cc-bottom-nav .tab .bi{ font-size:1.35rem; display:block; line-height:1; }
     .cc-bottom-nav .tab.active{ color:var(--blue-600); font-weight:600; }
 
@@ -158,7 +187,7 @@
       position:fixed; right:18px; bottom:88px; z-index:1031;
       width:56px; height:56px; border-radius:16px;
       background:var(--blue-600); color:#fff; border:0;
-      box-shadow:0 10px 25px rgba(37,99,235,.25);
+      box-shadow:0 10px 25px color-mix(in oklab, var(--blue-600) 30%, transparent);
     }
     .cc-fab:active{ transform:translateY(1px) }
 
@@ -175,6 +204,16 @@
 
     /* Prevent any sideways scroll on small screens */
     html, body { max-width:100%; overflow-x:hidden; }
+
+    /* ADDED: tiny floating theme controller */
+    .theme-controls{
+      position:fixed; right:12px; bottom:12px; z-index:2000;
+      display:flex; gap:.5rem;
+    }
+    .theme-controls button{
+      background:var(--card); color:var(--ink); border:1px solid var(--line);
+      border-radius:10px; padding:.4rem .6rem;
+    }
   </style>
 </head>
 <body>
@@ -184,24 +223,21 @@
     <header class="cc-header">
       <div class="cc-page">
         <div class="cc-toolbar">
-          <h1 class="cc-title text-primary"><span class="emoji">📊</span> Dashboard</h1>
+          <h1 class="cc-title"><span class="emoji">📊</span> Dashboard</h1>
 
           <!-- Actions: collapsible menu + Home -->
           <div class="actions">
-            <!-- Collapsible offcanvas trigger -->
             <button class="cc-menu-btn" type="button"
                     data-bs-toggle="offcanvas" data-bs-target="#ccMenu" aria-controls="ccMenu" aria-label="Menu">
               <i class="bi bi-list fs-5"></i>
             </button>
 
-            <!-- Home button -->
             <a class="btn btn-outline-primary btn-sm" href="/inventory/list/" title="Go to Stock List">
               <i class="bi bi-house"></i><span class="d-none d-sm-inline"> Home</span>
             </a>
           </div>
         </div>
 
-        <!-- premium “chips” quick links -->
         <nav class="crumbs" aria-label="Quick links">
           <a href="/inventory/list/"><i class="bi bi-house-door"></i> Home</a>
           <a href="/inventory/dashboard/"><i class="bi bi-speedometer2"></i> Dashboard</a>
@@ -235,6 +271,12 @@
           <div class="alert {% if message.tags == 'error' %}alert-danger{% elif message.tags == 'success' %}alert-success{% else %}alert-info{% endif %}">{{ message }}</div>
         {% endfor %}
       {% endif %}
+
+      <!-- ADDED: AI Recommendations card (predictive analytics) -->
+      <div class="cc-card p-3 mb-3 will-animate">
+        <h5>AI Recommendations</h5>
+        <div id="ai-recos">Loading…</div>
+      </div>
 
       <!-- KPIs -->
       <div class="row g-3 mb-3">
@@ -394,7 +436,7 @@
     </main>
 
     {% if is_manager_or_admin %}
-    <!-- Wallet Modal -->
+    <!-- Wallet Modal (unchanged) -->
     <div class="modal fade" id="walletModal" tabindex="-1" aria-labelledby="walletModalLabel" aria-hidden="true">
       <div class="modal-dialog">
         <div class="modal-content">
@@ -426,7 +468,7 @@
     </div>
     {% endif %}
 
-    <!-- Offcanvas Menu -->
+    <!-- Offcanvas Menu (unchanged) -->
     <div class="offcanvas offcanvas-start" tabindex="-1" id="ccMenu" aria-labelledby="ccMenuLabel">
       <div class="offcanvas-header">
         <h5 class="offcanvas-title" id="ccMenuLabel">Menu</h5>
@@ -446,7 +488,7 @@
       </div>
     </div>
 
-    <!-- Mobile Bottom Tabs -->
+    <!-- Mobile Bottom Tabs (unchanged) -->
     <nav class="cc-bottom-nav d-lg-none" aria-label="Primary">
       <div class="d-flex align-items-center">
         <a class="tab active" href="/"><i class="bi bi-speedometer2"></i>Home</a>
@@ -457,17 +499,24 @@
       </div>
     </nav>
 
-    <!-- Floating Action: go straight to Scan SOLD -->
+    <!-- Floating Action (unchanged) -->
     <button class="cc-fab d-lg-none" onclick="location.href='/inventory/scan-sold/'" aria-label="Scan SOLD">
       <i class="bi bi-qr-code-scan fs-4"></i>
     </button>
+
+    <!-- ADDED: floating theme controller -->
+    <div class="theme-controls">
+      <button id="theme-prev" type="button" title="Prev theme">◀</button>
+      <button id="theme-toggle-rotate" type="button" title="Auto rotate">Auto: Off</button>
+      <button id="theme-next" type="button" title="Next theme">▶</button>
+    </div>
   </div>
 
   <!-- Bootstrap JS -->
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 
-  <!-- Chart.js loaded at the bottom so it's definitely ready for our inline script -->
   {% if is_manager_or_admin %}
+  <!-- Chart.js -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <script id="chart-payload" type="application/json">
   {
@@ -480,7 +529,7 @@
   {% endif %}
 
   <script>
-    /* ===== tiny table sorter ===== */
+    /* ===== tiny table sorter (unchanged) ===== */
     function makeSortable(tableId){
       const table = document.getElementById(tableId);
       if(!table) return;
@@ -502,14 +551,14 @@
     makeSortable('tblAgents');
     makeSortable('tblAgentStock');
 
-    /* ===== number formatter ===== */
+    /* ===== number formatter (unchanged) ===== */
     const nf = new Intl.NumberFormat();
     document.querySelectorAll('.num').forEach(el=>{
       const v = Number(el.getAttribute('data-value') || '0');
       el.textContent = nf.format(v);
     });
 
-    /* ===== Count-up for KPI values ===== */
+    /* ===== Count-up for KPI values (unchanged) ===== */
     function countUp(el, to){
       const dur = 600; const start = performance.now();
       const from = 0;
@@ -525,7 +574,7 @@
       countUp(el, to);
     });
 
-    /* ===== Wallet chips (ajax) ===== */
+    /* ===== Wallet chips (unchanged) ===== */
     async function loadWalletChips(){
       const chips = document.querySelectorAll('.wallet-chip');
       if(!chips.length) return;
@@ -556,7 +605,7 @@
     loadWalletChips();
 
     {% if is_manager_or_admin %}
-    /* ===== Wallet modal ===== */
+    /* ===== Wallet modal (unchanged) ===== */
     const walletModal = document.getElementById('walletModal');
     const wm = walletModal ? new bootstrap.Modal(walletModal) : null;
 
@@ -583,7 +632,8 @@
       wm.show();
     }
 
-    /* ===== Charts: safe init after everything is ready ===== */
+    /* ===== Charts: theme-aware ===== */
+    let charts = [];
     function initChartsSafely(){
       if(!window.Chart) { console.warn('Chart.js not ready'); return; }
 
@@ -599,13 +649,20 @@
       const pieData       = (payload.crp     || []).map(v=>Number(v)||0);
 
       const nf = new Intl.NumberFormat();
-      const colorRevenue = 'rgba(59,130,246,0.85)';
-      const colorProfit  = 'rgba(16,185,129,0.85)';
+
+      function getThemeColors(){
+        const s=getComputedStyle(document.documentElement);
+        const revenue = s.getPropertyValue('--blue-600').trim() || 'rgba(59,130,246,0.85)';
+        const profit  = s.getPropertyValue('--blue-500').trim() || 'rgba(16,185,129,0.85)';
+        const grid    = s.getPropertyValue('--chart-grid').trim() || 'rgba(2,6,23,.06)';
+        return { revenue, profit, grid };
+      }
+      const colors = getThemeColors();
 
       function makeBar(id,label,data,color){
         const el = document.getElementById(id);
-        if(!el || !labels.length) return;
-        new Chart(el,{
+        if(!el || !labels.length) return null;
+        return new Chart(el,{
           type:'bar',
           data:{ labels, datasets:[{ label, data, backgroundColor:color, borderColor:color, borderWidth:1 }] },
           options:{
@@ -613,7 +670,7 @@
             plugins:{ legend:{ display:false }, tooltip:{ callbacks:{ label:(ctx)=>'MK '+nf.format(ctx.parsed.y) } } },
             scales:{
               x:{ ticks:{ maxRotation:0, autoSkip:true }, grid:{ display:false } },
-              y:{ beginAtZero:true, ticks:{ callback:(v)=> nf.format(v) }, grid:{ color:'rgba(2,6,23,.06)' } }
+              y:{ beginAtZero:true, ticks:{ callback:(v)=> nf.format(v) }, grid:{ color:colors.grid } }
             },
             animation:{ duration:700, easing:'easeOutQuart' }
           }
@@ -621,10 +678,10 @@
       }
       function makePie(id,data){
         const el = document.getElementById(id);
-        if(!el || !data.length) return;
-        new Chart(el,{
+        if(!el || !data.length) return null;
+        return new Chart(el,{
           type:'pie',
-          data:{ labels:['Cost','Revenue','Profit'], datasets:[{ data, backgroundColor:['#94a3b8', colorRevenue, colorProfit] }] },
+          data:{ labels:['Cost','Revenue','Profit'], datasets:[{ data, backgroundColor:['#94a3b8', colors.revenue, colors.profit] }] },
           options:{
             responsive:true, maintainAspectRatio:false,
             plugins:{ legend:{ position:'bottom' }, tooltip:{ callbacks:{ label:(ctx)=>`${ctx.label}: MK ${nf.format(ctx.parsed)}` } } },
@@ -633,16 +690,43 @@
         });
       }
 
+      charts = []; // reset
       if(labels.length && (revenuePoints.length || profitPoints.length)){
-        makeBar('barRevenue','Revenue',revenuePoints,colorRevenue);
-        makeBar('barProfit','Profit',profitPoints,colorProfit);
+        const c1 = makeBar('barRevenue','Revenue',revenuePoints,colors.revenue);
+        const c2 = makeBar('barProfit','Profit',profitPoints,colors.profit);
+        if(c1) charts.push(c1);
+        if(c2) charts.push(c2);
       }
-      if(pieData.length){ makePie('pieCRP',pieData); }
+      if(pieData.length){
+        const c3 = makePie('pieCRP',pieData);
+        if(c3) charts.push(c3);
+      }
     }
     window.addEventListener('load', initChartsSafely);
+
+    /* ADDED: recolor charts when theme changes */
+    window.addEventListener('theme:changed', ()=>{
+      if(!charts.length) return;
+      const s=getComputedStyle(document.documentElement);
+      const revenue = s.getPropertyValue('--blue-600').trim();
+      const profit  = s.getPropertyValue('--blue-500').trim();
+      const grid    = s.getPropertyValue('--chart-grid').trim();
+      charts.forEach(ch=>{
+        if(ch.config.type==='bar'){
+          const label = ch.data.datasets[0].label;
+          const color = label==='Revenue' ? revenue : profit;
+          ch.data.datasets[0].backgroundColor = color;
+          ch.data.datasets[0].borderColor = color;
+          if(ch.options.scales?.y?.grid) ch.options.scales.y.grid.color = grid;
+        }else if(ch.config.type==='pie'){
+          ch.data.datasets[0].backgroundColor = ['#94a3b8', revenue, profit];
+        }
+        ch.update('none');
+      });
+    });
     {% endif %}
 
-    /* Animate in on scroll (cards & KPIs) */
+    /* Animate in on scroll (unchanged) */
     const io = new IntersectionObserver((entries)=>{
       entries.forEach(e=>{
         if(e.isIntersecting){
@@ -653,7 +737,7 @@
     }, { threshold:.1 });
     document.querySelectorAll('.will-animate, .kpi-card, .cc-card').forEach(el=>io.observe(el));
 
-    /* Animate battery fill after paint */
+    /* Animate battery fill (unchanged) */
     window.requestAnimationFrame(()=>{
       const fill = document.getElementById('batteryFill');
       if(fill){
@@ -662,10 +746,79 @@
       }
     });
 
-    /* Optional: register SW (safe no-op if already registered) */
+    /* Optional SW (unchanged) */
     if('serviceWorker' in navigator){
       try{ navigator.serviceWorker.register('/static/sw.js'); }catch(e){}
     }
+
+    /* ===== ADDED: AI Recommendations fetch ===== */
+    (async function(){
+      const box=document.getElementById('ai-recos'); if(!box) return;
+      try{
+        const r=await fetch('/api/predictions/');
+        const d=await r.json();
+        const total=(d.overall||[]).reduce((s,x)=>s+(x.predicted_units||0),0);
+        const revenue=(d.overall||[]).reduce((s,x)=>s+(+x.predicted_revenue||0),0);
+        let html=`<div class="mb-1"><strong>Next 7 days</strong>: <b>${total.toLocaleString()}</b> units • <b>MK ${Math.round(revenue).toLocaleString()}</b></div>`;
+        if((d.risky||[]).length){
+          html+=`<div class="text-muted small">Likely stockouts</div><ul class="mt-1 mb-0">`;
+          for(const x of d.risky){
+            html+=`<li>${x.product}: by <b>${x.stockout_date}</b> • On-hand ${x.on_hand} • Restock <b>${x.suggested_restock}</b> ${x.urgent?'<span class="badge text-bg-danger">URGENT</span>':''}</li>`;
+          }
+          html+=`</ul>`;
+        }else{
+          html+=`<div class="text-success">All good — no stockouts in next 7 days.</div>`;
+        }
+        box.innerHTML=html;
+      }catch(e){
+        box.textContent='Could not load predictions.';
+      }
+    })();
+
+    /* ===== ADDED: Theme rotator (3 styles every 10s) ===== */
+    (function(){
+      const THEMES=["style-1","style-2","style-3"];
+      const KEY="cc-theme", ROTATE="cc-rotate", INTERVAL=10000;
+      const root=document.documentElement;
+      const themeMeta=document.querySelector('meta[name="theme-color"]');
+
+      const btnPrev=document.getElementById('theme-prev');
+      const btnNext=document.getElementById('theme-next');
+      const btnAuto=document.getElementById('theme-toggle-rotate');
+
+      let current = localStorage.getItem(KEY) || root.getAttribute('data-theme') || THEMES[0];
+      let auto = JSON.parse(localStorage.getItem(ROTATE) || 'false');
+      const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+      function apply(t){
+        current=t;
+        root.setAttribute('data-theme', t);
+        localStorage.setItem(KEY, t);
+        if(themeMeta){
+          themeMeta.setAttribute('content',
+            t==="style-2" ? "#0b1220" : (t==="style-3" ? "#0f1b30" : "#0b5bd3"));
+        }
+        window.dispatchEvent(new CustomEvent('theme:changed',{detail:{theme:t}}));
+      }
+      function next(){ apply(THEMES[(THEMES.indexOf(current)+1)%THEMES.length]); }
+      function prev(){ apply(THEMES[(THEMES.indexOf(current)-1+THEMES.length)%THEMES.length]); }
+
+      apply(current);
+
+      function setAuto(v){ auto=v; localStorage.setItem(ROTATE, JSON.stringify(v)); updateBtn(); v?start():stop(); }
+      function updateBtn(){ if(btnAuto) btnAuto.textContent=`Auto: ${auto?"On":"Off"}`; }
+
+      btnNext && btnNext.addEventListener('click', ()=>{ setAuto(false); next(); });
+      btnPrev && btnPrev.addEventListener('click', ()=>{ setAuto(false); prev(); });
+      btnAuto && btnAuto.addEventListener('click', ()=> setAuto(!auto));
+      updateBtn();
+
+      let timer=null;
+      function start(){ if(reduced||!auto) return; stop(); timer=setInterval(next, INTERVAL); }
+      function stop(){ if(timer) clearInterval(timer); timer=null; }
+      document.addEventListener('visibilitychange', ()=> document.hidden?stop():start());
+      window.addEventListener('load', start);
+    })();
   </script>
 </body>
 </html>

@@ -1,10 +1,10 @@
-/* static/css/tokens.css */
-
 /* ----------------------------------------------------------
-   Base design tokens (scale + brand)
+   Circuit City Design Tokens + 3 Themes (rotating-ready)
    ---------------------------------------------------------- */
+
+/* ============ Core brand + scale (unchanged) ============ */
 :root{
-  /* Brand (deeper blue) */
+  /* Brand */
   --brand:#0b5bd3;          /* primary */
   --brand-600:#0a3cd2;
   --brand-50:#eaf2ff;
@@ -40,56 +40,161 @@
   --bp-mobile:768px;
 }
 
-/* Reduce motion – keep */
+/* Reduced motion */
 @media (prefers-reduced-motion: reduce){
   *{animation-duration:.001ms !important;animation-iteration-count:1 !important;transition-duration:.001ms !important;}
 }
 
+/* Smooth theme transitions */
+*{transition:background-color .25s linear, color .25s linear, border-color .25s linear, box-shadow .25s linear}
+
 /* ----------------------------------------------------------
-   Theme tokens used by templates/components (—cc-* variables)
-   Light = deeper blue; Dark = vivid but readable
+   THEME API (what components consume) via --cc-*
+   Themes selected on <html data-theme="style-1|style-2|style-3">
    ---------------------------------------------------------- */
 
-/* LIGHT */
-:root[data-theme="light"]{
-  --cc-bg:#f5f8ff;             /* page background */
-  --cc-panel:var(--surface);   /* cards/nav */
-  --cc-panel-2:#eef4ff;        /* soft panel */
-  --cc-border:#c8d7ff;         /* subtle blue border */
-  --cc-text:#0b1533;           /* strong ink */
-  --cc-muted:#4b5e87;          /* labels/hints */
-  --cc-accent:var(--brand);    /* brand blue */
-  --cc-accent-2:#2f6df6;       /* gradient buddy */
+/* STYLE 1 — Light (deeper blue) */
+:root[data-theme="style-1"]{
+  --cc-bg:#f5f8ff;
+  --cc-panel:var(--surface);
+  --cc-panel-2:#eef4ff;
+  --cc-border:#c8d7ff;
+  --cc-text:#0b1533;
+  --cc-muted:#4b5e87;
+  --cc-accent:var(--brand);
+  --cc-accent-2:#2f6df6;
   --cc-shadow:var(--shadow);
+
+  /* chart tokens */
+  --chart-line: var(--cc-accent);
+  --chart-grid: #d8e3ff;
 }
 
-/* DARK */
-:root[data-theme="dark"]{
-  /* Dark neutrals tuned for contrast on charts + UI */
+/* STYLE 2 — Dark (vivid, readable) */
+:root[data-theme="style-2"]{
   --cc-bg:#0a1022;
   --cc-panel:#0d1730;
   --cc-panel-2:#0f1c3a;
   --cc-border:#1f2c4d;
   --cc-text:#e7ecfb;
   --cc-muted:#a9b5d6;
-
-  /* Accents that pop on dark while matching the brand hue */
   --cc-accent:#5aa0ff;
   --cc-accent-2:#2f6df6;
-
-  /* Slightly crisper shadow on dark */
   --cc-shadow:0 2px 10px rgba(0,0,0,.45),0 8px 30px rgba(0,0,0,.35);
+
+  --chart-line: var(--cc-accent);
+  --chart-grid: #1b2542;
+}
+
+/* STYLE 3 — Midnight Navy (teal accent) */
+:root[data-theme="style-3"]{
+  --cc-bg:#0b1222;
+  --cc-panel:#0e1a2c;
+  --cc-panel-2:#0f2237;
+  --cc-border:#223454;
+  --cc-text:#e6ecfb;
+  --cc-muted:#9fb0cf;
+  --cc-accent:#52d0a3;     /* teal pop */
+  --cc-accent-2:#77e0b7;
+  --cc-shadow:0 2px 12px rgba(0,0,0,.5),0 10px 30px rgba(0,0,0,.35);
+
+  --chart-line: var(--cc-accent);
+  --chart-grid: #1a2a45;
 }
 
 /* ----------------------------------------------------------
-   Optional helpers (can be used across the app)
+   Global/base styles that use the theme
    ---------------------------------------------------------- */
-:root{
-  /* Battery / status colors used by components */
-  --ok:#16a34a;
-  --low:#f59e0b;
-  --critical:#ef4444;
-
-  /* Focus ring unified */
-  --focus-ring:0 0 0 3px color-mix(in oklab, var(--cc-accent) 35%, transparent);
+html, body{height:100%}
+body{
+  background:var(--cc-bg);
+  color:var(--cc-text);
+  font-size:var(--fs-16);
+  -webkit-font-smoothing:antialiased;
+  -moz-osx-font-smoothing:grayscale;
 }
+
+a{color:var(--cc-accent);text-decoration:none}
+a:hover{text-decoration:underline}
+
+/* Containers / cards */
+.card{
+  background:var(--cc-panel);
+  border:1px solid var(--cc-border);
+  border-radius:var(--radius);
+  box-shadow:var(--cc-shadow);
+}
+
+/* Secondary “soft” panel (filters, trays) */
+.panel-soft{
+  background:var(--cc-panel-2);
+  border:1px solid var(--cc-border);
+  border-radius:var(--radius);
+}
+
+/* Buttons */
+.btn{
+  display:inline-flex;align-items:center;gap:.5rem;
+  padding:.55rem .9rem;border-radius:var(--radius-sm);
+  border:1px solid var(--cc-border);background:var(--cc-panel);
+  color:var(--cc-text);cursor:pointer
+}
+.btn:hover{filter:brightness(1.03)}
+.btn:focus{outline:none;box-shadow:0 0 0 3px color-mix(in oklab, var(--cc-accent) 35%, transparent)}
+
+.btn-primary{background:var(--cc-accent);color:#fff;border-color:transparent}
+.btn-primary:hover{filter:brightness(1.05)}
+.btn-ghost{background:transparent;border-color:transparent;color:var(--cc-text)}
+
+/* Inputs */
+.input, select {
+  background:var(--cc-panel);
+  color:var(--cc-text);
+  border:1px solid var(--cc-border);
+  border-radius:var(--radius-sm);
+  padding:.5rem .65rem;
+}
+
+/* Badges */
+.badge{
+  display:inline-flex;align-items:center;gap:.25rem;
+  background:color-mix(in oklab, var(--cc-accent) 20%, transparent);
+  color:var(--cc-accent);
+  border:1px solid color-mix(in oklab, var(--cc-accent) 40%, transparent);
+  padding:.15rem .5rem;border-radius:999px;font-size:var(--fs-12)
+}
+
+/* Charts (generic wrappers) */
+.chart-card .chart{
+  width:100%;height:100%;
+}
+.chart-grid { stroke: var(--chart-grid) }
+
+/* Predictive analytics card */
+.ai-card{
+  background:var(--cc-panel);
+  border:1px solid var(--cc-border);
+  border-radius:var(--radius);
+  padding:var(--sp-5);
+}
+.ai-card .title{font-size:var(--fs-18);font-weight:600}
+.ai-card .ok{color:var(--success)}
+.ai-card .warn{color:var(--warning)}
+.ai-card .crit{color:var(--danger)}
+
+/* Header + quick-actions tray (no layout shift) */
+.app-header{position:sticky;top:0;z-index:1000;background:var(--cc-panel-2);border-bottom:1px solid var(--cc-border)}
+.app-header-inner{position:relative}
+.quick-actions{position:absolute;top:56px;right:12px;z-index:1500;width:max-content}
+
+/* Theme control widget */
+.theme-controls{
+  position:fixed;right:12px;bottom:12px;display:flex;gap:8px;z-index:1600
+}
+.theme-controls button{
+  background:var(--cc-panel);color:var(--cc-text);
+  border:1px solid var(--cc-border);border-radius:10px;padding:6px 10px
+}
+
+/* Safety: avoid side-scroll & keep mobile tidy */
+html, body { overflow-x: hidden; }
