@@ -718,6 +718,13 @@ def inventory_dashboard(request):
             },
         },
     }
+
+    # NEW: feature flags for dashboard UI (non-breaking)
+    context["PREDICTIVE_ENABLED"]   = bool(getattr(settings, "PREDICTIVE_ENABLED", False))
+    context["THEME_ROTATE_ENABLED"] = bool(getattr(settings, "THEME_ROTATE_ENABLED", True))
+    context["THEME_ROTATE_MS"]      = int(getattr(settings, "THEME_ROTATE_MS", 10000))
+    context["THEME_DEFAULT"]        = str(getattr(settings, "THEME_DEFAULT", "style-1"))
+
     cache.set(cache_key, context, 60)
     return _render_dashboard_safe(request, context, today, mtd_count, all_time_count)
 
