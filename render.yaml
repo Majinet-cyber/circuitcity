@@ -6,17 +6,21 @@
     autoDeploy: true
 
     buildCommand: |
+      PIP_NO_INPUT=1
       python3 -m pip install --upgrade pip
       python3 -m pip install -r requirements.txt
       cd circuitcity
       python3 manage.py collectstatic --noinput --settings=cc.settings
       python3 manage.py migrate --noinput --settings=cc.settings
 
-    startCommand: >
-      gunicorn --chdir /opt/render/project/src/circuitcity
-      cc.wsgi:application
-      --workers=${WEB_CONCURRENCY:-2} --threads=4 --timeout=120 --log-file -
+    startCommand: |
+      cd circuitcity && gunicorn cc.wsgi:application \
+        --workers=${WEB_CONCURRENCY:-2} --threads=4 --timeout=120 --log-file -
 
     envVars:
+      - key: PYTHON_VERSION
+        value: 3.12.4
+      - key: PIP_DISABLE_PIP_VERSION_CHECK
+        value: "1"
       - key: DJANGO_SETTINGS_MODULE
         value: cc.settings
