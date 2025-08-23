@@ -6,12 +6,17 @@ services:
     autoDeploy: true
 
     buildCommand: |
-      pip install --upgrade pip
-      pip install -r requirements.txt
-      python manage.py collectstatic --noinput --settings=cc.settings
-      python manage.py migrate --noinput --settings=cc.settings
+      python3 -m pip install --upgrade pip
+      python3 -m pip install -r requirements.txt
+      cd circuitcity
+      python3 manage.py collectstatic --noinput --settings=cc.settings
+      python3 manage.py migrate --noinput --settings=cc.settings
 
     startCommand: >
-      gunicorn --chdir /opt/render/project/src
+      gunicorn --chdir /opt/render/project/src/circuitcity
       cc.wsgi:application
       --workers=${WEB_CONCURRENCY:-2} --threads=4 --timeout=120 --log-file -
+
+    envVars:
+      - key: DJANGO_SETTINGS_MODULE
+        value: cc.settings
