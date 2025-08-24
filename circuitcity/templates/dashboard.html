@@ -1,370 +1,506 @@
-﻿{% extends "base.html" %}
-{% load static humanize %}
-{% block title %}Dashboard · Circuit City{% endblock %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Dashboard · Circuit City</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
 
-{% block extra_css %}
-<style>
-  /* Match Stock List palette (light & dark) */
-  :root[data-theme="light"]{
-    --deep-bg:#eef5ff;
-    --deep-panel:#ffffff;
-    --deep-panel-2:#f2f7ff;
-    --deep-border:#cfe0ff;
-    --deep-accent:#2f6df6;
-    --deep-accent-2:#46c0ff;
-    --cc-text:#0e1320;
-    --cc-muted:#566181;
-  }
-  :root[data-theme="dark"]{
-    --deep-bg:#0a1222;
-    --deep-panel:#0d162b;
-    --deep-panel-2:#0f1b33;
-    --deep-border:#21375c;
-    --deep-accent:#76a9ff;
-    --deep-accent-2:#4ecbff;
-    --cc-text:#e8ecf8;
-    --cc-muted:#aab7d6;
-  }
+  <!-- Bootstrap / Chart.js -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <script defer src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
-  .dash{padding:1rem 1rem 2rem}
-  .h2{margin:.2rem 0 1rem;font-weight:800}
-  .pillrow{display:flex;gap:.5rem;flex-wrap:wrap;margin:0 0 .75rem}
-  .pill{display:inline-flex;align-items:center;gap:.4rem;padding:.45rem .7rem;border-radius:.6rem;background:var(--deep-panel-2);border:1px solid var(--deep-border);font-weight:700;color:var(--cc-text)}
-  .pill strong{font-weight:800}
+  <style>
+    /* ===== Blue theme ===== */
+    :root{
+      --blue-700:#1d4ed8;
+      --blue-600:#2563eb;
+      --blue-500:#3b82f6;
+      --blue-400:#60a5fa;
+      --ink:#0f172a;
+      --muted:#64748b;
+      --card:#ffffff;
+      --line:#e2e8f0;
+      --chip:#f1f5f9;
+      --ring:0 0 0 .25rem rgba(59,130,246,.25);
+    }
+    body{ background:#f6f9ff; }
+    .cc-page{ max-width:1200px; margin:0 auto; padding:1rem; }
 
-  .cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px}
-  .card{background:var(--deep-panel);border:1px solid var(--deep-border);border-radius:14px;padding:14px}
-  .muted{color:var(--cc-muted)}
-  .big{font-size:1.6rem;font-weight:800;letter-spacing:.2px}
+    .cc-title{ font-weight:800; letter-spacing:.2px; }
+    .cc-title .emoji{ filter: drop-shadow(0 6px 10px rgba(37,99,235,.25)); }
 
-  .grid-2{display:grid;grid-template-columns:2fr 1.2fr;gap:14px;margin-top:12px}
-  @media (max-width:980px){.grid-2{grid-template-columns:1fr}}
+    .btn-primary{ background:var(--blue-600); border-color:var(--blue-600); }
+    .btn-primary:hover{ background:var(--blue-700); border-color:var(--blue-700); }
+    /* keep outline style but match your blue */
+    .btn-outline-primary{ color:var(--blue-600); border-color:var(--blue-600); }
+    .btn-outline-primary:hover{ color:#fff; background:var(--blue-600); border-color:var(--blue-600); }
 
-  .meter{height:12px;background:var(--deep-panel-2);border:1px solid var(--deep-border);border-radius:999px;position:relative;overflow:hidden}
-  .meter > i{position:absolute;top:0;left:0;height:100%;border-radius:999px;background:var(--deep-accent)}
+    .form-select:focus{ box-shadow:var(--ring); border-color:var(--blue-500); }
 
-  .charts{display:grid;grid-template-columns:1.4fr 1fr;gap:14px;margin-top:14px}
-  @media (max-width:980px){.charts{grid-template-columns:1fr}}
-  .chart-card{background:var(--deep-panel-2);border:1px solid var(--deep-border);border-radius:14px;padding:12px}
-  .chart-card h3{margin:.25rem 0 .6rem;font-size:.95rem;color:var(--cc-muted)}
-  .toolbar{display:flex;gap:.5rem;align-items:center;justify-content:flex-end}
-  select{padding:.45rem .55rem;border-radius:.45rem;border:1px solid var(--deep-border);background:var(--deep-panel);color:var(--cc-text)}
+    /* KPI cards */
+    .kpi-card{
+      background:linear-gradient(135deg, var(--blue-600), var(--blue-400));
+      color:#fff;
+      border:0; border-radius:16px;
+      padding:1rem 1.1rem;
+      box-shadow:0 10px 25px rgba(37,99,235,.25);
+      min-height:92px;
+    }
+    .kpi-card .label{ font-size:.9rem; opacity:.9 }
+    .kpi-card .value{ font-size:1.65rem; font-weight:800; line-height:1; }
 
-  /* reliable canvas height + empty state */
-  .chart-holder{position:relative;height:260px}
-  .chart-empty{
-    position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
-    color:var(--cc-muted);font-weight:700;pointer-events:none
-  }
-  @media (max-width:980px){
-    .chart-holder{height:240px}
-  }
-</style>
-{% endblock %}
+    /* Normal cards */
+    .cc-card{
+      background:var(--card);
+      border:1px solid var(--line);
+      border-radius:16px;
+      box-shadow:0 6px 18px rgba(16,24,40,.06);
+    }
+    .cc-card h5{ margin-bottom:.75rem; font-weight:700; }
 
-{% block body %}
-<div class="dash">
-  <h2 class="h2">Key metrics</h2>
+    /* Wallet chips */
+    .wallet-chip{
+      display:inline-block;
+      font-weight:700; font-size:.85rem;
+      border-radius:999px; padding:.2rem .55rem;
+      background:var(--chip); border:1px solid var(--line); color:var(--ink);
+      white-space:nowrap;
+    }
+    .wallet-chip.loading{ color:var(--muted) }
+    .wallet-chip.positive{ background:#ecfdf5; border-color:#a7f3d0; color:#065f46 }
+    .wallet-chip.negative{ background:#fef2f2; border-color:#fecaca; color:#991b1b }
 
-  <!-- KPI pills -->
-  <div class="pillrow">
-    <span class="pill">Scope: <strong>{{ kpis.scope|default:"—" }}</strong></span>
-    <span class="pill">Today: <strong>{{ kpis.today_count|default:0|intcomma }}</strong></span>
-    <span class="pill">MTD: <strong>{{ kpis.month_count|default:0|intcomma }}</strong></span>
-    <span class="pill">All-time: <strong>{{ kpis.all_count|default:0|intcomma }}</strong></span>
-    {% if staff_view %}
-      <span class="pill">In stock: <strong>{{ in_stock_total|default:0|intcomma }}</strong></span>
-    {% else %}
-      <span class="pill">In stock: <strong>{{ agent_battery.count|default:0|intcomma }}</strong></span>
-    {% endif %}
-  </div>
+    /* Battery stock */
+    .battery-wrap{ position:relative; width:90px; }
+    .battery{
+      height:180px; width:90px;
+      border:2px solid #334155; border-radius:16px;
+      position:relative; overflow:hidden; background:#f8fafc;
+      box-shadow:inset 0 0 8px rgba(0,0,0,.08);
+    }
+    .battery-cap{
+      position:absolute; top:-12px; left:50%; transform:translateX(-50%);
+      width:36px; height:10px; border:2px solid #334155; border-bottom:none;
+      border-radius:8px 8px 0 0; background:#f8fafc;
+    }
+    .battery-fill{
+      position:absolute; bottom:0; left:0; right:0;
+      height:0%; transition:height .35s ease, background-color .25s ease;
+    }
+    .fill-red{ background:#ef4444 }
+    .fill-yellow{ background:#f59e0b }
+    .fill-mildgreen{ background:#22c55e }
+    .fill-lightgreen{ background:#86efac }
 
-  <!-- Battery + Wallet row -->
-  <div class="grid-2">
-    <!-- Battery -->
-    <div class="card">
-      <div class="muted" style="font-weight:800;margin:0 0 .4rem">
-        {% if staff_view %}Global stock battery{% else %}My stock battery{% endif %}
+    /* Tables */
+    .table thead th{ white-space:nowrap; cursor:pointer }
+    .sortable::after{ content:' ↕'; opacity:.35; font-weight:normal }
+    .table>tbody>tr>td{ vertical-align:middle }
+
+    /* Charts */
+    .chart-canvas{ width:100% !important; max-width:100%; height:260px !important }
+    .chart-canvas--sm{ height:200px !important }
+
+    @media (max-width: 992px){
+      .cc-page{ padding:.75rem }
+      .kpi-card .value{ font-size:1.45rem }
+      .chart-canvas{ height:220px !important }
+    }
+  </style>
+</head>
+<body>
+  <div class="cc-page">
+
+    <!-- Header -->
+    <div class="d-flex flex-wrap align-items-center justify-content-between mb-3">
+      <h1 class="cc-title text-primary mb-2"><span class="emoji">📊</span> Dashboard</h1>
+
+      <!-- ADDED: Actions (Menu + Home) kept in your blue theme -->
+      <div class="d-flex align-items-center gap-2 mb-2">
+        <!-- Menu (offcanvas) -->
+        <button class="btn btn-outline-primary btn-sm" type="button"
+                data-bs-toggle="offcanvas" data-bs-target="#ccMenu" aria-controls="ccMenu">
+          ☰ Menu
+        </button>
+        <!-- Home -->
+        <a class="btn btn-outline-primary btn-sm" href="/inventory/list/" title="Go to Stock List">Home</a>
       </div>
-      {% if staff_view %}
-        {% with pct=battery.pct|default:0 label=battery.label|default:"" count=battery.count|default:0 max=battery.max|default:100 %}
-          <div class="meter" aria-label="Stock meter">
-            <i style="width:{% firstof pct 0 %}%; background:{% if pct < 20 %}#ef4444{% elif pct < 60 %}#f59e0b{% else %}#22c55e{% endif %}"></i>
-          </div>
-          <div class="muted" style="margin-top:.4rem">{{ count|intcomma }} / {{ max|intcomma }} ({{ pct }}%) · {{ label }}</div>
-        {% endwith %}
-      {% else %}
-        {% with pct=agent_battery.pct|default:0 label=agent_battery.label|default:"" count=agent_battery.count|default:0 max=agent_battery.max|default:20 %}
-          <div class="meter" aria-label="Stock meter">
-            <i style="width:{% firstof pct 0 %}%; background:{% if pct < 20 %}#ef4444{% elif pct < 60 %}#f59e0b{% else %}#22c55e{% endif %}"></i>
-          </div>
-          <div class="muted" style="margin-top:.4rem">{{ count|intcomma }} / {{ max|intcomma }} ({{ pct }}%) · {{ label }}</div>
-        {% endwith %}
-      {% endif %}
+
+      <form method="get" class="d-flex gap-2 align-items-center flex-wrap">
+        <select name="period" class="form-select form-select-sm" style="width:auto">
+          <option value="month" {% if period == "month" %}selected{% endif %}>This month</option>
+          <option value="all" {% if period == "all" %}selected{% endif %}>All time</option>
+        </select>
+
+        <select name="model" class="form-select form-select-sm" style="min-width:240px">
+          <option value="">All models</option>
+          {% for p in products %}
+            <option value="{{ p.id }}" {% if model_id == p.id %}selected{% endif %}>
+              {{ p.brand }} {{ p.model }}{% if p.variant %} {{ p.variant }}{% endif %}
+            </option>
+          {% endfor %}
+        </select>
+
+        <button class="btn btn-primary btn-sm" type="submit">Apply</button>
+      </form>
     </div>
 
-    <!-- Wallet -->
-    {% if wallet %}
-    <div class="card">
-      <div class="muted" style="font-weight:800;margin:0 0 .4rem">My wallet</div>
-      <div class="big">MK {{ wallet.balance|floatformat:0|intcomma }}</div>
-      <div class="muted" style="margin-top:.35rem">
-        {{ wallet.month_label|default:"This month" }} ·
-        Comm {{ wallet.month.commission|floatformat:0|intcomma }}
-        {% if wallet.month.advance %} · Adv {{ wallet.month.advance|floatformat:0|intcomma }}{% endif %}
-        {% if wallet.month.adjustment %} · Adj {{ wallet.month.adjustment|floatformat:0|intcomma }}{% endif %}
-        · <strong>Total {{ wallet.month.total|floatformat:0|intcomma }}</strong>
-      </div>
-      {% if wallet_url %}
-        <div style="margin-top:.6rem">
-          <a href="{{ wallet_url }}" class="muted" style="text-decoration:underline">Open wallet →</a>
+    {% if messages %}
+      {% for message in messages %}
+        <div class="alert {% if message.tags == 'error' %}alert-danger{% elif message.tags == 'success' %}alert-success{% else %}alert-info{% endif %}">{{ message }}</div>
+      {% endfor %}
+    {% endif %}
+
+    <!-- KPIs -->
+    <div class="row g-3 mb-3">
+      <div class="col-6 col-md-3">
+        <div class="kpi-card h-100">
+          <div class="label">Sold today</div>
+          <div class="value">{{ today_count|default:"0" }}</div>
         </div>
+      </div>
+      <div class="col-6 col-md-3">
+        <div class="kpi-card h-100">
+          <div class="label">Sold this month</div>
+          <div class="value">{{ mtd_count|default:"0" }}</div>
+        </div>
+      </div>
+      <div class="col-6 col-md-3">
+        <div class="kpi-card h-100">
+          <div class="label">All-time sales</div>
+          <div class="value">{{ all_time_count|default:"0" }}</div>
+        </div>
+      </div>
+      <div class="col-6 col-md-3">
+        <div class="cc-card p-3 h-100">
+          <div class="text-muted small fw-semibold">My Wallet ({{ wallet.month.month_label }})</div>
+          <div class="fs-4 fw-bold">MK {{ wallet.balance|default:0|floatformat:0 }}</div>
+          <div class="d-flex justify-content-between small mt-1"><span>Commission</span><strong>MK {{ wallet.month.commission|default:0|floatformat:0 }}</strong></div>
+          <div class="d-flex justify-content-between small"><span>Advance</span><strong>MK {{ wallet.month.advance|default:0|floatformat:0 }}</strong></div>
+          <div class="d-flex justify-content-between small"><span>Adjustment</span><strong>MK {{ wallet.month.adjustment|default:0|floatformat:0 }}</strong></div>
+          <div class="d-flex justify-content-between small"><span>Total (month)</span><strong>MK {{ wallet.month.total|default:0|floatformat:0 }}</strong></div>
+          <a class="btn btn-sm btn-outline-secondary w-100 mt-2" href="/inventory/wallet/">Open Wallet</a>
+        </div>
+      </div>
+    </div>
+
+    <!-- Row 1 -->
+    <div class="row g-3 mb-3">
+      <div class="col-lg-6">
+        <div class="cc-card p-3 h-100">
+          <h5>Top Agents (earnings first, then sales)</h5>
+          {% if agent_rank %}
+            <div class="table-responsive">
+              <table id="tblAgents" class="table table-sm align-middle">
+                <thead class="table-light">
+                  <tr>
+                    <th class="sortable" data-type="text">Agent</th>
+                    <th class="text-end sortable" data-type="num">Earnings</th>
+                    <th class="text-end sortable" data-type="num">Sales</th>
+                    <th class="text-end sortable" data-type="num">Revenue</th>
+                    <th class="text-end">Wallet</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {% for r in agent_rank %}
+                    <tr>
+                      <td>
+                        {% if is_manager_or_admin %}
+                          <a href="#" class="agent-link agent-detail" data-user-id="{{ r.agent_id }}" data-username="{{ r.agent__username }}">{{ r.agent__username }}</a>
+                        {% else %}
+                          {{ r.agent__username }}
+                        {% endif %}
+                      </td>
+                      <!-- number spans use JS to add thousand separators without needing {% load humanize %} -->
+                      <td class="text-end"><span class="num" data-value="{{ r.earnings|default:0 }}"></span></td>
+                      <td class="text-end"><span class="num" data-value="{{ r.total_sales|default:0 }}"></span></td>
+                      <td class="text-end"><span class="num" data-value="{{ r.revenue|default:0 }}"></span></td>
+                      <td class="text-end">
+                        <span class="wallet-chip loading" data-user-id="{{ r.agent_id }}" data-username="{{ r.agent__username }}">…</span>
+                      </td>
+                    </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+          {% else %}
+            <div class="text-muted">No sales found for this period.</div>
+          {% endif %}
+        </div>
+      </div>
+
+      {% if is_manager_or_admin %}
+      <div class="col-lg-3">
+        <div class="cc-card p-3 h-100">
+          <h5>Cost vs Revenue vs Profit</h5>
+          <canvas id="pieCRP" class="chart-canvas chart-canvas--sm"></canvas>
+        </div>
+      </div>
       {% endif %}
-    </div>
-    {% endif %}
-  </div>
 
-  {% if staff_view %}
-    <!-- Monthly profit (admin only) -->
-    <div class="card" style="margin-top:14px">
-      <div class="muted" style="font-weight:800;margin:0 0 .4rem">Monthly profit</div>
-      <div class="big">MK {{ monthly_profit|floatformat:0|intcomma }}</div>
-    </div>
-
-    <!-- Active agents -->
-    <div class="card" style="margin-top:14px">
-      <div class="muted" style="font-weight:800;margin:0 0 .4rem">Active agents</div>
-      <div class="cards">
-        {% for a in agents %}
-          <a href="{{ a.url }}" class="card" style="text-decoration:none;color:inherit">
-            <div style="display:flex;align-items:center;gap:.6rem">
-              <div style="width:36px;height:36px;border-radius:999px;background:var(--deep-panel-2);border:1px solid var(--deep-border);display:grid;place-items:center;font-weight:800">{{ a.initials }}</div>
-              <div>
-                <div style="font-weight:700">{{ a.name }}</div>
-                <div class="muted">MTD: {{ a.mtd_amount|floatformat:0|intcomma }} · Sales: {{ a.mtd_count|intcomma }}</div>
+      <div class="col-lg-3">
+        <div class="cc-card p-3 h-100">
+          <h5>Stock Level</h5>
+          <div class="d-flex align-items-center gap-3">
+            <div class="battery-wrap">
+              <div class="battery-cap"></div>
+              <div class="battery">
+                <div class="battery-fill
+                  {% if jug_color == 'red' %}fill-red{% elif jug_color == 'yellow' %}fill-yellow{% elif jug_color == 'mildgreen' %}fill-mildgreen{% else %}fill-lightgreen{% endif %}"
+                  style="height: {{ jug_fill_pct }}%;"></div>
               </div>
             </div>
-          </a>
-        {% empty %}
-          <div class="muted">No agents yet.</div>
-        {% endfor %}
-      </div>
-    </div>
-  {% endif %}
-
-  <!-- Charts -->
-  <div class="charts">
-    <div class="chart-card">
-      <div style="display:flex;justify-content:space-between;align-items:center">
-        <h3>Profits</h3>
-        <div class="toolbar">
-          <select id="profitMonth">
-            <option value="">This month</option>
-          </select>
-          <select id="profitGroup">
-            <option value="">By month</option>
-            <option value="model">By model (this month)</option>
-          </select>
+            <div>
+              <div class="fw-semibold fs-5">{{ jug_count }} in stock</div>
+              <div class="text-muted small">100 = full, ≤20 = critical</div>
+            </div>
+          </div>
         </div>
-      </div>
-      <div class="chart-holder">
-        <canvas id="profitChart" height="120" aria-label="Profits chart" role="img"></canvas>
-        <div id="profitEmpty" class="chart-empty" hidden>No data yet</div>
       </div>
     </div>
 
-    <div class="chart-card">
-      <div style="display:flex;justify-content:space-between;align-items:center">
-        <h3>Agent performance trend</h3>
-        <div class="toolbar">
-          <select id="trendMetric">
-            <option value="sales" selected>Sales</option>
-            <option value="profit">Profit</option>
-          </select>
-          <select id="trendMonths">
-            <option value="3">Last 3 months</option>
-            <option value="6" selected>Last 6 months</option>
-            <option value="12">Last 12 months</option>
-          </select>
+    {% if is_manager_or_admin %}
+    <!-- Row 2 -->
+    <div class="row g-3 mb-3">
+      <div class="col-lg-6">
+        <div class="cc-card p-3">
+          <h5>Revenue (last 12 months)</h5>
+          <canvas id="barRevenue" class="chart-canvas"></canvas>
         </div>
       </div>
-      <div class="chart-holder">
-        <canvas id="agentTrend" height="120" aria-label="Agent trend chart" role="img"></canvas>
-        <div id="trendEmpty" class="chart-empty" hidden>No data yet</div>
+      <div class="col-lg-6">
+        <div class="cc-card p-3">
+          <h5>Profit (last 12 months)</h5>
+          <canvas id="barProfit" class="chart-canvas"></canvas>
+        </div>
+      </div>
+    </div>
+    {% endif %}
+
+    <!-- Row 3 -->
+    <div class="cc-card p-3">
+      <h5>Agents: Total Stock vs Sold Units</h5>
+      {% if agent_rows %}
+        <div class="table-responsive">
+          <table id="tblAgentStock" class="table table-sm align-middle">
+            <thead class="table-light">
+              <tr>
+                <th class="sortable" data-type="text">Agent</th>
+                <th class="text-end sortable" data-type="num">Total Stock</th>
+                <th class="text-end sortable" data-type="num">
+                  Sold Units ({% if period == "month" %}this month{% else %}all time{% endif %})
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for row in agent_rows %}
+              <tr>
+                <td>{{ row.agent }}</td>
+                <td class="text-end"><span class="num" data-value="{{ row.total_stock|default:0 }}"></span></td>
+                <td class="text-end"><span class="num" data-value="{{ row.sold_units|default:0 }}"></span></td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      {% else %}
+        <div class="text-muted">No agent stock data.</div>
+      {% endif %}
+    </div>
+  </div>
+
+  {% if is_manager_or_admin %}
+  <!-- Wallet Modal -->
+  <div class="modal fade" id="walletModal" tabindex="-1" aria-labelledby="walletModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title" id="walletModalLabel">Wallet · <span id="wmName">Agent</span></h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+          <div class="d-flex flex-column gap-2">
+            <div class="d-flex justify-content-between">
+              <span class="text-muted">Current balance</span>
+              <strong id="wmBalance">—</strong>
+            </div>
+            <div class="d-flex justify-content-between">
+              <span class="text-muted">This month (net wallet activity)</span>
+              <strong id="wmMonth">—</strong>
+            </div>
+            <div class="small text-muted mt-2">
+              Tip: For full COM / ADV / ADJ breakdown and lifetime commissions, open the Wallet page.
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <a id="wmLink" href="#" class="btn btn-outline-secondary" target="_blank" rel="noopener">Open Wallet</a>
+          <button type="button" class="btn btn-primary" data-bs-dismiss="modal">Close</button>
+        </div>
       </div>
     </div>
   </div>
-</div>
-{% endblock %}
+  {% endif %}
 
-{% block extra_js %}
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-<script>
-(function(){
-  // Colors from CSS variables
-  const cs = getComputedStyle(document.documentElement);
-  const css = (v, fb) => (cs.getPropertyValue(v) || fb).trim();
-  const GRID   = css('--deep-border', '#d1d5db');
-  const TICK   = css('--cc-muted',    '#6b7280');
-  const TEXT   = css('--cc-text',     '#111827');
-  const ACCENT = css('--deep-accent', '#3b82f6');
-  const ACCENT_BG = 'rgba(47,109,246,0.15)';
+  <!-- ADDED: Offcanvas Menu (works on mobile & desktop) -->
+  <div class="offcanvas offcanvas-start" tabindex="-1" id="ccMenu" aria-labelledby="ccMenuLabel">
+    <div class="offcanvas-header">
+      <h5 class="offcanvas-title" id="ccMenuLabel">Menu</h5>
+      <button type="button" class="btn-close text-reset" data-bs-dismiss="offcanvas" aria-label="Close"></button>
+    </div>
+    <div class="offcanvas-body">
+      <div class="list-group">
+        <a class="list-group-item list-group-item-action" href="/inventory/list/">Stock List</a>
+        <a class="list-group-item list-group-item-action" href="/inventory/scan-in/">Scan IN</a>
+        <a class="list-group-item list-group-item-action" href="/inventory/scan-sold/">Scan SOLD</a>
+        <a class="list-group-item list-group-item-action" href="/inventory/scan-web/">Scan (Web)</a>
+        <a class="list-group-item list-group-item-action" href="/inventory/time-checkin/">Time Check-in</a>
+        <a class="list-group-item list-group-item-action" href="/inventory/time-logs/">Time Logs</a>
+        <a class="list-group-item list-group-item-action" href="/inventory/wallet/">Wallet</a>
+        <a class="list-group-item list-group-item-action" href="/admin/">Django Admin</a>
+      </div>
+    </div>
+  </div>
 
-  // Base chart options (visible gridlines)
-  const baseOptions = {
-    responsive: true,
-    maintainAspectRatio: false,
-    animation: false,
-    interaction: { mode: 'index', intersect: false },
-    elements: { line: { tension: .25, borderWidth: 2 }, point: { radius: 2, hitRadius: 8 } },
-    scales: {
-      x: {
-        grid:  { display: true, color: GRID, borderColor: GRID, tickColor: TICK },
-        ticks: { color: TICK, autoSkip: true, maxRotation: 0 }
-      },
-      y: {
-        beginAtZero: true,
-        grid:  { display: true, color: GRID, borderColor: GRID, tickColor: TICK },
-        ticks: { color: TICK }
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+  <script>
+    /* ===== tiny table sorter ===== */
+    function makeSortable(tableId){
+      const table = document.getElementById(tableId);
+      if(!table) return;
+      const getCell = (tr,i)=> tr.children[i]?.innerText?.trim() ?? '';
+      const cmp = (i,type,asc)=>(a,b)=>{
+        const A = getCell(asc?a:b,i), B = getCell(asc?b:a,i);
+        if(type==='num'){ return (parseFloat(A.replace(/,/g,''))||0) - (parseFloat(B.replace(/,/g,''))||0); }
+        return A.localeCompare(B);
+      };
+      table.querySelectorAll('th.sortable').forEach((th,i)=>{
+        let asc = true;
+        th.addEventListener('click', ()=>{
+          const type = th.dataset.type || 'text';
+          const tbody = table.tBodies[0];
+          Array.from(tbody.querySelectorAll('tr')).sort(cmp(i,type,asc=!asc)).forEach(tr=>tbody.appendChild(tr));
+        });
+      });
+    }
+    makeSortable('tblAgents');
+    makeSortable('tblAgentStock');
+
+    /* ===== number formatter (adds thousand separators) ===== */
+    const nf = new Intl.NumberFormat();
+    document.querySelectorAll('.num').forEach(el=>{
+      const v = Number(el.getAttribute('data-value') || '0');
+      el.textContent = nf.format(v);
+    });
+
+    /* ===== formatters ===== */
+    function fmtnum(n){ return (new Intl.NumberFormat()).format(n||0); }
+    function mk(n){ return 'MK ' + fmtnum(n); }
+
+    /* ===== wallet chips ===== */
+    async function loadWalletChips(){
+      const chips = document.querySelectorAll('.wallet-chip');
+      if(!chips.length) return;
+      for(const chip of chips){
+        const uid = chip.getAttribute('data-user-id');
+        if(!uid){ chip.textContent='—'; chip.classList.remove('loading'); continue; }
+        try{
+          const res = await fetch(`/inventory/api/wallet-summary/?user_id=${encodeURIComponent(uid)}`);
+          const data = await res.json();
+          if(data && data.ok){
+            const bal = Number(data.balance||0);
+            chip.textContent = mk(bal);
+            chip.classList.remove('loading');
+            chip.classList.toggle('positive', bal>=0);
+            chip.classList.toggle('negative', bal<0);
+            {% if is_manager_or_admin %}
+            chip.style.cursor='pointer';
+            chip.addEventListener('click', ()=>openWalletModal(uid, chip.getAttribute('data-username')));
+            {% endif %}
+          }else{
+            chip.textContent='—'; chip.classList.remove('loading');
+          }
+        }catch{
+          chip.textContent='—'; chip.classList.remove('loading');
+        }
       }
-    },
-    plugins: {
-      legend:  { labels: { color: TEXT } },
-      tooltip: { titleColor: TEXT, bodyColor: TEXT }
     }
-  };
+    loadWalletChips();
 
-  const profitCtx = document.getElementById('profitChart')?.getContext('2d');
-  const trendCtx  = document.getElementById('agentTrend')?.getContext('2d');
-  let profitChart = null, trendChart = null;
+    {% if is_manager_or_admin %}
+    /* ===== wallet modal ===== */
+    const walletModal = document.getElementById('walletModal');
+    const wm = walletModal ? new bootstrap.Modal(walletModal) : null;
 
-  function showEmpty(id, show){
-    const el = document.getElementById(id);
-    if (el) el.hidden = !show;
-  }
-  const sum = (arr)=> (arr||[]).reduce((a,b)=>a+(+b||0),0);
-  const nocache = () => `&_=${Date.now()}`;
+    async function openWalletModal(userId, username){
+      if(!wm) return;
+      document.getElementById('wmName').textContent = username||'Agent';
+      document.getElementById('wmBalance').textContent = '…';
+      document.getElementById('wmMonth').textContent = '…';
+      document.getElementById('wmLink').href = `/inventory/wallet/?user_id=${encodeURIComponent(userId)}`;
 
-  // Try a list of candidate API paths (covers old & new endpoints)
-  async function tryFetchJson(candidates){
-    for (const u of candidates){
       try{
-        const res = await fetch(u + (u.includes('?') ? '&' : '?') + nocache().slice(2));
-        if (!res.ok) continue;
-        const data = await res.json();
-        // expect {labels:[], data:[]} or {labels:[], values:[]}
-        if (data && (Array.isArray(data.data) || Array.isArray(data.values))) return data;
-      }catch(e){ /* try next */ }
-    }
-    return null;
-  }
+        const r = await fetch(`/inventory/api/wallet-summary/?user_id=${encodeURIComponent(userId)}`);
+        const d = await r.json();
+        document.getElementById('wmBalance').textContent = (d&&d.ok) ? mk(Number(d.balance||0)) : '—';
+      }catch{ document.getElementById('wmBalance').textContent = '—'; }
 
-  function basePath(){
-    // e.g. /inventory/dashboard/ -> /inventory/
-    const p = location.pathname;
-    const i = p.indexOf('/inventory/');
-    return i >= 0 ? '/inventory/' : '/';
-  }
+      try{
+        const now=new Date(), y=now.getFullYear(), m=(now.getMonth()+1).toString().padStart(2,'0');
+        const r2 = await fetch(`/inventory/api/wallet-summary/?user_id=${encodeURIComponent(userId)}&year=${y}&month=${m}`);
+        const d2 = await r2.json();
+        document.getElementById('wmMonth').textContent = (d2&&d2.ok&&'month_sum' in d2) ? mk(Number(d2.month_sum||0)) : '—';
+      }catch{ document.getElementById('wmMonth').textContent = '—'; }
 
-  async function loadProfit(){
-    if (!profitCtx) return;
-    const month = document.getElementById('profitMonth').value;
-    const group = document.getElementById('profitGroup').value;
-
-    const b = basePath();
-    const qs = [];
-    if (month) qs.push('month='+encodeURIComponent(month));
-    if (group) qs.push('group_by='+encodeURIComponent(group));
-    const q = qs.length ? '?'+qs.join('&') : '';
-
-    const data = await tryFetchJson([
-      b + 'api_profit_bar/' + q,     // new
-      b + 'profit_data/' + q,        // legacy name
-      b + 'api_profit_bar'  + q,
-      b + 'profit_data'      + q
-    ]);
-
-    if (!data){
-      showEmpty('profitEmpty', true);
-      profitChart && profitChart.destroy();
-      return;
+      wm.show();
     }
 
-    const values = (data.data || data.values || []).map(v=>+v||0);
-    showEmpty('profitEmpty', !data.labels?.length || sum(values) === 0);
+    /* ===== charts (guarded) ===== */
+    const labels         = {{ labels_json|safe }};
+    const revenuePoints  = {{ revenue_points_json|safe }};
+    const profitPoints   = {{ profit_points_json|safe }};
+    const pieData        = {{ pie_data_json|safe }};
+    const colorRevenue   = 'rgba(59,130,246,0.85)';  /* blue */
+    const colorProfit    = 'rgba(16,185,129,0.85)';  /* green */
 
-    const options = JSON.parse(JSON.stringify(baseOptions));
-    const isBar = !!group;
-    profitChart && profitChart.destroy();
-    profitChart = new Chart(profitCtx, {
-      type: isBar ? 'bar' : 'line',
-      data: {
-        labels: data.labels || [],
-        datasets: [{
-          label: 'Profit',
-          data: values,
-          borderColor: ACCENT,
-          backgroundColor: isBar ? ACCENT : ACCENT_BG,
-          fill: !isBar
-        }]
-      },
-      options
-    });
-  }
-
-  async function loadTrend(){
-    if (!trendCtx) return;
-    const metric = document.getElementById('trendMetric').value;
-    const months = document.getElementById('trendMonths').value;
-
-    const b = basePath();
-    const q = `?metric=${encodeURIComponent(metric)}&months=${encodeURIComponent(months)}`;
-
-    const data = await tryFetchJson([
-      b + 'api_agent_trend/'     + q,  // new
-      b + 'agent_trend_data/'    + q,  // legacy
-      b + 'api_agent_trend'      + q,
-      b + 'agent_trend_data'     + q
-    ]);
-
-    if (!data){
-      showEmpty('trendEmpty', true);
-      trendChart && trendChart.destroy();
-      return;
+    function makeBar(id, label, data, color){
+      const el = document.getElementById(id);
+      if(!el) return;
+      new Chart(el, {
+        type:'bar',
+        data:{ labels, datasets:[{ label, data, backgroundColor:color, borderColor:color, borderWidth:1 }] },
+        options:{
+          responsive:true,
+          maintainAspectRatio:false,   // <<< more responsive in tight spaces
+          plugins:{ legend:{ display:false }, tooltip:{ callbacks:{ label:(ctx)=> mk(ctx.parsed.y) } } },
+          scales:{
+            x:{ ticks:{ maxRotation:0, autoSkip:true }, grid:{ display:false } },
+            y:{ beginAtZero:true, ticks:{ callback:(v)=> fmtnum(v) }, grid:{ color:'rgba(2,6,23,.06)' } }
+          }
+        }
+      });
+    }
+    function makePie(id, data){
+      const el = document.getElementById(id);
+      if(!el) return;
+      new Chart(el, {
+        type:'pie',
+        data:{ labels:['Cost','Revenue','Profit'], datasets:[{ data, backgroundColor:['#94a3b8', colorRevenue, colorProfit] }] },
+        options:{
+          responsive:true,
+          maintainAspectRatio:false,
+          plugins:{
+            legend:{ position:'bottom' },
+            tooltip:{ callbacks:{ label:(ctx)=> `${ctx.label}: ${mk(ctx.parsed)}` } }
+          }
+        }
+      });
     }
 
-    const values = (data.data || data.values || []).map(v=>+v||0);
-    showEmpty('trendEmpty', !data.labels?.length || sum(values) === 0);
-
-    const options = JSON.parse(JSON.stringify(baseOptions));
-    trendChart && trendChart.destroy();
-    trendChart = new Chart(trendCtx, {
-      type: 'line',
-      data: {
-        labels: data.labels || [],
-        datasets: [{
-          label: metric === 'profit' ? 'Profit' : 'Trend',
-          data: values,
-          borderColor: ACCENT,
-          backgroundColor: ACCENT_BG,
-          fill: true
-        }]
-      },
-      options
-    });
-  }
-
-  document.getElementById('profitGroup').addEventListener('change', loadProfit);
-  document.getElementById('profitMonth').addEventListener('change', loadProfit);
-  document.getElementById('trendMetric').addEventListener('change', loadTrend);
-  document.getElementById('trendMonths').addEventListener('change', loadTrend);
-
-  // Build charts after full load so mobile canvas sizes are final
-  window.addEventListener('load', () => {
-    if (typeof Chart === 'undefined') return;
-    loadProfit();
-    loadTrend();
-  });
-})();
-</script>
-{% endblock %}
+    makeBar('barRevenue', 'Revenue', revenuePoints, colorRevenue);
+    makeBar('barProfit',  'Profit',  profitPoints,  colorProfit);
+    makePie('pieCRP', pieData);
+    {% endif %}
+  </script>
+</body>
+</html>
