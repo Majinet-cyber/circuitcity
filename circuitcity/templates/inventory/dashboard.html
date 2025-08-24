@@ -1,17 +1,26 @@
 <!DOCTYPE html>
-<html lang="en">
+<!-- PROBE: NEW DASHBOARD v2.5 -->
+<!-- ADDED: start on rotating theme system -->
+<html lang="en" data-theme="style-1">
 <head>
   <meta charset="UTF-8" />
   <title>Dashboard · Circuit City</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
 
-  <!-- Bootstrap / Chart.js -->
+  <!-- Mobile-friendly viewport -->
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+  <meta name="color-scheme" content="light dark" />
+  <!-- ADDED: browser toolbar color per theme -->
+  <meta name="theme-color" content="#0b5bd3" />
+
+  <!-- Bootstrap / Icons -->
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-  <script defer src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
 
   <style>
-    /* ===== Blue theme ===== */
+    /* ===== Themeable design tokens ===== */
     :root{
+      /* base (fallbacks) */
+      --bg:#f6f9ff;
       --blue-700:#1d4ed8;
       --blue-600:#2563eb;
       --blue-500:#3b82f6;
@@ -22,55 +31,120 @@
       --line:#e2e8f0;
       --chip:#f1f5f9;
       --ring:0 0 0 .25rem rgba(59,130,246,.25);
+      --chart-grid: rgba(2,6,23,.06);
     }
-    body{ background:#f6f9ff; }
-    .cc-page{ max-width:1200px; margin:0 auto; padding:1rem; }
 
-    .cc-title{ font-weight:800; letter-spacing:.2px; }
-    .cc-title .emoji{ filter: drop-shadow(0 6px 10px rgba(37,99,235,.25)); }
+    /* ADDED: 3 themes (style-1 light, style-2 dark, style-3 midnight) */
+    html[data-theme="style-1"]{
+      --bg:#f6f9ff;
+      --card:#ffffff;
+      --line:#e2e8f0;
+      --ink:#0f172a; --muted:#64748b;
+      --blue-700:#1d4ed8; --blue-600:#2563eb; --blue-500:#3b82f6; --blue-400:#60a5fa;
+      --chart-grid: rgba(2,6,23,.06);
+    }
+    html[data-theme="style-2"]{
+      --bg:#0b1220;
+      --card:#0e1629;
+      --line:#20324d;
+      --ink:#e5e7eb; --muted:#a8b3cf;
+      --blue-700:#1342b8; --blue-600:#3c82ff; --blue-500:#5aa0ff; --blue-400:#8fc3ff;
+      --ring:0 0 0 .25rem rgba(90,160,255,.28);
+      --chart-grid: #1a2a45;
+    }
+    html[data-theme="style-3"]{
+      --bg:#0b1222;
+      --card:#0f1b30;
+      --line:#223454;
+      --ink:#e7ecfb; --muted:#9fb0cf;
+      --blue-700:#0e7a63; --blue-600:#10b981; --blue-500:#34d399; --blue-400:#6ee7b7; /* teal accent theme */
+      --ring:0 0 0 .25rem rgba(16,185,129,.28);
+      --chart-grid: #1b2b48;
+    }
+
+    body{ background:var(--bg); color:var(--ink); -webkit-tap-highlight-color:transparent; }
+    input, select, textarea, button { font-size:16px; }
+
+    .cc-shell { min-height:100dvh; display:flex; flex-direction:column; }
+    .cc-page{ max-width:1200px; width:100%; margin:0 auto; padding:0.75rem; padding-bottom:calc(76px + env(safe-area-inset-bottom)); }
+
+    /* header / top spacing */
+    .cc-header {
+      position:sticky; top:0; z-index:1030;
+      backdrop-filter:blur(10px);
+      background:color-mix(in oklab, var(--card) 85%, transparent);
+      border-bottom:1px solid var(--line);
+    }
+    .cc-header .cc-page{ padding-top:.5rem; padding-bottom:.25rem; }
+
+    .cc-title{ font-weight:800; letter-spacing:.2px; margin:0; color:var(--blue-600); }
+    .cc-title .emoji{ filter: drop-shadow(0 6px 10px color-mix(in oklab, var(--blue-600) 25%, transparent)); }
+
+    .cc-toolbar{ display:grid; grid-template-columns:1fr auto; gap:.5rem; align-items:center; }
+    .cc-toolbar .actions{ display:flex; flex-wrap:wrap; gap:.5rem; align-items:center; justify-content:flex-end; }
+    @media (max-width:576px){
+      .cc-toolbar{ grid-template-columns:1fr; }
+      .cc-toolbar .actions{ justify-content:flex-start; }
+    }
+
+    .crumbs{ display:flex; flex-wrap:wrap; gap:.5rem; margin-top:.5rem; }
+    .crumbs a{
+      text-decoration:none; font-weight:700; color:var(--ink);
+      background:var(--card); border:1px solid var(--line); border-radius:999px;
+      padding:.45rem .8rem; display:inline-flex; align-items:center; gap:.5rem;
+      box-shadow:0 6px 18px rgba(16,24,40,.06);
+    }
+    .crumbs a:hover{ filter:brightness(1.03); transform:translateY(-1px); transition:all .12s ease; }
+
+    .cc-menu-btn{
+      width:42px; height:42px; border-radius:12px; display:grid; place-items:center;
+      border:1px solid var(--line); background:var(--card); box-shadow:0 6px 18px rgba(16,24,40,.06);
+      color:var(--ink);
+    }
 
     .btn-primary{ background:var(--blue-600); border-color:var(--blue-600); }
     .btn-primary:hover{ background:var(--blue-700); border-color:var(--blue-700); }
-    /* keep outline style but match your blue */
     .btn-outline-primary{ color:var(--blue-600); border-color:var(--blue-600); }
     .btn-outline-primary:hover{ color:#fff; background:var(--blue-600); border-color:var(--blue-600); }
-
+    .form-select{ background:var(--card); color:var(--ink); border-color:var(--line); }
     .form-select:focus{ box-shadow:var(--ring); border-color:var(--blue-500); }
 
-    /* KPI cards */
     .kpi-card{
       background:linear-gradient(135deg, var(--blue-600), var(--blue-400));
-      color:#fff;
-      border:0; border-radius:16px;
+      color:#fff; border:0; border-radius:16px;
       padding:1rem 1.1rem;
-      box-shadow:0 10px 25px rgba(37,99,235,.25);
+      box-shadow:0 10px 25px color-mix(in oklab, var(--blue-600) 30%, transparent);
       min-height:92px;
+      transform:translateY(6px); opacity:0;
+      transition:transform .5s ease, opacity .5s ease;
     }
+    .kpi-card.in { transform:translateY(0); opacity:1; }
     .kpi-card .label{ font-size:.9rem; opacity:.9 }
     .kpi-card .value{ font-size:1.65rem; font-weight:800; line-height:1; }
 
-    /* Normal cards */
     .cc-card{
       background:var(--card);
       border:1px solid var(--line);
       border-radius:16px;
       box-shadow:0 6px 18px rgba(16,24,40,.06);
+      transform:translateY(8px); opacity:0;
+      transition:transform .55s ease, opacity .55s ease, background-color .25s linear, border-color .25s linear;
+      color:var(--ink);
     }
-    .cc-card h5{ margin-bottom:.75rem; font-weight:700; }
+    .cc-card.in { transform:translateY(0); opacity:1; }
+    .cc-card h5{ margin-bottom:.75rem; font-weight:700; color:var(--ink); }
 
-    /* Wallet chips */
     .wallet-chip{
-      display:inline-block;
-      font-weight:700; font-size:.85rem;
+      display:inline-block; font-weight:700; font-size:.85rem;
       border-radius:999px; padding:.2rem .55rem;
       background:var(--chip); border:1px solid var(--line); color:var(--ink);
-      white-space:nowrap;
+      white-space:nowrap; transition:transform .15s ease;
     }
     .wallet-chip.loading{ color:var(--muted) }
     .wallet-chip.positive{ background:#ecfdf5; border-color:#a7f3d0; color:#065f46 }
     .wallet-chip.negative{ background:#fef2f2; border-color:#fecaca; color:#991b1b }
+    .wallet-chip:active { transform:scale(.98); }
 
-    /* Battery stock */
     .battery-wrap{ position:relative; width:90px; }
     .battery{
       height:180px; width:90px;
@@ -85,286 +159,378 @@
     }
     .battery-fill{
       position:absolute; bottom:0; left:0; right:0;
-      height:0%; transition:height .35s ease, background-color .25s ease;
+      height:0%; transition:height .6s ease, background-color .25s ease;
     }
     .fill-red{ background:#ef4444 }
     .fill-yellow{ background:#f59e0b }
     .fill-mildgreen{ background:#22c55e }
     .fill-lightgreen{ background:#86efac }
 
-    /* Tables */
-    .table thead th{ white-space:nowrap; cursor:pointer }
+    .table thead th{ white-space:nowrap; cursor:pointer; color:var(--muted); }
     .sortable::after{ content:' ↕'; opacity:.35; font-weight:normal }
-    .table>tbody>tr>td{ vertical-align:middle }
+    .table>tbody>tr>td{ vertical-align:middle; color:var(--ink); }
 
-    /* Charts */
     .chart-canvas{ width:100% !important; max-width:100%; height:260px !important }
     .chart-canvas--sm{ height:200px !important }
 
+    .cc-bottom-nav{
+      position:fixed; left:0; right:0; bottom:0; z-index:1030;
+      background:color-mix(in oklab, var(--card) 95%, transparent);
+      border-top:1px solid var(--line);
+      backdrop-filter:blur(10px);
+      padding: .35rem .5rem calc(.35rem + env(safe-area-inset-bottom));
+    }
+    .cc-bottom-nav .tab{ flex:1; text-align:center; font-size:.8rem; color:#334155; text-decoration:none; }
+    .cc-bottom-nav .tab .bi{ font-size:1.35rem; display:block; line-height:1; }
+    .cc-bottom-nav .tab.active{ color:var(--blue-600); font-weight:600; }
+
+    .cc-fab{
+      position:fixed; right:18px; bottom:88px; z-index:1031;
+      width:56px; height:56px; border-radius:16px;
+      background:var(--blue-600); color:#fff; border:0;
+      box-shadow:0 10px 25px color-mix(in oklab, var(--blue-600) 30%, transparent);
+    }
+    .cc-fab:active{ transform:translateY(1px) }
+
     @media (max-width: 992px){
-      .cc-page{ padding:.75rem }
       .kpi-card .value{ font-size:1.45rem }
       .chart-canvas{ height:220px !important }
+      .cc-page{ padding: .75rem; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .kpi-card, .cc-card { transition:none; }
+      .battery-fill{ transition:none; }
+    }
+
+    /* Prevent any sideways scroll on small screens */
+    html, body { max-width:100%; overflow-x:hidden; }
+
+    /* ADDED: tiny floating theme controller */
+    .theme-controls{
+      position:fixed; right:12px; bottom:12px; z-index:2000;
+      display:flex; gap:.5rem;
+    }
+    .theme-controls button{
+      background:var(--card); color:var(--ink); border:1px solid var(--line);
+      border-radius:10px; padding:.4rem .6rem;
     }
   </style>
 </head>
 <body>
-  <div class="cc-page">
+  <div class="cc-shell">
 
-    <!-- Header -->
-    <div class="d-flex flex-wrap align-items-center justify-content-between mb-3">
-      <h1 class="cc-title text-primary mb-2"><span class="emoji">📊</span> Dashboard</h1>
+    <!-- Sticky Header -->
+    <header class="cc-header">
+      <div class="cc-page">
+        <div class="cc-toolbar">
+          <h1 class="cc-title"><span class="emoji">📊</span> Dashboard</h1>
 
-      <!-- ADDED: Actions (Menu + Home) kept in your blue theme -->
-      <div class="d-flex align-items-center gap-2 mb-2">
-        <!-- Menu (offcanvas) -->
-        <button class="btn btn-outline-primary btn-sm" type="button"
-                data-bs-toggle="offcanvas" data-bs-target="#ccMenu" aria-controls="ccMenu">
-          ☰ Menu
-        </button>
-        <!-- Home -->
-        <a class="btn btn-outline-primary btn-sm" href="/inventory/list/" title="Go to Stock List">Home</a>
+          <!-- Actions: collapsible menu + Home -->
+          <div class="actions">
+            <button class="cc-menu-btn" type="button"
+                    data-bs-toggle="offcanvas" data-bs-target="#ccMenu" aria-controls="ccMenu" aria-label="Menu">
+              <i class="bi bi-list fs-5"></i>
+            </button>
+
+            <a class="btn btn-outline-primary btn-sm" href="/inventory/list/" title="Go to Stock List">
+              <i class="bi bi-house"></i><span class="d-none d-sm-inline"> Home</span>
+            </a>
+          </div>
+        </div>
+
+        <nav class="crumbs" aria-label="Quick links">
+          <a href="/inventory/list/"><i class="bi bi-house-door"></i> Home</a>
+          <a href="/inventory/dashboard/"><i class="bi bi-speedometer2"></i> Dashboard</a>
+        </nav>
+
+        <!-- filters -->
+        <form method="get" class="d-flex gap-2 align-items-center flex-wrap mt-2">
+          <select name="period" class="form-select form-select-sm" style="width:auto">
+            <option value="month" {% if period == "month" %}selected{% endif %}>This month</option>
+            <option value="all" {% if period == "all" %}selected{% endif %}>All time</option>
+          </select>
+
+          <select name="model" class="form-select form-select-sm" style="min-width:240px">
+            <option value="">All models</option>
+            {% for p in products %}
+              <option value="{{ p.id }}" {% if model_id == p.id %}selected{% endif %}>
+                {{ p.brand }} {{ p.model }}{% if p.variant %} {{ p.variant }}{% endif %}
+              </option>
+            {% endfor %}
+          </select>
+
+          <button class="btn btn-primary btn-sm" type="submit">Apply</button>
+        </form>
+      </div>
+    </header>
+
+    <main class="cc-page">
+
+      {% if messages %}
+        {% for message in messages %}
+          <div class="alert {% if message.tags == 'error' %}alert-danger{% elif message.tags == 'success' %}alert-success{% else %}alert-info{% endif %}">{{ message }}</div>
+        {% endfor %}
+      {% endif %}
+
+      <!-- ADDED: AI Recommendations card (predictive analytics) -->
+      <div class="cc-card p-3 mb-3 will-animate">
+        <h5>AI Recommendations</h5>
+        <div id="ai-recos">Loading…</div>
       </div>
 
-      <form method="get" class="d-flex gap-2 align-items-center flex-wrap">
-        <select name="period" class="form-select form-select-sm" style="width:auto">
-          <option value="month" {% if period == "month" %}selected{% endif %}>This month</option>
-          <option value="all" {% if period == "all" %}selected{% endif %}>All time</option>
-        </select>
-
-        <select name="model" class="form-select form-select-sm" style="min-width:240px">
-          <option value="">All models</option>
-          {% for p in products %}
-            <option value="{{ p.id }}" {% if model_id == p.id %}selected{% endif %}>
-              {{ p.brand }} {{ p.model }}{% if p.variant %} {{ p.variant }}{% endif %}
-            </option>
-          {% endfor %}
-        </select>
-
-        <button class="btn btn-primary btn-sm" type="submit">Apply</button>
-      </form>
-    </div>
-
-    {% if messages %}
-      {% for message in messages %}
-        <div class="alert {% if message.tags == 'error' %}alert-danger{% elif message.tags == 'success' %}alert-success{% else %}alert-info{% endif %}">{{ message }}</div>
-      {% endfor %}
-    {% endif %}
-
-    <!-- KPIs -->
-    <div class="row g-3 mb-3">
-      <div class="col-6 col-md-3">
-        <div class="kpi-card h-100">
-          <div class="label">Sold today</div>
-          <div class="value">{{ today_count|default:"0" }}</div>
+      <!-- KPIs -->
+      <div class="row g-3 mb-3">
+        <div class="col-6 col-md-3">
+          <div class="kpi-card h-100 will-animate">
+            <div class="label">Sold today</div>
+            <div class="value" data-countup>{{ today_count|default:"0" }}</div>
+          </div>
+        </div>
+        <div class="col-6 col-md-3">
+          <div class="kpi-card h-100 will-animate">
+            <div class="label">Sold this month</div>
+            <div class="value" data-countup>{{ mtd_count|default:"0" }}</div>
+          </div>
+        </div>
+        <div class="col-6 col-md-3">
+          <div class="kpi-card h-100 will-animate">
+            <div class="label">All-time sales</div>
+            <div class="value" data-countup>{{ all_time_count|default:"0" }}</div>
+          </div>
+        </div>
+        <div class="col-6 col-md-3">
+          <div class="cc-card p-3 h-100 will-animate">
+            <div class="text-muted small fw-semibold">My Wallet ({{ wallet.month.month_label }})</div>
+            <div class="fs-4 fw-bold">MK {{ wallet.balance|default:0|floatformat:0 }}</div>
+            <div class="d-flex justify-content-between small mt-1"><span>Commission</span><strong>MK {{ wallet.month.commission|default:0|floatformat:0 }}</strong></div>
+            <div class="d-flex justify-content-between small"><span>Advance</span><strong>MK {{ wallet.month.advance|default:0|floatformat:0 }}</strong></div>
+            <div class="d-flex justify-content-between small"><span>Adjustment</span><strong>MK {{ wallet.month.adjustment|default:0|floatformat:0 }}</strong></div>
+            <div class="d-flex justify-content-between small"><span>Total (month)</span><strong>MK {{ wallet.month.total|default:0|floatformat:0 }}</strong></div>
+            <a class="btn btn-sm btn-outline-secondary w-100 mt-2" href="/inventory/wallet/">Open Wallet</a>
+          </div>
         </div>
       </div>
-      <div class="col-6 col-md-3">
-        <div class="kpi-card h-100">
-          <div class="label">Sold this month</div>
-          <div class="value">{{ mtd_count|default:"0" }}</div>
-        </div>
-      </div>
-      <div class="col-6 col-md-3">
-        <div class="kpi-card h-100">
-          <div class="label">All-time sales</div>
-          <div class="value">{{ all_time_count|default:"0" }}</div>
-        </div>
-      </div>
-      <div class="col-6 col-md-3">
-        <div class="cc-card p-3 h-100">
-          <div class="text-muted small fw-semibold">My Wallet ({{ wallet.month.month_label }})</div>
-          <div class="fs-4 fw-bold">MK {{ wallet.balance|default:0|floatformat:0 }}</div>
-          <div class="d-flex justify-content-between small mt-1"><span>Commission</span><strong>MK {{ wallet.month.commission|default:0|floatformat:0 }}</strong></div>
-          <div class="d-flex justify-content-between small"><span>Advance</span><strong>MK {{ wallet.month.advance|default:0|floatformat:0 }}</strong></div>
-          <div class="d-flex justify-content-between small"><span>Adjustment</span><strong>MK {{ wallet.month.adjustment|default:0|floatformat:0 }}</strong></div>
-          <div class="d-flex justify-content-between small"><span>Total (month)</span><strong>MK {{ wallet.month.total|default:0|floatformat:0 }}</strong></div>
-          <a class="btn btn-sm btn-outline-secondary w-100 mt-2" href="/inventory/wallet/">Open Wallet</a>
-        </div>
-      </div>
-    </div>
 
-    <!-- Row 1 -->
-    <div class="row g-3 mb-3">
-      <div class="col-lg-6">
-        <div class="cc-card p-3 h-100">
-          <h5>Top Agents (earnings first, then sales)</h5>
-          {% if agent_rank %}
-            <div class="table-responsive">
-              <table id="tblAgents" class="table table-sm align-middle">
-                <thead class="table-light">
-                  <tr>
-                    <th class="sortable" data-type="text">Agent</th>
-                    <th class="text-end sortable" data-type="num">Earnings</th>
-                    <th class="text-end sortable" data-type="num">Sales</th>
-                    <th class="text-end sortable" data-type="num">Revenue</th>
-                    <th class="text-end">Wallet</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {% for r in agent_rank %}
+      <!-- Row 1 -->
+      <div class="row g-3 mb-3">
+        <div class="col-lg-6">
+          <div class="cc-card p-3 h-100 will-animate">
+            <h5>Top Agents (earnings first, then sales)</h5>
+            {% if agent_rank %}
+              <div class="table-responsive">
+                <table id="tblAgents" class="table table-sm align-middle">
+                  <thead class="table-light">
                     <tr>
-                      <td>
-                        {% if is_manager_or_admin %}
-                          <a href="#" class="agent-link agent-detail" data-user-id="{{ r.agent_id }}" data-username="{{ r.agent__username }}">{{ r.agent__username }}</a>
-                        {% else %}
-                          {{ r.agent__username }}
-                        {% endif %}
-                      </td>
-                      <!-- number spans use JS to add thousand separators without needing {% load humanize %} -->
-                      <td class="text-end"><span class="num" data-value="{{ r.earnings|default:0 }}"></span></td>
-                      <td class="text-end"><span class="num" data-value="{{ r.total_sales|default:0 }}"></span></td>
-                      <td class="text-end"><span class="num" data-value="{{ r.revenue|default:0 }}"></span></td>
-                      <td class="text-end">
-                        <span class="wallet-chip loading" data-user-id="{{ r.agent_id }}" data-username="{{ r.agent__username }}">…</span>
-                      </td>
+                      <th class="sortable" data-type="text">Agent</th>
+                      <th class="text-end sortable" data-type="num">Earnings</th>
+                      <th class="text-end sortable" data-type="num">Sales</th>
+                      <th class="text-end sortable" data-type="num">Revenue</th>
+                      <th class="text-end">Wallet</th>
                     </tr>
-                  {% endfor %}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody>
+                    {% for r in agent_rank %}
+                      <tr>
+                        <td>
+                          {% if is_manager_or_admin %}
+                            <a href="#" class="agent-link agent-detail" data-user-id="{{ r.agent_id }}" data-username="{{ r.agent__username }}">{{ r.agent__username }}</a>
+                          {% else %}
+                            {{ r.agent__username }}
+                          {% endif %}
+                        </td>
+                        <td class="text-end"><span class="num" data-value="{{ r.earnings|default:0 }}"></span></td>
+                        <td class="text-end"><span class="num" data-value="{{ r.total_sales|default:0 }}"></span></td>
+                        <td class="text-end"><span class="num" data-value="{{ r.revenue|default:0 }}"></span></td>
+                        <td class="text-end">
+                          <span class="wallet-chip loading" data-user-id="{{ r.agent_id }}" data-username="{{ r.agent__username }}">…</span>
+                        </td>
+                      </tr>
+                    {% endfor %}
+                  </tbody>
+                </table>
+              </div>
+            {% else %}
+              <div class="text-muted">No sales found for this period.</div>
+            {% endif %}
+          </div>
+        </div>
+
+        {% if is_manager_or_admin %}
+        <div class="col-lg-3">
+          <div class="cc-card p-3 h-100 will-animate">
+            <h5>Cost vs Revenue vs Profit</h5>
+            <canvas id="pieCRP" class="chart-canvas chart-canvas--sm"></canvas>
+          </div>
+        </div>
+        {% endif %}
+
+        <div class="col-lg-3">
+          <div class="cc-card p-3 h-100 will-animate">
+            <h5>Stock Level</h5>
+            <div class="d-flex align-items-center gap-3">
+              <div class="battery-wrap">
+                <div class="battery-cap"></div>
+                <div class="battery">
+                  <div id="batteryFill" class="battery-fill
+                    {% if jug_color == 'red' %}fill-red{% elif jug_color == 'yellow' %}fill-yellow{% elif jug_color == 'mildgreen' %}fill-mildgreen{% else %}fill-lightgreen{% endif %}"
+                    style="height: 0%;"></div>
+                </div>
+              </div>
+              <div>
+                <div class="fw-semibold fs-5">{{ jug_count }} in stock</div>
+                <div class="text-muted small">100 = full, ≤20 = critical</div>
+              </div>
             </div>
-          {% else %}
-            <div class="text-muted">No sales found for this period.</div>
-          {% endif %}
+          </div>
         </div>
       </div>
 
       {% if is_manager_or_admin %}
-      <div class="col-lg-3">
-        <div class="cc-card p-3 h-100">
-          <h5>Cost vs Revenue vs Profit</h5>
-          <canvas id="pieCRP" class="chart-canvas chart-canvas--sm"></canvas>
+      <!-- Row 2 -->
+      <div class="row g-3 mb-3">
+        <div class="col-lg-6">
+          <div class="cc-card p-3 will-animate">
+            <h5>Revenue (last 12 months)</h5>
+            <canvas id="barRevenue" class="chart-canvas"></canvas>
+          </div>
+        </div>
+        <div class="col-lg-6">
+          <div class="cc-card p-3 will-animate">
+            <h5>Profit (last 12 months)</h5>
+            <canvas id="barProfit" class="chart-canvas"></canvas>
+          </div>
         </div>
       </div>
       {% endif %}
 
-      <div class="col-lg-3">
-        <div class="cc-card p-3 h-100">
-          <h5>Stock Level</h5>
-          <div class="d-flex align-items-center gap-3">
-            <div class="battery-wrap">
-              <div class="battery-cap"></div>
-              <div class="battery">
-                <div class="battery-fill
-                  {% if jug_color == 'red' %}fill-red{% elif jug_color == 'yellow' %}fill-yellow{% elif jug_color == 'mildgreen' %}fill-mildgreen{% else %}fill-lightgreen{% endif %}"
-                  style="height: {{ jug_fill_pct }}%;"></div>
-              </div>
-            </div>
-            <div>
-              <div class="fw-semibold fs-5">{{ jug_count }} in stock</div>
-              <div class="text-muted small">100 = full, ≤20 = critical</div>
-            </div>
+      <!-- Row 3 -->
+      <div class="cc-card p-3 will-animate">
+        <h5>Agents: Total Stock vs Sold Units</h5>
+        {% if agent_rows %}
+          <div class="table-responsive">
+            <table id="tblAgentStock" class="table table-sm align-middle">
+              <thead class="table-light">
+                <tr>
+                  <th class="sortable" data-type="text">Agent</th>
+                  <th class="text-end sortable" data-type="num">Total Stock</th>
+                  <th class="text-end sortable" data-type="num">
+                    Sold Units ({% if period == "month" %}this month{% else %}all time{% endif %})
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for row in agent_rows %}
+                <tr>
+                  <td>{{ row.agent }}</td>
+                  <td class="text-end"><span class="num" data-value="{{ row.total_stock|default:0 }}"></span></td>
+                  <td class="text-end"><span class="num" data-value="{{ row.sold_units|default:0 }}"></span></td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
           </div>
-        </div>
+        {% else %}
+          <div class="text-muted">No agent stock data.</div>
+        {% endif %}
       </div>
-    </div>
+    </main>
 
     {% if is_manager_or_admin %}
-    <!-- Row 2 -->
-    <div class="row g-3 mb-3">
-      <div class="col-lg-6">
-        <div class="cc-card p-3">
-          <h5>Revenue (last 12 months)</h5>
-          <canvas id="barRevenue" class="chart-canvas"></canvas>
-        </div>
-      </div>
-      <div class="col-lg-6">
-        <div class="cc-card p-3">
-          <h5>Profit (last 12 months)</h5>
-          <canvas id="barProfit" class="chart-canvas"></canvas>
+    <!-- Wallet Modal (unchanged) -->
+    <div class="modal fade" id="walletModal" tabindex="-1" aria-labelledby="walletModalLabel" aria-hidden="true">
+      <div class="modal-dialog">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title" id="walletModalLabel">Wallet · <span id="wmName">Agent</span></h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+          </div>
+          <div class="modal-body">
+            <div class="d-flex flex-column gap-2">
+              <div class="d-flex justify-content-between">
+                <span class="text-muted">Current balance</span>
+                <strong id="wmBalance">—</strong>
+              </div>
+              <div class="d-flex justify-content-between">
+                <span class="text-muted">This month (net wallet activity)</span>
+                <strong id="wmMonth">—</strong>
+              </div>
+              <div class="small text-muted mt-2">
+                Tip: For full COM / ADV / ADJ breakdown and lifetime commissions, open the Wallet page.
+              </div>
+            </div>
+          </div>
+          <div class="modal-footer">
+            <a id="wmLink" href="#" class="btn btn-outline-secondary" target="_blank" rel="noopener">Open Wallet</a>
+            <button type="button" class="btn btn-primary" data-bs-dismiss="modal">Close</button>
+          </div>
         </div>
       </div>
     </div>
     {% endif %}
 
-    <!-- Row 3 -->
-    <div class="cc-card p-3">
-      <h5>Agents: Total Stock vs Sold Units</h5>
-      {% if agent_rows %}
-        <div class="table-responsive">
-          <table id="tblAgentStock" class="table table-sm align-middle">
-            <thead class="table-light">
-              <tr>
-                <th class="sortable" data-type="text">Agent</th>
-                <th class="text-end sortable" data-type="num">Total Stock</th>
-                <th class="text-end sortable" data-type="num">
-                  Sold Units ({% if period == "month" %}this month{% else %}all time{% endif %})
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {% for row in agent_rows %}
-              <tr>
-                <td>{{ row.agent }}</td>
-                <td class="text-end"><span class="num" data-value="{{ row.total_stock|default:0 }}"></span></td>
-                <td class="text-end"><span class="num" data-value="{{ row.sold_units|default:0 }}"></span></td>
-              </tr>
-              {% endfor %}
-            </tbody>
-          </table>
+    <!-- Offcanvas Menu (unchanged) -->
+    <div class="offcanvas offcanvas-start" tabindex="-1" id="ccMenu" aria-labelledby="ccMenuLabel">
+      <div class="offcanvas-header">
+        <h5 class="offcanvas-title" id="ccMenuLabel">Menu</h5>
+        <button type="button" class="btn-close text-reset" data-bs-dismiss="offcanvas" aria-label="Close"></button>
+      </div>
+      <div class="offcanvas-body">
+        <div class="list-group">
+          <a class="list-group-item list-group-item-action" href="/inventory/list/">Stock List</a>
+          <a class="list-group-item list-group-item-action" href="/inventory/scan-in/">Scan IN</a>
+          <a class="list-group-item list-group-item-action" href="/inventory/scan-sold/">Scan SOLD</a>
+          <a class="list-group-item list-group-item-action" href="/inventory/scan-web/">Scan (Web)</a>
+          <a class="list-group-item list-group-item-action" href="/inventory/time-checkin/">Time Check-in</a>
+          <a class="list-group-item list-group-item-action" href="/inventory/time-logs/">Time Logs</a>
+          <a class="list-group-item list-group-item-action" href="/inventory/wallet/">Wallet</a>
+          <a class="list-group-item list-group-item-action" href="/admin/">Django Admin</a>
         </div>
-      {% else %}
-        <div class="text-muted">No agent stock data.</div>
-      {% endif %}
+      </div>
+    </div>
+
+    <!-- Mobile Bottom Tabs (unchanged) -->
+    <nav class="cc-bottom-nav d-lg-none" aria-label="Primary">
+      <div class="d-flex align-items-center">
+        <a class="tab active" href="/"><i class="bi bi-speedometer2"></i>Home</a>
+        <a class="tab" href="/inventory/list/"><i class="bi bi-box-seam"></i>Stock</a>
+        <a class="tab" href="/inventory/scan-in/"><i class="bi bi-upc-scan"></i>Scan IN</a>
+        <a class="tab" href="/inventory/scan-sold/"><i class="bi bi-qr-code-scan"></i>SOLD</a>
+        <a class="tab" href="/inventory/wallet/"><i class="bi bi-wallet2"></i>Wallet</a>
+      </div>
+    </nav>
+
+    <!-- Floating Action (unchanged) -->
+    <button class="cc-fab d-lg-none" onclick="location.href='/inventory/scan-sold/'" aria-label="Scan SOLD">
+      <i class="bi bi-qr-code-scan fs-4"></i>
+    </button>
+
+    <!-- ADDED: floating theme controller -->
+    <div class="theme-controls">
+      <button id="theme-prev" type="button" title="Prev theme">◀</button>
+      <button id="theme-toggle-rotate" type="button" title="Auto rotate">Auto: Off</button>
+      <button id="theme-next" type="button" title="Next theme">▶</button>
     </div>
   </div>
+
+  <!-- Bootstrap JS -->
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 
   {% if is_manager_or_admin %}
-  <!-- Wallet Modal -->
-  <div class="modal fade" id="walletModal" tabindex="-1" aria-labelledby="walletModalLabel" aria-hidden="true">
-    <div class="modal-dialog">
-      <div class="modal-content">
-        <div class="modal-header">
-          <h5 class="modal-title" id="walletModalLabel">Wallet · <span id="wmName">Agent</span></h5>
-          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-        </div>
-        <div class="modal-body">
-          <div class="d-flex flex-column gap-2">
-            <div class="d-flex justify-content-between">
-              <span class="text-muted">Current balance</span>
-              <strong id="wmBalance">—</strong>
-            </div>
-            <div class="d-flex justify-content-between">
-              <span class="text-muted">This month (net wallet activity)</span>
-              <strong id="wmMonth">—</strong>
-            </div>
-            <div class="small text-muted mt-2">
-              Tip: For full COM / ADV / ADJ breakdown and lifetime commissions, open the Wallet page.
-            </div>
-          </div>
-        </div>
-        <div class="modal-footer">
-          <a id="wmLink" href="#" class="btn btn-outline-secondary" target="_blank" rel="noopener">Open Wallet</a>
-          <button type="button" class="btn btn-primary" data-bs-dismiss="modal">Close</button>
-        </div>
-      </div>
-    </div>
-  </div>
+  <!-- Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script id="chart-payload" type="application/json">
+  {
+    "labels": {{ labels_json|default:"[]"|safe }},
+    "revenue": {{ revenue_points_json|default:"[]"|safe }},
+    "profit": {{ profit_points_json|default:"[]"|safe }},
+    "crp": {{ pie_data_json|default:"[]"|safe }}
+  }
+  </script>
   {% endif %}
 
-  <!-- ADDED: Offcanvas Menu (works on mobile & desktop) -->
-  <div class="offcanvas offcanvas-start" tabindex="-1" id="ccMenu" aria-labelledby="ccMenuLabel">
-    <div class="offcanvas-header">
-      <h5 class="offcanvas-title" id="ccMenuLabel">Menu</h5>
-      <button type="button" class="btn-close text-reset" data-bs-dismiss="offcanvas" aria-label="Close"></button>
-    </div>
-    <div class="offcanvas-body">
-      <div class="list-group">
-        <a class="list-group-item list-group-item-action" href="/inventory/list/">Stock List</a>
-        <a class="list-group-item list-group-item-action" href="/inventory/scan-in/">Scan IN</a>
-        <a class="list-group-item list-group-item-action" href="/inventory/scan-sold/">Scan SOLD</a>
-        <a class="list-group-item list-group-item-action" href="/inventory/scan-web/">Scan (Web)</a>
-        <a class="list-group-item list-group-item-action" href="/inventory/time-checkin/">Time Check-in</a>
-        <a class="list-group-item list-group-item-action" href="/inventory/time-logs/">Time Logs</a>
-        <a class="list-group-item list-group-item-action" href="/inventory/wallet/">Wallet</a>
-        <a class="list-group-item list-group-item-action" href="/admin/">Django Admin</a>
-      </div>
-    </div>
-  </div>
-
-  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
   <script>
-    /* ===== tiny table sorter ===== */
+    /* ===== tiny table sorter (unchanged) ===== */
     function makeSortable(tableId){
       const table = document.getElementById(tableId);
       if(!table) return;
@@ -386,18 +552,30 @@
     makeSortable('tblAgents');
     makeSortable('tblAgentStock');
 
-    /* ===== number formatter (adds thousand separators) ===== */
+    /* ===== number formatter (unchanged) ===== */
     const nf = new Intl.NumberFormat();
     document.querySelectorAll('.num').forEach(el=>{
       const v = Number(el.getAttribute('data-value') || '0');
       el.textContent = nf.format(v);
     });
 
-    /* ===== formatters ===== */
-    function fmtnum(n){ return (new Intl.NumberFormat()).format(n||0); }
-    function mk(n){ return 'MK ' + fmtnum(n); }
+    /* ===== Count-up for KPI values (unchanged) ===== */
+    function countUp(el, to){
+      const dur = 600; const start = performance.now();
+      const from = 0;
+      function step(t){
+        const p = Math.min((t - start)/dur, 1);
+        el.textContent = nf.format(Math.floor(from + (to - from) * p));
+        if(p<1) requestAnimationFrame(step);
+      }
+      requestAnimationFrame(step);
+    }
+    document.querySelectorAll('[data-countup]').forEach(el=>{
+      const to = Number(el.textContent.replace(/,/g,'')) || 0;
+      countUp(el, to);
+    });
 
-    /* ===== wallet chips ===== */
+    /* ===== Wallet chips (unchanged) ===== */
     async function loadWalletChips(){
       const chips = document.querySelectorAll('.wallet-chip');
       if(!chips.length) return;
@@ -409,7 +587,7 @@
           const data = await res.json();
           if(data && data.ok){
             const bal = Number(data.balance||0);
-            chip.textContent = mk(bal);
+            chip.textContent = 'MK ' + nf.format(bal);
             chip.classList.remove('loading');
             chip.classList.toggle('positive', bal>=0);
             chip.classList.toggle('negative', bal<0);
@@ -428,7 +606,7 @@
     loadWalletChips();
 
     {% if is_manager_or_admin %}
-    /* ===== wallet modal ===== */
+    /* ===== Wallet modal (unchanged) ===== */
     const walletModal = document.getElementById('walletModal');
     const wm = walletModal ? new bootstrap.Modal(walletModal) : null;
 
@@ -442,65 +620,206 @@
       try{
         const r = await fetch(`/inventory/api/wallet-summary/?user_id=${encodeURIComponent(userId)}`);
         const d = await r.json();
-        document.getElementById('wmBalance').textContent = (d&&d.ok) ? mk(Number(d.balance||0)) : '—';
+        document.getElementById('wmBalance').textContent = (d&&d.ok) ? 'MK ' + nf.format(Number(d.balance||0)) : '—';
       }catch{ document.getElementById('wmBalance').textContent = '—'; }
 
       try{
         const now=new Date(), y=now.getFullYear(), m=(now.getMonth()+1).toString().padStart(2,'0');
         const r2 = await fetch(`/inventory/api/wallet-summary/?user_id=${encodeURIComponent(userId)}&year=${y}&month=${m}`);
         const d2 = await r2.json();
-        document.getElementById('wmMonth').textContent = (d2&&d2.ok&&'month_sum' in d2) ? mk(Number(d2.month_sum||0)) : '—';
+        document.getElementById('wmMonth').textContent = (d2&&d2.ok&&'month_sum' in d2) ? 'MK ' + nf.format(Number(d2.month_sum||0)) : '—';
       }catch{ document.getElementById('wmMonth').textContent = '—'; }
 
       wm.show();
     }
 
-    /* ===== charts (guarded) ===== */
-    const labels         = {{ labels_json|safe }};
-    const revenuePoints  = {{ revenue_points_json|safe }};
-    const profitPoints   = {{ profit_points_json|safe }};
-    const pieData        = {{ pie_data_json|safe }};
-    const colorRevenue   = 'rgba(59,130,246,0.85)';  /* blue */
-    const colorProfit    = 'rgba(16,185,129,0.85)';  /* green */
+    /* ===== Charts: theme-aware ===== */
+    let charts = [];
+    function initChartsSafely(){
+      if(!window.Chart) { console.warn('Chart.js not ready'); return; }
 
-    function makeBar(id, label, data, color){
-      const el = document.getElementById(id);
-      if(!el) return;
-      new Chart(el, {
-        type:'bar',
-        data:{ labels, datasets:[{ label, data, backgroundColor:color, borderColor:color, borderWidth:1 }] },
-        options:{
-          responsive:true,
-          maintainAspectRatio:false,   // <<< more responsive in tight spaces
-          plugins:{ legend:{ display:false }, tooltip:{ callbacks:{ label:(ctx)=> mk(ctx.parsed.y) } } },
-          scales:{
-            x:{ ticks:{ maxRotation:0, autoSkip:true }, grid:{ display:false } },
-            y:{ beginAtZero:true, ticks:{ callback:(v)=> fmtnum(v) }, grid:{ color:'rgba(2,6,23,.06)' } }
-          }
-        }
-      });
-    }
-    function makePie(id, data){
-      const el = document.getElementById(id);
-      if(!el) return;
-      new Chart(el, {
-        type:'pie',
-        data:{ labels:['Cost','Revenue','Profit'], datasets:[{ data, backgroundColor:['#94a3b8', colorRevenue, colorProfit] }] },
-        options:{
-          responsive:true,
-          maintainAspectRatio:false,
-          plugins:{
-            legend:{ position:'bottom' },
-            tooltip:{ callbacks:{ label:(ctx)=> `${ctx.label}: ${mk(ctx.parsed)}` } }
-          }
-        }
-      });
-    }
+      let payload = {labels:[], revenue:[], profit:[], crp:[]};
+      try{
+        const el = document.getElementById('chart-payload');
+        if(el) payload = JSON.parse(el.textContent || '{}');
+      }catch(e){ console.warn('Bad chart payload', e); }
 
-    makeBar('barRevenue', 'Revenue', revenuePoints, colorRevenue);
-    makeBar('barProfit',  'Profit',  profitPoints,  colorProfit);
-    makePie('pieCRP', pieData);
+      const labels        = Array.isArray(payload.labels) ? payload.labels : [];
+      const revenuePoints = (payload.revenue || []).map(v=>Number(v)||0);
+      const profitPoints  = (payload.profit  || []).map(v=>Number(v)||0);
+      const pieData       = (payload.crp     || []).map(v=>Number(v)||0);
+
+      const nf = new Intl.NumberFormat();
+
+      function getThemeColors(){
+        const s=getComputedStyle(document.documentElement);
+        const revenue = s.getPropertyValue('--blue-600').trim() || 'rgba(59,130,246,0.85)';
+        const profit  = s.getPropertyValue('--blue-500').trim() || 'rgba(16,185,129,0.85)';
+        const grid    = s.getPropertyValue('--chart-grid').trim() || 'rgba(2,6,23,.06)';
+        return { revenue, profit, grid };
+      }
+      const colors = getThemeColors();
+
+      function makeBar(id,label,data,color){
+        const el = document.getElementById(id);
+        if(!el || !labels.length) return null;
+        return new Chart(el,{
+          type:'bar',
+          data:{ labels, datasets:[{ label, data, backgroundColor:color, borderColor:color, borderWidth:1 }] },
+          options:{
+            responsive:true, maintainAspectRatio:false,
+            plugins:{ legend:{ display:false }, tooltip:{ callbacks:{ label:(ctx)=>'MK '+nf.format(ctx.parsed.y) } } },
+            scales:{
+              x:{ ticks:{ maxRotation:0, autoSkip:true }, grid:{ display:false } },
+              y:{ beginAtZero:true, ticks:{ callback:(v)=> nf.format(v) }, grid:{ color:colors.grid } }
+            },
+            animation:{ duration:700, easing:'easeOutQuart' }
+          }
+        });
+      }
+      function makePie(id,data){
+        const el = document.getElementById(id);
+        if(!el || !data.length) return null;
+        return new Chart(el,{
+          type:'pie',
+          data:{ labels:['Cost','Revenue','Profit'], datasets:[{ data, backgroundColor:['#94a3b8', colors.revenue, colors.profit] }] },
+          options:{
+            responsive:true, maintainAspectRatio:false,
+            plugins:{ legend:{ position:'bottom' }, tooltip:{ callbacks:{ label:(ctx)=>`${ctx.label}: MK ${nf.format(ctx.parsed)}` } } },
+            animation:{ duration:700, easing:'easeOutQuart' }
+          }
+        });
+      }
+
+      charts = []; // reset
+      if(labels.length && (revenuePoints.length || profitPoints.length)){
+        const c1 = makeBar('barRevenue','Revenue',revenuePoints,colors.revenue);
+        const c2 = makeBar('barProfit','Profit',profitPoints,colors.profit);
+        if(c1) charts.push(c1);
+        if(c2) charts.push(c2);
+      }
+      if(pieData.length){
+        const c3 = makePie('pieCRP',pieData);
+        if(c3) charts.push(c3);
+      }
+    }
+    window.addEventListener('load', initChartsSafely);
+
+    /* ADDED: recolor charts when theme changes */
+    window.addEventListener('theme:changed', ()=>{
+      if(!charts.length) return;
+      const s=getComputedStyle(document.documentElement);
+      const revenue = s.getPropertyValue('--blue-600').trim();
+      const profit  = s.getPropertyValue('--blue-500').trim();
+      const grid    = s.getPropertyValue('--chart-grid').trim();
+      charts.forEach(ch=>{
+        if(ch.config.type==='bar'){
+          const label = ch.data.datasets[0].label;
+          const color = label==='Revenue' ? revenue : profit;
+          ch.data.datasets[0].backgroundColor = color;
+          ch.data.datasets[0].borderColor = color;
+          if(ch.options.scales?.y?.grid) ch.options.scales.y.grid.color = grid;
+        }else if(ch.config.type==='pie'){
+          ch.data.datasets[0].backgroundColor = ['#94a3b8', revenue, profit];
+        }
+        ch.update('none');
+      });
+    });
     {% endif %}
+
+    /* Animate in on scroll (unchanged) */
+    const io = new IntersectionObserver((entries)=>{
+      entries.forEach(e=>{
+        if(e.isIntersecting){
+          e.target.classList.add('in');
+          io.unobserve(e.target);
+        }
+      });
+    }, { threshold:.1 });
+    document.querySelectorAll('.will-animate, .kpi-card, .cc-card').forEach(el=>io.observe(el));
+
+    /* Animate battery fill (unchanged) */
+    window.requestAnimationFrame(()=>{
+      const fill = document.getElementById('batteryFill');
+      if(fill){
+        const pct = {{ jug_fill_pct|default:0 }};
+        fill.style.height = Math.max(0, Math.min(100, pct)) + '%';
+      }
+    });
+
+    /* Optional SW (unchanged) */
+    if('serviceWorker' in navigator){
+      try{ navigator.serviceWorker.register('/static/sw.js'); }catch(e){}
+    }
+
+    /* ===== ADDED: AI Recommendations fetch ===== */
+    (async function(){
+      const box=document.getElementById('ai-recos'); if(!box) return;
+      try{
+        const r=await fetch('/api/predictions/');
+        const d=await r.json();
+        const total=(d.overall||[]).reduce((s,x)=>s+(x.predicted_units||0),0);
+        const revenue=(d.overall||[]).reduce((s,x)=>s+(+x.predicted_revenue||0),0);
+        let html=`<div class="mb-1"><strong>Next 7 days</strong>: <b>${total.toLocaleString()}</b> units • <b>MK ${Math.round(revenue).toLocaleString()}</b></div>`;
+        if((d.risky||[]).length){
+          html+=`<div class="text-muted small">Likely stockouts</div><ul class="mt-1 mb-0">`;
+          for(const x of d.risky){
+            html+=`<li>${x.product}: by <b>${x.stockout_date}</b> • On-hand ${x.on_hand} • Restock <b>${x.suggested_restock}</b> ${x.urgent?'<span class="badge text-bg-danger">URGENT</span>':''}</li>`;
+          }
+          html+=`</ul>`;
+        }else{
+          html+=`<div class="text-success">All good — no stockouts in next 7 days.</div>`;
+        }
+        box.innerHTML=html;
+      }catch(e){
+        box.textContent='Could not load predictions.';
+      }
+    })();
+
+    /* ===== ADDED: Theme rotator (3 styles every 10s) ===== */
+    (function(){
+      const THEMES=["style-1","style-2","style-3"];
+      const KEY="cc-theme", ROTATE="cc-rotate", INTERVAL=10000;
+      const root=document.documentElement;
+      const themeMeta=document.querySelector('meta[name="theme-color"]');
+
+      const btnPrev=document.getElementById('theme-prev');
+      const btnNext=document.getElementById('theme-next');
+      const btnAuto=document.getElementById('theme-toggle-rotate');
+
+      let current = localStorage.getItem(KEY) || root.getAttribute('data-theme') || THEMES[0];
+      let auto = JSON.parse(localStorage.getItem(ROTATE) || 'false');
+      const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+      function apply(t){
+        current=t;
+        root.setAttribute('data-theme', t);
+        localStorage.setItem(KEY, t);
+        if(themeMeta){
+          themeMeta.setAttribute('content',
+            t==="style-2" ? "#0b1220" : (t==="style-3" ? "#0f1b30" : "#0b5bd3"));
+        }
+        window.dispatchEvent(new CustomEvent('theme:changed',{detail:{theme:t}}));
+      }
+      function next(){ apply(THEMES[(THEMES.indexOf(current)+1)%THEMES.length]); }
+      function prev(){ apply(THEMES[(THEMES.indexOf(current)-1+THEMES.length)%THEMES.length]); }
+
+      apply(current);
+
+      function setAuto(v){ auto=v; localStorage.setItem(ROTATE, JSON.stringify(v)); updateBtn(); v?start():stop(); }
+      function updateBtn(){ if(btnAuto) btnAuto.textContent=`Auto: ${auto?"On":"Off"}`; }
+
+      btnNext && btnNext.addEventListener('click', ()=>{ setAuto(false); next(); });
+      btnPrev && btnPrev.addEventListener('click', ()=>{ setAuto(false); prev(); });
+      btnAuto && btnAuto.addEventListener('click', ()=> setAuto(!auto));
+      updateBtn();
+
+      let timer=null;
+      function start(){ if(reduced||!auto) return; stop(); timer=setInterval(next, INTERVAL); }
+      function stop(){ if(timer) clearInterval(timer); timer=null; }
+      document.addEventListener('visibilitychange', ()=> document.hidden?stop():start());
+      window.addEventListener('load', start);
+    })();
   </script>
 </body>
 </html>
