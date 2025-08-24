@@ -2,8 +2,14 @@
 from django.urls import path
 from django.views.generic import RedirectView
 from . import views
-# ADDED: lightweight API module for predictions
-from . import api  # make sure inventory/api.py defines predictions_summary
+
+# Optional import: keep your existing inventory/api.py if you have it
+try:
+    from . import api  # expects api.predictions_summary(request)
+    _HAS_API_MODULE = True
+except Exception:
+    api = None
+    _HAS_API_MODULE = False
 
 # Namespace so {% url 'inventory:...' %} works
 app_name = "inventory"
@@ -54,7 +60,7 @@ urlpatterns = [
     path("healthz/", views.healthz, name="healthz"),
 ]
 
-# ---------- API: Time, Wallet, Charts, Predictions ----------
+# ---------- API: Time, Wallet, Charts ----------
 urlpatterns += [
     path("api/mark-sold/",       views.api_mark_sold,        name="api_mark_sold"),
     path("api/sales-trend/",     views.api_sales_trend,      name="api_sales_trend"),
@@ -64,7 +70,21 @@ urlpatterns += [
     path("api/time-checkin/",    views.api_time_checkin,     name="api_time_checkin"),
     path("api/wallet-summary/",  views.api_wallet_summary,   name="api_wallet_summary"),
     path("api/wallet-txn/",      views.api_wallet_add_txn,   name="api_wallet_add_txn"),
+]
 
-    # ADDED: Predictive analytics endpoint used by the dashboard AI card
-    path("api/predictions/",     api.predictions_summary,    name="api_predictions"),
+# ---------- API: Predictions & Cash (new) ----------
+# Prefer your existing inventory/api.py for backward compatibility.
+if _HAS_API_MODULE and hasattr(api, "predictions_summary"):
+    urlpatterns += [
+        path("api/predictions/", api.predictions_summary, name="api_predictions"),
+    ]
+else:
+    urlpatterns += [
+        path("api/predictions/", views.api_predictions, name="api_predictions"),
+    ]
+
+# Always provide a v2 and cash overview using the new views-based endpoints
+urlpatterns += [
+    path("api/predictions/v2/", views.api_predictions,  name="api_predictions_v2"),
+    path("api/cash-overview/",  views.api_cash_overview, name="api_cash_overview"),
 ]

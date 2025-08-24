@@ -17,7 +17,7 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.template.exceptions import TemplateDoesNotExist
 from django.utils import timezone
 from django.views.decorators.cache import never_cache
-from django.views.decorators.http import require_POST, require_http_methods
+from django.views.decorators.http import require_POST, require_http_methods, require_GET  # ADDED require_GET
 
 import csv
 import json
@@ -719,11 +719,33 @@ def inventory_dashboard(request):
         },
     }
 
-    # NEW: feature flags for dashboard UI (non-breaking)
-    context["PREDICTIVE_ENABLED"]   = bool(getattr(settings, "PREDICTIVE_ENABLED", False))
-    context["THEME_ROTATE_ENABLED"] = bool(getattr(settings, "THEME_ROTATE_ENABLED", True))
-    context["THEME_ROTATE_MS"]      = int(getattr(settings, "THEME_ROTATE_MS", 10000))
+    # --- Feature flags & slide config (rotator will switch slides every 10s) ---
+    context["PREDICTIVE_ENABLED"]   = bool(getattr(settings, "PREDICTIVE_ENABLED", True))
+    context["THEME_ROTATE_ENABLED"] = bool(getattr(settings, "THEME_ROTATE_ENABLED", True))   # keep the 3 buttons
+    context["THEME_ROTATE_MS"]      = int(getattr(settings, "THEME_ROTATE_MS", 10000))        # 10s
     context["THEME_DEFAULT"]        = str(getattr(settings, "THEME_DEFAULT", "style-1"))
+    # Tell the front-end rotator to rotate "slides" (not colors)
+    context["ROTATOR_MODE"]         = "slides"
+    # Optional slide descriptors the UI can use
+    context["DASHBOARD_SLIDES"] = [
+        {
+            "key": "trends",
+            "title": "Sales Trends",
+            "apis": ["/inventory/api_sales_trend?period=7d&metric=count",
+                     "/inventory/api_profit_bar",
+                     "/inventory/api_top_models?period=today"]
+        },
+        {
+            "key": "cash",
+            "title": "Cash Overview",
+            "apis": ["/inventory/api/cash_overview"]
+        },
+        {
+            "key": "agents",
+            "title": "Agent Performance",
+            "apis": ["/inventory/api_agent_trend?months=6&metric=sales"]
+        }
+    ]
 
     cache.set(cache_key, context, 60)
     return _render_dashboard_safe(request, context, today, mtd_count, all_time_count)
@@ -1257,7 +1279,7 @@ def agent_reset_confirm(request, token=None):
 
 
 # -----------------------
-# Charts APIs
+# Charts & analytics APIs
 # -----------------------
 @never_cache
 @login_required
@@ -1429,6 +1451,129 @@ def api_agent_trend(request):
         data = _build()
         cache.set(key, data, 60)
     return JsonResponse(data)
+
+
+# -----------------------
+# AI & Cash APIs (NEW)
+# -----------------------
+@never_cache
+@login_required
+@require_GET
+def api_predictions(request):
+    """
+    Baseline forecast used by the dashboard's 'AI Recommendations' card.
+    - Predict next 7 days by averaging last 14 days (units & revenue).
+    - Flag models likely to stock out: on_hand < 7 * model_daily_avg.
+    Obeys permissions.
+    """
+    today = timezone.localdate()
+    lookback_days = 14
+    start = today - timedelta(days=lookback_days)
+    end_excl = today + timedelta(days=1)
+
+    sales = Sale.objects.select_related("item__product").filter(sold_at__gte=start, sold_at__lt=end_excl)
+    items = InventoryItem.objects.select_related("product").filter(status="IN_STOCK")
+    if not _can_view_all(request.user):
+        sales = sales.filter(agent=request.user)
+        items = items.filter(assigned_agent=request.user)
+
+    # Per-day counts (last 14d)
+    per_day_counts = (
+        sales.annotate(d=TruncDate("sold_at"))
+        .values("d")
+        .annotate(c=Count("id"))
+    )
+    total_units_14 = sum(r["c"] for r in per_day_counts) or 0
+    daily_units_avg = total_units_14 / float(lookback_days)
+
+    # Per-day revenue (last 14d)
+    per_day_rev = (
+        sales.annotate(d=TruncDate("sold_at"))
+        .values("d")
+        .annotate(v=Sum("price"))
+    )
+    total_rev_14 = float(sum(r["v"] or 0 for r in per_day_rev))
+    daily_rev_avg = total_rev_14 / float(lookback_days) if total_rev_14 else 0.0
+
+    overall = [
+        {
+            "day": (today + timedelta(days=i)).isoformat(),
+            "predicted_units": round(daily_units_avg, 2),
+            "predicted_revenue": round(daily_rev_avg, 2),
+        }
+        for i in range(1, 8)
+    ]
+
+    # Model-level stockout risk
+    by_model_14 = (
+        sales.values("item__product_id", "item__product__brand", "item__product__model")
+        .annotate(c=Count("id"))
+    )
+    model_count_map = {r["item__product_id"]: r["c"] for r in by_model_14}
+
+    risky = []
+    by_model_stock = (
+        items.values("product_id", "product__brand", "product__model")
+        .annotate(on_hand=Count("id"))
+        .order_by("product__brand", "product__model")
+    )
+    for r in by_model_stock:
+        pid = r["product_id"]
+        daily_model_avg = (model_count_map.get(pid, 0) / float(lookback_days)) if pid in model_count_map else 0.0
+        need_next_7 = daily_model_avg * 7.0
+        on_hand = int(r["on_hand"] or 0)
+        if daily_model_avg > 0 and on_hand < need_next_7:
+            days_cover = (on_hand / daily_model_avg) if daily_model_avg else 0
+            risky.append({
+                "product": f'{r["product__brand"]} {r["product__model"]}',
+                "on_hand": on_hand,
+                "stockout_date": (today + timedelta(days=max(0, int(days_cover)))).isoformat(),
+                "suggested_restock": int(round(max(0.0, need_next_7 - on_hand))),
+                "urgent": on_hand <= (daily_model_avg * 2.0),
+            })
+
+    return JsonResponse({"ok": True, "overall": overall, "risky": risky})
+
+
+@never_cache
+@login_required
+@require_GET
+def api_cash_overview(request):
+    """
+    Totals for 'Cash' slide.
+    - total_orders (current month)
+    - total_revenue (current month)
+    - total_paid_out (Wallet Payouts, current month)
+    - total_expenses (Advances + Adjustments, current month)
+    """
+    today = timezone.localdate()
+    start = today.replace(day=1)
+    end_excl = today + timedelta(days=1)
+
+    if _can_view_all(request.user):
+        sales = Sale.objects.filter(sold_at__gte=start, sold_at__lt=end_excl)
+        tx = WalletTxn.objects.filter(created_at__date__gte=start, created_at__date__lte=today)
+    else:
+        sales = Sale.objects.filter(agent=request.user, sold_at__gte=start, sold_at__lt=end_excl)
+        tx = WalletTxn.objects.filter(user=request.user, created_at__date__gte=start, created_at__date__lte=today)
+
+    totals = sales.aggregate(
+        orders=Count("id"),
+        revenue=Coalesce(Sum("price"), Value(0), output_field=DecimalField(max_digits=14, decimal_places=2)),
+    )
+
+    paid_out = tx.filter(reason="PAYOUT").aggregate(s=Coalesce(Sum("amount"), Value(0)))["s"] or 0
+    advances = tx.filter(reason="ADVANCE").aggregate(s=Coalesce(Sum("amount"), Value(0)))["s"] or 0
+    adjustments = tx.filter(reason="ADJUSTMENT").aggregate(s=Coalesce(Sum("amount"), Value(0)))["s"] or 0
+
+    data = {
+        "orders": int(totals.get("orders") or 0),
+        "revenue": float(totals.get("revenue") or 0),
+        "paid_out": float(paid_out or 0),
+        "expenses": float((advances or 0) + (adjustments or 0)),
+        "period_label": start.strftime("%b %Y"),
+    }
+    return JsonResponse({"ok": True, **data})
 
 
 # -----------------------

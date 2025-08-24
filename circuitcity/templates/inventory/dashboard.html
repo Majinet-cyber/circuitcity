@@ -251,6 +251,17 @@
       .battery-wrap{ width:72px; }
       .battery{ width:72px; height:160px; }
     }
+
+    /* ===== NEW: Slides wrapper (simple CSS) ===== */
+    .cc-slides{ position:relative; }
+    .cc-slide{ display:none; }
+    .cc-slide.active{ display:block; }
+    .cc-slide[data-name]::before{
+      content:attr(data-name);
+      display:inline-block; font-weight:700; font-size:.9rem; color:var(--muted);
+      background:var(--chip); border:1px solid var(--line); border-radius:999px;
+      padding:.2rem .6rem; margin-bottom:.5rem;
+    }
   </style>
 </head>
 <body>
@@ -309,167 +320,223 @@
         {% endfor %}
       {% endif %}
 
-      <!-- ADDED: AI Recommendations card (predictive analytics) -->
-      <div class="cc-card p-3 mb-3 will-animate">
-        <h5>AI Recommendations</h5>
-        <div id="ai-recos">Loading…</div>
-      </div>
+      <!-- ========== SLIDES: wrap your existing content as Slide A; add Slide B ========== -->
+      <div class="cc-slides" id="ccSlides">
 
-      <!-- KPIs -->
-      <div class="row g-3 mb-3">
-        <div class="col-6 col-md-3">
-          <div class="kpi-card h-100 will-animate">
-            <div class="label">Sold today</div>
-            <div class="value" data-countup>{{ today_count|default:"0" }}</div>
+        <!-- SLIDE A: your full original dashboard content -->
+        <section class="cc-slide active" data-name="Trends">
+          <!-- ADDED: AI Recommendations card (predictive analytics) -->
+          <div class="cc-card p-3 mb-3 will-animate">
+            <h5>AI Recommendations</h5>
+            <div id="ai-recos">Loading…</div>
           </div>
-        </div>
-        <div class="col-6 col-md-3">
-          <div class="kpi-card h-100 will-animate">
-            <div class="label">Sold this month</div>
-            <div class="value" data-countup>{{ mtd_count|default:"0" }}</div>
-          </div>
-        </div>
-        <div class="col-6 col-md-3">
-          <div class="kpi-card h-100 will-animate">
-            <div class="label">All-time sales</div>
-            <div class="value" data-countup>{{ all_time_count|default:"0" }}</div>
-          </div>
-        </div>
-        <div class="col-6 col-md-3">
-          <div class="cc-card p-3 h-100 will-animate">
-            <div class="text-muted small fw-semibold">My Wallet ({{ wallet.month.month_label }})</div>
-            <div class="fs-4 fw-bold">MK {{ wallet.balance|default:0|floatformat:0 }}</div>
-            <div class="d-flex justify-content-between small mt-1"><span>Commission</span><strong>MK {{ wallet.month.commission|default:0|floatformat:0 }}</strong></div>
-            <div class="d-flex justify-content-between small"><span>Advance</span><strong>MK {{ wallet.month.advance|default:0|floatformat:0 }}</strong></div>
-            <div class="d-flex justify-content-between small"><span>Adjustment</span><strong>MK {{ wallet.month.adjustment|default:0|floatformat:0 }}</strong></div>
-            <div class="d-flex justify-content-between small"><span>Total (month)</span><strong>MK {{ wallet.month.total|default:0|floatformat:0 }}</strong></div>
-            <a class="btn btn-sm btn-outline-secondary w-100 mt-2" href="/inventory/wallet/">Open Wallet</a>
-          </div>
-        </div>
-      </div>
 
-      <!-- Row 1 -->
-      <div class="row g-3 mb-3">
-        <div class="col-lg-6">
-          <div class="cc-card p-3 h-100 will-animate">
-            <h5>Top Agents (earnings first, then sales)</h5>
-            {% if agent_rank %}
+          <!-- KPIs -->
+          <div class="row g-3 mb-3">
+            <div class="col-6 col-md-3">
+              <div class="kpi-card h-100 will-animate">
+                <div class="label">Sold today</div>
+                <div class="value" data-countup>{{ today_count|default:"0" }}</div>
+              </div>
+            </div>
+            <div class="col-6 col-md-3">
+              <div class="kpi-card h-100 will-animate">
+                <div class="label">Sold this month</div>
+                <div class="value" data-countup>{{ mtd_count|default:"0" }}</div>
+              </div>
+            </div>
+            <div class="col-6 col-md-3">
+              <div class="kpi-card h-100 will-animate">
+                <div class="label">All-time sales</div>
+                <div class="value" data-countup>{{ all_time_count|default:"0" }}</div>
+              </div>
+            </div>
+            <div class="col-6 col-md-3">
+              <div class="cc-card p-3 h-100 will-animate">
+                <div class="text-muted small fw-semibold">My Wallet ({{ wallet.month.month_label }})</div>
+                <div class="fs-4 fw-bold">MK {{ wallet.balance|default:0|floatformat:0 }}</div>
+                <div class="d-flex justify-content-between small mt-1"><span>Commission</span><strong>MK {{ wallet.month.commission|default:0|floatformat:0 }}</strong></div>
+                <div class="d-flex justify-content-between small"><span>Advance</span><strong>MK {{ wallet.month.advance|default:0|floatformat:0 }}</strong></div>
+                <div class="d-flex justify-content-between small"><span>Adjustment</span><strong>MK {{ wallet.month.adjustment|default:0|floatformat:0 }}</strong></div>
+                <div class="d-flex justify-content-between small"><span>Total (month)</span><strong>MK {{ wallet.month.total|default:0|floatformat:0 }}</strong></div>
+                <a class="btn btn-sm btn-outline-secondary w-100 mt-2" href="/inventory/wallet/">Open Wallet</a>
+              </div>
+            </div>
+          </div>
+
+          <!-- Row 1 -->
+          <div class="row g-3 mb-3">
+            <div class="col-lg-6">
+              <div class="cc-card p-3 h-100 will-animate">
+                <h5>Top Agents (earnings first, then sales)</h5>
+                {% if agent_rank %}
+                  <div class="table-responsive">
+                    <table id="tblAgents" class="table table-sm align-middle">
+                      <thead class="table-light">
+                        <tr>
+                          <th class="sortable" data-type="text">Agent</th>
+                          <th class="text-end sortable" data-type="num">Earnings</th>
+                          <th class="text-end sortable" data-type="num">Sales</th>
+                          <th class="text-end sortable" data-type="num">Revenue</th>
+                          <th class="text-end">Wallet</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {% for r in agent_rank %}
+                          <tr>
+                            <td>
+                              {% if is_manager_or_admin %}
+                                <a href="#" class="agent-link agent-detail" data-user-id="{{ r.agent_id }}" data-username="{{ r.agent__username }}">{{ r.agent__username }}</a>
+                              {% else %}
+                                {{ r.agent__username }}
+                              {% endif %}
+                            </td>
+                            <td class="text-end"><span class="num" data-value="{{ r.earnings|default:0 }}"></span></td>
+                            <td class="text-end"><span class="num" data-value="{{ r.total_sales|default:0 }}"></span></td>
+                            <td class="text-end"><span class="num" data-value="{{ r.revenue|default:0 }}"></span></td>
+                            <td class="text-end">
+                              <span class="wallet-chip loading" data-user-id="{{ r.agent_id }}" data-username="{{ r.agent__username }}">…</span>
+                            </td>
+                          </tr>
+                        {% endfor %}
+                      </tbody>
+                    </table>
+                  </div>
+                {% else %}
+                  <div class="text-muted">No sales found for this period.</div>
+                {% endif %}
+              </div>
+            </div>
+
+            {% if is_manager_or_admin %}
+            <div class="col-lg-3">
+              <div class="cc-card p-3 h-100 will-animate">
+                <h5>Cost vs Revenue vs Profit</h5>
+                <canvas id="pieCRP" class="chart-canvas chart-canvas--sm"></canvas>
+              </div>
+            </div>
+            {% endif %}
+
+            <div class="col-lg-3">
+              <div class="cc-card p-3 h-100 will-animate">
+                <h5>Stock Level</h5>
+                <div class="d-flex align-items-center gap-3">
+                  <div class="battery-wrap">
+                    <div class="battery-cap"></div>
+                    <div class="battery">
+                      <div id="batteryFill" class="battery-fill
+                        {% if jug_color == 'red' %}fill-red{% elif jug_color == 'yellow' %}fill-yellow{% elif jug_color == 'mildgreen' %}fill-mildgreen{% else %}fill-lightgreen{% endif %}"
+                        style="height: 0%;"></div>
+                    </div>
+                  </div>
+                  <div>
+                    <div class="fw-semibold fs-5">{{ jug_count }} in stock</div>
+                    <div class="text-muted small">100 = full, ≤20 = critical</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {% if is_manager_or_admin %}
+          <!-- Row 2 -->
+          <div class="row g-3 mb-3">
+            <div class="col-lg-6">
+              <div class="cc-card p-3 will-animate">
+                <h5>Revenue (last 12 months)</h5>
+                <canvas id="barRevenue" class="chart-canvas"></canvas>
+              </div>
+            </div>
+            <div class="col-lg-6">
+              <div class="cc-card p-3 will-animate">
+                <h5>Profit (last 12 months)</h5>
+                <canvas id="barProfit" class="chart-canvas"></canvas>
+              </div>
+            </div>
+          </div>
+          {% endif %}
+
+          <!-- Row 3 -->
+          <div class="cc-card p-3 will-animate">
+            <h5>Agents: Total Stock vs Sold Units</h5>
+            {% if agent_rows %}
               <div class="table-responsive">
-                <table id="tblAgents" class="table table-sm align-middle">
+                <table id="tblAgentStock" class="table table-sm align-middle">
                   <thead class="table-light">
                     <tr>
                       <th class="sortable" data-type="text">Agent</th>
-                      <th class="text-end sortable" data-type="num">Earnings</th>
-                      <th class="text-end sortable" data-type="num">Sales</th>
-                      <th class="text-end sortable" data-type="num">Revenue</th>
-                      <th class="text-end">Wallet</th>
+                      <th class="text-end sortable" data-type="num">Total Stock</th>
+                      <th class="text-end sortable" data-type="num">
+                        Sold Units ({% if period == "month" %}this month{% else %}all time{% endif %})
+                      </th>
                     </tr>
                   </thead>
                   <tbody>
-                    {% for r in agent_rank %}
-                      <tr>
-                        <td>
-                          {% if is_manager_or_admin %}
-                            <a href="#" class="agent-link agent-detail" data-user-id="{{ r.agent_id }}" data-username="{{ r.agent__username }}">{{ r.agent__username }}</a>
-                          {% else %}
-                            {{ r.agent__username }}
-                          {% endif %}
-                        </td>
-                        <td class="text-end"><span class="num" data-value="{{ r.earnings|default:0 }}"></span></td>
-                        <td class="text-end"><span class="num" data-value="{{ r.total_sales|default:0 }}"></span></td>
-                        <td class="text-end"><span class="num" data-value="{{ r.revenue|default:0 }}"></span></td>
-                        <td class="text-end">
-                          <span class="wallet-chip loading" data-user-id="{{ r.agent_id }}" data-username="{{ r.agent__username }}">…</span>
-                        </td>
-                      </tr>
+                    {% for row in agent_rows %}
+                    <tr>
+                      <td>{{ row.agent }}</td>
+                      <td class="text-end"><span class="num" data-value="{{ row.total_stock|default:0 }}"></span></td>
+                      <td class="text-end"><span class="num" data-value="{{ row.sold_units|default:0 }}"></span></td>
+                    </tr>
                     {% endfor %}
                   </tbody>
                 </table>
               </div>
             {% else %}
-              <div class="text-muted">No sales found for this period.</div>
+              <div class="text-muted">No agent stock data.</div>
             {% endif %}
           </div>
-        </div>
+        </section>
+        <!-- /SLIDE A -->
 
-        {% if is_manager_or_admin %}
-        <div class="col-lg-3">
-          <div class="cc-card p-3 h-100 will-animate">
-            <h5>Cost vs Revenue vs Profit</h5>
-            <canvas id="pieCRP" class="chart-canvas chart-canvas--sm"></canvas>
-          </div>
-        </div>
-        {% endif %}
-
-        <div class="col-lg-3">
-          <div class="cc-card p-3 h-100 will-animate">
-            <h5>Stock Level</h5>
-            <div class="d-flex align-items-center gap-3">
-              <div class="battery-wrap">
-                <div class="battery-cap"></div>
-                <div class="battery">
-                  <div id="batteryFill" class="battery-fill
-                    {% if jug_color == 'red' %}fill-red{% elif jug_color == 'yellow' %}fill-yellow{% elif jug_color == 'mildgreen' %}fill-mildgreen{% else %}fill-lightgreen{% endif %}"
-                    style="height: 0%;"></div>
-                </div>
+        <!-- SLIDE B: Financials view (additional, not replacing anything) -->
+        <section class="cc-slide" data-name="Financials">
+          <div class="row g-3 mb-3">
+            {% if is_manager_or_admin %}
+            <div class="col-lg-6">
+              <div class="cc-card p-3 h-100 will-animate">
+                <h5>Cost vs Revenue vs Profit</h5>
+                <canvas id="pieCRP" class="chart-canvas chart-canvas--sm"></canvas>
               </div>
-              <div>
-                <div class="fw-semibold fs-5">{{ jug_count }} in stock</div>
-                <div class="text-muted small">100 = full, ≤20 = critical</div>
+            </div>
+            {% endif %}
+            <div class="col-lg-6">
+              <div class="cc-card p-3 h-100 will-animate">
+                <h5>Wallet Summary</h5>
+                <div class="row g-2">
+                  <div class="col-6">
+                    <div class="text-muted small fw-semibold">Current Balance</div>
+                    <div class="fs-4 fw-bold">MK {{ wallet.balance|default:0|floatformat:0 }}</div>
+                  </div>
+                  <div class="col-6">
+                    <div class="text-muted small fw-semibold">This Month Total</div>
+                    <div class="fs-4 fw-bold">MK {{ wallet.month.total|default:0|floatformat:0 }}</div>
+                  </div>
+                </div>
+                <div class="d-flex justify-content-between small mt-2">
+                  <span>Commission</span><strong>MK {{ wallet.month.commission|default:0|floatformat:0 }}</strong>
+                </div>
+                <div class="d-flex justify-content-between small">
+                  <span>Advance</span><strong>MK {{ wallet.month.advance|default:0|floatformat:0 }}</strong>
+                </div>
+                <div class="d-flex justify-content-between small">
+                  <span>Adjustment</span><strong>MK {{ wallet.month.adjustment|default:0|floatformat:0 }}</strong>
+                </div>
+                <a class="btn btn-sm btn-outline-secondary w-100 mt-2" href="/inventory/wallet/">Open Wallet</a>
               </div>
             </div>
           </div>
-        </div>
-      </div>
 
-      {% if is_manager_or_admin %}
-      <!-- Row 2 -->
-      <div class="row g-3 mb-3">
-        <div class="col-lg-6">
           <div class="cc-card p-3 will-animate">
-            <h5>Revenue (last 12 months)</h5>
-            <canvas id="barRevenue" class="chart-canvas"></canvas>
+            <h5>Cash Overview</h5>
+            <div class="text-muted">Totals (orders / payouts / expenses). <span class="small">Hook to API later.</span></div>
           </div>
-        </div>
-        <div class="col-lg-6">
-          <div class="cc-card p-3 will-animate">
-            <h5>Profit (last 12 months)</h5>
-            <canvas id="barProfit" class="chart-canvas"></canvas>
-          </div>
-        </div>
-      </div>
-      {% endif %}
+        </section>
+        <!-- /SLIDE B -->
 
-      <!-- Row 3 -->
-      <div class="cc-card p-3 will-animate">
-        <h5>Agents: Total Stock vs Sold Units</h5>
-        {% if agent_rows %}
-          <div class="table-responsive">
-            <table id="tblAgentStock" class="table table-sm align-middle">
-              <thead class="table-light">
-                <tr>
-                  <th class="sortable" data-type="text">Agent</th>
-                  <th class="text-end sortable" data-type="num">Total Stock</th>
-                  <th class="text-end sortable" data-type="num">
-                    Sold Units ({% if period == "month" %}this month{% else %}all time{% endif %})
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {% for row in agent_rows %}
-                <tr>
-                  <td>{{ row.agent }}</td>
-                  <td class="text-end"><span class="num" data-value="{{ row.total_stock|default:0 }}"></span></td>
-                  <td class="text-end"><span class="num" data-value="{{ row.sold_units|default:0 }}"></span></td>
-                </tr>
-                {% endfor %}
-              </tbody>
-            </table>
-          </div>
-        {% else %}
-          <div class="text-muted">No agent stock data.</div>
-        {% endif %}
       </div>
+      <!-- ========== /SLIDES ========== -->
+
     </main>
 
     {% if is_manager_or_admin %}
@@ -541,7 +608,7 @@
       <i class="bi bi-qr-code-scan fs-4"></i>
     </button>
 
-    <!-- ADDED: floating theme controller -->
+    <!-- ADDED: floating theme (same 3 buttons, now also control slides) -->
     <div class="theme-controls">
       <button id="theme-prev" type="button" title="Prev theme">◀</button>
       <button id="theme-toggle-rotate" type="button" title="Auto rotate">Auto: Off</button>
@@ -685,7 +752,7 @@
       const profitPoints  = (payload.profit  || []).map(v=>Number(v)||0);
       const pieData       = (payload.crp     || []).map(v=>Number(v)||0);
 
-      const nf = new Intl.NumberFormat();
+      const nf2 = new Intl.NumberFormat();
 
       function getThemeColors(){
         const s=getComputedStyle(document.documentElement);
@@ -704,10 +771,10 @@
           data:{ labels, datasets:[{ label, data, backgroundColor:color, borderColor:color, borderWidth:1 }] },
           options:{
             responsive:true, maintainAspectRatio:false,
-            plugins:{ legend:{ display:false }, tooltip:{ callbacks:{ label:(ctx)=>'MK '+nf.format(ctx.parsed.y) } } },
+            plugins:{ legend:{ display:false }, tooltip:{ callbacks:{ label:(ctx)=>'MK '+nf2.format(ctx.parsed.y) } } },
             scales:{
               x:{ ticks:{ maxRotation:0, autoSkip:true }, grid:{ display:false } },
-              y:{ beginAtZero:true, ticks:{ callback:(v)=> nf.format(v) }, grid:{ color:colors.grid } }
+              y:{ beginAtZero:true, ticks:{ callback:(v)=> nf2.format(v) }, grid:{ color:colors.grid } }
             },
             animation:{ duration:700, easing:'easeOutQuart' }
           }
@@ -721,7 +788,7 @@
           data:{ labels:['Cost','Revenue','Profit'], datasets:[{ data, backgroundColor:['#94a3b8', colors.revenue, colors.profit] }] },
           options:{
             responsive:true, maintainAspectRatio:false,
-            plugins:{ legend:{ position:'bottom' }, tooltip:{ callbacks:{ label:(ctx)=>`${ctx.label}: MK ${nf.format(ctx.parsed)}` } } },
+            plugins:{ legend:{ position:'bottom' }, tooltip:{ callbacks:{ label:(ctx)=>`${ctx.label}: MK ${nf2.format(ctx.parsed)}` } } },
             animation:{ duration:700, easing:'easeOutQuart' }
           }
         });
@@ -812,50 +879,53 @@
       }
     })();
 
-    /* ===== ADDED: Theme rotator (3 styles every 10s) ===== */
+    /* ===== NEW: Slide rotator (uses your 3-button rotator; rotates every 10s) ===== */
     (function(){
-      const THEMES=["style-1","style-2","style-3"];
-      const KEY="cc-theme", ROTATE="cc-rotate", INTERVAL=10000;
-      const root=document.documentElement;
-      const themeMeta=document.querySelector('meta[name="theme-color"]');
+      const slides=[...document.querySelectorAll('.cc-slide')];
+      if(!slides.length) return;
+
+      const INTERVAL=10000; // 10 seconds
+      const KEY='cc-slide-index';
+      const ROTATE='cc-slide-rotate';
 
       const btnPrev=document.getElementById('theme-prev');
       const btnNext=document.getElementById('theme-next');
       const btnAuto=document.getElementById('theme-toggle-rotate');
 
-      let current = localStorage.getItem(KEY) || root.getAttribute('data-theme') || THEMES[0];
-      let auto = JSON.parse(localStorage.getItem(ROTATE) || 'false');
-      const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      let idx=Math.min(parseInt(localStorage.getItem(KEY)||'0',10)||0, slides.length-1);
+      let auto=JSON.parse(localStorage.getItem(ROTATE)||'true'); // default ON for dashboard screens
+      const reduced=window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-      function apply(t){
-        current=t;
-        root.setAttribute('data-theme', t);
-        localStorage.setItem(KEY, t);
-        if(themeMeta){
-          themeMeta.setAttribute('content',
-            t==="style-2" ? "#0b1220" : (t==="style-3" ? "#0f1b30" : "#0b5bd3"));
+      function show(i){
+        slides.forEach((s,j)=>s.classList.toggle('active', j===i));
+        idx=i; localStorage.setItem(KEY,String(idx));
+        // resize charts when the visible slide changes
+        if(typeof charts!=='undefined' && charts && charts.length){
+          charts.forEach(ch=>{ try{ ch.resize(); }catch(e){} });
         }
-        window.dispatchEvent(new CustomEvent('theme:changed',{detail:{theme:t}}));
+        window.dispatchEvent(new CustomEvent('slide:changed',{detail:{index:idx,name:slides[idx]?.dataset?.name}}));
       }
-      function next(){ apply(THEMES[(THEMES.indexOf(current)+1)%THEMES.length]); }
-      function prev(){ apply(THEMES[(THEMES.indexOf(current)-1+THEMES.length)%THEMES.length]); }
+      function next(){ show((idx+1)%slides.length); }
+      function prev(){ show((idx-1+slides.length)%slides.length); }
 
-      apply(current);
-
+      function updateBtn(){ if(btnAuto) btnAuto.textContent=`Auto: ${auto?'On':'Off'}`; }
       function setAuto(v){ auto=v; localStorage.setItem(ROTATE, JSON.stringify(v)); updateBtn(); v?start():stop(); }
-      function updateBtn(){ if(btnAuto) btnAuto.textContent=`Auto: ${auto?"On":"Off"}`; }
 
       btnNext && btnNext.addEventListener('click', ()=>{ setAuto(false); next(); });
       btnPrev && btnPrev.addEventListener('click', ()=>{ setAuto(false); prev(); });
       btnAuto && btnAuto.addEventListener('click', ()=> setAuto(!auto));
-      updateBtn();
 
       let timer=null;
       function start(){ if(reduced||!auto) return; stop(); timer=setInterval(next, INTERVAL); }
       function stop(){ if(timer) clearInterval(timer); timer=null; }
       document.addEventListener('visibilitychange', ()=> document.hidden?stop():start());
-      window.addEventListener('load', start);
+
+      show(idx); updateBtn(); window.addEventListener('load', start);
     })();
+
+    /* ===== NOTE: if you still want THEME auto-rotation too, we can run it in parallel,
+       but you asked the 3-button rotator to rotate the changing dashboard every 10s,
+       so we’ve bound the buttons/auto to slides here. ===== */
   </script>
 </body>
 </html>
