@@ -215,6 +215,42 @@
       background:var(--card); color:var(--ink); border:1px solid var(--line);
       border-radius:10px; padding:.4rem .6rem;
     }
+
+    /* ======== MOBILE POLISH (CSS-only; no markup changes) ======== */
+
+    /* 1) Ensure media elements never overflow */
+    img, canvas, svg, video { max-width:100%; height:auto; display:block; }
+
+    /* 2) Tables scroll within their container, not the page */
+    .table-responsive { overflow-x:auto; }
+
+    /* 3) Cards cannot grow wider than the container due to long content */
+    .cc-card { min-width:0; }
+
+    /* 4) Filter bar: keep existing form but make items wrap neatly.
+          We override inline min-width on the model select with !important. */
+    header .cc-page form.flex-wrap{
+      display:flex; flex-wrap:wrap; gap:.5rem;
+    }
+    header .cc-page form.flex-wrap > *{
+      flex:1 1 160px; min-width:0;
+    }
+    header .cc-page form.flex-wrap select[name="model"]{
+      min-width:0 !important; /* beats inline style */
+      width:100%;
+    }
+    header .cc-page form.flex-wrap select[name="period"]{
+      width:100%;
+    }
+    @media (max-width:576px){
+      header .cc-page form.flex-wrap > *{ flex-basis:100%; }
+    }
+
+    /* 5) Slightly narrower battery on phones so it never forces horizontal scroll */
+    @media (max-width:576px){
+      .battery-wrap{ width:72px; }
+      .battery{ width:72px; height:160px; }
+    }
   </style>
 </head>
 <body>
