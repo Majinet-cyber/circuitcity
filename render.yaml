@@ -2,21 +2,15 @@
   - type: web
     name: circuitcity-main
     env: python
-    plan: starter
-    autoDeploy: true
-
+    buildCommand: |
+      pip install --upgrade pip
+      pip install -r requirements.txt
+      python manage.py collectstatic --noinput --settings=cc.settings
+    startCommand: gunicorn cc.wsgi:application --workers=2 --threads=4 --timeout=120
+    postDeployCommand: |
+      python manage.py migrate --noinput --settings=cc.settings
     envVars:
       - key: PYTHON_VERSION
         value: 3.12.4
       - key: DJANGO_SETTINGS_MODULE
         value: cc.settings
-
-    buildCommand: |
-      pip install --upgrade pip
-      pip install -r requirements.txt
-      python manage.py collectstatic --noinput --settings=cc.settings
-
-    startCommand: gunicorn cc.wsgi:application --workers=2 --threads=4 --timeout=120
-
-    postDeployCommand: |
-      python manage.py migrate --noinput --settings=cc.settings
