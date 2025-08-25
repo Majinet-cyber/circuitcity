@@ -33,7 +33,7 @@ from .models import (
     InventoryItem,
     Product,
     InventoryAudit,
-    AgentPasswordReset,   # ok if unused
+    AgentPasswordReset,
     WarrantyCheckLog,
     TimeLog,
     WalletTxn,
@@ -326,20 +326,55 @@ def scan_sold(request):
 @login_required
 @require_http_methods(["GET"])
 def scan_web(request):
-    # If the template is missing in prod, render a tiny fallback instead of blank.
-    try:
-        return render(request, "inventory/scan_web.html", {})
-    except TemplateDoesNotExist:
-        return HttpResponse(
-            "<!doctype html><meta charset='utf-8'>"
-            "<title>Scan (Web) — Mark SOLD</title>"
-            "<body style='font:16px system-ui, sans-serif;padding:24px;background:#0f172a;color:#e5e7eb'>"
-            "<h1>Scan (Web) — Mark SOLD</h1>"
-            "<p>Template <code>inventory/scan_web.html</code> not found. "
-            "Please deploy the template or check template dirs.</p>"
-            "</body>",
-            content_type="text/html"
-        )
+    """
+    Render the web-scanner page, but be resilient to template path differences.
+    If neither template exists, render a minimal fallback so the page is never blank.
+    """
+    candidates = [
+        "inventory/scan_web.html",             # current
+        "circuitcity/templates/inventory/scan_web.html",  # legacy path (very rare)
+    ]
+    for tpl in candidates:
+        try:
+            return render(request, tpl, {})
+        except TemplateDoesNotExist:
+            continue
+
+    # Minimal fallback (never blank)
+    html = f"""<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Scan (Web) — Fallback</title>
+  <style>body{{font-family:system-ui,Segoe UI,Roboto,Arial,sans-serif;padding:24px;}}
+  .wrap{{max-width:640px;margin:auto}}.f{{display:flex;gap:8px}}</style>
+</head>
+<body>
+  <div class="wrap">
+    <h2>Scan (Web) — Fallback</h2>
+    <p>If you see this, the template wasn't found. You can still mark SOLD here.</p>
+    <div class="f">
+      <input id="imei" placeholder="IMEI (15 digits)" inputmode="numeric" maxlength="15" />
+      <input id="price" type="number" step="0.01" placeholder="Price (optional)" />
+      <button id="go">Mark SOLD</button>
+    </div>
+    <pre id="out"></pre>
+  </div>
+<script>
+const imei=document.getElementById('imei'), price=document.getElementById('price'), out=document.getElementById('out');
+document.getElementById('go').onclick=async()=>{{
+  const v=(imei.value||'').replace(/\\D/g,'');
+  if(v.length!==15){{out.textContent='IMEI must be exactly 15 digits.';return;}}
+  const r = await fetch("{settings.FORCE_SCRIPT_NAME or ''}/inventory/api/mark-sold/", {{
+    method:"POST", headers:{{"Content-Type":"application/json","X-CSRFToken":(document.cookie.match(/csrftoken=([^;]+)/)||[])[1]||""}},
+    body:JSON.stringify({{imei:v, price:price.value||undefined}})
+  }});
+  out.textContent = 'HTTP '+r.status+'\\n'+await r.text();
+}};
+</script>
+</body></html>"""
+    return HttpResponse(html, content_type="text/html")
 
 
 @never_cache
@@ -734,27 +769,28 @@ def inventory_dashboard(request):
 
     # --- Feature flags & slide config (rotator will switch slides every 10s) ---
     context["PREDICTIVE_ENABLED"]   = bool(getattr(settings, "PREDICTIVE_ENABLED", True))
-    context["THEME_ROTATE_ENABLED"] = bool(getattr(settings, "THEME_ROTATE_ENABLED", True))   # keep the 3 buttons
-    context["THEME_ROTATE_MS"]      = int(getattr(settings, "THEME_ROTATE_MS", 10000))        # 10s
+    context["THEME_ROTATE_ENABLED"] = bool(getattr(settings, "THEME_ROTATE_ENABLED", True))
+    context["THEME_ROTATE_MS"]      = int(getattr(settings, "THEME_ROTATE_MS", 10000))
     context["THEME_DEFAULT"]        = str(getattr(settings, "THEME_DEFAULT", "style-1"))
     context["ROTATOR_MODE"]         = "slides"
+    # ✅ corrected API URLs (were underscores before)
     context["DASHBOARD_SLIDES"] = [
         {
             "key": "trends",
             "title": "Sales Trends",
-            "apis": ["/inventory/api_sales_trend?period=7d&metric=count",
-                     "/inventory/api_profit_bar",
-                     "/inventory/api_top_models?period=today"]
+            "apis": ["/inventory/api/sales-trend/?period=7d&metric=count",
+                     "/inventory/api/profit-bar/",
+                     "/inventory/api/top-models/?period=today"]
         },
         {
             "key": "cash",
             "title": "Cash Overview",
-            "apis": ["/inventory/api/cash_overview"]
+            "apis": ["/inventory/api/cash-overview/"]
         },
         {
             "key": "agents",
             "title": "Agent Performance",
-            "apis": ["/inventory/api_agent_trend?months=6&metric=sales"]
+            "apis": ["/inventory/api/agent-trend/?months=6&metric=sales"]
         }
     ]
 
@@ -1465,7 +1501,7 @@ def api_agent_trend(request):
 
 
 # -----------------------
-# AI & Cash APIs (updated)
+# AI & Cash APIs (NEW)
 # -----------------------
 @never_cache
 @login_required
@@ -1506,10 +1542,9 @@ def api_predictions(request):
     total_rev_14 = float(sum(r["v"] or 0 for r in per_day_rev))
     daily_rev_avg = total_rev_14 / float(lookback_days) if total_rev_14 else 0.0
 
-    # NOTE: use "date" key to match front-end expectations
     overall = [
         {
-            "date": (today + timedelta(days=i)).isoformat(),
+            "day": (today + timedelta(days=i)).isoformat(),
             "predicted_units": round(daily_units_avg, 2),
             "predicted_revenue": round(daily_rev_avg, 2),
         }
@@ -1545,23 +1580,6 @@ def api_predictions(request):
             })
 
     return JsonResponse({"ok": True, "overall": overall, "risky": risky})
-
-
-# --- Compatibility shims so URLs can point anywhere without changing JS ---
-@never_cache
-@login_required
-@require_GET
-def api_predictions_summary(request):
-    """Alias for /.../api/predictions/summary/ → returns same as api_predictions."""
-    return api_predictions(request)
-
-
-@never_cache
-@login_required
-@require_GET
-def predictions_summary(request):
-    """Alias for /api/predictions/ or legacy callers → returns same as api_predictions."""
-    return api_predictions(request)
 
 
 @never_cache

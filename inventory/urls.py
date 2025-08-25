@@ -4,7 +4,6 @@ from django.views.generic import RedirectView
 from . import views
 
 # Try to import the optional API module.
-# Use broad Exception so deploys don't break if api.py imports fail at runtime.
 try:
     from . import api  # expects api.predictions_summary(request)
     _HAS_API_MODULE = True
@@ -12,8 +11,10 @@ except Exception:
     api = None
     _HAS_API_MODULE = False
 
-# Namespace so {% url 'inventory:...' %} works
 app_name = "inventory"
+
+# Choose which prediction view we expose (module wins if present)
+_prediction_view = api.predictions_summary if (_HAS_API_MODULE and hasattr(api, "predictions_summary")) else views.api_predictions
 
 urlpatterns = [
     # ---------- Dashboard ----------
@@ -49,6 +50,11 @@ urlpatterns = [
     path("delete/<int:pk>/",  views.delete_stock,  name="delete_stock"),
     path("restore/<int:pk>/", views.restore_stock, name="restore_stock"),
 
+    # ---------- Agent-only password reset placeholders ----------
+    path("forgot/",             views.agent_forgot_password, name="agent_forgot_password"),
+    path("reset/",              views.agent_reset_confirm,   name="agent_reset_confirm"),
+    path("reset/<slug:token>/", views.agent_reset_confirm,   name="agent_reset_confirm_token"),
+
     # ---------- UI: Time & Wallet ----------
     path("time/checkin/", views.time_checkin_page, name="time_checkin_page"),
     path("time/logs/",    views.time_logs,         name="time_logs"),
@@ -61,51 +67,31 @@ urlpatterns = [
 
 # ---------- API: Time, Wallet, Charts ----------
 urlpatterns += [
-    # Mark sold
     path("api/mark-sold/",       views.api_mark_sold,        name="api_mark_sold"),
-
-    # Charts (hyphen style)
     path("api/sales-trend/",     views.api_sales_trend,      name="api_sales_trend"),
     path("api/top-models/",      views.api_top_models,       name="api_top_models"),
     path("api/profit-bar/",      views.api_profit_bar,       name="api_profit_bar"),
     path("api/agent-trend/",     views.api_agent_trend,      name="api_agent_trend"),
-
-    # Wallet + Time APIs
     path("api/time-checkin/",    views.api_time_checkin,     name="api_time_checkin"),
     path("api/wallet-summary/",  views.api_wallet_summary,   name="api_wallet_summary"),
     path("api/wallet-txn/",      views.api_wallet_add_txn,   name="api_wallet_add_txn"),
 ]
 
-# --- Underscore aliases for front-end that calls /inventory/api_foo ---
+# ---------- API: Predictions (robust aliases) ----------
 urlpatterns += [
-    path("api_sales_trend",  views.api_sales_trend),   # e.g. /inventory/api_sales_trend?period=7d&metric=count
-    path("api_top_models",   views.api_top_models),    # e.g. /inventory/api_top_models?period=today
-    path("api_profit_bar",   views.api_profit_bar),    # e.g. /inventory/api_profit_bar
-    path("api_agent_trend",  views.api_agent_trend),   # e.g. /inventory/api_agent_trend?months=6&metric=sales
+    path("api/predictions/",      _prediction_view, name="api_predictions"),
+    path("api/predictions",       _prediction_view),  # no trailing slash
+    path("api_predictions/",      _prediction_view),  # legacy underscore
+    path("api_predictions",       _prediction_view),
+    path("api-predictions/",      _prediction_view),  # legacy hyphen
+    path("api-predictions",       _prediction_view),
+    path("api/predictions/v2/",   views.api_predictions,  name="api_predictions_v2"),
+    path("api/predictions/v2",    views.api_predictions),
 ]
 
-# ---------- API: Predictions ----------
-# Prefer inventory/api.py if it exists and exposes predictions_summary;
-# otherwise fall back to the views implementation.
-if _HAS_API_MODULE and hasattr(api, "predictions_summary"):
-    urlpatterns += [
-        path("api/predictions/",              api.predictions_summary, name="api_predictions"),
-        path("api/predictions/summary/",      api.predictions_summary),  # alias
-    ]
-else:
-    urlpatterns += [
-        path("api/predictions/",              views.api_predictions, name="api_predictions"),
-        path("api/predictions/summary/",      views.api_predictions),  # alias
-    ]
-
-# Also expose a v2 alias (same payload for now)
+# ---------- API: Legacy chart aliases (so underscores won’t 404) ----------
 urlpatterns += [
-    path("api/predictions/v2/", views.api_predictions, name="api_predictions_v2"),
-]
-
-# ---------- Cash Overview ----------
-# Hyphen route (current) and underscore alias (some JS references use underscore)
-urlpatterns += [
-    path("api/cash-overview/",  views.api_cash_overview,  name="api_cash_overview"),
-    path("api_cash_overview",   views.api_cash_overview),  # alias
+    path("api_sales_trend",  views.api_sales_trend),  # legacy
+    path("api_profit_bar",   views.api_profit_bar),
+    path("api_top_models",   views.api_top_models),
 ]
