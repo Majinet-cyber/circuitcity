@@ -141,7 +141,7 @@
     .wallet-chip.loading{ color:var(--muted) }
     .wallet-chip.positive{ background:#ecfdf5; border-color:#a7f3d0; color:#065f46 }
     .wallet-chip.negative{ background:#fef2f2; border-color:#fecaca; color:#991b1b }
-    .wallet-chip:active { transform:scale(.98); }
+    .wallet-chip:active { transform:scale(.98) }
 
     .battery-wrap{ position:relative; width:90px; }
     .battery{
@@ -933,29 +933,50 @@
       try{ navigator.serviceWorker.register('/static/sw.js'); }catch(e){}
     }
 
-    /* ===== FIXED: AI Recommendations fetch (paths + robust) ===== */
+    /* ===== FIXED: AI Recommendations fetch (robust, tries multiple aliases) ===== */
     (async function(){
       const box=document.getElementById('ai-recos'); if(!box) return;
-      try{
-        const r=await fetch('/inventory/api/predictions/');
-        if(!r.ok) throw new Error('HTTP '+r.status);
-        const d=await r.json();
-        const total=(d.overall||[]).reduce((s,x)=>s+(x.predicted_units||0),0);
-        const revenue=(d.overall||[]).reduce((s,x)=>s+(+x.predicted_revenue||0),0);
-        let html=`<div class="mb-1"><strong>Next 7 days</strong>: <b>${total.toLocaleString()}</b> units • <b>MK ${Math.round(revenue).toLocaleString()}</b></div>`;
-        if((d.risky||[]).length){
-          html+=`<div class="text-muted small">Likely stockouts</div><ul class="mt-1 mb-0">`;
-          for(const x of d.risky){
-            html+=`<li>${x.product}: by <b>${x.stockout_date}</b> • On-hand ${x.on_hand} • Restock <b>${x.suggested_restock}</b> ${x.urgent?'<span class="badge text-bg-danger">URGENT</span>':''}</li>`;
-          }
-          html+=`</ul>`;
-        }else{
-          html+=`<div class="text-success">All good — no stockouts in next 7 days.</div>`;
-        }
-        box.innerHTML=html;
-      }catch(e){
-        box.innerHTML=`<div class="text-danger">Could not load predictions.</div><div class="small text-muted">${String(e)}</div>`;
+
+      const endpoints=[
+        '/inventory/api/predictions/',
+        '/inventory/api/predictions',
+        '/inventory/api/predictions/v2/',
+        '/inventory/api/predictions/v2',
+        '/inventory/api_predictions/',
+        '/inventory/api_predictions',
+        '/inventory/api-predictions/',
+        '/inventory/api-predictions'
+      ];
+
+      let data=null, lastErr='';
+      for (const u of endpoints){
+        try{
+          const r=await fetch(u, {headers:{'Accept':'application/json'}});
+          if(!r.ok){ lastErr = `HTTP ${r.status}`; continue; }
+          data = await r.json();
+          break;
+        }catch(e){ lastErr = String(e); }
       }
+
+      if(!data){
+        box.innerHTML = `<div class="text-danger">Could not load predictions.</div><div class="small text-muted">${lastErr || 'No matching API route'}</div>`;
+        return;
+      }
+
+      const total=(data.overall||[]).reduce((s,x)=>s+(x.predicted_units||0),0);
+      const revenue=(data.overall||[]).reduce((s,x)=>s+(+x.predicted_revenue||0),0);
+      let html=`<div class="mb-1"><strong>Next 7 days</strong>: <b>${total.toLocaleString()}</b> units • <b>MK ${Math.round(revenue).toLocaleString()}</b></div>`;
+
+      if((data.risky||[]).length){
+        html+=`<div class="text-muted small">Likely stockouts</div><ul class="mt-1 mb-0">`;
+        for(const x of data.risky){
+          html+=`<li>${x.product}: by <b>${x.stockout_date}</b> • On-hand ${x.on_hand} • Restock <b>${x.suggested_restock}</b> ${x.urgent?'<span class="badge text-bg-danger">URGENT</span>':''}</li>`;
+        }
+        html+='</ul>';
+      }else{
+        html+='<div class="text-success">All good — no stockouts in next 7 days.</div>';
+      }
+      box.innerHTML=html;
     })();
 
     /* ===== Slides rotator (separate 3-button control; auto 10s) ===== */
@@ -978,7 +999,6 @@
       function show(i){
         slides.forEach((s,j)=>s.classList.toggle('active', j===i));
         idx=i; localStorage.setItem(KEY,String(idx));
-        // Resize charts when visible slide changes
         if(charts && charts.length){ charts.forEach(ch=>{ try{ ch.resize(); }catch(e){} }); }
         window.dispatchEvent(new CustomEvent('slide:changed',{detail:{index:idx,name:slides[idx]?.dataset?.name}}));
       }
@@ -1003,7 +1023,7 @@
     /* ===== Theme rotator (original 3-button control; independent) ===== */
     (function(){
       const THEMES=["style-1","style-2","style-3"];
-      const KEY="cc-theme", ROTATE="cc-theme-rotate", INTERVAL=12000; // theme auto can be different
+      const KEY="cc-theme", ROTATE="cc-theme-rotate", INTERVAL=12000;
       const root=document.documentElement;
       const themeMeta=document.querySelector('meta[name="theme-color"]');
 
@@ -1105,7 +1125,7 @@
 
           try{
             if(agent==='*'){
-              // apply to all agents sequentially so backend needn't support batch
+              // apply to all agents sequentially
               const rows=[...document.querySelectorAll('#tblWalletAdmin tbody tr[data-agent-id]')];
               for(const tr of rows){
                 const uid=tr.getAttribute('data-agent-id');

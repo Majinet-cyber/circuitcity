@@ -1,26 +1,41 @@
-# circuitcity/inventory/urls.py
-from django.urls import path
+# inventory/urls.py
+from django.urls import path, re_path
 from django.views.generic import RedirectView
 from . import views
 
-# Namespace so {% url 'inventory:...' %} works
+# Optional inventory/api.py (prefer its 'predictions_summary' if available)
+try:
+    from . import api as api_mod
+    _HAS_API_MODULE = True
+except Exception:
+    api_mod = None
+    _HAS_API_MODULE = False
+
+def _pick_prediction_view():
+    if _HAS_API_MODULE and hasattr(api_mod, "predictions_summary"):
+        return api_mod.predictions_summary
+    return views.api_predictions
+
+_prediction_view = _pick_prediction_view()
+
 app_name = "inventory"
 
 urlpatterns = [
     # ---------- Dashboard ----------
     path("dashboard/", views.inventory_dashboard, name="inventory_dashboard"),
-    # App home → dashboard
     path("", RedirectView.as_view(pattern_name="inventory:inventory_dashboard", permanent=False), name="home"),
     path("dash/", RedirectView.as_view(pattern_name="inventory:inventory_dashboard", permanent=False)),
-    # Old links → dashboard
+
+    # Old dashboard redirects
     path("dashboard/agent/",  RedirectView.as_view(pattern_name="inventory:inventory_dashboard", permanent=False)),
     path("dashboard/agents/", RedirectView.as_view(pattern_name="inventory:inventory_dashboard", permanent=False)),
 
     # ---------- Stock scanning ----------
     path("scan-in/",   views.scan_in,   name="scan_in"),
     path("scan-sold/", views.scan_sold, name="scan_sold"),
-    path("scan-web/",  views.scan_web,  name="scan_web"),  # desktop-first scanner page
-    # Short mobile-friendly aliases
+    path("scan-web/",  views.scan_web,  name="scan_web"),
+
+    # Short mobile aliases
     path("in/",   RedirectView.as_view(pattern_name="inventory:scan_in",   permanent=False), name="short_in"),
     path("sold/", RedirectView.as_view(pattern_name="inventory:scan_sold", permanent=False), name="short_sold"),
     path("scan/", RedirectView.as_view(pattern_name="inventory:scan_web",  permanent=False), name="short_scan"),
@@ -62,4 +77,24 @@ urlpatterns += [
     path("api/time-checkin/",    views.api_time_checkin,     name="api_time_checkin"),
     path("api/wallet-summary/",  views.api_wallet_summary,   name="api_wallet_summary"),
     path("api/wallet-txn/",      views.api_wallet_add_txn,   name="api_wallet_add_txn"),
+
+    # Cash overview (aliases)
+    re_path(r"^api/cash[-_]overview/?$", views.api_cash_overview, name="api_cash_overview"),
+]
+
+# ---------- API: Predictions (robust aliases) ----------
+urlpatterns += [
+    re_path(r"^api/predictions/?$",      _prediction_view, name="api_predictions"),
+    re_path(r"^api[-_]?predictions/?$", _prediction_view),
+    re_path(r"^api_predictions/?$",      _prediction_view),
+
+    # v2 alias
+    re_path(r"^api/predictions/v2/?$",   views.api_predictions, name="api_predictions_v2"),
+]
+
+# ---------- Legacy chart aliases ----------
+urlpatterns += [
+    re_path(r"^api[_-]?sales[_-]?trend/?$",  views.api_sales_trend),
+    re_path(r"^api[_-]?profit[_-]?bar/?$",   views.api_profit_bar),
+    re_path(r"^api[_-]?top[_-]?models/?$",   views.api_top_models),
 ]
