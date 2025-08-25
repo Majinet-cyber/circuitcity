@@ -1,5 +1,5 @@
 ﻿<!DOCTYPE html>
-<!-- PROBE: NEW DASHBOARD v2.6 -->
+<!-- PROBE: NEW DASHBOARD v2.6.1 -->
 <!-- THEMES + SLIDES: both rotators live -->
 <html lang="en" data-theme="style-1">
 <head>
@@ -330,6 +330,9 @@
                 <div class="value" data-countup>{{ all_time_count|default:"0" }}</div>
               </div>
             </div>
+
+            <!-- Agents-only wallet summary (admins must NOT see this card) -->
+            {% if not is_manager_or_admin %}
             <div class="col-6 col-md-3">
               <div class="cc-card p-3 h-100 will-animate">
                 <div class="text-muted small fw-semibold">My Wallet ({{ wallet.month.month_label }})</div>
@@ -341,6 +344,7 @@
                 <a class="btn btn-sm btn-outline-secondary w-100 mt-2" href="/inventory/wallet/">Open Wallet</a>
               </div>
             </div>
+            {% endif %}
           </div>
 
           <!-- Row 1 -->
@@ -595,9 +599,7 @@
             {% endif %}
           </div>
 
-          {% if not is_manager_or_admin %}
-          <!-- Agents do NOT see Cash Overview; nothing extra here -->
-          {% endif %}
+          {% if not is_manager_or_admin %}{% endif %}
         </section>
         <!-- /SLIDE B -->
 
@@ -639,7 +641,7 @@
     </div>
     {% endif %}
 
-    <!-- Offcanvas Menu (unchanged) -->
+    <!-- Offcanvas Menu -->
     <div class="offcanvas offcanvas-start" tabindex="-1" id="ccMenu" aria-labelledby="ccMenuLabel">
       <div class="offcanvas-header">
         <h5 class="offcanvas-title" id="ccMenuLabel">Menu</h5>
@@ -651,15 +653,15 @@
           <a class="list-group-item list-group-item-action" href="/inventory/scan-in/">Scan IN</a>
           <a class="list-group-item list-group-item-action" href="/inventory/scan-sold/">Scan SOLD</a>
           <a class="list-group-item list-group-item-action" href="/inventory/scan-web/">Scan (Web)</a>
-          <a class="list-group-item list-group-item-action" href="/inventory/time-checkin/">Time Check-in</a>
-          <a class="list-group-item list-group-item-action" href="/inventory/time-logs/">Time Logs</a>
+          <a class="list-group-item list-group-item-action" href="/inventory/time/checkin/">Time Check-in</a>
+          <a class="list-group-item list-group-item-action" href="/inventory/time/logs/">Time Logs</a>
           <a class="list-group-item list-group-item-action" href="/inventory/wallet/">Wallet</a>
           <a class="list-group-item list-group-item-action" href="/admin/">Django Admin</a>
         </div>
       </div>
     </div>
 
-    <!-- Mobile Bottom Tabs (unchanged) -->
+    <!-- Mobile Bottom Tabs -->
     <nav class="cc-bottom-nav d-lg-none" aria-label="Primary">
       <div class="d-flex align-items-center">
         <a class="tab active" href="/"><i class="bi bi-speedometer2"></i>Home</a>
@@ -670,7 +672,7 @@
       </div>
     </nav>
 
-    <!-- Floating Action (unchanged) -->
+    <!-- Floating Action -->
     <button class="cc-fab d-lg-none" onclick="location.href='/inventory/scan-sold/'" aria-label="Scan SOLD">
       <i class="bi bi-qr-code-scan fs-4"></i>
     </button>
@@ -813,9 +815,7 @@
     }
     {% endif %}
 
-    {% if is_manager_or_admin %}
-    /* ===== Charts: theme-aware ===== */
-    {% endif %}
+    {% if is_manager_or_admin %}{% endif %}
     let charts = [];
     function initChartsSafely(){
       if(!window.Chart) { return; }
@@ -1045,9 +1045,16 @@
       window.addEventListener('load', start);
     })();
 
-    /* ===== Admin wallet management helpers (API hooks) ===== */
+    /* ===== Admin wallet management helpers (API hooks + CSRF) ===== */
     {% if is_manager_or_admin %}
     (function(){
+      function getCookie(name){
+        const value = `; ${document.cookie}`;
+        const parts = value.split(`; ${name}=`);
+        if (parts.length === 2) return parts.pop().split(';').shift();
+      }
+      const csrftoken = getCookie('csrftoken');
+
       async function fetchAgentWalletRow(userId, rowEl){
         try{
           const now=new Date();
@@ -1078,7 +1085,7 @@
       async function postWalletTxn(payload){
         const r = await fetch('/inventory/api/wallet-txn/', {
           method:'POST',
-          headers:{ 'Content-Type':'application/json' },
+          headers:{ 'Content-Type':'application/json', 'X-CSRFToken': csrftoken || '' },
           body: JSON.stringify(payload)
         });
         if(!r.ok) throw new Error('HTTP '+r.status);

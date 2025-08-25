@@ -1,0 +1,17 @@
+/* Minimal tokens so non-dashboard pages inherit dark styles */
+:root{
+  --bg:#f6f9ff; --card:#fff; --line:#e2e8f0; --ink:#0f172a; --muted:#64748b;
+  --blue-700:#1d4ed8; --blue-600:#2563eb; --blue-500:#3b82f6; --blue-400:#60a5fa;
+}
+html[data-theme="style-2"]{
+  --bg:#0b1220; --card:#0e1629; --line:#20324d; --ink:#e5e7eb; --muted:#a8b3cf;
+  --blue-700:#1342b8; --blue-600:#3c82ff; --blue-500:#5aa0ff; --blue-400:#8fc3ff;
+}
+html[data-theme="style-3"]{
+  --bg:#0b1222; --card:#0f1b30; --line:#223454; --ink:#e7ecfb; --muted:#9fb0cf;
+  --blue-700:#0e7a63; --blue-600:#10b981; --blue-500:#34d399; --blue-400:#6ee7b7;
+}
+body{ background:var(--bg); color:var(--ink); }
+.btn-primary{ background:var(--blue-600); border-color:var(--blue-600); }
+.btn-primary:hover{ background:var(--blue-700); border-color:var(--blue-700); }
+.form-control, .form-select{ background:var(--card); color:var(--ink); border-color:var(--line); }

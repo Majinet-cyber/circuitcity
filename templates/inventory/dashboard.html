@@ -1,8 +1,4 @@
-<<<<<<< Updated upstream
 <!DOCTYPE html>
-=======
-﻿<!DOCTYPE html>
->>>>>>> Stashed changes
 <!-- PROBE: NEW DASHBOARD v2.6.1 -->
 <!-- THEMES + SLIDES: both rotators live -->
 <html lang="en" data-theme="style-1">
@@ -603,9 +599,7 @@
             {% endif %}
           </div>
 
-          {% if not is_manager_or_admin %}
-          <!-- Agents do NOT see Cash Overview; nothing extra here -->
-          {% endif %}
+          {% if not is_manager_or_admin %}{% endif %}
         </section>
         <!-- /SLIDE B -->
 
@@ -647,7 +641,7 @@
     </div>
     {% endif %}
 
-    <!-- Offcanvas Menu (unchanged) -->
+    <!-- Offcanvas Menu -->
     <div class="offcanvas offcanvas-start" tabindex="-1" id="ccMenu" aria-labelledby="ccMenuLabel">
       <div class="offcanvas-header">
         <h5 class="offcanvas-title" id="ccMenuLabel">Menu</h5>
@@ -659,15 +653,15 @@
           <a class="list-group-item list-group-item-action" href="/inventory/scan-in/">Scan IN</a>
           <a class="list-group-item list-group-item-action" href="/inventory/scan-sold/">Scan SOLD</a>
           <a class="list-group-item list-group-item-action" href="/inventory/scan-web/">Scan (Web)</a>
-          <a class="list-group-item list-group-item-action" href="/inventory/time-checkin/">Time Check-in</a>
-          <a class="list-group-item list-group-item-action" href="/inventory/time-logs/">Time Logs</a>
+          <a class="list-group-item list-group-item-action" href="/inventory/time/checkin/">Time Check-in</a>
+          <a class="list-group-item list-group-item-action" href="/inventory/time/logs/">Time Logs</a>
           <a class="list-group-item list-group-item-action" href="/inventory/wallet/">Wallet</a>
           <a class="list-group-item list-group-item-action" href="/admin/">Django Admin</a>
         </div>
       </div>
     </div>
 
-    <!-- Mobile Bottom Tabs (unchanged) -->
+    <!-- Mobile Bottom Tabs -->
     <nav class="cc-bottom-nav d-lg-none" aria-label="Primary">
       <div class="d-flex align-items-center">
         <a class="tab active" href="/"><i class="bi bi-speedometer2"></i>Home</a>
@@ -678,7 +672,7 @@
       </div>
     </nav>
 
-    <!-- Floating Action (unchanged) -->
+    <!-- Floating Action -->
     <button class="cc-fab d-lg-none" onclick="location.href='/inventory/scan-sold/'" aria-label="Scan SOLD">
       <i class="bi bi-qr-code-scan fs-4"></i>
     </button>
@@ -821,9 +815,7 @@
     }
     {% endif %}
 
-    {% if is_manager_or_admin %}
-    /* ===== Charts: theme-aware ===== */
-    {% endif %}
+    {% if is_manager_or_admin %}{% endif %}
     let charts = [];
     function initChartsSafely(){
       if(!window.Chart) { return; }
