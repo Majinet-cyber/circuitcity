@@ -1,184 +1,215 @@
 {% extends "base.html" %}
 {% block title %}Scan Sold · Circuit City{% endblock %}
 
-{% block body %}
-<div class="bg" style="min-height:100dvh;padding:2rem;display:grid;place-items:start">
-  <div class="card" style="max-width:680px;width:100%;padding:1.5rem">
-    <h2 class="brand" style="margin:0 0 1rem">Mark Item as SOLD</h2>
+{% block extra_css %}
+<style>
+  /* ===== Layout helpers ===== */
+  .page{margin:0 auto;max-width:1120px;padding:clamp(12px,4vw,24px)}
+  .vstack{display:flex;flex-direction:column;gap:.75rem}
+  .hstack{display:flex;align-items:center;gap:.75rem;flex-wrap:wrap}
 
-    {# flash messages #}
+  /* ===== Theme-aware tokens (fallbacks if tokens.css not loaded) ===== */
+  :root{
+    --bg: var(--bg, #ffffff);
+    --fg: var(--fg, #0f172a);
+    --border: var(--border, #e2e8f0);
+    --card: var(--card, #ffffff);
+    --accent: var(--accent, #2563eb);
+    --onAccent: var(--onAccent, #ffffff);
+  }
+  body{background:var(--bg);color:var(--fg)}
+
+  /* ===== Cards & fields ===== */
+  .card{
+    background:var(--card);color:var(--fg);
+    border:1px solid var(--border);border-radius:16px;padding:1.25rem;
+  }
+  .row{display:grid;grid-template-columns:1fr 1fr;gap:1rem}
+  @media (max-width: 640px){ .row{grid-template-columns:1fr} }
+  .field{position:relative;background:var(--card);border:1px solid var(--border);border-radius:12px;display:flex;align-items:center}
+  .field > input,.field > select,.field > .form-control{
+    flex:1;background:transparent;color:var(--fg);border:0;padding:12px 14px;outline:none;font-size:16px;min-height:44px;width:100%;
+  }
+  label{font-weight:600;margin-bottom:.35rem;display:block}
+
+  /* ===== Buttons ===== */
+  .btn{
+    appearance:none;border:1px solid var(--border);background:var(--card);color:var(--fg);
+    border-radius:10px;padding:10px 14px;cursor:pointer;font-weight:600;font-size:14px;min-height:44px;text-decoration:none;display:inline-flex;align-items:center;gap:.4rem;
+  }
+  .btn:hover{filter:brightness(1.05)}
+  .btn[disabled]{opacity:.5;cursor:not-allowed}
+  .btn-primary{background:var(--accent);color:var(--onAccent);border-color:transparent}
+  .btn-secondary{background:var(--card)}
+  .btn-muted{background:rgba(148,163,184,.18)}
+
+  /* ===== Alerts (messages) ===== */
+  .alert{margin:.5rem 0;padding:.75rem 1rem;border-radius:.75rem;border:1px solid var(--border)}
+  .alert-ok{background:rgba(59,130,246,.08)}
+  .alert-err{background:rgba(239,68,68,.1);border-color:rgba(239,68,68,.5)}
+
+  /* ===== Hints & text bits ===== */
+  .hint{font-size:.9rem;opacity:.8}
+  .error-text{color:#ef4444;font-size:.95rem;margin-top:.25rem}
+
+  /* ===== Modal ===== */
+  #scanModal{position:fixed;inset:0;background:rgba(0,0,0,.6);display:none;align-items:center;justify-content:center;z-index:9999}
+  #scanModal .modal-card{width:min(95vw,700px);padding:0;overflow:hidden}
+  #scanModal header, #scanModal footer{display:flex;align-items:center;justify-content:space-between;padding:.75rem 1rem;border-color:var(--border);border-style:solid}
+  #scanModal header{border-width:0 0 1px 0;background:var(--card)}
+  #scanModal footer{border-width:1px 0 0 0;background:var(--card)}
+  #scanVideo{width:100%;height:auto;background:#000;display:block}
+  #scanFrame{position:absolute;inset:0;border:2px dashed rgba(255,255,255,.5);margin:10%}
+</style>
+{% endblock %}
+
+{% block body %}
+{% include "_topbar.html" %}
+<main class="page vstack">
+  <section class="card vstack" aria-labelledby="sell">
+    <h1 id="sell" style="margin:0">Mark Item as SOLD</h1>
+
+    {# Flash messages #}
     {% if messages %}
       {% for message in messages %}
-        <div style="margin:.5rem 0;padding:.75rem 1rem;border-radius:.75rem;
-                    {% if message.tags == 'error' %}
-                      background:#fee2e2;border:1px solid #fecaca;color:#7f1d1d;
-                    {% else %}
-                      background:#e7f1ff;border:1px solid #cfe2ff;color:#102a7a;
-                    {% endif %}">
-          {{ message }}
-        </div>
+        <div class="alert {% if message.tags == 'error' %}alert-err{% else %}alert-ok{% endif %}">{{ message }}</div>
       {% endfor %}
     {% endif %}
 
-    {# non-field errors #}
+    {# Non-field errors #}
     {% if form.non_field_errors %}
-      <div style="margin:.5rem 0;padding:.75rem 1rem;border-radius:.75rem;
-                  background:#fee2e2;border:1px solid #fecaca;color:#7f1d1d;">
-        {{ form.non_field_errors }}
-      </div>
+      <div class="alert alert-err">{{ form.non_field_errors }}</div>
     {% endif %}
 
-    <form method="post" novalidate style="display:grid;gap:1rem" autocomplete="off">
+    <form method="post" novalidate class="vstack" autocomplete="off" style="gap:1rem">
       {% csrf_token %}
 
-      <!-- IMEI field + scan/paste/clear -->
+      <!-- IMEI -->
       <div>
-        <label for="{{ form.imei.id_for_label }}" style="display:block;margin:0 0 .35rem;color:#334155;font-weight:600">
-          IMEI / Barcode
-        </label>
-        {{ form.imei }}
-        <div style="display:flex;gap:.5rem;margin-top:.5rem;flex-wrap:wrap">
+        <label for="{{ form.imei.id_for_label }}">IMEI / Barcode</label>
+        <div class="field">{{ form.imei }}</div>
+        <div class="hstack" style="margin-top:.5rem">
           <button class="btn" type="button" id="btnOpenScanner">📷 Scan with camera</button>
           <button class="btn" type="button" id="btnPaste">📋 Paste</button>
-          <button class="btn" type="button" id="btnClear">✖ Clear</button>
+          <button class="btn btn-muted" type="button" id="btnClear">✖ Clear</button>
         </div>
-        <div id="imeiHint" style="color:#64748b;font-size:.9rem;margin-top:.35rem">
+        <div id="imeiHint" class="hint" style="margin-top:.35rem">
           Tip: You can type, paste, or scan. IMEI must be exactly 15 digits.
         </div>
-        {% if form.imei.errors %}
-          <div style="color:#b91c1c;margin-top:.25rem;font-size:.95rem;">
-            {{ form.imei.errors|striptags }}
-          </div>
-        {% endif %}
+        {% if form.imei.errors %}<div class="error-text">{{ form.imei.errors|striptags }}</div>{% endif %}
       </div>
 
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem">
+      <!-- Sold date / Price -->
+      <div class="row">
         <div>
-          <label for="{{ form.sold_at.id_for_label }}" style="display:block;margin:0 0 .35rem;color:#334155;font-weight:600">
-            Sold date
-          </label>
-          {{ form.sold_at }}
-          {% if form.sold_at.errors %}
-            <div style="color:#b91c1c;margin-top:.25rem;font-size:.95rem;">
-              {{ form.sold_at.errors|striptags }}
-            </div>
-          {% endif %}
+          <label for="{{ form.sold_at.id_for_label }}">Sold date</label>
+          <div class="field">{{ form.sold_at }}</div>
+          {% if form.sold_at.errors %}<div class="error-text">{{ form.sold_at.errors|striptags }}</div>{% endif %}
         </div>
 
         <div>
-          <label for="{{ form.price.id_for_label }}" style="display:block;margin:0 0 .35rem;color:#334155;font-weight:600">
-            Price
-          </label>
-          {{ form.price }}
-          {% if form.price.errors %}
-            <div style="color:#b91c1c;margin-top:.25rem;font-size:.95rem;">
-              {{ form.price.errors|striptags }}
-            </div>
-          {% endif %}
+          <label for="{{ form.price.id_for_label }}">Price</label>
+          <div class="field">{{ form.price }}</div>
+          {% if form.price.errors %}<div class="error-text">{{ form.price.errors|striptags }}</div>{% endif %}
         </div>
       </div>
 
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem">
+      <!-- Commission / Location -->
+      <div class="row">
         <div>
-          <label for="{{ form.commission_pct.id_for_label }}" style="display:block;margin:0 0 .35rem;color:#334155;font-weight:600">
-            Commission %
-          </label>
-          {{ form.commission_pct }}
-          {% if form.commission_pct.errors %}
-            <div style="color:#b91c1c;margin-top:.25rem;font-size:.95rem;">
-              {{ form.commission_pct.errors|striptags }}
-            </div>
-          {% endif %}
+          <label for="{{ form.commission_pct.id_for_label }}">Commission %</label>
+          <div class="field">{{ form.commission_pct }}</div>
+          {% if form.commission_pct.errors %}<div class="error-text">{{ form.commission_pct.errors|striptags }}</div>{% endif %}
         </div>
 
         <div>
-          <label for="{{ form.location.id_for_label }}" style="display:block;margin:0 0 .35rem;color:#334155;font-weight:600">
-            Location
-          </label>
-          {{ form.location }}
-          {% if form.location.errors %}
-            <div style="color:#b91c1c;margin-top:.25rem;font-size:.95rem;">
-              {{ form.location.errors|striptags }}
-            </div>
-          {% endif %}
+          <label for="{{ form.location.id_for_label }}">Location</label>
+          <div class="field">{{ form.location }}</div>
+          {% if form.location.errors %}<div class="error-text">{{ form.location.errors|striptags }}</div>{% endif %}
         </div>
       </div>
 
-      <div style="display:flex;gap:.6rem;flex-wrap:wrap">
-        <button class="btn" type="submit">Mark as SOLD</button>
-        <a class="btn" href="{% url 'inventory:stock_list' %}" style="background:#64748b">Stock list</a>
-        <a class="btn" href="{% url 'inventory:scan_in' %}" style="background:#2563eb">← Back to Scan In</a>
+      <!-- Actions -->
+      <div class="hstack">
+        <button class="btn btn-primary" type="submit">Mark as SOLD</button>
+        <a class="btn" href="{% url 'inventory:stock_list' %}">Stock list</a>
+        <a class="btn" href="{% url 'inventory:scan_in' %}">← Back to Scan In</a>
       </div>
     </form>
-  </div>
-</div>
+  </section>
+</main>
 
 <!-- Scanner Modal -->
-<div id="scanModal" style="position:fixed;inset:0;background:rgba(0,0,0,.6);display:none;align-items:center;justify-content:center;z-index:9999">
-  <div class="card" style="width:min(95vw,700px);padding:0;overflow:hidden">
-    <div style="display:flex;align-items:center;justify-content:space-between;padding:.75rem 1rem;border-bottom:1px solid #e5e7eb">
+<div id="scanModal">
+  <div class="card modal-card">
+    <header>
       <strong>Scan barcode</strong>
       <button class="btn" id="btnCloseScanner" type="button">Close</button>
-    </div>
+    </header>
     <div style="position:relative;background:#000">
-      <video id="scanVideo" playsinline style="width:100%;height:auto"></video>
-      <div style="position:absolute;inset:0;border:2px dashed rgba(255,255,255,.5);margin:10%"></div>
+      <video id="scanVideo" playsinline></video>
+      <div id="scanFrame"></div>
     </div>
-    <div style="padding:.75rem 1rem;border-top:1px solid #e5e7eb;display:flex;gap:.5rem;flex-wrap:wrap;align-items:center">
+    <footer class="hstack">
       <button class="btn" id="btnSwapCamera" type="button">🔁 Switch camera</button>
-      <span id="scanStatus" style="color:#64748b">Align barcode within the frame…</span>
-    </div>
+      <span id="scanStatus" class="hint">Align barcode within the frame…</span>
+    </footer>
   </div>
 </div>
 
 <!-- Quagga2 (barcode scanner) -->
 <script src="https://unpkg.com/@ericblade/quagga2/dist/quagga.js"></script>
 <script>
-  // Ensure the IMEI input has styling class if needed
-  (function ensureInputClass() {
-    const imei = document.getElementById("id_imei");
-    if (imei && !imei.classList.contains("input")) imei.classList.add("input");
+  // Ensure theme-friendly input class if your widgets don't render with it
+  (function ensureInputClasses() {
+    const ids = ["id_imei","id_sold_at","id_price","id_commission_pct","id_location"];
+    ids.forEach(id => {
+      const el = document.getElementById(id);
+      if (el && !el.classList.contains("input")) el.classList.add("input");
+    });
   })();
 
-  // Helpers for IMEI normalization (digits only, max 15)
+  // IMEI normalization (digits only, exactly 15)
   const imeiInput = document.getElementById("id_imei");
-  function setImei(val) {
-    const digits = (val || "").replace(/\D+/g, "").slice(0, 15);
+  function setImei(val){
+    const digits = (val || "").replace(/\\D+/g,"").slice(0,15);
     imeiInput.value = digits;
     imeiInput.setCustomValidity(digits.length === 15 ? "" : "IMEI must be exactly 15 digits.");
   }
-  const cap15 = (e) => setImei(e.target.value);
-  if (imeiInput) {
+  function cap15(e){ setImei(e.target.value); }
+  if (imeiInput){
     imeiInput.addEventListener("input", cap15);
     imeiInput.addEventListener("blur", cap15);
-    // init on load
     setImei(imeiInput.value || "");
   }
 
-  // Paste / Clear buttons
-  document.getElementById("btnPaste").onclick = async () => {
-    try {
-      const text = await navigator.clipboard.readText();
-      setImei(text);
-    } catch {
+  // Paste / Clear
+  const btnPaste = document.getElementById("btnPaste");
+  const btnClear = document.getElementById("btnClear");
+  btnPaste && (btnPaste.onclick = async () => {
+    try{
+      const txt = await navigator.clipboard.readText();
+      setImei(txt);
+    }catch{
       alert("Clipboard access is blocked by the browser.");
     }
-  };
-  document.getElementById("btnClear").onclick = () => setImei("");
+  });
+  btnClear && (btnClear.onclick = () => setImei(""));
 
-  // Scanner controls
+  // Modal + Quagga2
   const scanModal = document.getElementById("scanModal");
-  const btnOpen = document.getElementById("btnOpenScanner");
-  const btnClose = document.getElementById("btnCloseScanner");
-  const btnSwap = document.getElementById("btnSwapCamera");
-  const statusEl = document.getElementById("scanStatus");
+  const btnOpen   = document.getElementById("btnOpenScanner");
+  const btnClose  = document.getElementById("btnCloseScanner");
+  const btnSwap   = document.getElementById("btnSwapCamera");
+  const statusEl  = document.getElementById("scanStatus");
+  const videoEl   = document.getElementById("scanVideo");
 
   let currentDeviceId = null;
   let devices = [];
 
-  btnOpen.addEventListener("click", openScanner);
-  btnClose.addEventListener("click", closeScanner);
-  btnSwap.addEventListener("click", async () => {
+  btnOpen && btnOpen.addEventListener("click", openScanner);
+  btnClose && btnClose.addEventListener("click", closeScanner);
+  btnSwap  && btnSwap.addEventListener("click", async () => {
     if (!devices.length) return;
     const idx = devices.findIndex(d => d.deviceId === currentDeviceId);
     const next = devices[(idx + 1) % devices.length];
@@ -186,31 +217,31 @@
     await startQuagga();
   });
 
-  async function openScanner() {
+  async function openScanner(){
     scanModal.style.display = "flex";
     statusEl.textContent = "Starting camera…";
     await initDevices();
     await startQuagga();
   }
-
-  async function closeScanner() {
+  async function closeScanner(){
     scanModal.style.display = "none";
-    try { Quagga.stop(); } catch(e) {}
+    try{ Quagga.stop(); }catch(e){}
   }
 
-  async function initDevices() {
-    const all = await navigator.mediaDevices.enumerateDevices();
-    devices = all.filter(d => d.kind === "videoinput");
-    if (!devices.length) {
-      statusEl.textContent = "No camera found.";
-      return;
+  async function initDevices(){
+    try{
+      const all = await navigator.mediaDevices.enumerateDevices();
+      devices = all.filter(d => d.kind === "videoinput");
+      if (!devices.length){ statusEl.textContent = "No camera found."; return; }
+      const back = devices.find(d => /back|rear|environment/i.test(d.label));
+      currentDeviceId = (back || devices[0]).deviceId;
+    }catch{
+      statusEl.textContent = "Could not enumerate cameras.";
     }
-    const back = devices.find(d => /back|rear|environment/i.test(d.label));
-    currentDeviceId = (back || devices[0]).deviceId;
   }
 
-  async function startQuagga() {
-    try { Quagga.stop(); } catch(e) {}
+  async function startQuagga(){
+    try{ Quagga.stop(); }catch(e){}
     const constraints = {
       width: { ideal: 1280 },
       height: { ideal: 720 },
@@ -220,26 +251,15 @@
     Quagga.init({
       inputStream: {
         type: "LiveStream",
-        target: document.querySelector("#scanVideo"),
+        target: videoEl,
         constraints
       },
       locator: { patchSize: "medium", halfSample: true },
       numOfWorkers: navigator.hardwareConcurrency ? Math.min(navigator.hardwareConcurrency, 4) : 2,
       frequency: 10,
-      decoder: {
-        readers: [
-          "code_128_reader",
-          "ean_reader",
-          "ean_8_reader",
-          "upc_reader",
-          "upc_e_reader"
-        ]
-      }
+      decoder: { readers: ["code_128_reader","ean_reader","ean_8_reader","upc_reader","upc_e_reader"] }
     }, (err) => {
-      if (err) {
-        statusEl.textContent = "Camera error: " + err;
-        return;
-      }
+      if (err){ statusEl.textContent = "Camera error: " + err; return; }
       Quagga.start();
       statusEl.textContent = "Align barcode within the frame…";
       Quagga.offDetected(handleDetected);
@@ -247,14 +267,14 @@
     });
   }
 
-  function handleDetected(result) {
+  function handleDetected(result){
     const code = (result && result.codeResult && result.codeResult.code) || "";
     if (!code) return;
-    const digits = code.replace(/\D+/g, "").slice(0, 15);
+    const digits = code.replace(/\\D+/g,"").slice(0,15);
     if (!digits) return;
     setImei(digits);
     statusEl.textContent = "Scanned: " + digits;
-    setTimeout(() => { try { Quagga.stop(); } catch(e) {}; scanModal.style.display = "none"; }, 400);
+    setTimeout(() => { try{ Quagga.stop(); }catch(e){}; scanModal.style.display = "none"; }, 400);
   }
 </script>
 {% endblock %}

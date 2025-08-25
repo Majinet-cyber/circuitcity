@@ -17,7 +17,7 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.template.exceptions import TemplateDoesNotExist
 from django.utils import timezone
 from django.views.decorators.cache import never_cache
-from django.views.decorators.http import require_POST, require_http_methods, require_GET  # ADDED require_GET
+from django.views.decorators.http import require_POST, require_http_methods, require_GET
 
 import csv
 import json
@@ -326,7 +326,20 @@ def scan_sold(request):
 @login_required
 @require_http_methods(["GET"])
 def scan_web(request):
-    return render(request, "inventory/scan_web.html", {})
+    # If the template is missing in prod, render a tiny fallback instead of blank.
+    try:
+        return render(request, "inventory/scan_web.html", {})
+    except TemplateDoesNotExist:
+        return HttpResponse(
+            "<!doctype html><meta charset='utf-8'>"
+            "<title>Scan (Web) — Mark SOLD</title>"
+            "<body style='font:16px system-ui, sans-serif;padding:24px;background:#0f172a;color:#e5e7eb'>"
+            "<h1>Scan (Web) — Mark SOLD</h1>"
+            "<p>Template <code>inventory/scan_web.html</code> not found. "
+            "Please deploy the template or check template dirs.</p>"
+            "</body>",
+            content_type="text/html"
+        )
 
 
 @never_cache
@@ -724,9 +737,7 @@ def inventory_dashboard(request):
     context["THEME_ROTATE_ENABLED"] = bool(getattr(settings, "THEME_ROTATE_ENABLED", True))   # keep the 3 buttons
     context["THEME_ROTATE_MS"]      = int(getattr(settings, "THEME_ROTATE_MS", 10000))        # 10s
     context["THEME_DEFAULT"]        = str(getattr(settings, "THEME_DEFAULT", "style-1"))
-    # Tell the front-end rotator to rotate "slides" (not colors)
     context["ROTATOR_MODE"]         = "slides"
-    # Optional slide descriptors the UI can use
     context["DASHBOARD_SLIDES"] = [
         {
             "key": "trends",
@@ -1454,7 +1465,7 @@ def api_agent_trend(request):
 
 
 # -----------------------
-# AI & Cash APIs (NEW)
+# AI & Cash APIs (updated)
 # -----------------------
 @never_cache
 @login_required
@@ -1495,9 +1506,10 @@ def api_predictions(request):
     total_rev_14 = float(sum(r["v"] or 0 for r in per_day_rev))
     daily_rev_avg = total_rev_14 / float(lookback_days) if total_rev_14 else 0.0
 
+    # NOTE: use "date" key to match front-end expectations
     overall = [
         {
-            "day": (today + timedelta(days=i)).isoformat(),
+            "date": (today + timedelta(days=i)).isoformat(),
             "predicted_units": round(daily_units_avg, 2),
             "predicted_revenue": round(daily_rev_avg, 2),
         }
@@ -1533,6 +1545,23 @@ def api_predictions(request):
             })
 
     return JsonResponse({"ok": True, "overall": overall, "risky": risky})
+
+
+# --- Compatibility shims so URLs can point anywhere without changing JS ---
+@never_cache
+@login_required
+@require_GET
+def api_predictions_summary(request):
+    """Alias for /.../api/predictions/summary/ → returns same as api_predictions."""
+    return api_predictions(request)
+
+
+@never_cache
+@login_required
+@require_GET
+def predictions_summary(request):
+    """Alias for /api/predictions/ or legacy callers → returns same as api_predictions."""
+    return api_predictions(request)
 
 
 @never_cache

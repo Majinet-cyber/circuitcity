@@ -1,7 +1,8 @@
-# inventory/api.py
-from django.http import JsonResponse, HttpResponseBadRequest
+# circuitcity/inventory/api.py
+from django.http import JsonResponse
 from django.utils import timezone
 from django.views.decorators.http import require_GET
+from django.core.cache import cache  # optional simple caching
 from datetime import timedelta
 
 from insights.models import Forecast
@@ -41,6 +42,11 @@ def predictions_summary(request):
     lead_days = _int_arg(request, "lead", default=3, lo=0, hi=14)
     risky_limit = _int_arg(request, "limit", default=3, lo=1, hi=10)
 
+    cache_key = f"predictions_summary:v1:days={days}:lead={lead_days}:limit={risky_limit}"
+    cached = cache.get(cache_key)
+    if cached is not None:
+        return JsonResponse(cached)  # ~5ms
+
     today = timezone.now().date()
     horizon = today + timedelta(days=days)
 
@@ -52,7 +58,6 @@ def predictions_summary(request):
         .values("date", "predicted_units", "predicted_revenue")
     )
 
-    # Serialize dates to ISO and coerce numbers safely
     overall = []
     for row in overall_qs:
         d = row.get("date")
@@ -66,12 +71,13 @@ def predictions_summary(request):
 
     # ----- Top risky products (stockout risk) -----
     risky = []
-    # Limit to first 100 products as in your original code (tune if needed)
-    for p in Product.objects.all()[:100]:
+    # Filter to active products if you have such a field; else keep .all()
+    products = Product.objects.all().only("id", "name")[:100].iterator()
+    for p in products:
         try:
             s = stockout_and_restock(p, horizon_days=days, lead_days=lead_days)
-        except Exception:
-            # If the service raises, skip this product rather than failing the whole response
+        except Exception as e:
+            # Skip this product; keep the API alive
             continue
 
         stockout_date = s.get("stockout_date")
@@ -85,12 +91,15 @@ def predictions_summary(request):
             })
 
     # Urgent first, then earliest stockout date
-    # (note: sorting by (not urgent) puts urgent=True before False)
     risky.sort(key=lambda x: (not x["urgent"], x["stockout_date"] or horizon.isoformat()))
     risky = risky[:risky_limit]
 
-    return JsonResponse({
+    payload = {
         "ok": True,
         "overall": overall,
         "risky": risky,
-    })
+    }
+
+    # Cache for 5 minutes (tweak or remove)
+    cache.set(cache_key, payload, 300)
+    return JsonResponse(payload)

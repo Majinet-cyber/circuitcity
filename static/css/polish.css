@@ -1,5 +1,5 @@
 /* ================================
-   Circuit City – Polish v3 (safe)
+   Circuit City – Polish v3.1 (safe)
    Layered on top of app.css/tokens.css
    Only tweaks existing classes + adds utilities.
    ================================ */
@@ -59,19 +59,51 @@ body.cc-body{ font-size: var(--t-base); }
 }
 .cc-brand{ font-weight: 800; }
 
-/* Buttons in the header look like premium chips */
-.cc-topbtn.btn{
+/* --- Make ALL header/quick-action buttons look consistent --- */
+.cc-topnav .btn,
+.cc-toolbar .actions .btn,
+.cc-quick-actions .btn{
+  /* unified chip look */
+  height: 42px;
+  display: inline-flex; align-items: center; gap: 8px;
+  padding: 0 14px;
+  border-radius: 12px;
+  box-shadow: var(--p-shadow);
+  border: 1px solid var(--p-border);
+  background: var(--p-surface);
+  color: var(--p-text);
+  transition: transform .06s ease, filter .2s ease, box-shadow .2s ease;
+}
+.cc-topnav .btn:hover,
+.cc-toolbar .actions .btn:hover{ filter: brightness(1.02); }
+.cc-topnav .btn:active,
+.cc-toolbar .actions .btn:active{ transform: translateY(1px) scale(.99); }
+.cc-topnav .btn:focus-visible,
+.cc-toolbar .actions .btn:focus-visible{ box-shadow: var(--p-ring), var(--p-shadow); outline: none; }
+
+/* Emphasis variants where present */
+.cc-topnav .btn-primary,
+.cc-toolbar .actions .btn-primary,
+.cc-topnav .btn-sky{
+  border: 0;
+  color:#fff !important;
   background: linear-gradient(90deg, var(--p-brand), var(--p-brand-600));
-  color: #fff; border: 0;
+}
+.cc-topnav .btn-green,
+.cc-toolbar .actions .btn-green{
+  border: 0;
+  color:#052b1b !important;
+  background: linear-gradient(90deg, var(--p-ok), var(--p-ok-700));
+}
+
+/* Legacy header chip class support */
+.cc-topbtn.btn{
+  border: 0;
+  color:#fff;
+  background: linear-gradient(90deg, var(--p-brand), var(--p-brand-600));
   box-shadow: var(--p-shadow);
 }
 .cc-topbtn.btn:hover{ filter: brightness(.96); }
-
-/* Success variant used by “Scan SOLD” */
-.btn-green, .cc-topbtn.btn.btn-green{
-  background: linear-gradient(90deg, var(--p-ok), var(--p-ok-700)) !important;
-  color:#072316;
-}
 
 /* Theme toggle chip */
 .cc-theme-toggle{ border: 1px solid var(--p-border); background: var(--p-surface); }
@@ -163,6 +195,16 @@ body.cc-body{ font-size: var(--t-base); }
 
 /* Inline field with trailing action */
 .field{ display:flex; align-items:center; gap:10px; }
+
+/* --- Dark-mode fix for Scan IN / Scan SOLD inline backgrounds --- */
+:root[data-theme="dark"] .field,
+:root[data-theme="dark"] .field > input,
+:root[data-theme="dark"] .field > select,
+:root[data-theme="dark"] .field > .form-control{
+  background: var(--p-surface) !important;
+  color: var(--p-text) !important;
+  border-color: var(--p-border) !important;
+}
 
 /* ---------- Tables ---------- */
 .table-wrap{ width:100%; overflow-x:auto; -webkit-overflow-scrolling:touch; }
@@ -289,3 +331,12 @@ html, body{ max-width:100%; overflow-x:hidden; }
   transition:transform .12s ease, filter .2s ease;
 }
 .crumbs a:hover{ transform:translateY(-1px); filter:brightness(1.03); }
+
+/* --- Minor niceties --- */
+.kbd{
+  font-family: ui-monospace, Menlo, Consolas, monospace;
+  background: var(--p-surface-2);
+  border: 1px solid var(--p-border);
+  color: var(--p-text);
+  padding: 2px 6px; border-radius: 6px;
+}
