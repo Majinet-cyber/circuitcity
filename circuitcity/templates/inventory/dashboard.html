@@ -1,6 +1,6 @@
 <!DOCTYPE html>
-<!-- PROBE: NEW DASHBOARD v2.5 -->
-<!-- ADDED: start on rotating theme system -->
+<!-- PROBE: NEW DASHBOARD v2.6.1 -->
+<!-- THEMES + SLIDES: both rotators live -->
 <html lang="en" data-theme="style-1">
 <head>
   <meta charset="UTF-8" />
@@ -9,7 +9,6 @@
   <!-- Mobile-friendly viewport -->
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
   <meta name="color-scheme" content="light dark" />
-  <!-- ADDED: browser toolbar color per theme -->
   <meta name="theme-color" content="#0b5bd3" />
 
   <!-- Bootstrap / Icons -->
@@ -19,7 +18,6 @@
   <style>
     /* ===== Themeable design tokens ===== */
     :root{
-      /* base (fallbacks) */
       --bg:#f6f9ff;
       --blue-700:#1d4ed8;
       --blue-600:#2563eb;
@@ -34,7 +32,7 @@
       --chart-grid: rgba(2,6,23,.06);
     }
 
-    /* ADDED: 3 themes (style-1 light, style-2 dark, style-3 midnight) */
+    /* 3 themes */
     html[data-theme="style-1"]{
       --bg:#f6f9ff;
       --card:#ffffff;
@@ -57,7 +55,7 @@
       --card:#0f1b30;
       --line:#223454;
       --ink:#e7ecfb; --muted:#9fb0cf;
-      --blue-700:#0e7a63; --blue-600:#10b981; --blue-500:#34d399; --blue-400:#6ee7b7; /* teal accent theme */
+      --blue-700:#0e7a63; --blue-600:#10b981; --blue-500:#34d399; --blue-400:#6ee7b7;
       --ring:0 0 0 .25rem rgba(16,185,129,.28);
       --chart-grid: #1b2b48;
     }
@@ -206,53 +204,26 @@
     /* Prevent any sideways scroll on small screens */
     html, body { max-width:100%; overflow-x:hidden; }
 
-    /* ADDED: tiny floating theme controller */
-    .theme-controls{
+    /* === Tiny control groups === */
+    .controls-stack{
       position:fixed; right:12px; bottom:12px; z-index:2000;
-      display:flex; gap:.5rem;
+      display:flex; flex-direction:column; gap:.4rem;
     }
-    .theme-controls button{
+    .theme-controls, .slides-controls{
+      display:flex; gap:.4rem; justify-content:flex-end;
+    }
+    .theme-controls button, .slides-controls button{
       background:var(--card); color:var(--ink); border:1px solid var(--line);
-      border-radius:10px; padding:.4rem .6rem;
+      border-radius:10px; padding:.35rem .55rem; font-size:.85rem;
+      box-shadow:0 6px 18px rgba(16,24,40,.06);
+    }
+    .slides-controls .label, .theme-controls .label{
+      padding:.35rem .6rem; border-radius:10px; border:1px dashed var(--line);
+      color:var(--muted); background:color-mix(in oklab, var(--card) 92%, transparent);
+      font-size:.75rem; font-weight:700;
     }
 
-    /* ======== MOBILE POLISH (CSS-only; no markup changes) ======== */
-
-    /* 1) Ensure media elements never overflow */
-    img, canvas, svg, video { max-width:100%; height:auto; display:block; }
-
-    /* 2) Tables scroll within their container, not the page */
-    .table-responsive { overflow-x:auto; }
-
-    /* 3) Cards cannot grow wider than the container due to long content */
-    .cc-card { min-width:0; }
-
-    /* 4) Filter bar: keep existing form but make items wrap neatly.
-          We override inline min-width on the model select with !important. */
-    header .cc-page form.flex-wrap{
-      display:flex; flex-wrap:wrap; gap:.5rem;
-    }
-    header .cc-page form.flex-wrap > *{
-      flex:1 1 160px; min-width:0;
-    }
-    header .cc-page form.flex-wrap select[name="model"]{
-      min-width:0 !important; /* beats inline style */
-      width:100%;
-    }
-    header .cc-page form.flex-wrap select[name="period"]{
-      width:100%;
-    }
-    @media (max-width:576px){
-      header .cc-page form.flex-wrap > *{ flex-basis:100%; }
-    }
-
-    /* 5) Slightly narrower battery on phones so it never forces horizontal scroll */
-    @media (max-width:576px){
-      .battery-wrap{ width:72px; }
-      .battery{ width:72px; height:160px; }
-    }
-
-    /* ===== NEW: Slides wrapper (simple CSS) ===== */
+    /* ===== Slides wrapper ===== */
     .cc-slides{ position:relative; }
     .cc-slide{ display:none; }
     .cc-slide.active{ display:block; }
@@ -261,6 +232,14 @@
       display:inline-block; font-weight:700; font-size:.9rem; color:var(--muted);
       background:var(--chip); border:1px solid var(--line); border-radius:999px;
       padding:.2rem .6rem; margin-bottom:.5rem;
+    }
+
+    /* Pretty pills for agent wallet management */
+    .pill{
+      display:inline-flex; align-items:center; gap:.35rem;
+      padding:.35rem .6rem; border-radius:999px;
+      border:1px solid var(--line); background:var(--chip); color:var(--ink);
+      font-weight:700; font-size:.8rem;
     }
   </style>
 </head>
@@ -320,12 +299,12 @@
         {% endfor %}
       {% endif %}
 
-      <!-- ========== SLIDES: wrap your existing content as Slide A; add Slide B ========== -->
+      <!-- ========== SLIDES ========== -->
       <div class="cc-slides" id="ccSlides">
 
-        <!-- SLIDE A: your full original dashboard content -->
+        <!-- SLIDE A: Trends -->
         <section class="cc-slide active" data-name="Trends">
-          <!-- ADDED: AI Recommendations card (predictive analytics) -->
+          <!-- AI Recommendations -->
           <div class="cc-card p-3 mb-3 will-animate">
             <h5>AI Recommendations</h5>
             <div id="ai-recos">Loading…</div>
@@ -351,6 +330,9 @@
                 <div class="value" data-countup>{{ all_time_count|default:"0" }}</div>
               </div>
             </div>
+
+            <!-- Agents-only wallet summary (admins must NOT see this card) -->
+            {% if not is_manager_or_admin %}
             <div class="col-6 col-md-3">
               <div class="cc-card p-3 h-100 will-animate">
                 <div class="text-muted small fw-semibold">My Wallet ({{ wallet.month.month_label }})</div>
@@ -362,6 +344,7 @@
                 <a class="btn btn-sm btn-outline-secondary w-100 mt-2" href="/inventory/wallet/">Open Wallet</a>
               </div>
             </div>
+            {% endif %}
           </div>
 
           <!-- Row 1 -->
@@ -489,48 +472,136 @@
         </section>
         <!-- /SLIDE A -->
 
-        <!-- SLIDE B: Financials view (additional, not replacing anything) -->
+        <!-- SLIDE B: Financials -->
         <section class="cc-slide" data-name="Financials">
           <div class="row g-3 mb-3">
             {% if is_manager_or_admin %}
-            <div class="col-lg-6">
+            <!-- Admin: Agents Wallet Management -->
+            <div class="col-lg-8">
               <div class="cc-card p-3 h-100 will-animate">
-                <h5>Cost vs Revenue vs Profit</h5>
-                <canvas id="pieCRP" class="chart-canvas chart-canvas--sm"></canvas>
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                  <h5 class="m-0">Agents Wallet Management</h5>
+                  <span class="pill"><i class="bi bi-shield-lock"></i> Admin</span>
+                </div>
+
+                <form id="formWalletIssue" class="row g-2 align-items-end">
+                  <div class="col-md-4">
+                    <label class="form-label small fw-semibold">Agent</label>
+                    <select id="wiAgent" class="form-select form-select-sm">
+                      <option value="*">All Agents</option>
+                      {% for r in agent_rank %}
+                        <option value="{{ r.agent_id }}">{{ r.agent__username }}</option>
+                      {% endfor %}
+                    </select>
+                  </div>
+                  <div class="col-md-3">
+                    <label class="form-label small fw-semibold">Reason</label>
+                    <select id="wiReason" class="form-select form-select-sm">
+                      <option value="ADVANCE">Advance</option>
+                      <option value="EMERGENCY">Emergency</option>
+                      <option value="BONUS">Bonus</option>
+                      <option value="OTHER">Other</option>
+                    </select>
+                  </div>
+                  <div class="col-md-3">
+                    <label class="form-label small fw-semibold">Amount (MK)</label>
+                    <input id="wiAmount" type="number" class="form-control form-control-sm" placeholder="0" min="0" step="1">
+                  </div>
+                  <div class="col-md-2">
+                    <button class="btn btn-primary btn-sm w-100" type="submit"><i class="bi bi-send"></i> Assign</button>
+                  </div>
+                  <div class="col-12">
+                    <label class="form-label small fw-semibold">Note (optional)</label>
+                    <input id="wiNote" type="text" class="form-control form-control-sm" placeholder="Add a short note…">
+                  </div>
+                </form>
+
+                <hr class="my-3">
+
+                <div class="table-responsive">
+                  <table class="table table-sm align-middle" id="tblWalletAdmin">
+                    <thead class="table-light">
+                      <tr>
+                        <th>Agent</th>
+                        <th class="text-end">Balance</th>
+                        <th class="text-end">This Month</th>
+                        <th class="text-end">Lifetime Commissions</th>
+                        <th class="text-end">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {% for r in agent_rank %}
+                      <tr data-agent-id="{{ r.agent_id }}" data-agent-name="{{ r.agent__username }}">
+                        <td>{{ r.agent__username }}</td>
+                        <td class="text-end"><span class="num" data-wallet-balance>0</span></td>
+                        <td class="text-end"><span class="num" data-wallet-month>0</span></td>
+                        <td class="text-end"><span class="num" data-wallet-lifetime>0</span></td>
+                        <td class="text-end">
+                          <a class="btn btn-outline-secondary btn-sm" target="_blank" href="/inventory/wallet/?user_id={{ r.agent_id }}">Open</a>
+                        </td>
+                      </tr>
+                      {% empty %}
+                      <tr><td colspan="5" class="text-muted">No agents found.</td></tr>
+                      {% endfor %}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+
+            <!-- Admin: Cash Overview -->
+            <div class="col-lg-4">
+              <div class="cc-card p-3 h-100 will-animate">
+                <h5>Cash Overview</h5>
+                <div class="text-muted small mb-2">Orders / Payouts / Expenses (hook API later)</div>
+                <div class="d-grid gap-2">
+                  <div class="pill"><i class="bi bi-cart-check"></i> Orders: <span class="ms-auto">—</span></div>
+                  <div class="pill"><i class="bi bi-cash-coin"></i> Payouts: <span class="ms-auto">—</span></div>
+                  <div class="pill"><i class="bi bi-receipt"></i> Expenses: <span class="ms-auto">—</span></div>
+                </div>
+              </div>
+            </div>
+            {% else %}
+            <!-- Agent: Wallet Summary (beautiful, compact) -->
+            <div class="col-12">
+              <div class="cc-card p-3 h-100 will-animate">
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                  <h5 class="m-0">Wallet Summary</h5>
+                  <span class="pill"><i class="bi bi-person-badge"></i> My Wallet</span>
+                </div>
+
+                <div class="row g-3">
+                  <div class="col-6 col-md-4">
+                    <div class="text-muted small fw-semibold">Sales Earnings</div>
+                    <div class="fs-4 fw-bold">MK {{ wallet.month.commission|default:0|floatformat:0 }}</div>
+                  </div>
+                  <div class="col-6 col-md-4">
+                    <div class="text-muted small fw-semibold">Advance</div>
+                    <div class="fs-4 fw-bold">MK {{ wallet.month.advance|default:0|floatformat:0 }}</div>
+                  </div>
+                  <div class="col-6 col-md-4">
+                    <div class="text-muted small fw-semibold">Bonus</div>
+                    <div class="fs-4 fw-bold">MK {{ wallet.month.bonus|default:0|floatformat:0 }}</div>
+                  </div>
+                  <div class="col-6 col-md-4">
+                    <div class="text-muted small fw-semibold">Total (Monthly)</div>
+                    <div class="fs-4 fw-bold">MK {{ wallet.month.total|default:0|floatformat:0 }}</div>
+                  </div>
+                  <div class="col-6 col-md-4">
+                    <div class="text-muted small fw-semibold">All-time Earnings</div>
+                    <div class="fs-4 fw-bold">MK {{ wallet.all_time_earnings|default:0|floatformat:0 }}</div>
+                  </div>
+                </div>
+
+                <a class="btn btn-sm btn-outline-secondary w-100 mt-3" href="/inventory/wallet/">Open Wallet</a>
               </div>
             </div>
             {% endif %}
-            <div class="col-lg-6">
-              <div class="cc-card p-3 h-100 will-animate">
-                <h5>Wallet Summary</h5>
-                <div class="row g-2">
-                  <div class="col-6">
-                    <div class="text-muted small fw-semibold">Current Balance</div>
-                    <div class="fs-4 fw-bold">MK {{ wallet.balance|default:0|floatformat:0 }}</div>
-                  </div>
-                  <div class="col-6">
-                    <div class="text-muted small fw-semibold">This Month Total</div>
-                    <div class="fs-4 fw-bold">MK {{ wallet.month.total|default:0|floatformat:0 }}</div>
-                  </div>
-                </div>
-                <div class="d-flex justify-content-between small mt-2">
-                  <span>Commission</span><strong>MK {{ wallet.month.commission|default:0|floatformat:0 }}</strong>
-                </div>
-                <div class="d-flex justify-content-between small">
-                  <span>Advance</span><strong>MK {{ wallet.month.advance|default:0|floatformat:0 }}</strong>
-                </div>
-                <div class="d-flex justify-content-between small">
-                  <span>Adjustment</span><strong>MK {{ wallet.month.adjustment|default:0|floatformat:0 }}</strong>
-                </div>
-                <a class="btn btn-sm btn-outline-secondary w-100 mt-2" href="/inventory/wallet/">Open Wallet</a>
-              </div>
-            </div>
           </div>
 
-          <div class="cc-card p-3 will-animate">
-            <h5>Cash Overview</h5>
-            <div class="text-muted">Totals (orders / payouts / expenses). <span class="small">Hook to API later.</span></div>
-          </div>
+          {% if not is_manager_or_admin %}
+          <!-- Agents do NOT see Cash Overview; nothing extra here -->
+          {% endif %}
         </section>
         <!-- /SLIDE B -->
 
@@ -608,11 +679,20 @@
       <i class="bi bi-qr-code-scan fs-4"></i>
     </button>
 
-    <!-- ADDED: floating theme (same 3 buttons, now also control slides) -->
-    <div class="theme-controls">
-      <button id="theme-prev" type="button" title="Prev theme">◀</button>
-      <button id="theme-toggle-rotate" type="button" title="Auto rotate">Auto: Off</button>
-      <button id="theme-next" type="button" title="Next theme">▶</button>
+    <!-- Controls stack: slides + theme -->
+    <div class="controls-stack">
+      <div class="slides-controls">
+        <span class="label">Slides</span>
+        <button id="slides-prev" type="button" title="Prev slide">◀</button>
+        <button id="slides-toggle-rotate" type="button" title="Auto rotate slides">Auto: On</button>
+        <button id="slides-next" type="button" title="Next slide">▶</button>
+      </div>
+      <div class="theme-controls">
+        <span class="label">Theme</span>
+        <button id="theme-prev" type="button" title="Prev theme">◀</button>
+        <button id="theme-toggle-rotate" type="button" title="Auto rotate theme">Auto: Off</button>
+        <button id="theme-next" type="button" title="Next theme">▶</button>
+      </div>
     </div>
   </div>
 
@@ -735,11 +815,14 @@
 
       wm.show();
     }
+    {% endif %}
 
+    {% if is_manager_or_admin %}
     /* ===== Charts: theme-aware ===== */
+    {% endif %}
     let charts = [];
     function initChartsSafely(){
-      if(!window.Chart) { console.warn('Chart.js not ready'); return; }
+      if(!window.Chart) { return; }
 
       let payload = {labels:[], revenue:[], profit:[], crp:[]};
       try{
@@ -794,7 +877,7 @@
         });
       }
 
-      charts = []; // reset
+      charts = [];
       if(labels.length && (revenuePoints.length || profitPoints.length)){
         const c1 = makeBar('barRevenue','Revenue',revenuePoints,colors.revenue);
         const c2 = makeBar('barProfit','Profit',profitPoints,colors.profit);
@@ -808,7 +891,7 @@
     }
     window.addEventListener('load', initChartsSafely);
 
-    /* ADDED: recolor charts when theme changes */
+    /* Recolor charts when theme changes */
     window.addEventListener('theme:changed', ()=>{
       if(!charts.length) return;
       const s=getComputedStyle(document.documentElement);
@@ -816,19 +899,18 @@
       const profit  = s.getPropertyValue('--blue-500').trim();
       const grid    = s.getPropertyValue('--chart-grid').trim();
       charts.forEach(ch=>{
-        if(ch.config.type==='bar'){
+        if(ch.config?.type==='bar'){
           const label = ch.data.datasets[0].label;
           const color = label==='Revenue' ? revenue : profit;
           ch.data.datasets[0].backgroundColor = color;
           ch.data.datasets[0].borderColor = color;
-          if(ch.options.scales?.y?.grid) ch.options.scales.y.grid.color = grid;
-        }else if(ch.config.type==='pie'){
+          if(ch.options?.scales?.y?.grid) ch.options.scales.y.grid.color = grid;
+        }else if(ch.config?.type==='pie'){
           ch.data.datasets[0].backgroundColor = ['#94a3b8', revenue, profit];
         }
         ch.update('none');
       });
     });
-    {% endif %}
 
     /* Animate in on scroll (unchanged) */
     const io = new IntersectionObserver((entries)=>{
@@ -855,11 +937,12 @@
       try{ navigator.serviceWorker.register('/static/sw.js'); }catch(e){}
     }
 
-    /* ===== ADDED: AI Recommendations fetch ===== */
+    /* ===== FIXED: AI Recommendations fetch (paths + robust) ===== */
     (async function(){
       const box=document.getElementById('ai-recos'); if(!box) return;
       try{
-        const r=await fetch('/api/predictions/');
+        const r=await fetch('/inventory/api/predictions/');
+        if(!r.ok) throw new Error('HTTP '+r.status);
         const d=await r.json();
         const total=(d.overall||[]).reduce((s,x)=>s+(x.predicted_units||0),0);
         const revenue=(d.overall||[]).reduce((s,x)=>s+(+x.predicted_revenue||0),0);
@@ -875,34 +958,32 @@
         }
         box.innerHTML=html;
       }catch(e){
-        box.textContent='Could not load predictions.';
+        box.innerHTML=`<div class="text-danger">Could not load predictions.</div><div class="small text-muted">${String(e)}</div>`;
       }
     })();
 
-    /* ===== NEW: Slide rotator (uses your 3-button rotator; rotates every 10s) ===== */
+    /* ===== Slides rotator (separate 3-button control; auto 10s) ===== */
     (function(){
       const slides=[...document.querySelectorAll('.cc-slide')];
       if(!slides.length) return;
 
-      const INTERVAL=10000; // 10 seconds
+      const INTERVAL=10000;
       const KEY='cc-slide-index';
       const ROTATE='cc-slide-rotate';
 
-      const btnPrev=document.getElementById('theme-prev');
-      const btnNext=document.getElementById('theme-next');
-      const btnAuto=document.getElementById('theme-toggle-rotate');
+      const btnPrev=document.getElementById('slides-prev');
+      const btnNext=document.getElementById('slides-next');
+      const btnAuto=document.getElementById('slides-toggle-rotate');
 
       let idx=Math.min(parseInt(localStorage.getItem(KEY)||'0',10)||0, slides.length-1);
-      let auto=JSON.parse(localStorage.getItem(ROTATE)||'true'); // default ON for dashboard screens
+      let auto=JSON.parse(localStorage.getItem(ROTATE)||'true'); // default ON
       const reduced=window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
       function show(i){
         slides.forEach((s,j)=>s.classList.toggle('active', j===i));
         idx=i; localStorage.setItem(KEY,String(idx));
-        // resize charts when the visible slide changes
-        if(typeof charts!=='undefined' && charts && charts.length){
-          charts.forEach(ch=>{ try{ ch.resize(); }catch(e){} });
-        }
+        // Resize charts when visible slide changes
+        if(charts && charts.length){ charts.forEach(ch=>{ try{ ch.resize(); }catch(e){} }); }
         window.dispatchEvent(new CustomEvent('slide:changed',{detail:{index:idx,name:slides[idx]?.dataset?.name}}));
       }
       function next(){ show((idx+1)%slides.length); }
@@ -923,9 +1004,134 @@
       show(idx); updateBtn(); window.addEventListener('load', start);
     })();
 
-    /* ===== NOTE: if you still want THEME auto-rotation too, we can run it in parallel,
-       but you asked the 3-button rotator to rotate the changing dashboard every 10s,
-       so we’ve bound the buttons/auto to slides here. ===== */
+    /* ===== Theme rotator (original 3-button control; independent) ===== */
+    (function(){
+      const THEMES=["style-1","style-2","style-3"];
+      const KEY="cc-theme", ROTATE="cc-theme-rotate", INTERVAL=12000; // theme auto can be different
+      const root=document.documentElement;
+      const themeMeta=document.querySelector('meta[name="theme-color"]');
+
+      const btnPrev=document.getElementById('theme-prev');
+      const btnNext=document.getElementById('theme-next');
+      const btnAuto=document.getElementById('theme-toggle-rotate');
+
+      let current = localStorage.getItem(KEY) || root.getAttribute('data-theme') || THEMES[0];
+      let auto = JSON.parse(localStorage.getItem(ROTATE) || 'false');
+      const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+      function apply(t){
+        current=t;
+        root.setAttribute('data-theme', t);
+        localStorage.setItem(KEY, t);
+        if(themeMeta){
+          themeMeta.setAttribute('content',
+            t==="style-2" ? "#0b1220" : (t==="style-3" ? "#0f1b30" : "#0b5bd3"));
+        }
+        window.dispatchEvent(new CustomEvent('theme:changed',{detail:{theme:t}}));
+      }
+      function next(){ apply(THEMES[(THEMES.indexOf(current)+1)%THEMES.length]); }
+      function prev(){ apply(THEMES[(THEMES.indexOf(current)-1+THEMES.length)%THEMES.length]); }
+
+      apply(current);
+
+      function setAuto(v){ auto=v; localStorage.setItem(ROTATE, JSON.stringify(v)); updateBtn(); v?start():stop(); }
+      function updateBtn(){ if(btnAuto) btnAuto.textContent=`Auto: ${auto?"On":"Off"}`; }
+
+      btnNext && btnNext.addEventListener('click', ()=>{ setAuto(false); next(); });
+      btnPrev && btnPrev.addEventListener('click', ()=>{ setAuto(false); prev(); });
+      btnAuto && btnAuto.addEventListener('click', ()=> setAuto(!auto));
+      updateBtn();
+
+      let timer=null;
+      function start(){ if(reduced||!auto) return; stop(); timer=setInterval(next, INTERVAL); }
+      function stop(){ if(timer) clearInterval(timer); timer=null; }
+      document.addEventListener('visibilitychange', ()=> document.hidden?stop():start());
+      window.addEventListener('load', start);
+    })();
+
+    /* ===== Admin wallet management helpers (API hooks + CSRF) ===== */
+    {% if is_manager_or_admin %}
+    (function(){
+      function getCookie(name){
+        const value = `; ${document.cookie}`;
+        const parts = value.split(`; ${name}=`);
+        if (parts.length === 2) return parts.pop().split(';').shift();
+      }
+      const csrftoken = getCookie('csrftoken');
+
+      async function fetchAgentWalletRow(userId, rowEl){
+        try{
+          const now=new Date();
+          const y=now.getFullYear(), m=(now.getMonth()+1).toString().padStart(2,'0');
+          const [sumNow, sumMonth] = await Promise.all([
+            fetch(`/inventory/api/wallet-summary/?user_id=${encodeURIComponent(userId)}`).then(r=>r.json()).catch(()=>null),
+            fetch(`/inventory/api/wallet-summary/?user_id=${encodeURIComponent(userId)}&year=${y}&month=${m}`).then(r=>r.json()).catch(()=>null),
+          ]);
+          const bal = sumNow?.balance ?? 0;
+          const mon = sumMonth?.month_sum ?? 0;
+          const life = sumNow?.lifetime_commission ?? sumNow?.lifetime ?? 0;
+
+          const nf = new Intl.NumberFormat();
+          rowEl.querySelector('[data-wallet-balance]').textContent = nf.format(Math.round(bal));
+          rowEl.querySelector('[data-wallet-month]').textContent = nf.format(Math.round(mon));
+          rowEl.querySelector('[data-wallet-lifetime]').textContent = nf.format(Math.round(life));
+        }catch(e){
+          // ignore
+        }
+      }
+
+      // populate table
+      document.querySelectorAll('#tblWalletAdmin tbody tr[data-agent-id]').forEach(tr=>{
+        const uid=tr.getAttribute('data-agent-id');
+        fetchAgentWalletRow(uid, tr);
+      });
+
+      async function postWalletTxn(payload){
+        const r = await fetch('/inventory/api/wallet-txn/', {
+          method:'POST',
+          headers:{ 'Content-Type':'application/json', 'X-CSRFToken': csrftoken || '' },
+          body: JSON.stringify(payload)
+        });
+        if(!r.ok) throw new Error('HTTP '+r.status);
+        return r.json();
+      }
+
+      const form=document.getElementById('formWalletIssue');
+      if(form){
+        form.addEventListener('submit', async (e)=>{
+          e.preventDefault();
+          const agent = document.getElementById('wiAgent').value;
+          const reason = document.getElementById('wiReason').value;
+          const note = document.getElementById('wiNote').value || '';
+          const amount = Math.max(0, Number(document.getElementById('wiAmount').value||0));
+
+          if(!amount){ alert('Enter a valid amount.'); return; }
+
+          try{
+            if(agent==='*'){
+              // apply to all agents sequentially so backend needn't support batch
+              const rows=[...document.querySelectorAll('#tblWalletAdmin tbody tr[data-agent-id]')];
+              for(const tr of rows){
+                const uid=tr.getAttribute('data-agent-id');
+                await postWalletTxn({ user_id: uid, amount, reason, note });
+                await fetchAgentWalletRow(uid, tr);
+              }
+            }else{
+              await postWalletTxn({ user_id: agent, amount, reason, note });
+              const row=document.querySelector(`#tblWalletAdmin tbody tr[data-agent-id="${agent}"]`);
+              if(row) await fetchAgentWalletRow(agent, row);
+            }
+            form.reset();
+            document.getElementById('wiAgent').value='*';
+            document.getElementById('wiReason').value='ADVANCE';
+            alert('Wallet assignment saved.');
+          }catch(err){
+            alert('Could not save wallet assignment: '+err);
+          }
+        });
+      }
+    })();
+    {% endif %}
   </script>
 </body>
 </html>

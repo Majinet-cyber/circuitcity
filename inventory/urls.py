@@ -3,11 +3,11 @@ from django.urls import path
 from django.views.generic import RedirectView
 from . import views
 
-# Optional import: keep your existing inventory/api.py if you have it
+# Import API module if it exists
 try:
     from . import api  # expects api.predictions_summary(request)
     _HAS_API_MODULE = True
-except Exception:
+except ImportError:
     api = None
     _HAS_API_MODULE = False
 
@@ -17,10 +17,12 @@ app_name = "inventory"
 urlpatterns = [
     # ---------- Dashboard ----------
     path("dashboard/", views.inventory_dashboard, name="inventory_dashboard"),
+
     # App home → dashboard
     path("", RedirectView.as_view(pattern_name="inventory:inventory_dashboard", permanent=False), name="home"),
     path("dash/", RedirectView.as_view(pattern_name="inventory:inventory_dashboard", permanent=False)),
-    # Old links → dashboard
+
+    # Old dashboard links → redirect to main dashboard
     path("dashboard/agent/",  RedirectView.as_view(pattern_name="inventory:inventory_dashboard", permanent=False)),
     path("dashboard/agents/", RedirectView.as_view(pattern_name="inventory:inventory_dashboard", permanent=False)),
 
@@ -28,6 +30,7 @@ urlpatterns = [
     path("scan-in/",   views.scan_in,   name="scan_in"),
     path("scan-sold/", views.scan_sold, name="scan_sold"),
     path("scan-web/",  views.scan_web,  name="scan_web"),  # desktop-first scanner page
+
     # Short mobile-friendly aliases
     path("in/",   RedirectView.as_view(pattern_name="inventory:scan_in",   permanent=False), name="short_in"),
     path("sold/", RedirectView.as_view(pattern_name="inventory:scan_sold", permanent=False), name="short_sold"),
@@ -72,19 +75,23 @@ urlpatterns += [
     path("api/wallet-txn/",      views.api_wallet_add_txn,   name="api_wallet_add_txn"),
 ]
 
-# ---------- API: Predictions & Cash (new) ----------
-# Prefer your existing inventory/api.py for backward compatibility.
+# ---------- API: Predictions ----------
 if _HAS_API_MODULE and hasattr(api, "predictions_summary"):
+    # Use the dedicated inventory/api.py if present
     urlpatterns += [
         path("api/predictions/", api.predictions_summary, name="api_predictions"),
     ]
 else:
+    # Fallback to views.api_predictions if inventory/api.py missing
     urlpatterns += [
         path("api/predictions/", views.api_predictions, name="api_predictions"),
     ]
 
-# Always provide a v2 and cash overview using the new views-based endpoints
+# ---------- API v2: Advanced Predictions + Cash Overview ----------
 urlpatterns += [
+    # Better structured predictive analytics endpoint (JSON ready for charts)
     path("api/predictions/v2/", views.api_predictions,  name="api_predictions_v2"),
+
+    # Admin-only cash overview endpoint
     path("api/cash-overview/",  views.api_cash_overview, name="api_cash_overview"),
 ]
