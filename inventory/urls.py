@@ -1,20 +1,24 @@
 # circuitcity/inventory/urls.py
-from django.urls import path
+from django.urls import path, re_path
 from django.views.generic import RedirectView
 from . import views
 
-# Try to import the optional API module.
+# Optional API module (e.g., inventory/api.py). If it exposes predictions_summary,
+# prefer that; otherwise fall back to views.api_predictions.
 try:
-    from . import api  # expects api.predictions_summary(request)
+    from . import api as api_mod  # expects api_mod.predictions_summary(request)
     _HAS_API_MODULE = True
 except Exception:
-    api = None
+    api_mod = None
     _HAS_API_MODULE = False
 
 app_name = "inventory"
 
-# Choose which prediction view we expose (module wins if present)
-_prediction_view = api.predictions_summary if (_HAS_API_MODULE and hasattr(api, "predictions_summary")) else views.api_predictions
+_prediction_view = (
+    getattr(api_mod, "predictions_summary", None)
+    if (_HAS_API_MODULE and hasattr(api_mod, "predictions_summary"))
+    else views.api_predictions
+)
 
 urlpatterns = [
     # ---------- Dashboard ----------
@@ -75,23 +79,25 @@ urlpatterns += [
     path("api/time-checkin/",    views.api_time_checkin,     name="api_time_checkin"),
     path("api/wallet-summary/",  views.api_wallet_summary,   name="api_wallet_summary"),
     path("api/wallet-txn/",      views.api_wallet_add_txn,   name="api_wallet_add_txn"),
+
+    # Cash overview (aliases)
+    re_path(r"^api/cash[-_]overview/?$", views.api_cash_overview, name="api_cash_overview"),
 ]
 
 # ---------- API: Predictions (robust aliases) ----------
 urlpatterns += [
-    path("api/predictions/",      _prediction_view, name="api_predictions"),
-    path("api/predictions",       _prediction_view),  # no trailing slash
-    path("api_predictions/",      _prediction_view),  # legacy underscore
-    path("api_predictions",       _prediction_view),
-    path("api-predictions/",      _prediction_view),  # legacy hyphen
-    path("api-predictions",       _prediction_view),
-    path("api/predictions/v2/",   views.api_predictions,  name="api_predictions_v2"),
-    path("api/predictions/v2",    views.api_predictions),
+    # Canonical
+    re_path(r"^api/predictions/?$",      _prediction_view, name="api_predictions"),
+    # Legacy / alternate spellings
+    re_path(r"^api[-_]?predictions/?$", _prediction_view),
+    re_path(r"^api_predictions/?$",      _prediction_view),
+    # v2 (currently same view, but separate name)
+    re_path(r"^api/predictions/v2/?$",   views.api_predictions, name="api_predictions_v2"),
 ]
 
-# ---------- API: Legacy chart aliases (so underscores won’t 404) ----------
+# ---------- API: Legacy chart aliases (so underscores/hyphens and no trailing slash won’t 404) ----------
 urlpatterns += [
-    path("api_sales_trend",  views.api_sales_trend),  # legacy
-    path("api_profit_bar",   views.api_profit_bar),
-    path("api_top_models",   views.api_top_models),
+    re_path(r"^api[_-]?sales[_-]?trend/?$",  views.api_sales_trend),
+    re_path(r"^api[_-]?profit[_-]?bar/?$",   views.api_profit_bar),
+    re_path(r"^api[_-]?top[_-]?models/?$",   views.api_top_models),
 ]

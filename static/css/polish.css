@@ -1,5 +1,5 @@
 /* ================================
-   Circuit City – Polish v3.1 (safe)
+   Circuit City – Polish v3.2 (safe)
    Layered on top of app.css/tokens.css
    Only tweaks existing classes + adds utilities.
    ================================ */
@@ -26,6 +26,7 @@
   --t-xs:12px; --t-sm:13px; --t-base:clamp(14px, 1.6vw, 16px);
   --t-md:clamp(16px, 1.8vw, 18px); --t-lg:clamp(20px, 2.6vw, 26px);
   --t-xl:clamp(28px, 4.2vw, 40px); --t-2xl:clamp(36px, 6vw, 56px);
+  color-scheme: light;
 }
 
 /* Dark theme refinements (keeps your existing switch) */
@@ -42,6 +43,7 @@
   --p-ok-700:    #10b981;
   --p-danger:    #f87171;
   --p-shadow:    0 10px 28px rgba(0,0,0,.35), 0 2px 6px rgba(0,0,0,.25);
+  color-scheme: dark;
 }
 
 /* Subtle gradient background in dark for depth */
@@ -61,8 +63,12 @@ body.cc-body{ font-size: var(--t-base); }
 
 /* --- Make ALL header/quick-action buttons look consistent --- */
 .cc-topnav .btn,
+.cc-topnav a.btn,
+.cc-topnav button.btn,
 .cc-toolbar .actions .btn,
-.cc-quick-actions .btn{
+.cc-quick-actions .btn,
+.cc-topnav .cc-topbtn,          /* legacy class */
+.cc-toolbar .cc-topbtn{
   /* unified chip look */
   height: 42px;
   display: inline-flex; align-items: center; gap: 8px;
@@ -71,20 +77,25 @@ body.cc-body{ font-size: var(--t-base); }
   box-shadow: var(--p-shadow);
   border: 1px solid var(--p-border);
   background: var(--p-surface);
-  color: var(--p-text);
+  color: var(--p-text) !important;
+  text-decoration: none;
   transition: transform .06s ease, filter .2s ease, box-shadow .2s ease;
 }
 .cc-topnav .btn:hover,
-.cc-toolbar .actions .btn:hover{ filter: brightness(1.02); }
+.cc-toolbar .actions .btn:hover,
+.cc-topnav .cc-topbtn:hover{ filter: brightness(1.02); }
 .cc-topnav .btn:active,
-.cc-toolbar .actions .btn:active{ transform: translateY(1px) scale(.99); }
+.cc-toolbar .actions .btn:active,
+.cc-topnav .cc-topbtn:active{ transform: translateY(1px) scale(.99); }
 .cc-topnav .btn:focus-visible,
-.cc-toolbar .actions .btn:focus-visible{ box-shadow: var(--p-ring), var(--p-shadow); outline: none; }
+.cc-toolbar .actions .btn:focus-visible,
+.cc-topnav .cc-topbtn:focus-visible{ box-shadow: var(--p-ring), var(--p-shadow); outline: none; }
 
-/* Emphasis variants where present */
+/* Emphasis variants where present (primary/sky/green) */
 .cc-topnav .btn-primary,
 .cc-toolbar .actions .btn-primary,
-.cc-topnav .btn-sky{
+.cc-topnav .btn-sky,
+.cc-topnav .cc-topbtn.btn-primary{
   border: 0;
   color:#fff !important;
   background: linear-gradient(90deg, var(--p-brand), var(--p-brand-600));
@@ -96,28 +107,13 @@ body.cc-body{ font-size: var(--t-base); }
   background: linear-gradient(90deg, var(--p-ok), var(--p-ok-700));
 }
 
-/* Legacy header chip class support */
-.cc-topbtn.btn{
-  border: 0;
-  color:#fff;
-  background: linear-gradient(90deg, var(--p-brand), var(--p-brand-600));
-  box-shadow: var(--p-shadow);
-}
-.cc-topbtn.btn:hover{ filter: brightness(.96); }
-
 /* Theme toggle chip */
 .cc-theme-toggle{ border: 1px solid var(--p-border); background: var(--p-surface); }
 
 /* ---------- Sidebar polish ---------- */
-.cc-sidebar{
-  background: var(--p-surface);
-  border-right: 1px solid var(--p-border);
-}
+.cc-sidebar{ background: var(--p-surface); border-right: 1px solid var(--p-border); }
 .cc-sidebar-group{ color: var(--p-muted); font-weight: 700; letter-spacing: .06em; }
-.cc-sideitem{
-  color: var(--p-text);
-  border-radius: 10px;
-}
+.cc-sideitem{ color: var(--p-text); border-radius: 10px; }
 .cc-sideitem:hover{ background: color-mix(in oklab, var(--p-surface-2) 90%, transparent); }
 .cc-sideitem.active{
   background: color-mix(in oklab, var(--p-brand) 14%, transparent);
@@ -166,14 +162,25 @@ body.cc-body{ font-size: var(--t-base); }
   background: linear-gradient(180deg, color-mix(in oklab, var(--p-brand) 90%, white) 0%, var(--p-brand) 45%, var(--p-brand-600) 100%);
   color:#fff; border:0;
 }
+.btn-green{
+  background: linear-gradient(180deg, color-mix(in oklab, var(--p-ok) 90%, white) 0%, var(--p-ok) 45%, var(--p-ok-700) 100%);
+  color:#052b1b; border:0;
+}
+.btn-sky{
+  background: linear-gradient(135deg, #38bdf8, #0ea5e9);
+  color:#052c3b; border:0;
+}
 
-/* Subtle ghost */
+/* Subtle ghost / outline */
 .btn-ghost{ background: transparent; border:1px solid var(--p-border); }
 .btn-ghost:hover{ background: color-mix(in oklab, var(--p-surface-2) 80%, transparent); }
 
+/* Size helpers */
+.btn-sm{ height:36px; padding:0 12px; border-radius:10px; font-size:13px; }
+
 /* Mobile-friendly */
 @media (max-width:640px){
-  .btn, .cc-topbtn.btn{ min-height:44px; padding:.65rem .9rem; }
+  .btn, .cc-topnav .btn, .cc-topbtn.btn{ min-height:44px; padding:.65rem .9rem; }
   .btn-block{ width:100% }
 }
 
