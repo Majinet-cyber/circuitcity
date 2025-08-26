@@ -928,8 +928,8 @@ def export_csv(request):
         qs = qs.filter(
             Q(imei__icontains=q)
             | Q(product__model__icontains=q)
-            | Q(product__brand__icontains=q)
-            | Q(product__variant__icontains=q)
+            | Q(product__brand__icontainsq)
+            | Q(product__variant__icontainsq)
         )
 
     if status == "in_stock":
