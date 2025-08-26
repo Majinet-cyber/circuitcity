@@ -1,114 +1,113 @@
-# circuitcity/inventory/api.py
+# inventory/api.py
 from datetime import timedelta
+from django.contrib.auth.models import Group
+from django.db.models import Count, Sum
 from django.http import JsonResponse
 from django.utils import timezone
-from django.views.decorators.http import require_GET
-from django.views.decorators.cache import cache_page
 
-# If you want auth, wrap with @login_required (and handle 302 in frontend).
-# from django.contrib.auth.decorators import login_required
+from sales.models import Sale
+from .models import InventoryItem
+from django.db.models.functions import TruncDate
 
-SAFE_EMPTY = {"ok": True, "predictions": [], "detail": "no data yet"}
 
-@require_GET
-@cache_page(60 * 5)  # cache 5 minutes to keep it fast; adjust as needed
+def _is_manager_or_admin(user):
+    # mirrors views._is_manager_or_admin without importing views (avoid circulars)
+    try:
+        return user.is_staff or user.groups.filter(name__in=["Admin", "Manager"]).exists()
+    except Exception:
+        return bool(getattr(user, "is_staff", False))
+
+
+def _can_view_all(user):
+    # mirrors views._can_view_all (Manager/Admin or Auditor)
+    try:
+        return _is_manager_or_admin(user) or user.groups.filter(name__in=["Auditor", "Auditors"]).exists()
+    except Exception:
+        return _is_manager_or_admin(user)
+
+
 def predictions_summary(request):
     """
-    Returns simple AI-like recommendations based on recent sales velocity.
-    Gracefully degrades to empty results if tables or data are missing.
-
-    Response:
+    Baseline forecast + stockout risk.
+    Response shape:
     {
       "ok": true,
-      "generated_at": "...",
-      "horizon_days": 30,
-      "predictions": [
-        {
-          "sku": "TECNO-Spark10",
-          "model_name": "Tecno Spark 10",
-          "recommended_restock": 12,
-          "reason": "High 30d sales vs low on-hand",
-          "stats": {"sold_30d": 27, "on_hand": 5, "avg_daily": 0.9}
-        },
-        ...
-      ]
+      "overall": [{"date": "YYYY-MM-DD", "predicted_units": n, "predicted_revenue": x}, ... 7 days],
+      "risky": [{"product": "Brand Model", "on_hand": n, "stockout_date": "YYYY-MM-DD",
+                 "suggested_restock": n, "urgent": bool}, ...]
     }
     """
-    now = timezone.now()
-    horizon_days = int(request.GET.get("days", 30))
-    since = now - timedelta(days=horizon_days)
-
-    # Try to import models but *never* crash if schema changes.
     try:
-        from .models import Stock, StockTransaction  # adjust to your actual models
-    except Exception:
-        return JsonResponse(SAFE_EMPTY, status=200)
+        today = timezone.localdate()
+        lookback_days = 14
+        start = today - timedelta(days=lookback_days)
+        end_excl = today + timedelta(days=1)
 
-    # Guard: fields may differ per schema; try best-effort access
-    try:
-        # --- Example logic (adapt if your schema differs) ---
-        # Assumptions:
-        # - Stock has fields: sku, model_name (or name), quantity (on-hand)
-        # - StockTransaction records sales with:
-        #       type='sold' (or negative quantity)
-        #       model FK or sku + created_at timestamp
-        # You can modify the query to match your real schema.
-        from django.db.models import Sum, F
-        from django.db.models.functions import Coalesce
+        sales = Sale.objects.select_related("item__product").filter(sold_at__gte=start, sold_at__lt=end_excl)
+        items = InventoryItem.objects.select_related("product").filter(status="IN_STOCK")
 
-        sold_qs = (
-            StockTransaction.objects
-            .filter(type__iexact="sold", created_at__gte=since)
-            .values("sku", "model_name")
-            .annotate(sold_30d=Coalesce(Sum("quantity"), 0))
+        if not _can_view_all(request.user):
+            sales = sales.filter(agent=request.user)
+            items = items.filter(assigned_agent=request.user)
+
+        # ----- Daily units average (last 14d)
+        per_day_counts = (
+            sales.annotate(d=TruncDate("sold_at"))
+                 .values("d")
+                 .annotate(c=Count("id"))
+        )
+        total_units_14 = sum(r["c"] for r in per_day_counts) or 0
+        daily_units_avg = total_units_14 / float(lookback_days)
+
+        # ----- Daily revenue average (last 14d)
+        per_day_rev = (
+            sales.annotate(d=TruncDate("sold_at"))
+                 .values("d")
+                 .annotate(v=Sum("price"))
+        )
+        total_rev_14 = float(sum(r["v"] or 0 for r in per_day_rev))
+        daily_rev_avg = total_rev_14 / float(lookback_days) if total_rev_14 else 0.0
+
+        overall = [
+            {
+                "date": (today + timedelta(days=i)).isoformat(),
+                "predicted_units": round(daily_units_avg, 2),
+                "predicted_revenue": round(daily_rev_avg, 2),
+            }
+            for i in range(1, 8)
+        ]
+
+        # ----- Model-level stockout risk (simple 14d usage rate)
+        by_model_14 = (
+            sales.values("item__product_id", "item__product__brand", "item__product__model")
+                 .annotate(c=Count("id"))
+        )
+        model_count_map = {r["item__product_id"]: r["c"] for r in by_model_14}
+
+        risky = []
+        by_model_stock = (
+            items.values("product_id", "product__brand", "product__model")
+                 .annotate(on_hand=Count("id"))
+                 .order_by("product__brand", "product__model")
         )
 
-        on_hand_map = {
-            (s.sku, getattr(s, "model_name", getattr(s, "name", s.sku))): s.quantity
-            for s in Stock.objects.all()
-        }
-
-        preds = []
-        for row in sold_qs:
-            sku = row["sku"]
-            mname = row.get("model_name") or sku
-            sold_30d = int(row["sold_30d"]) if row["sold_30d"] else 0
-            avg_daily = round(sold_30d / max(1, horizon_days), 2)
-            on_hand = int(on_hand_map.get((sku, mname), 0))
-
-            # Simple “AI-like” rule: keep ~2 weeks of cover based on recent velocity.
-            target_cover_days = 14
-            target_stock = int(round(avg_daily * target_cover_days))
-            recommended = max(0, target_stock - on_hand)
-
-            if recommended > 0:
-                preds.append({
-                    "sku": sku,
-                    "model_name": mname,
-                    "recommended_restock": recommended,
-                    "reason": "High {}d sales vs low on-hand".format(horizon_days),
-                    "stats": {
-                        "sold_30d": sold_30d,
-                        "on_hand": on_hand,
-                        "avg_daily": avg_daily,
-                    },
+        for r in by_model_stock:
+            pid = r["product_id"]
+            daily_model_avg = (model_count_map.get(pid, 0) / float(lookback_days)) if pid in model_count_map else 0.0
+            need_next_7 = daily_model_avg * 7.0
+            on_hand = int(r["on_hand"] or 0)
+            if daily_model_avg > 0 and on_hand < need_next_7:
+                days_cover = (on_hand / daily_model_avg) if daily_model_avg else 0
+                risky.append({
+                    "product": f'{r["product__brand"]} {r["product__model"]}',
+                    "on_hand": on_hand,
+                    "stockout_date": (today + timedelta(days=max(0, int(days_cover)))).isoformat(),
+                    "suggested_restock": int(round(max(0.0, need_next_7 - on_hand))),
+                    "urgent": on_hand <= (daily_model_avg * 2.0),
                 })
 
-        # Sort by biggest gap first
-        preds.sort(key=lambda x: x["recommended_restock"], reverse=True)
-
-        return JsonResponse({
-            "ok": True,
-            "generated_at": now.isoformat(),
-            "horizon_days": horizon_days,
-            "predictions": preds,
-        }, status=200)
+        return JsonResponse({"ok": True, "overall": overall, "risky": risky})
 
     except Exception as e:
-        # Never 500—always a safe response + minimal hint for logs
-        return JsonResponse({
-            "ok": True,
-            "predictions": [],
-            "detail": "predictions failed gracefully",
-            "hint": str(e)[:200],
-        }, status=200)
+        # Never 500 the dashboard — return a harmless payload
+        return JsonResponse({"ok": False, "error": f"predictions failed: {e}", "overall": [], "risky": []}, status=200)

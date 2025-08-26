@@ -1,4 +1,4 @@
-# circuitcity/inventory/urls.py
+# inventory/urls.py
 from django.urls import path, re_path
 from django.views.generic import RedirectView
 from django.http import JsonResponse
@@ -6,15 +6,14 @@ from . import views
 
 app_name = "inventory"
 
-# ---- SAFE, LAZY PREDICTIONS PROXY -----------------------------------------
+# ---- SAFE, LAZY PREDICTIONS PROXY (no import-time attribute access) ----------
 def _predictions_proxy(request, *args, **kwargs):
     """
-    Dispatch to the first available predictions view:
-    1) inventory.api.predictions_summary (preferred, if present)
-    2) views.api_predictions (legacy, if present)
-    Otherwise return a harmless JSON so the route never 500s.
+    Dispatch to first available predictions view:
+      1) inventory.api.predictions_summary (preferred)
+      2) views.api_predictions (if present)
+    Otherwise return a harmless JSON.
     """
-    # Try inventory/api.py -> predictions_summary
     try:
         from . import api as api_mod
         func = getattr(api_mod, "predictions_summary", None)
@@ -23,24 +22,22 @@ def _predictions_proxy(request, *args, **kwargs):
     except Exception:
         pass
 
-    # Try legacy views.api_predictions (only if it exists)
+    # Legacy fallback only if it actually exists (don't touch at import time)
     func2 = getattr(views, "api_predictions", None)
     if callable(func2):
         return func2(request, *args, **kwargs)
 
     return JsonResponse({"ok": False, "error": "predictions endpoint not available"}, status=200)
 
-# ----------------------------------------------------------------------------
+# -----------------------------------------------------------------------------
 
 urlpatterns = [
     # ---------- Dashboard ----------
     path("dashboard/", views.inventory_dashboard, name="inventory_dashboard"),
-
-    # App home → dashboard
     path("", RedirectView.as_view(pattern_name="inventory:inventory_dashboard", permanent=False), name="home"),
     path("dash/", RedirectView.as_view(pattern_name="inventory:inventory_dashboard", permanent=False)),
 
-    # Old dashboard links → redirect to main dashboard
+    # Old dashboard links → redirect
     path("dashboard/agent/",  RedirectView.as_view(pattern_name="inventory:inventory_dashboard", permanent=False)),
     path("dashboard/agents/", RedirectView.as_view(pattern_name="inventory:inventory_dashboard", permanent=False)),
 
@@ -48,8 +45,6 @@ urlpatterns = [
     path("scan-in/",   views.scan_in,   name="scan_in"),
     path("scan-sold/", views.scan_sold, name="scan_sold"),
     path("scan-web/",  views.scan_web,  name="scan_web"),
-
-    # Short mobile-friendly aliases
     path("in/",   RedirectView.as_view(pattern_name="inventory:scan_in",   permanent=False), name="short_in"),
     path("sold/", RedirectView.as_view(pattern_name="inventory:scan_sold", permanent=False), name="short_sold"),
     path("scan/", RedirectView.as_view(pattern_name="inventory:scan_web",  permanent=False), name="short_scan"),
