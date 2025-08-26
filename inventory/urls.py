@@ -1,12 +1,12 @@
 # circuitcity/inventory/urls.py
 from django.urls import path, re_path
 from django.views.generic import RedirectView
+from django.http import JsonResponse
 from . import views
 
-# Optional API module (inventory/api.py). If it exposes predictions_summary,
-# prefer that; otherwise fall back to views.api_predictions.
+# Optional API module (e.g., inventory/api.py)
 try:
-    from . import api as api_mod  # expects api_mod.predictions_summary(request)
+    from . import api as api_mod
     _HAS_API_MODULE = True
 except Exception:
     api_mod = None
@@ -14,11 +14,33 @@ except Exception:
 
 app_name = "inventory"
 
-_prediction_view = (
-    getattr(api_mod, "predictions_summary", None)
-    if (_HAS_API_MODULE and hasattr(api_mod, "predictions_summary"))
-    else views.api_predictions
-)
+def _pick_prediction_view():
+    """
+    Choose the most appropriate predictions endpoint without crashing
+    if a candidate isn't implemented.
+    Order of preference:
+      1) inventory/api.py: predictions_summary
+      2) inventory/views.py: api_predictions
+      3) inventory/views.py: predictions_summary
+      4) inventory/views.py: api_predictions_v2
+      5) Fallback stub returning JSON 404
+    """
+    if _HAS_API_MODULE and hasattr(api_mod, "predictions_summary"):
+        return api_mod.predictions_summary
+
+    for name in ("api_predictions", "predictions_summary", "api_predictions_v2"):
+        if hasattr(views, name):
+            return getattr(views, name)
+
+    # Safe fallback so the app still runs
+    def _not_implemented(request, *args, **kwargs):
+        return JsonResponse(
+            {"ok": False, "error": "predictions endpoint not available"},
+            status=404,
+        )
+    return _not_implemented
+
+_prediction_view = _pick_prediction_view()
 
 urlpatterns = [
     # ---------- Dashboard ----------
@@ -36,9 +58,6 @@ urlpatterns = [
     path("scan-in/",   views.scan_in,   name="scan_in"),
     path("scan-sold/", views.scan_sold, name="scan_sold"),
     path("scan-web/",  views.scan_web,  name="scan_web"),  # desktop-first scanner page
-    # Extra aliases for historical links
-    re_path(r"^scanweb/?$",  views.scan_web),
-    re_path(r"^scan_web/?$", views.scan_web),
 
     # Short mobile-friendly aliases
     path("in/",   RedirectView.as_view(pattern_name="inventory:scan_in",   permanent=False), name="short_in"),
@@ -74,37 +93,34 @@ urlpatterns = [
 
 # ---------- API: Time, Wallet, Charts ----------
 urlpatterns += [
-    # Mark SOLD (canonical + aliases)
-    path("api/mark-sold/", views.api_mark_sold, name="api_mark_sold"),
-    re_path(r"^api/mark[-_]?sold/?$", views.api_mark_sold),
-
-    path("api/sales-trend/", views.api_sales_trend, name="api_sales_trend"),
-    path("api/top-models/",  views.api_top_models,  name="api_top_models"),
-    path("api/profit-bar/",  views.api_profit_bar,  name="api_profit_bar"),
-    path("api/agent-trend/", views.api_agent_trend, name="api_agent_trend"),
-
-    path("api/time-checkin/",   views.api_time_checkin,  name="api_time_checkin"),
-    re_path(r"^api/time[-_]?checkin/?$", views.api_time_checkin),
-
-    path("api/wallet-summary/", views.api_wallet_summary, name="api_wallet_summary"),
-    re_path(r"^api/wallet[-_]?summary/?$", views.api_wallet_summary),
-
-    # Cash overview (aliases)
-    re_path(r"^api/cash[-_]?overview/?$", views.api_cash_overview, name="api_cash_overview"),
+    path("api/mark-sold/",       views.api_mark_sold,        name="api_mark_sold"),
+    path("api/sales-trend/",     views.api_sales_trend,      name="api_sales_trend"),
+    path("api/top-models/",      views.api_top_models,       name="api_top_models"),
+    path("api/profit-bar/",      views.api_profit_bar,       name="api_profit_bar"),
+    path("api/agent-trend/",     views.api_agent_trend,      name="api_agent_trend"),
+    path("api/time-checkin/",    views.api_time_checkin,     name="api_time_checkin"),
+    path("api/wallet-summary/",  views.api_wallet_summary,   name="api_wallet_summary"),
+    path("api/wallet-txn/",      views.api_wallet_add_txn,   name="api_wallet_add_txn"),
 ]
+
+# Optional: Cash overview route only if implemented
+if hasattr(views, "api_cash_overview"):
+    urlpatterns += [
+        re_path(r"^api/cash[-_]overview/?$", views.api_cash_overview, name="api_cash_overview"),
+    ]
 
 # ---------- API: Predictions (robust aliases) ----------
 urlpatterns += [
     # Canonical
-    re_path(r"^api/predictions/?$", _prediction_view, name="api_predictions"),
+    re_path(r"^api/predictions/?$",      _prediction_view, name="api_predictions"),
     # Legacy / alternate spellings
     re_path(r"^api[-_]?predictions/?$", _prediction_view),
-    re_path(r"^api_predictions/?$", _prediction_view),
-    # v2 (currently same view, but separate name)
-    re_path(r"^api/predictions/v2/?$", views.api_predictions, name="api_predictions_v2"),
+    re_path(r"^api_predictions/?$",      _prediction_view),
+    # v2 (kept for compatibility; resolves safely above if implemented)
+    re_path(r"^api/predictions/v2/?$",   _pick_prediction_view()),
 ]
 
-# ---------- API: Legacy chart aliases (allow underscores/hyphens & optional trailing slash) ----------
+# ---------- API: Legacy chart aliases (underscores / hyphens / no trailing slash) ----------
 urlpatterns += [
     re_path(r"^api[_-]?sales[_-]?trend/?$",  views.api_sales_trend),
     re_path(r"^api[_-]?profit[_-]?bar/?$",   views.api_profit_bar),
