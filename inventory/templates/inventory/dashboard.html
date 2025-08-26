@@ -307,7 +307,30 @@
           <!-- AI Recommendations -->
           <div class="cc-card p-3 mb-3 will-animate">
             <h5>AI Recommendations</h5>
+            <div class="mb-2">
+              <button id="ai-recs-refresh" class="btn btn-outline-secondary btn-sm">
+                <i class="bi bi-arrow-clockwise"></i> Refresh
+              </button>
+            </div>
             <div id="ai-recos">Loading…</div>
+
+            <!-- NEW: structured containers (kept in addition to the existing #ai-recos) -->
+            <div id="ai-recs-overall" class="mt-2 small text-muted"></div>
+            <div class="table-responsive mt-2">
+              <table id="ai-recs-risky" class="table table-sm align-middle">
+                <thead class="table-light">
+                  <tr>
+                    <th>Model</th>
+                    <th class="text-end">On hand</th>
+                    <th>Stockout</th>
+                    <th class="text-end">Restock</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr><td colspan="4" class="text-muted">Waiting for data…</td></tr>
+                </tbody>
+              </table>
+            </div>
           </div>
 
           <!-- KPIs -->
@@ -934,7 +957,7 @@
     }
 
     /* ===== FIXED: AI Recommendations fetch (robust, tries multiple aliases) ===== */
-    (async function(){
+    (function(){
       const box=document.getElementById('ai-recos'); if(!box) return;
 
       const endpoints=[
@@ -948,35 +971,72 @@
         '/inventory/api-predictions'
       ];
 
-      let data=null, lastErr='';
-      for (const u of endpoints){
-        try{
-          const r=await fetch(u, {headers:{'Accept':'application/json'}});
-          if(!r.ok){ lastErr = `HTTP ${r.status}`; continue; }
-          data = await r.json();
-          break;
-        }catch(e){ lastErr = String(e); }
-      }
+      async function run(){
+        box.textContent='Loading…';
+        const overallEl = document.getElementById('ai-recs-overall');
+        const riskyTable = document.getElementById('ai-recs-risky');
+        if (overallEl) overallEl.textContent = 'Loading forecast…';
+        if (riskyTable) riskyTable.querySelector('tbody').innerHTML = '<tr><td colspan="4" class="text-muted">Calculating…</td></tr>';
 
-      if(!data){
-        box.innerHTML = `<div class="text-danger">Could not load predictions.</div><div class="small text-muted">${lastErr || 'No matching API route'}</div>`;
-        return;
-      }
-
-      const total=(data.overall||[]).reduce((s,x)=>s+(x.predicted_units||0),0);
-      const revenue=(data.overall||[]).reduce((s,x)=>s+(+x.predicted_revenue||0),0);
-      let html=`<div class="mb-1"><strong>Next 7 days</strong>: <b>${total.toLocaleString()}</b> units • <b>MK ${Math.round(revenue).toLocaleString()}</b></div>`;
-
-      if((data.risky||[]).length){
-        html+=`<div class="text-muted small">Likely stockouts</div><ul class="mt-1 mb-0">`;
-        for(const x of data.risky){
-          html+=`<li>${x.product}: by <b>${x.stockout_date}</b> • On-hand ${x.on_hand} • Restock <b>${x.suggested_restock}</b> ${x.urgent?'<span class="badge text-bg-danger">URGENT</span>':''}</li>`;
+        let data=null, lastErr='';
+        for (const u of endpoints){
+          try{
+            const r=await fetch(u, {headers:{'Accept':'application/json'}});
+            if(!r.ok){ lastErr = `HTTP ${r.status}`; continue; }
+            data = await r.json();
+            break;
+          }catch(e){ lastErr = String(e); }
         }
-        html+='</ul>';
-      }else{
-        html+='<div class="text-success">All good — no stockouts in next 7 days.</div>';
+
+        if(!data){
+          box.innerHTML = `<div class="text-danger">Could not load predictions.</div><div class="small text-muted">${lastErr || 'No matching API route'}</div>`;
+          if (overallEl) overallEl.innerHTML = `<span class="text-danger">Error: ${lastErr||'Unavailable'}</span>`;
+          if (riskyTable) riskyTable.querySelector('tbody').innerHTML = `<tr><td colspan="4" class="text-danger">Error</td></tr>`;
+          return;
+        }
+
+        const total=(data.overall||[]).reduce((s,x)=>s+(x.predicted_units||0),0);
+        const revenue=(data.overall||[]).reduce((s,x)=>s+(+x.predicted_revenue||0),0);
+        let html=`<div class="mb-1"><strong>Next 7 days</strong>: <b>${total.toLocaleString()}</b> units • <b>MK ${Math.round(revenue).toLocaleString()}</b></div>`;
+
+        if((data.risky||[]).length){
+          html+=`<div class="text-muted small">Likely stockouts</div><ul class="mt-1 mb-0">`;
+          for(const x of data.risky){
+            html+=`<li>${x.product}: by <b>${x.stockout_date}</b> • On-hand ${x.on_hand} • Restock <b>${x.suggested_restock}</b> ${x.urgent?'<span class="badge text-bg-danger">URGENT</span>':''}</li>`;
+          }
+          html+='</ul>';
+        }else{
+          html+='<div class="text-success">All good — no stockouts in next 7 days.</div>';
+        }
+        box.innerHTML=html;
+
+        // NEW: fill structured containers too (if present)
+        if (overallEl) {
+          const lines = (data.overall||[]).map(d =>
+            `${d.date}: <strong>${(d.predicted_units||0).toLocaleString()}</strong> units · <strong>MK ${Math.round(d.predicted_revenue||0).toLocaleString()}</strong>`
+          ).join('<br>');
+          overallEl.innerHTML = lines || 'No forecast yet.';
+        }
+
+        if (riskyTable) {
+          const tbody = riskyTable.querySelector('tbody');
+          const rows = (data.risky||[])
+            .slice()
+            .sort((a,b)=> (b.urgent?1:0)-(a.urgent?1:0) || (b.suggested_restock||0)-(a.suggested_restock||0))
+            .map(r => `<tr${r.urgent ? ' class="table-danger fw-semibold"' : ""}>
+              <td>${r.product||'—'}</td>
+              <td class="text-end">${(r.on_hand??0).toLocaleString()}</td>
+              <td>${r.stockout_date||'—'}</td>
+              <td class="text-end">${(r.suggested_restock??0).toLocaleString()}</td>
+            </tr>`).join('');
+          tbody.innerHTML = rows || `<tr><td colspan="4" class="text-muted">No stockout risks detected.</td></tr>`;
+        }
       }
-      box.innerHTML=html;
+
+      // initial load + refresh button
+      run();
+      const btn = document.getElementById('ai-recs-refresh');
+      if (btn) btn.addEventListener('click', run);
     })();
 
     /* ===== Slides rotator (separate 3-button control; auto 10s) ===== */
