@@ -6,13 +6,11 @@ from . import views
 
 app_name = "inventory"
 
-# ---- SAFE, LAZY PREDICTIONS PROXY (no import-time attribute access) ----------
+# ---- SAFE, LAZY PREDICTIONS PROXY (no import-time lookups) ----------
 def _predictions_proxy(request, *args, **kwargs):
     """
-    Dispatch to first available predictions view:
-      1) inventory.api.predictions_summary (preferred)
-      2) views.api_predictions (if present)
-    Otherwise return a harmless JSON.
+    Try inventory.api.predictions_summary (preferred), else views.api_predictions
+    (if present). Otherwise return a harmless JSON.
     """
     try:
         from . import api as api_mod
@@ -22,24 +20,19 @@ def _predictions_proxy(request, *args, **kwargs):
     except Exception:
         pass
 
-    # Legacy fallback only if it actually exists (don't touch at import time)
     func2 = getattr(views, "api_predictions", None)
     if callable(func2):
         return func2(request, *args, **kwargs)
 
     return JsonResponse({"ok": False, "error": "predictions endpoint not available"}, status=200)
 
-# -----------------------------------------------------------------------------
+# ---------------------------------------------------------------------
 
 urlpatterns = [
     # ---------- Dashboard ----------
     path("dashboard/", views.inventory_dashboard, name="inventory_dashboard"),
     path("", RedirectView.as_view(pattern_name="inventory:inventory_dashboard", permanent=False), name="home"),
     path("dash/", RedirectView.as_view(pattern_name="inventory:inventory_dashboard", permanent=False)),
-
-    # Old dashboard links → redirect
-    path("dashboard/agent/",  RedirectView.as_view(pattern_name="inventory:inventory_dashboard", permanent=False)),
-    path("dashboard/agents/", RedirectView.as_view(pattern_name="inventory:inventory_dashboard", permanent=False)),
 
     # ---------- Stock scanning ----------
     path("scan-in/",   views.scan_in,   name="scan_in"),
