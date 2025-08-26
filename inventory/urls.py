@@ -1,31 +1,34 @@
-# inventory/urls.py
+# circuitcity/inventory/urls.py
 from django.urls import path, re_path
 from django.views.generic import RedirectView
+from django.http import JsonResponse
 from . import views
 
+# Try optional api module (inventory/api.py). If it exposes predictions_summary, prefer it.
+try:
+    from . import api as api_mod
+except Exception:  # api module missing or broken
+    api_mod = None
+
+def _predictions_stub(request, *args, **kwargs):
+    """
+    Safe fallback used when neither inventory.api.predictions_summary nor
+    inventory.views.api_predictions exists. Returns a harmless JSON payload
+    so the site never fails to import.
+    """
+    return JsonResponse(
+        {"ok": False, "message": "Predictions endpoint not available"},
+        status=200,
+    )
+
+# Pick the best available predictions view WITHOUT raising at import time
+_prediction_view = (
+    getattr(api_mod, "predictions_summary", None)
+    or getattr(views, "api_predictions", None)
+    or _predictions_stub
+)
+
 app_name = "inventory"
-
-# ---- Lazy dispatcher for predictions (prevents import-time AttributeError) ----
-def predictions_dispatch(request, *args, **kwargs):
-    try:
-        # Optional API module
-        from . import api as api_mod
-        pred = getattr(api_mod, "predictions_summary", None)
-        if callable(pred):
-            return pred(request, *args, **kwargs)
-    except Exception:
-        pass
-
-    # Try common fallbacks in views.py
-    for attr in ("api_predictions", "predictions_summary"):
-        pred = getattr(views, attr, None)
-        if callable(pred):
-            return pred(request, *args, **kwargs)
-
-    # Graceful fallback (no crash)
-    from django.http import JsonResponse
-    return JsonResponse({"ok": False, "error": "predictions endpoint not available"}, status=404)
-
 
 urlpatterns = [
     # ---------- Dashboard ----------
@@ -69,12 +72,10 @@ urlpatterns = [
     # ---------- UI: Time & Wallet ----------
     path("time/checkin/", views.time_checkin_page, name="time_checkin_page"),
     path("time/logs/",    views.time_logs,         name="time_logs"),
-    path("time/", RedirectView.as_view(pattern_name="inventory:time_checkin_page", permanent=False)),
-    # Friendly hyphen aliases used in templates/sidebar
-    path("time-checkin/", RedirectView.as_view(pattern_name="inventory:time_checkin_page", permanent=False)),
-    path("time-logs/",    RedirectView.as_view(pattern_name="inventory:time_logs",        permanent=False)),
-
-    path("wallet/", views.wallet_page, name="wallet"),
+    path("wallet/",       views.wallet_page,       name="wallet"),
+    # Hyphen + underscore aliases (never 404)
+    re_path(r"^time[-_]?check[-_]?in/?$", RedirectView.as_view(pattern_name="inventory:time_checkin_page", permanent=False)),
+    re_path(r"^time[-_]?logs/?$",          RedirectView.as_view(pattern_name="inventory:time_logs",         permanent=False)),
 
     # ---------- Health check ----------
     path("healthz/", views.healthz, name="healthz"),
@@ -95,15 +96,18 @@ urlpatterns += [
     re_path(r"^api/cash[-_]overview/?$", views.api_cash_overview, name="api_cash_overview"),
 ]
 
-# ---------- API: Predictions (robust aliases; lazy dispatch) ----------
+# ---------- API: Predictions (robust aliases) ----------
 urlpatterns += [
-    re_path(r"^api/predictions/?$",      predictions_dispatch, name="api_predictions"),
-    re_path(r"^api[-_]?predictions/?$",  predictions_dispatch),
-    re_path(r"^api_predictions/?$",      predictions_dispatch),
-    re_path(r"^api/predictions/v2/?$",   predictions_dispatch, name="api_predictions_v2"),
+    # Canonical
+    re_path(r"^api/predictions/?$",      _prediction_view, name="api_predictions"),
+    # Legacy / alternate spellings
+    re_path(r"^api[-_]?predictions/?$", _prediction_view),
+    re_path(r"^api_predictions/?$",      _prediction_view),
+    # v2 (currently same handler)
+    re_path(r"^api/predictions/v2/?$",   _prediction_view, name="api_predictions_v2"),
 ]
 
-# ---------- API: Legacy chart aliases (so underscores/hyphens & no trailing slash won’t 404) ----------
+# ---------- API: Legacy chart aliases ----------
 urlpatterns += [
     re_path(r"^api[_-]?sales[_-]?trend/?$",  views.api_sales_trend),
     re_path(r"^api[_-]?profit[_-]?bar/?$",   views.api_profit_bar),
