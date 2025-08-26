@@ -6,46 +6,41 @@ from . import views
 
 app_name = "inventory"
 
-# ---- SAFE, LAZY PREDICTIONS PROXY (no import-time getattr!) ---------------
+# ---- SAFE, LAZY PREDICTIONS PROXY -----------------------------------------
 def _predictions_proxy(request, *args, **kwargs):
     """
-    Try, in order:
-      1) inventory.api.predictions_summary  (preferred if inventory/api.py exists)
-      2) views.api_predictions               (legacy/local)
-    If neither is available, return a harmless JSON instead of 500.
+    Dispatch to the first available predictions view:
+    1) inventory.api.predictions_summary (preferred, if present)
+    2) views.api_predictions (legacy, if present)
+    Otherwise return a harmless JSON so the route never 500s.
     """
-    # Try inventory/api.py (optional module)
+    # Try inventory/api.py -> predictions_summary
     try:
         from . import api as api_mod
         func = getattr(api_mod, "predictions_summary", None)
         if callable(func):
             return func(request, *args, **kwargs)
     except Exception:
-        # swallow any import/runtime errors and keep falling back
         pass
 
-    # Try legacy view on demand (do NOT resolve at import time)
-    legacy = getattr(views, "api_predictions", None)
-    if callable(legacy):
-        return legacy(request, *args, **kwargs)
+    # Try legacy views.api_predictions (only if it exists)
+    func2 = getattr(views, "api_predictions", None)
+    if callable(func2):
+        return func2(request, *args, **kwargs)
 
-    # Graceful, deploy-safe fallback (never 500)
-    return JsonResponse(
-        {
-            "ok": True,
-            "predictions": [],
-            "detail": "Predictions endpoint not wired (no inventory.api.predictions_summary "
-                      "or views.api_predictions). This response prevents deploy failures."
-        },
-        status=200,
-    )
-# ---------------------------------------------------------------------------
+    return JsonResponse({"ok": False, "error": "predictions endpoint not available"}, status=200)
+
+# ----------------------------------------------------------------------------
 
 urlpatterns = [
     # ---------- Dashboard ----------
     path("dashboard/", views.inventory_dashboard, name="inventory_dashboard"),
-    path("",    RedirectView.as_view(pattern_name="inventory:inventory_dashboard", permanent=False), name="home"),
+
+    # App home → dashboard
+    path("", RedirectView.as_view(pattern_name="inventory:inventory_dashboard", permanent=False), name="home"),
     path("dash/", RedirectView.as_view(pattern_name="inventory:inventory_dashboard", permanent=False)),
+
+    # Old dashboard links → redirect to main dashboard
     path("dashboard/agent/",  RedirectView.as_view(pattern_name="inventory:inventory_dashboard", permanent=False)),
     path("dashboard/agents/", RedirectView.as_view(pattern_name="inventory:inventory_dashboard", permanent=False)),
 
@@ -53,9 +48,11 @@ urlpatterns = [
     path("scan-in/",   views.scan_in,   name="scan_in"),
     path("scan-sold/", views.scan_sold, name="scan_sold"),
     path("scan-web/",  views.scan_web,  name="scan_web"),
-    path("in/",        RedirectView.as_view(pattern_name="inventory:scan_in",   permanent=False), name="short_in"),
-    path("sold/",      RedirectView.as_view(pattern_name="inventory:scan_sold", permanent=False), name="short_sold"),
-    path("scan/",      RedirectView.as_view(pattern_name="inventory:scan_web",  permanent=False), name="short_scan"),
+
+    # Short mobile-friendly aliases
+    path("in/",   RedirectView.as_view(pattern_name="inventory:scan_in",   permanent=False), name="short_in"),
+    path("sold/", RedirectView.as_view(pattern_name="inventory:scan_sold", permanent=False), name="short_sold"),
+    path("scan/", RedirectView.as_view(pattern_name="inventory:scan_web",  permanent=False), name="short_scan"),
 
     # ---------- Stock viewing ----------
     path("list/",   views.stock_list, name="stock_list"),
@@ -88,18 +85,18 @@ urlpatterns = [
 
 # ---------- API: Time, Wallet, Charts ----------
 urlpatterns += [
-    path("api/mark-sold/",      views.api_mark_sold,      name="api_mark_sold"),
-    path("api/sales-trend/",    views.api_sales_trend,    name="api_sales_trend"),
-    path("api/top-models/",     views.api_top_models,     name="api_top_models"),
-    path("api/profit-bar/",     views.api_profit_bar,     name="api_profit_bar"),
-    path("api/agent-trend/",    views.api_agent_trend,    name="api_agent_trend"),
-    path("api/time-checkin/",   views.api_time_checkin,   name="api_time_checkin"),
-    path("api/wallet-summary/", views.api_wallet_summary, name="api_wallet_summary"),
-    path("api/wallet-txn/",     views.api_wallet_add_txn, name="api_wallet_add_txn"),
+    path("api/mark-sold/",       views.api_mark_sold,        name="api_mark_sold"),
+    path("api/sales-trend/",     views.api_sales_trend,      name="api_sales_trend"),
+    path("api/top-models/",      views.api_top_models,       name="api_top_models"),
+    path("api/profit-bar/",      views.api_profit_bar,       name="api_profit_bar"),
+    path("api/agent-trend/",     views.api_agent_trend,      name="api_agent_trend"),
+    path("api/time-checkin/",    views.api_time_checkin,     name="api_time_checkin"),
+    path("api/wallet-summary/",  views.api_wallet_summary,   name="api_wallet_summary"),
+    path("api/wallet-txn/",      views.api_wallet_add_txn,   name="api_wallet_add_txn"),
     re_path(r"^api/cash[-_]overview/?$", views.api_cash_overview, name="api_cash_overview"),
 ]
 
-# ---------- API: Predictions (robust aliases; all point to the proxy) ----------
+# ---------- API: Predictions (robust aliases) ----------
 urlpatterns += [
     re_path(r"^api/predictions/?$",      _predictions_proxy, name="api_predictions"),
     re_path(r"^api[-_]?predictions/?$", _predictions_proxy),
