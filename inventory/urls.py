@@ -6,38 +6,37 @@ from . import views
 
 app_name = "inventory"
 
-# ---- SAFE, LAZY PREDICTIONS PROXY -----------------------------------------
+# ---- SAFE, LAZY PREDICTIONS PROXY (no import-time getattr!) ---------------
 def _predictions_proxy(request, *args, **kwargs):
     """
-    Dispatch to the first available predictions view:
-      1) inventory.api.predictions_summary (preferred, if inventory/api.py exists)
-      2) views.api_predictions (legacy/local fallback)
-    Otherwise return a harmless JSON explaining it's not wired yet.
+    Try, in order:
+      1) inventory.api.predictions_summary  (preferred if inventory/api.py exists)
+      2) views.api_predictions               (legacy/local)
+    If neither is available, return a harmless JSON instead of 500.
     """
-    # Try inventory/api.py -> predictions_summary
+    # Try inventory/api.py
     try:
-        from . import api as api_mod  # optional module
+        from . import api as api_mod          # optional module
         func = getattr(api_mod, "predictions_summary", None)
         if callable(func):
             return func(request, *args, **kwargs)
     except Exception:
         pass
 
-    # Try legacy: views.api_predictions
+    # Try legacy view on demand (do NOT resolve at import time)
     func2 = getattr(views, "api_predictions", None)
     if callable(func2):
         return func2(request, *args, **kwargs)
 
-    # Graceful fallback (never 500s)
+    # Graceful fallback
     return JsonResponse({"ok": False, "error": "predictions endpoint not available"}, status=200)
-# ----------------------------------------------------------------------------
+# ---------------------------------------------------------------------------
 
 urlpatterns = [
     # ---------- Dashboard ----------
     path("dashboard/", views.inventory_dashboard, name="inventory_dashboard"),
-    path("", RedirectView.as_view(pattern_name="inventory:inventory_dashboard", permanent=False), name="home"),
+    path("",    RedirectView.as_view(pattern_name="inventory:inventory_dashboard", permanent=False), name="home"),
     path("dash/", RedirectView.as_view(pattern_name="inventory:inventory_dashboard", permanent=False)),
-    # Old dashboard links -> redirect
     path("dashboard/agent/",  RedirectView.as_view(pattern_name="inventory:inventory_dashboard", permanent=False)),
     path("dashboard/agents/", RedirectView.as_view(pattern_name="inventory:inventory_dashboard", permanent=False)),
 
@@ -45,11 +44,9 @@ urlpatterns = [
     path("scan-in/",   views.scan_in,   name="scan_in"),
     path("scan-sold/", views.scan_sold, name="scan_sold"),
     path("scan-web/",  views.scan_web,  name="scan_web"),
-
-    # Short mobile-friendly aliases
-    path("in/",   RedirectView.as_view(pattern_name="inventory:scan_in",   permanent=False), name="short_in"),
-    path("sold/", RedirectView.as_view(pattern_name="inventory:scan_sold", permanent=False), name="short_sold"),
-    path("scan/", RedirectView.as_view(pattern_name="inventory:scan_web",  permanent=False), name="short_scan"),
+    path("in/",        RedirectView.as_view(pattern_name="inventory:scan_in",   permanent=False), name="short_in"),
+    path("sold/",      RedirectView.as_view(pattern_name="inventory:scan_sold", permanent=False), name="short_sold"),
+    path("scan/",      RedirectView.as_view(pattern_name="inventory:scan_web",  permanent=False), name="short_scan"),
 
     # ---------- Stock viewing ----------
     path("list/",   views.stock_list, name="stock_list"),
@@ -73,7 +70,6 @@ urlpatterns = [
     path("time/logs/",    views.time_logs,         name="time_logs"),
     path("wallet/",       views.wallet_page,       name="wallet"),
     path("time/",         RedirectView.as_view(pattern_name="inventory:time_checkin_page", permanent=False)),
-    # Hyphenated aliases
     path("time-checkin/", RedirectView.as_view(pattern_name="inventory:time_checkin_page", permanent=False)),
     path("time-logs/",    RedirectView.as_view(pattern_name="inventory:time_logs",         permanent=False)),
 
@@ -91,23 +87,18 @@ urlpatterns += [
     path("api/time-checkin/",   views.api_time_checkin,   name="api_time_checkin"),
     path("api/wallet-summary/", views.api_wallet_summary, name="api_wallet_summary"),
     path("api/wallet-txn/",     views.api_wallet_add_txn, name="api_wallet_add_txn"),
-
-    # Cash overview (hyphen/underscore tolerant)
     re_path(r"^api/cash[-_]overview/?$", views.api_cash_overview, name="api_cash_overview"),
 ]
 
-# ---------- API: Predictions (robust aliases) ----------
+# ---------- API: Predictions (robust aliases; all point to the proxy) ----------
 urlpatterns += [
-    # Canonical
     re_path(r"^api/predictions/?$",      _predictions_proxy, name="api_predictions"),
-    # Legacy / alternate spellings
     re_path(r"^api[-_]?predictions/?$", _predictions_proxy),
     re_path(r"^api_predictions/?$",      _predictions_proxy),
-    # v2 (same proxy for now)
     re_path(r"^api/predictions/v2/?$",   _predictions_proxy, name="api_predictions_v2"),
 ]
 
-# ---------- API: Legacy chart aliases (underscore/hyphen + optional slash) ----------
+# ---------- API: Legacy chart aliases ----------
 urlpatterns += [
     re_path(r"^api[_-]?sales[_-]?trend/?$",  views.api_sales_trend),
     re_path(r"^api[_-]?profit[_-]?bar/?$",   views.api_profit_bar),
