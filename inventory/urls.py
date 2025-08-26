@@ -1,46 +1,31 @@
-# circuitcity/inventory/urls.py
+# inventory/urls.py
 from django.urls import path, re_path
 from django.views.generic import RedirectView
-from django.http import JsonResponse
 from . import views
-
-# Optional API module (e.g., inventory/api.py)
-try:
-    from . import api as api_mod
-    _HAS_API_MODULE = True
-except Exception:
-    api_mod = None
-    _HAS_API_MODULE = False
 
 app_name = "inventory"
 
-def _pick_prediction_view():
-    """
-    Choose the most appropriate predictions endpoint without crashing
-    if a candidate isn't implemented.
-    Order of preference:
-      1) inventory/api.py: predictions_summary
-      2) inventory/views.py: api_predictions
-      3) inventory/views.py: predictions_summary
-      4) inventory/views.py: api_predictions_v2
-      5) Fallback stub returning JSON 404
-    """
-    if _HAS_API_MODULE and hasattr(api_mod, "predictions_summary"):
-        return api_mod.predictions_summary
+# ---- Lazy dispatcher for predictions (prevents import-time AttributeError) ----
+def predictions_dispatch(request, *args, **kwargs):
+    try:
+        # Optional API module
+        from . import api as api_mod
+        pred = getattr(api_mod, "predictions_summary", None)
+        if callable(pred):
+            return pred(request, *args, **kwargs)
+    except Exception:
+        pass
 
-    for name in ("api_predictions", "predictions_summary", "api_predictions_v2"):
-        if hasattr(views, name):
-            return getattr(views, name)
+    # Try common fallbacks in views.py
+    for attr in ("api_predictions", "predictions_summary"):
+        pred = getattr(views, attr, None)
+        if callable(pred):
+            return pred(request, *args, **kwargs)
 
-    # Safe fallback so the app still runs
-    def _not_implemented(request, *args, **kwargs):
-        return JsonResponse(
-            {"ok": False, "error": "predictions endpoint not available"},
-            status=404,
-        )
-    return _not_implemented
+    # Graceful fallback (no crash)
+    from django.http import JsonResponse
+    return JsonResponse({"ok": False, "error": "predictions endpoint not available"}, status=404)
 
-_prediction_view = _pick_prediction_view()
 
 urlpatterns = [
     # ---------- Dashboard ----------
@@ -84,8 +69,12 @@ urlpatterns = [
     # ---------- UI: Time & Wallet ----------
     path("time/checkin/", views.time_checkin_page, name="time_checkin_page"),
     path("time/logs/",    views.time_logs,         name="time_logs"),
-    path("wallet/",       views.wallet_page,       name="wallet"),
     path("time/", RedirectView.as_view(pattern_name="inventory:time_checkin_page", permanent=False)),
+    # Friendly hyphen aliases used in templates/sidebar
+    path("time-checkin/", RedirectView.as_view(pattern_name="inventory:time_checkin_page", permanent=False)),
+    path("time-logs/",    RedirectView.as_view(pattern_name="inventory:time_logs",        permanent=False)),
+
+    path("wallet/", views.wallet_page, name="wallet"),
 
     # ---------- Health check ----------
     path("healthz/", views.healthz, name="healthz"),
@@ -101,26 +90,20 @@ urlpatterns += [
     path("api/time-checkin/",    views.api_time_checkin,     name="api_time_checkin"),
     path("api/wallet-summary/",  views.api_wallet_summary,   name="api_wallet_summary"),
     path("api/wallet-txn/",      views.api_wallet_add_txn,   name="api_wallet_add_txn"),
+
+    # Cash overview (aliases)
+    re_path(r"^api/cash[-_]overview/?$", views.api_cash_overview, name="api_cash_overview"),
 ]
 
-# Optional: Cash overview route only if implemented
-if hasattr(views, "api_cash_overview"):
-    urlpatterns += [
-        re_path(r"^api/cash[-_]overview/?$", views.api_cash_overview, name="api_cash_overview"),
-    ]
-
-# ---------- API: Predictions (robust aliases) ----------
+# ---------- API: Predictions (robust aliases; lazy dispatch) ----------
 urlpatterns += [
-    # Canonical
-    re_path(r"^api/predictions/?$",      _prediction_view, name="api_predictions"),
-    # Legacy / alternate spellings
-    re_path(r"^api[-_]?predictions/?$", _prediction_view),
-    re_path(r"^api_predictions/?$",      _prediction_view),
-    # v2 (kept for compatibility; resolves safely above if implemented)
-    re_path(r"^api/predictions/v2/?$",   _pick_prediction_view()),
+    re_path(r"^api/predictions/?$",      predictions_dispatch, name="api_predictions"),
+    re_path(r"^api[-_]?predictions/?$",  predictions_dispatch),
+    re_path(r"^api_predictions/?$",      predictions_dispatch),
+    re_path(r"^api/predictions/v2/?$",   predictions_dispatch, name="api_predictions_v2"),
 ]
 
-# ---------- API: Legacy chart aliases (underscores / hyphens / no trailing slash) ----------
+# ---------- API: Legacy chart aliases (so underscores/hyphens & no trailing slash won’t 404) ----------
 urlpatterns += [
     re_path(r"^api[_-]?sales[_-]?trend/?$",  views.api_sales_trend),
     re_path(r"^api[_-]?profit[_-]?bar/?$",   views.api_profit_bar),
