@@ -363,15 +363,15 @@ def scan_web(request):
   </div>
 <script>
 const imei=document.getElementById('imei'), price=document.getElementById('price'), out=document.getElementById('out');
-document.getElementById('go').onclick=async()=>{{
+document.getElementById('go').onclick=async()=>{
   const v=(imei.value||'').replace(/\\D/g,'');
-  if(v.length!==15){{out.textContent='IMEI must be exactly 15 digits.';return;}}
-  const r = await fetch("{settings.FORCE_SCRIPT_NAME or ''}/inventory/api/mark-sold/", {{
-    method:"POST", headers:{{"Content-Type":"application/json","X-CSRFToken":(document.cookie.match(/csrftoken=([^;]+)/)||[])[1]||""}},
-    body:JSON.stringify({{imei:v, price:price.value||undefined}})
-  }});
+  if(v.length!==15){out.textContent='IMEI must be exactly 15 digits.';return;}
+  const r = await fetch("{settings.FORCE_SCRIPT_NAME or ''}/inventory/api/mark-sold/", {
+    method:"POST", headers:{"Content-Type":"application/json","X-CSRFToken":(document.cookie.match(/csrftoken=([^;]+)/)||[])[1]||""},
+    body:JSON.stringify({imei:v, price:price.value||undefined})
+  });
   out.textContent = 'HTTP '+r.status+'\\n'+await r.text();
-}};
+};
 </script>
 </body></html>"""
     return HttpResponse(html, content_type="text/html")
@@ -1508,11 +1508,21 @@ def api_agent_trend(request):
 @require_GET
 def api_predictions(request):
     """
-    Baseline forecast used by the dashboard's 'AI Recommendations' card.
-    - Predict next 7 days by averaging last 14 days (units & revenue).
-    - Flag models likely to stock out: on_hand < 7 * model_daily_avg.
-    Obeys permissions.
+    Dashboard 'AI Recommendations' endpoint.
+
+    Preferred path: delegate to inventory.api.predictions_summary (if available).
+    Fallback: local baseline so the endpoint never 500s.
     """
+    # ---- Preferred: reuse inventory/api.py implementation ----
+    try:
+        from . import api as _api  # lazy import to avoid hard dependency at import time
+        if hasattr(_api, "predictions_summary") and callable(_api.predictions_summary):
+            return _api.predictions_summary(request)
+    except Exception:
+        # If import or handler fails, continue to the fallback.
+        pass
+
+    # ---- Fallback baseline (compatible response shape) ----
     today = timezone.localdate()
     lookback_days = 14
     start = today - timedelta(days=lookback_days)
@@ -1544,7 +1554,7 @@ def api_predictions(request):
 
     overall = [
         {
-            "day": (today + timedelta(days=i)).isoformat(),
+            "date": (today + timedelta(days=i)).isoformat(),  # align key with inventory.api.predictions_summary
             "predicted_units": round(daily_units_avg, 2),
             "predicted_revenue": round(daily_rev_avg, 2),
         }
