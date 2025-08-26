@@ -4,31 +4,37 @@ from django.views.generic import RedirectView
 from django.http import JsonResponse
 from . import views
 
-# Try optional api module (inventory/api.py). If it exposes predictions_summary, prefer it.
-try:
-    from . import api as api_mod
-except Exception:  # api module missing or broken
-    api_mod = None
+app_name = "inventory"
 
-def _predictions_stub(request, *args, **kwargs):
+# ---- SAFE, LAZY PREDICTIONS PROXY -----------------------------------------
+def _predictions_proxy(request, *args, **kwargs):
     """
-    Safe fallback used when neither inventory.api.predictions_summary nor
-    inventory.views.api_predictions exists. Returns a harmless JSON payload
-    so the site never fails to import.
+    Dispatch to the first available predictions view:
+    1) inventory.api.predictions_summary (preferred, if you have inventory/api.py)
+    2) views.api_predictions (legacy, if present)
+    Otherwise return a harmless JSON explaining it isn't wired yet.
     """
+    # Try module: inventory/api.py -> predictions_summary
+    try:
+        from . import api as api_mod  # optional file
+        func = getattr(api_mod, "predictions_summary", None)
+        if callable(func):
+            return func(request, *args, **kwargs)
+    except Exception:
+        pass
+
+    # Try legacy: views.api_predictions
+    func2 = getattr(views, "api_predictions", None)
+    if callable(func2):
+        return func2(request, *args, **kwargs)
+
+    # Graceful fallback (no more 500s)
     return JsonResponse(
-        {"ok": False, "message": "Predictions endpoint not available"},
+        {"ok": False, "error": "predictions endpoint not available"},
         status=200,
     )
 
-# Pick the best available predictions view WITHOUT raising at import time
-_prediction_view = (
-    getattr(api_mod, "predictions_summary", None)
-    or getattr(views, "api_predictions", None)
-    or _predictions_stub
-)
-
-app_name = "inventory"
+# ----------------------------------------------------------------------------
 
 urlpatterns = [
     # ---------- Dashboard ----------
@@ -45,7 +51,7 @@ urlpatterns = [
     # ---------- Stock scanning ----------
     path("scan-in/",   views.scan_in,   name="scan_in"),
     path("scan-sold/", views.scan_sold, name="scan_sold"),
-    path("scan-web/",  views.scan_web,  name="scan_web"),  # desktop-first scanner page
+    path("scan-web/",  views.scan_web,  name="scan_web"),  # desktop/web scanner
 
     # Short mobile-friendly aliases
     path("in/",   RedirectView.as_view(pattern_name="inventory:scan_in",   permanent=False), name="short_in"),
@@ -73,9 +79,10 @@ urlpatterns = [
     path("time/checkin/", views.time_checkin_page, name="time_checkin_page"),
     path("time/logs/",    views.time_logs,         name="time_logs"),
     path("wallet/",       views.wallet_page,       name="wallet"),
-    # Hyphen + underscore aliases (never 404)
-    re_path(r"^time[-_]?check[-_]?in/?$", RedirectView.as_view(pattern_name="inventory:time_checkin_page", permanent=False)),
-    re_path(r"^time[-_]?logs/?$",          RedirectView.as_view(pattern_name="inventory:time_logs",         permanent=False)),
+    path("time/",         RedirectView.as_view(pattern_name="inventory:time_checkin_page", permanent=False)),
+    # Hyphenated aliases (avoid 404s)
+    path("time-checkin/", RedirectView.as_view(pattern_name="inventory:time_checkin_page", permanent=False)),
+    path("time-logs/",    RedirectView.as_view(pattern_name="inventory:time_logs",         permanent=False)),
 
     # ---------- Health check ----------
     path("healthz/", views.healthz, name="healthz"),
@@ -99,15 +106,15 @@ urlpatterns += [
 # ---------- API: Predictions (robust aliases) ----------
 urlpatterns += [
     # Canonical
-    re_path(r"^api/predictions/?$",      _prediction_view, name="api_predictions"),
+    re_path(r"^api/predictions/?$",      _predictions_proxy, name="api_predictions"),
     # Legacy / alternate spellings
-    re_path(r"^api[-_]?predictions/?$", _prediction_view),
-    re_path(r"^api_predictions/?$",      _prediction_view),
-    # v2 (currently same handler)
-    re_path(r"^api/predictions/v2/?$",   _prediction_view, name="api_predictions_v2"),
+    re_path(r"^api[-_]?predictions/?$", _predictions_proxy),
+    re_path(r"^api_predictions/?$",      _predictions_proxy),
+    # v2 (currently same proxy)
+    re_path(r"^api/predictions/v2/?$",   _predictions_proxy, name="api_predictions_v2"),
 ]
 
-# ---------- API: Legacy chart aliases ----------
+# ---------- API: Legacy chart aliases (underscores/hyphens & trailing slash optional) ----------
 urlpatterns += [
     re_path(r"^api[_-]?sales[_-]?trend/?$",  views.api_sales_trend),
     re_path(r"^api[_-]?profit[_-]?bar/?$",   views.api_profit_bar),
