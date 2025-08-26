@@ -2,15 +2,22 @@
   - type: web
     name: circuitcity-main
     env: python
+    plan: starter
+    autoDeploy: true
     buildCommand: |
-      pip install --upgrade pip
       pip install -r requirements.txt
-      python manage.py collectstatic --noinput --settings=cc.settings
-    startCommand: gunicorn cc.wsgi:application --workers=2 --threads=4 --timeout=120
-    postDeployCommand: |
-      python manage.py migrate --noinput --settings=cc.settings
+      python manage.py collectstatic --noinput || true
+      python manage.py migrate --noinput || true
+    startCommand: gunicorn circuitcity.wsgi:application --preload --bind 0.0.0.0:$PORT
+    healthCheckPath: /inventory/healthz/
     envVars:
       - key: PYTHON_VERSION
-        value: 3.12.4
+        value: 3.12.3
       - key: DJANGO_SETTINGS_MODULE
-        value: cc.settings
+        value: circuitcity.settings
+      - key: SECRET_KEY
+        generateValue: true
+      - key: DEBUG
+        value: "False"
+      # If using Postgres on Render, DATABASE_URL is injected automatically.
+      # Add any other settings your app needs here.

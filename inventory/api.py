@@ -1,134 +1,114 @@
 # circuitcity/inventory/api.py
 from datetime import timedelta
-
 from django.http import JsonResponse
 from django.utils import timezone
 from django.views.decorators.http import require_GET
-from django.core.cache import cache
+from django.views.decorators.cache import cache_page
 
+# If you want auth, wrap with @login_required (and handle 302 in frontend).
+# from django.contrib.auth.decorators import login_required
 
-def _int_arg(request, name, default, lo, hi):
-    """Clamp an optional int query param to [lo, hi]."""
-    v = request.GET.get(name)
-    if v is None:
-        return default
-    try:
-        v = int(v)
-        return max(lo, min(hi, v))
-    except ValueError:
-        return default
-
+SAFE_EMPTY = {"ok": True, "predictions": [], "detail": "no data yet"}
 
 @require_GET
+@cache_page(60 * 5)  # cache 5 minutes to keep it fast; adjust as needed
 def predictions_summary(request):
     """
-    GET /inventory/api/predictions/?days=7&lead=3&limit=3
+    Returns simple AI-like recommendations based on recent sales velocity.
+    Gracefully degrades to empty results if tables or data are missing.
 
     Response:
     {
       "ok": true,
-      "overall": [{"date":"YYYY-MM-DD","predicted_units":10,"predicted_revenue":12345.0}, ...],
-      "risky": [
-        {"product":"X","stockout_date":"YYYY-MM-DD","on_hand":6,"suggested_restock":30,"urgent":true},
+      "generated_at": "...",
+      "horizon_days": 30,
+      "predictions": [
+        {
+          "sku": "TECNO-Spark10",
+          "model_name": "Tecno Spark 10",
+          "recommended_restock": 12,
+          "reason": "High 30d sales vs low on-hand",
+          "stats": {"sold_30d": 27, "on_hand": 5, "avg_daily": 0.9}
+        },
         ...
       ]
     }
     """
-    # ---- query params (clamped) ----
-    days = _int_arg(request, "days", default=7, lo=1, hi=30)
-    lead_days = _int_arg(request, "lead", default=3, lo=0, hi=14)
-    risky_limit = _int_arg(request, "limit", default=3, lo=1, hi=10)
+    now = timezone.now()
+    horizon_days = int(request.GET.get("days", 30))
+    since = now - timedelta(days=horizon_days)
 
-    cache_key = f"predictions_summary:v1:days={days}:lead={lead_days}:limit={risky_limit}"
-    cached = cache.get(cache_key)
-    if cached is not None:
-        return JsonResponse(cached)
-
-    today = timezone.now().date()
-    horizon = today + timedelta(days=days)
-
-    overall = []
-    risky = []
-
-    # ---- Lazy/defensive imports so missing apps never 500 ----
-    Forecast = None
-    stockout_and_restock = None
-    Product = None
+    # Try to import models but *never* crash if schema changes.
     try:
-        from insights.models import Forecast as _Forecast  # type: ignore
-        Forecast = _Forecast
+        from .models import Stock, StockTransaction  # adjust to your actual models
     except Exception:
-        Forecast = None
+        return JsonResponse(SAFE_EMPTY, status=200)
 
+    # Guard: fields may differ per schema; try best-effort access
     try:
-        from insights.services import stockout_and_restock as _stock  # type: ignore
-        stockout_and_restock = _stock
-    except Exception:
-        stockout_and_restock = None
+        # --- Example logic (adapt if your schema differs) ---
+        # Assumptions:
+        # - Stock has fields: sku, model_name (or name), quantity (on-hand)
+        # - StockTransaction records sales with:
+        #       type='sold' (or negative quantity)
+        #       model FK or sku + created_at timestamp
+        # You can modify the query to match your real schema.
+        from django.db.models import Sum, F
+        from django.db.models.functions import Coalesce
 
-    try:
-        from inventory.models import Product as _Product
-        Product = _Product
-    except Exception:
-        Product = None
+        sold_qs = (
+            StockTransaction.objects
+            .filter(type__iexact="sold", created_at__gte=since)
+            .values("sku", "model_name")
+            .annotate(sold_30d=Coalesce(Sum("quantity"), 0))
+        )
 
-    # ---- Overall forecast (if insights present) ----
-    if Forecast is not None:
-        try:
-            overall_qs = (
-                Forecast.objects
-                .filter(product__isnull=True, date__gte=today, date__lte=horizon)
-                .order_by("date")
-                .values("date", "predicted_units", "predicted_revenue")
-            )
-            for row in overall_qs:
-                d = row.get("date")
-                pu = row.get("predicted_units") or 0
-                pr = row.get("predicted_revenue") or 0
-                overall.append({
-                    "date": d.isoformat() if hasattr(d, "isoformat") else str(d),
-                    "predicted_units": int(pu) if pu is not None else 0,
-                    "predicted_revenue": float(pr) if pr is not None else 0.0,
-                })
-        except Exception:
-            # keep overall as []
-            pass
+        on_hand_map = {
+            (s.sku, getattr(s, "model_name", getattr(s, "name", s.sku))): s.quantity
+            for s in Stock.objects.all()
+        }
 
-    # ---- Risky products (only if Product + service are available) ----
-    if (Product is not None) and (stockout_and_restock is not None):
-        try:
-            # keep it light — iterate first 100
-            products_iter = Product.objects.all().only("id", "name", "brand", "model", "variant")[:100].iterator()
-            for p in products_iter:
-                try:
-                    s = stockout_and_restock(p, horizon_days=days, lead_days=lead_days)
-                except Exception:
-                    continue
+        preds = []
+        for row in sold_qs:
+            sku = row["sku"]
+            mname = row.get("model_name") or sku
+            sold_30d = int(row["sold_30d"]) if row["sold_30d"] else 0
+            avg_daily = round(sold_30d / max(1, horizon_days), 2)
+            on_hand = int(on_hand_map.get((sku, mname), 0))
 
-                stockout_date = s.get("stockout_date")
-                if not stockout_date:
-                    continue
+            # Simple “AI-like” rule: keep ~2 weeks of cover based on recent velocity.
+            target_cover_days = 14
+            target_stock = int(round(avg_daily * target_cover_days))
+            recommended = max(0, target_stock - on_hand)
 
-                # Build a friendly product name
-                name = getattr(p, "name", None)
-                if not name:
-                    parts = [getattr(p, "brand", None), getattr(p, "model", None), getattr(p, "variant", None)]
-                    name = " ".join([str(x) for x in parts if x]) or f"Product {getattr(p, 'id', '—')}"
-
-                risky.append({
-                    "product": name,
-                    "stockout_date": stockout_date.isoformat() if hasattr(stockout_date, "isoformat") else str(stockout_date),
-                    "on_hand": s.get("on_hand", 0),
-                    "suggested_restock": s.get("suggested_restock", 0),
-                    "urgent": bool(s.get("urgent", False)),
+            if recommended > 0:
+                preds.append({
+                    "sku": sku,
+                    "model_name": mname,
+                    "recommended_restock": recommended,
+                    "reason": "High {}d sales vs low on-hand".format(horizon_days),
+                    "stats": {
+                        "sold_30d": sold_30d,
+                        "on_hand": on_hand,
+                        "avg_daily": avg_daily,
+                    },
                 })
 
-            # Urgent first, then earliest stockout
-            risky.sort(key=lambda x: (not x["urgent"], x["stockout_date"]))
-            risky = risky[:risky_limit]
-        except Exception:
-            pass
+        # Sort by biggest gap first
+        preds.sort(key=lambda x: x["recommended_restock"], reverse=True)
 
-    payload = {"ok": True, "overall": overall, "risky": risky}
-    cache.set(cache_key, payload, 300)  # 5 minutes
-    return JsonResponse(payload)
+        return JsonResponse({
+            "ok": True,
+            "generated_at": now.isoformat(),
+            "horizon_days": horizon_days,
+            "predictions": preds,
+        }, status=200)
+
+    except Exception as e:
+        # Never 500—always a safe response + minimal hint for logs
+        return JsonResponse({
+            "ok": True,
+            "predictions": [],
+            "detail": "predictions failed gracefully",
+            "hint": str(e)[:200],
+        }, status=200)

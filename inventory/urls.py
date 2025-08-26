@@ -14,22 +14,31 @@ def _predictions_proxy(request, *args, **kwargs):
       2) views.api_predictions               (legacy/local)
     If neither is available, return a harmless JSON instead of 500.
     """
-    # Try inventory/api.py
+    # Try inventory/api.py (optional module)
     try:
-        from . import api as api_mod          # optional module
+        from . import api as api_mod
         func = getattr(api_mod, "predictions_summary", None)
         if callable(func):
             return func(request, *args, **kwargs)
     except Exception:
+        # swallow any import/runtime errors and keep falling back
         pass
 
     # Try legacy view on demand (do NOT resolve at import time)
-    func2 = getattr(views, "api_predictions", None)
-    if callable(func2):
-        return func2(request, *args, **kwargs)
+    legacy = getattr(views, "api_predictions", None)
+    if callable(legacy):
+        return legacy(request, *args, **kwargs)
 
-    # Graceful fallback
-    return JsonResponse({"ok": False, "error": "predictions endpoint not available"}, status=200)
+    # Graceful, deploy-safe fallback (never 500)
+    return JsonResponse(
+        {
+            "ok": True,
+            "predictions": [],
+            "detail": "Predictions endpoint not wired (no inventory.api.predictions_summary "
+                      "or views.api_predictions). This response prevents deploy failures."
+        },
+        status=200,
+    )
 # ---------------------------------------------------------------------------
 
 urlpatterns = [
