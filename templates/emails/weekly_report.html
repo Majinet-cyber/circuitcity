@@ -1,0 +1,28 @@
+<!doctype html>
+<html>
+  <body style="font-family:system-ui,Segoe UI,Arial">
+    <h2 style="margin:0 0 8px 0">Circuit City — Weekly Report ({{ week_start }}–{{ week_end }})</h2>
+    <p><strong>Stores:</strong> {{ store_names|join:", " }}</p>
+    <hr>
+    <h3>KPIs</h3>
+    <ul>
+      <li>Units: {{ kpi.units }}</li>
+      <li>Revenue: {{ kpi.revenue }}</li>
+      <li>Profit: {{ kpi.profit }}</li>
+      <li>Avg Margin: {{ kpi.avg_margin }}%</li>
+    </ul>
+    <h3>Top SKUs</h3>
+    <ol>
+      {% for row in top_skus %}
+        <li>{{ row.name }} — {{ row.units }} units</li>
+      {% endfor %}
+    </ol>
+    <h3>Low Stock & Reorder Advice</h3>
+    <ul>
+      {% for r in reorder %}
+        <li>{{ r.product }} @ {{ r.store }} — On-hand {{ r.on_hand }} | ROP {{ r.rop }} | Recommend {{ r.qty }}</li>
+      {% endfor %}
+    </ul>
+    <p><a href="{{ deep_link }}">Open in Circuit City</a></p>
+  </body>
+</html>

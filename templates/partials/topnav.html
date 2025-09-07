@@ -1,0 +1,44 @@
+{% load static %}
+{% with p=request.path %}
+<style>
+  .cc-topnav{position:sticky;top:0;z-index:40;background:#fff;border-bottom:1px solid #e5e7eb;
+    display:flex;align-items:center;justify-content:space-between;padding:10px 16px}
+  .cc-topnav .brand a{font-weight:800;text-decoration:none;color:#0f172a}
+  .cc-topnav .links{display:flex;gap:14px;list-style:none;margin:0;padding:0}
+  .cc-topnav .links a{display:inline-block;padding:8px 10px;border-radius:10px;text-decoration:none;
+    color:#0f172a}
+  .cc-topnav .links li.active a{background:#eef2ff}
+  .cc-topnav .user{display:flex;align-items:center;gap:10px}
+  .cc-topnav .logout{color:#2563eb;text-decoration:none}
+  @media (max-width:720px){ .cc-topnav{flex-wrap:wrap;gap:8px} .cc-topnav .links{flex-wrap:wrap} }
+</style>
+
+<nav class="cc-topnav" role="navigation" aria-label="Primary">
+  <div class="brand"><a href="{% url 'inventory:dashboard' %}">⚡ Circuit City</a></div>
+
+  <ul class="links">
+    <li class="{% if p|slice:'0:11' == '/inventory/' %}active{% endif %}">
+      <a href="{% url 'inventory:dashboard' %}">Dashboard</a>
+    </li>
+    <li class="{% if p|slice:'0:11' == '/inventory/' %}active{% endif %}">
+      <a href="{% url 'inventory:dashboard' %}">Inventory</a>
+    </li>
+    {% if FEATURES.REPORTS|default:1 %}
+      <li class="{% if p|slice:'0:9' == '/reports/' %}active{% endif %}">
+        <a href="{% url 'reports:home' %}">Reports</a>
+      </li>
+    {% endif %}
+    <li class="{% if p|slice:'0:8' == '/wallet/' %}active{% endif %}">
+      <a href="{% url 'wallet:agent_wallet' %}">Wallet</a>
+    </li>
+    {% if request.user.is_staff %}
+      <li><a href="{% url 'admin:index' %}">Admin</a></li>
+    {% endif %}
+  </ul>
+
+  <div class="user">
+    <span>Hi, {{ request.user.first_name|default:request.user.username }}</span>
+    <a class="logout" href="{% url 'accounts:logout' %}?next=/accounts/login/">Logout</a>
+  </div>
+</nav>
+{% endwith %}

@@ -1,53 +1,36 @@
-# accounts/utils/images.py
+from __future__ import annotations
+
 from io import BytesIO
-from PIL import Image, UnidentifiedImageError
-from django.core.files.uploadedfile import InMemoryUploadedFile
-import os
+from django.core.files.base import ContentFile
 
-# Final output format and max dimensions
-TARGET_FORMAT = "WEBP"  # compact + strips EXIF; could use "JPEG"
-MAX_W, MAX_H = 512, 512  # avatars rarely need to be larger
-QUALITY = 85
+try:
+    from PIL import Image  # optional; if missing we just pass through
+except Exception:
+    Image = None
 
-def process_avatar(file) -> InMemoryUploadedFile:
+
+def process_avatar(uploaded_file, max_px: int = 512):
     """
-    Open, verify, resize to fit box, convert to RGB, re-encode to WEBP/JPEG.
-    Returns a new InMemoryUploadedFile suitable for saving.
-    Raises if not a real image.
+    Best-effort avatar processor:
+      - If Pillow is available: convert to RGB JPEG, max side <= max_px.
+      - If anything fails (or Pillow not installed), return the original file.
     """
+    if Image is None:
+        return uploaded_file
+
     try:
-        img = Image.open(file)
-        img.verify()  # quick integrity check
-    except UnidentifiedImageError:
-        raise ValueError("Invalid image file.")
-    file.seek(0)  # must re-open after verify
-
-    img = Image.open(file)
-    # Normalize mode (strip alpha if necessary)
-    if img.mode not in ("RGB", "L", "P"):
+        img = Image.open(uploaded_file)
         img = img.convert("RGB")
-    else:
-        img = img.convert("RGB")
+        img.thumbnail((max_px, max_px))
 
-    # Resize to fit within MAX_W x MAX_H
-    img.thumbnail((MAX_W, MAX_H))
+        buf = BytesIO()
+        img.save(buf, format="JPEG", quality=85)
+        data = buf.getvalue()
 
-    # Re-encode
-    buf = BytesIO()
-    img.save(buf, format=TARGET_FORMAT, quality=QUALITY, optimize=True)
-    buf.seek(0)
-
-    # Build a safe filename (ignore original)
-    base = "avatar"
-    ext = ".webp" if TARGET_FORMAT.upper() == "WEBP" else ".jpg"
-    fname = base + ext
-
-    # Wrap back into InMemoryUploadedFile
-    return InMemoryUploadedFile(
-        buf,               # file
-        field_name=None,   # not bound to a form field here
-        name=fname,
-        content_type="image/webp" if ext == ".webp" else "image/jpeg",
-        size=buf.getbuffer().nbytes,
-        charset=None
-    )
+        out = ContentFile(data)
+        base = uploaded_file.name.rsplit(".", 1)[0]
+        out.name = f"{base}.jpg"
+        return out
+    except Exception:
+        # Safety first: never block the flow because of image processing.
+        return uploaded_file

@@ -1,0 +1,234 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en" data-theme="{{ request.COOKIES.theme|default:'light' }}">
+<head>
+  <meta charset="utf-8" />
+  <title>Scanner · Circuit City</title>
+
+  <!-- Mobile friendly; no zoom jumps on inputs -->
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+  <meta name="color-scheme" content="light dark" />
+
+  <link rel="stylesheet" href="{% static 'css/app.css' %}">
+  <style>
+    /* Page-specific bits (uses the helpers we added in app.css) */
+    main { max-width: 720px; margin: 0 auto; padding: 1rem; }
+    .scan-header{display:flex;align-items:center;gap:.5rem;margin-bottom:.75rem}
+    .scan-header .title{font-weight:800;font-size:1.15rem}
+    .scan-chip{margin-left:auto}
+    .code-box{
+      margin:.75rem 0 0; display:none;
+      background:var(--cc-card); border:1px solid var(--cc-border);
+      border-radius:.8rem; padding:.65rem .75rem; font-weight:700;
+      box-shadow:var(--cc-shadow);
+      word-break:break-all;
+    }
+    .row-actions{display:flex; gap:.5rem; flex-wrap:wrap; margin-top:.6rem;}
+    .row-actions .btn{min-height:44px}
+    .manual-wrap{display:flex; gap:.5rem; margin-top:.75rem;}
+    .manual-wrap input{flex:1}
+  </style>
+</head>
+<body class="cc-body scan-page has-bottom-nav">
+
+  <header class="cc-topnav">
+    <button class="cc-burger" onclick="history.back()" aria-label="Back">←</button>
+    <a class="cc-brand" href="/inventory/list/"><span class="cc-logo">📦</span> Circuit City</a>
+    <div class="cc-topnav-actions">
+      <a class="cc-topbtn" href="/inventory/list/"><i>🏠</i> Home</a>
+    </div>
+  </header>
+
+  <div class="cc-shell no-sidebar">
+    <main class="cc-main">
+      <div class="scan-header">
+        <div class="title">Scan (Web)</div>
+        <span id="modeChip" class="chip scan-chip">Mode: auto</span>
+      </div>
+
+      <!-- Live preview -->
+      <section class="cc-scan-wrap will-animate in">
+        <video id="video" class="cc-scan-video" autoplay playsinline muted></video>
+        <div class="cc-scan-overlay">
+          <div class="cc-scan-reticle" aria-hidden="true"></div>
+        </div>
+      </section>
+
+      <div class="row-actions">
+        <button id="btnStart" class="btn btn-green" type="button">Start</button>
+        <button id="btnStop" class="btn btn-danger" type="button" disabled>Stop</button>
+        <button id="btnTorch" class="btn" type="button" disabled>🔦 Torch</button>
+        <button id="btnFlip" class="btn" type="button" disabled title="Back camera enforced">Back camera</button>
+      </div>
+
+      <!-- Manual fallback -->
+      <div class="manual-wrap">
+        <input id="manualCode" class="input" inputmode="numeric" placeholder="Enter / paste code…" />
+        <button id="btnSubmitManual" class="btn btn-primary" type="button">Go</button>
+      </div>
+
+      <div id="codeBox" class="code-box" role="status" aria-live="polite"></div>
+
+      <p class="cc-muted" style="margin-top:.5rem">
+        Tip: Give camera permission. We request the <strong>back camera</strong> for better focus on barcodes.
+      </p>
+    </main>
+  </div>
+
+  <!-- Bottom actions (same system as app.css) -->
+  <nav class="cc-bottom-nav">
+    <div class="cc-bottom-row">
+      <a class="cc-bottom-tab" href="/"><span class="ico">🏠</span><span>Home</span></a>
+      <a class="cc-bottom-tab" href="/inventory/list/"><span class="ico">📦</span><span>Stock</span></a>
+      <a class="cc-bottom-tab active" href="#"><span class="ico">🔍</span><span>Scan</span></a>
+      <a class="cc-bottom-tab" href="/inventory/wallet/"><span class="ico">👛</span><span>Wallet</span></a>
+    </div>
+  </nav>
+
+  <button class="cc-fab" onclick="document.getElementById('manualCode').focus()" aria-label="Enter code">
+    ⌨️
+  </button>
+
+  <script>
+    // ------- Small helpers -------
+    const $ = (s, r=document) => r.querySelector(s);
+    const qs = new URLSearchParams(location.search);
+    const mode = (qs.get('mode') || '').toLowerCase(); // in | sold | (default: web)
+    const nextFromMode = (code) => {
+      if (mode === 'in')   return `/inventory/scan-in/?code=${encodeURIComponent(code)}`;
+      if (mode === 'sold') return `/inventory/scan-sold/?code=${encodeURIComponent(code)}`;
+      return `/inventory/scan-web/?code=${encodeURIComponent(code)}`;
+    };
+    $('#modeChip').textContent = 'Mode: ' + (mode || 'web');
+
+    function showCode(code){
+      const box = $('#codeBox');
+      box.style.display='block';
+      box.textContent = code;
+    }
+    function beep(){
+      try {
+        const ctx = new (window.AudioContext || window.webkitAudioContext)();
+        const o = ctx.createOscillator(); const g = ctx.createGain();
+        o.connect(g); g.connect(ctx.destination); o.type='square'; o.frequency.value=880;
+        o.start(); setTimeout(()=>{ o.stop(); ctx.close(); }, 120);
+      } catch {}
+    }
+
+    // ------- Media setup (back camera only) -------
+    let stream = null, track = null, torchOn = false, stopScan = null;
+    const constraints = {
+      audio: false,
+      video: {
+        facingMode: { exact: "environment" }, // force back camera
+        width: { ideal: 1280 }, height: { ideal: 720 }
+      }
+    };
+
+    async function startCamera(){
+      if (stream) return;
+      try{
+        stream = await navigator.mediaDevices.getUserMedia(constraints);
+      }catch(e){
+        // Some browsers don't allow exact; fall back to ideal environment
+        constraints.video.facingMode = { ideal: "environment" };
+        stream = await navigator.mediaDevices.getUserMedia(constraints);
+      }
+      const video = $('#video');
+      video.srcObject = stream; await video.play();
+      track = stream.getVideoTracks()[0];
+      $('#btnStop').disabled = false; $('#btnStart').disabled = true;
+
+      // Torch capability
+      const caps = (track && track.getCapabilities) ? track.getCapabilities() : {};
+      $('#btnTorch').disabled = !caps.torch;
+
+      // Start decoding loop
+      startDecoding();
+    }
+
+    function stopCamera(){
+      if(stopScan){ stopScan(); stopScan = null; }
+      if (track){ track.stop(); track = null; }
+      if (stream){ stream.getTracks().forEach(t=>t.stop()); stream = null; }
+      $('#video').srcObject = null;
+      $('#btnStop').disabled = true; $('#btnStart').disabled = false;
+      $('#btnTorch').disabled = true; torchOn = false;
+    }
+
+    async function toggleTorch(){
+      if(!track || !track.applyConstraints) return;
+      try{
+        torchOn = !torchOn;
+        await track.applyConstraints({ advanced: [{ torch: torchOn }] });
+        $('#btnTorch').textContent = torchOn ? '🔦 Torch ON' : '🔦 Torch';
+      }catch{}
+    }
+
+    // ------- Decode via BarcodeDetector or ZXing fallback -------
+    async function startDecoding(){
+      const video = $('#video');
+      const hasNative = ('BarcodeDetector' in window);
+      if(hasNative){
+        const formats = ['qr_code','ean_13','ean_8','code_128','code_39','codabar','upc_a','upc_e','itf'];
+        const det = new window.BarcodeDetector({ formats });
+        let rafId;
+        const tick = async () => {
+          try{
+            const barcodes = await det.detect(video);
+            if(barcodes && barcodes.length){
+              const code = (barcodes[0].rawValue || '').trim();
+              if(code){ handleCode(code); return; }
+            }
+          }catch{} // ignore frame errors
+          rafId = requestAnimationFrame(tick);
+        };
+        rafId = requestAnimationFrame(tick);
+        stopScan = ()=> cancelAnimationFrame(rafId);
+        return;
+      }
+
+      // Fallback: ZXing from CDN
+      const { BrowserMultiFormatReader } = await import('https://cdn.jsdelivr.net/npm/@zxing/browser@0.1.4/+esm');
+      const reader = new BrowserMultiFormatReader();
+      const controls = await reader.decodeFromVideoDevice(
+        null, video, (result, err) => {
+          if(result){
+            handleCode(result.getText());
+          }
+        },
+        { video: { facingMode: { ideal: 'environment' } } }
+      );
+      stopScan = ()=> controls.stop();
+    }
+
+    let handled = false;
+    function handleCode(code){
+      if(handled) return;
+      handled = true;
+      beep(); showCode(code);
+      setTimeout(()=> { location.href = nextFromMode(code); }, 250);
+    }
+
+    // ------- Manual input -------
+    $('#btnSubmitManual').addEventListener('click', ()=>{
+      const val = ($('#manualCode').value || '').trim();
+      if(!val) return;
+      handleCode(val);
+    });
+
+    // ------- Buttons -------
+    $('#btnStart').addEventListener('click', startCamera);
+    $('#btnStop').addEventListener('click', stopCamera);
+    $('#btnTorch').addEventListener('click', toggleTorch);
+
+    // Auto-start when the page is visible
+    document.addEventListener('visibilitychange', ()=>{
+      if(document.hidden) stopCamera();
+      else startCamera().catch(()=>{});
+    });
+    window.addEventListener('pageshow', ()=> startCamera().catch(()=>{}));
+    window.addEventListener('pagehide', stopCamera);
+  </script>
+</body>
+</html>

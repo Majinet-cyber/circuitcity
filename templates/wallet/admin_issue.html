@@ -1,0 +1,97 @@
+{% extends "base.html" %}
+{% load humanize %}
+
+{% block title %}Issue Transaction · Admin Wallet{% endblock %}
+{% block header_title %}<i class="bi bi-plus-circle-dotted me-2"></i>Issue Wallet Transaction{% endblock %}
+
+{% block content %}
+<div class="container-xxl px-0">
+
+  <!-- Page intro -->
+  <div class="alert alert-info d-flex align-items-start gap-2">
+    <i class="bi bi-info-circle mt-1"></i>
+    <div>
+      <strong>Manual Wallet Transactions:</strong>  
+      Use this form to add **bonuses**, **deductions**, or **advances** to an agent's wallet.  
+      <br>These will automatically mirror into the **Company Ledger** for a full audit trail.
+    </div>
+  </div>
+
+  <!-- Issue Transaction Form -->
+  <div class="card shadow-sm border-0">
+    <div class="card-body">
+      <h5 class="mb-3">New Wallet Transaction</h5>
+      <form method="post" action="{% url 'wallet:admin_issue' %}" class="row g-3">
+        {% csrf_token %}
+
+        <!-- Select Agent -->
+        <div class="col-12 col-md-6">
+          <label for="agent" class="form-label">Select Agent</label>
+          <select class="form-select" id="agent" name="agent_id" required>
+            <option value="">-- Choose Agent --</option>
+            {% for a in users %}
+              <option value="{{ a.id }}">{{ a.first_name }} {{ a.last_name }} ({{ a.email }})</option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <!-- Transaction Type -->
+        <div class="col-12 col-md-3">
+          <label for="txnType" class="form-label">Transaction Type</label>
+          <select class="form-select" id="txnType" name="type" required>
+            <option value="bonus">Bonus (+)</option>
+            <option value="deduction">Deduction (−)</option>
+            <option value="advance">Advance (−)</option>
+          </select>
+        </div>
+
+        <!-- Amount -->
+        <div class="col-12 col-md-3">
+          <label for="txnAmount" class="form-label">Amount (MWK)</label>
+          <input type="number" class="form-control" id="txnAmount" name="amount" step="0.01" placeholder="e.g. 5000" required>
+          <div class="form-text">Sign is set automatically by type.</div>
+        </div>
+
+        <!-- Note -->
+        <div class="col-12">
+          <label for="note" class="form-label">Reason / Note</label>
+          <input type="text" class="form-control" id="note" name="note" placeholder="Explain why this transaction is issued" required>
+        </div>
+
+        <!-- Submit -->
+        <div class="col-12 mt-3">
+          <button type="submit" class="btn btn-primary">
+            <i class="bi bi-check2-circle me-1"></i> Save Transaction
+          </button>
+          <a href="{% url 'wallet:admin_home' %}" class="btn btn-outline-secondary ms-2">
+            <i class="bi bi-arrow-left me-1"></i> Back to Admin Wallet
+          </a>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+  // Auto-apply negative sign for deductions & advances
+  (function autoSign(){
+    const typeSel = document.getElementById('txnType');
+    const amtInp  = document.getElementById('txnAmount');
+    if(!typeSel || !amtInp) return;
+
+    function normalize(){
+      let v = parseFloat(amtInp.value || '0');
+      if (isNaN(v)) return;
+      const t = typeSel.value;
+      if (t === 'bonus' && v < 0) v = Math.abs(v);
+      if ((t === 'deduction' || t === 'advance') && v > 0) v = -Math.abs(v);
+      amtInp.value = v.toFixed(2);
+    }
+
+    typeSel.addEventListener('change', normalize);
+    amtInp.addEventListener('blur', normalize);
+  })();
+</script>
+{% endblock %}

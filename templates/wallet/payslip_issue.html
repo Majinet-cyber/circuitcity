@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+{% block title %}Issue Payslips · Circuit City{% endblock %}
+{% block header_title %}Issue Payslips{% endblock %}
+
+{% block body %}
+<div class="panel card">
+  <form method="post" class="row g-3">
+    {% csrf_token %}
+    <div class="col-12 col-md-5">
+      <label class="form-label fw-bold">Recipients</label>
+      {{ form.users }}
+      <div class="form-text">Select one or more agents/staff.</div>
+    </div>
+
+    <div class="col-6 col-md-3">
+      <label class="form-label fw-bold">Period start</label>
+      {{ form.period_start }}
+    </div>
+    <div class="col-6 col-md-3">
+      <label class="form-label fw-bold">Period end</label>
+      {{ form.period_end }}
+    </div>
+
+    <div class="col-12">
+      <div class="form-check">
+        {{ form.send_now }} <label class="form-check-label">Send email now</label>
+      </div>
+    </div>
+
+    <div class="col-12">
+      <div class="border rounded p-3">
+        <div class="form-check mb-2">
+          {{ form.schedule_monthly }} <label class="form-check-label fw-bold">Also schedule monthly auto-send</label>
+        </div>
+        <div class="row g-2">
+          <div class="col-6 col-md-3">
+            <label class="form-label">Day of month</label>
+            {{ form.schedule_day }}
+          </div>
+          <div class="col-6 col-md-3">
+            <label class="form-label">At hour (24h)</label>
+            {{ form.schedule_hour }}
+          </div>
+        </div>
+        <div class="form-text">Auto-sends payslips for the previous calendar month.</div>
+      </div>
+    </div>
+
+    <div class="col-12">
+      <button class="btn btn-primary btn-glass-blue" type="submit"><i class="bi bi-send"></i> Issue Payslips</button>
+      <a class="btn btn-outline-secondary" href="{% url 'wallet:payslip_history' %}">View History</a>
+    </div>
+  </form>
+</div>
+{% endblock %}

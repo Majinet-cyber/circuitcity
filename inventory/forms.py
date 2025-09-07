@@ -1,4 +1,7 @@
 # inventory/forms.py
+from decimal import Decimal
+from typing import Optional
+
 from django import forms
 from django.contrib.auth import get_user_model
 from django.contrib.auth.forms import AuthenticationForm
@@ -7,6 +10,13 @@ from django.core.exceptions import ValidationError
 from django.db import transaction
 
 from .models import Product, Location, InventoryItem
+
+# Optional import for Admin Purchase Orders (lives in wallet app)
+try:
+    from wallet.models import AdminPurchaseOrder, AdminPurchaseOrderItem
+except Exception:  # pragma: no cover - if wallet not installed yet
+    AdminPurchaseOrder = None
+    AdminPurchaseOrderItem = None
 
 User = get_user_model()
 
@@ -36,6 +46,10 @@ class StyledForm(forms.Form):
 
 # ---------- Scan IN ----------
 class ScanInForm(StyledForm):
+    """
+    Order price is now OPTIONAL for scan-in. If omitted, it auto-fills from the
+    selected product's model price (Product.cost_price).
+    """
     imei = forms.CharField(
         label="IMEI",
         max_length=15,
@@ -52,7 +66,14 @@ class ScanInForm(StyledForm):
     product = forms.ModelChoiceField(
         queryset=Product.objects.all().order_by("brand", "model", "variant")
     )
-    order_price = forms.DecimalField(label="Order price", max_digits=12, decimal_places=2)
+    # Optional; will default from Product.cost_price when missing
+    order_price = forms.DecimalField(
+        label="Order price",
+        max_digits=12,
+        decimal_places=2,
+        required=False,
+        help_text="If left blank, we’ll use the model’s default order price."
+    )
     received_at = forms.DateField(
         widget=forms.DateInput(attrs={"type": "date"}), label="Received date"
     )
@@ -67,6 +88,21 @@ class ScanInForm(StyledForm):
         self.fields["product"].widget.attrs.setdefault("class", "input")
         self.fields["location"].widget.attrs.setdefault("class", "input")
 
+        # Try to set an initial order_price from product if available
+        # Works for initial render when a product is pre-selected server-side
+        try:
+            product = self.initial.get("product") or self.data.get("product")
+            if product and not self.initial.get("order_price") and not self.data.get("order_price"):
+                if isinstance(product, Product):
+                    self.fields["order_price"].initial = product.cost_price
+                else:
+                    # product id in POST/GET
+                    p = Product.objects.filter(pk=product).only("cost_price").first()
+                    if p:
+                        self.fields["order_price"].initial = p.cost_price
+        except Exception:
+            pass
+
     def clean_imei(self):
         raw = self.cleaned_data.get("imei", "")
         imei = _normalize_imei(raw)
@@ -74,10 +110,25 @@ class ScanInForm(StyledForm):
         return imei
 
     def clean_order_price(self):
+        """
+        If no order_price provided, take it from the selected product’s cost_price.
+        """
         price = self.cleaned_data.get("order_price")
         if price is not None and price < 0:
             raise ValidationError("Order price cannot be negative.")
         return price
+
+    def clean(self):
+        cleaned = super().clean()
+        product = cleaned.get("product")
+        price: Optional[Decimal] = cleaned.get("order_price")
+        if price in (None, ""):
+            if product:
+                cleaned["order_price"] = product.cost_price or Decimal("0.00")
+            else:
+                # Keep a clear error message if product missing (shouldn’t happen due to field)
+                raise ValidationError("Select a product model to auto-fill the order price.")
+        return cleaned
 
 
 # ---------- Scan SOLD ----------
@@ -98,6 +149,7 @@ class ScanSoldForm(StyledForm):
     sold_at = forms.DateField(
         widget=forms.DateInput(attrs={"type": "date"}), label="Sold date"
     )
+    # Selling price MUST be entered at scan sold
     price = forms.DecimalField(max_digits=12, decimal_places=2)
     commission_pct = forms.DecimalField(label="Commission %", max_digits=5, decimal_places=2, initial=0)
     location = forms.ModelChoiceField(
@@ -208,6 +260,112 @@ class InventoryItemForm(forms.ModelForm):
                 InventoryItem.objects.filter(product=instance.product).update(**to_update)
 
         return instance
+
+
+# ---------- Product model price quick edit (optional use in Stock List) ----------
+class ProductPriceForm(forms.ModelForm):
+    """
+    Lets an admin/manager quickly adjust the default model prices:
+    - cost_price → used as the default order price (scan-in + place order)
+    - sale_price → optional default selling price reference
+    """
+    class Meta:
+        model = Product
+        fields = ["brand", "model", "variant", "cost_price", "sale_price"]
+        widgets = {
+            "brand": forms.TextInput(attrs={"class": "input"}),
+            "model": forms.TextInput(attrs={"class": "input"}),
+            "variant": forms.TextInput(attrs={"class": "input"}),
+            "cost_price": forms.NumberInput(attrs={"step": "0.01", "class": "input"}),
+            "sale_price": forms.NumberInput(attrs={"step": "0.01", "class": "input"}),
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Make identity fields read-only to avoid accidental edits in quick forms
+        self.fields["brand"].disabled = True
+        self.fields["model"].disabled = True
+        self.fields["variant"].disabled = True
+
+
+# ---------- Place Order (Admin) ----------
+class PurchaseOrderHeaderForm(forms.ModelForm if AdminPurchaseOrder else forms.Form):
+    """
+    Header for AdminPurchaseOrder. Uses MWK by default.
+    """
+    if AdminPurchaseOrder:
+        class Meta:
+            model = AdminPurchaseOrder
+            fields = [
+                "supplier_name", "supplier_email", "supplier_phone",
+                "agent_name", "notes", "currency", "tax",
+            ]
+            widgets = {
+                "supplier_name": forms.TextInput(attrs={"class": "input", "placeholder": "Supplier or Company"}),
+                "supplier_email": forms.EmailInput(attrs={"class": "input", "placeholder": "supplier@example.com"}),
+                "supplier_phone": forms.TextInput(attrs={"class": "input", "placeholder": "+265... (WhatsApp ok)"}),
+                "agent_name": forms.TextInput(attrs={"class": "input", "placeholder": "If sending to a specific agent"}),
+                "notes": forms.Textarea(attrs={"rows": 3, "class": "input", "placeholder": "Notes for supplier / delivery"}),
+                "currency": forms.TextInput(attrs={"class": "input", "placeholder": "MWK"}),
+                "tax": forms.NumberInput(attrs={"step": "0.01", "class": "input"}),
+            }
+    else:
+        # Fallback form if wallet app not present (keeps page functional)
+        supplier_name = forms.CharField(max_length=120, required=False)
+        supplier_email = forms.EmailField(required=False)
+        supplier_phone = forms.CharField(max_length=40, required=False)
+        agent_name = forms.CharField(max_length=120, required=False)
+        notes = forms.CharField(widget=forms.Textarea(attrs={"rows": 3, "class": "input"}), required=False)
+        currency = forms.CharField(max_length=8, initial="MWK", required=False)
+        tax = forms.DecimalField(max_digits=14, decimal_places=2, required=False, initial=Decimal("0.00"))
+
+
+class PurchaseOrderItemForm(StyledForm):
+    """
+    One line in the Place Order form. If unit_price is omitted, it auto-fills
+    from Product.cost_price (the model order price).
+    """
+    product = forms.ModelChoiceField(
+        queryset=Product.objects.all().order_by("brand", "model", "variant"),
+        widget=forms.Select(attrs={"class": "input"})
+    )
+    quantity = forms.IntegerField(min_value=1, initial=1, widget=forms.NumberInput(attrs={"class": "input"}))
+    unit_price = forms.DecimalField(
+        max_digits=12, decimal_places=2, required=False,
+        widget=forms.NumberInput(attrs={"class": "input", "step": "0.01"}),
+        help_text="If blank, uses the model’s default order price."
+    )
+
+    def clean(self):
+        cleaned = super().clean()
+        product: Optional[Product] = cleaned.get("product")
+        qty = cleaned.get("quantity")
+        up: Optional[Decimal] = cleaned.get("unit_price")
+
+        if not product:
+            raise ValidationError("Select a product.")
+        if not qty or qty < 1:
+            raise ValidationError("Quantity must be at least 1.")
+
+        if up in (None, ""):
+            cleaned["unit_price"] = product.cost_price or Decimal("0.00")
+        elif up < 0:
+            raise ValidationError("Unit price cannot be negative.")
+
+        return cleaned
+
+    def to_model_kwargs(self):
+        """
+        Helper to convert the cleaned form into kwargs suitable for
+        AdminPurchaseOrderItem.objects.create(...)
+        """
+        c = self.cleaned_data
+        return {
+            "product": c["product"],
+            "quantity": c["quantity"],
+            "unit_price": c["unit_price"],
+            # line_total computed in model.save() if not provided
+        }
 
 
 # ---------- Agent password reset (forms) ----------

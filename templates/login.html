@@ -1,86 +1,259 @@
+{# templates/accounts/login.html — Sleek, mobile-first LIGHT login (glass blue + page loader) #}
 {% extends "base.html" %}
 {% block title %}Sign in · Circuit City{% endblock %}
 
 {% block body %}
-<div class="bg" style="min-height:100dvh;display:grid;place-items:center;padding:2rem">
-  <div class="card" style="width:min(460px,92vw);padding:2rem">
-    <div style="display:flex;align-items:center;gap:.75rem;margin-bottom:1rem">
-      <svg width="28" height="28" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-        <defs>
-          <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
-            <stop stop-color="#2f77ff"/><stop offset="1" stop-color="#0b3a7e"/>
-          </linearGradient>
-        </defs>
-        <path d="M3 12a9 9 0 1 0 18 0A9 9 0 0 0 3 12Zm7.5 4.5 6-6m-7.75-.75h.01M8 15h4"
-              stroke="url(#g)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-      </svg>
-      <h1 class="brand" style="margin:0;font-size:1.35rem">Circuit City Portal</h1>
-    </div>
+{% url 'accounts:login' as login_url %}
+{% url 'accounts:forgot_password_request' as forgot_url %}
 
-    {# error banner (non-field or bad creds) #}
-    {% if form.errors or form.non_field_errors %}
-      <div style="background:#fee2e2;color:#991b1b;border:1px solid #fecaca;
-                  padding:.75rem 1rem;border-radius:.75rem;margin-bottom:1rem" role="alert">
-        Please check your username and password and try again.
-      </div>
-    {% endif %}
+<style>
+  /* ============== Scoped styles ============== */
+  .cc-auth{
+    --bg1:#eef5ff; --bg2:#f9fbff; --card:#ffffff; --text:#0f172a; --muted:#475569;
+    --border:#e2e8f0; --ring:#93c5fd; --brand:#2563eb; --brand-2:#1d4ed8;
+    --danger:#b91c1c; --danger-bg:#fee2e2; --danger-bd:#fecaca;
+    /* glassmorphic blue tokens */
+    --blue-1:#2563eb; --blue-2:#60a5fa;
+    --glass-bg: rgba(37,99,235,0.12);
+    --glass-brd: rgba(96,165,250,.55);
+    --glass-shadow: 0 10px 30px rgba(37,99,235,.22);
+  }
+  .cc-auth *{ box-sizing:border-box }
 
-    <form method="post" action="{% url 'login' %}" novalidate style="display:grid;gap:1rem">
-      {% csrf_token %}
-      {% if next %}<input type="hidden" name="next" value="{{ next }}">{% endif %}
+  /* ---------- Page-local loader (unique id to avoid base conflicts) ---------- */
+  #page-loader-auth{
+    position: fixed; inset: 0; z-index: 3000;
+    display: grid; place-items: center;
+    background: radial-gradient(1200px 800px at 50% 40%, rgba(15,23,42,0.12), transparent 60%);
+    backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
+    transition: opacity .35s ease, visibility .35s ease;
+  }
+  #page-loader-auth.hidden{ opacity:0; visibility:hidden; }
+  .loader-ring{
+    width:66px; height:66px; border-radius:50%;
+    border:4px solid rgba(96,165,250,.25);
+    border-top-color: var(--blue-1);
+    animation: spin1 1s linear infinite;
+    box-shadow: 0 0 0 4px rgba(37,99,235,.06) inset;
+  }
+  @keyframes spin1 { to { transform: rotate(360deg); } }
+  @media (prefers-reduced-motion: reduce){ .loader-ring{ animation:none; } }
 
-      <div>
-        <label for="id_username" style="display:block;margin:0 0 .35rem;color:#334155;font-weight:600">Username</label>
-        <input class="input" id="id_username" name="username" type="text"
-               required autocomplete="username" autofocus>
-        {% if form.username.errors %}
-          <div style="color:#b91c1c;font-size:.9rem;margin-top:.25rem">{{ form.username.errors|striptags }}</div>
-        {% endif %}
-      </div>
+  /* ---------- Layout ---------- */
+  .cc-auth .wrap{
+    min-height:100dvh;display:grid;place-items:center;
+    padding:max(16px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right))
+            max(24px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
+    background:
+      radial-gradient(1200px 600px at 20% -10%, #e0edff 0%, transparent 60%),
+      radial-gradient(1000px 500px at 110% 10%, #dbeafe 0%, transparent 60%),
+      linear-gradient(180deg,var(--bg1),var(--bg2));
+    color:var(--text);
+  }
+  .cc-auth .card{
+    width:min(560px,92vw); background:var(--card); border:1px solid var(--border);
+    border-radius:16px; padding:24px 22px 22px;
+    box-shadow:0 18px 60px rgba(2,8,23,.08), 0 2px 8px rgba(2,8,23,.04);
+    position:relative;
+  }
+  .cc-auth .card::before{
+    content:""; position:absolute; inset:-1px; border-radius:inherit;
+    background:conic-gradient(from 180deg,#93c5fd,transparent 30%,#a7f3d0 55%,transparent 80%);
+    filter:blur(10px) opacity(.25); z-index:-1; animation: spin2 8s linear infinite;
+  }
+  @keyframes spin2{ to{ transform:rotate(1turn); } }
+  @media (prefers-reduced-motion:reduce){ .cc-auth .card::before{ animation:none; } }
 
-      <div>
-        <label for="id_password" style="display:block;margin:0 0 .35rem;color:#334155;font-weight:600">Password</label>
-        <div style="display:flex;gap:.5rem;align-items:center">
-          <input class="input" id="id_password" name="password" type="password"
-                 required autocomplete="current-password" style="flex:1">
-          <button type="button" class="btn" id="toggle-pass">Show</button>
+  .cc-auth .brand{display:flex;align-items:center;gap:.75rem;margin-bottom:.75rem}
+  .cc-auth .dot{width:36px;height:36px;border-radius:10px;background:linear-gradient(135deg,#60a5fa,#3b82f6)}
+  .cc-auth h1{margin:0 0 .25rem;font-size:clamp(20px,4.5vw,24px)}
+  .cc-auth .muted{color:var(--muted);font-size:14px;margin:0 0 .5rem}
+
+  .cc-auth .alert{background:#e0f2fe;border:1px solid #bae6fd;color:#0c4a6e;
+    padding:10px 12px;border-radius:12px;font-size:14px;margin:10px 0 6px}
+  .cc-auth .alert.err{background:var(--danger-bg);border-color:var(--danger-bd);color:var(--danger)}
+
+  .cc-auth .fi{position:relative}
+  .cc-auth .fi input{
+    width:100%; background:#f8fafc; border:1px solid var(--border);
+    border-radius:12px; padding:18px 44px 12px 16px;
+    font-size:16px; color:var(--text); outline:0; transition:border .15s, box-shadow .15s;
+  }
+  .cc-auth .fi input:focus{border-color:var(--ring); box-shadow:0 0 0 4px rgba(147,197,253,.35)}
+  .cc-auth .fi label{
+    position:absolute; top:12px; left:16px; pointer-events:none; color:var(--muted);
+    font-size:14px; transition:all .15s; background:transparent; padding:0 .25rem;
+  }
+  .cc-auth .fi input:not(:placeholder-shown) + label,
+  .cc-auth .fi input:focus + label{ top:6px; font-size:12px; color:#334155 }
+
+  .cc-auth .fi .icon{
+    position:absolute; right:10px; top:50%; transform:translateY(-50%);
+    display:inline-flex; width:28px; height:28px; align-items:center; justify-content:center;
+    border:1px solid var(--border); border-radius:8px; background:#f8fafc; cursor:pointer; user-select:none;
+  }
+
+  /* ---------- Glassmorphic Blue Button (stays blue + responsive hover) ---------- */
+  .btn-glass-blue{
+    --_bg: var(--glass-bg);
+    --_brd: var(--glass-brd);
+    --_txt: #eaf2ff;
+    --_txt-strong: #ffffff;
+
+    display:inline-flex; align-items:center; justify-content:center; gap:.5rem;
+    width:100%;
+    padding:14px 16px;
+    font-weight:800; letter-spacing:.02em;
+    border-radius:14px; border:1px solid var(--_brd);
+    color:var(--_txt);
+    background:
+      radial-gradient(120% 160% at 30% 20%, rgba(255,255,255,.35), transparent 60%),
+      linear-gradient(135deg, rgba(96,165,250,.65), rgba(37,99,235,.55)),
+      var(--_bg);
+    box-shadow: var(--glass-shadow);
+    backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+    transition: transform .18s ease, box-shadow .18s ease, background .18s ease, color .18s ease;
+    cursor:pointer;
+  }
+  .btn-glass-blue:hover,
+  .btn-glass-blue:focus{
+    transform: translateY(-1px);
+    color: var(--_txt-strong);
+    box-shadow: 0 14px 34px rgba(37,99,235,.32);
+    background:
+      radial-gradient(140% 160% at 30% 20%, rgba(255,255,255,.5), transparent 60%),
+      linear-gradient(135deg, rgba(96,165,250,.75), rgba(37,99,235,.65)),
+      var(--_bg);
+  }
+  .btn-glass-blue:active{ transform:none; box-shadow:0 8px 22px rgba(37,99,235,.28); }
+  .btn-glass-blue:disabled{ opacity:.65; cursor:not-allowed; box-shadow:0 8px 18px rgba(37,99,235,.18); }
+
+  .cc-auth .footer{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-top:6px}
+  .cc-auth a{color:var(--brand);text-decoration:none}
+  .cc-auth a:hover{text-decoration:underline}
+  .cc-auth .help{font-size:12px;color:var(--muted)}
+  .cc-auth form{display:grid;gap:12px;margin-top:8px}
+  .cc-auth .field-error{color:var(--danger); font-size:12px; margin:6px 2px 0}
+</style>
+
+<!-- Page-local loader -->
+<div id="page-loader-auth" aria-hidden="true">
+  <div class="loader-ring" role="status" aria-label="Loading"></div>
+</div>
+
+<div class="cc-auth">
+  <div class="wrap">
+    <main class="card" role="dialog" aria-labelledby="loginTitle" aria-describedby="loginDesc">
+      <header class="brand" aria-hidden="true">
+        <div class="dot"></div>
+        <div>
+          <div style="font-weight:800">Circuit City</div>
+          <div class="muted">Staff Portal</div>
         </div>
-        {% if form.password.errors %}
-          <div style="color:#b91c1c;font-size:.9rem;margin-top:.25rem">{{ form.password.errors|striptags }}</div>
-        {% endif %}
-        <div style="margin-top:.35rem">
-          <a href="{% url 'password_reset' %}" style="font-size:.95rem;text-decoration:none;color:#2563eb">
-            Forgot your password?
-          </a>
+      </header>
+
+      <h1 id="loginTitle">Sign in</h1>
+      <p id="loginDesc" class="muted">Welcome back. Enter your credentials to continue.</p>
+
+      {% if messages %}
+        {% for m in messages %}
+          <div class="alert{% if m.tags and 'error' in m.tags %} err{% endif %}">{{ m }}</div>
+        {% endfor %}
+      {% endif %}
+      {% if form.non_field_errors %}
+        <div class="alert err">{{ form.non_field_errors|striptags }}</div>
+      {% endif %}
+
+      <form method="post"
+            action="{{ login_url|default:'/accounts/login/' }}"
+            novalidate>
+        {% csrf_token %}
+        {% with nxt=request.GET.next|default:next %}
+          {% if nxt %}<input type="hidden" name="next" value="{{ nxt|urlencode }}">{% endif %}
+        {% endwith %}
+
+        <div class="fi">
+          <input id="id_identifier" name="identifier" type="text" placeholder=" "
+                 autocomplete="username email" inputmode="email" required
+                 value="{{ form.identifier.value|default_if_none:'' }}"
+                 aria-invalid="{{ form.identifier.errors|yesno:'true,false' }}">
+          <label for="id_identifier">Email or Username</label>
+          {% if form.identifier.errors %}<div class="field-error">{{ form.identifier.errors|striptags }}</div>{% endif %}
         </div>
-      </div>
 
-      <div style="display:flex;gap:.5rem;align-items:center">
-        <input type="checkbox" id="remember" name="remember" value="1" checked>
-        <label for="remember" style="color:#334155;">Stay signed in for 14 days</label>
-      </div>
+        <div class="fi">
+          <input id="id_password" name="password" type="password" placeholder=" "
+                 autocomplete="current-password" required
+                 aria-invalid="{{ form.password.errors|yesno:'true,false' }}">
+          <label for="id_password">Password</label>
+          <button type="button" class="icon" id="toggle-pass" aria-controls="id_password" aria-pressed="false" title="Show/Hide password">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                    d="M2.1 12.6c2.2-4 5.4-6 9.9-6s7.7 2 9.9 6c-2.2 4-5.4 6-9.9 6s-7.7-2-9.9-6z"/>
+              <circle cx="12" cy="12" r="3" stroke-width="2"/>
+            </svg>
+          </button>
+          {% if form.password.errors %}<div class="field-error">{{ form.password.errors|striptags }}</div>{% endif %}
+        </div>
 
-      <div style="display:flex;gap:.6rem;flex-wrap:wrap;margin-top:.25rem">
-        <button class="btn btn-primary" type="submit">Sign in</button>
-        <a class="btn" href="{% url 'home' %}" style="background:#64748b">Cancel</a>
-      </div>
-    </form>
+        <!-- Glassmorphic Blue Button -->
+        <button class="btn-glass-blue" id="submitBtn" type="submit">Sign in</button>
+
+        <div class="footer">
+          <div class="help"><a href="{{ forgot_url|default:'/accounts/password/forgot/' }}">Forgot password?</a></div>
+          <div class="help">You’ll be redirected after sign in.</div>
+        </div>
+      </form>
+    </main>
   </div>
 </div>
 
 <script>
-  // show/hide password
-  (function(){
+  // Fade out page loader after load (unique id to avoid base conflicts)
+  window.addEventListener('load', function(){
+    const el = document.getElementById('page-loader-auth');
+    if (el) el.classList.add('hidden');
+  });
+
+  // Show/hide password + caps-lock hint + submit guard
+  (function () {
     const btn = document.getElementById('toggle-pass');
-    const input = document.getElementById('id_password');
-    if(btn && input){
+    const pwd = document.getElementById('id_password');
+    const idf = document.getElementById('id_identifier');
+    const submit = document.getElementById('submitBtn');
+    const form = document.querySelector('.cc-auth form');
+
+    if (btn && pwd) {
       btn.addEventListener('click', () => {
-        const isPwd = input.type === 'password';
-        input.type = isPwd ? 'text' : 'password';
-        btn.textContent = isPwd ? 'Hide' : 'Show';
-        input.focus();
+        const isPwd = pwd.type === 'password';
+        pwd.type = isPwd ? 'text' : 'password';
+        btn.setAttribute('aria-pressed', String(isPwd));
+        pwd.focus({preventScroll:true});
+      });
+      pwd.addEventListener('keyup', e => {
+        if (!('getModifierState' in e)) return;
+        pwd.title = e.getModifierState('CapsLock') ? 'Caps Lock is ON' : '';
       });
     }
+
+    const sync = () => { submit.disabled = !(idf.value.trim() && pwd.value); };
+    idf && idf.addEventListener('input', sync);
+    pwd && pwd.addEventListener('input', sync);
+    sync();
+
+    form && form.addEventListener('submit', () => {
+      submit.disabled = true;
+      // add tiny inline spinner on button during submit
+      const sp = document.createElement('span');
+      sp.style.display='inline-block';
+      sp.style.width='1em'; sp.style.height='1em'; sp.style.marginLeft='.5rem';
+      sp.style.border='2px solid rgba(255,255,255,.35)'; sp.style.borderTopColor='#fff';
+      sp.style.borderRadius='50%'; sp.style.animation='spin1 .9s linear infinite';
+      submit.appendChild(sp);
+      submit.firstChild && (submit.firstChild.nodeType===3) && (submit.firstChild.textContent='Signing in…');
+    });
+
+    if (idf && pwd && idf.value && !pwd.value) { pwd.focus(); }
   })();
 </script>
 {% endblock %}

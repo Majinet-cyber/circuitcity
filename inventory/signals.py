@@ -1,6 +1,9 @@
 # inventory/signals.py
 from __future__ import annotations
 
+from typing import Any, Dict, List, Optional
+
+from django.conf import settings
 from django.db.models.signals import pre_save, post_save, post_delete
 from django.dispatch import receiver
 from django.utils import timezone
@@ -8,10 +11,46 @@ from django.utils import timezone
 from .models import InventoryItem, InventoryAudit, WalletTxn
 from sales.models import Sale  # correct import (your FK on Sale is item)
 
+# ---- Tamper-evident audit (hash chain) optional import ----
+_AUDIT_ENABLED = bool(getattr(settings, "AUDIT_LOG_SETTINGS", {}).get("ENABLED", True))
+try:
+    from .models_audit import log_audit  # helper to create AuditLog rows
+except Exception:  # pragma: no cover
+    log_audit = None  # type: ignore
+
+
+# ---------------------------------------------------------------------
+# Minimal request-local so signals can see actor/ip/ua
+# ---------------------------------------------------------------------
+try:
+    from asgiref.local import Local
+except Exception:  # pragma: no cover
+    class Local:  # fall-back stub
+        def __init__(self): self.value = None
+
+_request_local = Local()
+
+def get_current_request():
+    return getattr(_request_local, "value", None)
+
+class RequestMiddleware:
+    """
+    Add 'inventory.signals.RequestMiddleware' to MIDDLEWARE (already done in settings).
+    Makes the current request accessible to signal handlers for audit metadata.
+    """
+    def __init__(self, get_response): self.get_response = get_response
+    def __call__(self, request):
+        _request_local.value = request
+        try:
+            return self.get_response(request)
+        finally:
+            _request_local.value = None
+
+
 # Optional: dashboard cache version bump
 try:
     from .cache_utils import bump_dashboard_cache_version as _bump_cache
-except Exception:
+except Exception:  # pragma: no cover
     def _bump_cache() -> None:
         pass
 
@@ -33,28 +72,14 @@ def _invitem_snap(sender, instance: InventoryItem, **kwargs):
         instance._before = None
 
 
-@receiver(post_save, sender=InventoryItem)
-def _invitem_audit(sender, instance: InventoryItem, created: bool, **kwargs):
+def _collect_changed_fields(instance: InventoryItem, before: InventoryItem | None) -> List[str]:
     """
-    Write audit rows for CREATE/UPDATE and bump dashboard cache version.
+    Return human-readable changes (public_name: before → after), tolerant of schema variations.
     """
-    if created:
-        InventoryAudit.objects.create(
-            item=instance,
-            by_user=getattr(instance, "_actor", None),
-            action="CREATE",
-            details=f"Created with status={getattr(instance, 'status', None)}",
-        )
-        _bump_cache()
-        return
-
-    before = getattr(instance, "_before", None)
     if not before:
-        return
+        return []
 
     changed: list[str] = []
-
-    # Be tolerant of differing field names across environments
     candidates = [
         ("status", "status"),
         ("location_id", "location_id"),
@@ -76,32 +101,120 @@ def _invitem_audit(sender, instance: InventoryItem, created: bool, **kwargs):
         if attr in seen:
             continue
         if hasattr(instance, attr) and hasattr(before, attr):
-            if getattr(before, attr) != getattr(instance, attr):
-                changed.append(f"{public_name}: {getattr(before, attr)} → {getattr(instance, attr)}")
+            before_val = getattr(before, attr)
+            after_val = getattr(instance, attr)
+            if before_val != after_val:
+                changed.append(f"{public_name}: {before_val} → {after_val}")
             seen.add(attr)
+    return changed
 
-    if changed:
-        InventoryAudit.objects.create(
-            item=instance,
-            by_user=getattr(instance, "_actor", None),
-            action="UPDATE",
-            details="\n".join(changed),
-        )
+
+@receiver(post_save, sender=InventoryItem)
+def _invitem_audit(sender, instance: InventoryItem, created: bool, **kwargs):
+    """
+    Write audit rows for CREATE/UPDATE and bump dashboard cache version.
+    Also writes tamper-evident AuditLog rows if enabled.
+    """
+    request = get_current_request()
+    actor = getattr(instance, "_actor", None) or getattr(getattr(request, "user", None), "pk", None)
+
+    if created:
+        # Legacy row (human summary)
+        try:
+            InventoryAudit.objects.create(
+                item=instance,
+                by_user=getattr(instance, "_actor", None),
+                action="CREATE",
+                details=f"Created with status={getattr(instance, 'status', None)}",
+            )
+        except Exception:
+            pass
+
+        # Hash-chained row
+        if _AUDIT_ENABLED and log_audit:
+            try:
+                log_audit(
+                    actor=getattr(request, "user", None),
+                    entity="InventoryItem",
+                    entity_id=str(instance.pk),
+                    action="CREATE",
+                    payload={
+                        "status": getattr(instance, "status", None),
+                        "location_id": getattr(instance, "location_id", None),
+                        "current_location_id": getattr(instance, "current_location_id", None),
+                        "selling_price": getattr(instance, "selling_price", None) if hasattr(instance, "selling_price") else getattr(instance, "price", None),
+                    },
+                    request=request,
+                )
+            except Exception:
+                pass
+
+        _bump_cache()
+        return
+
+    before = getattr(instance, "_before", None)
+    changes = _collect_changed_fields(instance, before)
+
+    if changes:
+        # Legacy row
+        try:
+            InventoryAudit.objects.create(
+                item=instance,
+                by_user=getattr(instance, "_actor", None),
+                action="UPDATE",
+                details="\n".join(changes),
+            )
+        except Exception:
+            pass
+
+        # Hash-chained row
+        if _AUDIT_ENABLED and log_audit:
+            try:
+                payload = {
+                    "changes": changes,
+                    "before_id": getattr(before, "pk", None) if before else None,
+                }
+                log_audit(
+                    actor=getattr(request, "user", None),
+                    entity="InventoryItem",
+                    entity_id=str(instance.pk),
+                    action="UPDATE",
+                    payload=payload,
+                    request=request,
+                )
+            except Exception:
+                pass
+
         _bump_cache()
 
 
 @receiver(post_delete, sender=InventoryItem)
 def _invitem_deleted(sender, instance: InventoryItem, **kwargs):
     """
-    On delete/soft-delete operations, ensure dashboards refresh.
+    On delete/soft-delete operations, ensure dashboards refresh and write tamper-audit.
     """
+    request = get_current_request()
+
+    if _AUDIT_ENABLED and log_audit:
+        try:
+            log_audit(
+                actor=getattr(request, "user", None),
+                entity="InventoryItem",
+                entity_id=str(instance.pk),
+                action="DELETE",
+                payload={"status": getattr(instance, "status", None)},
+                request=request,
+            )
+        except Exception:
+            pass
+
     _bump_cache()
 
 
 # ---------------------------------------------------------------------
 # Sale hooks: finalize item state on create + commission wallet + cache
 # ---------------------------------------------------------------------
-def _wallet_fields():
+def _wallet_fields() -> Dict[str, Optional[str]]:
     """
     Introspect WalletTxn flexible field names.
     Returns dict with keys: agent_key, reason_key, memo_key, ref_key, when_key, kind_credit_value
@@ -112,7 +225,7 @@ def _wallet_fields():
     reason_key = "reason" if "reason" in field_names else ("kind" if "kind" in field_names else None)
     memo_key = "memo" if "memo" in field_names else ("note" if "note" in field_names else None)
     ref_key = "ref" if "ref" in field_names else None
-    when_key = "happened_at" if "happened_at" in field_names else ( "created_at" if "created_at" in field_names else None)
+    when_key = "happened_at" if "happened_at" in field_names else ("created_at" if "created_at" in field_names else None)
 
     # Typical credit indicator if using "kind"
     kind_credit_value = "CREDIT"
@@ -152,6 +265,7 @@ def _sale_finalize(sender, instance: Sale, created: bool, **kwargs):
       - Write explicit SOLD audit.
       - Create commission WalletTxn (idempotent).
       - Bump dashboard cache version.
+      - Append tamper-evident AuditLog rows for Sale and the linked item.
     """
     item: InventoryItem = instance.item
 
@@ -200,7 +314,7 @@ def _sale_finalize(sender, instance: Sale, created: bool, **kwargs):
             # Don't let side-effects break the original save
             pass
 
-        # 2) Explicit SOLD audit row
+        # 2) Explicit SOLD audit row (legacy)
         try:
             InventoryAudit.objects.create(
                 item=item,
@@ -210,6 +324,38 @@ def _sale_finalize(sender, instance: Sale, created: bool, **kwargs):
             )
         except Exception:
             pass
+
+        # 2b) Hash-chained AuditLog rows
+        if _AUDIT_ENABLED and log_audit:
+            request = get_current_request()
+            try:
+                # Sale event
+                log_audit(
+                    actor=getattr(request, "user", None),
+                    entity="Sale",
+                    entity_id=str(instance.pk),
+                    action="CREATE",
+                    payload={
+                        "item_id": getattr(item, "pk", None),
+                        "agent_id": getattr(instance, "agent_id", None),
+                        "price": getattr(instance, "price", None),
+                        "location_id": getattr(instance, "location_id", None),
+                        "sold_at": getattr(instance, "sold_at", None) or getattr(item, "sold_at", None),
+                    },
+                    request=request,
+                )
+                # Linkage/update summary for item
+                if updates:
+                    log_audit(
+                        actor=getattr(request, "user", None),
+                        entity="InventoryItem",
+                        entity_id=str(item.pk),
+                        action="UPDATE",
+                        payload={"updates_from_sale": updates, "sale_id": instance.pk},
+                        request=request,
+                    )
+            except Exception:
+                pass
 
         # 3) Commission WalletTxn (idempotent)
         try:
@@ -267,5 +413,20 @@ def _sale_finalize(sender, instance: Sale, created: bool, **kwargs):
 def _sale_deleted(sender, instance: Sale, **kwargs):
     """
     Sales deletions also impact aggregates; bump the cache version.
+    Optionally append a tamper-audit row for the deleted sale reference.
     """
+    if _AUDIT_ENABLED and log_audit:
+        request = get_current_request()
+        try:
+            log_audit(
+                actor=getattr(request, "user", None),
+                entity="Sale",
+                entity_id=str(instance.pk),
+                action="DELETE",
+                payload={"item_id": getattr(instance, "item_id", None)},
+                request=request,
+            )
+        except Exception:
+            pass
+
     _bump_cache()

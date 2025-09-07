@@ -1,44 +1,78 @@
 /* circuitcity/static/css/app.css */
+/* ==========================================================================
+   Circuit City – Polished, responsive UI system
+   - Mobile-first, fluid (no fixed viewport widths)
+   - Light/Dark theme tokens
+   - Touch-friendly targets (>=44px)
+   - Safe-area (notch) aware bottom nav & FAB
+   - Stacked tables on phones
+   - Chart sizing via CSS var
+   - Scanner page helpers (video overlay, reticle)
+   ========================================================================== */
 
-/* ====== Base ====== */
+/* ====== Design tokens (light) ====== */
 :root{
+  color-scheme: light dark;
+
+  /* Surfaces / text */
   --cc-bg: #f6f7fb;
   --cc-card: #ffffff;
   --cc-border: #e5e7eb;
   --cc-text: #0f172a;
   --cc-muted: #64748b;
+
+  /* Brand & status */
   --cc-brand: #2563eb;
   --cc-brand-dark: #1d4ed8;
   --cc-ok: #10b981;
   --cc-ok-dark: #059669;
   --cc-danger: #ef4444;
+
+  /* Radii / shadows */
+  --cc-radius: .9rem;
+  --cc-radius-sm: .55rem;
   --cc-shadow: 0 6px 24px rgba(2,6,23,.06), 0 2px 6px rgba(2,6,23,.08);
+
+  /* Layout */
+  --cc-page-max: 1280px;
+  --cc-chart-h: 260px;            /* overridable per page */
+  --cc-chart-h-sm: 200px;
+
+  /* Bottom nav height (safe-area aware) */
+  --cc-bottom-nav-h: calc(56px + env(safe-area-inset-bottom));
 }
 
-/* === Dark theme palette (activated by <html data-theme="dark">) === */
+/* ====== Dark theme palette (opt-in via <html data-theme="dark">) ====== */
 :root[data-theme="dark"]{
   --cc-bg: #0b1220;
   --cc-card: #0e1629;
   --cc-border: #20324d;
   --cc-text: #e5e7eb;
   --cc-muted: #9aa4b2;
-  --cc-brand: #3b82f6;          /* a touch lighter for contrast on dark */
+
+  --cc-brand: #3b82f6;
   --cc-brand-dark: #2563eb;
   --cc-ok: #22c55e;
   --cc-ok-dark: #16a34a;
   --cc-danger: #ef4444;
+
+  --cc-shadow: 0 10px 30px rgba(0,0,0,.35);
 }
 
+/* ====== Base / Resets ====== */
 * { box-sizing: border-box; }
-html, body { height: 100%; }
+html, body { height: 100%; max-width: 100%; overflow-x: hidden; }
+html { -webkit-text-size-adjust: 100%; }
 body.cc-body {
   margin: 0;
   background: var(--cc-bg);
   color: var(--cc-text);
   font: 14px/1.45 system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, "Helvetica Neue", Arial, "Noto Sans", "Apple Color Emoji", "Segoe UI Emoji";
+  -webkit-tap-highlight-color: transparent;
+  overscroll-behavior-y: contain;
 }
 
-/* Better focus for accessibility */
+/* Better keyboard focus */
 :focus-visible {
   outline: 2px solid var(--cc-brand);
   outline-offset: 2px;
@@ -48,12 +82,11 @@ body.cc-body {
 /* ====== Top nav ====== */
 .cc-topnav {
   position: sticky; top: 0; z-index: 40;
-  display: flex; align-items: center; gap: .75rem;
+  display: flex; align-items: center; gap: .75rem; flex-wrap: wrap;
   padding: .6rem .9rem;
   background: #fff; border-bottom: 1px solid var(--cc-border);
   box-shadow: 0 2px 12px rgba(2,6,23,.04);
 }
-/* Dark override (non-destructive) */
 [data-theme="dark"] .cc-topnav{
   background: var(--cc-card);
   border-bottom-color: var(--cc-border);
@@ -62,14 +95,10 @@ body.cc-body {
 
 .cc-burger {
   border: 1px solid var(--cc-border);
-  background: #fff;
+  background: var(--cc-card);
+  color: var(--cc-text);
   border-radius: .5rem; padding: .4rem .6rem; cursor: pointer;
   display: none; /* shown on small screens below */
-}
-[data-theme="dark"] .cc-burger{
-  background: var(--cc-card);
-  border-color: var(--cc-border);
-  color: var(--cc-text);
 }
 
 .cc-brand {
@@ -83,27 +112,23 @@ body.cc-body {
 }
 .cc-topbtn {
   background: linear-gradient(90deg, var(--cc-brand), var(--cc-brand-dark));
-  color: #fff; padding: .45rem .75rem; border-radius: .55rem; text-decoration: none;
+  color: #fff; padding: .45rem .75rem; border-radius: var(--cc-radius-sm); text-decoration: none;
   box-shadow: var(--cc-shadow);
 }
 .cc-topbtn:hover { filter: brightness(0.96); }
 .cc-user { display: inline-flex; align-items: center; gap: .65rem; color: var(--cc-muted); }
 .cc-logout { color: var(--cc-danger); text-decoration: none; }
 
-.actions-row { display: flex; gap: .5rem; align-items: center; }
+.actions-row { display: flex; gap: .5rem; align-items: center; flex-wrap: wrap; }
 
 /* ====== Shell / Sidebar ====== */
 .cc-shell { display: grid; grid-template-columns: 240px 1fr; min-height: calc(100dvh - 56px); }
 .cc-shell.no-sidebar { grid-template-columns: 1fr; }
 
 .cc-sidebar {
-  background: #fff; border-right: 1px solid var(--cc-border);
+  background: var(--cc-card); border-right: 1px solid var(--cc-border);
   padding: .8rem; position: sticky; top: 56px; height: calc(100dvh - 56px);
   overflow: auto;
-}
-[data-theme="dark"] .cc-sidebar{
-  background: var(--cc-card);
-  border-right-color: var(--cc-border);
 }
 .cc-sidebar-group {
   font-size: .78rem; color: var(--cc-muted); text-transform: uppercase; letter-spacing: .06em;
@@ -125,18 +150,19 @@ body.cc-body {
 
 /* ====== Main content container ====== */
 .cc-main { padding: 1rem; }
-.cc-container { max-width: 1280px; margin: 0 auto; }
+.cc-container { max-width: var(--cc-page-max); margin: 0 auto; }
 
 /* ====== Utility styles ====== */
 .bg { background: transparent !important; padding: 0 !important; }
 .card {
-  background: var(--cc-card); border: 1px solid var(--cc-border); border-radius: .9rem;
+  background: var(--cc-card); border: 1px solid var(--cc-border); border-radius: var(--cc-radius);
   box-shadow: var(--cc-shadow);
 }
 .btn {
   background: linear-gradient(90deg, var(--cc-brand), var(--cc-brand-dark));
-  color: white; padding: .45rem .75rem; border-radius: .55rem; text-decoration: none;
+  color: white; padding: .45rem .75rem; border-radius: var(--cc-radius-sm); text-decoration: none;
   border: 0; cursor: pointer; display: inline-flex; align-items: center; gap: .4rem;
+  min-height: 44px;
   box-shadow: var(--cc-shadow);
 }
 .btn:hover { filter: brightness(.96); }
@@ -146,9 +172,10 @@ body.cc-body {
 .btn-danger  { background: linear-gradient(90deg, #ef4444, #dc2626); }
 
 .input {
-  border: 1px solid var(--cc-border); border-radius: .55rem; padding: .55rem .75rem;
+  border: 1px solid var(--cc-border); border-radius: var(--cc-radius-sm); padding: .55rem .75rem;
   outline: none; min-width: 220px; box-shadow: 0 1px 2px rgba(2,6,23,.04) inset;
   background: var(--cc-card); color: var(--cc-text);
+  font-size: 16px; /* prevents mobile zoom on focus */
 }
 .table { border-radius: .75rem; border: 1px solid var(--cc-border); overflow: hidden; }
 
@@ -158,7 +185,7 @@ body.cc-body {
 
 /* ====== Chart sizing helpers (prevents over-stretch) ====== */
 .cc-chart-wrap { position: relative; width: 100%; max-width: 100%; }
-.cc-chart { display: block; width: 100% !important; height: 260px !important; }
+.cc-chart { display: block; width: 100% !important; height: var(--cc-chart-h) !important; }
 
 /* Make images/SVG responsive without forcing canvas height */
 img, svg { max-width: 100%; height: auto; }
@@ -181,20 +208,17 @@ canvas { width: 100%; }
 
   /* Off-canvas sidebar */
   .cc-sidebar {
-    position: fixed; left: 0; top: 56px; bottom: 0; width: 280px;
+    position: fixed; left: 0; top: 56px; bottom: 0; width: 84vw; max-width: 320px;
     height: auto;
     transform: translateX(-100%);
     transition: transform .25s ease-in-out;
     box-shadow: 0 20px 60px rgba(2,6,23,.18);
     z-index: 1000;
     overflow-y: auto;
-    background: #fff;
+    background: var(--cc-card);
     padding: 1rem .75rem;
   }
-  [data-theme="dark"] .cc-sidebar{
-    background: var(--cc-card);
-    box-shadow: 0 20px 60px rgba(0,0,0,.4);
-  }
+  [data-theme="dark"] .cc-sidebar{ box-shadow: 0 20px 60px rgba(0,0,0,.4); }
   .cc-sidebar.open { transform: translateX(0); }
 
   /* Dim the page behind the open sidebar */
@@ -208,7 +232,6 @@ canvas { width: 100%; }
   body.no-scroll { overflow: hidden; touch-action: none; }
 
   /* Header buttons wrap nicely on phones */
-  .actions-row { flex-wrap: wrap; }
   .cc-topbtn, .btn { min-height: 44px; padding: .6rem .9rem; }
 
   /* Slightly tighter top bar and table padding on small screens */
@@ -216,7 +239,7 @@ canvas { width: 100%; }
   .table th, .table td { padding: .6rem; }
 
   /* Charts: shorter height on phones */
-  .cc-chart { height: 200px !important; }
+  .cc-chart { height: var(--cc-chart-h-sm) !important; }
 }
 
 /* ====== Touch/Coarse pointer enhancements ====== */
@@ -226,17 +249,11 @@ canvas { width: 100%; }
 
 /* ====== Subtle scrollbar polish (WebKit) ====== */
 .cc-sidebar::-webkit-scrollbar,
-.table-wrap::-webkit-scrollbar {
-  height: 10px; width: 10px;
-}
+.table-wrap::-webkit-scrollbar { height: 10px; width: 10px; }
 .cc-sidebar::-webkit-scrollbar-thumb,
-.table-wrap::-webkit-scrollbar-thumb {
-  background: #cbd5e1; border-radius: 8px;
-}
+.table-wrap::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 8px; }
 .cc-sidebar::-webkit-scrollbar-track,
-.table-wrap::-webkit-scrollbar-track {
-  background: #eff4ff;
-}
+.table-wrap::-webkit-scrollbar-track { background: #eff4ff; }
 /* Dark scrollbar tint */
 [data-theme="dark"] .cc-sidebar::-webkit-scrollbar-thumb,
 [data-theme="dark"] .table-wrap::-webkit-scrollbar-thumb { background: #475569; }
@@ -246,22 +263,25 @@ canvas { width: 100%; }
 /* ====== Reduced motion ====== */
 @media (prefers-reduced-motion: reduce){
   .cc-sidebar { transition: none; }
+  .will-animate{ transition: none; }
+  .skeleton::after{ animation: none; }
 }
 
 /* ===================================================================== */
-/* =========================  NEW POLISH ADDITIONS  ===================== */
+/* =========================  POLISH ADDITIONS  ======================== */
 /* ===================================================================== */
 
-/* === 1) Mobile bottom tabs + FAB (mirrors base.html fallback) === */
+/* === 1) Mobile bottom tabs + FAB (matches dashboard template) === */
 .cc-bottom-nav{
   position:fixed; left:0; right:0; bottom:0; z-index:32;
-  display:none; /* enabled via JS on phones */
+  display:none; /* enable via JS or a .has-bottom-nav body class */
   background: color-mix(in oklab, var(--cc-card) 92%, transparent);
   border-top:1px solid var(--cc-border);
   backdrop-filter: blur(10px);
   padding:.35rem .5rem calc(.35rem + env(safe-area-inset-bottom));
+  height: var(--cc-bottom-nav-h);
 }
-.cc-bottom-row{ display:flex; align-items:center; gap:.25rem; }
+.cc-bottom-row{ display:flex; align-items:center; gap:.25rem; height: 100%; }
 .cc-bottom-tab{
   flex:1; text-align:center; font-size:.8rem; color:var(--cc-text); text-decoration:none;
   padding:.35rem .25rem; border-radius:.65rem; transition:background .15s ease, transform .05s ease;
@@ -270,20 +290,20 @@ canvas { width: 100%; }
 .cc-bottom-tab:active{ transform:translateY(1px) }
 .cc-bottom-tab .ico{ font-size:1.2rem; line-height:1 }
 .cc-bottom-tab.active{ background: #eef2ff; font-weight:700; }
-[data-theme="dark"] .cc-bottom-nav{
-  background: color-mix(in oklab, var(--cc-card) 95%, transparent);
-}
+[data-theme="dark"] .cc-bottom-nav{ background: color-mix(in oklab, var(--cc-card) 95%, transparent); }
 [data-theme="dark"] .cc-bottom-tab.active{ background:#142447; }
 
 .cc-fab{
-  position:fixed; right:16px; bottom:76px; z-index:33;
-  display:none; /* enabled via JS on phones */
+  position:fixed; right:16px; bottom:calc(var(--cc-bottom-nav-h) + 20px); z-index:33;
+  display:none; /* enable via JS or .has-bottom-nav body class */
   width:56px; height:56px; border-radius:16px; border:0;
   background: var(--cc-brand); color:#fff; box-shadow: 0 10px 25px rgba(0,0,0,.15);
   font-size:1.35rem; cursor:pointer;
 }
 .cc-fab:hover{ filter: brightness(.96); }
-body.has-bottom-nav .cc-main{ padding-bottom: calc(80px + env(safe-area-inset-bottom)); }
+body.has-bottom-nav .cc-main{ padding-bottom: calc(var(--cc-bottom-nav-h) + 24px); }
+body.has-bottom-nav .cc-bottom-nav,
+body.has-bottom-nav .cc-fab{ display:block; }
 
 /* === 2) Skeleton shimmer (use .skeleton on any loading card/section) === */
 .skeleton{ position:relative; overflow:hidden; background:var(--cc-card) }
@@ -293,9 +313,6 @@ body.has-bottom-nav .cc-main{ padding-bottom: calc(80px + env(safe-area-inset-bo
   transform: translateX(-100%); animation: cc-shimmer 1.2s infinite;
 }
 @keyframes cc-shimmer{ 100%{ transform: translateX(100%); } }
-@media (prefers-reduced-motion: reduce){
-  .skeleton::after{ animation: none; }
-}
 
 /* === 3) Animate-in utility (add .will-animate; JS adds .in) === */
 .will-animate{ transform: translateY(8px); opacity:0; transition: transform .5s ease, opacity .5s ease; }
@@ -321,7 +338,7 @@ body.has-bottom-nav .cc-main{ padding-bottom: calc(80px + env(safe-area-inset-bo
   display:inline-flex; align-items:center; gap:.35rem; font-weight:700; font-size:.85rem;
   border-radius:999px; padding:.22rem .6rem; border:1px solid var(--cc-border); background:#f8fafc; color:var(--cc-text);
 }
-[data-theme="dark"] .chip{ background:#0f1b33; border-color:#20324d; color:var(--cc-text); }
+[data-theme="dark"] .chip{ background:#0f1b33; border-color:#20324d; color:#fff; }
 .chip--ok{ background:#ecfdf5; border-color:#a7f3d0; color:#065f46 }
 .chip--bad{ background:#fef2f2; border-color:#fecaca; color:#991b1b }
 
@@ -338,3 +355,41 @@ body.has-bottom-nav .cc-main{ padding-bottom: calc(80px + env(safe-area-inset-bo
 
 .only-mobile{ display:none !important; }
 @media (max-width: 1024px){ .only-mobile{ display:initial !important; } }
+
+/* ===================================================================== */
+/* =======================  Scanner Page Helpers  ====================== */
+/* ===================================================================== */
+/* These help /inventory/scan-web/ look and feel native on mobile.
+   JS will handle using the back camera (facingMode: environment). */
+
+.cc-scan-wrap{
+  position: relative; width: 100%; max-width: var(--cc-page-max);
+  margin: 0 auto; border-radius: var(--cc-radius);
+  overflow: hidden; background: #000; box-shadow: var(--cc-shadow);
+}
+.cc-scan-video{
+  display:block; width:100%; height:auto; object-fit: cover;
+  max-height: min(70vh, 70dvh);
+}
+.cc-scan-overlay{
+  position:absolute; inset:0; pointer-events:none;
+  display:grid; place-items:center;
+  background: linear-gradient(to bottom, rgba(0,0,0,.25), transparent 30%, transparent 70%, rgba(0,0,0,.25));
+}
+.cc-scan-reticle{
+  width:min(70vw,380px); max-width:92%; aspect-ratio: 1.6/1;
+  border: 2px dashed rgba(255,255,255,.85); border-radius: 12px;
+  box-shadow: 0 0 0 9999px rgba(0,0,0,.15) inset;
+}
+.cc-scan-actions{
+  display:flex; gap:.5rem; align-items:center; justify-content:center;
+  padding: .5rem; background: var(--cc-card); border:1px solid var(--cc-border);
+  border-top: 0; border-radius: 0 0 var(--cc-radius) var(--cc-radius);
+}
+.cc-torch-btn{
+  background: linear-gradient(90deg, var(--cc-ok), var(--cc-ok-dark));
+  color:#fff; border:0; border-radius: .65rem; padding:.5rem .8rem; min-height:44px;
+}
+
+/* Give scan pages a little extra bottom room so controls don't clash with bottom nav */
+body.scan-page.has-bottom-nav .cc-main{ padding-bottom: calc(var(--cc-bottom-nav-h) + 50px); }

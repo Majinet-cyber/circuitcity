@@ -1,0 +1,15 @@
+Hello {{ user.username }},
+
+Your payslip for {{ ps.period_start|date:"M Y" }}:
+
+Base salary:   MK {{ ps.base_salary|floatformat:0 }}
+Commission:    MK {{ ps.commission|floatformat:0 }}
+Bonuses/Fees:  MK {{ ps.bonuses_fees|floatformat:0 }}
+Deductions:    MK {{ ps.deductions|floatformat:0 }}
+
+Gross:         MK {{ ps.gross|floatformat:0 }}
+NET:           MK {{ ps.net|floatformat:0 }}
+
+Ref: {{ ps.reference }}
+
+Thank you.

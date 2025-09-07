@@ -2,9 +2,10 @@
 from __future__ import annotations
 
 from decimal import Decimal
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Dict, Any
 
+from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth import get_user_model, logout
 from django.contrib.auth.decorators import login_required, user_passes_test
@@ -13,6 +14,8 @@ from django.db.models import Sum
 from django.http import JsonResponse, HttpRequest, HttpResponse
 from django.shortcuts import redirect, render, get_object_or_404
 from django.utils import timezone
+from django.views.decorators.http import require_GET, require_http_methods
+from django.views.decorators.csrf import ensure_csrf_cookie, csrf_protect  # NEW
 
 from inventory.models import InventoryItem, TimeLog, WalletTxn
 from sales.models import Sale
@@ -28,7 +31,7 @@ SUNDAY_BONUS = Decimal("15000")         # any time on Sunday
 # -------------------------
 # Health & utility
 # -------------------------
-def healthz(request: HttpRequest) -> JsonResponse:
+def healthz(_request: HttpRequest) -> JsonResponse:
     """
     Lightweight liveness/readiness probe:
       - Confirms DB connectivity with a simple SELECT 1
@@ -46,6 +49,18 @@ def healthz(request: HttpRequest) -> JsonResponse:
     return JsonResponse({"ok": db_ok}, status=status)
 
 
+def temporary_ok(_request: HttpRequest) -> HttpResponse:
+    """Very small page to verify URLConf & server when debugging."""
+    return HttpResponse(
+        "<h3 style='margin:1rem;padding:.75rem;border-radius:8px;"
+        "background:#e7f7ec;border:1px solid #b7e5c4'>"
+        "It works! URLConf and server are OK.</h3>"
+        "<p style='margin:1rem;color:#334155'>If your normal pages still 500, "
+        "the error is in a specific view/template path.</p>",
+        content_type="text/html",
+    )
+
+
 def user_in_group(user: User, group_name: str) -> bool:
     return user.is_authenticated and user.groups.filter(name=group_name).exists()
 
@@ -55,11 +70,12 @@ def is_admin(user: User) -> bool:
 
 
 @login_required
+@ensure_csrf_cookie  # ensure csrftoken cookie is set on first GET
 def home(request: HttpRequest) -> HttpResponse:
     """
     Route users to the correct dashboard using the NEW (namespaced) routes.
     Staff/Admin  -> dashboard:dashboard
-    Manager      -> manager_dashboard (legacy view in cc)
+    Manager      -> manager_dashboard
     Agent        -> dashboard:agent_dashboard
     """
     u = request.user
@@ -70,9 +86,20 @@ def home(request: HttpRequest) -> HttpResponse:
     return redirect("dashboard:agent_dashboard")
 
 
-def logout_view(request: HttpRequest) -> HttpResponse:
-    logout(request)
-    return redirect("login")
+@require_http_methods(["GET", "POST"])
+def logout_now(request: HttpRequest) -> HttpResponse:
+    """
+    Log the user out on GET or POST and redirect to login.
+    Accepting GET avoids 405 errors when using a simple <a href="...">Logout</a>.
+    """
+    if request.user.is_authenticated:
+        logout(request)
+    next_url = getattr(settings, "LOGOUT_REDIRECT_URL", "/accounts/login/") or "/accounts/login/"
+    return redirect(next_url)
+
+
+# Back-compat alias (if any code imports logout_view)
+logout_view = logout_now
 
 
 def _totals_for_user(user: User, scope: str = "all") -> Dict[str, Any]:
@@ -86,7 +113,7 @@ def _totals_for_user(user: User, scope: str = "all") -> Dict[str, Any]:
         items = InventoryItem.objects.filter(assigned_agent=user)
         sales = Sale.objects.filter(agent=user)
 
-    # Use Decimal-safe aggregation
+    # Decimal-safe aggregation
     sales_value = sales.aggregate(total=Sum("price"))["total"] or Decimal("0")
     commission_total = sum((s.commission_amount for s in sales), Decimal("0"))
 
@@ -103,7 +130,7 @@ def _totals_for_user(user: User, scope: str = "all") -> Dict[str, Any]:
 # -------------------------
 @login_required
 @user_passes_test(is_admin)
-def admin_dashboard(request: HttpRequest) -> HttpResponse:
+def admin_dashboard(_request: HttpRequest) -> HttpResponse:
     """Old route name → redirect to the new namespaced admin dashboard."""
     return redirect("dashboard:dashboard")
 
@@ -113,6 +140,8 @@ def admin_dashboard(request: HttpRequest) -> HttpResponse:
 # -------------------------
 @login_required
 @user_passes_test(is_admin)
+@ensure_csrf_cookie         # set cookie on GET
+@csrf_protect               # enforce token on POST
 def admin_agent_detail(request: HttpRequest, user_id: int) -> HttpResponse:
     agent = get_object_or_404(User, pk=user_id)
 
@@ -187,6 +216,7 @@ def admin_agent_detail(request: HttpRequest, user_id: int) -> HttpResponse:
 # Manager dashboard (placeholder)
 # -------------------------
 @login_required
+@ensure_csrf_cookie
 def manager_dashboard(request: HttpRequest) -> HttpResponse:
     ctx = _totals_for_user(request.user)
     return render(request, "dash/manager_dashboard.html", ctx)
@@ -196,6 +226,8 @@ def manager_dashboard(request: HttpRequest) -> HttpResponse:
 # Agent dashboard (enhanced)
 # -------------------------
 @login_required
+@ensure_csrf_cookie  # set csrftoken cookie for JS/phone before any POST
+@csrf_protect        # enforce token on POST
 def agent_dashboard(request: HttpRequest) -> HttpResponse:
     """
     Agent dashboard:
@@ -307,3 +339,42 @@ def agent_dashboard(request: HttpRequest) -> HttpResponse:
         "last_logs": TimeLog.objects.filter(user=user).order_by("-logged_at")[:5],
     }
     return render(request, "dash/agent_dashboard.html", ctx)
+
+
+# -------------------------
+# API: lightweight AI recommendations for dashboard
+# -------------------------
+@login_required
+@require_GET
+def api_recommendations(request: HttpRequest) -> JsonResponse:
+    """
+    Very small, safe recommendations endpoint for local/dev.
+    Returns a shape the dashboard expects: {"success": true, "items": [...]}
+
+    - Suggest restock if agent has < 10 IN_STOCK items.
+    - Flag no recent sales (last 14 days).
+    """
+    user = request.user
+    now = timezone.localtime()
+
+    items: list[dict[str, Any]] = []
+
+    # Stock-based nudge
+    in_stock = InventoryItem.objects.filter(assigned_agent=user, status="IN_STOCK").count()
+    if in_stock < 10:
+        items.append({
+            "type": "restock",
+            "message": f"Low stock: only {in_stock} items available. Consider restocking to at least 12.",
+            "confidence": 0.82,
+        })
+
+    # Recent sales nudge
+    recent_sales = Sale.objects.filter(agent=user, sold_at__gte=now - timedelta(days=14)).count()
+    if recent_sales == 0:
+        items.append({
+            "type": "marketing",
+            "message": "No sales in the last 14 days. Try a small discount or a WhatsApp broadcast.",
+            "confidence": 0.61,
+        })
+
+    return JsonResponse({"success": True, "items": items})

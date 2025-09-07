@@ -1,0 +1,157 @@
+{% load humanize %}
+
+<div class="kpi-card will-animate" data-delay="{{ delay|default:0 }}">
+  <div class="kpi-header">
+    <div class="kpi-icon glass">
+      <i class="bi {{ icon }}"></i>
+    </div>
+    <div class="kpi-info">
+      <span class="kpi-label">{{ label }}</span>
+      <span class="kpi-value">
+        {% if is_currency %}
+          {{ value|floatformat:2|intcomma }} {{ currency_sign }}
+        {% else %}
+          {{ value|intcomma }}
+        {% endif %}
+      </span>
+    </div>
+  </div>
+  {% if delta is not None %}
+    <div class="kpi-delta {% if delta >= 0 %}up{% else %}down{% endif %}">
+      <i class="bi {% if delta >= 0 %}bi-arrow-up-right{% else %}bi-arrow-down-right{% endif %}"></i>
+      {{ delta|floatformat:1 }}%
+    </div>
+  {% endif %}
+</div>
+
+<style>
+  /* KPI Card Container */
+  .kpi-card {
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    gap: 0.5rem;
+    padding: 1.1rem 1.3rem;
+    background: var(--cc-panel);
+    border-radius: var(--radius-lg);
+    border: 1px solid var(--cc-border);
+    box-shadow: var(--cc-shadow);
+    min-width: 160px;
+    transition: transform .25s ease, box-shadow .25s ease, background .25s ease;
+    cursor: pointer;
+  }
+
+  .kpi-card:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 10px 25px color-mix(in oklab, var(--cc-accent) 20%, transparent);
+  }
+
+  /* KPI Header Layout */
+  .kpi-header {
+    display: flex;
+    align-items: center;
+    gap: 0.85rem;
+  }
+
+  .kpi-icon {
+    width: 48px;
+    height: 48px;
+    display: grid;
+    place-items: center;
+    border-radius: 14px;
+    background: rgba(var(--glass-tint) / var(--glass-alpha));
+    box-shadow: 0 4px 14px rgba(0, 0, 0, .08);
+    color: var(--cc-accent);
+    font-size: 1.4rem;
+  }
+
+  .kpi-info {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+  }
+
+  .kpi-label {
+    font-size: .9rem;
+    font-weight: 700;
+    color: var(--cc-muted);
+  }
+
+  .kpi-value {
+    font-size: 1.5rem;
+    font-weight: 800;
+    color: var(--cc-text);
+  }
+
+  /* Delta Styles */
+  .kpi-delta {
+    display: inline-flex;
+    align-items: center;
+    gap: .35rem;
+    font-size: .85rem;
+    font-weight: 700;
+    padding: 0.25rem 0.6rem;
+    border-radius: 999px;
+    margin-top: 0.6rem;
+    width: fit-content;
+    transition: background .25s ease;
+  }
+
+  .kpi-delta.up {
+    color: var(--success);
+    background: color-mix(in oklab, var(--success) 15%, transparent);
+    border: 1px solid color-mix(in oklab, var(--success) 35%, transparent);
+  }
+
+  .kpi-delta.down {
+    color: var(--danger);
+    background: color-mix(in oklab, var(--danger) 15%, transparent);
+    border: 1px solid color-mix(in oklab, var(--danger) 35%, transparent);
+  }
+
+  /* Entry Animation */
+  .will-animate {
+    opacity: 0;
+    transform: translateY(8px);
+    transition: opacity .6s ease, transform .6s ease;
+  }
+
+  .will-animate.in {
+    opacity: 1;
+    transform: translateY(0);
+  }
+
+  /* Mobile Responsiveness */
+  @media (max-width: 768px) {
+    .kpi-card {
+      padding: 1rem;
+      min-width: unset;
+    }
+
+    .kpi-value {
+      font-size: 1.3rem;
+    }
+
+    .kpi-icon {
+      width: 42px;
+      height: 42px;
+      font-size: 1.2rem;
+    }
+  }
+</style>
+
+<script>
+  // Animate KPIs on scroll into view
+  document.addEventListener("DOMContentLoaded", () => {
+    const observer = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add("in");
+          observer.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.2 });
+
+    document.querySelectorAll(".will-animate").forEach(el => observer.observe(el));
+  });
+</script>

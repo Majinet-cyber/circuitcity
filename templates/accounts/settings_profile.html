@@ -1,0 +1,97 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Settings · Profile{% endblock %}
+
+{% block content %}
+<div class="container my-4">
+  <h2 class="fw-bold mb-3">Account Settings</h2>
+  {% include "accounts/_settings_nav.html" %}
+
+  <div class="card shadow-sm border-0 rounded-3">
+    <div class="card-body p-4">
+      <h5 class="fw-semibold mb-3">Profile Information</h5>
+
+      <form method="post" enctype="multipart/form-data" class="needs-validation" novalidate>
+        {% csrf_token %}
+        {% if messages %}
+          {% for message in messages %}
+            <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+              {{ message }}
+              <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
+          {% endfor %}
+        {% endif %}
+
+        <div class="d-flex align-items-center mb-4">
+          {% if form.instance.avatar %}
+            <img src="{{ form.instance.avatar.url }}"
+                 alt="Avatar"
+                 class="rounded-circle shadow-sm"
+                 style="width: 80px; height: 80px; object-fit: cover;">
+          {% else %}
+            <div class="rounded-circle bg-primary text-white d-flex align-items-center justify-content-center shadow-sm"
+                 style="width: 80px; height: 80px; font-size: 1.8rem;">
+              {{ form.instance.initials|default:"?" }}
+            </div>
+          {% endif %}
+          <div class="ms-3">
+            <label for="{{ form.avatar.id_for_label }}" class="form-label fw-semibold mb-1">
+              Profile Picture
+            </label>
+            {{ form.avatar }}
+            <div class="form-text">
+              Upload a square image (JPEG/PNG/WEBP). Max size 5MB.
+            </div>
+          </div>
+        </div>
+
+        <div class="row g-3">
+          <div class="col-md-6">
+            <label for="{{ form.display_name.id_for_label }}" class="form-label fw-semibold">Display Name</label>
+            {{ form.display_name }}
+            {% if form.display_name.errors %}
+              <div class="text-danger small">{{ form.display_name.errors|join:", " }}</div>
+            {% endif %}
+          </div>
+
+          <div class="col-md-6">
+            <label for="{{ form.country.id_for_label }}" class="form-label fw-semibold">Country</label>
+            {{ form.country }}
+            {% if form.country.errors %}
+              <div class="text-danger small">{{ form.country.errors|join:", " }}</div>
+            {% endif %}
+          </div>
+        </div>
+
+        <div class="row g-3 mt-2">
+          <div class="col-md-6">
+            <label for="{{ form.language.id_for_label }}" class="form-label fw-semibold">Language</label>
+            {{ form.language }}
+            {% if form.language.errors %}
+              <div class="text-danger small">{{ form.language.errors|join:", " }}</div>
+            {% endif %}
+          </div>
+
+          <div class="col-md-6">
+            <label for="{{ form.timezone.id_for_label }}" class="form-label fw-semibold">Time Zone</label>
+            {{ form.timezone }}
+            {% if form.timezone.errors %}
+              <div class="text-danger small">{{ form.timezone.errors|join:", " }}</div>
+            {% endif %}
+          </div>
+        </div>
+
+        <div class="mt-4">
+          <button type="submit" class="btn btn-primary px-4">
+            <i class="bi bi-save me-1"></i> Save Changes
+          </button>
+          <a href="{% url 'accounts:settings_profile' %}" class="btn btn-outline-secondary px-4 ms-2">
+            Cancel
+          </a>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}

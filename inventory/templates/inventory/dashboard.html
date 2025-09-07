@@ -1,1213 +1,442 @@
-<!DOCTYPE html>
-<!-- PROBE: NEW DASHBOARD v2.6.1 -->
-<!-- THEMES + SLIDES: both rotators live -->
-<html lang="en" data-theme="style-1">
-<head>
-  <meta charset="UTF-8" />
-  <title>Dashboard · Circuit City</title>
+﻿{% extends "base.html" %}
+{% load static %}
+{% load humanize %}
 
-  <!-- Mobile-friendly viewport -->
-  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
-  <meta name="color-scheme" content="light dark" />
-  <meta name="theme-color" content="#0b5bd3" />
+{% block title %}Dashboard · Circuit City{% endblock %}
+{% block header_title %}Dashboard{% endblock %}
 
-  <!-- Bootstrap / Icons -->
-  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
+{% block extra_css %}
+<style>
+  :root{ --chart-h:260px; --chart-h-sm:210px; }
+  .panel{ border-radius:var(--radius,12px); border:1px solid var(--cc-border); background:var(--cc-panel); box-shadow:var(--cc-shadow); padding:1rem; }
+  .panel h5,.card-head>div{ font-weight:900; letter-spacing:.01em }
+  .kpi-row{ display:grid; gap:12px; grid-template-columns:repeat(4,1fr); margin-bottom:12px; }
+  @media (max-width:992px){ .kpi-row{ grid-template-columns:repeat(2,1fr); } }
+  .kpi .label{ color:var(--cc-muted); font-weight:800 }
+  .kpi .value{ font-size:1.6rem; font-weight:900 }
+  .chart-canvas{ width:100% !important; height:var(--chart-h) !important }
+  .chart-canvas--sm{ height:var(--chart-h-sm) !important }
+  .dash-grid{ display:grid; gap:12px; grid-template-columns:2fr 1fr; grid-template-rows:minmax(0,1fr) minmax(0,1fr); height:clamp(540px,62vh,760px); }
+  .dash-grid .left{ grid-row:1 / span 2; }
+  .equal-grid{ display:grid; gap:12px; grid-template-columns:7fr 5fr; align-items:stretch; }
+  @media (max-width:992px){ .dash-grid,.equal-grid{ display:block; height:auto; } .chart-canvas{ height:220px !important } }
+  .ai-item{ display:flex; gap:.5rem; align-items:flex-start; }
+  .ai-item .badge{ margin-top:.15rem }
+  .empty-hint{ color:var(--cc-muted); font-weight:700; padding:.5rem 0 .2rem }
+  .filters .form-select{ min-width:160px; }
+</style>
+{% endblock %}
 
-  <style>
-    /* ===== Themeable design tokens ===== */
-    :root{
-      --bg:#f6f9ff;
-      --blue-700:#1d4ed8;
-      --blue-600:#2563eb;
-      --blue-500:#3b82f6;
-      --blue-400:#60a5fa;
-      --ink:#0f172a;
-      --muted:#64748b;
-      --card:#ffffff;
-      --line:#e2e8f0;
-      --chip:#f1f5f9;
-      --ring:0 0 0 .25rem rgba(59,130,246,.25);
-      --chart-grid: rgba(2,6,23,.06);
-    }
+{% block content %}
 
-    /* 3 themes */
-    html[data-theme="style-1"]{
-      --bg:#f6f9ff;
-      --card:#ffffff;
-      --line:#e2e8f0;
-      --ink:#0f172a; --muted:#64748b;
-      --blue-700:#1d4ed8; --blue-600:#2563eb; --blue-500:#3b82f6; --blue-400:#60a5fa;
-      --chart-grid: rgba(2,6,23,.06);
-    }
-    html[data-theme="style-2"]{
-      --bg:#0b1220;
-      --card:#0e1629;
-      --line:#20324d;
-      --ink:#e5e7eb; --muted:#a8b3cf;
-      --blue-700:#1342b8; --blue-600:#3c82ff; --blue-500:#5aa0ff; --blue-400:#8fc3ff;
-      --ring:0 0 0 .25rem rgba(90,160,255,.28);
-      --chart-grid: #1a2a45;
-    }
-    html[data-theme="style-3"]{
-      --bg:#0b1222;
-      --card:#0f1b30;
-      --line:#223454;
-      --ink:#e7ecfb; --muted:#9fb0cf;
-      --blue-700:#0e7a63; --blue-600:#10b981; --blue-500:#34d399; --blue-400:#6ee7b7;
-      --ring:0 0 0 .25rem rgba(16,185,129,.28);
-      --chart-grid: #1b2b48;
-    }
-
-    body{ background:var(--bg); color:var(--ink); -webkit-tap-highlight-color:transparent; }
-    input, select, textarea, button { font-size:16px; }
-
-    .cc-shell { min-height:100dvh; display:flex; flex-direction:column; }
-    .cc-page{ max-width:1200px; width:100%; margin:0 auto; padding:0.75rem; padding-bottom:calc(76px + env(safe-area-inset-bottom)); }
-
-    /* header / top spacing */
-    .cc-header {
-      position:sticky; top:0; z-index:1030;
-      backdrop-filter:blur(10px);
-      background:color-mix(in oklab, var(--card) 85%, transparent);
-      border-bottom:1px solid var(--line);
-    }
-    .cc-header .cc-page{ padding-top:.5rem; padding-bottom:.25rem; }
-
-    .cc-title{ font-weight:800; letter-spacing:.2px; margin:0; color:var(--blue-600); }
-    .cc-title .emoji{ filter: drop-shadow(0 6px 10px color-mix(in oklab, var(--blue-600) 25%, transparent)); }
-
-    .cc-toolbar{ display:grid; grid-template-columns:1fr auto; gap:.5rem; align-items:center; }
-    .cc-toolbar .actions{ display:flex; flex-wrap:wrap; gap:.5rem; align-items:center; justify-content:flex-end; }
-    @media (max-width:576px){
-      .cc-toolbar{ grid-template-columns:1fr; }
-      .cc-toolbar .actions{ justify-content:flex-start; }
-    }
-
-    .crumbs{ display:flex; flex-wrap:wrap; gap:.5rem; margin-top:.5rem; }
-    .crumbs a{
-      text-decoration:none; font-weight:700; color:var(--ink);
-      background:var(--card); border:1px solid var(--line); border-radius:999px;
-      padding:.45rem .8rem; display:inline-flex; align-items:center; gap:.5rem;
-      box-shadow:0 6px 18px rgba(16,24,40,.06);
-    }
-    .crumbs a:hover{ filter:brightness(1.03); transform:translateY(-1px); transition:all .12s ease; }
-
-    .cc-menu-btn{
-      width:42px; height:42px; border-radius:12px; display:grid; place-items:center;
-      border:1px solid var(--line); background:var(--card); box-shadow:0 6px 18px rgba(16,24,40,.06);
-      color:var(--ink);
-    }
-
-    .btn-primary{ background:var(--blue-600); border-color:var(--blue-600); }
-    .btn-primary:hover{ background:var(--blue-700); border-color:var(--blue-700); }
-    .btn-outline-primary{ color:var(--blue-600); border-color:var(--blue-600); }
-    .btn-outline-primary:hover{ color:#fff; background:var(--blue-600); border-color:var(--blue-600); }
-    .form-select{ background:var(--card); color:var(--ink); border-color:var(--line); }
-    .form-select:focus{ box-shadow:var(--ring); border-color:var(--blue-500); }
-
-    .kpi-card{
-      background:linear-gradient(135deg, var(--blue-600), var(--blue-400));
-      color:#fff; border:0; border-radius:16px;
-      padding:1rem 1.1rem;
-      box-shadow:0 10px 25px color-mix(in oklab, var(--blue-600) 30%, transparent);
-      min-height:92px;
-      transform:translateY(6px); opacity:0;
-      transition:transform .5s ease, opacity .5s ease;
-    }
-    .kpi-card.in { transform:translateY(0); opacity:1; }
-    .kpi-card .label{ font-size:.9rem; opacity:.9 }
-    .kpi-card .value{ font-size:1.65rem; font-weight:800; line-height:1; }
-
-    .cc-card{
-      background:var(--card);
-      border:1px solid var(--line);
-      border-radius:16px;
-      box-shadow:0 6px 18px rgba(16,24,40,.06);
-      transform:translateY(8px); opacity:0;
-      transition:transform .55s ease, opacity .55s ease, background-color .25s linear, border-color .25s linear;
-      color:var(--ink);
-    }
-    .cc-card.in { transform:translateY(0); opacity:1; }
-    .cc-card h5{ margin-bottom:.75rem; font-weight:700; color:var(--ink); }
-
-    .wallet-chip{
-      display:inline-block; font-weight:700; font-size:.85rem;
-      border-radius:999px; padding:.2rem .55rem;
-      background:var(--chip); border:1px solid var(--line); color:var(--ink);
-      white-space:nowrap; transition:transform .15s ease;
-    }
-    .wallet-chip.loading{ color:var(--muted) }
-    .wallet-chip.positive{ background:#ecfdf5; border-color:#a7f3d0; color:#065f46 }
-    .wallet-chip.negative{ background:#fef2f2; border-color:#fecaca; color:#991b1b }
-    .wallet-chip:active { transform:scale(.98) }
-
-    .battery-wrap{ position:relative; width:90px; }
-    .battery{
-      height:180px; width:90px;
-      border:2px solid #334155; border-radius:16px;
-      position:relative; overflow:hidden; background:#f8fafc;
-      box-shadow:inset 0 0 8px rgba(0,0,0,.08);
-    }
-    .battery-cap{
-      position:absolute; top:-12px; left:50%; transform:translateX(-50%);
-      width:36px; height:10px; border:2px solid #334155; border-bottom:none;
-      border-radius:8px 8px 0 0; background:#f8fafc;
-    }
-    .battery-fill{
-      position:absolute; bottom:0; left:0; right:0;
-      height:0%; transition:height .6s ease, background-color .25s ease;
-    }
-    .fill-red{ background:#ef4444 }
-    .fill-yellow{ background:#f59e0b }
-    .fill-mildgreen{ background:#22c55e }
-    .fill-lightgreen{ background:#86efac }
-
-    .table thead th{ white-space:nowrap; cursor:pointer; color:var(--muted); }
-    .sortable::after{ content:' ↕'; opacity:.35; font-weight:normal }
-    .table>tbody>tr>td{ vertical-align:middle; color:var(--ink); }
-
-    .chart-canvas{ width:100% !important; max-width:100%; height:260px !important }
-    .chart-canvas--sm{ height:200px !important }
-
-    .cc-bottom-nav{
-      position:fixed; left:0; right:0; bottom:0; z-index:1030;
-      background:color-mix(in oklab, var(--card) 95%, transparent);
-      border-top:1px solid var(--line);
-      backdrop-filter:blur(10px);
-      padding: .35rem .5rem calc(.35rem + env(safe-area-inset-bottom));
-    }
-    .cc-bottom-nav .tab{ flex:1; text-align:center; font-size:.8rem; color:#334155; text-decoration:none; }
-    .cc-bottom-nav .tab .bi{ font-size:1.35rem; display:block; line-height:1; }
-    .cc-bottom-nav .tab.active{ color:var(--blue-600); font-weight:600; }
-
-    .cc-fab{
-      position:fixed; right:18px; bottom:88px; z-index:1031;
-      width:56px; height:56px; border-radius:16px;
-      background:var(--blue-600); color:#fff; border:0;
-      box-shadow:0 10px 25px color-mix(in oklab, var(--blue-600) 30%, transparent);
-    }
-    .cc-fab:active{ transform:translateY(1px) }
-
-    @media (max-width: 992px){
-      .kpi-card .value{ font-size:1.45rem }
-      .chart-canvas{ height:220px !important }
-      .cc-page{ padding: .75rem; }
-    }
-
-    @media (prefers-reduced-motion: reduce) {
-      .kpi-card, .cc-card { transition:none; }
-      .battery-fill{ transition:none; }
-    }
-
-    /* Prevent any sideways scroll on small screens */
-    html, body { max-width:100%; overflow-x:hidden; }
-
-    /* === Tiny control groups === */
-    .controls-stack{
-      position:fixed; right:12px; bottom:12px; z-index:2000;
-      display:flex; flex-direction:column; gap:.4rem;
-    }
-    .theme-controls, .slides-controls{
-      display:flex; gap:.4rem; justify-content:flex-end;
-    }
-    .theme-controls button, .slides-controls button{
-      background:var(--card); color:var(--ink); border:1px solid var(--line);
-      border-radius:10px; padding:.35rem .55rem; font-size:.85rem;
-      box-shadow:0 6px 18px rgba(16,24,40,.06);
-    }
-    .slides-controls .label, .theme-controls .label{
-      padding:.35rem .6rem; border-radius:10px; border:1px dashed var(--line);
-      color:var(--muted); background:color-mix(in oklab, var(--card) 92%, transparent);
-      font-size:.75rem; font-weight:700;
-    }
-
-    /* ===== Slides wrapper ===== */
-    .cc-slides{ position:relative; }
-    .cc-slide{ display:none; }
-    .cc-slide.active{ display:block; }
-    .cc-slide[data-name]::before{
-      content:attr(data-name);
-      display:inline-block; font-weight:700; font-size:.9rem; color:var(--muted);
-      background:var(--chip); border:1px solid var(--line); border-radius:999px;
-      padding:.2rem .6rem; margin-bottom:.5rem;
-    }
-
-    /* Pretty pills for agent wallet management */
-    .pill{
-      display:inline-flex; align-items:center; gap:.35rem;
-      padding:.35rem .6rem; border-radius:999px;
-      border:1px solid var(--line); background:var(--chip); color:var(--ink);
-      font-weight:700; font-size:.8rem;
-    }
-  </style>
-</head>
-<body>
-  <div class="cc-shell">
-
-    <!-- Sticky Header -->
-    <header class="cc-header">
-      <div class="cc-page">
-        <div class="cc-toolbar">
-          <h1 class="cc-title"><span class="emoji">📊</span> Dashboard</h1>
-
-          <!-- Actions: collapsible menu + Home -->
-          <div class="actions">
-            <button class="cc-menu-btn" type="button"
-                    data-bs-toggle="offcanvas" data-bs-target="#ccMenu" aria-controls="ccMenu" aria-label="Menu">
-              <i class="bi bi-list fs-5"></i>
-            </button>
-
-            <a class="btn btn-outline-primary btn-sm" href="/inventory/list/" title="Go to Stock List">
-              <i class="bi bi-house"></i><span class="d-none d-sm-inline"> Home</span>
-            </a>
-          </div>
-        </div>
-
-        <nav class="crumbs" aria-label="Quick links">
-          <a href="/inventory/list/"><i class="bi bi-house-door"></i> Home</a>
-          <a href="/inventory/dashboard/"><i class="bi bi-speedometer2"></i> Dashboard</a>
-        </nav>
-
-        <!-- filters -->
-        <form method="get" class="d-flex gap-2 align-items-center flex-wrap mt-2">
-          <select name="period" class="form-select form-select-sm" style="width:auto">
-            <option value="month" {% if period == "month" %}selected{% endif %}>This month</option>
-            <option value="all" {% if period == "all" %}selected{% endif %}>All time</option>
-          </select>
-
-          <select name="model" class="form-select form-select-sm" style="min-width:240px">
-            <option value="">All models</option>
-            {% for p in products %}
-              <option value="{{ p.id }}" {% if model_id == p.id %}selected{% endif %}>
-                {{ p.brand }} {{ p.model }}{% if p.variant %} {{ p.variant }}{% endif %}
-              </option>
-            {% endfor %}
-          </select>
-
-          <button class="btn btn-primary btn-sm" type="submit">Apply</button>
-        </form>
-      </div>
-    </header>
-
-    <main class="cc-page">
-
-      {% if messages %}
-        {% for message in messages %}
-          <div class="alert {% if message.tags == 'error' %}alert-danger{% elif message.tags == 'success' %}alert-success{% else %}alert-info{% endif %}">{{ message }}</div>
-        {% endfor %}
+  <!-- KPI band -->
+  <section class="kpi-row">
+    <div class="kpi">
+      <div class="label">Revenue ({{ period|default:"month"|title }})</div>
+      <div class="value">MK {{ total_revenue|default:0|floatformat:0|intcomma }}</div>
+      {% if revenue_delta is not None %}
+        <span class="delta {% if revenue_delta >= 0 %}up{% else %}down{% endif %}">{{ revenue_delta|floatformat:1 }}%</span>
       {% endif %}
+    </div>
+    <div class="kpi">
+      <div class="label">Units Sold</div>
+      <div class="value">{{ total_units|default:0|intcomma }}</div>
+      {% if units_delta is not None %}
+        <span class="delta {% if units_delta >= 0 %}up{% else %}down{% endif %}">{{ units_delta|floatformat:1 }}%</span>
+      {% endif %}
+    </div>
+    <div class="kpi">
+      <div class="label">Stock Value</div>
+      <div class="value">MK {{ stock_value|default:0|floatformat:0|intcomma }}</div>
+    </div>
+    <div class="kpi">
+      <div class="label">Low / Out Items</div>
+      <div class="value">{{ low_items|default:0|intcomma }}</div>
+    </div>
+  </section>
 
-      <!-- ========== SLIDES ========== -->
-      <div class="cc-slides" id="ccSlides">
+  <!-- Filters -->
+  <form method="get" class="filters d-flex flex-wrap gap-2 mb-3">
+    <select name="period" class="form-select" aria-label="Period">
+      <option value="month" {% if period == "month" %}selected{% endif %}>This month</option>
+      <option value="all" {% if period == "all" %}selected{% endif %}>All time</option>
+    </select>
+    <select name="model" class="form-select" aria-label="Filter by model">
+      <option value="">All models</option>
+      {% for p in products %}
+        <option value="{{ p.id }}" {% if model_id == p.id %}selected{% endif %}>{{ p.brand }} {{ p.model }}{% if p.variant %} {{ p.variant }}{% endif %}</option>
+      {% endfor %}
+    </select>
+    <button class="btn primary" type="submit"><i class="bi bi-sliders"></i> Apply</button>
+    <a href="." class="btn muted"><i class="bi bi-arrow-counterclockwise"></i> Reset</a>
+  </form>
 
-        <!-- SLIDE A: Trends -->
-        <section class="cc-slide active" data-name="Trends">
-          <!-- AI Recommendations -->
-          <div class="cc-card p-3 mb-3 will-animate">
-            <h5>AI Recommendations</h5>
-            <div class="mb-2">
-              <button id="ai-recs-refresh" class="btn btn-outline-secondary btn-sm">
-                <i class="bi bi-arrow-clockwise"></i> Refresh
-              </button>
-            </div>
-            <div id="ai-recos">Loading…</div>
-
-            <!-- NEW: structured containers (kept in addition to the existing #ai-recos) -->
-            <div id="ai-recs-overall" class="mt-2 small text-muted"></div>
-            <div class="table-responsive mt-2">
-              <table id="ai-recs-risky" class="table table-sm align-middle">
-                <thead class="table-light">
-                  <tr>
-                    <th>Model</th>
-                    <th class="text-end">On hand</th>
-                    <th>Stockout</th>
-                    <th class="text-end">Restock</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr><td colspan="4" class="text-muted">Waiting for data…</td></tr>
-                </tbody>
-              </table>
-            </div>
-          </div>
-
-          <!-- KPIs -->
-          <div class="row g-3 mb-3">
-            <div class="col-6 col-md-3">
-              <div class="kpi-card h-100 will-animate">
-                <div class="label">Sold today</div>
-                <div class="value" data-countup>{{ today_count|default:"0" }}</div>
-              </div>
-            </div>
-            <div class="col-6 col-md-3">
-              <div class="kpi-card h-100 will-animate">
-                <div class="label">Sold this month</div>
-                <div class="value" data-countup>{{ mtd_count|default:"0" }}</div>
-              </div>
-            </div>
-            <div class="col-6 col-md-3">
-              <div class="kpi-card h-100 will-animate">
-                <div class="label">All-time sales</div>
-                <div class="value" data-countup>{{ all_time_count|default:"0" }}</div>
-              </div>
-            </div>
-
-            <!-- Agents-only wallet summary (admins must NOT see this card) -->
-            {% if not is_manager_or_admin %}
-            <div class="col-6 col-md-3">
-              <div class="cc-card p-3 h-100 will-animate">
-                <div class="text-muted small fw-semibold">My Wallet ({{ wallet.month.month_label }})</div>
-                <div class="fs-4 fw-bold">MK {{ wallet.balance|default:0|floatformat:0 }}</div>
-                <div class="d-flex justify-content-between small mt-1"><span>Commission</span><strong>MK {{ wallet.month.commission|default:0|floatformat:0 }}</strong></div>
-                <div class="d-flex justify-content-between small"><span>Advance</span><strong>MK {{ wallet.month.advance|default:0|floatformat:0 }}</strong></div>
-                <div class="d-flex justify-content-between small"><span>Adjustment</span><strong>MK {{ wallet.month.adjustment|default:0|floatformat:0 }}</strong></div>
-                <div class="d-flex justify-content-between small"><span>Total (month)</span><strong>MK {{ wallet.month.total|default:0|floatformat:0 }}</strong></div>
-                <a class="btn btn-sm btn-outline-secondary w-100 mt-2" href="/inventory/wallet/">Open Wallet</a>
-              </div>
-            </div>
-            {% endif %}
-          </div>
-
-          <!-- Row 1 -->
-          <div class="row g-3 mb-3">
-            <div class="col-lg-6">
-              <div class="cc-card p-3 h-100 will-animate">
-                <h5>Top Agents (earnings first, then sales)</h5>
-                {% if agent_rank %}
-                  <div class="table-responsive">
-                    <table id="tblAgents" class="table table-sm align-middle">
-                      <thead class="table-light">
-                        <tr>
-                          <th class="sortable" data-type="text">Agent</th>
-                          <th class="text-end sortable" data-type="num">Earnings</th>
-                          <th class="text-end sortable" data-type="num">Sales</th>
-                          <th class="text-end sortable" data-type="num">Revenue</th>
-                          <th class="text-end">Wallet</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {% for r in agent_rank %}
-                          <tr>
-                            <td>
-                              {% if is_manager_or_admin %}
-                                <a href="#" class="agent-link agent-detail" data-user-id="{{ r.agent_id }}" data-username="{{ r.agent__username }}">{{ r.agent__username }}</a>
-                              {% else %}
-                                {{ r.agent__username }}
-                              {% endif %}
-                            </td>
-                            <td class="text-end"><span class="num" data-value="{{ r.earnings|default:0 }}"></span></td>
-                            <td class="text-end"><span class="num" data-value="{{ r.total_sales|default:0 }}"></span></td>
-                            <td class="text-end"><span class="num" data-value="{{ r.revenue|default:0 }}"></span></td>
-                            <td class="text-end">
-                              <span class="wallet-chip loading" data-user-id="{{ r.agent_id }}" data-username="{{ r.agent__username }}">…</span>
-                            </td>
-                          </tr>
-                        {% endfor %}
-                      </tbody>
-                    </table>
-                  </div>
-                {% else %}
-                  <div class="text-muted">No sales found for this period.</div>
-                {% endif %}
-              </div>
-            </div>
-
-            {% if is_manager_or_admin %}
-            <div class="col-lg-3">
-              <div class="cc-card p-3 h-100 will-animate">
-                <h5>Cost vs Revenue vs Profit</h5>
-                <canvas id="pieCRP" class="chart-canvas chart-canvas--sm"></canvas>
-              </div>
-            </div>
-            {% endif %}
-
-            <div class="col-lg-3">
-              <div class="cc-card p-3 h-100 will-animate">
-                <h5>Stock Level</h5>
-                <div class="d-flex align-items-center gap-3">
-                  <div class="battery-wrap">
-                    <div class="battery-cap"></div>
-                    <div class="battery">
-                      <div id="batteryFill" class="battery-fill
-                        {% if jug_color == 'red' %}fill-red{% elif jug_color == 'yellow' %}fill-yellow{% elif jug_color == 'mildgreen' %}fill-mildgreen{% else %}fill-lightgreen{% endif %}"
-                        style="height: 0%;"></div>
-                    </div>
-                  </div>
-                  <div>
-                    <div class="fw-semibold fs-5">{{ jug_count }} in stock</div>
-                    <div class="text-muted small">100 = full, ≤20 = critical</div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {% if is_manager_or_admin %}
-          <!-- Row 2 -->
-          <div class="row g-3 mb-3">
-            <div class="col-lg-6">
-              <div class="cc-card p-3 will-animate">
-                <h5>Revenue (last 12 months)</h5>
-                <canvas id="barRevenue" class="chart-canvas"></canvas>
-              </div>
-            </div>
-            <div class="col-lg-6">
-              <div class="cc-card p-3 will-animate">
-                <h5>Profit (last 12 months)</h5>
-                <canvas id="barProfit" class="chart-canvas"></canvas>
-              </div>
-            </div>
-          </div>
-          {% endif %}
-
-          <!-- Row 3 -->
-          <div class="cc-card p-3 will-animate">
-            <h5>Agents: Total Stock vs Sold Units</h5>
-            {% if agent_rows %}
-              <div class="table-responsive">
-                <table id="tblAgentStock" class="table table-sm align-middle">
-                  <thead class="table-light">
-                    <tr>
-                      <th class="sortable" data-type="text">Agent</th>
-                      <th class="text-end sortable" data-type="num">Total Stock</th>
-                      <th class="text-end sortable" data-type="num">
-                        Sold Units ({% if period == "month" %}this month{% else %}all time{% endif %})
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {% for row in agent_rows %}
-                    <tr>
-                      <td>{{ row.agent }}</td>
-                      <td class="text-end"><span class="num" data-value="{{ row.total_stock|default:0 }}"></span></td>
-                      <td class="text-end"><span class="num" data-value="{{ row.sold_units|default:0 }}"></span></td>
-                    </tr>
-                    {% endfor %}
-                  </tbody>
-                </table>
-              </div>
-            {% else %}
-              <div class="text-muted">No agent stock data.</div>
-            {% endif %}
-          </div>
-        </section>
-        <!-- /SLIDE A -->
-
-        <!-- SLIDE B: Financials -->
-        <section class="cc-slide" data-name="Financials">
-          <div class="row g-3 mb-3">
-            {% if is_manager_or_admin %}
-            <!-- Admin: Agents Wallet Management -->
-            <div class="col-lg-8">
-              <div class="cc-card p-3 h-100 will-animate">
-                <div class="d-flex justify-content-between align-items-center mb-2">
-                  <h5 class="m-0">Agents Wallet Management</h5>
-                  <span class="pill"><i class="bi bi-shield-lock"></i> Admin</span>
-                </div>
-
-                <form id="formWalletIssue" class="row g-2 align-items-end">
-                  <div class="col-md-4">
-                    <label class="form-label small fw-semibold">Agent</label>
-                    <select id="wiAgent" class="form-select form-select-sm">
-                      <option value="*">All Agents</option>
-                      {% for r in agent_rank %}
-                        <option value="{{ r.agent_id }}">{{ r.agent__username }}</option>
-                      {% endfor %}
-                    </select>
-                  </div>
-                  <div class="col-md-3">
-                    <label class="form-label small fw-semibold">Reason</label>
-                    <select id="wiReason" class="form-select form-select-sm">
-                      <option value="ADVANCE">Advance</option>
-                      <option value="EMERGENCY">Emergency</option>
-                      <option value="BONUS">Bonus</option>
-                      <option value="OTHER">Other</option>
-                    </select>
-                  </div>
-                  <div class="col-md-3">
-                    <label class="form-label small fw-semibold">Amount (MK)</label>
-                    <input id="wiAmount" type="number" class="form-control form-control-sm" placeholder="0" min="0" step="1">
-                  </div>
-                  <div class="col-md-2">
-                    <button class="btn btn-primary btn-sm w-100" type="submit"><i class="bi bi-send"></i> Assign</button>
-                  </div>
-                  <div class="col-12">
-                    <label class="form-label small fw-semibold">Note (optional)</label>
-                    <input id="wiNote" type="text" class="form-control form-control-sm" placeholder="Add a short note…">
-                  </div>
-                </form>
-
-                <hr class="my-3">
-
-                <div class="table-responsive">
-                  <table class="table table-sm align-middle" id="tblWalletAdmin">
-                    <thead class="table-light">
-                      <tr>
-                        <th>Agent</th>
-                        <th class="text-end">Balance</th>
-                        <th class="text-end">This Month</th>
-                        <th class="text-end">Lifetime Commissions</th>
-                        <th class="text-end">Actions</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {% for r in agent_rank %}
-                      <tr data-agent-id="{{ r.agent_id }}" data-agent-name="{{ r.agent__username }}">
-                        <td>{{ r.agent__username }}</td>
-                        <td class="text-end"><span class="num" data-wallet-balance>0</span></td>
-                        <td class="text-end"><span class="num" data-wallet-month>0</span></td>
-                        <td class="text-end"><span class="num" data-wallet-lifetime>0</span></td>
-                        <td class="text-end">
-                          <a class="btn btn-outline-secondary btn-sm" target="_blank" href="/inventory/wallet/?user_id={{ r.agent_id }}">Open</a>
-                        </td>
-                      </tr>
-                      {% empty %}
-                      <tr><td colspan="5" class="text-muted">No agents found.</td></tr>
-                      {% endfor %}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            </div>
-
-            <!-- Admin: Cash Overview -->
-            <div class="col-lg-4">
-              <div class="cc-card p-3 h-100 will-animate">
-                <h5>Cash Overview</h5>
-                <div class="text-muted small mb-2">Orders / Payouts / Expenses (hook API later)</div>
-                <div class="d-grid gap-2">
-                  <div class="pill"><i class="bi bi-cart-check"></i> Orders: <span class="ms-auto">—</span></div>
-                  <div class="pill"><i class="bi bi-cash-coin"></i> Payouts: <span class="ms-auto">—</span></div>
-                  <div class="pill"><i class="bi bi-receipt"></i> Expenses: <span class="ms-auto">—</span></div>
-                </div>
-              </div>
-            </div>
-            {% else %}
-            <!-- Agent: Wallet Summary (beautiful, compact) -->
-            <div class="col-12">
-              <div class="cc-card p-3 h-100 will-animate">
-                <div class="d-flex justify-content-between align-items-center mb-2">
-                  <h5 class="m-0">Wallet Summary</h5>
-                  <span class="pill"><i class="bi bi-person-badge"></i> My Wallet</span>
-                </div>
-
-                <div class="row g-3">
-                  <div class="col-6 col-md-4">
-                    <div class="text-muted small fw-semibold">Sales Earnings</div>
-                    <div class="fs-4 fw-bold">MK {{ wallet.month.commission|default:0|floatformat:0 }}</div>
-                  </div>
-                  <div class="col-6 col-md-4">
-                    <div class="text-muted small fw-semibold">Advance</div>
-                    <div class="fs-4 fw-bold">MK {{ wallet.month.advance|default:0|floatformat:0 }}</div>
-                  </div>
-                  <div class="col-6 col-md-4">
-                    <div class="text-muted small fw-semibold">Bonus</div>
-                    <div class="fs-4 fw-bold">MK {{ wallet.month.bonus|default:0|floatformat:0 }}</div>
-                  </div>
-                  <div class="col-6 col-md-4">
-                    <div class="text-muted small fw-semibold">Total (Monthly)</div>
-                    <div class="fs-4 fw-bold">MK {{ wallet.month.total|default:0|floatformat:0 }}</div>
-                  </div>
-                  <div class="col-6 col-md-4">
-                    <div class="text-muted small fw-semibold">All-time Earnings</div>
-                    <div class="fs-4 fw-bold">MK {{ wallet.all_time_earnings|default:0|floatformat:0 }}</div>
-                  </div>
-                </div>
-
-                <a class="btn btn-sm btn-outline-secondary w-100 mt-3" href="/inventory/wallet/">Open Wallet</a>
-              </div>
-            </div>
-            {% endif %}
-          </div>
-
-          {% if not is_manager_or_admin %}{% endif %}
-        </section>
-        <!-- /SLIDE B -->
-
-      </div>
-      <!-- ========== /SLIDES ========== -->
-
-    </main>
-
-    {% if is_manager_or_admin %}
-    <!-- Wallet Modal (unchanged) -->
-    <div class="modal fade" id="walletModal" tabindex="-1" aria-labelledby="walletModalLabel" aria-hidden="true">
-      <div class="modal-dialog">
-        <div class="modal-content">
-          <div class="modal-header">
-            <h5 class="modal-title" id="walletModalLabel">Wallet · <span id="wmName">Agent</span></h5>
-            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-          </div>
-          <div class="modal-body">
-            <div class="d-flex flex-column gap-2">
-              <div class="d-flex justify-content-between">
-                <span class="text-muted">Current balance</span>
-                <strong id="wmBalance">—</strong>
-              </div>
-              <div class="d-flex justify-content-between">
-                <span class="text-muted">This month (net wallet activity)</span>
-                <strong id="wmMonth">—</strong>
-              </div>
-              <div class="small text-muted mt-2">
-                Tip: For full COM / ADV / ADJ breakdown and lifetime commissions, open the Wallet page.
-              </div>
-            </div>
-          </div>
-          <div class="modal-footer">
-            <a id="wmLink" href="#" class="btn btn-outline-secondary" target="_blank" rel="noopener">Open Wallet</a>
-            <button type="button" class="btn btn-primary" data-bs-dismiss="modal">Close</button>
-          </div>
+  <!-- Band 1 -->
+  <section class="dash-grid mb-3">
+    <!-- Sales Trend -->
+    <div class="panel card header left" id="salesCard">
+      <div class="card-head d-flex justify-content-between align-items-center">
+        <div>Sales Trend</div>
+        <div class="d-flex gap-2">
+          <label class="visually-hidden" for="trendPeriod">Trend period</label>
+          <select id="trendPeriod" class="form-select" style="width:auto">
+            <option value="7d">Last 7 days</option>
+            <option value="month" selected>This month</option>
+          </select>
+          <label class="visually-hidden" for="trendMetric">Trend metric</label>
+          <select id="trendMetric" class="form-select" style="width:auto">
+            <option value="count" selected>Count</option>
+            <option value="amount">Amount</option>
+          </select>
         </div>
       </div>
-    </div>
-    {% endif %}
-
-    <!-- Offcanvas Menu -->
-    <div class="offcanvas offcanvas-start" tabindex="-1" id="ccMenu" aria-labelledby="ccMenuLabel">
-      <div class="offcanvas-header">
-        <h5 class="offcanvas-title" id="ccMenuLabel">Menu</h5>
-        <button type="button" class="btn-close text-reset" data-bs-dismiss="offcanvas" aria-label="Close"></button>
+      <div class="card-body">
+        <canvas id="salesTrend" class="chart-canvas" aria-label="Sales trend"></canvas>
+        <div id="salesEmpty" class="empty-hint d-none">No sales yet for this selection. Try switching the metric/period.</div>
+        <div id="errSales" class="text-danger small mt-2 d-none"></div>
       </div>
-      <div class="offcanvas-body">
-        <div class="list-group">
-          <a class="list-group-item list-group-item-action" href="/inventory/list/">Stock List</a>
-          <a class="list-group-item list-group-item-action" href="/inventory/scan-in/">Scan IN</a>
-          <a class="list-group-item list-group-item-action" href="/inventory/scan-sold/">Scan SOLD</a>
-          <a class="list-group-item list-group-item-action" href="/inventory/scan-web/">Scan (Web)</a>
-          <a class="list-group-item list-group-item-action" href="/inventory/time/checkin/">Time Check-in</a>
-          <a class="list-group-item list-group-item-action" href="/inventory/time/logs/">Time Logs</a>
-          <a class="list-group-item list-group-item-action" href="/inventory/wallet/">Wallet</a>
-          <a class="list-group-item list-group-item-action" href="/admin/">Django Admin</a>
+    </div>
+
+    <!-- AI Insights -->
+    <div class="panel card header" id="aiCard">
+      <div class="card-head d-flex justify-content-between align-items-center">
+        <div>AI-Driven Insights</div>
+        <button id="ai-recs-refresh" type="button" class="btn icon"><i class="bi bi-arrow-clockwise"></i> Refresh</button>
+      </div>
+      <div class="card-body">
+        <div id="ai-viewport" class="small"></div>
+        <div class="d-flex justify-content-between align-items-center mt-2">
+          <div id="ai-recs-overall" class="small" style="color:var(--cc-muted)"></div>
+          <div class="small" style="color:var(--cc-muted)">Auto-rotates every 5s</div>
+        </div>
+        <div id="errAI" class="text-danger small mt-2 d-none"></div>
+      </div>
+    </div>
+
+    <!-- Value Trend -->
+    <div class="panel card header" id="valueCard">
+      <div class="card-head d-flex justify-content-between align-items-center">
+        <div>Value Trend</div>
+        <div class="d-flex gap-2">
+          <label class="visually-hidden" for="vtMetric">Value metric</label>
+          <select id="vtMetric" class="form-select" style="width:auto">
+            <option value="revenue" selected>Revenue</option>
+            <option value="cost">Cost</option>
+            <option value="profit">Profit</option>
+          </select>
+          <label class="visually-hidden" for="vtPeriod">Value period</label>
+          <select id="vtPeriod" class="form-select" style="width:auto">
+            <option value="today">Today</option>
+            <option value="7d" selected>Last 7 days</option>
+            <option value="all">All time</option>
+          </select>
+        </div>
+      </div>
+      <div class="card-body">
+        <canvas id="valueTrend" class="chart-canvas chart-canvas--sm" aria-label="Value trend"></canvas>
+        <div id="valueEmpty" class="empty-hint d-none">No values to plot.</div>
+        <div id="errValue" class="text-danger small mt-2 d-none"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Band 2 -->
+  <section class="equal-grid mb-3">
+    <div>
+      <div class="panel card header h-100" id="topCard">
+        <div class="card-head d-flex justify-content-between align-items-center">
+          <div>Top-Selling Models</div>
+          <label class="visually-hidden" for="topPeriod">Top models period</label>
+          <select id="topPeriod" class="form-select" style="width:auto">
+            <option value="today">Today</option>
+            <option value="month" selected>This month</option>
+          </select>
+        </div>
+        <div class="card-body">
+          <canvas id="topModels" class="chart-canvas chart-canvas--sm" aria-label="Top models"></canvas>
+          <div id="topEmpty" class="empty-hint d-none">No model sales yet.</div>
+          <div id="errTop" class="text-danger small mt-2 d-none"></div>
         </div>
       </div>
     </div>
 
-    <!-- Mobile Bottom Tabs -->
-    <nav class="cc-bottom-nav d-lg-none" aria-label="Primary">
-      <div class="d-flex align-items-center">
-        <a class="tab active" href="/"><i class="bi bi-speedometer2"></i>Home</a>
-        <a class="tab" href="/inventory/list/"><i class="bi bi-box-seam"></i>Stock</a>
-        <a class="tab" href="/inventory/scan-in/"><i class="bi bi-upc-scan"></i>Scan IN</a>
-        <a class="tab" href="/inventory/scan-sold/"><i class="bi bi-qr-code-scan"></i>SOLD</a>
-        <a class="tab" href="/inventory/wallet/"><i class="bi bi-wallet2"></i>Wallet</a>
-      </div>
-    </nav>
-
-    <!-- Floating Action -->
-    <button class="cc-fab d-lg-none" onclick="location.href='/inventory/scan-sold/'" aria-label="Scan SOLD">
-      <i class="bi bi-qr-code-scan fs-4"></i>
-    </button>
-
-    <!-- Controls stack: slides + theme -->
-    <div class="controls-stack">
-      <div class="slides-controls">
-        <span class="label">Slides</span>
-        <button id="slides-prev" type="button" title="Prev slide">◀</button>
-        <button id="slides-toggle-rotate" type="button" title="Auto rotate slides">Auto: On</button>
-        <button id="slides-next" type="button" title="Next slide">▶</button>
-      </div>
-      <div class="theme-controls">
-        <span class="label">Theme</span>
-        <button id="theme-prev" type="button" title="Prev theme">◀</button>
-        <button id="theme-toggle-rotate" type="button" title="Auto rotate theme">Auto: Off</button>
-        <button id="theme-next" type="button" title="Next theme">▶</button>
+    <div>
+      <div class="panel card h-100" id="alertCard">
+        <h5 class="m-0 mb-2">Stock Alerts</h5>
+        <ul id="alertsList" class="list-group list-group-flush">
+          <li class="list-group-item" style="color:var(--cc-muted)">Loading…</li>
+        </ul>
       </div>
     </div>
-  </div>
+  </section>
 
-  <!-- Bootstrap JS -->
-  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+{% endblock %}
 
-  {% if is_manager_or_admin %}
-  <!-- Chart.js -->
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-  <script id="chart-payload" type="application/json">
-  {
-    "labels": {{ labels_json|default:"[]"|safe }},
-    "revenue": {{ revenue_points_json|default:"[]"|safe }},
-    "profit": {{ profit_points_json|default:"[]"|safe }},
-    "crp": {{ pie_data_json|default:"[]"|safe }}
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+<script>
+  const nf = new Intl.NumberFormat();
+  const CURRENT_MODEL = {{ model_id|default:"null" }};
+  const MODEL_QS = (CURRENT_MODEL !== null) ? `&model=${encodeURIComponent(CURRENT_MODEL)}` : '';
+
+  // helpers
+  const $id = (id)=>document.getElementById(id);
+  const show = (id)=>$id(id)?.classList.remove('d-none');
+  const hide = (id)=>$id(id)?.classList.add('d-none');
+  const cssVar=(name,fb)=> (getComputedStyle(document.documentElement).getPropertyValue(name).trim() || fb);
+  const GRID_CLR=()=> cssVar('--chart-grid','#d8e3ff');
+  const BRAND  =()=> cssVar('--cc-accent','#3b82f6');
+
+  // axis helpers
+  function chooseMoneyStep(max){
+    const c=[100000,200000,250000,500000,1000000,2000000,5000000];
+    for(const s of c){ if(max/s<=6) return s; }
+    return Math.pow(10, Math.max(2, Math.ceil(Math.log10(max||1))-1));
   }
-  </script>
-  {% endif %}
+  function axisMoney(values){
+    const m=Math.max(0,...(values||[0]));
+    const step=chooseMoneyStep(m||100000);
+    const niceMax=Math.max(step*2, Math.ceil((m||(step*1.5))/step)*step);
+    return {min:0, max:niceMax, stepSize:step};
+  }
+  function axisCount(values){
+    const m=Math.max(0,...(values||[0]));
+    const nice=Math.max(1, Math.ceil(m));
+    return {min:0, max:Math.max(1,nice), stepSize:1};
+  }
 
-  <script>
-    /* ===== tiny table sorter (unchanged) ===== */
-    function makeSortable(tableId){
-      const table = document.getElementById(tableId);
-      if(!table) return;
-      const getCell = (tr,i)=> tr.children[i]?.innerText?.trim() ?? '';
-      const cmp = (i,type,asc)=>(a,b)=>{
-        const A = getCell(asc?a:b,i), B = getCell(asc?b:a,i);
-        if(type==='num'){ return (parseFloat(A.replace(/,/g,''))||0) - (parseFloat(B.replace(/,/g,''))||0); }
-        return A.localeCompare(B);
-      };
-      table.querySelectorAll('th.sortable').forEach((th,i)=>{
-        let asc = true;
-        th.addEventListener('click', ()=>{
-          const type = th.dataset.type || 'text';
-          const tbody = table.tBodies[0];
-          Array.from(tbody.querySelectorAll('tr')).sort(cmp(i,type,asc=!asc)).forEach(tr=>tbody.appendChild(tr));
-        });
-      });
-    }
-    makeSortable('tblAgents');
-    makeSortable('tblAgentStock');
+  async function fetchJSON(url,{legacy=[]}={}){
+    const doFetch = (u)=> fetch(u,{credentials:'same-origin', headers:{Accept:'application/json'}});
+    const tryOnce = async (u)=>{
+      const r = await doFetch(u);
+      if(!r.ok) throw new Error(`HTTP ${r.status}`);
+      const ct=(r.headers.get('content-type')||'').toLowerCase();
+      if(!ct.includes('application/json')) throw new Error('Not JSON');
+      return r.json();
+    };
+    try{ return await tryOnce(url); }
+    catch(e){ for(const alt of legacy){ try{ return await tryOnce(alt); }catch(_){} } throw e; }
+  }
 
-    /* ===== number formatter (unchanged) ===== */
-    const nf = new Intl.NumberFormat();
-    document.querySelectorAll('.num').forEach(el=>{
-      const v = Number(el.getAttribute('data-value') || '0');
-      el.textContent = nf.format(v);
-    });
+  // ---------- Sales Trend ----------
+  let salesChart=null;
+  async function loadTrend(){
+    const metricSel=$id('trendMetric'); const periodSel=$id('trendPeriod');
+    if(!metricSel||!periodSel) return;
 
-    /* ===== Count-up for KPI values (unchanged) ===== */
-    function countUp(el, to){
-      const dur = 600; const start = performance.now();
-      const from = 0;
-      function step(t){
-        const p = Math.min((t - start)/dur, 1);
-        el.textContent = nf.format(Math.floor(from + (to - from) * p));
-        if(p<1) requestAnimationFrame(step);
-      }
-      requestAnimationFrame(step);
-    }
-    document.querySelectorAll('[data-countup]').forEach(el=>{
-      const to = Number(el.textContent.replace(/,/g,'')) || 0;
-      countUp(el, to);
-    });
+    hide('errSales'); hide('salesEmpty');
 
-    /* ===== Wallet chips (unchanged) ===== */
-    async function loadWalletChips(){
-      const chips = document.querySelectorAll('.wallet-chip');
-      if(!chips.length) return;
-      for(const chip of chips){
-        const uid = chip.getAttribute('data-user-id');
-        if(!uid){ chip.textContent='—'; chip.classList.remove('loading'); continue; }
-        try{
-          const res = await fetch(`/inventory/api/wallet-summary/?user_id=${encodeURIComponent(uid)}`);
-          const data = await res.json();
-          if(data && data.ok){
-            const bal = Number(data.balance||0);
-            chip.textContent = 'MK ' + nf.format(bal);
-            chip.classList.remove('loading');
-            chip.classList.toggle('positive', bal>=0);
-            chip.classList.toggle('negative', bal<0);
-            {% if is_manager_or_admin %}
-            chip.style.cursor='pointer';
-            chip.addEventListener('click', ()=>openWalletModal(uid, chip.getAttribute('data-username')));
-            {% endif %}
-          }else{
-            chip.textContent='—'; chip.classList.remove('loading');
-          }
-        }catch{
-          chip.textContent='—'; chip.classList.remove('loading');
-        }
-      }
-    }
-    loadWalletChips();
+    const period=periodSel.value;
+    let metric =metricSel.value;
 
-    {% if is_manager_or_admin %}
-    /* ===== Wallet modal (unchanged) ===== */
-    const walletModal = document.getElementById('walletModal');
-    const wm = walletModal ? new bootstrap.Modal(walletModal) : null;
+    const getData=(m)=> fetchJSON(
+      `/inventory/api/sales-trend/?period=${encodeURIComponent(period)}&metric=${encodeURIComponent(m)}${MODEL_QS}`,
+      { legacy:[`/inventory/api_sales_trend/?period=${encodeURIComponent(period)}&metric=${encodeURIComponent(m)}${MODEL_QS}`] }
+    );
 
-    async function openWalletModal(userId, username){
-      if(!wm) return;
-      document.getElementById('wmName').textContent = username||'Agent';
-      document.getElementById('wmBalance').textContent = '…';
-      document.getElementById('wmMonth').textContent = '…';
-      document.getElementById('wmLink').href = `/inventory/wallet/?user_id=${encodeURIComponent(userId)}`;
+    let data;
+    try{ data=await getData(metric); }
+    catch(e){ show('errSales'); $id('errSales').textContent=`Sales trend error: ${e.message}`; return; }
 
+    let labels=data?.labels||[];
+    let values=(data?.values||[]).map(v=>Number(v)||0);
+    const isAmount=(metric==='amount');
+    const sign=isAmount?(data?.currency?.sign||'MK'):'';
+
+    // If "amount" is all zeros, auto-switch to "count"
+    if(isAmount && labels.length && values.every(v=>v===0)){
       try{
-        const r = await fetch(`/inventory/api/wallet-summary/?user_id=${encodeURIComponent(userId)}`);
-        const d = await r.json();
-        document.getElementById('wmBalance').textContent = (d&&d.ok) ? 'MK ' + nf.format(Number(d.balance||0)) : '—';
-      }catch{ document.getElementById('wmBalance').textContent = '—'; }
-
-      try{
-        const now=new Date(), y=now.getFullYear(), m=(now.getMonth()+1).toString().padStart(2,'0');
-        const r2 = await fetch(`/inventory/api/wallet-summary/?user_id=${encodeURIComponent(userId)}&year=${y}&month=${m}`);
-        const d2 = await r2.json();
-        document.getElementById('wmMonth').textContent = (d2&&d2.ok&&'month_sum' in d2) ? 'MK ' + nf.format(Number(d2.month_sum||0)) : '—';
-      }catch{ document.getElementById('wmMonth').textContent = '—'; }
-
-      wm.show();
+        const alt=await getData('count'); const altVals=(alt?.values||[]).map(v=>Number(v)||0);
+        if(alt?.labels?.length && altVals.some(v=>v>0)){ labels=alt.labels; values=altVals; metric='count'; metricSel.value='count'; }
+      }catch{}
     }
-    {% endif %}
 
-    {% if is_manager_or_admin %}{% endif %}
-    let charts = [];
-    function initChartsSafely(){
-      if(!window.Chart) { return; }
+    const el=$id('salesTrend'); salesChart?.destroy();
+    if(!labels.length || values.every(v=>v===0)){ show('salesEmpty'); return; }
 
-      let payload = {labels:[], revenue:[], profit:[], crp:[]};
-      try{
-        const el = document.getElementById('chart-payload');
-        if(el) payload = JSON.parse(el.textContent || '{}');
-      }catch(e){ console.warn('Bad chart payload', e); }
-
-      const labels        = Array.isArray(payload.labels) ? payload.labels : [];
-      const revenuePoints = (payload.revenue || []).map(v=>Number(v)||0);
-      const profitPoints  = (payload.profit  || []).map(v=>Number(v)||0);
-      const pieData       = (payload.crp     || []).map(v=>Number(v)||0);
-
-      const nf2 = new Intl.NumberFormat();
-
-      function getThemeColors(){
-        const s=getComputedStyle(document.documentElement);
-        const revenue = s.getPropertyValue('--blue-600').trim() || 'rgba(59,130,246,0.85)';
-        const profit  = s.getPropertyValue('--blue-500').trim() || 'rgba(16,185,129,0.85)';
-        const grid    = s.getPropertyValue('--chart-grid').trim() || 'rgba(2,6,23,.06)';
-        return { revenue, profit, grid };
-      }
-      const colors = getThemeColors();
-
-      function makeBar(id,label,data,color){
-        const el = document.getElementById(id);
-        if(!el || !labels.length) return null;
-        return new Chart(el,{
-          type:'bar',
-          data:{ labels, datasets:[{ label, data, backgroundColor:color, borderColor:color, borderWidth:1 }] },
-          options:{
-            responsive:true, maintainAspectRatio:false,
-            plugins:{ legend:{ display:false }, tooltip:{ callbacks:{ label:(ctx)=>'MK '+nf2.format(ctx.parsed.y) } } },
-            scales:{
-              x:{ ticks:{ maxRotation:0, autoSkip:true }, grid:{ display:false } },
-              y:{ beginAtZero:true, ticks:{ callback:(v)=> nf2.format(v) }, grid:{ color:colors.grid } }
-            },
-            animation:{ duration:700, easing:'easeOutQuart' }
-          }
-        });
-      }
-      function makePie(id,data){
-        const el = document.getElementById(id);
-        if(!el || !data.length) return null;
-        return new Chart(el,{
-          type:'pie',
-          data:{ labels:['Cost','Revenue','Profit'], datasets:[{ data, backgroundColor:['#94a3b8', colors.revenue, colors.profit] }] },
-          options:{
-            responsive:true, maintainAspectRatio:false,
-            plugins:{ legend:{ position:'bottom' }, tooltip:{ callbacks:{ label:(ctx)=>`${ctx.label}: MK ${nf2.format(ctx.parsed)}` } } },
-            animation:{ duration:700, easing:'easeOutQuart' }
-          }
-        });
-      }
-
-      charts = [];
-      if(labels.length && (revenuePoints.length || profitPoints.length)){
-        const c1 = makeBar('barRevenue','Revenue',revenuePoints,colors.revenue);
-        const c2 = makeBar('barProfit','Profit',profitPoints,colors.profit);
-        if(c1) charts.push(c1);
-        if(c2) charts.push(c2);
-      }
-      if(pieData.length){
-        const c3 = makePie('pieCRP',pieData);
-        if(c3) charts.push(c3);
-      }
-    }
-    window.addEventListener('load', initChartsSafely);
-
-    /* Recolor charts when theme changes */
-    window.addEventListener('theme:changed', ()=>{
-      if(!charts.length) return;
-      const s=getComputedStyle(document.documentElement);
-      const revenue = s.getPropertyValue('--blue-600').trim();
-      const profit  = s.getPropertyValue('--blue-500').trim();
-      const grid    = s.getPropertyValue('--chart-grid').trim();
-      charts.forEach(ch=>{
-        if(ch.config?.type==='bar'){
-          const label = ch.data.datasets[0].label;
-          const color = label==='Revenue' ? revenue : profit;
-          ch.data.datasets[0].backgroundColor = color;
-          ch.data.datasets[0].borderColor = color;
-          if(ch.options?.scales?.y?.grid) ch.options.scales.y.grid.color = grid;
-        }else if(ch.config?.type==='pie'){
-          ch.data.datasets[0].backgroundColor = ['#94a3b8', revenue, profit];
-        }
-        ch.update('none');
-      });
-    });
-
-    /* Animate in on scroll (unchanged) */
-    const io = new IntersectionObserver((entries)=>{
-      entries.forEach(e=>{
-        if(e.isIntersecting){
-          e.target.classList.add('in');
-          io.unobserve(e.target);
-        }
-      });
-    }, { threshold:.1 });
-    document.querySelectorAll('.will-animate, .kpi-card, .cc-card').forEach(el=>io.observe(el));
-
-    /* Animate battery fill (unchanged) */
-    window.requestAnimationFrame(()=>{
-      const fill = document.getElementById('batteryFill');
-      if(fill){
-        const pct = {{ jug_fill_pct|default:0 }};
-        fill.style.height = Math.max(0, Math.min(100, pct)) + '%';
+    const yCfg=(metric==='count')?axisCount(values):axisMoney(values);
+    const ctx=el.getContext('2d');
+    const blue=BRAND();
+    salesChart = new Chart(ctx,{
+      type:'line',
+      data:{ labels, datasets:[{ label: metric==='count'?'Sales (count)':`Sales (${sign})`, data:values, borderColor:blue, backgroundColor:blue+'20', fill:true, pointRadius:2, tension:.35 }]},
+      options:{
+        responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}},
+        animation:{ duration:500, easing:'easeOutCubic' },
+        scales:{ x:{ grid:{ color:GRID_CLR() }}, y:{ min:yCfg.min, max:yCfg.max, grid:{ color:GRID_CLR() }, ticks:{ stepSize:yCfg.stepSize, callback:(v)=> metric==='count'?v:`${sign} ${nf.format(v)}` } } }
       }
     });
+  }
 
-    /* Optional SW (unchanged) */
-    if('serviceWorker' in navigator){
-      try{ navigator.serviceWorker.register('/static/sw.js'); }catch(e){}
-    }
+  // ---------- Top Models ----------
+  let topChart=null;
+  async function loadTop(){
+    const periodSel=$id('topPeriod'); if(!periodSel) return;
+    hide('errTop'); hide('topEmpty');
 
-    /* ===== FIXED: AI Recommendations fetch (robust, tries multiple aliases) ===== */
-    (function(){
-      const box=document.getElementById('ai-recos'); if(!box) return;
+    const p=periodSel.value;
+    let data=null;
+    try{
+      data=await fetchJSON(`/inventory/api/top-models/?period=${encodeURIComponent(p)}${MODEL_QS}`,
+              { legacy:[`/inventory/api_top_models/?period=${encodeURIComponent(p)}${MODEL_QS}`] });
+    }catch(e){ show('errTop'); $id('errTop').textContent=`Top models error: ${e.message}`; return; }
 
-      const endpoints=[
-        '/inventory/api/predictions/',
-        '/inventory/api/predictions',
-        '/inventory/api/predictions/v2/',
-        '/inventory/api/predictions/v2',
-        '/inventory/api_predictions/',
-        '/inventory/api_predictions',
-        '/inventory/api-predictions/',
-        '/inventory/api-predictions'
-      ];
+    const labels=data?.labels||[], values=(data?.values||[]).map(v=>Number(v)||0);
+    topChart?.destroy();
+    const el=$id('topModels');
+    if(!labels.length || values.every(v=>v===0)){ show('topEmpty'); return; }
 
-      async function run(){
-        box.textContent='Loading…';
-        const overallEl = document.getElementById('ai-recs-overall');
-        const riskyTable = document.getElementById('ai-recs-risky');
-        if (overallEl) overallEl.textContent = 'Loading forecast…';
-        if (riskyTable) riskyTable.querySelector('tbody').innerHTML = '<tr><td colspan="4" class="text-muted">Calculating…</td></tr>';
+    const y=axisCount(values); const blue=BRAND();
+    topChart = new Chart(el,{
+      type:'bar',
+      data:{ labels, datasets:[{ label:'Units', data:values, backgroundColor:blue, borderColor:blue }]},
+      options:{ responsive:true, maintainAspectRatio:false, plugins:{ legend:{ display:false } },
+        animation:{ duration:500, easing:'easeOutCubic' },
+        scales:{ x:{ grid:{ display:false }}, y:{ min:y.min, max:y.max, grid:{ color:GRID_CLR() }, ticks:{ stepSize:y.stepSize } } }
+      }
+    });
+  }
 
-        let data=null, lastErr='';
-        for (const u of endpoints){
-          try{
-            const r=await fetch(u, {headers:{'Accept':'application/json'}});
-            if(!r.ok){ lastErr = `HTTP ${r.status}`; continue; }
-            data = await r.json();
-            break;
-          }catch(e){ lastErr = String(e); }
-        }
+  // ---------- Alerts ----------
+  async function loadAlerts(){
+    const ul=$id('alertsList'); if(!ul) return;
+    try{
+      const d=await fetchJSON(`/inventory/api/alerts/?_=${Date.now()}${MODEL_QS}`);
+      const items=(d.alerts||[]).map(a=>{
+        const sev=a.severity==='high'?'danger':(a.severity==='warn'?'warning':'secondary');
+        return `<li class="list-group-item d-flex align-items-center gap-2">
+                  <span class="badge text-bg-${sev}">${a.type||'Alert'}</span>
+                  <span>${a.message||''}</span>
+                </li>`;
+      }).join('');
+      ul.innerHTML = items || '<li class="list-group-item" style="color:var(--cc-muted)">No alerts 🎉</li>';
+    }catch{ ul.innerHTML = `<li class="list-group-item" style="color:var(--cc-muted)">Alerts unavailable</li>`; }
+  }
 
-        if(!data){
-          box.innerHTML = `<div class="text-danger">Could not load predictions.</div><div class="small text-muted">${lastErr || 'No matching API route'}</div>`;
-          if (overallEl) overallEl.innerHTML = `<span class="text-danger">Error: ${lastErr||'Unavailable'}</span>`;
-          if (riskyTable) riskyTable.querySelector('tbody').innerHTML = `<tr><td colspan="4" class="text-danger">Error</td></tr>`;
-          return;
-        }
+  // ---------- AI (rotating) ----------
+  let aiSlides=[]; let aiTimer=null; let aiIdx=0;
+  const renderAISlide=(i)=>{ const vp=$id('ai-viewport'); if(vp) vp.innerHTML=aiSlides[i] || '<div class="text-muted">No insights</div>'; };
+  const startAIRotation=()=>{ stopAIRotation(); if(aiSlides.length<=1) return; aiTimer=setInterval(()=>{ aiIdx=(aiIdx+1)%aiSlides.length; renderAISlide(aiIdx); },5000); };
+  const stopAIRotation =()=>{ if(aiTimer){ clearInterval(aiTimer); aiTimer=null; } };
 
+  async function loadAI(){
+    const viewport=$id('ai-viewport'); const overallEl=$id('ai-recs-overall'); if(!viewport) return;
+    hide('errAI'); viewport.innerHTML='<span class="text-muted">Loading…</span>'; if(overallEl) overallEl.textContent='';
+    try{
+      const data=await fetchJSON(`/inventory/api/predictions/?_=${Date.now()}${MODEL_QS}`,
+        { legacy:[`/inventory/api/predictions?_=${Date.now()}${MODEL_QS}`, `/inventory/api-predictions/?_=${Date.now()}${MODEL_QS}`, `/inventory/api_predictions/?_=${Date.now()}${MODEL_QS}`] });
+
+      const risky=(data.risky||[]);
+      aiSlides = risky.length ? risky.map(x=>`
+          <div class="ai-item">
+            <span class="badge text-bg-danger">Risk</span>
+            <div><b>${x.product}</b> likely stockout by ${x.stockout_date}. On-hand ${x.on_hand}. Restock <b>${x.suggested_restock}</b>.</div>
+          </div>`)
+        : [`<div class="ai-item"><span class="badge text-bg-success">OK</span><div>All good — no stockouts predicted.</div></div>`];
+
+      aiIdx=0; renderAISlide(aiIdx); startAIRotation();
+
+      if(overallEl){
         const total=(data.overall||[]).reduce((s,x)=>s+(x.predicted_units||0),0);
-        const revenue=(data.overall||[]).reduce((s,x)=>s+(+x.predicted_revenue||0),0);
-        let html=`<div class="mb-1"><strong>Next 7 days</strong>: <b>${total.toLocaleString()}</b> units • <b>MK ${Math.round(revenue).toLocaleString()}</b></div>`;
+        const rev=(data.overall||[]).reduce((s,x)=>s+(+x.predicted_revenue||0),0);
+        const sign=data?.currency?.sign||'MK';
+        overallEl.innerHTML = `Next 7 days: <b>${nf.format(total)}</b> units • <b>${sign} ${nf.format(Math.round(rev))}</b>`;
+      }
+    }catch(e){
+      show('errAI'); $id('errAI').textContent=`Insights error: ${e.message}`;
+      aiSlides=['<div class="text-danger">No insights</div>']; renderAISlide(0); stopAIRotation();
+    }
+  }
 
-        if((data.risky||[]).length){
-          html+=`<div class="text-muted small">Likely stockouts</div><ul class="mt-1 mb-0">`;
-          for(const x of data.risky){
-            html+=`<li>${x.product}: by <b>${x.stockout_date}</b> • On-hand ${x.on_hand} • Restock <b>${x.suggested_restock}</b> ${x.urgent?'<span class="badge text-bg-danger">URGENT</span>':''}</li>`;
-          }
-          html+='</ul>';
-        }else{
-          html+='<div class="text-success">All good — no stockouts in next 7 days.</div>';
+  // ---------- Value Trend ----------
+  let vtChart=null;
+
+  function mergeByLabel(aLabels, aVals, bLabels, bVals){
+    const mapA=new Map(aLabels.map((l,i)=>[l, Number(aVals[i])||0]));
+    const lbls=[...new Set([...aLabels, ...bLabels])].sort();
+    const outA=lbls.map(l=>mapA.get(l)||0);
+    const mapB=new Map(bLabels.map((l,i)=>[l, Number(bVals[i])||0]));
+    const outB=lbls.map(l=>mapB.get(l)||0);
+    return {labels:lbls, A:outA, B:outB};
+  }
+  function mapVtToSalesPeriod(vt){ return (vt==='7d'||vt==='today') ? '7d' : 'month'; }
+
+  async function tryValueTrend(metric, period){
+    try{
+      return await fetchJSON(`/inventory/api/value-trend/?metric=${encodeURIComponent(metric)}&period=${encodeURIComponent(period)}${MODEL_QS}`,
+        { legacy:[`/inventory/api/value_trend/?metric=${encodeURIComponent(metric)}&period=${encodeURIComponent(period)}${MODEL_QS}`] });
+    }catch(_){}
+
+    if(metric==='profit'){
+      try{
+        const d = await fetchJSON(`/inventory/api/profit-bar/?period=${encodeURIComponent(period)}${MODEL_QS}`,
+                                   { legacy:[`/inventory/api_profit_bar/?period=${encodeURIComponent(period)}${MODEL_QS}`] });
+        if(d?.labels?.length) return { labels:d.labels, values:(d.values||[]), currency:{sign:d?.currency?.sign||'MK'} };
+      }catch(_){}
+    }
+
+    if(metric==='revenue' || metric==='cost'){
+      let rev=null;
+      try{
+        const p = mapVtToSalesPeriod(period);
+        rev = await fetchJSON(`/inventory/api/sales-trend/?period=${encodeURIComponent(p)}&metric=amount${MODEL_QS}`,
+                              { legacy:[`/inventory/api_sales_trend/?period=${encodeURIComponent(p)}&metric=amount${MODEL_QS}`] });
+      }catch(_){}
+
+      if(metric==='revenue' && rev?.labels?.length) return { labels:rev.labels, values:(rev.values||[]), currency:{sign:rev?.currency?.sign||'MK'} };
+
+      try{
+        const pr = await fetchJSON(`/inventory/api/profit-bar/?period=${encodeURIComponent(period)}${MODEL_QS}`,
+                                    { legacy:[`/inventory/api_profit_bar/?period=${encodeURIComponent(period)}${MODEL_QS}`] });
+        if(rev?.labels?.length && pr?.labels?.length){
+          const merged=mergeByLabel(rev.labels, rev.values, pr.labels, pr.values);
+          const cost=merged.labels.map((_,i)=> (merged.A[i]||0) - (merged.B[i]||0));
+          return { labels:merged.labels, values:cost, currency:{sign:rev?.currency?.sign||'MK'} };
         }
-        box.innerHTML=html;
+      }catch(_){}
+    }
+    return null;
+  }
 
-        // NEW: fill structured containers too (if present)
-        if (overallEl) {
-          const lines = (data.overall||[]).map(d =>
-            `${d.date}: <strong>${(d.predicted_units||0).toLocaleString()}</strong> units · <strong>MK ${Math.round(d.predicted_revenue||0).toLocaleString()}</strong>`
-          ).join('<br>');
-          overallEl.innerHTML = lines || 'No forecast yet.';
-        }
+  async function loadValueTrend(){
+    const mSel=$id('vtMetric'); const pSel=$id('vtPeriod'); if(!mSel||!pSel) return;
+    hide('errValue'); hide('valueEmpty');
 
-        if (riskyTable) {
-          const tbody = riskyTable.querySelector('tbody');
-          const rows = (data.risky||[])
-            .slice()
-            .sort((a,b)=> (b.urgent?1:0)-(a.urgent?1:0) || (b.suggested_restock||0)-(a.suggested_restock||0))
-            .map(r => `<tr${r.urgent ? ' class="table-danger fw-semibold"' : ""}>
-              <td>${r.product||'—'}</td>
-              <td class="text-end">${(r.on_hand??0).toLocaleString()}</td>
-              <td>${r.stockout_date||'—'}</td>
-              <td class="text-end">${(r.suggested_restock??0).toLocaleString()}</td>
-            </tr>`).join('');
-          tbody.innerHTML = rows || `<tr><td colspan="4" class="text-muted">No stockout risks detected.</td></tr>`;
-        }
+    const metric=mSel.value; const period=pSel.value;
+    let data=null;
+    try{ data = await tryValueTrend(metric, period); }catch{}
+
+    const el=$id('valueTrend'); vtChart?.destroy();
+    const labels=data?.labels||[]; const values=(data?.values||[]).map(v=>Number(v)||0);
+    const sign = data?.currency?.sign || 'MK';
+
+    if(!labels.length || values.every(v=>v===0)){ show('valueEmpty'); return; }
+
+    const y=axisMoney(values);
+    const ctx=el.getContext('2d');
+    const blue=BRAND();
+
+    vtChart = new Chart(ctx,{
+      type:'line',
+      data:{ labels, datasets:[{ label:(metric.charAt(0).toUpperCase()+metric.slice(1))+` (${sign})`, data:values, borderColor:blue, backgroundColor:blue+'20', fill:true, pointRadius:2, tension:.35 }]},
+      options:{ responsive:true, maintainAspectRatio:false,
+        plugins:{ legend:{ display:true }, tooltip:{ callbacks:{ label:(c)=> `${sign} ${nf.format(c.parsed.y||0)}` } } },
+        animation:{ duration:500, easing:'easeOutCubic' },
+        scales:{ x:{ grid:{ color:GRID_CLR() }}, y:{ min:y.min, max:y.max, grid:{ color:GRID_CLR() }, ticks:{ stepSize:y.stepSize, callback:(v)=> `${sign} ${nf.format(v)}` } } }
       }
+    });
+  }
 
-      // initial load + refresh button
-      run();
-      const btn = document.getElementById('ai-recs-refresh');
-      if (btn) btn.addEventListener('click', run);
-    })();
+  // Wire up
+  $id('trendPeriod')?.addEventListener('change', loadTrend);
+  $id('trendMetric')?.addEventListener('change', loadTrend);
+  $id('topPeriod')?.addEventListener('change', loadTop);
+  $id('ai-recs-refresh')?.addEventListener('click', loadAI);
+  $id('vtMetric')?.addEventListener('change', loadValueTrend);
+  $id('vtPeriod')?.addEventListener('change', loadValueTrend);
 
-    /* ===== Slides rotator (separate 3-button control; auto 10s) ===== */
-    (function(){
-      const slides=[...document.querySelectorAll('.cc-slide')];
-      if(!slides.length) return;
-
-      const INTERVAL=10000;
-      const KEY='cc-slide-index';
-      const ROTATE='cc-slide-rotate';
-
-      const btnPrev=document.getElementById('slides-prev');
-      const btnNext=document.getElementById('slides-next');
-      const btnAuto=document.getElementById('slides-toggle-rotate');
-
-      let idx=Math.min(parseInt(localStorage.getItem(KEY)||'0',10)||0, slides.length-1);
-      let auto=JSON.parse(localStorage.getItem(ROTATE)||'true'); // default ON
-      const reduced=window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-
-      function show(i){
-        slides.forEach((s,j)=>s.classList.toggle('active', j===i));
-        idx=i; localStorage.setItem(KEY,String(idx));
-        if(charts && charts.length){ charts.forEach(ch=>{ try{ ch.resize(); }catch(e){} }); }
-        window.dispatchEvent(new CustomEvent('slide:changed',{detail:{index:idx,name:slides[idx]?.dataset?.name}}));
-      }
-      function next(){ show((idx+1)%slides.length); }
-      function prev(){ show((idx-1+slides.length)%slides.length); }
-
-      function updateBtn(){ if(btnAuto) btnAuto.textContent=`Auto: ${auto?'On':'Off'}`; }
-      function setAuto(v){ auto=v; localStorage.setItem(ROTATE, JSON.stringify(v)); updateBtn(); v?start():stop(); }
-
-      btnNext && btnNext.addEventListener('click', ()=>{ setAuto(false); next(); });
-      btnPrev && btnPrev.addEventListener('click', ()=>{ setAuto(false); prev(); });
-      btnAuto && btnAuto.addEventListener('click', ()=> setAuto(!auto));
-
-      let timer=null;
-      function start(){ if(reduced||!auto) return; stop(); timer=setInterval(next, INTERVAL); }
-      function stop(){ if(timer) clearInterval(timer); timer=null; }
-      document.addEventListener('visibilitychange', ()=> document.hidden?stop():start());
-
-      show(idx); updateBtn(); window.addEventListener('load', start);
-    })();
-
-    /* ===== Theme rotator (original 3-button control; independent) ===== */
-    (function(){
-      const THEMES=["style-1","style-2","style-3"];
-      const KEY="cc-theme", ROTATE="cc-theme-rotate", INTERVAL=12000;
-      const root=document.documentElement;
-      const themeMeta=document.querySelector('meta[name="theme-color"]');
-
-      const btnPrev=document.getElementById('theme-prev');
-      const btnNext=document.getElementById('theme-next');
-      const btnAuto=document.getElementById('theme-toggle-rotate');
-
-      let current = localStorage.getItem(KEY) || root.getAttribute('data-theme') || THEMES[0];
-      let auto = JSON.parse(localStorage.getItem(ROTATE) || 'false');
-      const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-
-      function apply(t){
-        current=t;
-        root.setAttribute('data-theme', t);
-        localStorage.setItem(KEY, t);
-        if(themeMeta){
-          themeMeta.setAttribute('content',
-            t==="style-2" ? "#0b1220" : (t==="style-3" ? "#0f1b30" : "#0b5bd3"));
-        }
-        window.dispatchEvent(new CustomEvent('theme:changed',{detail:{theme:t}}));
-      }
-      function next(){ apply(THEMES[(THEMES.indexOf(current)+1)%THEMES.length]); }
-      function prev(){ apply(THEMES[(THEMES.indexOf(current)-1+THEMES.length)%THEMES.length]); }
-
-      apply(current);
-
-      function setAuto(v){ auto=v; localStorage.setItem(ROTATE, JSON.stringify(v)); updateBtn(); v?start():stop(); }
-      function updateBtn(){ if(btnAuto) btnAuto.textContent=`Auto: ${auto?"On":"Off"}`; }
-
-      btnNext && btnNext.addEventListener('click', ()=>{ setAuto(false); next(); });
-      btnPrev && btnPrev.addEventListener('click', ()=>{ setAuto(false); prev(); });
-      btnAuto && btnAuto.addEventListener('click', ()=> setAuto(!auto));
-      updateBtn();
-
-      let timer=null;
-      function start(){ if(reduced||!auto) return; stop(); timer=setInterval(next, INTERVAL); }
-      function stop(){ if(timer) clearInterval(timer); timer=null; }
-      document.addEventListener('visibilitychange', ()=> document.hidden?stop():start());
-      window.addEventListener('load', start);
-    })();
-
-    /* ===== Admin wallet management helpers (API hooks + CSRF) ===== */
-    {% if is_manager_or_admin %}
-    (function(){
-      function getCookie(name){
-        const value = `; ${document.cookie}`;
-        const parts = value.split(`; ${name}=`);
-        if (parts.length === 2) return parts.pop().split(';').shift();
-      }
-      const csrftoken = getCookie('csrftoken');
-
-      async function fetchAgentWalletRow(userId, rowEl){
-        try{
-          const now=new Date();
-          const y=now.getFullYear(), m=(now.getMonth()+1).toString().padStart(2,'0');
-          const [sumNow, sumMonth] = await Promise.all([
-            fetch(`/inventory/api/wallet-summary/?user_id=${encodeURIComponent(userId)}`).then(r=>r.json()).catch(()=>null),
-            fetch(`/inventory/api/wallet-summary/?user_id=${encodeURIComponent(userId)}&year=${y}&month=${m}`).then(r=>r.json()).catch(()=>null),
-          ]);
-          const bal = sumNow?.balance ?? 0;
-          const mon = sumMonth?.month_sum ?? 0;
-          const life = sumNow?.lifetime_commission ?? sumNow?.lifetime ?? 0;
-
-          const nf = new Intl.NumberFormat();
-          rowEl.querySelector('[data-wallet-balance]').textContent = nf.format(Math.round(bal));
-          rowEl.querySelector('[data-wallet-month]').textContent = nf.format(Math.round(mon));
-          rowEl.querySelector('[data-wallet-lifetime]').textContent = nf.format(Math.round(life));
-        }catch(e){
-          // ignore
-        }
-      }
-
-      // populate table
-      document.querySelectorAll('#tblWalletAdmin tbody tr[data-agent-id]').forEach(tr=>{
-        const uid=tr.getAttribute('data-agent-id');
-        fetchAgentWalletRow(uid, tr);
-      });
-
-      async function postWalletTxn(payload){
-        const r = await fetch('/inventory/api/wallet-txn/', {
-          method:'POST',
-          headers:{ 'Content-Type':'application/json', 'X-CSRFToken': csrftoken || '' },
-          body: JSON.stringify(payload)
-        });
-        if(!r.ok) throw new Error('HTTP '+r.status);
-        return r.json();
-      }
-
-      const form=document.getElementById('formWalletIssue');
-      if(form){
-        form.addEventListener('submit', async (e)=>{
-          e.preventDefault();
-          const agent = document.getElementById('wiAgent').value;
-          const reason = document.getElementById('wiReason').value;
-          const note = document.getElementById('wiNote').value || '';
-          const amount = Math.max(0, Number(document.getElementById('wiAmount').value||0));
-
-          if(!amount){ alert('Enter a valid amount.'); return; }
-
-          try{
-            if(agent==='*'){
-              // apply to all agents sequentially
-              const rows=[...document.querySelectorAll('#tblWalletAdmin tbody tr[data-agent-id]')];
-              for(const tr of rows){
-                const uid=tr.getAttribute('data-agent-id');
-                await postWalletTxn({ user_id: uid, amount, reason, note });
-                await fetchAgentWalletRow(uid, tr);
-              }
-            }else{
-              await postWalletTxn({ user_id: agent, amount, reason, note });
-              const row=document.querySelector(`#tblWalletAdmin tbody tr[data-agent-id="${agent}"]`);
-              if(row) await fetchAgentWalletRow(agent, row);
-            }
-            form.reset();
-            document.getElementById('wiAgent').value='*';
-            document.getElementById('wiReason').value='ADVANCE';
-            alert('Wallet assignment saved.');
-          }catch(err){
-            alert('Could not save wallet assignment: '+err);
-          }
-        });
-      }
-    })();
-    {% endif %}
-  </script>
-</body>
-</html>
+  (async function init(){
+    await Promise.allSettled([loadTrend(), loadTop(), loadAlerts(), loadAI(), loadValueTrend()]);
+  })();
+</script>
+{% endblock %}

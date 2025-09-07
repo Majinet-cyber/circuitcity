@@ -101,6 +101,49 @@ class Product(models.Model):
         bits = [self.brand, self.model, self.variant]
         return " ".join(b for b in bits if b).strip()
 
+    # Convenience for templates/forms: Product.active_order_price
+    @property
+    def active_order_price(self):
+        return OrderPrice.get_active_price(self.id)
+
+
+# --- NEW: Default Order Price catalog (with history) ---
+class OrderPrice(models.Model):
+    """
+    Stores the active default *order* price for each product, with history.
+    Exactly one active row per product (enforced by a partial unique constraint).
+    """
+    product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name="order_prices")
+    default_order_price = models.DecimalField(max_digits=12, decimal_places=2, validators=[MinValueValidator(0)])
+    active = models.BooleanField(default=True)
+    effective_from = models.DateField(default=timezone.now)
+
+    class Meta:
+        ordering = ["-effective_from", "-id"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["product", "active"],
+                condition=Q(active=True),
+                name="uniq_active_order_price_per_product",
+            )
+        ]
+        indexes = [
+            models.Index(fields=["product", "active"], name="ordprice_prod_active_idx"),
+            models.Index(fields=["effective_from"], name="ordprice_effective_idx"),
+        ]
+
+    def __str__(self):
+        return f"{self.product} — MWK {self.default_order_price:,.2f} ({'active' if self.active else 'old'})"
+
+    @staticmethod
+    def get_active_price(product_id: int):
+        return (
+            OrderPrice.objects
+            .filter(product_id=product_id, active=True)
+            .values_list("default_order_price", flat=True)
+            .first()
+        )
+
 
 # -------- Optimized QuerySet for InventoryItem --------
 class InventoryItemQuerySet(models.QuerySet):
@@ -226,13 +269,36 @@ class InventoryItem(models.Model):
         return self.status == "SOLD"
 
     def clean(self):
+        """
+        Extra business rules that don’t require a DB migration.
+
+        - If an item is marked SOLD, `sold_at` must be set (kept from before).
+        - If an item is assigned to a user, that user MUST be an agent
+          (has AgentProfile) and must NOT be staff/superuser.
+          This ensures **admins cannot hold stock**; they can only assign/transfer.
+        """
         errors = {}
+
+        # Existing SOLD rule
         if self.status == "SOLD" and not self.sold_at:
             errors["sold_at"] = "sold_at is required when status is SOLD."
+
+        # IMEI format rule (kept)
         if self.imei:
             s = str(self.imei).strip()
             if not s.isdigit() or len(s) != 15:
                 errors["imei"] = "IMEI must be exactly 15 numeric digits."
+
+        # Only true agents may be assigned stock
+        if self.assigned_agent_id:
+            # Disallow staff/superusers from being holders of stock
+            if getattr(self.assigned_agent, "is_staff", False) or getattr(self.assigned_agent, "is_superuser", False):
+                errors["assigned_agent"] = "Stock cannot be assigned to admin/staff accounts. Assign to an agent."
+
+            # Require an AgentProfile (treats “agent” as a user with a profile)
+            if not hasattr(self.assigned_agent, "agent_profile"):
+                errors["assigned_agent"] = "Assigned user must be an agent (has AgentProfile)."
+
         if errors:
             raise ValidationError(errors)
 
@@ -428,7 +494,12 @@ class WalletTxn(models.Model):
         ("ADVANCE", "Advance payment to agent"),
         ("PAYOUT", "Payout to agent"),
     ]
-    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="wallet_txns")
+    # 🔧 changed related_name to avoid collision with wallet.WalletTransaction.agent
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="inventory_wallet_txns",
+    )
     amount = models.DecimalField(max_digits=12, decimal_places=2)  # + = bonus/credit, − = deduction
     reason = models.CharField(max_length=32, choices=REASON_CHOICES, default="ADJUSTMENT")
     created_at = models.DateTimeField(default=timezone.now)

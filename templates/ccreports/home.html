@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% block title %}Reports · Circuit City{% endblock %}
+{% block header_title %}Reports{% endblock %}
+
+{% block content %}
+<div class="row g-3">
+  <div class="col-md-6">
+    <div class="card shadow-sm">
+      <div class="card-body">
+        <h5 class="card-title mb-1">Sales</h5>
+        <p class="text-muted">Top movers, revenue, agents.</p>
+        <a class="btn btn-glass-blue" href="{% url 'reports:sales' %}">Open Sales report</a>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-md-6">
+    <div class="card shadow-sm">
+      <div class="card-body">
+        <h5 class="card-title mb-1">Inventory</h5>
+        <p class="text-muted">Stock ageing, low stock, turnover.</p>
+        <a class="btn btn-glass-blue" href="{% url 'reports:inventory' %}">Open Inventory report</a>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

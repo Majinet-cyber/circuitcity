@@ -1,0 +1,112 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Settings · Security{% endblock %}
+
+{% block content %}
+<div class="container my-4">
+  <h2 class="fw-bold mb-3">Account Settings</h2>
+  {% include "accounts/_settings_nav.html" %}
+
+  {% if messages %}
+    {% for message in messages %}
+      <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+        {{ message }}
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+      </div>
+    {% endfor %}
+  {% endif %}
+
+  <div class="row g-4">
+    <!-- Password change -->
+    <div class="col-lg-6">
+      <div class="card shadow-sm border-0 rounded-3">
+        <div class="card-body p-4">
+          <h5 class="fw-semibold mb-3"><i class="bi bi-key me-1"></i> Change Password</h5>
+          <form method="post" novalidate>
+            {% csrf_token %}
+
+            <div class="mb-3">
+              <label class="form-label fw-semibold" for="{{ form.old_password.id_for_label }}">Current password</label>
+              {{ form.old_password }}
+              {% if form.old_password.errors %}
+                <div class="text-danger small mt-1">{{ form.old_password.errors|join:", " }}</div>
+              {% endif %}
+            </div>
+
+            <div class="mb-3">
+              <label class="form-label fw-semibold" for="{{ form.new_password1.id_for_label }}">New password</label>
+              {{ form.new_password1 }}
+              <div class="form-text">
+                Use at least 12 characters. Avoid common words or personal info.
+              </div>
+              {% if form.new_password1.errors %}
+                <div class="text-danger small mt-1">{{ form.new_password1.errors|join:", " }}</div>
+              {% endif %}
+            </div>
+
+            <div class="mb-3">
+              <label class="form-label fw-semibold" for="{{ form.new_password2.id_for_label }}">Confirm new password</label>
+              {{ form.new_password2 }}
+              {% if form.new_password2.errors %}
+                <div class="text-danger small mt-1">{{ form.new_password2.errors|join:", " }}</div>
+              {% endif %}
+            </div>
+
+            {% if form.non_field_errors %}
+              <div class="alert alert-danger">
+                {{ form.non_field_errors|join:" " }}
+              </div>
+            {% endif %}
+
+            <button type="submit" class="btn btn-primary px-4">
+              <i class="bi bi-save me-1"></i> Update Password
+            </button>
+          </form>
+        </div>
+      </div>
+    </div>
+
+    <!-- Two-Factor Authentication -->
+    <div class="col-lg-6">
+      <div class="card shadow-sm border-0 rounded-3">
+        <div class="card-body p-4">
+          <h5 class="fw-semibold mb-2"><i class="bi bi-shield-lock me-1"></i> Two-Factor Authentication (2FA)</h5>
+          <p class="text-muted mb-3">
+            Add a second step to sign in using an authenticator app (TOTP) and backup codes.
+          </p>
+
+          <div class="d-flex align-items-center mb-3">
+            {% if request.user.otp_device %}
+              <span class="badge bg-success me-2">Enabled</span>
+              <small class="text-muted">A TOTP device is registered for your account.</small>
+            {% else %}
+              <span class="badge bg-secondary me-2">Not enabled</span>
+              <small class="text-muted">Protect your account by enabling 2FA.</small>
+            {% endif %}
+          </div>
+
+          {# Resolve the URL only if the two_factor namespace is available #}
+          {% url 'two_factor:profile' as two_factor_url %}
+          {% if two_factor_url %}
+            <a class="btn btn-outline-primary" href="{{ two_factor_url }}">
+              Manage Two-Factor Authentication
+            </a>
+            <div class="mt-3 small text-muted">
+              You’ll be able to scan a QR code with an authenticator app (e.g., Google Authenticator, Authy)
+              and generate backup codes. You can also disable 2FA from that page if needed.
+            </div>
+          {% else %}
+            <div class="alert alert-warning d-flex align-items-start mt-2" role="alert">
+              <i class="bi bi-exclamation-triangle me-2"></i>
+              <div>
+                2FA management isn’t available because the <code>django-two-factor-auth</code> package isn’t installed or its URLs aren’t included.
+              </div>
+            </div>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

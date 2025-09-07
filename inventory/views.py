@@ -18,28 +18,42 @@ from django.template.exceptions import TemplateDoesNotExist
 from django.utils import timezone
 from django.views.decorators.cache import never_cache
 from django.views.decorators.http import require_POST, require_http_methods, require_GET
+from django.views.decorators.csrf import ensure_csrf_cookie  # ensure CSRF cookie exists for fallback page
+from django.urls import reverse
 
 import csv
 import json
 import math
 from datetime import timedelta, datetime, date
-from urllib.parse import urlencode
+from urllib.parse import urlencode, quote
 
 # Forms
 from .forms import ScanInForm, ScanSoldForm, InventoryItemForm
 
-# Models
+# Models (inventory)
 from .models import (
     InventoryItem,
     Product,
     InventoryAudit,
-    AgentPasswordReset,
     WarrantyCheckLog,
     TimeLog,
-    WalletTxn,
     Location,
 )
+
+# Wallet models live in the wallet app (safe import)
+try:
+    from wallet.models import WalletTxn  # type: ignore
+except Exception:
+    WalletTxn = None  # graceful fallback if wallet app/models not available
+
 from sales.models import Sale
+
+# NEW: Admin Purchase Orders (lives in wallet app)
+try:
+    from wallet.models import AdminPurchaseOrder, AdminPurchaseOrderItem  # type: ignore
+except Exception:
+    AdminPurchaseOrder = None
+    AdminPurchaseOrderItem = None
 
 # Cache version (signals may bump this). Safe fallback.
 try:
@@ -84,6 +98,15 @@ def _can_edit_inventory(user):
     return _is_manager_or_admin(user)
 
 
+def _is_agent_user(user) -> bool:
+    """
+    A user allowed to *hold* stock:
+    - must have an AgentProfile
+    - must NOT be staff/superuser (admins cannot hold stock)
+    """
+    return bool(getattr(user, "agent_profile", None)) and not (getattr(user, "is_staff", False) or getattr(user, "is_superuser", False))
+
+
 def _audit(item, user, action: str, details: str = ""):
     if not item:
         return
@@ -91,6 +114,9 @@ def _audit(item, user, action: str, details: str = ""):
 
 
 def _haversine_m(lat1, lon1, lat2, lon2):
+    """
+    Distance in meters between two lat/lon points.
+    """
     if None in (lat1, lon1, lat2, lon2):
         return None
     R = 6371000.0
@@ -126,20 +152,30 @@ def _paginate_qs(request, qs, default_per_page=50, max_per_page=200):
 
 
 def _wallet_balance(user):
+    if WalletTxn is None:
+        return 0
     try:
-        return WalletTxn.balance_for(user)
+        return WalletTxn.balance_for(user)  # type: ignore[attr-defined]
     except Exception:
-        return WalletTxn.objects.filter(user=user).aggregate(s=Sum("amount"))["s"] or 0
+        try:
+            return WalletTxn.objects.filter(user=user).aggregate(s=Sum("amount"))["s"] or 0  # type: ignore[union-attr]
+        except Exception:
+            return 0
 
 
 def _wallet_month_sum(user, year: int, month: int):
+    if WalletTxn is None:
+        return 0
     try:
-        return WalletTxn.month_sum_for(user, year, month)
+        return WalletTxn.month_sum_for(user, year, month)  # type: ignore[attr-defined]
     except Exception:
-        return (
-            WalletTxn.objects.filter(user=user, created_at__year=year, created_at__month=month)
-            .aggregate(s=Sum("amount"))["s"] or 0
-        )
+        try:
+            return (
+                WalletTxn.objects.filter(user=user, created_at__year=year, created_at__month=month)  # type: ignore[union-attr]
+                .aggregate(s=Sum("amount"))["s"] or 0
+            )
+        except Exception:
+            return 0
 
 
 def _inv_base(show_archived: bool):
@@ -163,6 +199,73 @@ def _render_dashboard_safe(request, context, today, mtd_count, all_time_count):
             f"<pre>today={today}  mtd={mtd_count}  all_time={all_time_count}</pre>",
             content_type="text/html",
         )
+
+def _render_stock_list_safe(request, context):
+    """
+    Try multiple template paths for the stock list. If none exists, render a minimal
+    fallback so the page is never blank.
+    """
+    candidates = [
+        "inventory/stock_list.html",  # preferred
+        "inventory/list.html",        # legacy/alt
+    ]
+    for tpl in candidates:
+        try:
+            return render(request, tpl, context)
+        except TemplateDoesNotExist:
+            continue
+
+    # Minimal fallback (keeps page useful even if template missing)
+    items = context.get("items", [])
+    rows_html = []
+    for it in items:
+        rows_html.append(
+            f"<tr>"
+            f"<td>{it.imei or ''}</td>"
+            f"<td>{(it.product or '')}</td>"
+            f"<td>{it.status}</td>"
+            f"<td>{'' if it.order_price is None else it.order_price}</td>"
+            f"<td>{'' if it.selling_price is None else it.selling_price}</td>"
+            f"<td>{getattr(getattr(it, 'current_location', None), 'name', '—') or '—'}</td>"
+            f"<td>{getattr(getattr(it, 'assigned_agent', None), 'username', '—') or '—'}</td>"
+            f"</tr>"
+        )
+    html = f"""<!doctype html>
+<html lang="en"><head>
+<meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Stock List — Fallback</title>
+<style>
+body{{font-family:system-ui,Segoe UI,Roboto,Arial,sans-serif;background:#f7fafc;margin:0}}
+.wrap{{max-width:1100px;margin:24px auto;padding:0 16px}}
+h1{{margin:.2rem 0 1rem}}
+.table{{width:100%;border-collapse:collapse;background:#fff;border:1px solid #e2e8f0}}
+.table th,.table td{{padding:.5rem .65rem;border-top:1px solid #e2e8f0;font-size:14px}}
+.table thead th{{background:#f1f5f9;text-align:left}}
+.badge{{display:inline-block;padding:.15rem .4rem;border-radius:.4rem;background:#e2e8f0}}
+.kpis{{display:flex;gap:12px;flex-wrap:wrap;margin:.75rem 0 1rem}}
+.kpis .card{{background:#fff;border:1px solid #e2e8f0;border-radius:.5rem;padding:.6rem .8rem}}
+</style>
+</head><body>
+<div class="wrap">
+  <h1>Stock List (Safe Fallback)</h1>
+  <div class="kpis">
+    <div class="card">In stock: <strong>{context.get('total_in_stock', 0)}</strong></div>
+    <div class="card">Sold: <strong>{context.get('total_sold', 0)}</strong></div>
+    <div class="card">Order total: <strong>{context.get('sum_order_price', 0)}</strong></div>
+    <div class="card">Selling total: <strong>{context.get('sum_selling_price', 0)}</strong></div>
+  </div>
+  <table class="table">
+    <thead><tr>
+      <th>IMEI</th><th>Product</th><th>Status</th><th>Order Price</th>
+      <th>Selling Price</th><th>Location</th><th>Agent</th>
+    </tr></thead>
+    <tbody>
+      {''.join(rows_html) if rows_html else '<tr><td colspan="7">No items found.</td></tr>'}
+    </tbody>
+  </table>
+</div>
+</body></html>"""
+    return HttpResponse(html, content_type="text/html")
 
 
 # -----------------------
@@ -229,13 +332,19 @@ def scan_in(request):
             messages.error(request, "IMEI is required.")
             return render(request, "inventory/scan_in.html", {"form": form, "blocked": True})
 
+        # Enforce: admins cannot *hold* stock. Ignore "assign to me" if user is staff/superuser.
+        assign_to_me = bool(data.get("assigned_to_me"))
+        assigned_user = request.user if (assign_to_me and _is_agent_user(request.user)) else None
+        if assign_to_me and assigned_user is None:
+            messages.info(request, "Stock was added but not assigned to you — admin/staff cannot hold stock.")
+
         item = InventoryItem.objects.create(
             imei=imei or None,
             product=data["product"],
             received_at=data["received_at"],
             order_price=data["order_price"],
             current_location=data["location"],
-            assigned_agent=request.user if data.get("assigned_to_me") else None,
+            assigned_agent=assigned_user,
             warranty_status="SKIPPED",
             warranty_expires_at=None,
             warranty_last_checked_at=None,
@@ -325,6 +434,7 @@ def scan_sold(request):
 @never_cache
 @login_required
 @require_http_methods(["GET"])
+@ensure_csrf_cookie
 def scan_web(request):
     """
     Render the web-scanner page, but be resilient to template path differences.
@@ -341,7 +451,7 @@ def scan_web(request):
             continue
 
     # Minimal fallback (never blank)
-    html = f"""<!doctype html>
+    html = """<!doctype html>
 <html lang="en">
 <head>
   <meta charset="utf-8" />
@@ -361,20 +471,415 @@ def scan_web(request):
     </div>
     <pre id="out"></pre>
   </div>
-<script>
-const imei=document.getElementById('imei'), price=document.getElementById('price'), out=document.getElementById('out');
-document.getElementById('go').onclick=async()=>{
-  const v=(imei.value||'').replace(/\\D/g,'');
-  if(v.length!==15){out.textContent='IMEI must be exactly 15 digits.';return;}
-  const r = await fetch("{settings.FORCE_SCRIPT_NAME or ''}/inventory/api/mark-sold/", {
-    method:"POST", headers:{"Content-Type":"application/json","X-CSRFToken":(document.cookie.match(/csrftoken=([^;]+)/)||[])[1]||""},
+# JS_MOVED: <script>
+# JS_MOVED: const imei=document.getElementById('imei'), price=document.getElementById('price'), out=document.getElementById('out');
+# JS_MOVED: document.getElementById('go').onclick=async()=>{
+  # JS_MOVED: const v=(imei.value||'').replace(/\\D/g,'');
+  # JS_MOVED: if(v.length!==15){out.textContent='IMEI must be exactly 15 digits.';return;}
+  # JS_MOVED: const csrft=(document.cookie.match(new RegExp("{{CSRFTOKEN}}=([^;]+)"))||[])[1]||"";
+  # JS_MOVED: const r = await fetch("/inventory/api/mark-sold/", {
+    method:"POST", headers:{"Content-Type":"application/json","X-CSRFToken":csrft},
     body:JSON.stringify({imei:v, price:price.value||undefined})
   });
   out.textContent = 'HTTP '+r.status+'\\n'+await r.text();
 };
-</script>
+# JS_MOVED: </script>
 </body></html>"""
+    html = html.replace("{{CSRFTOKEN}}", settings.CSRF_COOKIE_NAME)
     return HttpResponse(html, content_type="text/html")
+
+@never_cache
+@login_required
+@require_GET
+def place_order_page(request):
+    """
+    Renders the Place Order UI using base.html (sidebar stays visible).
+    """
+    try:
+        return render(request, "inventory/place_order.html", {
+            "currency": getattr(settings, "DEFAULT_CURRENCY", "MWK"),
+        })
+    except TemplateDoesNotExist:
+        html = """<!doctype html><meta charset="utf-8"><title>Place Order</title>
+        <p>This page expects <code>inventory/place_order.html</code>. JSON endpoints are:</p>
+        <ul>
+          <li>/inventory/api/stock-models/</li>
+          <li>/inventory/api/place-order/</li>
+          <li>/inventory/orders/&lt;po_id&gt;/invoice/</li>
+        </ul>
+        <p><a href="/inventory/">← Back to stock</a></p>"""
+        return HttpResponse(html, content_type="text/html; charset=utf-8")
+
+@never_cache
+@login_required
+@require_GET
+def place_order_page(request):
+    """
+    Manager/Admin-only Order Builder page (no server template needed).
+    Uses:
+      - GET  /inventory/api/stock-models/
+      - POST /inventory/api/place-order/
+      - GET  /inventory/orders/<po_id>/download/  (invoice)
+    """
+    html = """
+    <!doctype html><html lang="en"><head>
+      <meta charset="utf-8"/>
+      <meta name="viewport" content="width=device-width,initial-scale=1"/>
+      <title>Place Order</title>
+      <style>
+        :root{
+          --bg:#0b1020; --panel:#0e172b; --muted:#a8b3cf;
+          --border:#1f2a44; --primary:#2f6df6; --accent:#46c0ff; --ok:#16a34a; --warn:#f59e0b; --err:#ef4444;
+          --radius:14px;
+        }
+        @media (prefers-color-scheme: light){
+          :root{ --bg:#eef5ff; --panel:#ffffff; --muted:#475569; --border:#cfe0ff; --primary:#2f6df6; --accent:#0ea5e9; }
+        }
+        *{box-sizing:border-box}
+        body{font-family:system-ui,Segoe UI,Inter,Roboto,Arial,sans-serif;background:var(--bg);color:#e6edf6;margin:0}
+        .wrap{max-width:980px;margin:28px auto;padding:0 16px}
+        h2{margin:.2rem 0 1rem}
+        .note{background:var(--panel);border:1px solid var(--border);padding:12px;border-radius:var(--radius);color:var(--muted)}
+        .row{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:12px 0}
+        .row-1{display:grid;grid-template-columns:1fr;gap:12px;margin:12px 0}
+        label{display:block;font-size:13px;color:var(--muted);margin-bottom:6px}
+        input[type="text"], input[type="email"], input[type="tel"], input[type="number"], select, textarea{
+          width:100%;padding:10px 12px;border-radius:12px;border:1px solid var(--border);background:#0a1222;color:#e6edf6;
+        }
+        textarea{min-height:90px;resize:vertical}
+        .card{background:var(--panel);border:1px solid var(--border);border-radius:var(--radius);padding:14px}
+        .btn{display:inline-flex;gap:8px;align-items:center;padding:10px 14px;border-radius:12px;border:1px solid var(--border);text-decoration:none;color:#e6edf6;background:#0a1222;cursor:pointer}
+        .btn:hover{filter:brightness(1.1)}
+        .btn.primary{background:var(--primary);border-color:var(--primary);color:#fff}
+        .btn.ghost{background:transparent}
+        .btn.link{background:transparent;border:none;padding:0;color:var(--primary);cursor:pointer}
+        .btn.small{padding:6px 10px;border-radius:10px;font-size:13px}
+        .grid-3{display:grid;grid-template-columns:2fr 1fr 1fr;gap:10px}
+        .grid-4{display:grid;grid-template-columns:2fr 1fr 1fr 90px;gap:10px}
+        table{width:100%;border-collapse:collapse}
+        th,td{padding:10px;border-top:1px solid var(--border);font-size:14px}
+        thead th{background:#0a1222;color:#cbd5e1;border-top:none}
+        .right{text-align:right}
+        .muted{color:var(--muted)}
+        .kpis{display:flex;gap:10px;flex-wrap:wrap;margin:10px 0}
+        .chip{background:#0a1222;border:1px solid var(--border);padding:8px 10px;border-radius:999px;color:#cbd5e1;font-size:13px}
+        .success{border-color:#134e4a;background:#052e2b}
+        .error{border-color:#7f1d1d;background:#2b0909}
+        .warn{border-color:#7c2d12;background:#2f0d01}
+        .empty{padding:18px;border:1px dashed var(--border);border-radius:12px;color:var(--muted);text-align:center}
+        .total{font-size:18px}
+        .hidden{display:none}
+        .sep{height:1px;background:var(--border);margin:12px 0}
+        .search{display:flex;gap:8px;align-items:center}
+        .search input{flex:1}
+        .pill{display:inline-block;padding:3px 8px;border-radius:999px;border:1px solid var(--border);color:var(--muted);font-size:12px}
+        .onhand{color:#a3e635}
+      </style>
+    </head><body><div class="wrap">
+      <h2>Place Order</h2>
+
+      <div class="kpis">
+        <div class="chip">Currency: <strong style="margin-left:6px">MWK</strong></div>
+        <div class="chip hidden" id="roleChip"></div>
+      </div>
+
+      <div class="row">
+        <div class="card">
+          <h3 style="margin:0 0 8px">Supplier</h3>
+          <div class="row">
+            <div>
+              <label>Supplier name</label>
+              <input id="supplier_name" type="text" placeholder="e.g. ACME Phones Ltd" />
+            </div>
+            <div>
+              <label>Supplier phone</label>
+              <input id="supplier_phone" type="tel" placeholder="+26588..." />
+            </div>
+          </div>
+          <div class="row">
+            <div>
+              <label>Supplier email</label>
+              <input id="supplier_email" type="email" placeholder="vendor@example.com" />
+            </div>
+            <div>
+              <label>Agent name (optional)</label>
+              <input id="agent_name" type="text" placeholder="Who will receive?" />
+            </div>
+          </div>
+          <div class="row-1">
+            <div>
+              <label>Notes</label>
+              <textarea id="notes" placeholder="E.g. Urgent restock for next week..."></textarea>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <h3 style="margin:0 0 8px">Add Items</h3>
+
+          <div class="row-1">
+            <div class="search">
+              <input id="search" type="text" placeholder="Search model (brand / model / variant)..." />
+              <button class="btn small ghost" id="refreshBtn">↻ Refresh</button>
+            </div>
+          </div>
+
+          <div class="grid-3" style="margin:8px 0">
+            <div>
+              <label>Model</label>
+              <select id="model"></select>
+              <div class="muted" id="onhandHint"></div>
+            </div>
+            <div>
+              <label>Qty</label>
+              <input id="qty" type="number" min="1" value="1" />
+            </div>
+            <div style="align-self:end">
+              <button class="btn primary" id="addLine">+ Add</button>
+            </div>
+          </div>
+
+          <div id="modelsEmpty" class="empty hidden">No models in stock right now.</div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3 style="margin:0 0 8px">Order Lines</h3>
+        <div id="linesEmpty" class="empty">No items added yet.</div>
+        <div id="linesWrap" class="hidden">
+          <table>
+            <thead>
+              <tr>
+                <th>#</th><th>Product</th><th class="right">Qty</th><th class="right">Est. Unit</th><th class="right">Est. Line</th><th></th>
+              </tr>
+            </thead>
+            <tbody id="linesBody"></tbody>
+            <tfoot>
+              <tr>
+                <td colspan="4" class="right total"><strong>Estimated Total</strong></td>
+                <td class="right total"><strong id="ttl">0</strong></td>
+                <td></td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+      </div>
+
+      <div class="row">
+        <div class="card">
+          <div class="muted">The Admin Purchase Order will price each line using the Product's <em>cost_price</em>. The totals shown here are estimates using the same value surfaced by the API.</div>
+        </div>
+        <div class="card" style="display:flex;justify-content:space-between;align-items:center">
+          <a class="btn" href="/inventory/">← Back to stock</a>
+          <button class="btn primary" id="submitOrder">Create Purchase Order</button>
+        </div>
+      </div>
+
+      <div id="alert" class="card hidden"></div>
+
+      <div id="successPanel" class="card success hidden">
+        <h3 style="margin:0 0 6px">PO created ✅</h3>
+        <div id="successText" class="muted" style="margin-bottom:8px"></div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <a class="btn" id="dlBtn" download>⬇ Download invoice</a>
+          <a class="btn" id="whBtn" target="_blank" rel="noopener">WhatsApp</a>
+          <a class="btn" id="emBtn">Email</a>
+        </div>
+      </div>
+
+      <div class="note" style="margin-top:12px">
+        Tip: need default pricing for Scan-In? Use <code>/inventory/api/order-price/&lt;product_id&gt;/</code>.
+      </div>
+    </div>
+
+    <script>
+      // --- CSRF helper ---
+      const CSRFTOKEN_NAME = "{{CSRFTOKEN}}";
+      function getCSRFCookie(){
+        const m = document.cookie.match(new RegExp(CSRFTOKEN_NAME+"=([^;]+)"));
+        return m ? m[1] : "";
+      }
+
+      // --- UI state ---
+      const nf = new Intl.NumberFormat();
+      const $ = (id)=>document.getElementById(id);
+      const modelSel = $("model");
+      const qtyInp = $("qty");
+      const linesBody = $("linesBody");
+      const linesWrap = $("linesWrap");
+      const linesEmpty = $("linesEmpty");
+      const modelsEmpty = $("modelsEmpty");
+      const onhandHint = $("onhandHint");
+      const alertBox = $("alert");
+      const successPanel = $("successPanel");
+      const successText = $("successText");
+      const dlBtn = $("dlBtn");
+      const whBtn = $("whBtn");
+      const emBtn = $("emBtn");
+
+      const order = {
+        items: [] // {product_id, product, qty, unit}
+      };
+
+      function setAlert(kind, msg){
+        alertBox.className = "card " + (kind==="error"?"error":kind==="warn"?"warn":"");
+        alertBox.textContent = msg;
+        alertBox.classList.remove("hidden");
+        setTimeout(()=>alertBox.classList.add("hidden"), 4000);
+      }
+
+      function recalc(){
+        let total = 0;
+        linesBody.innerHTML = "";
+        order.items.forEach((it, idx)=>{
+          const line = (it.unit||0) * it.qty;
+          total += line;
+          const tr = document.createElement("tr");
+          tr.innerHTML = `
+            <td>${idx+1}</td>
+            <td>${it.product}</td>
+            <td class="right">${nf.format(it.qty)}</td>
+            <td class="right">${nf.format(it.unit||0)}</td>
+            <td class="right">${nf.format(line)}</td>
+            <td class="right"><button class="btn small link" data-i="${idx}">Remove</button></td>
+          `;
+          linesBody.appendChild(tr);
+        });
+        $("ttl").textContent = nf.format(total);
+        const has = order.items.length>0;
+        linesWrap.classList.toggle("hidden", !has);
+        linesEmpty.classList.toggle("hidden", has);
+      }
+
+      function addOrBump(pid, product, unit, addQty){
+        const existing = order.items.find(i=>i.product_id===pid);
+        if(existing){
+          existing.qty += addQty;
+        } else {
+          order.items.push({product_id: pid, product, unit, qty: addQty});
+        }
+        recalc();
+      }
+
+      linesBody.addEventListener("click", (e)=>{
+        const btn = e.target.closest("button[data-i]");
+        if(!btn) return;
+        const i = parseInt(btn.getAttribute("data-i"),10);
+        if(!Number.isNaN(i)){
+          order.items.splice(i,1);
+          recalc();
+        }
+      });
+
+      async function loadModels(){
+        try{
+          const r = await fetch("/inventory/api/stock-models/");
+          const data = await r.json();
+          const list = (data && data.models) || [];
+          modelSel.innerHTML = "";
+          if(!list.length){
+            modelsEmpty.classList.remove("hidden");
+            onhandHint.textContent = "";
+            return;
+          }
+          modelsEmpty.classList.add("hidden");
+          list.forEach(m=>{
+            const opt = document.createElement("option");
+            opt.value = m.product_id;
+            opt.textContent = `${m.product}  ·  on hand ${m.on_hand}`;
+            opt.dataset.price = m.default_price || "0";
+            opt.dataset.onhand = m.on_hand || 0;
+            modelSel.appendChild(opt);
+          });
+          updateOnhandHint();
+        }catch(err){
+          setAlert("error", "Failed to load models.");
+        }
+      }
+
+      function updateOnhandHint(){
+        const opt = modelSel.options[modelSel.selectedIndex];
+        if(!opt){ onhandHint.textContent = ""; return; }
+        const p = opt.dataset.price || "0";
+        const oh = opt.dataset.onhand || 0;
+        onhandHint.innerHTML = `<span class="pill">Default price ~ ${nf.format(parseFloat(p)||0)}</span> <span class="pill onhand">On hand: ${oh}</span>`;
+      }
+
+      modelSel.addEventListener("change", updateOnhandHint);
+      $("refreshBtn").addEventListener("click", (e)=>{ e.preventDefault(); loadModels(); });
+      $("search").addEventListener("input", (e)=>{
+        const q = (e.target.value||"").toLowerCase();
+        for(const opt of modelSel.options){
+          const txt = opt.textContent.toLowerCase();
+          opt.hidden = q && !txt.includes(q);
+        }
+        // pick first visible
+        for(const opt of modelSel.options){
+          if(!opt.hidden){ modelSel.value = opt.value; break; }
+        }
+        updateOnhandHint();
+      });
+
+      $("addLine").addEventListener("click", (e)=>{
+        e.preventDefault();
+        const opt = modelSel.options[modelSel.selectedIndex];
+        if(!opt){ setAlert("warn","No model selected."); return; }
+        const qty = parseInt(qtyInp.value,10);
+        if(!qty || qty < 1){ setAlert("warn","Quantity must be at least 1."); return; }
+        const pid = parseInt(opt.value,10);
+        const unit = parseFloat(opt.dataset.price||"0") || 0;
+        addOrBump(pid, opt.textContent, unit, qty);
+        qtyInp.value = "1";
+      });
+
+      $("submitOrder").addEventListener("click", async ()=>{
+        if(order.items.length===0){ setAlert("warn","Add at least one item to the order."); return; }
+        const payload = {
+          supplier_name: $("supplier_name").value.trim(),
+          supplier_email: $("supplier_email").value.trim(),
+          supplier_phone: $("supplier_phone").value.trim(),
+          agent_name: $("agent_name").value.trim(),
+          notes: $("notes").value.trim(),
+          items: order.items.map(i=>({product_id:i.product_id, quantity:i.qty}))
+        };
+        try{
+          const r = await fetch("/inventory/api/place-order/", {
+            method:"POST",
+            headers:{
+              "Content-Type":"application/json",
+              "X-CSRFToken": getCSRFCookie()
+            },
+            body: JSON.stringify(payload)
+          });
+          const data = await r.json();
+          if(!r.ok || !data.ok){
+            const msg = (data && (data.error || data.detail)) || ("HTTP "+r.status);
+            setAlert("error", "Failed to create PO: " + msg);
+            return;
+          }
+          // Success UI
+          successPanel.classList.remove("hidden");
+          successText.textContent = `PO-${data.po_id} created. Total will reflect product cost prices.`;
+          dlBtn.href = data.invoice_url;
+          whBtn.href = data.share && data.share.whatsapp ? data.share.whatsapp : "#";
+          emBtn.setAttribute("href", data.share && data.share.email ? data.share.email : "#");
+          // reset builder
+          order.items = [];
+          recalc();
+          window.scrollTo({top: document.body.scrollHeight, behavior: "smooth"});
+        }catch(err){
+          setAlert("error", "Network error creating PO.");
+        }
+      });
+
+      // init
+      loadModels();
+      updateOnhandHint();
+    </script>
+    </body></html>
+    """
+    html = html.replace("{{CSRFTOKEN}}", settings.CSRF_COOKIE_NAME)
+    return HttpResponse(html, content_type="text/html; charset=utf-8")
 
 
 @never_cache
@@ -504,11 +1009,15 @@ def inventory_dashboard(request):
         sales_qs_period = sales_qs_all.filter(sold_at__gte=month_start)
 
     today_count = sales_qs_all.filter(sold_at__gte=today, sold_at__lt=tomorrow).count()
+    # NEW for UI: today's total sales amount (MK)
+    dec2 = DecimalField(max_digits=14, decimal_places=2)
+    today_total = sales_qs_all.filter(sold_at__gte=today, sold_at__lt=tomorrow).aggregate(
+        s=Coalesce(Sum("price"), Value(0), output_field=dec2)
+    )["s"] or 0
     mtd_count = sales_qs_all.filter(sold_at__gte=month_start, sold_at__lt=tomorrow).count()
     all_time_count = sales_qs_all.count()
 
     # ---- Agent ranking (ALL agents, ordered by earnings desc then sales desc) ----
-    dec2 = DecimalField(max_digits=14, decimal_places=2)
     pct_dec = DecimalField(max_digits=5, decimal_places=2)
 
     rank_base = Sale.objects.select_related("agent")
@@ -538,8 +1047,8 @@ def inventory_dashboard(request):
     # Wallet summaries (decimal-safe defaults) for the agents present in ranking
     agent_wallet_summaries = {}
     agent_ids = [row["agent_id"] for row in agent_rank if row.get("agent_id")]
-    if agent_ids:
-        w = WalletTxn.objects.filter(user_id__in=agent_ids)
+    if agent_ids and WalletTxn is not None:
+        w = WalletTxn.objects.filter(user_id__in=agent_ids)  # type: ignore[union-attr]
         agent_wallet_rows = w.values("user_id").annotate(
             balance=Sum("amount"),
             lifetime_commission=Sum(Case(When(reason="COMMISSION", then="amount"),
@@ -652,8 +1161,16 @@ def inventory_dashboard(request):
     profit_points = [prof_map.get(lbl, 0.0) for lbl in last_12_labels]
 
     # ===== Agents: total stock vs sold units (period filter applied) =====
+    if _can_view_all(request.user):
+        items_scope = InventoryItem.objects.select_related("product", "assigned_agent", "current_location")
+    else:
+        items_scope = InventoryItem.objects.filter(assigned_agent=request.user).select_related(
+            "product", "assigned_agent", "current_location"
+        )
+    if model_id:
+        items_scope = items_scope.filter(product_id=model_id)
     total_assigned = (
-        items_qs.values("assigned_agent_id", "assigned_agent__username")
+        items_scope.values("assigned_agent_id", "assigned_agent__username")
         .annotate(total_stock=Count("id"))
         .order_by("assigned_agent__username")
     )
@@ -680,7 +1197,7 @@ def inventory_dashboard(request):
     pie_profit = float(totals.get("profit") or 0)
 
     # ===== Battery =====
-    in_stock_qs = items_qs.filter(status="IN_STOCK")
+    in_stock_qs = items_scope.filter(status="IN_STOCK")
     jug_count = in_stock_qs.count()
     jug_fill_pct = min(100, int(round((jug_count / 100.0) * 100))) if jug_count > 0 else 0
     if jug_count <= 20:
@@ -692,6 +1209,14 @@ def inventory_dashboard(request):
     else:
         jug_color = "lightgreen"
 
+    # NEW for UI: map to Stock Health label
+    if jug_count <= 10:
+        stock_health = "Critical"
+    elif jug_count <= 30:
+        stock_health = "Low"
+    else:
+        stock_health = "Good"
+
     products = Product.objects.order_by("brand", "model", "variant").values("id", "brand", "model", "variant")
 
     # ===== Wallet (current user) =====
@@ -701,17 +1226,23 @@ def inventory_dashboard(request):
     my_balance = _wallet_balance(request.user)
     today_local = timezone.localdate()
     month_start_local = today_local.replace(day=1)
-    month_qs = WalletTxn.objects.filter(user=request.user, created_at__date__gte=month_start_local, created_at__date__lte=today_local)
-    my_month_commission = _sum(month_qs.filter(reason="COMMISSION"))
-    my_month_advance = _sum(month_qs.filter(reason="ADVANCE"))
-    my_month_adjustment = _sum(month_qs.filter(reason="ADJUSTMENT"))
-    my_month_total = my_month_commission + my_month_advance + my_month_adjustment
 
-    life_qs = WalletTxn.objects.filter(user=request.user)
-    my_life_commission = _sum(life_qs.filter(reason="COMMISSION"))
-    my_life_advance = _sum(life_qs.filter(reason="ADVANCE"))
-    my_life_adjustment = _sum(life_qs.filter(reason="ADJUSTMENT"))
-    my_life_total = _sum(life_qs)
+    if WalletTxn is not None:
+        month_qs = WalletTxn.objects.filter(user=request.user, created_at__date__gte=month_start_local, created_at__date__lte=today_local)  # type: ignore[union-attr]
+        my_month_commission = _sum(month_qs.filter(reason="COMMISSION"))
+        my_month_advance = _sum(month_qs.filter(reason="ADVANCE"))
+        my_month_adjustment = _sum(month_qs.filter(reason="ADJUSTMENT"))
+        life_qs = WalletTxn.objects.filter(user=request.user)  # type: ignore[union-attr]
+        my_life_commission = _sum(life_qs.filter(reason="COMMISSION"))
+        my_life_advance = _sum(life_qs.filter(reason="ADVANCE"))
+        my_life_adjustment = _sum(life_qs.filter(reason="ADJUSTMENT"))
+        my_life_total = _sum(life_qs)
+    else:
+        my_month_commission = my_month_advance = my_month_adjustment = 0
+        my_life_commission = my_life_advance = my_life_adjustment = my_life_total = 0
+
+    # NEW for UI: Profit Margin (% of selected period)
+    profit_margin = int(round((pie_profit / pie_revenue) * 100)) if pie_revenue > 0 else 0
 
     context = {
         "period": period,
@@ -731,16 +1262,19 @@ def inventory_dashboard(request):
         # Agent stock table
         "agent_rows": agent_rows,
 
-        # Battery
+        # Battery / Stock health
         "jug_count": jug_count,
         "jug_fill_pct": jug_fill_pct,
         "jug_color": jug_color,
+        "stock_health": stock_health,
 
         # KPIs (also expose legacy 'kpis' bag used in some templates)
         "is_manager_or_admin": _is_manager_or_admin(request.user),
         "today_count": today_count,
         "mtd_count": mtd_count,
         "all_time_count": all_time_count,
+        "today_total": float(today_total or 0),
+        "profit_margin": profit_margin,
         "kpis": {
             "scope": scope_label,
             "today_count": today_count,
@@ -755,7 +1289,7 @@ def inventory_dashboard(request):
                 "commission": my_month_commission,
                 "advance": my_month_advance,
                 "adjustment": my_month_adjustment,
-                "total": my_month_total,
+                "total": my_month_commission + my_month_advance + my_month_adjustment,
                 "month_label": month_start_local.strftime("%b %Y"),
             },
             "lifetime": {
@@ -773,24 +1307,24 @@ def inventory_dashboard(request):
     context["THEME_ROTATE_MS"]      = int(getattr(settings, "THEME_ROTATE_MS", 10000))
     context["THEME_DEFAULT"]        = str(getattr(settings, "THEME_DEFAULT", "style-1"))
     context["ROTATOR_MODE"]         = "slides"
-    # ✅ corrected API URLs (were underscores before)
+    # Align slide APIs with underscore routes used by the template
     context["DASHBOARD_SLIDES"] = [
         {
             "key": "trends",
             "title": "Sales Trends",
-            "apis": ["/inventory/api/sales-trend/?period=7d&metric=count",
-                     "/inventory/api/profit-bar/",
-                     "/inventory/api/top-models/?period=today"]
+            "apis": ["/inventory/api_sales_trend/?period=7d&metric=count",
+                     "/inventory/api_profit_bar/",
+                     "/inventory/api_top_models/?period=today"]
         },
         {
             "key": "cash",
             "title": "Cash Overview",
-            "apis": ["/inventory/api/cash-overview/"]
+            "apis": ["/inventory/api_cash_overview/"]
         },
         {
             "key": "agents",
             "title": "Agent Performance",
-            "apis": ["/inventory/api/agent-trend/?months=6&metric=sales"]
+            "apis": ["/inventory/api_agent_trend/?months=6&metric=sales"]
         }
     ]
 
@@ -886,6 +1420,9 @@ def stock_list(request):
         for it in page_obj.object_list
     ]
 
+    # Battery target: managers/admins/auditors see a 100-cap battery, agents see 20-cap
+    target_full = 100 if _can_view_all(request.user) else 20
+
     context = {
         "items": page_obj.object_list,
         "q": q,
@@ -904,8 +1441,10 @@ def stock_list(request):
         "sum_order": sum_order,
         "sum_selling": sum_selling,
         "status": status,
+        "target_full": target_full,  # <-- used by UI battery
     }
-    return render(request, "inventory/stock_list.html", context)
+    # Render safely (try templates, then fallback HTML)
+    return _render_stock_list_safe(request, context)
 
 
 @never_cache
@@ -928,8 +1467,8 @@ def export_csv(request):
         qs = qs.filter(
             Q(imei__icontains=q)
             | Q(product__model__icontains=q)
-            | Q(product__brand__icontainsq)
-            | Q(product__variant__icontainsq)
+            | Q(product__brand__icontains=q)
+            | Q(product__variant__icontains=q)
         )
 
     if status == "in_stock":
@@ -1073,7 +1612,7 @@ def time_logs(request):
 
 @never_cache
 @login_required
-@require_http_methods(["GET"])
+@require_GET
 def api_wallet_summary(request):
     target = request.user
     user_id = request.GET.get("user_id")
@@ -1108,6 +1647,9 @@ api_wallet_balance = api_wallet_summary
 @login_required
 @require_POST
 def api_wallet_add_txn(request):
+    if WalletTxn is None:
+        return JsonResponse({"ok": False, "error": "Wallet models not installed."}, status=500)
+
     if not _is_admin(request.user):
         return JsonResponse({"ok": False, "error": "Admin only."}, status=403)
 
@@ -1130,13 +1672,13 @@ def api_wallet_add_txn(request):
         return JsonResponse({"ok": False, "error": "Invalid amount."}, status=400)
 
     reason = (payload.get("reason") or "ADJUSTMENT").upper()
-    allowed = {k for k, _ in getattr(WalletTxn, "REASON_CHOICES", [])} or {"ADJUSTMENT", "ADVANCE", "COMMISSION", "PAYOUT"}
+    allowed = {k for k, _ in getattr(WalletTxn, "REASON_CHOICES", [])} or {"ADJUSTMENT", "ADVANCE", "COMMISSION", "PAYOUT"}  # type: ignore[arg-type]
     if reason not in allowed:
         return JsonResponse({"ok": False, "error": f"Invalid reason. Allowed: {sorted(list(allowed))}"}, status=400)
 
     memo = (payload.get("memo") or "").strip()[:200]
 
-    txn = WalletTxn.objects.create(user=target, amount=amount, reason=reason, memo=memo)
+    txn = WalletTxn.objects.create(user=target, amount=amount, reason=reason, memo=memo)  # type: ignore[union-attr]
 
     new_balance = _wallet_balance(target)
     return JsonResponse({"ok": True, "txn_id": txn.id, "balance": new_balance})
@@ -1161,7 +1703,12 @@ def wallet_page(request):
     balance = _wallet_balance(target)
     month_sum = _wallet_month_sum(target, today.year, today.month)
 
-    recent_txns = WalletTxn.objects.select_related("user").filter(user=target).order_by("-created_at")[:50]
+    if WalletTxn is not None:
+        recent_txns = WalletTxn.objects.select_related("user").filter(user=target).order_by("-created_at")[:50]  # type: ignore[union-attr]
+        reasons = getattr(WalletTxn, "REASON_CHOICES", [])
+    else:
+        recent_txns = []
+        reasons = []
 
     agents = []
     if _is_manager_or_admin(request.user):
@@ -1172,7 +1719,7 @@ def wallet_page(request):
         "balance": balance,
         "month_sum": month_sum,
         "recent_txns": recent_txns,
-        "reasons": getattr(WalletTxn, "REASON_CHOICES", []),
+        "reasons": reasons,
         "is_admin": _is_admin(request.user),
         "is_manager_or_admin": _is_manager_or_admin(request.user),
         "agents": agents,
@@ -1204,6 +1751,12 @@ def update_stock(request, pk):
     if request.method == "POST":
         form = InventoryItemForm(request.POST, instance=item, user=request.user)
         if form.is_valid():
+            # Enforce: only agents (non-staff/superuser with AgentProfile) can *hold* stock
+            new_holder = form.cleaned_data.get("assigned_agent")
+            if new_holder and not _is_agent_user(new_holder):
+                messages.error(request, "Only agent accounts can hold stock. Choose a non-admin user with an AgentProfile.")
+                return render(request, "inventory/edit_stock.html", {"form": form, "item": item})
+
             changed_fields = list(form.changed_data)
             price_fields = {"order_price", "selling_price"}
             if (price_fields & set(changed_fields)) and not _is_admin(request.user):
@@ -1238,7 +1791,7 @@ def update_stock(request, pk):
                         )
 
             details = "Changed fields:\n" + (
-                "\n".join([f"{k}: {old_vals.get(k)} → {getattr(saved_item, k)}" for k in changed_fields])
+                "\n".join([f"{k}: {old_vals.get(k)} \u2192 {getattr(saved_item, k)}" for k in changed_fields])
                 if changed_fields
                 else "No field changes"
             )
@@ -1405,7 +1958,7 @@ def api_top_models(request):
     data = cache.get(key)
     if data is None:
         data = _build()
-        cache.set(key, data, 60)
+        cache.set(key, data, 60)  # fixed: cache value correctly
     return JsonResponse(data)
 
 
@@ -1456,7 +2009,7 @@ def api_profit_bar(request):
     data = cache.get(key)
     if data is None:
         data = _build()
-        cache.set(key, data, 60)
+        cache.set(key, data, 60)  # fixed
     return JsonResponse(data)
 
 
@@ -1496,7 +2049,7 @@ def api_agent_trend(request):
     data = cache.get(key)
     if data is None:
         data = _build()
-        cache.set(key, data, 60)
+        cache.set(key, data, 60)  # fixed
     return JsonResponse(data)
 
 
@@ -1609,19 +2162,28 @@ def api_cash_overview(request):
 
     if _can_view_all(request.user):
         sales = Sale.objects.filter(sold_at__gte=start, sold_at__lt=end_excl)
-        tx = WalletTxn.objects.filter(created_at__date__gte=start, created_at__date__lte=today)
+        if WalletTxn is not None:
+            tx = WalletTxn.objects.filter(created_at__date__gte=start, created_at__date__lte=today)  # type: ignore[union-attr]
+        else:
+            tx = None
     else:
         sales = Sale.objects.filter(agent=request.user, sold_at__gte=start, sold_at__lt=end_excl)
-        tx = WalletTxn.objects.filter(user=request.user, created_at__date__gte=start, created_at__date__lte=today)
+        if WalletTxn is not None:
+            tx = WalletTxn.objects.filter(user=request.user, created_at__date__gte=start, created_at__date__lte=today)  # type: ignore[union-attr]
+        else:
+            tx = None
 
     totals = sales.aggregate(
         orders=Count("id"),
         revenue=Coalesce(Sum("price"), Value(0), output_field=DecimalField(max_digits=14, decimal_places=2)),
     )
 
-    paid_out = tx.filter(reason="PAYOUT").aggregate(s=Coalesce(Sum("amount"), Value(0)))["s"] or 0
-    advances = tx.filter(reason="ADVANCE").aggregate(s=Coalesce(Sum("amount"), Value(0)))["s"] or 0
-    adjustments = tx.filter(reason="ADJUSTMENT").aggregate(s=Coalesce(Sum("amount"), Value(0)))["s"] or 0
+    if tx is not None:
+        paid_out = tx.filter(reason="PAYOUT").aggregate(s=Coalesce(Sum("amount"), Value(0)))["s"] or 0
+        advances = tx.filter(reason="ADVANCE").aggregate(s=Coalesce(Sum("amount"), Value(0)))["s"] or 0
+        adjustments = tx.filter(reason="ADJUSTMENT").aggregate(s=Coalesce(Sum("amount"), Value(0)))["s"] or 0
+    else:
+        paid_out = advances = adjustments = 0
 
     data = {
         "orders": int(totals.get("orders") or 0),
@@ -1631,6 +2193,263 @@ def api_cash_overview(request):
         "period_label": start.strftime("%b %Y"),
     }
     return JsonResponse({"ok": True, **data})
+
+
+# -----------------------
+# Alerts API (NEW for UI)
+# -----------------------
+@never_cache
+@login_required
+@require_GET
+def api_alerts(request):
+    """
+    Provides alert items for the Dashboard 'Stock Alerts' card.
+
+    Response:
+      {"ok": true, "alerts": [
+        {"type": "Low stock", "severity": "high|warn|info", "message": "..."}
+      ]}
+    """
+    alerts = []
+    today = timezone.localdate()
+    # Scope
+    if _can_view_all(request.user):
+        items_qs = InventoryItem.objects.select_related("product", "current_location")
+        sales_qs = Sale.objects.select_related("item__product")
+    else:
+        items_qs = InventoryItem.objects.select_related("product", "current_location").filter(assigned_agent=request.user)
+        sales_qs = Sale.objects.select_related("item__product").filter(agent=request.user)
+
+    # 1) Low stock by model
+    low_rows = (
+        items_qs.filter(status="IN_STOCK")
+        .values("product__brand", "product__model")
+        .annotate(on_hand=Count("id"))
+        .order_by("on_hand")[:10]
+    )
+    for r in low_rows:
+        on_hand = int(r["on_hand"] or 0)
+        if on_hand <= 3:
+            sev = "high" if on_hand <= 1 else "warn"
+            product_name = f'{r["product__brand"]} {r["product__model"]}'.strip()
+            alerts.append({
+                "type": "Low stock",
+                "severity": sev,
+                "message": f"{product_name}: only {on_hand} on hand.",
+            })
+
+    # 2) Unpriced SOLD items (recent)
+    recent_unpriced = (
+        sales_qs.filter(Q(price__isnull=True) | Q(price__lte=0), sold_at__gte=today - timedelta(days=30))
+        .count()
+    )
+    if recent_unpriced:
+        alerts.append({
+            "type": "Pricing",
+            "severity": "warn",
+            "message": f"{recent_unpriced} sold item(s) with missing/zero price in last 30 days.",
+        })
+
+    # 3) Stale stock (older than 45 days)
+    stale_count = items_qs.filter(status="IN_STOCK", received_at__lt=today - timedelta(days=45)).count()
+    if stale_count:
+        alerts.append({
+            "type": "Aging stock",
+            "severity": "info",
+            "message": f"{stale_count} item(s) in stock for 45+ days.",
+        })
+
+    # 4) Negative wallet balance (current user)
+    try:
+        bal = float(_wallet_balance(request.user))
+        if bal < 0:
+            alerts.append({
+                "type": "Wallet",
+                "severity": "warn",
+                "message": f"Your wallet balance is negative: MK {abs(int(bal)):,}.",
+            })
+    except Exception:
+        pass
+
+    return JsonResponse({"ok": True, "alerts": alerts})
+
+
+# -----------------------
+# Manager-only: Dashboard CSV export
+# -----------------------
+@never_cache
+@login_required
+@require_http_methods(["GET"])
+def dashboard_export_csv(request):
+    """
+    Exports the key dashboard datasets into a single CSV file (sectioned).
+    Manager-only.
+    """
+    if not _is_manager_or_admin(request.user):
+        return JsonResponse({"ok": False, "error": "Manager only."}, status=403)
+
+    # Rebuild the main dashboard datasets with current query params
+    period = request.GET.get("period", "month")
+    model_id = request.GET.get("model") or None
+    today = timezone.localdate()
+    month_start = today.replace(day=1)
+
+    # Scope
+    sales_qs_all = Sale.objects.select_related("item", "agent", "item__product")
+    items_qs = InventoryItem.objects.select_related("product", "assigned_agent", "current_location")
+    if model_id:
+        sales_qs_all = sales_qs_all.filter(item__product_id=model_id)
+        items_qs = items_qs.filter(product_id=model_id)
+
+    sales_qs_period = sales_qs_all
+    if period == "month":
+        sales_qs_period = sales_qs_all.filter(sold_at__gte=month_start)
+
+    # KPIs
+    tomorrow = today + timedelta(days=1)
+    kpi_today = sales_qs_all.filter(sold_at__gte=today, sold_at__lt=tomorrow).count()
+    kpi_mtd = sales_qs_all.filter(sold_at__gte=month_start, sold_at__lt=tomorrow).count()
+    kpi_all = sales_qs_all.count()
+
+    # Agent ranking + wallet
+    dec2 = DecimalField(max_digits=14, decimal_places=2)
+    pct_dec = DecimalField(max_digits=5, decimal_places=2)
+    commission_pct_dec = Cast(F("commission_pct"), pct_dec)
+    commission_expr = ExpressionWrapper(
+        Coalesce(F("price"), Value(0), output_field=dec2) *
+        (Coalesce(commission_pct_dec, Value(0), output_field=pct_dec) / Value(100, output_field=pct_dec)),
+        output_field=dec2,
+    )
+    rank_base = Sale.objects.select_related("agent")
+    if model_id:
+        rank_base = rank_base.filter(item__product_id=model_id)
+    if period == "month":
+        rank_base = rank_base.filter(sold_at__gte=month_start)
+    agent_rank = list(
+        rank_base.values("agent_id", "agent__username")
+        .annotate(
+            total_sales=Count("id"),
+            earnings=Coalesce(Sum(commission_expr), Value(0), output_field=dec2),
+            revenue=Coalesce(Sum("price"), Value(0), output_field=dec2),
+        )
+        .order_by("-earnings", "-total_sales", "agent__username")
+    )
+    # Wallet balances
+    agent_wallet_map = {}
+    if agent_rank and WalletTxn is not None:
+        ids = [r["agent_id"] for r in agent_rank if r.get("agent_id")]
+        w = WalletTxn.objects.filter(user_id__in=ids).values("user_id").annotate(balance=Sum("amount"))  # type: ignore[union-attr]
+        agent_wallet_map = {r["user_id"]: float(r["balance"] or 0) for r in w}
+    for r in agent_rank:
+        r["wallet_balance"] = agent_wallet_map.get(r.get("agent_id"), 0.0)
+
+    # Agent stock vs sold
+    total_assigned = (
+        items_qs.values("assigned_agent_id", "assigned_agent__username")
+        .annotate(total_stock=Count("id"))
+        .order_by("assigned_agent__username")
+    )
+    sold_units = sales_qs_period.values("agent_id").annotate(sold=Count("id"))
+    sold_map = {r["agent_id"]: r["sold"] for r in sold_units}
+    agent_rows = [
+        {
+            "agent_id": row["assigned_agent_id"],
+            "agent": row["assigned_agent__username"] or "—",
+            "total_stock": row["total_stock"],
+            "sold_units": sold_map.get(row["assigned_agent_id"], 0),
+        }
+        for row in total_assigned
+    ]
+
+    # 12 months revenue/profit
+    def back_n_months(d: date, n: int) -> date:
+        y = d.year
+        m = d.month - n
+        while m <= 0:
+            m += 12
+            y -= 1
+        return date(y, m, 1)
+    labels = [back_n_months(month_start, n).strftime("%Y-%m") for n in range(11, -1, -1)]
+    rev_qs = Sale.objects.select_related("item").filter(sold_at__gte=back_n_months(month_start, 11))
+    if model_id:
+        rev_qs = rev_qs.filter(item__product_id=model_id)
+    rev_by_month = (
+        rev_qs.annotate(m=TruncMonth("sold_at")).values("m")
+        .annotate(total=Coalesce(Sum("price"), Value(0), output_field=dec2))
+        .order_by("m")
+    )
+    totals_map = {r["m"].strftime("%Y-%m"): float(r["total"] or 0) for r in rev_by_month if r["m"]}
+    profit_expr_month = ExpressionWrapper(
+        Coalesce(F("price"), Value(0), output_field=dec2) -
+        Coalesce(F("item__order_price"), Value(0), output_field=dec2),
+        output_field=dec2,
+    )
+    prof_by_month = (
+        rev_qs.annotate(m=TruncMonth("sold_at")).values("m")
+        .annotate(total=Coalesce(Sum(profit_expr_month), Value(0), output_field=dec2))
+        .order_by("m")
+    )
+    prof_map = {r["m"].strftime("%Y-%m"): float(r["total"] or 0) for r in prof_by_month if r["m"]}
+
+    # Pie summary (period)
+    totals = sales_qs_period.aggregate(
+        revenue=Coalesce(Sum("price"), Value(0), output_field=dec2),
+        cost=Coalesce(Sum(Coalesce(F("item__order_price"), Value(0), output_field=dec2)), Value(0), output_field=dec2),
+        profit=Coalesce(Sum(profit_expr_month), Value(0), output_field=dec2),
+    )
+
+    # ---- Write CSV ----
+    filename = f"dashboard_export_{timezone.now():%Y%m%d_%H%M}.csv"
+    resp = HttpResponse(content_type="text/csv; charset=utf-8")
+    resp["Content-Disposition"] = f'attachment; filename="{filename}"'
+    resp["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+    resp["Pragma"] = "no-cache"
+    resp.write("\ufeff")  # Excel BOM
+    w = csv.writer(resp)
+
+    # Section 1: KPIs
+    w.writerow(["# Dashboard KPIs"])
+    w.writerow(["period", period])
+    w.writerow(["model_id", model_id or "all"])
+    w.writerow(["today_count", kpi_today])
+    w.writerow(["mtd_count", kpi_mtd])
+    w.writerow(["all_time_count", kpi_all])
+    w.writerow([])
+
+    # Section 2: Leaderboard
+    w.writerow(["# Top Agents (wallet_balance desc, then earnings desc, sales desc)"])
+    w.writerow(["Agent", "Earnings", "Sales", "Revenue", "WalletBalance"])
+    agent_rank.sort(key=lambda r: (r.get("wallet_balance", 0.0), float(r.get("earnings") or 0.0), int(r.get("total_sales") or 0)), reverse=True)
+    for r in agent_rank:
+        w.writerow([
+            r["agent__username"],
+            f'{float(r["earnings"] or 0):.2f}',
+            int(r["total_sales"] or 0),
+            f'{float(r["revenue"] or 0):.2f}',
+            f'{float(r.get("wallet_balance", 0.0)):.2f}',
+        ])
+    w.writerow([])
+
+    # Section 3: Agent stock vs sold
+    w.writerow(["# Agent Stock vs Sold Units"])
+    w.writerow(["Agent", "TotalStock", f'SoldUnits ({ "this month" if period=="month" else "all time" })'])
+    for r in agent_rows:
+        w.writerow([r["agent"], int(r["total_stock"] or 0), int(r["sold_units"] or 0)])
+    w.writerow([])
+
+    # Section 4: Revenue/Profit 12 months
+    w.writerow(["# Revenue and Profit (last 12 months)"])
+    w.writerow(["Month", "Revenue", "Profit"])
+    for lbl in labels:
+        w.writerow([lbl, f'{float(totals_map.get(lbl, 0.0)):.2f}', f'{float(prof_map.get(lbl, 0.0)):.2f}'])
+    w.writerow([])
+
+    # Section 5: Cost vs Revenue vs Profit (current selection)
+    w.writerow(["# Cost vs Revenue vs Profit (current selection)"])
+    w.writerow(["Cost", "Revenue", "Profit"])
+    w.writerow([f'{float(totals.get("cost") or 0):.2f}', f'{float(totals.get("revenue") or 0):.2f}', f'{float(totals.get("profit") or 0):.2f}'])
+
+    return resp
 
 
 # -----------------------
@@ -1651,3 +2470,515 @@ def healthz(request):
     if err:
         payload["error"] = err
     return JsonResponse(payload, status=200 if ok else 500)
+
+
+# -----------------------
+# Restock Heatmap API (manager-aware; agents get scoped view)
+# -----------------------
+@never_cache
+@login_required
+@require_GET
+def restock_heatmap_api(request):
+    """
+    Returns heatmap-style restock suggestions and a stock 'battery' percentage.
+
+    Manager/Admin  -> whole org (all products/locations), battery cap=100
+    Agent          -> only own stock/sales, battery cap=20
+
+    Response shape:
+    {
+      "ok": true,
+      "mode": "manager" | "agent",
+      "window_days": 30,
+      "generated_at": "...iso...",
+      "battery_pct": 75,
+      "battery_count": 75,
+      "battery_cap": 100,
+      "heatmap": [
+        {
+          "product_id": 1,
+          "product": "Brand Model",
+          "location_id": 3,
+          "location": "Shop A",
+          "on_hand": 8,
+          "sold_30d": 15,
+          "burn_rate_per_day": 0.5,
+          "need_next_7": 4,
+          "days_cover": 16,
+          "risk_score": 33
+        }
+      ],
+      "top_products": [
+        {"product_id": 1, "product": "Brand Model", "sold_30d": 42, "on_hand": 12, "risk_score": 78}
+      ]
+    }
+    """
+    mode_manager = _is_manager_or_admin(request.user)
+    window_days = int(request.GET.get("days", 30) or 30)
+    window_days = max(7, min(window_days, 90))
+    today = timezone.localdate()
+    start = today - timedelta(days=window_days)
+    end_excl = today + timedelta(days=1)
+
+    if mode_manager:
+        items_qs = InventoryItem.objects.select_related("product", "current_location").filter(status="IN_STOCK")
+        sales_qs = Sale.objects.select_related("item__product", "location").filter(sold_at__gte=start, sold_at__lt=end_excl)
+        battery_cap = 100
+    else:
+        items_qs = InventoryItem.objects.select_related("product", "current_location").filter(
+            status="IN_STOCK", assigned_agent=request.user
+        )
+        sales_qs = Sale.objects.select_related("item__product", "location").filter(
+            agent=request.user, sold_at__gte=start, sold_at__lt=end_excl
+        )
+        battery_cap = 20
+
+    # Battery
+    battery_count = items_qs.count()
+    battery_pct = int(round(min(100.0, (battery_count / float(battery_cap)) * 100))) if battery_count else 0
+
+    # On-hand by (product, location)
+    onhand_rows = items_qs.values(
+        "product_id", "product__brand", "product__model", "current_location_id", "current_location__name"
+    ).annotate(on_hand=Count("id"))
+
+    onhand_map = {}
+    for r in onhand_rows:
+        key = (r["product_id"], r["current_location_id"])
+        onhand_map[key] = {
+            "product_id": r["product_id"],
+            "product": f'{r["product__brand"]} {r["product__model"]}'.strip(),
+            "location_id": r["current_location_id"],
+            "location": r["current_location__name"] or "—",
+            "on_hand": int(r["on_hand"] or 0),
+        }
+
+    # Sold last N days by (product, location)
+    sold_rows = sales_qs.values(
+        "item__product_id", "item__product__brand", "item__product__model", "location_id", "location__name"
+    ).annotate(sold_30d=Count("id"))
+
+    combos = {}
+    for k, v in onhand_map.items():
+        combos[k] = {**v, "sold_30d": 0}
+    for r in sold_rows:
+        key = (r["item__product_id"], r["location_id"])
+        prod_name = f'{r["item__product__brand"]} {r["item__product__model"]}'.strip()
+        if key not in combos:
+            combos[key] = {
+                "product_id": r["item__product_id"],
+                "product": prod_name,
+                "location_id": r["location_id"],
+                "location": r["location__name"] or "—",
+                "on_hand": 0,
+                "sold_30d": 0,
+            }
+        combos[key]["sold_30d"] = int(r["sold_30d"] or 0)
+
+    # Compute burn, cover, risk
+    heatmap = []
+    eps = 1e-9
+    for (_pid, _loc), row in combos.items():
+        sold_30d = int(row["sold_30d"] or 0)
+        on_hand = int(row["on_hand"] or 0)
+        burn = sold_30d / float(window_days) if sold_30d > 0 else 0.0
+        need_next_7 = burn * 7.0
+        days_cover = (on_hand / (burn + eps)) if burn > 0 else None
+
+        if need_next_7 <= eps:
+            risk = 0
+        else:
+            deficit = max(0.0, need_next_7 - on_hand)
+            risk = int(round(min(100.0, (deficit / need_next_7) * 100.0)))
+
+        heatmap.append({
+            "product_id": row["product_id"],
+            "product": row["product"],
+            "location_id": row["location_id"],
+            "location": row["location"],
+            "on_hand": on_hand,
+            "sold_30d": sold_30d,
+            "burn_rate_per_day": round(burn, 3),
+            "need_next_7": int(round(need_next_7)),
+            "days_cover": (round(days_cover, 1) if days_cover is not None else None),
+            "risk_score": risk,
+        })
+
+    heatmap.sort(key=lambda x: (x["risk_score"], (x["need_next_7"] - x["on_hand"])), reverse=True)
+
+    # Top products across locations
+    prod_totals = {}
+    for row in heatmap:
+        pid = row["product_id"]
+        if pid not in prod_totals:
+            prod_totals[pid] = {"product_id": pid, "product": row["product"], "sold_30d": 0, "on_hand": 0}
+        prod_totals[pid]["sold_30d"] += row["sold_30d"]
+        prod_totals[pid]["on_hand"]  += row["on_hand"]
+
+    top_products = []
+    for p in prod_totals.values():
+        burn = p["sold_30d"] / float(window_days) if p["sold_30d"] > 0 else 0.0
+        need7 = burn * 7.0
+        if need7 <= eps:
+            risk = 0
+        else:
+            deficit = max(0.0, need7 - p["on_hand"])
+            risk = int(round(min(100.0, (deficit / need7) * 100.0)))
+        top_products.append({**p, "risk_score": risk})
+
+    top_products.sort(key=lambda r: (r["risk_score"], r["sold_30d"]), reverse=True)
+    top_products = top_products[:20]
+
+    return JsonResponse({
+        "ok": True,
+        "mode": "manager" if mode_manager else "agent",
+        "window_days": window_days,
+        "generated_at": timezone.now().isoformat(),
+        "battery_pct": battery_pct,
+        "battery_count": battery_count,
+        "battery_cap": battery_cap,
+        "heatmap": heatmap,
+        "top_products": top_products,
+    })
+
+
+# =======================
+# NEW: Stock List helpers for Admin Wallet
+# =======================
+
+@never_cache
+@login_required
+@require_GET
+def api_order_price(request, product_id: int):
+    """
+    Returns the default order price for a product (used to auto-fill Scan IN).
+    Source of truth: Product.cost_price
+    Response: {"ok": true, "product_id": 1, "price": "12345.00"}
+    """
+    try:
+        p = Product.objects.only("id", "cost_price").get(pk=int(product_id))
+    except (Product.DoesNotExist, ValueError):
+        return JsonResponse({"ok": False, "error": "Unknown product."}, status=404)
+    price = p.cost_price or 0
+    return JsonResponse({"ok": True, "product_id": p.id, "price": str(price)})
+
+
+@never_cache
+@login_required
+@require_GET
+def api_stock_models(request):
+    @never_cache
+    @login_required
+    @require_POST
+    def api_product_create(request):
+        if not _is_admin(request.user):
+            return JsonResponse({"ok": False, "error": "Admin only."}, status=403)
+        try:
+            payload = json.loads(request.body or "{}")
+            brand = (payload.get("brand") or "").strip()
+            model = (payload.get("model") or "").strip()
+            variant = (payload.get("variant") or "").strip()
+            cost_price = float(payload.get("cost_price") or 0)
+            if cost_price < 0:
+                raise ValueError()
+        except Exception:
+            return JsonResponse({"ok": False, "error": "Invalid input."}, status=400)
+        if not brand or not model:
+            return JsonResponse({"ok": False, "error": "brand and model are required."}, status=400)
+        p = Product.objects.create(brand=brand, model=model, variant=variant, cost_price=cost_price)
+        return JsonResponse({"ok": True, "product_id": p.id, "name": str(p)})
+
+    @never_cache
+    @login_required
+    @require_POST
+    def api_product_update_price(request):
+        if not _is_admin(request.user):
+            return JsonResponse({"ok": False, "error": "Admin only."}, status=403)
+        try:
+            payload = json.loads(request.body or "{}")
+            pid = int(payload.get("product_id"))
+            price = float(payload.get("cost_price"))
+            if price < 0:
+                raise ValueError()
+        except Exception:
+            return JsonResponse({"ok": False, "error": "Invalid product_id or cost_price."}, status=400)
+        try:
+            p = Product.objects.get(pk=pid)
+        except Product.DoesNotExist:
+            return JsonResponse({"ok": False, "error": "Unknown product."}, status=404)
+        p.cost_price = price
+        p.save(update_fields=["cost_price"])
+        return JsonResponse({"ok": True, "product_id": p.id, "cost_price": float(price)})
+
+    """
+    Compact list of product models in stock with on-hand counts.
+    Response: {"ok":true, "models":[{"product_id":1,"product":"Brand Model Variant","on_hand":5,"default_price":"100000.00"}]}
+    """
+    qs = (
+        InventoryItem.objects.filter(status="IN_STOCK")
+        .values("product_id", "product__brand", "product__model", "product__variant", "product__cost_price")
+        .annotate(on_hand=Count("id"))
+        .order_by("product__brand", "product__model", "product__variant")
+    )
+    models = []
+    for r in qs:
+        name = " ".join([r.get("product__brand") or "", r.get("product__model") or "", r.get("product__variant") or ""]).strip()
+        models.append({
+            "product_id": r["product_id"],
+            "product": name,
+            "on_hand": int(r["on_hand"] or 0),
+            "default_price": str(r.get("product__cost_price") or "0.00"),
+        })
+    return JsonResponse({"ok": True, "models": models})
+
+
+@never_cache
+@login_required
+@require_POST
+@transaction.atomic
+@never_cache
+@login_required
+@require_POST
+@transaction.atomic
+def api_place_order(request):
+    if not _is_manager_or_admin(request.user):
+        return JsonResponse({"ok": False, "error": "Manager/Admin only."}, status=403)
+    if AdminPurchaseOrder is None or AdminPurchaseOrderItem is None:
+        return JsonResponse({"ok": False, "error": "Purchase Order models not installed."}, status=500)
+
+    try:
+        payload = json.loads(request.body or "{}")
+    except Exception:
+        return JsonResponse({"ok": False, "error": "Invalid JSON."}, status=400)
+
+    items = payload.get("items") or []
+    if not isinstance(items, list) or not items:
+        return JsonResponse({"ok": False, "error": "Provide at least one item."}, status=400)
+
+    po = AdminPurchaseOrder.objects.create(
+        created_by=request.user,
+        supplier_name=(payload.get("supplier_name") or "").strip()[:120],
+        supplier_email=(payload.get("supplier_email") or "").strip()[:254],
+        supplier_phone=(payload.get("supplier_phone") or "").strip()[:40],
+        agent_name=(payload.get("agent_name") or "").strip()[:120],
+        notes=(payload.get("notes") or "").strip(),
+        currency=getattr(settings, "DEFAULT_CURRENCY", "MWK"),
+    )
+
+    prod_ids = [it.get("product_id") for it in items if it.get("product_id") is not None]
+    prod_map = {p.id: p for p in Product.objects.filter(id__in=prod_ids)}
+    created_any = False
+    for it in items:
+        try:
+            pid = int(it.get("product_id"))
+            qty = int(it.get("quantity"))
+        except Exception:
+            return JsonResponse({"ok": False, "error": "Bad product_id/quantity."}, status=400)
+        if qty <= 0 or pid not in prod_map:
+            return JsonResponse({"ok": False, "error": f"Invalid item: product={pid}, qty={qty}."}, status=400)
+
+        prod = prod_map[pid]
+        unit = None
+        if "unit_price" in it and it["unit_price"] is not None:
+            try:
+                unit = float(it["unit_price"])
+                if unit < 0:
+                    raise ValueError()
+            except Exception:
+                return JsonResponse({"ok": False, "error": f"Invalid unit_price for product {pid}."}, status=400)
+        if unit is None:
+            unit = float(prod.cost_price or 0)
+
+        line_total = (unit or 0) * qty
+        AdminPurchaseOrderItem.objects.create(
+            po=po, product=prod, quantity=qty, unit_price=unit, line_total=line_total
+        )
+        created_any = True
+
+    if not created_any:
+        po.delete()
+        return JsonResponse({"ok": False, "error": "No valid items."}, status=400)
+
+    po.recompute_totals(save=True)
+
+    invoice_url = reverse("inventory:po_invoice", args=[po.id])
+    subject = quote(f"Purchase Order PO-{po.id}")
+    body_lines = [
+        f"PO-{po.id} · Total {po.total} {po.currency}",
+        f"Supplier: {po.supplier_name or '-'}",
+        f"Agent: {po.agent_name or '-'}",
+        "", "Items:",
+    ]
+    for ln in po.items.select_related("product").all():
+        body_lines.append(f" - {ln.product} × {ln.quantity} @ {ln.unit_price} = {ln.line_total}")
+    body_lines.append("")
+    body_lines.append(f"Download invoice: {request.build_absolute_uri(invoice_url)}")
+    body = quote("\n".join(body_lines))
+    mailto = f"mailto:{quote((po.supplier_email or ''))}?subject={subject}&body={body}"
+    whatsapp = f"https://wa.me/?text={body}"
+
+    return JsonResponse({"ok": True, "po_id": po.id, "invoice_url": invoice_url,
+                         "share": {"email": mailto, "whatsapp": whatsapp}})
+
+    """
+    Creates an AdminPurchaseOrder + items from JSON.
+    Manager/Admin only.
+
+    Body JSON example:
+    {
+      "supplier_name": "ACME",
+      "supplier_email": "vendor@acme.com",
+      "supplier_phone": "+26588...",
+      "agent_name": "John (optional)",
+      "notes": "Urgent restock",
+      "items": [{"product_id": 1, "quantity": 5}, {"product_id": 3, "quantity": 2}]
+    }
+    """
+    if not _is_manager_or_admin(request.user):
+        return JsonResponse({"ok": False, "error": "Manager/Admin only."}, status=403)
+    if AdminPurchaseOrder is None or AdminPurchaseOrderItem is None:
+        return JsonResponse({"ok": False, "error": "Purchase Order models not installed."}, status=500)
+
+    try:
+        payload = json.loads(request.body or "{}")
+    except Exception:
+        return JsonResponse({"ok": False, "error": "Invalid JSON."}, status=400)
+
+    items = payload.get("items") or []
+    if not isinstance(items, list) or not items:
+        return JsonResponse({"ok": False, "error": "Provide at least one item."}, status=400)
+
+    # Create PO
+    po = AdminPurchaseOrder.objects.create(
+        created_by=request.user,
+        supplier_name=(payload.get("supplier_name") or "").strip()[:120],
+        supplier_email=(payload.get("supplier_email") or "").strip()[:254],
+        supplier_phone=(payload.get("supplier_phone") or "").strip()[:40],
+        agent_name=(payload.get("agent_name") or "").strip()[:120],
+        notes=(payload.get("notes") or "").strip(),
+        currency=getattr(settings, "DEFAULT_CURRENCY", "MWK"),
+    )
+
+    # Add lines (unit price from Product.cost_price)
+    prod_map = {p.id: p for p in Product.objects.filter(id__in=[it.get("product_id") for it in items])}
+    created_any = False
+    for it in items:
+        try:
+            pid = int(it.get("product_id"))
+            qty = int(it.get("quantity"))
+        except Exception:
+            return JsonResponse({"ok": False, "error": "Bad product_id/quantity."}, status=400)
+        if qty <= 0 or pid not in prod_map:
+            return JsonResponse({"ok": False, "error": f"Invalid item: product={pid}, qty={qty}."}, status=400)
+        prod = prod_map[pid]
+        unit = prod.cost_price or 0
+        line_total = (unit or 0) * qty
+        AdminPurchaseOrderItem.objects.create(
+            po=po, product=prod, quantity=qty, unit_price=unit, line_total=line_total
+        )
+        created_any = True
+
+    if not created_any:
+        po.delete()
+        return JsonResponse({"ok": False, "error": "No valid items."}, status=400)
+
+    # Totals
+    po.recompute_totals(save=True)
+
+    # Links
+    invoice_url = reverse("inventory:po_invoice", args=[po.id])
+    # Pre-filled share links
+    subject = quote(f"Purchase Order PO-{po.id}")
+    body_lines = [
+        f"PO-{po.id} · Total {po.total} {po.currency}",
+        f"Supplier: {po.supplier_name or '-'}",
+        f"Agent: {po.agent_name or '-'}",
+        "",
+        "Items:",
+    ]
+    for ln in po.items.select_related("product").all():
+        body_lines.append(f" - {ln.product} × {ln.quantity} @ {ln.unit_price} = {ln.line_total}")
+    body_lines.append("")
+    body_lines.append(f"Download invoice: {request.build_absolute_uri(invoice_url)}")
+    body = quote("\n".join(body_lines))
+    mailto = f"mailto:{quote(po.supplier_email or '')}?subject={subject}&body={body}"
+    whatsapp = f"https://wa.me/?text={body}"
+
+    return JsonResponse({
+        "ok": True,
+        "po_id": po.id,
+        "invoice_url": invoice_url,
+        "share": {
+            "email": mailto,
+            "whatsapp": whatsapp,
+        }
+    })
+
+
+@never_cache
+@login_required
+@require_GET
+def po_invoice(request, po_id: int):
+    """
+    Simple downloadable HTML invoice for a PO.
+    """
+    if AdminPurchaseOrder is None:
+        return HttpResponse("PO model missing.", status=500)
+
+    po = get_object_or_404(AdminPurchaseOrder.objects.select_related("created_by"), pk=int(po_id))
+    lines = list(po.items.select_related("product").all())
+
+    rows_html = "".join(
+        f"<tr><td>{i+1}</td><td>{ln.product}</td><td style='text-align:right'>{ln.quantity}</td>"
+        f"<td style='text-align:right'>{ln.unit_price:.2f}</td><td style='text-align:right'>{ln.line_total:.2f}</td></tr>"
+        for i, ln in enumerate(lines)
+    )
+
+    html = f"""<!doctype html>
+<html lang="en"><head>
+<meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>PO-{po.id}</title>
+<style>
+body{{font-family:system-ui,Segoe UI,Roboto,Arial,sans-serif;background:#fff;margin:24px;color:#0f172a}}
+.h{{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:16px}}
+.table{{width:100%;border-collapse:collapse;margin-top:8px}}
+.table th,.table td{{border:1px solid #e5e7eb;padding:8px;font-size:14px}}
+.table th{{background:#f3f4f6;text-align:left}}
+.total{{text-align:right;margin-top:12px}}
+.badge{{display:inline-block;padding:.1rem .4rem;border-radius:.4rem;background:#eef2ff;border:1px solid #dbeafe}}
+.small{{font-size:12px;opacity:.8}}
+</style>
+</head><body>
+<div class="h">
+  <div>
+    <h2 style="margin:0">Purchase Order <span class="badge">PO-{po.id}</span></h2>
+    <div class="small">Created: {po.created_at:%Y-%m-%d %H:%M}</div>
+    <div class="small">By: {getattr(po.created_by, 'username', '—')}</div>
+  </div>
+  <div>
+    <div><strong>Supplier</strong>: {po.supplier_name or '—'}</div>
+    <div><strong>Email</strong>: {po.supplier_email or '—'}</div>
+    <div><strong>Phone</strong>: {po.supplier_phone or '—'}</div>
+    <div><strong>Agent</strong>: {po.agent_name or '—'}</div>
+  </div>
+</div>
+
+<table class="table">
+  <thead><tr><th>#</th><th>Product</th><th style='text-align:right'>Qty</th><th style='text-align:right'>Unit</th><th style='text-align:right'>Line total</th></tr></thead>
+  <tbody>{rows_html or '<tr><td colspan="5">No items.</td></tr>'}</tbody>
+</table>
+
+<div class="total">
+  <div>Subtotal: <strong>{po.subtotal:.2f} {po.currency}</strong></div>
+  <div>Tax: <strong>{po.tax:.2f} {po.currency}</strong></div>
+  <div style="font-size:18px">TOTAL: <strong>{po.total:.2f} {po.currency}</strong></div>
+</div>
+
+<div style="margin-top:12px"><strong>Notes:</strong><br/>{(po.notes or '').replace('<','&lt;').replace('>','&gt;')}</div>
+</body></html>"""
+
+    resp = HttpResponse(html, content_type="text/html; charset=utf-8")
+    resp["Content-Disposition"] = f'attachment; filename="PO_{po.id}.html"'  # fixed quotes
+    resp["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+    resp["Pragma"] = "no-cache"
+    return resp

@@ -1,9 +1,202 @@
 {% extends "base.html" %}
+{% load humanize %}
+
 {% block title %}Manager · Circuit City{% endblock %}
+
+{% block extra_css %}
+<style>
+  :root{
+    --cc-bg: var(--bg, #f6f9ff);
+    --cc-card: var(--card, #ffffff);
+    --cc-line: var(--line, #e5e7eb);
+    --cc-ink: var(--ink, #0f172a);
+    --cc-muted: var(--muted, #64748b);
+    --cc-accent: var(--blue-600, #2563eb);
+  }
+  .manager-wrap{max-width:1100px;margin:0 auto;padding:1rem}
+  .hero{display:flex;align-items:center;justify-content:space-between;gap:.75rem;margin-bottom:1.5rem}
+  .hero h1{margin:0;font-weight:800;color:var(--cc-accent);display:flex;gap:.5rem;align-items:center}
+  .panel{background:var(--cc-card);border:1px solid var(--cc-line);border-radius:16px;padding:1rem;
+         box-shadow:0 6px 18px rgba(16,24,40,.06)}
+  .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:.75rem;margin-bottom:1.25rem}
+  .kpi{display:flex;align-items:center;gap:.75rem;border:1px solid var(--cc-line);border-radius:14px;padding:.9rem;
+       background:linear-gradient(180deg,#fff,rgba(255,255,255,.96))}
+  .kpi .icon{width:42px;height:42px;border-radius:12px;display:grid;place-items:center;
+             background:color-mix(in oklab,var(--cc-accent) 18%, transparent);color:var(--cc-accent)}
+  .kpi .label{font-size:.9rem;color:var(--cc-muted);font-weight:700}
+  .kpi .value{font-size:1.55rem;font-weight:800}
+  .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:.75rem}
+  .action{display:flex;align-items:center;gap:.6rem;border:1px solid var(--cc-line);border-radius:14px;padding:.85rem;
+          background:var(--cc-card);text-decoration:none;color:var(--cc-ink);font-weight:700}
+  .action:hover{filter:brightness(1.02)}
+  .action .badge{margin-left:auto;background:color-mix(in oklab,var(--cc-accent) 12%, transparent);color:var(--cc-accent);
+                 border:1px solid var(--cc-line);border-radius:999px;padding:.15rem .5rem;font-size:.75rem}
+  .danger{background:#fee2e2;border-color:#fecaca}
+</style>
+{% endblock %}
+
 {% block body %}
-<div style="padding:2rem">
-  <h2 class="brand">Manager Dashboard</h2>
-  <p>KPIs for your assigned locations (coming next).</p>
-  <p><a class="btn" href="{% url 'logout' %}">Log out</a></p>
+<div class="manager-wrap">
+  <!-- Header -->
+  <div class="hero">
+    <h1>📈 Manager Dashboard</h1>
+    <a class="btn btn-outline-primary btn-sm" href="{% url 'inventory:inventory_dashboard' %}">
+      <i class="bi bi-speedometer2"></i> Main Dashboard
+    </a>
+  </div>
+
+  <!-- KPI tiles -->
+  <div class="kpis">
+    <div class="kpi">
+      <div class="icon"><i class="bi bi-currency-dollar"></i></div>
+      <div>
+        <div class="label">Total Sales</div>
+        <div class="value">MK {{ total_sales|default:0|floatformat:0|intcomma }}</div>
+      </div>
+    </div>
+    <div class="kpi">
+      <div class="icon"><i class="bi bi-bag-check"></i></div>
+      <div>
+        <div class="label">Units Sold</div>
+        <div class="value">{{ sold_units|default:0|intcomma }}</div>
+      </div>
+    </div>
+    <div class="kpi">
+      <div class="icon"><i class="bi bi-wallet2"></i></div>
+      <div>
+        <div class="label">Commissions Paid</div>
+        <div class="value">MK {{ commission_total|default:0|floatformat:0|intcomma }}</div>
+      </div>
+    </div>
+    <div class="kpi">
+      <div class="icon"><i class="bi bi-box-seam"></i></div>
+      <div>
+        <div class="label">Stock Available</div>
+        <div class="value">{{ in_stock|default:0|intcomma }}</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Charts -->
+  <div class="panel" style="margin-bottom:1.5rem">
+    <div class="row g-3">
+      <div class="col-lg-7">
+        <h5 class="fw-bold mb-2">Sales Trend</h5>
+        <canvas id="salesTrend" class="chart-canvas" height="240"></canvas>
+      </div>
+      <div class="col-lg-5">
+        <h5 class="fw-bold mb-2">Top Models</h5>
+        <canvas id="topModels" class="chart-canvas chart-canvas--sm"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <!-- Agent Performance -->
+  <div class="panel" style="margin-bottom:1.5rem">
+    <h5 class="fw-bold mb-3">Agent Performance</h5>
+    {% if agent_rank %}
+    <div class="table-responsive">
+      <table class="table table-sm align-middle">
+        <thead class="table-light">
+          <tr>
+            <th>Agent</th>
+            <th class="text-end">Earnings</th>
+            <th class="text-end">Sales</th>
+            <th class="text-end">Revenue</th>
+            <th class="text-end">Wallet</th>
+          </tr>
+        </thead>
+        <tbody>
+        {% for r in agent_rank %}
+          <tr>
+            <td>{{ r.agent__username }}</td>
+            <td class="text-end">MK {{ r.earnings|default:0|floatformat:0|intcomma }}</td>
+            <td class="text-end">{{ r.total_sales|default:0|intcomma }}</td>
+            <td class="text-end">MK {{ r.revenue|default:0|floatformat:0|intcomma }}</td>
+            <td class="text-end"><span class="badge bg-light text-dark wallet-chip loading" data-user-id="{{ r.agent_id }}" data-username="{{ r.agent__username }}">…</span></td>
+          </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+      <div class="text-muted">No agent data available.</div>
+    {% endif %}
+  </div>
+
+  <!-- Quick Actions -->
+  <div class="panel">
+    <div class="grid">
+      <a class="action" href="{% url 'inventory:scan_in' %}">
+        <i class="bi bi-upc-scan"></i> Scan IN
+      </a>
+      <a class="action" href="{% url 'inventory:scan_sold' %}">
+        <i class="bi bi-qr-code-scan"></i> Scan SOLD
+      </a>
+      <a class="action" href="{% url 'inventory:stock_list' %}">
+        <i class="bi bi-box-seam"></i> Stock List
+      </a>
+      <a class="action" href="{% url 'inventory:wallet' %}">
+        <i class="bi bi-wallet2"></i> Wallet Overview
+      </a>
+      <a class="action danger" href="{% url 'logout' %}">
+        <i class="bi bi-box-arrow-right"></i> Log out
+      </a>
+    </div>
+  </div>
 </div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+  const nf = new Intl.NumberFormat();
+
+  function themeColors(){
+    const s=getComputedStyle(document.documentElement);
+    return {
+      blue: s.getPropertyValue('--blue-600').trim() || '#3b82f6',
+      blueSoft: s.getPropertyValue('--blue-400').trim() || '#60a5fa',
+      grid: s.getPropertyValue('--chart-grid').trim() || 'rgba(2,6,23,.06)'
+    };
+  }
+
+  // Load Sales Trend
+  async function loadTrend(){
+    try{
+      const res = await fetch('/inventory/api/sales-trend/');
+      const d = await res.json();
+      const labels = d.labels || [];
+      const values = (d.values||[]).map(v=>Number(v)||0);
+      const ctx=document.getElementById('salesTrend');
+      new Chart(ctx,{
+        type:'line',
+        data:{labels,datasets:[{label:'Sales',data:values,borderColor:themeColors().blue,fill:true,
+          backgroundColor:'rgba(37,99,235,.1)',tension:.35}]},
+        options:{responsive:true,maintainAspectRatio:false,
+          scales:{x:{grid:{color:themeColors().grid}},y:{beginAtZero:true,grid:{color:themeColors().grid}}}}
+      });
+    }catch(e){ console.error('Sales Trend Error',e); }
+  }
+
+  // Load Top Models
+  async function loadTop(){
+    try{
+      const res=await fetch('/inventory/api/top-models/');
+      const d=await res.json();
+      const labels=d.labels||[];
+      const values=(d.values||[]).map(v=>Number(v)||0);
+      const ctx=document.getElementById('topModels');
+      new Chart(ctx,{
+        type:'bar',
+        data:{labels,datasets:[{label:'Units',data:values,backgroundColor:themeColors().blue}]},
+        options:{responsive:true,maintainAspectRatio:false,
+          scales:{x:{grid:{display:false}},y:{beginAtZero:true,grid:{color:themeColors().grid}}}}
+      });
+    }catch(e){ console.error('Top Models Error',e); }
+  }
+
+  loadTrend();
+  loadTop();
+</script>
 {% endblock %}
