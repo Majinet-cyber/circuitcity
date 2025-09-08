@@ -1,34 +1,230 @@
 {% extends "base.html" %}
+{% load humanize %}
+
 {% block title %}Admin · Circuit City{% endblock %}
+{% block header_title %}Admin{% endblock %}
+
+{% block nav_actions %}
+  <a class="btn primary" href="{% url 'inventory:inventory_dashboard' %}">
+    <i class="bi bi-speedometer2"></i> <span class="d-none d-sm-inline">Main Dashboard</span>
+  </a>
+  <a class="btn" href="{% url 'inventory:place_order_page' %}">
+    <i class="bi bi-receipt"></i> Place Order
+  </a>
+  <a class="btn" href="{% url 'wallet:admin_home' %}">
+    <i class="bi bi-wallet2"></i> Wallets
+  </a>
+  <a class="btn" href="/admin/">
+    <i class="bi bi-gear"></i> Admin
+  </a>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+  :root{
+    --cc-card: var(--cc-panel, var(--card, #ffffff));
+    --cc-line: var(--cc-border, var(--line, #e5e7eb));
+    --cc-ink:  var(--cc-text,  var(--ink, #0f172a));
+    --cc-muted: var(--muted, #475569);
+    --cc-accent: var(--cc-accent, var(--brand, #2563eb));
+    --cc-accent-2: var(--cc-accent-2, var(--brand-2, #60a5fa));
+    --danger: #dc2626;
+  }
+
+  /* tighten top spacing under the sticky header */
+  .admin-wrap{max-width:1100px;margin:0 auto;padding:12px 0}
+
+  /* Panels */
+  .panel{
+    background:var(--cc-card);
+    border:1px solid var(--cc-line);
+    border-radius:16px;
+    padding:16px;
+    box-shadow:var(--shadow-md,0 6px 18px rgba(16,24,40,.06));
+  }
+
+  /* KPI bar — strong, not faint */
+  .kpis{
+    display:grid;
+    grid-template-columns:repeat(auto-fit,minmax(240px,1fr));
+    gap:12px;
+    margin-bottom:12px;
+  }
+  .kpi{
+    display:flex; align-items:center; gap:.85rem;
+    border:1px solid var(--cc-line); border-radius:14px; padding:14px;
+    background:linear-gradient(135deg,
+      color-mix(in oklab, var(--cc-accent) 10%, var(--cc-card)) 0%,
+      color-mix(in oklab, var(--cc-accent-2) 6%, var(--cc-card)) 100%);
+    box-shadow:0 10px 22px color-mix(in oklab, var(--cc-accent) 14%, transparent);
+  }
+  .kpi .icon{
+    width:44px;height:44px;border-radius:12px;display:grid;place-items:center;
+    background:color-mix(in oklab,var(--cc-accent) 22%, transparent);
+    color:var(--cc-accent);
+  }
+  .kpi .label{
+    font-size:.92rem; color:var(--cc-ink); font-weight:800; letter-spacing:.01em;
+  }
+  .kpi .value{
+    font-size:1.6rem; font-weight:900; line-height:1.1;
+  }
+
+  /* Quick actions */
+  .grid{
+    display:grid; grid-template-columns:repeat(auto-fit,minmax(240px,1fr)); gap:12px;
+  }
+  .action{
+    display:flex; align-items:center; gap:.6rem;
+    border:1px solid var(--cc-line); border-radius:14px; padding:.9rem;
+    background:var(--cc-card); text-decoration:none; color:var(--cc-ink); font-weight:800;
+    box-shadow:var(--shadow-sm,0 2px 10px rgba(0,0,0,.08));
+  }
+  .action:hover{ filter:brightness(1.02) }
+  .action .badge{
+    margin-left:auto; background:color-mix(in oklab,var(--cc-accent) 12%, transparent);
+    color:var(--cc-accent); border:1px solid var(--cc-line);
+    border-radius:999px; padding:.15rem .5rem; font-size:.75rem;
+  }
+
+  /* Helper text */
+  .muted{ color:var(--cc-muted); }
+</style>
+{% endblock %}
 
 {% block body %}
-<div class="bg" style="min-height:100dvh;padding:2rem">
-  <div class="card" style="max-width:1000px;margin:auto;padding:1.5rem">
-    <h2 class="brand" style="margin:0 0 1rem">Admin Dashboard</h2>
-    <p>Here you’ll see sales KPIs, restock alerts, and all locations.</p>
+{% url 'reports:home' as url_reports %}
+{% url 'reports:sales' as url_reports_sales %}
+{% url 'reports:inventory' as url_reports_inventory %}
 
-    <!-- KPI Cards (Optional – show data at a glance) -->
-    {% if in_stock or sold or sales_value or commission_total %}
-    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:1rem;margin-bottom:1.5rem">
-      <div class="card" style="padding:1rem"><div class="brand">In Stock</div><div style="font-size:1.6rem">{{ in_stock }}</div></div>
-      <div class="card" style="padding:1rem"><div class="brand">Sold</div><div style="font-size:1.6rem">{{ sold }}</div></div>
-      <div class="card" style="padding:1rem"><div class="brand">Sales Value</div><div style="font-size:1.4rem">{{ sales_value }}</div></div>
-      <div class="card" style="padding:1rem"><div class="brand">Commission</div><div style="font-size:1.4rem">{{ commission_total }}</div></div>
+<div class="admin-wrap">
+
+  <!-- Intro -->
+  <div class="panel" style="margin-bottom:12px">
+    <div class="d-flex align-items-center justify-content-between">
+      <div>
+        <div class="fw-bold">Admin control center</div>
+        <div class="small muted">Review KPIs, jump to scanners, wallets, and reports.</div>
+      </div>
+      <a class="btn" href="{% url 'logout' %}">
+        <i class="bi bi-box-arrow-right"></i> Log out
+      </a>
     </div>
-    {% endif %}
+  </div>
 
-    <!-- Navigation Buttons -->
-    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:.75rem;margin-bottom:1.5rem">
-      <a class="btn" href="{% url 'inventory:inventory_dashboard' %}">📊 Inventory Dashboard</a>
-      <a class="btn" href="{% url 'inventory:scan_in' %}">➕ Scan Stock IN</a>
-      <a class="btn" href="{% url 'inventory:scan_sold' %}">✔ Scan SOLD</a>
-      <a class="btn" href="{% url 'inventory:stock_list' %}">📦 Stock List</a>
-      <a class="btn" href="/admin/">⚙ Django Admin</a>
+  <!-- KPIs -->
+  {% if in_stock or sold or sales_value or commission_total %}
+  <div class="kpis">
+    <div class="kpi">
+      <div class="icon"><i class="bi bi-archive"></i></div>
+      <div>
+        <div class="label">In Stock</div>
+        <div class="value">{{ in_stock|default:0|intcomma }}</div>
+      </div>
     </div>
 
-    <!-- Logout -->
-    <div style="margin-top:1rem">
-      <a class="btn" href="{% url 'logout' %}" style="background:#ef4444">Log out</a>
+    <div class="kpi">
+      <div class="icon"><i class="bi bi-bag-check"></i></div>
+      <div>
+        <div class="label">Sold (Units)</div>
+        <div class="value">{{ sold|default:0|intcomma }}</div>
+      </div>
+    </div>
+
+    <div class="kpi">
+      <div class="icon"><i class="bi bi-cash-coin"></i></div>
+      <div>
+        <div class="label">Sales Value</div>
+        <div class="value">MK {{ sales_value|default:0|floatformat:0|intcomma }}</div>
+      </div>
+    </div>
+
+    <div class="kpi">
+      <div class="icon"><i class="bi bi-trophy"></i></div>
+      <div>
+        <div class="label">Commission (Month)</div>
+        <div class="value">MK {{ commission_total|default:0|floatformat:0|intcomma }}</div>
+      </div>
+    </div>
+  </div>
+  {% endif %}
+
+  <!-- Quick actions -->
+  <div class="panel" style="margin-bottom:12px">
+    <div class="grid">
+      <a class="action" href="{% url 'inventory:stock_list' %}">
+        <i class="bi bi-box-seam"></i> Stock List
+        <span class="badge">{{ in_stock|default:0|intcomma }} in stock</span>
+      </a>
+
+      <a class="action" href="{% url 'inventory:scan_in' %}">
+        <i class="bi bi-upc-scan"></i> Scan IN
+      </a>
+
+      <a class="action" href="{% url 'inventory:scan_sold' %}">
+        <i class="bi bi-qr-code-scan"></i> Scan SOLD
+      </a>
+
+      <a class="action" href="{% url 'inventory:scan_unified' %}">
+        <i class="bi bi-upc"></i> Unified Scanner
+        <span class="badge">Mobile</span>
+      </a>
+
+      <a class="action" href="{% url 'inventory:place_order_page' %}">
+        <i class="bi bi-receipt"></i> Place Order
+        <span class="badge">New</span>
+      </a>
+
+      <a class="action" href="{% url 'wallet:admin_home' %}">
+        <i class="bi bi-wallet2"></i> Wallets (Admin)
+      </a>
+
+      <a class="action" href="{% url 'wallet:admin_po_list' %}">
+        <i class="bi bi-receipt-cutoff"></i> Purchase Orders
+      </a>
+
+      <a class="action" href="{% url 'inventory:inventory_dashboard' %}?period=month">
+        <i class="bi bi-graph-up"></i> Analytics (MTD)
+      </a>
+
+      {% if url_reports %}
+      <a class="action" href="{{ url_reports }}">
+        <i class="bi bi-file-earmark-bar-graph"></i> Reports
+        <span class="badge">Live</span>
+      </a>
+      {% endif %}
+      {% if url_reports_sales %}
+      <a class="action" href="{{ url_reports_sales }}">
+        <i class="bi bi-bar-chart-line"></i> Sales Report
+      </a>
+      {% endif %}
+      {% if url_reports_inventory %}
+      <a class="action" href="{{ url_reports_inventory }}">
+        <i class="bi bi-clipboard-data"></i> Inventory Report
+      </a>
+      {% endif %}
+
+      <a class="action" href="{% url 'inventory:dashboard_export_csv' %}">
+        <i class="bi bi-download"></i> Export CSV
+      </a>
+
+      <a class="action" href="/admin/">
+        <i class="bi bi-gear-wide-connected"></i> Django Admin
+      </a>
+    </div>
+  </div>
+
+  <!-- Session panel -->
+  <div class="panel">
+    <div class="d-flex align-items-center justify-content-between">
+      <div>
+        <div class="fw-bold">Session</div>
+        <div class="small muted">Securely end your admin session when you’re done.</div>
+      </div>
+      <a class="btn" style="background:color-mix(in oklab, var(--danger, #dc2626) 85%, transparent); color:#fff; border-color:transparent"
+         href="{% url 'logout' %}">
+        <i class="bi bi-box-arrow-right"></i> Log out
+      </a>
     </div>
   </div>
 </div>

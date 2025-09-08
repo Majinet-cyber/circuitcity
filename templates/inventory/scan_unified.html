@@ -1,0 +1,198 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Scanner · Circuit City{% endblock %}
+{% block header_title %}<span class="emoji">📷</span> Scanner{% endblock %}
+
+{% block content %}
+<div class="card p-3 mb-3">
+  <div class="d-flex justify-content-between align-items-center">
+    <div class="fw-semibold">Scan IMEI</div>
+    <div class="badge" id="net-badge">Online</div>
+  </div>
+  <div class="mt-2 small text-muted">
+    Use your camera to scan a QR/Barcode with the IMEI encoded, or type/paste manually.
+  </div>
+
+  <!-- camera preview -->
+  <div class="mt-3">
+    <video id="cam" playsinline autoplay muted style="width:100%;max-height:260px;border-radius:12px;background:var(--cc-panel-2)"></video>
+  </div>
+
+  <!-- manual entry -->
+  <div class="row g-2 mt-3">
+    <div class="col-sm-6">
+      <label class="form-label small fw-semibold">IMEI (15 digits)</label>
+      <input id="imei" class="input w-100" inputmode="numeric" maxlength="20" placeholder="Scan or paste IMEI…">
+    </div>
+    <div class="col-sm-3">
+      <label class="form-label small fw-semibold">Price (optional)</label>
+      <input id="price" class="input w-100" type="number" step="0.01" placeholder="0">
+    </div>
+    <div class="col-sm-3">
+      <label class="form-label small fw-semibold">Location</label>
+      <select id="loc" class="input w-100">
+        <option value="">Default</option>
+        {% for l in locations|default:[] %}
+          <option value="{{ l.id }}">{{ l.name }}</option>
+        {% endfor %}
+      </select>
+    </div>
+  </div>
+
+  <div class="d-flex gap-2 mt-3">
+    <button id="markBtn" class="btn btn-primary"><i class="bi bi-check2-circle"></i> Mark SOLD</button>
+    <button id="clearBtn" class="btn"><i class="bi bi-eraser"></i> Clear</button>
+    <button id="switchBtn" class="btn"><i class="bi bi-camera"></i> Switch camera</button>
+  </div>
+
+  <div class="mt-3">
+    <div id="out" class="small panel-soft p-2" style="min-height:42px;border-radius:10px"></div>
+  </div>
+</div>
+
+<div class="card p-3">
+  <div class="fw-semibold">Queued (offline)</div>
+  <div class="small text-muted">These will auto-sync when you’re online.</div>
+  <ul id="queue" class="mt-2 mb-0" style="list-style:none;padding-left:0"></ul>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+  // ---- network badge ----
+  const badge = document.getElementById('net-badge');
+  function setBadge() { badge.textContent = navigator.onLine ? 'Online' : 'Offline'; badge.classList.toggle('warn', !navigator.onLine); }
+  window.addEventListener('online',  setBadge);
+  window.addEventListener('offline', setBadge);
+  setBadge();
+
+  // ---- camera setup (no library; just preview + manual scan entry) ----
+  // We won't do live decode here (keeps it lightweight). Users scan phone/box code with OS (paste result) or type.
+  const cam = document.getElementById('cam');
+  let currentStream = null, useRear = true;
+
+  async function startCam(){
+    if(!navigator.mediaDevices?.getUserMedia) return;
+    try{
+      if(currentStream){ currentStream.getTracks().forEach(t=>t.stop()); }
+      currentStream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: useRear ? { ideal: 'environment' } : 'user' },
+        audio: false
+      });
+      cam.srcObject = currentStream;
+    }catch(e){
+      // camera unavailable; silently ignore (manual flow still works)
+    }
+  }
+  document.getElementById('switchBtn').onclick = ()=>{ useRear = !useRear; startCam(); };
+  startCam();
+
+  // ---- offline queue (localStorage) ----
+  const QKEY='scan.queue.v1';
+  function getQ(){ try{ return JSON.parse(localStorage.getItem(QKEY)||'[]'); }catch{ return []; } }
+  function setQ(arr){ localStorage.setItem(QKEY, JSON.stringify(arr)); renderQ(); }
+  function pushQ(job){ const arr=getQ(); arr.push(job); setQ(arr); }
+  function shiftQ(){ const arr=getQ(); const x=arr.shift(); setQ(arr); return x; }
+
+  function renderQ(){
+    const ul=document.getElementById('queue'); ul.innerHTML='';
+    const arr=getQ();
+    if(!arr.length){ ul.innerHTML='<li class="text-muted small">Empty</li>'; return; }
+    for(const j of arr){
+      const li=document.createElement('li');
+      li.className='panel-soft p-2 mb-2';
+      li.textContent=`IMEI ${j.imei} • ${j.price ? ('MK '+Number(j.price).toLocaleString()) : '—'} • ${j.when}`;
+      ul.appendChild(li);
+    }
+  }
+  renderQ();
+
+  async function postSold(payload){
+    const csrft = (document.cookie.match(/csrftoken=([^;]+)/)||[])[1] || (document.querySelector('input[name=csrfmiddlewaretoken]')?.value||'');
+    const r = await fetch("{% url 'inventory:api_mark_sold' %}", {
+      method:'POST',
+      headers:{'Content-Type':'application/json','X-CSRFToken':csrft},
+      body: JSON.stringify(payload)
+    });
+    if(!r.ok) throw new Error('HTTP '+r.status);
+    return r.json();
+  }
+
+  // ---- sync loop ----
+  async function trySync(){
+    if(!navigator.onLine) return;
+    let guard=0;
+    while(getQ().length && guard<5){
+      guard++;
+      const job = shiftQ();
+      try{
+        await postSold(job);
+        log(`✅ Synced ${job.imei}`);
+      }catch(e){
+        // put back and stop (network/validation)
+        const arr=getQ(); arr.unshift(job); setQ(arr);
+        break;
+      }
+    }
+  }
+  window.addEventListener('online', trySync);
+  setInterval(trySync, 5000);
+
+  // ---- UI actions ----
+  const out  = document.getElementById('out');
+  const imei = document.getElementById('imei');
+  const price= document.getElementById('price');
+  const loc  = document.getElementById('loc');
+
+  function log(msg){ out.innerHTML = `<div>${msg}</div>`; }
+  function vibrate(ms=35){ try{ navigator.vibrate && navigator.vibrate(ms); }catch{} }
+
+  document.getElementById('clearBtn').onclick = ()=>{
+    imei.value=''; price.value=''; log('Cleared.'); imei.focus();
+  };
+
+  document.getElementById('markBtn').onclick = async ()=>{
+    const raw = (imei.value||'').replace(/\D/g,'');
+    if(raw.length!==15){ log('<span class="text-danger">IMEI must be exactly 15 digits.</span>'); vibrate(60); return; }
+    const payload = {
+      imei: raw,
+      price: price.value ? Number(price.value) : undefined,
+      location_id: loc.value || undefined
+    };
+
+    if(!navigator.onLine){
+      pushQ({ ...payload, when: new Date().toISOString() });
+      log(`🕓 Queued IMEI ${raw} (offline).`);
+      vibrate();
+      imei.value=''; price.value='';
+      return;
+    }
+
+    try{
+      const d = await postSold(payload);
+      if(d.ok){
+        log(`✅ Marked SOLD: ${raw}${payload.price?(' • MK '+Number(payload.price).toLocaleString()):''}`);
+        vibrate();
+        imei.value=''; price.value='';
+      }else{
+        log(`<span class="text-danger">Failed: ${d.error||'Unknown error'}</span>`);
+        vibrate(60);
+      }
+    }catch(e){
+      // fallback to queue
+      pushQ({ ...payload, when: new Date().toISOString() });
+      log(`🕓 Network issue — queued ${raw}.`);
+      vibrate();
+      imei.value=''; price.value='';
+    }
+  };
+
+  // Paste helper: if user pastes full JSON or text that contains 15+ digits
+  imei.addEventListener('paste', (ev)=>{
+    const t = (ev.clipboardData?.getData('text')||'');
+    const m = t.match(/(\d{15})/);
+    if(m){ setTimeout(()=>{ imei.value = m[1]; }, 0); }
+  });
+</script>
+{% endblock %}

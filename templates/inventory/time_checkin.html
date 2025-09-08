@@ -7,11 +7,12 @@
   <h2 style="margin:0 0 .75rem 0;">Time Check-in</h2>
 
   <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;">
+    <!-- Store target info -->
     <section style="border:1px dashed var(--cc-border);border-radius:10px;padding:.75rem;">
       <h3 style="margin:.25rem 0 .5rem 0;font-size:1rem;color:var(--cc-muted)">Store target</h3>
       <div><strong>Name:</strong> {{ home_loc.name|default:"(home location not set)" }}</div>
       <div><strong>Lat/Lon:</strong>
-        {% if home_loc.latitude and home_loc.longitude %}
+        {% if home_loc and home_loc.latitude and home_loc.longitude %}
           {{ home_loc.latitude }}, {{ home_loc.longitude }}
         {% else %}
           —
@@ -20,6 +21,7 @@
       <div><strong>Geofence radius:</strong> {{ home_loc.geofence_radius_m|default:150 }} m</div>
     </section>
 
+    <!-- Options -->
     <section style="border:1px dashed var(--cc-border);border-radius:10px;padding:.75rem;">
       <h3 style="margin:.25rem 0 .5rem 0;font-size:1rem;color:var(--cc-muted)">Options</h3>
       <label for="chkType" style="display:block;margin-bottom:.5rem;font-weight:600;">Check-in type</label>
@@ -40,6 +42,7 @@
     </section>
   </div>
 
+  <!-- Check-in button -->
   <div style="display:flex;gap:.75rem;align-items:center;margin-top:1rem;">
     <button id="doCheckin" class="btn btn-green" style="font-size:1.05rem;padding:.7rem 1.1rem;">⏱ Check-in now</button>
     <span id="spin" hidden aria-live="polite">Getting GPS…</span>
@@ -111,23 +114,31 @@
     `;
   }
 
-  btn?.addEventListener('click', ()=>{
+  btn?.addEventListener('click', async ()=>{
     out.textContent = '';
     spin.hidden = false;
+    btn.disabled = true;
+
     if (!navigator.geolocation){
       spin.hidden = true;
+      btn.disabled = false;
       out.innerHTML = '<div class="cc-alert cc-alert-error"><div>GPS not supported in this browser.</div></div>';
       return;
     }
+
     navigator.geolocation.getCurrentPosition(async (pos)=>{
       try{
         const data = await postCheckin(pos);
         renderResult(data);
       } catch(e){
         out.innerHTML = '<div class="cc-alert cc-alert-error"><div>Network error while saving.</div></div>';
-      } finally { spin.hidden = true; }
+      } finally {
+        spin.hidden = true;
+        btn.disabled = false;
+      }
     }, (err)=>{
       spin.hidden = true;
+      btn.disabled = false;
       out.innerHTML = `<div class="cc-alert cc-alert-error"><div>GPS error: ${err.message}</div></div>`;
     }, { enableHighAccuracy:true, maximumAge:0, timeout:12000 });
   });

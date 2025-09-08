@@ -1,4 +1,4 @@
-/* circuitcity/static/js/app.js
+/* static/inventory/app.js
    Polished, mobile-first helpers. Backwards-compatible with your existing IDs.
    - Sidebar toggle (supports #ccBurger/#ccSidebar AND legacy #sidebarToggle/#sidebar)
    - Theme toggle + persistence (data-theme on <html>)

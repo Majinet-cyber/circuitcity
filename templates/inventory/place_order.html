@@ -1,0 +1,307 @@
+{% extends "base.html" %}
+{% load static humanize %}
+
+{% block title %}Place Order · Circuit City{% endblock %}
+{% block header_title %}Place Order{% endblock %}
+
+{% block nav_actions %}
+  <a class="btn" href="{% url 'inventory:stock_list' %}">← Back to stock</a>
+  <a class="btn" href="{% url 'inventory:inventory_dashboard' %}"><i class="bi bi-speedometer2"></i> Dashboard</a>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+  :root{
+    --bg: var(--surface, #eef2ff);
+    --card: var(--panel, #ffffff);
+    --ink: var(--ink, #0f172a);
+    --line: var(--line, #cbd5e1);
+    --accent: var(--brand, #1d4ed8);
+    --accent-2: #2563eb;
+    --chip: #0f172a;
+  }
+  body{ background: color-mix(in oklab, var(--bg) 92%, #fff); }
+  .wrap{max-width:1100px;margin:0 auto;padding:12px 0}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:16px;box-shadow:0 6px 18px rgba(16,24,40,.08)}
+  .h{display:flex;align-items:center;gap:.75rem;margin-bottom:.75rem}
+  .chip{background:var(--ink);color:#fff;border-radius:999px;padding:.2rem .6rem;font-weight:700}
+  .grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+  .muted{color:#334155}
+  .label{font-weight:800;color:var(--ink);margin-bottom:4px}
+  input, select, textarea{
+    width:100%;border:1px solid var(--line);border-radius:10px;padding:.65rem .7rem;background:#0b1220;color:#e2e8f0;
+  }
+  input::placeholder, textarea::placeholder{color:#93a3b8}
+  table{width:100%;border-collapse:collapse}
+  th, td{border-top:1px solid var(--line);padding:.6rem .7rem}
+  thead th{background:#0b1220;color:#fff;border-top:none}
+  tfoot td{font-weight:900;color:var(--ink)}
+  .btn.primary{background:var(--accent);color:#fff;border:1px solid var(--accent);border-radius:12px;padding:.6rem 1rem;font-weight:800}
+  .btn{border:1px solid var(--line);border-radius:12px;padding:.6rem 1rem;text-decoration:none;color:var(--ink);font-weight:800}
+  .tag{display:inline-block;border-radius:999px;padding:.15rem .5rem;border:1px solid var(--line);font-size:.8rem;margin-right:.35rem}
+  .danger{background:#b91c1c;color:#fff;border-color:#b91c1c}
+  .ok{color:#065f46}
+  .err{background:#3f1a1a;color:#fff;border-radius:12px;padding:.6rem 1rem}
+</style>
+{% endblock %}
+
+{% block body %}
+<div class="wrap">
+  <div class="h">
+    <span class="chip">Currency: {{ currency|default:"MWK" }}</span>
+  </div>
+
+  <div class="grid">
+    <div class="card">
+      <div class="label">Supplier</div>
+      <div class="grid" style="grid-template-columns:1fr 1fr;">
+        <div>
+          <div class="label">Supplier name</div>
+          <input id="supplier_name" placeholder="e.g. ACME Phones Ltd">
+        </div>
+        <div>
+          <div class="label">Supplier phone</div>
+          <input id="supplier_phone" placeholder="+26588...">
+        </div>
+        <div>
+          <div class="label">Supplier email</div>
+          <input id="supplier_email" placeholder="vendor@example.com">
+        </div>
+        <div>
+          <div class="label">Agent name (optional)</div>
+          <input id="agent_name" placeholder="Who will receive?">
+        </div>
+      </div>
+      <div style="margin-top:8px">
+        <div class="label">Notes</div>
+        <textarea id="notes" rows="4" placeholder="E.g. Urgent restock for next week..."></textarea>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="label">Add Items</div>
+      <div class="grid" style="grid-template-columns:1fr 120px;">
+        <div>
+          <select id="model_select"></select>
+          <div style="margin-top:6px">
+            <span class="tag" id="default_price">Default price ~ 0</span>
+            <span class="tag" id="on_hand">On hand: 0</span>
+          </div>
+        </div>
+        <div>
+          <div class="label">Qty</div>
+          <input id="qty" type="number" value="1" min="1">
+        </div>
+      </div>
+
+      <div class="grid" style="grid-template-columns:1fr 1fr; margin-top:10px">
+        <div>
+          <div class="label">Override Unit Price (optional)</div>
+          <input id="unit_price_override" type="number" step="0.01" placeholder="Leave blank to use Product cost_price">
+        </div>
+        <div style="display:flex;align-items:flex-end;justify-content:flex-end">
+          <button class="btn primary" id="add">+ Add</button>
+        </div>
+      </div>
+
+      <div class="card" style="margin-top:12px">
+        <div class="label">Create Product (Admin)</div>
+        <div class="grid" style="grid-template-columns:1fr 1fr">
+          <input id="new_brand" placeholder="Brand">
+          <input id="new_model" placeholder="Model">
+          <input id="new_variant" placeholder="Variant (optional)">
+          <input id="new_price" type="number" step="0.01" placeholder="Cost price">
+        </div>
+        <div style="margin-top:8px">
+          <button class="btn" id="create_product">Create Product</button>
+          <button class="btn" id="update_price">Update Selected Product Price</button>
+        </div>
+        <div class="muted small" style="margin-top:6px">Admin only actions.</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card" style="margin-top:16px">
+    <div class="label">Order Lines</div>
+    <table>
+      <thead>
+        <tr><th>#</th><th>Product</th><th>Qty</th><th>Est. Unit</th><th>Est. Line</th><th></th></tr>
+      </thead>
+      <tbody id="lines"></tbody>
+      <tfoot>
+        <tr><td colspan="4" style="text-align:right">Estimated Total</td><td id="est_total">0</td><td></td></tr>
+      </tfoot>
+    </table>
+    <div class="grid" style="grid-template-columns:1fr 1fr;margin-top:12px">
+      <div>
+        <div class="muted">The order will price each line using the Product’s <em>cost_price</em> unless
+          you provide an override above.</div>
+      </div>
+      <div style="text-align:right">
+        <a class="btn" href="{% url 'inventory:stock_list' %}">← Back to stock</a>
+        <button class="btn primary" id="create_po">Create Purchase Order</button>
+      </div>
+    </div>
+    <div id="error" class="err" style="display:none; margin-top:10px">Network error.</div>
+    <div id="ok" class="ok" style="display:none; margin-top:10px"></div>
+  </div>
+
+  <div class="muted" style="margin-top:12px">
+    Tip: default pricing for Scan-In? <code>/inventory/api/order-price/&lt;product_id&gt;/</code>
+  </div>
+</div>
+
+<script>
+const sel = id => document.getElementById(id);
+const linesEl = sel('lines');
+let models = [];
+let lines = [];
+
+function fmt(n){ try{ return Number(n).toLocaleString(); } catch(e){ return n; } }
+
+function redraw(){
+  linesEl.innerHTML = '';
+  let total = 0;
+  lines.forEach((ln, idx) => {
+    const estUnit = ln.unit_price_override != null ? ln.unit_price_override : (ln.default_price || 0);
+    const estLine = (estUnit || 0) * ln.qty;
+    total += estLine;
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td>${idx+1}</td>
+      <td>${ln.name}</td>
+      <td>${ln.qty}</td>
+      <td>${fmt(estUnit)}</td>
+      <td>${fmt(estLine)}</td>
+      <td><a href="#" data-i="${idx}" class="rm">Remove</a></td>`;
+    linesEl.appendChild(tr);
+  });
+  sel('est_total').textContent = fmt(total);
+  [...document.querySelectorAll('.rm')].forEach(a => {
+    a.onclick = e => { e.preventDefault(); const i = +a.dataset.i; lines.splice(i,1); redraw(); };
+  });
+}
+
+async function fetchModels(){
+  const r = await fetch("{% url 'inventory:api_stock_models' %}");
+  const data = await r.json();
+  models = data.models || [];
+  const s = sel('model_select');
+  s.innerHTML = '';
+  models.forEach(m => {
+    const opt = document.createElement('option');
+    opt.value = m.product_id;
+    opt.textContent = `${m.product} — on hand ${m.on_hand}`;
+    opt.dataset.defaultPrice = m.default_price || "0";
+    s.appendChild(opt);
+  });
+  updateBadges();
+}
+
+function updateBadges(){
+  const o = sel('model_select').selectedOptions[0];
+  const price = o ? (o.dataset.defaultPrice || "0") : "0";
+  const selModel = models.find(m => m.product_id == (o ? o.value : 0));
+  sel('default_price').textContent = `Default price ~ ${price}`;
+  sel('on_hand').textContent = `On hand: ${selModel ? selModel.on_hand : 0}`;
+}
+
+sel('model_select').addEventListener('change', updateBadges);
+
+sel('add').onclick = e => {
+  e.preventDefault();
+  const o = sel('model_select').selectedOptions[0];
+  if(!o) return;
+  const pid = +o.value;
+  const name = o.textContent;
+  const qty = Math.max(1, parseInt(sel('qty').value || '1', 10));
+  const override = sel('unit_price_override').value;
+  const unit_override = override !== '' ? Number(override) : null;
+  const defp = Number(o.dataset.defaultPrice || '0');
+  lines.push({ product_id: pid, name, qty, unit_price_override: unit_override, default_price: defp });
+  sel('unit_price_override').value = '';
+  redraw();
+};
+
+sel('create_po').onclick = async e => {
+  e.preventDefault();
+  sel('error').style.display = 'none';
+  sel('ok').style.display = 'none';
+
+  if(lines.length === 0){
+    sel('error').textContent = 'Add at least one line.';
+    sel('error').style.display = 'block';
+    return;
+  }
+  const payload = {
+    supplier_name: sel('supplier_name').value || '',
+    supplier_email: sel('supplier_email').value || '',
+    supplier_phone: sel('supplier_phone').value || '',
+    agent_name: sel('agent_name').value || '',
+    notes: sel('notes').value || '',
+    items: lines.map(ln => ({
+      product_id: ln.product_id,
+      quantity: ln.qty,
+      ...(ln.unit_price_override != null ? {unit_price: ln.unit_price_override} : {})
+    }))
+  };
+
+  const r = await fetch("{% url 'inventory:api_place_order' %}", {
+    method: 'POST',
+    headers: {'Content-Type':'application/json','X-CSRFToken': '{{ csrf_token }}'},
+    body: JSON.stringify(payload)
+  });
+
+  const txt = await r.text();
+  let data = {};
+  try{ data = JSON.parse(txt) } catch(e){}
+  if(!r.ok || !data.ok){
+    sel('error').textContent = (data && data.error) ? data.error : 'Network error creating PO.';
+    sel('error').style.display = 'block';
+    return;
+  }
+  sel('ok').innerHTML = `PO created. <a href="${data.invoice_url}">Download invoice</a>`;
+  sel('ok').style.display = 'block';
+};
+
+sel('create_product').onclick = async e => {
+  e.preventDefault();
+  const brand = sel('new_brand').value.trim();
+  const model = sel('new_model').value.trim();
+  const variant = sel('new_variant').value.trim();
+  const price = sel('new_price').value.trim();
+  if(!brand || !model || price === ''){
+    alert('Brand, Model and Cost price are required.');
+    return;
+  }
+  const r = await fetch("{% url 'inventory:api_product_create' %}", {
+    method:'POST',
+    headers:{'Content-Type':'application/json','X-CSRFToken':'{{ csrf_token }}'},
+    body: JSON.stringify({brand, model, variant, cost_price: Number(price)})
+  });
+  const data = await r.json();
+  if(!data.ok){ alert(data.error || 'Failed.'); return; }
+  await fetchModels();
+  alert('Product created.');
+};
+
+sel('update_price').onclick = async e => {
+  e.preventDefault();
+  const o = sel('model_select').selectedOptions[0];
+  if(!o){ alert('Select a product first.'); return; }
+  const price = prompt('New cost price (number):', o.dataset.defaultPrice || '0');
+  if(price == null) return;
+  const r = await fetch("{% url 'inventory:api_product_update_price' %}", {
+    method:'POST',
+    headers:{'Content-Type':'application/json','X-CSRFToken':'{{ csrf_token }}'},
+    body: JSON.stringify({product_id: Number(o.value), cost_price: Number(price)})
+  });
+  const data = await r.json();
+  if(!data.ok){ alert(data.error || 'Failed.'); return; }
+  await fetchModels();
+  alert('Price updated.');
+};
+
+fetchModels();
+</script>
+{% endblock %}

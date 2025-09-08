@@ -1,0 +1,196 @@
+{% extends "base.html" %}
+{% load static humanize %}
+
+{% block title %}Reports · Circuit City{% endblock %}
+
+{% block content %}
+<div class="container my-4">
+  <h2 class="fw-bold mb-3">Reports & Analytics</h2>
+
+  <!-- Filters -->
+  <form id="report-filters" class="row g-3 align-items-end">
+    <div class="col-sm-3">
+      <label class="form-label">From</label>
+      <input type="date" class="form-control" name="date_from">
+    </div>
+    <div class="col-sm-3">
+      <label class="form-label">To</label>
+      <input type="date" class="form-control" name="date_to">
+    </div>
+    <div class="col-sm-2">
+      <label class="form-label">Agent</label>
+      <input type="number" class="form-control" name="agent" placeholder="ID">
+    </div>
+    <div class="col-sm-2">
+      <label class="form-label">Model</label>
+      <input type="text" class="form-control" name="model" placeholder="e.g. Tecno Spark">
+    </div>
+    <div class="col-sm-2">
+      <label class="form-label">Ads</label>
+      <select class="form-select" name="ads">
+        <option value="">All</option>
+        <option value="with">With Ads</option>
+        <option value="without">No Ads</option>
+      </select>
+    </div>
+    <div class="col-sm-12">
+      <button class="btn btn-primary"><i class="bi bi-funnel"></i> Apply</button>
+      <a id="dl-sales" class="btn btn-outline-secondary">Download Sales CSV</a>
+      <a id="dl-expenses" class="btn btn-outline-secondary">Monthly Expenses CSV</a>
+      <a id="dl-inventory" class="btn btn-outline-secondary">Inventory Sold CSV</a>
+      <a id="dl-management" class="btn btn-outline-secondary">Management Snapshot CSV</a>
+    </div>
+  </form>
+
+  <!-- KPI cards -->
+  <div class="row row-cols-1 row-cols-md-3 g-3 mt-3" id="kpi-cards">
+    <div class="col">
+      <div class="card shadow-sm">
+        <div class="card-body">
+          <div class="d-flex justify-content-between">
+            <h6 class="text-muted mb-2">Total Sales (MWK)</h6>
+            <i class="bi bi-cash-coin"></i>
+          </div>
+          <div class="fs-3 fw-bold" id="kpi-sales">—</div>
+        </div>
+      </div>
+    </div>
+    <div class="col">
+      <div class="card shadow-sm">
+        <div class="card-body">
+          <div class="d-flex justify-content-between">
+            <h6 class="text-muted mb-2">Total Profit (MWK)</h6>
+            <i class="bi bi-graph-up-arrow"></i>
+          </div>
+          <div class="fs-3 fw-bold" id="kpi-profit">—</div>
+        </div>
+      </div>
+    </div>
+    <div class="col">
+      <div class="card shadow-sm">
+        <div class="card-body">
+          <div class="d-flex justify-content-between">
+            <h6 class="text-muted mb-2">Orders</h6>
+            <i class="bi bi-basket"></i>
+          </div>
+          <div class="fs-3 fw-bold" id="kpi-orders">—</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Charts -->
+  <div class="row g-3 mt-1">
+    <div class="col-lg-6">
+      <div class="card shadow-sm"><div class="card-body">
+        <h6 class="fw-semibold mb-2">Sales by Month</h6>
+        <canvas id="salesByMonth"></canvas>
+      </div></div>
+    </div>
+    <div class="col-lg-6">
+      <div class="card shadow-sm"><div class="card-body">
+        <h6 class="fw-semibold mb-2">Profit Trend</h6>
+        <canvas id="profitTrend"></canvas>
+      </div></div>
+    </div>
+    <div class="col-lg-6">
+      <div class="card shadow-sm"><div class="card-body">
+        <h6 class="fw-semibold mb-2">Top Agents</h6>
+        <canvas id="agentPerf"></canvas>
+      </div></div>
+    </div>
+    <div class="col-lg-6">
+      <div class="card shadow-sm"><div class="card-body">
+        <h6 class="fw-semibold mb-2">Ads vs No Ads (MWK)</h6>
+        <canvas id="adsRoi"></canvas>
+      </div></div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script>
+const qs = (form)=> new URLSearchParams(new FormData(form)).toString();
+const fmt = (n)=> new Intl.NumberFormat('en-MW', {maximumFractionDigits:0}).format(n||0);
+const step500k = (ctx)=> ({ // y-axis tick steps: 0, 500k, 1,000k...
+  ticks: {
+    callback: (v)=> fmt(v),
+    stepSize: 500000
+  }
+});
+
+const form = document.getElementById('report-filters');
+const salesEl = document.getElementById('kpi-sales');
+const profitEl = document.getElementById('kpi-profit');
+const ordersEl = document.getElementById('kpi-orders');
+
+let c1,c2,c3,c4;
+
+async function loadAll(){
+  const q = qs(form);
+
+  // KPIs + Sales by Month
+  const s = await fetch(`{% url 'reports:api_sales_summary' %}?`+q).then(r=>r.json());
+  salesEl.textContent = "MWK " + fmt(s.kpis.total_sales);
+  profitEl.textContent = "MWK " + fmt(s.kpis.total_profit);
+  ordersEl.textContent = fmt(s.kpis.orders);
+
+  const labels1 = s.by_month.map(r=> new Date(r.m).toLocaleDateString('en-GB',{year:'2-digit', month:'short'}));
+  const data1 = s.by_month.map(r=> r.amount);
+
+  if(c1) c1.destroy();
+  c1 = new Chart(document.getElementById('salesByMonth'), {
+    type:'bar',
+    data:{ labels: labels1, datasets:[{ label:'Sales (MWK)', data: data1 }]},
+    options:{ scales:{ y: step500k() }, plugins:{ legend:{ display:false } } }
+  });
+
+  // Profit trend (daily)
+  const p = await fetch(`{% url 'reports:api_profit_trend' %}?`+q).then(r=>r.json());
+  const labels2 = p.series.map(r=> new Date(r.d).toLocaleDateString('en-GB'));
+  const profitSeries = p.series.map(r=> r.profit);
+
+  if(c2) c2.destroy();
+  c2 = new Chart(document.getElementById('profitTrend'), {
+    type:'line',
+    data:{ labels: labels2, datasets:[{ label:'Profit (MWK)', data: profitSeries, tension:.2 }]},
+    options:{ scales:{ y: step500k() }, plugins:{ legend:{ display:false } } }
+  });
+
+  // Agent performance
+  const a = await fetch(`{% url 'reports:api_agent_performance' %}?`+q).then(r=>r.json());
+  const labels3 = a.rows.map(r=> r["agent__name"] || ("Agent #"+r.agent_id));
+  const data3 = a.rows.map(r=> r.amount);
+
+  if(c3) c3.destroy();
+  c3 = new Chart(document.getElementById('agentPerf'), {
+    type:'bar',
+    data:{ labels: labels3, datasets:[{ label:'Sales (MWK)', data: data3 }]},
+    options:{ indexAxis:'y', scales:{ x: step500k() }, plugins:{ legend:{ display:false } } }
+  });
+
+  // Ads ROI
+  const ads = await fetch(`{% url 'reports:api_ads_roi' %}?`+q).then(r=>r.json());
+  const labels4 = ['With Ads','No Ads'];
+  const data4 = [ads.with_ads.amount, ads.without_ads.amount];
+
+  if(c4) c4.destroy();
+  c4 = new Chart(document.getElementById('adsRoi'), {
+    type:'bar',
+    data:{ labels: labels4, datasets:[{ label:'Sales (MWK)', data: data4 }]},
+    options:{ scales:{ y: step500k() }, plugins:{ legend:{ display:false } } }
+  });
+
+  // Update download links with current filters
+  document.getElementById('dl-sales').href = `{% url 'reports:export_sales_csv' %}?`+q;
+  document.getElementById('dl-expenses').href = `{% url 'reports:export_expenses_csv' %}?`+q;
+  document.getElementById('dl-inventory').href = `{% url 'reports:export_inventory_csv' %}?`+q;
+  document.getElementById('dl-management').href = `{% url 'reports:export_management_csv' %}?`+q;
+}
+
+form.addEventListener('submit', (e)=>{ e.preventDefault(); loadAll(); });
+document.addEventListener('DOMContentLoaded', loadAll);
+</script>
+{% endblock %}

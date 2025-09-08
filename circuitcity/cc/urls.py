@@ -3,7 +3,6 @@ from django.contrib import admin
 from django.urls import path, include, reverse, NoReverseMatch
 from django.conf import settings
 from django.conf.urls.static import static
-from django.contrib.auth import views as auth_views
 from django.views.generic import RedirectView
 from django.http import HttpResponse
 from django.shortcuts import redirect
@@ -36,7 +35,7 @@ def root_redirect(_request):
         "dashboard:agent_dashboard",
         "inventory:stock_list",
         "admin:index",
-        "login",
+        "login",  # alias to accounts:login below
     )
     for name in candidates:
         try:
@@ -51,17 +50,13 @@ urlpatterns = [
     # ---- Django admin ----
     path("admin/", admin.site.urls),
 
-    # ---- Auth ----
-    path(
-        "accounts/login/",
-        auth_views.LoginView.as_view(
-            template_name="registration/login.html",
-            redirect_authenticated_user=True,
-        ),
-        name="login",
-    ),
-    path("logout/", core_views.logout_view, name="logout"),
+    # ---- Auth (project-level aliases that delegate to accounts app) ----
+    path("accounts/", include(("accounts.urls", "accounts"), namespace="accounts")),
+    path("login/",   RedirectView.as_view(pattern_name="accounts:login", permanent=False), name="login"),
+    path("logout/",  core_views.logout_view, name="logout"),
     path("accounts/logout/", core_views.logout_view, name="accounts_logout"),
+    path("password/forgot/", RedirectView.as_view(pattern_name="accounts:forgot_password_request", permanent=False)),
+    path("password/reset/",  RedirectView.as_view(pattern_name="accounts:forgot_password_reset", permanent=False)),
 
     # ---- Health / robots / favicon ----
     path("healthz/", core_views.healthz, name="healthz"),
@@ -94,7 +89,7 @@ try:
 except Exception:
     pass
 
-# ---- Static & media in DEBUG (prod served by Whitenoise) ----
+# ---- Static & media in DEBUG (prod served by WhiteNoise) ----
 if settings.DEBUG:
     urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
     urlpatterns += static(settings.STATIC_URL, document_root=settings.STATIC_ROOT)

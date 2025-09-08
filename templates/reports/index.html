@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+{% load humanize %}
+
+{% block title %}Reports{% endblock %}
+
+{% block content %}
+<div class="container">
+  <h1 class="mb-4">Reports</h1>
+
+  <div class="grid" style="display:grid; gap:16px; grid-template-columns: repeat(auto-fit,minmax(260px,1fr));">
+    <div class="card p-3">
+      <h3>Stock on Hand</h3>
+      <div style="font-size:28px; font-weight:700;">{{ on_hand|intcomma }}</div>
+    </div>
+    <div class="card p-3">
+      <h3>Units Sold (last 7 days)</h3>
+      <div style="font-size:28px; font-weight:700;">{{ sold_7|intcomma }}</div>
+    </div>
+    <div class="card p-3">
+      <h3>Wallet Balance (all time)</h3>
+      {% if balance is not None %}
+      <div style="font-size:28px; font-weight:700;">MWK {{ balance|floatformat:2|intcomma }}</div>
+      <div>Credits: MWK {{ credits|floatformat:2|intcomma }} &middot; Debits: MWK {{ debits|floatformat:2|intcomma }}</div>
+      {% else %}
+      <div>Wallet module not installed.</div>
+      {% endif %}
+    </div>
+  </div>
+
+  <div class="card p-3 mt-4">
+    <h3 class="mb-2">Top Models on Hand</h3>
+    <table class="table">
+      <thead><tr><th>Brand</th><th>Model</th><th>On Hand</th></tr></thead>
+      <tbody>
+        {% for r in top_onhand %}
+          <tr>
+            <td>{{ r.brand }}</td>
+            <td>{{ r.model }}</td>
+            <td>{{ r.n|intcomma }}</td>
+          </tr>
+        {% empty %}
+          <tr><td colspan="3">No inventory yet.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+{% load humanize %}
+{% block title %}Time Logs · Circuit City{% endblock %}
+{% block header_title %}Time Logs{% endblock %}
+
+{% block body %}
+<div class="panel card mb-3">
+  <div class="d-flex justify-content-between align-items-center">
+    <h5 class="m-0">Recent Logs</h5>
+    <a class="btn primary" href="{% url 'inventory:time_checkin_page' %}"><i class="bi bi-clock"></i> Check in / Log time</a>
+  </div>
+</div>
+
+<div class="panel card">
+  <div class="table-responsive">
+    <table class="table table-compact align-middle">
+      <thead>
+        <tr>
+          <th>User</th>
+          <th>When</th>
+          <th>Local time</th>
+          <th>Note</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% if logs %}
+          {% for row in logs %}
+            <tr>
+              <td>{{ row.user.get_username }}</td>
+              <td>{{ row.logged_at|date:"Y-m-d H:i" }} UTC</td>
+              <td>{{ row.logged_at|date:"M d, Y H:i" }}</td>
+              <td class="cell-ellipsis">{{ row.note }}</td>
+            </tr>
+          {% endfor %}
+        {% else %}
+          <tr><td colspan="4" class="text-center" style="color:var(--muted)">No time logs yet.</td></tr>
+        {% endif %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

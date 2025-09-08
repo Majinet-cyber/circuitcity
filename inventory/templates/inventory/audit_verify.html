@@ -1,0 +1,191 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Audit Verification · Circuit City{% endblock %}
+{% block header_title %}<i class="bi bi-shield-check me-2"></i>Audit Chain Verification{% endblock %}
+
+{% block extra_css %}
+<style>
+  .audit-container {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    max-width: 800px;
+    margin: 0 auto;
+  }
+
+  .audit-card {
+    background: var(--cc-panel);
+    border: 1px solid var(--cc-border);
+    border-radius: var(--radius-lg);
+    padding: 1.5rem;
+    box-shadow: var(--cc-shadow);
+    backdrop-filter: blur(12px) saturate(140%);
+  }
+
+  .audit-status {
+    display: flex;
+    align-items: center;
+    gap: .8rem;
+    font-size: 1.2rem;
+    font-weight: 700;
+  }
+
+  .audit-status .ok { color: var(--success); }
+  .audit-status .warn { color: var(--warning); }
+  .audit-status .fail { color: var(--danger); }
+
+  .summary-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 1rem;
+    margin-top: 1rem;
+  }
+
+  .summary-card {
+    background: var(--cc-panel-2);
+    border: 1px solid var(--cc-border);
+    padding: 1rem;
+    border-radius: var(--radius);
+    display: flex;
+    flex-direction: column;
+    gap: .25rem;
+    text-align: center;
+  }
+
+  .summary-card .value {
+    font-size: 1.4rem;
+    font-weight: 800;
+    color: var(--cc-text);
+  }
+
+  .summary-card .label {
+    font-size: .85rem;
+    color: var(--cc-muted);
+  }
+
+  .verify-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: .5rem;
+    background: var(--cc-accent);
+    color: #fff;
+    font-weight: 700;
+    border: none;
+    padding: .65rem 1.2rem;
+    border-radius: var(--radius);
+    margin-top: 1.2rem;
+    transition: background .2s ease;
+  }
+  .verify-btn:hover { filter: brightness(1.1); }
+
+  .log-box {
+    background: var(--cc-panel-2);
+    border: 1px solid var(--cc-border);
+    border-radius: var(--radius);
+    padding: 1rem;
+    margin-top: 1rem;
+    max-height: 260px;
+    overflow-y: auto;
+    font-family: monospace;
+    font-size: .85rem;
+  }
+
+  @media (max-width: 768px) {
+    .audit-status { font-size: 1rem; }
+    .verify-btn { width: 100%; }
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="audit-container">
+  <div class="audit-card">
+    <div class="audit-status" id="audit-status">
+      <i class="bi bi-shield-check ok"></i>
+      <span>Audit chain verified — no tampering detected.</span>
+    </div>
+
+    <div class="summary-grid">
+      <div class="summary-card">
+        <div class="value" id="total-logs">--</div>
+        <div class="label">Total Logs</div>
+      </div>
+      <div class="summary-card">
+        <div class="value" id="verified-logs">--</div>
+        <div class="label">Verified</div>
+      </div>
+      <div class="summary-card">
+        <div class="value" id="tampered-logs">--</div>
+        <div class="label">Tampered</div>
+      </div>
+      <div class="summary-card">
+        <div class="value" id="last-verified">--</div>
+        <div class="label">Last Verified</div>
+      </div>
+    </div>
+
+    <button class="verify-btn" id="verify-btn">
+      <i class="bi bi-arrow-repeat"></i> Verify Now
+    </button>
+
+    <div class="log-box" id="audit-log">
+      <em>Audit verification logs will appear here…</em>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener("DOMContentLoaded", () => {
+  const btn = document.getElementById("verify-btn");
+  const statusBox = document.getElementById("audit-status");
+  const totalLogs = document.getElementById("total-logs");
+  const verifiedLogs = document.getElementById("verified-logs");
+  const tamperedLogs = document.getElementById("tampered-logs");
+  const lastVerified = document.getElementById("last-verified");
+  const logBox = document.getElementById("audit-log");
+
+  async function verifyAudit() {
+    btn.disabled = true;
+    btn.innerHTML = '<i class="bi bi-hourglass-split"></i> Verifying…';
+    statusBox.innerHTML = '<i class="bi bi-hourglass-split"></i> Verifying audit chain…';
+
+    try {
+      const res = await fetch("{% url 'inventory:api_audit_verify' %}");
+      const data = await res.json();
+
+      if (data.ok) {
+        totalLogs.textContent = data.stats.total || 0;
+        verifiedLogs.textContent = data.stats.verified || 0;
+        tamperedLogs.textContent = data.stats.tampered || 0;
+        lastVerified.textContent = data.stats.last_verified || '—';
+
+        if (data.stats.tampered > 0) {
+          statusBox.innerHTML = '<i class="bi bi-shield-exclamation fail"></i> Tampering detected!';
+        } else {
+          statusBox.innerHTML = '<i class="bi bi-shield-check ok"></i> Audit chain verified — no tampering detected.';
+        }
+
+        logBox.innerHTML = (data.logs || []).map(line => `<div>${line}</div>`).join("") ||
+          "<em>No issues found.</em>";
+      } else {
+        statusBox.innerHTML = '<i class="bi bi-exclamation-triangle warn"></i> Verification failed.';
+        logBox.innerHTML = `<em>${data.error || 'Unknown error'}</em>`;
+      }
+    } catch (err) {
+      statusBox.innerHTML = '<i class="bi bi-exclamation-triangle fail"></i> Error verifying audit chain.';
+      logBox.innerHTML = `<em>${err}</em>`;
+    } finally {
+      btn.disabled = false;
+      btn.innerHTML = '<i class="bi bi-arrow-repeat"></i> Verify Now';
+    }
+  }
+
+  btn.addEventListener("click", verifyAudit);
+  verifyAudit();
+});
+</script>
+{% endblock %}

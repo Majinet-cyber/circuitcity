@@ -61,7 +61,7 @@ Requires the 'request' context processor.
   </label>
   <label>Rows/page:
     <input type="number" name="page_size" min="1" max="200"
-           value="{{ page_obj.paginator.per_page if page_obj else 50 }}">
+           value="{% if page_obj %}{{ page_obj.paginator.per_page }}{% else %}50{% endif %}">
   </label>
   <button class="btn primary" type="submit">Apply</button>
 
@@ -98,8 +98,20 @@ Requires the 'request' context processor.
         </td>
         <td class="right">{% if it.order_price is not None %}{{ it.order_price|floatformat:0 }}{% endif %}</td>
         <td class="right">{% if it.selling_price is not None %}{{ it.selling_price|floatformat:0 }}{% endif %}</td>
-        <td>{{ it.current_location.name if it.current_location_id else "—" }}</td>
-        <td>{{ it.assigned_agent.username if it.assigned_agent_id else "—" }}</td>
+        <td>
+          {% if it.current_location_id %}
+            {{ it.current_location.name }}
+          {% else %}
+            —
+          {% endif %}
+        </td>
+        <td>
+          {% if it.assigned_agent_id %}
+            {{ it.assigned_agent.username }}
+          {% else %}
+            —
+          {% endif %}
+        </td>
         <td>{{ it.received_at|date:"Y-m-d" }}</td>
         <td class="actions">
           {% if can_edit %}

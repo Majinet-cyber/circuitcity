@@ -2,131 +2,189 @@
 {% load humanize static %}
 
 {% block title %}Stock List · Circuit City{% endblock %}
+{% block header_title %}Inventory · Stock{% endblock %}
 
 {% block extra_css %}
 <style>
-  /* ===== Blue theme (auto light/dark) ===== */
-  :root[data-theme="light"]{
-    --deep-bg:#eef5ff; --deep-panel:#ffffff; --deep-panel-2:#f2f7ff;
-    --deep-border:#cfe0ff; --deep-accent:#2f6df6; --deep-accent-2:#46c0ff;
-    --cc-text:#0f172a; --cc-muted:#64748b;
-  }
-  :root[data-theme="dark"]{
-    --deep-bg:#0a1222; --deep-panel:#0d162b; --deep-panel-2:#0f1b33;
-    --deep-border:#21375c; --deep-accent:#76a9ff; --deep-accent-2:#4ecbff;
-    --cc-text:#e5edff; --cc-muted:#9db4d6;
-  }
-
-  .sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
-
   section{max-width:1200px;margin-inline:auto}
-  .stock-head{display:flex;justify-content:space-between;align-items:center;margin:0 0 .75rem}
-  .stock-actions{display:flex;gap:.5rem;align-items:center;flex-wrap:wrap}
-  /* NEW: make action row nicely scroll on mobile */
-  .stock-actions{overflow-x:auto;-webkit-overflow-scrolling:touch;padding-bottom:.25rem}
-  .pill{display:inline-flex;align-items:center;gap:.4rem;padding:.45rem .7rem;border-radius:.6rem;background:var(--deep-panel-2);border:1px solid var(--deep-border);font-weight:700;color:var(--cc-text)}
-  .pill strong{font-weight:800}
 
-  /* NEW: collapsible wrapper for the filters (used only on phones) */
-  .filters-wrap.collapsed{display:none}
+  /* Glass buttons (respect tokens) */
+  .glass-btn{
+    -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px);
+    background: linear-gradient(180deg, rgba(255,255,255,.18), rgba(255,255,255,.06));
+    border:1px solid var(--cc-border);
+    border-radius:.8rem; padding:.55rem .85rem; font-weight:800;
+    text-decoration:none; box-shadow: var(--cc-shadow);
+    display:inline-flex; align-items:center; gap:.5rem; color:var(--cc-text);
+    transition:transform .15s ease, box-shadow .2s ease, background .2s ease;
+  }
+  .glass-btn:hover{ transform:translateY(-1px); }
+  .glass-green{ color:#065f46 }
+  .glass-amber{ color:#92400e }
+  .glass-blue{ color:#1e40af }
+  .glass-dark{ color:var(--cc-accent) }
+  .glass-icon{ width:1.25rem; height:1.25rem; display:inline-grid; place-items:center; }
 
-  .filters{display:flex;gap:.5rem;align-items:center;flex-wrap:wrap;margin:.5rem 0 .75rem}
-  .filters input[type="text"], .filters select, .filters input[type="number"]{
-    padding:.45rem .55rem;border-radius:.45rem;border:1px solid var(--deep-border);background:var(--deep-panel)
+  .hero-row{ display:flex; flex-wrap:wrap; gap:.6rem; align-items:center; margin-bottom:.6rem }
+  .brand-chip{
+    font-weight:800; display:inline-flex; align-items:center; gap:.5rem;
+    background:var(--cc-panel); border:1px solid var(--cc-border);
+    padding:.5rem .8rem; border-radius:.9rem; box-shadow:var(--cc-shadow);
+  }
+
+  /* KPI quick line */
+  .kpi-line{ display:flex; flex-wrap:wrap; gap:.75rem; align-items:center; margin:.35rem 0 1rem }
+  .kpi-pill{
+    display:inline-flex; align-items:center; gap:.5rem; padding:.45rem .7rem; border-radius:.6rem;
+    background:var(--cc-panel-2); border:1px solid var(--cc-border); font-weight:700;
+  }
+  .kpi-pill b{ font-weight:800 }
+
+  /* Filters row */
+  .filters-wrap{ margin:.25rem 0 .85rem }
+  .filters-row{ display:flex; gap:.5rem; align-items:center; flex-wrap:wrap }
+  .filters-row input[type="text"], .filters-row select, .filters-row input[type="number"]{
+    padding:.5rem .6rem; border-radius:.55rem; border:1px solid var(--cc-border); background:var(--cc-panel); color:var(--cc-text);
   }
   .btn-deep{
-    background:linear-gradient(180deg, rgba(255,255,255,.18), rgba(255,255,255,.06));
-    border:1px solid var(--deep-border);border-radius:.5rem;padding:.45rem .65rem;
-    font-weight:700;color:var(--cc-text);text-decoration:none
+    background:linear-gradient(180deg, rgba(255,255,255,.14), rgba(255,255,255,.04));
+    border:1px solid var(--cc-border); border-radius:.55rem; padding:.5rem .7rem;
+    font-weight:700; color:var(--cc-text); text-decoration:none;
+    transition:transform .12s ease, box-shadow .2s ease, background .2s ease;
   }
-  .btn-deep:hover{background:var(--deep-panel)}
-  .btn-deep.active{outline:2px solid var(--deep-accent); box-shadow:0 0 0 2px rgba(47,109,246,.15) inset}
+  .btn-deep:hover{ background:var(--cc-panel); transform:translateY(-1px); box-shadow:var(--cc-shadow) }
 
-  /* ===== Ticker ===== */
-  .ticker{background:var(--deep-panel-2);border:1px solid var(--deep-border);border-radius:14px;padding:12px}
-  .ticker-row{display:grid;grid-template-columns:1.2fr 1fr .8fr .8fr .8fr 1fr 1fr;gap:12px;align-items:center}
-  .ticker-row > div{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-  .ticker-controls{display:flex;gap:.4rem;margin-top:.6rem;flex-wrap:wrap}
+  /* Ticker + table */
+  .ticker{ background:var(--cc-panel-2); border:1px solid var(--cc-border); border-radius:14px; padding:12px }
+  .ticker-row{ display:grid; grid-template-columns:1.2fr 1fr .8fr .8fr .8fr 1fr 1fr; gap:12px; align-items:center }
+  .ticker-row > div{ overflow:hidden; text-overflow:ellipsis; white-space:nowrap }
+  .ticker-controls{ display:flex; gap:.4rem; margin-top:.6rem; flex-wrap:wrap }
 
-  /* ===== Table ===== */
-  #stockTableWrap{margin-top:12px}
-  #stockTable{width:100%;border-collapse:collapse;background:var(--deep-panel);border:1px solid var(--deep-border);border-radius:12px;overflow:hidden}
-  #stockTable thead th{position:sticky;top:0;z-index:1;font-weight:700;color:var(--cc-muted);background:var(--deep-panel-2)}
-  #stockTable th,#stockTable td{padding:.6rem .65rem;border-bottom:1px solid var(--deep-border);vertical-align:middle}
-  #stockTable tbody tr:hover td{background:rgba(47,109,246,.08)}
-  #stockTable td.num{text-align:right;font-variant-numeric:tabular-nums}
+  #stockTable{ width:100%; border-collapse:collapse; background:var(--cc-panel); border:1px solid var(--cc-border); border-radius:12px; overflow:hidden }
+  #stockTable thead th{ position:sticky; top:0; z-index:1; font-weight:700; color:var(--cc-muted); background:var(--cc-panel-2) }
+  #stockTable th,#stockTable td{ padding:.6rem .65rem; border-bottom:1px solid var(--cc-border); vertical-align:middle }
+  #stockTable tbody tr:hover td{ background: color-mix(in oklab, var(--cc-accent) 8%, transparent) }
+  #stockTable td.num{ text-align:right; font-variant-numeric:tabular-nums }
 
-  .badge{display:inline-block;padding:.2rem .5rem;border-radius:999px;border:1px solid var(--deep-border)}
-  .badge.green{background:#eafff4;color:#0b6b3a}
-  .badge.red{background:#ffecec;color:#9f1c1c}
+  /* Mobile table */
+  .table-mobile{ width:100%; border:1px solid var(--cc-border); border-radius:12px; overflow:hidden; background:var(--cc-panel) }
+  .table-mobile tr{ border-bottom:1px solid var(--cc-border) }
+  .table-mobile td{ padding:.6rem .65rem }
+  .table-mobile td[data-label]::before{
+    content: attr(data-label) " · "; color:var(--cc-muted); font-weight:700; margin-right:.25rem;
+  }
 
-  nav.pager{display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;margin-top:.75rem}
-  nav.pager .info{color:var(--cc-muted)}
+  .badge-chip{ display:inline-block; padding:.2rem .5rem; border-radius:999px; border:1px solid var(--cc-border) }
+  .badge-chip.green{ background:#ecfdf5; color:#065f46; border-color:#a7f3d0 }
+  .badge-chip.red{ background:#fef2f2; color:#991b1b; border-color:#fecaca }
 
-  /* ===== Charts (no stretching) ===== */
-  .charts{display:grid;grid-template-columns:1.4fr 1fr;gap:14px;margin-top:14px}
-  .chart-card{background:var(--deep-panel-2);border:1px solid var(--deep-border);border-radius:14px;padding:12px}
-  .chart-card h3{margin:.25rem 0 .6rem;font-size:.95rem;color:var(--cc-muted)}
-  .chart-toolbar{display:flex;gap:.5rem;align-items:center;justify-content:flex-end}
-  .chart-canvas{width:100% !important;max-width:100%;height:240px !important}
-  .chart-canvas--sm{height:200px !important}
+  /* Charts */
+  .charts{ display:grid; grid-template-columns:1.4fr 1fr; gap:14px; margin-top:14px }
+  .chart-card{ background:var(--cc-panel-2); border:1px solid var(--cc-border); border-radius:14px; padding:12px; position:relative; overflow:hidden }
+  .chart-card h3{ margin:.25rem 0 .6rem; font-size:.95rem; color:var(--cc-muted) }
+  .chart-toolbar{ display:flex; gap:.5rem; align-items:center; justify-content:flex-end }
+  .chart-canvas{ width:100% !important; max-width:100%; height:240px !important }
+  .chart-canvas--sm{ height:200px !important }
 
-  /* NEW: mobile "card table" */
-  .table-mobile{width:100%;border:1px solid var(--deep-border);border-radius:12px;background:var(--deep-panel)}
-  .table-mobile tbody tr{border-bottom:1px solid var(--deep-border)}
-  .table-mobile td{display:block;padding:.55rem .65rem}
-  .table-mobile td::before{content:attr(data-label);font-size:.75rem;color:var(--cc-muted);display:block;margin-bottom:.15rem}
-  .table-mobile .num{text-align:right;font-variant-numeric:tabular-nums}
+  /* Skeleton loaders */
+  .chart-skel{
+    position:absolute; inset:44px 12px 12px 12px; border-radius:10px;
+    background:linear-gradient(90deg, rgba(148,163,184,.15), rgba(255,255,255,.45), rgba(148,163,184,.15));
+    background-size:200% 100%; animation: skel 1.1s linear infinite;
+  }
+  @keyframes skel{ 0%{background-position:200% 0} 100%{background-position:-200% 0} }
+
+  /* Battery (INVENTORY ONLY) */
+  .battery-card{ background:var(--cc-panel-2); border:1px solid var(--cc-border); border-radius:14px; padding:12px; margin-top:14px }
+  .battery-wrap{ display:flex; align-items:center; gap:1rem; flex-wrap:wrap }
+  .battery{ position:relative; width:220px; height:68px; border-radius:14px;
+            border:4px solid #cbd5e1; padding:6px; background:linear-gradient(180deg,#ffffff,#f8fafc); }
+  .battery:after{ content:""; position:absolute; right:-16px; top:18px; width:14px; height:32px; background:#cbd5e1; border-radius:3px }
+  .battery-fill{ height:100%; width:0%; border-radius:10px; transition:width .45s ease; background:linear-gradient(90deg,#22c55e,#06b6d4) }
+  .battery-label{ font-weight:800 }
+  .battery-hint{ color:var(--cc-muted); font-size:.85rem }
 
   @media (max-width: 900px){
-    .ticker-row{grid-template-columns:1fr .9fr .7fr .8fr .8fr .9fr 1fr}
-    .charts{grid-template-columns:1fr}
-    .chart-canvas{height:220px !important}
+    .ticker-row{ grid-template-columns:1fr .9fr .7fr .8fr .8fr .9fr 1fr }
+    .charts{ grid-template-columns:1fr }
+    .chart-canvas{ height:220px !important }
   }
 </style>
 {% endblock %}
 
-{% block body %}
+{% block content %}
 <section aria-labelledby="stock">
-  <div class="stock-head">
-    <h2 id="stock" style="margin:0">Stock List</h2>
-    <div class="stock-actions">
-      <!-- NEW: quick Home button (keeps your style) -->
-      <a href="/" class="btn-deep">Home</a>
+  {# Pre-resolve URLs safely so missing names don't crash #}
+  {% url 'inventory:stock_list'   as stock_url %}
+  {% url 'inventory:export_csv'   as export_csv_url %}
+  {% url 'inventory:scan_in'      as scan_in_url %}
+  {% url 'inventory:scan_sold'    as scan_sold_url %}
+  {% url 'inventory:scan_web'     as scan_web_url %}
+  {% url 'inventory:place_order_page' as place_order_url %}
+  {% url 'feedback'               as feedback_url %}
 
-      <span class="pill">In stock: <strong>{{ in_stock|default:0|intcomma }}</strong></span>
-      <span class="pill">Sold: <strong>{{ sold_count|default:0|intcomma }}</strong></span>
-      <span class="pill">Sum order: <strong>{{ sum_order|default:0|floatformat:0|intcomma }}</strong></span>
-      <span class="pill">Sum selling: <strong>{{ sum_selling|default:0|floatformat:0|intcomma }}</strong></span>
-    </div>
+  <!-- Top: brand + quick actions -->
+  <div class="hero-row">
+    <button class="glass-btn" type="button" data-bs-toggle="offcanvas" data-bs-target="#ccMenu" aria-label="Menu">
+      <span class="glass-icon">≡</span>
+    </button>
+    <a href="/" class="brand-chip"><span class="glass-icon">📊</span> Circuit City</a>
+
+    <a class="glass-btn glass-green" href="{{ scan_in_url|default:'#' }}"><span class="glass-icon">➕</span> Stock IN</a>
+    <a class="glass-btn glass-amber" href="{{ scan_sold_url|default:'#' }}"><span class="glass-icon">✅</span> Scan SOLD</a>
+    <a class="glass-btn glass-blue"  href="{{ scan_web_url|default:'#' }}"><span class="glass-icon">🌐</span> Scan (Web)</a>
+    <a class="glass-btn"            href="{{ place_order_url|default:'#' }}"><span class="glass-icon">🧾</span> Place Order</a>
+
+    <!-- Theme toggle -->
+    <button id="ccThemeBtn" class="glass-btn glass-dark" type="button" title="Toggle theme">
+      <span class="glass-icon">☀️</span> Theme
+    </button>
+
+    <!-- Feedback link -->
+    <a class="glass-btn" href="{{ feedback_url|default:'/feedback/' }}"><span class="glass-icon">💬</span> Feedback</a>
+
+    <span class="ms-auto d-none d-md-inline text-muted fw-bold">
+      {% if request.user.is_authenticated %}<i class="bi bi-person-circle me-1"></i>{{ request.user.username }}{% endif %}
+      {% if request.user.is_authenticated %} &nbsp; <a href="/logout/">Logout</a>{% endif %}
+    </span>
   </div>
 
-  <!-- NEW: mobile Filters toggle button -->
-  <button class="btn-deep d-sm-none w-100 mb-2" type="button" id="filtersToggle">Filters</button>
+  <!-- KPI quick line -->
+  <div class="kpi-line">
+    <a href="/" class="kpi-pill"><i class="bi bi-house-door"></i> Home</a>
+    <span class="kpi-pill">In stock: <b>{{ in_stock|default:0|intcomma }}</b></span>
+    <span class="kpi-pill">Sold: <b>{{ sold_count|default:0|intcomma }}</b></span>
+    <span class="kpi-pill">Sum order: <b>{{ sum_order|default:0|floatformat:0|intcomma }}</b></span>
+    <span class="kpi-pill">Sum selling: <b>{{ sum_selling|default:0|floatformat:0|intcomma }}</b></span>
+  </div>
 
-  <!-- NEW: collapsible wrapper (desktop always open; phone can collapse) -->
-  <div id="filtersWrap" class="filters-wrap">
-    <form class="filters" method="get" action="{% url 'inventory:stock_list' %}">
-      <input type="hidden" name="view" value="{{ request.GET.view|default:'all' }}">
-      <input type="text" name="q" placeholder="Search IMEI/brand/model…" value="{{ q }}">
-      <label>Status:
-        <select name="status">
-          <option value="" {% if not status %}selected{% endif %}>All</option>
-          <option value="in_stock" {% if status == 'in_stock' %}selected{% endif %}>In stock</option>
-          <option value="sold" {% if status == 'sold' %}selected{% endif %}>Sold</option>
-        </select>
-      </label>
-      <label>
-        <input type="checkbox" name="archived" value="1" {% if show_archived %}checked{% endif %}>
-        Include archived
-      </label>
-      <label>Rows/page:
-        <input type="number" name="page_size" min="10" max="200" value="{{ request.GET.page_size|default:50 }}">
-      </label>
-      <button class="btn-deep" type="submit">Apply</button>
+  <h2 id="stock" style="margin:.25rem 0 0">Stock List</h2>
 
-      <a class="btn-deep" href="{% url 'inventory:export_csv' %}?{% for k,v in request.GET.items %}{% if k != 'export' %}{{k}}={{v|urlencode}}&{% endif %}{% endfor %}export=csv">Download CSV</a>
-    </form>
+  <!-- Filters -->
+  <div class="filters-wrap">
+    <button class="glass-btn" type="button" data-bs-toggle="collapse" data-bs-target="#filtersPanel" aria-expanded="true">
+      <span class="glass-icon">⚙️</span> Filters
+    </button>
+
+    <div id="filtersPanel" class="collapse show mt-2">
+      <form class="filters-row" method="get" action="{{ stock_url|default:'/inventory/list/' }}">
+        <input type="hidden" name="view" value="{{ request.GET.view|default:'all' }}">
+        <input type="text" name="q" placeholder="Search IMEI/brand/model…" value="{{ q|default:'' }}">
+        <label>Status:
+          <select name="status">
+            <option value="" {% if not status %}selected{% endif %}>All</option>
+            <option value="in_stock" {% if status == 'in_stock' %}selected{% endif %}>In stock</option>
+            <option value="sold" {% if status == 'sold' %}selected{% endif %}>Sold</option>
+          </select>
+        </label>
+        <label class="ms-1">
+          <input type="checkbox" name="archived" value="1" {% if show_archived %}checked{% endif %}> Include archived
+        </label>
+        <label>Rows/page: <input type="number" name="page_size" min="10" max="200" value="{{ request.GET.page_size|default:50 }}"></label>
+        <button class="btn-deep" type="submit">Apply</button>
+        <a class="btn-deep" href="{{ export_csv_url|default:'/inventory/export/' }}?{% for k,v in request.GET.items %}{% if k != 'export' %}{{k}}={{v|urlencode}}&{% endif %}{% endfor %}export=csv">Download CSV</a>
+      </form>
+    </div>
   </div>
 
   <!-- ========== Ticker / Preview ========== -->
@@ -138,20 +196,19 @@
       <button class="btn-deep" id="prevRow" type="button" aria-label="Previous">◀ Prev</button>
       <button class="btn-deep" id="nextRow" type="button" aria-label="Next">Next ▶</button>
       <a class="btn-deep" id="viewAllBtn"
-         href="{% url 'inventory:stock_list' %}?view=all{% if q %}&q={{ q|urlencode }}{% endif %}{% if status %}&status={{ status }}{% endif %}{% if show_archived %}&archived=1{% endif %}">
+         href="{{ stock_url|default:'/inventory/list/' }}?view=all{% if q %}&q={{ q|urlencode }}{% endif %}{% if status %}&status={{ status }}{% endif %}{% if show_archived %}&archived=1{% endif %}{% if request.GET.page_size %}&page_size={{ request.GET.page_size }}{% endif %}">
          View all stock
       </a>
     </div>
   </div>
 
   <!-- ========== Full Table ========== -->
-  <div id="stockTableWrap" hidden>
+  <div id="stockTableWrap" {% if request.GET.view == 'all' %}{% else %}hidden{% endif %} class="mt-2">
     <div style="display:flex;justify-content:space-between;align-items:center;margin:.5rem 0 .75rem">
       <div style="font-weight:700;color:var(--cc-muted)">All stock</div>
       <a class="btn-deep" href="{{ request.path }}">Hide table</a>
     </div>
 
-    <!-- Original desktop table (unchanged) -->
     <div class="table-responsive d-none d-lg-block">
       <table id="stockTable">
         <thead>
@@ -167,9 +224,9 @@
                 <td>{{ it.product }}</td>
                 <td>
                   {% if it.status == 'SOLD' %}
-                    <span class="badge red">Sold</span>
+                    <span class="badge-chip red">Sold</span>
                   {% else %}
-                    <span class="badge green">In stock</span>
+                    <span class="badge-chip green">In stock</span>
                   {% endif %}
                 </td>
                 <td class="num">{% if it.order_price is not None %}{{ it.order_price|floatformat:0|intcomma }}{% else %}—{% endif %}</td>
@@ -187,9 +244,9 @@
               <td>{{ row.product }}</td>
               <td>
                 {% if row.status == 'SOLD' %}
-                  <span class="badge red">Sold</span>
+                  <span class="badge-chip red">Sold</span>
                 {% else %}
-                  <span class="badge green">In stock</span>
+                  <span class="badge-chip green">In stock</span>
                 {% endif %}
               </td>
               <td class="num">{{ row.order_price }}</td>
@@ -205,7 +262,7 @@
       </table>
     </div>
 
-    <!-- NEW: Mobile card table (shows only on small screens) -->
+    <!-- Mobile table -->
     <div class="d-lg-none" style="margin-top:8px">
       <table class="table-mobile">
         <tbody>
@@ -216,9 +273,9 @@
               <td data-label="Product">{{ it.product }}</td>
               <td data-label="Status">
                 {% if it.status == 'SOLD' %}
-                  <span class="badge red">Sold</span>
+                  <span class="badge-chip red">Sold</span>
                 {% else %}
-                  <span class="badge green">In stock</span>
+                  <span class="badge-chip green">In stock</span>
                 {% endif %}
               </td>
               <td data-label="Order Price" class="num">{% if it.order_price is not None %}{{ it.order_price|floatformat:0|intcomma }}{% else %}—{% endif %}</td>
@@ -234,9 +291,9 @@
               <td data-label="Product">{{ row.product }}</td>
               <td data-label="Status">
                 {% if row.status == 'SOLD' %}
-                  <span class="badge red">Sold</span>
+                  <span class="badge-chip red">Sold</span>
                 {% else %}
-                  <span class="badge green">In stock</span>
+                  <span class="badge-chip green">In stock</span>
                 {% endif %}
               </td>
               <td data-label="Order Price" class="num">{{ row.order_price }}</td>
@@ -251,30 +308,30 @@
     </div>
 
     {% if page_obj %}
-      <nav class="pager">
+      <nav class="mt-2" style="display:flex;align-items:center;gap:.5rem;flex-wrap:wrap">
         {% if page_obj.has_previous %}
-          <a class="btn-deep" href="{% url 'inventory:stock_list' %}?view=all{% if q %}&q={{ q|urlencode }}{% endif %}{% if status %}&status={{ status }}{% endif %}{% if show_archived %}&archived=1{% endif %}{% if request.GET.page_size %}&page_size={{ request.GET.page_size }}{% endif %}&page={{ page_obj.previous_page_number }}">Prev</a>
+          <a class="btn-deep" href="{{ stock_url|default:'/inventory/list/' }}?view=all{% if q %}&q={{ q|urlencode }}{% endif %}{% if status %}&status={{ status }}{% endif %}{% if show_archived %}&archived=1{% endif %}{% if request.GET.page_size %}&page_size={{ request.GET.page_size }}{% endif %}&page={{ page_obj.previous_page_number }}">Prev</a>
         {% endif %}
-        <span class="info">Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span>
+        <span class="text-muted">Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span>
         {% if page_obj.has_next %}
-          <a class="btn-deep" href="{% url 'inventory:stock_list' %}?view=all{% if q %}&q={{ q|urlencode }}{% endif %}{% if status %}&status={{ status }}{% endif %}{% if show_archived %}&archived=1{% endif %}{% if request.GET.page_size %}&page_size={{ request.GET.page_size }}{% endif %}&page={{ page_obj.next_page_number }}">Next</a>
+          <a class="btn-deep" href="{{ stock_url|default:'/inventory/list/' }}?view=all{% if q %}&q={{ q|urlencode }}{% endif %}{% if status %}&status={{ status }}{% endif %}{% if show_archived %}&archived=1{% endif %}{% if request.GET.page_size %}&page_size={{ request.GET.page_size }}{% endif %}&page={{ page_obj.next_page_number }}">Next</a>
         {% endif %}
       </nav>
     {% endif %}
   </div>
 
-  <!-- ========== Charts ========== -->
+  <!-- Charts -->
   <div class="charts">
     <div class="chart-card">
       <div style="display:flex;justify-content:space-between;align-items:center">
         <h3>Sales trend (daily)</h3>
         <div class="chart-toolbar">
-          <label for="trendPeriod" class="sr-only">Period</label>
+          <label for="trendPeriod" class="visually-hidden">Period</label>
           <select id="trendPeriod" class="input">
             <option value="month" selected>This month</option>
             <option value="7d">Last 7 days</option>
           </select>
-          <label for="trendMetric" class="sr-only">Metric</label>
+          <label for="trendMetric" class="visually-hidden">Metric</label>
           <select id="trendMetric" class="input">
             <option value="amount" selected>Amount</option>
             <option value="count">Count</option>
@@ -282,6 +339,7 @@
         </div>
       </div>
       <div style="position:relative">
+        <div id="salesSkel" class="chart-skel" aria-hidden="true"></div>
         <canvas id="salesTrend" class="chart-canvas" aria-label="Sales trend line chart" role="img"></canvas>
       </div>
     </div>
@@ -290,7 +348,7 @@
       <div style="display:flex;justify-content:space-between;align-items:center">
         <h3>Top models</h3>
         <div class="chart-toolbar">
-          <label for="topPeriod" class="sr-only">Period</label>
+          <label for="topPeriod" class="visually-hidden">Period</label>
           <select id="topPeriod" class="input">
             <option value="today" selected>Today</option>
             <option value="month">This month</option>
@@ -298,34 +356,79 @@
         </div>
       </div>
       <div style="position:relative">
-        <canvas id="topModels" class="chart-canvas chart-canvas--sm" aria-label="Top models pie chart" role="img"></canvas>
+        <div id="topSkel" class="chart-skel" aria-hidden="true"></div>
+        <canvas id="topModels" class="chart-canvas chart-canvas--sm" aria-label="Top models chart" role="img"></canvas>
       </div>
     </div>
   </div>
 
-  <!-- NEW: tiny sticky quick-nav for phones -->
-  <div class="d-lg-none" style="position:sticky;bottom:0;left:0;right:0;background:var(--deep-panel);border-top:1px solid var(--deep-border);z-index:1030;margin-top:10px">
-    <div class="d-flex text-center">
-      <a href="/" class="flex-fill py-2 text-decoration-none">Home</a>
-      <a href="{% url 'inventory:stock_list' %}" class="flex-fill py-2 text-decoration-none">Stock</a>
-      <a href="{% url 'inventory:scan_sold' %}" class="flex-fill py-2 text-decoration-none">Scan SOLD</a>
-      <a href="{% url 'inventory:inventory_dashboard' %}" class="flex-fill py-2 text-decoration-none">Dashboard</a>
+  <!-- Stock Battery (INVENTORY ONLY) -->
+  <div class="battery-card">
+    <h3 style="margin:.25rem 0 .6rem;color:var(--cc-muted)">Stock health</h3>
+    <div class="battery-wrap">
+      <div class="battery">
+        <div id="batteryFill" class="battery-fill"></div>
+      </div>
+      <div>
+        <div id="batteryLabel" class="battery-label"></div>
+        <div class="battery-hint">100 = full, ≤20 = critical</div>
+      </div>
     </div>
   </div>
 </section>
+
+<!-- Offcanvas Menu -->
+<div class="offcanvas offcanvas-start" tabindex="-1" id="ccMenu" aria-labelledby="ccMenuLabel">
+  <div class="offcanvas-header">
+    <h5 class="offcanvas-title" id="ccMenuLabel">Menu</h5>
+    <button type="button" class="btn-close text-reset" data-bs-dismiss="offcanvas" aria-label="Close"></button>
+  </div>
+  <div class="offcanvas-body">
+    <h6 class="text-muted">Control Center</h6>
+    <div class="list-group mb-3">
+      <a class="list-group-item list-group-item-action" href="/"><i class="bi bi-speedometer2 me-2"></i> Dashboard</a>
+      <a class="list-group-item list-group-item-action" href="{{ stock_url|default:'/inventory/list/' }}"><i class="bi bi-list me-2"></i> Inventory</a>
+      {% url 'inventory:time_checkin_page' as time_in %}
+      {% if time_in %}<a class="list-group-item list-group-item-action" href="{{ time_in }}"><i class="bi bi-stopwatch me-2"></i> Time Check-in</a>{% endif %}
+      {% url 'inventory:time_logs' as time_logs %}
+      {% if time_logs %}<a class="list-group-item list-group-item-action" href="{{ time_logs }}"><i class="bi bi-clock-history me-2"></i> Time Logs</a>{% endif %}
+      {% url 'feedback' as feedback %}
+      {% if feedback %}<a class="list-group-item list-group-item-action" href="{{ feedback }}"><i class="bi bi-chat-dots me-2"></i> Feedback</a>{% endif %}
+    </div>
+
+    <h6 class="text-muted">Admin</h6>
+    <div class="list-group">
+      {% url 'inventory:place_order_page' as place_order_url %}
+      {% if place_order_url %}<a class="list-group-item list-group-item-action" href="{{ place_order_url }}"><i class="bi bi-receipt-cutoff me-2"></i> Place Order</a>{% endif %}
+      <a class="list-group-item list-group-item-action" href="/admin/"><i class="bi bi-gear me-2"></i> Django Admin</a>
+    </div>
+  </div>
+</div>
 {% endblock %}
 
 {% block extra_js %}
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
 <script>
 (function(){
+  // Show full table when view=all
   const params   = new URLSearchParams(location.search);
   const showAll  = params.get('view') === 'all';
   const tableWrap= document.getElementById('stockTableWrap');
   const ticker   = document.getElementById('ticker');
   if (showAll){ tableWrap.hidden = false; ticker.hidden = true; }
 
-  /* ===== Build ticker data from table (server-paginated or injected rows) ===== */
+  // Theme toggle
+  (function(){
+    const KEY="cc-theme";
+    const THEMES=["style-1","style-2","style-3"];
+    const root=document.documentElement;
+    const btn=document.getElementById('ccThemeBtn');
+    let current=localStorage.getItem(KEY)||root.getAttribute('data-theme')||THEMES[0];
+    function apply(t){ current=t; root.setAttribute('data-theme',t); localStorage.setItem(KEY,t); window.dispatchEvent(new CustomEvent('theme:changed',{detail:{theme:t}})); }
+    btn && btn.addEventListener('click', ()=> apply(THEMES[(THEMES.indexOf(current)+1)%THEMES.length]));
+  })();
+
+  // Build ticker data from the table
   const tbody = document.querySelector('#stockTable tbody');
   const rows  = Array.from((tbody || {}).rows || []).map(tr => {
     const td = tr.querySelectorAll('td');
@@ -359,86 +462,200 @@
   }
   let idx = 0;
   renderTicker(idx);
-  const tickerTimer = setInterval(()=>{ idx = (idx+1) % (rows.length || 1); renderTicker(idx); }, 5000);
-  document.getElementById('nextRow').addEventListener('click', ()=>{ idx = (idx+1) % (rows.length||1); renderTicker(idx); });
-  document.getElementById('prevRow').addEventListener('click', ()=>{ idx = (idx-1+rows.length) % (rows.length||1); renderTicker(idx); });
+  document.getElementById('nextRow')?.addEventListener('click', ()=>{ idx = (idx+1) % (rows.length||1); renderTicker(idx); });
+  document.getElementById('prevRow')?.addEventListener('click', ()=>{ idx = (idx-1+rows.length) % (rows.length||1); renderTicker(idx); });
+  setInterval(()=>{ idx = (idx+1) % (rows.length || 1); renderTicker(idx); }, 5000);
 
-  /* ===== Charts (fixed heights, no stretch) ===== */
-  const BLUE = 'rgba(59,130,246,0.9)';   // blue fun
-  const BLUE_SOFT = 'rgba(59,130,246,0.2)';
-  const GREEN = 'rgba(16,185,129,0.9)';
-  const GRAY = '#94a3b8';
+  // --------- API helpers (use first working alias) ---------
+  async function fetchFirstOk(urls, query){
+    for (const u of urls){
+      try{
+        const r = await fetch(u + (query||''), {headers:{Accept:'application/json'}});
+        if (r.ok) return await r.json();
+      }catch(e){}
+    }
+    return null;
+  }
+  const SALES_TREND_ENDPOINTS = [
+    '/inventory/api/sales-trend/','/inventory/api_sales_trend/','/inventory/api-sales-trend/','/inventory/api/sales_trend/'
+  ];
+  const TOP_MODELS_ENDPOINTS = [
+    '/inventory/api/top-models/','/inventory/api_top_models/','/inventory/api-top-models/','/inventory/api/top_models/'
+  ];
+  const HEATMAP_ENDPOINTS = [
+    '/inventory/api/restock-heatmap/','/inventory/restock_heatmap_api/','/inventory/restock-heatmap/','/inventory/api/restock_heatmap/'
+  ];
 
-  const salesCtx = document.getElementById('salesTrend').getContext('2d');
-  const topCtx   = document.getElementById('topModels').getContext('2d');
+  // --------- Charts ---------
+  const BLUE = getComputedStyle(document.documentElement).getPropertyValue('--cc-accent').trim() || 'rgba(59,130,246,0.9)';
+  const BLUE_SOFT = BLUE + '33';
+  const gridColor = ()=> getComputedStyle(document.documentElement).getPropertyValue('--chart-grid').trim() || 'rgba(148,163,184,.25)';
+
+  const salesCtx = document.getElementById('salesTrend')?.getContext('2d');
+  const topCtx   = document.getElementById('topModels')?.getContext('2d');
   let salesChart = null, topChart = null;
 
-  function scaleOpts(){
-    return {
-      x: { ticks:{ maxTicksLimit: 10, color:'var(--cc-muted)' }, grid:{ color:'rgba(148,163,184,.25)' } },
-      y: { beginAtZero:true, ticks:{ maxTicksLimit: 6, color:'var(--cc-muted)' }, grid:{ color:'rgba(148,163,184,.25)' } }
-    };
+  function moneyHuman(v){
+    const n = Number(v)||0;
+    if (Math.abs(n) >= 1_000_000) return (n/1_000_000).toLocaleString(undefined,{maximumFractionDigits:1})+'M';
+    if (Math.abs(n) >= 1_000)     return (n/1_000).toLocaleString(undefined,{maximumFractionDigits:0})+'k';
+    return n.toLocaleString();
+  }
+  function niceScale(max){
+    const m = Number(max)||0;
+    const steps = [50_000, 100_000, 250_000, 500_000, 1_000_000, 2_000_000, 5_000_000];
+    let step = steps[0];
+    for (const s of steps){ if (m / s <= 8){ step = s; break; } step = s; }
+    const maxNice = Math.max(step*2, Math.ceil(m/step)*step);
+    return { step, max: maxNice };
   }
 
+  const salesSkel = document.getElementById('salesSkel');
+  const topSkel   = document.getElementById('topSkel');
+  const showSkel=(el)=> el && (el.style.display='block');
+  const hideSkel=(el)=> el && (el.style.display='none');
+
   async function loadTrend(){
+    if (!salesCtx) return;
+    showSkel(salesSkel);
+
     const period = document.getElementById('trendPeriod').value;
     const metric = document.getElementById('trendMetric').value;
-    const url = "{% url 'inventory:api_sales_trend' %}" + `?period=${period}&metric=${metric}`;
-    const res = await fetch(url);
-    const data = await res.json();
 
-    const cfg = {
-      type:'line',
-      data:{
-        labels:data.labels,
-        datasets:[{
-          label: metric==='amount'?'Sales (MK)':'Sales (count)',
-          data:data.values,
-          borderColor:BLUE, backgroundColor:BLUE_SOFT,
-          fill:true, pointRadius:2, tension:.35
-        }]
-      },
-      options:{
-        responsive:true, maintainAspectRatio:false,
-        plugins:{ legend:{ display:false }, tooltip:{ mode:'index', intersect:false } },
-        scales: scaleOpts()
+    const data = await fetchFirstOk(SALES_TREND_ENDPOINTS, `?period=${period}&metric=${metric}`) || {labels:[],values:[]};
+    let labels = data.labels||[];
+    let values = (data.values||[]).map(v => Number(v)||0);
+    const sign  = (metric === 'amount') ? (data?.currency?.sign || 'MK') : '';
+
+    const isCount = (metric === 'count');
+    if (isCount) values = values.map(v=>Math.round(v));
+
+    if (salesChart) salesChart.destroy();
+
+    if (!labels.length){
+      hideSkel(salesSkel);
+      const el = document.getElementById('salesTrend');
+      const ctx = el.getContext('2d'); ctx.clearRect(0,0,el.width,el.height);
+      ctx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--cc-muted').trim() || '#94a3b8';
+      ctx.font = '14px system-ui'; ctx.fillText('No data', 12, 22);
+      return;
+    }
+
+    const maxV = Math.max(0, ...values);
+    const nice  = isCount ? null : niceScale(maxV);
+
+    salesChart = new Chart(salesCtx, {
+      type: 'line',
+      data: { labels, datasets: [{
+        label: isCount ? 'Sales (count)' : `Sales (${sign})`,
+        data: values,
+        borderColor: BLUE, backgroundColor: BLUE_SOFT, fill: true, pointRadius: 2, tension: .35
+      }]},
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        animation:{ duration:650, easing:'easeOutQuart' },
+        plugins: { legend: { display: false }, tooltip:{ mode:'index', intersect:false,
+          callbacks: isCount ? {} : { label: (ctx)=> `${sign} ${ctx.parsed.y.toLocaleString()}` }
+        }},
+        scales: {
+          x: { grid: { color: gridColor() } },
+          y: isCount ? {
+            beginAtZero: true, min: 0, max: Math.max(3, Math.ceil(maxV)+1),
+            grid: { color: gridColor() },
+            ticks: { stepSize: 1, precision: 0, callback: (v)=> Number.isInteger(v) ? v : '' }
+          } : {
+            beginAtZero: true, min: 0, max: nice.max,
+            grid: { color: gridColor() },
+            ticks: { stepSize: nice.step, precision: 0, callback: (v)=> `${sign} ${moneyHuman(v)}` }
+          }
+        }
       }
-    };
-    if(salesChart) salesChart.destroy();
-    salesChart = new Chart(salesCtx, cfg);
+    });
+
+    hideSkel(salesSkel);
   }
 
   async function loadTop(){
+    if (!topCtx) return;
+    showSkel(topSkel);
+
     const period = document.getElementById('topPeriod').value;
-    const url = "{% url 'inventory:api_top_models' %}" + `?period=${period}`;
-    const res = await fetch(url);
-    const data = await res.json();
-    const cfg = {
-      type:'pie',
-      data:{ labels:data.labels, datasets:[{ data:data.values, backgroundColor:[BLUE, GREEN, GRAY, '#60a5fa', '#86efac'] }] },
-      options:{ responsive:true, maintainAspectRatio:false, plugins:{ legend:{ position:'bottom' } } }
-    };
-    if(topChart) topChart.destroy();
-    topChart = new Chart(topCtx, cfg);
+    const data = await fetchFirstOk(TOP_MODELS_ENDPOINTS, `?period=${period}`) || {labels:[],values:[]};
+    const labels = data.labels||[];
+    const values = (data.values||[]).map(v=>Number(v)||0);
+
+    if (topChart) topChart.destroy();
+
+    if (!labels.length){
+      hideSkel(topSkel);
+      const el = document.getElementById('topModels');
+      const ctx = el.getContext('2d'); ctx.clearRect(0,0,el.width,el.height);
+      ctx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--cc-muted').trim() || '#94a3b8';
+      ctx.font = '14px system-ui'; ctx.fillText('No data', 12, 22);
+      return;
+    }
+
+    topChart = new Chart(topCtx, {
+      type:'bar',
+      data:{ labels, datasets:[{ label:'Units', data: values, backgroundColor: BLUE, borderColor: BLUE }] },
+      options:{
+        responsive:true, maintainAspectRatio:false,
+        animation:{ duration:650, easing:'easeOutQuart' },
+        plugins:{ legend:{ display:false } },
+        scales:{
+          x:{ grid:{ display:false }},
+          y:{ beginAtZero:true, grid: { color: gridColor() },
+              ticks:{ stepSize:1, precision:0, callback:(v)=>Number.isInteger(v)?v:'' } }
+        }
+      }
+    });
+
+    hideSkel(topSkel);
   }
 
-  document.getElementById('trendPeriod').addEventListener('change', loadTrend);
-  document.getElementById('trendMetric').addEventListener('change', loadTrend);
-  document.getElementById('topPeriod').addEventListener('change', loadTop);
-
+  document.getElementById('trendPeriod')?.addEventListener('change', loadTrend);
+  document.getElementById('trendMetric')?.addEventListener('change', loadTrend);
+  document.getElementById('topPeriod')?.addEventListener('change', loadTop);
   loadTrend(); loadTop();
 
-  /* ===== NEW: mobile Filters collapse logic ===== */
-  const fw = document.getElementById('filtersWrap');
-  const ft = document.getElementById('filtersToggle');
-  if (fw && ft){
-    const mq = window.matchMedia('(max-width: 576px)');
-    const applyState = ()=>{ if(mq.matches){ fw.classList.add('collapsed'); } else { fw.classList.remove('collapsed'); } };
-    applyState();
-    if (mq.addEventListener) mq.addEventListener('change', applyState);
-    else mq.addListener(applyState); // older Safari
-    ft.addEventListener('click', ()=> fw.classList.toggle('collapsed'));
+  // --------- Stock Battery (INVENTORY ONLY) ---------
+  const STATIC_INSTOCK = Number({{ in_stock|default:0 }});
+  const STATIC_TARGET  = Number({{ target_full|default:100 }});
+
+  async function loadBattery(){
+    const fill  = document.getElementById('batteryFill');
+    const label = document.getElementById('batteryLabel');
+    if (!fill || !label) return;
+
+    // Prefer restock heatmap endpoint (it returns battery_pct / battery_count)
+    const hm = await fetchFirstOk(HEATMAP_ENDPOINTS, '');
+    let pct=0, on_hand=STATIC_INSTOCK;
+
+    if (hm && typeof hm.battery_pct !== 'undefined'){
+      pct = Math.max(0, Math.min(100, Math.round(Number(hm.battery_pct)||0)));
+      on_hand = Number(hm.battery_count||STATIC_INSTOCK)||0;
+    } else {
+      pct = STATIC_TARGET ? Math.max(0, Math.min(100, (STATIC_INSTOCK/STATIC_TARGET)*100)) : 0;
+    }
+
+    fill.style.width = pct + '%';
+    if (pct <= 20){ fill.style.background = 'linear-gradient(90deg,#ef4444,#dc2626)'; label.textContent = `${on_hand} in stock • ${pct}% • Critical`; }
+    else if (pct <= 50){ fill.style.background = 'linear-gradient(90deg,#f59e0b,#d97706)'; label.textContent = `${on_hand} in stock • ${pct}% • Low`; }
+    else { fill.style.background = 'linear-gradient(90deg,#22c55e,#06b6d4)'; label.textContent = `${on_hand} in stock • ${pct}% • OK`; }
   }
+  loadBattery();
+
+  // Surface Django messages (optional)
+  {% if messages %}
+    {% for message in messages %}
+      window.pushNote?.({
+        type: '{% if "error" in message.tags or "danger" in message.tags %}danger{% elif "success" in message.tags %}success{% elif "warning" in message.tags %}warn{% else %}info{% endif %}',
+        title: 'Inventory',
+        body: "{{ message|escapejs }}",
+        dot: true
+      });
+    {% endfor %}
+  {% endif %}
 })();
 </script>
 {% endblock %}

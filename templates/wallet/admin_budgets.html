@@ -1,0 +1,185 @@
+{% extends "base.html" %}
+{% load humanize %}
+
+{% block title %}Manage Budgets · Admin Wallet{% endblock %}
+{% block header_title %}<i class="bi bi-cash-coin me-2"></i>Manage Budget Requests{% endblock %}
+
+{% block content %}
+<div class="container-xxl px-0">
+
+  <!-- Intro -->
+  <div class="alert alert-info d-flex align-items-start gap-2">
+    <i class="bi bi-info-circle mt-1"></i>
+    <div>
+      Review agents’ budget requests. <strong>Approve</strong> to mark as approved,
+      <strong>Pay</strong> to disburse and post to wallet, or <strong>Reject</strong> to decline.
+      Paying a request credits the agent’s wallet and mirrors a company ledger entry.
+    </div>
+  </div>
+
+  <!-- ===== Pending ===== -->
+  <div class="card shadow-sm border-0 mb-3">
+    <div class="card-body">
+      <div class="d-flex justify-content-between align-items-center mb-2">
+        <h5 class="mb-0"><i class="bi bi-hourglass-split me-1"></i>Pending Requests</h5>
+        <span class="badge rounded-pill text-bg-warning">{{ pending|length }} pending</span>
+      </div>
+
+      <div class="table-responsive">
+        <table class="table align-middle">
+          <thead>
+            <tr class="text-muted small">
+              <th>Agent</th>
+              <th>Title</th>
+              <th class="text-end">Amount (MWK)</th>
+              <th>Reason</th>
+              <th>Requested</th>
+              <th class="text-end" style="min-width:220px">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for b in pending %}
+              <tr>
+                <td>{{ b.agent.first_name }} {{ b.agent.last_name }}</td>
+                <td class="fw-semibold text-truncate" style="max-width:240px">{{ b.title }}</td>
+                <td class="text-end fw-semibold">MWK {{ b.amount|floatformat:2|intcomma }}</td>
+                <td class="text-truncate" style="max-width:360px">{{ b.reason|default:"—" }}</td>
+                <td class="text-muted small">{{ b.created_at|date:"M j, Y · H:i" }}</td>
+                <td class="text-end">
+                  <div class="d-inline-flex gap-1">
+                    <form method="post" action="{% url 'wallet:admin_budgets' %}">
+                      {% csrf_token %}
+                      <input type="hidden" name="budget_id" value="{{ b.id }}">
+                      <input type="hidden" name="action" value="approve">
+                      <button class="btn btn-primary btn-sm" title="Approve">
+                        <i class="bi bi-check2-circle"></i> Approve
+                      </button>
+                    </form>
+                    <form method="post" action="{% url 'wallet:admin_budgets' %}">
+                      {% csrf_token %}
+                      <input type="hidden" name="budget_id" value="{{ b.id }}">
+                      <input type="hidden" name="action" value="reject">
+                      <button class="btn btn-outline-secondary btn-sm" title="Reject">
+                        <i class="bi bi-x-circle"></i> Reject
+                      </button>
+                    </form>
+                    <form method="post" action="{% url 'wallet:admin_budgets' %}" onsubmit="return confirmPay('{{ b.title|escapejs }}', '{{ b.amount|floatformat:2|intcomma }}')">
+                      {% csrf_token %}
+                      <input type="hidden" name="budget_id" value="{{ b.id }}">
+                      <input type="hidden" name="action" value="pay">
+                      <button class="btn btn-success btn-sm" title="Pay">
+                        <i class="bi bi-cash-stack"></i> Pay
+                      </button>
+                    </form>
+                  </div>
+                </td>
+              </tr>
+            {% empty %}
+              <tr><td colspan="6" class="text-muted">No pending requests.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ===== Approved (not yet paid) ===== -->
+  <div class="card shadow-sm border-0 mb-3">
+    <div class="card-body">
+      <h5 class="mb-2"><i class="bi bi-stamp me-1"></i>Approved</h5>
+      <div class="table-responsive">
+        <table class="table table-sm align-middle">
+          <thead>
+            <tr class="text-muted small">
+              <th>Agent</th>
+              <th>Title</th>
+              <th class="text-end">Amount (MWK)</th>
+              <th>Reason</th>
+              <th>Approved</th>
+              <th>By</th>
+              <th class="text-end" style="min-width:140px">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for b in approved %}
+              <tr>
+                <td>{{ b.agent.first_name }} {{ b.agent.last_name }}</td>
+                <td class="text-truncate" style="max-width:240px">{{ b.title }}</td>
+                <td class="text-end fw-semibold">MWK {{ b.amount|floatformat:2|intcomma }}</td>
+                <td class="text-truncate" style="max-width:360px">{{ b.reason|default:"—" }}</td>
+                <td class="text-muted small">
+                  {% if b.decided_at %}{{ b.decided_at|date:"M j, Y · H:i" }}{% else %}—{% endif %}
+                </td>
+                <td class="text-muted small">
+                  {% if b.decided_by %}{{ b.decided_by.first_name }} {{ b.decided_by.last_name }}{% else %}—{% endif %}
+                </td>
+                <td class="text-end">
+                  <form method="post" action="{% url 'wallet:admin_budgets' %}" class="d-inline" onsubmit="return confirmPay('{{ b.title|escapejs }}', '{{ b.amount|floatformat:2|intcomma }}')">
+                    {% csrf_token %}
+                    <input type="hidden" name="budget_id" value="{{ b.id }}">
+                    <input type="hidden" name="action" value="pay">
+                    <button class="btn btn-success btn-sm">
+                      <i class="bi bi-cash-stack"></i> Pay
+                    </button>
+                  </form>
+                </td>
+              </tr>
+            {% empty %}
+              <tr><td colspan="7" class="text-muted">No approved requests.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== Paid ===== -->
+  <div class="card shadow-sm border-0">
+    <div class="card-body">
+      <h5 class="mb-2"><i class="bi bi-check2-circle me-1"></i>Paid</h5>
+      <div class="table-responsive">
+        <table class="table table-sm align-middle mb-0">
+          <thead>
+            <tr class="text-muted small">
+              <th>Agent</th>
+              <th>Title</th>
+              <th class="text-end">Amount (MWK)</th>
+              <th>Reason</th>
+              <th>Paid</th>
+              <th>By</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for b in paid %}
+              <tr>
+                <td>{{ b.agent.first_name }} {{ b.agent.last_name }}</td>
+                <td class="text-truncate" style="max-width:240px">{{ b.title }}</td>
+                <td class="text-end fw-semibold text-success">MWK {{ b.amount|floatformat:2|intcomma }}</td>
+                <td class="text-truncate" style="max-width:360px">{{ b.reason|default:"—" }}</td>
+                <td class="text-muted small">
+                  {% if b.decided_at %}{{ b.decided_at|date:"M j, Y · H:i" }}{% else %}—{% endif %}
+                </td>
+                <td class="text-muted small">
+                  {% if b.decided_by %}{{ b.decided_by.first_name }} {{ b.decided_by.last_name }}{% else %}—{% endif %}
+                </td>
+              </tr>
+            {% empty %}
+              <tr><td colspan="6" class="text-muted">No paid requests yet.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+  function confirmPay(title, amount){
+    return confirm(`Pay budget "${title}" of MWK ${amount}? This will credit the agent wallet and mirror a company ledger entry.`);
+  }
+</script>
+{% endblock %}

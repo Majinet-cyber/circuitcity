@@ -16,6 +16,7 @@
     --card: var(--card, #ffffff);
     --accent: var(--accent, #2563eb);
     --onAccent: var(--onAccent, #ffffff);
+    --scanline: #00ff5a; /* neon green */
   }
   body{background:var(--bg);color:var(--fg)}
 
@@ -54,12 +55,30 @@
 
   /* ===== Modal ===== */
   #scanModal{position:fixed;inset:0;background:rgba(0,0,0,.6);display:none;align-items:center;justify-content:center;z-index:9999}
-  #scanModal .modal-card{width:min(95vw,700px);padding:0;overflow:hidden}
+  #scanModal .modal-card{width:min(95vw,700px);padding:0;overflow:hidden;border-radius:16px}
   #scanModal header, #scanModal footer{display:flex;align-items:center;justify-content:space-between;padding:.75rem 1rem;border-color:var(--border);border-style:solid}
   #scanModal header{border-width:0 0 1px 0;background:var(--card)}
   #scanModal footer{border-width:1px 0 0 0;background:var(--card)}
-  #scanVideo{width:100%;height:auto;background:#000;display:block}
-  #scanFrame{position:absolute;inset:0;border:2px dashed rgba(255,255,255,.5);margin:10%}
+
+  /* Camera shell with animated scanline */
+  .cam-shell{position:relative;background:#000}
+  #scanVideo{width:100%;height:auto;display:block;background:#000}
+
+  .scan-overlay{position:absolute;inset:0;pointer-events:none}
+  .scan-frame{
+    position:absolute; inset:10% 8%;
+    border:2px solid rgba(255,255,255,.25);
+    border-radius:12px;
+    box-shadow: inset 0 0 0 9999px rgba(0,0,0,.20);
+  }
+  .scanline{
+    position:absolute; left:8%; right:8%; height:2px; border-radius:2px;
+    background:linear-gradient(90deg, transparent, var(--scanline), transparent);
+    box-shadow:0 0 10px var(--scanline), 0 0 20px rgba(0,255,90,.6);
+    animation: sweep 2.0s linear infinite alternate;
+  }
+  .scanline.paused{ animation-play-state: paused; }
+  @keyframes sweep { from { top: 10%; } to { top: 90%; } }
 </style>
 {% endblock %}
 
@@ -92,9 +111,12 @@
           <button class="btn" type="button" id="btnOpenScanner">📷 Scan with camera</button>
           <button class="btn" type="button" id="btnPaste">📋 Paste</button>
           <button class="btn btn-muted" type="button" id="btnClear">✖ Clear</button>
+          <label class="hint" style="display:inline-flex;align-items:center;gap:.4rem;margin-left:auto">
+            <input type="checkbox" id="autoSubmit" /> Auto-submit on valid IMEI
+          </label>
         </div>
         <div id="imeiHint" class="hint" style="margin-top:.35rem">
-          Tip: You can type, paste, or scan. IMEI must be exactly 15 digits.
+          Tip: You can type, paste, or scan. IMEI must be exactly 15 digits. Press <kbd>Enter</kbd> to submit.
         </div>
         {% if form.imei.errors %}<div class="error-text">{{ form.imei.errors|striptags }}</div>{% endif %}
       </div>
@@ -140,16 +162,22 @@
 </main>
 
 <!-- Scanner Modal -->
-<div id="scanModal">
+<div id="scanModal" role="dialog" aria-modal="true" aria-labelledby="scanDialogTitle">
   <div class="card modal-card">
     <header>
-      <strong>Scan barcode</strong>
-      <button class="btn" id="btnCloseScanner" type="button">Close</button>
+      <strong id="scanDialogTitle">Scan barcode</strong>
+      <button class="btn" id="btnCloseScanner" type="button" aria-label="Close scanner">Close</button>
     </header>
-    <div style="position:relative;background:#000">
+
+    <!-- Camera shell with overlay -->
+    <div class="cam-shell">
       <video id="scanVideo" playsinline></video>
-      <div id="scanFrame"></div>
+      <div class="scan-overlay" aria-hidden="true">
+        <div class="scan-frame"></div>
+        <div class="scanline" id="scanline"></div>
+      </div>
     </div>
+
     <footer class="hstack">
       <button class="btn" id="btnSwapCamera" type="button">🔁 Switch camera</button>
       <span id="scanStatus" class="hint">Align barcode within the frame…</span>
@@ -169,19 +197,61 @@
     });
   })();
 
-  // IMEI normalization (digits only, exactly 15)
+  const formEl    = document.querySelector("form[novalidate]");
   const imeiInput = document.getElementById("id_imei");
+  const priceEl   = document.getElementById("id_price");
+  const locEl     = document.getElementById("id_location");
+  const autoBox   = document.getElementById("autoSubmit");
+
+  // Utility
+  const onlyDigits = (s) => (s||"").replace(/\D+/g,"");
+  const looksLikeImei = (s) => /^\d{15}$/.test(onlyDigits(s||""));
+
   function setImei(val){
-    const digits = (val || "").replace(/\\D+/g,"").slice(0,15);
-    imeiInput.value = digits;
-    imeiInput.setCustomValidity(digits.length === 15 ? "" : "IMEI must be exactly 15 digits.");
+    const digits = onlyDigits(val).slice(0,15);
+    if (imeiInput){
+      imeiInput.value = digits;
+      imeiInput.setCustomValidity(digits.length === 15 ? "" : "IMEI must be exactly 15 digits.");
+    }
+    maybeAutoSubmit();
   }
-  function cap15(e){ setImei(e.target.value); }
+
+  function readyToSubmit(){
+    const imeiOk = imeiInput && looksLikeImei(imeiInput.value);
+    const locOk  = !!(locEl && locEl.value);
+    return imeiOk && locOk; // server will re-validate everything
+  }
+
+  function maybeAutoSubmit(){
+    if (autoBox && autoBox.checked && readyToSubmit() && formEl){
+      formEl.submit();
+    }
+  }
+
+  // IMEI normalization & keyboard helpers
   if (imeiInput){
+    try{
+      imeiInput.setAttribute("inputmode","numeric");
+      imeiInput.setAttribute("maxlength","15");
+      imeiInput.setAttribute("autocomplete","off");
+    }catch(_){}
+
+    const cap15 = (e)=> setImei(e.target.value);
     imeiInput.addEventListener("input", cap15);
     imeiInput.addEventListener("blur", cap15);
+    imeiInput.addEventListener("keydown", (e)=>{
+      if (e.key === "Enter"){ e.preventDefault(); if (readyToSubmit()) formEl.submit(); }
+    });
+    // initial cleanup
     setImei(imeiInput.value || "");
   }
+
+  // Global shortcuts
+  document.addEventListener("keydown", (e)=>{
+    if (e.key === "F2"){ e.preventDefault(); imeiInput && imeiInput.focus(); }
+    if (e.key === "Escape" && scanModal.style.display === "flex"){ e.preventDefault(); closeScanner(); }
+  });
+  window.addEventListener("load", ()=>{ if (imeiInput){ imeiInput.focus(); } });
 
   // Paste / Clear
   const btnPaste = document.getElementById("btnPaste");
@@ -192,6 +262,7 @@
       setImei(txt);
     }catch{
       alert("Clipboard access is blocked by the browser.");
+      imeiInput && imeiInput.focus();
     }
   });
   btnClear && (btnClear.onclick = () => setImei(""));
@@ -203,9 +274,11 @@
   const btnSwap   = document.getElementById("btnSwapCamera");
   const statusEl  = document.getElementById("scanStatus");
   const videoEl   = document.getElementById("scanVideo");
+  const scanLine  = document.getElementById("scanline");
 
   let currentDeviceId = null;
   let devices = [];
+  let quaggaActive = false;
 
   btnOpen && btnOpen.addEventListener("click", openScanner);
   btnClose && btnClose.addEventListener("click", closeScanner);
@@ -217,26 +290,33 @@
     await startQuagga();
   });
 
+  function pauseScanline(ms=900){
+    if(!scanLine) return;
+    scanLine.classList.add('paused');
+    setTimeout(()=> scanLine.classList.remove('paused'), ms);
+  }
+
   async function openScanner(){
     scanModal.style.display = "flex";
     statusEl.textContent = "Starting camera…";
     await initDevices();
     await startQuagga();
   }
+
   async function closeScanner(){
     scanModal.style.display = "none";
-    try{ Quagga.stop(); }catch(e){}
+    try{ Quagga.stop(); quaggaActive = false; }catch(e){}
   }
 
   async function initDevices(){
     try{
       const all = await navigator.mediaDevices.enumerateDevices();
       devices = all.filter(d => d.kind === "videoinput");
-      if (!devices.length){ statusEl.textContent = "No camera found."; return; }
+      if (!devices.length){ statusEl.textContent = "No camera found (permissions/HTTPS)."; return; }
       const back = devices.find(d => /back|rear|environment/i.test(d.label));
       currentDeviceId = (back || devices[0]).deviceId;
     }catch{
-      statusEl.textContent = "Could not enumerate cameras.";
+      statusEl.textContent = "Could not enumerate cameras (permissions?).";
     }
   }
 
@@ -260,7 +340,7 @@
       decoder: { readers: ["code_128_reader","ean_reader","ean_8_reader","upc_reader","upc_e_reader"] }
     }, (err) => {
       if (err){ statusEl.textContent = "Camera error: " + err; return; }
-      Quagga.start();
+      Quagga.start(); quaggaActive = true;
       statusEl.textContent = "Align barcode within the frame…";
       Quagga.offDetected(handleDetected);
       Quagga.onDetected(handleDetected);
@@ -268,13 +348,28 @@
   }
 
   function handleDetected(result){
+    if(!quaggaActive) return;
     const code = (result && result.codeResult && result.codeResult.code) || "";
     if (!code) return;
-    const digits = code.replace(/\\D+/g,"").slice(0,15);
+    const digits = onlyDigits(code).slice(0,15);
     if (!digits) return;
+
     setImei(digits);
     statusEl.textContent = "Scanned: " + digits;
-    setTimeout(() => { try{ Quagga.stop(); }catch(e){}; scanModal.style.display = "none"; }, 400);
+    pauseScanline(); // pause the green sweep briefly on success
+
+    // Auto-submit if enabled and form is ready; else close and focus Price for quick entry
+    if (autoBox && autoBox.checked && readyToSubmit()){
+      try{ Quagga.stop(); quaggaActive=false; }catch(e){}
+      scanModal.style.display = "none";
+      formEl.submit();
+    }else{
+      setTimeout(() => {
+        try{ Quagga.stop(); quaggaActive=false; }catch(e){}
+        scanModal.style.display = "none";
+        if (priceEl){ priceEl.focus(); }
+      }, 350);
+    }
   }
 </script>
 {% endblock %}

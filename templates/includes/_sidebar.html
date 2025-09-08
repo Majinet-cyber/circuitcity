@@ -1,0 +1,70 @@
+<!-- templates/includes/_sidebar.html -->
+<aside class="cc-sidebar">
+  <div class="brand">
+    <div class="logo"><i class="bi bi-lightning-charge-fill"></i></div>
+    Circuit City
+  </div>
+
+  <div class="menu-group">CONTROL CENTER</div>
+  <ul class="navlist">
+    <li>
+      <a class="navlink hover-lift tap focus-ring" href="{% url 'inventory:inventory_dashboard' %}" aria-label="Dashboard">
+        <i class="bi bi-speedometer2"></i> <span>Dashboard</span>
+      </a>
+    </li>
+    <li>
+      <a class="navlink hover-lift tap focus-ring" href="{% url 'inventory:stock_list' %}" aria-label="Inventory">
+        <i class="bi bi-boxes"></i> <span>Inventory</span>
+      </a>
+    </li>
+    <li>
+      <a class="navlink hover-lift tap focus-ring" href="{% url 'inventory:wallet' %}" aria-label="Wallet">
+        <i class="bi bi-wallet2"></i> <span>Wallet</span>
+      </a>
+    </li>
+    <li>
+      <a class="navlink hover-lift tap focus-ring" href="{% url 'inventory:time_checkin_page' %}" aria-label="Time Check-in">
+        <i class="bi bi-geo-alt"></i> <span>Time Check-in</span>
+      </a>
+    </li>
+    <li>
+      <a class="navlink hover-lift tap focus-ring" href="{% url 'inventory:time_logs' %}" aria-label="Time Logs">
+        <i class="bi bi-clock-history"></i> <span>Time Logs</span>
+      </a>
+    </li>
+    <li>
+      <a class="navlink hover-lift tap focus-ring" href="/feedback/" aria-label="Feedback">
+        <i class="bi bi-chat-dots"></i> <span>Feedback</span>
+      </a>
+    </li>
+  </ul>
+
+  <div class="menu-group">ADMIN</div>
+  <ul class="navlist">
+    <li>
+      <a class="navlink hover-lift tap focus-ring" href="/wallet/admin/" aria-label="Admin Wallet">
+        <i class="bi bi-person-gear"></i> <span>Admin Wallet</span>
+      </a>
+    </li>
+    <li>
+      <a class="navlink hover-lift tap focus-ring" href="/admin/" aria-label="Django Admin">
+        <i class="bi bi-shield-lock"></i> <span>Django Admin</span>
+      </a>
+    </li>
+  </ul>
+
+  <div class="menu-group">REPORTS</div>
+  <ul class="navlist">
+    <li>
+      <a class="navlink hover-lift tap focus-ring" href="{% url 'reports:home' %}" aria-label="Reports">
+        <i class="bi bi-graph-up-arrow"></i> <span>Reports</span>
+      </a>
+    </li>
+  </ul>
+
+  <div class="side-footer">
+    <a class="navlink logout tap focus-ring" href="/accounts/logout/?next=/accounts/login/" aria-label="Logout">
+      <i class="bi bi-box-arrow-right"></i> <span>Logout</span>
+    </a>
+  </div>
+</aside>

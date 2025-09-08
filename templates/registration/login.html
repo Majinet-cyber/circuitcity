@@ -1,95 +1,281 @@
-{% extends "base.html" %}
-{% block title %}Sign in · Circuit City{% endblock %}
+{# templates/registration/login.html — LIGHT MODE, minimal inputs + glassmorphic blue + page loader #}
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Sign in · Circuit City</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
 
-{% block body %}
-<div class="login-page">
-  <div class="bg" style="min-height:100dvh;display:grid;place-items:center;padding:2rem">
-    <div class="card" style="width:min(520px,100%);padding:1.5rem">
-      <h2 class="brand" style="margin:0 0 1rem; font-weight:700;">Sign in</h2>
+  <style>
+    :root{
+      --bg1:#eef5ff; --bg2:#f9fbff; --card:#ffffff; --muted:#475569; --text:#0f172a;
+      --accent:#2563eb; --accent-2:#22c55e; --border:#e2e8f0;
 
+      /* Glass tokens (blue) */
+      --blue-1:#2563eb; --blue-2:#60a5fa;
+      --glass-bg: rgba(37,99,235,0.12);
+      --glass-brd: rgba(96,165,250,.55);
+      --shadow: 0 10px 30px rgba(37,99,235,.22);
+
+      /* Focus ring */
+      --ring: rgba(147,197,253,.35);
+    }
+
+    *{box-sizing:border-box}
+    html,body{height:100%}
+    body{
+      margin:0; font-family:system-ui,-apple-system,Segoe UI,Inter,Roboto,sans-serif;
+      background:linear-gradient(180deg,var(--bg1),var(--bg2)); color:var(--text);
+      -webkit-font-smoothing:antialiased; text-rendering:optimizeLegibility;
+    }
+
+    /* ---------- Full-page Loader ---------- */
+    #page-loader{
+      position: fixed; inset: 0;
+      display: grid; place-items: center;
+      background: radial-gradient(1200px 800px at 50% 40%, rgba(15,23,42,0.12), transparent 60%);
+      backdrop-filter: blur(4px);
+      -webkit-backdrop-filter: blur(4px);
+      z-index: 2000;
+      transition: opacity .35s ease, visibility .35s ease;
+    }
+    #page-loader.hidden{ opacity: 0; visibility: hidden; }
+    .loader-ring{
+      width: 64px; height: 64px; border-radius: 50%;
+      border: 4px solid rgba(96,165,250,.25);
+      border-top-color: var(--blue-1);
+      animation: spin 1s linear infinite;
+      box-shadow: 0 0 0 4px rgba(37,99,235,.06) inset;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    @media (prefers-reduced-motion: reduce){
+      .loader-ring{ animation: none; }
+      #page-loader{ backdrop-filter: none; -webkit-backdrop-filter: none; }
+    }
+
+    /* ---------- Layout ---------- */
+    .wrap{min-height:100%; display:grid; place-items:center; padding:clamp(16px,4vw,32px)}
+    .card{
+      width:min(560px,92vw); background:var(--card); border:1px solid var(--border);
+      border-radius:16px; padding:20px 18px 18px;
+      box-shadow:0 12px 28px rgba(2,8,23,.08);
+      position: relative;
+    }
+
+    .brand{display:flex; align-items:center; gap:10px; margin-bottom:6px}
+    .brand .dot{width:34px; height:34px; border-radius:9px; background:linear-gradient(135deg,#60a5fa,#3b82f6)}
+    h1{font-size:22px; margin:0 0 8px}
+    .muted{color:var(--muted); font-size:13px}
+
+    form{display:grid; gap:12px; margin-top:8px}
+    label{font-weight:600; font-size:14px}
+    .field{
+      display:flex; align-items:center; gap:8px; background:#f8fafc; border:1px solid var(--border);
+      border-radius:12px; padding:2px 2px 2px 12px;
+      transition: border-color .15s ease, box-shadow .15s ease;
+    }
+    .field:focus-within{
+      border-color:#93c5fd;
+      box-shadow:0 0 0 4px var(--ring);
+    }
+    .field input{
+      flex:1; background:transparent; color:var(--text); border:0; outline:none;
+      padding:12px; font-size:16px;
+    }
+    .row{display:grid; grid-template-columns:1fr auto; gap:8px; align-items:center}
+    @media (max-width:420px){ .row{grid-template-columns:1fr} }
+
+    /* Base buttons (kept for secondary/link styles) */
+    .btn{
+      border:1px solid var(--border); background:#f1f5f9; color:#0f172a;
+      border-radius:10px; padding:12px 16px; font-weight:700; cursor:pointer;
+      transition: filter .15s ease, transform .07s ease;
+    }
+    .btn:active{ transform: translateY(1px); }
+    .btn.link{background:transparent; border:0; padding:0; color:var(--accent); font-weight:600}
+
+    .actions{display:flex; gap:10px; align-items:center; justify-content:space-between; flex-wrap:wrap}
+
+    .alert{
+      background:#fee2e2; border:1px solid #fecaca; color:#991b1b;
+      padding:10px 12px; border-radius:12px; font-size:14px;
+    }
+    .help{font-size:12px; color:var(--muted)}
+    .err{color:#991b1b}
+    .toggle{
+      border:1px solid var(--border); background:#f8fafc; color:#334155;
+      border-radius:8px; padding:10px 12px; cursor:pointer; white-space:nowrap;
+    }
+    a{color:var(--accent); text-decoration:none}
+    a:hover{text-decoration:underline}
+
+    /* ---------- Glassmorphic Blue Primary Button (stays blue on hover) ---------- */
+    .btn-glass-blue{
+      --_bg: var(--glass-bg);
+      --_brd: var(--glass-brd);
+      --_txt: #eaf2ff;
+      --_txt-strong: #ffffff;
+
+      position: relative;
+      display: inline-flex; align-items: center; justify-content: center;
+      gap: .5rem;
+      padding: .72rem 1.15rem;
+      font-weight: 800;
+      letter-spacing: .02em;
+      border-radius: 14px;
+      color: var(--_txt);
+      background:
+        radial-gradient(120% 160% at 30% 20%, rgba(255,255,255,.35), transparent 60%),
+        linear-gradient(135deg, rgba(96,165,250,.55), rgba(37,99,235,.45)),
+        var(--_bg);
+      border: 1px solid var(--_brd);
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+      transition: transform .18s ease, box-shadow .18s ease, background .18s ease, color .18s ease;
+      text-decoration: none;
+      cursor: pointer;
+    }
+    .btn-glass-blue:hover,
+    .btn-glass-blue:focus{
+      transform: translateY(-1px);
+      color: var(--_txt-strong);
+      box-shadow: 0 14px 34px rgba(37,99,235,.32);
+      background:
+        radial-gradient(140% 160% at 30% 20%, rgba(255,255,255,.5), transparent 60%),
+        linear-gradient(135deg, rgba(96,165,250,.65), rgba(37,99,235,.55)),
+        var(--_bg);
+    }
+    .btn-glass-blue:active{
+      transform: translateY(0);
+      box-shadow: 0 8px 22px rgba(37,99,235,.28);
+    }
+    .btn-glass-blue:disabled{
+      opacity: .65; cursor: not-allowed; transform: none;
+      box-shadow: 0 8px 18px rgba(37,99,235,.18);
+    }
+    @media (max-width: 480px){
+      .btn-glass-blue{ width: 100%; }
+    }
+  </style>
+</head>
+<body>
+  <!-- Full-page Loader -->
+  <div id="page-loader" aria-hidden="true">
+    <div class="loader-ring" role="status" aria-label="Loading"></div>
+  </div>
+
+  <div class="wrap">
+    <div class="card" role="dialog" aria-labelledby="loginTitle" aria-describedby="loginDesc">
+      <div class="brand" aria-hidden="true">
+        <div class="dot"></div>
+        <div>
+          <div style="font-weight:800">Circuit City</div>
+          <div class="muted">Staff Portal</div>
+        </div>
+      </div>
+
+      <h1 id="loginTitle">Sign in</h1>
+      <p id="loginDesc" class="muted" style="margin:0 0 8px">
+        Welcome back. Enter your credentials to continue.
+      </p>
+
+      {% if messages %}
+        {% for m in messages %}
+          <div class="alert" role="alert" aria-live="assertive">{{ m }}</div>
+        {% endfor %}
+      {% endif %}
       {% if form.errors or form.non_field_errors %}
-        <div style="margin:.5rem 0 1rem;padding:.75rem 1rem;border-radius:.75rem;
-                    background:#fee2e2;border:1px solid #fecaca;color:#7f1d1d;"
-             role="alert" aria-live="assertive">
-          Please check your username and password and try again.
+        <div class="alert" role="alert" aria-live="assertive">
+          Please check your details and try again.
         </div>
       {% endif %}
 
-      <form method="post" action="{% url 'login' %}" novalidate style="display:grid;gap:1rem">
+      <form method="post" action="{% url 'accounts:login' %}" novalidate>
         {% csrf_token %}
-        {% if next %}<input type="hidden" name="next" value="{{ next }}">{% endif %}
+        {% if request.GET.next %}<input type="hidden" name="next" value="{{ request.GET.next|urlencode }}">{% endif %}
 
-        <!-- Username -->
         <div>
-          <label for="username-input" style="display:block;margin:0 0 .4rem;color:#334155;font-weight:600">
-            Username
-          </label>
-          <input class="input" id="username-input" name="username" type="text"
-                 required autocomplete="username" autofocus
-                 value="{{ form.username.value|default_if_none:'' }}"
-                 aria-invalid="{{ form.username.errors|yesno:'true,false' }}">
-          {% if form.username.errors %}
-            <div class="small" style="color:#b91c1c;margin-top:.25rem;">
-              {{ form.username.errors.0 }}
-            </div>
-          {% endif %}
+          <label for="id_identifier">Email or Username</label>
+          <div class="field">
+            <input id="id_identifier" name="identifier" type="text" autocomplete="username email" autofocus
+                   value="{{ form.identifier.value|default_if_none:'' }}"
+                   aria-invalid="{{ form.identifier.errors|yesno:'true,false' }}">
+          </div>
+          {% if form.identifier.errors %}<div class="help err">{{ form.identifier.errors.0 }}</div>{% endif %}
         </div>
 
-        <!-- Password + show/hide -->
         <div>
-          <label for="password-input" style="display:block;margin:0 0 .4rem;color:#334155;font-weight:600">
-            Password
-          </label>
-          <div style="display:flex;gap:.5rem;align-items:center">
-            <input class="input" id="password-input" name="password" type="password"
-                   required autocomplete="current-password"
-                   aria-invalid="{{ form.password.errors|yesno:'true,false' }}">
-            <button type="button" class="btn" id="toggle-pass" aria-controls="password-input" aria-pressed="false">
-              Show
-            </button>
-          </div>
-          {% if form.password.errors %}
-            <div class="small" style="color:#b91c1c;margin-top:.25rem;">
-              {{ form.password.errors.0 }}
+          <label for="id_password">Password</label>
+          <div class="row">
+            <div class="field">
+              <input id="id_password" name="password" type="password" autocomplete="current-password"
+                     aria-invalid="{{ form.password.errors|yesno:'true,false' }}">
             </div>
-          {% endif %}
-          <div style="margin-top:.35rem">
-            <a href="{% url 'inventory:agent_forgot_password' %}" style="font-size:.95rem;text-decoration:none;color:#2563eb">
-              Forgot your password?
-            </a>
+            <button type="button" class="toggle" id="toggle-pass" aria-controls="id_password" aria-pressed="false" aria-label="Show password">Show</button>
           </div>
+          <div class="help">
+            <a href="{% url 'accounts:forgot_password_request' %}">Forgot password?</a>
+          </div>
+          {% if form.password.errors %}<div class="help err">{{ form.password.errors.0 }}</div>{% endif %}
         </div>
 
-        <!-- Stay signed in (requires server-side support to change session expiry) -->
-        <div style="display:flex;gap:.5rem;align-items:center">
-          <input type="checkbox" id="remember" name="remember" value="1" {% if request.POST.remember %}checked{% endif %}>
-          <label for="remember" style="color:#334155;">Stay signed in for 14 days</label>
+        <div class="actions">
+          <!-- Primary glassmorphic blue button (stays blue on hover) -->
+          <button class="btn-glass-blue" type="submit" id="loginSubmit">Sign in</button>
+          <a class="btn link" href="/">Cancel</a>
         </div>
 
-        <!-- Actions -->
-        <div style="display:flex;gap:.6rem;flex-wrap:wrap;margin-top:.25rem">
-          <button class="btn btn-primary" type="submit">Sign in</button>
-          <a class="btn" href="{% url 'root' %}" style="background:#64748b">Cancel</a>
+        <div class="help" style="margin-top:6px">
+          You’ll be redirected after sign in.
         </div>
       </form>
     </div>
   </div>
-</div>
 
-<script>
-  // Simple show/hide password toggle
-  (function(){
-    const btn = document.getElementById('toggle-pass');
-    const input = document.getElementById('password-input');
-    if(btn && input){
+  <script>
+    // Hide the page loader once everything is loaded
+    window.addEventListener('load', function () {
+      const el = document.getElementById('page-loader');
+      if (el) el.classList.add('hidden');
+    });
+
+    // (Optional) hooks if you later use Turbo/HTMX — safe no-ops otherwise
+    document.addEventListener('turbo:visit', () => {
+      const el = document.getElementById('page-loader'); if (el) el.classList.remove('hidden');
+    });
+    document.addEventListener('turbo:load', () => {
+      const el = document.getElementById('page-loader'); if (el) el.classList.add('hidden');
+    });
+
+    // Show/hide password + CapsLock hint
+    (function () {
+      const btn = document.getElementById('toggle-pass');
+      const input = document.getElementById('id_password');
+      if (!btn || !input) return;
+
       btn.addEventListener('click', () => {
         const isPwd = input.type === 'password';
         input.type = isPwd ? 'text' : 'password';
         btn.textContent = isPwd ? 'Hide' : 'Show';
         btn.setAttribute('aria-pressed', String(isPwd));
-        input.focus();
+        btn.setAttribute('aria-label', isPwd ? 'Hide password' : 'Show password');
+        input.focus({preventScroll:true});
       });
-    }
-  })();
-</script>
-{% endblock %}
+
+      input.addEventListener('keyup', (e) => {
+        if (!('getModifierState' in e)) return;
+        input.title = e.getModifierState('CapsLock') ? 'Caps Lock is ON' : '';
+      });
+    })();
+
+    // Autofocus password if identifier already filled
+    (function(){
+      const u = document.getElementById('id_identifier');
+      const p = document.getElementById('id_password');
+      if (!u || !p) return;
+      if (u.value && !p.value) p.focus();
+    })();
+  </script>
+</body>
+</html>

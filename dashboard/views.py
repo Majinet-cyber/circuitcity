@@ -7,10 +7,14 @@ from django.db.models import (
     Sum, F, DecimalField, ExpressionWrapper, Count, Case, When
 )
 from django.db.models.functions import TruncMonth
-from django.http import JsonResponse
+from django.http import JsonResponse, HttpResponseRedirect
 from django.shortcuts import render, get_object_or_404
 from django.urls import reverse, NoReverseMatch
 from django.utils import timezone
+from django.views.decorators.http import require_GET
+from django.views.decorators.cache import never_cache
+
+from importlib import import_module  # <-- added
 
 from inventory.models import InventoryItem
 from sales.models import Sale
@@ -426,3 +430,276 @@ def agent_trend_data(request):
     labels = [r["m"].strftime("%b %Y") for r in rows]
     data = [float(r["v"] or 0) for r in rows]
     return JsonResponse({"labels": labels, "data": data})
+
+
+# =========================
+# APPEND-ONLY: Inventory proxies and gentle redirects
+# (No changes to existing views above)
+# =========================
+
+def _inventory_dashboard_url() -> str:
+    """
+    Reverse the canonical inventory dashboard URL with multiple fallbacks.
+    Never raises: returns a best-effort path even if reversing fails.
+    """
+    candidates = (
+        "inventory:inventory_dashboard",  # preferred
+        "inventory_dashboard",
+        "inventory:dashboard",
+        "inventory:home",
+    )
+    for name in candidates:
+        try:
+            return reverse(name)
+        except NoReverseMatch:
+            continue
+    from django.conf import settings
+    prefix = getattr(settings, "FORCE_SCRIPT_NAME", "") or ""
+    return f"{prefix}/inventory/dashboard/"
+
+def _call_inventory_view(func_name, request):
+    """
+    Dynamically dispatch to inventory.views.<func_name>.
+    Keep all inventory logic centralized and reuse its permissions/caching.
+    """
+    inv_views = import_module("inventory.views")
+    func = getattr(inv_views, func_name)
+    return func(request)
+
+
+@never_cache
+@login_required
+def admin_dashboard_proxy(request):
+    """Gentle redirect to the inventory dashboard (keeps old links working)."""
+    return HttpResponseRedirect(_inventory_dashboard_url())
+
+
+@never_cache
+@login_required
+def agent_dashboard_proxy(request):
+    """Alias for agent home -> inventory dashboard."""
+    return HttpResponseRedirect(_inventory_dashboard_url())
+
+
+# JSON proxies to inventory APIs — safe fallbacks, no collisions with your existing endpoints
+
+@never_cache
+@login_required
+@require_GET
+def v2_sales_trend_data_proxy(request):
+    """
+    Proxy to inventory.views.api_sales_trend
+    Accepts the same query params: ?period=7d|month&metric=count|amount
+    """
+    try:
+        return _call_inventory_view("api_sales_trend", request)
+    except Exception:
+        return JsonResponse({"labels": [], "values": []})
+
+
+@never_cache
+@login_required
+@require_GET
+def v2_top_models_data_proxy(request):
+    """
+    Proxy to inventory.views.api_top_models
+    Accepts: ?period=today|month
+    """
+    try:
+        return _call_inventory_view("api_top_models", request)
+    except Exception:
+        return JsonResponse({"labels": [], "values": []})
+
+
+@never_cache
+@login_required
+@require_GET
+def v2_profit_data_proxy(request):
+    """
+    Proxy to inventory.views.api_profit_bar
+    Accepts: ?month=YYYY-MM (optional) &group_by=model (optional)
+    """
+    try:
+        return _call_inventory_view("api_profit_bar", request)
+    except Exception:
+        return JsonResponse({"labels": [], "data": []})
+
+
+@never_cache
+@login_required
+@require_GET
+def v2_agent_trend_data_proxy(request):
+    """
+    Proxy to inventory.views.api_agent_trend
+    Accepts: ?months=6&metric=sales|profit&agent=<id> (optional)
+    """
+    try:
+        return _call_inventory_view("api_agent_trend", request)
+    except Exception:
+        return JsonResponse({"labels": [], "data": []})
+
+
+@never_cache
+@login_required
+@require_GET
+def v2_cash_overview_proxy(request):
+    """
+    Proxy to inventory.views.api_cash_overview
+    Returns: orders, revenue, paid_out, expenses, period_label
+    """
+    try:
+        return _call_inventory_view("api_cash_overview", request)
+    except Exception:
+        today = timezone.localdate()
+        return JsonResponse({
+            "ok": True,
+            "orders": 0,
+            "revenue": 0.0,
+            "paid_out": 0.0,
+            "expenses": 0.0,
+            "period_label": today.replace(day=1).strftime("%b %Y"),
+        })
+
+
+@never_cache
+@login_required
+@require_GET
+def v2_recommendations_proxy(request):
+    """
+    Tries inventory.api.predictions_summary (if present),
+    falls back to inventory.views.api_predictions,
+    then returns a stub (never 500s).
+    """
+    try:
+        inv_api = import_module("inventory.api")
+        fn = getattr(inv_api, "predictions_summary", None)
+        if callable(fn):
+            return fn(request)
+    except Exception:
+        pass
+
+    try:
+        return _call_inventory_view("api_predictions", request)
+    except Exception:
+        pass
+
+    today = timezone.localdate()
+    return JsonResponse({
+        "ok": True,
+        "overall": [
+            {
+                "date": (today + timedelta(days=i)).isoformat(),
+                "predicted_units": 0,
+                "predicted_revenue": 0.0,
+            } for i in range(1, 8)
+        ],
+        "risky": [],
+        "message": "recommendations stub",
+    })
+
+
+# ---------------------------
+# NEW: Local AI-style recommendations for /api/recommendations/
+# ---------------------------
+@never_cache
+@login_required
+@require_GET
+def api_recommendations(request):
+    """
+    Lightweight, local-only recommendations used by the dashboard card.
+    No external service required.
+
+    Returns:
+      { "success": true, "items": [ { "message": str, "confidence": float }, ... ] }
+    """
+    u = request.user
+    now = timezone.now()
+    last_30 = now - timedelta(days=30)
+    items = []
+
+    # 1) Personal stock level
+    try:
+        my_in_stock = InventoryItem.objects.filter(assigned_agent=u, status="IN_STOCK").count()
+        if my_in_stock < 10:
+            items.append({
+                "message": f"Your stock is low ({my_in_stock}/20). Request replenishment.",
+                "confidence": 0.90,
+            })
+        elif my_in_stock < 12:
+            items.append({
+                "message": f"Consider topping up: you have {my_in_stock}/20 units.",
+                "confidence": 0.65,
+            })
+    except Exception:
+        pass
+
+    # 2) Stale inventory (try updated_at, else created_at)
+    try:
+        fields = {getattr(f, "name", None) for f in InventoryItem._meta.get_fields()}
+        stale_cutoff = now - timedelta(days=14)
+        stale_qs = InventoryItem.objects.filter(assigned_agent=u, status="IN_STOCK")
+        if "updated_at" in fields:
+            stale_qs = stale_qs.filter(updated_at__lt=stale_cutoff)
+        elif "created_at" in fields:
+            stale_qs = stale_qs.filter(created_at__lt=stale_cutoff)
+        else:
+            stale_qs = None
+        if stale_qs is not None:
+            stale_count = stale_qs.count()
+            if stale_count:
+                items.append({
+                    "message": f"{stale_count} items haven’t moved in 14+ days — consider promos/rotation.",
+                    "confidence": 0.75,
+                })
+    except Exception:
+        pass
+
+    # 3) What’s selling (last 30 days) — attempt a few label fields
+    try:
+        label_key = None
+        top = []
+        # attempt item__product__model first
+        try:
+            top = (Sale.objects.filter(sold_at__gte=last_30)
+                   .values("item__product__model")
+                   .annotate(n=Count("id"))
+                   .order_by("-n")[:3])
+            label_key = "item__product__model"
+        except Exception:
+            pass
+        if not top:
+            try:
+                top = (Sale.objects.filter(sold_at__gte=last_30)
+                       .values("item__model")
+                       .annotate(n=Count("id"))
+                       .order_by("-n")[:3])
+                label_key = "item__model"
+            except Exception:
+                pass
+        if not top:
+            try:
+                top = (Sale.objects.filter(sold_at__gte=last_30)
+                       .values("model")
+                       .annotate(n=Count("id"))
+                       .order_by("-n")[:3])
+                label_key = "model"
+            except Exception:
+                pass
+
+        for t in top:
+            label = (t.get(label_key) or "Popular model")
+            items.append({
+                "message": f"Push {label}: {t['n']} sold in the last 30 days.",
+                "confidence": 0.60,
+            })
+    except Exception:
+        pass
+
+    return JsonResponse({"success": True, "items": items}, status=200)
+
+
+@never_cache
+@require_GET
+def dashboard_healthz_proxy(request):
+    """Lightweight liveness check for the dashboard app."""
+    return JsonResponse({"ok": True, "time": timezone.now().isoformat()})

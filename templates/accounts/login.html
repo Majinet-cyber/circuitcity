@@ -1,0 +1,149 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Sign in · Circuit City (v10)</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <!-- Expose CSRF token for scripts (Django will fill this value when present) -->
+  <meta name="csrf-token" content="{{ csrf_token }}"/>
+
+  <style>
+    :root{
+      --cc-bg:#f6f9ff; --cc-card:#fff; --cc-line:#e5e7eb; --cc-ink:#0f172a; --cc-muted:#64748b;
+      --blue-1:#2563eb; --glass-bg:rgba(37,99,235,0.12); --glass-brd:rgba(96,165,250,.55);
+      --glass-shadow:0 10px 30px rgba(37,99,235,.22);
+    }
+    *{box-sizing:border-box}
+    body{margin:0;background:linear-gradient(180deg,var(--cc-bg),#fff);font-family:system-ui,Segoe UI,Inter,Roboto,Arial,sans-serif;color:var(--cc-ink)}
+    .auth-wrap{min-height:100vh;display:grid;place-items:center;padding:clamp(16px,4vw,32px)}
+    .auth-card{width:min(520px,92vw);background:var(--cc-card);border:1px solid var(--cc-line);border-radius:16px;padding:28px;box-shadow:0 20px 60px rgba(2,6,23,.06)}
+    .brand{font-weight:800;margin:0 0 .25rem}
+    .muted{color:var(--cc-muted);margin:0 0 12px}
+    label{display:block;font-size:14px;margin:12px 0 6px}
+    input[type="text"],input[type="password"]{width:100%;padding:10px 12px;border:1px solid #cbd5e1;border-radius:10px;font-size:14px}
+    .err{background:#fef2f2;border:1px solid #fecaca;color:#991b1b;padding:.6rem .8rem;border-radius:10px;margin:0 0 12px}
+    .pw-field{position:relative}
+    .pw-toggle{position:absolute;right:.55rem;top:50%;transform:translateY(-50%);background:transparent;border:0;color:#64748b;cursor:pointer;width:1.75rem;height:1.75rem}
+    /* pretty submit */
+    #loginSubmit{display:inline-flex;align-items:center;justify-content:center;gap:.5rem;width:100%;
+      padding:.8rem 1.1rem;font-weight:800;letter-spacing:.02em;border-radius:14px;border:1px solid var(--glass-brd);
+      color:#eaf2ff;background:
+      radial-gradient(120% 160% at 30% 20%, rgba(255,255,255,.35), transparent 60%),
+      linear-gradient(135deg, rgba(96,165,250,.65), rgba(37,99,235,.55)), var(--glass-bg);
+      box-shadow:var(--glass-shadow);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);
+      transition:transform .18s ease, box-shadow .18s ease, background .18s ease, color .18s ease;cursor:pointer;margin-top:.5rem}
+    #loginSubmit:hover{transform:translateY(-1px);color:#fff;box-shadow:0 14px 34px rgba(37,99,235,.32)}
+    #loginSubmit:disabled{opacity:.65;cursor:not-allowed;box-shadow:0 8px 18px rgba(37,99,235,.18)}
+    /* page loader */
+    #page-loader{position:fixed;inset:0;z-index:3000;display:grid;place-items:center;
+      background:radial-gradient(1200px 800px at 50% 40%, rgba(15,23,42,0.12), transparent 60%);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);
+      transition:opacity .35s, visibility .35s}
+    #page-loader.hidden{opacity:0;visibility:hidden}
+    .loader-ring{width:66px;height:66px;border-radius:50%;border:4px solid rgba(96,165,250,.25);border-top-color:var(--blue-1);animation:spin 1s linear infinite;box-shadow:0 0 0 4px rgba(37,99,235,.06) inset}
+    @keyframes spin{to{transform:rotate(360deg)}}
+    a{color:#2563eb;text-decoration:none}
+  </style>
+</head>
+<body>
+  <!-- Loader -->
+  <div id="page-loader" aria-hidden="true"><div class="loader-ring" role="status" aria-label="Loading"></div></div>
+
+  <div class="auth-wrap">
+    <div class="auth-card" role="dialog" aria-labelledby="loginTitle" aria-describedby="loginDesc">
+      <h1 id="loginTitle" class="brand">Circuit City</h1>
+      <p id="loginDesc" class="muted">Sign in to continue. <strong style="color:#2563eb">[v10]</strong></p>
+
+      {% if messages %}
+        {% for m in messages %}<div class="err" role="alert" aria-live="assertive">{{ m }}</div>{% endfor %}
+      {% endif %}
+      {% if form and form.errors %}
+        <div class="err" role="alert" aria-live="assertive">Invalid details. Please try again.</div>
+      {% endif %}
+
+      <form method="post" action="" novalidate>
+        {% csrf_token %}
+        <!-- Fallback CSRF (patched by JS if needed) -->
+        <input type="hidden" id="csrfFallback" name="csrfmiddlewaretoken" value="" />
+        <input type="hidden" name="next" value="{{ next }}"/>
+
+        <label for="id_identifier">Email or Username</label>
+        <input id="id_identifier" name="identifier" type="text" required autofocus
+               autocomplete="username"
+               value="{% if form %}{{ form.identifier.value|default_if_none:'' }}{% endif %}"/>
+
+        <label for="id_password">Password</label>
+        <div class="pw-field">
+          <input id="id_password" name="password" type="password" required autocomplete="current-password"/>
+          <button class="pw-toggle" type="button" aria-label="Show password" data-state="hidden">👁</button>
+        </div>
+
+        <button id="loginSubmit" type="submit">Sign in</button>
+      </form>
+
+      <p class="muted" style="margin-top:12px">
+        <a href="/accounts/password/forgot/">Forgot your password?</a>
+      </p>
+    </div>
+  </div>
+
+  <script>
+    // Hide loader when page is ready
+    window.addEventListener('load', function(){
+      var el = document.getElementById('page-loader'); if(el) el.classList.add('hidden');
+    });
+
+    // Password toggle
+    (function(){
+      var btn = document.querySelector('.pw-toggle'); var input = document.getElementById('id_password');
+      if(!btn||!input) return;
+      btn.addEventListener('click', function(){
+        var show = this.getAttribute('data-state') !== 'visible';
+        input.type = show ? 'text' : 'password';
+        this.setAttribute('data-state', show ? 'visible' : 'hidden');
+        this.textContent = show ? '🙈' : '👁';
+      });
+    })();
+
+    // Disable button on submit + tiny spinner
+    (function(){
+      var form=document.querySelector('form[method="post"]'); var btn=document.getElementById('loginSubmit');
+      if(!form||!btn) return;
+      form.addEventListener('submit', function(){
+        btn.disabled=true;
+        var sp=document.createElement('span'); sp.style.display='inline-block';
+        sp.style.width='1em'; sp.style.height='1em'; sp.style.marginLeft='.5rem';
+        sp.style.border='2px solid rgba(255,255,255,.35)'; sp.style.borderTopColor='#fff';
+        sp.style.borderRadius='50%'; sp.style.animation='spin .9s linear infinite';
+        btn.appendChild(sp);
+      });
+    })();
+
+    // --- CSRF hardening on mobile browsers ---
+    // If the template didn't inject a value (or a privacy mode stripped cookies),
+    // copy token from cookie into the hidden input so POST is always CSRF-valid.
+    (function ensureCsrfPresent(){
+      function getCookie(name){
+        var m = document.cookie.match('(^|;)\\s*' + name + '\\s*=\\s*([^;]+)');
+        return m ? decodeURIComponent(m.pop()) : '';
+      }
+      var cookieToken = getCookie('cc_csrftoken') || getCookie('csrftoken') || '';
+      var metaToken = (document.querySelector('meta[name="csrf-token"]')||{}).content || '';
+      var djangoHidden = document.querySelector('input[name="csrfmiddlewaretoken"]');
+      var fb = document.getElementById('csrfFallback');
+
+      // If Django already rendered the hidden field with a value, keep it.
+      // Otherwise, use cookie/meta as fallback.
+      if (djangoHidden && djangoHidden.value) {
+        fb && (fb.disabled = true);
+        return;
+      }
+
+      var token = cookieToken || metaToken;
+      if (token) {
+        if (djangoHidden) djangoHidden.value = token;
+        if (fb) fb.value = token;
+      }
+    })();
+  </script>
+</body>
+</html>

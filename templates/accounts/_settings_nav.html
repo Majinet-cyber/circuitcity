@@ -1,0 +1,29 @@
+{# templates/accounts/_settings_nav.html #}
+<ul class="nav nav-tabs mb-3">
+  <li class="nav-item">
+    <a
+      class="nav-link {% if request.resolver_match.url_name == 'settings_profile' %}active{% endif %}"
+      href="{% url 'accounts:settings_profile' %}"
+    >
+      <i class="bi bi-person-circle me-1"></i> Profile
+    </a>
+  </li>
+
+  <li class="nav-item">
+    <a
+      class="nav-link {% if request.resolver_match.url_name == 'settings_security' %}active{% endif %}"
+      href="{% url 'accounts:settings_security' %}"
+    >
+      <i class="bi bi-shield-lock me-1"></i> Security
+    </a>
+  </li>
+
+  <li class="nav-item">
+    <a
+      class="nav-link {% if request.resolver_match.url_name|slice:':12' == 'settings_ses' %}active{% endif %}"
+      href="{% url 'accounts:settings_sessions' %}"
+    >
+      <i class="bi bi-phone me-1"></i> Sessions
+    </a>
+  </li>
+</ul>

@@ -192,6 +192,7 @@ INSTALLED_APPS = [
     # Helpful (optional)
     "django.contrib.humanize",
     # Your apps
+    "accounts.apps.AccountsConfig",  # ✅ enables signals & auth views
     "inventory",
     "sales",
     "dashboard",
@@ -245,13 +246,27 @@ WSGI_APPLICATION = "cc.wsgi.application"
 # -------------------------------------------------
 DATABASES: dict = {}
 
+# NEW: explicit override to force SQLite (even if DATABASE_URL is set)
+FORCE_SQLITE = env_bool("FORCE_SQLITE", False)
+
 DATABASE_URL = os.environ.get("DATABASE_URL", "").strip()
 USE_LOCAL_SQLITE = env_bool("USE_LOCAL_SQLITE", default=DEBUG)
 
 # In production (Render or DEBUG=False), require DATABASE_URL so we never fall back to SQLite.
 REQUIRE_DATABASE_URL = env_bool("REQUIRE_DATABASE_URL", (RENDER or not DEBUG))
 
-if DATABASE_URL:
+if FORCE_SQLITE:
+    # Highest precedence: always use SQLite if explicitly requested
+    sqlite_path = str(BASE_DIR / "db.sqlite3")
+    DATABASES["default"] = {"ENGINE": "django.db.backends.sqlite3", "NAME": sqlite_path}
+
+elif USE_LOCAL_SQLITE and not DATABASE_URL:
+    # Dev-friendly default: use SQLite when developing and no DB URL provided
+    sqlite_path = str(BASE_DIR / "db.sqlite3")
+    DATABASES["default"] = {"ENGINE": "django.db.backends.sqlite3", "NAME": sqlite_path}
+
+elif DATABASE_URL:
+    # Respect DATABASE_URL when provided (typical for prod/hosted DBs)
     try:
         import dj_database_url  # type: ignore
     except Exception as e:
@@ -262,15 +277,13 @@ if DATABASE_URL:
         conn_max_age=600,
         ssl_require=USE_SSL,  # enforce SSL in prod
     )
+
 elif REQUIRE_DATABASE_URL and not USE_LOCAL_SQLITE:
     # Hard fail to avoid ephemeral SQLite in prod
     raise RuntimeError("DATABASE_URL must be set in production (Render/DEBUG=False).")
-elif USE_LOCAL_SQLITE:
-    # Local dev default
-    sqlite_path = str(BASE_DIR / "db.sqlite3")
-    DATABASES["default"] = {"ENGINE": "django.db.backends.sqlite3", "NAME": sqlite_path}
+
 else:
-    # Optional: discrete Postgres vars (rarely used now that we require DATABASE_URL)
+    # Optional: discrete Postgres vars for local setups without DATABASE_URL
     NAME = os.environ.get("POSTGRES_DB") or os.environ.get("DB_NAME", "circuitcity")
     USER = os.environ.get("POSTGRES_USER") or os.environ.get("DB_USER", "ccuser")
     PASSWORD = os.environ.get("POSTGRES_PASSWORD") or os.environ.get("DB_PASSWORD", "")
@@ -369,9 +382,10 @@ WHITENOISE_AUTOREFRESH = DEBUG
 # -------------------------------------------------
 # Auth redirects
 # -------------------------------------------------
-LOGIN_URL = "login"
+# Point to our accounts views (we also expose global hard aliases in cc.urls)
+LOGIN_URL = "accounts:login"
 LOGIN_REDIRECT_URL = "dashboard:agent_dashboard"  # namespaced url name
-LOGOUT_REDIRECT_URL = "login"
+LOGOUT_REDIRECT_URL = "accounts:login"
 
 # -------------------------------------------------
 # Email / Admins
@@ -522,3 +536,21 @@ if SENTRY_DSN:
 APP_NAME = os.environ.get("APP_NAME", "Circuit City")
 APP_ENV = os.environ.get("APP_ENV", "dev" if DEBUG else "beta")
 BETA_FEEDBACK_MAILTO = os.environ.get("BETA_FEEDBACK_MAILTO", "beta@circuitcity.example")
+
+# -------------------------------------------------
+# Accounts / Auth feature knobs (used by utils.reset & views)
+# -------------------------------------------------
+# OTP expiry (5 minutes), send window & max sends per window
+ACCOUNTS_RESET_CODE_TTL_SECONDS = env_int("ACCOUNTS_RESET_CODE_TTL_SECONDS", 5 * 60)
+ACCOUNTS_RESET_SEND_WINDOW_MINUTES = env_int("ACCOUNTS_RESET_SEND_WINDOW_MINUTES", 45)
+ACCOUNTS_RESET_MAX_SENDS_PER_WINDOW = env_int("ACCOUNTS_RESET_MAX_SENDS_PER_WINDOW", 3)
+
+# Staged login lockout policy (documentational; model implements same logic)
+ACCOUNTS_LOGIN_LOCKOUT = {
+    "STAGE0_FAILS": 3,
+    "STAGE0_LOCK_SECONDS": 5 * 60,
+    "STAGE1_FAILS": 2,
+    "STAGE1_LOCK_SECONDS": 45 * 60,
+    "STAGE2_FAILS": 2,
+    "HARD_BLOCK": True,
+}

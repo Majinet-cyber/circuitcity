@@ -1,0 +1,148 @@
+{% extends "base.html" %}
+{% load humanize static %}
+
+{% block title %}Sales Report · Circuit City{% endblock %}
+
+{% block content %}
+<div class="container my-4">
+
+  <!-- Header / nav -->
+  <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
+    <div>
+      <h2 class="fw-bold m-0">Sales Report</h2>
+      <div class="text-muted">Top models, agent performance, and recent sales.</div>
+    </div>
+    <div class="btn-group">
+      <a class="btn btn-outline-secondary" href="/"><i class="bi bi-house-door me-1"></i> Home</a>
+      <a class="btn btn-outline-secondary" href="{% url 'inventory:stock_list' %}"><i class="bi bi-list me-1"></i> Inventory</a>
+      <a class="btn btn-primary" href="{% url 'reports:home' %}"><i class="bi bi-graph-up me-1"></i> Reports Home</a>
+    </div>
+  </div>
+
+  <!-- Top models -->
+  <div class="card shadow-sm mb-4">
+    <div class="card-header bg-white d-flex align-items-center justify-content-between">
+      <strong>Top models</strong>
+      <span class="text-muted small">Best performers by units/value</span>
+    </div>
+    <div class="card-body p-0">
+      {% if top_models %}
+        <div class="table-responsive">
+          <table class="table table-sm align-middle mb-0">
+            <thead class="table-light">
+              <tr>
+                <th style="width:50%">Model</th>
+                <th class="text-end">Units</th>
+                <th class="text-end">Value</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for m in top_models %}
+              <tr>
+                <td class="fw-semibold">{{ m.name|default:"—" }}</td>
+                <td class="text-end">{{ m.units|default:0|intcomma }}</td>
+                <td class="text-end">MK {{ m.value|default:0|floatformat:0|intcomma }}</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      {% else %}
+        <div class="p-3 text-muted">No top-model data available.</div>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- Agent performance -->
+  <div class="card shadow-sm mb-4">
+    <div class="card-header bg-white d-flex align-items-center justify-content-between">
+      <strong>Agent performance</strong>
+      <span class="text-muted small">Sales and value per agent</span>
+    </div>
+    <div class="card-body p-0">
+      {% if agents %}
+        <div class="table-responsive">
+          <table class="table table-sm align-middle mb-0">
+            <thead class="table-light">
+              <tr>
+                <th>Agent</th>
+                <th class="text-end">Sales (count)</th>
+                <th class="text-end">Sales (value)</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for a in agents %}
+              <tr>
+                <td class="fw-semibold">{{ a.name|default:"—" }}</td>
+                <td class="text-end">{{ a.sales|default:0|intcomma }}</td>
+                <td class="text-end">MK {{ a.value|default:0|floatformat:0|intcomma }}</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      {% else %}
+        <div class="p-3 text-muted">No agent performance data.</div>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- Recent sales -->
+  <div class="card shadow-sm">
+    <div class="card-header bg-white d-flex align-items-center justify-content-between">
+      <strong>Recent sales</strong>
+      <span class="text-muted small">Most recent transactions</span>
+    </div>
+    <div class="card-body p-0">
+      {% if recent_sales %}
+        <div class="table-responsive">
+          <table class="table table-sm align-middle mb-0">
+            <thead class="table-light">
+              <tr>
+                <th style="width:16rem">Timestamp</th>
+                <th>SKU / Model</th>
+                <th>Agent</th>
+                <th class="text-end">Amount</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for r in recent_sales %}
+              <tr>
+                <td class="text-nowrap">
+                  {# r.ts may be a datetime or string; both handled gracefully #}
+                  {% if r.ts %}{{ r.ts|date:"Y-m-d H:i"|default:r.ts }}{% else %}—{% endif %}
+                </td>
+                <td>{{ r.sku|default:r.model|default:"—" }}</td>
+                <td>{{ r.agent|default:"—" }}</td>
+                <td class="text-end">MK {{ r.amount|default:0|floatformat:0|intcomma }}</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+
+        {# Optional pagination hook if your view sets page_obj (e.g., for recent_sales) #}
+        {% if page_obj %}
+          <nav class="p-2 d-flex align-items-center justify-content-between flex-wrap gap-2">
+            <div class="text-muted small">
+              Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}
+            </div>
+            <div class="btn-group">
+              {% if page_obj.has_previous %}
+                <a class="btn btn-outline-secondary btn-sm" href="?page={{ page_obj.previous_page_number }}">Prev</a>
+              {% endif %}
+              {% if page_obj.has_next %}
+                <a class="btn btn-outline-secondary btn-sm" href="?page={{ page_obj.next_page_number }}">Next</a>
+              {% endif %}
+            </div>
+          </nav>
+        {% endif %}
+
+      {% else %}
+        <div class="p-3 text-muted">No recent sales recorded.</div>
+      {% endif %}
+    </div>
+  </div>
+
+</div>
+{% endblock %}

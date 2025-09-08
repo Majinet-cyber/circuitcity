@@ -1,0 +1,31 @@
+{% if is_manager_or_admin %}
+<div class="modal fade" id="walletModal" tabindex="-1" aria-labelledby="walletModalLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="walletModalLabel">Wallet · <span id="wmName">Agent</span></h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <div class="d-flex flex-column gap-2">
+          <div class="d-flex justify-content-between">
+            <span class="text-muted">Current balance</span>
+            <strong id="wmBalance">—</strong>
+          </div>
+          <div class="d-flex justify-content-between">
+            <span class="text-muted">This month (net wallet activity)</span>
+            <strong id="wmMonth">—</strong>
+          </div>
+          <div class="small text-muted mt-2">
+            Tip: For full COM / ADV / ADJ breakdown and lifetime commissions, open the Wallet page.
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <a id="wmLink" href="#" class="btn btn-outline-secondary" target="_blank" rel="noopener">Open Wallet</a>
+        <button type="button" class="btn btn-primary" data-bs-dismiss="modal">Close</button>
+      </div>
+    </div>
+  </div>
+</div>
+{% endif %}

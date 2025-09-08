@@ -1,7 +1,9 @@
 # inventory/admin.py
-from django.contrib import admin
+from django.contrib import admin, messages
 from django import forms
 from django.db.models import F, DecimalField, ExpressionWrapper
+from django.contrib.auth import get_user_model
+
 from .models import (
     Location,
     AgentProfile,
@@ -56,6 +58,7 @@ class ProductAdmin(admin.ModelAdmin):
 
 
 # ---------- Inventory + inline audits ----------
+
 class InventoryAuditInline(admin.TabularInline):
     model = InventoryAudit
     extra = 0
@@ -66,8 +69,52 @@ class InventoryAuditInline(admin.TabularInline):
     show_change_link = True
     verbose_name_plural = "Recent audits"
 
+
+class InventoryItemAdminForm(forms.ModelForm):
+    """
+    Admins may assign/transfer items but are NOT allowed to be the holder.
+    This form enforces that 'assigned_agent' cannot be a staff/admin user.
+    It also filters the autocomplete/queryset to non-staff users (i.e., field agents).
+    """
+    class Meta:
+        model = InventoryItem
+        fields = "__all__"
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        User = get_user_model()
+        try:
+            qs = User.objects.filter(is_staff=False)
+        except Exception:
+            qs = User.objects.none()
+        if "assigned_agent" in self.fields:
+            self.fields["assigned_agent"].queryset = qs
+            self.fields["assigned_agent"].help_text = "Assign to a field agent (staff cannot hold stock)."
+
+    def clean_assigned_agent(self):
+        user = self.cleaned_data.get("assigned_agent")
+        if user and getattr(user, "is_staff", False):
+            raise forms.ValidationError("Staff/admin users cannot hold stock. Please choose a field agent.")
+        return user
+
+
+class AssignToAgentActionForm(forms.Form):
+    """
+    Extra widget shown above the actions dropdown to choose the target agent
+    for the bulk transfer.
+    """
+    agent = forms.ModelChoiceField(
+        queryset=get_user_model().objects.filter(is_staff=False),
+        required=True,
+        label="Target agent",
+        help_text="Choose the agent who will receive the selected stock.",
+    )
+
+
 @admin.register(InventoryItem)
 class InventoryItemAdmin(admin.ModelAdmin):
+    form = InventoryItemAdminForm  # <- enforce 'admin cannot hold stock'
+
     # NOTE: profit is annotated in get_queryset for speed
     list_display = (
         "imei", "product", "status", "current_location", "assigned_agent",
@@ -82,6 +129,10 @@ class InventoryItemAdmin(admin.ModelAdmin):
     inlines = [InventoryAuditInline]
     list_per_page = 50
     show_full_result_count = False
+
+    # ----- Bulk actions -----
+    actions = ("action_assign_to_agent", "action_unassign")
+    action_form = AssignToAgentActionForm
 
     def get_queryset(self, request):
         qs = super().get_queryset(request).select_related(
@@ -98,6 +149,69 @@ class InventoryItemAdmin(admin.ModelAdmin):
     @admin.display(ordering="_profit", description="Profit")
     def profit_display(self, obj):
         return obj._profit
+
+    @admin.action(description="Assign / transfer to selected agent")
+    def action_assign_to_agent(self, request, queryset):
+        """
+        Bulk assign/transfer selected items to a non-staff agent.
+        Writes an InventoryAudit entry for each item.
+        """
+        agent_id = request.POST.get("agent")
+        if not agent_id:
+            messages.warning(request, "Please pick a target agent in the action box, then click 'Go'.")
+            return
+
+        User = get_user_model()
+        try:
+            target = User.objects.get(pk=agent_id, is_staff=False)
+        except User.DoesNotExist:
+            messages.error(request, "Invalid target agent (staff/admin users cannot hold stock).")
+            return
+
+        # Perform update & audit trail
+        updated = 0
+        audits = []
+        for item in queryset:
+            # Skip if already assigned to the same target
+            if item.assigned_agent_id == target.id:
+                continue
+            item.assigned_agent = target
+            item.save(update_fields=["assigned_agent"])
+            updated += 1
+            audits.append(InventoryAudit(
+                item=item,
+                by_user=request.user,
+                action="TRANSFER",
+                details=f"Assigned/transferred to {getattr(target, 'username', target.pk)} via admin action",
+            ))
+        if audits:
+            InventoryAudit.objects.bulk_create(audits, ignore_conflicts=True)
+
+        messages.success(request, f"Transferred {updated} item(s) to {getattr(target, 'username', target.pk)}.")
+
+    @admin.action(description="Unassign (return to warehouse)")
+    def action_unassign(self, request, queryset):
+        """
+        Remove assigned agent (stock returns to warehouse pool).
+        """
+        updated = 0
+        audits = []
+        for item in queryset:
+            if item.assigned_agent_id is None:
+                continue
+            item.assigned_agent = None
+            item.save(update_fields=["assigned_agent"])
+            updated += 1
+            audits.append(InventoryAudit(
+                item=item,
+                by_user=request.user,
+                action="TRANSFER",
+                details="Unassigned from agent (returned to warehouse) via admin action",
+            ))
+        if audits:
+            InventoryAudit.objects.bulk_create(audits, ignore_conflicts=True)
+
+        messages.success(request, f"Unassigned {updated} item(s).")
 
 
 # ---------- Audit log ----------
@@ -154,6 +268,7 @@ class WalletTxnForm(forms.ModelForm):
             "Positive = credit to agent (e.g., bonus, commission). "
             "Negative = deduction from agent (e.g., ADVANCE or PAYOUT)."
         )
+
 
 @admin.register(WalletTxn)
 class WalletTxnAdmin(admin.ModelAdmin):

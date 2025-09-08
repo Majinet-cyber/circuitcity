@@ -1,38 +1,160 @@
 {% extends "base.html" %}
+{% load humanize %}
+
 {% block title %}Agent · Circuit City{% endblock %}
+{% block header_title %}Agent{% endblock %}
+
+{% block extra_css %}
+<style>
+  /* Page-scoped tweaks built atop tokens.css/ui.css */
+  :root{
+    --cc-card:  var(--cc-panel, var(--card, #ffffff));
+    --cc-line:  var(--cc-border, var(--line, #e5e7eb));
+    --cc-ink:   var(--cc-text,  var(--ink, #0f172a));
+    --cc-muted: var(--cc-muted, var(--muted, #64748b));
+    --cc-accent: var(--cc-accent, var(--brand, #2563eb));
+    --cc-accent-2: var(--cc-accent-2, var(--brand-2, #60a5fa));
+  }
+
+  .agent-wrap{max-width:980px;margin:0 auto;padding:12px 0}
+
+  /* Panels use design-system surface */
+  .panel{
+    background:var(--cc-card);
+    border:1px solid var(--cc-line);
+    border-radius:16px;
+    padding:16px;
+    box-shadow:var(--shadow-md,0 6px 18px rgba(16,24,40,.06));
+  }
+
+  /* Header bar */
+  .hero{display:flex;align-items:center;justify-content:space-between;gap:.75rem;margin-bottom:12px}
+  .hero h1{margin:0;font-weight:800;color:var(--cc-accent);display:flex;gap:.5rem;align-items:center}
+
+  /* KPI tiles (personal) */
+  .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px;margin-bottom:12px}
+  .kpi{
+    display:flex;align-items:center;gap:.75rem;border:1px solid var(--cc-line);
+    border-radius:14px;padding:14px;
+    background:linear-gradient(135deg,
+      color-mix(in oklab, var(--cc-accent) 12%, var(--cc-card)) 0%,
+      color-mix(in oklab, var(--cc-accent-2) 8%, var(--cc-card)) 100%);
+    box-shadow:0 8px 22px color-mix(in oklab, var(--cc-accent) 12%, transparent)
+  }
+  .kpi .icon{
+    width:42px;height:42px;border-radius:12px;display:grid;place-items:center;
+    background:color-mix(in oklab,var(--cc-accent) 18%, transparent);color:var(--cc-accent)
+  }
+  .kpi .label{font-size:.9rem;color:var(--cc-muted);font-weight:700;letter-spacing:.01em}
+  .kpi .value{font-size:1.55rem;font-weight:800}
+
+  /* Quick actions */
+  .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px}
+  .action{
+    display:flex;align-items:center;gap:.6rem;border:1px solid var(--cc-line);
+    border-radius:14px;padding:.9rem;background:var(--cc-card);
+    text-decoration:none;color:var(--cc-ink);font-weight:700;
+    box-shadow:var(--shadow-sm,0 2px 10px rgba(0,0,0,.08))
+  }
+  .action:hover{filter:brightness(1.02)}
+  .action .badge{
+    margin-left:auto;background:color-mix(in oklab,var(--cc-accent) 12%, transparent);
+    color:var(--cc-accent);border:1px solid var(--cc-line);
+    border-radius:999px;padding:.15rem .5rem;font-size:.75rem
+  }
+
+  /* Logout (destructive emphasis) */
+  .danger{
+    background:color-mix(in oklab, var(--danger, #dc2626) 10%, var(--cc-card));
+    border-color:color-mix(in oklab, var(--danger, #dc2626) 30%, var(--cc-line));
+    color:#7a0a0a;
+  }
+  .danger:hover{filter:brightness(1.01)}
+</style>
+{% endblock %}
 
 {% block body %}
-<div class="bg" style="min-height:100dvh;padding:2rem">
-  <div class="card" style="max-width:900px;margin:auto;padding:1.5rem">
-    <h2 class="brand" style="margin:0 0 1rem">Agent Dashboard</h2>
+<div class="agent-wrap">
+  <div class="hero">
+    <h1>👤 Agent Dashboard</h1>
+    <a class="btn primary" href="{% url 'inventory:inventory_dashboard' %}">
+      <i class="bi bi-speedometer2"></i> <span class="d-none d-sm-inline">Main Dashboard</span>
+    </a>
+  </div>
 
-    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:1rem;margin-bottom:1rem">
-      <div class="card" style="padding:1rem">
-        <div class="brand">My In Stock</div>
-        <div style="font-size:1.8rem">{{ in_stock }}</div>
-      </div>
-      <div class="card" style="padding:1rem">
-        <div class="brand">My Sold</div>
-        <div style="font-size:1.8rem">{{ sold }}</div>
-      </div>
-      <div class="card" style="padding:1rem">
-        <div class="brand">My Sales Value</div>
-        <div style="font-size:1.4rem">{{ sales_value }}</div>
-      </div>
-      <div class="card" style="padding:1rem">
-        <div class="brand">My Commission</div>
-        <div style="font-size:1.4rem">{{ commission_total }}</div>
+  <!-- Personal KPI tiles (scoped to the current agent only) -->
+  <div class="kpis">
+    <div class="kpi">
+      <div class="icon"><i class="bi bi-archive"></i></div>
+      <div>
+        <div class="label">My In Stock</div>
+        <div class="value">{{ in_stock|default:0|intcomma }}</div>
       </div>
     </div>
 
-    <div style="display:flex;gap:.75rem;flex-wrap:wrap">
-      <a class="btn" href="{% url 'inventory:scan_in' %}">Scan In</a>
-      <a class="btn" href="{% url 'inventory:scan_sold' %}">Scan Sold</a>
-      <a class="btn" href="{% url 'inventory:stock_list' %}">My Stock</a>
-      <form action="{% url 'logout' %}" method="post" style="display:inline">
+    <div class="kpi">
+      <div class="icon"><i class="bi bi-bag-check"></i></div>
+      <div>
+        <div class="label">My Sold (units)</div>
+        <div class="value">{{ sold|default:0|intcomma }}</div>
+      </div>
+    </div>
+
+    <div class="kpi">
+      <div class="icon"><i class="bi bi-cash-coin"></i></div>
+      <div>
+        <div class="label">My Sales Value</div>
+        <div class="value">MK {{ sales_value|default:0|floatformat:0|intcomma }}</div>
+      </div>
+    </div>
+
+    <div class="kpi">
+      <div class="icon"><i class="bi bi-trophy"></i></div>
+      <div>
+        <div class="label">My Commission (month)</div>
+        <div class="value">MK {{ commission_total|default:0|floatformat:0|intcomma }}</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Quick actions (agent-only scope; list view auto-filters to “my stock”) -->
+  <div class="panel" style="margin-bottom:12px">
+    <div class="grid">
+      <a class="action" href="{% url 'inventory:scan_in' %}">
+        <i class="bi bi-upc-scan"></i> Scan IN
+      </a>
+
+      <a class="action" href="{% url 'inventory:scan_sold' %}">
+        <i class="bi bi-qr-code-scan"></i> Scan SOLD
+      </a>
+
+      <a class="action" href="{% url 'inventory:scan_unified' %}">
+        <i class="bi bi-upc"></i> Unified Scanner
+        <span class="badge">Mobile</span>
+      </a>
+
+      <a class="action" href="{% url 'inventory:stock_list' %}">
+        <i class="bi bi-box-seam"></i> My Stock
+        <span class="badge">{{ in_stock|default:0|intcomma }}</span>
+      </a>
+
+      <a class="action" href="{% url 'inventory:wallet' %}">
+        <i class="bi bi-wallet2"></i> Wallet
+      </a>
+
+      <!-- Logout as a form (POST) with consistent styling -->
+      <form action="{% url 'logout' %}" method="post" class="action danger" style="display:flex">
         {% csrf_token %}
-        <button type="submit" class="btn" style="background:#e11d48">Log out</button>
+        <i class="bi bi-box-arrow-right"></i>
+        <button type="submit" style="all:unset;cursor:pointer;font-weight:700;color:inherit">Log out</button>
       </form>
+    </div>
+  </div>
+
+  <!-- Helper tip -->
+  <div class="panel">
+    <div class="small" style="color:var(--cc-muted)">
+      Tip: Use <strong>Unified Scanner</strong> on mobile to switch between Scan IN and Scan SOLD without leaving the camera.
     </div>
   </div>
 </div>

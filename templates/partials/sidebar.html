@@ -1,0 +1,77 @@
+{% load static %}
+{% with p=request.path %}
+<style>
+  .cc-sidebar{
+    position:sticky; top:0; height:100vh; width:260px; min-width:260px;
+    background:#0b1220; color:#e5e7eb; border-right:1px solid rgba(255,255,255,.06);
+    display:flex; flex-direction:column; gap:14px; padding:16px 14px;
+  }
+  .cc-brand{display:flex; align-items:center; gap:.6rem; font-weight:800; color:#fff; font-size:1.05rem}
+  .cc-section{font-size:.72rem; letter-spacing:.08em; color:#9aa4b2; margin:10px 10px 6px}
+  .cc-nav{list-style:none; padding:0; margin:0; display:flex; flex-direction:column; gap:8px}
+  .cc-nav a{
+    display:flex; align-items:center; gap:.65rem; padding:10px 12px; border-radius:10px;
+    color:#dbeafe; text-decoration:none; background:transparent;
+  }
+  .cc-nav a .bi{opacity:.9}
+  .cc-nav li.active a{background:#1e293b; color:#fff}
+  .cc-bottom{margin-top:auto}
+</style>
+
+<aside class="cc-sidebar">
+  <div class="cc-brand">
+    <img src="{% static 'img/logo-32.png' %}" alt="" width="24" height="24" />
+    <span>Circuit City</span>
+  </div>
+
+  <div>
+    <div class="cc-section">CONTROL CENTER</div>
+    <ul class="cc-nav">
+      <li class="{% if p|slice:'0:19' == '/inventory/dashboard' %}active{% endif %}">
+        <a href="/inventory/dashboard/"><i class="bi bi-speedometer2"></i><span>Dashboard</span></a>
+      </li>
+      <li class="{% if p|slice:'0:11' == '/inventory/' %}active{% endif %}">
+        <a href="/inventory/"><i class="bi bi-box-seam"></i><span>Inventory</span></a>
+      </li>
+      <li class="{% if p|slice:'0:8' == '/wallet/' %}active{% endif %}">
+        <a href="/wallet/"><i class="bi bi-wallet2"></i><span>Wallet</span></a>
+      </li>
+      <li>
+        <a href="/time/checkin/"><i class="bi bi-clock-history"></i><span>Time Check-in</span></a>
+      </li>
+      <li>
+        <a href="/time/logs/"><i class="bi bi-journal-text"></i><span>Time Logs</span></a>
+      </li>
+      <li>
+        <a href="/feedback/"><i class="bi bi-chat-left-text"></i><span>Feedback</span></a>
+      </li>
+    </ul>
+  </div>
+
+  <div>
+    <div class="cc-section">ADMIN</div>
+    <ul class="cc-nav">
+      <li>
+        <a href="/wallet/admin/"><i class="bi bi-briefcase"></i><span>Admin Wallet</span></a>
+      </li>
+      <li>
+        <a href="/admin/"><i class="bi bi-gear-wide-connected"></i><span>Django Admin</span></a>
+      </li>
+    </ul>
+  </div>
+
+  <div class="cc-bottom">
+    <ul class="cc-nav">
+      <!-- ✅ real Reports link now -->
+      <li class="{% if p|slice:'0:9' == '/reports/' %}active{% endif %}">
+        <a href="/reports/"><i class="bi bi-graph-up"></i><span>Reports</span></a>
+      </li>
+      <li>
+        <a href="{% url 'accounts:logout' %}?next=/accounts/login/">
+          <i class="bi bi-box-arrow-right"></i><span>Logout</span>
+        </a>
+      </li>
+    </ul>
+  </div>
+</aside>
+{% endwith %}
