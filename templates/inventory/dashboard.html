@@ -24,6 +24,14 @@
   .ai-item .badge{ margin-top:.15rem }
   .empty-hint{ color:var(--cc-muted); font-weight:700; padding:.5rem 0 .2rem }
   .filters .form-select{ min-width:160px; }
+
+  /* CFO band layout */
+  .cfo-band{ display:grid; gap:12px; grid-template-columns: 2fr 1fr; margin-bottom:12px; }
+  @media (max-width:992px){ .cfo-band{ grid-template-columns:1fr; } }
+
+  /* Simulation quick actions */
+  .sim-actions .btn{ min-width: 160px; }
+  .muted-note{ color:var(--cc-muted); }
 </style>
 {% endblock %}
 
@@ -70,6 +78,16 @@
     <button class="btn primary" type="submit"><i class="bi bi-sliders"></i> Apply</button>
     <a href="." class="btn muted"><i class="bi bi-arrow-counterclockwise"></i> Reset</a>
   </form>
+
+  <!-- ✅ Financial Overview (AI-CFO) -->
+  <section class="cfo-band">
+    <div class="panel">
+      {% include "dashboard/partials/cfo_tiles.html" %}
+    </div>
+    <div class="panel">
+      {% include "dashboard/partials/cfo_alerts.html" %}
+    </div>
+  </section>
 
   <!-- Band 1 -->
   <section class="dash-grid mb-3">
@@ -166,6 +184,32 @@
         <ul id="alertsList" class="list-group list-group-flush">
           <li class="list-group-item" style="color:var(--cc-muted)">Loading…</li>
         </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- ✅ New: Simulation & Scenarios quick panel -->
+  <section class="mb-3">
+    <div class="panel card">
+      <div class="card-head d-flex justify-content-between align-items-center">
+        <div>Simulation &amp; Scenarios</div>
+        <span class="small muted-note">Model growth, profit, and breakeven with saved scenarios</span>
+      </div>
+      <div class="card-body sim-actions">
+        <div class="d-flex flex-wrap gap-2">
+          <a class="btn btn-outline-primary" href="/simulator/new/">
+            <i class="bi bi-magic me-1"></i> New Scenario
+          </a>
+          <a class="btn btn-primary" href="/simulator/">
+            <i class="bi bi-graph-up me-1"></i> Open Simulator
+          </a>
+          <a class="btn btn-outline-secondary" href="/simulator/compare/?id=1&id=2">
+            <i class="bi bi-bar-chart-line me-1"></i> Compare (sample)
+          </a>
+        </div>
+        <div class="small mt-2 muted-note">
+          Tip: Use “Compare” like <code>/simulator/compare/?id=12&amp;id=15</code> to overlay Net Profit curves across scenarios.
+        </div>
       </div>
     </div>
   </section>

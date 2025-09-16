@@ -1,0 +1,174 @@
+{% extends "base.html" %}
+{% block title %}New Simulation · Circuit City{% endblock %}
+{% block header_title %}New Simulation{% endblock %}
+
+{% block content %}
+<form method="post" class="glass-card p-3" action="">
+  {% csrf_token %}
+  <div class="row g-2">
+    <div class="col-md-6">
+      <label class="form-label">Scenario name</label>
+      <input type="text" name="name" class="form-control" required value="{{ form.name.value|default:'' }}">
+    </div>
+
+    {# --- Demand & Pricing (growth + price change) --- #}
+    <div class="col-md-3">
+      <label class="form-label">Demand growth %/day</label>
+      <input type="number" step="0.01" name="demand_growth_pct" class="form-control" value="{{ form.demand_growth_pct.value|default:0 }}">
+    </div>
+    <div class="col-md-3">
+      <label class="form-label">Price change %</label>
+      <input type="number" step="0.01" name="price_change_pct" class="form-control" value="{{ form.price_change_pct.value|default:0 }}">
+    </div>
+
+    {# --- Inventory policy --- #}
+    <div class="col-md-3">
+      <label class="form-label">Lead time (days)</label>
+      <input type="number" min="0" name="lead_time_days" class="form-control" value="{{ form.lead_time_days.value|default:7 }}">
+    </div>
+    <div class="col-md-3">
+      <label class="form-label">Reorder point</label>
+      <input type="number" min="0" name="reorder_point" class="form-control" value="{{ form.reorder_point.value|default:10 }}">
+    </div>
+    <div class="col-md-3">
+      <label class="form-label">Initial stock</label>
+      <input type="number" min="0" name="initial_stock" class="form-control" value="{{ form.initial_stock.value|default:50 }}">
+    </div>
+    <div class="col-md-3">
+      <label class="form-label">Horizon (days)</label>
+      <input type="number" min="1" max="365" name="horizon_days" class="form-control" value="{{ form.horizon_days.value|default:30 }}">
+    </div>
+
+    {# --- NEW: Pricing & Cost levels --- #}
+    <div class="col-md-3">
+      <label class="form-label">Base price</label>
+      <input type="number" step="0.01" name="base_price" class="form-control" value="{{ form.base_price.value|default:100 }}">
+    </div>
+    <div class="col-md-3">
+      <label class="form-label">Unit cost</label>
+      <input type="number" step="0.01" name="unit_cost" class="form-control" value="{{ form.unit_cost.value|default:60 }}">
+    </div>
+
+    {# --- NEW: P&L & Cashflow knobs --- #}
+    <div class="col-md-3">
+      <label class="form-label">Opex % of revenue</label>
+      <input type="number" step="0.01" name="op_ex_pct_of_revenue" class="form-control" value="{{ form.op_ex_pct_of_revenue.value|default:10 }}">
+    </div>
+    <div class="col-md-3">
+      <label class="form-label">Tax rate %</label>
+      <input type="number" step="0.01" name="tax_rate_pct" class="form-control" value="{{ form.tax_rate_pct.value|default:25 }}">
+    </div>
+    <div class="col-md-3">
+      <label class="form-label">AR days</label>
+      <input type="number" min="0" name="ar_days" class="form-control" value="{{ form.ar_days.value|default:7 }}">
+    </div>
+    <div class="col-md-3">
+      <label class="form-label">AP days</label>
+      <input type="number" min="0" name="ap_days" class="form-control" value="{{ form.ap_days.value|default:7 }}">
+    </div>
+    <div class="col-md-3">
+      <label class="form-label">Opening cash</label>
+      <input type="number" step="0.01" name="opening_cash" class="form-control" value="{{ form.opening_cash.value|default:0 }}">
+    </div>
+  </div>
+
+  <div class="mt-3 d-flex gap-2">
+    <button class="btn primary" type="submit"><i class="bi bi-save"></i> Save scenario</button>
+    <button class="btn btn-light" type="button" id="runAdhoc"><i class="bi bi-play"></i> Run ad-hoc</button>
+  </div>
+</form>
+
+<div id="adhocResult" class="panel p-3 mt-3 d-none">
+  <h6 class="fw-bold">Ad-hoc Result</h6>
+  <canvas id="adhocChart" style="height:260px"></canvas>
+  <div id="adhocKPIs" class="small text-muted mt-2"></div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+<script>
+async function postJSON(url, payload){
+  const r = await fetch(url, {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json', 'X-CSRFToken': CC.getCsrfToken(), 'Accept':'application/json'},
+    credentials: 'same-origin',
+    body: JSON.stringify(payload||{})
+  });
+  const d = await r.json();
+  if(!r.ok) throw new Error(d.error||('HTTP '+r.status));
+  return d;
+}
+
+document.getElementById('runAdhoc').addEventListener('click', async ()=>{
+  const form = document.querySelector('form');
+  const payload = Object.fromEntries(new FormData(form).entries());
+
+  // Convert numeric strings -> numbers (keeps blanks as-is)
+  [
+    "demand_growth_pct","price_change_pct","lead_time_days","reorder_point","initial_stock","horizon_days",
+    "base_price","unit_cost","op_ex_pct_of_revenue","tax_rate_pct","ar_days","ap_days","opening_cash"
+  ].forEach(k=>{
+    if(k in payload){
+      const n = +payload[k];
+      if(!Number.isNaN(n)) payload[k] = n;
+    }
+  });
+
+  try{
+    // NOTE: This expects the URL name 'simulator:api_run' (views_api.run_simulation).
+    // If you're using the view that returns JSON on POST (sim_run), replace with {% url 'simulator:sim_run' pk=0 %} dynamically, or wire an API route.
+    const res = await postJSON("{% url 'simulator:api_run' %}", payload);
+    renderAdhoc(res);
+  }catch(e){
+    alert("Run failed: "+e.message);
+  }
+});
+
+let chart=null;
+function renderAdhoc(data){
+  const box = document.getElementById('adhocResult');
+  box.classList.remove('d-none');
+
+  const series = data.series||[];
+  const labels = series.map(p=>'D'+p.day);
+  const sold   = series.map(p=>p.sold);
+  const stock  = series.map(p=>p.stock);
+
+  // NEW: finance series
+  const cash   = series.map(p=>p.cash_cum ?? 0);
+  const gpCum  = series.map(p=>p.gross_profit_cum ?? 0);
+  const opCum  = series.map(p=>p.op_profit_cum ?? 0);
+
+  const ctx = document.getElementById('adhocChart').getContext('2d');
+  chart?.destroy();
+  chart = new Chart(ctx, {
+    type:'line',
+    data:{ labels, datasets:[
+      {label:'Sold (units)', data:sold, yAxisID:'y1'},
+      {label:'Stock (units)', data:stock, yAxisID:'y1'},
+      {label:'Cash (cum)', data:cash, yAxisID:'y2'},
+      {label:'Gross Profit (cum)', data:gpCum, yAxisID:'y2'},
+      {label:'Op Profit (cum)', data:opCum, yAxisID:'y2'}
+    ]},
+    options:{
+      responsive:true, maintainAspectRatio:false,
+      plugins:{legend:{position:'bottom'}},
+      scales:{
+        y1:{type:'linear', position:'left', title:{display:true, text:'Units'}},
+        y2:{type:'linear', position:'right', title:{display:true, text:'Currency'}, grid:{drawOnChartArea:false}}
+      }
+    }
+  });
+
+  const k = data.kpis||{};
+  document.getElementById('adhocKPIs').innerHTML =
+    `Revenue: <b>${(k.revenue_total??0).toLocaleString()}</b> · `+
+    `Gross Profit: <b>${(k.gross_profit_total??0).toLocaleString()}</b> · `+
+    `Op Profit: <b>${(k.op_profit_total??0).toLocaleString()}</b> · `+
+    `Tax: <b>${(k.tax_total??0).toLocaleString()}</b> · `+
+    `Ending Cash: <b>${(k.ending_cash??0).toLocaleString()}</b> · `+
+    `Stockout days: <b>${(k.stockouts_days??0)}</b>`;
+}
+</script>
+{% endblock %}

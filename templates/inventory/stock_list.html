@@ -4,11 +4,15 @@
 {% block title %}Stock List · Circuit City{% endblock %}
 {% block header_title %}Inventory · Stock{% endblock %}
 
+{# --- Inventory page: narrow notifications & no search --- #}
+{% block notif_scope %}inventory{% endblock %}
+{% block notif_allow %}stock_in,stock_sold,low_stock{% endblock %}
+
 {% block extra_css %}
 <style>
   section{max-width:1200px;margin-inline:auto}
 
-  /* Glass buttons (respect tokens) */
+  /* Glass buttons */
   .glass-btn{
     -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px);
     background: linear-gradient(180deg, rgba(255,255,255,.18), rgba(255,255,255,.06));
@@ -17,12 +21,12 @@
     text-decoration:none; box-shadow: var(--cc-shadow);
     display:inline-flex; align-items:center; gap:.5rem; color:var(--cc-text);
     transition:transform .15s ease, box-shadow .2s ease, background .2s ease;
+    min-height:44px;
   }
   .glass-btn:hover{ transform:translateY(-1px); }
   .glass-green{ color:#065f46 }
   .glass-amber{ color:#92400e }
   .glass-blue{ color:#1e40af }
-  .glass-dark{ color:var(--cc-accent) }
   .glass-icon{ width:1.25rem; height:1.25rem; display:inline-grid; place-items:center; }
 
   .hero-row{ display:flex; flex-wrap:wrap; gap:.6rem; align-items:center; margin-bottom:.6rem }
@@ -36,7 +40,7 @@
   .kpi-line{ display:flex; flex-wrap:wrap; gap:.75rem; align-items:center; margin:.35rem 0 1rem }
   .kpi-pill{
     display:inline-flex; align-items:center; gap:.5rem; padding:.45rem .7rem; border-radius:.6rem;
-    background:var(--cc-panel-2); border:1px solid var(--cc-border); font-weight:700;
+    background:var(--cc-panel-2); border:1px solid var(--cc-border); font-weight:700; min-height:40px;
   }
   .kpi-pill b{ font-weight:800 }
 
@@ -45,12 +49,14 @@
   .filters-row{ display:flex; gap:.5rem; align-items:center; flex-wrap:wrap }
   .filters-row input[type="text"], .filters-row select, .filters-row input[type="number"]{
     padding:.5rem .6rem; border-radius:.55rem; border:1px solid var(--cc-border); background:var(--cc-panel); color:var(--cc-text);
+    min-height:44px;
   }
   .btn-deep{
     background:linear-gradient(180deg, rgba(255,255,255,.14), rgba(255,255,255,.04));
     border:1px solid var(--cc-border); border-radius:.55rem; padding:.5rem .7rem;
     font-weight:700; color:var(--cc-text); text-decoration:none;
     transition:transform .12s ease, box-shadow .2s ease, background .2s ease;
+    min-height:44px;
   }
   .btn-deep:hover{ background:var(--cc-panel); transform:translateY(-1px); box-shadow:var(--cc-shadow) }
 
@@ -104,6 +110,17 @@
   .battery-label{ font-weight:800 }
   .battery-hint{ color:var(--cc-muted); font-size:.85rem }
 
+  /* Mobile FAB (Scan) */
+  .cc-fab{
+    position:fixed; right:18px;
+    bottom: calc(var(--tabbar-h,64px) + var(--safe-bottom, 0px) + 18px);
+    width:56px; height:56px; border-radius:28px; display:grid; place-items:center;
+    background:var(--cc-accent); color:white; box-shadow:0 10px 24px rgba(0,0,0,.35);
+    z-index: 1040;
+  }
+  .cc-fab:active{ transform: translateY(1px) scale(.98); }
+  @media (min-width: 768px){ .cc-fab{ display:none; } }
+
   @media (max-width: 900px){
     .ticker-row{ grid-template-columns:1fr .9fr .7fr .8fr .8fr .9fr 1fr }
     .charts{ grid-template-columns:1fr }
@@ -114,7 +131,7 @@
 
 {% block content %}
 <section aria-labelledby="stock">
-  {# Pre-resolve URLs safely so missing names don't crash #}
+  {# Safe URL resolutions #}
   {% url 'inventory:stock_list'   as stock_url %}
   {% url 'inventory:export_csv'   as export_csv_url %}
   {% url 'inventory:scan_in'      as scan_in_url %}
@@ -122,26 +139,28 @@
   {% url 'inventory:scan_web'     as scan_web_url %}
   {% url 'inventory:place_order_page' as place_order_url %}
   {% url 'feedback'               as feedback_url %}
+  {% url 'inventory:dashboard'    as dash_url %}
+  {% url 'settings' as settings_url %}
+  {% url 'inventory:settings' as settings_url2 %}
 
   <!-- Top: brand + quick actions -->
   <div class="hero-row">
-    <button class="glass-btn" type="button" data-bs-toggle="offcanvas" data-bs-target="#ccMenu" aria-label="Menu">
+    <button class="glass-btn tap" type="button" data-bs-toggle="offcanvas" data-bs-target="#ccMenu" aria-label="Menu" onclick="window.buzz&&buzz(8)">
       <span class="glass-icon">≡</span>
     </button>
-    <a href="/" class="brand-chip"><span class="glass-icon">📊</span> Circuit City</a>
+    <a href="{{ dash_url|default:'/' }}" class="brand-chip tap" onclick="window.buzz&&buzz(6)"><span class="glass-icon">📊</span> Circuit City</a>
 
-    <a class="glass-btn glass-green" href="{{ scan_in_url|default:'#' }}"><span class="glass-icon">➕</span> Stock IN</a>
-    <a class="glass-btn glass-amber" href="{{ scan_sold_url|default:'#' }}"><span class="glass-icon">✅</span> Scan SOLD</a>
-    <a class="glass-btn glass-blue"  href="{{ scan_web_url|default:'#' }}"><span class="glass-icon">🌐</span> Scan (Web)</a>
-    <a class="glass-btn"            href="{{ place_order_url|default:'#' }}"><span class="glass-icon">🧾</span> Place Order</a>
+    <a class="glass-btn glass-green tap" href="{{ scan_in_url|default:'#' }}" onclick="window.buzz&&buzz(10)"><span class="glass-icon">➕</span> Stock IN</a>
+    <a class="glass-btn glass-amber tap" href="{{ scan_sold_url|default:'#' }}" onclick="window.buzz&&buzz(10)"><span class="glass-icon">✅</span> Scan SOLD</a>
+    <a class="glass-btn glass-blue  tap" href="{{ scan_web_url|default:'#' }}" onclick="window.buzz&&buzz(10)"><span class="glass-icon">🌐</span> Scan (Web)</a>
 
-    <!-- Theme toggle -->
-    <button id="ccThemeBtn" class="glass-btn glass-dark" type="button" title="Toggle theme">
-      <span class="glass-icon">☀️</span> Theme
-    </button>
+    {# Place Order – managers/admins only #}
+    {% if IS_MANAGER or request.user.is_staff or request.user.is_superuser %}
+      <a class="glass-btn tap" href="{{ place_order_url|default:'#' }}" onclick="window.buzz&&buzz(8)"><span class="glass-icon">🧾</span> Place Order</a>
+    {% endif %}
 
     <!-- Feedback link -->
-    <a class="glass-btn" href="{{ feedback_url|default:'/feedback/' }}"><span class="glass-icon">💬</span> Feedback</a>
+    <a class="glass-btn tap" href="{{ feedback_url|default:'/feedback/' }}" onclick="window.buzz&&buzz(6)"><span class="glass-icon">💬</span> Feedback</a>
 
     <span class="ms-auto d-none d-md-inline text-muted fw-bold">
       {% if request.user.is_authenticated %}<i class="bi bi-person-circle me-1"></i>{{ request.user.username }}{% endif %}
@@ -151,7 +170,7 @@
 
   <!-- KPI quick line -->
   <div class="kpi-line">
-    <a href="/" class="kpi-pill"><i class="bi bi-house-door"></i> Home</a>
+    <a href="{{ dash_url|default:'/' }}" class="kpi-pill tap" onclick="window.buzz&&buzz(6)"><i class="bi bi-house-door"></i> Home</a>
     <span class="kpi-pill">In stock: <b>{{ in_stock|default:0|intcomma }}</b></span>
     <span class="kpi-pill">Sold: <b>{{ sold_count|default:0|intcomma }}</b></span>
     <span class="kpi-pill">Sum order: <b>{{ sum_order|default:0|floatformat:0|intcomma }}</b></span>
@@ -162,14 +181,14 @@
 
   <!-- Filters -->
   <div class="filters-wrap">
-    <button class="glass-btn" type="button" data-bs-toggle="collapse" data-bs-target="#filtersPanel" aria-expanded="true">
+    <button class="glass-btn tap" type="button" data-bs-toggle="collapse" data-bs-target="#filtersPanel" aria-expanded="true" onclick="window.buzz&&buzz(8)">
       <span class="glass-icon">⚙️</span> Filters
     </button>
 
     <div id="filtersPanel" class="collapse show mt-2">
       <form class="filters-row" method="get" action="{{ stock_url|default:'/inventory/list/' }}">
         <input type="hidden" name="view" value="{{ request.GET.view|default:'all' }}">
-        <input type="text" name="q" placeholder="Search IMEI/brand/model…" value="{{ q|default:'' }}">
+        <input type="text" name="q" placeholder="Search IMEI/brand/model…" value="{{ q|default:'' }}" inputmode="search" autocomplete="off">
         <label>Status:
           <select name="status">
             <option value="" {% if not status %}selected{% endif %}>All</option>
@@ -180,9 +199,9 @@
         <label class="ms-1">
           <input type="checkbox" name="archived" value="1" {% if show_archived %}checked{% endif %}> Include archived
         </label>
-        <label>Rows/page: <input type="number" name="page_size" min="10" max="200" value="{{ request.GET.page_size|default:50 }}"></label>
-        <button class="btn-deep" type="submit">Apply</button>
-        <a class="btn-deep" href="{{ export_csv_url|default:'/inventory/export/' }}?{% for k,v in request.GET.items %}{% if k != 'export' %}{{k}}={{v|urlencode}}&{% endif %}{% endfor %}export=csv">Download CSV</a>
+        <label>Rows/page: <input type="number" name="page_size" min="10" max="200" value="{{ request.GET.page_size|default:50 }}" inputmode="numeric"></label>
+        <button class="btn-deep tap" type="submit" onclick="window.buzz&&buzz(8)">Apply</button>
+        <a class="btn-deep tap" href="{{ export_csv_url|default:'/inventory/export/' }}?{% for k,v in request.GET.items %}{% if k != 'export' %}{{k}}={{v|urlencode}}&{% endif %}{% endfor %}export=csv" onclick="window.buzz&&buzz(8)">Download CSV</a>
       </form>
     </div>
   </div>
@@ -193,10 +212,11 @@
       <div>IMEI</div><div>Product</div><div>Status</div><div>Order Price</div><div>Selling Price</div><div>Location</div><div>Agent</div>
     </div>
     <div class="ticker-controls">
-      <button class="btn-deep" id="prevRow" type="button" aria-label="Previous">◀ Prev</button>
-      <button class="btn-deep" id="nextRow" type="button" aria-label="Next">Next ▶</button>
-      <a class="btn-deep" id="viewAllBtn"
-         href="{{ stock_url|default:'/inventory/list/' }}?view=all{% if q %}&q={{ q|urlencode }}{% endif %}{% if status %}&status={{ status }}{% endif %}{% if show_archived %}&archived=1{% endif %}{% if request.GET.page_size %}&page_size={{ request.GET.page_size }}{% endif %}">
+      <button class="btn-deep tap" id="prevRow" type="button" aria-label="Previous" onclick="window.buzz&&buzz(6)">◀ Prev</button>
+      <button class="btn-deep tap" id="nextRow" type="button" aria-label="Next" onclick="window.buzz&&buzz(6)">Next ▶</button>
+      <a class="btn-deep tap" id="viewAllBtn"
+         href="{{ stock_url|default:'/inventory/list/' }}?view=all{% if q %}&q={{ q|urlencode }}{% endif %}{% if status %}&status={{ status }}{% endif %}{% if show_archived %}&archived=1{% endif %}{% if request.GET.page_size %}&page_size={{ request.GET.page_size }}{% endif %}"
+         onclick="window.buzz&&buzz(6)">
          View all stock
       </a>
     </div>
@@ -206,11 +226,11 @@
   <div id="stockTableWrap" {% if request.GET.view == 'all' %}{% else %}hidden{% endif %} class="mt-2">
     <div style="display:flex;justify-content:space-between;align-items:center;margin:.5rem 0 .75rem">
       <div style="font-weight:700;color:var(--cc-muted)">All stock</div>
-      <a class="btn-deep" href="{{ request.path }}">Hide table</a>
+      <a class="btn-deep tap" href="{{ request.path }}" onclick="window.buzz&&buzz(6)">Hide table</a>
     </div>
 
     <div class="table-responsive d-none d-lg-block">
-      <table id="stockTable">
+      <table id="stockTable" data-kb-table>
         <thead>
           <tr>
             <th>IMEI</th><th>Product</th><th>Status</th><th>Order Price</th><th>Selling Price</th><th>Location</th><th>Agent</th>
@@ -235,7 +255,11 @@
                 <td>{% if it.assigned_agent_id %}{{ it.assigned_agent.username }}{% else %}—{% endif %}</td>
               </tr>
             {% empty %}
-              <tr><td colspan="7" style="text-align:center;color:var(--cc-muted)">No stock yet.</td></tr>
+              <tr>
+                <td colspan="7" style="text-align:center;color:var(--cc-muted)">
+                  No stock yet. <a href="{{ scan_in_url|default:'#' }}" class="ms-1">Scan IN your first item →</a>
+                </td>
+              </tr>
             {% endfor %}
           {% else %}
             {% for row in rows %}
@@ -255,7 +279,11 @@
               <td>{{ row.agent }}</td>
             </tr>
             {% empty %}
-            <tr><td colspan="7" style="text-align:center;color:var(--cc-muted)">No stock yet.</td></tr>
+            <tr>
+              <td colspan="7" style="text-align:center;color:var(--cc-muted)">
+                No stock yet. <a href="{{ scan_in_url|default:'#' }}" class="ms-1">Scan IN your first item →</a>
+              </td>
+            </tr>
             {% endfor %}
           {% endif %}
         </tbody>
@@ -310,11 +338,11 @@
     {% if page_obj %}
       <nav class="mt-2" style="display:flex;align-items:center;gap:.5rem;flex-wrap:wrap">
         {% if page_obj.has_previous %}
-          <a class="btn-deep" href="{{ stock_url|default:'/inventory/list/' }}?view=all{% if q %}&q={{ q|urlencode }}{% endif %}{% if status %}&status={{ status }}{% endif %}{% if show_archived %}&archived=1{% endif %}{% if request.GET.page_size %}&page_size={{ request.GET.page_size }}{% endif %}&page={{ page_obj.previous_page_number }}">Prev</a>
+          <a class="btn-deep tap" href="{{ stock_url|default:'/inventory/list/' }}?view=all{% if q %}&q={{ q|urlencode }}{% endif %}{% if status %}&status={{ status }}{% endif %}{% if show_archived %}&archived=1{% endif %}{% if request.GET.page_size %}&page_size={{ request.GET.page_size }}{% endif %}&page={{ page_obj.previous_page_number }}" onclick="window.buzz&&buzz(6)">Prev</a>
         {% endif %}
         <span class="text-muted">Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span>
         {% if page_obj.has_next %}
-          <a class="btn-deep" href="{{ stock_url|default:'/inventory/list/' }}?view=all{% if q %}&q={{ q|urlencode }}{% endif %}{% if status %}&status={{ status }}{% endif %}{% if show_archived %}&archived=1{% endif %}{% if request.GET.page_size %}&page_size={{ request.GET.page_size }}{% endif %}&page={{ page_obj.next_page_number }}">Next</a>
+          <a class="btn-deep tap" href="{{ stock_url|default:'/inventory/list/' }}?view=all{% if q %}&q={{ q|urlencode }}{% endif %}{% if status %}&status={{ status }}{% endif %}{% if show_archived %}&archived=1{% endif %}{% if request.GET.page_size %}&page_size={{ request.GET.page_size }}{% endif %}&page={{ page_obj.next_page_number }}" onclick="window.buzz&&buzz(6)">Next</a>
         {% endif %}
       </nav>
     {% endif %}
@@ -362,7 +390,7 @@
     </div>
   </div>
 
-  <!-- Stock Battery (INVENTORY ONLY) -->
+  <!-- Stock Battery -->
   <div class="battery-card">
     <h3 style="margin:.25rem 0 .6rem;color:var(--cc-muted)">Stock health</h3>
     <div class="battery-wrap">
@@ -386,7 +414,7 @@
   <div class="offcanvas-body">
     <h6 class="text-muted">Control Center</h6>
     <div class="list-group mb-3">
-      <a class="list-group-item list-group-item-action" href="/"><i class="bi bi-speedometer2 me-2"></i> Dashboard</a>
+      <a class="list-group-item list-group-item-action" href="{{ dash_url|default:'/' }}"><i class="bi bi-speedometer2 me-2"></i> Dashboard</a>
       <a class="list-group-item list-group-item-action" href="{{ stock_url|default:'/inventory/list/' }}"><i class="bi bi-list me-2"></i> Inventory</a>
       {% url 'inventory:time_checkin_page' as time_in %}
       {% if time_in %}<a class="list-group-item list-group-item-action" href="{{ time_in }}"><i class="bi bi-stopwatch me-2"></i> Time Check-in</a>{% endif %}
@@ -394,16 +422,33 @@
       {% if time_logs %}<a class="list-group-item list-group-item-action" href="{{ time_logs }}"><i class="bi bi-clock-history me-2"></i> Time Logs</a>{% endif %}
       {% url 'feedback' as feedback %}
       {% if feedback %}<a class="list-group-item list-group-item-action" href="{{ feedback }}"><i class="bi bi-chat-dots me-2"></i> Feedback</a>{% endif %}
+      {# Settings (safe fallback) #}
+      {% url 'settings' as oc_settings_url %}
+      {% url 'inventory:settings' as oc_settings_url2 %}
+      <a class="list-group-item list-group-item-action" href="{{ oc_settings_url|default:oc_settings_url2|default:'/settings/' }}">
+        <i class="bi bi-sliders me-2"></i> Settings
+      </a>
     </div>
 
-    <h6 class="text-muted">Admin</h6>
-    <div class="list-group">
-      {% url 'inventory:place_order_page' as place_order_url %}
-      {% if place_order_url %}<a class="list-group-item list-group-item-action" href="{{ place_order_url }}"><i class="bi bi-receipt-cutoff me-2"></i> Place Order</a>{% endif %}
-      <a class="list-group-item list-group-item-action" href="/admin/"><i class="bi bi-gear me-2"></i> Django Admin</a>
-    </div>
+    {# ---- Admin section ---- #}
+    {% if IS_MANAGER or request.user.is_staff or request.user.is_superuser %}
+      <h6 class="text-muted">Admin</h6>
+      <div class="list-group">
+        {% url 'inventory:place_order_page' as place_order_url %}
+        {% if place_order_url %}<a class="list-group-item list-group-item-action" href="{{ place_order_url }}"><i class="bi bi-receipt-cutoff me-2"></i> Place Order</a>{% endif %}
+        {# Show Django Admin ONLY to staff/superusers #}
+        {% if request.user.is_staff or request.user.is_superuser %}
+          <a class="list-group-item list-group-item-action" href="/admin/"><i class="bi bi-gear me-2"></i> Django Admin</a>
+        {% endif %}
+      </div>
+    {% endif %}
   </div>
 </div>
+
+<!-- Mobile FAB: quick Scan (prefers web scanner if available, else sold) -->
+<a href="{{ scan_web_url|default:scan_sold_url|default:'/inventory/scan-sold/' }}" class="cc-fab" onclick="window.buzz&&buzz(10)" aria-label="Scan">
+  <i class="bi bi-upc-scan fs-4"></i>
+</a>
 {% endblock %}
 
 {% block extra_js %}
@@ -416,17 +461,6 @@
   const tableWrap= document.getElementById('stockTableWrap');
   const ticker   = document.getElementById('ticker');
   if (showAll){ tableWrap.hidden = false; ticker.hidden = true; }
-
-  // Theme toggle
-  (function(){
-    const KEY="cc-theme";
-    const THEMES=["style-1","style-2","style-3"];
-    const root=document.documentElement;
-    const btn=document.getElementById('ccThemeBtn');
-    let current=localStorage.getItem(KEY)||root.getAttribute('data-theme')||THEMES[0];
-    function apply(t){ current=t; root.setAttribute('data-theme',t); localStorage.setItem(KEY,t); window.dispatchEvent(new CustomEvent('theme:changed',{detail:{theme:t}})); }
-    btn && btn.addEventListener('click', ()=> apply(THEMES[(THEMES.indexOf(current)+1)%THEMES.length]));
-  })();
 
   // Build ticker data from the table
   const tbody = document.querySelector('#stockTable tbody');
@@ -618,7 +652,7 @@
   document.getElementById('topPeriod')?.addEventListener('change', loadTop);
   loadTrend(); loadTop();
 
-  // --------- Stock Battery (INVENTORY ONLY) ---------
+  // --------- Stock Battery ---------
   const STATIC_INSTOCK = Number({{ in_stock|default:0 }});
   const STATIC_TARGET  = Number({{ target_full|default:100 }});
 
@@ -627,15 +661,14 @@
     const label = document.getElementById('batteryLabel');
     if (!fill || !label) return;
 
-    // Prefer restock heatmap endpoint (it returns battery_pct / battery_count)
     const hm = await fetchFirstOk(HEATMAP_ENDPOINTS, '');
-    let pct=0, on_hand=STATIC_INSTOCK;
+    let pct = 0, on_hand = STATIC_INSTOCK;
 
     if (hm && typeof hm.battery_pct !== 'undefined'){
       pct = Math.max(0, Math.min(100, Math.round(Number(hm.battery_pct)||0)));
       on_hand = Number(hm.battery_count||STATIC_INSTOCK)||0;
     } else {
-      pct = STATIC_TARGET ? Math.max(0, Math.min(100, (STATIC_INSTOCK/STATIC_TARGET)*100)) : 0;
+      pct = STATIC_TARGET ? Math.max(0, Math.min(100, Math.round((STATIC_INSTOCK/STATIC_TARGET)*100))) : 0;
     }
 
     fill.style.width = pct + '%';
@@ -645,15 +678,19 @@
   }
   loadBattery();
 
-  // Surface Django messages (optional)
+  // Surface Django messages (toast-friendly)
   {% if messages %}
     {% for message in messages %}
-      window.pushNote?.({
+      (window.CCToast?.show ? CCToast.show({
+        type: '{% if "error" in message.tags or "danger" in message.tags %}danger{% elif "success" in message.tags %}success{% elif "warning" in message.tags %}warning{% else %}info{% endif %}',
+        title: 'Inventory',
+        body: "{{ message|escapejs }}"
+      }) : window.pushNote?.({
         type: '{% if "error" in message.tags or "danger" in message.tags %}danger{% elif "success" in message.tags %}success{% elif "warning" in message.tags %}warn{% else %}info{% endif %}',
         title: 'Inventory',
         body: "{{ message|escapejs }}",
         dot: true
-      });
+      }));
     {% endfor %}
   {% endif %}
 })();

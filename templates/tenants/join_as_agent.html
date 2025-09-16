@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Join as Agent{% endblock %}
+{% block header_title %}Join an Existing Business{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'tenants/tenants.css' %}">
+{% endblock %}
+
+{% block content %}
+<section class="tenants-wrap tenants-narrow">
+  <form method="post" class="gcard" data-anim>
+    {% csrf_token %}
+    <div class="gtitle">Request access</div>
+    <div class="gsub">Enter the exact business name. A manager will approve.</div>
+
+    <div class="gfield" style="margin-top:14px" data-anim>
+      <div class="label">Business name</div>
+      {{ form.business_name|add_class:"ginput" }}
+      {% if form.business_name.errors %}<div class="badge badge-warn" style="margin-top:8px">{{ form.business_name.errors.0 }}</div>{% endif %}
+    </div>
+
+    <div class="gactions">
+      <a href="{% url 'tenants:choose_business' %}" class="gbtn">Back</a>
+      <button class="gbtn primary" data-anim="pop">Request to Join</button>
+    </div>
+  </form>
+</section>
+{% endblock %}
+
+{% block extra_js %}
+<script src="{% static 'tenants/tenants.js' %}"></script>
+{% endblock %}

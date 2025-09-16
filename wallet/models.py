@@ -1,12 +1,36 @@
 # wallet/models.py
 from __future__ import annotations
-from decimal import Decimal
+
+from decimal import Decimal, ROUND_HALF_UP
+from typing import Optional
+
 from django.conf import settings
 from django.db import models
+from django.db.models import Sum
 from django.utils import timezone
 
 # Use AUTH_USER_MODEL string for FKs to avoid import cycles
 User = settings.AUTH_USER_MODEL
+
+
+# ----------------------------
+# Utilities
+# ----------------------------
+def q2(x: Optional[Decimal]) -> Decimal:
+    """Quantize to 2 dp (banker's rounding style we prefer: HALF_UP here)."""
+    if x is None:
+        return Decimal("0.00")
+    if not isinstance(x, Decimal):
+        x = Decimal(str(x))
+    return x.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+
+
+def is_manager_like(user) -> bool:
+    """Admins (is_staff) or profile.is_manager."""
+    try:
+        return bool(user and user.is_authenticated and (user.is_staff or user.profile.is_manager))
+    except Exception:
+        return False
 
 
 # ----------------------------
@@ -28,6 +52,16 @@ class TxnType(models.TextChoices):
     BUDGET = "budget", "Budget Payout/Recovery"
 
 
+class WalletTransactionQuerySet(models.QuerySet):
+    def for_user(self, user):
+        """Admin/manager → all; Agent → only their transactions."""
+        return self if is_manager_like(user) else self.filter(agent=user)
+
+    def balance_for_agent(self, agent_id):
+        s = self.filter(ledger=Ledger.AGENT, agent_id=agent_id).aggregate(total=Sum("amount"))["total"]
+        return q2(s or Decimal("0"))
+
+
 class WalletTransaction(models.Model):
     """
     Signed amounts in MWK.
@@ -45,6 +79,8 @@ class WalletTransaction(models.Model):
     created_by = models.ForeignKey(User, null=True, blank=True, on_delete=models.SET_NULL, related_name="created_wallet_txns")
     meta = models.JSONField(default=dict, blank=True)
 
+    objects = WalletTransactionQuerySet.as_manager()
+
     class Meta:
         indexes = [
             models.Index(fields=["ledger", "agent", "effective_date"]),
@@ -55,6 +91,11 @@ class WalletTransaction(models.Model):
     def __str__(self) -> str:
         who = self.agent_id or "company"
         return f"{self.type} {self.amount} → {who} {self.effective_date}"
+
+    def save(self, *args, **kwargs):
+        # Normalize amount to 2dp
+        self.amount = q2(self.amount)
+        super().save(*args, **kwargs)
 
 
 class SalesTarget(models.Model):
@@ -85,6 +126,18 @@ class AttendanceLog(models.Model):
         return f"{self.agent_id} · {self.date} · {'in' if self.check_in else 'absent'}"
 
 
+class BudgetRequestQuerySet(models.QuerySet):
+    def visible_to(self, user):
+        """Admin/manager see all; agent sees only their requests."""
+        return self if is_manager_like(user) else self.filter(agent=user)
+
+    def pending(self):
+        return self.filter(status=BudgetRequest.Status.PENDING)
+
+    def decided(self):
+        return self.exclude(status=BudgetRequest.Status.PENDING)
+
+
 class BudgetRequest(models.Model):
     class Status(models.TextChoices):
         PENDING = "pending", "Pending"
@@ -101,14 +154,45 @@ class BudgetRequest(models.Model):
     decided_at = models.DateTimeField(null=True, blank=True)
     decided_by = models.ForeignKey(User, null=True, blank=True, on_delete=models.SET_NULL, related_name="decided_budgets")
 
+    objects = BudgetRequestQuerySet.as_manager()
+
+    class Meta:
+        indexes = [
+            models.Index(fields=["agent", "status", "created_at"]),
+        ]
+        ordering = ("-created_at",)
+
     def __str__(self) -> str:
         return f"{self.title} · {self.agent_id} · {self.amount} · {self.status}"
+
+    # --- minor guards / helpers ---
+    def save(self, *args, **kwargs):
+        self.amount = q2(self.amount)
+        super().save(*args, **kwargs)
+
+    def approve(self, by_user):
+        self.status = self.Status.APPROVED
+        self.decided_at = timezone.now()
+        self.decided_by = by_user
+        self.save(update_fields=["status", "decided_at", "decided_by"])
+
+    def reject(self, by_user):
+        self.status = self.Status.REJECTED
+        self.decided_at = timezone.now()
+        self.decided_by = by_user
+        self.save(update_fields=["status", "decided_at", "decided_by"])
+
+    def mark_paid(self, by_user=None):
+        self.status = self.Status.PAID
+        self.decided_at = self.decided_at or timezone.now()
+        if by_user:
+            self.decided_by = by_user
+        self.save(update_fields=["status", "decided_at", "decided_by"])
 
 
 # ----------------------------
 # Payslips + Payments + Schedules
 # ----------------------------
-
 def _default_base_salary() -> Decimal:
     """Global fallback base salary (can be overridden per user in the future)."""
     return Decimal(getattr(settings, "WALLET_BASE_SALARY", "40000.00"))
@@ -185,10 +269,18 @@ class Payslip(models.Model):
         if (self.gross is None or self.gross == 0) and (
             self.base_salary or self.commission or self.bonuses_fees or self.deductions
         ):
-            gross = (self.base_salary or 0) + (self.commission or 0) + (self.bonuses_fees or 0)
-            net = gross - (self.deductions or 0)
+            gross = q2((self.base_salary or 0) + (self.commission or 0) + (self.bonuses_fees or 0))
+            net = q2(gross - (self.deductions or 0))
             self.gross = gross
             self.net = net
+
+        # Normalize components
+        self.base_salary = q2(self.base_salary)
+        self.commission = q2(self.commission)
+        self.bonuses_fees = q2(self.bonuses_fees)
+        self.deductions = q2(self.deductions)
+        self.gross = q2(self.gross)
+        self.net = q2(self.net)
 
         super().save(*args, **kwargs)
 
@@ -229,6 +321,10 @@ class Payment(models.Model):
 
     def __str__(self) -> str:
         return f"{self.get_method_display()} · {self.amount} · {self.status}"
+
+    def save(self, *args, **kwargs):
+        self.amount = q2(self.amount)
+        super().save(*args, **kwargs)
 
 
 class PayoutSchedule(models.Model):
@@ -295,12 +391,13 @@ class AdminPurchaseOrder(models.Model):
         return f"PO-{self.id} · {self.supplier_name or 'Supplier'} · {self.total} {self.currency}"
 
     def recompute_totals(self, save: bool = True):
-        agg = self.items.aggregate(s=models.Sum("line_total"))
+        agg = self.items.aggregate(s=Sum("line_total"))
         subtotal = agg["s"] or Decimal("0.00")
-        self.subtotal = subtotal
-        # add VAT here if you want (e.g., 16.5%): self.tax = (subtotal * Decimal("0.165")).quantize(Decimal("0.01"))
-        self.tax = self.tax or Decimal("0.00")
-        self.total = self.subtotal + self.tax
+        self.subtotal = q2(subtotal)
+        # add VAT here if you want (e.g., 16.5%):
+        # self.tax = q2(self.subtotal * Decimal("0.165"))
+        self.tax = q2(self.tax or Decimal("0.00"))
+        self.total = q2(self.subtotal + self.tax)
         if save:
             self.save(update_fields=["subtotal", "tax", "total"])
 
@@ -325,5 +422,8 @@ class AdminPurchaseOrderItem(models.Model):
     def save(self, *args, **kwargs):
         # Compute line total if not provided
         if not self.line_total and self.quantity and self.unit_price is not None:
-            self.line_total = (Decimal(self.quantity) * Decimal(self.unit_price)).quantize(Decimal("0.01"))
+            self.line_total = q2(Decimal(self.quantity) * Decimal(self.unit_price))
+        else:
+            self.line_total = q2(self.line_total)
+        self.unit_price = q2(self.unit_price)
         super().save(*args, **kwargs)

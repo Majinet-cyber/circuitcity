@@ -1,26 +1,31 @@
 {% extends "base.html" %}
 {% load static %}
 {% block title %}Scan IN · Inventory{% endblock %}
+{% block header_title %}Inventory · Scan In{% endblock %}
+
+{# Inventory pages: scoped notifications, no global search #}
+{% block notif_scope %}inventory{% endblock %}
+{% block notif_allow %}stock_in,stock_sold,low_stock{% endblock %}
 
 {% block extra_css %}
 <style>
-  /* ===== Layout helpers (safe even if tokens.css already defines these) ===== */
+  /* ===== Layout ===== */
   .page{margin:0 auto;max-width:1120px;padding:clamp(12px,4vw,24px)}
   .vstack{display:flex;flex-direction:column;gap:.75rem}
   .hstack{display:flex;align-items:center;gap:.75rem;flex-wrap:wrap}
 
-  /* ===== Theme-aware primitives ===== */
+  /* ===== Theme (use global cc tokens; fall back to light) ===== */
   :root{
-    --bg: var(--bg, #ffffff);
-    --fg: var(--fg, #0f172a);
-    --border: var(--border, #e2e8f0);
-    --card: var(--card, #ffffff);
-    --accent: var(--accent, #2563eb);
-    --onAccent: var(--onAccent, #ffffff);
-    --danger: var(--danger, #ef4444);
-    --scanline: #00ff5a; /* neon green */
+    --cc-bg: var(--cc-bg, #ffffff);
+    --cc-text: var(--cc-text, #0f172a);
+    --cc-muted: var(--cc-muted, #64748b);
+    --cc-border: var(--cc-border, #e2e8f0);
+    --cc-panel: var(--cc-panel, #ffffff);
+    --cc-panel-2: var(--cc-panel-2, #f8fafc);
+    --cc-accent: var(--cc-accent, #2563eb);
+    --cc-shadow: var(--cc-shadow, 0 6px 18px rgba(2,6,23,.08));
   }
-  body{background:var(--bg);color:var(--fg)}
+  body{background:var(--cc-bg);color:var(--cc-text)}
 
   /* ===== Form layout ===== */
   .form{display:grid;gap:14px;max-width:880px}
@@ -29,41 +34,41 @@
 
   /* ===== Field & control styling ===== */
   .field{
-    position:relative;background:var(--card);border:1px solid var(--border);
-    border-radius:12px;display:flex;align-items:center
+    position:relative;background:var(--cc-panel);border:1px solid var(--cc-border);
+    border-radius:12px;display:flex;align-items:center;box-shadow:var(--cc-shadow)
   }
   .field > input,.field > select,.field > .form-control{
-    flex:1;background:transparent;color:var(--fg);border:0;padding:12px 14px;
+    flex:1;background:transparent;color:var(--cc-text);border:0;padding:12px 14px;
     outline:none;font-size:16px;width:100%;min-height:44px;
   }
-  label{font-weight:600;margin-bottom:6px;display:inline-block}
+  label{font-weight:700;margin-bottom:6px;display:inline-block}
 
   /* ===== Buttons ===== */
   .btn{
-    appearance:none;border:1px solid var(--border);color:var(--fg);
-    background:var(--card);border-radius:10px;padding:10px 14px;
-    cursor:pointer;font-weight:600;font-size:14px;min-height:44px
+    appearance:none;border:1px solid var(--cc-border);color:var(--cc-text);
+    background:var(--cc-panel);border-radius:10px;padding:10px 14px;
+    cursor:pointer;font-weight:700;font-size:14px;min-height:44px;
+    transition:transform .12s ease,box-shadow .2s ease,background .2s ease
   }
-  .btn:hover{filter:brightness(1.05)}
+  .btn:hover{transform:translateY(-1px);box-shadow:var(--cc-shadow)}
   .btn[disabled]{opacity:.5;cursor:not-allowed}
-  .btn-primary{background:var(--accent);color:var(--onAccent);border-color:transparent}
-  .btn-secondary{background:var(--card)}
+  .btn-primary{background:var(--cc-accent);color:#fff;border-color:transparent}
+  .btn-secondary{background:var(--cc-panel)}
   .btn-sky{
     background:linear-gradient(135deg,#38bdf8,#0ea5e9);
     color:#052c3b;border-color:#075985
   }
 
   /* ===== Misc UI ===== */
-  .hint{font-size:12px;opacity:.8}
+  .hint{font-size:12px;color:var(--cc-muted)}
   .help-error{font-size:12px;color:#ef4444}
   .help-error[hidden]{display:none}
   .pill{font-size:12px;color:#0b3b2b;background:rgba(56,189,248,.12);border:1px solid rgba(56,189,248,.35);padding:4px 8px;border-radius:999px}
-  .kbd{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;background:var(--card);border:1px solid var(--border);color:var(--fg);padding:2px 6px;border-radius:6px}
-  .flex{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+  .kbd{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;background:var(--cc-panel);border:1px solid var(--cc-border);color:var(--cc-text);padding:2px 6px;border-radius:6px}
 
   /* ===== Camera shell + overlay scanline ===== */
-  #cameraBox{margin-top:8px;display:none;background:var(--card);border:1px dashed var(--border);border-radius:14px;padding:12px}
-  .scan-shell{position:relative;border-radius:14px;overflow:hidden;background:#000}
+  #cameraBox{margin-top:8px;display:none;background:var(--cc-panel);border:1px dashed var(--cc-border);border-radius:14px;padding:12px}
+  .scan-shell{position:relative;border-radius:14px;overflow:hidden;background:#000;box-shadow:var(--cc-shadow)}
   #camera{width:100%;max-height:360px;min-height:220px;background:#000}
 
   .scan-overlay{position:absolute;inset:0;pointer-events:none}
@@ -75,8 +80,8 @@
   }
   .scanline{
     position:absolute; left:8%; right:8%; height:2px; border-radius:2px;
-    background:linear-gradient(90deg, transparent, var(--scanline), transparent);
-    box-shadow:0 0 10px var(--scanline), 0 0 20px rgba(0,255,90,.6);
+    background:linear-gradient(90deg, transparent, #00ff5a, transparent);
+    box-shadow:0 0 10px #00ff5a, 0 0 20px rgba(0,255,90,.6);
     animation: sweep 2.0s linear infinite alternate;
   }
   .scanline.paused{ animation-play-state: paused; }
@@ -85,7 +90,7 @@
   /* Toast */
   .toast{
     position:fixed;right:18px;bottom:18px;min-width:240px;
-    background:var(--card);border:1px solid var(--border);color:var(--fg);
+    background:var(--cc-panel);border:1px solid var(--cc-border);color:var(--cc-text);
     border-radius:12px;padding:12px 14px;box-shadow:0 10px 25px rgba(0,0,0,.25);
     display:none;z-index:1000
   }
@@ -103,6 +108,7 @@
       Paste or scan the <strong>IMEI</strong>. Scanners typically “type” digits then send <span class="kbd">Enter</span>.
     </p>
 
+    {% url 'inventory:stock_list' as stock_url %}
     <form method="post" novalidate class="form" data-validate>
       {% csrf_token %}
       {% if form.non_field_errors %}<div class="help-error">{{ form.non_field_errors }}</div>{% endif %}
@@ -115,7 +121,7 @@
         </div>
         {% if form.imei.errors %}<div class="help-error">{{ form.imei.errors|striptags }}</div>{% endif %}
         <div id="imeiHelp" class="help-error" hidden>Enter a valid IMEI (exactly 15 digits).</div>
-        <div class="flex" style="margin-top:6px">
+        <div class="hstack" style="margin-top:6px">
           <button type="button" id="pasteBtn" class="btn btn-secondary">Paste from Clipboard</button>
           <button type="button" id="camToggle" class="btn btn-sky">Start Camera</button>
           <span class="pill">Shortcut: <span class="kbd">Enter</span> submits</span>
@@ -134,7 +140,7 @@
             </div>
           </div>
 
-          <div class="flex" style="margin-top:10px">
+          <div class="hstack" style="margin-top:10px">
             <select id="cameraSelect" class="btn"></select>
             <button type="button" id="camStop" class="btn">Stop Camera</button>
           </div>
@@ -150,10 +156,10 @@
           <div class="hint">Pick the exact model. <em>Order price auto-fills from catalog.</em></div>
         </div>
         <div>
-          <label for="id_location">Location</label>
+          <label for="id_location">Location <span class="hint">(optional)</span></label>
           <div class="field">{{ form.location }}</div>
           {% if form.location.errors %}<div class="help-error">{{ form.location.errors|striptags }}</div>{% endif %}
-          <div class="hint">Defaults to your home store if set.</div>
+          <div class="hint">Leave blank to assign later.</div>
         </div>
       </div>
 
@@ -175,20 +181,22 @@
       </div>
 
       <!-- Assign toggle -->
+      {% if form.assigned_to_me %}
       <div class="hstack">
         <label style="display:flex;align-items:center;gap:10px;">
           {{ form.assigned_to_me }} Assign this device to me
         </label>
         {% if form.assigned_to_me.errors %}<div class="help-error">{{ form.assigned_to_me.errors|striptags }}</div>{% endif %}
-        {% if user.is_staff %}
+        {% if request.user.is_staff or request.user.is_superuser %}
           <span class="pill">Note: admin/staff accounts can’t hold stock — this toggle will be ignored.</span>
         {% endif %}
       </div>
+      {% endif %}
 
       <!-- Actions -->
       <div class="hstack" style="margin-top:.25rem">
         <button type="submit" id="submitBtn" class="btn btn-primary" disabled>Save</button>
-        <a class="btn btn-secondary" href="{% url 'inventory:stock_list' %}">Cancel</a>
+        <a class="btn btn-secondary" href="{{ stock_url|default:'/inventory/' }}">Cancel</a>
       </div>
     </form>
   </section>
@@ -197,10 +205,11 @@
 <!-- Toast -->
 <div id="toast" class="toast" role="status" aria-live="polite"></div>
 
-<!-- QuaggaJS for barcode scanning -->
+<!-- QuaggaJS for barcode scanning (loaded upfront; lightweight) -->
 <script src="https://unpkg.com/quagga@0.12.1/dist/quagga.min.js"></script>
 
 <script>
+(function(){
   // Elements
   const form      = document.querySelector('form[data-validate]');
   const imeiEl    = document.getElementById('id_imei');
@@ -219,7 +228,13 @@
   const scanLine  = document.getElementById('scanline');
   const orderPriceHint = document.getElementById('orderPriceHint');
 
-  // Helpers
+  // Make Location explicitly optional on the client
+  if (locEl) {
+    locEl.removeAttribute('required');
+    locEl.removeAttribute('aria-required');
+  }
+
+  // ===== Helpers
   function showToast(msg, ok=true){
     toast.textContent = msg;
     toast.className = 'toast ' + (ok ? 'ok' : 'err');
@@ -227,34 +242,38 @@
     setTimeout(()=> toast.style.display = 'none', 3000);
   }
   function digitsOnly(s){ return (s||'').replace(/\D/g,''); }
-  function looksLikeIMEI(s){
-    s = digitsOnly(s);
-    return /^\d{15}$/.test(s); // exactly 15 digits
-  }
-  function valOrZeroFloat(el){
-    const v = (el && el.value || '').trim();
-    if(v === '') return 0;
-    const n = Number(v);
-    return Number.isFinite(n) ? n : 0;
-  }
+  function looksLikeIMEI(s){ s = digitsOnly(s); return /^\d{15}$/.test(s); } // exactly 15 digits
 
   function updateValidity(){
-    // IMEI helper (optional unless your form enforces it)
     if (imeiEl){
       const hasValue = (imeiEl.value || '').length > 0;
       const good = looksLikeIMEI(imeiEl.value || '');
       const help = document.getElementById('imeiHelp');
       if (help) help.hidden = (!hasValue || good);
     }
-    // Enable when product & location selected and order price is a number >= 0
-    const ok =
-      (!!(prodEl && prodEl.value)) &&
-      (!!(locEl && locEl.value)) &&
-      (orderEl && orderEl.value !== '' && !Number.isNaN(Number(orderEl.value)));
-    submitBtn && (submitBtn.disabled = !ok);
+    // Location is OPTIONAL now. Enable Save when IMEI is valid, product selected, and order price is a number.
+    const imeiOk = looksLikeIMEI(imeiEl && imeiEl.value || '');
+    const prodOk = !!(prodEl && prodEl.value);
+    const priceOk = (orderEl && orderEl.value !== '' && !Number.isNaN(Number(orderEl.value)));
+    const ok = imeiOk && prodOk && priceOk;
+
+    if (submitBtn) submitBtn.disabled = !ok;
   }
 
-  // Autofill: default order price from catalog (inventory.api_order_price/<id>/)
+  // ---------- Default order price (resilient endpoint aliases)
+  const ORDER_PRICE_ENDPOINTS = [
+    '/inventory/api/order-price/', '/inventory/api/order_price/', '/inventory/order-price/'
+  ];
+  async function fetchFirstOk(base, productId){
+    for (const b of base){
+      try{
+        const r = await fetch(`${b}${productId}/`, {headers:{'Accept':'application/json'}});
+        if (r.ok) return await r.json();
+      }catch(e){}
+    }
+    return null;
+  }
+
   let manualPrice = false; // set when user edits price
 
   function setOrderHint(text){
@@ -263,33 +282,25 @@
 
   async function autofillOrderPrice(force=false){
     if(!prodEl || !prodEl.value) return;
-    try{
-      const res = await fetch(`/inventory/api/order-price/${prodEl.value}/`, {headers:{'Accept':'application/json'}});
-      const data = await res.json();
-      const price = (data && data.price != null) ? Number(data.price) : null;
+    const data = await fetchFirstOk(ORDER_PRICE_ENDPOINTS, prodEl.value);
+    const price = data && data.price != null ? Number(data.price) : null;
 
-      if(price != null){
-        if (orderEl){
-          // Only fill if user hasn't typed OR force is true OR field is 0/blank
-          const isBlankOrZero = (orderEl.value === '' || Number(orderEl.value) === 0);
-          if (force || !manualPrice || isBlankOrZero){
-            orderEl.value = price.toFixed(2);
-            manualPrice = false; // reset to catalog state
-          }
+    if(price != null){
+      if (orderEl){
+        const isBlankOrZero = (orderEl.value === '' || Number(orderEl.value) === 0);
+        if (force || !manualPrice || isBlankOrZero){
+          orderEl.value = price.toFixed(2);
+          manualPrice = false;
         }
-        setOrderHint('Auto-filled from default order price catalog. You can override.');
-      }else{
-        setOrderHint('No default price set for this model yet. Enter one manually.');
       }
-    }catch{
-      // silent; keep whatever the user has
-      setOrderHint('Could not fetch default price (offline?). Enter manually.');
-    }finally{
-      updateValidity();
+      setOrderHint('Auto-filled from default order price catalog. You can override.');
+    }else{
+      setOrderHint('No default price set for this model yet. Enter one manually.');
     }
+    updateValidity();
   }
 
-  // Wire up basic UX + numeric constraints
+  // ---------- Wire up basic UX
   if (imeiEl) {
     try{
       imeiEl.setAttribute('inputmode','numeric');
@@ -311,15 +322,13 @@
   if (orderEl){
     orderEl.setAttribute('inputmode', 'decimal');
     orderEl.addEventListener('input', ()=>{
-      manualPrice = true; // user touched price; stop auto-overwrite
-      // guard against negative values
+      manualPrice = true;
       if (Number(orderEl.value) < 0) orderEl.value = '0';
       updateValidity();
     });
   }
 
   if (recvEl){
-    // If empty on load, set to today (yyyy-mm-dd)
     const v = (recvEl.value || '').trim();
     if(!v){
       try{
@@ -334,22 +343,21 @@
 
   if (prodEl) {
     prodEl.addEventListener('change', ()=>{
-      manualPrice = false;   // new product → allow autofill
+      manualPrice = false;
       autofillOrderPrice(false);
       updateValidity();
     });
   }
-  if (locEl) locEl.addEventListener('change', updateValidity);
+  if (locEl) locEl.addEventListener('change', updateValidity); // still updates UI, but no longer required
 
   document.addEventListener('keydown', (e)=>{ if(e.key==='F2'){ e.preventDefault(); imeiEl && imeiEl.focus(); }});
   window.addEventListener('load', ()=>{
     imeiEl && imeiEl.focus();
-    // initial checks + attempt autofill if a product is preselected
     updateValidity();
     if (prodEl && prodEl.value){ autofillOrderPrice(false); }
   });
 
-  // Clipboard helper
+  // ---------- Clipboard helper
   pasteBtn && pasteBtn.addEventListener('click', async ()=>{
     try{
       const txt = await navigator.clipboard.readText();
@@ -366,7 +374,7 @@
     }
   });
 
-  // ===== Camera / QuaggaJS (with animated scanline) =====
+  // ---------- Camera / QuaggaJS (with animated scanline)
   let quaggaRunning = false;
   let lastDetected = '';
 
@@ -424,9 +432,10 @@
         imeiEl.value = numeric.slice(0, 15);
         updateValidity();
 
-        pauseScanline(); // pause the sweep briefly on successful read
+        pauseScanline();
 
         if(looksLikeIMEI(imeiEl.value) && submitBtn && !submitBtn.disabled){
+          try{ navigator.vibrate && navigator.vibrate(20); }catch(_){}
           showToast('Scanned IMEI: ' + imeiEl.value, true);
           form.submit();
         }else{
@@ -454,10 +463,20 @@
     }
   });
 
+  camSelect && camSelect.addEventListener('change', ()=>{
+    if(quaggaRunning){
+      stopQuagga();
+      startQuagga(camSelect.value);
+    }
+  });
+
   camStop && camStop.addEventListener('click', ()=>{
     stopQuagga();
     if (camBox) camBox.style.display='none';
     if (camToggle) camToggle.textContent='Start Camera';
   });
+
+  window.addEventListener('beforeunload', stopQuagga);
+})();
 </script>
 {% endblock %}

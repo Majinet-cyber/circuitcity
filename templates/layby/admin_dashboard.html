@@ -1,0 +1,159 @@
+{% extends "base.html" %}
+{% load humanize %}
+
+{% block title %}Admin · Laybys{% endblock %}
+{% block header_title %}Admin · Laybys{% endblock %}
+
+{% block extra_css %}
+<style>
+  /* Panels & layout */
+  .cc-panel{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px}
+  .cc-header{display:flex;justify-content:space-between;align-items:center;gap:.8rem;flex-wrap:wrap;margin-bottom:.8rem}
+  .cc-kpis{display:grid;grid-template-columns:repeat(3,1fr);gap:.8rem;margin-bottom:.8rem}
+  .cc-kpi{background:color-mix(in oklab, var(--card) 86%, transparent);border:1px solid var(--line);border-radius:12px;padding:.8rem}
+  .cc-kpi .label{opacity:.75;font-weight:800}
+  .cc-kpi .val{font-size:1.25rem;font-weight:900}
+
+  /* Actions & inputs */
+  .cc-actions{display:flex;gap:.5rem;flex-wrap:wrap}
+  .cc-input{padding:.5rem .7rem;border:1px solid var(--line);border-radius:10px;background:color-mix(in oklab, var(--card) 88%, transparent);min-width:220px}
+  .cc-btn{display:inline-flex;align-items:center;gap:.4rem;padding:.48rem .8rem;border-radius:10px;border:1px solid var(--line);text-decoration:none}
+  .cc-btn.primary{background:linear-gradient(180deg, #4f8cff, #3b6ed9);color:#fff;border-color:transparent}
+  .cc-btn.ghost{background:transparent}
+
+  /* Table */
+  .cc-table-wrap{overflow:auto}
+  .cc-table{width:100%;border-collapse:separate;border-spacing:0 .6rem;min-width:980px}
+  .cc-table thead th{background:color-mix(in oklab, var(--card) 86%, transparent);font-weight:800;padding:.55rem .8rem;text-align:left}
+  .cc-table tbody td{padding:.65rem .8rem;background:color-mix(in oklab, var(--card) 92%, transparent);border:1px solid var(--line)}
+  .cc-table tbody tr td:first-child{border-top-left-radius:10px;border-bottom-left-radius:10px}
+  .cc-table tbody tr td:last-child{border-top-right-radius:10px;border-bottom-right-radius:10px}
+
+  /* Chips / badges */
+  .pill{display:inline-block;padding:.25rem .6rem;border-radius:999px;border:1px solid var(--line);font-weight:800;color:#052e2b}
+  .chip{display:inline-block;padding:.22rem .55rem;border-radius:999px;font-weight:800;font-size:.86rem}
+  .chip.ok{background:color-mix(in oklab, white 10%, transparent)}
+  .chip.warn{background:color-mix(in oklab, #f59e0b 20%, transparent);color:#f59e0b}
+  .chip.danger{background:color-mix(in oklab, #ef4444 20%, transparent);color:#ef4444}
+  .status{text-transform:capitalize;font-weight:800}
+  .meta{opacity:.75}
+
+  /* Right-align helper */
+  .text-right{text-align:right}
+</style>
+{% endblock %}
+
+{% block content %}
+
+  <div class="cc-header">
+    <div class="cc-actions">
+      <input id="q" class="cc-input" placeholder="Search customer, ref, product…" oninput="filterRows()">
+      <select id="alertFilter" class="cc-input" onchange="filterRows()">
+        <option value="">All alerts</option>
+        <option value="Unpaid">Unpaid</option>
+        <option value="Overdue">Overdue</option>
+        <option value="OK">OK</option>
+      </select>
+    </div>
+    <div class="cc-actions">
+      <a href="{% url 'layby:agent_new' %}" class="cc-btn primary">➕ New layby</a>
+    </div>
+  </div>
+
+  <div class="cc-kpis">
+    <div class="cc-kpi">
+      <div class="label">Total outstanding</div>
+      <div class="val">{{ total_outstanding|default:total_balance|floatformat:2|intcomma }}</div>
+    </div>
+    <div class="cc-kpi">
+      <div class="label">Active laybys</div>
+      <div class="val">{{ count_active|default:0 }}</div>
+    </div>
+    <div class="cc-kpi">
+      <div class="label">Paid this week</div>
+      <div class="val">{{ paid_this_week|default:0|floatformat:2|intcomma }}</div>
+    </div>
+  </div>
+
+  <div class="cc-panel cc-table-wrap">
+    <table class="cc-table" id="laybyTable">
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th>Ref</th>
+          <th>Customer</th>
+          <th>Product</th>
+          <th>Status</th>
+          <th class="text-right">Paid</th>
+          <th class="text-right">Balance</th>
+          <th>Alert</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for o in orders %}
+          <tr>
+            <td>{{ o.id }}</td>
+            <td class="meta">{{ o.ref }}</td>
+            <td>
+              {% if o.customer_phone %}
+                <a href="{% url 'layby:admin_customer' %}?phone={{ o.customer_phone|urlencode }}" class="text-decoration-none">
+              {% else %}
+                <a href="{% url 'layby:admin_customer' %}?name={{ o.customer_name|urlencode }}" class="text-decoration-none">
+              {% endif %}
+                  <span class="pill" style="background: {{ color_for(o.customer_name) }}">{{ o.customer_name }}</span>
+                </a>
+            </td>
+            <td>
+              {{ o.product }}
+              {% if o.sku %}<span class="pill meta">{{ o.sku }}</span>{% endif %}
+            </td>
+            <td class="status">
+              {% if o.status|lower == "active" %}
+                <span class="chip ok">active</span>
+              {% else %}
+                <span class="chip ok">{{ o.status }}</span>
+              {% endif %}
+            </td>
+            <td class="text-right">{{ o.amount_paid|floatformat:2|intcomma }}</td>
+            <td class="text-right"><strong>{{ o.balance|floatformat:2|intcomma }}</strong></td>
+            <td>
+              {% if o.overdue %}
+                <span class="chip danger">Overdue</span>
+              {% elif o.balance > 0 %}
+                <span class="chip warn">Unpaid</span>
+              {% else %}
+                <span class="chip ok">OK</span>
+              {% endif %}
+            </td>
+            <td class="text-right">
+              <a class="cc-btn" href="{% url 'layby:agent_add_payment' o.id %}">➕ Pay</a>
+              {% if o.customer_phone %}
+                <a class="cc-btn ghost" href="{% url 'layby:admin_customer' %}?phone={{ o.customer_phone|urlencode }}">👁 View</a>
+              {% else %}
+                <a class="cc-btn ghost" href="{% url 'layby:admin_customer' %}?name={{ o.customer_name|urlencode }}">👁 View</a>
+              {% endif %}
+            </td>
+          </tr>
+        {% empty %}
+          <tr><td colspan="9">No laybys yet.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <script>
+    function filterRows(){
+      const q = (document.getElementById('q').value || '').toLowerCase();
+      const af = document.getElementById('alertFilter').value;
+      document.querySelectorAll('#laybyTable tbody tr').forEach(tr=>{
+        const text = tr.innerText.toLowerCase();
+        const alert = tr.querySelector('td:nth-child(8)')?.innerText.trim();
+        const passQ = !q || text.includes(q);
+        const passA = !af || alert === af;
+        tr.style.display = (passQ && passA) ? '' : 'none';
+      });
+    }
+  </script>
+
+{% endblock %}

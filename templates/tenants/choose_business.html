@@ -1,0 +1,78 @@
+{% extends "base.html" %}
+
+{% block title %}Choose Business{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+  <div class="d-flex align-items-center justify-content-between mb-3">
+    <h2 class="mb-0">Choose Business</h2>
+    <span class="badge rounded-pill text-bg-light">Tenant setup</span>
+  </div>
+
+  {% if messages %}
+    {% for m in messages %}
+      <div class="alert alert-{{ m.tags|default:'info' }} mb-3">{{ m }}</div>
+    {% endfor %}
+  {% endif %}
+
+  {% if request.user.is_staff or request.user.is_superuser %}
+    <!-- STAFF VIEW: show ALL ACTIVE BUSINESSES -->
+    <div class="card shadow-sm mb-4">
+      <div class="card-body">
+        <h5 class="card-title mb-3">All active businesses</h5>
+        {% if all_active_businesses %}
+          <div class="list-group">
+            {% for b in all_active_businesses %}
+              <form class="list-group-item d-flex align-items-center justify-content-between gap-2"
+                    method="post" action="{% url 'tenants:choose_business' %}">
+                {% csrf_token %}
+                <div class="d-flex align-items-center gap-2">
+                  <span class="fw-semibold">{{ b.name }}</span>
+                  <span class="text-muted">/ {{ b.slug }}</span>
+                </div>
+                <input type="hidden" name="business_id" value="{{ b.id }}">
+                <button class="btn btn-primary btn-sm">Switch</button>
+              </form>
+            {% endfor %}
+          </div>
+        {% else %}
+          <div class="text-muted">No active businesses found.</div>
+        {% endif %}
+      </div>
+    </div>
+  {% endif %}
+
+  <!-- REGULAR USER VIEW: own memberships -->
+  <div class="card shadow-sm">
+    <div class="card-body">
+      <h5 class="card-title mb-3">Your active memberships</h5>
+
+      {% if memberships %}
+        <div class="list-group">
+          {% for m in memberships %}
+            <form class="list-group-item d-flex align-items-center justify-content-between gap-2"
+                  method="post" action="{% url 'tenants:choose_business' %}">
+              {% csrf_token %}
+              <div class="d-flex align-items-center gap-2">
+                <span class="fw-semibold">{{ m.business.name }}</span>
+                <span class="text-muted">/ {{ m.business.slug }}</span>
+                <span class="badge text-bg-secondary">{{ m.role|title }}</span>
+              </div>
+              <input type="hidden" name="business_id" value="{{ m.business.id }}">
+              <button class="btn btn-outline-primary btn-sm">Switch</button>
+            </form>
+          {% endfor %}
+        </div>
+      {% else %}
+        <div class="text-muted mb-3">No active memberships yet.</div>
+        {% if not request.user.is_staff and not request.user.is_superuser %}
+          <div class="d-flex gap-2">
+            <a class="btn btn-outline-secondary" href="{% url 'tenants:create_business' %}">Create business</a>
+            <a class="btn btn-outline-primary" href="{% url 'tenants:join_as_agent' %}">Join as agent</a>
+          </div>
+        {% endif %}
+      {% endif %}
+    </div>
+  </div>
+</div>
+{% endblock %}

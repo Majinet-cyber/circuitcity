@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+
+{% block title %}Layby · Login{% endblock %}
+{% block header_title %}Layby · Login{% endblock %}
+
+{% block extra_css %}
+<style>
+  .cc-card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px;max-width:520px;margin:auto}
+  .cc-input{width:100%;padding:.65rem .8rem;border:1px solid var(--line);border-radius:10px;background:color-mix(in oklab, var(--card) 88%, transparent)}
+  .cc-btn{display:inline-flex;gap:.4rem;align-items:center;padding:.6rem 1rem;border-radius:10px;border:1px solid var(--line);background:linear-gradient(180deg,#4f8cff,#3b6ed9);color:#fff;text-decoration:none}
+  .muted{opacity:.7}
+</style>
+{% endblock %}
+
+{% block content %}
+  <div class="cc-card">
+    <h2 class="mb-2">Access your laybys</h2>
+    <p class="muted">Enter the phone number you used at checkout. We’ll text you a 4-digit code.</p>
+    <form method="post" action="{% url 'layby:customer_send_otp' %}">
+      {% csrf_token %}
+      <label class="muted">Phone number</label>
+      <input class="cc-input mb-2" type="tel" name="phone" placeholder="+265 888 123 456" required>
+      <button class="cc-btn" type="submit">Send code</button>
+    </form>
+  </div>
+{% endblock %}

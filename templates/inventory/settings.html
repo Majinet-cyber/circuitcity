@@ -1,0 +1,107 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Settings · Circuit City{% endblock %}
+
+{% block content %}
+<div class="page maxw-1200">
+  <h1 style="font-size:var(--fs-32); font-weight:900; line-height:1; margin-bottom:var(--sp-6);">
+    Settings
+  </h1>
+
+  <!-- Profile & Security -->
+  <div class="vstack">
+    <div class="card pad">
+      <div class="hstack" style="align-items:flex-start;">
+        <!-- Avatar image (actual image URL) -->
+        <img src="{{ avatar_img_url }}" alt="Avatar" width="96" height="96"
+             style="border-radius:16px; box-shadow:var(--shadow-sm); object-fit:cover;">
+
+        <!-- User Info -->
+        <div class="vstack" style="gap:6px; min-width:260px;">
+          <div style="font-weight:800; font-size:var(--fs-20);">{{ user_full_name }}</div>
+          <div class="text-muted">@{{ user_username }}</div>
+          <div class="text-muted">{{ user_email }}</div>
+
+          <div class="hstack" style="gap:8px; margin-top:6px;">
+            {% if upload_avatar_url %}
+              <!-- POST upload (shows file picker, then auto-submits) -->
+              <form action="{{ upload_avatar_url }}" method="post" enctype="multipart/form-data" style="display:inline;">
+                {% csrf_token %}
+                <input type="file" name="avatar" id="id_avatar" style="display:none" accept="image/*" onchange="this.form.submit()">
+                <label for="id_avatar" class="btn btn-muted btn-icon" style="cursor:pointer;">Change avatar</label>
+              </form>
+            {% else %}
+              <a href="https://gravatar.com" target="_blank" class="btn btn-muted btn-icon">Change avatar</a>
+            {% endif %}
+
+            {% if change_password_url %}
+              <a href="{{ change_password_url }}" class="btn">Change password</a>
+            {% endif %}
+          </div>
+        </div>
+
+        <!-- Two-Factor Authentication -->
+        <div class="panel-soft pad-sm round" style="margin-left:auto; min-width:min(420px, 100%);">
+          <div class="hstack" style="justify-content:space-between;">
+            <div>
+              <div style="font-weight:900; font-size:var(--fs-18);">Two-Factor Authentication</div>
+              <div class="text-muted">Status: {{ twofa_status }}</div>
+            </div>
+            <div class="hstack" style="gap:8px;">
+              {% if twofa_manage_url %}
+                <a href="{{ twofa_manage_url }}" class="btn {% if not twofa_enabled %}btn-primary{% endif %}">
+                  {% if twofa_enabled %}Manage 2FA{% else %}Set up 2FA{% endif %}
+                </a>
+              {% else %}
+                <button class="btn" disabled title="Two-factor app not installed">Unavailable</button>
+              {% endif %}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Notifications (placeholder switches) -->
+    <div class="card pad">
+      <h2 style="font-size:var(--fs-24); font-weight:900; margin-bottom:var(--sp-4);">Notifications</h2>
+
+      <div class="hstack" style="align-items:flex-start;">
+        <div class="panel-soft pad round" style="flex:1; min-width:280px;">
+          <div style="font-weight:800; margin-bottom:6px;">Dashboard notifications</div>
+          <label class="hstack" style="gap:8px; margin-bottom:8px;">
+            <input type="checkbox" class="input-compact"> Payments
+          </label>
+          <label class="hstack" style="gap:8px;">
+            <input type="checkbox" class="input-compact"> Wallet events
+          </label>
+          <p class="text-muted" style="margin-top:8px;">
+            General business notifications (e.g., payments, wallet top-ups/deductions).
+          </p>
+        </div>
+
+        <div class="panel-soft pad round" style="flex:1; min-width:280px;">
+          <div style="font-weight:800; margin-bottom:6px;">Inventory notifications</div>
+          <label class="hstack" style="gap:8px; margin-bottom:8px;">
+            <input type="checkbox" class="input-compact"> Stock IN
+          </label>
+          <label class="hstack" style="gap:8px; margin-bottom:8px;">
+            <input type="checkbox" class="input-compact"> Sold
+          </label>
+          <label class="hstack" style="gap:8px;">
+            <input type="checkbox" class="input-compact"> Low stock
+          </label>
+          <p class="text-muted" style="margin-top:8px;">
+            These show on Inventory pages; the dashboard shows broader alerts.
+          </p>
+        </div>
+      </div>
+
+      <div class="hstack" style="justify-content:flex-start; margin-top:var(--sp-5);">
+        <button class="btn btn-primary">Save settings</button>
+        <a href="{% url 'inventory:inventory_dashboard' %}" class="btn btn-muted">Back to dashboard</a>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

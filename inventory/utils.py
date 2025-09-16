@@ -3,7 +3,8 @@ from __future__ import annotations
 
 import math
 from datetime import datetime
-from typing import Optional, Tuple, Iterable, Any, Callable
+from functools import wraps
+from typing import Optional, Callable
 
 from django.core.exceptions import PermissionDenied
 from django.db.models import Q, QuerySet
@@ -24,8 +25,7 @@ def user_in_group(user, group_name: str) -> bool:
     """
     if not getattr(user, "is_authenticated", False):
         return False
-    return bool(getattr(user, "is_superuser", False) or
-                user.groups.filter(name=group_name).exists())
+    return bool(getattr(user, "is_superuser", False) or user.groups.filter(name=group_name).exists())
 
 
 def require_groups(*group_names: str) -> Callable:
@@ -36,6 +36,7 @@ def require_groups(*group_names: str) -> Callable:
         def my_view(request): ...
     """
     def deco(view_func: Callable):
+        @wraps(view_func)
         def _wrapped(request: HttpRequest, *args, **kwargs):
             if not any(user_in_group(request.user, g) for g in group_names):
                 raise PermissionDenied("You do not have access to this resource.")
@@ -117,41 +118,68 @@ def _parse_date(value: str):
 def apply_inventory_filters(request: HttpRequest, qs: QuerySet) -> QuerySet:
     """
     Apply common GET-based filters to an InventoryItem queryset.
-    Supports: status, location, product, date_from, date_to, q (text search).
-    """
-    status = request.GET.get("status")
-    if status:
-        qs = qs.filter(status=status)
 
-    loc = request.GET.get("location")
+    Supported params:
+      - status: "in"/"in_stock" -> exclude SOLD, "sold" -> only SOLD, "all" -> no status filter,
+                otherwise matched verbatim (uppercased)
+      - location: numeric id or location name (matches current_location)
+      - product: numeric product_id or text (matches product code/name/brand/model/variant)
+      - date_from / date_to: filter by received_at date
+      - q: text search across IMEI, product name/brand/model/code, and current location name
+    """
+    # ---- status
+    status = (request.GET.get("status") or "").strip().lower()
+    if status:
+        if status in ("in", "in_stock"):
+            qs = qs.exclude(status="SOLD")
+        elif status == "sold":
+            qs = qs.filter(status="SOLD")
+        elif status == "all":
+            pass
+        else:
+            qs = qs.filter(status=status.upper())
+
+    # ---- location
+    loc = (request.GET.get("location") or "").strip()
     if loc:
         try:
-            qs = qs.filter(location_id=int(loc))
+            qs = qs.filter(current_location_id=int(loc))
         except ValueError:
-            qs = qs.filter(location__name__iexact=loc)
+            qs = qs.filter(current_location__name__iexact=loc)
 
-    prod = request.GET.get("product")
+    # ---- product
+    prod = (request.GET.get("product") or "").strip()
     if prod:
         try:
             qs = qs.filter(product_id=int(prod))
         except ValueError:
-            qs = qs.filter(product__code__iexact=prod) | qs.filter(product__name__icontains=prod)
+            qs = qs.filter(
+                Q(product__code__iexact=prod)
+                | Q(product__name__icontains=prod)
+                | Q(product__brand__icontains=prod)
+                | Q(product__model__icontains=prod)
+                | Q(product__variant__icontains=prod)
+            )
 
-    df = request.GET.get("date_from")
+    # ---- date range (by received_at date)
+    df = (request.GET.get("date_from") or "").strip()
     if df:
-        qs = qs.filter(created_at__date__gte=_parse_date(df))
+        qs = qs.filter(received_at__date__gte=_parse_date(df))
 
-    dt = request.GET.get("date_to")
+    dt = (request.GET.get("date_to") or "").strip()
     if dt:
-        qs = qs.filter(created_at__date__lte=_parse_date(dt))
+        qs = qs.filter(received_at__date__lte=_parse_date(dt))
 
-    q = request.GET.get("q")
+    # ---- text search
+    q = (request.GET.get("q") or "").strip()
     if q:
         qs = qs.filter(
-            Q(serial_or_imei__icontains=q) |
-            Q(product__name__icontains=q) |
-            Q(product__code__icontains=q) |
-            Q(location__name__icontains=q)
+            Q(imei__icontains=q)
+            | Q(product__name__icontains=q)
+            | Q(product__brand__icontains=q)
+            | Q(product__model__icontains=q)
+            | Q(product__code__icontains=q)
+            | Q(current_location__name__icontains=q)
         )
 
     return qs
@@ -178,9 +206,15 @@ def user_home_location(user):
 
 __all__ = [
     # roles / access
-    "ADMIN", "AGENT", "AUDITOR", "user_in_group", "require_groups", "forbid_auditor_on_write",
+    "ADMIN",
+    "AGENT",
+    "AUDITOR",
+    "user_in_group",
+    "require_groups",
+    "forbid_auditor_on_write",
     # geo
-    "haversine_m", "nearest_location",
+    "haversine_m",
+    "nearest_location",
     # filters
     "apply_inventory_filters",
     # users

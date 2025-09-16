@@ -1,0 +1,18 @@
+{% load static %}
+<nav class="cc-tabbar">
+  <a href="{% url 'inventory:inventory_dashboard' %}" class="tab {% if request.resolver_match.url_name in 'inventory_dashboard dashboard' %}active{% endif %}">
+    <i class="bi bi-speedometer2"></i><span>Home</span>
+  </a>
+  <a href="{% url 'inventory:stock_list' %}" class="tab {% if request.resolver_match.url_name in 'stock_list' %}active{% endif %}">
+    <i class="bi bi-box-seam"></i><span>Stock</span>
+  </a>
+  <a href="{% url 'wallet:agent_wallet' %}" class="tab {% if request.resolver_match.namespace == 'wallet' %}active{% endif %}">
+    <i class="bi bi-wallet2"></i><span>Wallet</span>
+  </a>
+  <a href="{% url 'reports:home' %}" class="tab {% if request.resolver_match.namespace == 'reports' %}active{% endif %}">
+    <i class="bi bi-graph-up"></i><span>Reports</span>
+  </a>
+  <a href="{% url 'accounts:settings' %}" class="tab {% if request.resolver_match.namespace == 'accounts' %}active{% endif %}">
+    <i class="bi bi-person"></i><span>Me</span>
+  </a>
+</nav>

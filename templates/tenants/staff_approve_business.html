@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Approve Business{% endblock %}
+{% block header_title %}Staff Approval · {{ business.name }}{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'tenants/tenants.css' %}">
+{% endblock %}
+
+{% block content %}
+<section class="tenants-wrap tenants-narrow">
+  <div class="gcard" data-anim>
+    <div class="grow">
+      <div class="gcol">
+        <div class="gtitle">{{ business.name }}</div>
+        <div class="gsub">Status: <b>{{ business.status }}</b> · Created {{ business.created_at|date:"M j, Y H:i" }}</div>
+        {% if business.created_by %}
+          <div class="gsub">Creator: {{ business.created_by.get_full_name|default:business.created_by.username }}</div>
+        {% endif %}
+      </div>
+      <span class="badge">ID #{{ business.id }}</span>
+    </div>
+
+    <hr style="border:none;border-top:1px solid var(--border,#294a84);margin:14px 0">
+
+    <div class="gtitle" style="margin-bottom:6px">Memberships</div>
+    <div class="glist">
+      {% for m in members %}
+        <div class="grow" data-anim>
+          <div class="gcol">
+            <div class="gtitle">{{ m.user.get_full_name|default:m.user.username }}</div>
+            <div class="gsub">{{ m.role }} · {{ m.status }}</div>
+          </div>
+        </div>
+      {% empty %}
+        <div class="gsub">No memberships yet.</div>
+      {% endfor %}
+    </div>
+
+    <div class="gactions" style="margin-top:16px">
+      <form method="post" style="display:flex;gap:.6rem">
+        {% csrf_token %}
+        <button name="action" value="approve" class="gbtn primary" data-anim="pop">Approve</button>
+        <button name="action" value="reject" class="gbtn danger" data-anim="pop">Reject</button>
+      </form>
+    </div>
+  </div>
+</section>
+{% endblock %}
+
+{% block extra_js %}
+<script src="{% static 'tenants/tenants.js' %}"></script>
+{% endblock %}

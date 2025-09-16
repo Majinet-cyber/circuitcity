@@ -1,0 +1,62 @@
+{% extends "base.html" %}
+{% load static humanize %}
+
+{% block title %}Agents{% endblock %}
+{% block header_title %}Agent Requests & Members{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'tenants/tenants.css' %}">
+{% endblock %}
+
+{% block content %}
+<section class="tenants-wrap" style="grid-template-columns:1fr 1fr">
+  <div class="gcard" data-anim>
+    <div class="gtitle">Pending Requests</div>
+    <div class="gsub">Approve or reject new agent access for this business.</div>
+    {% if pending %}
+      <div class="glist" style="margin-top:10px">
+        {% for m in pending %}
+          <form method="post" class="grow" data-anim>
+            {% csrf_token %}
+            <input type="hidden" name="membership_id" value="{{ m.id }}">
+            <div class="gcol">
+              <div class="gtitle">{{ m.user.get_full_name|default:m.user.username }}</div>
+              <div class="gsub">Requested {{ m.created_at|naturaltime }}</div>
+            </div>
+            <div class="gactions" style="margin:0">
+              <button name="action" value="approve" class="gbtn small primary">Approve</button>
+              <button name="action" value="reject" class="gbtn small danger">Reject</button>
+            </div>
+          </form>
+        {% endfor %}
+      </div>
+    {% else %}
+      <div class="gsub" style="margin-top:10px">No pending requests.</div>
+    {% endif %}
+  </div>
+
+  <div class="gcard" data-anim>
+    <div class="gtitle">Active Agents</div>
+    <div class="gsub">Members currently approved in this business.</div>
+    {% if active %}
+      <div class="glist" style="margin-top:10px">
+        {% for m in active %}
+          <div class="grow" data-anim>
+            <div class="gcol">
+              <div class="gtitle">{{ m.user.get_full_name|default:m.user.username }}</div>
+              <div class="gsub">Active since {{ m.created_at|date:"M j, Y" }}</div>
+            </div>
+            <span class="badge">AGENT</span>
+          </div>
+        {% endfor %}
+      </div>
+    {% else %}
+      <div class="gsub" style="margin-top:10px">No active agents yet.</div>
+    {% endif %}
+  </div>
+</section>
+{% endblock %}
+
+{% block extra_js %}
+<script src="{% static 'tenants/tenants.js' %}"></script>
+{% endblock %}

@@ -1,0 +1,123 @@
+{% extends "base.html" %}
+{% block title %}Simulator · Circuit City{% endblock %}
+{% block header_title %}Simulator{% endblock %}
+
+{% block content %}
+<div class="glass-card p-3 mb-3">
+  <h5 class="fw-bold m-0">Scenarios</h5>
+  <p class="text-muted mb-2">Create and run simulations for demand, price and stock policies.</p>
+  <a class="btn primary" href="{% url 'simulator:new' %}"><i class="bi bi-magic"></i> New Simulation</a>
+</div>
+
+<div class="panel p-3">
+  {% if scenarios %}
+    <table class="table table-sm align-middle">
+      <thead><tr>
+        <th>Name</th><th>Params</th><th>Created</th><th class="text-end">Actions</th>
+      </tr></thead>
+      <tbody>
+      {% for s in scenarios %}
+        <tr>
+          <td class="fw-bold">{{ s.name }}</td>
+          <td class="text-muted">
+            Growth {{ s.demand_growth_pct }}%, Price {{ s.price_change_pct }}%, Lead {{ s.lead_time_days }}d,
+            RP {{ s.reorder_point }}, Stock {{ s.initial_stock }}, Horizon {{ s.horizon_days }}d
+          </td>
+          <td class="text-muted">{{ s.created_at|date:"M d, Y H:i" }}</td>
+          <td class="text-end">
+            <button class="btn btn-sm btn-light run-btn" data-id="{{ s.id }}">Run</button>
+          </td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  {% else %}
+    <div class="text-muted">No scenarios yet. Click <b>New Simulation</b> to create one.</div>
+  {% endif %}
+</div>
+
+<div class="panel p-3 mt-3">
+  <h6 class="fw-bold">Recent Runs</h6>
+  <div id="runsBox" class="small text-muted">Loading…</div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+<script>
+async function postJSON(url, payload){
+  const r = await fetch(url, {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json', 'X-CSRFToken': CC.getCsrfToken(), 'Accept':'application/json'},
+    credentials:'same-origin',
+    body: JSON.stringify(payload||{})
+  });
+  const d = await r.json();
+  if(!r.ok) throw new Error(d.error||('HTTP '+r.status));
+  return d;
+}
+async function getJSON(url){
+  const r = await fetch(url, {headers:{Accept:'application/json'}, credentials:'same-origin'});
+  return r.json();
+}
+
+document.querySelectorAll('.run-btn').forEach(btn=>{
+  btn.addEventListener('click', async ()=>{
+    btn.disabled = true;
+    try{
+      const payload = { scenario_id: btn.dataset.id }; // server will load params from DB
+      // Quick fetch of scenario to get the fields (optional; or extend API to accept id only)
+      // Here we’ll do a simple run with only id (views_api handles it by not reading scenario fields).
+      const res = await postJSON("{% url 'simulator:api_run' %}", payload);
+      renderResult(res);
+    }catch(e){ alert("Run failed: "+e.message); }
+    finally{ btn.disabled=false; }
+  });
+});
+
+async function loadRuns(){
+  try{
+    const items = await getJSON("{% url 'simulator:api_runs' %}");
+    const box = document.getElementById('runsBox');
+    if(!Array.isArray(items) || !items.length){ box.textContent = 'No recent runs.'; return; }
+    box.innerHTML = items.map(it => `
+      <div class="d-flex justify-content-between">
+        <div><b>${it.scenario}</b> — revenue: <code>${(it.kpis?.revenue_total??0).toLocaleString()}</code>, stockout days: <code>${it.kpis?.stockouts_days??0}</code></div>
+        <div class="text-muted">${new Date(it.created_at).toLocaleString()}</div>
+      </div>`).join('');
+  }catch{ /* ignore */ }
+}
+loadRuns();
+
+let chart=null;
+function renderResult(data){
+  const series = data.series||[];
+  if(!series.length){ alert('No series returned'); return; }
+  const labels = series.map(p=> 'D'+p.day);
+  const sold = series.map(p=> p.sold);
+  const stock = series.map(p=> p.stock);
+
+  let canvas = document.getElementById('simChart');
+  if(!canvas){
+    const panel = document.createElement('div');
+    panel.className = 'panel p-3 mt-3';
+    panel.innerHTML = `
+      <h6 class="fw-bold">Result</h6>
+      <canvas id="simChart" style="height:260px"></canvas>
+      <div class="small text-muted mt-2">Revenue total: <b>${data.kpis?.revenue_total?.toLocaleString?.()||data.kpis?.revenue_total||0}</b> • Stockout days: <b>${data.kpis?.stockouts_days||0}</b></div>`;
+    document.querySelector('main .cc-page, .cc-page').appendChild(panel);
+    canvas = document.getElementById('simChart');
+  }
+  chart?.destroy();
+  chart = new Chart(canvas.getContext('2d'), {
+    type:'line',
+    data:{ labels, datasets:[
+      {label:'Sold (units)', data:sold},
+      {label:'Stock (units)', data:stock}
+    ]},
+    options:{ responsive:true, maintainAspectRatio:false, plugins:{legend:{position:'bottom'}} }
+  });
+}
+</script>
+{% endblock %}

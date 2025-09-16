@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>{% block title %}Circuit City{% endblock %}</title>
+  <style>
+    /* Light, friendly defaults (works even if global tokens are missing) */
+    :root{
+      --bg:#f6f8fc; --card:#ffffff; --line:#e5e9f2; --text:#0b2545;
+      --brand:#2563eb; --brand-2:#1e40af; --ok:#16c784; --warn:#f59e0b; --danger:#ef4444;
+      --muted:#6b7280; --radius:16px;
+    }
+    @media (prefers-color-scheme: dark){
+      :root{ --bg:#0b1527; --card:#0f1f3a; --line:#1c3763; --text:#e6eefc; --muted:#a4b7d4; --brand:#3b82f6; --brand-2:#1d4ed8 }
+    }
+    *{box-sizing:border-box}
+    body{margin:0;background:var(--bg);color:var(--text);font:16px/1.45 system-ui,-apple-system,Segoe UI,Roboto,Inter,Arial}
+    a{color:inherit}
+    .wrap{max-width:960px;margin:0 auto;padding:16px}
+    header.app{
+      position:sticky;top:0;z-index:10;background:var(--bg);
+      border-bottom:1px solid var(--line);padding:12px 16px
+    }
+    .brand{display:flex;gap:.6rem;align-items:center;font-weight:900}
+    .brand .logo{width:28px;height:28px;border-radius:8px;background:var(--brand)}
+    .title{font-size:1.1rem}
+    .card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:16px}
+    .muted{color:var(--muted)}
+    .btn{display:inline-flex;align-items:center;justify-content:center;gap:.45rem;
+      padding:.8rem 1rem;border-radius:12px;border:1px solid var(--line);text-decoration:none;font-weight:700}
+    .btn.primary{background:linear-gradient(180deg,var(--brand),var(--brand-2));color:#fff;border-color:transparent}
+    .btn.success{background:linear-gradient(180deg,#22c55e,#16a34a);color:#052e2b;border-color:transparent}
+    .btn.ghost{background:transparent}
+    .grid{display:grid;gap:12px}
+    .row{display:flex;gap:12px;flex-wrap:wrap}
+    .kpi{display:grid;grid-template-columns:1fr auto;gap:.25rem;padding:.8rem 1rem;border:1px solid var(--line);border-radius:12px;background:rgba(0,0,0,0.02)}
+    .kpi .label{font-weight:800;color:var(--muted)}
+    .kpi .val{font-weight:900}
+    .pill{display:inline-block;padding:.2rem .55rem;border-radius:999px;border:1px solid var(--line);font-weight:800}
+    .bar{height:10px;background:rgba(0,0,0,.08);border-radius:999px;overflow:hidden}
+    .bar > i{display:block;height:100%;background:var(--ok);width:0%}
+    .section{margin:16px 0 8px;font-weight:900}
+    .footer-space{height:80px} /* keeps content above sticky bar */
+    .sticky-pay{
+      position:sticky;bottom:0;background:var(--card);border-top:1px solid var(--line);
+      padding:10px 14px;display:flex;gap:10px;align-items:center;justify-content:space-between
+    }
+    @media (min-width:640px){ .sticky-pay{border:1px solid var(--line);border-bottom-left-radius:var(--radius);border-bottom-right-radius:var(--radius)} }
+    {% block extra_css %}{% endblock %}
+  </style>
+</head>
+<body>
+  <header class="app">
+    <div class="brand">
+      <div class="logo"></div>
+      <div class="title">{% block header_title %}Circuit City{% endblock %}</div>
+    </div>
+  </header>
+  <main class="wrap">
+    {% block content %}{% endblock %}
+  </main>
+</body>
+</html>

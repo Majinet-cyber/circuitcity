@@ -1,0 +1,91 @@
+{% extends "base.html" %}
+{% load humanize %}
+{% block title %}Dashboard · Circuit City{% endblock %}
+{% block content %}
+
+{% include "_messages.html" %}
+
+<div class="container py-3">
+  <div class="d-flex align-items-center mb-3">
+    <h1 class="h4 mb-0">Dashboard</h1>
+    <span class="ms-3 text-muted small">Updated {{ now|naturaltime }}</span>
+  </div>
+
+  <!-- KPIs -->
+  <div class="row g-3">
+    <div class="col-12 col-sm-6 col-lg-3">
+      <div class="card shadow-sm h-100">
+        <div class="card-body">
+          <div class="d-flex align-items-center justify-content-between">
+            <div>
+              <div class="text-muted small">Sales Today</div>
+              <div class="fs-4 fw-semibold">{{ sales_today|floatformat:0|intcomma }} MWK</div>
+            </div>
+            <i class="bi bi-cash-coin fs-3"></i>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-12 col-sm-6 col-lg-3">
+      <div class="card shadow-sm h-100">
+        <div class="card-body">
+          <div class="d-flex align-items-center justify-content-between">
+            <div>
+              <div class="text-muted small">Stock Items</div>
+              <div class="fs-4 fw-semibold">{{ stock_items|intcomma }}</div>
+              <div class="text-muted small">Qty: {{ stock_quantity|intcomma }}</div>
+            </div>
+            <i class="bi bi-box-seam fs-3"></i>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-12 col-sm-6 col-lg-3">
+      <div class="card shadow-sm h-100">
+        <div class="card-body">
+          <div class="d-flex align-items-center justify-content-between">
+            <div>
+              <div class="text-muted small">Commission (Today)</div>
+              <div class="fs-4 fw-semibold">{{ commission_today|floatformat:0|intcomma }} MWK</div>
+            </div>
+            <i class="bi bi-percent fs-3"></i>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-12 col-sm-6 col-lg-3">
+      <div class="card shadow-sm h-100">
+        <div class="card-body">
+          <div class="d-flex align-items-center justify-content-between">
+            <div>
+              <div class="text-muted small">Commission (Month)</div>
+              <div class="fs-4 fw-semibold">{{ commission_month|floatformat:0|intcomma }} MWK</div>
+            </div>
+            <i class="bi bi-calendar2-week fs-3"></i>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Quick actions -->
+  <div class="mt-4">
+    <div class="card">
+      <div class="card-body d-flex flex-wrap gap-2">
+        <a class="btn btn-primary" href="{% url 'inventory:stock_list' %}">
+          <i class="bi bi-collection me-1"></i> View Stock
+        </a>
+        <a class="btn btn-outline-primary" href="{% url 'onboarding:add_product' %}">
+          <i class="bi bi-plus-lg me-1"></i> Add Product
+        </a>
+        <a class="btn btn-outline-secondary" href="{% url 'onboarding:create_business' %}">
+          <i class="bi bi-building-add me-1"></i> New Business
+        </a>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

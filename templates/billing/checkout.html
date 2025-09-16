@@ -1,0 +1,245 @@
+{# templates/billing/checkout.html #}
+{% load static %}
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Checkout · Subscriptions</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <style>
+    :root{
+      --bg: #0b1220;
+      --card-bg: rgba(255,255,255,.08);
+      --card-stroke: rgba(255,255,255,.16);
+      --muted: rgba(255,255,255,.65);
+      --text: #fff;
+      --accent: #60a5fa;
+      --focus: #93c5fd;
+    }
+    *{box-sizing:border-box}
+    html,body{height:100%}
+    body{
+      margin:0;background:
+        radial-gradient(1200px 800px at 0% -10%, #1b2a4a 0%, transparent 60%),
+        radial-gradient(1000px 700px at 100% 110%, #143a52 0%, transparent 60%),
+        var(--bg);
+      color:var(--text);font:400 14px/1.45 Inter,system-ui,Segoe UI,Roboto,Arial,sans-serif;
+    }
+    .wrap{max-width:1100px;margin:40px auto;padding:16px}
+    .grid{display:grid;grid-template-columns:1.1fr .9fr;gap:20px}
+    @media (max-width:900px){.grid{grid-template-columns:1fr}}
+    .glass{
+      background:var(--card-bg);
+      border:1px solid var(--card-stroke);
+      border-radius:18px;
+      backdrop-filter: blur(14px);
+      box-shadow: 0 10px 40px rgba(0,0,0,.25), inset 0 1px 0 rgba(255,255,255,.08);
+    }
+    .panel{padding:18px}
+    h1{margin:0 0 6px;font-weight:700;letter-spacing:.2px}
+    .subline{color:var(--muted);margin-bottom:16px}
+    .tabs{display:flex;gap:8px;margin:8px 0 14px}
+    .tab{
+      cursor:pointer;padding:10px 12px;border-radius:12px;border:1px solid var(--card-stroke);
+      background:rgba(255,255,255,.06);color:var(--muted);font-weight:600;
+    }
+    .tab.active{background:rgba(96,165,250,.16);color:#e5f0ff;border-color:rgba(96,165,250,.35)}
+    .tab .ico{opacity:.9;margin-right:8px}
+    .section{display:none}
+    .section.active{display:block}
+
+    /* Inputs */
+    .field{margin:10px 0 12px}
+    .label{display:block;margin:0 0 6px;color:var(--muted);font-size:12px}
+    .control{
+      display:flex;align-items:center;gap:8px;
+      padding:12px 14px;border-radius:14px;
+      background:rgba(255,255,255,.06);border:1px solid var(--card-stroke);
+      color:#e8eefc;
+    }
+    .control input{
+      width:100%;background:transparent;border:0;outline:0;color:#fff;
+      font:500 14px/1.2 Inter,system-ui;
+    }
+    .control:focus-within{border-color:var(--focus);box-shadow:0 0 0 3px rgba(147,197,253,.18)}
+    .hint{font-size:12px;color:var(--muted)}
+    .grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+    .btn{
+      appearance:none;border:0;cursor:pointer;
+      border-radius:14px;padding:12px 14px;font-weight:700;
+      background:linear-gradient(180deg,#60a5fa,#3b82f6);
+      color:#041221;box-shadow:0 8px 24px rgba(59,130,246,.35);
+    }
+    .btn:disabled{opacity:.6;cursor:not-allowed}
+    .row{display:flex;gap:10px;align-items:center;justify-content:space-between;margin-top:10px}
+    .mini{font-size:12px;color:var(--muted)}
+    .badge{padding:6px 10px;border-radius:9999px;background:rgba(96,165,250,.2);border:1px solid rgba(96,165,250,.4)}
+    .divider{height:1px;background:linear-gradient(90deg,transparent,rgba(255,255,255,.18),transparent);margin:14px 0}
+
+    /* Invoice preview */
+    .invoice{padding:16px}
+    .invoice h3{margin:6px 0 8px}
+    .table{width:100%;border-collapse:collapse}
+    .table th,.table td{padding:8px;border-bottom:1px solid rgba(255,255,255,.12)}
+    .actions{display:flex;gap:10px;margin-top:10px}
+    .ghost{background:rgba(255,255,255,.06);color:#eaf2ff;border:1px solid var(--card-stroke)}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="row">
+      <div>
+        <h1>Complete your subscription</h1>
+        <div class="subline">Choose a payment method to activate your plan.</div>
+      </div>
+      <div class="mini">{% load billing_tags %}{% subscription_badge %}</div>
+    </div>
+
+    <div class="grid">
+      <!-- LEFT: Checkout -->
+      <div class="glass panel">
+        <div class="tabs" role="tablist">
+          <button class="tab active" data-tab="airtel" aria-selected="true">
+            <span class="ico">📱</span> Airtel Money
+          </button>
+          <button class="tab" data-tab="standard">
+            <span class="ico">🏦</span> Standard Bank
+          </button>
+          <button class="tab" data-tab="card">
+            <span class="ico">💳</span> Card (VISA/Mastercard)
+          </button>
+        </div>
+        <div class="divider"></div>
+
+        <!-- Airtel -->
+        <section id="airtel" class="section active" aria-labelledby="Airtel Money">
+          <form method="post" action="{% url 'billing:checkout' %}" autocomplete="off" novalidate>
+            {% csrf_token %}
+            <input type="hidden" name="provider" value="airtel">
+            <div class="field">
+              <label class="label">Wallet Number (MSISDN)</label>
+              <div class="control"><span>🇲🇼</span><input name="wallet_msisdn" placeholder="e.g. 0991 12 34 56"></div>
+              <div class="hint">We’ll send a push prompt to this Airtel wallet to confirm payment.</div>
+            </div>
+            <button class="btn" type="submit">Pay with Airtel Money</button>
+          </form>
+        </section>
+
+        <!-- Standard Bank -->
+        <section id="standard" class="section" aria-labelledby="Standard Bank">
+          <form method="post" action="{% url 'billing:checkout' %}" autocomplete="off" novalidate>
+            {% csrf_token %}
+            <input type="hidden" name="provider" value="standard_bank">
+            <div class="field">
+              <label class="label">Bank Reference</label>
+              <div class="control"><span>🔖</span><input name="bank_ref" placeholder="Enter your transfer reference"></div>
+              <div class="hint">We’ll match your EFT to this reference and activate automatically.</div>
+            </div>
+            <button class="btn" type="submit">I’ve paid by EFT</button>
+          </form>
+        </section>
+
+        <!-- Card -->
+        <section id="card" class="section" aria-labelledby="Card">
+          <form method="post" action="{% url 'billing:checkout' %}" autocomplete="off" novalidate id="cardForm">
+            {% csrf_token %}
+            <input type="hidden" name="provider" value="card">
+            <div class="field">
+              <label class="label">Card number</label>
+              <div class="control">
+                <span>💳</span>
+                <input name="card_number" id="cardNumber" inputmode="numeric" autocomplete="cc-number" placeholder="4242 4242 4242 4242" maxlength="19">
+              </div>
+            </div>
+            <div class="grid2">
+              <div class="field">
+                <label class="label">Expiry (MM/YY)</label>
+                <div class="control"><span>📅</span><input name="card_exp" id="cardExp" inputmode="numeric" autocomplete="cc-exp" placeholder="MM/YY" maxlength="5"></div>
+              </div>
+              <div class="field">
+                <label class="label">CVV</label>
+                <div class="control"><span>🔒</span><input name="card_cvv" id="cardCvv" inputmode="numeric" autocomplete="cc-csc" placeholder="123" maxlength="4"></div>
+              </div>
+            </div>
+            <div class="hint">Your card details are transmitted securely. We never store CVV.</div>
+            <button class="btn" type="submit">Pay with Card</button>
+          </form>
+        </section>
+
+        <div class="row">
+          <div class="mini">By continuing you agree to our terms.</div>
+          <span class="badge">Plan: {{ plan.name }} — {{ plan.currency }} {{ plan.amount }} / {{ plan.get_interval_display }}</span>
+        </div>
+      </div>
+
+      <!-- RIGHT: Invoice preview -->
+      <div class="glass panel">
+        <div class="row">
+          <h3 style="margin:6px 0">Invoice Preview</h3>
+          {% if invoice %}
+            <a class="btn ghost" href="{% url 'billing:invoice_send' invoice.id %}" title="Email & WhatsApp">Send</a>
+            <a class="btn ghost" href="{% url 'billing:invoice_download' invoice.id %}" title="Download PDF">Download</a>
+          {% endif %}
+        </div>
+        <div class="divider"></div>
+        <div class="invoice">
+          {% if invoice %}
+            <div class="mini">Invoice #{{ invoice.number }} · {{ invoice.currency }} {{ invoice.total }}</div>
+            <table class="table">
+              <thead><tr><th align="left">Description</th><th align="right">Qty</th><th align="right">Unit</th><th align="right">Amount</th></tr></thead>
+              <tbody>
+                {% for it in invoice.items.all %}
+                <tr>
+                  <td>{{ it.description }}</td>
+                  <td align="right">{{ it.qty }}</td>
+                  <td align="right">{{ it.unit }}</td>
+                  <td align="right">{{ invoice.currency }} {{ it.line_total }}</td>
+                </tr>
+                {% endfor %}
+              </tbody>
+              <tfoot>
+                <tr><td></td><td></td><td align="right"><strong>Subtotal</strong></td><td align="right">{{ invoice.currency }} {{ invoice.subtotal }}</td></tr>
+                <tr><td></td><td></td><td align="right"><strong>Tax</strong></td><td align="right">{{ invoice.currency }} {{ invoice.tax_amount }}</td></tr>
+                <tr><td></td><td></td><td align="right"><strong>Total</strong></td><td align="right">{{ invoice.currency }} {{ invoice.total }}</td></tr>
+              </tfoot>
+            </table>
+          {% else %}
+            <p class="mini">No invoice yet. It will appear here when created.</p>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Tabs
+    const tabs = document.querySelectorAll(".tab");
+    const sections = document.querySelectorAll(".section");
+    tabs.forEach(t => t.addEventListener("click", () => {
+      tabs.forEach(x => x.classList.remove("active"));
+      sections.forEach(s => s.classList.remove("active"));
+      t.classList.add("active");
+      const id = t.dataset.tab;
+      document.getElementById(id)?.classList.add("active");
+    }));
+
+    // Light formatting for card inputs
+    const cc = document.getElementById("cardNumber");
+    if (cc) {
+      cc.addEventListener("input", e => {
+        let v = e.target.value.replace(/\D/g,"").slice(0,16);
+        v = v.replace(/(\d{4})(?=\d)/g, "$1 ");
+        e.target.value = v;
+      });
+    }
+    const exp = document.getElementById("cardExp");
+    if (exp) {
+      exp.addEventListener("input", e => {
+        let v = e.target.value.replace(/\D/g,"").slice(0,4);
+        if (v.length >= 3) v = v.slice(0,2) + "/" + v.slice(2);
+        e.target.value = v;
+      });
+    }
+  </script>
+</body>
+</html>

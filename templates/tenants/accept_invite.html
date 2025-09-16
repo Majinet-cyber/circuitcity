@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container py-5" style="max-width:520px;">
+<h3>Join {{ invite.business.name }}</h3>
+<p class="text-muted">Create your password to finish setup.</p>
+<form method="post">
+{% csrf_token %}
+{{ form.as_p }}
+<button class="btn btn-primary w-100">Create account</button>
+</form>
+</div>
+{% endblock %}

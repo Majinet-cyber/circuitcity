@@ -1,0 +1,158 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Choose a business{% endblock %}
+
+{% block content %}
+<div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+  <div class="flex items-center justify-between mb-6">
+    <h1 class="text-2xl font-semibold">Choose a business</h1>
+    <div class="flex gap-2">
+      <a href="{% url 'tenants:create_business' %}" class="inline-flex items-center rounded-xl px-4 py-2 text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 shadow">
+        Create business
+      </a>
+      <a href="{% url 'tenants:join_as_agent' %}" class="inline-flex items-center rounded-xl px-4 py-2 text-sm font-medium text-indigo-700 bg-indigo-50 hover:bg-indigo-100">
+        Join as agent
+      </a>
+    </div>
+  </div>
+
+  {# Messages #}
+  {% if messages %}
+  <div class="space-y-2 mb-6">
+    {% for message in messages %}
+      <div class="rounded-xl px-4 py-3 text-sm
+                  {% if message.tags == 'error' %}bg-red-50 text-red-700 border border-red-200
+                  {% elif message.tags == 'warning' %}bg-yellow-50 text-yellow-800 border border-yellow-200
+                  {% elif message.tags == 'success' %}bg-green-50 text-green-700 border border-green-200
+                  {% else %}bg-slate-50 text-slate-700 border border-slate-200{% endif %}">
+        {{ message }}
+      </div>
+    {% endfor %}
+  </div>
+  {% endif %}
+
+  {# Resolve a unified list "rows" of { business, role, status } #}
+  {% with rows=None %}
+    {% if memberships %}
+      {% comment %} Build from memberships {% endcomment %}
+      {% regroup memberships by business as grouped %}
+      {% firstof 0 0 %} {# noop to keep template engine happy #}
+    {% endif %}
+  {% endwith %}
+
+  {% if memberships %}
+    <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-5">
+      {% for m in memberships %}
+        {% with b=m.business %}
+        <div class="rounded-2xl border border-slate-200 bg-white shadow-sm p-5 flex flex-col">
+          <div class="flex items-start justify-between gap-3">
+            <div>
+              <div class="text-base font-semibold">{{ b.name }}</div>
+              <div class="text-xs text-slate-500">
+                {% if b.slug %}/t/{{ b.slug }}/{% else %}—{% endif %}
+              </div>
+            </div>
+            <div class="flex items-center gap-2">
+              <span class="inline-flex items-center rounded-full px-2 py-0.5 text-xs
+                {% if m.status == 'ACTIVE' %}bg-emerald-50 text-emerald-700 border border-emerald-200
+                {% elif m.status == 'PENDING' %}bg-amber-50 text-amber-700 border border-amber-200
+                {% elif m.status == 'REJECTED' %}bg-rose-50 text-rose-700 border border-rose-200
+                {% else %}bg-slate-50 text-slate-600 border border-slate-200{% endif %}">
+                {{ m.role|title }} • {{ m.status|title }}
+              </span>
+            </div>
+          </div>
+
+          <div class="mt-4 text-sm text-slate-600 line-clamp-3">
+            {% if b.description %}{{ b.description }}{% else %}<span class="italic text-slate-400">No description</span>{% endif %}
+          </div>
+
+          <div class="mt-5 flex items-center justify-between gap-3">
+            <a href="{% if b.slug %}/t/{{ b.slug }}/{% else %}/{% endif %}" class="text-sm text-slate-600 hover:text-slate-900">
+              Open
+            </a>
+            {% if m.status == 'ACTIVE' %}
+              <a href="{% url 'tenants:set_active' b.id %}"
+                 class="inline-flex items-center rounded-xl px-3 py-2 text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 shadow">
+                Switch
+              </a>
+            {% else %}
+              <button class="inline-flex items-center rounded-xl px-3 py-2 text-sm font-medium text-slate-400 bg-slate-100 cursor-not-allowed" disabled>
+                Switch
+              </button>
+            {% endif %}
+          </div>
+        </div>
+        {% endwith %}
+      {% endfor %}
+    </div>
+
+    {% if not memberships %}
+      <p class="text-slate-600">You don't belong to any business yet.</p>
+    {% endif %}
+  {% elif businesses %}
+    {# Fallback when the view passes a plain `businesses` list (e.g., superuser browse) #}
+    <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-5">
+      {% for b in businesses %}
+        <div class="rounded-2xl border border-slate-200 bg-white shadow-sm p-5 flex flex-col">
+          <div class="flex items-start justify-between gap-3">
+            <div>
+              <div class="text-base font-semibold">{{ b.name }}</div>
+              <div class="text-xs text-slate-500">
+                {% if b.slug %}/t/{{ b.slug }}/{% else %}—{% endif %}
+              </div>
+            </div>
+            <span class="inline-flex items-center rounded-full px-2 py-0.5 text-xs bg-emerald-50 text-emerald-700 border border-emerald-200">
+              Active
+            </span>
+          </div>
+
+          <div class="mt-4 text-sm text-slate-600 line-clamp-3">
+            {% if b.description %}{{ b.description }}{% else %}<span class="italic text-slate-400">No description</span>{% endif %}
+          </div>
+
+          <div class="mt-5 flex items-center justify-between gap-3">
+            <a href="{% if b.slug %}/t/{{ b.slug }}/{% else %}/{% endif %}" class="text-sm text-slate-600 hover:text-slate-900">
+              Open
+            </a>
+            <a href="{% url 'tenants:set_active' b.id %}"
+               class="inline-flex items-center rounded-xl px-3 py-2 text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 shadow">
+              Switch
+            </a>
+          </div>
+        </div>
+      {% endfor %}
+    </div>
+
+    {% if not businesses %}
+      <p class="text-slate-600">No businesses found.</p>
+    {% endif %}
+  {% else %}
+    {# Absolute empty-state #}
+    <div class="rounded-2xl border border-dashed border-slate-300 bg-white p-8 text-center">
+      <h2 class="text-lg font-medium mb-2">No businesses yet</h2>
+      <p class="text-slate-600 mb-4">Create a business or request to join an existing one.</p>
+      <div class="flex items-center justify-center gap-3">
+        <a href="{% url 'tenants:create_business' %}" class="inline-flex items-center rounded-xl px-4 py-2 text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 shadow">Create business</a>
+        <a href="{% url 'tenants:join_as_agent' %}" class="inline-flex items-center rounded-xl px-4 py-2 text-sm font-medium text-indigo-700 bg-indigo-50 hover:bg-indigo-100">Join as agent</a>
+      </div>
+    </div>
+  {% endif %}
+
+  {# Optional: POST fallback (if you prefer posting business_id instead of GET switch links) #}
+  <form method="post" action="{% url 'tenants:choose_business' %}" class="hidden">
+    {% csrf_token %}
+    <input type="hidden" name="business_id" id="js-business-id">
+  </form>
+</div>
+
+{# Little helper if you decide to convert 'Switch' to POST without changing views #}
+<script>
+  function postSwitch(id) {
+    const f = document.getElementById('js-business-id').form;
+    document.getElementById('js-business-id').value = id;
+    f.submit();
+  }
+</script>
+{% endblock %}

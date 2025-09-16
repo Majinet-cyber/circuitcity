@@ -22,6 +22,7 @@
     label{display:block;font-size:14px;margin:12px 0 6px}
     input[type="text"],input[type="password"]{width:100%;padding:10px 12px;border:1px solid #cbd5e1;border-radius:10px;font-size:14px}
     .err{background:#fef2f2;border:1px solid #fecaca;color:#991b1b;padding:.6rem .8rem;border-radius:10px;margin:0 0 12px}
+    .help{font-size:13px;color:#7f1d1d;margin:.4rem 0 0}
     .pw-field{position:relative}
     .pw-toggle{position:absolute;right:.55rem;top:50%;transform:translateY(-50%);background:transparent;border:0;color:#64748b;cursor:pointer;width:1.75rem;height:1.75rem}
     /* pretty submit */
@@ -42,6 +43,10 @@
     .loader-ring{width:66px;height:66px;border-radius:50%;border:4px solid rgba(96,165,250,.25);border-top-color:var(--blue-1);animation:spin 1s linear infinite;box-shadow:0 0 0 4px rgba(37,99,235,.06) inset}
     @keyframes spin{to{transform:rotate(360deg)}}
     a{color:#2563eb;text-decoration:none}
+    .cta{margin-top:18px;padding-top:16px;border-top:1px dashed var(--cc-line)}
+    .cta .btn{display:inline-block;border:1px solid #cbd5e1;border-radius:12px;padding:.65rem 1rem;font-weight:700}
+    .btn-outline{background:#fff}
+    .cta small{display:block;color:var(--cc-muted);margin-top:6px}
   </style>
 </head>
 <body>
@@ -56,24 +61,27 @@
       {% if messages %}
         {% for m in messages %}<div class="err" role="alert" aria-live="assertive">{{ m }}</div>{% endfor %}
       {% endif %}
-      {% if form and form.errors %}
+      {% if form and form.non_field_errors %}
+        <div class="err" role="alert" aria-live="assertive">
+          {% for e in form.non_field_errors %}{{ e }}{% if not forloop.last %}<br>{% endif %}{% endfor %}
+        </div>
+      {% elif form and form.errors %}
         <div class="err" role="alert" aria-live="assertive">Invalid details. Please try again.</div>
       {% endif %}
 
-      <form method="post" action="" novalidate>
+      <!-- IdentifierLoginForm fields: identifier + password -->
+      <form method="post" action="{% url 'accounts:login' %}" novalidate>
         {% csrf_token %}
         <!-- Fallback CSRF (patched by JS if needed) -->
         <input type="hidden" id="csrfFallback" name="csrfmiddlewaretoken" value="" />
-        <input type="hidden" name="next" value="{{ next }}"/>
+        <input type="hidden" name="next" value="{{ next|default:'' }}"/>
 
-        <label for="id_identifier">Email or Username</label>
-        <input id="id_identifier" name="identifier" type="text" required autofocus
-               autocomplete="username"
-               value="{% if form %}{{ form.identifier.value|default_if_none:'' }}{% endif %}"/>
+        <label for="{{ form.identifier.id_for_label }}">Email or Username</label>
+        {{ form.identifier }}
 
-        <label for="id_password">Password</label>
+        <label for="{{ form.password.id_for_label }}">Password</label>
         <div class="pw-field">
-          <input id="id_password" name="password" type="password" required autocomplete="current-password"/>
+          {{ form.password }}
           <button class="pw-toggle" type="button" aria-label="Show password" data-state="hidden">👁</button>
         </div>
 
@@ -83,6 +91,14 @@
       <p class="muted" style="margin-top:12px">
         <a href="/accounts/password/forgot/">Forgot your password?</a>
       </p>
+
+      <!-- Sign up CTA -->
+      <div class="cta" aria-label="Create account">
+        <p class="muted" style="margin:0 0 10px">New here?</p>
+        <a class="btn btn-outline" href="{% url 'accounts:signup_manager' %}">Create a Manager account</a>
+        <small>Managers create the store and can invite agents later.</small>
+        <small>Agents: ask your manager for an invite link.</small>
+      </div>
     </div>
   </div>
 
@@ -94,7 +110,10 @@
 
     // Password toggle
     (function(){
-      var btn = document.querySelector('.pw-toggle'); var input = document.getElementById('id_password');
+      var btn = document.querySelector('.pw-toggle'); var input = document.getElementById('{{ form.password.id_for_label }}');
+      if(!btn) return;
+      // If Django didn't render an id on the password field, fall back to known id.
+      if(!input) input = document.getElementById('id_password');
       if(!btn||!input) return;
       btn.addEventListener('click', function(){
         var show = this.getAttribute('data-state') !== 'visible';
@@ -119,8 +138,6 @@
     })();
 
     // --- CSRF hardening on mobile browsers ---
-    // If the template didn't inject a value (or a privacy mode stripped cookies),
-    // copy token from cookie into the hidden input so POST is always CSRF-valid.
     (function ensureCsrfPresent(){
       function getCookie(name){
         var m = document.cookie.match('(^|;)\\s*' + name + '\\s*=\\s*([^;]+)');
@@ -131,8 +148,6 @@
       var djangoHidden = document.querySelector('input[name="csrfmiddlewaretoken"]');
       var fb = document.getElementById('csrfFallback');
 
-      // If Django already rendered the hidden field with a value, keep it.
-      // Otherwise, use cookie/meta as fallback.
       if (djangoHidden && djangoHidden.value) {
         fb && (fb.disabled = true);
         return;

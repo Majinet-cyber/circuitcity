@@ -1,70 +1,118 @@
-<!-- templates/includes/_sidebar.html -->
-<aside class="cc-sidebar">
+{% load static %}
+
+{# ---------- Safe URL capture (never raises) ---------- #}
+{% url 'inventory:inventory_dashboard' as url_home %}
+{% url 'inventory:stock_list'        as url_stock %}
+{% url 'inventory:scan_in'           as url_scan_in %}
+{% url 'inventory:scan_sold'         as url_scan_sold %}
+
+{% url 'wallet:agent_wallet'         as url_wallet_agent %}
+{% url 'wallet:admin_dashboard'      as url_wallet_admin %}
+{% url 'wallet:wallet'               as url_wallet_root %} {# legacy #}
+
+{% url 'reports:home'                as url_reports %}
+{% url 'sales:list'                  as url_sales %}
+
+{% url 'simulator:home'              as url_simulator %}
+{% url 'simulator:new'               as url_simulator_new %}
+
+{# Layby URLs #}
+{% url 'layby:admin_dashboard'       as url_layby_admin %}
+{% url 'layby:agent_dashboard'       as url_layby_agent %}
+{% url 'layby:agent_create'          as url_layby_create %}
+{% url 'layby:customer_portal'       as url_layby_customer %}
+{% url 'layby:sandbox_form'          as url_layby_sandbox %}
+{% url 'layby:layby_home'            as url_layby_home %}
+
+{# Settings + Admin #}
+{% url 'inventory:settings'          as url_settings_inv %}
+{% url 'settings_root'               as url_settings_root %}
+{% url 'admin:index'                 as url_django_admin %}
+
+<aside class="cc-sidebar" role="navigation" aria-label="Main">
   <div class="brand">
-    <div class="logo"><i class="bi bi-lightning-charge-fill"></i></div>
-    Circuit City
+    <span class="logo">CC</span>
+    <span>{{ APP_NAME|default:"Circuit City" }}</span>
   </div>
 
-  <div class="menu-group">CONTROL CENTER</div>
+  <!-- MAIN -->
+  <div class="menu-group">MAIN</div>
   <ul class="navlist">
-    <li>
-      <a class="navlink hover-lift tap focus-ring" href="{% url 'inventory:inventory_dashboard' %}" aria-label="Dashboard">
-        <i class="bi bi-speedometer2"></i> <span>Dashboard</span>
-      </a>
-    </li>
-    <li>
-      <a class="navlink hover-lift tap focus-ring" href="{% url 'inventory:stock_list' %}" aria-label="Inventory">
-        <i class="bi bi-boxes"></i> <span>Inventory</span>
-      </a>
-    </li>
-    <li>
-      <a class="navlink hover-lift tap focus-ring" href="{% url 'inventory:wallet' %}" aria-label="Wallet">
-        <i class="bi bi-wallet2"></i> <span>Wallet</span>
-      </a>
-    </li>
-    <li>
-      <a class="navlink hover-lift tap focus-ring" href="{% url 'inventory:time_checkin_page' %}" aria-label="Time Check-in">
-        <i class="bi bi-geo-alt"></i> <span>Time Check-in</span>
-      </a>
-    </li>
-    <li>
-      <a class="navlink hover-lift tap focus-ring" href="{% url 'inventory:time_logs' %}" aria-label="Time Logs">
-        <i class="bi bi-clock-history"></i> <span>Time Logs</span>
-      </a>
-    </li>
-    <li>
-      <a class="navlink hover-lift tap focus-ring" href="/feedback/" aria-label="Feedback">
-        <i class="bi bi-chat-dots"></i> <span>Feedback</span>
-      </a>
-    </li>
+    <li><a class="navlink" href="{{ url_home|default:'/inventory/dashboard/' }}"><i class="bi bi-speedometer2"></i> Dashboard</a></li>
+    <li><a class="navlink" href="{{ url_stock|default:'/inventory/list/' }}"><i class="bi bi-box-seam"></i> Stock</a></li>
+    <li><a class="navlink" href="{{ url_scan_in|default:'/inventory/scan-in/' }}"><i class="bi bi-upc-scan"></i> Scan IN</a></li>
+    <li><a class="navlink" href="{{ url_scan_sold|default:'/inventory/scan-sold/' }}"><i class="bi bi-cart-check"></i> Sell</a></li>
   </ul>
 
+  <!-- BUSINESS -->
+  <div class="menu-group">BUSINESS</div>
+  <ul class="navlist">
+    {% if url_sales %}<li><a class="navlink" href="{{ url_sales }}"><i class="bi bi-receipt"></i> Sales</a></li>{% endif %}
+    {# Agent wallet (or generic wallet) #}
+    <li>
+      <a class="navlink" href="{{ url_wallet_agent|default:url_wallet_root|default:'/wallet/' }}">
+        <i class="bi bi-wallet2"></i> Wallet
+      </a>
+    </li>
+    <li><a class="navlink" href="{{ url_reports|default:'/reports/' }}"><i class="bi bi-graph-up-arrow"></i> Reports</a></li>
+  </ul>
+
+  <!-- LAYBY -->
+  <div class="menu-group">LAYBY</div>
+  <ul class="navlist">
+    {% if request.user.is_authenticated %}
+      {% if request.user.is_staff %}
+        <li><a class="navlink" href="{{ url_layby_admin|default:'/layby/admin/' }}"><i class="bi bi-bag-check"></i> Admin Dashboard</a></li>
+        <li><a class="navlink" href="{{ url_layby_sandbox|default:'/layby/sandbox/' }}"><i class="bi bi-flask"></i> Sandbox</a></li>
+      {% else %}
+        <li><a class="navlink" href="{{ url_layby_agent|default:'/layby/agent/' }}"><i class="bi bi-bag-check"></i> My Laybys</a></li>
+        <li><a class="navlink" href="{{ url_layby_create|default:'/layby/agent/new/' }}"><i class="bi bi-plus-square"></i> New Layby</a></li>
+      {% endif %}
+    {% else %}
+      <li><a class="navlink" href="{{ url_layby_customer|default:'/layby/customer/' }}"><i class="bi bi-person-badge"></i> Customer Portal</a></li>
+    {% endif %}
+  </ul>
+
+  {% if FEATURES.SIMULATOR %}
+  <div class="menu-group">SIMULATOR</div>
+  <ul class="navlist">
+    <li><a class="navlink" href="{{ url_simulator|default:'/simulator/' }}"><i class="bi bi-graph-up"></i> Scenarios</a></li>
+    {% if url_simulator_new %}<li><a class="navlink" href="{{ url_simulator_new }}"><i class="bi bi-magic"></i> New Simulation</a></li>{% endif %}
+  </ul>
+  {% endif %}
+
+  <!-- ADMIN -->
   <div class="menu-group">ADMIN</div>
   <ul class="navlist">
     <li>
-      <a class="navlink hover-lift tap focus-ring" href="/wallet/admin/" aria-label="Admin Wallet">
-        <i class="bi bi-person-gear"></i> <span>Admin Wallet</span>
+      <a class="navlink" href="{{ url_settings_inv|default:url_settings_root|default:'/settings/' }}">
+        <i class="bi bi-sliders"></i> Settings
       </a>
     </li>
     <li>
-      <a class="navlink hover-lift tap focus-ring" href="/admin/" aria-label="Django Admin">
-        <i class="bi bi-shield-lock"></i> <span>Django Admin</span>
+      <a class="navlink" href="{{ url_wallet_admin|default:'/wallet/admin/' }}">
+        <i class="bi bi-wallet"></i> Admin Wallet
       </a>
     </li>
-  </ul>
-
-  <div class="menu-group">REPORTS</div>
-  <ul class="navlist">
     <li>
-      <a class="navlink hover-lift tap focus-ring" href="{% url 'reports:home' %}" aria-label="Reports">
-        <i class="bi bi-graph-up-arrow"></i> <span>Reports</span>
+      <a class="navlink" href="{{ url_django_admin|default:'/admin/' }}">
+        <i class="bi bi-shield-lock"></i> Django Admin
       </a>
     </li>
   </ul>
 
   <div class="side-footer">
-    <a class="navlink logout tap focus-ring" href="/accounts/logout/?next=/accounts/login/" aria-label="Logout">
-      <i class="bi bi-box-arrow-right"></i> <span>Logout</span>
-    </a>
+    <small class="opacity-75">
+      Howdy, {{ request.user.get_short_name|default:request.user.username|default:"Guest" }}
+    </small>
+    {% if request.user.is_authenticated %}
+      <a class="btn btn-sm btn-outline-light logout" href="/accounts/logout/" title="Sign out">
+        <i class="bi bi-box-arrow-right"></i>
+      </a>
+    {% else %}
+      <a class="btn btn-sm btn-outline-light" href="/accounts/login/" title="Sign in">
+        <i class="bi bi-box-arrow-in-right"></i>
+      </a>
+    {% endif %}
   </div>
 </aside>

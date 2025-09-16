@@ -1,0 +1,119 @@
+{% extends "base.html" %}
+{% load humanize %}
+{% block title %}Add Payment{% endblock %}
+
+{# Prefer product_name, fall back to item_name #}
+{% with pname=order.product_name|default_if_none:order.item_name %}
+{% block header_title %}Add Payment for {{ order.customer_name }}{% endblock %}
+
+{% block extra_css %}
+<style>
+  .wrap{ max-width:720px; margin:0 auto; padding:10px; }
+  .card{
+    border:1px solid var(--cc-border);
+    background:var(--cc-panel);
+    border-radius:16px;
+    padding:16px;
+    box-shadow: var(--cc-shadow);
+  }
+  .kv{ display:grid; grid-template-columns: 140px 1fr; gap:6px; }
+  .k{ color: var(--cc-muted); font-weight:800; }
+  .v{ font-weight:900; }
+  .muted{ color: var(--cc-muted); }
+  .btn-row{ display:flex; gap:10px; flex-wrap:wrap; align-items:center; }
+  .btn{ border:1px solid var(--cc-border); border-radius:12px; padding:.75rem 1rem; font-weight:900; text-decoration:none; display:inline-flex; align-items:center; gap:8px; }
+  .btn-primary{ background: var(--cc-accent); color: var(--cc-on-accent); border-color: transparent; }
+  .alert{ border:1px solid var(--cc-border); border-radius:12px; padding:.6rem .8rem; margin:10px 0; }
+  .alert.warn{ background: color-mix(in oklab, #ffb300 18%, transparent); }
+  .meter{ margin-top:10px; height:12px; width:100%; background: color-mix(in oklab, var(--cc-panel) 60%, transparent); border:1px solid var(--cc-border); border-radius:999px; overflow:hidden; }
+  .bar{ height:100%; width:0%; background: var(--cc-accent); transition: width .3s ease; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="wrap">
+  <section class="card">
+    <h3 style="margin:0 0 8px; font-weight:900">{{ pname|default:"(Item)" }}</h3>
+
+    <div class="kv" aria-label="Order summary">
+      <div class="k">Customer</div><div class="v">{{ order.customer_name }}</div>
+      <div class="k">Layby Ref</div><div class="v">{{ order.ref|default:order.id }}</div>
+      <div class="k">Total</div><div class="v">{{ order.total_price|floatformat:2|intcomma }}</div>
+      <div class="k">Paid</div><div class="v" id="paid-now">{{ order.amount_paid|floatformat:2|intcomma }}</div>
+      <div class="k">Balance</div><div class="v" id="bal-now"><strong>{{ order.balance|floatformat:2|intcomma }}</strong></div>
+    </div>
+
+    <div class="meter" title="Progress toward full payment">
+      {% with total=order.total_price|default_if_none:0 paid=order.amount_paid|default_if_none:0 %}
+      {% with pct=total|divisibleby:0 %}
+      <div class="bar" id="progress-bar" style="width:{% if total > 0 %}{{ (paid|floatformat:2|floatformat:"0")|default_if_none:"0" }}{% endif %}%"></div>
+      {% endwith %}
+      {% endwith %}
+    </div>
+
+    <div class="btn-row" style="margin:12px 0 18px">
+      <a class="btn" href="{% url 'layby:agent_dashboard' %}">← Back to dashboard</a>
+      <a class="btn btn-primary" href="{% url 'layby:pay_now' order.id %}">💳 Pay Now (QR / Deep Link)</a>
+    </div>
+
+    {% if messages %}
+      {% for m in messages %}
+        <div class="alert {% if 'warning' in m.tags %}warn{% endif %}">{{ m }}</div>
+      {% endfor %}
+    {% endif %}
+
+    <form method="post" novalidate id="payment-form">
+      {% csrf_token %}
+      {{ form.as_p }}
+
+      <div id="overpay-warning" class="alert warn" style="display:none">
+        The amount entered is greater than the current balance. Please confirm before recording.
+      </div>
+
+      <div class="btn-row" style="margin-top:10px">
+        <button class="btn btn-primary" type="submit">Record Payment</button>
+        <a class="btn" href="{% url 'layby:agent_dashboard' %}">Cancel</a>
+      </div>
+    </form>
+  </section>
+</div>
+
+<script>
+  (function(){
+    // Live "new balance" preview + simple overpay warning.
+    const total = parseFloat('{{ order.total_price|default_if_none:0 }}') || 0;
+    const paid  = parseFloat('{{ order.amount_paid|default_if_none:0 }}') || 0;
+    const bal   = parseFloat('{{ order.balance|default_if_none:0 }}') || 0;
+
+    const amtInput = document.querySelector('input[name$="amount"]');
+    const paidNow = document.getElementById('paid-now');
+    const balNow = document.getElementById('bal-now');
+    const warn = document.getElementById('overpay-warning');
+    const bar = document.getElementById('progress-bar');
+
+    function fmt(n){
+      return (Number(n || 0)).toLocaleString(undefined, {minimumFractionDigits:2, maximumFractionDigits:2});
+    }
+    function recalc(){
+      const a = parseFloat(amtInput && amtInput.value ? amtInput.value : '0') || 0;
+      const newPaid = Math.max(0, paid + a);
+      const newBal  = Math.max(0, (total || 0) - newPaid);
+      if(paidNow) paidNow.textContent = fmt(newPaid);
+      if(balNow)  balNow.innerHTML = '<strong>' + fmt(newBal) + '</strong>';
+      if(warn)    warn.style.display = a > bal ? '' : 'none';
+      if(bar){
+        const pct = (total > 0) ? Math.min(100, Math.max(0, (newPaid/total)*100)) : 0;
+        bar.style.width = pct.toFixed(2) + '%';
+      }
+    }
+
+    if (amtInput){
+      amtInput.setAttribute('inputmode','decimal');
+      amtInput.setAttribute('min','0.01');
+      amtInput.addEventListener('input', recalc);
+      recalc();
+    }
+  })();
+</script>
+{% endblock %}
+{% endwith %}

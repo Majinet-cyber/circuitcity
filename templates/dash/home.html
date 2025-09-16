@@ -1,0 +1,142 @@
+{% extends "base.html" %}
+{% load humanize %}
+
+{% block title %}Dashboard · {{ request.business.name|default:"Your business" }}{% endblock %}
+{% block header_title %}Dashboard{% endblock %}
+
+{% block content %}
+<section class="container py-3" style="max-width:1100px">
+
+  {# Active business badge #}
+  <div class="d-flex align-items-center gap-2 mb-3">
+    {% if request.business %}
+      <span class="badge text-bg-light">Active: {{ request.business.name }}</span>
+    {% else %}
+      <a class="badge text-bg-warning text-decoration-none" href="{% url 'tenants:choose_business' %}">
+        No active business · Set up
+      </a>
+    {% endif %}
+    <div class="ms-auto">
+      {% if request.user.is_staff %}
+        <a class="btn btn-sm btn-outline-secondary" href="{% url 'tenants:choose_business' %}">Switch business</a>
+      {% endif %}
+    </div>
+  </div>
+
+  {% if first_run %}
+    <!-- First-run checklist -->
+    <div class="card shadow-sm mb-4">
+      <div class="card-body">
+        <h5 class="mb-2">Welcome to {{ request.business.name }}</h5>
+        <p class="text-muted mb-4">Let’s set up your store. Do these in order:</p>
+        <div class="row g-3">
+          <div class="col-md-4">
+            <a class="btn btn-primary w-100" href="{% url 'inventory:product_new' %}">
+              1) Add your first product
+            </a>
+          </div>
+          <div class="col-md-4">
+            <a class="btn btn-outline-primary w-100" href="{% url 'inventory:stock_in' %}">
+              2) Stock in items
+            </a>
+          </div>
+          <div class="col-md-4">
+            <a class="btn btn-outline-primary w-100" href="{% url 'tenants:manager_review_agents' %}">
+              3) Invite/approve agents
+            </a>
+          </div>
+        </div>
+      </div>
+    </div>
+  {% else %}
+    <!-- KPI tiles -->
+    <div class="row g-3 mb-3">
+      <div class="col-6 col-md-3">
+        <div class="card shadow-sm">
+          <div class="card-body">
+            <div class="text-muted small">Products</div>
+            <div class="fs-4 fw-bold">{{ products_count|intcomma }}</div>
+          </div>
+        </div>
+      </div>
+      <div class="col-6 col-md-3">
+        <div class="card shadow-sm">
+          <div class="card-body">
+            <div class="text-muted small">Items in stock</div>
+            <div class="fs-4 fw-bold">{{ stock_count|intcomma }}</div>
+          </div>
+        </div>
+      </div>
+      <div class="col-6 col-md-3">
+        <div class="card shadow-sm">
+          <div class="card-body">
+            <div class="text-muted small">Warehouses</div>
+            <div class="fs-4 fw-bold">{{ warehouses_count|intcomma }}</div>
+          </div>
+        </div>
+      </div>
+      <div class="col-6 col-md-3">
+        <div class="card shadow-sm">
+          <div class="card-body">
+            <div class="text-muted small">Sales (MTD)</div>
+            <div class="fs-4 fw-bold">{{ sold_mtd_count|intcomma }}</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Quick actions -->
+    <div class="card shadow-sm mb-4">
+      <div class="card-body">
+        <div class="d-flex flex-wrap gap-2">
+          <a class="btn btn-primary" href="{% url 'inventory:stock_in' %}">
+            <i class="bi bi-box-arrow-in-down"></i> Stock In
+          </a>
+          <a class="btn btn-outline-primary" href="{% url 'inventory:inventory_dashboard' %}">
+            <i class="bi bi-columns-gap"></i> Inventory Dashboard
+          </a>
+          <a class="btn btn-outline-primary" href="{% url 'tenants:manager_review_agents' %}">
+            <i class="bi bi-people"></i> Agents
+          </a>
+        </div>
+      </div>
+    </div>
+
+    <!-- Simple KPI card -->
+    <div class="card shadow-sm">
+      <div class="card-body">
+        <div class="d-flex justify-content-between align-items-center mb-2">
+          <h6 class="mb-0">KPIs · {{ kpis.scope }}</h6>
+        </div>
+        <div class="row g-3">
+          <div class="col-6 col-md-3">
+            <div class="p-3 border rounded">
+              <div class="text-muted small">Today</div>
+              <div class="fw-bold">{{ kpis.today.total|default:0|floatformat:0|intcomma }}</div>
+            </div>
+          </div>
+          <div class="col-6 col-md-3">
+            <div class="p-3 border rounded">
+              <div class="text-muted small">MTD</div>
+              <div class="fw-bold">{{ kpis.month.total|default:0|floatformat:0|intcomma }}</div>
+            </div>
+          </div>
+          <div class="col-6 col-md-3">
+            <div class="p-3 border rounded">
+              <div class="text-muted small">Avg Ticket</div>
+              <div class="fw-bold">{{ kpis.month.avg|default:0|floatformat:0 }}</div>
+            </div>
+          </div>
+          <div class="col-6 col-md-3">
+            <div class="p-3 border rounded">
+              <div class="text-muted small">All-time</div>
+              <div class="fw-bold">{{ kpis.all.total|default:0|floatformat:0|intcomma }}</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  {% endif %}
+
+</section>
+{% endblock %}

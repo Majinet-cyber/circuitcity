@@ -1,0 +1,31 @@
+<form method="get" class="d-flex align-items-center gap-2 flex-wrap">
+  {# keep your other filters (search, status, etc.) #}
+
+  <select name="range" id="stock-range" class="form-select" style="max-width: 180px;">
+    <option value="month" {% if preset == 'month' %}selected{% endif %}>This month</option>
+    <option value="7d"    {% if preset == '7d' %}selected{% endif %}>Last 7 days</option>
+    <option value="all"   {% if preset == 'all' %}selected{% endif %}>All time</option>
+    <option value="day"   {% if preset == 'day' %}selected{% endif %}>Select date…</option>
+  </select>
+
+  <input type="date"
+         name="day"
+         id="stock-day"
+         class="form-control"
+         value="{{ day }}"
+         {% if preset != 'day' %}style="display:none"{% endif %}
+         />
+
+  <button class="btn btn-primary">Apply</button>
+  <a href="?" class="btn btn-light">Reset</a>
+</form>
+
+<script>
+  (function(){
+    const sel = document.getElementById('stock-range');
+    const day = document.getElementById('stock-day');
+    const toggle = () => day.style.display = (sel.value === 'day') ? '' : 'none';
+    sel.addEventListener('change', toggle);
+    toggle();
+  })();
+</script>

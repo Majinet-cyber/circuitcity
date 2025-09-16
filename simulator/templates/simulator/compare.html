@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% block title %}Compare Scenarios · Circuit City{% endblock %}
+{% block header_title %}Compare Scenarios{% endblock %}
+{% block extra_js_head %}<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>{% endblock %}
+{% block content %}
+<div class="container-xxl px-0">
+  <div class="card border-0 shadow-sm">
+    <div class="card-body">
+      <canvas id="cmp" style="height: 360px"></canvas>
+    </div>
+  </div>
+</div>
+
+<script>
+const payload = {{ payload|safe }};
+const labels = payload[0]?.results.labels ?? [];
+const datasets = payload.map((p, idx) => ({
+  label: p.scenario_name + " (Net)",
+  data: p.results.series["Net Profit"],
+  borderWidth: 2,
+  tension: 0.25,
+}));
+new Chart(document.getElementById("cmp").getContext("2d"), {
+  type: "line",
+  data: { labels, datasets },
+  options: { maintainAspectRatio: false, interaction: { mode: 'index', intersect: false } }
+});
+</script>
+{% endblock %}

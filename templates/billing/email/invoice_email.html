@@ -1,0 +1,75 @@
+{% load humanize %}
+<!doctype html>
+<html>
+  <body style="margin:0;font-family:system-ui,-apple-system,Segoe UI,Inter,Roboto,Arial,sans-serif;color:#0b1220;background:#f6f8fc">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f6f8fc;padding:24px 0">
+      <tr>
+        <td align="center">
+          <table role="presentation" width="640" cellpadding="0" cellspacing="0" style="background:#ffffff;border-radius:14px;border:1px solid #e5e7eb;overflow:hidden">
+            <tr>
+              <td style="padding:18px 18px 0">
+                <div style="display:flex;align-items:center;gap:10px">
+                  <div style="width:36px;height:36px;border-radius:10px;background:#132036;color:#8fb5ff;display:grid;place-items:center;font-weight:900">CC</div>
+                  <div>
+                    <div style="font-weight:800">Circuit City</div>
+                    <div style="color:#64748b;font-size:13px">{{ invoice.business.name|default:"Your Business" }}</div>
+                  </div>
+                </div>
+                <h2 style="margin:12px 0 0">Invoice {{ invoice.number }}</h2>
+                <div style="color:#64748b;font-size:13px">Issued {{ invoice.issue_date|date:"M j, Y" }}{% if invoice.due_date %} · Due {{ invoice.due_date|date:"M j, Y" }}{% endif %}</div>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:18px">
+                <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse">
+                  <thead>
+                    <tr style="text-align:left;color:#64748b;font-size:13px">
+                      <th style="padding:8px 0">Item</th>
+                      <th style="padding:8px 0;text-align:right">Qty</th>
+                      <th style="padding:8px 0;text-align:right">Unit</th>
+                      <th style="padding:8px 0;text-align:right">Unit Price</th>
+                      <th style="padding:8px 0;text-align:right">Line Total</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {% for it in invoice.items.all %}
+                    <tr>
+                      <td style="padding:6px 0;font-weight:600">{{ it.description }}</td>
+                      <td style="padding:6px 0;text-align:right">{{ it.qty }}</td>
+                      <td style="padding:6px 0;text-align:right">{{ it.unit }}</td>
+                      <td style="padding:6px 0;text-align:right">{{ invoice.currency }} {{ it.unit_price|intcomma }}</td>
+                      <td style="padding:6px 0;text-align:right">{{ invoice.currency }} {{ it.line_total|intcomma }}</td>
+                    </tr>
+                    {% empty %}
+                    <tr><td colspan="5" style="padding:6px 0;color:#94a3b8">No items.</td></tr>
+                    {% endfor %}
+                  </tbody>
+                </table>
+                <hr style="border:0;border-top:1px solid #e5e7eb;margin:12px 0" />
+                <table role="presentation" width="100%">
+                  <tr>
+                    <td></td>
+                    <td style="text-align:right">
+                      <div>Subtotal: <strong>{{ invoice.currency }} {{ invoice.subtotal|intcomma }}</strong></div>
+                      <div>Tax: <strong>{{ invoice.currency }} {{ invoice.tax_amount|intcomma }}</strong></div>
+                      <div style="font-size:18px;margin-top:4px">Total: <strong>{{ invoice.currency }} {{ invoice.total|intcomma }}</strong></div>
+                    </td>
+                  </tr>
+                </table>
+                {% if invoice.notes %}
+                  <div style="margin-top:10px;color:#64748b;white-space:pre-line">{{ invoice.notes }}</div>
+                {% endif %}
+                <p style="margin-top:16px;color:#64748b;font-size:13px">You can also request this invoice via WhatsApp.</p>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:16px 18px;background:#0b1220;color:#e6edf7;font-size:12px">
+                © {{ invoice.issue_date|date:"Y" }} Circuit City — All rights reserved.
+              </td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+    </table>
+  </body>
+</html>

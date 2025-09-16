@@ -1,0 +1,325 @@
+/* ==========================================================================
+   v2-overrides.css — local dev overrides for Circuit City
+   Safe to keep in repo; tweak styles without touching vendor CSS.
+   --------------------------------------------------------------------------
+   Notes:
+   - Designed to be harmless if classes aren’t present.
+   - Light Bootstrap-leaning defaults; works even without Bootstrap loaded.
+   - Keep selectors specific but not too heavy to avoid cascade wars.
+   ========================================================================== */
+
+/* --------------------------------------------------------------------------
+   CSS Variables (theme tokens)
+   -------------------------------------------------------------------------- */
+:root {
+  --cc-dev: 1;
+
+  /* Brand */
+  --cc-brand: #0d6efd;           /* primary */
+  --cc-brand-600: #0b5ed7;
+  --cc-accent: #20c997;          /* teal-ish success accent */
+  --cc-warning: #f59f00;
+  --cc-danger: #e03131;
+
+  /* Grays */
+  --cc-bg: #f7f8fb;
+  --cc-card: #ffffff;
+  --cc-muted: #6c757d;
+  --cc-border: #e5e7eb;
+  --cc-heading: #111827;
+  --cc-text: #1f2937;
+
+  /* Surfaces */
+  --cc-shadow-sm: 0 1px 2px rgb(0 0 0 / 6%);
+  --cc-shadow-md: 0 8px 24px rgb(0 0 0 / 10%);
+
+  /* Radius & spacing */
+  --cc-radius: 14px;
+  --cc-radius-sm: 10px;
+  --cc-gap: 14px;
+
+  /* Charts */
+  --cc-chart-1: #4f46e5;
+  --cc-chart-2: #06b6d4;
+  --cc-chart-3: #22c55e;
+  --cc-chart-4: #f59e0b;
+
+  /* Table */
+  --cc-row-hover: #f3f4f6;
+}
+
+/* Dark mode (opt-in via body.dark or prefers-color-scheme) */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --cc-bg: #0f1115;
+    --cc-card: #171a21;
+    --cc-text: #e5e7eb;
+    --cc-heading: #f8fafc;
+    --cc-border: #242936;
+    --cc-row-hover: #1b1f2a;
+    --cc-shadow-sm: 0 1px 2px rgb(0 0 0 / 40%);
+    --cc-shadow-md: 0 8px 24px rgb(0 0 0 / 50%);
+  }
+}
+body.dark {
+  --cc-bg: #0f1115;
+  --cc-card: #171a21;
+  --cc-text: #e5e7eb;
+  --cc-heading: #f8fafc;
+  --cc-border: #242936;
+  --cc-row-hover: #1b1f2a;
+}
+
+/* --------------------------------------------------------------------------
+   Base layout polish
+   -------------------------------------------------------------------------- */
+html, body {
+  background: var(--cc-bg);
+  color: var(--cc-text);
+}
+
+h1, h2, h3, h4, h5 {
+  color: var(--cc-heading);
+  letter-spacing: -0.01em;
+}
+
+.container, .container-fluid {
+  padding-left: max(12px, 3vw);
+  padding-right: max(12px, 3vw);
+}
+
+/* Reduce overly large gaps on dashboards */
+.section,
+.section-sm {
+  margin-block: calc(var(--cc-gap) * 1.2);
+}
+
+/* Cards */
+.card,
+.cc-card,
+.stat-card {
+  background: var(--cc-card);
+  border: 1px solid var(--cc-border);
+  border-radius: var(--cc-radius);
+  box-shadow: var(--cc-shadow-sm);
+}
+
+.card:hover,
+.cc-card:hover,
+.stat-card:hover {
+  box-shadow: var(--cc-shadow-md);
+  transition: box-shadow .18s ease;
+}
+
+.card-header {
+  background: transparent;
+  border-bottom: 1px solid var(--cc-border);
+  font-weight: 600;
+}
+
+/* KPI chips */
+.kpi,
+.kpi-chip {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 8px 12px;
+  border-radius: 999px;
+  background: var(--cc-row-hover);
+  border: 1px solid var(--cc-border);
+  font-variation-settings: "wght" 580;
+}
+
+/* --------------------------------------------------------------------------
+   Buttons (Bootstrap-like without requiring it)
+   -------------------------------------------------------------------------- */
+.btn, .button, .cc-btn {
+  --_bg: var(--cc-brand);
+  --_bg-hover: var(--cc-brand-600);
+  --_text: #fff;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  font-weight: 600;
+  border-radius: 12px;
+  border: 1px solid transparent;
+  background: var(--_bg);
+  color: var(--_text);
+  text-decoration: none;
+  cursor: pointer;
+}
+.btn:hover, .button:hover, .cc-btn:hover { background: var(--_bg-hover); }
+
+.btn-outline, .btn-outline-primary {
+  --_bg: transparent;
+  --_text: var(--cc-brand);
+  border-color: var(--cc-brand);
+  background: transparent;
+  color: var(--_text);
+}
+.btn-outline:hover, .btn-outline-primary:hover {
+  background: color-mix(in srgb, var(--cc-brand) 10%, transparent);
+}
+
+/* Utility tints */
+.badge-success, .pill-success { background: color-mix(in srgb, var(--cc-accent) 18%, #fff); color: #0f5132; border: 1px solid color-mix(in srgb, var(--cc-accent) 30%, #0000); }
+.badge-warning, .pill-warning { background: color-mix(in srgb, var(--cc-warning) 18%, #fff); color: #7a4d00; border: 1px solid color-mix(in srgb, var(--cc-warning) 30%, #0000); }
+.badge-danger,  .pill-danger  { background: color-mix(in srgb, var(--cc-danger) 18%, #fff);  color: #6b1010; border: 1px solid color-mix(in srgb, var(--cc-danger) 30%, #0000); }
+
+/* --------------------------------------------------------------------------
+   Tables
+   -------------------------------------------------------------------------- */
+.table, table.cc-table {
+  width: 100%;
+  background: var(--cc-card);
+  border: 1px solid var(--cc-border);
+  border-radius: var(--cc-radius);
+  overflow: hidden;
+  border-collapse: separate;
+  border-spacing: 0;
+}
+
+.table thead th, table.cc-table thead th {
+  background: var(--cc-row-hover);
+  color: var(--cc-heading);
+  font-weight: 700;
+  border-bottom: 1px solid var(--cc-border);
+}
+
+.table tbody tr:hover,
+table.cc-table tbody tr:hover {
+  background: var(--cc-row-hover);
+}
+
+.table th, .table td,
+table.cc-table th, table.cc-table td {
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--cc-border);
+  vertical-align: middle;
+  white-space: nowrap;        /* keep numeric columns tidy */
+}
+
+.table td.text-wrap, table.cc-table td.text-wrap { white-space: normal; }
+
+/* Responsive table wrapper */
+.table-responsive {
+  overflow: auto;
+  border: 1px solid var(--cc-border);
+  border-radius: var(--cc-radius);
+}
+
+/* --------------------------------------------------------------------------
+   Forms
+   -------------------------------------------------------------------------- */
+input[type="text"], input[type="number"], input[type="email"], input[type="password"],
+select, textarea, .form-control {
+  background: var(--cc-card);
+  border: 1px solid var(--cc-border);
+  border-radius: 12px;
+  padding: 10px 12px;
+  color: var(--cc-text);
+}
+
+input:focus, select:focus, textarea:focus, .form-control:focus {
+  outline: none;
+  border-color: color-mix(in srgb, var(--cc-brand) 60%, var(--cc-border));
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--cc-brand) 15%, transparent);
+  transition: box-shadow .18s ease, border-color .18s ease;
+}
+
+/* Fix select2 / datepicker overlapping modals if used */
+.select2-container, .flatpickr-calendar, .datepicker {
+  z-index: 2000 !important;
+}
+
+/* --------------------------------------------------------------------------
+   Dashboard-specific helpers (safe if unused)
+   -------------------------------------------------------------------------- */
+.dashboard-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: var(--cc-gap);
+}
+
+.stat-card .stat-value {
+  font-size: clamp(22px, 3.2vw, 32px);
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+.stat-card .stat-label {
+  color: var(--cc-muted);
+  font-weight: 500;
+}
+
+/* Simple progress bar */
+.cc-progress {
+  height: 8px;
+  background: var(--cc-border);
+  border-radius: 999px;
+  overflow: hidden;
+}
+.cc-progress > span {
+  display: block;
+  height: 100%;
+  width: var(--value, 0%);
+  background: var(--cc-brand);
+  border-radius: inherit;
+}
+
+/* --------------------------------------------------------------------------
+   Charts (generic containers)
+   -------------------------------------------------------------------------- */
+.chart-card canvas, .chart, .rechart, .apexchart {
+  width: 100%;
+  height: 280px;
+}
+
+/* --------------------------------------------------------------------------
+   Navbar / Sidebar (if present)
+   -------------------------------------------------------------------------- */
+.navbar, .app-navbar {
+  background: var(--cc-card);
+  border-bottom: 1px solid var(--cc-border);
+  backdrop-filter: saturate(1.2) blur(6px);
+}
+.sidebar, .app-sidebar {
+  background: var(--cc-card);
+  border-right: 1px solid var(--cc-border);
+}
+
+/* --------------------------------------------------------------------------
+   Toasts / Alerts
+   -------------------------------------------------------------------------- */
+.alert {
+  border: 1px solid var(--cc-border);
+  border-radius: 12px;
+  box-shadow: var(--cc-shadow-sm);
+}
+.alert-success { border-color: color-mix(in srgb, var(--cc-accent) 45%, var(--cc-border)); }
+.alert-warning { border-color: color-mix(in srgb, var(--cc-warning) 45%, var(--cc-border)); }
+.alert-danger  { border-color: color-mix(in srgb, var(--cc-danger)  45%, var(--cc-border)); }
+
+/* --------------------------------------------------------------------------
+   Misc utilities
+   -------------------------------------------------------------------------- */
+.text-muted { color: var(--cc-muted) !important; }
+.border     { border: 1px solid var(--cc-border) !important; border-radius: 12px; }
+.shadow-sm  { box-shadow: var(--cc-shadow-sm) !important; }
+.shadow-md  { box-shadow: var(--cc-shadow-md) !important; }
+.rounded    { border-radius: var(--cc-radius) !important; }
+.rounded-sm { border-radius: var(--cc-radius-sm) !important; }
+
+.gap-cc     { gap: var(--cc-gap); }
+.p-cc       { padding: var(--cc-gap); }
+.py-cc      { padding-block: var(--cc-gap); }
+.px-cc      { padding-inline: var(--cc-gap); }
+
+/* --------------------------------------------------------------------------
+   Print (hide chrome, keep table borders)
+   -------------------------------------------------------------------------- */
+@media print {
+  .navbar, .sidebar, .btn, .cc-btn, .no-print { display: none !important; }
+  body { background: #fff; color: #000; }
+  .card, .table, .cc-card { box-shadow: none; border-color: #bbb; }
+}

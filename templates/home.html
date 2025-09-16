@@ -1,8 +1,84 @@
 {% extends "base.html" %}
-{% block body %}
-  <div style="padding:2rem">
-    <h2 class="brand">Welcome, {{ request.user.get_username }}</h2>
-    <p>This is your placeholder home page. We’ll put the dashboards here later.</p>
-    <p><a class="btn" href="{% url 'logout' %}">Log out</a></p>
-  </div>
+{% load static %}
+
+{% block title %}Reports · Circuit City{% endblock %}
+{% block header_title %}Reports{% endblock %}
+{% block notif_scope %}reports{% endblock %}
+
+{% block extra_css %}
+<style>
+  .report-grid{
+    display:grid; gap:16px;
+    grid-template-columns: repeat(12, 1fr);
+  }
+  .report-card{
+    grid-column: span 12;
+    border:1px solid var(--line);
+    background:var(--card);
+    border-radius:12px;
+    box-shadow: var(--shadow-sm);
+    padding:14px;
+    display:flex; flex-direction:column; gap:10px;
+  }
+  .report-card h5{ margin:0; font-weight:900; letter-spacing:.01em; }
+  .report-card p{ margin:0; color:var(--muted); }
+  .report-card .actions{ margin-top:6px; }
+  @media (min-width: 768px){
+    .report-card{ grid-column: span 6; }
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+
+{# --- Resolve URLs (these names can match your reports urls.py) --- #}
+{% url 'reports:sales' as url_sales %}
+{% url 'reports:inventory' as url_inventory %}
+{% url 'simulator:home' as url_simulator %}
+
+<div class="report-grid">
+
+  <!-- Sales Report -->
+  <section class="report-card">
+    <div class="d-flex align-items-center justify-content-between">
+      <h5 class="m-0">Sales</h5>
+    </div>
+    <p>Top movers, revenue, agents, daily trends.</p>
+    <div class="actions">
+      <a class="btn btn-primary" href="{{ url_sales|default:'/reports/sales/' }}">
+        <i class="bi bi-graph-up"></i> Open Sales report
+      </a>
+    </div>
+  </section>
+
+  <!-- Inventory Report -->
+  <section class="report-card">
+    <div class="d-flex align-items-center justify-content-between">
+      <h5 class="m-0">Inventory</h5>
+    </div>
+    <p>Stock ageing, low stock, turnover, valuation.</p>
+    <div class="actions">
+      <a class="btn btn-primary" href="{{ url_inventory|default:'/reports/inventory/' }}">
+        <i class="bi bi-box-seam"></i> Open Inventory report
+      </a>
+    </div>
+  </section>
+
+  {# Admin/Manager-only: Simulations / Scenario Analysis #}
+  {% if IS_MANAGER or request.user.is_staff or request.user.profile.is_manager %}
+  <section class="report-card">
+    <div class="d-flex align-items-center justify-content-between">
+      <h5 class="m-0">Scenario Analysis</h5>
+    </div>
+    <p>Simulations for forecasts, targets, and what-ifs (admin only).</p>
+    <div class="actions">
+      <a class="btn btn-outline-primary" href="{{ url_simulator|default:'/simulator/' }}">
+        <i class="bi bi-cpu"></i> Open Simulations
+      </a>
+    </div>
+  </section>
+  {% endif %}
+
+</div>
+
 {% endblock %}

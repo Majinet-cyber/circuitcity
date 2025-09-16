@@ -1,0 +1,171 @@
+{% extends "base.html" %}
+{% load static %}
+{% block title %}Verify Code{% endblock %}
+{% block header_title %}Enter Verification Code{% endblock %}
+
+{% block extra_css %}
+<style>
+  .auth-wrap{ max-width:520px; margin:0 auto; padding:10px; }
+  .glass-card{
+    border:1px solid var(--cc-border);
+    background:var(--cc-panel);
+    border-radius:16px;
+    padding:16px;
+    box-shadow: var(--cc-shadow);
+  }
+  .msg{ border:1px solid var(--cc-border); border-radius:12px; padding:.6rem .8rem; margin-bottom:10px; }
+  .msg.error{ background: color-mix(in oklab, #ff5252 18%, transparent); }
+  .msg.success{ background: color-mix(in oklab, #00c853 18%, transparent); }
+  .hint{ font-size:.85rem; color: var(--cc-muted); margin-top:6px; }
+  .otp-wrap{ display:flex; gap:10px; justify-content:center; margin:12px 0; }
+  .otp-input{
+    width:56px; height:56px; text-align:center; font-size:1.35rem; font-weight:900;
+    border:1px solid var(--cc-border); border-radius:12px; background:var(--cc-input); color:var(--cc-ink);
+  }
+  .actions{ display:flex; gap:10px; flex-wrap:wrap; justify-content:flex-end; margin-top:10px; }
+  .btn{ border:1px solid var(--cc-border); border-radius:12px; padding:.75rem 1rem; font-weight:900; text-decoration:none; display:inline-flex; align-items:center; gap:8px; }
+  .btn-primary{ background: var(--cc-accent); color: var(--cc-on-accent); border-color:transparent; }
+  .muted{ color: var(--cc-muted); }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="auth-wrap">
+  <section class="glass-card">
+    {# messages framework #}
+    {% if messages %}
+      {% for m in messages %}
+        <div class="msg {% if m.tags %}{{ m.tags }}{% endif %}">{{ m }}</div>
+      {% endfor %}
+    {% endif %}
+
+    {% if error %}<div class="msg error">{{ error }}</div>{% endif %}
+
+    <form method="post" action="{% url 'layby:customer_verify_otp' %}" id="otp-form" novalidate>
+      {% csrf_token %}
+      <input type="hidden" name="phone" value="{{ phone }}"/>
+      <input type="hidden" name="otp" id="otp-hidden" value=""/>
+
+      <p class="muted" style="margin:0 0 6px">We sent a 4-digit code to <strong>{{ phone }}</strong>.</p>
+
+      {# Progressive enhancement: visible 4 boxes via JS; keep a fallback single input #}
+      <div id="otp-enhanced" class="otp-wrap" aria-label="Enter 4-digit verification code"></div>
+
+      <div id="otp-fallback" style="text-align:center">
+        <label class="muted" for="otp-fallback-input">Code</label>
+        <input id="otp-fallback-input" name="otp_fallback" class="form-control" inputmode="numeric"
+               pattern="[0-9]{4}" maxlength="4" placeholder="1234" style="max-width:160px;margin:8px auto 0; text-align:center;">
+      </div>
+
+      {% if otp_dev %}
+        <p class="hint">Dev OTP: <code>{{ otp_dev }}</code></p>
+      {% endif %}
+
+      <div class="actions">
+        <a class="btn" href="{% url 'layby:customer_login' %}">Change number</a>
+        <button class="btn btn-primary" type="submit" id="verify-btn">Verify</button>
+      </div>
+    </form>
+
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:10px; margin-top:10px">
+      <span class="muted">Didn’t get a code?</span>
+      <form method="post" action="{% url 'layby:customer_send_otp' %}" id="resend-form">
+        {% csrf_token %}
+        <input type="hidden" name="phone" value="{{ phone }}"/>
+        <button class="btn" type="submit" id="resend-btn" disabled>Resend (<span id="resend-timer">60</span>s)</button>
+      </form>
+    </div>
+  </section>
+</div>
+
+<script>
+  (function(){
+    // --- OTP boxes (4 inputs) with auto-advance, backspace, and paste ---
+    const enhanced = document.getElementById('otp-enhanced');
+    const fallback = document.getElementById('otp-fallback');
+    const fallbackInput = document.getElementById('otp-fallback-input');
+    const hidden = document.getElementById('otp-hidden');
+    const VERIFY_LEN = 4;
+
+    function createBox(i){
+      const el = document.createElement('input');
+      el.type = 'text';
+      el.inputMode = 'numeric';
+      el.autocomplete = 'one-time-code';
+      el.pattern = '\\\\d*';
+      el.maxLength = 1;
+      el.className = 'otp-input';
+      el.setAttribute('aria-label', 'Digit ' + (i+1));
+      return el;
+    }
+
+    const boxes = [];
+    for(let i=0;i<VERIFY_LEN;i++){
+      const b = createBox(i);
+      boxes.push(b); enhanced.appendChild(b);
+    }
+
+    function value(){ return boxes.map(b => (b.value || '').replace(/\\D/g,'')).join(''); }
+    function syncHidden(){ hidden.value = value(); }
+
+    boxes.forEach((b, idx) => {
+      b.addEventListener('input', (e) => {
+        b.value = (b.value || '').replace(/\\D/g,'').slice(0,1);
+        if (b.value && idx < VERIFY_LEN-1) boxes[idx+1].focus();
+        syncHidden();
+      });
+      b.addEventListener('keydown', (e) => {
+        if (e.key === 'Backspace' && !b.value && idx > 0){
+          boxes[idx-1].focus();
+          boxes[idx-1].value = '';
+          e.preventDefault();
+          syncHidden();
+        }
+        if (e.key === 'ArrowLeft' && idx > 0){ boxes[idx-1].focus(); e.preventDefault(); }
+        if (e.key === 'ArrowRight' && idx < VERIFY_LEN-1){ boxes[idx+1].focus(); e.preventDefault(); }
+      });
+    });
+
+    // Paste handler (e.g., "1234")
+    enhanced.addEventListener('paste', (e) => {
+      const text = (e.clipboardData.getData('text') || '').replace(/\\D/g,'').slice(0, VERIFY_LEN);
+      if (!text) return;
+      e.preventDefault();
+      for (let i=0;i<VERIFY_LEN;i++){ boxes[i].value = text[i] || ''; }
+      boxes[Math.min(text.length, VERIFY_LEN)-1].focus();
+      syncHidden();
+    });
+
+    // If JS loaded, hide fallback and focus first box
+    fallback.style.display = 'none';
+    boxes[0].focus();
+
+    // On submit: if enhanced has value use hidden; else use fallback
+    document.getElementById('otp-form').addEventListener('submit', () => {
+      const v = value();
+      if (v.length === VERIFY_LEN){
+        hidden.value = v;
+      } else {
+        // Use fallback input (if user disabled JS mid-way)
+        hidden.value = (fallbackInput.value || '').replace(/\\D/g,'').slice(0, VERIFY_LEN);
+      }
+    });
+
+    // --- Resend countdown (60s) ---
+    const timerEl = document.getElementById('resend-timer');
+    const resendBtn = document.getElementById('resend-btn');
+    let secs = 60;
+    const tick = () => {
+      timerEl.textContent = secs;
+      if (secs <= 0){
+        resendBtn.disabled = false;
+        resendBtn.textContent = 'Resend';
+        clearInterval(iv);
+      }
+      secs--;
+    };
+    const iv = setInterval(tick, 1000);
+    tick();
+  })();
+</script>
+{% endblock %}

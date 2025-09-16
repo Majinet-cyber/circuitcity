@@ -1,19 +1,30 @@
-﻿# Python
+﻿# Python / venv
 __pycache__/
-*.pyc
-*.pyo
-*.pyd
-.env
+*.py[cod]
+*.egg-info/
 .venv/
 venv/
-env/
+.env
+.env.*
+
 # Django
 db.sqlite3
+*.sqlite3
 media/
 staticfiles/
-# IDE
-.vscode/
-.idea/
-# OS
+static_root/
+*.log
+
+# OS / IDE
 .DS_Store
 Thumbs.db
+.idea/
+.vscode/
+
+# Node
+node_modules/
+/git
+/o
+/start
+/oft Corporation. All rights reserved.
+/e -- to separate paths from revisions, like this*

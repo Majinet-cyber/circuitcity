@@ -1,27 +1,33 @@
 {# templates/accounts/_settings_nav.html #}
-<ul class="nav nav-tabs mb-3">
-  <li class="nav-item">
+<ul class="nav nav-tabs mb-3" role="tablist">
+  <li class="nav-item" role="presentation">
     <a
       class="nav-link {% if request.resolver_match.url_name == 'settings_profile' %}active{% endif %}"
       href="{% url 'accounts:settings_profile' %}"
+      role="tab"
+      aria-current="{% if request.resolver_match.url_name == 'settings_profile' %}page{% endif %}"
     >
       <i class="bi bi-person-circle me-1"></i> Profile
     </a>
   </li>
 
-  <li class="nav-item">
+  <li class="nav-item" role="presentation">
     <a
       class="nav-link {% if request.resolver_match.url_name == 'settings_security' %}active{% endif %}"
       href="{% url 'accounts:settings_security' %}"
+      role="tab"
+      aria-current="{% if request.resolver_match.url_name == 'settings_security' %}page{% endif %}"
     >
       <i class="bi bi-shield-lock me-1"></i> Security
     </a>
   </li>
 
-  <li class="nav-item">
+  <li class="nav-item" role="presentation">
     <a
-      class="nav-link {% if request.resolver_match.url_name|slice:':12' == 'settings_ses' %}active{% endif %}"
+      class="nav-link {% if request.resolver_match.url_name == 'settings_sessions' %}active{% endif %}"
       href="{% url 'accounts:settings_sessions' %}"
+      role="tab"
+      aria-current="{% if request.resolver_match.url_name == 'settings_sessions' %}page{% endif %}"
     >
       <i class="bi bi-phone me-1"></i> Sessions
     </a>

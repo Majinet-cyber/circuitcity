@@ -1,0 +1,213 @@
+{% extends "base.html" %}
+{% load humanize %}
+
+{% block title %}AI CFO{% endblock %}
+
+{% block content %}
+<div class="container mx-auto px-4 py-6">
+  <h1 class="text-2xl font-semibold mb-4">AI CFO</h1>
+
+  <!-- KPI Tiles -->
+  <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+    <div class="bg-white rounded-xl shadow p-4">
+      <div class="text-gray-500">Runway</div>
+      <div id="tile-runway" class="text-3xl font-bold">--</div>
+      <div id="tile-runway-sub" class="text-sm text-gray-500">days</div>
+    </div>
+    <div class="bg-white rounded-xl shadow p-4">
+      <div class="text-gray-500">Opening Balance</div>
+      <div id="tile-opening" class="text-3xl font-bold">--</div>
+      <div class="text-sm text-gray-500">Projected start of period</div>
+    </div>
+    <div class="bg-white rounded-xl shadow p-4">
+      <div class="text-gray-500">Projected Inflows (30d)</div>
+      <div id="tile-inflows" class="text-3xl font-bold">--</div>
+      <div class="text-sm text-gray-500">Safety-adjusted</div>
+    </div>
+    <div class="bg-white rounded-xl shadow p-4">
+      <div class="text-gray-500">Projected Outflows (30d)</div>
+      <div id="tile-outflows" class="text-3xl font-bold">--</div>
+      <div class="text-sm text-gray-500">Including payroll, rent & suppliers</div>
+    </div>
+  </div>
+
+  <!-- Forecast chart + Next obligations -->
+  <div class="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-6">
+    <div class="bg-white rounded-xl shadow p-4 lg:col-span-2">
+      <div class="flex items-center justify-between">
+        <h2 class="text-lg font-semibold">30-day Forecast</h2>
+        <button id="btn-recompute" class="text-sm px-3 py-1 rounded bg-black text-white">Recompute</button>
+      </div>
+      <canvas id="forecastChart" height="120"></canvas>
+    </div>
+    <div class="bg-white rounded-xl shadow p-4">
+      <h2 class="text-lg font-semibold mb-2">Alerts</h2>
+      <ul id="alerts-list" class="space-y-2 text-sm">
+        <li class="text-gray-400">No alerts yet.</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- Recommendations + Payouts queue -->
+  <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+    <div class="bg-white rounded-xl shadow p-4 lg:col-span-2">
+      <h2 class="text-lg font-semibold mb-2">Recommendations</h2>
+      <ul id="recs-list" class="space-y-3 text-sm">
+        <li class="text-gray-400">No recommendations yet.</li>
+      </ul>
+    </div>
+    <div class="bg-white rounded-xl shadow p-4">
+      <div class="flex items-center justify-between">
+        <h2 class="text-lg font-semibold">Payouts</h2>
+        <a href="/admin/cfo/paymentintent/" class="text-sm underline">Admin</a>
+      </div>
+      <ul id="payouts-list" class="space-y-2 text-sm">
+        <li class="text-gray-400">No pending payouts.</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<!-- Chart.js CDN -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<script>
+(async function () {
+  const API = "{{ api_prefix }}";
+  const POLL_MS = {{ poll_ms|default:15000 }};
+  let chart;
+
+  const fmtMoney = (n) => {
+    if (n === null || n === undefined) return "--";
+    try { return Number(n).toLocaleString(); } catch (e) { return n; }
+  };
+
+  async function fetchJSON(url, opts={}) {
+    const r = await fetch(url, {credentials: "same-origin", headers: {"X-Requested-With": "XMLHttpRequest"}, ...opts});
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    return await r.json();
+  }
+
+  async function loadForecast() {
+    const snaps = await fetchJSON(`${API}/cfo/forecast/`);
+    if (!snaps || snaps.length === 0) return;
+
+    const s = snaps[0]; // latest snapshot
+    document.getElementById("tile-runway").textContent = s.projected_runway_days ?? "--";
+    document.getElementById("tile-opening").textContent = fmtMoney(s.opening_balance);
+    document.getElementById("tile-inflows").textContent = fmtMoney(s.projected_inflows);
+    document.getElementById("tile-outflows").textContent = fmtMoney(s.projected_outflows);
+
+    // Build a very simple 30-day projection line (net cumulative)
+    const days = s.horizon_days || 30;
+    const dailyIn = (Number(s.projected_inflows || 0) / days);
+    const dailyOut = (Number(s.projected_outflows || 0) / days);
+    const series = [];
+    let bal = Number(s.opening_balance || 0);
+    for (let i = 0; i <= days; i++) {
+      series.push({x: i, y: bal});
+      bal += (dailyIn - dailyOut);
+    }
+
+    const ctx = document.getElementById("forecastChart").getContext("2d");
+    if (chart) chart.destroy();
+    chart = new Chart(ctx, {
+      type: "line",
+      data: {
+        labels: series.map(p => p.x),
+        datasets: [{
+          label: "Projected Balance",
+          data: series.map(p => p.y),
+          tension: 0.25,
+          borderWidth: 2,
+          pointRadius: 0,
+        }]
+      },
+      options: {
+        responsive: true,
+        plugins: { legend: { display: false } },
+        scales: {
+          x: { title: { display: true, text: "Days" } },
+          y: { title: { display: true, text: "Balance" }, ticks: { callback: (v)=> v.toLocaleString() } }
+        }
+      }
+    });
+  }
+
+  async function loadAlerts() {
+    const items = await fetchJSON(`${API}/cfo/alerts/`);
+    const ul = document.getElementById("alerts-list");
+    ul.innerHTML = "";
+    if (!items.length) {
+      ul.innerHTML = `<li class="text-gray-400">No alerts 🎉</li>`;
+      return;
+    }
+    items.slice(0, 10).forEach(a => {
+      const li = document.createElement("li");
+      li.className = "bg-orange-50 border border-orange-200 rounded p-2";
+      li.innerHTML = `<div class="font-medium">${a.kind.replaceAll("_"," ")}</div>
+                      <div class="text-gray-600">${a.message}</div>
+                      <div class="text-xs text-gray-500">${a.severity} • ${new Date(a.created_at).toLocaleString()}</div>`;
+      ul.appendChild(li);
+    });
+  }
+
+  async function loadRecs() {
+    const items = await fetchJSON(`${API}/cfo/recommendations/`);
+    const ul = document.getElementById("recs-list");
+    ul.innerHTML = "";
+    if (!items.length) {
+      ul.innerHTML = `<li class="text-gray-400">No recommendations yet.</li>`;
+      return;
+    }
+    items.slice(0, 8).forEach(r => {
+      const li = document.createElement("li");
+      li.className = "border rounded p-3";
+      li.innerHTML = `<div class="font-medium">${r.title}</div>
+                      <div class="text-gray-600">${r.body}</div>
+                      <div class="text-xs text-gray-500">confidence: ${(r.confidence ?? 0).toFixed(2)} • ${new Date(r.created_at).toLocaleString()}</div>`;
+      ul.appendChild(li);
+    });
+  }
+
+  async function loadPayouts() {
+    const items = await fetchJSON(`${API}/payouts/`);
+    const ul = document.getElementById("payouts-list");
+    ul.innerHTML = "";
+    if (!items.length) {
+      ul.innerHTML = `<li class="text-gray-400">No pending payouts.</li>`;
+      return;
+    }
+    items.filter(x => x.status !== "PAID").slice(0, 8).forEach(p => {
+      const li = document.createElement("li");
+      li.className = "border rounded p-2";
+      li.innerHTML = `<div class="font-medium">${p.purpose} • ${Number(p.amount).toLocaleString()} ${p.currency}</div>
+                      <div class="text-xs text-gray-500">status: ${p.status} • created: ${new Date(p.created_at).toLocaleString()}</div>`;
+      ul.appendChild(li);
+    });
+  }
+
+  // Recompute forecast on click (calls POST /cfo/forecast/compute)
+  document.getElementById("btn-recompute").addEventListener("click", async () => {
+    try {
+      await fetchJSON(`${API}/cfo/forecast/compute/`, {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({ horizon: 30 })
+      });
+      await refreshAll();
+    } catch (e) {
+      alert("Failed to recompute forecast.");
+      console.error(e);
+    }
+  });
+
+  async function refreshAll() {
+    await Promise.all([loadForecast(), loadAlerts(), loadRecs(), loadPayouts()]);
+  }
+
+  await refreshAll();
+  setInterval(refreshAll, POLL_MS);
+})();
+</script>
+{% endblock %}

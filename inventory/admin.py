@@ -3,21 +3,28 @@ from django.contrib import admin, messages
 from django import forms
 from django.db.models import F, DecimalField, ExpressionWrapper
 from django.contrib.auth import get_user_model
+from django.apps import apps
 
-from .models import (
-    Location,
-    AgentProfile,
-    Product,
-    InventoryItem,
-    InventoryAudit,
-    TimeLog,
-    WalletTxn,
-    WarrantyCheckLog,
-    AgentPasswordReset,
-)
+# ---- Resolve models lazily to avoid import-time errors during migrations ----
+def _m(name):
+    try:
+        return apps.get_model("inventory", name)
+    except Exception:
+        return None
+
+Location = _m("Location")
+AgentProfile = _m("AgentProfile")
+Product = _m("Product")
+InventoryItem = _m("InventoryItem")
+InventoryAudit = _m("InventoryAudit")
+TimeLog = _m("TimeLog")
+WalletTxn = _m("WalletTxn")
+WarrantyCheckLog = _m("WarrantyCheckLog")
+AgentPasswordReset = _m("AgentPasswordReset")
+AuditLog = _m("AuditLog")  # proxy (optional)
+
 
 # ---------- Locations (with GPS) ----------
-@admin.register(Location)
 class LocationAdmin(admin.ModelAdmin):
     list_display = ("name", "city", "latitude", "longitude", "geofence_radius_m")
     list_filter = ("city",)
@@ -34,7 +41,6 @@ class LocationAdmin(admin.ModelAdmin):
 
 
 # ---------- Agent profiles (with joined_on) ----------
-@admin.register(AgentProfile)
 class AgentProfileAdmin(admin.ModelAdmin):
     list_display = ("user", "location", "joined_on")
     list_filter = ("location", "joined_on")
@@ -48,7 +54,6 @@ class AgentProfileAdmin(admin.ModelAdmin):
 
 
 # ---------- Products ----------
-@admin.register(Product)
 class ProductAdmin(admin.ModelAdmin):
     list_display = ("brand", "model", "variant")
     list_filter = ("brand",)
@@ -58,7 +63,6 @@ class ProductAdmin(admin.ModelAdmin):
 
 
 # ---------- Inventory + inline audits ----------
-
 class InventoryAuditInline(admin.TabularInline):
     model = InventoryAudit
     extra = 0
@@ -70,6 +74,7 @@ class InventoryAuditInline(admin.TabularInline):
     verbose_name_plural = "Recent audits"
 
 
+# ModelForm bound after models are available
 class InventoryItemAdminForm(forms.ModelForm):
     """
     Admins may assign/transfer items but are NOT allowed to be the holder.
@@ -111,7 +116,6 @@ class AssignToAgentActionForm(forms.Form):
     )
 
 
-@admin.register(InventoryItem)
 class InventoryItemAdmin(admin.ModelAdmin):
     form = InventoryItemAdminForm  # <- enforce 'admin cannot hold stock'
 
@@ -181,7 +185,8 @@ class InventoryItemAdmin(admin.ModelAdmin):
             audits.append(InventoryAudit(
                 item=item,
                 by_user=request.user,
-                action="TRANSFER",
+                # Use an allowed choice value; include the transfer note in details
+                action="UPDATE",
                 details=f"Assigned/transferred to {getattr(target, 'username', target.pk)} via admin action",
             ))
         if audits:
@@ -205,7 +210,7 @@ class InventoryItemAdmin(admin.ModelAdmin):
             audits.append(InventoryAudit(
                 item=item,
                 by_user=request.user,
-                action="TRANSFER",
+                action="UPDATE",
                 details="Unassigned from agent (returned to warehouse) via admin action",
             ))
         if audits:
@@ -215,7 +220,6 @@ class InventoryItemAdmin(admin.ModelAdmin):
 
 
 # ---------- Audit log ----------
-@admin.register(InventoryAudit)
 class InventoryAuditAdmin(admin.ModelAdmin):
     list_display = ("at", "action", "item", "by_user", "short_details")
     list_filter = ("action", "at")
@@ -234,7 +238,6 @@ class InventoryAuditAdmin(admin.ModelAdmin):
 
 
 # ---------- Time logs (GPS check-ins) ----------
-@admin.register(TimeLog)
 class TimeLogAdmin(admin.ModelAdmin):
     list_display = ("user", "checkin_type", "logged_at", "location",
                     "within_geofence", "distance_m", "accuracy_m")
@@ -270,7 +273,6 @@ class WalletTxnForm(forms.ModelForm):
         )
 
 
-@admin.register(WalletTxn)
 class WalletTxnAdmin(admin.ModelAdmin):
     form = WalletTxnForm
     list_display = ("user", "amount", "reason", "created_at", "memo")
@@ -286,7 +288,6 @@ class WalletTxnAdmin(admin.ModelAdmin):
 
 
 # ---------- Warranty checks ----------
-@admin.register(WarrantyCheckLog)
 class WarrantyCheckLogAdmin(admin.ModelAdmin):
     list_display = ("created_at", "imei", "result", "expires_at", "item", "by_user")
     list_filter = ("result", "created_at")
@@ -300,7 +301,6 @@ class WarrantyCheckLogAdmin(admin.ModelAdmin):
 
 
 # ---------- Agent password reset ----------
-@admin.register(AgentPasswordReset)
 class AgentPasswordResetAdmin(admin.ModelAdmin):
     list_display = ("user", "code", "used", "created_at", "expires_at")
     list_filter = ("used", "created_at")
@@ -311,3 +311,29 @@ class AgentPasswordResetAdmin(admin.ModelAdmin):
     autocomplete_fields = ("user",)
     list_per_page = 50
     show_full_result_count = False
+
+
+# ---------- Register everything (without @admin.register to stay lazy) ----------
+def _safe_register(model, admin_class):
+    if model is None:
+        return
+    try:
+        admin.site.register(model, admin_class)
+    except admin.sites.AlreadyRegistered:
+        pass
+
+_safe_register(Location, LocationAdmin)
+_safe_register(AgentProfile, AgentProfileAdmin)
+_safe_register(Product, ProductAdmin)
+_safe_register(InventoryItem, InventoryItemAdmin)
+_safe_register(InventoryAudit, InventoryAuditAdmin)
+_safe_register(TimeLog, TimeLogAdmin)
+_safe_register(WalletTxn, WalletTxnAdmin)
+_safe_register(WarrantyCheckLog, WarrantyCheckLogAdmin)
+_safe_register(AgentPasswordReset, AgentPasswordResetAdmin)
+
+# Optional: register AuditLog proxy if present
+if AuditLog is not None:
+    class AuditLogAdmin(InventoryAuditAdmin):
+        pass
+    _safe_register(AuditLog, AuditLogAdmin)

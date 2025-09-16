@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+{% block title %}Simulations · Circuit City{% endblock %}
+{% block header_title %}<i class="bi bi-graph-up-arrow me-2"></i>Simulations{% endblock %}
+
+{% block content %}
+<div class="container-xxl px-0">
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <h5 class="mb-0 fw-bold">Your Scenarios</h5>
+    <a href="{% url 'simulator:new' %}" class="btn btn-primary">New Scenario</a>
+  </div>
+
+  {% if scenarios %}
+  <div class="table-responsive">
+    <table class="table align-middle">
+      <thead>
+        <tr>
+          <th>Name</th><th>Baseline Units</th><th>Avg Price</th><th>Var Cost %</th><th>Fixed (MWK)</th><th>Growth %</th><th>Months</th><th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for s in scenarios %}
+        <tr>
+          <td><a href="{% url 'simulator:detail' s.id %}" class="fw-semibold">{{ s.name }}</a></td>
+          <td>{{ s.baseline_monthly_units }}</td>
+          <td>{{ s.avg_unit_price }}</td>
+          <td>{{ s.variable_cost_pct }}%</td>
+          <td>{{ s.monthly_fixed_costs }}</td>
+          <td>{{ s.monthly_growth_pct }}%</td>
+          <td>{{ s.months }}</td>
+          <td><a class="btn btn-sm btn-outline-primary" href="{% url 'simulator:detail' s.id %}">Open</a></td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="alert alert-info">No scenarios yet. Create one to begin.</div>
+  {% endif %}
+</div>
+{% endblock %}

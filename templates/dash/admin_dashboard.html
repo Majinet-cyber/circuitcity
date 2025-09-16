@@ -1,4 +1,4 @@
-{# templates/dash/admin.html #}
+{# templates/dash/admin_dashboard.html #}
 {% extends "base.html" %}
 {% load static %}
 {% block title %}Admin · Circuit City{% endblock %}
@@ -233,6 +233,11 @@
         <span class="mi">✅</span><span class="label">Scan SOLD</span>
       </a>
 
+      <div class="section">Finance</div>
+      <a href="{% url 'dashboard:dashboard_cfo' %}">
+        <span class="mi">💹</span><span class="label">AI-CFO Panel</span>
+      </a>
+
       <div class="section">Admin</div>
       <a href="{% url 'admin:index' %}">
         <span class="mi">⚙️</span><span class="label">Django Admin</span>
@@ -302,6 +307,16 @@
         <span class="muted">Tip: press <span class="kbd">/</span> to focus table search</span>
       </div>
 
+      <!-- ✅ Financial overview (AI-CFO) -->
+      <div class="row" style="padding:1rem; align-items:stretch; gap:1rem;">
+        <div style="flex:3 1 560px; min-width:320px;">
+          {% include "dashboard/partials/cfo_tiles.html" %}
+        </div>
+        <div style="flex:1 1 280px; min-width:280px;">
+          {% include "dashboard/partials/cfo_alerts.html" %}
+        </div>
+      </div>
+
       <!-- Summary tiles -->
       <div class="grid grid-auto" style="padding:1rem; gap: .9rem;">
         <div class="stat">
@@ -347,6 +362,10 @@
           <a class="btn ghost icon" href="{% url 'admin:index' %}">
             <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M3 21h18M12 3l9 9-9 9-9-9 9-9z" stroke="currentColor" stroke-width="2"/></svg>
             Django Admin
+          </a>
+          <a class="btn ghost icon" href="{% url 'dashboard:dashboard_cfo' %}">
+            <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 3c5 0 9 4 9 9s-4 9-9 9-9-4-9-9 4-9 9-9z" stroke="currentColor" stroke-width="2"/></svg>
+            Open AI-CFO
           </a>
         </div>
       </div>

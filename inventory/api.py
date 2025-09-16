@@ -4,9 +4,9 @@ from __future__ import annotations
 
 import json
 import logging
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 from decimal import Decimal, InvalidOperation
-from typing import Any, Callable, Optional
+from typing import Any, Callable, Optional, Tuple
 
 from django.contrib.auth.decorators import login_required
 from django.db import models as djmodels
@@ -230,6 +230,77 @@ def _currency_payload():
     return {"base": base, "display": display, "sign": sign}
 
 
+# ---------- date utils (NEW) ----------
+
+def _parse_date_loose(s: str | None) -> Optional[date]:
+    if not s:
+        return None
+    s = s.strip()
+    for fmt in ("%Y-%m-%d", "%Y/%m/%d", "%d/%m/%Y", "%m/%d/%Y"):
+        try:
+            return datetime.strptime(s, fmt).date()
+        except Exception:
+            continue
+    try:
+        return datetime.fromisoformat(s).date()
+    except Exception:
+        return None
+
+def _extract_range(request: HttpRequest, *, default_period: str = "month") -> Tuple[date, date, dict]:
+    """
+    Determine [start, end_inclusive] from GET:
+      - on=<YYYY-MM-DD> or date=<YYYY-MM-DD>   (single day)
+      - start/end (or from/to, df/dt, date_from/date_to, start_date/end_date)
+      - period=today|7d|month|all  (fallback)
+    Returns (start, end_inclusive, meta_range_dict)
+    """
+    today = timezone.localdate()
+
+    # 1) single day (support both ?on= and ?date=)
+    on = _parse_date_loose(
+        (request.GET.get("on") or request.GET.get("date") or request.GET.get("day"))
+    )
+    if on:
+        return on, on, {"start": on.isoformat(), "end": on.isoformat()}
+
+    # 2) many alias pairs for convenience
+    aliases_start = ["start", "from", "df", "date_from", "start_date"]
+    aliases_end   = ["end", "to", "dt", "date_to", "end_date"]
+    start = None
+    end_incl = None
+    for key in aliases_start:
+        start = _parse_date_loose(request.GET.get(key))
+        if start:
+            break
+    for key in aliases_end:
+        end_incl = _parse_date_loose(request.GET.get(key))
+        if end_incl:
+            break
+
+    if start and not end_incl:
+        end_incl = start
+    if start and end_incl:
+        if end_incl < start:
+            start, end_incl = end_incl, start
+        return start, end_incl, {"start": start.isoformat(), "end": end_incl.isoformat()}
+
+    # 3) fall back to period
+    period = (request.GET.get("period") or default_period).lower()
+    if period in ("today", "day", "date"):  # accept "date" as synonym of a single-day window when no ?date=
+        start = end_incl = today
+    elif period in ("7d", "last7", "last_7", "week"):
+        start = today - timedelta(days=6)
+        end_incl = today
+    elif period in ("all", "alltime"):
+        start = date(2000, 1, 1)
+        end_incl = today
+    else:  # month (default)
+        start = today.replace(day=1)
+        end_incl = today
+
+    return start, end_incl, {"start": start.isoformat(), "end": end_incl.isoformat()}
+
+
 # ---------- SOLD-like logic & day filler ----------
 
 _SOLD_LIKE = (
@@ -243,11 +314,32 @@ _SOLD_LIKE = (
 )
 _IN_STOCK_LIKE = ("IN_STOCK","IN STOCK","AVAILABLE","Available","available","NEW","New","new")
 
-def _fill_days(start: date, end_excl: date, data_map: dict[date, float]) -> tuple[list[str], list[float]]:
+def _fill_days(
+    start: date,
+    end_excl: date,
+    data_map: dict[date, float],
+    *,
+    fmt: str | Callable[[date], str] = "iso",
+) -> tuple[list[str], list[float]]:
+    """
+    Build parallel lists of labels and values for each day in [start, end_excl).
+    fmt:
+      - "iso"    -> YYYY-MM-DD
+      - "pretty" -> Mon DD (e.g., 'Sep 10')
+      - callable -> function(date)->str
+    """
     labels, values = [], []
     day = start
+
+    if fmt == "pretty":
+        render = lambda d: d.strftime("%b %d")
+    elif callable(fmt):
+        render = fmt
+    else:
+        render = lambda d: d.strftime("%Y-%m-%d")
+
     while day < end_excl:
-        labels.append(day.strftime("%Y-%m-%d"))
+        labels.append(render(day))
         values.append(float(data_map.get(day, 0.0)))
         day += timedelta(days=1)
     return labels, values
@@ -255,7 +347,15 @@ def _fill_days(start: date, end_excl: date, data_map: dict[date, float]) -> tupl
 
 # ---------- Fallback from InventoryItem when Sales empty ----------
 
-def _fallback_items_daily(request: HttpRequest, start, end_excl, metric: str, model_id: str | None):
+def _fallback_items_daily(
+    request: HttpRequest,
+    start,
+    end_excl,
+    metric: str,
+    model_id: str | None,
+    *,
+    label_fmt: str | Callable[[date], str] = "iso",
+):
     status_field = _item_status_field()
     date_field   = _best_item_date_field()
     price_field  = _best_item_price_field()
@@ -303,10 +403,10 @@ def _fallback_items_daily(request: HttpRequest, start, end_excl, metric: str, mo
             raw = round(float(raw), 2)
         data_map[r["d"]] = raw
 
-    return _fill_days(start, end_excl, data_map)
+    return _fill_days(start, end_excl, data_map, fmt=label_fmt)
 
 
-# ---------- API: AI predictions (now flags absolute low stock) ----------
+# ---------- API: AI predictions (kept as-is; based on last 14d) ----------
 
 @never_cache
 @login_required
@@ -352,13 +452,13 @@ def predictions_summary(request: HttpRequest):
         daily_model_avg = (model_count_map.get(pid, 0) / float(lookback_days)) if lookback_days else 0.0
         need_next_7 = daily_model_avg * 7.0
 
-        # NEW: if stock is critically low, flag as risky even with zero run-rate
+        # Flag critical low stock even with zero run-rate
         if on_hand <= 2:
             risky.append({
                 "product": f'{r["product__brand"]} {r["product__model"]}',
                 "on_hand": on_hand,
                 "stockout_date": today.isoformat(),
-                "suggested_restock": max(1, 5 - on_hand),  # simple default suggestion
+                "suggested_restock": max(1, 5 - on_hand),
                 "urgent": True,
                 "reason": "critical_low_stock",
             })
@@ -383,27 +483,27 @@ def predictions_summary(request: HttpRequest):
 def api_sales_trend(request: HttpRequest):
     """
     /inventory/api_sales_trend/?period=month|7d|all&metric=amount|count&model=<product_id?>
+    Also supports explicit ranges:
+      - on=YYYY-MM-DD  (alias: date=YYYY-MM-DD)
+      - start/end (or from/to, df/dt, date_from/date_to)
+      - labels=iso|pretty  (default iso)
     """
-    period = (request.GET.get("period") or "month").lower()
     metric = (request.GET.get("metric") or "amount").lower()
     model_id = request.GET.get("model")
+    labels_fmt = (request.GET.get("labels") or "iso").lower()
 
-    today = timezone.localdate()
-    if period == "7d":
-        start = today - timedelta(days=6)
-    elif period == "all":
-        start = date(2000, 1, 1)
-    else:
-        start = today.replace(day=1)
-    end_excl = today + timedelta(days=1)
+    start_incl, end_incl, range_meta = _extract_range(request, default_period="month")
+    end_excl = end_incl + timedelta(days=1)
 
     dfield = _sale_date_field()
     afield = _sale_amount_field()
 
-    qs = date_range_filter(_scoped_sales_qs(request), dfield, start, end_excl)
+    qs = date_range_filter(_scoped_sales_qs(request), dfield, start_incl, end_excl)
     if model_id:
-        try: qs = qs.filter(item__product_id=int(model_id))
-        except Exception: pass
+        try:
+            qs = qs.filter(item__product_id=int(model_id))
+        except Exception:
+            pass
 
     try:
         val_expr = _amount_sum_expression(afield) if metric == "amount" else Count("id")
@@ -419,15 +519,24 @@ def api_sales_trend(request: HttpRequest):
                 raw = round(float(raw), 2)
             data_map[r["d"]] = raw
 
-        labels, values = _fill_days(start, end_excl, data_map)
+        labels, values = _fill_days(start_incl, end_excl, data_map, fmt=labels_fmt)
 
         if sum(values) == 0:
-            flabels, fvalues = _fallback_items_daily(request, start, end_excl,
-                                                     "amount" if metric == "amount" else "count", model_id)
-            if flabels: labels, values = flabels, fvalues
+            flabels, fvalues = _fallback_items_daily(
+                request, start_incl, end_excl,
+                "amount" if metric == "amount" else "count",
+                model_id,
+                label_fmt=labels_fmt,
+            )
+            if flabels:
+                labels, values = flabels, fvalues
 
-        return _ok({"labels": labels, "values": values,
-                    "currency": _currency_payload() if metric == "amount" else None})
+        return _ok({
+            "labels": labels,
+            "values": values,
+            "range": range_meta,
+            "currency": _currency_payload() if metric == "amount" else None
+        })
 
     except Exception as e:
         log.warning("api_sales_trend primary aggregation failed: %s", e)
@@ -436,8 +545,10 @@ def api_sales_trend(request: HttpRequest):
     per_day = {}
     for sale in qs.iterator():
         dval = getattr(sale, dfield)
-        try: dkey = dval.date()
-        except Exception: dkey = dval
+        try:
+            dkey = dval.date()
+        except Exception:
+            dkey = dval
         if metric == "amount" and afield:
             raw = getattr(sale, afield, 0)
             try:
@@ -453,15 +564,24 @@ def api_sales_trend(request: HttpRequest):
     for k, v in per_day.items():
         data_map[k] = _convert_amount(float(v), base, display, rates) if metric == "amount" else float(v)
 
-    labels, values = _fill_days(start, end_excl, data_map)
+    labels, values = _fill_days(start_incl, end_excl, data_map, fmt=labels_fmt)
 
     if sum(values) == 0:
-        flabels, fvalues = _fallback_items_daily(request, start, end_excl,
-                                                 "amount" if metric == "amount" else "count", model_id)
-        if flabels: labels, values = flabels, fvalues
+        flabels, fvalues = _fallback_items_daily(
+            request, start_incl, end_excl,
+            "amount" if metric == "amount" else "count",
+            model_id,
+            label_fmt=labels_fmt,
+        )
+        if flabels:
+            labels, values = flabels, fvalues
 
-    return _ok({"labels": labels, "values": values,
-                "currency": _currency_payload() if metric == "amount" else None})
+    return _ok({
+        "labels": labels,
+        "values": values,
+        "range": range_meta,
+        "currency": _currency_payload() if metric == "amount" else None
+    })
 
 
 # ---------- API: Value Trend (Revenue / Cost / Profit) ----------
@@ -471,28 +591,28 @@ def api_sales_trend(request: HttpRequest):
 def api_value_trend(request: HttpRequest):
     """
     /inventory/api/value_trend/?metric=revenue|cost|profit&period=today|7d|all&model=<product_id?>
+    Also supports:
+      - on=YYYY-MM-DD  (alias: date=YYYY-MM-DD)
+      - start/end (or from/to, df/dt, date_from/date_to)
+      - labels=iso|pretty
     """
     metric = (request.GET.get("metric") or "revenue").lower()
-    period = (request.GET.get("period") or "7d").lower()
     model_id = request.GET.get("model")
+    labels_fmt = (request.GET.get("labels") or "iso").lower()
 
-    today = timezone.localdate()
-    if period == "today":
-        start = today
-    elif period in ("7d", "last7", "last_7", "week"):
-        start = today - timedelta(days=6)
-    else:
-        start = date(2000, 1, 1)
-    end_excl = today + timedelta(days=1)
+    start_incl, end_incl, range_meta = _extract_range(request, default_period="7d")
+    end_excl = end_incl + timedelta(days=1)
 
     dfield = _sale_date_field()
     afield = _sale_amount_field()
     cfield = _sale_cost_field()
 
-    qs = date_range_filter(_scoped_sales_qs(request), dfield, start, end_excl)
+    qs = date_range_filter(_scoped_sales_qs(request), dfield, start_incl, end_excl)
     if model_id:
-        try: qs = qs.filter(item__product_id=int(model_id))
-        except Exception: pass
+        try:
+            qs = qs.filter(item__product_id=int(model_id))
+        except Exception:
+            pass
 
     dec = DecimalField(max_digits=14, decimal_places=2)
     if metric == "revenue":
@@ -515,13 +635,16 @@ def api_value_trend(request: HttpRequest):
         conv_val = _convert_amount(raw_val, base, display, rates)
         data_map[r["d"]] = round(conv_val, 2)
 
-    labels, values = _fill_days(start, end_excl, data_map)
+    labels, values = _fill_days(start_incl, end_excl, data_map, fmt=labels_fmt)
 
     if metric == "revenue" and sum(values) == 0:
-        flabels, fvalues = _fallback_items_daily(request, start, end_excl, "amount", model_id)
-        if flabels: labels, values = flabels, fvalues
+        flabels, fvalues = _fallback_items_daily(
+            request, start_incl, end_excl, "amount", model_id, label_fmt=labels_fmt
+        )
+        if flabels:
+            labels, values = flabels, fvalues
 
-    return _ok({"labels": labels, "values": values, "currency": _currency_payload()})
+    return _ok({"labels": labels, "values": values, "range": range_meta, "currency": _currency_payload()})
 
 
 # ---------- API: Top models (bar chart) ----------
@@ -531,14 +654,16 @@ def api_value_trend(request: HttpRequest):
 def api_top_models(request: HttpRequest):
     """
     /inventory/api_top_models/?period=today|month
+    Also supports explicit ranges:
+      - on=YYYY-MM-DD  (alias: date=YYYY-MM-DD)
+      - start/end (or from/to, df/dt, date_from/date_to)
     """
-    period = (request.GET.get("period") or "today").lower()
-    today = timezone.localdate()
-    start = today.replace(day=1) if period == "month" else today
-    end_excl = today + timedelta(days=1)
+    # Range first; if no explicit range, keep existing behavior for month/today
+    start_incl, end_incl, range_meta = _extract_range(request, default_period="today")
+    end_excl = end_incl + timedelta(days=1)
 
     dfield = _sale_date_field()
-    qs = date_range_filter(_scoped_sales_qs(request), dfield, start, end_excl)
+    qs = date_range_filter(_scoped_sales_qs(request), dfield, start_incl, end_excl)
 
     labels: list[str] = []
     values: list[int] = []
@@ -575,7 +700,7 @@ def api_top_models(request: HttpRequest):
                  | ~Q(**{f"{status_field}__in": _IN_STOCK_LIKE})
             iqs = iqs.filter(cond)
         if _has_field(InventoryItem, date_field):
-            iqs = date_range_filter(iqs, date_field, start, end_excl)
+            iqs = date_range_filter(iqs, date_field, start_incl, end_excl)
 
         try:
             iagg = (iqs.values("product__brand", "product__model")
@@ -595,21 +720,35 @@ def api_top_models(request: HttpRequest):
         except Exception:
             labels = []; values = []
 
-    return _ok({"labels": labels, "values": values})
+    return _ok({"labels": labels, "values": values, "range": range_meta})
 
 
-# ---------- API: Alerts ----------
+# ---------- API: Alerts (window-aware) ----------
 
 @never_cache
 @login_required
 def alerts_feed(request: HttpRequest):
-    today = timezone.localdate()
-    lookback_days = 14
-    start = today - timedelta(days=lookback_days)
+    """
+    Computes low-stock / near-stockout alerts using a lookback window.
+    Accepts:
+      - days=N  (default 14)  OR explicit date range via start/end/on (same as other APIs)
+    """
+    days_param = request.GET.get("days")
+    if days_param:
+        try:
+            lookback_days = max(1, min(90, int(days_param)))
+        except Exception:
+            lookback_days = 14
+        today = timezone.localdate()
+        start_incl = today - timedelta(days=lookback_days)
+        end_incl = today
+        range_meta = {"start": start_incl.isoformat(), "end": end_incl.isoformat()}
+    else:
+        start_incl, end_incl, range_meta = _extract_range(request, default_period="7d")
 
     dfield = _sale_date_field()
-    sales_qs = date_range_filter(_scoped_sales_qs(request), dfield, start, today + timedelta(days=1))
-    stock_qs = _scoped_stock_qs(request)
+    sales_qs = date_range_filter(_scoped_sales_qs(request), dfield, start_incl, end_incl + timedelta(days=1))
+    stock_qs  = _scoped_stock_qs(request)
 
     model_id = request.GET.get("model")
     if model_id:
@@ -619,6 +758,9 @@ def alerts_feed(request: HttpRequest):
             stock_qs = stock_qs.filter(product_id=pid)
         except Exception:
             pass
+
+    # Convert chosen window to daily run-rate
+    lookback_days = max(1, (end_incl - start_incl).days + 1)
 
     stock = stock_qs.values("product_id", "product__brand", "product__model").annotate(on_hand=Count("id"))
     recent = sales_qs.values("item__product_id").annotate(c=Count("id"))
@@ -640,7 +782,7 @@ def alerts_feed(request: HttpRequest):
 
     sev_order = {"high": 0, "warn": 1, "info": 2}
     alerts.sort(key=lambda a: sev_order.get(a.get("severity", "info"), 9))
-    return _ok({"alerts": alerts})
+    return _ok({"alerts": alerts, "range": range_meta})
 
 
 # ---------- Scanner & Time APIs ----------
@@ -872,7 +1014,7 @@ def api_audit_verify(request: HttpRequest):
         payload = {
             "prev": prev,
             "actor": r["actor_id"],
-            "ip": None,  # not fetched in values(); ip/ua aren't necessary to detect tamper if the stored hash used them
+            "ip": None,
             "ua": None,
             "entity": r["entity"],
             "entity_id": r["entity_id"],

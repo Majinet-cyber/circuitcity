@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container py-4">
+<div class="d-flex justify-content-between align-items-center mb-3">
+<h3>Team</h3>
+<a class="btn btn-primary" href="{% url 'tenants:invite_agent' %}"><i class="bi bi-person-plus"></i> Invite agent</a>
+</div>
+
+
+<div class="row g-4">
+<div class="col-md-6">
+<div class="card">
+<div class="card-header">Members</div>
+<ul class="list-group list-group-flush">
+{% for u in users %}
+<li class="list-group-item d-flex justify-content-between align-items-center">
+<div>
+<div class="fw-semibold">{{ u.get_full_name|default:u.username }}</div>
+<div class="text-muted small">{{ u.email }}</div>
+</div>
+<form method="post" action="{% url 'tenants:trigger_password_reset' %}">
+{% csrf_token %}
+<input type="hidden" name="user_id" value="{{ u.id }}" />
+<button class="btn btn-sm btn-outline-secondary">Send reset link</button>
+</form>
+</li>
+{% empty %}
+<li class="list-group-item">No members yet.</li>
+{% endfor %}
+</ul>
+</div>
+</div>
+
+
+<div class="col-md-6">
+<div class="card">
+<div class="card-header">Pending invites</div>
+<ul class="list-group list-group-flush">
+{% for inv in invites %}
+<li class="list-group-item d-flex justify-content-between align-items-center">
+<div>
+<div class="fw-semibold">{{ inv.full_name }} <span class="badge text-bg-info">{{ inv.role }}</span></div>
+<div class="text-muted small">Expires {{ inv.expires_at|date:"Y-m-d H:i" }}</div>
+</div>
+<div class="btn-group">
+<a class="btn btn-sm btn-outline-primary" href="{% url 'tenants:accept_invite' inv.token %}" target="_blank">Open link</a>
+<a class="btn btn-sm btn-outline-danger" href="{% url 'tenants:cancel_invite' inv.token %}">Cancel</a>
+</div>
+</li>
+{% empty %}
+<li class="list-group-item">No pending invites.</li>
+{% endfor %}
+</ul>
+</div>
+</div>
+</div>
+</div>
+{% endblock %}
