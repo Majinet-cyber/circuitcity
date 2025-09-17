@@ -1,0 +1,77 @@
+{% extends "base.html" %}
+{% load humanize %}
+{% block title %}Scenario · {{ scenario.name }}{% endblock %}
+{% block header_title %}<i class="bi bi-boxes me-2"></i>{{ scenario.name }}{% endblock %}
+
+{% block extra_js_head %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+{% endblock %}
+
+{% block content %}
+<div class="container-xxl px-0">
+  <div class="d-flex align-items-center justify-content-between mb-3">
+    <div class="small text-muted">Created {{ scenario.created_at|naturaltime }}</div>
+    <form method="post" action="{% url 'simulator:run' scenario.id %}">
+      {% csrf_token %}
+      <button class="btn btn-success"><i class="bi bi-play-fill me-1"></i>Run Simulation</button>
+    </form>
+  </div>
+
+  <div id="summary" class="row g-3 mb-3"></div>
+  <div class="card border-0 shadow-sm">
+    <div class="card-body">
+      <canvas id="chartRev" style="height: 320px"></canvas>
+    </div>
+  </div>
+</div>
+
+<script>
+async function loadResults() {
+  const res = await fetch("{% url 'simulator:results_api' scenario.id %}");
+  if (!res.ok) return;
+  const payload = await res.json();
+  const data = payload.data;
+
+  // Summary cards
+  const s = data.summary;
+  document.getElementById("summary").innerHTML = `
+    <div class="col-md-3"><div class="card shadow-sm border-0"><div class="card-body">
+      <div class="text-muted small">Total Revenue</div>
+      <div class="fs-5 fw-bold">MWK ${Math.round(s.total_revenue).toLocaleString()}</div>
+    </div></div></div>
+    <div class="col-md-3"><div class="card shadow-sm border-0"><div class="card-body">
+      <div class="text-muted small">Total Net Profit</div>
+      <div class="fs-5 fw-bold">MWK ${Math.round(s.total_net_profit).toLocaleString()}</div>
+    </div></div></div>
+    <div class="col-md-3"><div class="card shadow-sm border-0"><div class="card-body">
+      <div class="text-muted small">Last Month Net</div>
+      <div class="fs-5 fw-bold">MWK ${Math.round(s.last_month_net_profit).toLocaleString()}</div>
+    </div></div></div>
+    <div class="col-md-3"><div class="card shadow-sm border-0"><div class="card-body">
+      <div class="text-muted small">Breakeven Month</div>
+      <div class="fs-5 fw-bold">${s.breakeven_month ?? "—"}</div>
+    </div></div></div>
+  `;
+
+  // Chart
+  const ctx = document.getElementById("chartRev").getContext("2d");
+  new Chart(ctx, {
+    type: "line",
+    data: {
+      labels: data.labels,
+      datasets: [
+        { label: "Revenue", data: data.series["Revenue"], borderWidth: 2, tension: 0.25 },
+        { label: "COGS+Fixed", data: data.series["COGS+Fixed"], borderWidth: 2, tension: 0.25 },
+        { label: "Net Profit", data: data.series["Net Profit"], borderWidth: 2, tension: 0.25 },
+      ]
+    },
+    options: {
+      maintainAspectRatio: false,
+      interaction: { mode: 'index', intersect: false },
+      scales: { y: { ticks: { callback: (v)=>"MWK " + v.toLocaleString() } } }
+    }
+  });
+}
+loadResults();
+</script>
+{% endblock %}

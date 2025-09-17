@@ -1,6 +1,7 @@
 # wallet/views.py
 from __future__ import annotations
 
+import json
 from calendar import monthrange
 from datetime import date
 from decimal import Decimal
@@ -11,11 +12,23 @@ from django.contrib.auth import get_user_model
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.core.mail import send_mail
-from django.db.models import Sum, Q
+from django.db.models import Sum
 from django.http import HttpRequest, JsonResponse, HttpResponseBadRequest
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
+from django.utils.decorators import method_decorator
+from django.views.decorators.csrf import ensure_csrf_cookie
+from django.views.decorators.http import require_GET, require_POST
 from django.views.generic import ListView, TemplateView
+
+# ---- OTP alias: requires OTP when ENABLE_2FA=1; otherwise behaves like login_required
+try:
+    if getattr(settings, "ENABLE_2FA", False):
+        from django_otp.decorators import otp_required  # type: ignore
+    else:
+        raise ImportError
+except Exception:  # pragma: no cover
+    from django.contrib.auth.decorators import login_required as otp_required  # type: ignore
 
 from .models import (
     AdminPurchaseOrder,
@@ -32,6 +45,7 @@ from .models import (
 )
 from .services import add_txn, agent_wallet_summary, ranking
 
+
 # Optional: PO forms come from inventory.forms if available
 try:
     from inventory.forms import PurchaseOrderHeaderForm, PurchaseOrderItemForm
@@ -44,7 +58,15 @@ except Exception:  # pragma: no cover
 # Helpers / guards
 # ---------------------------------------------------------------------
 def _staff(user) -> bool:
-    return user.is_staff or user.groups.filter(name__in=["Admin", "Manager"]).exists()
+    """
+    Manager-like users can access admin views:
+    - Admins: user.is_staff
+    - Managers: user.profile.is_manager
+    """
+    try:
+        return bool(user.is_authenticated and (user.is_staff or user.profile.is_manager))
+    except Exception:
+        return bool(user.is_authenticated and user.is_staff)
 
 
 def _month_bounds(year: int, month: int) -> Tuple[date, date]:
@@ -114,6 +136,85 @@ def _send_payslip_email(p: Payslip) -> bool:
     return bool(sent)
 
 
+def _json_requested(request: HttpRequest) -> bool:
+    """
+    True if the client clearly asked for JSON.
+    """
+    accept = (request.headers.get("Accept") or "").lower()
+    return accept.startswith("application/json") or request.GET.get("format") == "json"
+
+
+# =====================================================================
+# JSON APIs used by the wallet page
+# =====================================================================
+
+@login_required
+@require_GET
+def api_txn_types(request: HttpRequest):
+    """Return available transaction types for the Reason dropdown."""
+    return JsonResponse({
+        "ok": True,
+        "types": [{"value": v, "label": lbl} for v, lbl in TxnType.choices],
+    })
+
+
+@login_required
+@require_GET
+def api_summary(request: HttpRequest):
+    """Return the current user's wallet summary (balance, etc.)."""
+    s = agent_wallet_summary(request.user)
+
+    def ser(val):
+        return float(val) if isinstance(val, Decimal) else val
+
+    if isinstance(s, dict):
+        s = {k: ser(v) for k, v in s.items()}
+
+    return JsonResponse({"ok": True, "summary": s})
+
+
+@login_required
+@require_POST
+def api_add_txn(request: HttpRequest):
+    """
+    Add a transaction to the current user's agent wallet.
+    Accepts JSON or form-encoded data.
+    """
+    if request.content_type and "application/json" in request.content_type.lower():
+        try:
+            data = json.loads(request.body.decode() or "{}")
+        except Exception:
+            data = {}
+    else:
+        data = request.POST
+
+    # Parse fields
+    try:
+        amount = Decimal(str(data.get("amount", "0") or "0"))
+    except Exception:
+        return JsonResponse({"ok": False, "error": "Invalid amount."}, status=400)
+
+    ttype = (data.get("type") or data.get("reason") or "").strip()
+    note = (data.get("note") or data.get("memo") or "").strip()
+
+    if ttype not in TxnType.values:
+        return JsonResponse({"ok": False, "error": "Invalid reason/type."}, status=400)
+
+    # Post to the AGENT ledger
+    add_txn(
+        agent=request.user,
+        amount=amount,
+        type=ttype,
+        note=note,
+        created_by=request.user,
+        ledger=Ledger.AGENT,
+    )
+    return JsonResponse({"ok": True})
+
+
+# ---------------------------------------------------------------------
+# Payslip builder (helper)
+# ---------------------------------------------------------------------
 def _create_or_update_payslip_and_txn(
     *,
     agent,
@@ -221,9 +322,17 @@ def _create_or_update_payslip_and_txn(
 
 
 # ---------------------------------------------------------------------
-# Agent wallet views
+# Agent wallet views (login-only; read/own-wallet)
 # ---------------------------------------------------------------------
+@method_decorator(ensure_csrf_cookie, name="dispatch")
 class AgentWalletView(LoginRequiredMixin, TemplateView):
+    """
+    Agent self wallet page.
+
+    ensure_csrf_cookie -> guarantees a CSRF cookie on first GET so that any
+    subsequent fetch/POST from the page has a token (prevents 403 HTML pages
+    that used to surface as “Unexpected token '<'” in the UI).
+    """
     template_name = "wallet/agent_wallet.html"
 
     def get_context_data(self, **kwargs):
@@ -257,8 +366,9 @@ def api_ranking(request: HttpRequest):
 
 
 # ---------------------------------------------------------------------
-# Admin wallet views
+# Admin wallet views (OTP-required)
 # ---------------------------------------------------------------------
+@method_decorator([otp_required, ensure_csrf_cookie], name="dispatch")
 class AdminWalletHome(LoginRequiredMixin, TemplateView):
     template_name = "wallet/admin_home.html"
 
@@ -278,6 +388,7 @@ class AdminWalletHome(LoginRequiredMixin, TemplateView):
         return ctx
 
 
+@method_decorator([otp_required, ensure_csrf_cookie], name="dispatch")
 class AdminAgentWallet(LoginRequiredMixin, TemplateView):
     template_name = "wallet/admin_agent.html"
 
@@ -301,6 +412,7 @@ class AdminAgentWallet(LoginRequiredMixin, TemplateView):
         return ctx
 
 
+@method_decorator([otp_required, ensure_csrf_cookie], name="dispatch")
 class AdminIssueTxnView(LoginRequiredMixin, TemplateView):
     template_name = "wallet/admin_issue.html"
 
@@ -338,6 +450,7 @@ class AdminIssueTxnView(LoginRequiredMixin, TemplateView):
         return redirect("wallet:admin_agent", agent_id=agent.id)
 
 
+@method_decorator([otp_required, ensure_csrf_cookie], name="dispatch")
 class AdminBudgetsView(LoginRequiredMixin, TemplateView):
     template_name = "wallet/admin_budgets.html"
 
@@ -393,12 +506,13 @@ class AdminBudgetsView(LoginRequiredMixin, TemplateView):
 
 
 # ---------------------------------------------------------------------
-# Payslips (single + bulk + schedules)
+# Payslips (single + bulk + schedules) — OTP-required
 # ---------------------------------------------------------------------
-@login_required
+@otp_required
 def issue_payslip(request, agent_id: int, year: int, month: int):
     """
     Legacy single-agent endpoint. Now delegates to the bulk-capable helper.
+    Returns JSON if explicitly requested.
     """
     if not _staff(request.user):
         return redirect("wallet:agent_wallet")
@@ -406,7 +520,7 @@ def issue_payslip(request, agent_id: int, year: int, month: int):
     U = get_user_model()
     agent = get_object_or_404(U, id=agent_id)
 
-    _create_or_update_payslip_and_txn(
+    p = _create_or_update_payslip_and_txn(
         agent=agent,
         year=year,
         month=month,
@@ -414,9 +528,14 @@ def issue_payslip(request, agent_id: int, year: int, month: int):
         send_now=bool(request.GET.get("send") == "1" or request.POST.get("send_now")),
         payment_method=request.POST.get("method") if request.method == "POST" else None,
     )
+    if _json_requested(request):
+        return JsonResponse(
+            {"ok": True, "agent": agent.id, "reference": p.reference, "net": float(p.net)}
+        )
     return redirect("wallet:admin_agent", agent_id=agent.id)
 
 
+@method_decorator([otp_required, ensure_csrf_cookie], name="dispatch")
 class AdminIssuePayslipView(LoginRequiredMixin, TemplateView):
     """
     Small helper page to issue a SINGLE payslip from a form:
@@ -448,7 +567,7 @@ class AdminIssuePayslipView(LoginRequiredMixin, TemplateView):
         send_now = request.POST.get("send_now") in ("1", "true", "on", "yes")
         method = request.POST.get("method")  # optional
 
-        _create_or_update_payslip_and_txn(
+        p = _create_or_update_payslip_and_txn(
             agent=agent,
             year=year,
             month=month,
@@ -456,9 +575,14 @@ class AdminIssuePayslipView(LoginRequiredMixin, TemplateView):
             send_now=send_now,
             payment_method=method,
         )
+        if _json_requested(request):
+            return JsonResponse(
+                {"ok": True, "agent": agent.id, "reference": p.reference, "net": float(p.net)}
+            )
         return redirect("wallet:admin_agent", agent_id=agent.id)
 
 
+@method_decorator([otp_required, ensure_csrf_cookie], name="dispatch")
 class AdminPayslipBulkView(LoginRequiredMixin, TemplateView):
     """
     GET  -> show a form (template you’ll add) to pick agents + period + send_now flag
@@ -488,6 +612,10 @@ class AdminPayslipBulkView(LoginRequiredMixin, TemplateView):
             agent_ids = [x for x in (y.strip() for y in raw.split(",")) if x]
         else:
             agent_ids = raw
+
+        if not agent_ids and _json_requested(request):
+            return JsonResponse({"ok": False, "error": "No agents selected."}, status=400)
+
         year = int(request.POST.get("year"))
         month = int(request.POST.get("month"))
         send_now = request.POST.get("send_now") in ("1", "true", "on", "yes")
@@ -507,11 +635,12 @@ class AdminPayslipBulkView(LoginRequiredMixin, TemplateView):
             results.append({"agent": a.id, "net": float(p.net), "reference": p.reference, "sent": p.sent_to_email})
 
         # JSON if requested; otherwise go home
-        if request.headers.get("Accept", "").lower().startswith("application/json") or request.GET.get("format") == "json":
+        if _json_requested(request):
             return JsonResponse({"ok": True, "count": len(results), "results": results})
         return redirect("wallet:admin_home")
 
 
+@method_decorator([otp_required, ensure_csrf_cookie], name="dispatch")
 class AdminPayoutSchedulesView(LoginRequiredMixin, TemplateView):
     """
     Minimal view to create/update monthly auto-send schedules.
@@ -548,12 +677,12 @@ class AdminPayoutSchedulesView(LoginRequiredMixin, TemplateView):
         if user_ids:
             sch.users.add(*user_ids)
 
-        if request.headers.get("Accept", "").lower().startswith("application/json"):
+        if _json_requested(request):
             return JsonResponse({"ok": True, "id": sch.id})
         return redirect("wallet:admin_schedules")
 
 
-@login_required
+@otp_required
 def run_payout_schedule(request: HttpRequest, schedule_id: int):
     """
     Manual trigger: issues payslips for all users on the schedule for
@@ -585,8 +714,9 @@ def run_payout_schedule(request: HttpRequest, schedule_id: int):
 
 
 # ---------------------------------------------------------------------
-# Admin Purchase Orders (simple views)
+# Admin Purchase Orders (simple views) — OTP-required
 # ---------------------------------------------------------------------
+@method_decorator([otp_required, ensure_csrf_cookie], name="dispatch")
 class AdminPOListView(LoginRequiredMixin, TemplateView):
     """
     Lists Admin Purchase Orders with simple filters. (Wire in wallet/urls.py)
@@ -602,14 +732,19 @@ class AdminPOListView(LoginRequiredMixin, TemplateView):
         ctx = super().get_context_data(**kwargs)
         status = self.request.GET.get("status")
         qs = AdminPurchaseOrder.objects.all().order_by("-created_at")
-        if status in (PurchaseOrderStatus.DRAFT, PurchaseOrderStatus.SENT, PurchaseOrderStatus.COMPLETED, PurchaseOrderStatus.CANCELLED):
+        if status in (
+            PurchaseOrderStatus.DRAFT,
+            PurchaseOrderStatus.SENT,
+            PurchaseOrderStatus.COMPLETED,
+            PurchaseOrderStatus.CANCELLED,
+        ):
             qs = qs.filter(status=status)
         ctx["orders"] = qs
         ctx["status"] = status or "all"
         return ctx
 
 
-@login_required
+@otp_required
 def admin_po_new(request: HttpRequest):
     """
     Create a new PO header then redirect to detail page to add items.
@@ -634,7 +769,7 @@ def admin_po_new(request: HttpRequest):
     return render(request, "wallet/admin_po_new.html", {"form": form})
 
 
-@login_required
+@otp_required
 def admin_po_detail(request: HttpRequest, po_id: int):
     """
     View/edit a PO: add items, recompute totals, and move simple statuses.

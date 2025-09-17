@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container py-5" style="max-width: 520px;">
+<h3>Delete location</h3>
+<p>Are you sure you want to delete <strong>{{ loc.name }}</strong>?</p>
+<form method="post">
+{% csrf_token %}
+<button class="btn btn-danger">Yes, delete</button>
+<a class="btn btn-link" href="{% url 'tenants:locations_index' %}">Cancel</a>
+</form>
+</div>
+{% endblock %}

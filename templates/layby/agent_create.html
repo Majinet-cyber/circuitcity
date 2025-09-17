@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+{% block title %}New Layby{% endblock %}
+{% block header_title %}Create a Layby{% endblock %}
+
+{% block content %}
+<section class="glass-card p-3" style="max-width:900px;margin:auto">
+  <form method="post" novalidate>
+    {% csrf_token %}
+    <div class="row g-3">
+      <div class="col-12 col-md-6">
+        <label class="form-label fw-bold">Customer name</label>
+        {{ form.customer_name }}
+      </div>
+      <div class="col-12 col-md-6">
+        <label class="form-label fw-bold">Customer phone</label>
+        {{ form.customer_phone }}
+      </div>
+
+      <div class="col-12">
+        <label class="form-label fw-bold">Product</label>
+        {{ form.product_name }}
+        <div class="form-text">Use the exact model name for better reporting.</div>
+      </div>
+
+      <div class="col-6">
+        <label class="form-label fw-bold">Total price (MWK)</label>
+        {{ form.total_price }}
+      </div>
+      <div class="col-6">
+        <label class="form-label fw-bold">Deposit (optional)</label>
+        {{ form.deposit }}
+        <div class="form-text">If you enter a deposit, the order will start as <strong>Active</strong>.</div>
+      </div>
+
+      <div class="col-6">
+        <label class="form-label fw-bold">Target date</label>
+        {{ form.target_date }}
+        <div class="form-text">When should this be fully paid?</div>
+      </div>
+      <div class="col-6">
+        <label class="form-label fw-bold">Notes</label>
+        {{ form.notes }}
+      </div>
+    </div>
+
+    <div class="d-flex gap-2 mt-3">
+      <button class="btn btn-primary"><i class="bi bi-plus-square me-1"></i>Create Layby</button>
+      <a class="btn btn-light" href="{% url 'layby:agent_dashboard' %}">Cancel</a>
+    </div>
+  </form>
+</section>
+{% endblock %}

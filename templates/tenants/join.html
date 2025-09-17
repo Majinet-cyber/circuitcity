@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Create Business · Circuit City</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+
+  <style>
+    :root {
+      --bg1:#eef5ff; --bg2:#f9fbff; --card:#ffffff; --muted:#475569; --text:#0f172a;
+      --accent:#2563eb; --border:#e2e8f0;
+      --glass-bg: rgba(37,99,235,0.12);
+      --glass-brd: rgba(96,165,250,.55);
+      --shadow: 0 10px 30px rgba(37,99,235,.22);
+      --ring: rgba(147,197,253,.35);
+    }
+    *{box-sizing:border-box}
+    body {
+      margin:0; font-family:system-ui,-apple-system,Segoe UI,Inter,Roboto,sans-serif;
+      background:linear-gradient(180deg,var(--bg1),var(--bg2));
+      color:var(--text); min-height:100vh; display:grid; place-items:center;
+    }
+    .card {
+      width:min(560px,92vw); background:var(--card); border:1px solid var(--border);
+      border-radius:16px; padding:22px 20px;
+      box-shadow:0 12px 28px rgba(2,8,23,.08);
+    }
+    h1 { margin:0 0 10px; font-size:22px }
+    .muted{color:var(--muted); font-size:14px; margin-bottom:14px}
+    form{display:grid; gap:16px}
+    label{font-weight:600; font-size:14px}
+    .field{
+      display:flex; align-items:center; background:#f8fafc; border:1px solid var(--border);
+      border-radius:12px; padding:2px 2px 2px 12px; transition:.15s;
+    }
+    .field:focus-within{ border-color:#93c5fd; box-shadow:0 0 0 4px var(--ring) }
+    .field input{
+      flex:1; background:transparent; border:0; outline:none;
+      padding:12px; font-size:15px;
+    }
+    .btn-glass-blue{
+      --_bg: var(--glass-bg); --_brd: var(--glass-brd); --_txt: #eaf2ff; --_txt-strong: #ffffff;
+      display:inline-flex; align-items:center; justify-content:center; gap:.5rem;
+      padding:.75rem 1.15rem; font-weight:800; border-radius:14px;
+      color:var(--_txt);
+      background:linear-gradient(135deg, rgba(96,165,250,.55), rgba(37,99,235,.45)), var(--_bg);
+      border:1px solid var(--_brd); box-shadow:var(--shadow);
+      backdrop-filter:blur(10px); -webkit-backdrop-filter:blur(10px);
+      cursor:pointer; text-decoration:none; transition:.18s;
+    }
+    .btn-glass-blue:hover{ color:var(--_txt-strong); transform:translateY(-1px) }
+    .help{font-size:12px; color:var(--muted)}
+    .err{color:#991b1b; font-size:13px}
+    .alert{background:#fee2e2; border:1px solid #fecaca; color:#991b1b;
+      padding:10px 12px; border-radius:12px; font-size:14px; margin-bottom:10px}
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>Create your business</h1>
+    <p class="muted">Enter details to set up your company profile. You’ll become the manager automatically.</p>
+
+    {% if messages %}
+      {% for m in messages %}
+        <div class="alert">{{ m }}</div>
+      {% endfor %}
+    {% endif %}
+
+    <form method="post" novalidate>
+      {% csrf_token %}
+      <div>
+        <label for="id_name">Business Name</label>
+        <div class="field">
+          {{ form.name }}
+        </div>
+        {% if form.name.errors %}<div class="err">{{ form.name.errors.0 }}</div>{% endif %}
+      </div>
+
+      <div>
+        <label for="id_slug">Slug (optional)</label>
+        <div class="field">
+          {{ form.slug }}
+        </div>
+        {% if form.slug.errors %}<div class="err">{{ form.slug.errors.0 }}</div>{% endif %}
+        <div class="help">Used in URL, e.g. <code>/t/acme-stores/</code></div>
+      </div>
+
+      <button type="submit" class="btn-glass-blue">Create Business</button>
+    </form>
+  </div>
+</body>
+</html>

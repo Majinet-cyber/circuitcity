@@ -1,0 +1,132 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Billing · Super Admin Dashboard</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+
+  <style>
+    :root {
+      --bg:#f8fafc; --card:#ffffff; --muted:#64748b; --text:#0f172a;
+      --accent:#2563eb; --border:#e2e8f0; --shadow:0 6px 20px rgba(2,8,23,.06);
+    }
+    *{box-sizing:border-box}
+    body {
+      margin:0; font-family:system-ui,Segoe UI,Inter,Roboto,sans-serif;
+      background:var(--bg); color:var(--text); min-height:100vh;
+    }
+    header {
+      background:#1e293b; color:#fff; padding:14px 20px;
+      display:flex; align-items:center; justify-content:space-between;
+    }
+    header h1 { margin:0; font-size:20px; }
+    .wrap{padding:20px; max-width:1200px; margin:0 auto; display:grid; gap:20px}
+    .cards{display:grid; grid-template-columns:repeat(auto-fit,minmax(240px,1fr)); gap:20px}
+    .card{
+      background:var(--card); border:1px solid var(--border); border-radius:14px;
+      padding:18px 16px; box-shadow:var(--shadow);
+    }
+    .card h2{font-size:15px; margin:0 0 8px; color:var(--muted)}
+    .card .value{font-size:26px; font-weight:700}
+    table{width:100%; border-collapse:collapse; font-size:14px}
+    th,td{padding:10px 8px; border-bottom:1px solid var(--border); text-align:left}
+    th{font-weight:600; color:var(--muted); background:#f1f5f9}
+    .status{font-weight:600; padding:4px 8px; border-radius:6px; font-size:12px}
+    .status.active{background:#dcfce7; color:#166534}
+    .status.trial{background:#e0f2fe; color:#075985}
+    .status.past_due{background:#fee2e2; color:#991b1b}
+    .status.grace{background:#fef9c3; color:#854d0e}
+    a.btn{
+      display:inline-block; margin-top:6px; padding:8px 12px;
+      border-radius:8px; background:var(--accent); color:#fff; text-decoration:none;
+      font-weight:600; font-size:14px;
+    }
+    a.btn:hover{background:#1d4ed8}
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Billing · Super Admin Dashboard</h1>
+    <nav>
+      <a href="/" style="color:#93c5fd;text-decoration:none">← Back</a>
+    </nav>
+  </header>
+
+  <div class="wrap">
+    <!-- KPI Cards -->
+    <div class="cards">
+      <div class="card">
+        <h2>Active Subscriptions</h2>
+        <div class="value">{{ stats.active_subs }}</div>
+      </div>
+      <div class="card">
+        <h2>Trialing Businesses</h2>
+        <div class="value">{{ stats.trials }}</div>
+      </div>
+      <div class="card">
+        <h2>Monthly Revenue</h2>
+        <div class="value">{{ stats.mrr|default:"0.00" }} MWK</div>
+      </div>
+      <div class="card">
+        <h2>Overdue Invoices</h2>
+        <div class="value">{{ stats.overdue_invoices }}</div>
+      </div>
+    </div>
+
+    <!-- Subscriptions Table -->
+    <div class="card">
+      <h2>Latest Subscriptions</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>Business</th>
+            <th>Plan</th>
+            <th>Status</th>
+            <th>Next Billing</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for sub in subscriptions %}
+          <tr>
+            <td>{{ sub.business.name }}</td>
+            <td>{{ sub.plan.name }}</td>
+            <td><span class="status {{ sub.status }}">{{ sub.get_status_display }}</span></td>
+            <td>{{ sub.next_billing_date|date:"Y-m-d" }}</td>
+          </tr>
+          {% empty %}
+          <tr><td colspan="4">No subscriptions found.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      <a href="{% url 'billing:admin_dashboard' %}" class="btn">View All</a>
+    </div>
+
+    <!-- Invoices Table -->
+    <div class="card">
+      <h2>Recent Invoices</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>Number</th>
+            <th>Business</th>
+            <th>Total</th>
+            <th>Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for inv in invoices %}
+          <tr>
+            <td>{{ inv.number }}</td>
+            <td>{{ inv.business.name }}</td>
+            <td>{{ inv.total }} {{ inv.currency }}</td>
+            <td><span class="status {{ inv.status }}">{{ inv.get_status_display }}</span></td>
+          </tr>
+          {% empty %}
+          <tr><td colspan="4">No invoices found.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</body>
+</html>

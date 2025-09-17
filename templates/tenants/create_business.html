@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Create Business{% endblock %}
+{% block header_title %}Create Business (Manager Request){% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'tenants/tenants.css' %}">
+{% endblock %}
+
+{% block content %}
+<section class="tenants-wrap tenants-narrow">
+  <form method="post" class="gcard" data-anim>
+    {% csrf_token %}
+    <div class="gtitle">Business details</div>
+    <div class="gsub">This name will appear in UI and dashboards. Staff will approve before activation.</div>
+
+    <div class="gfield" style="margin-top:14px" data-anim>
+      <div class="label">Business name</div>
+      {{ form.name|add_class:"ginput" }}
+      {% if form.name.errors %}<div class="badge badge-warn" style="margin-top:8px">{{ form.name.errors.0 }}</div>{% endif %}
+    </div>
+
+    <div class="gactions">
+      <a href="{% url 'tenants:choose_business' %}" class="gbtn">Cancel</a>
+      <button class="gbtn primary" data-anim="pop">Submit for Approval</button>
+    </div>
+  </form>
+</section>
+{% endblock %}
+
+{% block extra_js %}
+<script src="{% static 'tenants/tenants.js' %}"></script>
+{% endblock %}

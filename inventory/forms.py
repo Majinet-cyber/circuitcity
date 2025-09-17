@@ -47,8 +47,10 @@ class StyledForm(forms.Form):
 # ---------- Scan IN ----------
 class ScanInForm(StyledForm):
     """
-    Order price is now OPTIONAL for scan-in. If omitted, it auto-fills from the
+    Order price is OPTIONAL for scan-in. If omitted, it auto-fills from the
     selected product's model price (Product.cost_price).
+
+    Location is now OPTIONAL (can be assigned later or auto-defaulted by the view).
     """
     imei = forms.CharField(
         label="IMEI",
@@ -77,8 +79,11 @@ class ScanInForm(StyledForm):
     received_at = forms.DateField(
         widget=forms.DateInput(attrs={"type": "date"}), label="Received date"
     )
+    # ⬇⬇⬇  Make location optional so saving isn't blocked
     location = forms.ModelChoiceField(
-        queryset=Location.objects.all().order_by("name")
+        queryset=Location.objects.all().order_by("name"),
+        required=False,  # <- key change
+        empty_label="---------"
     )
     assigned_to_me = forms.BooleanField(label="Assign to me", required=False, initial=True)
 
@@ -128,6 +133,7 @@ class ScanInForm(StyledForm):
             else:
                 # Keep a clear error message if product missing (shouldn’t happen due to field)
                 raise ValidationError("Select a product model to auto-fill the order price.")
+        # location is optional; no extra validation here
         return cleaned
 
 
@@ -315,7 +321,7 @@ class PurchaseOrderHeaderForm(forms.ModelForm if AdminPurchaseOrder else forms.F
         supplier_email = forms.EmailField(required=False)
         supplier_phone = forms.CharField(max_length=40, required=False)
         agent_name = forms.CharField(max_length=120, required=False)
-        notes = forms.CharField(widget=forms.Textarea(attrs={"rows": 3, "class": "input"}), required=False)
+        notes = forms.CharField(widget=forms.Textarea(attrs({"rows": 3, "class": "input"})), required=False)
         currency = forms.CharField(max_length=8, initial="MWK", required=False)
         tax = forms.DecimalField(max_digits=14, decimal_places=2, required=False, initial=Decimal("0.00"))
 

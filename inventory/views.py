@@ -1,31 +1,81 @@
-# circuitcity/inventory/views.py
+#--- PART 1/3 START (inventory/views.py) ---
+
+# --- PART 1/3 — circuitcity/inventory/views.py ---
+
+
+from __future__ import annotations
+
+# --- Role helper import (safe) ----------------------------------------
+try:
+    from accounts.utils import user_is_manager  # type: ignore[attr-defined]
+except Exception:
+    def user_is_manager(user) -> bool:  # type: ignore[no-redef]
+        if not getattr(user, "is_authenticated", False):
+            return False
+        if getattr(user, "is_superuser", False) or getattr(user, "is_staff", False):
+            return True
+        try:
+            return user.groups.filter(name__in=["Manager", "Admin"]).exists()
+        except Exception:
+            return False
+
+# --- Optional Business model (safe) ----------------------------------
+try:
+    from tenants.models import Business  # type: ignore
+except Exception:
+    Business = None  # graceful fallback when multi-tenant app is absent
+from datetime import datetime, timedelta, date
+from django.db.models.functions import TruncMonth, TruncDate, Cast, Coalesce
+from django.db import connection, transaction
+from django.urls import reverse
+from urllib.parse import quote
+from decimal import Decimal
+import logging
+
 from django.conf import settings
 from django.contrib import messages
-from django.contrib.auth import get_user_model
+from django.core.exceptions import ValidationError
+from django.db import transaction, IntegrityError
+from django.shortcuts import render, redirect
+from django.utils import timezone
+from django.views.decorators.cache import never_cache
+from django.views.decorators.http import require_http_methods
 from django.contrib.auth.decorators import login_required
+
+
+from django.contrib.auth.decorators import login_required
+from django.shortcuts import redirect, render
+from django.conf import settings
+from datetime import timedelta, date, datetime   # ← add datetime
+from django.db.models.functions import TruncMonth, TruncDate, Cast, Coalesce  # ← add TruncDate
+from django.contrib import messages
+from django.contrib.auth import get_user_model
 from django.core.mail import mail_admins
 from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
 from django.core.cache import cache
-from django.db import transaction, connection
+from django.db import transaction, connection, IntegrityError
 from django.db.models import (
     Sum, Q, Exists, OuterRef, Count, F, DecimalField, ExpressionWrapper, Case, When, Value
 )
 from django.db.models.deletion import ProtectedError
 from django.db.models.functions import TruncMonth, TruncDate, Cast, Coalesce
 from django.http import HttpResponse, JsonResponse
-from django.shortcuts import get_object_or_404, redirect, render
+from django.shortcuts import get_object_or_404
 from django.template.exceptions import TemplateDoesNotExist
 from django.utils import timezone
 from django.views.decorators.cache import never_cache
 from django.views.decorators.http import require_POST, require_http_methods, require_GET
-from django.views.decorators.csrf import ensure_csrf_cookie  # ensure CSRF cookie exists for fallback page
+from django.views.decorators.csrf import ensure_csrf_cookie
 from django.urls import reverse
+from django.core.exceptions import ValidationError
 
 import csv
 import json
 import math
-from datetime import timedelta, datetime, date
+from functools import wraps
+from datetime import datetime, timedelta, date, time  # <-- added time
 from urllib.parse import urlencode, quote
+import logging
 
 # Forms
 from .forms import ScanInForm, ScanSoldForm, InventoryItemForm
@@ -44,11 +94,11 @@ from .models import (
 try:
     from wallet.models import WalletTxn  # type: ignore
 except Exception:
-    WalletTxn = None  # graceful fallback if wallet app/models not available
+    WalletTxn = None  # graceful fallback
 
 from sales.models import Sale
 
-# NEW: Admin Purchase Orders (lives in wallet app)
+# Admin Purchase Orders (wallet app)
 try:
     from wallet.models import AdminPurchaseOrder, AdminPurchaseOrderItem  # type: ignore
 except Exception:
@@ -69,54 +119,293 @@ User = get_user_model()
 # ------------------------------------------------------------------
 _WARRANTY_LOOKUPS_DISABLED = True
 
+# ------------------------------------------------------------------
+# OTP alias: when ENABLE_2FA=1 use django-otp, else fall back to login_required
+# ------------------------------------------------------------------
+try:
+    if getattr(settings, "ENABLE_2FA", False):
+        from django_otp.decorators import otp_required  # type: ignore
+    else:
+        raise ImportError
+except Exception:  # pragma: no cover
+    from django.contrib.auth.decorators import login_required as otp_required  # type: ignore
 
 # -----------------------
-# Helpers
+# Role helpers
+# -----------------------
+def is_manager_like(user) -> bool:
+    if getattr(user, "is_staff", False):
+        return True
+    try:
+        manager_group_names = set(getattr(settings, "ROLE_GROUP_MANAGER_NAMES", ["Manager", "Admin"]))
+    except Exception:
+        manager_group_names = {"Manager", "Admin"}
+    return user.groups.filter(name__in=manager_group_names).exists()
+
+# -----------------------
+# JSON helpers / safe API wrapper
+# -----------------------
+def json_ok(payload=None, **extra):
+    data = {"ok": True}
+    if payload:
+        data.update(payload)
+    if extra:
+        data.update(extra)
+    return JsonResponse(data)
+
+def json_err(message, status=400, **extra):
+    data = {"ok": False, "error": str(message)}
+    if extra:
+        data.update(extra)
+    return JsonResponse(data, status=status)
+
+def safe_api(fn):
+    @wraps(fn)
+    def _wrap(request, *args, **kwargs):
+        try:
+            return fn(request, *args, **kwargs)
+        except PermissionError as e:
+            return json_err(e, status=403)
+        except ValueError as e:
+            return json_err(e, status=400)
+        except Exception as e:
+            return json_err(f"Unexpected error: {e}", status=500)
+    return _wrap
+
+# -----------------------
+# Multi-tenant helpers
+# -----------------------
+_SESSION_BIZ_KEY = "active_business_id"
+
+def _model_has_field(model, field_name: str) -> bool:
+    try:
+        model._meta.get_field(field_name)  # type: ignore[attr-defined]
+        return True
+    except Exception:
+        return False
+
+def _biz_field_name_for(model) -> str | None:
+    """Return the FK field name used for business/tenant on this model, if any."""
+    for name in ("business", "tenant", "store", "company", "org", "organization"):
+        if _model_has_field(model, name):
+            return name
+    return None
+
+def _biz_filter_kwargs(model, biz_id: int | None) -> dict:
+    """Build a filter dict for the model based on the active business id."""
+    if not biz_id:
+        return {}
+    fld = _biz_field_name_for(model)
+    return {fld: biz_id} if fld else {}
+
+def _attach_business_kwargs(model, biz_id: int | None) -> dict:
+    """
+    Return kwargs to attach business FK when creating objects.
+    IMPORTANT: use the *_id form so we can pass an integer pk safely.
+    """
+    if not biz_id:
+        return {}
+    fld = _biz_field_name_for(model)
+    return {f"{fld}_id": biz_id} if fld else {}
+
+def _get_active_business(request):
+    """
+    Return the active Business object (if available) and its id from session.
+    Never raises; returns (None, None) when unavailable.
+    """
+    biz_id = None
+    try:
+        biz_id = int(request.session.get(_SESSION_BIZ_KEY) or 0) or None
+    except Exception:
+        biz_id = None
+
+    if Business is None or not biz_id:
+        return None, None
+
+    try:
+        biz = Business.objects.filter(pk=biz_id).first()
+        if not biz:
+            return None, None
+        return biz, biz.pk
+    except Exception:
+        return None, None
+
+def _require_active_business(request):
+    """
+    If no active business is selected, redirect the user to the setup/join page.
+    This keeps brand-new managers from seeing global data.
+    """
+    _, biz_id = _get_active_business(request)
+    if biz_id:
+        return None  # OK
+    # Try a best-effort URL
+    try:
+        url = reverse("tenants:join")
+    except Exception:
+        url = "/tenants/join/"
+    messages.info(request, "Select or create your business to continue.")
+    return redirect(url)
+
+def _scoped(qs, request):
+    """
+    Scope any queryset to the active business if the underlying model supports it.
+    """
+    _, biz_id = _get_active_business(request)
+    if not biz_id:
+        return qs  # No scoping field or no business selected
+    try:
+        return qs.filter(**_biz_filter_kwargs(qs.model, biz_id))
+    except Exception:
+        return qs
+
+def _obj_belongs_to_active_business(obj, request) -> bool:
+    """Return True if obj has a business/tenant FK matching the active business (or no FK)."""
+    if obj is None:
+        return True
+    _, biz_id = _get_active_business(request)
+    if not biz_id:
+        return True
+    fld = _biz_field_name_for(obj.__class__)
+    if not fld:
+        return True
+    try:
+        related = getattr(obj, fld, None)
+        if related is None:
+            return False
+        rel_id = getattr(related, "pk", getattr(related, "id", related))
+        return rel_id == biz_id
+    except Exception:
+        return False
+
+def _limit_form_querysets(form, request):
+    """Constrain form dropdowns (Product, Location) to the active business."""
+    try:
+        if hasattr(form, "fields"):
+            if "product" in form.fields:
+                form.fields["product"].queryset = _scoped(Product.objects.all(), request)
+            if "location" in form.fields:
+                form.fields["location"].queryset = _scoped(Location.objects.all(), request)
+    except Exception:
+        pass
+
+# -----------------------
+# Date-window helpers (for calendar filtering)
+# -----------------------
+def parse_day_window(day_str: str) -> tuple[datetime | None, datetime | None]:
+    """
+    Parse YYYY-MM-DD and return aware start/end for that local day.
+    Returns (None, None) if invalid.
+    """
+    if not day_str:
+        return None, None
+    try:
+        d = datetime.fromisoformat(day_str).date()
+    except Exception:
+        return None, None
+    tz = timezone.get_current_timezone()
+    start = timezone.make_aware(datetime.combine(d, time.min), tz)
+    end   = timezone.make_aware(datetime.combine(d, time.max), tz)
+    return start, end
+
+def get_preset_window(request, default_preset: str = "month") -> tuple[str, str, datetime | None, datetime | None]:
+    """
+    Read ?range=month|7d|all|day and ?day=YYYY-MM-DD
+    Returns (preset, day_str, start, end).
+    """
+    preset = (request.GET.get("range") or default_preset).strip().lower()
+    day_str = (request.GET.get("day") or "").strip()
+    now = timezone.now()
+    start = end = None
+
+    if preset == "7d":
+        end = now
+        start = end - timedelta(days=7)
+    elif preset == "all":
+        start = end = None
+    elif preset == "day":
+        start, end = parse_day_window(day_str)
+        if not (start and end):
+            # fall back to default if invalid
+            preset = default_preset
+    if preset == "month":
+        start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+        end = now
+    return preset, day_str, start, end
+
+def _time_q_for(model, start, end, fields: tuple[str, ...]) -> Q:
+    """
+    Build a Q(...) covering start..end over the first existing timestamp fields.
+    If no (start,end) or no matching fields exist, returns empty Q().
+    """
+    if not (start and end):
+        return Q()
+    q = Q()
+    for f in fields:
+        try:
+            model._meta.get_field(f)
+            q |= (Q(**{f + "__gte": start}) & Q(**{f + "__lte": end}))
+        except Exception:
+            continue
+    return q
+
+# -----------------------
+# Other helpers
 # -----------------------
 def _user_home_location(user):
     prof = getattr(user, "agent_profile", None)
     return getattr(prof, "location", None)
 
-
 def _is_manager_or_admin(user):
-    return user.is_staff or user.groups.filter(name__in=["Admin", "Manager"]).exists()
-
+    return bool(user_is_manager(user))
 
 def _is_admin(user):
-    return user.is_staff or user.groups.filter(name="Admin").exists()
-
+    return bool(getattr(user, "is_staff", False) or getattr(user, "is_superuser", False))
 
 def _is_auditor(user):
-    return user.groups.filter(name__in=["Auditor", "Auditors"]).exists()
-
+    try:
+        return user.groups.filter(name__in=["Auditor", "Auditors"]).exists()
+    except Exception:
+        return False
 
 def _can_view_all(user):
     return _is_manager_or_admin(user) or _is_auditor(user)
 
-
 def _can_edit_inventory(user):
     return _is_manager_or_admin(user)
 
-
 def _is_agent_user(user) -> bool:
-    """
-    A user allowed to *hold* stock:
-    - must have an AgentProfile
-    - must NOT be staff/superuser (admins cannot hold stock)
-    """
     return bool(getattr(user, "agent_profile", None)) and not (getattr(user, "is_staff", False) or getattr(user, "is_superuser", False))
 
+def _reject_admin_assignment(user) -> str | None:
+    """
+    Returns an error message if this user is not eligible to be assigned stock.
+    Agents only — never staff/superusers; must have an AgentProfile.
+    """
+    if getattr(user, "is_staff", False) or getattr(user, "is_superuser", False):
+        return "Stock cannot be assigned to admin/staff accounts. Assign to an agent."
+    if not hasattr(user, "agent_profile"):
+        return "Assigned user must be an agent (has AgentProfile)."
+    return None
 
 def _audit(item, user, action: str, details: str = ""):
     if not item:
         return
-    InventoryAudit.objects.create(item=item, by_user=user, action=action, details=details or "")
-
+    try:
+        biz_id = None
+        # If the item itself has a biz FK (most do), reuse it
+        for fldname in ("business", "tenant", "store", "company", "org", "organization"):
+            if hasattr(item, fldname):
+                rel = getattr(item, fldname)
+                biz_id = getattr(rel, "id", getattr(rel, "pk", None))
+                break
+        InventoryAudit.objects.create(
+            item=item, by_user=user, action=action, details=details or "",
+            **_attach_business_kwargs(InventoryAudit, biz_id)
+        )
+    except Exception:
+        pass  # never block on auditing
 
 def _haversine_m(lat1, lon1, lat2, lon2):
-    """
-    Distance in meters between two lat/lon points.
-    """
     if None in (lat1, lon1, lat2, lon2):
         return None
     R = 6371000.0
@@ -127,7 +416,6 @@ def _haversine_m(lat1, lon1, lat2, lon2):
     a = math.sin(dphi / 2) ** 2 + math.cos(phi1) * math.cos(phi2) * math.sin(dlmb / 2) ** 2
     c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
     return int(round(R * c))
-
 
 def _paginate_qs(request, qs, default_per_page=50, max_per_page=200):
     try:
@@ -150,7 +438,6 @@ def _paginate_qs(request, qs, default_per_page=50, max_per_page=200):
 
     return page_obj, url_for
 
-
 def _wallet_balance(user):
     if WalletTxn is None:
         return 0
@@ -158,10 +445,9 @@ def _wallet_balance(user):
         return WalletTxn.balance_for(user)  # type: ignore[attr-defined]
     except Exception:
         try:
-            return WalletTxn.objects.filter(user=user).aggregate(s=Sum("amount"))["s"] or 0  # type: ignore[union-attr]
+            return WalletTxn.objects.filter(user=user).aggregate(s=Sum("amount"))["s"] or 0
         except Exception:
             return 0
-
 
 def _wallet_month_sum(user, year: int, month: int):
     if WalletTxn is None:
@@ -171,12 +457,11 @@ def _wallet_month_sum(user, year: int, month: int):
     except Exception:
         try:
             return (
-                WalletTxn.objects.filter(user=user, created_at__year=year, created_at__month=month)  # type: ignore[union-attr]
+                WalletTxn.objects.filter(user=user, created_at__year=year, created_at__month=month)
                 .aggregate(s=Sum("amount"))["s"] or 0
             )
         except Exception:
             return 0
-
 
 def _inv_base(show_archived: bool):
     if show_archived:
@@ -187,7 +472,6 @@ def _inv_base(show_archived: bool):
         return InventoryItem.objects.filter(is_active=True)
     except Exception:
         return InventoryItem.objects
-
 
 def _render_dashboard_safe(request, context, today, mtd_count, all_time_count):
     try:
@@ -201,10 +485,6 @@ def _render_dashboard_safe(request, context, today, mtd_count, all_time_count):
         )
 
 def _render_stock_list_safe(request, context):
-    """
-    Try multiple template paths for the stock list. If none exists, render a minimal
-    fallback so the page is never blank.
-    """
     candidates = [
         "inventory/stock_list.html",  # preferred
         "inventory/list.html",        # legacy/alt
@@ -215,7 +495,6 @@ def _render_stock_list_safe(request, context):
         except TemplateDoesNotExist:
             continue
 
-    # Minimal fallback (keeps page useful even if template missing)
     items = context.get("items", [])
     rows_html = []
     for it in items:
@@ -226,8 +505,8 @@ def _render_stock_list_safe(request, context):
             f"<td>{it.status}</td>"
             f"<td>{'' if it.order_price is None else it.order_price}</td>"
             f"<td>{'' if it.selling_price is None else it.selling_price}</td>"
-            f"<td>{getattr(getattr(it, 'current_location', None), 'name', '—') or '—'}</td>"
-            f"<td>{getattr(getattr(it, 'assigned_agent', None), 'username', '—') or '—'}</td>"
+            f"<td>{getattr(getattr(it, 'current_location', None), 'name', getattr(getattr(it, 'location', None), 'name', '—')) or '—'}</td>"
+            f"<td>{getattr(getattr(it, 'assigned_agent', None), 'username', getattr(getattr(it, 'assigned_to', None), 'username', '—')) or '—'}</td>"
             f"</tr>"
         )
     html = f"""<!doctype html>
@@ -267,103 +546,293 @@ h1{{margin:.2rem 0 1rem}}
 </body></html>"""
     return HttpResponse(html, content_type="text/html")
 
+# -----------------------
+# Scan pages (tenant-scoped)
+# -----------------------
+# --- required imports (safe if duplicated) ---
+from decimal import Decimal
+import logging
 
-# -----------------------
-# Scan pages
-# -----------------------
+from django.conf import settings
+from django.contrib import messages
+from django.core.exceptions import ValidationError
+from django.db import IntegrityError, transaction
+from django.shortcuts import render, redirect
+from django.utils import timezone
+from django.views.decorators.cache import never_cache
+from django.contrib.auth.decorators import login_required
+from django.views.decorators.http import require_http_methods
+
+# scan_in view
 @never_cache
 @login_required
 @require_http_methods(["GET", "POST"])
 @transaction.atomic
 def scan_in(request):
+    # Require business selection for all inventory ops
+    gate = _require_active_business(request)
+    if gate:
+        return gate
+
     if _is_auditor(request.user) and request.method == "POST":
         messages.error(request, "Auditors cannot stock-in devices.")
         return redirect("inventory:stock_list")
 
+    # ---------- helper: is this user an Agent? ----------
+    def _is_agent_user(u):
+        try:
+            if getattr(u, "agentprofile", None):  # AgentProfile relation if present
+                return True
+        except Exception:
+            pass
+        try:
+            return u.groups.filter(name__iexact="Agent").exists()
+        except Exception:
+            return False
+
+    # ---------- helper: resolve a default Location (scoped to active biz) ----------
+    def _resolve_default_location():
+        """
+        Pick a sensible default location:
+        1) exact match to the active business/store name (e.g., "Air Easy"),
+           also tries "<name> Store" and icontains match.
+        2) user home location (if your project defines it)
+        3) other sane fallbacks (Maren/Home/Main/default/first)
+        All queries are scoped to the active business when possible.
+        """
+        loc_field = (
+            "current_location" if _model_has_field(InventoryItem, "current_location")
+            else ("location" if _model_has_field(InventoryItem, "location") else None)
+        )
+        if not loc_field:
+            return None
+
+        # Active business (store) and its name
+        biz, biz_id = _get_active_business(request)
+        store_name = None
+        try:
+            store_name = (
+                getattr(biz, "display_name", None)
+                or getattr(biz, "name", None)
+                or getattr(biz, "title", None)
+            )
+        except Exception:
+            store_name = None
+
+        # Related Location model
+        Loc = None
+        try:
+            f = InventoryItem._meta.get_field(loc_field)
+            Loc = getattr(getattr(f, "remote_field", None), "model", None)
+        except Exception:
+            Loc = None
+        if not Loc:
+            return None
+
+        # Scope to this business if the model supports it
+        qs = Loc.objects.all()
+        try:
+            if biz_id:
+                if hasattr(Loc, "business_id"):
+                    qs = qs.filter(business_id=biz_id)
+                elif hasattr(Loc, "business"):
+                    qs = qs.filter(business_id=biz_id)
+        except Exception:
+            pass
+
+        # Prefer the active store name (e.g., "Air Easy")
+        try:
+            if store_name:
+                for filt in (
+                    {"name__iexact": store_name},
+                    {"name__iexact": f"{store_name} Store"},
+                    {"name__icontains": store_name},
+                ):
+                    m = qs.filter(**filt).order_by("id").first()
+                    if m:
+                        return m
+        except Exception:
+            pass
+
+        # Per-user home/store next
+        try:
+            loc = _user_home_location(request.user)
+            if loc:
+                return loc
+        except Exception:
+            pass
+
+        # Legacy / generic fallbacks
+        try:
+            cand = (
+                qs.filter(name__iexact="Maren Store").first()
+                or qs.filter(name__iexact="Maren").first()
+                or qs.filter(name__icontains="maren").first()
+                or qs.filter(name__iexact="Home").first()
+                or qs.filter(name__iexact="Main").first()
+                or qs.filter(name__icontains="default").first()
+                or qs.order_by("id").first()
+            )
+            if cand:
+                return cand
+        except Exception:
+            pass
+
+        return None
+
+    # Compute default BEFORE using it anywhere
+    default_location = _resolve_default_location()
+
+    # ---------- initial form values for GET ----------
     initial = {}
-    loc = _user_home_location(request.user)
-    if loc:
-        initial["location"] = loc
+    if default_location:
+        initial["location"] = default_location
     initial.setdefault("received_at", timezone.localdate())
 
+    # Active business scoping
+    _, biz_id = _get_active_business(request)
+    biz_create_kwargs = _attach_business_kwargs(InventoryItem, biz_id)
+
+    # Is location column REQUIRED (not null)?
+    loc_field_name = (
+        "current_location" if _model_has_field(InventoryItem, "current_location")
+        else ("location" if _model_has_field(InventoryItem, "location") else None)
+    )
+    loc_is_required = False
+    if loc_field_name:
+        try:
+            loc_field_obj = InventoryItem._meta.get_field(loc_field_name)
+            loc_is_required = not getattr(loc_field_obj, "null", True)
+        except Exception:
+            loc_is_required = False
+
     if request.method == "POST":
-        form = ScanInForm(request.POST)
+        # If user didn’t pick a location, inject our default (so validation won’t block).
+        post_data = request.POST.copy()
+        if not post_data.get("location") and default_location is not None:
+            try:
+                post_data["location"] = str(getattr(default_location, "pk", default_location.id))
+            except Exception:
+                pass
+
+        form = ScanInForm(post_data)
+        _limit_form_querysets(form, request)  # scope dropdowns
+
         if not form.is_valid():
             messages.error(request, "Please correct the errors below.")
             return render(request, "inventory/scan_in.html", {"form": form})
 
         data = form.cleaned_data
 
+        # Product is required
         if not data.get("product"):
             messages.error(request, "Select a product model.")
             return render(request, "inventory/scan_in.html", {"form": form})
+
+        # Location handling
         if not data.get("location"):
-            messages.error(request, "Choose a location.")
+            data["location"] = default_location  # may still be None
+        if loc_is_required and not data.get("location"):
+            messages.error(
+                request,
+                "Your inventory requires a location, but none were found for this store. "
+                "Please create a location (e.g., “Air Easy Store”) and try again."
+            )
             return render(request, "inventory/scan_in.html", {"form": form})
-        if data.get("order_price") is None or data["order_price"] < 0:
-            messages.error(request, "Order price must be a non-negative amount.")
+
+        # Tenant checks
+        if not _obj_belongs_to_active_business(data["product"], request):
+            messages.error(request, "That product is not in your store.")
+            return render(request, "inventory/scan_in.html", {"form": form})
+        if data.get("location") and not _obj_belongs_to_active_business(data["location"], request):
+            messages.error(request, "That location is not in your store.")
             return render(request, "inventory/scan_in.html", {"form": form})
 
         imei = (data.get("imei") or "").strip()
 
-        if imei and InventoryItem.objects.select_for_update().filter(imei=imei).exists():
-            messages.error(request, f"Item with IMEI {imei} already exists.")
+        # Duplicate check (tenant-scoped)
+        dup_qs = InventoryItem.objects.select_for_update()
+        if biz_id:
+            dup_qs = dup_qs.filter(**_biz_filter_kwargs(InventoryItem, biz_id))
+        if imei and _model_has_field(InventoryItem, "imei") and dup_qs.filter(imei=imei).exists():
+            messages.error(request, f"Item with IMEI {imei} already exists in your store.")
             return render(request, "inventory/scan_in.html", {"form": form})
 
-        # Warranty checks are disabled
-        WarrantyCheckLog.objects.create(
-            imei=imei or "",
-            result="SKIPPED",
-            expires_at=None,
-            notes="scan_in (warranty disabled)",
-            by_user=request.user,
-        )
+        # ---------- build create kwargs ----------
+        create_kwargs = {}
+        if _model_has_field(InventoryItem, "product"):
+            create_kwargs["product"] = data["product"]
 
-        allow = True
-        if not imei and not _is_manager_or_admin(request.user):
-            allow = False
+        # Map Location field (only if we have one)
+        if data.get("location"):
+            if _model_has_field(InventoryItem, "current_location"):
+                create_kwargs["current_location"] = data["location"]
+            elif _model_has_field(InventoryItem, "location"):
+                create_kwargs["location"] = data["location"]
 
-        if not allow:
-            mail_admins(
-                subject="Stock-in blocked",
-                message=f"User {request.user} attempted to stock IMEI {imei} (warranty disabled).",
-                fail_silently=True,
-            )
-            messages.error(request, "IMEI is required.")
-            return render(request, "inventory/scan_in.html", {"form": form, "blocked": True})
+        # Dates & price
+        if _model_has_field(InventoryItem, "received_at"):
+            create_kwargs["received_at"] = data.get("received_at") or timezone.localdate()
+        if _model_has_field(InventoryItem, "order_price"):
+            create_kwargs["order_price"] = data.get("order_price") or Decimal("0.00")
+        if _model_has_field(InventoryItem, "imei"):
+            create_kwargs["imei"] = imei
+        if _model_has_field(InventoryItem, "status"):
+            create_kwargs.setdefault("status", "IN_STOCK")
 
-        # Enforce: admins cannot *hold* stock. Ignore "assign to me" if user is staff/superuser.
-        assign_to_me = bool(data.get("assigned_to_me"))
-        assigned_user = request.user if (assign_to_me and _is_agent_user(request.user)) else None
-        if assign_to_me and assigned_user is None:
-            messages.info(request, "Stock was added but not assigned to you — admin/staff cannot hold stock.")
+        # Assign to current user only if they are truly an Agent
+        if data.get("assigned_to_me") and _is_agent_user(request.user):
+            if _model_has_field(InventoryItem, "assigned_agent"):
+                create_kwargs["assigned_agent"] = request.user
+            elif _model_has_field(InventoryItem, "assigned_to"):
+                create_kwargs["assigned_to"] = request.user
+        # (Managers/admins: toggle is ignored so we don't violate model rules)
 
-        item = InventoryItem.objects.create(
-            imei=imei or None,
-            product=data["product"],
-            received_at=data["received_at"],
-            order_price=data["order_price"],
-            current_location=data["location"],
-            assigned_agent=assigned_user,
-            warranty_status="SKIPPED",
-            warranty_expires_at=None,
-            warranty_last_checked_at=None,
-            activation_detected_at=None,
-        )
+        # Attach business (tenant)
+        create_kwargs.update(biz_create_kwargs)
 
-        _audit(item, request.user, "STOCK_IN", "Warranty disabled")
-        messages.success(request, f"Stocked: {imei or data['product']}")
-        return redirect("inventory:scan_in")
+        # ---------- save ----------
+        try:
+            item = InventoryItem(**create_kwargs)
+            try:
+                item.full_clean()
+            except ValidationError as ve:
+                first_err = "; ".join([f"{k}: {', '.join(v)}" for k, v in ve.message_dict.items()])
+                messages.error(request, f"Cannot stock-in: {first_err}")
+                return render(request, "inventory/scan_in.html", {"form": form})
+            item.save()
+        except IntegrityError as e:
+            if "unique" in str(e).lower():
+                messages.error(request, f"Item with IMEI {imei or '(blank)'} already exists.")
+            else:
+                messages.error(request, "Could not save this item (constraint error). Please check values and try again.")
+            return render(request, "inventory/scan_in.html", {"form": form})
+        except Exception:
+            logging.exception("Scan IN failed | kwargs=%s", create_kwargs)
+            if getattr(settings, "DEBUG", False):
+                raise
+            messages.error(request, "Unexpected error while saving this item. Please try again.")
+            return render(request, "inventory/scan_in.html", {"form": form})
 
+        _audit(item, request.user, "STOCK_IN", "Scan IN")
+        messages.success(request, "Item saved.")
+        return redirect("inventory:stock_list")
+
+    # GET
     form = ScanInForm(initial=initial)
+    _limit_form_querysets(form, request)
     return render(request, "inventory/scan_in.html", {"form": form})
-
 
 @never_cache
 @login_required
 @require_http_methods(["GET", "POST"])
 @transaction.atomic
 def scan_sold(request):
+    # Require business selection for all inventory ops
+    gate = _require_active_business(request)
+    if gate:
+        return gate
+
     if _is_auditor(request.user) and request.method == "POST":
         messages.error(request, "Auditors cannot mark items as SOLD.")
         return redirect("inventory:stock_list")
@@ -374,8 +843,12 @@ def scan_sold(request):
         initial["location"] = loc
     initial.setdefault("sold_at", timezone.localdate())
 
+    # Active business
+    _, biz_id = _get_active_business(request)
+
     if request.method == "POST":
         form = ScanSoldForm(request.POST)
+        _limit_form_querysets(form, request)  # <-- scope dropdowns
         if not form.is_valid():
             messages.error(request, "Please correct the errors below.")
             return render(request, "inventory/scan_sold.html", {"form": form})
@@ -383,13 +856,18 @@ def scan_sold(request):
         data = form.cleaned_data
         imei = data["imei"]
 
+        # Tenant-scoped fetch
+        qs = InventoryItem.objects.select_for_update()
+        if biz_id:
+            qs = qs.filter(**_biz_filter_kwargs(InventoryItem, biz_id))
         try:
-            item = InventoryItem.objects.select_for_update().get(imei=imei)
+            item = qs.get(imei=imei)
         except InventoryItem.DoesNotExist:
-            messages.error(request, "Item not found. Check the IMEI and try again.")
+            messages.error(request, "Item not found in your store. Check the IMEI and try again.")
             return render(request, "inventory/scan_sold.html", {"form": form})
 
-        if str(getattr(item, "status", "")) == "SOLD":
+        # If model has a "status" field, respect it
+        if _model_has_field(InventoryItem, "status") and str(getattr(item, "status", "")) == "SOLD":
             messages.error(request, f"Item {item.imei} is already sold.")
             return render(request, "inventory/scan_sold.html", {"form": form})
 
@@ -397,13 +875,25 @@ def scan_sold(request):
             messages.error(request, "Price must be a non-negative amount.")
             return render(request, "inventory/scan_sold.html", {"form": form})
 
-        item._actor = request.user
-        item.status = "SOLD"
-        item.selling_price = data.get("price")
-        item.current_location = data["location"]
-        item.sold_at = data.get("sold_at") or timezone.localdate()
+        # Ensure the chosen location is within this business
+        if not _obj_belongs_to_active_business(data["location"], request):
+            messages.error(request, "That location is not in your store.")
+            return render(request, "inventory/scan_sold.html", {"form": form})
 
-        if hasattr(item, "sold_by") and getattr(item, "sold_by", None) is None:
+        # Apply updates only for fields that exist
+        item._actor = request.user
+        if _model_has_field(InventoryItem, "status"):
+            item.status = "SOLD"
+        if _model_has_field(InventoryItem, "selling_price"):
+            item.selling_price = data.get("price")
+        # Location may be 'current_location' or 'location'
+        if _model_has_field(InventoryItem, "current_location"):
+            item.current_location = data["location"]
+        elif _model_has_field(InventoryItem, "location"):
+            item.location = data["location"]
+        if _model_has_field(InventoryItem, "sold_at"):
+            item.sold_at = data.get("sold_at") or timezone.localdate()
+        if _model_has_field(InventoryItem, "sold_by") and getattr(item, "sold_by", None) is None:
             try:
                 item.sold_by = request.user
             except Exception:
@@ -411,38 +901,53 @@ def scan_sold(request):
 
         item.save()
 
-        Sale.objects.create(
-            item=item,
-            agent=request.user,
-            location=data["location"],
-            sold_at=item.sold_at,
-            price=item.selling_price or 0,
-            commission_pct=data.get("commission_pct"),
-        )
+        # Best-effort Sale record (also tenant-safe if Sale has business FK)
+        try:
+            sale_kwargs = {
+                "item": item,
+                "agent": request.user,
+                "price": getattr(item, "selling_price", None) or 0,
+            }
+            if _model_has_field(InventoryItem, "sold_at"):
+                sale_kwargs["sold_at"] = getattr(item, "sold_at", timezone.localdate())
+            # pick a location for the Sale if available
+            if _model_has_field(InventoryItem, "current_location"):
+                sale_kwargs["location"] = data["location"]
+            elif _model_has_field(InventoryItem, "location"):
+                sale_kwargs["location"] = data["location"]
+            sale_kwargs["commission_pct"] = data.get("commission_pct")
+            sale_kwargs.update(_attach_business_kwargs(Sale, biz_id))
+            Sale.objects.create(**{k: v for k, v in sale_kwargs.items() if v is not None})
+        except Exception:
+            pass
 
         _audit(item, request.user, "SOLD_FORM", "V1 flow")
         messages.success(
             request,
-            f"Marked SOLD: {item.imei}{' at ' + str(item.selling_price) if item.selling_price else ''}",
+            f"Marked SOLD: {item.imei}{' at ' + str(getattr(item, 'selling_price', '')) if getattr(item, 'selling_price', None) else ''}",
         )
         return redirect("inventory:scan_sold")
 
     form = ScanSoldForm(initial=initial)
+    _limit_form_querysets(form, request)  # <-- scope dropdowns
     return render(request, "inventory/scan_sold.html", {"form": form})
 
 
 @never_cache
 @login_required
-@require_http_methods(["GET"])
+@require_GET
 @ensure_csrf_cookie
 def scan_web(request):
     """
-    Render the web-scanner page, but be resilient to template path differences.
-    If neither template exists, render a minimal fallback so the page is never blank.
+    Render the web-scanner page; if the template is missing, render a minimal fallback.
     """
+    gate = _require_active_business(request)
+    if gate:
+        return gate
+
     candidates = [
-        "inventory/scan_web.html",             # current
-        "circuitcity/templates/inventory/scan_web.html",  # legacy path (very rare)
+        "inventory/scan_web.html",
+        "circuitcity/templates/inventory/scan_web.html",
     ]
     for tpl in candidates:
         try:
@@ -457,8 +962,8 @@ def scan_web(request):
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>Scan (Web) — Fallback</title>
-  <style>body{{font-family:system-ui,Segoe UI,Roboto,Arial,sans-serif;padding:24px;}}
-  .wrap{{max-width:640px;margin:auto}}.f{{display:flex;gap:8px}}</style>
+  <style>body{font-family:system-ui,Segoe UI,Roboto,Arial,sans-serif;padding:24px;}
+  .wrap{max-width:640px;margin:auto}.f{display:flex;gap:8px}</style>
 </head>
 <body>
   <div class="wrap">
@@ -471,56 +976,49 @@ def scan_web(request):
     </div>
     <pre id="out"></pre>
   </div>
-# JS_MOVED: <script>
-# JS_MOVED: const imei=document.getElementById('imei'), price=document.getElementById('price'), out=document.getElementById('out');
-# JS_MOVED: document.getElementById('go').onclick=async()=>{
-  # JS_MOVED: const v=(imei.value||'').replace(/\\D/g,'');
-  # JS_MOVED: if(v.length!==15){out.textContent='IMEI must be exactly 15 digits.';return;}
-  # JS_MOVED: const csrft=(document.cookie.match(new RegExp("{{CSRFTOKEN}}=([^;]+)"))||[])[1]||"";
-  # JS_MOVED: const r = await fetch("/inventory/api/mark-sold/", {
-    method:"POST", headers:{"Content-Type":"application/json","X-CSRFToken":csrft},
-    body:JSON.stringify({imei:v, price:price.value||undefined})
-  });
-  out.textContent = 'HTTP '+r.status+'\\n'+await r.text();
-};
-# JS_MOVED: </script>
+  <script>
+    const CSRFTOKEN_NAME = "{CSRFTOKEN}";
+    function getCSRFCookie(){
+      const m = document.cookie.match(new RegExp(CSRFTOKEN_NAME+"=([^;]+)"));
+      return m ? m[1] : "";
+    }
+    document.getElementById('go').onclick = async () => {
+      const imei = document.getElementById('imei').value.replace(/\\D/g, '');
+      const price = document.getElementById('price').value;
+      const out = document.getElementById('out');
+      if (imei.length !== 15){ out.textContent = 'IMEI must be exactly 15 digits.'; return; }
+      try{
+        const r = await fetch("/inventory/api/mark-sold/", {
+          method: "POST",
+          headers: {"Content-Type":"application/json","X-CSRFToken": getCSRFCookie()},
+          body: JSON.stringify({imei, price: price || undefined})
+        });
+        out.textContent = 'HTTP ' + r.status + '\\n' + (await r.text());
+      }catch(err){
+        out.textContent = 'Network error.';
+      }
+    };
+  </script>
 </body></html>"""
-    html = html.replace("{{CSRFTOKEN}}", settings.CSRF_COOKIE_NAME)
+    html = html.replace("{CSRFTOKEN}", settings.CSRF_COOKIE_NAME)
     return HttpResponse(html, content_type="text/html")
 
+# -----------------------
+# Place Order (OTP-protected page)
+# -----------------------
 @never_cache
 @login_required
+@otp_required
 @require_GET
 def place_order_page(request):
-    """
-    Renders the Place Order UI using base.html (sidebar stays visible).
-    """
-    try:
-        return render(request, "inventory/place_order.html", {
-            "currency": getattr(settings, "DEFAULT_CURRENCY", "MWK"),
-        })
-    except TemplateDoesNotExist:
-        html = """<!doctype html><meta charset="utf-8"><title>Place Order</title>
-        <p>This page expects <code>inventory/place_order.html</code>. JSON endpoints are:</p>
-        <ul>
-          <li>/inventory/api/stock-models/</li>
-          <li>/inventory/api/place-order/</li>
-          <li>/inventory/orders/&lt;po_id&gt;/invoice/</li>
-        </ul>
-        <p><a href="/inventory/">← Back to stock</a></p>"""
-        return HttpResponse(html, content_type="text/html; charset=utf-8")
+    # Require business selection (POs are tenant data)
+    gate = _require_active_business(request)
+    if gate:
+        return gate
 
-@never_cache
-@login_required
-@require_GET
-def place_order_page(request):
-    """
-    Manager/Admin-only Order Builder page (no server template needed).
-    Uses:
-      - GET  /inventory/api/stock-models/
-      - POST /inventory/api/place-order/
-      - GET  /inventory/orders/<po_id>/download/  (invoice)
-    """
+    if not _is_manager_or_admin(request.user):
+        return redirect("inventory:stock_list")
+
     html = """
     <!doctype html><html lang="en"><head>
       <meta charset="utf-8"/>
@@ -539,10 +1037,10 @@ def place_order_page(request):
         body{font-family:system-ui,Segoe UI,Inter,Roboto,Arial,sans-serif;background:var(--bg);color:#e6edf6;margin:0}
         .wrap{max-width:980px;margin:28px auto;padding:0 16px}
         h2{margin:.2rem 0 1rem}
-        .note{background:var(--panel);border:1px solid var(--border);padding:12px;border-radius:var(--radius);color:var(--muted)}
+        .note{background:var(--panel);border:1px solid var(--border);padding:12px;border-radius:var(--radius);color:#cbd5e1}
         .row{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:12px 0}
         .row-1{display:grid;grid-template-columns:1fr;gap:12px;margin:12px 0}
-        label{display:block;font-size:13px;color:var(--muted);margin-bottom:6px}
+        label{display:block;font-size:13px;color:#cbd5e1;margin-bottom:6px}
         input[type="text"], input[type="email"], input[type="tel"], input[type="number"], select, textarea{
           width:100%;padding:10px 12px;border-radius:12px;border:1px solid var(--border);background:#0a1222;color:#e6edf6;
         }
@@ -552,7 +1050,7 @@ def place_order_page(request):
         .btn:hover{filter:brightness(1.1)}
         .btn.primary{background:var(--primary);border-color:var(--primary);color:#fff}
         .btn.ghost{background:transparent}
-        .btn.link{background:transparent;border:none;padding:0;color:var(--primary);cursor:pointer}
+        .btn.link{background:transparent;border:none;padding:0;color:#2f6df6;cursor:pointer}
         .btn.small{padding:6px 10px;border-radius:10px;font-size:13px}
         .grid-3{display:grid;grid-template-columns:2fr 1fr 1fr;gap:10px}
         .grid-4{display:grid;grid-template-columns:2fr 1fr 1fr 90px;gap:10px}
@@ -560,19 +1058,8 @@ def place_order_page(request):
         th,td{padding:10px;border-top:1px solid var(--border);font-size:14px}
         thead th{background:#0a1222;color:#cbd5e1;border-top:none}
         .right{text-align:right}
-        .muted{color:var(--muted)}
-        .kpis{display:flex;gap:10px;flex-wrap:wrap;margin:10px 0}
-        .chip{background:#0a1222;border:1px solid var(--border);padding:8px 10px;border-radius:999px;color:#cbd5e1;font-size:13px}
-        .success{border-color:#134e4a;background:#052e2b}
-        .error{border-color:#7f1d1d;background:#2b0909}
-        .warn{border-color:#7c2d12;background:#2f0d01}
-        .empty{padding:18px;border:1px dashed var(--border);border-radius:12px;color:var(--muted);text-align:center}
-        .total{font-size:18px}
         .hidden{display:none}
-        .sep{height:1px;background:var(--border);margin:12px 0}
-        .search{display:flex;gap:8px;align-items:center}
-        .search input{flex:1}
-        .pill{display:inline-block;padding:3px 8px;border-radius:999px;border:1px solid var(--border);color:var(--muted);font-size:12px}
+        .pill{display:inline-block;padding:3px 8px;border-radius:999px;border:1px solid var(--border);color:#cbd5e1;font-size:12px}
         .onhand{color:#a3e635}
       </style>
     </head><body><div class="wrap">
@@ -645,8 +1132,8 @@ def place_order_page(request):
 
       <div class="card">
         <h3 style="margin:0 0 8px">Order Lines</h3>
-        <div id="linesEmpty" class="empty">No items added yet.</div>
-        <div id="linesWrap" class="hidden">
+        <div id="linesEmpty" class="hidden">No items added yet.</div>
+        <div id="linesWrap">
           <table>
             <thead>
               <tr>
@@ -656,8 +1143,8 @@ def place_order_page(request):
             <tbody id="linesBody"></tbody>
             <tfoot>
               <tr>
-                <td colspan="4" class="right total"><strong>Estimated Total</strong></td>
-                <td class="right total"><strong id="ttl">0</strong></td>
+                <td colspan="4" class="right"><strong>Estimated Total</strong></td>
+                <td class="right"><strong id="ttl">0</strong></td>
                 <td></td>
               </tr>
             </tfoot>
@@ -667,7 +1154,7 @@ def place_order_page(request):
 
       <div class="row">
         <div class="card">
-          <div class="muted">The Admin Purchase Order will price each line using the Product's <em>cost_price</em>. The totals shown here are estimates using the same value surfaced by the API.</div>
+          <div class="note">The Admin Purchase Order will price each line using the Product's <em>cost_price</em>. The totals shown here are estimates using the same value surfaced by the API.</div>
         </div>
         <div class="card" style="display:flex;justify-content:space-between;align-items:center">
           <a class="btn" href="/inventory/">← Back to stock</a>
@@ -677,9 +1164,9 @@ def place_order_page(request):
 
       <div id="alert" class="card hidden"></div>
 
-      <div id="successPanel" class="card success hidden">
+      <div id="successPanel" class="card hidden" style="border-color:#134e4a;background:#052e2b">
         <h3 style="margin:0 0 6px">PO created ✅</h3>
-        <div id="successText" class="muted" style="margin-bottom:8px"></div>
+        <div id="successText" class="note" style="margin-bottom:8px"></div>
         <div style="display:flex;gap:8px;flex-wrap:wrap">
           <a class="btn" id="dlBtn" download>⬇ Download invoice</a>
           <a class="btn" id="whBtn" target="_blank" rel="noopener">WhatsApp</a>
@@ -693,22 +1180,17 @@ def place_order_page(request):
     </div>
 
     <script>
-      // --- CSRF helper ---
       const CSRFTOKEN_NAME = "{{CSRFTOKEN}}";
       function getCSRFCookie(){
         const m = document.cookie.match(new RegExp(CSRFTOKEN_NAME+"=([^;]+)"));
         return m ? m[1] : "";
       }
 
-      // --- UI state ---
       const nf = new Intl.NumberFormat();
       const $ = (id)=>document.getElementById(id);
       const modelSel = $("model");
       const qtyInp = $("qty");
       const linesBody = $("linesBody");
-      const linesWrap = $("linesWrap");
-      const linesEmpty = $("linesEmpty");
-      const modelsEmpty = $("modelsEmpty");
       const onhandHint = $("onhandHint");
       const alertBox = $("alert");
       const successPanel = $("successPanel");
@@ -717,9 +1199,7 @@ def place_order_page(request):
       const whBtn = $("whBtn");
       const emBtn = $("emBtn");
 
-      const order = {
-        items: [] // {product_id, product, qty, unit}
-      };
+      const order = { items: [] };
 
       function setAlert(kind, msg){
         alertBox.className = "card " + (kind==="error"?"error":kind==="warn"?"warn":"");
@@ -741,14 +1221,11 @@ def place_order_page(request):
             <td class="right">${nf.format(it.qty)}</td>
             <td class="right">${nf.format(it.unit||0)}</td>
             <td class="right">${nf.format(line)}</td>
-            <td class="right"><button class="btn small link" data-i="${idx}">Remove</button></td>
+            <td class="right"><button class="btn small" data-i="${idx}" style="background:transparent;border:none;color:#2f6df6;cursor:pointer">Remove</button></td>
           `;
           linesBody.appendChild(tr);
         });
-        $("ttl").textContent = nf.format(total);
-        const has = order.items.length>0;
-        linesWrap.classList.toggle("hidden", !has);
-        linesEmpty.classList.toggle("hidden", has);
+        document.getElementById("ttl").textContent = nf.format(total);
       }
 
       function addOrBump(pid, product, unit, addQty){
@@ -761,7 +1238,7 @@ def place_order_page(request):
         recalc();
       }
 
-      linesBody.addEventListener("click", (e)=>{
+      document.getElementById("linesBody").addEventListener("click", (e)=>{
         const btn = e.target.closest("button[data-i]");
         if(!btn) return;
         const i = parseInt(btn.getAttribute("data-i"),10);
@@ -778,11 +1255,9 @@ def place_order_page(request):
           const list = (data && data.models) || [];
           modelSel.innerHTML = "";
           if(!list.length){
-            modelsEmpty.classList.remove("hidden");
-            onhandHint.textContent = "";
+            onhandHint.textContent = "No models in stock right now.";
             return;
           }
-          modelsEmpty.classList.add("hidden");
           list.forEach(m=>{
             const opt = document.createElement("option");
             opt.value = m.product_id;
@@ -802,25 +1277,24 @@ def place_order_page(request):
         if(!opt){ onhandHint.textContent = ""; return; }
         const p = opt.dataset.price || "0";
         const oh = opt.dataset.onhand || 0;
-        onhandHint.innerHTML = `<span class="pill">Default price ~ ${nf.format(parseFloat(p)||0)}</span> <span class="pill onhand">On hand: ${oh}</span>`;
+        onhandHint.textContent = `Default price ~ ${nf.format(parseFloat(p)||0)} · On hand: ${oh}`;
       }
 
       modelSel.addEventListener("change", updateOnhandHint);
-      $("refreshBtn").addEventListener("click", (e)=>{ e.preventDefault(); loadModels(); });
-      $("search").addEventListener("input", (e)=>{
+      document.getElementById("refreshBtn")?.addEventListener("click", (e)=>{ e.preventDefault(); loadModels(); });
+      document.getElementById("search")?.addEventListener("input", (e)=>{
         const q = (e.target.value||"").toLowerCase();
         for(const opt of modelSel.options){
           const txt = opt.textContent.toLowerCase();
           opt.hidden = q && !txt.includes(q);
         }
-        // pick first visible
         for(const opt of modelSel.options){
           if(!opt.hidden){ modelSel.value = opt.value; break; }
         }
         updateOnhandHint();
       });
 
-      $("addLine").addEventListener("click", (e)=>{
+      document.getElementById("addLine")?.addEventListener("click", (e)=>{
         e.preventDefault();
         const opt = modelSel.options[modelSel.selectedIndex];
         if(!opt){ setAlert("warn","No model selected."); return; }
@@ -832,23 +1306,20 @@ def place_order_page(request):
         qtyInp.value = "1";
       });
 
-      $("submitOrder").addEventListener("click", async ()=>{
+      document.getElementById("submitOrder")?.addEventListener("click", async ()=>{
         if(order.items.length===0){ setAlert("warn","Add at least one item to the order."); return; }
         const payload = {
-          supplier_name: $("supplier_name").value.trim(),
-          supplier_email: $("supplier_email").value.trim(),
-          supplier_phone: $("supplier_phone").value.trim(),
-          agent_name: $("agent_name").value.trim(),
-          notes: $("notes").value.trim(),
+          supplier_name: document.getElementById("supplier_name").value.trim(),
+          supplier_email: document.getElementById("supplier_email").value.trim(),
+          supplier_phone: document.getElementById("supplier_phone").value.trim(),
+          agent_name: document.getElementById("agent_name").value.trim(),
+          notes: document.getElementById("notes").value.trim(),
           items: order.items.map(i=>({product_id:i.product_id, quantity:i.qty}))
         };
         try{
           const r = await fetch("/inventory/api/place-order/", {
             method:"POST",
-            headers:{
-              "Content-Type":"application/json",
-              "X-CSRFToken": getCSRFCookie()
-            },
+            headers:{ "Content-Type":"application/json", "X-CSRFToken": getCSRFCookie() },
             body: JSON.stringify(payload)
           });
           const data = await r.json();
@@ -857,13 +1328,11 @@ def place_order_page(request):
             setAlert("error", "Failed to create PO: " + msg);
             return;
           }
-          // Success UI
           successPanel.classList.remove("hidden");
           successText.textContent = `PO-${data.po_id} created. Total will reflect product cost prices.`;
           dlBtn.href = data.invoice_url;
           whBtn.href = data.share && data.share.whatsapp ? data.share.whatsapp : "#";
           emBtn.setAttribute("href", data.share && data.share.email ? data.share.email : "#");
-          // reset builder
           order.items = [];
           recalc();
           window.scrollTo({top: document.body.scrollHeight, behavior: "smooth"});
@@ -872,7 +1341,6 @@ def place_order_page(request):
         }
       });
 
-      // init
       loadModels();
       updateOnhandHint();
     </script>
@@ -886,12 +1354,20 @@ def place_order_page(request):
 @login_required
 @require_POST
 @transaction.atomic
+@safe_api
 def api_mark_sold(request):
+    # Require business selection
+    gate = _require_active_business(request)
+    if gate:
+        return gate  # safe_api will wrap this into a response
+
     if _is_auditor(request.user):
         return JsonResponse({"ok": False, "error": "Auditors cannot modify inventory."}, status=403)
 
+    # Parse body (JSON or form)
     try:
-        if request.content_type and "application/json" in request.content_type.lower():
+        ctype = (request.headers.get("Content-Type") or request.content_type or "").lower()
+        if "application/json" in ctype:
             payload = json.loads(request.body or "{}")
         else:
             payload = request.POST
@@ -900,51 +1376,79 @@ def api_mark_sold(request):
 
     imei = (payload.get("imei") or "").strip()
     comment = (payload.get("comment") or "").strip()
-    price = payload.get("price")
-    location_id = payload.get("location_id")
+    raw_price = payload.get("price")
+    raw_loc = payload.get("location_id") or payload.get("location")
 
     if not imei.isdigit() or len(imei) != 15:
         return JsonResponse({"ok": False, "error": "IMEI must be exactly 15 digits."}, status=400)
 
+    # Active business & tenant-scoped fetch
+    _, biz_id = _get_active_business(request)
+    qs = InventoryItem.objects.select_for_update()
+    if biz_id:
+        qs = qs.filter(**_biz_filter_kwargs(InventoryItem, biz_id))
     try:
-        item = InventoryItem.objects.select_for_update().get(imei=imei)
+        item = qs.get(imei=imei)
     except InventoryItem.DoesNotExist:
-        return JsonResponse({"ok": False, "error": "Item not found."}, status=404)
+        return JsonResponse({"ok": False, "error": "Item not found in your store."}, status=404)
 
-    if str(getattr(item, "status", "")) == "SOLD":
+    # If already sold (when model has status)
+    if _model_has_field(InventoryItem, "status") and str(getattr(item, "status", "")) == "SOLD":
         _audit(item, request.user, "SOLD_API_DUP", f"Duplicate mark-sold via API. Comment: {comment}")
         return JsonResponse({"ok": True, "imei": imei, "already_sold": True})
 
-    if price is not None:
+    # Validate price (optional)
+    price_val = None
+    if raw_price is not None and raw_price != "":
         try:
-            price_val = float(price)
+            price_val = float(raw_price)
             if price_val < 0:
                 return JsonResponse({"ok": False, "error": "Price must be a non-negative amount."}, status=400)
         except Exception:
             return JsonResponse({"ok": False, "error": "Invalid price format."}, status=400)
-    else:
-        price_val = None
 
-    updates = {"status": "SOLD"}
-    item._actor = request.user
-    item.status = "SOLD"
+    # Validate location (optional) WITH tenant check
+    loc_id = None
+    if raw_loc not in (None, "", 0, "0"):
+        try:
+            loc_id = int(raw_loc)
+        except Exception:
+            return JsonResponse({"ok": False, "error": "Invalid location id."}, status=400)
+        # ensure provided location belongs to active tenant
+        try:
+            loc_qs = Location.objects.all()
+            if biz_id:
+                loc_qs = loc_qs.filter(**_biz_filter_kwargs(Location, biz_id))
+            if not loc_qs.filter(id=loc_id).exists():
+                return JsonResponse({"ok": False, "error": "That location is not in your store."}, status=403)
+        except Exception:
+            # If we cannot check, fail safe
+            return JsonResponse({"ok": False, "error": "Unable to verify location for this store."}, status=400)
 
-    if hasattr(item, "sold_at") and not item.sold_at:
+    # Apply updates (only existing fields)
+    updates = {}
+    if _model_has_field(InventoryItem, "status"):
+        item.status = "SOLD"
+        updates["status"] = "SOLD"
+
+    if _model_has_field(InventoryItem, "sold_at") and not getattr(item, "sold_at", None):
         item.sold_at = timezone.localdate()
         updates["sold_at"] = item.sold_at
 
-    if price_val is not None:
+    if price_val is not None and _model_has_field(InventoryItem, "selling_price"):
         item.selling_price = price_val
         updates["selling_price"] = item.selling_price
 
-    if location_id:
-        try:
-            item.current_location_id = int(location_id)
+    # Location may be 'current_location' or 'location'
+    if loc_id is not None:
+        if _model_has_field(InventoryItem, "current_location"):
+            item.current_location_id = loc_id
             updates["current_location_id"] = item.current_location_id
-        except Exception:
-            return JsonResponse({"ok": False, "error": "Invalid location id."}, status=400)
+        elif _model_has_field(InventoryItem, "location"):
+            item.location_id = loc_id
+            updates["location_id"] = item.location_id
 
-    if hasattr(item, "sold_by") and getattr(item, "sold_by", None) is None:
+    if _model_has_field(InventoryItem, "sold_by") and getattr(item, "sold_by", None) is None:
         try:
             item.sold_by = request.user
         except Exception:
@@ -953,50 +1457,97 @@ def api_mark_sold(request):
     item.save()
     _audit(item, request.user, "SOLD_API", f"via scan_web; comment={comment}")
 
+    # Create Sale record (best-effort, tenant-safe)
     try:
         sale_kwargs = {
             "item": item,
             "agent": request.user,
-            "sold_at": getattr(item, "sold_at", timezone.localdate()),
-            "price": item.selling_price or 0,
+            "price": getattr(item, "selling_price", None) or 0,
         }
-        if location_id:
-            sale_kwargs["location_id"] = item.current_location_id
-        Sale.objects.create(**sale_kwargs)
+        if _model_has_field(InventoryItem, "sold_at"):
+            sale_kwargs["sold_at"] = getattr(item, "sold_at", timezone.localdate())
+        if loc_id is not None:
+            sale_kwargs["location_id"] = (
+                item.current_location_id if hasattr(item, "current_location_id") else getattr(item, "location_id", None)
+            )
+        sale_kwargs.update(_attach_business_kwargs(Sale, biz_id))
+        Sale.objects.create(**{k: v for k, v in sale_kwargs.items() if v is not None})
     except Exception:
         pass
 
     return JsonResponse({"ok": True, "imei": imei, "updates": updates})
 
+# --- PART 1/3 end ---
+# --- PART 2/3 — circuitcity/inventory/views.py ---
 
 # -----------------------
 # Dashboard & list
 # -----------------------
+from django.contrib.auth.decorators import login_required
+from django.views.decorators.cache import never_cache
+from django.views.decorators.http import require_http_methods, require_GET, require_POST
+from django.shortcuts import render, redirect, get_object_or_404
+from django.http import HttpResponse, JsonResponse
+from django.db.models import (
+    Sum, Q, Exists, OuterRef, Count, F, DecimalField, ExpressionWrapper, Case, When, Value
+)
+from django.db.models.functions import TruncMonth, TruncDate, Cast, Coalesce
+from django.utils import timezone
+from datetime import timedelta, date
+import json
+import csv
+
 @login_required
 def inventory_dashboard(request):
+    # Require a selected business
+    gate = _require_active_business(request)
+    if gate:
+        return gate
+    _, biz_id = _get_active_business(request)
+
+    # NEW: calendar filter (range: all | 7d | month | day; day: YYYY-MM-DD)
+    range_preset, day_str, start_dt, end_dt = get_preset_window(request, default_preset="month")
+
+    # Back-compat: keep old ?period=month behavior if no new range supplied
     period = request.GET.get("period", "month")
+    if request.GET.get("range"):
+        # If explicit range given, normalize the legacy period label
+        period = {"7d": "7d", "all": "all", "day": "day"}.get(range_preset, "month")
+
     model_id = request.GET.get("model") or None
     today = timezone.localdate()
     tomorrow = today + timedelta(days=1)
     month_start = today.replace(day=1)
 
     ver = get_dashboard_cache_version()
-    cache_key = f"dash:v{ver}:u{request.user.id}:p:{period}:m:{model_id or 'all'}"
+    cache_key = (
+        f"dash:v{ver}:biz:{biz_id or 'none'}:u{request.user.id}"
+        f":p:{period}:m:{model_id or 'all'}:r:{range_preset}:d:{day_str or '*'}"
+    )
     cached = cache.get(cache_key)
     if cached:
         return _render_dashboard_safe(
             request, cached, today, cached.get("mtd_count", 0), cached.get("all_time_count", 0)
         )
 
-    # Scope for KPIs and stock widgets (respect permissions)
+    # Scope for KPIs and stock widgets (respect permissions AND business)
     if _can_view_all(request.user):
-        sales_qs_all = Sale.objects.select_related("item", "agent", "item__product")
-        items_qs = InventoryItem.objects.select_related("product", "assigned_agent", "current_location")
+        sales_qs_all = _scoped(Sale.objects.select_related("item", "agent", "item__product"), request)
+        items_qs = _scoped(
+            InventoryItem.objects.select_related("product", "assigned_agent", "current_location"),
+            request,
+        )
         scope_label = "All agents"
     else:
-        sales_qs_all = Sale.objects.filter(agent=request.user).select_related("item", "agent", "item__product")
-        items_qs = InventoryItem.objects.filter(assigned_agent=request.user).select_related(
-            "product", "assigned_agent", "current_location"
+        sales_qs_all = _scoped(
+            Sale.objects.filter(agent=request.user).select_related("item", "agent", "item__product"),
+            request,
+        )
+        items_qs = _scoped(
+            InventoryItem.objects.filter(assigned_agent=request.user).select_related(
+                "product", "assigned_agent", "current_location"
+            ),
+            request,
         )
         scope_label = "My sales"
 
@@ -1004,12 +1555,20 @@ def inventory_dashboard(request):
         sales_qs_all = sales_qs_all.filter(item__product_id=model_id)
         items_qs = items_qs.filter(product_id=model_id)
 
-    sales_qs_period = sales_qs_all
-    if period == "month":
-        sales_qs_period = sales_qs_all.filter(sold_at__gte=month_start)
+    # Period/window filter for charts + KPIs (sold_at range)
+    time_q = _time_q_for(Sale, start_dt, end_dt, ("sold_at",))
+    if time_q:
+        sales_qs_period = sales_qs_all.filter(time_q)
+    else:
+        sales_qs_period = sales_qs_all
+        if period == "month":
+            sales_qs_period = sales_qs_all.filter(sold_at__gte=month_start)
+        elif period == "7d":
+            sales_qs_period = sales_qs_all.filter(sold_at__gte=timezone.now() - timedelta(days=7))
+        # period == "all" -> no extra filter; period == "day" would have time_q already
 
+    # KPI: today + month + all-time (unchanged legacy)
     today_count = sales_qs_all.filter(sold_at__gte=today, sold_at__lt=tomorrow).count()
-    # NEW for UI: today's total sales amount (MK)
     dec2 = DecimalField(max_digits=14, decimal_places=2)
     today_total = sales_qs_all.filter(sold_at__gte=today, sold_at__lt=tomorrow).aggregate(
         s=Coalesce(Sum("price"), Value(0), output_field=dec2)
@@ -1017,14 +1576,25 @@ def inventory_dashboard(request):
     mtd_count = sales_qs_all.filter(sold_at__gte=month_start, sold_at__lt=tomorrow).count()
     all_time_count = sales_qs_all.count()
 
-    # ---- Agent ranking (ALL agents, ordered by earnings desc then sales desc) ----
-    pct_dec = DecimalField(max_digits=5, decimal_places=2)
+    # NEW: window KPIs (respecting calendar range)
+    window_totals = sales_qs_period.aggregate(
+        window_revenue=Coalesce(Sum("price"), Value(0), output_field=dec2)
+    )
+    window_count = sales_qs_period.count()
+    window_revenue = float(window_totals.get("window_revenue") or 0)
 
-    rank_base = Sale.objects.select_related("agent")
+    # ---- Agent ranking (ALL agents within this business) ----
+    pct_dec = DecimalField(max_digits=5, decimal_places=2)
+    rank_base = _scoped(Sale.objects.select_related("agent"), request)
     if model_id:
         rank_base = rank_base.filter(item__product_id=model_id)
-    if period == "month":
+    # Apply the same window
+    if time_q:
+        rank_base = rank_base.filter(time_q)
+    elif period == "month":
         rank_base = rank_base.filter(sold_at__gte=month_start)
+    elif period == "7d":
+        rank_base = rank_base.filter(sold_at__gte=timezone.now() - timedelta(days=7))
 
     commission_pct_dec = Cast(F("commission_pct"), pct_dec)
     commission_expr = ExpressionWrapper(
@@ -1044,11 +1614,13 @@ def inventory_dashboard(request):
     )
     agent_rank = list(agent_rank_qs)
 
-    # Wallet summaries (decimal-safe defaults) for the agents present in ranking
+    # Wallet summaries (decimal-safe) — scoped to business if WalletTxn has a business FK
     agent_wallet_summaries = {}
     agent_ids = [row["agent_id"] for row in agent_rank if row.get("agent_id")]
     if agent_ids and WalletTxn is not None:
-        w = WalletTxn.objects.filter(user_id__in=agent_ids)  # type: ignore[union-attr]
+        w = _scoped(WalletTxn.objects, request).filter(user_id__in=agent_ids)  # type: ignore[union-attr]
+        month_start_dt = timezone.make_aware(timezone.datetime.combine(month_start, timezone.datetime.min.time()))
+        today_dt = timezone.make_aware(timezone.datetime.combine(today, timezone.datetime.max.time()))
         agent_wallet_rows = w.values("user_id").annotate(
             balance=Sum("amount"),
             lifetime_commission=Sum(Case(When(reason="COMMISSION", then="amount"),
@@ -1060,7 +1632,7 @@ def inventory_dashboard(request):
             month_commission=Sum(
                 Case(
                     When(reason="COMMISSION",
-                         created_at__date__gte=month_start, created_at__date__lte=today,
+                         created_at__gte=month_start_dt, created_at__lte=today_dt,
                          then="amount"),
                     default=Value(0, output_field=dec2),
                 )
@@ -1068,7 +1640,7 @@ def inventory_dashboard(request):
             month_advance=Sum(
                 Case(
                     When(reason="ADVANCE",
-                         created_at__date__gte=month_start, created_at__date__lte=today,
+                         created_at__gte=month_start_dt, created_at__lte=today_dt,
                          then="amount"),
                     default=Value(0, output_field=dec2),
                 )
@@ -1076,7 +1648,7 @@ def inventory_dashboard(request):
             month_adjustment=Sum(
                 Case(
                     When(reason="ADJUSTMENT",
-                         created_at__date__gte=month_start, created_at__date__lte=today,
+                         created_at__gte=month_start_dt, created_at__lte=today_dt,
                          then="amount"),
                     default=Value(0, output_field=dec2),
                 )
@@ -1102,7 +1674,7 @@ def inventory_dashboard(request):
                 },
             }
 
-    # >>> Rank agents by WALLET BALANCE (desc). Tie-breakers keep original intent.
+    # >>> Rank by WALLET BALANCE (desc) as primary key; keep original ties
     for row in agent_rank:
         uid = row.get("agent_id")
         row["wallet_balance"] = float(agent_wallet_summaries.get(uid, {}).get("balance", 0.0))
@@ -1116,7 +1688,7 @@ def inventory_dashboard(request):
     )
     # <<< End wallet-based ranking
 
-    # ===== Revenue/Profit last 12 months =====
+    # ===== Revenue/Profit last 12 months (scoped to business) =====
     def back_n_months(d: date, n: int) -> date:
         y = d.year
         m = d.month - n
@@ -1125,10 +1697,11 @@ def inventory_dashboard(request):
             y -= 1
         return date(y, m, 1)
 
-    last_12_labels = [back_n_months(month_start, n).strftime("%Y-%m") for n in range(11, -1, -1)]
+    month_start_base = month_start
+    last_12_labels = [back_n_months(month_start_base, n).strftime("%Y-%m") for n in range(11, -1, -1)]
 
-    rev_qs = Sale.objects.select_related("item").filter(
-        sold_at__gte=back_n_months(month_start, 11)
+    rev_qs = _scoped(Sale.objects.select_related("item"), request).filter(
+        sold_at__gte=back_n_months(month_start_base, 11)
     )
     if not _can_view_all(request.user):
         rev_qs = rev_qs.filter(agent=request.user)
@@ -1160,12 +1733,18 @@ def inventory_dashboard(request):
     revenue_points = [totals_map.get(lbl, 0.0) for lbl in last_12_labels]
     profit_points = [prof_map.get(lbl, 0.0) for lbl in last_12_labels]
 
-    # ===== Agents: total stock vs sold units (period filter applied) =====
+    # ===== Agents: total stock vs sold units (period filter applied, scoped) =====
     if _can_view_all(request.user):
-        items_scope = InventoryItem.objects.select_related("product", "assigned_agent", "current_location")
+        items_scope = _scoped(
+            InventoryItem.objects.select_related("product", "assigned_agent", "current_location"),
+            request,
+        )
     else:
-        items_scope = InventoryItem.objects.filter(assigned_agent=request.user).select_related(
-            "product", "assigned_agent", "current_location"
+        items_scope = _scoped(
+            InventoryItem.objects.filter(assigned_agent=request.user).select_related(
+                "product", "assigned_agent", "current_location"
+            ),
+            request,
         )
     if model_id:
         items_scope = items_scope.filter(product_id=model_id)
@@ -1217,34 +1796,43 @@ def inventory_dashboard(request):
     else:
         stock_health = "Good"
 
-    products = Product.objects.order_by("brand", "model", "variant").values("id", "brand", "model", "variant")
+    # Products dropdown (scoped)
+    products_qs = _scoped(Product.objects.order_by("brand", "model", "variant"), request)
+    products = products_qs.values("id", "brand", "model", "variant")
 
-    # ===== Wallet (current user) =====
+    # ===== Wallet (current user) - scoped if WalletTxn supports business =====
     def _sum(qs):
         return qs.aggregate(s=Sum("amount"))["s"] or 0
 
-    my_balance = _wallet_balance(request.user)
-    today_local = timezone.localdate()
-    month_start_local = today_local.replace(day=1)
-
     if WalletTxn is not None:
-        month_qs = WalletTxn.objects.filter(user=request.user, created_at__date__gte=month_start_local, created_at__date__lte=today_local)  # type: ignore[union-attr]
+        month_qs = _scoped(
+            WalletTxn.objects.filter(user=request.user, created_at__date__gte=month_start, created_at__date__lte=today),
+            request,
+        )  # type: ignore[union-attr]
         my_month_commission = _sum(month_qs.filter(reason="COMMISSION"))
         my_month_advance = _sum(month_qs.filter(reason="ADVANCE"))
         my_month_adjustment = _sum(month_qs.filter(reason="ADJUSTMENT"))
-        life_qs = WalletTxn.objects.filter(user=request.user)  # type: ignore[union-attr]
+        life_qs = _scoped(WalletTxn.objects.filter(user=request.user), request)  # type: ignore[union-attr]
         my_life_commission = _sum(life_qs.filter(reason="COMMISSION"))
         my_life_advance = _sum(life_qs.filter(reason="ADVANCE"))
         my_life_adjustment = _sum(life_qs.filter(reason="ADJUSTMENT"))
         my_life_total = _sum(life_qs)
+        my_balance = _sum(life_qs)
     else:
         my_month_commission = my_month_advance = my_month_adjustment = 0
         my_life_commission = my_life_advance = my_life_adjustment = my_life_total = 0
+        my_balance = 0
 
     # NEW for UI: Profit Margin (% of selected period)
     profit_margin = int(round((pie_profit / pie_revenue) * 100)) if pie_revenue > 0 else 0
 
     context = {
+        # filter state for the UI (calendar picker can read these)
+        "range": range_preset,
+        "filter_day": day_str or "",
+        "filter_start": start_dt.isoformat() if start_dt else None,
+        "filter_end": end_dt.isoformat() if end_dt else None,
+
         "period": period,
         "model_id": int(model_id) if model_id else None,
         "products": list(products),
@@ -1268,13 +1856,18 @@ def inventory_dashboard(request):
         "jug_color": jug_color,
         "stock_health": stock_health,
 
-        # KPIs (also expose legacy 'kpis' bag used in some templates)
+        # KPIs (legacy + new window KPIs)
         "is_manager_or_admin": _is_manager_or_admin(request.user),
         "today_count": today_count,
         "mtd_count": mtd_count,
         "all_time_count": all_time_count,
         "today_total": float(today_total or 0),
         "profit_margin": profit_margin,
+
+        # NEW window KPIs
+        "window_count": window_count,
+        "window_revenue": window_revenue,
+
         "kpis": {
             "scope": scope_label,
             "today_count": today_count,
@@ -1290,7 +1883,7 @@ def inventory_dashboard(request):
                 "advance": my_month_advance,
                 "adjustment": my_month_adjustment,
                 "total": my_month_commission + my_month_advance + my_month_adjustment,
-                "month_label": month_start_local.strftime("%b %Y"),
+                "month_label": month_start.strftime("%b %Y"),
             },
             "lifetime": {
                 "commission": my_life_commission,
@@ -1301,14 +1894,14 @@ def inventory_dashboard(request):
         },
     }
 
-    # --- Feature flags & slide config (rotator will switch slides every 10s) ---
+    # --- Feature flags & slide config: disable the landing overlay/rotator “cloud”
     context["PREDICTIVE_ENABLED"]   = bool(getattr(settings, "PREDICTIVE_ENABLED", True))
-    context["THEME_ROTATE_ENABLED"] = bool(getattr(settings, "THEME_ROTATE_ENABLED", True))
+    context["THEME_ROTATE_ENABLED"] = False  # <— turn off rotation by default
     context["THEME_ROTATE_MS"]      = int(getattr(settings, "THEME_ROTATE_MS", 10000))
     context["THEME_DEFAULT"]        = str(getattr(settings, "THEME_DEFAULT", "style-1"))
-    context["ROTATOR_MODE"]         = "slides"
-    # Align slide APIs with underscore routes used by the template
+    context["ROTATOR_MODE"]         = "off"  # <— no slideshow overlay on first land
     context["DASHBOARD_SLIDES"] = [
+        # kept for compatibility if you choose to re-enable rotation later
         {
             "key": "trends",
             "title": "Sales Trends",
@@ -1336,115 +1929,171 @@ def inventory_dashboard(request):
 @login_required
 @require_http_methods(["GET"])
 def stock_list(request):
-    q = request.GET.get("q", "").strip()
+    # Tenant gate
+    gate = _require_active_business(request)
+    if gate:
+        return gate
+    _, biz_id = _get_active_business(request)
+
+    q = (request.GET.get("q") or "").strip()
     show_archived = request.GET.get("archived") == "1"
     want_csv = request.GET.get("export") == "csv"
-    status = (request.GET.get("status") or "").lower()
 
+    # NEW: calendar filter on stock page too (for sales KPIs panel)
+    range_preset, day_str, start_dt, end_dt = get_preset_window(request, default_preset="all")
+    time_q_sales = _time_q_for(Sale, start_dt, end_dt, ("sold_at",))
+
+    # Normalize status filter:
+    raw_status = (request.GET.get("status") or "").lower()
+    # accepted: "in", "in_stock", "sold", "all" (default -> "in")
+    if raw_status in ("sold", "all", "in", "in_stock"):
+        status = raw_status
+    else:
+        status = "in"
+
+    # Base queryset (scoped to business)
     has_sales_subq = Sale.objects.filter(item=OuterRef("pk"))
-    base = _inv_base(show_archived)
+    if biz_id:
+        has_sales_subq = has_sales_subq.filter(**_biz_filter_kwargs(Sale, biz_id))
 
-    base_qs = base.select_related("product", "current_location", "assigned_agent").annotate(
-        has_sales=Exists(has_sales_subq)
+    base_mgr = _inv_base(show_archived)
+    base_scoped = _scoped(base_mgr.all(), request).select_related(
+        "product", "current_location", "assigned_agent"
+    ).annotate(has_sales=Exists(has_sales_subq))
+
+    # Permission scoping for visible data
+    if _can_view_all(request.user):
+        visible_base = base_scoped
+        sales_scope = _scoped(Sale.objects.select_related("item", "agent"), request)
+    else:
+        visible_base = base_scoped.filter(assigned_agent=request.user)
+        sales_scope = _scoped(Sale.objects.filter(agent=request.user).select_related("item", "agent"), request)
+
+    # ===== KPIs (computed from visible_base; not affected by search/status UI) =====
+    is_sold = Q(status="SOLD")
+    dec2 = DecimalField(max_digits=14, decimal_places=2)
+
+    total_in_stock = visible_base.exclude(is_sold).count()
+    total_sold = visible_base.filter(is_sold).count()
+    sum_order_price = visible_base.exclude(is_sold).aggregate(
+        s=Coalesce(Sum("order_price"), Value(0), output_field=dec2)
+    )["s"] or 0
+    sum_selling_price = visible_base.filter(is_sold).aggregate(
+        s=Coalesce(Sum("selling_price"), Value(0), output_field=dec2)
+    )["s"] or 0
+
+    # NEW: window sales KPIs for the selected date/day/7d/all
+    if time_q_sales:
+        win_sales_qs = sales_scope.filter(time_q_sales)
+    else:
+        if range_preset == "7d":
+            win_sales_qs = sales_scope.filter(sold_at__gte=timezone.now() - timedelta(days=7))
+        elif range_preset == "month":
+            win_sales_qs = sales_scope.filter(sold_at__gte=timezone.now().replace(day=1))
+        else:
+            win_sales_qs = sales_scope  # all time
+
+    window_sales_count = win_sales_qs.count()
+    window_sales_total = float(
+        win_sales_qs.aggregate(s=Coalesce(Sum("price"), Value(0), output_field=dec2))["s"] or 0
     )
 
-    if _can_view_all(request.user):
-        qs = base_qs
-    else:
-        qs = base_qs.filter(assigned_agent=request.user)
+    # ===== Build list queryset (status + search) from visible_base =====
+    qs = visible_base
+    if status == "sold":
+        qs = qs.filter(is_sold)
+    elif status in ("all",):
+        pass
+    else:  # default: in-stock
+        qs = qs.exclude(is_sold)
 
     if q:
         qs = qs.filter(
             Q(imei__icontains=q)
-            | Q(product__model__icontains=q)
+            | Q(product__name__icontains=q)
             | Q(product__brand__icontains=q)
-            | Q(product__variant__icontains=q)
+            | Q(product__model__icontains=q)
+            | Q(product__code__icontains=q)  # replaced sku with code (field exists)
         )
 
-    if status == "in_stock":
-        qs = qs.filter(status="IN_STOCK")
-    elif status == "sold":
-        qs = qs.filter(status="SOLD")
-
+    # Sort results
     qs = qs.order_by("-received_at", "product__model")
 
-    if want_csv:
-        filename = f"stock_export_{timezone.now():%Y%m%d_%H%M}.csv"
-        response = HttpResponse(content_type="text/csv; charset=utf-8")
-        response["Content-Disposition"] = f'attachment; filename="{filename}"'
-        response["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
-        response["Pragma"] = "no-cache"
-        response.write("\ufeff")  # BOM for Excel
-        writer = csv.writer(response)
-        writer.writerow(
-            ["IMEI", "Product", "Status", "Order Price", "Selling Price", "Location", "Agent", "Received", "Archived", "Has Sales"]
-        )
-        for it in qs.iterator():
-            product_str = str(it.product) if it.product else ""
-            location_str = it.current_location.name if it.current_location_id else ""
-            agent_str = it.assigned_agent.get_username() if it.assigned_agent_id else ""
-            received_str = it.received_at.strftime("%Y-%m-%d") if it.received_at else ""
-            writer.writerow(
-                [
-                    it.imei or "",
-                    product_str,
-                    it.status,
-                    f"{it.order_price:.2f}" if it.order_price is not None else "",
-                    f"{it.selling_price:.2f}" if it.selling_price is not None else "",
-                    location_str,
-                    agent_str,
-                    received_str,
-                    "No" if getattr(it, "is_active", True) else "Yes",
-                    "Yes" if getattr(it, "has_sales", False) else "No",
-                ]
-            )
-        return response
+    # Paginate
+    page_obj, url_for = _paginate_qs(
+        request,
+        qs,
+        default_per_page=50,
+        max_per_page=200
+    )
 
-    in_stock = qs.filter(status="IN_STOCK").count()
-    sold_count = qs.filter(status="SOLD").count()
-    sum_order = qs.aggregate(s=Sum("order_price"))["s"] or 0
-    sum_selling = qs.aggregate(s=Sum("selling_price"))["s"] or 0
-
-    page_obj, url_for = _paginate_qs(request, qs, default_per_page=50, max_per_page=200)
-
+    # Build rows for template
     rows = [
         {
-            "imei": (it.imei or ""),
+            "imei": it.imei or "",
             "product": str(it.product) if it.product else "",
-            "status": ("SOLD" if it.status == "SOLD" else "In stock"),
+            "status": "SOLD" if it.status == "SOLD" else "In stock",
             "order_price": f"{(it.order_price or 0):,.0f}",
-            "selling_price": ("" if it.selling_price is None else f"{float(it.selling_price):,.0f}"),
-            "location": it.current_location.name if it.current_location_id else "—",
-            "agent": it.assigned_agent.get_username() if it.assigned_agent_id else "—",
+            "selling_price": "-" if it.selling_price is None else f"{float(it.selling_price):,.0f}",
+            "location": it.current_location.name if it.current_location_id else "-",
+            "agent": it.assigned_agent.get_username() if it.assigned_agent_id else "-",
         }
         for it in page_obj.object_list
     ]
 
-    # Battery target: managers/admins/auditors see a 100-cap battery, agents see 20-cap
-    target_full = 100 if _can_view_all(request.user) else 20
+    # Optional CSV export (still scoped)
+    if want_csv:
+        response = HttpResponse(content_type="text/csv")
+        response["Content-Disposition"] = 'attachment; filename="stock.csv"'
+        writer = csv.writer(response)
+        writer.writerow(["IMEI", "Product", "Status", "Order Price", "Selling Price", "Location", "Agent"])
+        for row in rows:
+            writer.writerow([
+                row["imei"], row["product"], row["status"],
+                row["order_price"], row["selling_price"],
+                row["location"], row["agent"],
+            ])
+        return response
 
-    context = {
-        "items": page_obj.object_list,
-        "q": q,
-        "is_admin": _is_admin(request.user),
-        "can_edit": _can_edit_inventory(request.user),
-        "show_archived": show_archived,
-        "total_in_stock": in_stock,
-        "total_sold": sold_count,
-        "sum_order_price": sum_order,
-        "sum_selling_price": sum_selling,
-        "page_obj": page_obj,
-        "url_for": url_for,
-        "rows": rows,
-        "in_stock": in_stock,
-        "sold_count": sold_count,
-        "sum_order": sum_order,
-        "sum_selling": sum_selling,
-        "status": status,
-        "target_full": target_full,  # <-- used by UI battery
-    }
-    # Render safely (try templates, then fallback HTML)
-    return _render_stock_list_safe(request, context)
+    # Render with robust fallback if the template is missing
+    return _render_stock_list_safe(
+        request,
+        {
+            "items": page_obj.object_list,
+            "rows": rows,
+            "q": q,
+            "is_admin": _is_admin(request.user),
+            "can_edit": _can_edit_inventory(request.user),
+            "show_archived": show_archived,
+
+            # date filter state for UI calendar
+            "range": range_preset,
+            "filter_day": day_str or "",
+            "filter_start": start_dt.isoformat() if start_dt else None,
+            "filter_end": end_dt.isoformat() if end_dt else None,
+
+            # Fallback template expects these exact keys:
+            "total_in_stock": total_in_stock,
+            "total_sold": total_sold,
+            "sum_order_price": sum_order_price,
+            "sum_selling_price": sum_selling_price,
+
+            # Extra KPIs for the selected window
+            "window_sales_count": window_sales_count,
+            "window_sales_total": window_sales_total,
+
+            # Also include the more descriptive ones some templates use:
+            "in_stock": total_in_stock,
+            "sold_count": total_sold,
+            "sum_order": sum_order_price,
+            "sum_selling": sum_selling_price,
+            "page_obj": page_obj,
+            "url_for": url_for,
+            "status": status,
+            # Battery target: managers/admins/auditors see a 100-cap battery, agents see 20-cap
+            "target_full": 100 if _can_view_all(request.user) else 20,
+        }
+    )
 
 
 @never_cache
@@ -1452,17 +2101,25 @@ def stock_list(request):
 @require_http_methods(["GET"])
 def export_csv(request):
     # Same filters/permissions as stock_list, but always returns CSV
+    gate = _require_active_business(request)
+    if gate:
+        return gate
+    _, biz_id = _get_active_business(request)
+
     q = request.GET.get("q", "").strip()
     show_archived = request.GET.get("archived") == "1"
     status = (request.GET.get("status") or "").lower()
 
     has_sales_subq = Sale.objects.filter(item=OuterRef("pk"))
-    base = _inv_base(show_archived)
+    if biz_id:
+        has_sales_subq = has_sales_subq.filter(**_biz_filter_kwargs(Sale, biz_id))
+    base_mgr = _inv_base(show_archived)
 
-    qs = base.select_related("product", "current_location", "assigned_agent").annotate(has_sales=Exists(has_sales_subq))
+    qs = _scoped(base_mgr.all(), request).select_related("product", "current_location", "assigned_agent").annotate(has_sales=Exists(has_sales_subq))
     if not _can_view_all(request.user):
         qs = qs.filter(assigned_agent=request.user)
 
+    # Match stock_list search & status handling
     if q:
         qs = qs.filter(
             Q(imei__icontains=q)
@@ -1470,11 +2127,11 @@ def export_csv(request):
             | Q(product__brand__icontains=q)
             | Q(product__variant__icontains=q)
         )
-
-    if status == "in_stock":
-        qs = qs.filter(status="IN_STOCK")
-    elif status == "sold":
-        qs = qs.filter(status="SOLD")
+    is_sold = Q(status="SOLD")
+    if status == "sold":
+        qs = qs.filter(is_sold)
+    elif status not in ("", "all"):
+        qs = qs.exclude(is_sold)
 
     qs = qs.order_by("-received_at", "product__model")
 
@@ -1517,19 +2174,96 @@ def export_csv(request):
 @login_required
 @require_http_methods(["GET"])
 def time_checkin_page(request):
-    prof = getattr(request.user, "agent_profile", None)
-    pref_loc = getattr(prof, "location", None)
+    # Prefer a home location only if it belongs to the active business
+    pref_loc = _user_home_location(request.user)
+    if pref_loc and not _obj_belongs_to_active_business(pref_loc, request):
+        pref_loc = None
     return render(
         request,
         "inventory/time_checkin.html",
         {"pref_loc_id": pref_loc.id if pref_loc else "", "pref_loc_name": pref_loc.name if pref_loc else ""},
     )
 
+# --- Inventory Settings (profile + 2FA + notifications) ---
+from hashlib import md5
+
+def _gravatar(email: str, size: int = 160) -> str:
+    if not email:
+        email = "user@example.com"
+    h = md5(email.strip().lower().encode("utf-8")).hexdigest()
+    return f"https://www.gravatar.com/avatar/{h}?s={size}&d=identicon"
+
+def _two_factor_status(user) -> dict:
+    """
+    Try to detect common 2FA setups gracefully.
+    - django-two-factor-auth (user.phonenumber or default device)
+    - django-otp devices
+    Fallback: disabled.
+    """
+    enabled = False
+    provider = None
+    try:
+        # django-otp
+        from django_otp import devices_for_user
+        devs = list(devices_for_user(user))
+        if devs:
+            enabled = True
+            provider = devs[0].device_id if hasattr(devs[0], "device_id") else devs[0].__class__.__name__
+    except Exception:
+        pass
+
+    try:
+        # two_factor default device API
+        if hasattr(user, "staticdevice_set") or hasattr(user, "defaultdevice"):
+            # If any static tokens or default device exists, assume enabled
+            if getattr(user, "defaultdevice", None) or (hasattr(user, "staticdevice_set") and user.staticdevice_set.exists()):
+                enabled = True
+                provider = provider or "TOTP"
+    except Exception:
+        pass
+
+    return {
+        "enabled": enabled,
+        "provider": provider or ("TOTP" if enabled else None),
+        # Where to send user to manage 2FA if you have the app mounted; otherwise leave "#"
+        "manage_url": getattr(settings, "TWO_FACTOR_MANAGE_URL", "/account/two-factor/"),
+    }
+
+@login_required
+def settings_home(request):
+    user = request.user
+    profile = getattr(user, "profile", None)  # ok if you don’t have a Profile model
+    avatar_url = getattr(profile, "avatar_url", None) or _gravatar(user.email, 160)
+
+    twofa = _two_factor_status(user)
+
+    context = {
+        "title": "Settings",
+        "avatar_url": avatar_url,
+        "user_full_name": (user.get_full_name() or user.username),
+        "user_username": user.username,
+        "user_email": user.email,
+        "last_login": user.last_login,
+        "twofa": twofa,
+        # existing notification toggles can be wired later; showing as UI only
+    }
+    return render(request, "inventory/settings.html", context)
+
+@login_required
+def settings_redirect(request):
+    return redirect("accounts:settings_unified")
+
 
 @never_cache
 @login_required
 @require_POST
 def api_time_checkin(request):
+    # Ensure an active business and attach it to TimeLog when possible
+    gate = _require_active_business(request)
+    if gate:
+        return gate
+    _, biz_id = _get_active_business(request)
+
     try:
         if request.content_type and "application/json" in request.content_type.lower():
             payload = json.loads(request.body or "{}")
@@ -1557,11 +2291,13 @@ def api_time_checkin(request):
     loc_id = payload.get("location_id")
     if loc_id:
         try:
-            loc = Location.objects.get(pk=int(loc_id))
+            loc = _scoped(Location.objects.all(), request).get(pk=int(loc_id))
         except Exception:
             return JsonResponse({"ok": False, "error": "Invalid location_id."}, status=400)
     if not loc:
         loc = _user_home_location(request.user)
+        if loc and not _obj_belongs_to_active_business(loc, request):
+            loc = None  # ignore foreign-business locations
 
     dist = None
     within = False
@@ -1580,6 +2316,7 @@ def api_time_checkin(request):
         distance_m=dist,
         within_geofence=within,
         note=(payload.get("note") or "").strip()[:200],
+        **_attach_business_kwargs(TimeLog, biz_id),
     )
 
     return JsonResponse(
@@ -1594,15 +2331,16 @@ def api_time_checkin(request):
         }
     )
 
-
 @never_cache
 @login_required
 @require_http_methods(["GET"])
 def time_logs(request):
+    # Scope TimeLog to business if model supports it
+    base = _scoped(TimeLog.objects.select_related("user", "location"), request)
     if _can_view_all(request.user):
-        qs = TimeLog.objects.select_related("user", "location").order_by("-logged_at")
+        qs = base.order_by("-logged_at")
     else:
-        qs = TimeLog.objects.select_related("user", "location").filter(user=request.user).order_by("-logged_at")
+        qs = base.filter(user=request.user).order_by("-logged_at")
 
     page_obj, url_for = _paginate_qs(request, qs, default_per_page=50, max_per_page=200)
     return render(
@@ -1614,6 +2352,7 @@ def time_logs(request):
 @login_required
 @require_GET
 def api_wallet_summary(request):
+    # Scoped wallet summary (if WalletTxn has business FK, _scoped will apply it)
     target = request.user
     user_id = request.GET.get("user_id")
     if user_id:
@@ -1624,7 +2363,10 @@ def api_wallet_summary(request):
         except Exception:
             return JsonResponse({"ok": False, "error": "Unknown user_id."}, status=400)
 
-    balance = _wallet_balance(target)
+    if WalletTxn is not None:
+        balance = _scoped(WalletTxn.objects.filter(user=target), request).aggregate(s=Sum("amount"))["s"] or 0
+    else:
+        balance = 0
 
     year = request.GET.get("year")
     month = request.GET.get("month")
@@ -1632,7 +2374,13 @@ def api_wallet_summary(request):
     if year and month:
         try:
             y, m = int(year), int(month)
-            data["month_sum"] = _wallet_month_sum(target, y, m)
+            if WalletTxn is not None:
+                data["month_sum"] = _scoped(
+                    WalletTxn.objects.filter(user=target, created_at__year=y, created_at__month=m),
+                    request,
+                ).aggregate(s=Sum("amount"))["s"] or 0
+            else:
+                data["month_sum"] = 0
             data["year"] = y
             data["month"] = m
         except Exception:
@@ -1645,6 +2393,7 @@ api_wallet_balance = api_wallet_summary
 
 @never_cache
 @login_required
+@otp_required
 @require_POST
 def api_wallet_add_txn(request):
     if WalletTxn is None:
@@ -1652,6 +2401,12 @@ def api_wallet_add_txn(request):
 
     if not _is_admin(request.user):
         return JsonResponse({"ok": False, "error": "Admin only."}, status=403)
+
+    # Ensure business to attach on create
+    gate = _require_active_business(request)
+    if gate:
+        return gate
+    _, biz_id = _get_active_business(request)
 
     try:
         if request.content_type and "application/json" in request.content_type.lower():
@@ -1678,9 +2433,16 @@ def api_wallet_add_txn(request):
 
     memo = (payload.get("memo") or "").strip()[:200]
 
-    txn = WalletTxn.objects.create(user=target, amount=amount, reason=reason, memo=memo)  # type: ignore[union-attr]
+    txn = WalletTxn.objects.create(  # type: ignore[union-attr]
+        user=target,
+        amount=amount,
+        reason=reason,
+        memo=memo,
+        **_attach_business_kwargs(WalletTxn, biz_id),
+    )
 
-    new_balance = _wallet_balance(target)
+    # Return business-scoped balance
+    new_balance = _scoped(WalletTxn.objects.filter(user=target), request).aggregate(s=Sum("amount"))["s"] or 0
     return JsonResponse({"ok": True, "txn_id": txn.id, "balance": new_balance})
 
 
@@ -1691,6 +2453,12 @@ api_wallet_txn = api_wallet_add_txn
 @login_required
 @require_http_methods(["GET"])
 def wallet_page(request):
+    # Business gate
+    gate = _require_active_business(request)
+    if gate:
+        return gate
+    _, biz_id = _get_active_business(request)
+
     target = request.user
     user_id = request.GET.get("user_id")
     if user_id and _is_manager_or_admin(request.user):
@@ -1700,19 +2468,33 @@ def wallet_page(request):
             target = request.user
 
     today = timezone.localdate()
-    balance = _wallet_balance(target)
-    month_sum = _wallet_month_sum(target, today.year, today.month)
 
     if WalletTxn is not None:
-        recent_txns = WalletTxn.objects.select_related("user").filter(user=target).order_by("-created_at")[:50]  # type: ignore[union-attr]
+        life_qs = _scoped(WalletTxn.objects.filter(user=target), request)  # type: ignore[union-attr]
+        balance = life_qs.aggregate(s=Sum("amount"))["s"] or 0
+        month_sum = _scoped(
+            WalletTxn.objects.filter(user=target, created_at__year=today.year, created_at__month=today.month),
+            request,
+        ).aggregate(s=Sum("amount"))["s"] or 0
+        recent_txns = _scoped(
+            WalletTxn.objects.select_related("user").filter(user=target).order_by("-created_at")[:50],
+            request,
+        )  # type: ignore[union-attr]
         reasons = getattr(WalletTxn, "REASON_CHOICES", [])
     else:
+        balance = 0
+        month_sum = 0
         recent_txns = []
         reasons = []
 
+    # Restrict agent list to current business if possible
     agents = []
     if _is_manager_or_admin(request.user):
-        agents = list(User.objects.order_by("username").values("id", "username"))
+        if biz_id:
+            agents_qs = User.objects.filter(assigned_items__business_id=biz_id).order_by("username").distinct()
+        else:
+            agents_qs = User.objects.order_by("username")
+        agents = list(agents_qs.values("id", "username"))
 
     context = {
         "target": target,
@@ -1736,7 +2518,8 @@ def wallet_page(request):
 @login_required
 @require_http_methods(["GET", "POST"])
 def update_stock(request, pk):
-    item = get_object_or_404(InventoryItem, pk=pk)
+    # Only load items from the active business
+    item = get_object_or_404(_scoped(InventoryItem.objects, request), pk=pk)
 
     if not _can_edit_inventory(request.user):
         msg = (
@@ -1777,7 +2560,8 @@ def update_stock(request, pk):
                     base_mgr = (
                         InventoryItem.active if hasattr(InventoryItem, "active") else InventoryItem.objects.filter(is_active=True)
                     )
-                    qs = base_mgr.filter(product=saved_item.product).exclude(pk=saved_item.pk)
+                    # Apply bulk updates only within the same business
+                    qs = _scoped(base_mgr, request).filter(product=saved_item.product).exclude(pk=saved_item.pk)
                     updated = qs.update(**bulk_updates)
                     if updated:
                         _audit(
@@ -1809,7 +2593,8 @@ def update_stock(request, pk):
 @never_cache
 @login_required
 def delete_stock(request, pk):
-    item = get_object_or_404(InventoryItem, pk=pk)
+    # Only delete within the active business
+    item = get_object_or_404(_scoped(InventoryItem.objects, request), pk=pk)
 
     if not _is_admin(request.user):
         msg = (
@@ -1838,19 +2623,34 @@ def delete_stock(request, pk):
         messages.info(request, "This item has sales, so it was archived instead of deleted.")
     return redirect("inventory:stock_list")
 
+# --- PART 2/3 ENDS ---
+
+# --- PART 3/3 — circuitcity/inventory/views.py ---
+
+from django.db import transaction, connection
+from django.urls import reverse
+from urllib.parse import quote
+from django.db.models.functions import TruncDate
+from datetime import datetime
 
 @require_POST
 @never_cache
 @login_required
 def restore_stock(request, pk):
-    item = get_object_or_404(InventoryItem, pk=pk)
+    # Tenant gate + scoped fetch
+    gate = _require_active_business(request)
+    if gate:
+        return gate
+
+    item = get_object_or_404(_scoped(InventoryItem.objects, request), pk=pk)
 
     if not _is_admin(request.user):
         msg = (
             f"Restore attempt BLOCKED: user '{request.user.username}' tried to restore "
             f"item {item.imei or item.pk} at {timezone.now():%Y-%m-%d %H:%M}."
         )
-        _audit(item, request.user, "RESTORE_DENIED", msg)
+        # Use a valid action choice (RESTORE_DENIED is not in InventoryAudit.ACTION_CHOICES)
+        _audit(item, request.user, "EDIT_DENIED", msg)
         messages.error(request, "You do not have permission to restore items.")
         return redirect("inventory:stock_list")
 
@@ -1884,11 +2684,17 @@ def agent_reset_confirm(request, token=None):
 @never_cache
 @login_required
 def api_sales_trend(request):
+    # Tenant scope
+    gate = _require_active_business(request)
+    if gate:
+        return gate
+    _, biz_id = _get_active_business(request)
+
     period = request.GET.get("period", "month")
     metric = request.GET.get("metric", "amount")  # amount|count
 
     ver = get_dashboard_cache_version()
-    key = f"api:sales_trend:v{ver}:u{request.user.id}:p:{period}:m:{metric}"
+    key = f"api:sales_trend:v{ver}:biz:{biz_id or 'none'}:u{request.user.id}:p:{period}:m:{metric}"
 
     def _build():
         today = timezone.localdate()
@@ -1898,13 +2704,11 @@ def api_sales_trend(request):
         else:
             start = today.replace(day=1)
 
-        if _can_view_all(request.user):
-            qs = Sale.objects.all()
-        else:
-            qs = Sale.objects.filter(agent=request.user)
+        base = _scoped(Sale.objects.all(), request)
+        if not _can_view_all(request.user):
+            base = base.filter(agent=request.user)
 
-        qs = qs.filter(sold_at__gte=start, sold_at__lt=end_excl)
-        qs = qs.annotate(d=TruncDate("sold_at")).values("d").order_by("d")
+        qs = base.filter(sold_at__gte=start, sold_at__lt=end_excl).annotate(d=TruncDate("sold_at")).values("d").order_by("d")
 
         if metric == "count":
             agg = qs.annotate(v=Count("id"))
@@ -1930,22 +2734,27 @@ def api_sales_trend(request):
 @never_cache
 @login_required
 def api_top_models(request):
+    # Tenant scope
+    gate = _require_active_business(request)
+    if gate:
+        return gate
+    _, biz_id = _get_active_business(request)
+
     period = request.GET.get("period", "today")
     ver = get_dashboard_cache_version()
-    key = f"api:top_models:v{ver}:u{request.user.id}:p:{period}"
+    key = f"api:top_models:v{ver}:biz:{biz_id or 'none'}:u{request.user.id}:p:{period}"
 
     def _build():
         today = timezone.localdate()
         end_excl = today + timedelta(days=1)
         start = today if period == "today" else today.replace(day=1)
 
-        if _can_view_all(request.user):
-            qs = Sale.objects.select_related("item__product")
-        else:
-            qs = Sale.objects.select_related("item__product").filter(agent=request.user)
+        base = _scoped(Sale.objects.select_related("item__product"), request)
+        if not _can_view_all(request.user):
+            base = base.filter(agent=request.user)
 
         qs = (
-            qs.filter(sold_at__gte=start, sold_at__lt=end_excl)
+            base.filter(sold_at__gte=start, sold_at__lt=end_excl)
             .values("item__product__brand", "item__product__model")
             .annotate(c=Count("id"))
             .order_by("-c")[:8]
@@ -1958,23 +2767,29 @@ def api_top_models(request):
     data = cache.get(key)
     if data is None:
         data = _build()
-        cache.set(key, data, 60)  # fixed: cache value correctly
+        cache.set(key, data, 60)
     return JsonResponse(data)
 
 
 @never_cache
 @login_required
 def api_profit_bar(request):
+    # Tenant scope
+    gate = _require_active_business(request)
+    if gate:
+        return gate
+    _, biz_id = _get_active_business(request)
+
     month_str = request.GET.get("month")
     group_by = request.GET.get("group_by")  # 'model' or None
     ver = get_dashboard_cache_version()
-    key = f"api:profit_bar:v{ver}:u{request.user.id}:m:{month_str or 'curr'}:g:{group_by or 'none'}"
+    key = f"api:profit_bar:v{ver}:biz:{biz_id or 'none'}:u:{request.user.id}:m:{month_str or 'curr'}:g:{group_by or 'none'}"
 
     def _build():
         today = timezone.localdate()
         if month_str:
             dt = datetime.strptime(month_str, "%Y-%m")
-            start = dt.replace(day=1)
+            start = dt.replace(day=1).date()
         else:
             start = today.replace(day=1)
 
@@ -1984,7 +2799,7 @@ def api_profit_bar(request):
             end = today
         end_excl = end + timedelta(days=1)
 
-        base = Sale.objects.select_related("item__product")
+        base = _scoped(Sale.objects.select_related("item__product"), request)
         if not _can_view_all(request.user):
             base = base.filter(agent=request.user)
 
@@ -2009,21 +2824,27 @@ def api_profit_bar(request):
     data = cache.get(key)
     if data is None:
         data = _build()
-        cache.set(key, data, 60)  # fixed
+        cache.set(key, data, 60)
     return JsonResponse(data)
 
 
 @never_cache
 @login_required
 def api_agent_trend(request):
+    # Tenant scope
+    gate = _require_active_business(request)
+    if gate:
+        return gate
+    _, biz_id = _get_active_business(request)
+
     months = int(request.GET.get("months", 6))
     metric = request.GET.get("metric", "sales")
     agent_id = request.GET.get("agent")
     ver = get_dashboard_cache_version()
-    key = f"api:agent_trend:v{ver}:u{request.user.id}:mo:{months}:met:{metric}:a:{agent_id or 'all'}"
+    key = f"api:agent_trend:v{ver}:biz:{biz_id or 'none'}:u:{request.user.id}:mo:{months}:met:{metric}:a:{agent_id or 'all'}"
 
     def _build():
-        base = Sale.objects.select_related("agent", "item")
+        base = _scoped(Sale.objects.select_related("agent", "item"), request)
         if not _can_view_all(request.user):
             base = base.filter(agent=request.user)
         if agent_id:
@@ -2049,7 +2870,7 @@ def api_agent_trend(request):
     data = cache.get(key)
     if data is None:
         data = _build()
-        cache.set(key, data, 60)  # fixed
+        cache.set(key, data, 60)
     return JsonResponse(data)
 
 
@@ -2066,48 +2887,44 @@ def api_predictions(request):
     Preferred path: delegate to inventory.api.predictions_summary (if available).
     Fallback: local baseline so the endpoint never 500s.
     """
+    # Tenant gate
+    gate = _require_active_business(request)
+    if gate:
+        return gate
+
     # ---- Preferred: reuse inventory/api.py implementation ----
     try:
-        from . import api as _api  # lazy import to avoid hard dependency at import time
+        from . import api as _api  # lazy import
         if hasattr(_api, "predictions_summary") and callable(_api.predictions_summary):
             return _api.predictions_summary(request)
     except Exception:
-        # If import or handler fails, continue to the fallback.
         pass
 
-    # ---- Fallback baseline (compatible response shape) ----
+    # ---- Fallback baseline (tenant-scoped) ----
     today = timezone.localdate()
     lookback_days = 14
     start = today - timedelta(days=lookback_days)
     end_excl = today + timedelta(days=1)
 
-    sales = Sale.objects.select_related("item__product").filter(sold_at__gte=start, sold_at__lt=end_excl)
-    items = InventoryItem.objects.select_related("product").filter(status="IN_STOCK")
+    sales = _scoped(Sale.objects.select_related("item__product"), request).filter(sold_at__gte=start, sold_at__lt=end_excl)
+    items = _scoped(InventoryItem.objects.select_related("product"), request).filter(status="IN_STOCK")
     if not _can_view_all(request.user):
         sales = sales.filter(agent=request.user)
         items = items.filter(assigned_agent=request.user)
 
     # Per-day counts (last 14d)
-    per_day_counts = (
-        sales.annotate(d=TruncDate("sold_at"))
-        .values("d")
-        .annotate(c=Count("id"))
-    )
+    per_day_counts = sales.annotate(d=TruncDate("sold_at")).values("d").annotate(c=Count("id"))
     total_units_14 = sum(r["c"] for r in per_day_counts) or 0
     daily_units_avg = total_units_14 / float(lookback_days)
 
     # Per-day revenue (last 14d)
-    per_day_rev = (
-        sales.annotate(d=TruncDate("sold_at"))
-        .values("d")
-        .annotate(v=Sum("price"))
-    )
+    per_day_rev = sales.annotate(d=TruncDate("sold_at")).values("d").annotate(v=Sum("price"))
     total_rev_14 = float(sum(r["v"] or 0 for r in per_day_rev))
     daily_rev_avg = total_rev_14 / float(lookback_days) if total_rev_14 else 0.0
 
     overall = [
         {
-            "date": (today + timedelta(days=i)).isoformat(),  # align key with inventory.api.predictions_summary
+            "date": (today + timedelta(days=i)).isoformat(),
             "predicted_units": round(daily_units_avg, 2),
             "predicted_revenue": round(daily_rev_avg, 2),
         }
@@ -2115,10 +2932,7 @@ def api_predictions(request):
     ]
 
     # Model-level stockout risk
-    by_model_14 = (
-        sales.values("item__product_id", "item__product__brand", "item__product__model")
-        .annotate(c=Count("id"))
-    )
+    by_model_14 = sales.values("item__product_id", "item__product__brand", "item__product__model").annotate(c=Count("id"))
     model_count_map = {r["item__product_id"]: r["c"] for r in by_model_14}
 
     risky = []
@@ -2156,29 +2970,29 @@ def api_cash_overview(request):
     - total_paid_out (Wallet Payouts, current month)
     - total_expenses (Advances + Adjustments, current month)
     """
+    # Tenant scope
+    gate = _require_active_business(request)
+    if gate:
+        return gate
+
     today = timezone.localdate()
     start = today.replace(day=1)
     end_excl = today + timedelta(days=1)
 
-    if _can_view_all(request.user):
-        sales = Sale.objects.filter(sold_at__gte=start, sold_at__lt=end_excl)
-        if WalletTxn is not None:
-            tx = WalletTxn.objects.filter(created_at__date__gte=start, created_at__date__lte=today)  # type: ignore[union-attr]
-        else:
-            tx = None
-    else:
-        sales = Sale.objects.filter(agent=request.user, sold_at__gte=start, sold_at__lt=end_excl)
-        if WalletTxn is not None:
-            tx = WalletTxn.objects.filter(user=request.user, created_at__date__gte=start, created_at__date__lte=today)  # type: ignore[union-attr]
-        else:
-            tx = None
+    sales = _scoped(Sale.objects.filter(sold_at__gte=start, sold_at__lt=end_excl), request)
+    if not _can_view_all(request.user):
+        sales = sales.filter(agent=request.user)
 
+    dec2 = DecimalField(max_digits=14, decimal_places=2)
     totals = sales.aggregate(
         orders=Count("id"),
-        revenue=Coalesce(Sum("price"), Value(0), output_field=DecimalField(max_digits=14, decimal_places=2)),
+        revenue=Coalesce(Sum("price"), Value(0), output_field=dec2),
     )
 
-    if tx is not None:
+    if WalletTxn is not None:
+        tx = _scoped(WalletTxn.objects.filter(created_at__date__gte=start, created_at__date__lte=today), request)  # type: ignore[union-attr]
+        if not _can_view_all(request.user):
+            tx = tx.filter(user=request.user)
         paid_out = tx.filter(reason="PAYOUT").aggregate(s=Coalesce(Sum("amount"), Value(0)))["s"] or 0
         advances = tx.filter(reason="ADVANCE").aggregate(s=Coalesce(Sum("amount"), Value(0)))["s"] or 0
         adjustments = tx.filter(reason="ADJUSTMENT").aggregate(s=Coalesce(Sum("amount"), Value(0)))["s"] or 0
@@ -2210,15 +3024,19 @@ def api_alerts(request):
         {"type": "Low stock", "severity": "high|warn|info", "message": "..."}
       ]}
     """
+    # Tenant scope
+    gate = _require_active_business(request)
+    if gate:
+        return gate
+
     alerts = []
     today = timezone.localdate()
-    # Scope
-    if _can_view_all(request.user):
-        items_qs = InventoryItem.objects.select_related("product", "current_location")
-        sales_qs = Sale.objects.select_related("item__product")
-    else:
-        items_qs = InventoryItem.objects.select_related("product", "current_location").filter(assigned_agent=request.user)
-        sales_qs = Sale.objects.select_related("item__product").filter(agent=request.user)
+
+    items_qs = _scoped(InventoryItem.objects.select_related("product", "current_location"), request)
+    sales_qs = _scoped(Sale.objects.select_related("item__product"), request)
+    if not _can_view_all(request.user):
+        items_qs = items_qs.filter(assigned_agent=request.user)
+        sales_qs = sales_qs.filter(agent=request.user)
 
     # 1) Low stock by model
     low_rows = (
@@ -2239,10 +3057,7 @@ def api_alerts(request):
             })
 
     # 2) Unpriced SOLD items (recent)
-    recent_unpriced = (
-        sales_qs.filter(Q(price__isnull=True) | Q(price__lte=0), sold_at__gte=today - timedelta(days=30))
-        .count()
-    )
+    recent_unpriced = sales_qs.filter(Q(price__isnull=True) | Q(price__lte=0), sold_at__gte=today - timedelta(days=30)).count()
     if recent_unpriced:
         alerts.append({
             "type": "Pricing",
@@ -2259,9 +3074,12 @@ def api_alerts(request):
             "message": f"{stale_count} item(s) in stock for 45+ days.",
         })
 
-    # 4) Negative wallet balance (current user)
+    # 4) Negative wallet balance (current user; tenant-scoped if WalletTxn present)
     try:
-        bal = float(_wallet_balance(request.user))
+        if WalletTxn is not None:
+            bal = float(_scoped(WalletTxn.objects.filter(user=request.user), request).aggregate(s=Sum("amount"))["s"] or 0)  # type: ignore[union-attr]
+        else:
+            bal = float(_wallet_balance(request.user))
         if bal < 0:
             alerts.append({
                 "type": "Wallet",
@@ -2285,6 +3103,11 @@ def dashboard_export_csv(request):
     Exports the key dashboard datasets into a single CSV file (sectioned).
     Manager-only.
     """
+    # Tenant scope
+    gate = _require_active_business(request)
+    if gate:
+        return gate
+
     if not _is_manager_or_admin(request.user):
         return JsonResponse({"ok": False, "error": "Manager only."}, status=403)
 
@@ -2295,15 +3118,13 @@ def dashboard_export_csv(request):
     month_start = today.replace(day=1)
 
     # Scope
-    sales_qs_all = Sale.objects.select_related("item", "agent", "item__product")
-    items_qs = InventoryItem.objects.select_related("product", "assigned_agent", "current_location")
+    sales_qs_all = _scoped(Sale.objects.select_related("item", "agent", "item__product"), request)
+    items_qs = _scoped(InventoryItem.objects.select_related("product", "assigned_agent", "current_location"), request)
     if model_id:
         sales_qs_all = sales_qs_all.filter(item__product_id=model_id)
         items_qs = items_qs.filter(product_id=model_id)
 
-    sales_qs_period = sales_qs_all
-    if period == "month":
-        sales_qs_period = sales_qs_all.filter(sold_at__gte=month_start)
+    sales_qs_period = sales_qs_all.filter(sold_at__gte=month_start) if period == "month" else sales_qs_all
 
     # KPIs
     tomorrow = today + timedelta(days=1)
@@ -2320,7 +3141,7 @@ def dashboard_export_csv(request):
         (Coalesce(commission_pct_dec, Value(0), output_field=pct_dec) / Value(100, output_field=pct_dec)),
         output_field=dec2,
     )
-    rank_base = Sale.objects.select_related("agent")
+    rank_base = _scoped(Sale.objects.select_related("agent"), request)
     if model_id:
         rank_base = rank_base.filter(item__product_id=model_id)
     if period == "month":
@@ -2334,11 +3155,11 @@ def dashboard_export_csv(request):
         )
         .order_by("-earnings", "-total_sales", "agent__username")
     )
-    # Wallet balances
+    # Wallet balances (scoped)
     agent_wallet_map = {}
     if agent_rank and WalletTxn is not None:
         ids = [r["agent_id"] for r in agent_rank if r.get("agent_id")]
-        w = WalletTxn.objects.filter(user_id__in=ids).values("user_id").annotate(balance=Sum("amount"))  # type: ignore[union-attr]
+        w = _scoped(WalletTxn.objects.filter(user_id__in=ids), request).values("user_id").annotate(balance=Sum("amount"))  # type: ignore[union-attr]
         agent_wallet_map = {r["user_id"]: float(r["balance"] or 0) for r in w}
     for r in agent_rank:
         r["wallet_balance"] = agent_wallet_map.get(r.get("agent_id"), 0.0)
@@ -2370,7 +3191,7 @@ def dashboard_export_csv(request):
             y -= 1
         return date(y, m, 1)
     labels = [back_n_months(month_start, n).strftime("%Y-%m") for n in range(11, -1, -1)]
-    rev_qs = Sale.objects.select_related("item").filter(sold_at__gte=back_n_months(month_start, 11))
+    rev_qs = _scoped(Sale.objects.select_related("item"), request).filter(sold_at__gte=back_n_months(month_start, 11))
     if model_id:
         rev_qs = rev_qs.filter(item__product_id=model_id)
     rev_by_month = (
@@ -2484,35 +3305,12 @@ def restock_heatmap_api(request):
 
     Manager/Admin  -> whole org (all products/locations), battery cap=100
     Agent          -> only own stock/sales, battery cap=20
-
-    Response shape:
-    {
-      "ok": true,
-      "mode": "manager" | "agent",
-      "window_days": 30,
-      "generated_at": "...iso...",
-      "battery_pct": 75,
-      "battery_count": 75,
-      "battery_cap": 100,
-      "heatmap": [
-        {
-          "product_id": 1,
-          "product": "Brand Model",
-          "location_id": 3,
-          "location": "Shop A",
-          "on_hand": 8,
-          "sold_30d": 15,
-          "burn_rate_per_day": 0.5,
-          "need_next_7": 4,
-          "days_cover": 16,
-          "risk_score": 33
-        }
-      ],
-      "top_products": [
-        {"product_id": 1, "product": "Brand Model", "sold_30d": 42, "on_hand": 12, "risk_score": 78}
-      ]
-    }
     """
+    # Tenant scope
+    gate = _require_active_business(request)
+    if gate:
+        return gate
+
     mode_manager = _is_manager_or_admin(request.user)
     window_days = int(request.GET.get("days", 30) or 30)
     window_days = max(7, min(window_days, 90))
@@ -2520,18 +3318,13 @@ def restock_heatmap_api(request):
     start = today - timedelta(days=window_days)
     end_excl = today + timedelta(days=1)
 
-    if mode_manager:
-        items_qs = InventoryItem.objects.select_related("product", "current_location").filter(status="IN_STOCK")
-        sales_qs = Sale.objects.select_related("item__product", "location").filter(sold_at__gte=start, sold_at__lt=end_excl)
-        battery_cap = 100
-    else:
-        items_qs = InventoryItem.objects.select_related("product", "current_location").filter(
-            status="IN_STOCK", assigned_agent=request.user
-        )
-        sales_qs = Sale.objects.select_related("item__product", "location").filter(
-            agent=request.user, sold_at__gte=start, sold_at__lt=end_excl
-        )
-        battery_cap = 20
+    items_qs = _scoped(InventoryItem.objects.select_related("product", "current_location"), request).filter(status="IN_STOCK")
+    sales_qs = _scoped(Sale.objects.select_related("item__product", "location").filter(sold_at__gte=start, sold_at__lt=end_excl), request)
+    if not mode_manager:
+        items_qs = items_qs.filter(assigned_agent=request.user)
+        sales_qs = sales_qs.filter(agent=request.user)
+
+    battery_cap = 100 if mode_manager else 20
 
     # Battery
     battery_count = items_qs.count()
@@ -2655,8 +3448,12 @@ def api_order_price(request, product_id: int):
     Source of truth: Product.cost_price
     Response: {"ok": true, "product_id": 1, "price": "12345.00"}
     """
+    gate = _require_active_business(request)
+    if gate:
+        return gate
+
     try:
-        p = Product.objects.only("id", "cost_price").get(pk=int(product_id))
+        p = _scoped(Product.objects.only("id", "cost_price"), request).get(pk=int(product_id))
     except (Product.DoesNotExist, ValueError):
         return JsonResponse({"ok": False, "error": "Unknown product."}, status=404)
     price = p.cost_price or 0
@@ -2667,55 +3464,16 @@ def api_order_price(request, product_id: int):
 @login_required
 @require_GET
 def api_stock_models(request):
-    @never_cache
-    @login_required
-    @require_POST
-    def api_product_create(request):
-        if not _is_admin(request.user):
-            return JsonResponse({"ok": False, "error": "Admin only."}, status=403)
-        try:
-            payload = json.loads(request.body or "{}")
-            brand = (payload.get("brand") or "").strip()
-            model = (payload.get("model") or "").strip()
-            variant = (payload.get("variant") or "").strip()
-            cost_price = float(payload.get("cost_price") or 0)
-            if cost_price < 0:
-                raise ValueError()
-        except Exception:
-            return JsonResponse({"ok": False, "error": "Invalid input."}, status=400)
-        if not brand or not model:
-            return JsonResponse({"ok": False, "error": "brand and model are required."}, status=400)
-        p = Product.objects.create(brand=brand, model=model, variant=variant, cost_price=cost_price)
-        return JsonResponse({"ok": True, "product_id": p.id, "name": str(p)})
-
-    @never_cache
-    @login_required
-    @require_POST
-    def api_product_update_price(request):
-        if not _is_admin(request.user):
-            return JsonResponse({"ok": False, "error": "Admin only."}, status=403)
-        try:
-            payload = json.loads(request.body or "{}")
-            pid = int(payload.get("product_id"))
-            price = float(payload.get("cost_price"))
-            if price < 0:
-                raise ValueError()
-        except Exception:
-            return JsonResponse({"ok": False, "error": "Invalid product_id or cost_price."}, status=400)
-        try:
-            p = Product.objects.get(pk=pid)
-        except Product.DoesNotExist:
-            return JsonResponse({"ok": False, "error": "Unknown product."}, status=404)
-        p.cost_price = price
-        p.save(update_fields=["cost_price"])
-        return JsonResponse({"ok": True, "product_id": p.id, "cost_price": float(price)})
-
     """
     Compact list of product models in stock with on-hand counts.
     Response: {"ok":true, "models":[{"product_id":1,"product":"Brand Model Variant","on_hand":5,"default_price":"100000.00"}]}
     """
+    gate = _require_active_business(request)
+    if gate:
+        return gate
+
     qs = (
-        InventoryItem.objects.filter(status="IN_STOCK")
+        _scoped(InventoryItem.objects.filter(status="IN_STOCK"), request)
         .values("product_id", "product__brand", "product__model", "product__variant", "product__cost_price")
         .annotate(on_hand=Count("id"))
         .order_by("product__brand", "product__model", "product__variant")
@@ -2734,13 +3492,15 @@ def api_stock_models(request):
 
 @never_cache
 @login_required
-@require_POST
-@transaction.atomic
-@never_cache
-@login_required
+@otp_required
 @require_POST
 @transaction.atomic
 def api_place_order(request):
+    gate = _require_active_business(request)
+    if gate:
+        return gate
+    _, biz_id = _get_active_business(request)
+
     if not _is_manager_or_admin(request.user):
         return JsonResponse({"ok": False, "error": "Manager/Admin only."}, status=403)
     if AdminPurchaseOrder is None or AdminPurchaseOrderItem is None:
@@ -2763,10 +3523,11 @@ def api_place_order(request):
         agent_name=(payload.get("agent_name") or "").strip()[:120],
         notes=(payload.get("notes") or "").strip(),
         currency=getattr(settings, "DEFAULT_CURRENCY", "MWK"),
+        **_attach_business_kwargs(AdminPurchaseOrder, biz_id),
     )
 
     prod_ids = [it.get("product_id") for it in items if it.get("product_id") is not None]
-    prod_map = {p.id: p for p in Product.objects.filter(id__in=prod_ids)}
+    prod_map = {p.id: p for p in _scoped(Product.objects.filter(id__in=prod_ids), request)}
     created_any = False
     for it in items:
         try:
@@ -2791,7 +3552,7 @@ def api_place_order(request):
 
         line_total = (unit or 0) * qty
         AdminPurchaseOrderItem.objects.create(
-            po=po, product=prod, quantity=qty, unit_price=unit, line_total=line_total
+            po=po, product=prod, quantity=qty, unit_price=unit, line_total=line_total, **_attach_business_kwargs(AdminPurchaseOrderItem, biz_id)
         )
         created_any = True
 
@@ -2820,112 +3581,23 @@ def api_place_order(request):
     return JsonResponse({"ok": True, "po_id": po.id, "invoice_url": invoice_url,
                          "share": {"email": mailto, "whatsapp": whatsapp}})
 
-    """
-    Creates an AdminPurchaseOrder + items from JSON.
-    Manager/Admin only.
-
-    Body JSON example:
-    {
-      "supplier_name": "ACME",
-      "supplier_email": "vendor@acme.com",
-      "supplier_phone": "+26588...",
-      "agent_name": "John (optional)",
-      "notes": "Urgent restock",
-      "items": [{"product_id": 1, "quantity": 5}, {"product_id": 3, "quantity": 2}]
-    }
-    """
-    if not _is_manager_or_admin(request.user):
-        return JsonResponse({"ok": False, "error": "Manager/Admin only."}, status=403)
-    if AdminPurchaseOrder is None or AdminPurchaseOrderItem is None:
-        return JsonResponse({"ok": False, "error": "Purchase Order models not installed."}, status=500)
-
-    try:
-        payload = json.loads(request.body or "{}")
-    except Exception:
-        return JsonResponse({"ok": False, "error": "Invalid JSON."}, status=400)
-
-    items = payload.get("items") or []
-    if not isinstance(items, list) or not items:
-        return JsonResponse({"ok": False, "error": "Provide at least one item."}, status=400)
-
-    # Create PO
-    po = AdminPurchaseOrder.objects.create(
-        created_by=request.user,
-        supplier_name=(payload.get("supplier_name") or "").strip()[:120],
-        supplier_email=(payload.get("supplier_email") or "").strip()[:254],
-        supplier_phone=(payload.get("supplier_phone") or "").strip()[:40],
-        agent_name=(payload.get("agent_name") or "").strip()[:120],
-        notes=(payload.get("notes") or "").strip(),
-        currency=getattr(settings, "DEFAULT_CURRENCY", "MWK"),
-    )
-
-    # Add lines (unit price from Product.cost_price)
-    prod_map = {p.id: p for p in Product.objects.filter(id__in=[it.get("product_id") for it in items])}
-    created_any = False
-    for it in items:
-        try:
-            pid = int(it.get("product_id"))
-            qty = int(it.get("quantity"))
-        except Exception:
-            return JsonResponse({"ok": False, "error": "Bad product_id/quantity."}, status=400)
-        if qty <= 0 or pid not in prod_map:
-            return JsonResponse({"ok": False, "error": f"Invalid item: product={pid}, qty={qty}."}, status=400)
-        prod = prod_map[pid]
-        unit = prod.cost_price or 0
-        line_total = (unit or 0) * qty
-        AdminPurchaseOrderItem.objects.create(
-            po=po, product=prod, quantity=qty, unit_price=unit, line_total=line_total
-        )
-        created_any = True
-
-    if not created_any:
-        po.delete()
-        return JsonResponse({"ok": False, "error": "No valid items."}, status=400)
-
-    # Totals
-    po.recompute_totals(save=True)
-
-    # Links
-    invoice_url = reverse("inventory:po_invoice", args=[po.id])
-    # Pre-filled share links
-    subject = quote(f"Purchase Order PO-{po.id}")
-    body_lines = [
-        f"PO-{po.id} · Total {po.total} {po.currency}",
-        f"Supplier: {po.supplier_name or '-'}",
-        f"Agent: {po.agent_name or '-'}",
-        "",
-        "Items:",
-    ]
-    for ln in po.items.select_related("product").all():
-        body_lines.append(f" - {ln.product} × {ln.quantity} @ {ln.unit_price} = {ln.line_total}")
-    body_lines.append("")
-    body_lines.append(f"Download invoice: {request.build_absolute_uri(invoice_url)}")
-    body = quote("\n".join(body_lines))
-    mailto = f"mailto:{quote(po.supplier_email or '')}?subject={subject}&body={body}"
-    whatsapp = f"https://wa.me/?text={body}"
-
-    return JsonResponse({
-        "ok": True,
-        "po_id": po.id,
-        "invoice_url": invoice_url,
-        "share": {
-            "email": mailto,
-            "whatsapp": whatsapp,
-        }
-    })
-
 
 @never_cache
 @login_required
+@otp_required
 @require_GET
 def po_invoice(request, po_id: int):
     """
-    Simple downloadable HTML invoice for a PO.
+    Simple downloadable HTML invoice for a PO. Manager/Admin only.
     """
     if AdminPurchaseOrder is None:
         return HttpResponse("PO model missing.", status=500)
 
-    po = get_object_or_404(AdminPurchaseOrder.objects.select_related("created_by"), pk=int(po_id))
+    if not _is_manager_or_admin(request.user):
+        return HttpResponse("Manager/Admin only.", status=403)
+
+    # Tenant-scoped fetch
+    po = get_object_or_404(_scoped(AdminPurchaseOrder.objects.select_related("created_by"), request), pk=int(po_id))
     lines = list(po.items.select_related("product").all())
 
     rows_html = "".join(
@@ -2978,7 +3650,8 @@ body{{font-family:system-ui,Segoe UI,Roboto,Arial,sans-serif;background:#fff;mar
 </body></html>"""
 
     resp = HttpResponse(html, content_type="text/html; charset=utf-8")
-    resp["Content-Disposition"] = f'attachment; filename="PO_{po.id}.html"'  # fixed quotes
+    resp["Content-Disposition"] = f'attachment; filename="PO_{po.id}.html"'
     resp["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
     resp["Pragma"] = "no-cache"
     return resp
+# --- PART 3/3 ENDS ---

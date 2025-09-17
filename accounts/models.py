@@ -11,7 +11,7 @@ from django.dispatch import receiver
 
 
 # -----------------------------
-# Profile (avatar + settings)
+# Profile (avatar + settings + role)
 # -----------------------------
 def avatar_upload_to(instance: "Profile", filename: str) -> str:
     return f"avatars/{instance.user_id}/{filename}"
@@ -32,15 +32,22 @@ class Profile(models.Model):
     language     = models.CharField(max_length=80,  blank=True, default="English - United States")
     timezone     = models.CharField(max_length=80,  blank=True, default=settings.TIME_ZONE)
 
+    # ---- Role flag (no need to replace AUTH_USER_MODEL) ----
+    # Mark “manager” users who can access CFO/approvals/etc.
+    # Admins remain those with user.is_staff=True.
+    is_manager   = models.BooleanField(default=False)
+
     class Meta:
         db_table = "accounts_profile"
         indexes = [
             models.Index(fields=["user"]),
+            models.Index(fields=["is_manager"]),
         ]
 
     def __str__(self) -> str:
         return f"{self.user.get_username()} profile"
 
+    # ----- Convenience helpers -----
     @property
     def initials(self) -> str:
         """
@@ -55,6 +62,20 @@ class Profile(models.Model):
         first = parts[0][0]
         second = parts[1][0] if len(parts) > 1 else ""
         return (first + second).upper()
+
+    @property
+    def is_admin(self) -> bool:
+        """Admins = Django staff/superusers."""
+        u = getattr(self, "user", None)
+        return bool(u and u.is_authenticated and u.is_staff)
+
+    @property
+    def is_agent(self) -> bool:
+        """
+        Agent = not admin and not manager.
+        Use this to keep the agent UI clean (no CFO/Approvals/etc).
+        """
+        return not self.is_admin and not self.is_manager
 
 
 # -------------------------------------

@@ -1,0 +1,120 @@
+{# templates/notifications/bell.html #}
+<style>
+  .notif-bell { position: relative; cursor: pointer; }
+  .notif-badge {
+    position:absolute; top:-4px; right:-4px; background:#ef4444; color:#fff;
+    border-radius:9999px; font-size:12px; line-height:16px; min-width:16px;
+    text-align:center; padding:0 4px;
+  }
+  .notif-menu {
+    position:absolute; right:0; top:100%; background:#fff; border:1px solid #e5e7eb;
+    border-radius:10px; box-shadow:0 10px 20px rgba(0,0,0,0.1);
+    width:320px; max-height:380px; overflow:auto; display:none; z-index:1000;
+  }
+  .notif-item { padding:10px 12px; border-bottom:1px solid #f3f4f6; font-size:14px; }
+  .notif-item:last-child { border-bottom:0; }
+  .notif-item.time { color:#6b7280; font-size:12px; }
+  .notif-actions { display:flex; justify-content:space-between; padding:8px 10px; background:#f9fafb; border-bottom:1px solid #f3f4f6; }
+</style>
+
+<div id="notifBell" class="notif-bell">
+  <svg width="24" height="24" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+    <path d="M12 2a6 6 0 00-6 6v3.586l-.707.707A1 1 0 006 14h12a1 1 0 00.707-1.707L18 11.586V8a6 6 0 00-6-6zm0 20a3 3 0 01-3-3h6a3 3 0 01-3 3z"/>
+  </svg>
+  <span id="notifBadge" class="notif-badge" style="display:none;">0</span>
+  <div id="notifMenu" class="notif-menu">
+    <div class="notif-actions">
+      <strong>Notifications</strong>
+      <button id="notifMarkAll" type="button">Mark all read</button>
+    </div>
+    <div id="notifList"></div>
+  </div>
+</div>
+
+<script>
+(function(){
+  const bell = document.getElementById("notifBell");
+  const badge = document.getElementById("notifBadge");
+  const menu = document.getElementById("notifMenu");
+  const list = document.getElementById("notifList");
+  const markAllBtn = document.getElementById("notifMarkAll");
+  let lastFetch = null;
+
+  function getCookie(name) {
+    const m = document.cookie.match('(^|;)\\s*' + name + '\\s*=\\s*([^;]+)');
+    return m ? m.pop() : '';
+  }
+
+  function render(items) {
+    list.innerHTML = "";
+    if (!items.length) {
+      list.innerHTML = '<div class="notif-item">No notifications.</div>';
+      return;
+    }
+    items.forEach(it => {
+      const d = new Date(it.created_at);
+      const row = document.createElement("div");
+      row.className = "notif-item";
+      row.innerHTML = `
+        <div>${it.message}</div>
+        <div class="notif-item time">${d.toLocaleString()}</div>
+      `;
+      row.addEventListener("click", () => markRead(it.id));
+      list.appendChild(row);
+    });
+  }
+
+  function toggleMenu() {
+    menu.style.display = (menu.style.display === "block") ? "none" : "block";
+  }
+
+  async function fetchFeed() {
+    const url = lastFetch ? `/notifications/feed/?since=${encodeURIComponent(lastFetch)}` : "/notifications/feed/";
+    try {
+      const r = await fetch(url, { credentials: "same-origin" });
+      if (!r.ok) return;
+      const data = await r.json();
+      lastFetch = data.now;
+      if (data.items) render(data.items);
+      if (data.unread && data.unread > 0) {
+        badge.style.display = "inline-block";
+        badge.textContent = data.unread > 99 ? "99+" : data.unread;
+      } else {
+        badge.style.display = "none";
+      }
+    } catch (e) {
+      console.error("notif fetch failed", e);
+    }
+  }
+
+  async function markRead(id) {
+    try {
+      const r = await fetch("/notifications/read/", {
+        method: "POST",
+        headers: { "X-CSRFToken": getCookie("csrftoken") },
+        body: new URLSearchParams({ id: String(id) })
+      });
+      if (r.ok) fetchFeed();
+    } catch (e) {}
+  }
+
+  async function markAll() {
+    try {
+      const r = await fetch("/notifications/read/", {
+        method: "POST",
+        headers: { "X-CSRFToken": getCookie("csrftoken") },
+        body: new URLSearchParams({ all: "1" })
+      });
+      if (r.ok) fetchFeed();
+    } catch (e) {}
+  }
+
+  bell.addEventListener("click", toggleMenu);
+  markAllBtn.addEventListener("click", (ev) => { ev.stopPropagation(); markAll(); });
+  document.addEventListener("click", (e) => { if (!bell.contains(e.target)) menu.style.display = "none"; });
+
+  // initial + poll
+  fetchFeed();
+  setInterval(fetchFeed, 30000);
+})();
+</script>

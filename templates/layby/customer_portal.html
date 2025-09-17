@@ -1,0 +1,195 @@
+{% extends "base.html" %}
+{% load humanize %}
+
+{% block title %}My Laybys{% endblock %}
+{% block header_title %}Dashboard{% endblock %}
+
+{% block extra_css %}
+<style>
+  /* Mobile-first layout tweaks */
+  .cc-wrap{max-width:980px;margin:0 auto}
+  .cc-card{background:var(--card, #fff);border:1px solid var(--line, #e5e9f2);border-radius:14px}
+  .cc-pad{padding:14px}
+  .cc-pad-lg{padding:18px}
+  .cc-row{display:flex;gap:12px;flex-wrap:wrap}
+  .cc-col{flex:1 1 220px}
+  .cc-kpi{background:color-mix(in oklab, var(--card,#fff) 92%, transparent);border:1px dashed var(--line,#e5e9f2);border-radius:12px;padding:12px}
+  .cc-kpi h6{margin:0 0 6px;font-size:.82rem;opacity:.8}
+  .cc-kpi strong{font-size:1.05rem}
+
+  /* Welcome banner */
+  .welcome{background:color-mix(in oklab, #4ea8ff 14%, transparent);border:1px solid var(--line,#e5e9f2);border-radius:12px}
+  .welcome h3{margin:0;font-weight:800;display:flex;align-items:center;gap:.5rem}
+  .pulse{display:inline-block;width:.55rem;height:.55rem;border-radius:999px;background:#2ecc71;position:relative}
+  .pulse::after{content:"";position:absolute;inset:-4px;border-radius:inherit;border:2px solid #2ecc71;animation:pulse 1.8s infinite}
+  @keyframes pulse{0%{opacity:.7;transform:scale(.9)}70%{opacity:0;transform:scale(1.6)}100%{opacity:0}}
+  .wave{display:inline-block;transform-origin:70% 70%;animation:wave 1.8s ease-in-out infinite}
+  @keyframes wave{0%,100%{transform:rotate(0)}25%{transform:rotate(16deg)}50%{transform:rotate(-10deg)}75%{transform:rotate(12deg)}}
+
+  /* Progress bar */
+  .bar{height:8px;border-radius:999px;background:color-mix(in oklab, var(--line,#e5e9f2) 70%, transparent);overflow:hidden}
+  .bar > i{display:block;height:100%;width:0;border-radius:inherit;background:linear-gradient(90deg,#2dd4bf,#60a5fa);transition:width .9s cubic-bezier(.22,1,.36,1)}
+  .meta{opacity:.78}
+
+  /* Lists */
+  .list{list-style:none;margin:0;padding:0}
+  .list li{display:flex;justify-content:space-between;gap:10px;padding:10px 12px;border-top:1px solid var(--line,#e5e9f2)}
+  .list li:first-child{border-top:none}
+  .pill{display:inline-block;padding:.18rem .5rem;border-radius:999px;border:1px solid var(--line,#e5e9f2);font-weight:700;font-size:.82rem}
+  .sku{background:color-mix(in oklab, var(--card,#fff) 86%, transparent)}
+
+  /* Buttons */
+  .btn{display:inline-flex;align-items:center;gap:.4rem;padding:.6rem 1rem;border-radius:.7rem;border:1px solid transparent;text-decoration:none;font-weight:700}
+  .btn-primary{background:#1a73e8;color:#fff}
+  .btn-secondary{background:transparent;border-color:var(--line,#e5e9f2);color:inherit}
+
+  @media (min-width:860px){
+    .cc-split{display:grid;grid-template-columns:1.3fr .9fr;gap:18px}
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="cc-wrap">
+
+  <!-- Welcome -->
+  <div class="cc-card cc-pad welcome mb-3">
+    <h3>
+      <span class="pulse" aria-hidden="true"></span>
+      Welcome, {{ display_name|default:"friend" }}
+      <span class="wave" aria-hidden="true">👋</span>
+    </h3>
+    {% if customer_phone %}
+      <div class="meta">Phone: {{ customer_phone }}</div>
+    {% endif %}
+  </div>
+
+  {% if orders_data %}
+    {% for item in orders_data %}
+      {% with o=item.o payments=item.payments sms=item.sms %}
+      <div class="cc-card cc-pad-lg mb-4">
+
+        <!-- Header -->
+        <div class="cc-row" style="align-items:baseline">
+          <div class="cc-col" style="flex:2 1 auto">
+            <h2 style="margin:.1rem 0 0">{{ o.product }}
+              {% if o.sku %}<span class="pill sku">{{ o.sku }}</span>{% endif %}
+            </h2>
+          </div>
+          <div class="cc-col meta" style="text-align:right">
+            Ref: <strong>{{ o.ref|default:o.id }}</strong>
+          </div>
+        </div>
+
+        <!-- KPIs -->
+        <div class="cc-row mt-3">
+          <div class="cc-col">
+            <div class="cc-kpi">
+              <h6>Status</h6>
+              <strong style="text-transform:capitalize">{{ o.status|default:"active" }}</strong>
+            </div>
+          </div>
+          <div class="cc-col">
+            <div class="cc-kpi">
+              <h6>Total</h6>
+              <strong>{{ o.total|floatformat:2|intcomma }}</strong>
+            </div>
+          </div>
+          <div class="cc-col">
+            <div class="cc-kpi">
+              <h6>Paid</h6>
+              <strong>{{ o.amount_paid|floatformat:2|intcomma }}</strong>
+            </div>
+          </div>
+          <div class="cc-col">
+            <div class="cc-kpi">
+              <h6>Balance</h6>
+              <strong style="color:#0b4;white-space:nowrap">{{ o.balance|floatformat:2|intcomma }}</strong>
+            </div>
+          </div>
+        </div>
+
+        <!-- Progress -->
+        <div class="mt-3">
+          <div class="meta mb-1">
+            <span class="pill" id="pct-{{ o.id }}">0% paid</span>
+            {% if o.term_months %}
+              <span class="meta">&nbsp;·&nbsp; Term: {{ o.term_months }} months</span>
+            {% endif %}
+          </div>
+          <div class="bar" data-total="{{ o.total }}" data-paid="{{ o.amount_paid }}">
+            <i></i>
+          </div>
+        </div>
+
+        <!-- Split: history / actions -->
+        <div class="cc-split mt-4">
+          <!-- Left: histories -->
+          <div class="cc-card cc-pad">
+            <h4 style="margin:.25rem 0 8px">Payment history</h4>
+            {% if payments %}
+              <ul class="list">
+                {% for p in payments %}
+                  <li>
+                    <div>
+                      <div><strong>{{ p.amount|floatformat:2|intcomma }}</strong> <span class="meta">({{ p.method|default:"—" }})</span></div>
+                      {% if p.tx_ref %}<div class="meta">Ref: {{ p.tx_ref }}</div>{% endif %}
+                    </div>
+                    <div class="meta" style="white-space:nowrap">{{ p.when }}</div>
+                  </li>
+                {% endfor %}
+              </ul>
+            {% else %}
+              <div class="meta">No payments recorded yet.</div>
+            {% endif %}
+
+            <h4 class="mt-4" style="margin:.9rem 0 8px">Messages from Circuit City</h4>
+            {% if sms %}
+              <ul class="list">
+                {% for m in sms %}
+                  <li>
+                    <div style="max-width:70ch">{{ m.body }}</div>
+                    <div class="meta" style="white-space:nowrap">{{ m.when }}</div>
+                  </li>
+                {% endfor %}
+              </ul>
+            {% else %}
+              <div class="meta">No messages yet.</div>
+            {% endif %}
+          </div>
+
+          <!-- Right: actions -->
+          <div class="cc-card cc-pad">
+            <h4 style="margin:.25rem 0 12px">Pay remaining</h4>
+            <div class="cc-row">
+              <a class="btn btn-primary" href="{% url 'layby:pay_now' o.id %}">Pay now</a>
+              <a class="btn btn-secondary" target="_blank" href="{% url 'layby:qr_png' o.id %}">QR code</a>
+            </div>
+          </div>
+        </div>
+      </div>
+      {% endwith %}
+    {% endfor %}
+  {% else %}
+    <div class="cc-card cc-pad">
+      No laybys linked to this phone yet.
+    </div>
+  {% endif %}
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+  // Animate each progress bar based on data attributes
+  document.querySelectorAll('.bar').forEach(function(bar){
+    const total = parseFloat(bar.dataset.total || '0');
+    const paid  = parseFloat(bar.dataset.paid  || '0');
+    const pct   = total > 0 ? Math.min(100, Math.max(0, (paid/total)*100)) : 0;
+    const fill  = bar.querySelector('i');
+    requestAnimationFrame(()=>{ fill.style.width = pct.toFixed(2) + '%'; });
+    // Write the percentage near the bar label if present
+    const wrapper = bar.closest('.cc-card').querySelector('#pct-' + (bar.closest('.cc-card').querySelector('[id^="pct-"]')?.id?.split('-')[1] || ''));
+    if (wrapper) wrapper.textContent = pct.toFixed(0) + '% paid';
+  });
+</script>
+{% endblock %}

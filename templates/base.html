@@ -3,54 +3,48 @@
 <html lang="en" data-theme="style-2">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1, user-scalable=no">
+  <meta name="format-detection" content="telephone=no">
   <title>{% block title %}Circuit City{% endblock %}</title>
   <meta name="color-scheme" content="light dark" />
   <meta name="theme-color" content="#0b1220" />
 
   <script>
-    (function () { try {
+    (function(){try{
       const saved = localStorage.getItem("cc-theme");
       if (saved) document.documentElement.setAttribute("data-theme", saved);
-    } catch(_){} })();
+    }catch(_){}})();
   </script>
 
   <!-- Bootstrap & Icons -->
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
   <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
 
-  <!-- Core design tokens / base styles -->
+  <!-- Core styles -->
   <link rel="stylesheet" href="{% static 'css/tokens.css' %}?v={{ STATIC_VERSION|default:'1' }}">
   <link rel="stylesheet" href="{% static 'css/ui.css' %}?v={{ STATIC_VERSION|default:'1' }}">
   <link rel="stylesheet" href="{% static 'css/app.css' %}?v={{ STATIC_VERSION|default:'1' }}">
-
-  <!-- v2 minimal overrides for cards, tables, badges -->
   <link rel="stylesheet" href="{% static 'css/v2-overrides.css' %}?v={{ STATIC_VERSION|default:'1' }}">
+  <link rel="stylesheet" href="{% static 'css/mobile.css' %}?v={{ STATIC_VERSION|default:'1' }}">
 
   <style>
     :root{
-      --sidebar-w: 270px;
-      --radius: 12px;
+      --sidebar-w: 270px; --radius: 12px;
       --shadow-sm: 0 2px 10px rgba(2,8,23,.08);
       --shadow-md: 0 6px 18px rgba(16,24,40,.06);
 
-      /* Page (light) – bumped contrast */
-      --bg:#f5f7fe;
-      --ink:#0b1220;
-      --muted:#475569;
-      --line:#d9e2ef;
-      --card:#ffffff;
+      /* Page (light) */
+      --bg:#f5f7fe; --ink:#0b1220; --muted:#475569;
+      --line:#d9e2ef; --card:#ffffff;
 
-      /* Sidebar (dark – fixed) */
+      /* Sidebar (dark) */
       --sb-bg:#0b1220; --sb-ink:#e6edf7; --sb-line:#20324d;
 
       /* Brand */
       --cc-accent:#3b82f6; --cc-accent-2:#60a5fa;
       --chart-grid: rgba(2,6,23,.10);
 
-      /* Type scale + motion tokens */
-      --font-sans: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Arial, "Noto Sans", "Apple Color Emoji", "Segoe UI Emoji";
+      --font-sans: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Arial, "Noto Sans";
       --fs-2xl: clamp(20px, 2.7vw, 24px);
       --fs-xl:  clamp(18px, 2.2vw, 20px);
       --fs-lg:  clamp(16px, 1.9vw, 18px);
@@ -62,36 +56,25 @@
       --pop:     cubic-bezier(.17,.67,.25,1.35);
       --fast: 140ms; --med: 220ms; --slow: 360ms;
 
-      /* Glass touches */
       --glass-bg: color-mix(in oklab, var(--card) 78%, transparent);
       --glass-br: 12px;
       --glass-bd: 1px solid var(--line);
       --glass-shadow: 0 6px 24px rgba(0,0,0,.06);
     }
-
     @media (prefers-reduced-motion: reduce){
       *{ animation-duration:1ms !important; animation-iteration-count:1 !important; transition-duration:1ms !important; scroll-behavior:auto !important; }
     }
-
     html,body{height:100%}
-    body{
-      margin:0; background:var(--bg); color:var(--ink);
-      font-family:var(--font-sans);
-      -webkit-font-smoothing:antialiased;
-    }
+    body{ margin:0; background:var(--bg); color:var(--ink); font-family:var(--font-sans); -webkit-font-smoothing:antialiased; }
     a{text-decoration:none}
 
-    /* ---------- App shell ---------- */
-    .cc-shell{ min-height:100dvh; display:flex; align-items:stretch; width:100%; }
-
-    /* Sidebar (always dark) */
+    /* Shell */
+    .cc-shell{ min-height:100dvh; display:flex; width:100%; }
     .cc-sidebar{
-      position:sticky; top:0;
-      width:var(--sidebar-w); flex:0 0 var(--sidebar-w);
-      height:100dvh; overflow:auto; z-index:10;
-      padding:16px; display:flex; flex-direction:column; gap:10px;
-      background:var(--sb-bg); color:var(--sb-ink); border-right:1px solid var(--sb-line);
-      color-scheme: dark;
+      position:sticky; top:0; width:var(--sidebar-w); flex:0 0 var(--sidebar-w);
+      height:100dvh; overflow:auto; z-index:10; padding:16px;
+      display:flex; flex-direction:column; gap:10px;
+      background:var(--sb-bg); color:var(--sb-ink); border-right:1px solid var(--sb-line); color-scheme: dark;
     }
     .brand{ display:flex; align-items:center; gap:.6rem; font-weight:800; font-size:1.25rem; margin:2px 2px 10px; }
     .brand .logo{ display:grid; place-items:center; width:36px; height:36px; border-radius:10px; background:#132036; color:#8fb5ff; }
@@ -106,20 +89,31 @@
     .side-footer{ margin-top:auto; display:flex; gap:8px; align-items:center; justify-content:space-between; }
     .side-footer .logout{ padding:.45rem .6rem; }
 
-    /* Main */
     .cc-main{ flex:1 1 auto; min-width:0; position:relative; z-index:0; background:var(--bg); color:var(--ink); }
     .cc-page{ max-width:1200px; margin:0 auto; padding:18px; }
 
-    /* Header – sticky, crisp, compact */
+    /* Sticky header (polished) */
     .cc-header{
       position:sticky; top:0; z-index:2;
       background:rgba(255,255,255,.98);
       backdrop-filter: blur(10px);
       border-bottom:1px solid var(--line);
     }
-    .cc-header h1{ line-height:var(--lh-tight); letter-spacing:.01em; font-size:var(--fs-xl); font-weight:900; }
+    .cc-header .topbar{
+      display:grid;
+      grid-template-columns: 1fr auto auto;
+      gap:.75rem; align-items:center;
+      min-height:64px;
+    }
+    .cc-header h1{ line-height:var(--lh-tight); letter-spacing:.01em; font-size:var(--fs-xl); font-weight:900; margin:0; }
 
-    .cc-actions{ display:flex; gap:.5rem; align-items:center; }
+    .cc-actions{ display:flex; gap:.5rem; align-items:center; flex-wrap:nowrap; }
+    .cc-actions > *{ flex:0 0 auto; }
+
+    /* Search block */
+    .cc-search{ display:flex; align-items:center; gap:.5rem; width:100%; max-width:640px; margin-left:auto; }
+    .cc-search .input{ flex:1 1 auto; min-width:240px; }
+    #global-search-go{ font-weight:800; }
 
     /* Messages */
     .msg { border-radius: 12px; padding: .75rem 1rem; border: 1px solid var(--line); margin-bottom: .75rem; }
@@ -128,12 +122,11 @@
     .msg-warning { background: #fffbeb; border-color:#fde68a; color:#92400e; }
     .msg-danger  { background: #fef2f2; border-color:#fecaca; color:#991b1b; }
 
-    /* Global button style */
+    /* Buttons */
     .btn.primary{ background:var(--cc-accent); color:#fff; border:0; font-weight:800; min-height:44px; }
     .btn.muted{ background:#e2e8f0; color:#0b1220; border:0; font-weight:700; min-height:44px; }
-    .btn.icon{ background:#eef2ff; color:#1d4ed8; border:1px solid #c7d2fe; font-weight:800; min-height:44px; }
+    .btn.icon{ background:#eef2ff; color:#1d4ed8; border:1px solid #c7d2fe; font-weight:800; }
 
-    /* Micro-interactions */
     .hover-lift{ transition: transform var(--med) var(--elevate), box-shadow var(--med) var(--elevate); }
     .hover-lift:where(:hover,:focus-visible){ transform: translateY(-2px); box-shadow: 0 8px 24px rgba(0,0,0,.12); }
     .tap{ transition: transform var(--fast) var(--elevate); }
@@ -142,38 +135,107 @@
     .fade-in{ animation: fadeIn var(--slow) var(--elevate); }
     @keyframes fadeIn{ from{opacity:0; transform:translateY(6px)} to{opacity:1; transform:translateY(0)} }
 
-    /* Compact glass card */
     .glass-card{ border-radius:var(--glass-br); border:var(--glass-bd); background:var(--glass-bg); box-shadow:var(--glass-shadow); }
+
+    /* ---------- Active Business Pill (glass) ---------- */
+    .tenant-pill{
+      position:relative; display:flex; align-items:center; gap:.5rem; padding:.35rem .6rem .35rem .45rem;
+      border-radius:999px; border:1px solid var(--line); background:color-mix(in oklab, var(--card) 82%, transparent);
+      -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px);
+      box-shadow: 0 8px 26px rgba(0,0,0,.08);
+      font-weight:800; line-height:1; cursor:default;
+      transition: transform var(--med) var(--elevate), box-shadow var(--med) var(--elevate);
+    }
+    .tenant-pill:hover{ transform: translateY(-1px); box-shadow: 0 12px 30px rgba(0,0,0,.12); }
+    .tenant-dot{ width:8px; height:8px; border-radius:50%; background: #3ecd87; box-shadow: 0 0 0 3px rgba(62,205,135,.18) inset; }
+    .tenant-name{ max-width:38ch; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .tenant-role{ font-size:.78rem; color:#64748b; font-weight:900; }
+    .tenant-caret{ display:inline-grid; place-items:center; width:28px; height:28px; border-radius:999px; }
+    .tenant-caret:hover{ background:rgba(2,6,23,.06); }
+    .tenant-menu{
+      position:absolute; right:0; top:calc(100% + 8px); min-width:240px; z-index:30;
+      border-radius:14px; border:1px solid var(--line);
+      background:color-mix(in oklab, var(--card) 92%, transparent);
+      -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px);
+      box-shadow: 0 14px 40px rgba(2,6,23,.18); padding:6px; display:none;
+    }
+    .tenant-menu.open{ display:block; animation: fadeIn var(--med) var(--elevate); }
+    .tenant-item{
+      display:flex; align-items:center; gap:.6rem; padding:.5rem .6rem; border-radius:10px; color:inherit; text-decoration:none;
+      border:1px solid transparent; font-weight:800;
+    }
+    .tenant-item:hover{ background:rgba(2,6,23,.06); border-color:rgba(2,6,23,.08); }
+    .tenant-divider{ height:1px; background:var(--line); margin:.3rem .25rem; }
+
+    /* ---------- Notifications (polished) ---------- */
+    .notif-btn{
+      position:relative; display:inline-grid; place-items:center;
+      width:40px; height:40px; border-radius:12px; border:1px solid var(--line);
+      background:color-mix(in oklab, var(--card) 92%, transparent);
+    }
+    .notif-btn .bi{ font-size:1.1rem; }
+    .notif-btn:hover{ transform:translateY(-1px); box-shadow:var(--shadow-sm); }
+    .notif-dot{
+      position:absolute; right:6px; top:6px; width:8px; height:8px; border-radius:50%;
+      background:#ef4444; box-shadow:0 0 0 2px #fff;
+      display:none;
+    }
+    .notif-menu{
+      position:absolute; right:0; top:calc(100% + 8px); min-width:360px; max-width:min(92vw,420px);
+      border-radius:14px; border:1px solid var(--line);
+      background:color-mix(in oklab, var(--card) 94%, transparent);
+      -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px);
+      box-shadow: 0 14px 40px rgba(2,6,23,.18);
+      display:none; overflow:hidden;
+    }
+    .notif-menu.open{ display:block; animation: fadeIn var(--med) var(--elevate); }
+    .notif-item{
+      display:flex; gap:.6rem; padding:.65rem .75rem; border-top:1px solid rgba(2,6,23,.04);
+      align-items:flex-start;
+    }
+    .notif-item .badge{ height:22px; align-self:center; }
+    .notif-empty{ padding:1rem; color:#64748b; }
+    @media (max-width: 576px){
+      .notif-menu{ right:8px; left:8px; min-width:auto; }
+      .cc-search{ max-width:100%; }
+    }
 
     /* Mobile drawer */
     @media (max-width: 992px){
-      .cc-sidebar{
-        position:fixed; left:0; top:0; height:100dvh; transform:translateX(-100%);
-        transition: transform .26s var(--elevate); box-shadow: 0 20px 60px rgba(0,0,0,.35);
-      }
+      .cc-sidebar{ position:fixed; left:0; top:0; height:100dvh; transform:translateX(-100%); transition: transform .26s var(--elevate); box-shadow: 0 20px 60px rgba(0,0,0,.35); }
       .cc-sidebar.open{ transform:translateX(0); }
       .cc-backdrop{ position:fixed; inset:0; background:rgba(2,6,23,.42); backdrop-filter:blur(2px); display:none; z-index:9; }
       .cc-backdrop.show{ display:block; }
-      .mobile-toggle{
-        position:fixed; top:12px; left:12px; z-index:11;
-        border:0; border-radius:12px; width:42px; height:42px;
-        display:grid; place-items:center; background:var(--cc-accent); color:#fff;
-        box-shadow:0 10px 22px rgba(59,130,246,.35);
-      }
+      .mobile-toggle{ position:fixed; top:12px; left:12px; z-index:11; border:0; border-radius:12px; width:42px; height:42px;
+        display:grid; place-items:center; background:var(--cc-accent); color:#fff; box-shadow:0 10px 22px rgba(59,130,246,.35); }
     }
     @media (min-width: 992px){
       .mobile-toggle{ display:none; }
       .offcanvas, [data-legacy-menu]{ display:none !important; }
     }
 
-    /* Bottom mobile tab bar */
-    .mobile-tabbar{ position:sticky; bottom:0; left:0; right:0; z-index:1030; backdrop-filter: blur(10px); background:color-mix(in oklab, var(--card) 85%, transparent); border-top:1px solid var(--line); }
+    /* Mobile tab bar (Layby tab removed) */
+    .mobile-tabbar{ position:sticky; bottom:0; left:0; right:0; z-index:1030; backdrop-filter: blur(10px);
+      background:color-mix(in oklab, var(--card) 85%, transparent); border-top:1px solid var(--line); }
     .mobile-tabbar .tab{ flex:1; text-align:center; padding:10px 4px; font-size:12px; color:var(--muted); min-height:44px; }
     .mobile-tabbar .tab.active{ color:var(--cc-accent); font-weight:800; }
     @media (min-width: 768px){ .mobile-tabbar{ display:none; } }
 
-    /* Touch-friendly table cells */
     .table td, .table th{ vertical-align: middle; }
+
+    /* ---------- Go button (first-hover shows “Go”) ---------- */
+    .go-btn{
+      position:relative;
+      background: var(--cc-accent);
+      color:#fff;
+      font-weight:800;
+      border:0;
+      min-width:56px;
+      transition: background .2s var(--elevate), transform .2s var(--elevate);
+    }
+    .go-btn:focus-visible{ outline: 3px solid color-mix(in oklab, #22c55e 35%, transparent); outline-offset:2px; }
+    /* Only during the first-hover demo */
+    .gx-btn.gx-first{ background:#22c55e !important; }
   </style>
 
   {% block extra_head %}{% endblock %}
@@ -182,20 +244,114 @@
 <body>
 
 <div class="cc-shell">
-  {% block sidebar %}
-    {% include "includes/_sidebar.html" %}
-  {% endblock %}
+  {# CHANGED: include the sidebar we edited earlier #}
+  {% block sidebar %}{% include "partials/sidebar.html" %}{% endblock %}
 
   <button class="mobile-toggle tap focus-ring" id="sidebarOpen" aria-label="Open menu"><i class="bi bi-list"></i></button>
   <div class="cc-backdrop" id="ccBackdrop" aria-hidden="true"></div>
 
   <div class="cc-main">
-    <header class="cc-header">
-      <div class="cc-page d-flex align-items-center justify-content-between gap-2">
-        <h1 class="m-0 fw-bold">{% block header_title %}Dashboard{% endblock %}</h1>
-        <div class="cc-actions">{% block nav_actions %}{% endblock %}</div>
-      </div>
-    </header>
+
+    {# ------- URLs for routing/helpers ------- #}
+    {% url 'inventory:inventory_dashboard' as url_home %}
+    {% url 'inventory:scan_in'           as url_scan_in %}
+    {% url 'inventory:scan_sold'         as url_sell %}
+    {% url 'inventory:stock_list'        as url_stock %}
+    {% url 'wallet:agent_wallet'         as url_wallet %}
+    {% url 'reports:home'                as url_reports %}
+    {% url 'simulator:home'              as url_simulator %}
+    {% url 'simulator:new'               as url_simulator_new %}
+    {% url 'layby:admin_dashboard'       as url_layby_admin %}
+    {% url 'layby:agent_dashboard'       as url_layby_agent %}
+    {% url 'layby:customer_portal'       as url_layby_customer %}
+    {% url 'tenants:choose_business'     as url_choose_business %}
+    {% url 'tenants:manager_review_agents' as url_manager_agents %}
+    {% url 'admin:tenants_business_changelist' as url_admin_business %}
+
+    {% with path=request.path|default:'' %}
+      {% if 'accounts/settings' not in path %}
+        <header class="cc-header">
+          <div class="cc-page topbar">
+            <h1 class="fw-bold">{% block header_title %}Dashboard{% endblock %}</h1>
+
+            {# Search — visible on dashboard or when show_search is set #}
+            {% if show_search or "inventory/dashboard" in path %}
+              <div class="cc-search">
+                <i class="bi bi-search text-muted"></i>
+                <input id="global-search" class="form-control input" type="search" placeholder="Search SKUs, agents, invoices…" autocomplete="off" />
+                <button class="btn gx-btn" type="button" id="global-search-go" title="Go">Go</button>
+              </div>
+            {% else %}
+              <div></div>
+            {% endif %}
+
+            <div class="cc-actions">
+              {# -------- Active Business Pill -------- #}
+              <div class="position-relative me-1" id="tenantRoot">
+                {% if request.business %}
+                  <div class="tenant-pill hover-lift tap" role="button" id="tenantBtn" aria-haspopup="true" aria-expanded="false">
+                    <span class="tenant-dot" aria-hidden="true"></span>
+                    <span class="tenant-name">{{ request.business.name }}</span>
+                    {% if request.membership %}
+                      <span class="tenant-role">· {{ request.membership.role|title }}</span>
+                    {% elif IS_MANAGER %}
+                      <span class="tenant-role">· Manager</span>
+                    {% elif request.user.is_authenticated and request.user.profile.is_manager %}
+                      <span class="tenant-role">· Manager</span>
+                    {% endif %}
+                    <span class="tenant-caret"><i class="bi bi-chevron-down"></i></span>
+                  </div>
+                  <div class="tenant-menu" id="tenantMenu" role="menu" aria-label="Business menu">
+                    <a class="tenant-item" href="{{ url_choose_business|default:'/tenants/choose/' }}"><i class="bi bi-arrow-left-right"></i> Switch business</a>
+                    {% if request.membership and request.membership.role == "MANAGER" %}
+                      <a class="tenant-item" href="{{ url_manager_agents|default:'/tenants/manager/agents/' }}"><i class="bi bi-people"></i> Agents</a>
+                    {% elif IS_MANAGER %}
+                      <a class="tenant-item" href="{{ url_manager_agents|default:'/tenants/manager/agents/' }}"><i class="bi bi-people"></i> Agents</a>
+                    {% elif request.user.is_authenticated and request.user.profile.is_manager %}
+                      <a class="tenant-item" href="{{ url_manager_agents|default:'/tenants/manager/agents/' }}"><i class="bi bi-people"></i> Agents</a>
+                    {% endif %}
+                    {% if request.user.is_staff %}
+                      <div class="tenant-divider"></div>
+                      <a class="tenant-item" href="{{ url_admin_business }}"><i class="bi bi-shield-lock"></i> Staff approvals</a>
+                    {% endif %}
+                  </div>
+                {% else %}
+                  <a class="tenant-pill hover-lift tap" href="{{ url_choose_business|default:'/tenants/choose/' }}">
+                    <span class="tenant-dot" style="background:#f59e0b"></span>
+                    <span class="tenant-name">No active business</span>
+                    <span class="tenant-role">· Set up</span>
+                  </a>
+                {% endif %}
+              </div>
+              {# Notifications #}
+              <div class="position-relative" id="ccNotifRoot"
+                   data-scope="{% block notif_scope %}dashboard{% endblock %}"
+                   data-allow="{% block notif_allow %}{% endblock %}">
+                <button class="notif-btn focus-ring" id="ccNotifBtn" type="button" aria-haspopup="true" aria-expanded="false" aria-label="Notifications">
+                  <i class="bi bi-bell"></i>
+                  <span class="notif-dot" id="ccNotifDot" aria-hidden="true"></span>
+                </button>
+                <div class="notif-menu" id="ccNotifMenu" role="menu" aria-label="Notifications">
+                  <div class="p-2 border-bottom d-flex align-items-center justify-content-between">
+                    <strong>Notifications</strong>
+                    <button class="btn btn-sm btn-light" id="ccNotifRefresh" type="button">
+                      <i class="bi bi-arrow-clockwise"></i> Refresh
+                    </button>
+                  </div>
+                  <div id="ccNotifList">
+                    <div class="notif-empty">No notifications.</div>
+                  </div>
+                  <div class="p-2 text-end border-top">
+                    <a class="text-decoration-underline" href="#" id="ccNotifOpen">Open inbox</a>
+                  </div>
+                </div>
+              </div>
+              {# /Notifications #}
+            </div>
+          </div>
+        </header>
+      {% endif %}
+    {% endwith %}
 
     <main class="cc-page">
       {% if messages %}
@@ -211,30 +367,13 @@
         {% endfor %}
       {% endif %}
 
-      {# Compatibility: render whichever block a template uses #}
       {% block body %}{% endblock %}
       {% block content %}{% endblock %}
       {% block page_content %}{% endblock %}
       {% block main %}{% endblock %}
     </main>
 
-    {# ------- SAFE URL CAPTURE (never raises) ------- #}
-    {% url 'inventory:inventory_dashboard' as url_home %}
-    {% url 'inventory:scan_in' as url_scan_in %}
-    {% url 'inventory:scan_sold' as url_sell %}
-    {% url 'inventory:stock_list' as url_stock %}
-    {% url 'inventory:wallet' as url_wallet %}
-    {% url 'reports:home' as url_reports %}
-
-    {# Floating Primary Action – mobile #}
-    <a href="{{ url_sell|default:'/inventory/scan-sold/' }}"
-       class="btn btn-primary position-fixed d-md-none tap focus-ring"
-       style="right:16px; bottom:76px; border-radius:999px; padding:.8rem 1rem; box-shadow:0 10px 20px rgba(0,0,0,.18);"
-       aria-label="Sell or Scan">
-      <i class="bi bi-lightning-charge"></i>
-    </a>
-
-    {# Bottom Tab Bar – mobile primary navigation #}
+    {# Bottom Tab Bar – Layby tab removed #}
     <nav class="mobile-tabbar d-flex d-md-none">
       <a class="tab {% if active_tab == 'home' %}active{% endif %}" href="{{ url_home|default:'/inventory/dashboard/' }}">
         <i class="bi bi-speedometer2 d-block"></i>Home
@@ -251,14 +390,99 @@
       <a class="tab {% if active_tab == 'wallet' %}active{% endif %}" href="{{ url_wallet|default:'/wallet/' }}">
         <i class="bi bi-wallet2 d-block"></i>Wallet
       </a>
+      {% if request.user.is_authenticated %}
+        {% if IS_MANAGER or request.user.is_staff or request.user.profile.is_manager %}
+          <a class="tab {% if active_tab == 'sim' %}active{% endif %}" href="{{ url_simulator|default:'/simulator/' }}">
+            <i class="bi bi-graph-up d-block"></i>Sim
+          </a>
+        {% endif %}
+      {% endif %}
+      {# Layby tab intentionally omitted #}
     </nav>
+  </div>
+</div>
+
+<!-- Inbox Modal (fallback) -->
+<div class="modal fade" id="ccInbox" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-scrollable modal-xl">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title cc-inbox-title"><i class="bi bi-bell me-2"></i>Notifications Inbox</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <div class="d-flex align-items-center justify-content-between mb-2">
+          <div class="text-muted">Read-only fallback (server inbox is down)</div>
+          <div class="d-flex gap-2">
+            <button class="btn btn-sm btn-light" id="ccInboxRefresh"><i class="bi bi-arrow-clockwise"></i> Refresh</button>
+          </div>
+        </div>
+        <div id="ccInboxList" class="cc-inbox-list">
+          <div class="notif-empty">Loading…</div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+      </div>
+    </div>
   </div>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js" defer></script>
 <script src="{% static 'js/app.js' %}?v={{ STATIC_VERSION|default:'1' }}" defer></script>
+<script src="{% static 'js/mobile.js' %}?v={{ STATIC_VERSION|default:'1' }}" defer></script>
+
 <script>
-  // Mobile drawer
+  /* CSRF + fetch helpers */
+  (function(){
+    function readCookie(name){
+      const m = document.cookie.match(new RegExp('(?:^|; )' + name + '=([^;]*)'));
+      return m ? decodeURIComponent(m[1]) : '';
+    }
+    function getCsrfToken(){ return readCookie('cc_csrftoken') || readCookie('csrftoken') || ''; }
+
+    async function ccFetchJSON(url, opts){
+      const resp = await fetch(url, { credentials: 'same-origin',
+        headers: { 'Accept': 'application/json', ...(opts && opts.headers || {}) }, ...(opts || {}) });
+      const ct = (resp.headers.get('content-type') || '').toLowerCase();
+      if (!ct.includes('application/json')){
+        const text = await resp.text();
+        throw new Error(`Expected JSON, got ${ct || 'unknown'} — starts with: ${text.slice(0,80)}`);
+      }
+      const data = await resp.json();
+      if (!resp.ok){ throw new Error((data && (data.detail || data.error)) || `HTTP ${resp.status}`); }
+      return data;
+    }
+    function ccPostJSON(url, payload, extra){
+      return ccFetchJSON(url, { method:'POST',
+        headers:{ 'Content-Type':'application/json','X-CSRFToken': getCsrfToken(),'X-Requested-With':'XMLHttpRequest', ...(extra && extra.headers || {}) },
+        body: JSON.stringify(payload || {}), ...(extra || {}) });
+    }
+    window.CC = Object.assign(window.CC || {}, {
+      getCsrfToken, ccFetchJSON, ccPostJSON,
+      URLS: {
+        home: "{{ url_home|default:'/inventory/dashboard/' }}",
+        scan_in: "{{ url_scan_in|default:'/inventory/scan-in/' }}",
+        scan_sold: "{{ url_sell|default:'/inventory/scan-sold/' }}",
+        stock_list: "{{ url_stock|default:'/inventory/list/' }}",
+        wallet: "{{ url_wallet|default:'/wallet/' }}",
+        reports: "{{ url_reports|default:'/reports/' }}",
+        simulator: "{{ url_simulator|default:'/simulator/' }}",
+        simulator_new: "{{ url_simulator_new|default:'/simulator/new/' }}",
+        layby_admin: "{{ url_layby_admin|default:'/layby/admin/' }}",
+        layby_agent: "{{ url_layby_agent|default:'/layby/agent/' }}",
+        layby_customer: "{{ url_layby_customer|default:'/layby/customer/' }}"
+      },
+      USER: {
+        is_staff: {{ request.user.is_staff|yesno:"true,false" }},
+        is_superuser: {{ request.user.is_superuser|yesno:"true,false" }},
+        is_manager: {% if IS_MANAGER %}true{% elif request.user.is_authenticated and request.user.profile.is_manager %}true{% elif request.user.is_authenticated and request.user.is_staff %}true{% else %}false{% endif %},
+        is_agent: {% if request.user.is_authenticated %}{% if IS_MANAGER %}false{% elif request.user.is_staff %}false{% elif request.user.profile.is_manager %}false{% else %}true{% endif %}{% else %}false{% endif %}
+      }
+    });
+  })();
+
+  /* Mobile drawer */
   const sidebar  = document.querySelector('.cc-sidebar');
   const backdrop = document.getElementById('ccBackdrop');
   const openBtn  = document.getElementById('sidebarOpen');
@@ -273,10 +497,10 @@
     });
   });
 
-  // Active nav highlight
+  /* Active nav highlight — CHANGED to match any sidebar link */
   (function(){
     const path = location.pathname.replace(/\/+$/,'/') || '/';
-    document.querySelectorAll('.cc-sidebar a.navlink[href]').forEach(a=>{
+    document.querySelectorAll('.cc-sidebar a[href]').forEach(a=>{
       const href = (a.getAttribute('href')||'').replace(/\/+$/,'/') || '/';
       if (path === href || (href !== '/' && path.startsWith(href))){
         a.classList.add('active'); a.setAttribute('aria-current','page');
@@ -284,24 +508,212 @@
     });
   })();
 
-  // Keyboard shortcuts (guarded)
+  /* Dashboard global-search routing */
   (function(){
-    const map = {};
-    {% if url_home %}     map['g d'] = '{{ url_home }}'; {% endif %}
-    {% if url_stock %}    map['g s'] = '{{ url_stock }}'; {% endif %}
-    {% if url_reports %}  map['g r'] = '{{ url_reports }}'; {% endif %}
-    {% if url_sell %}     map['s s'] = '{{ url_sell }}'; {% endif %}
-    {% if url_scan_in %}  map['s i'] = '{{ url_scan_in }}'; {% endif %}
+    const inp = document.querySelector('#global-search');
+    const btn = document.querySelector('#global-search-go');
+    if (!inp || !btn) return;
 
-    let buffer=''; let timer=null;
-    document.addEventListener('keydown', (e)=>{
-      if (e.target.closest('input,textarea,[contenteditable=true]')) return;
-      const key = e.key.length===1 ? e.key.toLowerCase() : ' ';
-      if ((e.ctrlKey||e.metaKey) && key==='k'){ e.preventDefault(); document.querySelector('#global-search')?.focus(); return; }
-      buffer += key;
-      clearTimeout(timer); timer=setTimeout(()=>buffer='', 700);
-      if(map[buffer]){ window.location = map[buffer]; buffer=''; }
+    const go = (path) => { if (path) window.location.assign(path); };
+    const isMgr = !!(CC.USER && (CC.USER.is_staff || CC.USER.is_manager));
+    const map = [
+      {k:/^scan(\s|-)?in$/i, url: CC.URLS.scan_in},
+      {k:/^scan(\s|-)?sold$/i, url: CC.URLS.scan_sold},
+      {k:/^inventory$|^stock$/i, url: CC.URLS.stock_list},
+      {k:/^wallet$/i, url: CC.URLS.wallet},
+      {k:/^dashboard$|^home$/i, url: CC.URLS.home},
+      {k:/^reports?$/i, url: CC.URLS.reports},
+      ...(isMgr ? [{k:/^sim(ulation|ulator)?$|^scenarios?$/i, url: CC.URLS.simulator}] : []),
+      {k:/^layby$|^lay[- ]?by$/i, url: (
+        CC.USER?.is_staff || CC.USER?.is_manager
+          ? CC.URLS.layby_admin
+          : ({{ request.user.is_authenticated|yesno:"true,false" }} ? CC.URLS.layby_agent : CC.URLS.layby_customer)
+      ))}
+    ];
+    function handle(){
+      const q = (inp.value||'').trim();
+      const hit = map.find(m => m.k.test(q));
+      if (hit) go(hit.url);
+    }
+    inp.addEventListener('keydown', (e)=>{ if (e.key === 'Enter'){ e.preventDefault(); handle(); }});
+    btn.addEventListener('click', handle);
+  })();
+
+  /* Go button: show “Go” only on the first hover/focus, then remember */
+  (function(){
+    const btn = document.getElementById('global-search-go');
+    if(!btn) return;
+    const SEEN_KEY = 'cc_go_seen';
+    const seen = localStorage.getItem(SEEN_KEY) === '1';
+    btn.title = 'Go';
+    if (!seen){
+      const showOnce = () => {
+        const original = btn.textContent;
+        btn.textContent = 'Go';
+        btn.classList.add('go-first');
+        setTimeout(() => {
+          btn.textContent = original;
+          btn.classList.remove('go-first');
+          localStorage.setItem(SEEN_KEY, '1');
+        }, 1200);
+      };
+      btn.addEventListener('mouseenter', showOnce, { once: true });
+      btn.addEventListener('focus', showOnce, { once: true });
+    }
+  })();
+
+  /* Notifications bell */
+  (function(){
+    const btn  = document.getElementById('ccNotifBtn');
+    const dot  = document.getElementById('ccNotifDot');
+    const menu = document.getElementById('ccNotifMenu');
+    const list = document.getElementById('ccNotifList');
+    const refresh = document.getElementById('ccNotifRefresh');
+    const openLink = document.getElementById('ccNotifOpen');
+    const root = document.getElementById('ccNotifRoot');
+
+    const scope = (root?.dataset.scope || 'dashboard').toLowerCase();
+    const allowCSV = (root?.dataset.allow || '').trim();
+    const ALLOW = allowCSV
+      ? allowCSV.split(',').map(s=>s.trim()).filter(Boolean)
+      : (scope==='inventory'
+          ? ['stock_in','stock_sold','low_stock']
+          : ['sale','low_stock','payslip','forecast','alert','payment','order','invoice','wallet','restock','stock_in','stock_sold']);
+
+    function typeBadge(t){
+      const map = {
+        sale:{cls:'text-bg-primary', label:'Sale'},
+        low_stock:{cls:'text-bg-warning', label:'Low stock'},
+        stock_in:{cls:'text-bg-success', label:'Stock IN'},
+        stock_sold:{cls:'text-bg-danger', label:'Sold'},
+        payslip:{cls:'text-bg-success', label:'Payslip'},
+        payment:{cls:'text-bg-info', label:'Payment'},
+        forecast:{cls:'text-bg-info', label:'Forecast'},
+        alert:{cls:'text-bg-danger', label:'Alert'},
+        restock:{cls:'text-bg-secondary', label:'Restock'},
+        wallet:{cls:'text-bg-secondary', label:'Wallet'},
+        order:{cls:'text-bg-secondary', label:'Order'},
+        invoice:{cls:'text-bg-secondary', label:'Invoice'},
+      };
+      return map[t] || {cls:'text-bg-secondary', label:t};
+    }
+
+    function render(items){
+      if (!Array.isArray(items) || !items.length){
+        dot.style.display = 'none';
+        list.innerHTML = '<div class="notif-empty">No notifications.</div>';
+        window.CC_NOTIF_ITEMS = [];
+        return;
+      }
+      const filtered = items.filter(it => !ALLOW.length || ALLOW.includes(it.type));
+      if (!filtered.length){
+        dot.style.display = 'none';
+        list.innerHTML = '<div class="notif-empty">No notifications.</div>';
+        window.CC_NOTIF_ITEMS = [];
+        return;
+      }
+      dot.style.display = 'block';
+      list.innerHTML = filtered.map(it=>{
+        const badge = typeBadge(it.type);
+        const when  = it.created_human || '';
+        const body  = (it.body || it.message || '').replace(/\n/g,' ');
+        const url   = it.url || '#';
+        return `
+          <a class="notif-item text-reset" href="${url}">
+            <span class="badge ${badge.cls}">${badge.label}</span>
+            <div>
+              <div class="fw-bold">${it.title || it.heading || 'Notification'}</div>
+              <div class="text-muted" style="font-size:.875rem">${body}</div>
+              <div class="text-muted" style="font-size:.75rem">${when}</div>
+            </div>
+          </a>`;
+      }).join('');
+      window.CC_NOTIF_ITEMS = filtered;
+    }
+
+    async function tryFetchJSON(url){
+      try{
+        const r = await fetch(url, {headers:{Accept:'application/json'}, credentials:'same-origin'});
+        const ct = (r.headers.get('content-type')||'').toLowerCase();
+        if (!ct.includes('application/json')) return null;
+        const data = await r.json();
+        return r.ok ? data : null;
+      }catch(_){ return null; }
+    }
+
+    async function load(){
+      const candidates=['/notifications/inbox.json?limit=50','/notifications/feed/?format=json&limit=50','/notifications/feed/'];
+      let data=null;
+      for(const c of candidates){ data = await tryFetchJSON(c); if(data) break; }
+      let items=[];
+      if(data){ items = Array.isArray(data) ? data : (data.items || data.results || []); }
+      const isMgr = !!(CC.USER?.is_staff || CC.USER?.is_manager);
+      if (!isMgr){ items = items.filter(it => ['low_stock','stock_in','stock_sold','sale'].includes(it.type)); }
+      render(items);
+    }
+
+    function renderInbox(items){
+      const box = document.getElementById('ccInboxList');
+      if (!box) return;
+      if (!Array.isArray(items) || !items.length){
+        box.innerHTML = '<div class="notif-empty">No notifications.</div>'; return;
+      }
+      box.innerHTML = items.map(it=>{
+        const badge = typeBadge(it.type);
+        const when  = it.created_human || '';
+        const body  = (it.body || it.message || '').replace(/\n/g,' ');
+        const url   = it.url || '#';
+        const title = it.title || it.heading || 'Notification';
+        return `
+          <div class="item-row">
+            <span class="badge ${badge.cls} me-1">${badge.label}</span>
+            <div class="flex-grow-1">
+              <div class="fw-bold">${title}</div>
+              <div class="meta">${when}</div>
+              <div>${body}</div>
+              ${url && url !== '#' ? `<div class="mt-1"><a href="${url}" class="link-primary">Open related page</a></div>` : ''}
+            </div>
+          </div>`;
+      }).join('');
+    }
+
+    async function openInbox(){
+      const pages=['/notifications/feed/','/notifications/','/notifications/read/'];
+      for (const url of pages){
+        try{ const r = await fetch(url, {method:'GET', credentials:'same-origin'}); if (r.ok){ location.assign(url); return; } }catch(_){}
+      }
+      const items = window.CC_NOTIF_ITEMS || [];
+      renderInbox(items);
+      const el = document.getElementById('ccInbox');
+      if (window.bootstrap && el){ const modal = new bootstrap.Modal(el); modal.show(); }
+      else{ alert('No inbox page available right now. The dropdown still shows live notifications.'); }
+    }
+
+    document.getElementById('ccNotifOpen')?.addEventListener('click', (e)=>{ e.preventDefault(); openInbox(); });
+    document.getElementById('ccNotifRefresh')?.addEventListener('click', load);
+    document.getElementById('ccInboxRefresh')?.addEventListener('click', load);
+
+    load(); setInterval(load, 60_000);
+  })();
+
+  /* ---------- Tenant pill dropdown ---------- */
+  (function(){
+    const root = document.getElementById('tenantRoot');
+    if(!root) return;
+    const btn  = document.getElementById('tenantBtn');
+    const menu = document.getElementById('tenantMenu');
+
+    function open(){ menu?.classList.add('open'); btn?.setAttribute('aria-expanded','true'); }
+    function close(){ menu?.classList.remove('open'); btn?.setAttribute('aria-expanded','false'); }
+    function toggle(){ menu?.classList.contains('open') ? close() : open(); }
+
+    btn?.addEventListener('click', toggle);
+    document.addEventListener('click', (e)=>{
+      if(!menu || !btn) return;
+      if(menu.contains(e.target) || btn.contains(e.target)) return;
+      close();
     });
+    document.addEventListener('keydown', (e)=>{ if(e.key === 'Escape') close(); });
   })();
 </script>
 

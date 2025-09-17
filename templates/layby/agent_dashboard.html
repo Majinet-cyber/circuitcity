@@ -1,0 +1,136 @@
+{% extends "base.html" %}
+{% load humanize %}
+{% block title %}My Laybys · Circuit City{% endblock %}
+{% block header_title %}My Laybys{% endblock %}
+
+{% block extra_css %}
+<style>
+  .wrap{ max-width: 1100px; margin: 0 auto; padding: 10px; }
+
+  /* Glass panel */
+  .glass{ position:relative; border:1px solid var(--cc-border); border-radius:16px;
+          background: linear-gradient(180deg, rgba(255,255,255,.18), rgba(255,255,255,.06));
+          box-shadow: var(--cc-shadow);
+          -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px); }
+
+  .card{ padding: 14px; }
+  .kpi{ display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; }
+
+  .btn{ border:1px solid var(--cc-border); border-radius:12px; padding:.7rem 1rem; font-weight:900;
+        text-decoration:none; display:inline-flex; align-items:center; gap:8px; box-shadow: var(--cc-shadow); }
+  .btn-primary{ background: var(--cc-accent); color: var(--cc-on-accent); border-color: transparent; }
+  .btn-ghost{ background: color-mix(in oklab, var(--card) 70%, transparent); color: var(--ink); }
+
+  /* Table → card responsive */
+  .table-wrap{ overflow:auto; border-radius:14px; }
+  table{ width:100%; border-collapse: collapse; min-width: 780px; }
+  th, td{ padding: 10px; border-bottom: 1px solid var(--cc-border); text-align:left; }
+  thead th{ font-weight:900; background: color-mix(in oklab, var(--card) 10%, transparent); }
+
+  .pill{ display:inline-block; padding:.18rem .55rem; border-radius:999px;
+         border:1px solid var(--cc-border); font-weight:700; font-size:.85rem; }
+
+  .status{ font-weight:800; text-transform:capitalize; }
+  .money{ font-variant-numeric: tabular-nums; }
+
+  /* On very small screens, render rows as cards (stacked) */
+  @media (max-width: 720px){
+    table{ display:none; }
+    .cards{ display:grid; gap:10px; }
+    .row-card{ padding:12px; border:1px solid var(--cc-border); border-radius:14px;
+               background: linear-gradient(180deg, rgba(255,255,255,.16), rgba(255,255,255,.04));
+               -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px); }
+    .row-top{ display:flex; align-items:center; justify-content:space-between; gap:8px; }
+    .row-top .left{ display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+    .row-meta{ display:grid; gap:6px; margin-top:8px; font-size:.95rem; }
+    .row-meta .line{ display:flex; align-items:center; justify-content:space-between; }
+    .actions{ display:flex; gap:8px; flex-wrap:wrap; margin-top:10px; }
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="wrap">
+  <div class="glass card kpi" style="margin-bottom:12px">
+    <h3 style="margin:0;font-weight:900">My Laybys</h3>
+    <a class="btn btn-primary" href="{% url 'layby:agent_new' %}">+ New layby</a>
+  </div>
+
+  <div class="glass card" style="margin-bottom:12px">
+    <strong>Total outstanding balance:</strong>
+    <span class="money">{{ total_balance|floatformat:2|intcomma }}</span>
+  </div>
+
+  <!-- Desktop/tablet table -->
+  <div class="glass card table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th>Ref</th>
+          <th>Customer</th>
+          <th>Product</th>
+          <th>Status</th>
+          <th>Paid</th>
+          <th>Balance</th>
+          <th style="width:220px">Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% if orders %}
+          {% for o in orders %}
+          <tr>
+            <td>{{ o.id }}</td>
+            <td><span class="pill">{{ o.ref|default_if_none:"" }}</span></td>
+            <td>{{ o.customer_name }}</td>
+            <td>
+              {{ o.product }}
+              {% if o.sku %} <span class="pill">{{ o.sku }}</span>{% endif %}
+            </td>
+            <td class="status">{{ o.status|default:"active" }}</td>
+            <td class="money">{{ o.amount_paid|floatformat:2|intcomma }}</td>
+            <td class="money"><strong>{{ o.balance|floatformat:2|intcomma }}</strong></td>
+            <td>
+              <div style="display:flex; gap:8px; flex-wrap:wrap">
+                <a class="btn btn-ghost" href="{% url 'layby:agent_add_payment' o.id %}">Add Payment</a>
+                <a class="btn btn-primary" href="{% url 'layby:pay_now' o.id %}">Pay Now</a>
+              </div>
+            </td>
+          </tr>
+          {% endfor %}
+        {% else %}
+          <tr><td colspan="8">No laybys yet.</td></tr>
+        {% endif %}
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Mobile cards -->
+  <div class="cards">
+    {% for o in orders %}
+      <div class="row-card">
+        <div class="row-top">
+          <div class="left">
+            <span class="pill">#{{ o.id }}</span>
+            {% if o.ref %}<span class="pill">{{ o.ref }}</span>{% endif %}
+          </div>
+          <div class="status">{{ o.status|default:"active" }}</div>
+        </div>
+        <div class="row-meta">
+          <div class="line"><span>Customer</span><strong>{{ o.customer_name }}</strong></div>
+          <div class="line"><span>Product</span><strong>{{ o.product }}</strong></div>
+          {% if o.sku %}<div class="line"><span>SKU</span><span class="pill">{{ o.sku }}</span></div>{% endif %}
+          <div class="line"><span>Paid</span><span class="money">{{ o.amount_paid|floatformat:2|intcomma }}</span></div>
+          <div class="line"><span>Balance</span><span class="money"><strong>{{ o.balance|floatformat:2|intcomma }}</strong></span></div>
+        </div>
+        <div class="actions">
+          <a class="btn btn-ghost" href="{% url 'layby:agent_add_payment' o.id %}">Add Payment</a>
+          <a class="btn btn-primary" href="{% url 'layby:pay_now' o.id %}">Pay Now</a>
+        </div>
+      </div>
+    {% empty %}
+      <div class="row-card">No laybys yet.</div>
+    {% endfor %}
+  </div>
+</div>
+{% endblock %}

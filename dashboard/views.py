@@ -1,34 +1,51 @@
 ﻿# dashboard/views.py
-from datetime import datetime, timedelta, time, date
+from __future__ import annotations
 
-from django.contrib.auth.decorators import login_required, user_passes_test
+from datetime import datetime, timedelta, time, date
+from importlib import import_module
+
+from django.conf import settings
 from django.contrib.auth import get_user_model
+from django.contrib.auth.decorators import login_required, user_passes_test
 from django.db.models import (
-    Sum, F, DecimalField, ExpressionWrapper, Count, Case, When
+    Sum, F, DecimalField, ExpressionWrapper, Count, Case, When, QuerySet
 )
 from django.db.models.functions import TruncMonth
 from django.http import JsonResponse, HttpResponseRedirect
-from django.shortcuts import render, get_object_or_404
+from django.shortcuts import render, get_object_or_404, redirect
 from django.urls import reverse, NoReverseMatch
 from django.utils import timezone
 from django.views.decorators.http import require_GET
 from django.views.decorators.cache import never_cache
 
-from importlib import import_module  # <-- added
+from tenants.utils import require_business  # ✅ tenant guard
 
 from inventory.models import InventoryItem
 from sales.models import Sale
 from reports.kpis import compute_sales_kpis
 
+# Cache optional inventory models module once (safer / faster)
+try:
+    inv_models = import_module("inventory.models")
+except Exception:
+    inv_models = None
+
 # ---- Optional wallet model (graceful if missing) ----
 try:
-    # WalletTxn lives in inventory.models in your codebase
+    # WalletTxn often lives in inventory.models
     from inventory.models import WalletTxn
 except Exception:
     try:
         from wallets.models import WalletTxn  # fallback path if you moved it
     except Exception:
         WalletTxn = None
+
+# ---- Optional OTP decorator (no-op fallback if not available) ----
+try:
+    from accounts.decorators import otp_required  # type: ignore
+except Exception:  # pragma: no cover
+    def otp_required(view_func):
+        return view_func
 
 
 # ---------------------------
@@ -80,12 +97,7 @@ def _wallet_summary_for(user):
     Shape:
     {
       "balance": <float>,
-      "month": {
-        "commission": <float>,
-        "advance": <float>,
-        "adjustment": <float>,
-        "total": <float>,
-      },
+      "month": {"commission": <float>, "advance": <float>, "adjustment": <float>, "total": <float>},
       "month_label": "Aug 2025",
     }
     """
@@ -137,34 +149,167 @@ def _wallet_summary_for(user):
     }
 
 
+def _scope_queryset(qs: QuerySet, business):
+    """
+    Scope a queryset to the active business.
+    - If the manager/queryset provides .for_business(), use it.
+    - Else, if model has a 'business' field, filter(business=...).
+    - Else, return qs as-is (or .none() if you prefer hard isolation).
+    """
+    try:
+        fn = getattr(qs, "for_business", None)
+        if callable(fn):
+            return fn(business)
+        fields = {getattr(f, "name", None) for f in qs.model._meta.get_fields()}
+        if "business" in fields and business is not None:
+            return qs.filter(business=business)
+    except Exception:
+        pass
+    return qs
+
+
+def _count_in_stock(qs: QuerySet) -> int:
+    """
+    Count "in stock" safely across schema variants:
+      - prefer status="IN_STOCK"
+      - else is_active=True
+      - else just count all
+    """
+    try:
+        fields = {getattr(f, "name", None) for f in qs.model._meta.get_fields()}
+        if "status" in fields:
+            qs = qs.filter(status="IN_STOCK")
+        elif "is_active" in fields:
+            qs = qs.filter(is_active=True)
+        return qs.count()
+    except Exception:
+        return 0
+
+
+def _products_count(biz) -> int:
+    """
+    Try Product model; fallback to distinct items by product; else 0.
+    """
+    try:
+        Product = getattr(inv_models, "Product", None) if inv_models else None
+        if Product:
+            return _scope_queryset(Product.objects.all(), biz).count()
+        # fallback via InventoryItem.product if it exists
+        fields = {getattr(f, "name", None) for f in InventoryItem._meta.get_fields()}
+        if "product" in fields:
+            return (
+                _scope_queryset(InventoryItem.objects.select_related("product"), biz)
+                .values("product").distinct().count()
+            )
+    except Exception:
+        pass
+    return 0
+
+
 # ---------------------------
-# Dashboards
+# Manager/tenant “home” (fresh dashboard UX)
+# ---------------------------
+@login_required
+@require_business
+def home(request):
+    """
+    Default dashboard for managers/agents within an active business.
+    Shows a 'first-run' checklist when there’s no data yet; otherwise normal KPIs.
+    Staff users are redirected to the staff dashboard (per-tenant view if business is set).
+    """
+    if request.user.is_staff:
+        # Let staff land on the staff dashboard; keep tenant context if present
+        return redirect("dashboard:admin_dashboard")
+
+    biz = request.business
+
+    # Tenant-scoped counts (robust across schema variants)
+    products_count = _products_count(biz)
+    stock_count = _count_in_stock(_scope_queryset(InventoryItem.objects.all(), biz))
+
+    Warehouse = getattr(inv_models, "Warehouse", None) if inv_models else None
+    if Warehouse:
+        warehouses_count = _scope_queryset(Warehouse.objects.all(), biz).count()
+    else:
+        warehouses_count = 0
+
+    sales_count = _scope_queryset(Sale.objects.select_related("item"), biz).count()
+    first_run = (products_count == 0 and stock_count == 0 and sales_count == 0)
+
+    # Simple per-tenant KPIs (safe)
+    tz = timezone.get_current_timezone()
+    today = timezone.localdate()
+    month_start = _start_of_day(today.replace(day=1), tz)
+    month_end = _start_of_day(_first_of_next_month(today), tz)
+
+    sales_qs = _scope_queryset(Sale.objects.select_related("item", "agent"), biz)
+    try:
+        kpis = compute_sales_kpis(sales_qs, dt_field="sold_at", amount_field="price") or {}
+    except Exception:
+        kpis = {}
+    kpis["scope"] = f"{biz.name}"
+
+    # Sold (MTD) for tile
+    sold_mtd_count = sales_qs.filter(sold_at__gte=month_start, sold_at__lt=month_end).count()
+
+    ctx = {
+        "first_run": first_run,
+        "products_count": products_count,
+        "stock_count": stock_count,
+        "warehouses_count": warehouses_count,
+        "sales_count": sales_count,
+        "kpis": kpis,
+        "sold_mtd_count": sold_mtd_count,
+        "staff_view": False,
+    }
+    return render(request, "dashboard/home.html", ctx)
+
+
+# ---------------------------
+# Staff/admin dashboard (global or per-tenant)
 # ---------------------------
 @login_required
 @user_passes_test(_is_staff)
+@otp_required  # Protect staff dashboard with OTP
 def admin_dashboard(request):
     """
     Staff/admin dashboard:
-      - KPI tiles (Today/MTD/All-time)
-      - In stock / Sold (MTD) / Monthly profit
-      - Global stock battery
-      - Active agents grid (clickable, initials avatar; uses photo_url if present)
+
+    - If you pass ?scope=global (default when no active business), show global KPIs.
+    - If there is an active business and you pass ?scope=tenant, scope to that tenant.
+      (Useful when you switch into a subscriber via the switcher.)
     """
     tz = timezone.get_current_timezone()
     now = timezone.localtime()
     today = now.date()
+    biz = getattr(request, "business", None)
+
+    # Decide scope
+    scope = request.GET.get("scope")
+    if not scope:
+        scope = "tenant" if biz is not None else "global"
+
+    # Base querysets (scoped if tenant scope)
+    if scope == "tenant" and biz is not None:
+        sales_qs = _scope_queryset(Sale.objects.select_related("item", "agent"), biz)
+        stock_qs = _scope_queryset(InventoryItem.objects.all(), biz)
+    else:
+        sales_qs = Sale.objects.select_related("item", "agent").all()
+        stock_qs = InventoryItem.objects.all()
 
     # Month window (tz-aware bounds)
     month_start = _start_of_day(today.replace(day=1), tz)
     month_end = _start_of_day(_first_of_next_month(today), tz)
 
     # KPIs (safe fallback)
-    sales_qs = Sale.objects.select_related("item", "agent").all()
-    kpis = compute_sales_kpis(sales_qs, dt_field="sold_at", amount_field="price") or {}
-    kpis["scope"] = "All agents"
+    try:
+        kpis = compute_sales_kpis(sales_qs, dt_field="sold_at", amount_field="price") or {}
+    except Exception:
+        kpis = {}
+    kpis["scope"] = (biz.name if (scope == "tenant" and biz) else "All businesses")
 
-    # In stock (global)
-    in_stock_total = InventoryItem.objects.filter(status="IN_STOCK").count()
+    # In stock
+    in_stock_total = _count_in_stock(stock_qs)
 
     # Sold (MTD)
     month_sales_qs = sales_qs.filter(sold_at__gte=month_start, sold_at__lt=month_end)
@@ -177,7 +322,7 @@ def admin_dashboard(request):
     )
     monthly_profit = month_sales_qs.aggregate(p=Sum(profit_expr))["p"] or 0
 
-    # Global stock battery
+    # Global/tenant stock battery (simple heuristic)
     battery_max = 100
     battery_count = in_stock_total
     battery_pct = int(round(min(100, (battery_count / battery_max) * 100))) if battery_max else 0
@@ -190,9 +335,23 @@ def admin_dashboard(request):
 
     # Agents (clickable cards)
     User = get_user_model()
-    agents_qs = User.objects.filter(groups__name="Agent").distinct()
-    if not agents_qs.exists():
-        agents_qs = User.objects.filter(is_staff=False)
+    if scope == "tenant" and biz is not None:
+        # Restrict to agents active in this tenant (sold this month or hold stock here)
+        agent_ids = set(month_sales_qs.values_list("agent_id", flat=True))
+        try:
+            assigned_ids = set(_scope_queryset(InventoryItem.objects.all(), biz)
+                               .exclude(assigned_agent__isnull=True)
+                               .values_list("assigned_agent_id", flat=True))
+            agent_ids |= assigned_ids
+        except Exception:
+            pass
+        agents_qs = User.objects.filter(id__in=[aid for aid in agent_ids if aid]).distinct()
+        if not agents_qs.exists():
+            agents_qs = User.objects.filter(groups__name="Agent").distinct()
+    else:
+        agents_qs = User.objects.filter(groups__name="Agent").distinct()
+        if not agents_qs.exists():
+            agents_qs = User.objects.filter(is_staff=False)
 
     agent_cards = []
     for a in agents_qs:
@@ -222,24 +381,35 @@ def admin_dashboard(request):
         },
         "agents": agent_cards,
         "staff_view": True,
+        "scope": scope,
     }
     return render(request, "dashboard.html", ctx)
 
 
+# ---------------------------
+# Agent dashboard (tenant + per-agent)
+# ---------------------------
 @login_required
+@require_business
 def agent_dashboard(request):
     """
-    Agent dashboard: per-agent KPIs + personal stock battery.
+    Agent dashboard: per-agent KPIs + personal stock battery (within tenant if active).
     """
+    biz = getattr(request, "business", None)
+
     # KPIs for this agent
-    my_sales_qs = Sale.objects.select_related("item").filter(agent=request.user)
-    kpis = compute_sales_kpis(my_sales_qs, dt_field="sold_at", amount_field="price") or {}
+    my_sales_qs = Sale.objects.select_related("item")
+    my_sales_qs = _scope_queryset(my_sales_qs, biz).filter(agent=request.user)
+    try:
+        kpis = compute_sales_kpis(my_sales_qs, dt_field="sold_at", amount_field="price") or {}
+    except Exception:
+        kpis = {}
     kpis["scope"] = "My sales"
 
     # Agent battery (max 20 like before)
-    my_in_stock = InventoryItem.objects.filter(
-        assigned_agent=request.user, status="IN_STOCK"
-    ).count()
+    my_stock_qs = _scope_queryset(InventoryItem.objects.all(), biz).filter(assigned_agent=request.user)
+    my_in_stock = _count_in_stock(my_stock_qs)
+
     battery_max = 20
     pct = int(round(min(100, (my_in_stock / battery_max) * 100))) if battery_max else 0
     if my_in_stock < 10:
@@ -255,7 +425,7 @@ def agent_dashboard(request):
     ctx = {
         "kpis": kpis,
         "agent_battery": {"count": my_in_stock, "max": battery_max, "pct": pct, "label": label, "color": color},
-        "wallet": wallet,         # <- added, harmless if None
+        "wallet": wallet,         # <- harmless if None
         "staff_view": False,
     }
     return render(request, "dashboard.html", ctx)
@@ -263,21 +433,28 @@ def agent_dashboard(request):
 
 @login_required
 @user_passes_test(_is_staff)
+@otp_required  # Protect staff-only agent detail with OTP
 def agent_detail(request, pk: int):
     """
     Staff-only page showing KPIs and stock battery for a specific agent (clickable card).
     Reuses the same dashboard template for visual consistency.
     """
+    biz = getattr(request, "business", None)
     User = get_user_model()
     agent = get_object_or_404(User, pk=pk)
 
     # KPIs for this agent (from staff context)
-    sales_qs = Sale.objects.select_related("item").filter(agent=agent)
-    kpis = compute_sales_kpis(sales_qs, dt_field="sold_at", amount_field="price") or {}
+    sales_qs = _scope_queryset(Sale.objects.select_related("item"), biz).filter(agent=agent)
+    try:
+        kpis = compute_sales_kpis(sales_qs, dt_field="sold_at", amount_field="price") or {}
+    except Exception:
+        kpis = {}
     kpis["scope"] = f"{agent.get_username()}'s sales"
 
     # Agent battery (same rules as agent_dashboard)
-    in_stock = InventoryItem.objects.filter(assigned_agent=agent, status="IN_STOCK").count()
+    in_stock_qs = _scope_queryset(InventoryItem.objects.all(), biz).filter(assigned_agent=agent)
+    in_stock = _count_in_stock(in_stock_qs)
+
     battery_max = 20
     pct = int(round(min(100, (in_stock / battery_max) * 100))) if battery_max else 0
     if in_stock < 10:
@@ -296,7 +473,7 @@ def agent_detail(request, pk: int):
     ctx = {
         "kpis": kpis,
         "agent_battery": {"count": in_stock, "max": battery_max, "pct": pct, "label": label, "color": color},
-        "wallet": wallet,  # <- added
+        "wallet": wallet,
         "staff_view": False,  # show the “My stock battery” style component
         "view_agent": {
             "id": agent.id,
@@ -309,9 +486,35 @@ def agent_detail(request, pk: int):
 
 
 # ---------------------------
-# Chart data endpoints
+# ✅ Staff-only AI-CFO Panel
 # ---------------------------
 @login_required
+@user_passes_test(_is_staff)
+@otp_required
+def cfo_panel(request):
+    """
+    Renders the AI-CFO panel page.
+
+    Context:
+      - poll_ms: refresh interval for client polling
+      - api_prefix: where DRF endpoints are mounted (default /api/v1)
+    """
+    return render(
+        request,
+        "dashboard/cfo_panel.html",
+        {
+            "poll_ms": getattr(settings, "NOTIFICATIONS_POLL_MS", 15000),
+            "api_prefix": "/api/v1",
+        },
+    )
+
+
+# ---------------------------
+# Chart data endpoints (tenant-aware)
+# ---------------------------
+@never_cache
+@login_required
+@require_GET
 def profit_data(request):
     """
     Returns bar-chart data.
@@ -324,6 +527,7 @@ def profit_data(request):
 
     Profit = Sale.price - InventoryItem.order_price
     """
+    biz = getattr(request, "business", None)
     month_str = request.GET.get("month")
     group_by = request.GET.get("group_by")  # 'model' or None
 
@@ -334,8 +538,8 @@ def profit_data(request):
     else:
         anchor = today.replace(day=1)
 
-    # Permissions: staff can see all; agents only their own
-    base = Sale.objects.select_related("item__product")
+    # Permissions: staff can see all (but still respect tenant if present); agents only their own
+    base = _scope_queryset(Sale.objects.select_related("item__product"), biz)
     if not request.user.is_staff:
         base = base.filter(agent=request.user)
 
@@ -352,7 +556,12 @@ def profit_data(request):
                   .values("item__product__brand", "item__product__model")
                   .annotate(v=Sum(profit_expr))
                   .order_by("-v"))[:20]
-        labels = [f"{r['item__product__brand']} {r['item__product__model']}".strip() for r in qs]
+        def _label(r):
+            brand = (r.get("item__product__brand") or "").strip()
+            model = (r.get("item__product__model") or "").strip()
+            s = f"{brand} {model}".strip()
+            return s or "Unknown model"
+        labels = [_label(r) for r in qs]
         data = [float(r["v"] or 0) for r in qs]
     else:
         # 12-month trend ending at anchor month
@@ -366,7 +575,6 @@ def profit_data(request):
 
         # Map onto an exact 12-slot sequence (oldest→newest)
         def add_month(y, m, delta):
-            # returns (y, m) advanced by delta months
             total = y * 12 + (m - 1) + delta
             return total // 12, total % 12 + 1
 
@@ -383,7 +591,9 @@ def profit_data(request):
     return JsonResponse({"labels": labels, "data": data})
 
 
+@never_cache
 @login_required
+@require_GET
 def agent_trend_data(request):
     """
     Returns monthly sales/profit trend for agents.
@@ -394,11 +604,12 @@ def agent_trend_data(request):
       - agent=<id> (optional; if omitted, all allowed agents aggregated)
         * If the caller is not staff, we always use the current user.
     """
+    biz = getattr(request, "business", None)
     months = int(request.GET.get("months", 6))
     metric = request.GET.get("metric", "sales")
     agent_id = request.GET.get("agent")
 
-    base = Sale.objects.select_related("agent", "item")
+    base = _scope_queryset(Sale.objects.select_related("agent", "item"), biz)
 
     # Permissions
     if request.user.is_staff:
@@ -453,9 +664,9 @@ def _inventory_dashboard_url() -> str:
             return reverse(name)
         except NoReverseMatch:
             continue
-    from django.conf import settings
     prefix = getattr(settings, "FORCE_SCRIPT_NAME", "") or ""
     return f"{prefix}/inventory/dashboard/"
+
 
 def _call_inventory_view(func_name, request):
     """
@@ -591,7 +802,7 @@ def v2_recommendations_proxy(request):
                 "date": (today + timedelta(days=i)).isoformat(),
                 "predicted_units": 0,
                 "predicted_revenue": 0.0,
-            } for i in range(1, 8)
+            } for i in range(1, 7 + 1)
         ],
         "risky": [],
         "message": "recommendations stub",
@@ -613,13 +824,16 @@ def api_recommendations(request):
       { "success": true, "items": [ { "message": str, "confidence": float }, ... ] }
     """
     u = request.user
+    biz = getattr(request, "business", None)
     now = timezone.now()
     last_30 = now - timedelta(days=30)
     items = []
 
-    # 1) Personal stock level
+    # 1) Personal stock level (tenant-aware)
     try:
-        my_in_stock = InventoryItem.objects.filter(assigned_agent=u, status="IN_STOCK").count()
+        my_in_stock = _count_in_stock(
+            _scope_queryset(InventoryItem.objects.all(), biz).filter(assigned_agent=u)
+        )
         if my_in_stock < 10:
             items.append({
                 "message": f"Your stock is low ({my_in_stock}/20). Request replenishment.",
@@ -637,13 +851,21 @@ def api_recommendations(request):
     try:
         fields = {getattr(f, "name", None) for f in InventoryItem._meta.get_fields()}
         stale_cutoff = now - timedelta(days=14)
-        stale_qs = InventoryItem.objects.filter(assigned_agent=u, status="IN_STOCK")
+        stale_qs = _scope_queryset(InventoryItem.objects.all(), biz).filter(
+            assigned_agent=u
+        )
+        if "status" in fields:
+            stale_qs = stale_qs.filter(status="IN_STOCK")
+        elif "is_active" in fields:
+            stale_qs = stale_qs.filter(is_active=True)
+
         if "updated_at" in fields:
             stale_qs = stale_qs.filter(updated_at__lt=stale_cutoff)
         elif "created_at" in fields:
             stale_qs = stale_qs.filter(created_at__lt=stale_cutoff)
         else:
             stale_qs = None
+
         if stale_qs is not None:
             stale_count = stale_qs.count()
             if stale_count:
@@ -660,7 +882,8 @@ def api_recommendations(request):
         top = []
         # attempt item__product__model first
         try:
-            top = (Sale.objects.filter(sold_at__gte=last_30)
+            top = (_scope_queryset(Sale.objects.all(), biz)
+                   .filter(sold_at__gte=last_30)
                    .values("item__product__model")
                    .annotate(n=Count("id"))
                    .order_by("-n")[:3])
@@ -669,7 +892,8 @@ def api_recommendations(request):
             pass
         if not top:
             try:
-                top = (Sale.objects.filter(sold_at__gte=last_30)
+                top = (_scope_queryset(Sale.objects.all(), biz)
+                       .filter(sold_at__gte=last_30)
                        .values("item__model")
                        .annotate(n=Count("id"))
                        .order_by("-n")[:3])
@@ -678,7 +902,8 @@ def api_recommendations(request):
                 pass
         if not top:
             try:
-                top = (Sale.objects.filter(sold_at__gte=last_30)
+                top = (_scope_queryset(Sale.objects.all(), biz)
+                       .filter(sold_at__gte=last_30)
                        .values("model")
                        .annotate(n=Count("id"))
                        .order_by("-n")[:3])

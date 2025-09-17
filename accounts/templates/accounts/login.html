@@ -1,182 +1,118 @@
-{% extends "base.html" %}
-
-{% block title %}Sign in · Circuit City{% endblock %}
-
-{% block extra_css %}
-<style>
-  /* -------- Tokens -------- */
-  :root{
-    --cc-bg: var(--bg, #f6f9ff);
-    --cc-card: var(--card, #ffffff);
-    --cc-line: var(--line, #e5e7eb);
-    --cc-ink: var(--ink, #0f172a);
-    --cc-muted: var(--muted, #64748b);
-
-    /* Glassmorphic blue */
-    --blue-1:#2563eb; /* base */
-    --blue-2:#60a5fa; /* tint */
-    --glass-bg: rgba(37,99,235,0.12);
-    --glass-brd: rgba(96,165,250,.55);
-    --glass-shadow: 0 10px 30px rgba(37,99,235,.22);
-  }
-
-  body{ background: linear-gradient(180deg, var(--cc-bg), #fff); }
-
-  /* We rely on base.html's global page loader. Only define our spinner keyframes here. */
-  @keyframes ccspin { to { transform: rotate(360deg); } }
-
-  /* -------- Layout -------- */
-  .auth-wrap{
-    min-height: calc(100vh - 0px);
-    display: grid;
-    place-items: center;
-    padding: clamp(16px, 4vw, 32px);
-  }
-  .auth-card{
-    width: min(520px, 92vw);
-    background: var(--cc-card);
-    border: 1px solid var(--cc-line);
-    border-radius: 16px;
-    padding: 28px;
-    box-shadow: 0 20px 60px rgba(2, 6, 23, .06);
-  }
-  .brand{
-    display: flex; align-items: center; gap: .6rem;
-    font-weight: 800; color: var(--cc-ink); margin-bottom: .25rem;
-  }
-  .muted{ color: var(--cc-muted); }
-
-  .err{
-    background: #fef2f2; border: 1px solid #fecaca; color: #991b1b;
-    padding: .6rem .8rem; border-radius: 10px; margin-bottom: 12px;
-  }
-
-  .pw-wrap{ position: relative; }
-  .pw-toggle{
-    position: absolute; right: .5rem; top: 50%; transform: translateY(-50%);
-    border: none; background: transparent; color: #64748b;
-    padding: .25rem; line-height: 0; cursor: pointer;
-  }
-
-  /* -------- Glassmorphic Blue Button (stays blue) -------- */
-  .btn-glass-blue{
-    --_bg: var(--glass-bg);
-    --_brd: var(--glass-brd);
-    --_txt: #eaf2ff;
-    --_txt-strong: #ffffff;
-
-    width: 100%;
-    display: inline-flex; align-items: center; justify-content: center; gap: .5rem;
-    padding: .9rem 1.15rem;
-    font-weight: 800; letter-spacing: .02em;
-    border-radius: 14px; border: 1px solid var(--_brd);
-    color: var(--_txt);
-    background:
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Sign in · Circuit City (v10)</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    :root{
+      --cc-bg:#f6f9ff; --cc-card:#fff; --cc-line:#e5e7eb; --cc-ink:#0f172a; --cc-muted:#64748b;
+      --blue-1:#2563eb; --glass-bg:rgba(37,99,235,0.12); --glass-brd:rgba(96,165,250,.55);
+      --glass-shadow:0 10px 30px rgba(37,99,235,.22);
+    }
+    *{box-sizing:border-box}
+    body{margin:0;background:linear-gradient(180deg,var(--cc-bg),#fff);font-family:system-ui,Segoe UI,Inter,Roboto,Arial,sans-serif;color:var(--cc-ink)}
+    .auth-wrap{min-height:100vh;display:grid;place-items:center;padding:clamp(16px,4vw,32px)}
+    .auth-card{width:min(520px,92vw);background:var(--cc-card);border:1px solid var(--cc-line);border-radius:16px;padding:28px;box-shadow:0 20px 60px rgba(2,6,23,.06)}
+    .brand{font-weight:800;margin:0 0 .25rem}
+    .muted{color:var(--cc-muted);margin:0 0 12px}
+    label{display:block;font-size:14px;margin:12px 0 6px}
+    input[type="text"],input[type="password"]{width:100%;padding:10px 12px;border:1px solid #cbd5e1;border-radius:10px;font-size:14px}
+    .err{background:#fef2f2;border:1px solid #fecaca;color:#991b1b;padding:.6rem .8rem;border-radius:10px;margin:0 0 12px}
+    .pw-field{position:relative}
+    .pw-toggle{position:absolute;right:.55rem;top:50%;transform:translateY(-50%);background:transparent;border:0;color:#64748b;cursor:pointer;width:1.75rem;height:1.75rem}
+    #loginSubmit{display:inline-flex;align-items:center;justify-content:center;gap:.5rem;width:100%;
+      padding:.8rem 1.1rem;font-weight:800;letter-spacing:.02em;border-radius:14px;border:1px solid var(--glass-brd);
+      color:#eaf2ff;background:
       radial-gradient(120% 160% at 30% 20%, rgba(255,255,255,.35), transparent 60%),
-      linear-gradient(135deg, rgba(96,165,250,.65), rgba(37,99,235,.55)),
-      var(--_bg);
-    box-shadow: var(--glass-shadow);
-    backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
-    cursor: pointer;
-    transition: transform .18s ease, box-shadow .18s ease, background .18s ease, color .18s ease, opacity .18s ease;
-    text-decoration: none;
-  }
-  .btn-glass-blue:hover,
-  .btn-glass-blue:focus{
-    transform: translateY(-1px);
-    color: var(--_txt-strong);
-    box-shadow: 0 14px 34px rgba(37,99,235,.32);
-    background:
-      radial-gradient(140% 160% at 30% 20%, rgba(255,255,255,.5), transparent 60%),
-      linear-gradient(135deg, rgba(96,165,250,.75), rgba(37,99,235,.65)),
-      var(--_bg);
-  }
-  .btn-glass-blue:active{ transform:none; box-shadow:0 8px 22px rgba(37,99,235,.28); }
-  .btn-glass-blue:disabled{ opacity:.65; cursor:not-allowed; box-shadow:0 8px 18px rgba(37,99,235,.18); }
-</style>
-{% endblock %}
+      linear-gradient(135deg, rgba(96,165,250,.65), rgba(37,99,235,.55)), var(--glass-bg);
+      box-shadow:var(--glass-shadow);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);
+      transition:transform .18s ease, box-shadow .18s ease, background .18s ease, color .18s ease;cursor:pointer;margin-top:.5rem}
+    #loginSubmit:hover{transform:translateY(-1px);color:#fff;box-shadow:0 14px 34px rgba(37,99,235,.32)}
+    #loginSubmit:disabled{opacity:.65;cursor:not-allowed;box-shadow:0 8px 18px rgba(37,99,235,.18)}
+    a{color:#2563eb;text-decoration:none}
+    .cta{margin-top:18px;padding-top:16px;border-top:1px dashed var(--cc-line)}
+    .cta .btn{display:inline-block;border:1px solid #cbd5e1;border-radius:12px;padding:.65rem 1rem;font-weight:700}
+    .btn-outline{background:#fff}
+    .cta small{display:block;color:#64748b;margin-top:6px}
+  </style>
+</head>
+<body>
+  <div class="auth-wrap">
+    <div class="auth-card" role="dialog" aria-labelledby="loginTitle" aria-describedby="loginDesc">
+      <h1 id="loginTitle" class="brand">Circuit City</h1>
+      <p id="loginDesc" class="muted">Sign in to continue. <strong style="color:#2563eb">[v10]</strong></p>
 
-{% block body %}
-<div class="auth-wrap">
-  <div class="auth-card" role="dialog" aria-labelledby="loginTitle" aria-describedby="loginDesc">
-    <div class="brand" aria-hidden="true">
-      <i class="bi bi-lightning-charge-fill"></i> Circuit City
-    </div>
-    <p id="loginDesc" class="muted mb-3">Sign in to continue.</p>
-
-    {% if form and form.errors %}
-      <div class="err" role="alert" aria-live="assertive">Incorrect username or password. Please try again.</div>
-    {% endif %}
-
-    <!-- Post back to the same URL to avoid NoReverseMatch if 'login' URL name/namespace differs -->
-    <form method="post" action="" class="vstack gap-2" novalidate>
-      {% csrf_token %}
-
-      {% if redirect_field_value %}
-        <input type="hidden" name="{{ redirect_field_name }}" value="{{ redirect_field_value }}">
-      {% elif next %}
-        <input type="hidden" name="next" value="{{ next }}">
+      {% if messages %}
+        {% for m in messages %}<div class="err" role="alert" aria-live="assertive">{{ m }}</div>{% endfor %}
       {% endif %}
 
-      <div>
-        <label class="form-label" for="id_username">Username</label>
-        <input id="id_username" name="username" class="form-control" required autofocus
-               autocomplete="username"
-               value="{% if form %}{{ form.username.value|default:'' }}{% endif %}">
+      <!-- SIMPLE, ROBUST LOGIN FORM (no {{ form.identifier }} anywhere) -->
+      <form method="post" action="{% url 'accounts:login' %}" novalidate>
+        {% csrf_token %}
+        <input type="hidden" name="next" value="{{ next|default:'' }}"/>
+
+        <label for="id_identifier">Email or Username</label>
+        <input id="id_identifier"
+               name="identifier"
+               type="text"
+               required
+               autocomplete="username email"
+               value="{{ request.POST.identifier|default:'' }}" />
+
+        <label for="id_password">Password</label>
+        <div class="pw-field">
+          <input id="id_password"
+                 name="password"
+                 type="password"
+                 required
+                 autocomplete="current-password" />
+          <button class="pw-toggle" type="button" aria-label="Show password" data-state="hidden">👁</button>
+        </div>
+
+        <button id="loginSubmit" type="submit">Sign in</button>
+      </form>
+
+      <p class="muted" style="margin-top:12px">
+        <a href="{% url 'accounts:forgot_password_request' %}">Forgot your password?</a>
+      </p>
+
+      <div class="cta" aria-label="Create account">
+        <p class="muted" style="margin:0 0 10px">New here?</p>
+        <a class="btn btn-outline" href="{% url 'accounts:signup_manager' %}">Create a Manager account</a>
+        <small>Managers create the store and can invite agents later.</small>
+        <small>Agents: ask your manager for an invite link.</small>
       </div>
-
-      <div class="pw-wrap">
-        <label class="form-label" for="id_password">Password</label>
-        <input id="id_password" name="password" type="password" class="form-control"
-               required autocomplete="current-password">
-        <button class="pw-toggle" type="button" aria-label="Show password" data-state="hidden">
-          <i class="bi bi-eye"></i>
-        </button>
-      </div>
-
-      <!-- Always-blue glassmorphic primary button -->
-      <button class="btn-glass-blue mt-2" type="submit" id="loginSubmit">Sign in</button>
-    </form>
-
-    <div class="d-flex justify-content-between mt-3">
-      <a class="muted text-decoration-none" href="/accounts/password/forgot/">Forgot password?</a>
     </div>
   </div>
-</div>
-{% endblock %}
 
-{% block extra_js %}
-<script>
-  // Password show/hide
-  (function(){
-    const btn = document.querySelector('.pw-toggle');
-    const input = document.getElementById('id_password');
-    if (!btn || !input) return;
-    btn.addEventListener('click', function(){
-      const hidden = this.getAttribute('data-state') !== 'visible';
-      input.type = hidden ? 'text' : 'password';
-      this.setAttribute('data-state', hidden ? 'visible' : 'hidden');
-      this.setAttribute('aria-label', hidden ? 'Hide password' : 'Show password');
-      this.innerHTML = hidden ? '<i class="bi bi-eye-slash"></i>' : '<i class="bi bi-eye"></i>';
-      input.focus({preventScroll:true});
-    });
-  })();
+  <script>
+    // Password show/hide
+    (function(){
+      var btn=document.querySelector('.pw-toggle');
+      var input=document.getElementById('id_password');
+      if(!btn||!input) return;
+      btn.addEventListener('click', function(){
+        var show=this.getAttribute('data-state')!=='visible';
+        input.type=show?'text':'password';
+        this.setAttribute('data-state',show?'visible':'hidden');
+        this.textContent=show?'🙈':'👁';
+      });
+    })();
 
-  // Tiny inline spinner on submit (button remains blue)
-  (function(){
-    const form = document.querySelector('form[novalidate]');
-    const btn  = document.getElementById('loginSubmit');
-    if(!form || !btn) return;
-    form.addEventListener('submit', function(){
-      btn.disabled = true;
-      const sp = document.createElement('span');
-      sp.style.display='inline-block';
-      sp.style.width='1em'; sp.style.height='1em'; sp.style.marginLeft='.5rem';
-      sp.style.border='2px solid rgba(255,255,255,.35)';
-      sp.style.borderTopColor='#fff'; sp.style.borderRadius='50%';
-      sp.style.animation='ccspin .9s linear infinite';
-      btn.appendChild(sp);
-    });
-  })();
-</script>
-{% endblock %}
+    // Disable button on submit + tiny spinner
+    (function(){
+      var form=document.querySelector('form[method="post"]'); var btn=document.getElementById('loginSubmit');
+      if(!form||!btn) return;
+      form.addEventListener('submit', function(){
+        btn.disabled=true;
+        var sp=document.createElement('span'); sp.style.display='inline-block';
+        sp.style.width='1em'; sp.style.height='1em'; sp.style.marginLeft='.5rem';
+        sp.style.border='2px solid rgba(255,255,255,.35)'; sp.style.borderTopColor='#fff';
+        sp.style.borderRadius='50%'; sp.style.animation='spin .9s linear infinite';
+        btn.appendChild(sp);
+      });
+    })();
+  </script>
+</body>
+</html>

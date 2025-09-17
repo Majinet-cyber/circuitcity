@@ -2,6 +2,14 @@
 {% load static %}
 
 {% block title %}Settings · Security{% endblock %}
+{% block header_title %}Settings{% endblock %}
+
+{# Hide Layby + Notifications only on settings pages #}
+{% block extra_head %}
+<style>
+  .cc-header .cc-actions { display: none !important; }
+</style>
+{% endblock %}
 
 {% block content %}
 <div class="container my-4">

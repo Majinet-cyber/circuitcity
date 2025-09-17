@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Subscribe{% endblock %}
+{% block header_title %}Choose a plan{% endblock %}
+
+{% block extra_css %}
+<style>
+  .bill-wrap{max-width:1100px;margin-inline:auto;display:grid;gap:16px}
+  .g{border:1px solid var(--line);border-radius:14px;background:color-mix(in oklab,var(--card) 86%,transparent);backdrop-filter:blur(12px);box-shadow:0 10px 30px rgba(0,0,0,.06);padding:16px}
+  .plans{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:14px}
+  .plan{padding:16px;border-radius:12px;border:1px solid var(--line);background:linear-gradient(180deg,rgba(255,255,255,.12),rgba(255,255,255,.04))}
+  .plan h3{font-weight:900;margin:0 0 4px}
+  .price{font-size:1.6rem;font-weight:900}
+  .feat{opacity:.85}
+  .go{display:flex;gap:.6rem;justify-content:flex-end;margin-top:12px}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="bill-wrap">
+  <div class="g">
+    <p class="text-muted m-0">Your trial ends: <strong>{{ sub.trial_ends_at|date:"M j, Y H:i" }}</strong></p>
+  </div>
+
+  <form method="post" class="g">
+    {% csrf_token %}
+    <div class="plans">
+      {% for p in plans %}
+        <label class="plan hover-lift tap">
+          <input type="radio" name="plan" value="{{ p.id }}" {% if forloop.first %}checked{% endif %} hidden>
+          <h3>{{ p.name }}</h3>
+          <div class="price">{{ p.currency }} {{ p.price_mwk }}</div>
+          {% if p.features %}
+            <div class="feat small text-muted mt-1">
+              {% for k,v in p.features.items %}• {{ k|title }}: {{ v }}<br>{% endfor %}
+            </div>
+          {% endif %}
+        </label>
+      {% endfor %}
+    </div>
+    <div class="go">
+      <a href="{% url 'tenants:choose_business' %}" class="btn muted">Back</a>
+      <button class="btn primary">Continue</button>
+    </div>
+  </form>
+</div>
+{% endblock %}

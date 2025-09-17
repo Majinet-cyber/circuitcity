@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% block title %}Add First Product{% endblock %}
+{% block content %}
+<div class="container py-4">
+  <h1 class="h4 mb-3">Add your first product</h1>
+  {% include "_messages.html" %}
+  <form method="post" class="card p-3 shadow-sm">
+    {% csrf_token %}
+    {% for field in form %}
+      <div class="mb-3">
+        <label class="form-label">{{ field.label }}</label>
+        {{ field }}
+        {% if field.errors %}
+          <div class="text-danger small">{{ field.errors|join:", " }}</div>
+        {% endif %}
+      </div>
+    {% endfor %}
+    <div class="d-flex gap-2">
+      <a href="{% url 'dashboard:home' %}" class="btn btn-outline-secondary">Skip for now</a>
+      <button class="btn btn-primary" type="submit">Save product</button>
+    </div>
+  </form>
+</div>
+{% endblock %}

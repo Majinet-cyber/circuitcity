@@ -1,0 +1,58 @@
+{% extends "layby/base_customer.html" %}
+{% load humanize %}
+
+{% block title %}Pay Now{% endblock %}
+{% block header_title %}Pay Now{% endblock %}
+
+{% block extra_css %}
+<style>
+  .card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:16px}
+  .mono{font-family:ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace}
+  .hint{color:var(--muted);font-size:.95rem}
+  .qr{display:flex;align-items:center;justify-content:center;background:var(--bg);border-radius:16px;border:1px solid var(--line);padding:16px}
+  .copy{display:inline-flex;gap:.4rem;align-items:center;padding:.55rem .8rem;border-radius:10px;border:1px solid var(--line);background:transparent}
+  .grid{display:grid;gap:12px}
+  @media (min-width:700px){ .grid{grid-template-columns:1.2fr 1fr} }
+</style>
+{% endblock %}
+
+{% block content %}
+  <div class="card">
+    <div class="grid">
+      <div>
+        <h2 style="margin:0 0 .5rem">Pay for <strong>{{ ser.product|default:"Item" }}</strong></h2>
+
+        <div class="hint">Reference</div>
+        <div style="display:grid;grid-template-columns:auto auto;gap:8px;align-items:center">
+          <span class="pill mono">LAYBY-{{ ser.id }}</span>
+          <button class="copy mono" onclick="navigator.clipboard.writeText('LAYBY-{{ ser.id }}')">Copy</button>
+        </div>
+
+        <div class="hint" style="margin-top:12px">Amount due</div>
+        <div class="kpi" style="max-width:280px">
+          <div class="label">Balance</div>
+          <div class="val">{{ ser.balance|floatformat:2|intcomma }}</div>
+        </div>
+
+        <div class="hint" style="margin-top:12px">Deep link</div>
+        <div style="display:grid;grid-template-columns:1fr auto;gap:8px;align-items:center">
+          <div class="mono" style="overflow:auto;white-space:nowrap;border:1px solid var(--line);padding:.6rem;border-radius:10px;background:#fff">{{ deeplink }}</div>
+          <a class="btn primary" href="{{ deeplink }}">Open link</a>
+        </div>
+
+        <div class="hint" style="margin-top:.75rem">Make sure to include the reference when paying.</div>
+
+        <div style="margin-top:12px">
+          <a href="{% url 'layby:customer_portal' %}?phone={{ ser.customer_phone|urlencode }}" class="btn ghost">Back to My Laybys</a>
+        </div>
+      </div>
+
+      <div>
+        <div class="qr">
+          <img src="{% url 'layby:qr_png' ser.id %}" alt="QR to pay {{ ser.product }}" style="width:min(320px,80vw);height:auto">
+        </div>
+        <div class="hint" style="margin-top:.5rem">Scan with Airtel / TNM / bank app where supported.</div>
+      </div>
+    </div>
+  </div>
+{% endblock %}

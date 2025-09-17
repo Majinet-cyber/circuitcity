@@ -1,0 +1,80 @@
+{% load humanize static %}
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>My Laybys</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="stylesheet" href="{% static 'css/app.css' %}">
+  <style>
+    :root{ --gap:12px; --radius:14px; }
+    body{ margin:0; font-family:system-ui,Segoe UI,Inter,Roboto,Arial }
+    .container{ max-width:1100px; margin:0 auto; padding:16px; }
+    .toolbar{ display:flex; align-items:center; justify-content:space-between; gap:10px; flex-wrap:wrap; margin:1rem 0; }
+    .btn{ display:inline-flex; align-items:center; gap:8px; padding:.6rem 1rem; border-radius:10px; text-decoration:none; font-weight:700; }
+    .btn-primary{ background:#16c784; color:#052e2b; border:0; }
+    .muted{ color:#667085; }
+    .card{ background:#f8fafc; border:1px solid #e5e7eb; border-radius:var(--radius); padding:12px; margin-bottom:12px; }
+    .table-wrap{ overflow:auto; border:1px solid #e5e7eb; border-radius:var(--radius); }
+    table{ width:100%; border-collapse:collapse; min-width:720px; }
+    th, td{ text-align:left; padding:10px; border-bottom:1px solid #e5e7eb; }
+    thead th{ font-weight:800; background:#f9fafb; }
+    .pill{ display:inline-block; padding:.2rem .55rem; border:1px solid #e5e7eb; border-radius:999px; font-size:.85rem; color:#475467; }
+    @media (max-width:720px){
+      .container{ padding:12px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header class="toolbar">
+      <h1 style="margin:0">My Laybys</h1>
+      <a href="{% url 'layby:agent_create' %}" class="btn btn-primary">+ New layby</a>
+    </header>
+
+    <p class="muted" style="margin:.5rem 0 1.25rem">
+      Total outstanding balance:
+      <strong>{{ total_balance|floatformat:2|intcomma }}</strong>
+    </p>
+
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Ref / ID</th>
+            <th>Customer</th>
+            <th>Product</th>
+            <th>SKU</th>
+            <th>Status</th>
+            <th>Paid</th>
+            <th>Balance</th>
+          </tr>
+        </thead>
+        <tbody>
+        {% if orders %}
+          {% for o in orders %}
+          <tr>
+            <td>
+              {% if o.ref %}
+                <span class="pill">{{ o.ref }}</span>
+              {% else %}
+                {{ o.id }}
+              {% endif %}
+            </td>
+            <td>{{ o.customer_name }}</td>
+            <td>{{ o.product }}</td>
+            <td>{% if o.sku %}<span class="pill">{{ o.sku }}</span>{% endif %}</td>
+            <td>{{ o.status }}</td>
+            <td>{{ o.amount_paid|floatformat:2|intcomma }}</td>
+            <td><strong>{{ o.balance|floatformat:2|intcomma }}</strong></td>
+          </tr>
+          {% endfor %}
+        {% else %}
+          <tr><td colspan="7">No laybys yet.</td></tr>
+        {% endif %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</body>
+</html>

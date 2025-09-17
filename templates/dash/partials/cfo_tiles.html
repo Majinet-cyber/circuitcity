@@ -1,0 +1,100 @@
+<div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+  <!-- Runway -->
+  <div class="bg-white rounded-xl shadow p-4 text-center">
+    <div class="text-gray-500 text-sm font-semibold">Runway</div>
+    <div id="cfo-tile-runway" class="text-3xl font-bold mt-1">--</div>
+    <div id="cfo-tile-runway-sub" class="text-xs text-gray-400">days</div>
+  </div>
+
+  <!-- Opening Balance -->
+  <div class="bg-white rounded-xl shadow p-4 text-center">
+    <div class="text-gray-500 text-sm font-semibold">Opening Balance</div>
+    <div id="cfo-tile-opening" class="text-3xl font-bold mt-1">--</div>
+    <div class="text-xs text-gray-400">Start of forecast period</div>
+  </div>
+
+  <!-- Projected Inflows -->
+  <div class="bg-white rounded-xl shadow p-4 text-center">
+    <div class="text-gray-500 text-sm font-semibold">Projected Inflows (30d)</div>
+    <div id="cfo-tile-inflows" class="text-3xl font-bold mt-1">--</div>
+    <div class="text-xs text-gray-400">Sales & other income</div>
+  </div>
+
+  <!-- Projected Outflows -->
+  <div class="bg-white rounded-xl shadow p-4 text-center">
+    <div class="text-gray-500 text-sm font-semibold">Projected Outflows (30d)</div>
+    <div id="cfo-tile-outflows" class="text-3xl font-bold mt-1">--</div>
+    <div class="text-xs text-gray-400">Expenses, rent & payroll</div>
+  </div>
+</div>
+
+<script>
+(async function () {
+  const API = "/api/v1";  // Adjust if your API prefix is different
+  const POLL_MS = 15000;  // Refresh every 15s
+
+  const elRunway = document.getElementById("cfo-tile-runway");
+  const elOpening = document.getElementById("cfo-tile-opening");
+  const elInflows = document.getElementById("cfo-tile-inflows");
+  const elOutflows = document.getElementById("cfo-tile-outflows");
+
+  function fmtMoney(value) {
+    if (value === null || value === undefined) return "--";
+    try {
+      return Number(value).toLocaleString();
+    } catch (e) {
+      return value;
+    }
+  }
+
+  async function fetchJSON(url, opts = {}) {
+    const r = await fetch(url, {
+      credentials: "same-origin",
+      headers: {"X-Requested-With": "XMLHttpRequest"},
+      ...opts
+    });
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    return await r.json();
+  }
+
+  async function loadCfoTiles() {
+    try {
+      const snaps = await fetchJSON(`${API}/cfo/forecast/`);
+      if (!snaps || !snaps.length) {
+        elRunway.textContent = "--";
+        elOpening.textContent = "--";
+        elInflows.textContent = "--";
+        elOutflows.textContent = "--";
+        return;
+      }
+
+      const s = snaps[0];  // Latest snapshot
+      elRunway.textContent = s.projected_runway_days ?? "--";
+      elOpening.textContent = fmtMoney(s.opening_balance);
+      elInflows.textContent = fmtMoney(s.projected_inflows);
+      elOutflows.textContent = fmtMoney(s.projected_outflows);
+
+      // Optional: color-code runway status
+      if (s.projected_runway_days <= 14) {
+        elRunway.classList.remove("text-green-600", "text-yellow-500");
+        elRunway.classList.add("text-red-600");
+      } else if (s.projected_runway_days <= 30) {
+        elRunway.classList.remove("text-green-600", "text-red-600");
+        elRunway.classList.add("text-yellow-500");
+      } else {
+        elRunway.classList.remove("text-red-600", "text-yellow-500");
+        elRunway.classList.add("text-green-600");
+      }
+    } catch (e) {
+      console.error("Failed to load CFO tiles:", e);
+      elRunway.textContent = "--";
+      elOpening.textContent = "--";
+      elInflows.textContent = "--";
+      elOutflows.textContent = "--";
+    }
+  }
+
+  await loadCfoTiles();
+  setInterval(loadCfoTiles, POLL_MS);
+})();
+</script>

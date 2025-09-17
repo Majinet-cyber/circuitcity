@@ -1,0 +1,200 @@
+{% load static %}
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>New Layby</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <!-- Your global styles if any -->
+  <link rel="stylesheet" href="{% static 'css/app.css' %}">
+  <style>
+    :root{
+      --bg:#0b2545; --panel:#13315c; --panel-2:#1b3b6f; --ink:#e6eefc; --muted:#9fb7dd;
+      --accent:#16c784; --accent-ink:#052e2b; --border:#294a84; --radius:16px; --gap:12px;
+    }
+    *{ box-sizing:border-box }
+    body{ margin:0; background:var(--bg); color:var(--ink); font-family:system-ui,Segoe UI,Inter,Roboto,Arial }
+    .wrap{ max-width: 980px; margin: 0 auto; padding: 20px 14px; }
+    .card{ background:var(--panel); border:1px solid var(--panel-2); border-radius:var(--radius); padding:16px; box-shadow:0 8px 32px rgba(0,0,0,.18); }
+    h1{ margin:0 0 16px; font-weight:900 }
+    h3{ margin:14px 0 10px; font-weight:900 }
+    label{ font-weight:800; font-size:.9rem; color:var(--muted); display:block; margin-bottom:6px }
+    input[type="text"], input[type="number"], input[type="file"], select, textarea{
+      width:100%; border:1px solid var(--border); border-radius:12px; padding:.7rem .8rem; background:#0e2a50; color:var(--ink);
+    }
+    .grid{ display:grid; gap:var(--gap); grid-template-columns:1fr; }
+    @media (min-width:720px){ .grid.two{ grid-template-columns:1fr 1fr; } }
+    .row{ display:grid; gap:var(--gap); grid-template-columns:1fr; }
+    @media (min-width:520px){ .row.two{ grid-template-columns:1fr 1fr; } }
+    .hint{ font-size:.8rem; color:var(--muted) }
+    .errors{ background:#3a1d1d; border:1px solid #6b2b2b; color:#ffd5d5; padding:10px; border-radius:12px; margin-bottom:10px }
+    .btn{ display:inline-flex; align-items:center; gap:8px; border:1px solid var(--panel-2); border-radius:12px; padding:.75rem 1rem; font-weight:900; text-decoration:none }
+    .btn-primary{ background:var(--accent); color:var(--accent-ink); border-color:transparent }
+    .btn-ghost{ background:transparent; color:#cfe1ff }
+    .actions{ display:flex; gap:10px; flex-wrap:wrap; justify-content:flex-end; }
+    .sticky{ position:sticky; bottom:0; left:0; right:0; padding:10px; background:rgba(11,37,69,.65); backdrop-filter:blur(8px); border-top:1px solid var(--panel-2); border-radius:0 0 var(--radius) var(--radius); margin:0 -16px -16px; }
+    .pill{ display:inline-block; padding:.25rem .6rem; border-radius:999px; border:1px solid var(--border); color:var(--muted) }
+    .id-preview{ border:1px dashed var(--border); border-radius:12px; padding:10px; min-height:132px; display:flex; align-items:center; justify-content:center; color:var(--muted); }
+    .totals{ display:flex; gap:12px; flex-wrap:wrap; font-weight:700 }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>New Layby</h1>
+
+    <form class="card" method="post" enctype="multipart/form-data" novalidate>
+      {% csrf_token %}
+
+      {% if form.non_field_errors %}
+        <div class="errors">{{ form.non_field_errors }}</div>
+      {% endif %}
+
+      <!-- Customer -->
+      <h3>Customer</h3>
+      <div class="grid two">
+        <div>
+          <label for="{{ form.customer_name.id_for_label }}">Customer name</label>
+          {{ form.customer_name }}
+          {% if form.customer_name.errors %}<div class="errors">{{ form.customer_name.errors|striptags }}</div>{% endif %}
+        </div>
+        <div>
+          <label for="{{ form.customer_phone.id_for_label }}">Customer phone</label>
+          {{ form.customer_phone }}
+          {% if form.customer_phone.errors %}<div class="errors">{{ form.customer_phone.errors|striptags }}</div>{% endif %}
+        </div>
+
+        {% if form.id_number %}
+        <div>
+          <label for="{{ form.id_number.id_for_label }}">ID number (exactly 8 digits)</label>
+          {{ form.id_number }}
+          <div class="hint">Numbers only, length = 8.</div>
+          {% if form.id_number.errors %}<div class="errors">{{ form.id_number.errors|striptags }}</div>{% endif %}
+        </div>
+        {% endif %}
+
+        {% if form.id_photo %}
+        <div>
+          <label for="{{ form.id_photo.id_for_label }}">Photo of ID</label>
+          {{ form.id_photo }}
+          <div id="id-preview" class="id-preview">ID preview will appear here</div>
+          {% if form.id_photo.errors %}<div class="errors">{{ form.id_photo.errors|striptags }}</div>{% endif %}
+        </div>
+        {% endif %}
+      </div>
+
+      <!-- Next of Kin -->
+      {% if form.kin1_name or form.kin1_phone or form.kin2_name or form.kin2_phone %}
+      <h3>Next of Kin (2 contacts)</h3>
+      <div class="row two">
+        {% if form.kin1_name %}<div><label>Kin #1 — Full name</label>{{ form.kin1_name }}</div>{% endif %}
+        {% if form.kin1_phone %}<div><label>Kin #1 — Phone</label>{{ form.kin1_phone }}</div>{% endif %}
+        {% if form.kin2_name %}<div><label>Kin #2 — Full name</label>{{ form.kin2_name }}</div>{% endif %}
+        {% if form.kin2_phone %}<div><label>Kin #2 — Phone</label>{{ form.kin2_phone }}</div>{% endif %}
+      </div>
+      {% endif %}
+
+      <!-- Terms & Product -->
+      <h3>Terms & Product</h3>
+      <div class="row two">
+        <div>
+          <label for="{{ form.term_months.id_for_label }}">Term (months, max 12)</label>
+          {{ form.term_months }}
+          {% if form.term_months.errors %}<div class="errors">{{ form.term_months.errors|striptags }}</div>{% endif %}
+        </div>
+        <div>
+          <label for="{{ form.product.id_for_label }}">Product (from stock)</label>
+          {{ form.product }}
+          {% if form.product.errors %}<div class="errors">{{ form.product.errors|striptags }}</div>{% endif %}
+        </div>
+        <div>
+          <label for="{{ form.deposit_amount.id_for_label }}">Deposit amount</label>
+          {{ form.deposit_amount }}
+          {% if form.deposit_amount.errors %}<div class="errors">{{ form.deposit_amount.errors|striptags }}</div>{% endif %}
+        </div>
+      </div>
+
+      <!-- Hidden model fields that will be set from the product picker -->
+      {{ form.item_name }} {{ form.sku }} {{ form.total_price }}
+
+      <!-- Totals helper (readonly visual) -->
+      <div class="totals" style="margin-top:10px">
+        <div><span class="pill">Selected: <span id="p-name">—</span></span></div>
+        <div><span class="pill">SKU: <span id="p-sku">—</span></span></div>
+        <div><span class="pill">Total: <span id="p-total">0.00</span></span></div>
+        <div><span class="pill">Deposit: <span id="p-dep">0.00</span></span></div>
+        <div><span class="pill">Balance: <span id="p-bal">0.00</span></span></div>
+      </div>
+
+      <div class="sticky">
+        <div class="actions">
+          <a class="btn btn-ghost" href="{% url 'layby:agent_dashboard' %}">Cancel</a>
+          <button type="submit" class="btn btn-primary">Save layby</button>
+        </div>
+      </div>
+    </form>
+  </div>
+
+  <script>
+    // ---- Helpers ----
+    const $ = (q) => document.querySelector(q);
+
+    // Enforce ID(8) on the client for nicer UX (server still validates)
+    (function enforceID8(){
+      const idInput = document.querySelector('input[name$="id_number"]');
+      if(!idInput) return;
+      idInput.setAttribute('inputmode','numeric');
+      idInput.setAttribute('maxlength','8');
+      idInput.addEventListener('input', () => {
+        // Strip non-digits and trim to 8
+        idInput.value = idInput.value.replace(/\\D+/g,'').slice(0,8);
+      });
+    })();
+
+    // Live preview for ID photo
+    (function previewID(){
+      const fileInput = document.querySelector('input[type="file"][name$="id_photo"]');
+      const previewEl = $('#id-preview');
+      if(!fileInput || !previewEl) return;
+      fileInput.addEventListener('change', function(){
+        const f = this.files && this.files[0];
+        if(!f){ previewEl.textContent='ID preview will appear here'; previewEl.style.backgroundImage=''; return; }
+        const reader = new FileReader();
+        reader.onload = e => {
+          previewEl.style.backgroundImage = `url(${e.target.result})`;
+          previewEl.style.backgroundSize = 'cover';
+          previewEl.style.backgroundPosition = 'center';
+          previewEl.textContent = '';
+        };
+        reader.readAsDataURL(f);
+      });
+    })();
+
+    // Product -> show name, sku, total; compute balance with deposit
+    (function totals(){
+      const sel = document.querySelector('select[name$="product"]');
+      const depInput = document.querySelector('input[name$="deposit_amount"]');
+      const nameEl = $('#p-name'), skuEl = $('#p-sku'), totalEl = $('#p-total'), depEl = $('#p-dep'), balEl = $('#p-bal');
+
+      function parsePacked(v){
+        // value is "sku|name|price"
+        const parts = (v||'').split('|');
+        if(parts.length !== 3) return { sku:'', name:'', price:0 };
+        return { sku:parts[0], name:parts[1], price: parseFloat(parts[2]||'0') || 0 };
+      }
+      function fmt(n){ return (Number(n||0)).toFixed(2); }
+      function recalc(){
+        const p = parsePacked(sel ? sel.value : '');
+        const dep = parseFloat(depInput ? depInput.value : '0') || 0;
+        nameEl.textContent = p.name || '—';
+        skuEl.textContent = p.sku || '—';
+        totalEl.textContent = fmt(p.price);
+        depEl.textContent = fmt(dep);
+        balEl.textContent = fmt(Math.max((p.price||0) - (dep||0), 0));
+      }
+      if(sel) sel.addEventListener('change', recalc);
+      if(depInput) depInput.addEventListener('input', recalc);
+      recalc();
+    })();
+  </script>
+</body>
+</html>

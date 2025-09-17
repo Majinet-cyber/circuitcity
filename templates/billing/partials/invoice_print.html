@@ -1,0 +1,45 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Invoice {{ invoice.number }}</title>
+  <style>
+    body{font-family:Inter,system-ui,Segoe UI,Roboto,Arial,sans-serif;margin:30px;color:#0b1220}
+    h1,h3{margin:0}
+    .muted{color:#6b7280}
+    table{width:100%;border-collapse:collapse;margin-top:16px}
+    th,td{padding:8px;border-bottom:1px solid #e5e7eb;text-align:left}
+    tfoot td{font-weight:700}
+    .totals td{text-align:right}
+  </style>
+</head>
+<body>
+  <h1>Invoice {{ invoice.number }}</h1>
+  <p class="muted">Issued {{ invoice.issue_date }}</p>
+
+  <div style="margin-top:18px">
+    <strong>Bill To:</strong><br>
+    {{ invoice.to_name|default:invoice.business.name }}<br>
+    {{ invoice.manager_email }}{% if invoice.manager_whatsapp %} · {{ invoice.manager_whatsapp }}{% endif %}
+  </div>
+
+  <table>
+    <thead><tr><th>Description</th><th style="text-align:right">Qty</th><th style="text-align:right">Unit</th><th style="text-align:right">Amount</th></tr></thead>
+    <tbody>
+      {% for it in invoice.items.all %}
+      <tr>
+        <td>{{ it.description }}</td>
+        <td style="text-align:right">{{ it.qty }}</td>
+        <td style="text-align:right">{{ it.unit }}</td>
+        <td style="text-align:right">{{ invoice.currency }} {{ it.line_total }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+    <tfoot>
+      <tr class="totals"><td colspan="3">Subtotal</td><td>{{ invoice.currency }} {{ invoice.subtotal }}</td></tr>
+      <tr class="totals"><td colspan="3">Tax</td><td>{{ invoice.currency }} {{ invoice.tax_amount }}</td></tr>
+      <tr class="totals"><td colspan="3">Total</td><td>{{ invoice.currency }} {{ invoice.total }}</td></tr>
+    </tfoot>
+  </table>
+</body>
+</html>

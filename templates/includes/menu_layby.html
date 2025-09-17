@@ -1,0 +1,12 @@
+{# templates/includes/menu_layby.html #}
+{% if FEATURES.LAYBY %}
+  {% if request.user.is_authenticated %}
+    {% if request.user.is_staff %}
+      <li><a href="{% url 'layby:admin_dashboard' %}">Layby</a></li>
+    {% else %}
+      <li><a href="{% url 'layby:agent_dashboard' %}">Layby</a></li>
+    {% endif %}
+  {% else %}
+    <li><a href="{% url 'layby:customer_portal' %}">Layby</a></li>
+  {% endif %}
+{% endif %}

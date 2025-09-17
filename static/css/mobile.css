@@ -1,0 +1,119 @@
+/* Root tokens tuned for phones */
+:root{
+  --cc-bg:#0b1220;           /* dark-friendly default; your theme switcher can override */
+  --cc-panel:rgba(255,255,255,0.03);
+  --cc-border:rgba(255,255,255,0.10);
+  --cc-muted:#94a3b8;
+  --cc-text:#e5e7eb;
+  --cc-accent:#2f6df6;
+  --radius:16px;
+  --tap:14px; /* min hit slop */
+
+  /* Layout */
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --tabbar-h: 64px;
+  --container-px: 14px;
+
+  /* Motion */
+  --ease: cubic-bezier(.22,.61,.36,1);
+  --dur: 200ms;
+}
+
+html,body{
+  background:var(--cc-bg);
+  color:var(--cc-text);
+  -webkit-tap-highlight-color: transparent;
+  font-size:16px; /* keeps mobile zoom off on inputs */
+}
+
+.container-xxl,.container-xl,.container-lg,.container-md,.container,.container-fluid{
+  padding-left:var(--container-px);
+  padding-right:var(--container-px);
+}
+
+/* Thumb-safe bottom padding (for fixed tabbar) */
+body{ padding-bottom: calc(var(--tabbar-h) + var(--safe-bottom) + 8px); }
+
+/* Cards / panels */
+.panel, .card{
+  border-radius: var(--radius);
+  border: 1px solid var(--cc-border);
+  background: var(--cc-panel);
+  backdrop-filter: blur(6px);
+  box-shadow: 0 6px 20px rgb(0 0 0 / .25);
+}
+
+/* KPI grid: 2 columns on phones */
+.kpi-row{
+  display:grid; gap:12px; grid-template-columns:1fr 1fr;
+}
+@media(min-width:992px){
+  .kpi-row{ grid-template-columns:repeat(4,1fr); }
+}
+
+/* Bottom Tabbar */
+.cc-tabbar{
+  position: fixed; left:0; right:0; bottom:0;
+  height: calc(var(--tabbar-h) + var(--safe-bottom));
+  padding-bottom: var(--safe-bottom);
+  background: rgba(8,12,22,0.9);
+  border-top: 1px solid var(--cc-border);
+  display:flex; justify-content:space-between; gap:4px;
+  backdrop-filter: blur(14px);
+  z-index: 1100;
+}
+.cc-tabbar .tab{
+  flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center;
+  text-decoration:none; color:var(--cc-muted);
+  font-size:.75rem; padding:6px 0; gap:4px;
+}
+.cc-tabbar .tab i{ font-size:20px; line-height:1; }
+.cc-tabbar .tab.active{ color:var(--cc-accent); }
+.cc-tabbar .tab:active{ transform: translateY(1px); }
+
+/* Buttons: larger tap targets */
+.btn, button, .form-control{
+  border-radius: 12px;
+}
+.btn{ padding:12px 14px; font-weight:700; }
+.btn-sm{ padding:10px 12px; }
+
+/* Lists that feel "game-like" (spring hover on desktop, press scale on mobile) */
+.tile{
+  display:flex; align-items:center; gap:12px; padding:12px; border-radius:14px;
+  border:1px solid var(--cc-border); background:var(--cc-panel);
+  transition: transform var(--dur) var(--ease), background var(--dur) var(--ease);
+}
+.tile:active{ transform: scale(.98); }
+
+/* Responsive table → cards (auto on <= 576px) */
+.table-mobile{
+  width:100%; border-collapse: collapse;
+}
+@media(max-width:576px){
+  .table-mobile thead{ display:none; }
+  .table-mobile tr{
+    display:block; margin-bottom:10px; border:1px solid var(--cc-border);
+    border-radius:12px; overflow:hidden; background:var(--cc-panel);
+  }
+  .table-mobile td{
+    display:flex; justify-content:space-between; gap:10px;
+    padding:10px 12px; border-bottom:1px dashed var(--cc-border);
+  }
+  .table-mobile td:last-child{ border-bottom:none; }
+  .table-mobile td::before{
+    content: attr(data-label);
+    color: var(--cc-muted); font-weight:700;
+  }
+}
+
+/* Form improvements for mobile */
+input, select, textarea{
+  font-size:16px !important; /* prevents iOS zoom */
+}
+.form-control, .form-select{ padding:12px 14px; }
+.form-check-input{ width:1.2rem; height:1.2rem; }
+
+/* Micro animations */
+.fade-in{ animation: fadeIn .28s var(--ease) both; }
+@keyframes fadeIn{ from{ opacity:0; transform:translateY(6px); } to{ opacity:1; transform:translateY(0); } }

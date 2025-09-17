@@ -1,0 +1,76 @@
+{% extends "base.html" %}
+{% load humanize %}
+
+{% block title %}Customer · {{ cust_name }}{% endblock %}
+{% block header_title %}Customer · {{ cust_name }}{% endblock %}
+
+{% block extra_css %}
+<style>
+  /* DEBUG PROOF: title will be pink if THIS template is loaded */
+  h1, h2, .page-title { color: #ff6ad5 !important; }
+
+  /* Keep only the sidebar dark (assumes your base gives it this class/id) */
+  aside, .sidebar, #sidebar { background: var(--panel) !important; }
+
+  /* Main page background back to light */
+  main, .content, #content, body { background: var(--bg) !important; }
+
+  /* Cards & table in light theme */
+  .cc-card{ background: var(--card); border:1px solid var(--line); border-radius:12px; padding:14px; margin-bottom:1rem }
+  .cc-table{ width:100%; border-collapse:collapse; min-width:800px }
+  .cc-table th, .cc-table td{ padding:10px; border-bottom:1px solid var(--line); text-align:left }
+  .cc-table thead th{ background: color-mix(in oklab, var(--card) 86%, transparent); font-weight:800 }
+
+  .pill{
+    display:inline-block; padding:.25rem .6rem; border-radius:999px;
+    border:1px solid var(--line); font-weight:800; color:#052e2b;
+  }
+  .meta{ opacity:.75 }
+</style>
+{% endblock %}
+
+{% block content %}
+  <div class="cc-card">
+    <h2 class="mb-1">
+      Customer · <span class="pill" style="background: {{ color_for|default_if_none:''|default:'' }}{{ color_for(cust_name) if color_for }}">{% if color_for %}{{ cust_name }}{% else %}{{ cust_name }}{% endif %}</span>
+    </h2>
+    <div class="meta">Phone: {{ cust_phone }}</div>
+  </div>
+
+  <div class="cc-card">
+    <strong>Totals</strong> — Total: {{ total|floatformat:2|intcomma }}
+    · Paid: {{ paid|floatformat:2|intcomma }}
+    · Balance: <strong>{{ balance|floatformat:2|intcomma }}</strong>
+  </div>
+
+  <div class="cc-card p-0">
+    <div class="table-responsive">
+      <table class="cc-table">
+        <thead>
+          <tr>
+            <th>ID</th>
+            <th>Ref</th>
+            <th>Product</th>
+            <th>Status</th>
+            <th>Paid</th>
+            <th>Balance</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for o in orders %}
+            <tr>
+              <td>{{ o.id }}</td>
+              <td class="meta">{{ o.ref }}</td>
+              <td>{{ o.product }}</td>
+              <td>{{ o.status }}</td>
+              <td>{{ o.amount_paid|floatformat:2|intcomma }}</td>
+              <td><strong>{{ o.balance|floatformat:2|intcomma }}</strong></td>
+            </tr>
+          {% empty %}
+            <tr><td colspan="6">No laybys yet.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+{% endblock %}

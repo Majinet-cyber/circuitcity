@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% block title %}Layby Sandbox{% endblock %}
+{% block header_title %}Layby Payment Webhook Sandbox{% endblock %}
+{% block content %}
+<section class="panel" style="max-width:720px;margin:auto">
+  <form method="post" action="{% url 'layby:sandbox_trigger' %}">
+    {% csrf_token %}
+    <div style="display:grid;gap:10px;grid-template-columns:1fr 1fr">
+      <label>Order ID<input name="order_id" value="{{ sample.order_id }}" required class="form-control"></label>
+      <label>Amount<input name="amount" value="{{ sample.amount }}" class="form-control" placeholder="e.g. 50000.00"></label>
+      <label>Method
+        <select name="method" class="form-control">
+          <option {% if sample.method == 'AIRTEL' %}selected{% endif %}>AIRTEL</option>
+          <option {% if sample.method == 'TNM' %}selected{% endif %}>TNM</option>
+          <option {% if sample.method == 'BANK' %}selected{% endif %}>BANK</option>
+          <option {% if sample.method == 'CASH' %}selected{% endif %}>CASH</option>
+          <option {% if sample.method == 'OTHER' %}selected{% endif %}>OTHER</option>
+        </select>
+      </label>
+      <label>Provider Ref<input name="provider_ref" value="{{ sample.provider_ref }}" class="form-control"></label>
+    </div>
+    <label>Note<textarea name="note" class="form-control">{{ sample.note }}</textarea></label>
+    <div style="margin-top:12px">
+      <button class="glass-btn" type="submit">Trigger Webhook ▶</button>
+      <a class="glass-btn" href="{% url 'layby:sandbox' %}">Reset</a>
+    </div>
+    <p style="opacity:.7;margin-top:8px">Sends JSON to <code>/layby/api/webhook/payment/</code>. If <code>LAYBY_WEBHOOK_REQUIRE_SECRET=1</code>, adds <code>X-Layby-Signature</code> header.</p>
+  </form>
+</section>
+{% endblock %}

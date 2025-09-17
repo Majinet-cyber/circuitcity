@@ -1,0 +1,16 @@
+{# templates/layby/agent_new.html #}
+{% extends "base.html" %}
+{% block title %}New Layby{% endblock %}
+{% block header_title %}New Layby{% endblock %}
+
+{% block content %}
+  <div class="panel p-3 glass-card">
+    <p class="text-muted mb-3">This is a placeholder “New Layby” page. Hook up your form here.</p>
+
+    <div class="d-flex gap-2">
+      <a class="btn btn-light" href="{% url 'layby:agent_dashboard' %}">
+        <i class="bi bi-arrow-left"></i> Back to Agent dashboard
+      </a>
+    </div>
+  </div>
+{% endblock %}

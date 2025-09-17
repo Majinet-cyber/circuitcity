@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container py-4" style="max-width: 760px;">
+<h3>Invite agent</h3>
+<form method="post" class="mt-3">
+{% csrf_token %}
+{{ form.as_p }}
+<button class="btn btn-primary">Send invite</button>
+<a class="btn btn-link" href="{% url 'tenants:people_index' %}">Cancel</a>
+</form>
+</div>
+{% endblock %}

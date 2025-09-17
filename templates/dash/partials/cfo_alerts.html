@@ -1,0 +1,72 @@
+<div class="bg-white rounded-xl shadow p-4">
+  <div class="flex items-center justify-between mb-3">
+    <h2 class="text-lg font-semibold">CFO Alerts</h2>
+    <a href="{% url 'dashboard-cfo' %}" class="text-sm text-blue-600 hover:underline">View All</a>
+  </div>
+
+  <ul id="cfo-alerts-list" class="space-y-2 text-sm">
+    <li class="text-gray-400">Loading alerts...</li>
+  </ul>
+</div>
+
+<script>
+(async function () {
+  const API = "/api/v1";  // Adjust if your API prefix is different
+  const POLL_MS = 15000;  // Refresh every 15s
+  const ul = document.getElementById("cfo-alerts-list");
+
+  async function fetchJSON(url, opts={}) {
+    const r = await fetch(url, {
+      credentials: "same-origin",
+      headers: {"X-Requested-With": "XMLHttpRequest"},
+      ...opts
+    });
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    return await r.json();
+  }
+
+  async function loadCfoAlerts() {
+    try {
+      const items = await fetchJSON(`${API}/cfo/alerts/`);
+      ul.innerHTML = "";
+      if (!items.length) {
+        ul.innerHTML = `<li class="text-gray-400">No alerts 🎉</li>`;
+        return;
+      }
+
+      items.slice(0, 5).forEach(a => {
+        const li = document.createElement("li");
+
+        // Choose a color based on severity
+        let borderColor = "border-gray-200", bgColor = "bg-gray-50";
+        if (a.severity === "HIGH") {
+          borderColor = "border-red-300";
+          bgColor = "bg-red-50";
+        } else if (a.severity === "MEDIUM") {
+          borderColor = "border-yellow-300";
+          bgColor = "bg-yellow-50";
+        } else {
+          borderColor = "border-green-200";
+          bgColor = "bg-green-50";
+        }
+
+        li.className = `${bgColor} ${borderColor} border rounded p-2`;
+        li.innerHTML = `
+          <div class="font-medium capitalize">${a.kind.replaceAll("_", " ")}</div>
+          <div class="text-gray-600">${a.message}</div>
+          <div class="text-xs text-gray-500">
+            ${a.severity} • ${new Date(a.created_at).toLocaleString()}
+          </div>
+        `;
+        ul.appendChild(li);
+      });
+    } catch (e) {
+      ul.innerHTML = `<li class="text-red-500">⚠️ Failed to load alerts</li>`;
+      console.error(e);
+    }
+  }
+
+  await loadCfoAlerts();
+  setInterval(loadCfoAlerts, POLL_MS);
+})();
+</script>

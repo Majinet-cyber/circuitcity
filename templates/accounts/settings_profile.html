@@ -2,10 +2,19 @@
 {% load static %}
 
 {% block title %}Settings · Profile{% endblock %}
+{% block header_title %}Settings{% endblock %}
+
+{# Hide the header actions (Layby + Notifications) on Settings pages only #}
+{% block extra_head %}
+<style>
+  .cc-header .cc-actions { display: none !important; }
+</style>
+{% endblock %}
 
 {% block content %}
 <div class="container my-4">
   <h2 class="fw-bold mb-3">Account Settings</h2>
+
   {% include "accounts/_settings_nav.html" %}
 
   <div class="card shadow-sm border-0 rounded-3">
@@ -14,6 +23,7 @@
 
       <form method="post" enctype="multipart/form-data" class="needs-validation" novalidate>
         {% csrf_token %}
+
         {% if messages %}
           {% for message in messages %}
             <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">

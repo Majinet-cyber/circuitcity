@@ -1,0 +1,134 @@
+{% extends "base.html" %}
+{% load humanize %}
+
+{% block title %}Invoice {{ invoice.number }} · {{ block.super }}{% endblock %}
+{% block header_title %}Invoice {{ invoice.number }}{% endblock %}
+
+{% block body %}
+<style>
+  .inv-shell{max-width:980px;margin:8px auto;}
+  .glass{background:color-mix(in oklab, #fff 86%, transparent); border:1px solid var(--line);
+         border-radius:16px; box-shadow:0 12px 40px rgba(2,6,23,.06);}
+  .inv-head{display:flex; gap:18px; padding:18px;}
+  .inv-brand{display:flex; align-items:center; gap:12px;}
+  .inv-brand .logo{width:44px; height:44px; border-radius:12px; display:grid; place-items:center;
+                   background:#132036; color:#8fb5ff; font-weight:900;}
+  .inv-meta{margin-left:auto; text-align:right;}
+  .inv-grid{display:grid; gap:16px; grid-template-columns: 1fr; padding:0 18px 18px;}
+  .card{padding:16px; border-radius:14px; border:1px solid var(--line); background:var(--glass-bg);}
+  .inv-items th, .inv-items td { padding:12px; border-bottom:1px dashed var(--line); }
+  .inv-items th{ font-weight:800; color:#334155; }
+  .inv-total{ font-weight:900; font-size:1.1rem;}
+  .pill{display:inline-flex; align-items:center; gap:6px; padding:6px 10px; border-radius:999px; font-weight:700;}
+  .pill.draft{background:#fef3c7; color:#92400e;}
+  .pill.sent{background:#dbeafe; color:#1e3a8a;}
+  .pill.paid{background:#dcfce7; color:#065f46;}
+  .pill.overdue{background:#fee2e2; color:#991b1b;}
+  .actions{display:flex; gap:10px; flex-wrap:wrap;}
+</style>
+
+<div class="inv-shell">
+  <section class="glass fade-in">
+    <header class="inv-head">
+      <div class="inv-brand">
+        <div class="logo">CC</div>
+        <div>
+          <div class="fw-bold">Circuit City</div>
+          <div class="text-muted" style="font-size:.9rem">{{ invoice.business.name|default:"Your Business" }}</div>
+        </div>
+      </div>
+      <div class="inv-meta">
+        <div class="mb-1"><span class="text-muted">Invoice #</span> <strong>{{ invoice.number }}</strong></div>
+        <div class="text-muted">Issued {{ invoice.issue_date|date:"M j, Y" }}{% if invoice.due_date %} · Due {{ invoice.due_date|date:"M j, Y" }}{% endif %}</div>
+        <div class="mt-2">
+          <span class="pill {{ invoice.status }}">
+            {{ invoice.get_status_display }}
+          </span>
+        </div>
+      </div>
+    </header>
+
+    <div class="inv-grid">
+      <div class="card">
+        <div class="row g-3">
+          <div class="col-md-6">
+            <div class="fw-bold mb-1">Bill To</div>
+            <div>{{ invoice.to_name|default:"Manager" }}</div>
+            {% if invoice.manager_email %}<div class="text-muted">{{ invoice.manager_email }}</div>{% endif %}
+            {% if invoice.manager_whatsapp %}<div class="text-muted">WhatsApp: {{ invoice.manager_whatsapp }}</div>{% endif %}
+          </div>
+          <div class="col-md-6 text-md-end">
+            <div class="fw-bold mb-1">Summary</div>
+            <div>Subtotal: <strong>{{ invoice.currency }} {{ invoice.subtotal|intcomma }}</strong></div>
+            <div>Tax: <strong>{{ invoice.currency }} {{ invoice.tax_amount|intcomma }}</strong></div>
+            <div class="inv-total mt-1">Total: <strong>{{ invoice.currency }} {{ invoice.total|intcomma }}</strong></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card p-0">
+        <table class="table inv-items m-0">
+          <thead>
+            <tr>
+              <th class="text-muted">Item</th>
+              <th class="text-muted text-end">Qty</th>
+              <th class="text-muted text-end">Unit Price</th>
+              <th class="text-muted text-end">Line Total</th>
+            </tr>
+          </thead>
+          <tbody>
+          {% for it in invoice.items.all %}
+            <tr>
+              <td class="fw-semibold">{{ it.description }}</td>
+              <td class="text-end">{{ it.qty }}</td>
+              <td class="text-end">{{ invoice.currency }} {{ it.unit_price|intcomma }}</td>
+              <td class="text-end">{{ invoice.currency }} {{ it.line_total|intcomma }}</td>
+            </tr>
+          {% empty %}
+            <tr><td colspan="4" class="text-center text-muted">No items.</td></tr>
+          {% endfor %}
+          </tbody>
+        </table>
+      </div>
+
+      {% if invoice.notes %}
+      <div class="card">
+        <div class="fw-bold mb-1">Notes</div>
+        <div class="text-muted">{{ invoice.notes|linebreaksbr }}</div>
+      </div>
+      {% endif %}
+
+      <div class="card d-flex align-items-center justify-content-between flex-wrap">
+        <div class="text-muted">Send this invoice to the manager via Email or WhatsApp.</div>
+        <div class="actions">
+          <button class="btn btn-primary hover-lift tap" id="sendEmail">
+            <i class="bi bi-envelope"></i> Email
+          </button>
+          <button class="btn btn-outline-primary hover-lift tap" id="sendWA">
+            <i class="bi bi-whatsapp"></i> WhatsApp
+          </button>
+        </div>
+      </div>
+    </div>
+  </section>
+</div>
+
+<script>
+(function(){
+  const url = "{% url 'billing:invoice_send' invoice.id %}";
+  async function send(channels){
+    const form = new FormData();
+    form.append("channels", channels.join(","));
+    const r = await fetch(url, { method: "POST", body: form, credentials: "same-origin",
+      headers: { "X-Requested-With":"XMLHttpRequest", "X-CSRFToken": (window.CC?.getCsrfToken?.() || "") }});
+    const data = await r.json();
+    if (!r.ok){ throw new Error((data && (data.detail || data.error)) || `HTTP ${r.status}`); }
+    alert("Sent: " + data.results.map(x => `${x.channel}: ${x.ok ? "OK" : x.detail}`).join(" | "));
+    // Optionally reload to reflect status=SENT
+    location.reload();
+  }
+  document.getElementById("sendEmail")?.addEventListener("click", ()=>send(["email"]));
+  document.getElementById("sendWA")?.addEventListener("click", ()=>send(["whatsapp"]));
+})();
+</script>
+{% endblock %}

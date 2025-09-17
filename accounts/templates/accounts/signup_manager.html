@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Create Manager account · Circuit City</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="csrf-token" content="{{ csrf_token }}"/>
+
+  <style>
+    :root{
+      --cc-bg:#f6f9ff; --cc-card:#fff; --cc-line:#e5e7eb; --cc-ink:#0f172a; --cc-muted:#64748b;
+      --blue-1:#2563eb; --glass-bg:rgba(37,99,235,0.12); --glass-brd:rgba(96,165,250,.55);
+      --glass-shadow:0 10px 30px rgba(37,99,235,.22);
+    }
+    *{box-sizing:border-box}
+    body{margin:0;background:linear-gradient(180deg,var(--cc-bg),#fff);font-family:system-ui,Segoe UI,Inter,Roboto,Arial,sans-serif;color:var(--cc-ink)}
+    .auth-wrap{min-height:100vh;display:grid;place-items:center;padding:clamp(16px,4vw,32px)}
+    .auth-card{width:min(560px,92vw);background:var(--cc-card);border:1px solid var(--cc-line);border-radius:16px;padding:28px;box-shadow:0 20px 60px rgba(2,6,23,.06)}
+    .brand{font-weight:800;margin:0 0 .25rem}
+    .muted{color:var(--cc-muted);margin:0 0 12px}
+    label{display:block;font-size:14px;margin:12px 0 6px}
+    input[type="text"],input[type="email"],input[type="password"]{width:100%;padding:10px 12px;border:1px solid #cbd5e1;border-radius:10px;font-size:14px}
+    .row{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+    .err{background:#fef2f2;border:1px solid #fecaca;color:#991b1b;padding:.6rem .8rem;border-radius:10px;margin:0 0 12px}
+    .help{font-size:13px;color:#7f1d1d;margin:.4rem 0 0}
+    #submitBtn{display:inline-flex;align-items:center;justify-content:center;gap:.5rem;width:100%;
+      padding:.8rem 1.1rem;font-weight:800;letter-spacing:.02em;border-radius:14px;border:1px solid var(--glass-brd);
+      color:#eaf2ff;background:
+      radial-gradient(120% 160% at 30% 20%, rgba(255,255,255,.35), transparent 60%),
+      linear-gradient(135deg, rgba(96,165,250,.65), rgba(37,99,235,.55)), var(--glass-bg);
+      box-shadow:var(--glass-shadow);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);
+      transition:transform .18s ease, box-shadow .18s ease, background .18s ease, color .18s ease;cursor:pointer;margin-top:.75rem}
+    #submitBtn:hover{transform:translateY(-1px);color:#fff;box-shadow:0 14px 34px rgba(37,99,235,.32)}
+    #submitBtn:disabled{opacity:.65;cursor:not-allowed;box-shadow:0 8px 18px rgba(37,99,235,.18)}
+    a{color:#2563eb;text-decoration:none}
+  </style>
+</head>
+<body>
+  <div class="auth-wrap">
+    <div class="auth-card" role="dialog" aria-labelledby="h1" aria-describedby="desc">
+      <h1 id="h1" class="brand">Create your Manager account</h1>
+      <p id="desc" class="muted">Managers create the store and can invite agents later.</p>
+
+      {% if messages %}
+        {% for m in messages %}<div class="err" role="alert" aria-live="assertive">{{ m }}</div>{% endfor %}
+      {% endif %}
+      {% if form and form.non_field_errors %}
+        <div class="err" role="alert" aria-live="assertive">
+          {% for e in form.non_field_errors %}{{ e }}{% if not forloop.last %}<br>{% endif %}{% endfor %}
+        </div>
+      {% elif form and form.errors %}
+        <div class="err" role="alert" aria-live="assertive">Please fix the errors below.</div>
+      {% endif %}
+
+      <form method="post" action="" novalidate>
+        {% csrf_token %}
+
+        <!-- Email -->
+        <label for="{{ form.email.id_for_label }}">Work email</label>
+        {{ form.email }}
+        {% if form.email.errors %}
+          <div class="help">{% for e in form.email.errors %}{{ e }}{% if not forloop.last %}<br>{% endif %}{% endfor %}</div>
+        {% endif %}
+
+        <!-- Full name -->
+        <label for="{{ form.full_name.id_for_label }}">Full name</label>
+        {{ form.full_name }}
+        {% if form.full_name.errors %}
+          <div class="help">{% for e in form.full_name.errors %}{{ e }}{% if not forloop.last %}<br>{% endif %}{% endfor %}</div>
+        {% endif %}
+
+        <!-- Business -->
+        <label for="{{ form.business_name.id_for_label }}">Store / business name</label>
+        {{ form.business_name }}
+        {% if form.business_name.errors %}
+          <div class="help">{% for e in form.business_name.errors %}{{ e }}{% if not forloop.last %}<br>{% endif %}{% endfor %}</div>
+        {% endif %}
+
+        <!-- Passwords -->
+        <div class="row">
+          <div>
+            <label for="{{ form.password1.id_for_label }}">Password</label>
+            {{ form.password1 }}
+            {% if form.password1.errors %}
+              <div class="help">{% for e in form.password1.errors %}{{ e }}{% if not forloop.last %}<br>{% endif %}{% endfor %}</div>
+            {% endif %}
+          </div>
+          <div>
+            <label for="{{ form.password2.id_for_label }}">Confirm password</label>
+            {{ form.password2 }}
+            {% if form.password2.errors %}
+              <div class="help">{% for e in form.password2.errors %}{{ e }}{% if not forloop.last %}<br>{% endif %}{% endfor %}</div>
+            {% endif %}
+          </div>
+        </div>
+
+        <button id="submitBtn" type="submit">Create account</button>
+      </form>
+
+      <p class="muted" style="margin-top:14px">
+        Already have an account? <a href="{% url 'accounts:login' %}">Sign in</a>
+      </p>
+    </div>
+  </div>
+
+  <script>
+    (function(){
+      var form=document.querySelector('form'); var btn=document.getElementById('submitBtn');
+      if(!form||!btn) return;
+      form.addEventListener('submit', function(){
+        btn.disabled=true;
+        var sp=document.createElement('span'); sp.style.display='inline-block';
+        sp.style.width='1em'; sp.style.height='1em'; sp.style.marginLeft='.5rem';
+        sp.style.border='2px solid rgba(255,255,255,.35)'; sp.style.borderTopColor='#fff';
+        sp.style.borderRadius='50%'; sp.style.animation='spin .9s linear infinite';
+        btn.appendChild(sp);
+      });
+    })();
+  </script>
+</body>
+</html>

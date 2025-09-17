@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+{% block title %}Sign in · 2FA{% endblock %}
+{% block content %}
+<div class="container-xxl" style="max-width:520px">
+  <div class="panel p-4">
+    <h4 class="mb-3 fw-bold">Sign in</h4>
+    <form method="post">{% csrf_token %}
+      {{ form.non_field_errors }}
+      <div class="mb-3">{{ form.username.label_tag }}{{ form.username }}</div>
+      <div class="mb-3">{{ form.password.label_tag }}{{ form.password }}</div>
+      <button class="btn btn-primary w-100">Continue</button>
+    </form>
+  </div>
+</div>
+{% endblock %}

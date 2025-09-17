@@ -7,69 +7,134 @@
 
 {% block extra_css %}
 <style>
-  :root{ --chart-h:260px; --chart-h-sm:210px; }
-  .panel{ border-radius:var(--radius,12px); border:1px solid var(--cc-border); background:var(--cc-panel); box-shadow:var(--cc-shadow); padding:1rem; }
+  /* --- Mobile-first tuning --- */
+  :root{
+    --chart-h: 220px;         /* default phone height */
+    --chart-h-sm: 180px;
+  }
+  @media (min-width: 576px){
+    :root{ --chart-h: 240px; --chart-h-sm: 200px; }
+  }
+  @media (min-width: 992px){
+    :root{ --chart-h: 260px; --chart-h-sm: 210px; }
+  }
+
+  .panel{
+    border-radius:var(--radius,12px);
+    border:1px solid var(--cc-border);
+    background:var(--cc-panel);
+    box-shadow:var(--cc-shadow);
+    padding:1rem;
+  }
   .panel h5,.card-head>div{ font-weight:900; letter-spacing:.01em }
-  .kpi-row{ display:grid; gap:12px; grid-template-columns:repeat(4,1fr); margin-bottom:12px; }
-  @media (max-width:992px){ .kpi-row{ grid-template-columns:repeat(2,1fr); } }
+
+  /* KPIs → 2-cols on phones, 4 on desktops */
+  .kpi-row{
+    display:grid; gap:12px; grid-template-columns:1fr 1fr; margin-bottom:12px;
+  }
+  @media (min-width: 992px){
+    .kpi-row{ grid-template-columns:repeat(4,1fr); }
+  }
   .kpi .label{ color:var(--cc-muted); font-weight:800 }
-  .kpi .value{ font-size:1.6rem; font-weight:900 }
+  .kpi .value{ font-size:clamp(1.2rem, 3.4vw, 1.6rem); font-weight:900 }
+
+  /* Charts */
   .chart-canvas{ width:100% !important; height:var(--chart-h) !important }
   .chart-canvas--sm{ height:var(--chart-h-sm) !important }
-  .dash-grid{ display:grid; gap:12px; grid-template-columns:2fr 1fr; grid-template-rows:minmax(0,1fr) minmax(0,1fr); height:clamp(540px,62vh,760px); }
-  .dash-grid .left{ grid-row:1 / span 2; }
-  .equal-grid{ display:grid; gap:12px; grid-template-columns:7fr 5fr; align-items:stretch; }
-  @media (max-width:992px){ .dash-grid,.equal-grid{ display:block; height:auto; } .chart-canvas{ height:220px !important } }
+
+  /* Main grids: stack on phones */
+  .dash-grid{
+    display:grid; gap:12px; grid-template-columns:1fr; grid-auto-rows:minmax(0,auto);
+  }
+  .dash-grid .left{ order:-1; }
+  @media (min-width: 992px){
+    .dash-grid{
+      grid-template-columns:2fr 1fr;
+      grid-template-rows:minmax(0,1fr) minmax(0,1fr);
+      height:clamp(540px,62vh,760px);
+    }
+    .dash-grid .left{ grid-row:1 / span 2; }
+  }
+
+  .equal-grid{ display:grid; gap:12px; grid-template-columns:1fr; align-items:stretch; }
+  @media (min-width: 992px){
+    .equal-grid{ grid-template-columns:7fr 5fr; }
+  }
+
   .ai-item{ display:flex; gap:.5rem; align-items:flex-start; }
   .ai-item .badge{ margin-top:.15rem }
   .empty-hint{ color:var(--cc-muted); font-weight:700; padding:.5rem 0 .2rem }
-  .filters .form-select{ min-width:160px; }
+
+  /* Filters: phone-friendly line wrap */
+  .filters .form-select{ min-width:min(160px, 45vw); }
+  .filters .btn{ min-height:44px; }
+
+  /* CFO band layout */
+  .cfo-band{ display:grid; gap:12px; grid-template-columns:1fr; margin-bottom:12px; }
+  @media (min-width: 992px){ .cfo-band{ grid-template-columns: 2fr 1fr; } }
+
+  /* Simulation quick actions */
+  .sim-actions .btn{ min-width: 160px; }
+  .muted-note{ color:var(--cc-muted); }
+
+  /* Mobile FAB for primary action (Scan) */
+  .cc-fab{
+    position:fixed; right:18px;
+    bottom: calc(var(--tabbar-h,64px) + var(--safe-bottom, 0px) + 18px);
+    width:56px; height:56px; border-radius:28px; display:grid; place-items:center;
+    background:var(--cc-accent); color:white; box-shadow:0 10px 24px rgba(0,0,0,.35);
+    z-index: 1040;
+  }
+  .cc-fab:active{ transform: translateY(1px) scale(.98); }
+  @media (min-width: 768px){ .cc-fab{ display:none; } }
 </style>
 {% endblock %}
 
 {% block content %}
 
+  {# Resolve URLs we need here #}
+  {% url 'inventory:scan_in' as url_scan_in %}
+
+  {# Derive a boolean for “manager-like” (admin/staff OR manager) #}
+  {% with is_mgr=(request.user.is_staff or request.user.profile.is_manager) %}
+
   <!-- KPI band -->
   <section class="kpi-row">
-    <div class="kpi">
+    <div class="kpi panel">
       <div class="label">Revenue ({{ period|default:"month"|title }})</div>
       <div class="value">MK {{ total_revenue|default:0|floatformat:0|intcomma }}</div>
       {% if revenue_delta is not None %}
         <span class="delta {% if revenue_delta >= 0 %}up{% else %}down{% endif %}">{{ revenue_delta|floatformat:1 }}%</span>
       {% endif %}
     </div>
-    <div class="kpi">
+    <div class="kpi panel">
       <div class="label">Units Sold</div>
       <div class="value">{{ total_units|default:0|intcomma }}</div>
       {% if units_delta is not None %}
         <span class="delta {% if units_delta >= 0 %}up{% else %}down{% endif %}">{{ units_delta|floatformat:1 }}%</span>
       {% endif %}
     </div>
-    <div class="kpi">
+    <div class="kpi panel">
       <div class="label">Stock Value</div>
       <div class="value">MK {{ stock_value|default:0|floatformat:0|intcomma }}</div>
     </div>
-    <div class="kpi">
+    <div class="kpi panel">
       <div class="label">Low / Out Items</div>
       <div class="value">{{ low_items|default:0|intcomma }}</div>
     </div>
   </section>
 
-  <!-- Filters -->
-  <form method="get" class="filters d-flex flex-wrap gap-2 mb-3">
-    <select name="period" class="form-select" aria-label="Period">
-      <option value="month" {% if period == "month" %}selected{% endif %}>This month</option>
-      <option value="all" {% if period == "all" %}selected{% endif %}>All time</option>
-    </select>
-    <select name="model" class="form-select" aria-label="Filter by model">
-      <option value="">All models</option>
-      {% for p in products %}
-        <option value="{{ p.id }}" {% if model_id == p.id %}selected{% endif %}>{{ p.brand }} {{ p.model }}{% if p.variant %} {{ p.variant }}{% endif %}</option>
-      {% endfor %}
-    </select>
-    <button class="btn primary" type="submit"><i class="bi bi-sliders"></i> Apply</button>
-    <a href="." class="btn muted"><i class="bi bi-arrow-counterclockwise"></i> Reset</a>
-  </form>
+  {# ✅ Financial Overview (AI-CFO) — managers/admins only #}
+  {% if is_mgr %}
+  <section class="cfo-band">
+    <div class="panel">
+      {% include "dashboard/partials/cfo_tiles.html" %}
+    </div>
+    <div class="panel">
+      {% include "dashboard/partials/cfo_alerts.html" %}
+    </div>
+  </section>
+  {% endif %}
 
   <!-- Band 1 -->
   <section class="dash-grid mb-3">
@@ -77,12 +142,15 @@
     <div class="panel card header left" id="salesCard">
       <div class="card-head d-flex justify-content-between align-items-center">
         <div>Sales Trend</div>
-        <div class="d-flex gap-2">
+        <div class="d-flex gap-2 align-items-center">
           <label class="visually-hidden" for="trendPeriod">Trend period</label>
           <select id="trendPeriod" class="form-select" style="width:auto">
             <option value="7d">Last 7 days</option>
             <option value="month" selected>This month</option>
+            <option value="all">All time</option>
+            <option value="date">Choose date…</option>
           </select>
+          <input type="date" id="trendDate" class="form-control" style="width:auto; display:none;">
           <label class="visually-hidden" for="trendMetric">Trend metric</label>
           <select id="trendMetric" class="form-select" style="width:auto">
             <option value="count" selected>Count</option>
@@ -100,8 +168,13 @@
     <!-- AI Insights -->
     <div class="panel card header" id="aiCard">
       <div class="card-head d-flex justify-content-between align-items-center">
-        <div>AI-Driven Insights</div>
-        <button id="ai-recs-refresh" type="button" class="btn icon"><i class="bi bi-arrow-clockwise"></i> Refresh</button>
+        <div>
+          AI-Driven Insights
+          {% if not is_mgr %}
+            <span class="small text-muted">· for your stock &amp; sales</span>
+          {% endif %}
+        </div>
+        <button id="ai-recs-refresh" type="button" class="btn icon tap" onclick="window.buzz&&buzz(8)"><i class="bi bi-arrow-clockwise"></i> Refresh</button>
       </div>
       <div class="card-body">
         <div id="ai-viewport" class="small"></div>
@@ -117,7 +190,7 @@
     <div class="panel card header" id="valueCard">
       <div class="card-head d-flex justify-content-between align-items-center">
         <div>Value Trend</div>
-        <div class="d-flex gap-2">
+        <div class="d-flex gap-2 align-items-center">
           <label class="visually-hidden" for="vtMetric">Value metric</label>
           <select id="vtMetric" class="form-select" style="width:auto">
             <option value="revenue" selected>Revenue</option>
@@ -129,7 +202,9 @@
             <option value="today">Today</option>
             <option value="7d" selected>Last 7 days</option>
             <option value="all">All time</option>
+            <option value="date">Choose date…</option>
           </select>
+          <input type="date" id="vtDate" class="form-control" style="width:auto; display:none;">
         </div>
       </div>
       <div class="card-body">
@@ -146,11 +221,15 @@
       <div class="panel card header h-100" id="topCard">
         <div class="card-head d-flex justify-content-between align-items-center">
           <div>Top-Selling Models</div>
-          <label class="visually-hidden" for="topPeriod">Top models period</label>
-          <select id="topPeriod" class="form-select" style="width:auto">
-            <option value="today">Today</option>
-            <option value="month" selected>This month</option>
-          </select>
+          <div class="d-flex gap-2 align-items-center">
+            <label class="visually-hidden" for="topPeriod">Top models period</label>
+            <select id="topPeriod" class="form-select" style="width:auto">
+              <option value="today">Today</option>
+              <option value="month" selected>This month</option>
+              <option value="date">Choose date…</option>
+            </select>
+            <input type="date" id="topDate" class="form-control" style="width:auto; display:none;">
+          </div>
         </div>
         <div class="card-body">
           <canvas id="topModels" class="chart-canvas chart-canvas--sm" aria-label="Top models"></canvas>
@@ -170,6 +249,40 @@
     </div>
   </section>
 
+  {# ✅ Simulation & Scenarios — managers/admins only #}
+  {% if is_mgr %}
+  <section class="mb-3">
+    <div class="panel card">
+      <div class="card-head d-flex justify-content-between align-items-center">
+        <div>Simulation &amp; Scenarios</div>
+        <span class="small muted-note">Model growth, profit, and breakeven with saved scenarios</span>
+      </div>
+      <div class="card-body sim-actions">
+        <div class="d-flex flex-wrap gap-2">
+          <a class="btn btn-outline-primary tap" href="/simulator/new/" onclick="window.buzz&&buzz(8)">
+            <i class="bi bi-magic me-1"></i> New Scenario
+          </a>
+          <a class="btn btn-primary tap" href="/simulator/" onclick="window.buzz&&buzz(8)">
+            <i class="bi bi-graph-up me-1"></i> Open Simulator
+          </a>
+          <a class="btn btn-outline-secondary tap" href="/simulator/compare/?id=1&id=2" onclick="window.buzz&&buzz(8)">
+            <i class="bi bi-bar-chart-line me-1"></i> Compare (sample)
+          </a>
+        </div>
+        <div class="small mt-2 muted-note">
+          Tip: Use “Compare” like <code>/simulator/compare/?id=12&amp;id=15</code> to overlay Net Profit curves across scenarios.
+        </div>
+      </div>
+    </div>
+  </section>
+  {% endif %}
+
+  <!-- Mobile FAB: quick Scan (safe URL) -->
+  <a href="{{ url_scan_in|default:'/inventory/scan-in/' }}" class="cc-fab" onclick="window.buzz&&buzz(8)" aria-label="Scan">
+    <i class="bi bi-upc-scan fs-4"></i>
+  </a>
+
+  {% endwith %}
 {% endblock %}
 
 {% block extra_js %}
@@ -186,6 +299,7 @@
   const cssVar=(name,fb)=> (getComputedStyle(document.documentElement).getPropertyValue(name).trim() || fb);
   const GRID_CLR=()=> cssVar('--chart-grid','#d8e3ff');
   const BRAND  =()=> cssVar('--cc-accent','#3b82f6');
+
 
   // axis helpers
   function chooseMoneyStep(max){
@@ -218,20 +332,47 @@
     catch(e){ for(const alt of legacy){ try{ return await tryOnce(alt); }catch(_){} } throw e; }
   }
 
+  // ---- date toggles (show input when "Choose date…" is picked) ----
+  function bindDateToggle(selectId, inputId){
+    const sel=$id(selectId), input=$id(inputId);
+    if(!sel || !input) return;
+    const ensureToday=()=>{ const t=new Date(); const mm=String(t.getMonth()+1).padStart(2,'0'); const dd=String(t.getDate()).padStart(2,'0'); return `${t.getFullYear()}-${mm}-${dd}`; };
+    function toggle(){
+      if(sel.value==='date'){
+        input.style.display='inline-block';
+        if(!input.value) input.value = ensureToday();
+        input.focus();
+      } else {
+        input.style.display='none';
+      }
+    }
+    sel.addEventListener('change', toggle);
+    toggle();
+  }
+  bindDateToggle('trendPeriod','trendDate');
+  bindDateToggle('vtPeriod','vtDate');
+  bindDateToggle('topPeriod','topDate');
+
   // ---------- Sales Trend ----------
   let salesChart=null;
   async function loadTrend(){
-    const metricSel=$id('trendMetric'); const periodSel=$id('trendPeriod');
+    const metricSel=$id('trendMetric'); const periodSel=$id('trendPeriod'); const dateInp=$id('trendDate');
     if(!metricSel||!periodSel) return;
 
     hide('errSales'); hide('salesEmpty');
 
-    const period=periodSel.value;
-    let metric =metricSel.value;
+    let period=periodSel.value;
+    const metric=metricSel.value;
+    let dateQS='';
+
+    if(period==='date'){
+      if(!dateInp.value){ alert('Pick a date'); return; }
+      dateQS = `&on=${encodeURIComponent(dateInp.value)}`;   // <-- changed to &on=
+    }
 
     const getData=(m)=> fetchJSON(
-      `/inventory/api/sales-trend/?period=${encodeURIComponent(period)}&metric=${encodeURIComponent(m)}${MODEL_QS}`,
-      { legacy:[`/inventory/api_sales_trend/?period=${encodeURIComponent(period)}&metric=${encodeURIComponent(m)}${MODEL_QS}`] }
+      `/inventory/api/sales-trend/?period=${encodeURIComponent(period)}&metric=${encodeURIComponent(m)}${dateQS}${MODEL_QS}`,
+      { legacy:[`/inventory/api_sales_trend/?period=${encodeURIComponent(period)}&metric=${encodeURIComponent(m)}${dateQS}${MODEL_QS}`] }
     );
 
     let data;
@@ -247,7 +388,7 @@
     if(isAmount && labels.length && values.every(v=>v===0)){
       try{
         const alt=await getData('count'); const altVals=(alt?.values||[]).map(v=>Number(v)||0);
-        if(alt?.labels?.length && altVals.some(v=>v>0)){ labels=alt.labels; values=altVals; metric='count'; metricSel.value='count'; }
+        if(alt?.labels?.length && altVals.some(v=>v>0)){ labels=alt.labels; values=altVals; }
       }catch{}
     }
 
@@ -271,14 +412,21 @@
   // ---------- Top Models ----------
   let topChart=null;
   async function loadTop(){
-    const periodSel=$id('topPeriod'); if(!periodSel) return;
+    const periodSel=$id('topPeriod'); const dateInp=$id('topDate'); if(!periodSel) return;
     hide('errTop'); hide('topEmpty');
 
-    const p=periodSel.value;
+    let p=periodSel.value;
+    let dateQS='';
+    if(p==='date'){
+      p='today'; // API accepts a date via &on=...; period can be anything, using 'today' is fine.
+      if(!dateInp.value){ alert('Pick a date'); return; }
+      dateQS=`&on=${encodeURIComponent(dateInp.value)}`;     // <-- changed to &on=
+    }
+
     let data=null;
     try{
-      data=await fetchJSON(`/inventory/api/top-models/?period=${encodeURIComponent(p)}${MODEL_QS}`,
-              { legacy:[`/inventory/api_top_models/?period=${encodeURIComponent(p)}${MODEL_QS}`] });
+      data=await fetchJSON(`/inventory/api/top-models/?period=${encodeURIComponent(p)}${dateQS}${MODEL_QS}`,
+              { legacy:[`/inventory/api_top_models/?period=${encodeURIComponent(p)}${dateQS}${MODEL_QS}`] });
     }catch(e){ show('errTop'); $id('errTop').textContent=`Top models error: ${e.message}`; return; }
 
     const labels=data?.labels||[], values=(data?.values||[]).map(v=>Number(v)||0);
@@ -361,16 +509,16 @@
   }
   function mapVtToSalesPeriod(vt){ return (vt==='7d'||vt==='today') ? '7d' : 'month'; }
 
-  async function tryValueTrend(metric, period){
+  async function tryValueTrend(metric, period, dateQS){
     try{
-      return await fetchJSON(`/inventory/api/value-trend/?metric=${encodeURIComponent(metric)}&period=${encodeURIComponent(period)}${MODEL_QS}`,
-        { legacy:[`/inventory/api/value_trend/?metric=${encodeURIComponent(metric)}&period=${encodeURIComponent(period)}${MODEL_QS}`] });
+      return await fetchJSON(`/inventory/api/value-trend/?metric=${encodeURIComponent(metric)}&period=${encodeURIComponent(period)}${dateQS}${MODEL_QS}`,
+        { legacy:[`/inventory/api/value_trend/?metric=${encodeURIComponent(metric)}&period=${encodeURIComponent(period)}${dateQS}${MODEL_QS}`] });
     }catch(_){}
 
     if(metric==='profit'){
       try{
-        const d = await fetchJSON(`/inventory/api/profit-bar/?period=${encodeURIComponent(period)}${MODEL_QS}`,
-                                   { legacy:[`/inventory/api_profit_bar/?period=${encodeURIComponent(period)}${MODEL_QS}`] });
+        const d = await fetchJSON(`/inventory/api/profit-bar/?period=${encodeURIComponent(period)}${dateQS}${MODEL_QS}`,
+                                   { legacy:[`/inventory/api_profit_bar/?period=${encodeURIComponent(period)}${dateQS}${MODEL_QS}`] });
         if(d?.labels?.length) return { labels:d.labels, values:(d.values||[]), currency:{sign:d?.currency?.sign||'MK'} };
       }catch(_){}
     }
@@ -379,15 +527,15 @@
       let rev=null;
       try{
         const p = mapVtToSalesPeriod(period);
-        rev = await fetchJSON(`/inventory/api/sales-trend/?period=${encodeURIComponent(p)}&metric=amount${MODEL_QS}`,
-                              { legacy:[`/inventory/api_sales_trend/?period=${encodeURIComponent(p)}&metric=amount${MODEL_QS}`] });
+        rev = await fetchJSON(`/inventory/api/sales-trend/?period=${encodeURIComponent(p)}&metric=amount${dateQS}${MODEL_QS}`,
+                              { legacy:[`/inventory/api_sales_trend/?period=${encodeURIComponent(p)}&metric=amount${dateQS}${MODEL_QS}`] });
       }catch(_){}
 
       if(metric==='revenue' && rev?.labels?.length) return { labels:rev.labels, values:(rev.values||[]), currency:{sign:rev?.currency?.sign||'MK'} };
 
       try{
-        const pr = await fetchJSON(`/inventory/api/profit-bar/?period=${encodeURIComponent(period)}${MODEL_QS}`,
-                                    { legacy:[`/inventory/api_profit_bar/?period=${encodeURIComponent(period)}${MODEL_QS}`] });
+        const pr = await fetchJSON(`/inventory/api/profit-bar/?period=${encodeURIComponent(period)}${dateQS}${MODEL_QS}`,
+                                    { legacy:[`/inventory/api_profit_bar/?period=${encodeURIComponent(period)}${dateQS}${MODEL_QS}`] });
         if(rev?.labels?.length && pr?.labels?.length){
           const merged=mergeByLabel(rev.labels, rev.values, pr.labels, pr.values);
           const cost=merged.labels.map((_,i)=> (merged.A[i]||0) - (merged.B[i]||0));
@@ -399,12 +547,18 @@
   }
 
   async function loadValueTrend(){
-    const mSel=$id('vtMetric'); const pSel=$id('vtPeriod'); if(!mSel||!pSel) return;
+    const mSel=$id('vtMetric'); const pSel=$id('vtPeriod'); const dInp=$id('vtDate'); if(!mSel||!pSel) return;
     hide('errValue'); hide('valueEmpty');
 
-    const metric=mSel.value; const period=pSel.value;
+    let period=pSel.value;
+    let dateQS='';
+    if(period==='date'){
+      if(!dInp.value){ alert('Pick a date'); return; }
+      dateQS=`&on=${encodeURIComponent(dInp.value)}`;       // <-- changed to &on=
+    }
+
     let data=null;
-    try{ data = await tryValueTrend(metric, period); }catch{}
+    try{ data = await tryValueTrend(mSel.value, period, dateQS); }catch{}
 
     const el=$id('valueTrend'); vtChart?.destroy();
     const labels=data?.labels||[]; const values=(data?.values||[]).map(v=>Number(v)||0);
@@ -418,7 +572,7 @@
 
     vtChart = new Chart(ctx,{
       type:'line',
-      data:{ labels, datasets:[{ label:(metric.charAt(0).toUpperCase()+metric.slice(1))+` (${sign})`, data:values, borderColor:blue, backgroundColor:blue+'20', fill:true, pointRadius:2, tension:.35 }]},
+      data:{ labels, datasets:[{ label:(mSel.value.charAt(0).toUpperCase()+mSel.value.slice(1))+` (${sign})`, data:values, borderColor:blue, backgroundColor:blue+'20', fill:true, pointRadius:2, tension:.35 }]},
       options:{ responsive:true, maintainAspectRatio:false,
         plugins:{ legend:{ display:true }, tooltip:{ callbacks:{ label:(c)=> `${sign} ${nf.format(c.parsed.y||0)}` } } },
         animation:{ duration:500, easing:'easeOutCubic' },
@@ -434,6 +588,9 @@
   $id('ai-recs-refresh')?.addEventListener('click', loadAI);
   $id('vtMetric')?.addEventListener('change', loadValueTrend);
   $id('vtPeriod')?.addEventListener('change', loadValueTrend);
+  $id('trendDate')?.addEventListener('change', loadTrend);
+  $id('vtDate')?.addEventListener('change', loadValueTrend);
+  $id('topDate')?.addEventListener('change', loadTop);
 
   (async function init(){
     await Promise.allSettled([loadTrend(), loadTop(), loadAlerts(), loadAI(), loadValueTrend()]);

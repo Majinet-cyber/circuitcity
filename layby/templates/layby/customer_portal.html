@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+{% load humanize %}
+
+{% block title %}My Laybys{% endblock %}
+{% block header_title %}My Laybys{% endblock %}
+
+{% block extra_css %}
+<style>
+  .cc-card{ background: var(--card); border:1px solid var(--line); border-radius:14px; padding:16px; margin-bottom:1rem }
+  .cc-card h3{ margin:0 0 .5rem; font-weight:700 }
+  .progress{ background:#e9ecef; border-radius:999px; height:10px; overflow:hidden; margin:.5rem 0 }
+  .progress-bar{ background:#16c784; height:100% }
+  .pill{ display:inline-block; padding:.2rem .6rem; border-radius:999px; background:var(--panel); font-size:.85rem; margin-left:.4rem }
+</style>
+{% endblock %}
+
+{% block content %}
+  {% if orders %}
+    {% for o in orders %}
+      <div class="cc-card">
+        <h3>{{ o.product }} <span class="pill">Ref: {{ o.ref }}</span></h3>
+        <div class="meta mb-2">Status: <strong>{{ o.status }}</strong></div>
+        <div>Total: {{ o.total|floatformat:2|intcomma }}</div>
+        <div>Paid: {{ o.amount_paid|floatformat:2|intcomma }}</div>
+        <div>Balance: <strong>{{ o.balance|floatformat:2|intcomma }}</strong></div>
+
+        <div class="progress">
+          <div class="progress-bar" style="width: {% widthratio o.amount_paid o.total 100 %}%"></div>
+        </div>
+
+        <div style="margin-top:.8rem; display:flex; gap:.6rem; flex-wrap:wrap">
+          <a href="{% url 'layby:pay_now' o.id %}" class="btn btn-sm btn-success">Pay now</a>
+          <a href="{% url 'layby:qr_png' o.id %}" class="btn btn-sm btn-outline-secondary">QR Code</a>
+        </div>
+      </div>
+    {% endfor %}
+  {% else %}
+    <p>You have no active laybys.</p>
+  {% endif %}
+{% endblock %}

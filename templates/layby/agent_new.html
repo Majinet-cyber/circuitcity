@@ -1,0 +1,126 @@
+{% extends "base.html" %}
+{% load static %}
+{% block title %}New Layby · Circuit City{% endblock %}
+{% block header_title %}Layby · New{% endblock %}
+
+{% block extra_css %}
+<style>
+  :root{ --card-pad:14px; --gap:12px; --radius:16px; }
+  .section{ max-width: 980px; margin: 0 auto; padding: 10px; }
+  .glass{ position:relative; border:1px solid var(--cc-border); border-radius:var(--radius);
+          background: linear-gradient(180deg, rgba(255,255,255,.18), rgba(255,255,255,.06));
+          box-shadow: var(--cc-shadow); -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px); }
+  .card{ padding: var(--card-pad); }
+  .grid{ display:grid; gap: var(--gap); grid-template-columns: 1fr; }
+  @media (min-width: 720px){ .grid{ grid-template-columns: 1fr 1fr; } }
+  label{ font-weight: 800; font-size: .9rem; color: var(--cc-muted); }
+  input[type="text"], input[type="number"], input[type="file"], textarea, select{
+    width:100%; border:1px solid var(--cc-border); border-radius:12px; padding:.7rem .8rem;
+    background: var(--cc-input); color: var(--cc-ink);
+  }
+  .hint{ font-size:.8rem; color: var(--cc-muted); }
+  .row{ display:grid; gap: var(--gap); grid-template-columns: 1fr; }
+  @media (min-width: 520px){ .row{ grid-template-columns: 1fr 1fr; } }
+  .actions{ display:flex; gap:10px; flex-wrap:wrap; justify-content:flex-end; margin-top:10px; }
+  .btn{ border:1px solid var(--cc-border); border-radius:12px; padding:.75rem 1rem; font-weight:900;
+        text-decoration:none; display:inline-flex; align-items:center; gap:8px; box-shadow: var(--cc-shadow); }
+  .btn-primary{ background: var(--cc-accent); color: var(--cc-on-accent); border-color: transparent; }
+  .btn-ghost{ background: transparent; }
+  .id-preview{ border:1px dashed var(--cc-border); border-radius:12px; padding:8px; min-height:120px;
+               display:flex; align-items:center; justify-content:center; font-size:.85rem; color:var(--cc-muted); }
+  .sticky-footer{ position:sticky; bottom:0; left:0; right:0; padding:8px; backdrop-filter: blur(8px);
+                  background: color-mix(in oklab, var(--cc-panel) 75%, transparent); border-top:1px solid var(--cc-border); }
+</style>
+{% endblock %}
+
+{% block content %}
+<section class="section">
+  <form class="glass card" method="post" enctype="multipart/form-data">
+    {% csrf_token %}
+
+    <h3 style="margin:0 0 10px;font-weight:900">New Layby</h3>
+
+    <div class="grid">
+      <div>
+        <label>Customer name</label>
+        {{ form.customer_name }}
+      </div>
+      <div>
+        <label>Customer phone</label>
+        {{ form.customer_phone }}
+      </div>
+
+      {% if form.id_number %}
+      <div>
+        <label>ID number (8 digits)</label>
+        {{ form.id_number }}
+        <div class="hint">Must be exactly 8 digits.</div>
+      </div>
+      {% endif %}
+
+      {% if form.id_photo %}
+      <div>
+        <label>Photo of ID</label>
+        {{ form.id_photo }}
+        <div id="id-preview" class="id-preview">ID preview will appear here</div>
+      </div>
+      {% endif %}
+    </div>
+
+    {% if form.kin1_name or form.kin1_phone or form.kin2_name or form.kin2_phone %}
+    <h4 style="margin:12px 0 6px;font-weight:900">Next of Kin (2)</h4>
+    <div class="row">
+      {% if form.kin1_name %}<div><label>Kin #1 — Full name</label>{{ form.kin1_name }}</div>{% endif %}
+      {% if form.kin1_phone %}<div><label>Kin #1 — Phone</label>{{ form.kin1_phone }}</div>{% endif %}
+      {% if form.kin2_name %}<div><label>Kin #2 — Full name</label>{{ form.kin2_name }}</div>{% endif %}
+      {% if form.kin2_phone %}<div><label>Kin #2 — Phone</label>{{ form.kin2_phone }}</div>{% endif %}
+    </div>
+    {% endif %}
+
+    <h4 style="margin:12px 0 6px;font-weight:900">Terms & Product</h4>
+    <div class="row">
+      <div>
+        <label>Term (months, max 12)</label>
+        {{ form.term_months }}
+      </div>
+      <div>
+        <label>Product (from stock)</label>
+        {{ form.product }}
+      </div>
+      <div>
+        <label>Deposit amount</label>
+        {{ form.deposit_amount }}
+      </div>
+    </div>
+
+    {{ form.item_name }}  {# hidden #}
+    {{ form.sku }}        {# hidden #}
+    {{ form.total_price }}{# hidden #}
+
+    <div class="sticky-footer actions">
+      <a class="btn btn-ghost" href="{% url 'layby:agent_dashboard' %}">Cancel</a>
+      <button class="btn btn-primary" type="submit">Save layby</button>
+    </div>
+  </form>
+</section>
+
+<script>
+  // Live preview for ID photo (if present)
+  const fileInput = document.querySelector('input[type="file"][name$="id_photo"]');
+  const previewEl = document.getElementById('id-preview');
+  if (fileInput && previewEl) {
+    fileInput.addEventListener('change', function(){
+      const f = this.files && this.files[0];
+      if (!f) { previewEl.textContent = 'ID preview will appear here'; previewEl.style.backgroundImage = ''; return; }
+      const reader = new FileReader();
+      reader.onload = e => {
+        previewEl.style.backgroundImage = `url(${e.target.result})`;
+        previewEl.style.backgroundSize = 'cover';
+        previewEl.style.backgroundPosition = 'center';
+        previewEl.textContent = '';
+      };
+      reader.readAsDataURL(f);
+    });
+  }
+</script>
+{% endblock %}

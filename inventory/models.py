@@ -11,11 +11,28 @@ import secrets
 import string
 import json
 
+# --- Tenancy imports (explicit) ---
+from tenants.models import Business, TenantManager, UnscopedManager  # NEW
+
 User = get_user_model()
 
 
+# =========================
+# Core reference models
+# =========================
 class Location(models.Model):
-    name = models.CharField(max_length=80, unique=True)
+    """
+    Store / warehouse, scoped to a tenant.
+    """
+    business = models.ForeignKey(
+        Business,
+        on_delete=models.CASCADE,
+        related_name="locations",
+        db_index=True,
+        null=True,   # keep nullable for smooth migration; backfill then set False if desired
+        blank=True,
+    )
+    name = models.CharField(max_length=80)
     city = models.CharField(max_length=80, blank=True)
 
     # Optional GPS + geofence radius (meters)
@@ -27,12 +44,17 @@ class Location(models.Model):
     )
 
     class Meta:
+        unique_together = (("business", "name"),)
         indexes = [
+            models.Index(fields=["business", "name"], name="loc_biz_name_idx"),
             models.Index(fields=["city"], name="loc_city_idx"),
         ]
 
     def __str__(self):
-        return self.name
+        label = self.name
+        if self.business_id:
+            label = f"{label} · {getattr(self.business, 'name', self.business_id)}"
+        return label
 
 
 class AgentProfile(models.Model):
@@ -107,7 +129,7 @@ class Product(models.Model):
         return OrderPrice.get_active_price(self.id)
 
 
-# --- NEW: Default Order Price catalog (with history) ---
+# --- Default Order Price catalog (with history) ---
 class OrderPrice(models.Model):
     """
     Stores the active default *order* price for each product, with history.
@@ -145,7 +167,9 @@ class OrderPrice(models.Model):
         )
 
 
-# -------- Optimized QuerySet for InventoryItem --------
+# =========================
+# Inventory
+# =========================
 class InventoryItemQuerySet(models.QuerySet):
     def with_related(self):
         """Pull common FKs to prevent N+1s in views/admin/templates."""
@@ -158,17 +182,13 @@ class InventoryItemQuerySet(models.QuerySet):
         return self.filter(status="SOLD")
 
 
-# -------- Soft-delete managers powered by the QuerySet above --------
-BaseItemManager = models.Manager.from_queryset(InventoryItemQuerySet)
+# -------- Tenant-aware managers (scoped/global) --------
+TenantInventoryItemManager = TenantManager.from_queryset(InventoryItemQuerySet)      # scoped
+UnscopedInventoryItemManager = UnscopedManager.from_queryset(InventoryItemQuerySet)  # global
 
 
-class InventoryItemManager(BaseItemManager):
-    pass
-
-
-class ActiveItemManager(BaseItemManager):
+class TenantActiveItemManager(TenantInventoryItemManager):
     def get_queryset(self):
-        # Only items not archived
         return super().get_queryset().filter(is_active=True)
 
 
@@ -179,13 +199,22 @@ class InventoryItem(models.Model):
     """
     STATUS = [("IN_STOCK", "In stock"), ("SOLD", "Sold")]
 
+    # --- TENANCY ---
+    business = models.ForeignKey(
+        Business,
+        on_delete=models.CASCADE,
+        related_name="inventory_items",
+        db_index=True,
+        null=True,   # keep nullable for migration/backfill; set not null once data is clean
+        blank=True,
+    )
+
     imei = models.CharField(
         max_length=30,
-        unique=True,           # unique already creates an index in Postgres/SQLite
         null=True,
         blank=True,
         validators=[RegexValidator(r"^\d{15}$", "IMEI must be exactly 15 digits.")],
-        help_text="15-digit IMEI. Leave blank only when the device truly has no IMEI.",
+        help_text="15-digit IMEI. Unique per business when provided.",
     )
     product = models.ForeignKey("Product", on_delete=models.PROTECT)
     received_at = models.DateField()  # stock-in date
@@ -224,26 +253,33 @@ class InventoryItem(models.Model):
     sold_at = models.DateTimeField(null=True, blank=True, db_index=True)  # fast recent-sold lookups
     # ----------------------------------------------------------------
 
-    objects = InventoryItemManager()   # full manager (with QuerySet helpers)
-    active = ActiveItemManager()       # only non-archived rows (also has helpers)
+    # Tenant-aware managers
+    objects = TenantInventoryItemManager()    # scoped to active tenant (has QuerySet helpers)
+    active = TenantActiveItemManager()        # scoped + non-archived
+    all_objects = UnscopedInventoryItemManager()  # global/admin (use sparingly)
 
     class Meta:
         indexes = [
-            # Composite for your most common filters (INVENTORY LISTS)
+            models.Index(fields=["business", "imei"], name="inv_biz_imei_idx"),
+            # Composite for inventory lists — name <= 30 chars
             models.Index(
-                fields=["product", "current_location", "status"],
-                name="invitem_prod_loc_status_idx",
+                fields=["business", "product", "current_location", "status"],
+                name="inv_bpls_idx",
                 condition=Q(is_active=True),
             ),
-            # Keep a compact status filter index for quick counts/toggles
-            models.Index(fields=["is_active", "status"], name="invitem_active_status_idx"),
-            # Warranty lookups  (SHORTENED)
+            models.Index(fields=["business", "is_active", "status"], name="inv_bis_idx"),
+            # Warranty lookups
             models.Index(fields=["warranty_status", "warranty_expires_at"], name="inv_wty_stat_exp_idx"),
-            # Helpful for admin date_hierarchy & stock aging reports
-            models.Index(fields=["received_at"], name="invitem_received_at_idx"),
-            # NOTE: no extra IMEI index—`unique=True` already creates one.
+            # Stock aging
+            models.Index(fields=["received_at"], name="inv_received_idx"),
         ]
         constraints = [
+            # Per-tenant IMEI uniqueness (only when IMEI present)
+            models.UniqueConstraint(
+                fields=["business", "imei"],
+                condition=Q(imei__isnull=False),
+                name="uniq_imei_per_business",
+            ),
             models.CheckConstraint(check=Q(order_price__gte=0), name="inv_order_price_nonneg"),
             models.CheckConstraint(
                 check=Q(selling_price__gte=0) | Q(selling_price__isnull=True),
@@ -257,7 +293,6 @@ class InventoryItem(models.Model):
         ]
 
     def __str__(self):
-        # Keep this lightweight to avoid accidental queries when product isn't joined
         return self.imei or f"{self.pk} (no IMEI)"
 
     @property
@@ -269,33 +304,19 @@ class InventoryItem(models.Model):
         return self.status == "SOLD"
 
     def clean(self):
-        """
-        Extra business rules that don’t require a DB migration.
-
-        - If an item is marked SOLD, `sold_at` must be set (kept from before).
-        - If an item is assigned to a user, that user MUST be an agent
-          (has AgentProfile) and must NOT be staff/superuser.
-          This ensures **admins cannot hold stock**; they can only assign/transfer.
-        """
         errors = {}
 
-        # Existing SOLD rule
         if self.status == "SOLD" and not self.sold_at:
             errors["sold_at"] = "sold_at is required when status is SOLD."
 
-        # IMEI format rule (kept)
         if self.imei:
             s = str(self.imei).strip()
             if not s.isdigit() or len(s) != 15:
                 errors["imei"] = "IMEI must be exactly 15 numeric digits."
 
-        # Only true agents may be assigned stock
         if self.assigned_agent_id:
-            # Disallow staff/superusers from being holders of stock
             if getattr(self.assigned_agent, "is_staff", False) or getattr(self.assigned_agent, "is_superuser", False):
                 errors["assigned_agent"] = "Stock cannot be assigned to admin/staff accounts. Assign to an agent."
-
-            # Require an AgentProfile (treats “agent” as a user with a profile)
             if not hasattr(self.assigned_agent, "agent_profile"):
                 errors["assigned_agent"] = "Assigned user must be an agent (has AgentProfile)."
 
@@ -303,10 +324,10 @@ class InventoryItem(models.Model):
             raise ValidationError(errors)
 
 
+# =========================
+# Auditing & logs
+# =========================
 class InventoryAudit(models.Model):
-    """
-    Simple audit trail: logs edits, deletes, and other inventory state changes.
-    """
     ACTION_CHOICES = [
         ("CREATE", "Create"),
         ("UPDATE", "Update"),
@@ -325,14 +346,10 @@ class InventoryAudit(models.Model):
         ("RESTORE", "Restore"),
     ]
 
-    # Nullable so legacy/tests can create generic entries; keep logs if item removed
-    item = models.ForeignKey(
-        "InventoryItem",
-        on_delete=models.SET_NULL,
-        related_name="audits",
-        null=True,
-        blank=True,
+    business = models.ForeignKey( # carry tenant for fast/scoped reads
+        Business, on_delete=models.CASCADE, null=True, blank=True, related_name="inventory_audits", db_index=True
     )
+    item = models.ForeignKey("InventoryItem", on_delete=models.SET_NULL, related_name="audits", null=True, blank=True)
     action = models.CharField(max_length=32, choices=ACTION_CHOICES)
     by_user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True)
     at = models.DateTimeField(auto_now_add=True)
@@ -341,6 +358,7 @@ class InventoryAudit(models.Model):
     class Meta:
         ordering = ["-at"]
         indexes = [
+            models.Index(fields=["business", "action", "at"], name="invaudit_biz_action_at_idx"),
             models.Index(fields=["action", "at"], name="invaudit_action_at_idx"),
         ]
 
@@ -349,13 +367,8 @@ class InventoryAudit(models.Model):
         return f"{self.at:%Y-%m-%d %H:%M} {self.action} by {who} on item {self.item_id}"
 
 
-# ---- Proxy so tests/modules that expect inventory.AuditLog work without schema changes ----
+# ---- Proxy for legacy AuditLog API ----
 class _AuditLogManager(models.Manager):
-    """
-    Shim to accept legacy kwargs used by some tests:
-      AuditLog.objects.create(action="X", model="Y", object_id="1", user=<u>, changes={...})
-    We map them to InventoryAudit fields.
-    """
     def create(self, *args, **kwargs):
         mapped = {}
         if "action" in kwargs:
@@ -366,6 +379,10 @@ class _AuditLogManager(models.Manager):
             mapped["by_user"] = kwargs.pop("user")
         if "item" in kwargs:
             mapped["item"] = kwargs.pop("item")
+
+        # allow business passthrough if provided
+        if "business" in kwargs:
+            mapped["business"] = kwargs.pop("business")
 
         extra_bits = []
         if "model" in kwargs:
@@ -397,9 +414,9 @@ class AuditLog(InventoryAudit):
         verbose_name_plural = "Audit Logs"
 
 
-# -------- Warranty check log (for Carlcare lookups & overrides) --------
 class WarrantyCheckLog(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
+    business = models.ForeignKey(Business, on_delete=models.CASCADE, null=True, blank=True, db_index=True)
     imei = models.CharField(max_length=30)
     result = models.CharField(max_length=32)  # mirrors InventoryItem.WARRANTY_CHOICES keys
     expires_at = models.DateField(null=True, blank=True)
@@ -410,8 +427,9 @@ class WarrantyCheckLog(models.Model):
     class Meta:
         ordering = ["-created_at"]
         indexes = [
+            # SHORTENED to satisfy 30-char limit
+            models.Index(fields=["business", "imei", "created_at"], name="wcl_biz_imei_created"),
             models.Index(fields=["imei", "created_at"], name="warrantylog_imei_created_idx"),
-            # SHORTENED
             models.Index(fields=["result", "created_at"], name="wlog_res_created_idx"),
         ]
 
@@ -419,12 +437,7 @@ class WarrantyCheckLog(models.Model):
         return f"[{self.created_at:%Y-%m-%d %H:%M}] {self.imei} -> {self.result}"
 
 
-# -------- Agent password reset (agents only) --------
 class AgentPasswordReset(models.Model):
-    """
-    Stores 6-digit reset codes for agent (non-admin) password resets.
-    Codes are time-limited and marked used after a successful reset.
-    """
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="agent_resets")
     code = models.CharField(max_length=6)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -433,7 +446,6 @@ class AgentPasswordReset(models.Model):
 
     class Meta:
         indexes = [
-            # SHORTENED
             models.Index(fields=["user", "code", "used", "expires_at"], name="agrs_user_code_used_exp_idx"),
         ]
         ordering = ["-created_at"]
@@ -446,11 +458,9 @@ class AgentPasswordReset(models.Model):
 
     @staticmethod
     def generate_code() -> str:
-        # 6-digit numeric (easy to type)
         return "".join(secrets.choice(string.digits) for _ in range(6))
 
 
-# -------- Agent time logs --------
 class TimeLog(models.Model):
     """Agent arrival/departure logs with optional GPS verification."""
     ARRIVAL = "ARRIVAL"
@@ -482,7 +492,6 @@ class TimeLog(models.Model):
         return f"{self.user} {self.checkin_type} @ {self.logged_at:%Y-%m-%d %H:%M} ({where})"
 
 
-# -------- Agent wallet transactions --------
 class WalletTxn(models.Model):
     """Money going into/out of an agent wallet (bonuses, penalties, manual)."""
     REASON_CHOICES = [
@@ -494,7 +503,6 @@ class WalletTxn(models.Model):
         ("ADVANCE", "Advance payment to agent"),
         ("PAYOUT", "Payout to agent"),
     ]
-    # 🔧 changed related_name to avoid collision with wallet.WalletTransaction.agent
     user = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.CASCADE,
@@ -516,7 +524,6 @@ class WalletTxn(models.Model):
         sign = "+" if self.amount >= 0 else "-"
         return f"{self.user} {sign}MK{abs(self.amount)} ({self.reason})"
 
-    # --- Convenience helpers for balances ---
     @staticmethod
     def balance_for(user) -> float:
         val = WalletTxn.objects.filter(user=user).aggregate(s=Sum("amount"))["s"] or 0
@@ -524,7 +531,6 @@ class WalletTxn(models.Model):
 
     @staticmethod
     def month_sum_for(user, year: int, month: int) -> float:
-        # month window [start, next-month)
         start = timezone.datetime(year, month, 1, tzinfo=timezone.get_current_timezone())
         end = (start.replace(day=28) + timedelta(days=4)).replace(day=1)
         val = WalletTxn.objects.filter(

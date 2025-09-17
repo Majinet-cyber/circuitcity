@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container py-4">
+<div class="d-flex justify-content-between align-items-center mb-3">
+<h3>Locations</h3>
+<a class="btn btn-primary" href="{% url 'tenants:location_create' %}"><i class="bi bi-plus"></i> New location</a>
+</div>
+<div class="card">
+<table class="table table-hover mb-0">
+<thead><tr><th>Name</th><th>City</th><th width="220">Actions</th></tr></thead>
+<tbody>
+{% for loc in locations %}
+<tr>
+<td>{{ loc.name }} {% if loc.is_default %}<span class="badge text-bg-secondary">Default</span>{% endif %}</td>
+<td>{{ loc.city }}</td>
+<td class="text-end">
+<a class="btn btn-sm btn-outline-secondary" href="{% url 'tenants:location_edit' loc.pk %}">Edit</a>
+<a class="btn btn-sm btn-outline-danger" href="{% url 'tenants:location_delete' loc.pk %}">Delete</a>
+{% if hasattr(loc, 'is_default') %}
+<a class="btn btn-sm btn-outline-primary" href="{% url 'tenants:location_set_default' loc.pk %}">Make default</a>
+{% endif %}
+</td>
+</tr>
+{% empty %}
+<tr><td colspan="3" class="text-muted">No locations yet.</td></tr>
+{% endfor %}
+</tbody>
+</table>
+</div>
+</div>
+{% endblock %}
