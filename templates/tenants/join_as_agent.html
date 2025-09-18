@@ -1,5 +1,7 @@
+{# templates/tenants/join_as_agent.html #}
 {% extends "base.html" %}
 {% load static %}
+{% load form_extras %} {# provides add_class filter #}
 
 {% block title %}Join as Agent{% endblock %}
 {% block header_title %}Join an Existing Business{% endblock %}
@@ -10,25 +12,53 @@
 
 {% block content %}
 <section class="tenants-wrap tenants-narrow">
-  <form method="post" class="gcard" data-anim>
+  <form method="post" class="gcard" data-anim novalidate autocomplete="off">
     {% csrf_token %}
+
     <div class="gtitle">Request access</div>
-    <div class="gsub">Enter the exact business name. A manager will approve.</div>
+    <div class="gsub">
+      Enter the <strong>exact business name</strong>. A manager will review and approve your request.
+    </div>
+
+    {# Non-field errors (e.g., duplicate request, not found, etc.) #}
+    {% if form.non_field_errors %}
+      <div class="badge badge-warn" style="margin-top:10px">
+        {{ form.non_field_errors|join:", " }}
+      </div>
+    {% endif %}
 
     <div class="gfield" style="margin-top:14px" data-anim>
-      <div class="label">Business name</div>
+      <label class="label" for="{{ form.business_name.id_for_label }}">Business name</label>
       {{ form.business_name|add_class:"ginput" }}
-      {% if form.business_name.errors %}<div class="badge badge-warn" style="margin-top:8px">{{ form.business_name.errors.0 }}</div>{% endif %}
+      {% if form.business_name.errors %}
+        <div class="badge badge-warn" style="margin-top:8px">
+          {{ form.business_name.errors.0 }}
+        </div>
+      {% endif %}
     </div>
 
     <div class="gactions">
       <a href="{% url 'tenants:choose_business' %}" class="gbtn">Back</a>
-      <button class="gbtn primary" data-anim="pop">Request to Join</button>
+      <button type="submit" class="gbtn primary" data-anim="pop">Request to Join</button>
     </div>
   </form>
+
+  <div class="ghelp" style="margin-top:16px; color:var(--cc-muted)">
+    <small>
+      Tip: If you can’t find the exact name, ask the business owner to share their
+      <em>Join Code</em> from the dashboard, or request they add you directly.
+    </small>
+  </div>
 </section>
 {% endblock %}
 
 {% block extra_js %}
 <script src="{% static 'tenants/tenants.js' %}"></script>
+<script>
+  // Auto-focus the input if empty
+  (function () {
+    const el = document.querySelector('.ginput');
+    if (el && !el.value) el.focus();
+  })();
+</script>
 {% endblock %}

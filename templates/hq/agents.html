@@ -1,0 +1,33 @@
+{% extends "hq/base.html" %}
+{% block title %}Agents{% endblock %}
+{% block body %}
+<h1 style="margin:0 0 10px">Agents</h1>
+
+<form class="kpis" method="get">
+  <input type="search" name="q" value="{{ q }}" placeholder="Search agent or business">
+  <button class="btn btn-ghost">Go</button>
+</form>
+
+<table>
+  <thead><tr><th>Agent</th><th>Business</th><th>Location</th><th>Joined</th></tr></thead>
+  <tbody>
+  {% for a in page_obj %}
+    <tr>
+      <td>
+        <div style="display:flex;align-items:center;gap:10px">
+          <div style="width:28px;height:28px;border-radius:999px;background:#e9f2ff;display:grid;place-items:center;font-weight:900;color:#2757d8">
+            {{ a.name|first|upper|default:a.user.username|first|upper }}
+          </div>
+          <div style="font-weight:800">{% if a.name %}{{ a.name }}{% elif a.user %}{{ a.user.username }}{% else %}—{% endif %}</div>
+        </div>
+      </td>
+      <td><a href="{% url 'hq:business_detail' a.business_id %}">{{ a.business.name }}</a></td>
+      <td>{{ a.location.name|default:"—" }}</td>
+      <td>{{ a.created_at|date:"Y-m-d" }}</td>
+    </tr>
+  {% empty %}
+    <tr><td colspan="4">No agents yet.</td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% endblock %}

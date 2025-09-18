@@ -1,4 +1,4 @@
-# tenants/views.py
+# circuitcity/tenants/views.py
 from __future__ import annotations
 
 from typing import Optional
@@ -23,7 +23,7 @@ from .utils import (
 # -------------------------------------------------------------------
 
 def _home_redirect(request: HttpRequest) -> HttpResponse:
-    """Redirect to your main dashboard if defined; otherwise to root."""
+    """Redirect to your main *tenant* dashboard if defined; otherwise to root."""
     from django.urls import reverse
     try:
         return redirect("dashboard:home")
@@ -31,10 +31,34 @@ def _home_redirect(request: HttpRequest) -> HttpResponse:
         return redirect("/")
 
 
-def _redirect_next_or_home(request: HttpRequest, fallback="tenants:choose_business") -> HttpResponse:
+def _superuser_landing(request: HttpRequest) -> HttpResponse:
+    """
+    Where superusers should land by default.
+    If HQ dashboard URL isn't wired, fall back to the general home redirect.
+    """
+    from django.urls import reverse
+    try:
+        return redirect("hq:dashboard")
+    except NoReverseMatch:
+        return _home_redirect(request)
+
+
+def _redirect_next_or_home(
+    request: HttpRequest, fallback: str = "tenants:choose_business"
+) -> HttpResponse:
+    """
+    Respect ?next= when present. Otherwise:
+      - superusers → HQ dashboard
+      - everyone else → fallback (usually the chooser)
+    """
     nxt = request.GET.get("next") or request.POST.get("next")
     if nxt:
         return redirect(nxt)
+
+    user = getattr(request, "user", None)
+    if user and user.is_authenticated and user.is_superuser:
+        return _superuser_landing(request)
+
     try:
         from django.urls import reverse
         return redirect(fallback)
@@ -65,9 +89,10 @@ def activate_mine(request: HttpRequest) -> HttpResponse:
 
     Priority:
       1) If already active → go to next/home.
-      2) If exactly ONE ACTIVE membership → activate that business.
-      3) If multiple ACTIVE memberships → show chooser.
-      4) If none:
+      2) If SUPERUSER → HQ dashboard (never show join flow).
+      3) If exactly ONE ACTIVE membership → activate that business.
+      4) If multiple ACTIVE memberships → show chooser.
+      5) If none:
          - If they created a business that's PENDING → inform and send to chooser.
          - Else show Join form.
     """
@@ -75,15 +100,22 @@ def activate_mine(request: HttpRequest) -> HttpResponse:
     if get_active_business(request):
         return _redirect_next_or_home(request, fallback="tenants:choose_business")
 
+    # 2) superusers never go through agent onboarding
+    if request.user.is_superuser:
+        return _superuser_landing(request)
+
     user = request.user
 
-    # 2) look for a single ACTIVE membership (and business ACTIVE)
+    # 3) look for a single ACTIVE membership (and business ACTIVE)
     active_memberships = list(
         Membership.objects.filter(user=user, status="ACTIVE")
         .select_related("business")
         .order_by("-created_at")
     )
-    active_memberships = [m for m in active_memberships if getattr(m.business, "status", "ACTIVE") == "ACTIVE"]
+    active_memberships = [
+        m for m in active_memberships
+        if getattr(m.business, "status", "ACTIVE") == "ACTIVE"
+    ]
 
     if len(active_memberships) == 1:
         b = active_memberships[0].business
@@ -93,13 +125,18 @@ def activate_mine(request: HttpRequest) -> HttpResponse:
         return _redirect_next_or_home(request, fallback="tenants:choose_business")
 
     if len(active_memberships) > 1:
-        # 3) let them choose
+        # let them choose
         return redirect("tenants:choose_business")
 
-    # 4) none active — nudge based on what exists
-    pending_i_created = Business.objects.filter(created_by=user, status="PENDING").order_by("-created_at").first()
+    # none active — nudge based on what exists
+    pending_i_created = Business.objects.filter(
+        created_by=user, status="PENDING"
+    ).order_by("-created_at").first()
     if pending_i_created:
-        messages.info(request, "Your business is pending approval. You can still browse or request to join another.")
+        messages.info(
+            request,
+            "Your business is pending approval. You can still browse or request to join another.",
+        )
         return redirect("tenants:choose_business")
 
     messages.info(request, "Join an existing business to get started.")
@@ -233,8 +270,17 @@ def create_business_as_manager(request: HttpRequest) -> HttpResponse:
 def join_as_agent(request: HttpRequest) -> HttpResponse:
     """
     Agent onboarding: user requests to join an ACTIVE business by name.
-    Managers of that business will approve/reject the request.
+
+    🚫 **Superusers must never see this page** — send them to HQ dashboard.
     """
+    # Keep superusers away from the agent join flow entirely.
+    if request.user.is_superuser:
+        return _superuser_landing(request)
+
+    # If the user already has an active business, don't show the join form.
+    if get_active_business(request):
+        return _home_redirect(request)
+
     if request.method == "POST":
         form = JoinAsAgentForm(request.POST)
         if form.is_valid():

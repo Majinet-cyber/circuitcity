@@ -18,6 +18,20 @@ from inventory.views_import import import_opening_stock
 from inventory import views as inv_views  # legacy fallbacks for some APIs
 from accounts import views as accounts_views
 
+# --- HQ (platform admin) permission check (guarded import)
+try:
+    from hq.permissions import is_hq_admin  # app name 'hq'
+except Exception:
+    def is_hq_admin(_user):  # fallback if HQ app not installed yet
+        return False
+
+# --- Tenants helpers (for active-business detection)
+try:
+    from tenants.utils import get_active_business
+except Exception:
+    def get_active_business(_request):
+        return None
+
 # Optional polish APIs (guarded imports so dev doesn't 500)
 try:
     from core import views_search as core_search  # api_global_search
@@ -39,9 +53,13 @@ def robots_txt(_request):
 
 def root_redirect(request):
     """
-    Try a few likely dashboards; fall back to login.
-    If anonymous, prefer direct login to avoid extra hops.
+    Clean home router:
+    - If not authenticated -> go to login.
+    - If HQ admin -> go to HQ dashboard (if available).
+    - If no active business -> go to tenants chooser/join.
+    - Else try tenant dashboards in order.
     """
+    # Anonymous -> login
     if not getattr(request, "user", None) or not request.user.is_authenticated:
         for name in ("two_factor:login", "accounts:login"):
             try:
@@ -51,6 +69,28 @@ def root_redirect(request):
                 continue
         return redirect("/accounts/login/")
 
+    # HQ admins first
+    if is_hq_admin(request.user):
+        try:
+            return redirect("hq:home")
+        except NoReverseMatch:
+            # HQ app not wired yet; fall through to tenant flows
+            pass
+
+    # If no active business, push them to choose/join/create flow
+    try:
+        active = get_active_business(request)
+    except Exception:
+        active = None
+    if not active:
+        for name in ("tenants:choose_business", "tenants:join"):
+            try:
+                reverse(name)
+                return redirect(name)
+            except NoReverseMatch:
+                continue
+
+    # Active business present -> try likely tenant dashboards
     candidates = (
         "dashboard:home",
         "inventory:inventory_dashboard",
@@ -67,6 +107,7 @@ def root_redirect(request):
             return redirect(name)
         except NoReverseMatch:
             continue
+
     return redirect("/inventory/")  # last resort
 
 
@@ -441,6 +482,12 @@ urlpatterns += [
     path("notifications/",  include(("notifications.urls", "notifications"), namespace="notifications")),
 ]
 
+# ---------------- HQ (platform admin) include — guarded so dev doesn’t 500 if not installed
+try:
+    urlpatterns.append(path("hq/", include(("hq.urls", "hq"), namespace="hq")))
+except Exception:
+    pass
+
 # ---------------- Onboarding include (guarded)
 try:
     import onboarding.urls  # noqa: F401
@@ -603,6 +650,13 @@ urlpatterns += [
         RedirectView.as_view(pattern_name="inventory:stock_list", permanent=False),
         name="stock_list",
     ),
+]
+
+# ---------------- Convenience short paths (nice aliases)
+urlpatterns += [
+    path("sell/",  RedirectView.as_view(pattern_name="inventory:scan_sold", permanent=False), name="sell_short"),
+    path("scan/",  RedirectView.as_view(pattern_name="inventory:scan_sold", permanent=False), name="scan_short"),
+    path("stock/", RedirectView.as_view(pattern_name="inventory:stock_list", permanent=False), name="stock_short"),
 ]
 
 # ---------------- Static / media in DEBUG

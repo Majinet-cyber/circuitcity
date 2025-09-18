@@ -1,4 +1,5 @@
 {% load static %}
+
 {# -------- Resolve URLs SAFELY (no crash if missing) -------- #}
 {# Main dashboard (app) #}
 {% url 'dashboard:home' as url_main_dash %}
@@ -13,6 +14,7 @@
 {% url 'inventory:stock_list'          as url_stock %}
 {% url 'inventory:scan_in'             as url_scan_in %}
 {% url 'wallet:agent_wallet'           as url_wallet %}
+{% url 'wallet:admin_wallet'           as url_wallet_admin %}{# may not exist in some installs #}
 {% url 'reports:home'                  as url_reports %}
 {% url 'simulator:home'                as url_sim_home %}
 {% if not url_sim_home %}{% url 'simulator_placeholder_home' as url_sim_home %}{% endif %}
@@ -22,6 +24,29 @@
 {% url 'tenants:manager_locations'     as url_locations %}
 {% url 'billing:admin_dashboard'       as url_billing_admin %}
 {% url 'admin:index'                   as url_admin %}
+
+{# HQ (platform) links — all optional, safe fallbacks #}
+{% url 'hq:home'          as url_hq_home %}
+{% url 'hq:businesses'    as url_hq_businesses %}
+{% url 'hq:subscriptions' as url_hq_subscriptions %}
+{% url 'hq:invoices'      as url_hq_invoices %}
+{% url 'hq:agents'        as url_hq_agents %}
+{% url 'hq:stock_trends'  as url_hq_stock_trends %}
+
+{# ---- Orders (safe; tries canonical + legacy) ---- #}
+{% url 'inventory:place_order_page' as url_place_order %}
+{% if not url_place_order %}{% url 'inventory:place_order' as url_place_order %}{% endif %}
+{% url 'inventory:orders_list' as url_orders %}
+
+{# ---- Payslips links (safe, try namespaced then global) ---- #}
+{% url 'wallet:payslip_issue' as url_payslip_issue %}
+{% if not url_payslip_issue %}{% url 'payslip_issue' as url_payslip_issue %}{% endif %}
+
+{% url 'wallet:payslip_bulk' as url_payslip_bulk %}
+{% if not url_payslip_bulk %}{% url 'payslip_bulk' as url_payslip_bulk %}{% endif %}
+
+{% url 'wallet:payslip_schedules' as url_payslip_schedules %}
+{% if not url_payslip_schedules %}{% url 'payslip_schedules' as url_payslip_schedules %}{% endif %}
 
 <style>
   .cc-sidebar {
@@ -52,6 +77,33 @@
     <img src="{% static 'img/logo-32.png' %}" width="24" height="24" alt="" />
     <span>{% firstof request.business.name APP_NAME 'Circuit City' %}</span>
   </a>
+
+  {# -------- PLATFORM HQ (superusers) -------- #}
+  {% if request.user.is_superuser %}
+  <div>
+    <div class="cc-section">PLATFORM</div>
+    <ul class="cc-nav">
+      <li class="{% if request.path|slice:'0:4' == '/hq/' and request.path == '/hq/' %}active{% endif %}">
+        <a href="{{ url_hq_home|default:'/hq/' }}"><i class="bi bi-speedometer2"></i><span>HQ Dashboard</span></a>
+      </li>
+      <li class="{% if request.path|slice:'0:14' == '/hq/businesses' %}active{% endif %}">
+        <a href="{{ url_hq_businesses|default:'/hq/businesses/' }}"><i class="bi bi-buildings"></i><span>Businesses</span></a>
+      </li>
+      <li class="{% if request.path|slice:'0:16' == '/hq/subscriptions' %}active{% endif %}">
+        <a href="{{ url_hq_subscriptions|default:'/hq/subscriptions/' }}"><i class="bi bi-credit-card"></i><span>Subscriptions</span></a>
+      </li>
+      <li class="{% if request.path|slice:'0:11' == '/hq/invoices' %}active{% endif %}">
+        <a href="{{ url_hq_invoices|default:'/hq/invoices/' }}"><i class="bi bi-receipt-cutoff"></i><span>Invoices</span></a>
+      </li>
+      <li class="{% if request.path|slice:'0:9' == '/hq/agents' %}active{% endif %}">
+        <a href="{{ url_hq_agents|default:'/hq/agents/' }}"><i class="bi bi-people"></i><span>Agents</span></a>
+      </li>
+      <li class="{% if request.path|slice:'0:15' == '/hq/stock-trends' %}active{% endif %}">
+        <a href="{{ url_hq_stock_trends|default:'/hq/stock-trends/' }}"><i class="bi bi-graph-up-arrow"></i><span>Stock Trends</span></a>
+      </li>
+    </ul>
+  </div>
+  {% endif %}
 
   <div>
     <div class="cc-section">MAIN</div>
@@ -94,8 +146,15 @@
     <div class="cc-section">BUSINESS</div>
     <ul class="cc-nav">
       {% if url_wallet %}
-      <li class="{% if request.path|slice:'0:8' == '/wallet/' %}active{% endif %}">
+      <li class="{% if request.path|slice:'0:8' == '/wallet/' and not request.path|slice:'0:14' == '/wallet/admin/' %}active{% endif %}">
         <a href="{{ url_wallet }}"><i class="bi bi-wallet2"></i><span>Wallet</span></a>
+      </li>
+      {% endif %}
+
+      {# Admin Wallet: managers/staff ONLY (not superusers) #}
+      {% if request.user.is_staff and not request.user.is_superuser or request.user.profile.is_manager %}
+      <li class="{% if request.path|slice:'0:14' == '/wallet/admin/' %}active{% endif %}">
+        <a href="{{ url_wallet_admin|default:'/wallet/admin/' }}"><i class="bi bi-briefcase"></i><span>Admin Wallet</span></a>
       </li>
       {% endif %}
 
@@ -116,6 +175,42 @@
       <li class="{% if '/tenants/manager/locations/' in request.path %}active{% endif %}">
         <a href="{{ url_locations }}"><i class="bi bi-geo"></i><span>Locations</span></a>
       </li>
+      {% endif %}
+
+      {# ---- Orders (Managers) ---- #}
+      {% if url_place_order %}
+      <li class="{% if request.path|slice:'0:20' == '/inventory/place-order' or request.path|slice:'0:18' == '/inventory/orders/' %}active{% endif %}">
+        <a href="{{ url_place_order }}"><i class="bi bi-clipboard-plus"></i><span>Place Order</span></a>
+      </li>
+      {% endif %}
+      {% if url_orders %}
+      <li class="{% if request.path|slice:'0:18' == '/inventory/orders/' %}active{% endif %}">
+        <a href="{{ url_orders }}"><i class="bi bi-clipboard-data"></i><span>Orders</span></a>
+      </li>
+      {% endif %}
+
+      {# ---- Payslips (if routes exist) ---- #}
+      {% if url_payslip_issue or url_payslip_bulk or url_payslip_schedules %}
+      <li class="{% if request.path|slice:'0:9' == '/payslips' %}active{% endif %}">
+        <a href="{{ url_payslip_issue|default:url_payslip_bulk|default:url_payslip_schedules|default:'#' }}">
+          <i class="bi bi-receipt"></i><span>Payslips</span>
+        </a>
+      </li>
+      {% if url_payslip_issue %}
+      <li class="{% if request.path|slice:'0:17' == '/wallet/payslips/' or request.path|slice:'0:16' == '/payslips/issue' %}active{% endif %}">
+        <a href="{{ url_payslip_issue }}"><i class="bi bi-file-earmark-plus"></i><span>Issue (Single)</span></a>
+      </li>
+      {% endif %}
+      {% if url_payslip_bulk %}
+      <li class="{% if request.path|slice:'0:16' == '/payslips/bulk' %}active{% endif %}">
+        <a href="{{ url_payslip_bulk }}"><i class="bi bi-files"></i><span>Issue (Bulk)</span></a>
+      </li>
+      {% endif %}
+      {% if url_payslip_schedules %}
+      <li class="{% if request.path|slice:'0:20' == '/payslips/schedules' %}active{% endif %}">
+        <a href="{{ url_payslip_schedules }}"><i class="bi bi-calendar2-check"></i><span>Auto-Schedules</span></a>
+      </li>
+      {% endif %}
       {% endif %}
     </ul>
   </div>
@@ -155,14 +250,11 @@
   </div>
   {% endif %}
 
-  {# ADMIN: superusers only; Django Admin hidden for others #}
+  {# ADMIN: superusers only (Admin Wallet removed here by request) #}
   {% if request.user.is_superuser %}
   <div>
     <div class="cc-section">ADMIN</div>
     <ul class="cc-nav">
-      <li class="{% if request.path|slice:'0:14' == '/wallet/admin/' %}active{% endif %}">
-        <a href="/wallet/admin/"><i class="bi bi-briefcase"></i><span>Admin Wallet</span></a>
-      </li>
       {% if url_billing_admin %}
       <li class="{% if request.path|slice:'0:9' == '/billing/' %}active{% endif %}">
         <a href="{{ url_billing_admin }}"><i class="bi bi-credit-card"></i><span>Subscriptions</span></a>

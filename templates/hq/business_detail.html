@@ -1,0 +1,58 @@
+{% load static %}
+<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>{{ biz.name }} · Profile</title>
+<style>
+  body{font:500 15px/1.45 system-ui;background:#f7fbff;margin:0;color:#0b1b3a}
+  .shell{max-width:1100px;margin:20px auto;padding:0 14px}
+  h1{margin:0 0 8px}
+  .muted{color:#476aa0}
+  .grid{display:grid;gap:12px;grid-template-columns:1fr}
+  @media(min-width:900px){.grid{grid-template-columns:1fr 1fr}}
+  .card{padding:16px;border:1px solid #d8e4ff;border-radius:16px;background:#fff;box-shadow:0 10px 30px rgba(12,36,97,.06)}
+  .num{font-weight:900}
+  ul{margin:8px 0 0}
+  canvas{width:100%;height:160px}
+  .list{margin-top:10px}
+  .pill{padding:6px 10px;border-radius:999px;border:1px solid #d8e4ff;background:#eef5ff;color:#2757d8;font-weight:800}
+</style>
+</head><body>
+<div class="shell">
+  <h1>{{ biz.name }}</h1>
+  <div class="muted">Public business overview (no private data).</div>
+
+  <div class="grid">
+    <div class="card">
+      <div><span class="num">{{ active_subs }}</span> active subscriptions · MRR <span class="num">{{ mrr }}</span></div>
+      <div><span class="num">{{ total_invoices }}</span> invoices · Paid <span class="num">{{ paid_total }}</span> · Open <span class="num">{{ open_total }}</span></div>
+      <div class="list">
+        <span class="pill">{{ agents_qs|length }} agents</span>
+        <span class="pill">{{ locs_qs|length }} locations</span>
+      </div>
+    </div>
+    <div class="card">
+      <strong>Trajectory (paid invoices)</strong>
+      <canvas id="spark"></canvas>
+    </div>
+  </div>
+</div>
+<script>
+(function(){
+  const data = {{ series_paid|default:"[]"|safe }};
+  const c = document.getElementById('spark'), ctx=c.getContext('2d');
+  function draw(){
+    const w=c.width=c.clientWidth*devicePixelRatio, h=c.height=c.clientHeight*devicePixelRatio;
+    ctx.clearRect(0,0,w,h);
+    if(!data.length) return;
+    const pad=10, xw=w-2*pad, yh=h-2*pad;
+    const ys=data.map(d=>d.amount); const max=Math.max(10, Math.max(...ys));
+    data.forEach((d,i)=>{
+      const x = pad + (i/(data.length-1))*xw;
+      const y = pad + yh - (d.amount/max)*yh;
+      i?ctx.lineTo(x,y):ctx.moveTo(x,y);
+    });
+    ctx.strokeStyle="#2563eb"; ctx.lineWidth=2*devicePixelRatio; ctx.stroke();
+  }
+  draw(); new ResizeObserver(draw).observe(document.getElementById('spark'));
+})();
+</script>
+</body></html>

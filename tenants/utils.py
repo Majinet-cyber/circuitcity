@@ -1,4 +1,4 @@
-# tenants/utils.py
+# circuitcity/tenants/utils.py
 from __future__ import annotations
 
 from functools import wraps
@@ -13,7 +13,7 @@ from django.core.exceptions import PermissionDenied
 try:
     from django.http import HttpRequest, HttpResponse
     from django.shortcuts import redirect
-    from django.urls import reverse, NoReverseMatch
+    from django.urls import reverse
     from django.contrib import messages
 except Exception:  # pragma: no cover
     # Minimal shims if imported very early
@@ -82,6 +82,20 @@ def _safe_reverse(name: str, default: str) -> str:
         return reverse(name)
     except Exception:
         return default
+
+
+def _superuser_home_url() -> str:
+    """
+    Where to send superusers when no active tenant is selected.
+    Prefer the HQ dashboard; fall back to a general dashboard, then /hq/, then root.
+    """
+    url = _safe_reverse("hq:dashboard", "")
+    if url and url != "/":
+        return url
+    url = _safe_reverse("dashboard:home", "")
+    if url and url != "/":
+        return url
+    return "/hq/"
 
 
 def _model_has_field(model, field_name: str) -> bool:
@@ -298,15 +312,24 @@ def _has_active_membership(user, business) -> bool:
 def require_business(view: Callable) -> Callable:
     """
     Ensure a Business is active (via request.business or session key).
-    If not, redirect to a small activator that will pick/create one for the user.
-    Fallback: Accounts settings page if tenants URLs aren’t wired yet.
+
+    If not:
+      - SUPERUSERS are redirected to the HQ dashboard (never to agent join).
+      - Everyone else is redirected to the activation helper (with ?next=…),
+        or to account settings if tenant URLs aren’t wired.
     """
     @wraps(view)
     def _wrapped(request: "HttpRequest", *args, **kwargs):
+        # Already selected
         if get_active_business(request) is not None:
             return view(request, *args, **kwargs)
 
-        # Best target: tenants activation endpoint (adds ?next=…)
+        # Superusers should not see onboarding/join
+        user = getattr(request, "user", None)
+        if getattr(user, "is_authenticated", False) and getattr(user, "is_superuser", False):
+            return redirect(_superuser_home_url())
+
+        # Normal users → activation flow with next=
         target = _safe_reverse("tenants:activate_mine", "/tenants/activate/")
         next_q = quote_plus(getattr(request, "get_full_path", lambda: "/")())
         url = f"{target}?next={next_q}" if next_q else target
@@ -333,11 +356,6 @@ def require_role(roles: Optional[Iterable[str]] = None) -> Callable:
       - Superusers always pass (platform-admin).
       - Otherwise, user MUST have an ACTIVE membership in the active business.
       - Then user must belong to at least one of the required groups (roles).
-
-    Example:
-        @require_role(["Manager", "Admin"])
-        def my_view(...):
-            ...
     """
     roles = list(roles or [])
     role_set = set(roles)
@@ -355,6 +373,7 @@ def require_role(roles: Optional[Iterable[str]] = None) -> Callable:
             if not getattr(user, "is_authenticated", False):
                 login_url = _safe_reverse("accounts:login", "/accounts/login/")
                 next_q = quote_plus(getattr(request, "get_full_path", lambda: "/")())
+                # FIX: remove stray '}' that caused SyntaxError
                 return redirect(f"{login_url}?next={next_q}")
 
             # Superuser bypass (platform-admin)
