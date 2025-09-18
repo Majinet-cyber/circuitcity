@@ -6,59 +6,46 @@
 {% block body %}
 <style>
   /* =========================================================
-     Admin Dashboard (v2)
-     Uses global tokens: --cc-panel, --cc-panel-2, --cc-border, --cc-text,
-     --cc-muted, --cc-accent, --cc-shadow, --radius, etc.
+     Admin Dashboard (v2) – SUPERUSER view
      ========================================================= */
-
   :root{
     --admin-sidebar-w: 240px;
     --admin-sidebar-w-collapsed: 76px;
     --admin-br: var(--radius, 12px);
   }
-
   html, body { background: var(--cc-bg); color: var(--cc-text); }
 
   /* ---- Layout ---- */
-  .layout{
-    display: grid;
-    grid-template-columns: var(--admin-sidebar-w) 1fr;
-    min-height: 100dvh;
-  }
+  .layout{ display:grid; grid-template-columns: var(--admin-sidebar-w) 1fr; min-height:100dvh; }
   .layout.collapsed{ grid-template-columns: var(--admin-sidebar-w-collapsed) 1fr; }
 
   /* ---- Sidebar ---- */
   .sidebar{
-    position: sticky; top: 0; height: 100dvh; overflow:auto;
-    display: flex; flex-direction: column;
-    background: var(--cc-panel);
-    border-right: 1px solid var(--cc-border);
-    box-shadow: var(--cc-shadow);
+    position:sticky; top:0; height:100dvh; overflow:auto;
+    display:flex; flex-direction:column;
+    background:var(--cc-panel); border-right:1px solid var(--cc-border); box-shadow:var(--cc-shadow);
   }
   .brandbar{
     display:flex; align-items:center; gap:.6rem; padding:.9rem;
     border-bottom:1px solid var(--cc-border);
-    background: color-mix(in oklab, var(--cc-panel-2) 60%, transparent);
-    position: sticky; top:0; z-index: 1;
+    background:color-mix(in oklab, var(--cc-panel-2) 60%, transparent);
+    position:sticky; top:0; z-index:1;
   }
   .brandlogo{
     width:32px; height:32px; border-radius:8px;
-    background: linear-gradient(135deg, var(--cc-accent), var(--cc-accent-2));
-    box-shadow: 0 6px 18px color-mix(in oklab, var(--cc-accent) 28%, transparent);
+    background:linear-gradient(135deg, var(--cc-accent), var(--cc-accent-2));
+    box-shadow:0 6px 18px color-mix(in oklab, var(--cc-accent) 28%, transparent);
   }
   .brandname{ font-weight:800; letter-spacing:.3px; white-space:nowrap; }
   .collapse-btn{
     margin-left:auto; width:38px; height:32px; border-radius:10px;
-    background: var(--cc-panel-2); border:1px solid var(--cc-border);
+    background:var(--cc-panel-2); border:1px solid var(--cc-border);
     display:grid; place-items:center; cursor:pointer;
   }
-  .collapse-btn:hover{ box-shadow: 0 0 0 6px color-mix(in oklab, var(--cc-accent) 28%, transparent); }
+  .collapse-btn:hover{ box-shadow:0 0 0 6px color-mix(in oklab, var(--cc-accent) 28%, transparent); }
 
   .menu{ padding:.5rem; }
-  .menu .section{
-    margin:.75rem .5rem .35rem; color:var(--cc-muted);
-    font-size:.8rem; text-transform:uppercase; letter-spacing:.12rem;
-  }
+  .menu .section{ margin:.75rem .5rem .35rem; color:var(--cc-muted); font-size:.8rem; text-transform:uppercase; letter-spacing:.12rem; }
   .menu a{
     display:flex; align-items:center; gap:.8rem;
     padding:.6rem .7rem; margin:.2rem 0; border-radius:10px;
@@ -66,143 +53,120 @@
   }
   .menu a .mi{
     width:22px; height:22px; display:grid; place-items:center; border-radius:8px;
-    background: var(--cc-panel-2); border:1px solid var(--cc-border);
-    font-size:.9rem;
+    background:var(--cc-panel-2); border:1px solid var(--cc-border); font-size:.9rem;
   }
-  .menu a:hover{ background: color-mix(in oklab, var(--cc-accent) 8%, transparent); }
+  .menu a:hover{ background:color-mix(in oklab, var(--cc-accent) 8%, transparent); }
   .menu a.active{
-    background: linear-gradient(180deg, var(--cc-panel-2), var(--cc-panel));
-    border:1px solid var(--cc-border);
-    box-shadow: inset 0 1px 0 rgba(255,255,255,.06);
+    background:linear-gradient(180deg, var(--cc-panel-2), var(--cc-panel));
+    border:1px solid var(--cc-border); box-shadow:inset 0 1px 0 rgba(255,255,255,.06);
   }
   .layout.collapsed .label, .layout.collapsed .section{ display:none; }
 
   /* ---- Main ---- */
-  .content{ padding: 1.25rem; }
+  .content{ padding:1.25rem; }
   .container{
-    max-width: 1200px; margin: auto;
-    background: var(--cc-panel);
-    border:1px solid var(--cc-border);
-    border-radius: var(--admin-br);
-    box-shadow: var(--cc-shadow);
+    max-width:1200px; margin:auto;
+    background:var(--cc-panel); border:1px solid var(--cc-border);
+    border-radius:var(--admin-br); box-shadow:var(--cc-shadow);
   }
 
   .row{ display:flex; gap:.75rem; align-items:center; flex-wrap:wrap; }
-  .muted{ color: var(--cc-muted); }
+  .muted{ color:var(--cc-muted); }
   .brand{ font-weight:800; letter-spacing:.2px; }
 
   /* Toolbar / filters */
   .toolbar{
     display:flex; gap:.5rem; align-items:center;
-    padding:.6rem .75rem; background: var(--cc-panel-2);
-    border-radius:12px; border: 1px solid var(--cc-border);
+    padding:.6rem .75rem; background:var(--cc-panel-2);
+    border-radius:12px; border:1px solid var(--cc-border);
   }
   .input, select{
-    background: var(--cc-panel-2); color: var(--cc-text);
+    background:var(--cc-panel-2); color:var(--cc-text);
     border:1px solid var(--cc-border);
     padding:.55rem .7rem; border-radius:10px; outline:0;
   }
   .input:focus, select:focus{
-    box-shadow: 0 0 0 6px color-mix(in oklab, var(--cc-accent) 28%, transparent);
-    border-color: color-mix(in oklab, var(--cc-accent) 38%, var(--cc-border));
+    box-shadow:0 0 0 6px color-mix(in oklab, var(--cc-accent) 28%, transparent);
+    border-color:color-mix(in oklab, var(--cc-accent) 38%, var(--cc-border));
   }
 
   /* Buttons */
   .btn{
     --b: var(--cc-accent);
     display:inline-flex; align-items:center; gap:.5rem;
-    background: var(--b); color:#fff; font-weight:700; border:0;
+    background:var(--b); color:#fff; font-weight:700; border:0;
     padding:.55rem .9rem; border-radius:10px;
-    box-shadow: 0 4px 12px color-mix(in oklab, var(--cc-accent) 30%, transparent);
+    box-shadow:0 4px 12px color-mix(in oklab, var(--cc-accent) 30%, transparent);
     text-decoration:none; line-height:1; cursor:pointer;
   }
-  .btn:hover{ filter: brightness(1.06); }
-  .btn.ok{ --b: #16a34a; }
-  .btn.ghost{
-    background: transparent; color: var(--cc-text);
-    border:1px solid var(--cc-border);
-    box-shadow: none;
-  }
+  .btn:hover{ filter:brightness(1.06); }
+  .btn.ok{ --b:#16a34a; }
+  .btn.ghost{ background:transparent; color:var(--cc-text); border:1px solid var(--cc-border); box-shadow:none; }
   .btn.icon svg{ width:18px; height:18px; }
   .btn-group{ display:flex; gap:.5rem; flex-wrap:wrap; }
 
   /* Chips / toggles */
   .chip{
-    background: color-mix(in oklab, var(--cc-accent) 6%, var(--cc-panel));
-    border:1px solid var(--cc-border); color: var(--cc-text);
+    background:color-mix(in oklab, var(--cc-accent) 6%, var(--cc-panel));
+    border:1px solid var(--cc-border); color:var(--cc-text);
     padding:.35rem .7rem; border-radius:999px; font-weight:600; cursor:pointer;
   }
-  .toggle{
-    width:42px; height:26px; background: var(--cc-panel-2);
-    border-radius:999px; border:1px solid var(--cc-border);
-    position:relative; cursor:pointer;
-  }
-  .toggle i{
-    position:absolute; top:2px; left:2px; width:22px; height:22px;
-    border-radius:999px; background: var(--cc-accent);
-    transition: transform .25s ease;
-  }
-  .toggle.on i{ transform: translateX(16px); }
+  .toggle{ width:42px; height:26px; background:var(--cc-panel-2); border-radius:999px; border:1px solid var(--cc-border); position:relative; cursor:pointer; }
+  .toggle i{ position:absolute; top:2px; left:2px; width:22px; height:22px; border-radius:999px; background:var(--cc-accent); transition:transform .25s ease; }
+  .toggle.on i{ transform:translateX(16px); }
 
   /* Stats */
   .grid{ display:grid; gap:.75rem; }
-  .grid-auto{ grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); }
+  .grid-auto{ grid-template-columns:repeat(auto-fit, minmax(220px, 1fr)); }
   .stat{
-    padding:1rem;
-    background: linear-gradient(180deg, var(--cc-panel), var(--cc-panel-2));
-    border:1px solid var(--cc-border);
-    border-radius: var(--admin-br);
+    padding:1rem; background:linear-gradient(180deg, var(--cc-panel), var(--cc-panel-2));
+    border:1px solid var(--cc-border); border-radius:var(--admin-br);
   }
   .stat h4{ margin:0 0 .25rem; font-size:.9rem; color:var(--cc-muted); font-weight:700; }
   .stat .big{ font-size:1.8rem; font-weight:800; letter-spacing:.3px; }
 
   /* Table */
-  .table-wrap{
-    overflow:auto; border:1px solid var(--cc-border);
-    border-radius:14px; background: var(--cc-panel-2);
-  }
-  table.data{
-    width:100%; border-collapse:separate; border-spacing:0; min-width:720px;
-    background: linear-gradient(180deg, var(--cc-panel), var(--cc-panel-2));
-  }
-  .data th, .data td{
-    padding:.75rem .85rem; border-bottom:1px solid var(--cc-border); text-align:left; white-space:nowrap;
-  }
+  .table-wrap{ overflow:auto; border:1px solid var(--cc-border); border-radius:14px; background:var(--cc-panel-2); }
+  table.data{ width:100%; border-collapse:separate; border-spacing:0; min-width:720px; background:linear-gradient(180deg, var(--cc-panel), var(--cc-panel-2)); }
+  .data th, .data td{ padding:.75rem .85rem; border-bottom:1px solid var(--cc-border); text-align:left; white-space:nowrap; }
   .data thead th{
     font-size:.8rem; text-transform:uppercase; letter-spacing:.12rem; color:var(--cc-muted); cursor:pointer;
-    background: color-mix(in oklab, var(--cc-panel-2) 70%, transparent);
+    background:color-mix(in oklab, var(--cc-panel-2) 70%, transparent);
   }
-  .data tbody tr:hover{ background: color-mix(in oklab, var(--cc-accent) 8%, transparent); }
+  .data tbody tr:hover{ background:color-mix(in oklab, var(--cc-accent) 8%, transparent); }
 
-  .pill{
-    border-radius:999px; padding:.12rem .55rem; font-size:.85rem; font-weight:700; border:1px solid;
-  }
+  .pill{ border-radius:999px; padding:.12rem .55rem; font-size:.85rem; font-weight:700; border:1px solid; }
   .pill.good{ color:#0f5132; background:rgba(34,197,94,.18); border-color:rgba(34,197,94,.35); }
   .pill.mid{  color:#7c3a02; background:rgba(245,158,11,.18); border-color:rgba(245,158,11,.35); }
   .pill.low{  color:#7f1d1d; background:rgba(239,68,68,.18); border-color:rgba(239,68,68,.35); }
 
   /* Avatars & inline uploader */
   .avatar{ width:36px; height:36px; border-radius:50%; display:inline-grid; place-items:center; font-weight:800; color:#fff; overflow:hidden;
-           background: linear-gradient(135deg, var(--cc-accent), var(--cc-accent-2)); }
+           background:linear-gradient(135deg, var(--cc-accent), var(--cc-accent-2)); }
   .avatar img{ width:100%; height:100%; object-fit:cover; display:block; }
   .avatar-lg{ width:48px; height:48px; }
   .avatar-uploader{ position:relative; cursor:pointer; }
   .avatar-uploader input[type=file]{ position:absolute; inset:0; opacity:0; cursor:pointer; }
 
-  .icon-btn{
-    background: transparent; border:1px solid var(--cc-border);
-    color: var(--cc-text); border-radius:8px; padding:.2rem .45rem;
-    font-size:.75rem; line-height:1; display:inline-flex; align-items:center; gap:.35rem;
-  }
-  .icon-btn:hover{ box-shadow: 0 0 0 6px color-mix(in oklab, var(--cc-accent) 28%, transparent); }
+  .icon-btn{ background:transparent; border:1px solid var(--cc-border); color:var(--cc-text); border-radius:8px; padding:.2rem .45rem;
+             font-size:.75rem; line-height:1; display:inline-flex; align-items:center; gap:.35rem; }
+  .icon-btn:hover{ box-shadow:0 0 0 6px color-mix(in oklab, var(--cc-accent) 28%, transparent); }
   .name-cell{ display:flex; align-items:center; gap:.5rem }
   .name-extras{ display:flex; align-items:center; gap:.4rem }
 
-  /* Responsive */
-  @media (max-width: 960px){
-    .layout{ grid-template-columns: var(--admin-sidebar-w-collapsed) 1fr; }
-  }
+  @media (max-width:960px){ .layout{ grid-template-columns: var(--admin-sidebar-w-collapsed) 1fr; } }
 </style>
+
+{# ---------- Soft gate: only superusers get the full admin UI ---------- #}
+{% if not request.user.is_superuser %}
+  <main class="content">
+    <div class="container" style="padding:1.25rem">
+      <h2 style="margin:0 0 .5rem">Restricted area</h2>
+      <p class="muted">This view is for superusers. Your manager/agent dashboards are unaffected.</p>
+      <p><a class="btn ghost" href="{% url 'dashboard:home' %}">Go to my dashboard</a></p>
+    </div>
+  </main>
+{% else %}
 
 <div id="rootLayout" class="layout">
   <!-- Sidebar -->
@@ -217,19 +181,18 @@
       </button>
     </div>
 
-    {% with current=request.resolver_match.url_name %}
     <nav class="menu">
       <div class="section">General</div>
-      <a href="{% url 'inventory:dashboard' %}" class="{% if current == 'dashboard' %}active{% endif %}">
-        <span class="mi">🏠</span><span class="label">Dashboard</span>
+      <a href="{% url 'inventory:inventory_dashboard' %}">
+        <span class="mi">🏠</span><span class="label">Inventory Dashboard</span>
       </a>
-      <a href="{% url 'inventory:stock_list' %}" class="{% if current == 'stock_list' %}active{% endif %}">
+      <a href="{% url 'inventory:stock_list' %}">
         <span class="mi">📋</span><span class="label">Stock List</span>
       </a>
-      <a href="{% url 'inventory:scan_in' %}" class="{% if current == 'scan_in' %}active{% endif %}">
+      <a href="{% url 'inventory:scan_in' %}">
         <span class="mi">➕</span><span class="label">Scan Stock IN</span>
       </a>
-      <a href="{% url 'inventory:scan_sold' %}" class="{% if current == 'scan_sold' %}active{% endif %}">
+      <a href="{% url 'inventory:scan_sold' %}">
         <span class="mi">✅</span><span class="label">Scan SOLD</span>
       </a>
 
@@ -245,11 +208,12 @@
       <a href="{% url 'reports:home' %}">
         <span class="mi">📈</span><span class="label">Reports</span>
       </a>
-      <a href="{% url 'accounts:settings_home' %}">
+      {% url 'accounts:settings_home' as settings_url %}
+      {% if not settings_url %}{% url 'accounts:settings' as settings_url %}{% endif %}
+      <a href="{{ settings_url|default:'/accounts/settings/' }}">
         <span class="mi">🔧</span><span class="label">Settings</span>
       </a>
     </nav>
-    {% endwith %}
   </aside>
 
   <!-- Content -->
@@ -259,7 +223,7 @@
       <div class="row" style="justify-content:space-between; padding:1rem; border-bottom:1px solid var(--cc-border)">
         <h2 class="brand" style="margin:0">Admin Dashboard</h2>
         <div class="row">
-          <!-- Theme rotate: style-1 → style-2 → style-3 -->
+          <!-- Theme rotate -->
           <label class="row" style="gap:.4rem">
             <span class="muted">Theme</span>
             <button id="themeRotate" class="toggle" aria-pressed="false" title="Rotate theme"><i></i></button>
@@ -275,7 +239,7 @@
             <button class="btn" type="submit">Apply</button>
           </form>
 
-          {# Current-user avatar uploader (namespaced → fallback) #}
+          {# Current-user avatar uploader (safe fallback) #}
           {% url 'accounts:upload_my_avatar' as upload_my_avatar_url %}
           {% if not upload_my_avatar_url %}{% url 'upload_my_avatar' as upload_my_avatar_url %}{% endif %}
           {% if upload_my_avatar_url %}
@@ -301,24 +265,46 @@
       </div>
 
       <!-- Quick chips -->
-      <div class="row" style="padding: .75rem 1rem; border-bottom:1px solid var(--cc-border)">
+      <div class="row" style="padding:.75rem 1rem; border-bottom:1px solid var(--cc-border)">
         <button class="chip" data-period="month" type="button">This month</button>
         <button class="chip" data-period="all" type="button">All time</button>
         <span class="muted">Tip: press <span class="kbd">/</span> to focus table search</span>
       </div>
 
-      <!-- ✅ Financial overview (AI-CFO) -->
+      <!-- ✅ Financial overview (AI-CFO) – include with ‘ignore missing’ fallbacks -->
       <div class="row" style="padding:1rem; align-items:stretch; gap:1rem;">
         <div style="flex:3 1 560px; min-width:320px;">
-          {% include "dashboard/partials/cfo_tiles.html" %}
+          {% include "dash/partials/cfo_tiles.html" ignore missing %}
+          {% include "dashboard/partials/cfo_tiles.html" ignore missing %}
         </div>
         <div style="flex:1 1 280px; min-width:280px;">
-          {% include "dashboard/partials/cfo_alerts.html" %}
+          {% include "dash/partials/cfo_alerts.html" ignore missing %}
+          {% include "dashboard/partials/cfo_alerts.html" ignore missing %}
         </div>
       </div>
 
-      <!-- Summary tiles -->
-      <div class="grid grid-auto" style="padding:1rem; gap: .9rem;">
+      <!-- Business overview (superuser scope) -->
+      <div class="grid grid-auto" style="padding:1rem; gap:.9rem;">
+        <div class="stat">
+          <h4>Active Businesses</h4>
+          <div class="big">{{ active_businesses|default:"0" }}</div>
+        </div>
+        <div class="stat">
+          <h4>Signed-up Agents</h4>
+          <div class="big">{{ agents_count|default:"0" }}</div>
+        </div>
+        <div class="stat">
+          <h4>MTD Revenue</h4>
+          <div class="big">MK {{ revenue_mtd|default:0|floatformat:0 }}</div>
+        </div>
+        <div class="stat">
+          <h4>Projected (AI)</h4>
+          <div class="big">MK {{ projected_revenue|default:0|floatformat:0 }}</div>
+        </div>
+      </div>
+
+      <!-- Inventory KPIs (kept from your earlier version) -->
+      <div class="grid grid-auto" style="padding:0 1rem 1rem; gap:.9rem;">
         <div class="stat">
           <h4>In Stock</h4>
           <div class="row" style="gap:.6rem">
@@ -343,7 +329,7 @@
       <!-- Action bar -->
       <div class="row" style="padding:0 1rem 1rem">
         <div class="btn-group">
-          <a class="btn icon" href="{% url 'inventory:dashboard' %}">
+          <a class="btn icon" href="{% url 'inventory:inventory_dashboard' %}">
             <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M3 3h8v8H3zM13 3h8v8h-8zM3 13h8v8H3zM13 13h8v8h-8z" fill="currentColor"/></svg>
             Inventory
           </a>
@@ -391,7 +377,7 @@
         </div>
       </div>
 
-      <div class="table-wrap" style="margin: .75rem 1rem 1.25rem;">
+      <div class="table-wrap" style="margin:.75rem 1rem 1.25rem;">
         <table id="agentTable" class="data" role="table" aria-label="Agent performance">
           <thead>
             <tr>
@@ -414,11 +400,9 @@
                       {% endif %}
                     </span>
                     {% if agent.id %}
-                      <a href="{% url 'admin_agent_detail' agent.id %}" style="text-decoration:none; color:var(--cc-accent)">{{ agent.name }}</a>
+                      <a href="{% url 'dashboard:admin_agent_detail' agent.id %}" style="text-decoration:none; color:var(--cc-accent)">{{ agent.name }}</a>
                     {% else %} {{ agent.name }} {% endif %}
-
                     <span class="name-extras">
-                      {# Per-agent uploader (namespaced → fallback) #}
                       {% url 'accounts:upload_agent_avatar' agent.id as agent_upload_url %}
                       {% if not agent_upload_url %}{% url 'upload_agent_avatar' agent.id as agent_upload_url %}{% endif %}
                       {% if agent_upload_url %}
@@ -456,10 +440,12 @@
           </tbody>
         </table>
       </div>
-      {# Projections chart intentionally omitted for simplicity #}
+
+      {# (Optional) projections/chart area could go here if you want it back later #}
     </div>
   </main>
 </div>
+{% endif %}
 
 <script>
 /* Sidebar collapse (persist) */
@@ -467,6 +453,7 @@
   const key='cc-sidebar';
   const layout=document.getElementById('rootLayout');
   const btn=document.getElementById('collapseBtn');
+  if(!layout || !btn) return;
   function apply(state){
     layout.classList.toggle('collapsed', state==='collapsed');
     btn.setAttribute('aria-pressed', state==='collapsed' ? 'true' : 'false');
@@ -479,24 +466,24 @@
   });
 })();
 
-/* Theme rotate (persist, syncs with base) */
+/* Theme rotate (persist) */
 (function(){
   const KEY="cc-theme";
   const THEMES=["style-1","style-2","style-3"];
   const root=document.documentElement;
   const btn=document.getElementById('themeRotate');
+  if(!btn) return;
   function idx(){ return Math.max(0, THEMES.indexOf(root.getAttribute('data-theme') || THEMES[0])); }
   function apply(theme){
     root.setAttribute('data-theme', theme);
     localStorage.setItem(KEY, theme);
-    // visual toggle state (on when not first theme, just a hint)
     btn.classList.toggle('on', theme !== THEMES[0]);
     btn.setAttribute('aria-pressed', theme !== THEMES[0] ? 'true' : 'false');
     window.dispatchEvent(new CustomEvent('theme:changed',{detail:{theme}}));
   }
   const saved = localStorage.getItem(KEY) || root.getAttribute('data-theme') || THEMES[0];
   apply(saved);
-  btn?.addEventListener('click', ()=>{
+  btn.addEventListener('click', ()=>{
     const next = THEMES[(idx()+1)%THEMES.length];
     apply(next);
   });
@@ -507,6 +494,7 @@ document.querySelectorAll('[data-period]').forEach(chip=>{
   chip.addEventListener('click',()=>{
     const v=chip.getAttribute('data-period');
     const sel=document.getElementById('period');
+    if(!sel) return;
     sel.value=v; document.getElementById('periodForm').submit();
   });
 });
@@ -562,7 +550,7 @@ document.querySelectorAll('[data-period]').forEach(chip=>{
   function esc(s){return String(s).replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));}
 
   // Try namespaced and non-namespaced endpoints gracefully
-  const RECO_ENDPOINTS = ['/api/recommendations/', '/recommendations/', '/ai/recommendations/'];
+  const RECO_ENDPOINTS = ['/api/recommendations/','/recommendations/','/ai/recommendations/'];
 
   async function fetchFirstOk(urls){
     for(const u of urls){

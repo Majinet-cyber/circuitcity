@@ -152,17 +152,33 @@ def _wallet_summary_for(user):
 def _scope_queryset(qs: QuerySet, business):
     """
     Scope a queryset to the active business.
-    - If the manager/queryset provides .for_business(), use it.
-    - Else, if model has a 'business' field, filter(business=...).
-    - Else, return qs as-is (or .none() if you prefer hard isolation).
+    Priority:
+      1) If the queryset provides .for_business(), use it.
+      2) If model has a 'business' field -> filter(business=business).
+      3) If model lacks 'business' but has 'item' FK and that model has 'business',
+         scope via item__business=business (e.g., Sale -> InventoryItem -> business).
+      4) Otherwise return qs unchanged.
     """
     try:
         fn = getattr(qs, "for_business", None)
         if callable(fn):
             return fn(business)
+
         fields = {getattr(f, "name", None) for f in qs.model._meta.get_fields()}
-        if "business" in fields and business is not None:
-            return qs.filter(business=business)
+
+        if business is not None:
+            if "business" in fields:
+                return qs.filter(business=business)
+
+            # smart fallback: item__business (Sale → InventoryItem)
+            if "item" in fields:
+                try:
+                    item_model = qs.model._meta.get_field("item").remote_field.model
+                    item_fields = {getattr(f, "name", None) for f in item_model._meta.get_fields()}
+                    if "business" in item_fields:
+                        return qs.filter(item__business=business)
+                except Exception:
+                    pass
     except Exception:
         pass
     return qs
@@ -188,18 +204,37 @@ def _count_in_stock(qs: QuerySet) -> int:
 
 def _products_count(biz) -> int:
     """
-    Try Product model; fallback to distinct items by product; else 0.
+    Count products for the active business.
+    - If Product has a business field: straight count for that business.
+    - If Product lacks business: count distinct products referenced by this
+      business's InventoryItem, not global Product rows.
+    - If Product model is missing: fallback to distinct InventoryItem.product.
     """
     try:
         Product = getattr(inv_models, "Product", None) if inv_models else None
         if Product:
-            return _scope_queryset(Product.objects.all(), biz).count()
-        # fallback via InventoryItem.product if it exists
-        fields = {getattr(f, "name", None) for f in InventoryItem._meta.get_fields()}
-        if "product" in fields:
+            product_fields = {getattr(f, "name", None) for f in Product._meta.get_fields()}
+            if "business" in product_fields:
+                return _scope_queryset(Product.objects.all(), biz).count()
+
+            # No business on Product: count only products actually used by THIS tenant's stock
+            if hasattr(InventoryItem, "product"):
+                return (
+                    _scope_queryset(InventoryItem.objects.select_related("product"), biz)
+                    .exclude(product__isnull=True)
+                    .values("product_id")
+                    .distinct()
+                    .count()
+                )
+
+        # No Product model at all: fallback via InventoryItem
+        if hasattr(InventoryItem, "product"):
             return (
                 _scope_queryset(InventoryItem.objects.select_related("product"), biz)
-                .values("product").distinct().count()
+                .exclude(product__isnull=True)
+                .values("product_id")
+                .distinct()
+                .count()
             )
     except Exception:
         pass
@@ -233,6 +268,7 @@ def home(request):
     else:
         warehouses_count = 0
 
+    # IMPORTANT: sales scoped even if Sale lacks 'business' (handled in _scope_queryset)
     sales_count = _scope_queryset(Sale.objects.select_related("item"), biz).count()
     first_run = (products_count == 0 and stock_count == 0 and sales_count == 0)
 
@@ -249,7 +285,7 @@ def home(request):
         kpis = {}
     kpis["scope"] = f"{biz.name}"
 
-    # Sold (MTD) for tile
+    # Sold (MTD) for tile (tenant-scoped because sales_qs is already scoped)
     sold_mtd_count = sales_qs.filter(sold_at__gte=month_start, sold_at__lt=month_end).count()
 
     ctx = {

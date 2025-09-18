@@ -1,0 +1,681 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>HQ · Dashboard</title>
+
+  <style>
+    :root{
+      --bg-0:#f7faff; --bg-1:#eef5ff;
+      --ink-900:#0b1b3a; --ink-700:#1c2f57; --ink-500:#476aa0;
+      --brand-500:#2f6bff; --brand-600:#2757d8;
+      --ring:#d8e4ff; --chip:#e9f2ff;
+      --glass: rgba(255,255,255,.65);
+      --shadow-1: 0 10px 30px rgba(12,36,97,.08);
+      --shadow-2: 0 12px 40px rgba(12,36,97,.12);
+      --radius:18px;
+      --border-grad: linear-gradient(135deg, rgba(47,107,255,.35), rgba(255,255,255,.35));
+      --ok:#0ea5e9; --warn:#f59e0b; --bad:#ef4444; --good:#16a34a; --good-bright:#22c55e;
+      --navy:#0f1e35;
+
+      /* Stacking so popovers/panels are clickable and above everything */
+      --z-header: 4000;
+      --z-pop: 5000;     /* search, date picker, bell etc. */
+      --z-panel: 7000;   /* notifications panel (highest UI layer) */
+    }
+    html,body{
+      height:100%;margin:0;
+      background:
+        radial-gradient(1100px 1100px at 10% -10%, #ffffff 0, #f7fbff 30%, #eef5ff 60%, #e6f0ff 100%),
+        linear-gradient(180deg, rgba(47,107,255,.06), transparent 40%);
+      color:var(--ink-900);
+      font:500 15px/1.45 system-ui,-apple-system,Segoe UI,Roboto,Inter,"Helvetica Neue",Arial;
+    }
+    .layout{display:grid;grid-template-columns:250px 1fr;min-height:100%}
+
+    /* Sidebar */
+    .sidebar{
+      position:sticky;top:0;height:100dvh;
+      background:#0b0f14;color:#cfe0ff;border-right:1px solid rgba(255,255,255,.06);
+      padding:14px 10px;display:flex;flex-direction:column;gap:10px;overflow:hidden;
+    }
+    .brand{display:flex;align-items:center;gap:10px;padding:10px;border-radius:12px;background:rgba(255,255,255,.05);
+      box-shadow:inset 0 0 0 1px rgba(255,255,255,.06);font-weight:700}
+    .brand .dot{width:34px;height:34px;border-radius:9px;background:linear-gradient(160deg,#1f6feb,#58a6ff);
+      display:grid;place-items:center;color:#fff;font-weight:800}
+    .hide-sm{display:none}
+    @media (min-width:720px){.hide-sm{display:inline}}
+
+    .nav{margin-top:8px;display:flex;flex-direction:column;gap:8px;overflow:auto;flex:1;scrollbar-gutter:stable}
+    .nav::-webkit-scrollbar{width:8px}
+    .nav::-webkit-scrollbar-thumb{background:rgba(255,255,255,.18);border-radius:8px}
+    .nav a{
+      display:flex;align-items:center;gap:10px;text-decoration:none;color:#c7d2e5;
+      padding:12px 12px;border-radius:12px;background:transparent;border:1px solid rgba(255,255,255,.06);
+      transition:.2s ease;
+    }
+    .nav a:hover{background:var(--navy);color:#fff;border-color:rgba(255,255,255,.12)}
+    .nav a.active{background:linear-gradient(180deg,rgba(255,255,255,.1),rgba(255,255,255,.06));color:#fff;
+      box-shadow:inset 0 0 0 1px rgba(255,255,255,.08)}
+    .nav-sep{height:1px;background:rgba(255,255,255,.08);margin:6px 6px}
+
+    .admin-link{margin-top:8px}
+    .admin-link a{color:#a9b8d9;text-decoration:none}
+    .admin-link a:hover{color:#fff;text-decoration:underline}
+
+    /* Content */
+    .content{padding:18px 14px 28px}
+    .shell{max-width:1240px;margin:0 auto}
+    .header{
+      position:relative; z-index:var(--z-header); isolation:isolate;
+      display:grid;grid-template-columns:1fr;gap:10px;align-items:center;margin-bottom:10px
+    }
+    @media(min-width:980px){.header{grid-template-columns:auto 1fr auto}}
+    h1{margin:0;font-size:24px;letter-spacing:.2px;display:flex;align-items:center;gap:10px}
+
+    /* Online status */
+    .status{display:inline-flex;align-items:center;gap:6px;padding:6px 10px;border-radius:999px;background:var(--glass);
+      border:1px solid var(--ring);font-size:12px;font-weight:800;color:#153e75;backdrop-filter:blur(10px)}
+    .s-dot{width:8px;height:8px;border-radius:50%;background:#10b981;box-shadow:0 0 0 3px rgba(16,185,129,.15)}
+    .s-off{background:#f43f5e;box-shadow:0 0 0 3px rgba(244,63,94,.15)}
+
+    /* Search + suggestions */
+    .search-wrap{display:flex;align-items:center;gap:8px}
+    .search{
+      width:100%;max-width:640px;display:flex;align-items:center;gap:10px;
+      padding:10px 12px;border-radius:999px;background:var(--glass);
+      border:1px solid transparent;background-clip:padding-box;box-shadow:var(--shadow-1);backdrop-filter:blur(10px);position:relative;
+      z-index:var(--z-pop);
+    }
+    .search:before{
+      content:"";position:absolute;inset:0;padding:1px;border-radius:999px;background:var(--border-grad);
+      -webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);-webkit-mask-composite:xor;mask-composite:exclude;pointer-events:none
+    }
+    .search input{border:none;outline:none;background:transparent;width:100%;font:inherit;color:var(--ink-900)}
+    .go{border:none;border-radius:999px;padding:8px 14px;font-weight:800;background:var(--brand-600);color:#fff;cursor:pointer}
+
+    .suggest{
+      position:absolute;top:calc(100% + 8px);left:0;right:0;
+      z-index:calc(var(--z-pop) + 1);
+      background:var(--glass);backdrop-filter:blur(12px);border-radius:14px;box-shadow:var(--shadow-2);
+      border:1px solid transparent;display:none;max-height:320px;overflow:auto; pointer-events:auto;
+    }
+    .suggest:before{
+      content:"";position:absolute;inset:0;padding:1px;border-radius:14px;background:var(--border-grad);
+      -webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);-webkit-mask-composite:xor;mask-composite:exclude;pointer-events:none
+    }
+    .s-item{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:10px 12px;border-radius:12px;margin:6px;border:1px solid rgba(47,107,255,.12);cursor:pointer}
+    .s-item:hover{background:rgba(47,107,255,.10)}
+    .s-pill{font-size:11px;font-weight:800;border:1px solid var(--ring);padding:.15rem .5rem;border-radius:999px;background:#eef4ff;color:#2757d8}
+
+    /* Top filter pills */
+    .filters-top{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin:8px 0 12px}
+    .pill{
+      display:inline-flex;gap:8px;align-items:center;padding:8px 12px;border-radius:999px;background:var(--glass);
+      border:1px solid var(--ring);font-weight:700;cursor:pointer;user-select:none
+    }
+    .pill.active{background:rgba(47,107,255,.14);color:var(--brand-600);border-color:rgba(47,107,255,.32)}
+    .date-pop{position:relative; z-index:var(--z-pop);}
+    .date-card{
+      position:absolute;top:44px;left:0;z-index:calc(var(--z-pop) + 1);
+      display:none;padding:12px;border-radius:14px;background:var(--glass);backdrop-filter:blur(12px);
+      border:1px solid transparent;box-shadow:var(--shadow-2)
+    }
+    .date-card:before{
+      content:"";position:absolute;inset:0;padding:1px;border-radius:14px;background:var(--border-grad);
+      -webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);-webkit-mask-composite:xor;mask-composite:exclude;pointer-events:none
+    }
+    .date-card input{padding:8px 10px;border-radius:10px;border:1px solid var(--ring);background:rgba(255,255,255,.7)}
+    .date-card .apply{margin-left:8px}
+
+    /* Right side header */
+    .right{display:flex;align-items:center;gap:10px}
+    .chip{padding:.25rem .6rem;border-radius:999px;background:var(--chip);border:1px solid var(--ring);color:#1e3a8a;font-weight:700;font-size:12px}
+    .bell{position:relative;width:42px;height:42px;border-radius:999px;background:var(--glass);backdrop-filter:blur(10px);
+      border:1px solid transparent;box-shadow:var(--shadow-1);display:grid;place-items:center;cursor:pointer;user-select:none; z-index:var(--z-pop);}
+    .bell:before{content:"";position:absolute;inset:0;padding:1px;border-radius:999px;background:var(--border-grad);
+      -webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);-webkit-mask-composite:xor;mask-composite:exclude;pointer-events:none}
+    .bell svg{width:20px;height:20px;fill:#274a8f}
+    .dot-ind{position:absolute;top:6px;right:6px;min-width:18px;height:18px;border-radius:9px;background:#ff3b3b;color:#fff;
+      display:grid;place-items:center;font-size:11px;font-weight:900;padding:0 5px;border:2px solid rgba(255,255,255,.9)}
+
+    /* Notifications panel – guaranteed clickable */
+    .panel{
+      position:fixed;top:72px;right:16px;width:360px;max-width:86vw;
+      z-index:var(--z-panel); background:var(--glass);backdrop-filter:blur(12px);
+      border-radius:16px;box-shadow:var(--shadow-2);border:1px solid transparent;
+      pointer-events:auto;
+    }
+    .panel *{pointer-events:auto}
+    .panel:before{content:"";position:absolute;inset:0;padding:1px;border-radius:16px;background:var(--border-grad);
+      -webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);-webkit-mask-composite:xor;mask-composite:exclude}
+    .panel .ph{display:flex;align-items:center;justify-content:space-between;padding:12px 12px 8px}
+    .panel h3{margin:0;font-size:14px;font-weight:900;color:var(--ink-700)}
+    .panel .pl{list-style:none;margin:0;padding:8px 10px;max-height:360px;overflow:auto}
+    .panel .pi{display:grid;grid-template-columns:auto 1fr auto;gap:10px;padding:10px;border-radius:12px;border:1px solid rgba(47,107,255,.12);background:rgba(255,255,255,.5);margin-bottom:8px}
+    .panel .pi .badge{font-size:11px}
+    .panel .foot{display:flex;justify-content:space-between;align-items:center;padding:8px 12px 12px}
+    .btn-text{background:transparent;border:none;color:var(--brand-600);font-weight:800;cursor:pointer}
+
+    /* Cards */
+    .cards{display:grid;gap:14px;grid-template-columns:1fr}
+    @media (min-width:1080px){.cards{grid-template-columns:repeat(4,1fr)}}
+    .card{
+      position:relative;background:var(--glass);backdrop-filter:blur(10px);border-radius:18px;
+      padding:16px 16px 18px;box-shadow:var(--shadow-1);transition:transform .25s ease, box-shadow .25s ease
+    }
+    .card:before{content:"";position:absolute;inset:0;padding:1px;border-radius:18px;background:var(--border-grad);
+      -webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);-webkit-mask-composite:xor;mask-composite:exclude}
+    .card:hover{transform:translateY(-3px);box-shadow:var(--shadow-2)}
+    .card h3{margin:0 0 10px;font-size:13px;font-weight:800;color:var(--ink-500);letter-spacing:.3px}
+    .num{font-size:30px;font-weight:900;color:var(--ink-900)}
+    .card.link{cursor:pointer}
+    .card.link, .card.link * { text-decoration:none !important }
+
+    /* Trend badge */
+    .trend{
+      position:absolute; top:10px; right:12px;
+      display:inline-flex; align-items:center; gap:6px;
+      font-size:14px; font-weight:900;
+      padding:4px 8px;border-radius:999px;
+      background:rgba(255,255,255,.7); backdrop-filter:blur(6px);
+      border:1px solid var(--ring);
+      user-select:none; pointer-events:none;
+      box-shadow: 0 2px 6px rgba(0,0,0,.06);
+    }
+    .trend svg{width:18px;height:18px}
+    .trend.up{color:var(--good-bright)} .trend.flat{color:#6b7280}
+    .trend.down{color:#ef4444}.trend.down svg{transform:rotate(180deg)}
+
+    .section-title{margin:26px 4px 12px;font-size:14px;font-weight:900;color:var(--ink-700)}
+
+    /* Wallet & chart */
+    .wallet{display:grid;gap:14px;grid-template-columns:1fr}
+    @media (min-width:980px){.wallet{grid-template-columns:1fr 1fr 2fr}}
+    .filters{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:8px}
+    .input{
+      padding:10px 12px;border-radius:12px;background:var(--glass);backdrop-filter:blur(10px);border:1px solid var(--ring);
+      font:inherit;color:var(--ink-900)
+    }
+    .apply{padding:10px 14px;border-radius:12px;border:none;background:var(--brand-600);color:#fff;font-weight:800;cursor:pointer}
+    .chart-card{padding:14px 14px 6px}
+    .legend{display:flex;gap:10px;align-items:center;margin:6px 0 8px}
+    .lg-dot{width:10px;height:10px;border-radius:999px;background:#2563eb}
+
+    /* AI insights */
+    .insights{display:grid;gap:12px;grid-template-columns:1fr}
+    .ins-card{padding:16px;border-radius:18px;background:var(--glass);backdrop-filter:blur(10px);box-shadow:var(--shadow-1);position:relative}
+    .ins-card:before{content:"";position:absolute;inset:0;padding:1px;border-radius:18px;background:var(--border-grad);
+      -webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);-webkit-mask-composite:xor;mask-composite:exclude}
+    .ins-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
+    .ins-head h3{margin:0;font-size:14px;font-weight:900;color:var(--ink-700)}
+    .badge{display:inline-flex;align-items:center;gap:6px;padding:.28rem .6rem;border-radius:999px;background:#eef4ff;border:1px solid var(--ring);font-size:12px;font-weight:800;color:var(--brand-600)}
+    .i-list{padding:0;margin:0;list-style:none;display:grid;gap:10px}
+    .i{display:flex;gap:10px;align-items:flex-start}
+    .dot{flex:0 0 10px;height:10px;border-radius:50%}
+    .p-high{background:var(--bad)} .p-med{background:var(--warn)} .p-low{background:var(--ok)} .p-good{background:var(--good)}
+    .i span{font-weight:700}
+    .muted{color:var(--ink-500);font-size:12px}
+
+    /* Animations */
+    .reveal{opacity:0;transform:translateY(10px);animation:reveal .6s ease forwards}
+    .reveal.d2{animation-delay:.06s}.reveal.d3{animation-delay:.12s}.reveal.d4{animation-delay:.18s}
+    @keyframes reveal{to{opacity:1;transform:none}}
+  </style>
+</head>
+<body>
+
+  {# Canonical hq URLs #}
+  {% url 'hq:dashboard' as dashboard_url %}
+  {% url 'hq:subscriptions' as subscriptions_url %}
+  {% url 'hq:invoices' as invoices_url %}
+  {% url 'hq:businesses' as businesses_url %}
+  {% url 'hq:agents' as agents_url %}
+  {% url 'hq:wallet' as wallet_url %}
+  {% url 'hq:stock_trends' as stock_trends_url %}
+  {% url 'logout' as logout_url %}
+  {% url 'admin:index' as admin_url %}
+
+  <script id="income-series" type="application/json">{{ income_series_json|default:"[]"|safe }}</script>
+
+  <div class="layout">
+    <aside class="sidebar">
+      <div class="brand">
+        <div class="dot">HQ</div>
+        <div class="hide-sm">Control Center</div>
+      </div>
+
+      <nav class="nav">
+        <a class="active" href="{{ dashboard_url|default:'/hq/' }}">Dashboard</a>
+        <a href="{{ subscriptions_url|default:'/hq/subscriptions/' }}">Subscriptions</a>
+        <a href="{{ invoices_url|default:'/hq/invoices/' }}">Invoices</a>
+        <a href="{{ businesses_url|default:'/hq/businesses/' }}">Businesses</a>
+        <a href="{{ agents_url|default:'/hq/agents/' }}">Agents</a>
+        <a href="{{ wallet_url|default:'/hq/wallet/' }}">Wallet</a>
+        <a href="{{ stock_trends_url|default:'/hq/stock-trends/' }}">Stock trends</a>
+
+        <div class="nav-sep"></div>
+        <a href="{{ admin_url|default:'/admin/' }}">↗ Django Admin</a>
+        <a href="{{ logout_url|default:'/accounts/logout/' }}">Logout</a>
+      </nav>
+    </aside>
+
+    <main class="content">
+      <div class="shell">
+        <!-- Header -->
+        <div class="header reveal">
+          <h1>
+            HQ • Dashboard
+            <span class="status" id="net"><span class="s-dot" id="netDot"></span><span id="netTxt">Online</span></span>
+          </h1>
+
+          <!-- Search -->
+          <div class="search-wrap">
+            <form id="searchForm" class="search" role="search" aria-label="Global Search"
+                  action="{{ businesses_url|default:'/hq/businesses/' }}" method="GET" autocomplete="off">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M15.5 15.5L21 21" stroke="#5a78b0" stroke-width="2" stroke-linecap="round"/><circle cx="10.5" cy="10.5" r="6.5" stroke="#5a78b0" stroke-width="2"/></svg>
+              <input id="q" name="q" type="search" placeholder="Search businesses, invoices, agents, subscriptions…" autocomplete="off"/>
+              <button class="go" id="go" type="submit">Go</button>
+              <div class="suggest" id="sugg" aria-live="polite"></div>
+            </form>
+          </div>
+
+          <div class="right">
+            <!-- Time Filters -->
+            <div class="filters-top">
+              <div class="pill active" data-range="all" id="flt-all" tabindex="0">All time</div>
+              <div class="pill" data-range="7d" id="flt-7d" tabindex="0">Last 7d</div>
+              <div class="pill date-pop" id="flt-custom" tabindex="0" aria-expanded="false" aria-haspopup="true">
+                Custom
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M7 11h10M7 15h6M5 4h14a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z" stroke="#2757d8" stroke-width="2" stroke-linecap="round"/></svg>
+                <div class="date-card" id="date-card">
+                  <input type="date" id="d-from"><input type="date" id="d-to">
+                  <button class="apply" id="d-apply" type="button">Apply</button>
+                </div>
+              </div>
+            </div>
+
+            <span class="chip">Live</span>
+            <div class="bell" id="bell" tabindex="0" role="button" aria-label="Notifications" aria-haspopup="true" aria-expanded="false">
+              <svg viewBox="0 0 24 24"><path d="M12 22a2.5 2.5 0 0 0 2.45-2h-4.9A2.5 2.5 0 0 0 12 22Zm6-6V11a6 6 0 1 0-12 0v5l-2 2v1h18v-1l-2-2Z"/></svg>
+              <div class="dot-ind" id="bell-count" style="display:none">0</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- KPIs -->
+        <div class="cards">
+          <a class="card link reveal" href="{{ businesses_url|default:'/hq/businesses/' }}">
+            <span class="trend up" id="trend-biz" title="Trend"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M6 14l4-4 3 3 5-5v4h2V6h-6v2h4l-4 4-3-3-5 5z"/></svg></span>
+            <h3>Total Businesses</h3><div class="num">{{ total_biz|default:"0" }}</div>
+          </a>
+          <a class="card link reveal d2" href="{{ businesses_url|default:'/hq/businesses/' }}?filter=new7"><h3>New (7d)</h3><div class="num">{{ new_biz_7d|default:"0" }}</div></a>
+          <a class="card link reveal d3" href="{{ subscriptions_url|default:'/hq/subscriptions/' }}?status=active">
+            <span class="trend up" id="trend-subs" title="Trend"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M6 14l4-4 3 3 5-5v4h2V6h-6v2h4l-4 4-3-3-5 5z"/></svg></span>
+            <h3>Active Subs</h3><div class="num">{{ active_subs|default:"0" }}</div>
+          </a>
+          <a class="card link reveal d4" href="{{ subscriptions_url|default:'/hq/subscriptions/' }}?metric=mrr"><h3>MRR (plan amount sum)</h3><div class="num">{{ mrr_sum|default:"0.00" }}</div></a>
+          <a class="card link reveal" href="{{ invoices_url|default:'/hq/invoices/' }}?status=open"><h3>Open Invoices</h3><div class="num">{{ open_invoices|default:"0" }}</div></a>
+          <a class="card link reveal d2" href="{{ invoices_url|default:'/hq/invoices/' }}?status=open"><h3>Open Total</h3><div class="num">{{ open_total|default:"0.00" }}</div></a>
+          <a class="card link reveal d3" href="{{ agents_url|default:'/hq/agents/' }}"><h3>Agents Total</h3><div class="num">{{ agents_total|default:"0" }}</div></a>
+          <a class="card link reveal d4" href="{{ agents_url|default:'/hq/agents/' }}?filter=new30"><h3>Agents New (30d)</h3><div class="num">{{ agents_new_30d|default:"0" }}</div></a>
+          <a class="card link reveal" href="{{ businesses_url|default:'/hq/businesses/' }}?tab=inventory&view=in"><h3>Stock In (7d)</h3><div class="num">{{ stock_in_7d|default:"0" }}</div></a>
+          <a class="card link reveal d2" href="{{ businesses_url|default:'/hq/businesses/' }}?tab=inventory&view=out"><h3>Stock Out (7d)</h3><div class="num">{{ stock_out_7d|default:"0" }}</div></a>
+        </div>
+
+        <!-- AI Insights -->
+        <div class="section-title reveal">AI Insights &amp; Recommendations</div>
+        <div class="insights">
+          <div class="ins-card reveal d2">
+            <div class="ins-head">
+              <h3>What needs your attention</h3>
+              <span class="badge" id="ins-stamp">Updating…</span>
+            </div>
+            <ul class="i-list" id="ai-list"></ul>
+            <div class="muted">Generated from your live KPIs.</div>
+          </div>
+        </div>
+
+        <!-- Wallet -->
+        <div class="section-title reveal">Wallet</div>
+        <div class="wallet">
+          <a class="card link reveal" href="{{ wallet_url|default:'/hq/wallet/' }}?range=30d&type=in"><h3>Incoming (30d)</h3><div class="num">{{ wallet_in_30d|default:"0.00" }}</div></a>
+          <a class="card link reveal d2" href="{{ wallet_url|default:'/hq/wallet/' }}?range=30d&type=out"><h3>Outgoing (30d)</h3><div class="num">{{ wallet_out_30d|default:"0.00" }}</div></a>
+          <div class="card chart-card reveal d3">
+            <div class="filters">
+              <strong>Income (MWK)</strong>
+              <input id="from" class="input" type="date"/>
+              <span class="muted">to</span>
+              <input id="to" class="input" type="date"/>
+              <button id="apply" class="apply">Apply</button>
+              <span class="muted" id="sum-range" style="margin-left:auto">Sum: MWK 0.00</span>
+            </div>
+            <div class="legend"><div class="lg-dot"></div><span class="muted">Income by day</span></div>
+            <canvas id="chart" height="160"></canvas>
+          </div>
+        </div>
+
+        <!-- Hidden metrics -->
+        <div id="metrics"
+             data-biz_total="{{ total_biz|default:'0' }}"
+             data-subs_active="{{ active_subs|default:'0' }}"
+             data-biz_total_prev="{{ total_biz_prev|default:'' }}"
+             data-subs_active_prev="{{ active_subs_prev|default:'' }}"
+             data-biz_new7="{{ new_biz_7d|default:'0' }}"
+             data-mrr="{{ mrr_sum|default:'0' }}"
+             data-open_invoices="{{ open_invoices|default:'0' }}"
+             data-open_total="{{ open_total|default:'0' }}"
+             data-agents_total="{{ agents_total|default:'0' }}"
+             data-agents_new30="{{ agents_new_30d|default:'0' }}"
+             data-stock_in7d="{{ stock_in_7d|default:'0' }}"
+             data-stock_out7d="{{ stock_out_7d|default:'0' }}"
+             data-wallet_in30="{{ wallet_in_30d|default:'0' }}"
+             data-wallet_out30="{{ wallet_out_30d|default:'0' }}"
+             data-wallet_balance="{{ wallet_balance|default:'0' }}"
+             style="display:none"></div>
+      </div>
+    </main>
+  </div>
+
+  <!-- Notifications portal -->
+  <div class="panel" id="panel" role="dialog" aria-modal="false" style="display:none">
+    <div class="ph">
+      <h3>Notifications</h3>
+      <button class="btn-text" id="mark-all" type="button">Mark all read</button>
+    </div>
+    <ul class="pl" id="plist"></ul>
+    <div class="foot">
+      <span class="muted">Shows important events (new businesses, agents, payments, repeated errors).</span>
+      <button class="btn-text" id="view-all" type="button" onclick="window.location='{{ dashboard_url|default:'/hq/' }}#notifications'">View all</button>
+    </div>
+  </div>
+
+  <script>
+  (function(){
+    const $ = (sel, root=document) => root.querySelector(sel);
+    const $$ = (sel, root=document) => Array.from(root.querySelectorAll(sel));
+
+    /* Reveal animation */
+    try{
+      const els = $$('.reveal');
+      const io = new IntersectionObserver((entries)=>entries.forEach(e=>{ if(e.isIntersecting) e.target.style.animationPlayState='running'; }), {threshold:.08});
+      els.forEach(el=>{ el.style.animationPlayState='paused'; io.observe(el); });
+    }catch(e){}
+
+    /* Online pill */
+    try{
+      const netTxt = $('#netTxt'), netDot = $('#netDot');
+      const setNet=()=>{ const on=navigator.onLine; netTxt.textContent=on?'Online':'Offline'; netDot.classList.toggle('s-off',!on); };
+      window.addEventListener('online', setNet); window.addEventListener('offline', setNet); setNet();
+    }catch(e){}
+
+    /* ROUTES + helpers */
+    const ROUTES = {
+      businesses: "{{ businesses_url|default:'/hq/businesses/' }}",
+      invoices: "{{ invoices_url|default:'/hq/invoices/' }}",
+      subscriptions: "{{ subscriptions_url|default:'/hq/subscriptions/' }}",
+      agents: "{{ agents_url|default:'/hq/agents/' }}",
+      searchFallback: "/hq/search/"
+    };
+    const firstValidBase = () => {
+      const order = [ROUTES.businesses, ROUTES.invoices, ROUTES.subscriptions, ROUTES.agents, ROUTES.searchFallback];
+      for (const b of order){ if (b && b !== '#') return b; }
+      return "/hq/";
+    };
+    const buildUrl = (base, term) => base + (base.includes('?')?'&':'?') + 'q=' + encodeURIComponent(term || '');
+
+    /* Search + suggestions (always on top) */
+    try{
+      const form = $('#searchForm'), q = $('#q'), sugg = $('#sugg');
+
+      form.addEventListener('submit', (e)=>{
+        e.preventDefault();
+        const term = (q.value||'').trim();
+        const base = firstValidBase();
+        window.location = term ? buildUrl(base, term) : base;
+      });
+
+      async function fetchSuggest(term){
+        if(!term) return [];
+        try{
+          const r = await fetch(`/hq/api/search/suggest?q=${encodeURIComponent(term)}`, {headers:{'Accept':'application/json'}});
+          if(r.ok){ const arr = await r.json(); if(Array.isArray(arr) && arr.length) return arr.slice(0,8); }
+        }catch(_){}
+        return [
+          {label:`Businesses matching “${term}”`, type:'Businesses', url:buildUrl(ROUTES.businesses, term)},
+          {label:`Invoices for “${term}”`,     type:'Invoices',   url:buildUrl(ROUTES.invoices, term)},
+          {label:`Subscriptions with “${term}”`,type:'Subscriptions', url:buildUrl(ROUTES.subscriptions, term)},
+          {label:`Agents named “${term}”`,      type:'Agents',     url:buildUrl(ROUTES.agents, term)}
+        ];
+      }
+      let selIndex=-1, timer=null;
+      function renderSuggest(items){
+        sugg.innerHTML=''; selIndex=-1;
+        if(!items.length){ sugg.style.display='none'; return; }
+        items.forEach((it)=>{
+          const row=document.createElement('div');
+          row.className='s-item';
+          row.innerHTML=`<div>${it.label}</div><span class="s-pill">${it.type}</span>`;
+          row.addEventListener('click', ()=> window.location = it.url );
+          sugg.appendChild(row);
+        });
+        sugg.style.display='block';
+      }
+      q.addEventListener('input', ()=>{
+        clearTimeout(timer);
+        const term=q.value.trim();
+        if(!term){ sugg.style.display='none'; return; }
+        timer=setTimeout(async()=>renderSuggest(await fetchSuggest(term)), 120);
+      });
+      q.addEventListener('keydown', (e)=>{
+        const rows=[...sugg.children];
+        if(e.key==='Enter'){
+          if(sugg.style.display==='block' && rows[selIndex]){ e.preventDefault(); rows[selIndex].click(); }
+        }else if(e.key==='ArrowDown' && rows.length){
+          selIndex=(selIndex+1)%rows.length; rows.forEach((r,i)=>r.style.background=i===selIndex?'rgba(47,107,255,.10)':''); rows[selIndex].scrollIntoView({block:'nearest'});
+        }else if(e.key==='ArrowUp' && rows.length){
+          selIndex=(selIndex-1+rows.length)%rows.length; rows.forEach((r,i)=>r.style.background=i===selIndex?'rgba(47,107,255,.10)':''); rows[selIndex].scrollIntoView({block:'nearest'});
+        }else if(e.key==='Escape'){ sugg.style.display='none'; }
+      });
+      document.addEventListener('click', (e)=>{ if(!e.target.closest('.search')) sugg.style.display='none'; }, {passive:true});
+    }catch(e){}
+
+    /* Top time filters */
+    try{
+      const pillAll = $('#flt-all'), pill7 = $('#flt-7d'), pillCustom = $('#flt-custom');
+      const dateCard = $('#date-card'), dFrom = $('#d-from'), dTo = $('#d-to'), dApply = $('#d-apply');
+
+      const setActive = (el) => { [pillAll, pill7, pillCustom].forEach(p=>p.classList.remove('active')); if(el) el.classList.add('active'); };
+      const applyRange = (params) => {
+        const url = new URL(window.location.href);
+        Object.keys(params).forEach(k => { if(params[k]===null) url.searchParams.delete(k); else url.searchParams.set(k, params[k]); });
+        window.location = url.pathname + url.search;
+      };
+      pillAll.addEventListener('click', ()=>{ setActive(pillAll); applyRange({range:'all', start:null, end:null}); });
+      pill7.addEventListener('click', ()=>{ setActive(pill7); applyRange({range:'7d', start:null, end:null}); });
+      pillCustom.addEventListener('click', (e)=>{ e.stopPropagation(); const open= dateCard.style.display==='block'; dateCard.style.display = open?'none':'block'; pillCustom.setAttribute('aria-expanded', open?'false':'true'); setActive(pillCustom); });
+      document.addEventListener('click', (e)=>{ if(!pillCustom.contains(e.target)) { dateCard.style.display='none'; pillCustom.setAttribute('aria-expanded','false'); } }, {passive:true});
+      const today=new Date(), fmt=d=>`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+      const aWeek=new Date(); aWeek.setDate(today.getDate()-7);
+      dFrom.value=fmt(aWeek); dTo.value=fmt(today);
+      dApply.addEventListener('click', ()=>{ applyRange({range:'custom', start:dFrom.value, end:dTo.value}); });
+      const params=new URLSearchParams(window.location.search); const cur=params.get('range');
+      if(cur==='7d') setActive(pill7); else if(cur==='custom') setActive(pillCustom); else setActive(pillAll);
+    }catch(e){}
+
+    /* Trend arrows */
+    try{
+      const m = $('#metrics')?.dataset || {};
+      const num = (v)=>Number((v??'').toString().replace(/[^0-9.\-]/g,''))||0;
+      function setTrend(elId, current, previous){
+        const el = document.getElementById(elId); if(!el) return;
+        let cls = 'up';
+        if(previous !== null && previous !== undefined && previous !== ''){
+          const prev = num(previous);
+          if(current < prev) cls = 'down';
+          else if(current === prev) cls = 'flat';
+        }
+        el.classList.remove('up','down','flat'); el.classList.add(cls);
+      }
+      setTrend('trend-biz',  num(m.biz_total), m.biz_total_prev);
+      setTrend('trend-subs', num(m.subs_active), m.subs_active_prev);
+    }catch(e){}
+
+    /* Notifications (clickable, positioned) */
+    try{
+      const bell = $('#bell'), panel = $('#panel'), countEl = $('#bell-count'), listEl = $('#plist'), markAll = $('#mark-all');
+
+      function positionPanel(){
+        try{
+          const r = bell.getBoundingClientRect();
+          const panelWidth = Math.min(360, window.innerWidth * 0.86);
+          const left = Math.min(window.innerWidth - 12 - panelWidth, r.right - panelWidth);
+          panel.style.top  = (r.bottom + 10) + 'px';
+          panel.style.left = Math.max(12, left) + 'px';
+          panel.style.right = 'auto';
+        }catch(_){}
+      }
+
+      let notifications=[];
+      function renderNotifs(){
+        listEl.innerHTML=''; let unread=0;
+        notifications.forEach(n=>{
+          if(!n.read) unread++;
+          const li=document.createElement('li'); li.className='pi';
+          li.innerHTML=`
+            <span class="badge">${n.kind}</span>
+            <div><div style="font-weight:800">${n.title}</div><div class="muted">${new Date(n.ts).toLocaleString()}</div></div>
+            <a href="${n.link||'#'}" class="btn-text">Open</a>`;
+          listEl.appendChild(li);
+        });
+        if(unread>0){ countEl.style.display='grid'; countEl.textContent=unread>99?'99+':String(unread); }
+        else{ countEl.style.display='none'; }
+      }
+      function addNotif(n){ notifications.unshift(n); renderNotifs(); }
+
+      function togglePanel(force){
+        const show=(typeof force==='boolean')?force:panel.style.display==='none';
+        panel.style.display=show?'block':'none';
+        if(show) positionPanel();
+        bell.setAttribute('aria-expanded', show?'true':'false');
+      }
+      bell.addEventListener('click', (e)=>{ e.stopPropagation(); togglePanel(); });
+      bell.addEventListener('keydown', (e)=>{ if(e.key==='Enter'||e.key===' ') { e.preventDefault(); togglePanel(); } });
+      window.addEventListener('resize', ()=>{ if(panel.style.display==='block') positionPanel(); });
+      window.addEventListener('scroll', ()=>{ if(panel.style.display==='block') positionPanel(); }, {passive:true});
+      document.addEventListener('click', (e)=>{ if(panel.style.display==='block' && !panel.contains(e.target) && !bell.contains(e.target)) panel.style.display='none'; }, {passive:true});
+      panel.addEventListener('click', (e)=>{ e.stopPropagation(); }); // keep clicks inside clickable
+
+      try{
+        const es = (!!window.EventSource) ? new EventSource('/events/notifications') : null;
+        if(es){ es.onmessage = (ev)=>{ try{ addNotif(JSON.parse(ev.data)); }catch(_){ } }; }
+      }catch(_){}
+
+      async function poll(){
+        try{
+          const r = await fetch('/hq/api/notifications?since=' + encodeURIComponent(window.__since||''), {headers:{'Accept':'application/json'}});
+          if(r.ok){ (await r.json()).forEach(addNotif); window.__since = new Date().toISOString(); }
+        }catch(_){ }
+      }
+      setInterval(poll, 15000);
+
+      bell.addEventListener('click', ()=>{
+        if(notifications.length===0){
+          addNotif({id:'demo1', kind:'Payment', title:'New subscription paid · MWK 120,000', ts:Date.now(), link:"{{ subscriptions_url|default:'/hq/subscriptions/' }}"});
+          addNotif({id:'demo2', kind:'Business', title:'New business onboarded', ts:Date.now()-3*60*1000, link:"{{ businesses_url|default:'/hq/businesses/' }}"});
+          addNotif({id:'demo3', kind:'Agent', title:'Agent invitation accepted', ts:Date.now()-7*60*1000, link:"{{ agents_url|default:'/hq/agents/' }}"});
+          addNotif({id:'demo4', kind:'Error', title:'Manager failed action 3× (check logs)', ts:Date.now()-12*60*1000, link:"{{ admin_url|default:'/admin/' }}"});
+        }
+      });
+    }catch(e){}
+
+    /* AI insights */
+    try{
+      const m = $('#metrics')?.dataset || {};
+      const toNum = v => Number((v||'0').toString().replace(/[^0-9.\-]/g,''));
+      const data = {
+        bizTotal: toNum(m.biz_total),
+        bizNew7: toNum(m.biz_new7),
+        subsActive: toNum(m.subs_active),
+        mrr: toNum(m.mrr),
+        openInvoices: toNum(m.open_invoices),
+        openTotal: toNum(m.open_total),
+        agentsTotal: toNum(m.agents_total),
+        agentsNew30: toNum(m.agents_new30),
+        in7: toNum(m.stock_in7d),
+        out7: toNum(m.stock_out7d),
+        win: toNum(m.wallet_in30),
+        wout: toNum(m.wallet_out30),
+        wbal: toNum(m.wallet_balance)
+      };
+      const mk = (cls,txt)=>{ const li=document.createElement('li'); li.className='i';
+        const d=document.createElement('div'); d.className='dot '+cls;
+        const s=document.createElement('span'); s.textContent=txt; li.append(d,s); return li; };
+      const list = $('#ai-list'); const stamp = $('#ins-stamp');
+      const rec=[];
+      if (data.openInvoices>0 && data.openTotal>0) rec.push(mk('p-high', `Collect ${data.openInvoices} open invoice${data.openInvoices>1?'s':''} — open total MWK ${data.openTotal.toLocaleString()}.`));
+      if (data.subsActive===0 && data.bizTotal>0) rec.push(mk('p-high','No active subscriptions. Convert trials or set plans.'));
+      if (data.agentsTotal===0) rec.push(mk('p-med','No agents yet. Invite at least one.'));
+      else if (data.agentsNew30===0) rec.push(mk('p-low','No new agents in 30d. Consider a referral push.'));
+      if (data.out7>data.in7) rec.push(mk('p-med',`Stock outpaced intake this week (${data.out7} out vs ${data.in7} in). Reorder.`));
+      if (data.mrr===0 && data.subsActive>0) rec.push(mk('p-low','Active subs but zero MRR. Check plan amounts.'));
+      if (data.bizNew7===0) rec.push(mk('p-low','No new businesses in 7d. Run outreach.'));
+      if (data.wbal<0) rec.push(mk('p-high',`Wallet negative (MWK ${data.wbal}). Slow spend & collect.`));
+      else if (data.wout>data.win) rec.push(mk('p-med','Spending exceeded income in 30d. Review expenses.'));
+      else if (data.win>0 && data.wbal>=0) rec.push(mk('p-good','Healthy cashflow. Consider investing in inventory.'));
+      if (rec.length===0) rec.push(mk('p-good','All clear. No urgent actions.'));
+      rec.forEach(x=>list.appendChild(x));
+      if(stamp){ const d=new Date(); stamp.textContent='Updated · '+d.toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'}); }
+    }catch(e){}
+
+    /* Wallet chart */
+    try{
+      const canvas = $('#chart'); const ctx = canvas.getContext('2d');
+      function ymd(d){ const t = new Date(d); const m=('0'+(t.getMonth()+1)).slice(-2), day=('0'+t.getDate()).slice(-2); return `${t.getFullYear()}-${m}-${day}`; }
+      function daysAgo(n){ const d=new Date(); d.setDate(d.getDate()-n); return d; }
+      function parseSeries(){ try{ return JSON.parse($('#income-series')?.textContent || '[]'); }catch(e){ return []; } }
+
+      let series = parseSeries();
+      if(!series.length){ const total=Number(($('#metrics')?.dataset.wallet_in30)||0); const pts=14;
+        for(let i=pts-1;i>=0;i--) series.push({date: ymd(daysAgo(i)), amount: Math.max(0, Math.round((total/pts)*(.75+Math.random()*0.5)))}); }
+
+      const inputFrom = $('#from'), inputTo = $('#to'), sumLabel=$('#sum-range');
+      inputFrom.value = ymd(daysAgo(29)); inputTo.value = ymd(new Date());
+
+      async function fetchSeries(start, end){
+        try{
+          const r = await fetch(`/hq/api/wallet/income?start=${start}&end=${end}&currency=MWK`, {headers:{'Accept':'application/json'}});
+          if(r.ok) return await r.json();
+        }catch(_){}
+        return series.filter(p=>p.date>=start && p.date<=end);
+      }
+
+      function draw(rows){
+        const w = canvas.width = canvas.clientWidth * devicePixelRatio;
+        const h = canvas.height = canvas.clientHeight * devicePixelRatio;
+        ctx.clearRect(0,0,w,h);
+        if(!rows.length) return;
+        const pad={l:48,t:14,r:12,b:26}, innerW=w-pad.l-pad.r, innerH=h-pad.t-pad.b;
+        const xs=rows.map(r=>+new Date(r.date)), ys=rows.map(r=>+r.amount||0);
+        const xMin=Math.min(...xs), xMax=Math.max(...xs), yMax=Math.max(10, Math.max(...ys)*1.2);
+        ctx.strokeStyle='rgba(39,87,216,.25)'; ctx.lineWidth=1*devicePixelRatio;
+        ctx.beginPath(); ctx.moveTo(pad.l,pad.t); ctx.lineTo(pad.l,pad.t+innerH); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(pad.l,pad.t+innerH); ctx.lineTo(pad.l+innerW,pad.t+innerH); ctx.stroke();
+        ctx.beginPath();
+        rows.forEach((r,i)=>{ const x=pad.l+((+new Date(r.date)-xMin)/(xMax-xMin||1))*innerW; const y=pad.t+innerH-(r.amount/yMax)*innerH; i?ctx.lineTo(x,y):ctx.moveTo(x,y); });
+        ctx.strokeStyle='#2563eb'; ctx.lineWidth=2*devicePixelRatio; ctx.stroke();
+        rows.forEach((r)=>{ const x=pad.l+((+new Date(r.date)-xMin)/(xMax-xMin||1))*innerW; const y=pad.t+innerH-(r.amount/yMax)*innerH; ctx.beginPath(); ctx.arc(x,y,3.2*devicePixelRatio,0,Math.PI*2); ctx.fillStyle='#2563eb'; ctx.fill(); });
+        const sum=rows.reduce((a,b)=>a+(+b.amount||0),0);
+        sumLabel.textContent=`Sum: MWK ${sum.toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})}`;
+      }
+
+      async function apply(){ const rows=await fetchSeries(inputFrom.value, inputTo.value); draw(rows); }
+      $('#apply').addEventListener('click', apply);
+      apply(); new ResizeObserver(apply).observe(canvas);
+    }catch(e){}
+  })();
+  </script>
+</body>
+</html>

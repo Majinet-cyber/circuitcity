@@ -82,6 +82,9 @@ _FALLBACKS = {
     "inventory:scan_in": "/inventory/scan-in/",
     "inventory:scan_sold": "/inventory/scan-sold/",
     "inventory:scan_web": "/inventory/scan-web/",
+    # helpful fallbacks for orders
+    "inventory:place_order_page": "/inventory/place-order/",
+    "inventory:place_order": "/inventory/orders/new/",
 }
 
 def _redirect_to(view_name: str):
@@ -212,7 +215,11 @@ urlpatterns = [
 
 # Orders — pages + APIs (ADMIN/MANAGER ONLY)
 urlpatterns += [
+    # Current canonical route
     path("place-order/",                 manager_required(_need_biz(_place_order_page)),   name="place_order_page"),
+    # 🔙 Back-compat alias for older templates/links
+    path("orders/new/",                  manager_required(_need_biz(_place_order_page)),   name="place_order"),
+
     path("orders/",                      manager_required(_need_biz(_orders_list)),        name="orders_list"),
     path("orders/<int:po_id>/invoice/",  manager_required(_need_biz(_po_invoice)),         name="po_invoice"),
     path("orders/<int:po_id>/download/", manager_required(_need_biz(_po_invoice)),         name="po_invoice_download"),

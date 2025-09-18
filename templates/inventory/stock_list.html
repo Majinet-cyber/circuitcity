@@ -51,6 +51,7 @@
     padding:.5rem .6rem; border-radius:.55rem; border:1px solid var(--cc-border); background:var(--cc-panel); color:var(--cc-text);
     min-height:44px;
   }
+  .filters-right{ margin-left:auto; display:flex; gap:.5rem; align-items:center; flex-wrap:wrap }
   .btn-deep{
     background:linear-gradient(180deg, rgba(255,255,255,.14), rgba(255,255,255,.04));
     border:1px solid var(--cc-border); border-radius:.55rem; padding:.5rem .7rem;
@@ -67,7 +68,7 @@
   .ticker-controls{ display:flex; gap:.4rem; margin-top:.6rem; flex-wrap:wrap }
 
   #stockTable{ width:100%; border-collapse:collapse; background:var(--cc-panel); border:1px solid var(--cc-border); border-radius:12px; overflow:hidden }
-  #stockTable thead th{ position:sticky; top:0; z-index:1; font-weight:700; color:var(--cc-muted); background:var(--cc-panel-2) }
+  #stockTable thead th{ position:sticky; top:0; z-index:1; font-weight:700; color:#94a3b8; background:var(--cc-panel-2) }
   #stockTable th,#stockTable td{ padding:.6rem .65rem; border-bottom:1px solid var(--cc-border); vertical-align:middle }
   #stockTable tbody tr:hover td{ background: color-mix(in oklab, var(--cc-accent) 8%, transparent) }
   #stockTable td.num{ text-align:right; font-variant-numeric:tabular-nums }
@@ -87,7 +88,7 @@
   /* Charts */
   .charts{ display:grid; grid-template-columns:1.4fr 1fr; gap:14px; margin-top:14px }
   .chart-card{ background:var(--cc-panel-2); border:1px solid var(--cc-border); border-radius:14px; padding:12px; position:relative; overflow:hidden }
-  .chart-card h3{ margin:.25rem 0 .6rem; font-size:.95rem; color:var(--cc-muted) }
+  .chart-card h3{ margin:.25rem 0 .6rem; font-size:.95rem; color:#94a3b8 }
   .chart-toolbar{ display:flex; gap:.5rem; align-items:center; justify-content:flex-end }
   .chart-canvas{ width:100% !important; max-width:100%; height:240px !important }
   .chart-canvas--sm{ height:200px !important }
@@ -138,6 +139,7 @@
   {% url 'inventory:scan_sold'    as scan_sold_url %}
   {% url 'inventory:scan_web'     as scan_web_url %}
   {% url 'inventory:place_order_page' as place_order_url %}
+  {% if not place_order_url %}{% url 'inventory:place_order' as place_order_url %}{% endif %}
   {% url 'feedback'               as feedback_url %}
   {% url 'inventory:dashboard'    as dash_url %}
   {% url 'settings' as settings_url %}
@@ -154,9 +156,11 @@
     <a class="glass-btn glass-amber tap" href="{{ scan_sold_url|default:'#' }}" onclick="window.buzz&&buzz(10)"><span class="glass-icon">✅</span> Scan SOLD</a>
     <a class="glass-btn glass-blue  tap" href="{{ scan_web_url|default:'#' }}" onclick="window.buzz&&buzz(10)"><span class="glass-icon">🌐</span> Scan (Web)</a>
 
-    {# Place Order – managers/admins only #}
-    {% if IS_MANAGER or request.user.is_staff or request.user.is_superuser %}
-      <a class="glass-btn tap" href="{{ place_order_url|default:'#' }}" onclick="window.buzz&&buzz(8)"><span class="glass-icon">🧾</span> Place Order</a>
+    {# Place Order – show only if URL resolved AND user has a manager/staff/superuser role #}
+    {% if place_order_url %}
+      {% if IS_MANAGER or request.user.is_staff or request.user.is_superuser or request.user.profile.is_manager %}
+        <a class="glass-btn tap" href="{{ place_order_url }}" onclick="window.buzz&&buzz(8)"><span class="glass-icon">🧾</span> Place Order</a>
+      {% endif %}
     {% endif %}
 
     <!-- Feedback link -->
@@ -202,6 +206,17 @@
         <label>Rows/page: <input type="number" name="page_size" min="10" max="200" value="{{ request.GET.page_size|default:50 }}" inputmode="numeric"></label>
         <button class="btn-deep tap" type="submit" onclick="window.buzz&&buzz(8)">Apply</button>
         <a class="btn-deep tap" href="{{ export_csv_url|default:'/inventory/export/' }}?{% for k,v in request.GET.items %}{% if k != 'export' %}{{k}}={{v|urlencode}}&{% endif %}{% endfor %}export=csv" onclick="window.buzz&&buzz(8)">Download CSV</a>
+
+        {# Secondary Place Order action on the right #}
+        {% if place_order_url %}
+          {% if IS_MANAGER or request.user.is_staff or request.user.is_superuser or request.user.profile.is_manager %}
+            <span class="filters-right">
+              <a class="btn-deep tap" href="{{ place_order_url }}" onclick="window.buzz&&buzz(8)">
+                <i class="bi bi-clipboard-plus"></i> Place Order
+              </a>
+            </span>
+          {% endif %}
+        {% endif %}
       </form>
     </div>
   </div>
@@ -431,12 +446,12 @@
     </div>
 
     {# ---- Admin section ---- #}
-    {% if IS_MANAGER or request.user.is_staff or request.user.is_superuser %}
+    {% if IS_MANAGER or request.user.is_staff or request.user.is_superuser or request.user.profile.is_manager %}
       <h6 class="text-muted">Admin</h6>
       <div class="list-group">
         {% url 'inventory:place_order_page' as place_order_url %}
+        {% if not place_order_url %}{% url 'inventory:place_order' as place_order_url %}{% endif %}
         {% if place_order_url %}<a class="list-group-item list-group-item-action" href="{{ place_order_url }}"><i class="bi bi-receipt-cutoff me-2"></i> Place Order</a>{% endif %}
-        {# Show Django Admin ONLY to staff/superusers #}
         {% if request.user.is_staff or request.user.is_superuser %}
           <a class="list-group-item list-group-item-action" href="/admin/"><i class="bi bi-gear me-2"></i> Django Admin</a>
         {% endif %}

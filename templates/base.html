@@ -92,7 +92,7 @@
     .cc-main{ flex:1 1 auto; min-width:0; position:relative; z-index:0; background:var(--bg); color:var(--ink); }
     .cc-page{ max-width:1200px; margin:0 auto; padding:18px; }
 
-    /* Sticky header (polished) */
+    /* Sticky header */
     .cc-header{
       position:sticky; top:0; z-index:2;
       background:rgba(255,255,255,.98);
@@ -137,7 +137,7 @@
 
     .glass-card{ border-radius:var(--glass-br); border:var(--glass-bd); background:var(--glass-bg); box-shadow:var(--glass-shadow); }
 
-    /* ---------- Active Business Pill (glass) ---------- */
+    /* ---------- Active Business / HQ Pill ---------- */
     .tenant-pill{
       position:relative; display:flex; align-items:center; gap:.5rem; padding:.35rem .6rem .35rem .45rem;
       border-radius:999px; border:1px solid var(--line); background:color-mix(in oklab, var(--card) 82%, transparent);
@@ -167,7 +167,7 @@
     .tenant-item:hover{ background:rgba(2,6,23,.06); border-color:rgba(2,6,23,.08); }
     .tenant-divider{ height:1px; background:var(--line); margin:.3rem .25rem; }
 
-    /* ---------- Notifications (polished) ---------- */
+    /* ---------- Notifications ---------- */
     .notif-btn{
       position:relative; display:inline-grid; place-items:center;
       width:40px; height:40px; border-radius:12px; border:1px solid var(--line);
@@ -223,19 +223,10 @@
 
     .table td, .table th{ vertical-align: middle; }
 
-    /* ---------- Go button (first-hover shows “Go”) ---------- */
-    .go-btn{
-      position:relative;
-      background: var(--cc-accent);
-      color:#fff;
-      font-weight:800;
-      border:0;
-      min-width:56px;
-      transition: background .2s var(--elevate), transform .2s var(--elevate);
-    }
+    /* Go button */
+    .go-btn{ position:relative; background: var(--cc-accent); color:#fff; font-weight:800; border:0; min-width:56px;
+      transition: background .2s var(--elevate), transform .2s var(--elevate); }
     .go-btn:focus-visible{ outline: 3px solid color-mix(in oklab, #22c55e 35%, transparent); outline-offset:2px; }
-    /* Only during the first-hover demo */
-    .gx-btn.gx-first{ background:#22c55e !important; }
   </style>
 
   {% block extra_head %}{% endblock %}
@@ -244,15 +235,17 @@
 <body>
 
 <div class="cc-shell">
-  {# CHANGED: include the sidebar we edited earlier #}
-  {% block sidebar %}{% include "partials/sidebar.html" %}{% endblock %}
+  {# ---------- Sidebar: always present (safe fallback) ---------- #}
+  {% block sidebar %}
+    {% include "partials/sidebar.html" %}
+  {% endblock %}
 
   <button class="mobile-toggle tap focus-ring" id="sidebarOpen" aria-label="Open menu"><i class="bi bi-list"></i></button>
   <div class="cc-backdrop" id="ccBackdrop" aria-hidden="true"></div>
 
   <div class="cc-main">
 
-    {# ------- URLs for routing/helpers ------- #}
+    {# ------- URLs for routing/helpers (tenant areas only) ------- #}
     {% url 'inventory:inventory_dashboard' as url_home %}
     {% url 'inventory:scan_in'           as url_scan_in %}
     {% url 'inventory:scan_sold'         as url_sell %}
@@ -279,16 +272,17 @@
               <div class="cc-search">
                 <i class="bi bi-search text-muted"></i>
                 <input id="global-search" class="form-control input" type="search" placeholder="Search SKUs, agents, invoices…" autocomplete="off" />
-                <button class="btn gx-btn" type="button" id="global-search-go" title="Go">Go</button>
+                <button class="btn primary" type="button" id="global-search-go" title="Go">Go</button>
               </div>
             {% else %}
               <div></div>
             {% endif %}
 
             <div class="cc-actions">
-              {# -------- Active Business Pill -------- #}
+              {# -------- HQ / Tenant Pill -------- #}
               <div class="position-relative me-1" id="tenantRoot">
                 {% if request.business %}
+                  {# Standard tenant pill when a business is active #}
                   <div class="tenant-pill hover-lift tap" role="button" id="tenantBtn" aria-haspopup="true" aria-expanded="false">
                     <span class="tenant-dot" aria-hidden="true"></span>
                     <span class="tenant-name">{{ request.business.name }}</span>
@@ -315,6 +309,13 @@
                       <a class="tenant-item" href="{{ url_admin_business }}"><i class="bi bi-shield-lock"></i> Staff approvals</a>
                     {% endif %}
                   </div>
+                {% elif request.user.is_superuser %}
+                  {# HQ pill for superusers when no active business is selected #}
+                  <a class="tenant-pill hover-lift tap" href="/hq/">
+                    <span class="tenant-dot" style="background:#60a5fa"></span>
+                    <span class="tenant-name">Platform HQ</span>
+                    <span class="tenant-role">· Admin</span>
+                  </a>
                 {% else %}
                   <a class="tenant-pill hover-lift tap" href="{{ url_choose_business|default:'/tenants/choose/' }}">
                     <span class="tenant-dot" style="background:#f59e0b"></span>
@@ -497,7 +498,7 @@
     });
   });
 
-  /* Active nav highlight — CHANGED to match any sidebar link */
+  /* Active nav highlight */
   (function(){
     const path = location.pathname.replace(/\/+$/,'/') || '/';
     document.querySelectorAll('.cc-sidebar a[href]').forEach(a=>{
@@ -539,7 +540,7 @@
     btn.addEventListener('click', handle);
   })();
 
-  /* Go button: show “Go” only on the first hover/focus, then remember */
+  /* Go button: first-hover hint */
   (function(){
     const btn = document.getElementById('global-search-go');
     if(!btn) return;
@@ -696,7 +697,7 @@
     load(); setInterval(load, 60_000);
   })();
 
-  /* ---------- Tenant pill dropdown ---------- */
+  /* Tenant pill dropdown */
   (function(){
     const root = document.getElementById('tenantRoot');
     if(!root) return;

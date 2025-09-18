@@ -1,0 +1,38 @@
+{% extends "hq/base.html" %}
+{% block title %}Businesses{% endblock %}
+{% block body %}
+<h1 style="margin:0 0 10px">Businesses</h1>
+
+<form class="kpis" method="get">
+  <span class="pill {% if range == 'all' %}active{% endif %}" onclick="setRange('all')">All time</span>
+  <span class="pill {% if range == '7d' %}active{% endif %}" onclick="setRange('7d')">Last 7d</span>
+  <span class="pill {% if range == 'custom' %}active{% endif %}">
+    Custom <input type="date" name="start" value="{{ start|date:'Y-m-d' }}"> <input type="date" name="end" value="{{ end|date:'Y-m-d' }}">
+    <button class="btn btn-ghost" type="submit">Apply</button>
+  </span>
+  <input type="hidden" name="range" id="range" value="{{ range|default:'all' }}">
+  <div style="margin-left:auto"></div>
+  <input type="search" name="q" value="{{ q }}" placeholder="Search businesses">
+  <button class="btn btn-ghost">Go</button>
+</form>
+
+<table>
+  <thead>
+    <tr><th>Name</th><th>Active Subs</th><th>Invoices</th><th>MRR (sum)</th></tr>
+  </thead>
+  <tbody>
+  {% for b in page_obj %}
+    <tr onclick="location.href='{% url 'hq:business_detail' b.pk %}'" style="cursor:pointer">
+      <td><a href="{% url 'hq:business_detail' b.pk %}">{{ b.name }}</a></td>
+      <td>{{ b.subs_count|default:'—' }}</td>
+      <td>{{ b.invoices_count|default:'—' }}</td>
+      <td>{{ b.mrr_sum|default:'—' }}</td>
+    </tr>
+  {% empty %}
+    <tr><td colspan="4">No businesses yet.</td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+
+<script>function setRange(r){document.getElementById('range').value=r;document.forms[0].submit();}</script>
+{% endblock %}

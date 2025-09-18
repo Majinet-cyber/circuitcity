@@ -1,0 +1,75 @@
+{# templates/inventory/super_dashboard.html #}
+{% extends "base.html" %}
+{% block title %}Inventory · Super{% endblock %}
+{% block content %}
+<section class="container py-3" style="max-width:1200px">
+  <h2 class="mb-3">Inventory Control Tower</h2>
+
+  <div class="row g-3 mb-3">
+    <div class="col-md-3"><div class="card"><div class="card-body">
+      <div class="text-muted small">Businesses</div>
+      <div class="fs-4 fw-bold">{{ kpi.businesses }}</div>
+    </div></div></div>
+    <div class="col-md-3"><div class="card"><div class="card-body">
+      <div class="text-muted small">SKUs</div>
+      <div class="fs-4 fw-bold">{{ kpi.skus }}</div>
+    </div></div></div>
+    <div class="col-md-3"><div class="card"><div class="card-body">
+      <div class="text-muted small">Units on hand</div>
+      <div class="fs-4 fw-bold">{{ kpi.units|default:0 }}</div>
+    </div></div></div>
+    <div class="col-md-3"><div class="card"><div class="card-body">
+      <div class="text-muted small">Exchange (aging &gt; 90d)</div>
+      <div class="fs-4 fw-bold"><span id="agingTotal">—</span></div>
+    </div></div></div>
+  </div>
+
+  <div class="card mb-3"><div class="card-body">
+    <h5 class="mb-2">Hotspots (Tenants)</h5>
+    <div class="table-responsive">
+      <table class="table table-sm align-middle">
+        <thead><tr>
+          <th>Business</th><th class="text-end">Units</th><th class="text-end">Aging &gt; 90d</th><th class="text-end">Stockouts</th>
+        </tr></thead>
+        <tbody>
+          {% for r in by_tenant %}
+          <tr>
+            <td>{{ r.business__name }}</td>
+            <td class="text-end">{{ r.units|default:0 }}</td>
+            <td class="text-end">{{ r.aging_gt_90|default:0 }}</td>
+            <td class="text-end">{{ r.stockouts|default:0 }}</td>
+          </tr>
+          {% empty %}<tr><td colspan="4" class="text-muted">No data.</td></tr>{% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div></div>
+
+  <div class="card mb-3"><div class="card-body">
+    <h5 class="mb-2">Top SKUs (multi-tenant)</h5>
+    <div class="table-responsive">
+      <table class="table table-sm align-middle">
+        <thead><tr>
+          <th>SKU</th><th class="text-end">Units</th><th class="text-end">Tenants</th><th class="text-end">Aging %</th>
+        </tr></thead>
+        <tbody>
+          {% for r in by_sku %}
+          <tr>
+            <td>{{ r.product__name }}</td>
+            <td class="text-end">{{ r.units|default:0 }}</td>
+            <td class="text-end">{{ r.tenants|default:1 }}</td>
+            <td class="text-end">{{ r.aging_pct|floatformat:0 }}%</td>
+          </tr>
+          {% empty %}<tr><td colspan="4" class="text-muted">No data.</td></tr>{% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div></div>
+
+  <div class="d-flex gap-2">
+    <a class="btn btn-primary" href="{% url 'inventory:super_rebalance' %}">AI Rebalance</a>
+    <a class="btn btn-outline-primary" href="{% url 'inventory:super_exchange' %}">Open Exchange</a>
+    <a class="btn btn-outline-secondary" href="{% url 'dashboard:dashboard_cfo' %}">AI-CFO</a>
+  </div>
+</section>
+{% endblock %}

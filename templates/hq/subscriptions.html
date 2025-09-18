@@ -1,0 +1,92 @@
+{% load static %}
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>HQ · Subscriptions</title>
+  <style>
+    :root{
+      --glass: rgba(255,255,255,.65);
+      --ring:#d8e4ff; --ink-900:#0b1b3a; --ink-700:#1c2f57; --ink-500:#476aa0;
+      --brand-600:#2757d8; --shadow: 0 12px 40px rgba(12,36,97,.12);
+      --grad: linear-gradient(135deg, rgba(47,107,255,.35), rgba(255,255,255,.35));
+    }
+    html,body{margin:0;background:radial-gradient(1100px 1100px at 10% -10%, #ffffff 0, #f7fbff 30%, #eef5ff 60%, #e6f0ff 100%); color:var(--ink-900); font:500 15px/1.45 system-ui,-apple-system,Segoe UI,Inter,Roboto,Arial}
+    .wrap{max-width:1180px;margin:24px auto;padding:0 14px}
+    h1{margin:0 0 14px;font-size:28px;letter-spacing:.2px}
+    .toolbar{display:flex;gap:10px;align-items:center;margin:10px 0 16px}
+    .search{flex:1;display:flex;gap:10px;align-items:center;padding:10px 12px;border-radius:999px;background:var(--glass);backdrop-filter:blur(10px);border:1px solid transparent;box-shadow:0 10px 30px rgba(12,36,97,.08); position:relative}
+    .search:before{content:"";position:absolute;inset:0;padding:1px;border-radius:999px;background:var(--grad);-webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);-webkit-mask-composite:xor;mask-composite:exclude}
+    .search input{flex:1;border:none;background:transparent;outline:none;font:inherit}
+    .go{border:none;border-radius:999px;padding:8px 14px;font-weight:800;background:var(--brand-600);color:#fff;cursor:pointer}
+    .chip{padding:.35rem .7rem;border-radius:999px;background:#e9f2ff;border:1px solid var(--ring);color:#1e3a8a;font-weight:800;font-size:12px}
+
+    .card{background:var(--glass);backdrop-filter:blur(10px);border-radius:16px;box-shadow:var(--shadow);border:1px solid transparent;overflow:hidden}
+    .card:before{content:"";position:absolute}
+    table{width:100%;border-collapse:separate;border-spacing:0}
+    thead th{font-size:12px;text-transform:uppercase;letter-spacing:.4px;color:var(--ink-500);text-align:left;padding:12px 14px;background:rgba(255,255,255,.5);position:sticky;top:0;backdrop-filter:blur(8px)}
+    tbody td{padding:14px}
+    tbody tr:not(:last-child) td{border-bottom:1px solid rgba(39,87,216,.12)}
+    .num{font-weight:900}
+    .muted{color:var(--ink-500);font-size:12px}
+    .status{display:inline-flex;gap:6px;align-items:center;padding:.25rem .55rem;border-radius:999px;border:1px solid var(--ring);background:#eef4ff;font-weight:800;color:#2757d8;font-size:12px}
+    .pager{display:flex;gap:8px;justify-content:flex-end;margin-top:12px}
+    .pager a,.pager span{padding:.4rem .7rem;border-radius:10px;border:1px solid var(--ring);text-decoration:none;color:#1e3a8a;background:rgba(255,255,255,.7)}
+    .pager .current{background:#2757d8;color:#fff;border-color:#2757d8}
+  </style>
+</head>
+<body>
+  {% url 'hq:dashboard' as dashboard_url %}
+  {% url 'hq:subscriptions' as subscriptions_url %}
+
+  <div class="wrap">
+    <h1>Subscriptions <span class="chip">{{ subs.paginator.count }} total</span></h1>
+
+    <form class="toolbar" method="get" action="{{ subscriptions_url|default:'/hq/subscriptions/' }}">
+      <div class="search">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M15.5 15.5L21 21" stroke="#5a78b0" stroke-width="2" stroke-linecap="round"/><circle cx="10.5" cy="10.5" r="6.5" stroke="#5a78b0" stroke-width="2"/></svg>
+        <input type="search" name="q" value="{{ query }}" placeholder="Search business or plan…"/>
+      </div>
+      <button class="go" type="submit">Go</button>
+    </form>
+
+    <div class="card">
+      <table>
+        <thead>
+          <tr>
+            <th>Business</th>
+            <th>Plan</th>
+            <th>Cycle</th>
+            <th>Status</th>
+            <th>Plan amount</th>
+            <th>Started</th>
+          </tr>
+        </thead>
+        <tbody>
+        {% for s in subs %}
+          <tr>
+            <td><a href="{{ s.business.get_absolute_url|default:'#' }}">{{ s.business.name }}</a></td>
+            <td>{{ s.plan_name|default:"—" }}</td>
+            <td>{{ s.billing_interval|default:"—" }}</td>
+            <td><span class="status">{{ s.get_status_display|default:s.status }}</span></td>
+            <td class="num">MWK {{ s.plan_amount|default:"0.00" }}</td>
+            <td class="muted">{{ s.created_at|date:"Y-m-d" }}</td>
+          </tr>
+        {% empty %}
+          <tr><td colspan="6" class="muted" style="padding:24px">No subscriptions.</td></tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    {% if subs.paginator.num_pages > 1 %}
+    <div class="pager">
+      {% if subs.has_previous %}<a href="?page={{ subs.previous_page_number }}&q={{ query|urlencode }}">Prev</a>{% endif %}
+      <span class="current">{{ subs.number }} / {{ subs.paginator.num_pages }}</span>
+      {% if subs.has_next %}<a href="?page={{ subs.next_page_number }}&q={{ query|urlencode }}">Next</a>{% endif %}
+    </div>
+    {% endif %}
+  </div>
+</body>
+</html>

@@ -1,0 +1,67 @@
+{% load static %}
+<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Invoices</title>
+<style>
+  body{font:500 15px/1.45 system-ui;background:#f7fbff;margin:0;color:#0b1b3a}
+  .shell{max-width:1200px;margin:20px auto;padding:0 14px}
+  h1{margin:0 0 10px}
+  .kpis{display:flex;gap:10px;flex-wrap:wrap;margin:8px 0 12px}
+  .card{padding:12px 14px;border:1px solid #d8e4ff;border-radius:14px;background:#fff;box-shadow:0 10px 30px rgba(12,36,97,.06)}
+  .filters{display:flex;gap:8px;align-items:center;margin:12px 0 16px;flex-wrap:wrap}
+  .pill{padding:8px 12px;border-radius:999px;border:1px solid #d8e4ff;background:#ffffffaa}
+  .pill.active{background:#e9f2ff;border-color:#bcd0ff;color:#2757d8}
+  input[type="search"], input[type="date"]{padding:8px 10px;border-radius:10px;border:1px solid #d8e4ff}
+  table{width:100%;border-collapse:separate;border-spacing:0 10px}
+  th{font-size:12px;color:#476aa0;text-align:left;padding:0 10px}
+  td{background:#fff;border:1px solid #e7eeff;border-left:none;border-right:none;padding:14px 10px}
+  tr{box-shadow:0 6px 18px rgba(12,36,97,.08)}
+  .muted{color:#476aa0}
+</style>
+</head><body>
+<div class="shell">
+  <h1>Invoices</h1>
+
+  <div class="kpis">
+    <div class="card">Count: <b>{{ totals.count }}</b></div>
+    <div class="card">Open total: <b>{{ totals.open_total }}</b></div>
+    <div class="card">Paid total: <b>{{ totals.paid_total }}</b></div>
+    <div class="card">Bank fees: <b>{{ totals.bank_fees }}</b></div>
+    <div class="card">Partner fees: <b>{{ totals.partner_fees }}</b></div>
+  </div>
+
+  <form class="filters" method="get">
+    <div class="pill {% if range == 'all' %}active{% endif %}" onclick="setRange('all')">All time</div>
+    <div class="pill {% if range == '7d' %}active{% endif %}"  onclick="setRange('7d')">Last 7d</div>
+    <div class="pill {% if range == 'custom' %}active{% endif %}">
+      Custom <input type="date" name="start" value="{{ start|date:'Y-m-d' }}"> <input type="date" name="end" value="{{ end|date:'Y-m-d' }}"> <button>Apply</button>
+    </div>
+    <select name="status">
+      <option value="">Any status</option>
+      <option value="OPEN"  {% if status == 'OPEN' %}selected{% endif %}>Open</option>
+      <option value="PAID"  {% if status == 'PAID' %}selected{% endif %}>Paid</option>
+      <option value="DUE"   {% if status == 'DUE' %}selected{% endif %}>Due</option>
+    </select>
+    <input type="hidden" name="range" id="range" value="{{ range|default:'all' }}">
+    <input type="search" name="q" value="{{ q }}" placeholder="Search number or business">
+    <button>Go</button>
+  </form>
+
+  {% if page_obj %}
+  <table>
+    <thead><tr><th>No.</th><th>Business</th><th>Amount</th><th>Status</th><th>Date</th></tr></thead>
+    <tbody>
+      {% for inv in page_obj %}
+      <tr>
+        <td>{{ inv.number|default:inv.pk }}</td>
+        <td>{{ inv.business.name|default:"—" }}</td>
+        <td>{{ inv.amount }}</td>
+        <td>{{ inv.status }}</td>
+        <td class="muted">{{ inv.issue_date|date:"Y-m-d" }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% endif %}
+</div>
+<script>function setRange(r){document.getElementById('range').value=r;document.forms[0].submit();}</script>
+</body></html>

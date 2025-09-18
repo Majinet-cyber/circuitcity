@@ -257,6 +257,7 @@ INSTALLED_APPS = [
     "django.contrib.messages",
     "django.contrib.staticfiles",
     "django.contrib.humanize",
+    "hq",
 
     # NEW: multi-tenant core
     "tenants",
