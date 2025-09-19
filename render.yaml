@@ -1,4 +1,4 @@
-﻿services:
+services:
   - type: web
     name: circuitcity-main
     env: python
@@ -6,16 +6,7 @@
     autoDeploy: true
 
     buildCommand: |
-      python -m pip install --upgrade pip
-      python -m pip install -r requirements.txt
-      python - <<'PY'
-import sys
-try:
-    import PIL
-    print("Pillow OK:", getattr(PIL, "__version__", "unknown"), file=sys.stderr)
-except Exception as e:
-    print("Pillow import FAILED:", repr(e), file=sys.stderr); raise
-PY
+      pip install -r requirements.txt
       python manage.py collectstatic --noinput || true
       python manage.py migrate --noinput || true
 
