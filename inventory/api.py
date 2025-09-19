@@ -18,6 +18,7 @@ from django.db.models.functions import TruncDate, Coalesce, Cast
 from django.http import JsonResponse, HttpRequest
 from django.utils import timezone
 from django.views.decorators.cache import never_cache
+from django.views.decorators.csrf import csrf_exempt
 
 from .models import InventoryItem
 from sales.models import Sale
@@ -87,18 +88,24 @@ def _err(msg: str, status: int = 400, **extra) -> JsonResponse:
     return JsonResponse(payload, status=status)
 
 def _can_view_all(user) -> bool:
-    if not user.is_authenticated:
+    if not getattr(user, "is_authenticated", False):
         return False
-    if user.is_staff:
+    if getattr(user, "is_staff", False):
         return True
+    # Manager / Admin groups
     return user.groups.filter(name__in=["Admin", "Manager", "Auditor", "Auditors"]).exists()
 
 def _scope_mode(request: HttpRequest) -> str:
+    """
+    Default to per-agent scope (self) unless the caller explicitly asks for ?scope=all.
+    """
     val = (request.GET.get("scope") or "").strip().lower()
-    return "self" if val in {"self", "mine", "me", "user", "agent"} else "all"
+    return "all" if val in {"all", "global"} else "self"
 
 def _has_field(model, name: str) -> bool:
     return any(getattr(f, "name", None) == name for f in model._meta.get_fields())
+
+# -- Dynamic field discovery for Sales/Inventory --
 
 def _sale_date_field() -> str:
     for c in ("sold_at", "created_at", "created", "timestamp", "date"):
@@ -139,16 +146,56 @@ def _best_item_price_field() -> str | None:
             return c
     return None
 
+# --------- Ownership logic (CRITICAL FIX) ----------
+
+_OWNER_FIELD_CANDIDATES = [
+    # very common
+    "assigned_agent", "assigned_to", "assignee", "owner",
+    "user", "agent", "created_by", "added_by", "received_by",
+    "handled_by", "custodian", "stocked_by", "checked_in_by",
+    "sold_by", "creator", "createdby",
+]
+
+def _agent_owner_q(model, user) -> Q:
+    """
+    Build an OR'd Q() across many possible agent/owner fields for InventoryItem or Sale.
+    Works with FK fields (*_id), user relation, or username text fields.
+    """
+    q = Q(pk__in=[])  # start false
+    for name in _OWNER_FIELD_CANDIDATES:
+        if not _has_field(model, name):
+            continue
+        # FK relation or user field
+        q |= Q(**{name: user})
+        q |= Q(**{f"{name}_id": getattr(user, "id", None)})
+        # username/text fallback
+        q |= Q(**{f"{name}__username": getattr(user, "username", None)})
+    return q
+
+def _apply_self_scope_or_none(qs, model, user):
+    """
+    If caller is agent-level, restrict to self-ownership.
+    If no recognizable ownership field exists, return qs.none()
+    to avoid leaking global data.
+    """
+    q = _agent_owner_q(model, user)
+    if q.children:
+        return qs.filter(q)
+    # No ownership columns we recognize -> show nothing for agents
+    return qs.none()
+
 def _scoped_sales_qs(request: HttpRequest):
     qs = Sale.objects.all()
     try:
         qs = qs.select_related("item__product")
     except Exception:
         pass
-    if _scope_mode(request) == "self" and not _can_view_all(request.user):
-        if _has_field(Sale, "agent"):
-            qs = qs.filter(agent=request.user)
-    return qs
+
+    # Only managers/admins can see global; agents default to self
+    if _scope_mode(request) == "all":
+        if _can_view_all(request.user):
+            return qs
+    return _apply_self_scope_or_none(qs, Sale, request.user)
 
 def _scoped_stock_qs(request: HttpRequest):
     qs = InventoryItem.objects.all()
@@ -156,10 +203,13 @@ def _scoped_stock_qs(request: HttpRequest):
         qs = qs.select_related("product")
     except Exception:
         pass
-    if _scope_mode(request) == "self" and not _can_view_all(request.user):
-        if _has_field(InventoryItem, "assigned_agent"):
-            qs = qs.filter(assigned_agent=request.user)
-    return qs
+
+    if _scope_mode(request) == "all":
+        if _can_view_all(request.user):
+            return qs
+    return _apply_self_scope_or_none(qs, InventoryItem, request.user)
+
+# ---------- utilities ----------
 
 def date_range_filter(qs, field_name: str, start, end_excl):
     field = qs.model._meta.get_field(field_name)
@@ -230,7 +280,7 @@ def _currency_payload():
     return {"base": base, "display": display, "sign": sign}
 
 
-# ---------- date utils (NEW) ----------
+# ---------- date utils ----------
 
 def _parse_date_loose(s: str | None) -> Optional[date]:
     if not s:
@@ -286,7 +336,7 @@ def _extract_range(request: HttpRequest, *, default_period: str = "month") -> Tu
 
     # 3) fall back to period
     period = (request.GET.get("period") or default_period).lower()
-    if period in ("today", "day", "date"):  # accept "date" as synonym of a single-day window when no ?date=
+    if period in ("today", "day", "date"):
         start = end_incl = today
     elif period in ("7d", "last7", "last_7", "week"):
         start = today - timedelta(days=6)
@@ -406,7 +456,7 @@ def _fallback_items_daily(
     return _fill_days(start, end_excl, data_map, fmt=label_fmt)
 
 
-# ---------- API: AI predictions (kept as-is; based on last 14d) ----------
+# ---------- API: AI predictions (last 14d) ----------
 
 @never_cache
 @login_required
@@ -597,7 +647,7 @@ def api_value_trend(request: HttpRequest):
       - labels=iso|pretty
     """
     metric = (request.GET.get("metric") or "revenue").lower()
-    model_id = request.GET.get("model")
+    model_id = (request.GET.get("model") or "").strip() or None
     labels_fmt = (request.GET.get("labels") or "iso").lower()
 
     start_incl, end_incl, range_meta = _extract_range(request, default_period="7d")
@@ -848,6 +898,15 @@ def api_mark_sold(request: HttpRequest):
     except Exception: pass
     sale.save()
 
+    # Mirror agent onto the item when possible
+    for agent_field in ("assigned_agent", "assigned_to", "assignee", "owner", "user", "agent", "created_by", "added_by"):
+        if _has_field(InventoryItem, agent_field):
+            try:
+                setattr(item, agent_field, request.user)
+                break
+            except Exception:
+                pass
+
     try: setattr(item, status_field, "SOLD")
     except Exception: pass
     if sold_at_field and _has_field(InventoryItem, sold_at_field):
@@ -860,6 +919,7 @@ def api_mark_sold(request: HttpRequest):
 
 @never_cache
 @login_required
+@csrf_exempt  # Dev-friendly: allow AJAX without CSRF token; remove if you enforce CSRF
 def api_time_checkin(request: HttpRequest):
     if request.method != "POST":
         return _err("POST required", status=405)
@@ -999,7 +1059,9 @@ def api_audit_verify(request: HttpRequest):
     limit = max(100, min(limit, 200000))
 
     # Verify newest→oldest slice by reversing after fetch to walk forward
-    rows = list(AuditLog.objects.order_by("-id").values("id", "prev_hash", "hash", "actor_id", "entity", "entity_id", "action", "payload")[:limit])
+    rows = list(AuditLog.objects.order_by("-id").values(
+        "id", "prev_hash", "hash", "actor_id", "entity", "entity_id", "action", "payload"
+    )[:limit])
     rows.reverse()
 
     import hashlib as _hashlib
@@ -1031,3 +1093,8 @@ def api_audit_verify(request: HttpRequest):
         checked += 1
 
     return _ok({"supported": True, "ok_chain": ok_chain, "broken_at": broken_at, "checked": checked})
+
+
+# ---------- Back-compat alias ----------
+
+api_predictions = predictions_summary

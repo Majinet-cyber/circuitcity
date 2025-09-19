@@ -12,7 +12,6 @@ class CreateBusinessForm(forms.ModelForm):
     Minimal manager-onboarding form.
     - Only asks for 'name'
     - Derives a unique slug automatically
-    - (Optionally) allows subdomain if you uncomment the Meta fields
     """
     class Meta:
         model = Business
@@ -51,4 +50,35 @@ class JoinAsAgentForm(forms.Form):
             raise forms.ValidationError("No active business with that name.")
 
         cleaned["business"] = biz
+        return cleaned
+
+
+class InviteAgentForm(forms.Form):
+    """
+    Used by managers to invite agents.
+
+    New behavior to match the updated template:
+      - 'invited_name' is optional
+      - 'email' and 'phone' are BOTH optional
+      - optional 'message' field is included for convenience
+    """
+    invited_name = forms.CharField(
+        max_length=120,
+        required=False,
+        label="Invited name (optional)",
+    )
+    email = forms.EmailField(required=False)
+    phone = forms.CharField(required=False, help_text="Optional. WhatsApp/phone number")
+    message = forms.CharField(required=False, max_length=240)
+
+    def clean(self):
+        cleaned = super().clean()
+
+        # Normalize whitespace on free-text fields
+        for key in ("invited_name", "email", "phone", "message"):
+            if key in cleaned and isinstance(cleaned.get(key), str):
+                cleaned[key] = cleaned[key].strip()
+
+        # NOTE: We intentionally do NOT require email or phone.
+        # The manager can copy/share the generated link directly.
         return cleaned

@@ -7,17 +7,26 @@ from django.http import JsonResponse
 from django.shortcuts import redirect
 from django.urls import path, re_path, reverse, NoReverseMatch
 
-# ---- Import app views (and optional modules) safely ----
+# ---- Import app views (page handlers) ----
 try:
     from . import views
 except Exception:
     views = SimpleNamespace()
 
+# ---- Import API modules ----
+# v2 (safe shims & new handlers live here)
 try:
-    from . import api as _api
+    from . import api_views as _api_v2
 except Exception:
-    _api = SimpleNamespace()
+    _api_v2 = SimpleNamespace()
 
+# legacy (older aggregations; some use SQLite UDFs)
+try:
+    from . import api as _api_legacy
+except Exception:
+    _api_legacy = SimpleNamespace()
+
+# optional audit views packaged under separate module
 try:
     from . import views_audit as _views_audit
 except Exception:
@@ -54,11 +63,12 @@ def _get_view(name: str, *sources, msg: str | None = None):
             return fn
     return _stub(msg or f"{name} endpoint not implemented")
 
-def _get_any(names: tuple[str, ...], src, msg: str | None = None):
-    for name in names:
-        fn = getattr(src, name, None)
-        if callable(fn):
-            return fn
+def _get_any(names: tuple[str, ...], *sources, msg: str | None = None):
+    for src in sources:
+        for name in names:
+            fn = getattr(src, name, None)
+            if callable(fn):
+                return fn
     return _stub(msg or f"{'/'.join(names)} endpoint not implemented")
 
 # Best-effort reverse that tolerates missing namespaces
@@ -67,7 +77,6 @@ def _safe_reverse(view_name: str, *args, **kwargs) -> str | None:
         return reverse(view_name, args=args, kwargs=kwargs)
     except NoReverseMatch:
         if ":" in view_name:
-            # Try without namespace
             _, bare = view_name.split(":", 1)
             try:
                 return reverse(bare, args=args, kwargs=kwargs)
@@ -122,35 +131,40 @@ _place_order_page   = _get_view("place_order_page", views, msg="place order page
 _orders_list        = _get_view("orders_list", views, msg="orders list page not implemented")
 _po_invoice         = _get_view("po_invoice", views, msg="invoice view missing")
 
-_mark_sold_view     = _get_view("api_mark_sold",      views)
-_time_checkin_view  = _get_view("api_time_checkin",   views)
-_wallet_summary     = _get_view("api_wallet_summary", views)
-_wallet_add_txn     = _get_view("api_wallet_add_txn", views)
-_sales_trend_view   = _get_view("api_sales_trend",    views)
-_top_models_view    = _get_view("api_top_models",     views)
-_profit_bar_view    = _get_view("api_profit_bar",     views)
-_value_trend_view   = _get_view("api_value_trend",    views)
-_agent_trend_view   = _get_view("api_agent_trend",    views)
-_predictions_view   = _get_view("api_predictions",    views)
-_cash_overview_view = _get_view("api_cash_overview",  views)
-_alerts_view        = _get_view("api_alerts",         views)
-_restock_heatmap    = _get_view("restock_heatmap_api", views)
-_api_order_price    = _get_view("api_order_price",    views)
-_api_stock_models   = _get_view("api_stock_models",   views)
-_api_place_order    = _get_view("api_place_order",    views)
+# ---- API resolvers (prefer v2, then legacy, then page views as last resort) ----
+_mark_sold_view     = _get_any(("api_mark_sold",),      _api_v2, _api_legacy, views)
+_time_checkin_view  = _get_any(("api_time_checkin",),   _api_v2, _api_legacy, views)
+_wallet_summary     = _get_any(("api_wallet_summary",), _api_v2, _api_legacy, views)
+_wallet_add_txn     = _get_any(("api_wallet_add_txn",), _api_v2, _api_legacy, views)
+_sales_trend_view   = _get_any(("api_sales_trend","sales_trend"), _api_v2, _api_legacy, views)
+_top_models_view    = _get_any(("api_top_models",),     _api_v2, _api_legacy, views)
+_profit_bar_view    = _get_any(("api_profit_bar",),     _api_v2, _api_legacy, views)
 
-_api_product_create       = _get_view("api_product_create", views, msg="api_product_create missing")
-_api_product_update_price = _get_view("api_product_update_price", views, msg="api_product_update_price missing")
+# ✅ IMPORTANT: route value_trend to v2 shim first to avoid legacy SQLite UDF crashes
+_value_trend_view   = _get_any(("value_trend","api_value_trend","api_sales_trend","sales_trend"), _api_v2, _api_legacy, views)
 
-_api_task_submit   = _get_view("api_task_submit",   _api, msg="api_task_submit missing")
-_api_task_status   = _get_view("api_task_status",   _api, msg="api_task_status missing")
-_api_audit_verify  = _get_view("api_audit_verify",  _api, msg="api_audit_verify missing")
+_agent_trend_view   = _get_any(("api_agent_trend",),    _api_v2, _api_legacy, views)
+_predictions_view   = _get_any(("api_predictions",),    _api_v2, _api_legacy, views)
+_cash_overview_view = _get_any(("api_cash_overview",),  _api_v2, _api_legacy, views)
+_alerts_view        = _get_any(("api_alerts",),         _api_v2, _api_legacy, views)
+_restock_heatmap    = _get_any(("restock_heatmap_api",), _api_v2, _api_legacy, views)
+_api_order_price    = _get_any(("api_order_price",),    _api_v2, _api_legacy, views)
+_api_stock_models   = _get_any(("api_stock_models",),   _api_v2, _api_legacy, views)
+_api_place_order    = _get_any(("api_place_order",),    _api_v2, _api_legacy, views)
 
-_audit_home    = _get_view("audit_home",    _views_audit, _api, views)
-_audit_verify  = _get_view("audit_verify",  _views_audit, _api, views)
-_audit_list    = _get_view("audit_list",    _views_audit, _api, views)
-_audit_detail  = _get_view("audit_detail",  _views_audit, _api, views)
-_audit_export  = _get_view("audit_export",  _views_audit, _api, views)
+_api_product_create       = _get_any(("api_product_create",), _api_v2, _api_legacy, views, msg="api_product_create missing")
+_api_product_update_price = _get_any(("api_product_update_price",), _api_v2, _api_legacy, views, msg="api_product_update_price missing")
+
+# Optional audit endpoints (available in either module)
+_api_task_submit   = _get_any(("api_task_submit",),  _api_v2, _api_legacy, msg="api_task_submit missing")
+_api_task_status   = _get_any(("api_task_status",),  _api_v2, _api_legacy, msg="api_task_status missing")
+_api_audit_verify  = _get_any(("api_audit_verify",), _api_v2, _api_legacy, msg="api_audit_verify missing")
+
+_audit_home    = _get_any(("audit_home",),    _views_audit, _api_v2, _api_legacy, views)
+_audit_verify  = _get_any(("audit_verify",),  _views_audit, _api_v2, _api_legacy, views)
+_audit_list    = _get_any(("audit_list",),    _views_audit, _api_v2, _api_legacy, views)
+_audit_detail  = _get_any(("audit_detail",),  _views_audit, _api_v2, _api_legacy, views)
+_audit_export  = _get_any(("audit_export",),  _views_audit, _api_v2, _api_legacy, views)
 
 # ---------------------------------------------------------------------
 # Local redirect helpers

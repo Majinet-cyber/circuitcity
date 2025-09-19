@@ -4,15 +4,15 @@ from __future__ import annotations
 import json
 from calendar import monthrange
 from datetime import date
-from decimal import Decimal
-from typing import Tuple
+from decimal import Decimal, InvalidOperation
+from typing import Tuple, Iterable
 
 from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.core.mail import send_mail
-from django.db.models import Sum
+from django.db.models import Sum, Q
 from django.http import HttpRequest, JsonResponse, HttpResponseBadRequest
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
@@ -30,6 +30,13 @@ try:
 except Exception:  # pragma: no cover
     from django.contrib.auth.decorators import login_required as otp_required  # type: ignore
 
+# Optional tenant helper (don’t hard-fail if tenants app is unavailable)
+try:
+    from tenants.utils import get_active_business  # type: ignore
+except Exception:  # pragma: no cover
+    def get_active_business(_request):  # type: ignore
+        return None
+
 from .models import (
     AdminPurchaseOrder,
     AdminPurchaseOrderItem,
@@ -44,7 +51,6 @@ from .models import (
     WalletTransaction,
 )
 from .services import add_txn, agent_wallet_summary, ranking
-
 
 # Optional: PO forms come from inventory.forms if available
 try:
@@ -61,7 +67,7 @@ def _staff(user) -> bool:
     """
     Manager-like users can access admin views:
     - Admins: user.is_staff
-    - Managers: user.profile.is_manager
+    - Managers: user.profile.is_manager  (if profile exists)
     """
     try:
         return bool(user.is_authenticated and (user.is_staff or user.profile.is_manager))
@@ -77,6 +83,22 @@ def _month_bounds(year: int, month: int) -> Tuple[date, date]:
 
 def _sum(qs, **filters) -> Decimal:
     return qs.filter(**filters).aggregate(s=Sum("amount"))["s"] or Decimal("0")
+
+
+def _maybe_scope_to_business(qs, business):
+    """
+    If model has a 'business' field, add business filter;
+    otherwise return qs unchanged. This avoids crashes when some
+    models aren’t tenant-scoped.
+    """
+    if not business:
+        return qs
+    try:
+        if "business" in [f.name for f in qs.model._meta.get_fields()]:
+            return qs.filter(business=business)
+    except Exception:
+        pass
+    return qs
 
 
 def _compute_breakdown(agent, first: date, last: date) -> dict:
@@ -115,7 +137,7 @@ def _send_payslip_email(p: Payslip) -> bool:
     Minimal email sender; attach numbers in body.
     Returns True if we think it went out successfully.
     """
-    if not p.email_to:
+    if not getattr(p, "email_to", ""):
         return False
 
     subject = f"Payslip · {p.year}-{p.month:02d} · {getattr(settings, 'APP_NAME', 'Circuit City')}"
@@ -191,7 +213,7 @@ def api_add_txn(request: HttpRequest):
     # Parse fields
     try:
         amount = Decimal(str(data.get("amount", "0") or "0"))
-    except Exception:
+    except (InvalidOperation, TypeError, ValueError):
         return JsonResponse({"ok": False, "error": "Invalid amount."}, status=400)
 
     ttype = (data.get("type") or data.get("reason") or "").strip()
@@ -200,7 +222,7 @@ def api_add_txn(request: HttpRequest):
     if ttype not in TxnType.values:
         return JsonResponse({"ok": False, "error": "Invalid reason/type."}, status=400)
 
-    # Post to the AGENT ledger
+    # Post to the AGENT ledger (services.add_txn handles sign/validation)
     add_txn(
         agent=request.user,
         amount=amount,
@@ -271,9 +293,9 @@ def _create_or_update_payslip_and_txn(
         p.deductions = deductions
         p.gross = gross
         p.net = net
-        if not p.email_to:
+        if not getattr(p, "email_to", ""):
             p.email_to = getattr(agent, "email", "") or ""
-        if not p.created_by:
+        if not getattr(p, "created_by", None):
             p.created_by = created_by
         p.save()
 
@@ -338,13 +360,27 @@ class AgentWalletView(LoginRequiredMixin, TemplateView):
     def get_context_data(self, **kwargs):
         ctx = super().get_context_data(**kwargs)
         u = self.request.user
+        biz = get_active_business(self.request)
+
+        # Summary is already per-user; txns also per-user
+        txns = WalletTransaction.objects.filter(ledger=Ledger.AGENT, agent=u)
         ctx["agent_summary"] = agent_wallet_summary(u)
-        ctx["txns"] = (
-            WalletTransaction.objects.filter(ledger=Ledger.AGENT, agent=u)
-            .order_by("-effective_date", "-id")[:50]
-        )
-        ctx["budgets"] = BudgetRequest.objects.filter(agent=u).order_by("-created_at")[:5]
-        ctx["payslips"] = Payslip.objects.filter(agent=u).order_by("-year", "-month")[:5]
+        ctx["txns"] = txns.order_by("-effective_date", "-id")[:50]
+
+        # Scope tenant-aware lists where possible
+        bqs = BudgetRequest.objects.filter(agent=u).order_by("-created_at")
+        pqs = Payslip.objects.filter(agent=u).order_by("-year", "-month")
+        ctx["budgets"] = bqs[:5]
+        ctx["payslips"] = pqs[:5]
+
+        # For ranking chart on the wallet page, prefer tenant scope if supported by service
+        try:
+            ctx["ranking_period"] = "month"
+            ctx["ranking_rows"] = ranking("month", business=biz)  # type: ignore[arg-type]
+        except TypeError:
+            # If your ranking(service) doesn't accept business, fall back gracefully
+            ctx["ranking_period"] = "month"
+            ctx["ranking_rows"] = ranking("month")
         return ctx
 
 
@@ -362,7 +398,12 @@ class AgentTxnListView(LoginRequiredMixin, ListView):
 @login_required
 def api_ranking(request: HttpRequest):
     period = request.GET.get("period", "month")
-    return JsonResponse({"rows": ranking(period)})
+    biz = get_active_business(request)
+    try:
+        rows = ranking(period, business=biz)  # type: ignore[arg-type]
+    except TypeError:
+        rows = ranking(period)
+    return JsonResponse({"rows": rows})
 
 
 # ---------------------------------------------------------------------
@@ -379,12 +420,14 @@ class AdminWalletHome(LoginRequiredMixin, TemplateView):
 
     def get_context_data(self, **kwargs):
         ctx = super().get_context_data(**kwargs)
+        biz = get_active_business(self.request)
         qs = WalletTransaction.objects.filter(ledger=Ledger.COMPANY)
+        qs = _maybe_scope_to_business(qs, biz)
         ctx["company_spend"] = qs.aggregate(s=Sum("amount"))["s"] or Decimal("0")
         ctx["recent"] = qs.select_related("agent").order_by("-created_at")[:30]
-        ctx["budgets_pending"] = BudgetRequest.objects.filter(
-            status=BudgetRequest.Status.PENDING
-        ).count()
+        pending = BudgetRequest.objects.all()
+        pending = _maybe_scope_to_business(pending, biz)
+        ctx["budgets_pending"] = pending.filter(status=BudgetRequest.Status.PENDING).count()
         return ctx
 
 
@@ -401,14 +444,21 @@ class AdminAgentWallet(LoginRequiredMixin, TemplateView):
         U = get_user_model()
         agent = get_object_or_404(U, id=agent_id)
         ctx = super().get_context_data(**kwargs)
+        biz = get_active_business(self.request)
+
         ctx["agent"] = agent
         ctx["summary"] = agent_wallet_summary(agent)
-        ctx["txns"] = (
-            WalletTransaction.objects.filter(ledger=Ledger.AGENT, agent=agent)
-            .order_by("-effective_date", "-id")[:100]
-        )
-        ctx["budgets"] = BudgetRequest.objects.filter(agent=agent).order_by("-created_at")
-        ctx["payslips"] = Payslip.objects.filter(agent=agent).order_by("-year", "-month")
+
+        tx = WalletTransaction.objects.filter(ledger=Ledger.AGENT, agent=agent)
+        ctx["txns"] = tx.order_by("-effective_date", "-id")[:100]
+
+        bqs = BudgetRequest.objects.filter(agent=agent)
+        pqs = Payslip.objects.filter(agent=agent)
+        bqs = _maybe_scope_to_business(bqs, biz)
+        pqs = _maybe_scope_to_business(pqs, biz)
+
+        ctx["budgets"] = bqs.order_by("-created_at")
+        ctx["payslips"] = pqs.order_by("-year", "-month")
         return ctx
 
 
@@ -461,15 +511,19 @@ class AdminBudgetsView(LoginRequiredMixin, TemplateView):
 
     def get_context_data(self, **kwargs):
         ctx = super().get_context_data(**kwargs)
-        ctx["pending"] = BudgetRequest.objects.filter(
-            status=BudgetRequest.Status.PENDING
-        ).select_related("agent")
-        ctx["approved"] = BudgetRequest.objects.filter(
-            status=BudgetRequest.Status.APPROVED
-        ).select_related("agent")
-        ctx["paid"] = BudgetRequest.objects.filter(
-            status=BudgetRequest.Status.PAID
-        ).select_related("agent")
+        biz = get_active_business(self.request)
+
+        pending = BudgetRequest.objects.all()
+        approved = BudgetRequest.objects.all()
+        paid = BudgetRequest.objects.all()
+
+        pending = _maybe_scope_to_business(pending, biz).filter(status=BudgetRequest.Status.PENDING).select_related("agent")
+        approved = _maybe_scope_to_business(approved, biz).filter(status=BudgetRequest.Status.APPROVED).select_related("agent")
+        paid = _maybe_scope_to_business(paid, biz).filter(status=BudgetRequest.Status.PAID).select_related("agent")
+
+        ctx["pending"] = pending
+        ctx["approved"] = approved
+        ctx["paid"] = paid
         return ctx
 
     def post(self, request):
@@ -487,7 +541,7 @@ class AdminBudgetsView(LoginRequiredMixin, TemplateView):
                 agent=b.agent,
                 amount=Decimal(b.amount),
                 type=TxnType.BUDGET,
-                note=f"Budget: {b.title}",
+                note=f"Budget: {getattr(b, 'title', 'Approved budget')}",
                 created_by=request.user,
             )
             WalletTransaction.objects.create(
@@ -495,7 +549,7 @@ class AdminBudgetsView(LoginRequiredMixin, TemplateView):
                 agent=b.agent,
                 amount=-Decimal(b.amount),
                 type=TxnType.BUDGET,
-                note=f"[Agent {b.agent_id}] {b.title}",
+                note=f"[Agent {b.agent_id}] {getattr(b, 'title', 'Approved budget')}",
                 created_by=request.user,
             )
 

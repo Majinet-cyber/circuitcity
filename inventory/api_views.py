@@ -1,217 +1,182 @@
-# inventory/api_views.py
-from datetime import date, timedelta
-from collections import defaultdict
+# circuitcity/tenants/api_view.py
+from __future__ import annotations
 
-from django.db.models import Count, Sum, F, Value as V
-from django.db.models.functions import TruncDay, Coalesce
-from django.http import JsonResponse
-from django.utils.timezone import now
+from typing import Any, Dict
 
-from .models import InventoryItem  # adjust if your model name differs
+from django.http import JsonResponse, HttpRequest
+from django.views.decorators.http import require_GET, require_POST
+from django.contrib.auth.decorators import login_required
+from django.db.models import Q
 
-CURRENCY_SIGN = "MK"  # change if needed
+from .utils import (
+    get_active_business,
+    set_active_business,
+    user_is_manager,
+    user_is_admin,
+    _has_active_membership,
+    scoped,  # role-aware queryset scoping
+)
+from .models import Business, Membership
 
-
-def _period_bounds(period: str):
-    """Return (start_date, end_date_inclusive) for 'today'|'7d'|'month'|'all'."""
-    today = date.today()
-    if period == "today":
-        return today, today
-    if period in ("7d", "7days", "week"):
-        return today - timedelta(days=6), today
-    if period in ("month", "this_month"):
-        return today.replace(day=1), today
-    # all time → None means no lower bound
-    return None, today
-
-
-def _base_qs(period: str):
-    """Filter sold records by period if we have dates available."""
-    start, end = _period_bounds(period)
-    qs = InventoryItem.objects.all()
-
-    # Prefer a 'sold_at' field; otherwise fall back to 'updated_at' or 'created_at'
-    date_field = None
-    for cand in ("sold_at", "updated_at", "created_at"):
-        if cand in [f.name for f in InventoryItem._meta.get_fields()]:
-            date_field = cand
-            break
-
-    if date_field:
-        if start:
-            qs = qs.filter(**{f"{date_field}__date__gte": start})
-        if end:
-            qs = qs.filter(**{f"{date_field}__date__lte": end})
-
-    return qs, date_field
+# Optional imports – these may not exist during early wiring; we stay defensive.
+try:
+    from inventory.models import InventoryItem, Location  # type: ignore
+except Exception:  # pragma: no cover
+    InventoryItem = None  # type: ignore
+    Location = None  # type: ignore
 
 
-# ---------- /inventory/api/sales-trend/ ----------
-def api_sales_trend(request):
+# -----------------------------
+# Helpers
+# -----------------------------
+def _err(msg: str, code: int = 400) -> JsonResponse:
+    return JsonResponse({"ok": False, "error": msg}, status=code)
+
+
+def _biz_payload(b) -> Dict[str, Any]:
+    if not b:
+        return {"id": None, "name": None, "slug": None, "status": None}
+    return {
+        "id": b.id,
+        "name": getattr(b, "name", None),
+        "slug": getattr(b, "slug", None),
+        "status": getattr(b, "status", None),
+    }
+
+
+def _role_payload(user, business) -> Dict[str, Any]:
+    role = None
+    status = None
+    try:
+        m = Membership.objects.filter(user=user, business=business).first()
+        if m:
+            role = getattr(m, "role", None)
+            status = getattr(m, "status", None)
+    except Exception:
+        pass
+    return {
+        "role": role,
+        "status": status,
+        "is_manager": bool(user_is_manager(user)),
+        "is_admin": bool(user_is_admin(user)),
+    }
+
+
+# -----------------------------
+# Endpoints
+# -----------------------------
+
+@login_required
+@require_GET
+def api_current_business(request: HttpRequest) -> JsonResponse:
     """
-    metric = 'amount' (sum selling_price) | 'count' (sold units)
-    period = 'today'|'7d'|'month'|'all'
-    model  = optional product id/name filter (?model=)
+    GET /tenants/api/current
+    -> { ok, business:{id,name,slug,status}, role:{...} }
     """
-    metric = request.GET.get("metric", "amount")
-    period = request.GET.get("period", "month")
-
-    qs, date_field = _base_qs(period)
-
-    # Only count SOLD rows when available
-    if "status" in [f.name for f in InventoryItem._meta.get_fields()]:
-        qs = qs.filter(status="SOLD")
-
-    # Optional model filter via ?model= (id or substring)
-    model_q = request.GET.get("model")
-    if model_q:
-        # try id → else substring on product name/label/model
-        if model_q.isdigit() and "product_id" in [f.name for f in InventoryItem._meta.get_fields()]:
-            qs = qs.filter(product_id=int(model_q))
-        else:
-            for fname in ("product__model", "product__name", "product__label", "product"):
-                if fname.split("__")[0] in [f.name for f in InventoryItem._meta.get_fields()]:
-                    qs = qs.filter(**{f"{fname}__icontains": model_q})
-                    break
-
-    if not date_field:
-        # No date field? Return a single bucket with totals so the chart still shows something.
-        if metric == "count":
-            total = qs.count()
-            return JsonResponse({"labels": ["All time"], "values": [total]})
-        total = qs.aggregate(v=Coalesce(Sum("selling_price"), V(0)))["v"] or 0
-        return JsonResponse({"labels": ["All time"], "values": [int(total)], "currency": {"sign": CURRENCY_SIGN}})
-
-    # Group per day
-    per_day = (
-        qs.annotate(d=TruncDay(date_field))
-          .values("d")
-          .annotate(
-              cnt=Count("id"),
-              amt=Coalesce(Sum("selling_price"), V(0)),
-          )
-          .order_by("d")
+    b = get_active_business(request)
+    return JsonResponse(
+        {"ok": True, "business": _biz_payload(b), "role": _role_payload(request.user, b)}
     )
 
-    labels, values = [], []
-    for row in per_day:
-        labels.append(row["d"].strftime("%b %d"))
-        values.append(int(row["cnt"] if metric == "count" else row["amt"] or 0))
 
-    payload = {"labels": labels, "values": values}
-    if metric != "count":
-        payload["currency"] = {"sign": CURRENCY_SIGN}
-    return JsonResponse(payload)
-
-
-# ---------- /inventory/api/top-models/ ----------
-def api_top_models(request):
+@login_required
+@require_POST
+def api_switch_business(request: HttpRequest) -> JsonResponse:
     """
-    period = 'today'|'7d'|'month'|'all'
-    Returns top models by SOLD count.
+    POST /tenants/api/switch  body: { "business_id": <int> }
+    Switch active tenant if the user has an ACTIVE membership there.
     """
-    period = request.GET.get("period", "today")
-    qs, _ = _base_qs(period)
+    try:
+        bid = int((request.POST.get("business_id") or request.GET.get("business_id") or "").strip())
+    except Exception:
+        return _err("Provide a valid business_id.", 400)
 
-    if "status" in [f.name for f in InventoryItem._meta.get_fields()]:
-        qs = qs.filter(status="SOLD")
+    try:
+        b = Business.objects.get(pk=bid)
+    except Business.DoesNotExist:
+        return _err("Business not found.", 404)
 
-    # Resolve a readable product field
-    product_name_field = None
-    for fname in ("product__model", "product__name", "product__label", "product"):
-        if fname.split("__")[0] in [f.name for f in InventoryItem._meta.get_fields()]:
-            product_name_field = fname
-            break
+    if not _has_active_membership(request.user, b):
+        return _err("You are not a member of that business.", 403)
 
-    if not product_name_field:
-        product_name_field = "id"
-
-    agg = (
-        qs.values(product_name_field)
-          .annotate(n=Count("id"))
-          .order_by("-n")[:8]
-    )
-
-    labels = [str(x[product_name_field]) for x in agg]
-    values = [int(x["n"]) for x in agg]
-    return JsonResponse({"labels": labels, "values": values})
+    set_active_business(request, b)
+    return JsonResponse({"ok": True, "business": _biz_payload(b)})
 
 
-# ---------- /inventory/api/value-trend/ ----------
-def api_value_trend(request):
+@login_required
+@require_GET
+def api_my_memberships(request: HttpRequest) -> JsonResponse:
     """
-    metric = 'revenue'|'cost'|'profit'
-    period = 'today'|'7d'|'month'|'all'
+    GET /tenants/api/memberships
+    -> { ok, items:[{business:{...}, role, status}] }
     """
-    metric = request.GET.get("metric", "revenue")
-    period = request.GET.get("period", "7d")
-
-    qs, date_field = _base_qs(period)
-    if "status" in [f.name for f in InventoryItem._meta.get_fields()]:
-        qs = qs.filter(status="SOLD")
-
-    # choose fields safely
-    has_sell = "selling_price" in [f.name for f in InventoryItem._meta.get_fields()]
-    has_cost = "order_price" in [f.name for f in InventoryItem._meta.get_fields()]
-
-    if not date_field:
-        rev = qs.aggregate(v=Coalesce(Sum("selling_price"), V(0)))["v"] if has_sell else 0
-        cost = qs.aggregate(v=Coalesce(Sum("order_price"), V(0)))["v"] if has_cost else 0
-        prof = (rev or 0) - (cost or 0)
-        val = {"revenue": rev, "cost": cost, "profit": prof}[metric]
-        return JsonResponse({"labels": ["All time"], "values": [int(val)], "currency": {"sign": CURRENCY_SIGN}})
-
-    per_day = (
-        qs.annotate(d=TruncDay(date_field))
-          .values("d")
-          .annotate(
-              revenue=Coalesce(Sum("selling_price"), V(0)) if has_sell else V(0),
-              cost=Coalesce(Sum("order_price"), V(0)) if has_cost else V(0),
-          )
-          .order_by("d")
-    )
-
-    labels, values = [], []
-    for row in per_day:
-        rev = int(row.get("revenue") or 0)
-        cost = int(row.get("cost") or 0)
-        prof = rev - cost
-        pick = {"revenue": rev, "cost": cost, "profit": prof}[metric]
-        labels.append(row["d"].strftime("%b %d"))
-        values.append(pick)
-
-    return JsonResponse({"labels": labels, "values": values, "currency": {"sign": CURRENCY_SIGN}})
+    items = []
+    try:
+        qs = (
+            Membership.objects.select_related("business")
+            .filter(user=request.user)
+            .order_by("business__name")
+        )
+        for m in qs:
+            items.append(
+                {
+                    "business": _biz_payload(getattr(m, "business", None)),
+                    "role": getattr(m, "role", None),
+                    "status": getattr(m, "status", None),
+                }
+            )
+    except Exception:
+        pass
+    return JsonResponse({"ok": True, "items": items})
 
 
-# ---------- /inventory/api/alerts/ (optional simple fallback) ----------
-def api_alerts(request):
+# -----------------------------
+# Optional: quick scoping sanity checks
+# -----------------------------
+@login_required
+@require_GET
+def api_scope_preview(request: HttpRequest) -> JsonResponse:
     """
-    Basic low-stock alerts by product. If you already have an alerts endpoint,
-    keep it; otherwise this gives the UI something to render.
+    GET /tenants/api/scope-preview
+    Returns quick counts showing what the current user sees after role-aware scoping.
+    This helps verify that agents do NOT see global stock.
+
+    If Inventory models aren't wired, it will still return ok:true with zeroes.
     """
-    # Count on-hand by product
-    product_name_field = None
-    for fname in ("product__model", "product__name", "product__label", "product"):
-        if fname.split("__")[0] in [f.name for f in InventoryItem._meta.get_fields()]:
-            product_name_field = fname
-            break
-    if not product_name_field:
-        product_name_field = "id"
+    b = get_active_business(request)
+    data: Dict[str, Any] = {
+        "business": _biz_payload(b),
+        "role": _role_payload(request.user, b),
+        "inventory": {"in_stock": 0, "sold": 0, "total": 0},
+        "locations": [],
+    }
 
-    on_hand = (
-        InventoryItem.objects.exclude(status="SOLD")
-        .values(product_name_field)
-        .annotate(c=Count("id"))
-        .order_by("c")
-    )
+    # Locations visible to user (if Location exists)
+    try:
+        if Location is not None:
+            loc_qs = Location.objects.filter(business=b)
+            # If your Location has memberships relation, filter by that for agents
+            try:
+                if not user_is_manager(request.user):
+                    loc_qs = loc_qs.filter(memberships__user=request.user)
+            except Exception:
+                pass
+            data["locations"] = [
+                {"id": x.id, "name": getattr(x, "name", None)} for x in loc_qs[:50]
+            ]
+    except Exception:
+        pass
 
-    alerts = []
-    for row in on_hand:
-        if int(row["c"]) <= 1:  # threshold
-            alerts.append({
-                "severity": "warn",
-                "type": "Low stock",
-                "message": f"{row[product_name_field]} has only {row['c']} on hand."
-            })
+    # Inventory counts via role-aware scoping
+    try:
+        if InventoryItem is not None:
+            base = scoped(InventoryItem.objects.all(), request)  # role-aware + tenant-aware
+            data["inventory"]["total"] = base.count()
 
-    return JsonResponse({"alerts": alerts})
+            if hasattr(InventoryItem, "status"):
+                data["inventory"]["in_stock"] = base.exclude(status="SOLD").count()
+                data["inventory"]["sold"] = base.filter(status="SOLD").count()
+    except Exception:
+        pass
+
+    return JsonResponse({"ok": True, "data": data})

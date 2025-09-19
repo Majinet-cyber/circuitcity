@@ -1,0 +1,67 @@
+/* -------- Glass Sidebar -------- */
+:root{
+  --sb-bg: 255 255 255;           /* white glass */
+  --sb-ink: 16 24 40;             /* dark text */
+  --sb-ink-dim: 99 115 129;       /* dim text */
+  --sb-ring: 0 0 0 / .06;
+  --sb-card: 255 255 255 / .55;   /* inner glass cards */
+}
+
+.app-shell{
+  display:grid; grid-template-columns: 260px 1fr; min-height:100vh;
+  background: #f6f8fb;
+}
+
+/* main sidebar container */
+.sidebar{
+  position:sticky; top:0; height:100dvh; padding:18px 16px;
+  background: rgba(var(--sb-bg) / .72);
+  backdrop-filter: blur(14px) saturate(120%);
+  -webkit-backdrop-filter: blur(14px) saturate(120%);
+  box-shadow: 0 10px 30px rgba(16,24,40,.06), inset 0 1px 0 rgba(255,255,255,.6);
+  border-right: 1px solid rgba(0,0,0,.06);
+}
+
+/* brand header */
+.sidebar .brand{
+  display:flex; align-items:center; gap:10px; margin-bottom:14px;
+}
+.sidebar .brand .dot{ width:8px; height:8px; border-radius:999px; background:#22c55e; }
+
+/* groups */
+.sidebar .group-title{
+  font: 600 12px/1.2 ui-sans-serif,system-ui,Segoe UI,Roboto,Helvetica,Arial;
+  letter-spacing:.04em; text-transform:uppercase;
+  color: rgba(var(--sb-ink) / .55);
+  margin: 18px 8px 10px;
+}
+
+/* links */
+.sidebar a.nav{
+  display:flex; align-items:center; gap:10px;
+  padding:10px 12px; border-radius:12px; text-decoration:none;
+  color: rgb(var(--sb-ink));
+  transition: transform .06s ease, background .15s ease, box-shadow .15s ease;
+}
+.sidebar a.nav:hover{
+  background: rgba(var(--sb-bg) / .9);
+  box-shadow: 0 6px 14px rgba(16,24,40,.06), inset 0 0 0 1px rgba(0,0,0,.05);
+  transform: translateY(-1px);
+}
+.sidebar a.nav.active{
+  background: rgba(99,102,241,.10);
+  box-shadow: inset 0 0 0 1px rgba(99,102,241,.22);
+}
+
+/* small “chip” (e.g., counts) */
+.sidebar .chip{
+  margin-left:auto; padding:2px 8px; border-radius:999px;
+  background: rgba(0,0,0,.06); font: 600 11px/18px ui-sans-serif;
+  color: rgba(var(--sb-ink) / .8);
+}
+
+/* footer */
+.sidebar .footer{
+  margin-top:auto; padding-top:12px; border-top:1px solid rgba(0,0,0,.06);
+  color: rgba(var(--sb-ink) / .6); font-size:12px;
+}

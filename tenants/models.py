@@ -4,12 +4,14 @@ from __future__ import annotations
 from typing import Optional
 import threading
 from contextlib import contextmanager
+import uuid
 
 from django.apps import apps
 from django.conf import settings
 from django.db import models
 from django.db.models import Q
 from django.utils import timezone
+from django.core.signing import TimestampSigner, BadSignature, SignatureExpired
 
 User = settings.AUTH_USER_MODEL
 
@@ -18,9 +20,11 @@ User = settings.AUTH_USER_MODEL
 # ===============================
 _tenant_state = threading.local()
 
+
 def get_current_business_id() -> Optional[int]:
     """Read the active tenant id for this request/thread."""
     return getattr(_tenant_state, "business_id", None)
+
 
 def set_current_business_id(business_id: Optional[int]) -> None:
     """Write/clear the active tenant id for this request/thread."""
@@ -29,6 +33,7 @@ def set_current_business_id(business_id: Optional[int]) -> None:
             delattr(_tenant_state, "business_id")
     else:
         _tenant_state.business_id = int(business_id)
+
 
 @contextmanager
 def using_business(business: Optional["Business"] | int):
@@ -122,25 +127,38 @@ class Business(models.Model):
             return
 
         # Store
-        store = Store.all_objects.filter(business=self).order_by("id").first() \
-            if hasattr(Store, "all_objects") else Store.objects.filter(business=self).order_by("id").first()
+        store = (
+            Store.all_objects.filter(business=self).order_by("id").first()
+            if hasattr(Store, "all_objects")
+            else Store.objects.filter(business=self).order_by("id").first()
+        )
         if not store:
             kwargs = {"business": self, "name": f"{self.name} Store"}
             if hasattr(Store, "is_default"):
                 kwargs["is_default"] = True
-            store = Store.all_objects.create(**kwargs) if hasattr(Store, "all_objects") else Store.objects.create(**kwargs)
+            store = (
+                Store.all_objects.create(**kwargs)
+                if hasattr(Store, "all_objects")
+                else Store.objects.create(**kwargs)
+            )
 
         # Warehouse
-        wh = Warehouse.all_objects.filter(business=self).order_by("id").first() \
-            if hasattr(Warehouse, "all_objects") else Warehouse.objects.filter(business=self).order_by("id").first()
+        wh = (
+            Warehouse.all_objects.filter(business=self).order_by("id").first()
+            if hasattr(Warehouse, "all_objects")
+            else Warehouse.objects.filter(business=self).order_by("id").first()
+        )
         if not wh:
             wkwargs = {"business": self, "name": "Main Warehouse"}
             if hasattr(Warehouse, "store"):
                 wkwargs["store"] = store
             if hasattr(Warehouse, "is_default"):
                 wkwargs["is_default"] = True
-            (Warehouse.all_objects.create(**wkwargs)
-             if hasattr(Warehouse, "all_objects") else Warehouse.objects.create(**wkwargs))
+            (
+                Warehouse.all_objects.create(**wkwargs)
+                if hasattr(Warehouse, "all_objects")
+                else Warehouse.objects.create(**wkwargs)
+            )
 
 
 class Membership(models.Model):
@@ -238,8 +256,157 @@ class BaseTenantModel(models.Model):
 
     # Safety net: auto-attach active tenant if caller forgot to set .business
     def save(self, *args, **kwargs):
-        if not self.business_id:
+        if not getattr(self, "business_id", None):
             bid = get_current_business_id()
             if bid:
                 self.business_id = bid
         super().save(*args, **kwargs)
+
+
+# ===============================
+# Agent Invites (new)
+# ===============================
+
+class AgentInvite(BaseTenantModel):
+    """
+    Manager-generated invite that lets an agent create their own account
+    and auto-join this Business.
+
+    We keep it intentionally simple:
+      - optional invited_name / email / phone
+      - a token string to embed in links (signed helper provided)
+      - status to track lifecycle
+      - joined_user set when someone uses it successfully
+      - optional expires_at for auto-expiry
+    """
+    STATUS_CHOICES = [
+        ("PENDING", "Pending"),
+        ("SENT", "Sent"),
+        ("JOINED", "Joined"),
+        ("EXPIRED", "Expired"),
+    ]
+
+    created_at = models.DateTimeField(default=timezone.now, db_index=True)
+    created_by = models.ForeignKey(
+        User,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="agent_invites_created",
+    )
+
+    # NEW: friendly display name for the invitee (works with views that read .invited_name)
+    invited_name = models.CharField(max_length=120, blank=True, default="")
+
+    email = models.EmailField(blank=True, default="", db_index=True)
+    phone = models.CharField(max_length=32, blank=True, default="", db_index=True)
+
+    # Expanded to allow signed tokens
+    token = models.CharField(max_length=140, unique=True, db_index=True)
+    status = models.CharField(max_length=10, choices=STATUS_CHOICES, default="PENDING", db_index=True)
+
+    # Filled when an invite link is redeemed and a membership is activated
+    joined_user = models.ForeignKey(
+        User,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="agent_invites_redeemed",
+    )
+    joined_at = models.DateTimeField(null=True, blank=True)
+
+    # Optional: manager’s custom message
+    message = models.CharField(max_length=240, blank=True, default="")
+
+    # NEW: optional expiry timestamp for UI/auto-expiry convenience
+    expires_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        indexes = [
+            models.Index(fields=["business", "status", "-created_at"]),
+        ]
+        ordering = ["-created_at", "-id"]
+
+    def __str__(self) -> str:
+        to = self.email or self.phone or "unknown"
+        return f"Invite → {to} [{self.business.name}] ({self.status})"
+
+    # -------- Convenience bits --------
+
+    @property
+    def recipient(self) -> str:
+        """Return a human-friendly recipient indicator."""
+        return self.email or self.phone or "—"
+
+    @property
+    def display_name(self) -> str:
+        """Best-effort label for the invitee (name/email/phone fallback)."""
+        return (self.invited_name or self.email or self.phone or "").strip()
+
+    # ---- Token helpers (compatible with views.create_agent_invite / accept_invite) ----
+
+    @staticmethod
+    def _signer() -> TimestampSigner:
+        return TimestampSigner(salt="tenants.AgentInvite")
+
+    @classmethod
+    def make_token(cls, payload: str) -> str:
+        """
+        Return a signed token carrying the payload + timestamp.
+        """
+        payload = (payload or "").strip() or uuid.uuid4().hex
+        return cls._signer().sign(payload)
+
+    @classmethod
+    def unsign_token(cls, token: str, *, max_age_seconds: int | None = None) -> str:
+        """
+        Verify and return the original payload. Raises on failure.
+        """
+        try:
+            if max_age_seconds:
+                return cls._signer().unsign(token, max_age=max_age_seconds)
+            return cls._signer().unsign(token)
+        except SignatureExpired as e:
+            # Re-raise so caller can treat as expired
+            raise e
+        except BadSignature as e:
+            raise e
+
+    def ensure_token(self) -> None:
+        """Generate a token if missing (idempotent, unsigned fallback)."""
+        if not self.token:
+            self.token = uuid.uuid4().hex  # 32 chars; unique + compact
+
+    def save(self, *args, **kwargs):
+        self.ensure_token()
+        super().save(*args, **kwargs)
+
+    # ---- Status helpers ----
+
+    def mark_sent(self, *, message: str | None = None, save: bool = True) -> None:
+        self.status = "SENT"
+        if message is not None:
+            self.message = message
+        if save:
+            self.save(update_fields=["status", "message"])
+
+    def mark_joined(self, *, user, when: Optional[timezone.datetime] = None, save: bool = True) -> None:
+        self.status = "JOINED"
+        self.joined_user = user
+        self.joined_at = when or timezone.now()
+        if save:
+            self.save(update_fields=["status", "joined_user", "joined_at"])
+
+    def mark_expired_if_needed(self, *, save: bool = True) -> bool:
+        """
+        If expires_at is in the past and status is not already EXPIRED/JOINED,
+        set status → EXPIRED. Returns True if a change was made.
+        """
+        if self.status in ("EXPIRED", "JOINED"):
+            return False
+        if self.expires_at and timezone.now() >= self.expires_at:
+            self.status = "EXPIRED"
+            if save:
+                self.save(update_fields=["status"])
+            return True
+        return False

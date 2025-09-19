@@ -41,7 +41,15 @@
   <section class="kpi-row">
     <div class="kpi">
       <div class="label">Revenue ({{ period|default:"month"|title }})</div>
-      <div class="value">MK {{ total_revenue|default:0|floatformat:0|intcomma }}</div>
+      {# If no units sold, force MK 0 so agents don’t see phantom revenue #}
+      <div class="value">
+        MK
+        {% if total_units|default:0 %}
+          {{ total_revenue|default:0|floatformat:0|intcomma }}
+        {% else %}
+          0
+        {% endif %}
+      </div>
       {% if revenue_delta is not None %}
         <span class="delta {% if revenue_delta >= 0 %}up{% else %}down{% endif %}">{{ revenue_delta|floatformat:1 }}%</span>
       {% endif %}
@@ -65,16 +73,20 @@
 
   <!-- Filters -->
   <form method="get" class="filters d-flex flex-wrap gap-2 mb-3">
-    <select name="period" class="form-select" aria-label="Period">
+    <label class="visually-hidden" for="f-period">Period</label>
+    <select id="f-period" name="period" class="form-select" aria-label="Period">
       <option value="month" {% if period == "month" %}selected{% endif %}>This month</option>
       <option value="all" {% if period == "all" %}selected{% endif %}>All time</option>
     </select>
-    <select name="model" class="form-select" aria-label="Filter by model">
+
+    <label class="visually-hidden" for="f-model">Filter by model</label>
+    <select id="f-model" name="model" class="form-select" aria-label="Filter by model">
       <option value="">All models</option>
       {% for p in products %}
         <option value="{{ p.id }}" {% if model_id == p.id %}selected{% endif %}>{{ p.brand }} {{ p.model }}{% if p.variant %} {{ p.variant }}{% endif %}</option>
       {% endfor %}
     </select>
+
     <button class="btn primary" type="submit"><i class="bi bi-sliders"></i> Apply</button>
     <a href="." class="btn muted"><i class="bi bi-arrow-counterclockwise"></i> Reset</a>
   </form>

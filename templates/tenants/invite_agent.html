@@ -1,12 +1,165 @@
 {% extends "base.html" %}
+{% load static %}
 {% block content %}
-<div class="container py-4" style="max-width: 760px;">
-<h3>Invite agent</h3>
-<form method="post" class="mt-3">
-{% csrf_token %}
-{{ form.as_p }}
-<button class="btn btn-primary">Send invite</button>
-<a class="btn btn-link" href="{% url 'tenants:people_index' %}">Cancel</a>
-</form>
+<div class="container py-4" style="max-width: 860px;">
+  <h3 class="mb-3">Invite an Agent</h3>
+
+  {# If an invite object is passed (after creation), show share UI #}
+  {% if invite %}
+    <div class="alert alert-success">
+      <strong>Invite created!</strong> Share the link below.
+    </div>
+
+    <div class="card mb-4 shadow-sm">
+      <div class="card-body">
+        <h5 class="card-title mb-3">Share the invite</h5>
+
+        <div class="row g-3 align-items-end">
+          <div class="col-sm-6">
+            <label class="form-label fw-semibold">Invited name</label>
+            <input id="invitedName" type="text" class="form-control"
+                   value="{{ invite.invited_name|default_if_none:'' }}"
+                   placeholder="e.g. Alice">
+            <div class="form-text">This only personalizes the message—edit if you like.</div>
+          </div>
+
+          <div class="col-sm-6">
+            <label class="form-label fw-semibold">Invite link</label>
+            <div class="input-group">
+              <input id="inviteLink" type="text" class="form-control"
+                     value="{{ invite.accept_url|default:request.build_absolute_uri|default:'' }}"
+                     readonly>
+              <button class="btn btn-outline-secondary" type="button" id="copyBtn">Copy</button>
+            </div>
+          </div>
+        </div>
+
+        <hr class="my-4">
+
+        <div class="mb-3">
+          <label class="form-label fw-semibold">Preview</label>
+          <div class="border rounded p-3 bg-light" id="previewBox"
+               style="white-space: pre-wrap; font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial;">
+Hi {{ invite.invited_name|default:"there" }}, please click this link to join {{ invite.business.name }}:
+{{ invite.accept_url }}
+          </div>
+        </div>
+
+        <div class="d-flex flex-wrap gap-2">
+          <a id="waBtn" class="btn btn-success"
+             href="#" target="_blank" rel="noopener">
+            Share via WhatsApp
+          </a>
+          <a id="mailBtn" class="btn btn-primary"
+             href="#">
+            Share via Email
+          </a>
+          <a class="btn btn-link" href="{% url 'tenants:manager_review_agents' %}">Back to Agents</a>
+        </div>
+      </div>
+    </div>
+
+  {% else %}
+    {# Default: show the form to create an invite #}
+    <div class="card shadow-sm">
+      <div class="card-body">
+        <h5 class="card-title mb-3">Send a new invite</h5>
+        <form method="post" action="{% url 'tenants:create_agent_invite' %}" class="row g-3">
+          {% csrf_token %}
+
+          {# Render fields explicitly to avoid .as_widget(attrs=...) in template #}
+          <div class="col-sm-6">
+            <label class="form-label fw-semibold" for="{{ form.invited_name.id_for_label }}">Invited name</label>
+            {{ form.invited_name }}
+          </div>
+          <div class="col-sm-6">
+            <label class="form-label fw-semibold" for="{{ form.email.id_for_label }}">Email (optional)</label>
+            {{ form.email }}
+          </div>
+          <div class="col-sm-6">
+            <label class="form-label fw-semibold" for="{{ form.phone.id_for_label }}">Phone / WhatsApp (optional)</label>
+            {{ form.phone }}
+          </div>
+          {% if form.message %}
+          <div class="col-sm-6">
+            <label class="form-label fw-semibold" for="{{ form.message.id_for_label }}">Message (optional)</label>
+            {{ form.message }}
+          </div>
+          {% endif %}
+
+          <div class="col-12">
+            <div class="form-text">
+              The agent will see a clean page to enter their name, create a password, and accept the invite.
+            </div>
+          </div>
+
+          <div class="col-12 d-flex gap-2">
+            <button class="btn btn-primary">Create invite</button>
+            <a class="btn btn-link" href="{% url 'tenants:manager_review_agents' %}">Cancel</a>
+          </div>
+        </form>
+      </div>
+    </div>
+  {% endif %}
 </div>
+
+{% if invite %}
+<script>
+(function() {
+  const nameInput = document.getElementById('invitedName');
+  const linkInput = document.getElementById('inviteLink');
+  const preview = document.getElementById('previewBox');
+  const waBtn = document.getElementById('waBtn');
+  const mailBtn = document.getElementById('mailBtn');
+  const copyBtn = document.getElementById('copyBtn');
+
+  const shopName = {{ invite.business.name|default:"'our shop'"|safe|escapejs }};
+  const initName = nameInput ? nameInput.value.trim() : '';
+  const initLink = linkInput ? linkInput.value.trim() : '';
+
+  function buildMessage(name, link) {
+    const who = name || 'there';
+    return `Hi ${who}, please click this link to join ${shopName}: ${link}`;
+  }
+
+  function updateUI() {
+    const name = (nameInput && nameInput.value.trim()) || '';
+    const link = (linkInput && linkInput.value.trim()) || '';
+    const text = buildMessage(name, link);
+
+    if (preview) preview.textContent = text;
+
+    if (waBtn) {
+      const wa = 'https://wa.me/?text=' + encodeURIComponent(text);
+      waBtn.href = wa;
+      waBtn.classList.toggle('disabled', !link);
+      waBtn.setAttribute('aria-disabled', !link ? 'true' : 'false');
+    }
+
+    if (mailBtn) {
+      const subject = `Join ${shopName}`;
+      const mailto = `mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(text)}`;
+      mailBtn.href = mailto;
+      mailBtn.classList.toggle('disabled', !link);
+      mailBtn.setAttribute('aria-disabled', !link ? 'true' : 'false');
+    }
+  }
+
+  if (nameInput) nameInput.addEventListener('input', updateUI);
+  if (copyBtn && linkInput) {
+    copyBtn.addEventListener('click', function () {
+      linkInput.select();
+      linkInput.setSelectionRange(0, 99999);
+      try {
+        document.execCommand('copy');
+        copyBtn.textContent = 'Copied!';
+        setTimeout(() => (copyBtn.textContent = 'Copy'), 1200);
+      } catch (e) {}
+    });
+  }
+
+  updateUI();
+})();
+</script>
+{% endif %}
 {% endblock %}

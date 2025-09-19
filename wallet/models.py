@@ -13,9 +13,9 @@ from django.utils import timezone
 User = settings.AUTH_USER_MODEL
 
 
-# ----------------------------
+# ----------------------------------------------------------------------
 # Utilities
-# ----------------------------
+# ----------------------------------------------------------------------
 def q2(x: Optional[Decimal]) -> Decimal:
     """Quantize to 2 dp (banker's rounding style we prefer: HALF_UP here)."""
     if x is None:
@@ -33,9 +33,9 @@ def is_manager_like(user) -> bool:
         return False
 
 
-# ----------------------------
-# Wallet / Budgets / Attendance
-# ----------------------------
+# ----------------------------------------------------------------------
+# Wallet / Transactions / Budgets
+# ----------------------------------------------------------------------
 class Ledger(models.TextChoices):
     AGENT = "agent", "Agent Wallet"
     COMPANY = "company", "Company (Admin) Wallet"
@@ -76,7 +76,9 @@ class WalletTransaction(models.Model):
     reference = models.CharField(max_length=64, blank=True, default="")
     effective_date = models.DateField(default=timezone.now)
     created_at = models.DateTimeField(auto_now_add=True)
-    created_by = models.ForeignKey(User, null=True, blank=True, on_delete=models.SET_NULL, related_name="created_wallet_txns")
+    created_by = models.ForeignKey(
+        User, null=True, blank=True, on_delete=models.SET_NULL, related_name="created_wallet_txns"
+    )
     meta = models.JSONField(default=dict, blank=True)
 
     objects = WalletTransactionQuerySet.as_manager()
@@ -98,6 +100,9 @@ class WalletTransaction(models.Model):
         super().save(*args, **kwargs)
 
 
+# ----------------------------------------------------------------------
+# Sales Targets & Attendance
+# ----------------------------------------------------------------------
 class SalesTarget(models.Model):
     agent = models.ForeignKey(User, on_delete=models.CASCADE, related_name="sales_targets")
     year = models.IntegerField()
@@ -126,6 +131,9 @@ class AttendanceLog(models.Model):
         return f"{self.agent_id} · {self.date} · {'in' if self.check_in else 'absent'}"
 
 
+# ----------------------------------------------------------------------
+# Budget Requests
+# ----------------------------------------------------------------------
 class BudgetRequestQuerySet(models.QuerySet):
     def visible_to(self, user):
         """Admin/manager see all; agent sees only their requests."""
@@ -165,11 +173,11 @@ class BudgetRequest(models.Model):
     def __str__(self) -> str:
         return f"{self.title} · {self.agent_id} · {self.amount} · {self.status}"
 
-    # --- minor guards / helpers ---
     def save(self, *args, **kwargs):
         self.amount = q2(self.amount)
         super().save(*args, **kwargs)
 
+    # Helpers
     def approve(self, by_user):
         self.status = self.Status.APPROVED
         self.decided_at = timezone.now()
@@ -190,9 +198,9 @@ class BudgetRequest(models.Model):
         self.save(update_fields=["status", "decided_at", "decided_by"])
 
 
-# ----------------------------
+# ----------------------------------------------------------------------
 # Payslips + Payments + Schedules
-# ----------------------------
+# ----------------------------------------------------------------------
 def _default_base_salary() -> Decimal:
     """Global fallback base salary (can be overridden per user in the future)."""
     return Decimal(getattr(settings, "WALLET_BASE_SALARY", "40000.00"))
@@ -206,7 +214,6 @@ class PayslipStatus(models.TextChoices):
 
 
 class Payslip(models.Model):
-    # Core identity (keep year/month for compatibility and uniqueness)
     agent = models.ForeignKey(User, on_delete=models.CASCADE, related_name="payslips")
     year = models.IntegerField()
     month = models.IntegerField()  # 1..12
@@ -214,29 +221,27 @@ class Payslip(models.Model):
     # Components
     base_salary = models.DecimalField(max_digits=12, decimal_places=2, default=_default_base_salary)
     commission = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal("0"))
-    bonuses_fees = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal("0"))  # +/- adjustments
-    deductions = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal("0"))    # positive number
+    bonuses_fees = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal("0"))
+    deductions = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal("0"))
 
-    # Totals (denormalized for quick display/export)
+    # Totals
     gross = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal("0"))
     net = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal("0"))
 
-    # Delivery + bookkeeping
-    reference = models.CharField(  # app-level uniqueness; indexed to search quickly
-        max_length=24, editable=False, blank=True, default="", db_index=True
-    )
+    # Delivery
+    reference = models.CharField(max_length=24, editable=False, blank=True, default="", db_index=True)
     email_to = models.EmailField(blank=True, default="")
     status = models.CharField(max_length=12, choices=PayslipStatus.choices, default=PayslipStatus.DRAFT)
-    sent_to_email = models.BooleanField(default=False)  # legacy flag – retained
+    sent_to_email = models.BooleanField(default=False)
     sent_at = models.DateTimeField(null=True, blank=True)
 
     issued_at = models.DateTimeField(auto_now_add=True)
     created_by = models.ForeignKey(User, null=True, blank=True, on_delete=models.SET_NULL, related_name="payslips_created")
 
-    # Optional PDF for record keeping
+    # Optional PDF
     pdf = models.FileField(upload_to="payslips/", null=True, blank=True)
 
-    # Free-form machine info (calculation inputs, preview lines, etc.)
+    # Machine info (calculation inputs, preview lines, etc.)
     meta = models.JSONField(default=dict, blank=True)
 
     class Meta:
@@ -255,26 +260,20 @@ class Payslip(models.Model):
         return f"PS{ts}{(self.agent_id or 0):04d}"[-24:]
 
     def save(self, *args, **kwargs):
-        # Auto-fill reference and email if missing
         if not self.reference:
             ref = self._make_reference()
-            # Guard against rare collisions (app-level check)
             while Payslip.objects.filter(reference=ref).exists():
                 ref = self._make_reference()
             self.reference = ref
         if not self.email_to and hasattr(self, "agent") and getattr(self.agent, "email", ""):
             self.email_to = self.agent.email
 
-        # Compute totals if components present and totals not set
-        if (self.gross is None or self.gross == 0) and (
-            self.base_salary or self.commission or self.bonuses_fees or self.deductions
-        ):
-            gross = q2((self.base_salary or 0) + (self.commission or 0) + (self.bonuses_fees or 0))
-            net = q2(gross - (self.deductions or 0))
-            self.gross = gross
-            self.net = net
+        gross = q2((self.base_salary or 0) + (self.commission or 0) + (self.bonuses_fees or 0))
+        net = q2(gross - (self.deductions or 0))
+        self.gross = gross
+        self.net = net
 
-        # Normalize components
+        # Normalize
         self.base_salary = q2(self.base_salary)
         self.commission = q2(self.commission)
         self.bonuses_fees = q2(self.bonuses_fees)
@@ -299,9 +298,6 @@ class PaymentStatus(models.TextChoices):
 
 
 class Payment(models.Model):
-    """
-    Records how a payslip was actually paid (future integrations can update this).
-    """
     payslip = models.ForeignKey(Payslip, on_delete=models.CASCADE, related_name="payments")
     method = models.CharField(max_length=12, choices=PaymentMethod.choices, default=PaymentMethod.MANUAL)
     amount = models.DecimalField(max_digits=12, decimal_places=2)
@@ -328,11 +324,7 @@ class Payment(models.Model):
 
 
 class PayoutSchedule(models.Model):
-    """
-    Monthly auto-send schedule.
-    At `day_of_month` and `at_hour` (local time), send payslips for the PREVIOUS calendar month
-    to the selected users. A Celery beat task should call the runner daily/hourly.
-    """
+    """Monthly auto-send schedule for payslips."""
     name = models.CharField(max_length=120)
     users = models.ManyToManyField(User, related_name="payout_schedules", blank=True)
     day_of_month = models.PositiveSmallIntegerField(default=28)  # 1..31
@@ -350,9 +342,9 @@ class PayoutSchedule(models.Model):
         return f"{self.name} · day {self.day_of_month} @ {self.at_hour:02d}:00"
 
 
-# ----------------------------
-# Admin Purchase Orders (Stock List → Place Order → Invoice)
-# ----------------------------
+# ----------------------------------------------------------------------
+# Admin Purchase Orders
+# ----------------------------------------------------------------------
 class PurchaseOrderStatus(models.TextChoices):
     DRAFT = "draft", "Draft"
     SENT = "sent", "Sent"
@@ -364,16 +356,14 @@ class AdminPurchaseOrder(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     created_by = models.ForeignKey(User, null=True, blank=True, on_delete=models.SET_NULL, related_name="admin_pos_created")
 
-    # Who we’re ordering from / for
     supplier_name = models.CharField(max_length=120, blank=True)
     supplier_email = models.EmailField(blank=True)
-    supplier_phone = models.CharField(max_length=40, blank=True)  # WhatsApp-friendly
-    agent_name = models.CharField(max_length=120, blank=True)     # if ordering for a specific agent
+    supplier_phone = models.CharField(max_length=40, blank=True)
+    agent_name = models.CharField(max_length=120, blank=True)
 
     notes = models.TextField(blank=True)
     currency = models.CharField(max_length=8, default="MWK")
 
-    # Totals
     subtotal = models.DecimalField(max_digits=14, decimal_places=2, default=Decimal("0.00"))
     tax = models.DecimalField(max_digits=14, decimal_places=2, default=Decimal("0.00"))
     total = models.DecimalField(max_digits=14, decimal_places=2, default=Decimal("0.00"))
@@ -394,8 +384,6 @@ class AdminPurchaseOrder(models.Model):
         agg = self.items.aggregate(s=Sum("line_total"))
         subtotal = agg["s"] or Decimal("0.00")
         self.subtotal = q2(subtotal)
-        # add VAT here if you want (e.g., 16.5%):
-        # self.tax = q2(self.subtotal * Decimal("0.165"))
         self.tax = q2(self.tax or Decimal("0.00"))
         self.total = q2(self.subtotal + self.tax)
         if save:
@@ -404,10 +392,9 @@ class AdminPurchaseOrder(models.Model):
 
 class AdminPurchaseOrderItem(models.Model):
     po = models.ForeignKey(AdminPurchaseOrder, related_name="items", on_delete=models.CASCADE)
-    # FK kept as a plain string to avoid import cycle; actual model in inventory
     product = models.ForeignKey("inventory.Product", on_delete=models.PROTECT)
     quantity = models.PositiveIntegerField()
-    unit_price = models.DecimalField(max_digits=12, decimal_places=2)   # copied from inventory.OrderPrice at creation
+    unit_price = models.DecimalField(max_digits=12, decimal_places=2)
     line_total = models.DecimalField(max_digits=14, decimal_places=2)
 
     class Meta:
@@ -420,7 +407,6 @@ class AdminPurchaseOrderItem(models.Model):
         return f"{self.product} × {self.quantity}"
 
     def save(self, *args, **kwargs):
-        # Compute line total if not provided
         if not self.line_total and self.quantity and self.unit_price is not None:
             self.line_total = q2(Decimal(self.quantity) * Decimal(self.unit_price))
         else:

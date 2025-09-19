@@ -8,7 +8,7 @@ import os
 import re
 import logging
 import sys
-import importlib.util as _ils  # for optional context processors
+import importlib.util as _ils  # for optional imports
 
 # Safe import for Celery crontab (so settings still load before Celery is installed)
 try:
@@ -362,6 +362,7 @@ ROOT_URLCONF = "cc.urls"
 # -------------------------------------------------
 # Templates  ✅ Keep this simple & reliable
 # -------------------------------------------------
+# Base template config
 TEMPLATES = [
     {
         "BACKEND": "django.template.backends.django.DjangoTemplates",
@@ -369,11 +370,10 @@ TEMPLATES = [
         "APP_DIRS": True,
         "OPTIONS": {
             "debug": DEBUG,
-            # Preload some built-in libraries so templates can use them without {% load ... %}
+            # Preload only safe builtins; add optional ones below
             "builtins": [
                 "django.templatetags.static",      # {% static %}
                 "django.contrib.humanize.templatetags.humanize",  # intcomma, naturaltime, etc.
-                "tenants.templatetags.form_extras",  # ✅ allow |add_class without {% load %}
             ],
             "context_processors": [
                 "django.template.context_processors.debug",
@@ -382,8 +382,6 @@ TEMPLATES = [
                 "django.contrib.messages.context_processors.messages",
                 "django.template.context_processors.static",
                 "cc.context.globals",               # STATIC_VERSION, APP_NAME, APP_ENV, FEATURES, etc.
-                # ⬇️ Use our new roles+features provider for sidebar menus
-                "core.context.flags",               # ✅ adds IS_MANAGER/IS_OWNER/IS_AGENT + FEATURES
             ],
             # Default OFF to avoid scary ⚠️ markers unless you opt in.
             **(
@@ -395,7 +393,7 @@ TEMPLATES = [
     },
 ]
 
-# Optionally add a tenants context-processor if the module exists.
+# ---------- Optional template helpers (safe to miss) ----------
 def _maybe_add_ctx(path: str):
     try:
         mod = ".".join(path.split(".")[:-1])
@@ -404,9 +402,21 @@ def _maybe_add_ctx(path: str):
     except Exception:
         pass
 
-# These are no-ops if the module/attr isn’t present
-_maybe_add_ctx("tenants.context.globals")     # e.g., can expose request.business & BRAND_NAME
+def _maybe_add_builtin(path: str):
+    try:
+        mod = ".".join(path.split(".")[:-1])
+        if _ils.find_spec(mod):
+            TEMPLATES[0]["OPTIONS"]["builtins"].append(path)
+    except Exception:
+        pass
+
+# Context processors that are nice-to-have but optional
+_maybe_add_ctx("core.context.flags")          # adds IS_MANAGER/IS_OWNER/IS_AGENT + FEATURES if available
+_maybe_add_ctx("tenants.context.globals")     # may expose request.business / BRAND_NAME
 _maybe_add_ctx("tenants.context.business")    # alt name if you create it
+
+# Builtin template tags/filters that are optional
+_maybe_add_builtin("tenants.templatetags.form_extras")  # e.g., |add_class; loaded only if present
 
 WSGI_APPLICATION = "cc.wsgi.application"
 
@@ -582,7 +592,7 @@ MEDIA_URL = "/media/"
 MEDIA_ROOT = BASE_DIR / "media"
 
 # ---- UI cache-busting (used in templates as ?v={{ STATIC_VERSION }}) ----
-STATIC_VERSION = os.environ.get("STATIC_VERSION", "2025-09-16-1")
+STATIC_VERSION = os.environ.get("STATIC_VERSION", "2025-09-19-1")
 
 # ✅ Manifest hashing toggle:
 #  - Always DISABLE manifest for runserver/DEBUG/TESTING unless you override with FORCE_PROD_BEHAVIOR=1.
@@ -786,6 +796,26 @@ DATA_IMPORT_MAX_EXPANSION = env_int("DATA_IMPORT_MAX_EXPANSION", 5000)
 REPORTS_DEFAULT_CURRENCY = os.environ.get("REPORTS_DEFAULT_CURRENCY", "MWK")
 REPORTS_MAX_ROWS_EXPORT = env_int("REPORTS_MAX_ROWS_EXPORT", 50000)
 
+# ---------- Public knobs used by inventory APIs ----------
+# Currency symbol used by charts/UI when API returns amounts
+CURRENCY_SIGN = os.environ.get("CURRENCY_SIGN", "MK")
+# Owner field(s) that link inventory items to a user/agent. Comma list env override:
+#   AGENT_OWNER_FIELDS="agent,handler,seller"
+AGENT_OWNER_FIELDS = env_csv(
+    "AGENT_OWNER_FIELDS",
+    "agent,owner,user,assigned_to,sold_by,created_by,added_by,scanned_in_by,checked_in_by,last_modified_by",
+)
+
+# ---------- Agent visibility / scoping (STRICT SELF-ONLY) ----------
+# Enforce that agents cannot see global/business-wide stock or KPIs.
+AGENT_CAN_VIEW_ALL = env_bool("AGENT_CAN_VIEW_ALL", False)  # keep False
+AGENT_SCOPE_MODE = os.environ.get("AGENT_SCOPE_MODE", "self").strip().lower()
+if AGENT_SCOPE_MODE not in ("self", "business"):
+    AGENT_SCOPE_MODE = "self"
+# Dashboard for agents must NOT aggregate globally
+DASHBOARD_AGENT_GLOBAL = env_bool("DASHBOARD_AGENT_GLOBAL", False)
+# Optional cache-buster for any dashboard/inventory caches
+INVENTORY_CACHE_BUST_VERSION = os.environ.get("INVENTORY_CACHE_BUST_VERSION", "1")
 
 # -------------------------------------------------
 # Sentry (optional)

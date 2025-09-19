@@ -1,18 +1,20 @@
 # inventory/models.py
-from django.db import models
-from django.contrib.auth import get_user_model
+from datetime import timedelta
+
 from django.conf import settings
-from django.utils import timezone
+from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
 from django.core.validators import MinValueValidator, RegexValidator
+from django.db import models
 from django.db.models import Q, Sum
-from datetime import timedelta
-import secrets
-import string
-import json
+from django.utils import timezone
 
 # --- Tenancy imports (explicit) ---
 from tenants.models import Business, TenantManager, UnscopedManager  # NEW
+
+import json
+import secrets
+import string
 
 User = get_user_model()
 
@@ -228,13 +230,13 @@ class InventoryItem(models.Model):
         validators=[MinValueValidator(0)],
         help_text="Must be zero or positive when provided.",
     )
-    status = models.CharField(max_length=10, choices=STATUS, default="IN_STOCK")
-    current_location = models.ForeignKey("Location", on_delete=models.PROTECT)
+    status = models.CharField(max_length=10, choices=STATUS, default="IN_STOCK", db_index=True)
+    current_location = models.ForeignKey("Location", on_delete=models.PROTECT, db_index=True)
     assigned_agent = models.ForeignKey(
         User, null=True, blank=True, on_delete=models.SET_NULL, related_name="assigned_items"
     )
     # Soft-delete flag (archive instead of hard delete when needed)
-    is_active = models.BooleanField(default=True)
+    is_active = models.BooleanField(default=True, db_index=True)
 
     # ---------- Carlcare warranty/activation tracking ----------
     WARRANTY_CHOICES = [
@@ -274,10 +276,10 @@ class InventoryItem(models.Model):
             models.Index(fields=["received_at"], name="inv_received_idx"),
         ]
         constraints = [
-            # Per-tenant IMEI uniqueness (only when IMEI present)
+            # Per-tenant IMEI uniqueness (only when IMEI present and non-empty)
             models.UniqueConstraint(
                 fields=["business", "imei"],
-                condition=Q(imei__isnull=False),
+                condition=Q(imei__isnull=False) & ~Q(imei=""),
                 name="uniq_imei_per_business",
             ),
             models.CheckConstraint(check=Q(order_price__gte=0), name="inv_order_price_nonneg"),
@@ -346,7 +348,7 @@ class InventoryAudit(models.Model):
         ("RESTORE", "Restore"),
     ]
 
-    business = models.ForeignKey( # carry tenant for fast/scoped reads
+    business = models.ForeignKey(  # carry tenant for fast/scoped reads
         Business, on_delete=models.CASCADE, null=True, blank=True, related_name="inventory_audits", db_index=True
     )
     item = models.ForeignKey("InventoryItem", on_delete=models.SET_NULL, related_name="audits", null=True, blank=True)

@@ -1,12 +1,246 @@
 {% extends "base.html" %}
+{% load static %}
 {% block content %}
-<div class="container py-5" style="max-width:520px;">
-<h3>Join {{ invite.business.name }}</h3>
-<p class="text-muted">Create your password to finish setup.</p>
-<form method="post">
-{% csrf_token %}
-{{ form.as_p }}
-<button class="btn btn-primary w-100">Create account</button>
-</form>
+
+<div class="container py-5" style="max-width:640px;">
+  <div class="card shadow-sm border-0">
+    <div class="card-body p-4">
+      <div class="d-flex align-items-center gap-2 mb-2">
+        <div class="fw-bold text-uppercase small text-secondary">Agent Invite</div>
+        <div class="vr"></div>
+        <div class="small text-muted">Secure sign-up</div>
+        {% if invite.expires_at %}
+          <div class="ms-auto">
+            <span class="badge rounded-pill text-bg-light border" id="expiryBadge" title="{{ invite.expires_at|date:'c' }}">
+              checking expiry…
+            </span>
+          </div>
+        {% endif %}
+      </div>
+
+      <h3 class="mb-1">Join {{ invite.business.name }}</h3>
+      <p class="text-muted mb-4">Create your account to start working in this shop.</p>
+
+      {% if error %}
+        <div class="alert alert-danger" role="alert">{{ error }}</div>
+      {% endif %}
+
+      <div class="mb-3 p-3 rounded" style="background:#f8fafc;">
+        <div class="small text-muted mb-1">Personalized greeting</div>
+        <div id="greeting" style="font-weight:600;">
+          Hi {{ invite.invited_name|default:"there" }}, welcome to {{ invite.business.name }}.
+        </div>
+      </div>
+
+      <form method="post" novalidate id="inviteForm">
+        {% csrf_token %}
+
+        <div class="mb-3">
+          <label for="username" class="form-label fw-semibold">Your name</label>
+          <input
+            type="text"
+            class="form-control"
+            id="username"
+            name="username"
+            placeholder="e.g. Chris Mwale"
+            value="{{ invite.invited_name|default_if_none:'' }}"
+            required
+            autocomplete="name"
+          >
+          <div class="form-text">Use the name teammates will recognize.</div>
+        </div>
+
+        {% if invite.email %}
+        <div class="mb-3">
+          <label class="form-label fw-semibold">Email (from invite)</label>
+          <input type="email" class="form-control" value="{{ invite.email }}" readonly>
+          <div class="form-text">Used for notifications and password reset.</div>
+        </div>
+        {% endif %}
+
+        <div class="mb-3">
+          <label for="password1" class="form-label fw-semibold">Create password</label>
+          <div class="input-group">
+            <input
+              type="password"
+              class="form-control"
+              id="password1"
+              name="password1"
+              minlength="6"
+              required
+              autocomplete="new-password"
+              placeholder="At least 6 characters"
+              aria-describedby="pwdHelp strengthHint"
+            >
+            <button class="btn btn-outline-secondary" type="button" data-toggle="reveal" data-target="#password1">Show</button>
+          </div>
+          <div id="pwdHelp" class="form-text">Tip: mix letters and numbers for a stronger password.</div>
+          <div id="strengthHint" class="small mt-1"></div>
+        </div>
+
+        <div class="mb-3">
+          <label for="password2" class="form-label fw-semibold">Confirm password</label>
+          <div class="input-group">
+            <input
+              type="password"
+              class="form-control"
+              id="password2"
+              name="password2"
+              minlength="6"
+              required
+              autocomplete="new-password"
+              placeholder="Re-enter password"
+              aria-describedby="matchHint"
+            >
+            <button class="btn btn-outline-secondary" type="button" data-toggle="reveal" data-target="#password2">Show</button>
+          </div>
+          <div class="form-text" id="matchHint" style="display:none;">Passwords match ✔</div>
+        </div>
+
+        <button class="btn btn-primary w-100 mb-2" type="submit">Create account &amp; accept invite</button>
+        <div class="text-center">
+          <a href="{% url 'accounts:login' %}" class="small">Already have an account? Sign in</a>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div class="text-center mt-3 text-muted small">
+    By continuing, you agree to follow your shop’s policies while using this system.
+  </div>
 </div>
+
+<script>
+(function() {
+  const shopName = "{{ invite.business.name|escapejs }}";
+  const defaultInvitee = "{{ invite.invited_name|default:'there'|escapejs }}";
+
+  const form = document.getElementById('inviteForm');
+  const nameInput = document.getElementById('username');
+  const greeting = document.getElementById('greeting');
+  const p1 = document.getElementById('password1');
+  const p2 = document.getElementById('password2');
+  const matchHint = document.getElementById('matchHint');
+  const strengthHint = document.getElementById('strengthHint');
+  const expiryBadge = document.getElementById('expiryBadge');
+
+  // --- Greeting live update ---
+  function updateGreeting() {
+    const name = (nameInput.value || '').trim() || defaultInvitee || 'there';
+    greeting.textContent = `Hi ${name}, welcome to ${shopName}.`;
+  }
+
+  // --- Password strength (simple client-side hint; server still validates) ---
+  function strength(s) {
+    let score = 0;
+    if (s.length >= 6) score++;
+    if (/[a-z]/.test(s) && /[A-Z]/.test(s)) score++;
+    if (/\d/.test(s)) score++;
+    if (/[^A-Za-z0-9]/.test(s)) score++;
+    return score;
+  }
+  function updateStrength() {
+    const s = p1.value || "";
+    const sc = strength(s);
+    let msg = "";
+    if (!s) msg = "";
+    else if (sc <= 1) msg = "Strength: weak";
+    else if (sc === 2) msg = "Strength: fair";
+    else if (sc === 3) msg = "Strength: good";
+    else msg = "Strength: strong";
+    strengthHint.textContent = msg;
+    strengthHint.className = "small mt-1 " + (sc <= 1 ? "text-danger" : sc === 2 ? "text-warning" : "text-success");
+  }
+
+  // --- Match indicator & guard ---
+  function updateMatch() {
+    if (!p1.value || !p2.value) {
+      matchHint.style.display = 'none';
+      return;
+    }
+    const ok = p1.value === p2.value && p1.value.length >= 6;
+    matchHint.style.display = ok ? 'block' : 'none';
+    matchHint.className = "form-text " + (ok ? "text-success" : "text-danger");
+    matchHint.textContent = ok ? "Passwords match ✔" : "Passwords don't match";
+  }
+
+  // prevent submit if mismatch or too short (client-side nicety; server still authoritative)
+  if (form) {
+    form.addEventListener('submit', (e) => {
+      const ok = p1.value === p2.value && p1.value.length >= 6;
+      if (!ok) {
+        e.preventDefault();
+        updateMatch();
+        if (p1.value.length < 6) p1.focus();
+        else p2.focus();
+      }
+    });
+  }
+
+  // --- Show/Hide password buttons ---
+  function wireRevealButtons() {
+    document.querySelectorAll('button[data-toggle="reveal"]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const sel = btn.getAttribute('data-target');
+        const input = document.querySelector(sel);
+        if (!input) return;
+        const isPwd = input.getAttribute('type') === 'password';
+        input.setAttribute('type', isPwd ? 'text' : 'password');
+        btn.textContent = isPwd ? 'Hide' : 'Show';
+      });
+    });
+  }
+
+  // --- Expiry countdown badge (if provided) ---
+  function renderExpiryBadge() {
+    if (!expiryBadge) return;
+    const iso = expiryBadge.title; // server put ISO timestamp in title
+    if (!iso) return;
+    const end = new Date(iso);
+    if (isNaN(end.getTime())) {
+      expiryBadge.textContent = "expiry unknown";
+      return;
+    }
+    function tick() {
+      const now = new Date();
+      let ms = end - now;
+      const expired = ms <= 0;
+      if (expired) ms = Math.abs(ms);
+
+      const sec = Math.floor(ms / 1000);
+      const m = Math.floor(sec / 60);
+      const h = Math.floor(m / 60);
+      const d = Math.floor(h / 24);
+
+      let text;
+      if (expired) {
+        if (m < 1) text = "expired just now";
+        else if (h < 1) text = `expired ${m} min ago`;
+        else if (d < 1) text = `expired ${h} hr ago`;
+        else text = `expired ${d} d ago`;
+        expiryBadge.classList.add('text-bg-light','border','text-danger');
+      } else {
+        if (h < 1) text = `expires in ${m} min`;
+        else if (d < 1) text = `expires in ${h} hr`;
+        else text = `expires in ${d} d`;
+        expiryBadge.classList.remove('text-danger');
+      }
+      expiryBadge.textContent = text;
+    }
+    tick();
+    setInterval(tick, 30000);
+  }
+
+  // Wire up
+  if (nameInput) nameInput.addEventListener('input', updateGreeting);
+  if (p1) { p1.addEventListener('input', updateStrength); p1.addEventListener('input', updateMatch); }
+  if (p2) p2.addEventListener('input', updateMatch);
+
+  wireRevealButtons();
+  updateGreeting();
+  updateStrength();
+  renderExpiryBadge();
+})();
+</script>
+
 {% endblock %}

@@ -9,6 +9,7 @@ from django.conf import settings
 from django.db import transaction
 from django.utils.text import slugify
 from django.core.exceptions import PermissionDenied
+from django.db.models import Q
 
 try:
     from django.http import HttpRequest, HttpResponse
@@ -78,8 +79,13 @@ def _resolve_business_by_id(pk):
 
 
 def _safe_reverse(name: str, default: str) -> str:
+    """
+    Reverse a URL by name, falling back to the provided default string
+    if reversing fails or the URL is "/".
+    """
     try:
-        return reverse(name)
+        url = reverse(name)
+        return url or default
     except Exception:
         return default
 
@@ -104,6 +110,13 @@ def _model_has_field(model, field_name: str) -> bool:
         return True
     except Exception:
         return False
+
+
+def _user_group_names(user) -> set[str]:
+    try:
+        return set(user.groups.values_list("name", flat=True))
+    except Exception:
+        return set()
 
 
 # ----------------------------
@@ -199,78 +212,8 @@ def attach_business(get_response):
 
 
 # ----------------------------
-# Query scoping & object binding
+# Role helpers
 # ----------------------------
-def scoped(qs_or_manager, request: "HttpRequest"):
-    """
-    Scope any queryset/manager to the active business. If there is no active business,
-    returns qs.none() (when possible) to avoid accidental cross-tenant leakage.
-    Only applies if the model has a 'business' field; otherwise returns original qs.
-    """
-    biz = get_active_business(request)
-    # Build a queryset from manager or queryset
-    try:
-        qs = qs_or_manager.all() if hasattr(qs_or_manager, "all") else qs_or_manager
-    except Exception:
-        qs = qs_or_manager
-
-    # If model has a business field, apply the filter
-    try:
-        model = getattr(qs, "model", None)
-        if model and _model_has_field(model, "business"):
-            if not biz:
-                return qs.none() if hasattr(qs, "none") else qs
-            return qs.filter(business=biz)
-    except Exception:
-        # Fail-safe: return original qs on any unexpected issue
-        return qs
-
-    # If model doesn’t carry business, leave unchanged
-    return qs
-
-
-def bind_business(obj, request: "HttpRequest"):
-    """
-    Stamp an object with the active business if it has a 'business' field and isn't set.
-    Use for create flows to guarantee tenant ownership.
-    """
-    try:
-        if hasattr(obj, "business") and getattr(obj, "business_id", None) is None:
-            biz = get_active_business(request)
-            if biz is None:
-                raise PermissionDenied("No active business selected.")
-            obj.business = biz
-    except Exception:
-        pass
-    return obj
-
-
-def assert_owns(obj, request: "HttpRequest"):
-    """
-    Raise PermissionDenied if `obj` does not belong to the active tenant.
-    Use after lookups that aren't pre-scoped (defense-in-depth).
-    """
-    try:
-        biz = get_active_business(request)
-        if hasattr(obj, "business_id") and biz and obj.business_id != biz.id:
-            raise PermissionDenied("Cross-tenant access denied.")
-    except PermissionDenied:
-        raise
-    except Exception:
-        # If we can't determine, don't throw here—let the caller decide.
-        pass
-
-
-# ----------------------------
-# Role & membership helpers
-# ----------------------------
-def _user_group_names(user) -> set[str]:
-    try:
-        return set(user.groups.values_list("name", flat=True))
-    except Exception:
-        return set()
-
-
 def user_is_admin(user) -> bool:
     """
     Platform admin ≠ Django staff.
@@ -304,6 +247,127 @@ def _has_active_membership(user, business) -> bool:
         ).exists()
     except Exception:
         return False
+
+
+# ----------------------------
+# Query scoping & object binding
+# ----------------------------
+def _tenant_fence(qs, business):
+    """
+    Apply tenant filter if the model carries either 'business' or 'location__business'.
+    """
+    try:
+        model = getattr(qs, "model", None)
+        if not model or business is None:
+            return qs.none() if business is None and hasattr(qs, "none") else qs
+
+        # Prefer direct business fence
+        if _model_has_field(model, "business"):
+            return qs.filter(business=business)
+
+        # Otherwise try via location
+        return qs.filter(location__business=business)
+    except Exception:
+        return qs
+
+
+def _agent_visibility_q(user, model):
+    """
+    Build a best-effort Q() that limits visibility to rows the agent 'owns'.
+    We try multiple common patterns but never crash if a field is missing.
+    """
+    q = Q()
+    # direct ownership fields commonly seen
+    for fname in ("assigned_to", "owner", "agent", "user"):
+        try:
+            if _model_has_field(model, fname):
+                q |= Q(**{fname: user})
+        except Exception:
+            pass
+
+    # via location membership
+    try:
+        # If model has FK to Location
+        if _model_has_field(model, "location"):
+            # Location has memberships.user (if you modeled it)
+            q |= Q(location__memberships__user=user)
+    except Exception:
+        pass
+
+    # If nothing matched, q will be empty; caller will handle fallback
+    return q
+
+
+def scoped(qs_or_manager, request: "HttpRequest", *, role_aware: bool = True):
+    """
+    Scope any queryset/manager to the active business and (optionally) role.
+    - Managers/Admins: see all rows within their active business.
+    - Agents: see ONLY their own/assigned/location rows.
+    If a model does not carry a tenant field, the queryset is returned unchanged.
+    """
+    biz = get_active_business(request)
+
+    # Normalize to queryset
+    try:
+        qs = qs_or_manager.all() if hasattr(qs_or_manager, "all") else qs_or_manager
+    except Exception:
+        qs = qs_or_manager
+
+    # If the model doesn't expose anything we can fence by, leave as-is or none()
+    model = getattr(qs, "model", None)
+    if model is None:
+        return qs
+
+    # 1) Tenant fence
+    qs = _tenant_fence(qs, biz)
+
+    # If role-aware scoping is disabled or user is manager/admin, we're done
+    user = getattr(request, "user", None)
+    if not role_aware or user_is_manager(user):
+        return qs
+
+    # 2) Agent narrowing (best effort)
+    try:
+        q_agent = _agent_visibility_q(user, model)
+        if q_agent.children:
+            return qs.filter(q_agent)
+        # If we can't determine ownership fields, safest is to return none for agents
+        return qs.none() if hasattr(qs, "none") else qs
+    except Exception:
+        # Never leak cross-agent data on errors
+        return qs.none() if hasattr(qs, "none") else qs
+
+
+def bind_business(obj, request: "HttpRequest"):
+    """
+    Stamp an object with the active business if it has a 'business' field and isn't set.
+    Use for create flows to guarantee tenant ownership.
+    """
+    try:
+        if hasattr(obj, "business") and getattr(obj, "business_id", None) is None:
+            biz = get_active_business(request)
+            if biz is None:
+                raise PermissionDenied("No active business selected.")
+            obj.business = biz
+    except Exception:
+        pass
+    return obj
+
+
+def assert_owns(obj, request: "HttpRequest"):
+    """
+    Raise PermissionDenied if `obj` does not belong to the active tenant.
+    Use after lookups that aren't pre-scoped (defense-in-depth).
+    """
+    try:
+        biz = get_active_business(request)
+        if hasattr(obj, "business_id") and biz and obj.business_id != biz.id:
+            raise PermissionDenied("Cross-tenant access denied.")
+    except PermissionDenied:
+        raise
+    except Exception:
+        # If we can't determine, don't throw here—let the caller decide.
+        pass
 
 
 # ----------------------------
@@ -373,7 +437,6 @@ def require_role(roles: Optional[Iterable[str]] = None) -> Callable:
             if not getattr(user, "is_authenticated", False):
                 login_url = _safe_reverse("accounts:login", "/accounts/login/")
                 next_q = quote_plus(getattr(request, "get_full_path", lambda: "/")())
-                # FIX: remove stray '}' that caused SyntaxError
                 return redirect(f"{login_url}?next={next_q}")
 
             # Superuser bypass (platform-admin)

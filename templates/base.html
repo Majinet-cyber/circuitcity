@@ -36,13 +36,10 @@
       /* Page (light) */
       --bg:#f5f7fe; --ink:#0b1220; --muted:#475569;
       --line:#d9e2ef; --card:#ffffff;
-
-      /* Sidebar (dark) */
-      --sb-bg:#0b1220; --sb-ink:#e6edf7; --sb-line:#20324d;
+      --chart-grid: rgba(2,6,23,.10);
 
       /* Brand */
       --cc-accent:#3b82f6; --cc-accent-2:#60a5fa;
-      --chart-grid: rgba(2,6,23,.10);
 
       --font-sans: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Arial, "Noto Sans";
       --fs-2xl: clamp(20px, 2.7vw, 24px);
@@ -56,11 +53,23 @@
       --pop:     cubic-bezier(.17,.67,.25,1.35);
       --fast: 140ms; --med: 220ms; --slow: 360ms;
 
-      --glass-bg: color-mix(in oklab, var(--card) 78%, transparent);
-      --glass-br: 12px;
+      /* Glass tokens */
+      --glass-bg: color-mix(in oklab, var(--card) 82%, transparent);
+      --glass-br: 14px;
       --glass-bd: 1px solid var(--line);
-      --glass-shadow: 0 6px 24px rgba(0,0,0,.06);
+      --glass-shadow: 0 14px 40px rgba(2,6,23,.10);
+
+      /* ========= Midnight Glass Sidebar ========= */
+      --mid-bg:#0f172a;                 /* slate-900 */
+      --mid-ink:#cbd5e1;                /* text */
+      --mid-ink-dim:#94a3b8;            /* dim text */
+      --mid-sep: rgba(148,163,184,.15); /* border */
+      --mid-active: rgba(255,255,255,.08);
+      --mid-hover: rgba(255,255,255,.06);
+      --neon-cyan:#22d3ee;
+      --neon-green:#10b981;
     }
+
     @media (prefers-reduced-motion: reduce){
       *{ animation-duration:1ms !important; animation-iteration-count:1 !important; transition-duration:1ms !important; scroll-behavior:auto !important; }
     }
@@ -70,29 +79,68 @@
 
     /* Shell */
     .cc-shell{ min-height:100dvh; display:flex; width:100%; }
+
+    /* ========= Midnight Glass Sidebar ========= */
     .cc-sidebar{
       position:sticky; top:0; width:var(--sidebar-w); flex:0 0 var(--sidebar-w);
       height:100dvh; overflow:auto; z-index:10; padding:16px;
-      display:flex; flex-direction:column; gap:10px;
-      background:var(--sb-bg); color:var(--sb-ink); border-right:1px solid var(--sb-line); color-scheme: dark;
-    }
-    .brand{ display:flex; align-items:center; gap:.6rem; font-weight:800; font-size:1.25rem; margin:2px 2px 10px; }
-    .brand .logo{ display:grid; place-items:center; width:36px; height:36px; border-radius:10px; background:#132036; color:#8fb5ff; }
+      display:flex; flex-direction:column; gap:14px;
+      color: var(--mid-ink); color-scheme: dark;
 
-    .menu-group{ font-size:.76rem; opacity:.9; font-weight:800; letter-spacing:.02em; margin:8px 6px 6px; }
-    .navlist{ list-style:none; padding:0; margin:0; display:flex; flex-direction:column; gap:6px; }
-    .navlink{ display:flex; align-items:center; gap:.6rem; padding:.58rem .72rem; border-radius:10px; font-weight:700; color:var(--sb-ink); border:1px solid transparent; min-height:44px; }
-    .navlink .bi{ font-size:1.05rem; }
-    .navlink:hover{ background:#121b2d; border-color:#1a2742; }
-    .navlink.active{ background:var(--cc-accent); color:#fff; box-shadow:0 8px 24px rgba(59,130,246,.28); }
-    .navlink.active .bi{ color:#fff; }
-    .side-footer{ margin-top:auto; display:flex; gap:8px; align-items:center; justify-content:space-between; }
+      background:
+        radial-gradient(1200px 800px at -10% -10%, rgba(34,211,238,.08), transparent 40%),
+        radial-gradient(1000px 600px at 110% 110%, rgba(16,185,129,.06), transparent 45%),
+        var(--mid-bg);
+      border-right: 1px solid var(--mid-sep);
+
+      -webkit-backdrop-filter: blur(14px) saturate(120%);
+      backdrop-filter: blur(14px) saturate(120%);
+      box-shadow: inset 0 1px 0 rgba(255,255,255,.04);
+    }
+    .brand{ display:flex; align-items:center; gap:.6rem; font-weight:900; font-size:1.2rem; margin:2px 2px 10px; color:#e2e8f0; }
+    .brand .logo{
+      display:grid; place-items:center; width:36px; height:36px; border-radius:12px;
+      background: linear-gradient(135deg, rgba(34,211,238,.22), rgba(16,185,129,.18));
+      color:#e2e8f0; box-shadow: inset 0 1px 0 rgba(255,255,255,.25);
+    }
+
+    .menu-group{
+      font-size:.72rem; font-weight:800; letter-spacing:.08em; text-transform:uppercase;
+      margin:8px 6px 6px; color: var(--mid-ink-dim);
+    }
+    .navlist{ list-style:none; padding:0; margin:0; display:flex; flex-direction:column; gap:8px; }
+    .navlink{
+      display:flex; align-items:center; gap:.6rem;
+      padding:.58rem .72rem; border-radius:12px; font-weight:700; min-height:44px;
+      color: var(--mid-ink); background: transparent; border:1px solid transparent;
+      transition:transform var(--fast) var(--elevate), box-shadow var(--fast) var(--elevate), background var(--fast) var(--elevate), border-color var(--fast) var(--elevate);
+    }
+    .navlink .bi{ font-size:1.05rem; color: var(--mid-ink-dim); }
+    .navlink:hover{
+      background: var(--mid-hover);
+      border-color: rgba(34,211,238,.28);
+      box-shadow:
+        0 6px 20px rgba(34,211,238,.12),
+        0 0 0 1px rgba(34,211,238,.22) inset;
+      transform: translateY(-1px);
+    }
+    .navlink.active{
+      background: var(--mid-active);
+      border-color: rgba(34,211,238,.35);
+      box-shadow:
+        0 10px 28px rgba(34,211,238,.16),
+        inset 0 0 0 1px rgba(34,211,238,.35);
+      color:#eaf2ff;
+    }
+    .navlink.active .bi{ color:#eaf2ff; }
+
+    .side-footer{ margin-top:auto; display:flex; gap:8px; align-items:center; justify-content:space-between; color:var(--mid-ink-dim); }
     .side-footer .logout{ padding:.45rem .6rem; }
 
     .cc-main{ flex:1 1 auto; min-width:0; position:relative; z-index:0; background:var(--bg); color:var(--ink); }
     .cc-page{ max-width:1200px; margin:0 auto; padding:18px; }
 
-    /* Sticky header */
+    /* Sticky header (kept light for contrast) */
     .cc-header{
       position:sticky; top:0; z-index:2;
       background:rgba(255,255,255,.98);
@@ -131,7 +179,7 @@
     .hover-lift:where(:hover,:focus-visible){ transform: translateY(-2px); box-shadow: 0 8px 24px rgba(0,0,0,.12); }
     .tap{ transition: transform var(--fast) var(--elevate); }
     .tap:active{ transform: scale(.98); }
-    .focus-ring:focus-visible{ outline: 3px solid color-mix(in oklab, var(--cc-accent) 35%, transparent); outline-offset:2px; }
+    .focus-ring:focus-visible{ outline: 3px solid color-mix(in oklab, var(--neon-green) 45%, transparent); outline-offset:2px; }
     .fade-in{ animation: fadeIn var(--slow) var(--elevate); }
     @keyframes fadeIn{ from{opacity:0; transform:translateY(6px)} to{opacity:1; transform:translateY(0)} }
 
@@ -140,7 +188,7 @@
     /* ---------- Active Business / HQ Pill ---------- */
     .tenant-pill{
       position:relative; display:flex; align-items:center; gap:.5rem; padding:.35rem .6rem .35rem .45rem;
-      border-radius:999px; border:1px solid var(--line); background:color-mix(in oklab, var(--card) 82%, transparent);
+      border-radius:999px; border:1px solid var(--line); background:color-mix(in oklab, var(--card) 88%, transparent);
       -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px);
       box-shadow: 0 8px 26px rgba(0,0,0,.08);
       font-weight:800; line-height:1; cursor:default;
@@ -260,6 +308,9 @@
     {% url 'tenants:choose_business'     as url_choose_business %}
     {% url 'tenants:manager_review_agents' as url_manager_agents %}
     {% url 'admin:tenants_business_changelist' as url_admin_business %}
+    {# NEW: Time pages for role-aware sidebar links #}
+    {% url 'inventory:time_checkin'      as url_time_checkin %}
+    {% url 'inventory:time_logs'         as url_time_logs %}
 
     {% with path=request.path|default:'' %}
       {% if 'accounts/settings' not in path %}
@@ -472,7 +523,9 @@
         simulator_new: "{{ url_simulator_new|default:'/simulator/new/' }}",
         layby_admin: "{{ url_layby_admin|default:'/layby/admin/' }}",
         layby_agent: "{{ url_layby_agent|default:'/layby/agent/' }}",
-        layby_customer: "{{ url_layby_customer|default:'/layby/customer/' }}"
+        layby_customer: "{{ url_layby_customer|default:'/layby/customer/' }}",
+        time_checkin: "{{ url_time_checkin|default:'/inventory/time/checkin/' }}",
+        time_logs: "{{ url_time_logs|default:'/inventory/time/logs/' }}"
       },
       USER: {
         is_staff: {{ request.user.is_staff|yesno:"true,false" }},
