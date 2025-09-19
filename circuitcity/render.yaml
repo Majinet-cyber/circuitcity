@@ -1,0 +1,40 @@
+services:
+  - type: web
+    name: circuitcity-main
+    env: python
+    plan: starter
+    autoDeploy: true
+
+    buildCommand: |
+      pip install -r requirements.txt
+      python manage.py collectstatic --noinput || true
+      python manage.py migrate --noinput || true
+
+    startCommand: gunicorn cc.wsgi:application --preload --workers=3 --timeout=120 --bind 0.0.0.0:$PORT
+    healthCheckPath: /inventory/healthz/
+
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.12.3
+      - key: DJANGO_SETTINGS_MODULE
+        value: cc.settings
+      - key: DJANGO_SECRET_KEY
+        generateValue: true
+      - key: DEBUG
+        value: "False"
+      - key: FORCE_SQLITE
+        value: "0"
+      - key: HEALTHZ_ALLOW_HTTP
+        value: "1"
+      - key: CSRF_TRUSTED_ORIGINS
+        value: "https://*.onrender.com"
+      - key: ALLOWED_HOSTS
+        value: "localhost,127.0.0.1,.onrender.com"
+      - key: DATABASE_URL
+        fromDatabase:
+          name: circuitcity-db
+          property: connectionString
+
+databases:
+  - name: circuitcity-db
+    plan: free
