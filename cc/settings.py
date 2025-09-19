@@ -422,18 +422,21 @@ WSGI_APPLICATION = "cc.wsgi.application"
 
 
 # -------------------------------------------------
-# Database — prefer SQLite locally; require DATABASE_URL only when truly needed
+# Database — prefer SQLite locally; require DATABASE_URL when hosted
 # -------------------------------------------------
 DATABASES: dict = {}
 
-# 🔒 HARD GLOBAL OVERRIDE: force SQLite unless you explicitly disable it
-FORCE_SQLITE = env_bool("FORCE_SQLITE", True)
+# 🔧 DEFAULT CHANGE: do NOT force SQLite when hosted (Render).
+# - Locally: default True (SQLite)
+# - On hosting (Render/custom domain): default False (use Postgres via DATABASE_URL)
+FORCE_SQLITE = env_bool("FORCE_SQLITE", default=not ON_HOSTING)
 if FORCE_SQLITE:
+    # Keep developer convenience locally
     os.environ.pop("DATABASE_URL", None)
     os.environ["USE_LOCAL_SQLITE"] = "1"
 
 DATABASE_URL = _str_env("DATABASE_URL")
-USE_LOCAL_SQLITE = env_bool("USE_LOCAL_SQLITE", default=DEBUG)
+USE_LOCAL_SQLITE = env_bool("USE_LOCAL_SQLITE", default=(DEBUG and not ON_HOSTING))
 
 REQUIRE_DATABASE_URL = env_bool(
     "REQUIRE_DATABASE_URL",
@@ -826,7 +829,7 @@ if SENTRY_DSN:
     from sentry_sdk.integrations.django import DjangoIntegration
     sentry_sdk.init(
         dsn=SENTRY_DSN,
-        integrations=[DjangoIntegration()],
+        integrations=[DjangoIntegration],
         traces_sample_rate=float(os.environ.get("SENTRY_TRACES_SAMPLE_RATE", 0.0)),
         send_default_pii=True,
         environment=os.environ.get("SENTRY_ENV", "dev" if DEBUG else "prod"),
