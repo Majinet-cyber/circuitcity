@@ -6,7 +6,10 @@ services:
     autoDeploy: true
 
     buildCommand: |
-      pip install -r requirements.txt
+      python -m pip install --upgrade pip
+      # encourage wheels for the heavyweight libs
+      PIP_ONLY_BINARY="numpy,scipy,pandas,matplotlib,kiwisolver,contourpy,statsmodels" \
+      pip install --no-cache-dir -r requirements.txt
       python manage.py collectstatic --noinput || true
       python manage.py migrate --noinput || true
 
@@ -15,7 +18,7 @@ services:
 
     envVars:
       - key: PYTHON_VERSION
-        value: 3.12.3
+        value: 3.11.9          # ⟵ switch from 3.12.x
       - key: DJANGO_SETTINGS_MODULE
         value: cc.settings
       - key: DJANGO_SECRET_KEY
