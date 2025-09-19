@@ -1,39 +1,49 @@
-﻿asgiref==3.9.1
-certifi==2025.8.3
-contourpy==1.3.2
-cycler==0.12.1
-dj-database-url==3.0.1
-Django>=4.2,<6
-fonttools==4.58.5
-gunicorn==23.0.0
-kiwisolver==1.4.8
-matplotlib==3.10.3
-numpy==2.2.3
-oauthlib==3.3.1
-packaging==24.2
-pandas==2.3.2
-patsy==1.0.1
-pillow==11.1.0
-psycopg2-binary==2.9.10
-pyasn1==0.6.1
-pycparser==2.22
-pyparsing==3.2.3
-PySocks==1.7.1
-python-dateutil==2.9.0.post0
-python-dotenv==1.1.1
-python-json-logger==3.3.0
-pytz==2025.1
-scipy==1.16.1
-sentry-sdk==2.35.0
-six==1.17.0
-sniffio==1.3.1
-sortedcontainers==2.4.0
-soupsieve==2.7
-sqlparse==0.5.3
-statsmodels==0.14.5
-typing_extensions==4.14.1
-tzdata==2025.1
-urllib3==2.5.0
-websocket-client==1.8.0
-whitenoise==6.9.0
-xyzservices==2025.1.0
+﻿services:
+  - type: web
+    name: circuitcity-main
+    env: python
+    plan: starter
+    autoDeploy: true
+
+    buildCommand: |
+      python -m pip install --upgrade pip
+      python -m pip install -r requirements.txt
+      python - <<'PY'
+import sys
+try:
+    import PIL
+    print("Pillow OK:", getattr(PIL, "__version__", "unknown"), file=sys.stderr)
+except Exception as e:
+    print("Pillow import FAILED:", repr(e), file=sys.stderr); raise
+PY
+      python manage.py collectstatic --noinput || true
+      python manage.py migrate --noinput || true
+
+    startCommand: gunicorn cc.wsgi:application --preload --workers=3 --timeout=120 --bind 0.0.0.0:$PORT
+    healthCheckPath: /inventory/healthz/
+
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.12.3
+      - key: DJANGO_SETTINGS_MODULE
+        value: cc.settings
+      - key: DJANGO_SECRET_KEY
+        generateValue: true
+      - key: DEBUG
+        value: "False"
+      - key: FORCE_SQLITE
+        value: "0"
+      - key: HEALTHZ_ALLOW_HTTP
+        value: "1"
+      - key: CSRF_TRUSTED_ORIGINS
+        value: "https://*.onrender.com"
+      - key: ALLOWED_HOSTS
+        value: "localhost,127.0.0.1,.onrender.com"
+      - key: DATABASE_URL
+        fromDatabase:
+          name: circuitcity-db
+          property: connectionString
+
+databases:
+  - name: circuitcity-db
+    plan: free
