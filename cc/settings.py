@@ -222,7 +222,7 @@ if DEBUG or TESTING:
     _add_origin("http://testserver")
 
 # ----------- DEV OVERRIDES FOR LOCAL LOGIN -----------
-// disable hard redirects / secure-only cookies locally
+# disable hard redirects / secure-only cookies locally
 if DEBUG:
     SECURE_SSL_REDIRECT = False
     SESSION_COOKIE_SECURE = False
