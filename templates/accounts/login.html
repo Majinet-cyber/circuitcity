@@ -4,15 +4,10 @@
   <meta charset="utf-8" />
   <title>Sign in · Circuit City (v10)</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <!-- Expose CSRF token for scripts (Django will fill this value when present) -->
   <meta name="csrf-token" content="{{ csrf_token }}"/>
 
   <style>
-    :root{
-      --cc-bg:#f6f9ff; --cc-card:#fff; --cc-line:#e5e7eb; --cc-ink:#0f172a; --cc-muted:#64748b;
-      --blue-1:#2563eb; --glass-bg:rgba(37,99,235,0.12); --glass-brd:rgba(96,165,250,.55);
-      --glass-shadow:0 10px 30px rgba(37,99,235,.22);
-    }
+    :root{--cc-bg:#f6f9ff;--cc-card:#fff;--cc-line:#e5e7eb;--cc-ink:#0f172a;--cc-muted:#64748b;--blue-1:#2563eb;--glass-bg:rgba(37,99,235,0.12);--glass-brd:rgba(96,165,250,.55);--glass-shadow:0 10px 30px rgba(37,99,235,.22)}
     *{box-sizing:border-box}
     body{margin:0;background:linear-gradient(180deg,var(--cc-bg),#fff);font-family:system-ui,Segoe UI,Inter,Roboto,Arial,sans-serif;color:var(--cc-ink)}
     .auth-wrap{min-height:100vh;display:grid;place-items:center;padding:clamp(16px,4vw,32px)}
@@ -20,25 +15,14 @@
     .brand{font-weight:800;margin:0 0 .25rem}
     .muted{color:var(--cc-muted);margin:0 0 12px}
     label{display:block;font-size:14px;margin:12px 0 6px}
-    input[type="text"],input[type="password"]{width:100%;padding:10px 12px;border:1px solid #cbd5e1;border-radius:10px;font-size:14px}
+    input[type="text"],input[type="email"],input[type="password"]{width:100%;padding:10px 12px;border:1px solid #cbd5e1;border-radius:10px;font-size:14px}
     .err{background:#fef2f2;border:1px solid #fecaca;color:#991b1b;padding:.6rem .8rem;border-radius:10px;margin:0 0 12px}
-    .help{font-size:13px;color:#7f1d1d;margin:.4rem 0 0}
     .pw-field{position:relative}
     .pw-toggle{position:absolute;right:.55rem;top:50%;transform:translateY(-50%);background:transparent;border:0;color:#64748b;cursor:pointer;width:1.75rem;height:1.75rem}
-    /* pretty submit */
-    #loginSubmit{display:inline-flex;align-items:center;justify-content:center;gap:.5rem;width:100%;
-      padding:.8rem 1.1rem;font-weight:800;letter-spacing:.02em;border-radius:14px;border:1px solid var(--glass-brd);
-      color:#eaf2ff;background:
-      radial-gradient(120% 160% at 30% 20%, rgba(255,255,255,.35), transparent 60%),
-      linear-gradient(135deg, rgba(96,165,250,.65), rgba(37,99,235,.55)), var(--glass-bg);
-      box-shadow:var(--glass-shadow);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);
-      transition:transform .18s ease, box-shadow .18s ease, background .18s ease, color .18s ease;cursor:pointer;margin-top:.5rem}
+    #loginSubmit{display:inline-flex;align-items:center;justify-content:center;gap:.5rem;width:100%;padding:.8rem 1.1rem;font-weight:800;letter-spacing:.02em;border-radius:14px;border:1px solid var(--glass-brd);color:#eaf2ff;background:radial-gradient(120% 160% at 30% 20%, rgba(255,255,255,.35), transparent 60%),linear-gradient(135deg, rgba(96,165,250,.65), rgba(37,99,235,.55)), var(--glass-bg);box-shadow:var(--glass-shadow);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);transition:transform .18s, box-shadow .18s, background .18s, color .18s;cursor:pointer;margin-top:.5rem}
     #loginSubmit:hover{transform:translateY(-1px);color:#fff;box-shadow:0 14px 34px rgba(37,99,235,.32)}
     #loginSubmit:disabled{opacity:.65;cursor:not-allowed;box-shadow:0 8px 18px rgba(37,99,235,.18)}
-    /* page loader */
-    #page-loader{position:fixed;inset:0;z-index:3000;display:grid;place-items:center;
-      background:radial-gradient(1200px 800px at 50% 40%, rgba(15,23,42,0.12), transparent 60%);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);
-      transition:opacity .35s, visibility .35s}
+    #page-loader{position:fixed;inset:0;z-index:3000;display:grid;place-items:center;background:radial-gradient(1200px 800px at 50% 40%, rgba(15,23,42,0.12), transparent 60%);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);transition:opacity .35s, visibility .35s}
     #page-loader.hidden{opacity:0;visibility:hidden}
     .loader-ring{width:66px;height:66px;border-radius:50%;border:4px solid rgba(96,165,250,.25);border-top-color:var(--blue-1);animation:spin 1s linear infinite;box-shadow:0 0 0 4px rgba(37,99,235,.06) inset}
     @keyframes spin{to{transform:rotate(360deg)}}
@@ -50,7 +34,6 @@
   </style>
 </head>
 <body>
-  <!-- Loader -->
   <div id="page-loader" aria-hidden="true"><div class="loader-ring" role="status" aria-label="Loading"></div></div>
 
   <div class="auth-wrap">
@@ -58,9 +41,7 @@
       <h1 id="loginTitle" class="brand">Circuit City</h1>
       <p id="loginDesc" class="muted">Sign in to continue. <strong style="color:#2563eb">[v10]</strong></p>
 
-      {% if messages %}
-        {% for m in messages %}<div class="err" role="alert" aria-live="assertive">{{ m }}</div>{% endfor %}
-      {% endif %}
+      {% if messages %}{% for m in messages %}<div class="err" role="alert" aria-live="assertive">{{ m }}</div>{% endfor %}{% endif %}
       {% if form and form.non_field_errors %}
         <div class="err" role="alert" aria-live="assertive">
           {% for e in form.non_field_errors %}{{ e }}{% if not forloop.last %}<br>{% endif %}{% endfor %}
@@ -69,21 +50,29 @@
         <div class="err" role="alert" aria-live="assertive">Invalid details. Please try again.</div>
       {% endif %}
 
-      <!-- IdentifierLoginForm fields: identifier + password -->
       <form method="post" action="{% url 'accounts:login' %}" novalidate>
         {% csrf_token %}
-        <!-- Fallback CSRF (patched by JS if needed) -->
         <input type="hidden" id="csrfFallback" name="csrfmiddlewaretoken" value="" />
         <input type="hidden" name="next" value="{{ next|default:'' }}"/>
 
-        <label for="{{ form.identifier.id_for_label }}">Email or Username</label>
-        {{ form.identifier }}
+        {# --- First field (identifier/username/email) --- #}
+        {% for f in form %}
+          {% if forloop.first %}
+            <label for="{{ f.id_for_label }}">Email or Username</label>
+            {{ f }}
+          {% endif %}
+        {% endfor %}
 
-        <label for="{{ form.password.id_for_label }}">Password</label>
-        <div class="pw-field">
-          {{ form.password }}
-          <button class="pw-toggle" type="button" aria-label="Show password" data-state="hidden">👁</button>
-        </div>
+        {# --- Password field (by widget type) --- #}
+        {% for f in form %}
+          {% if f.field.widget.input_type == "password" %}
+            <label for="{{ f.id_for_label }}">Password</label>
+            <div class="pw-field">
+              {{ f }}
+              <button class="pw-toggle" type="button" aria-label="Show password" data-state="hidden">👁</button>
+            </div>
+          {% endif %}
+        {% endfor %}
 
         <button id="loginSubmit" type="submit">Sign in</button>
       </form>
@@ -92,7 +81,6 @@
         <a href="/accounts/password/forgot/">Forgot your password?</a>
       </p>
 
-      <!-- Sign up CTA -->
       <div class="cta" aria-label="Create account">
         <p class="muted" style="margin:0 0 10px">New here?</p>
         <a class="btn btn-outline" href="{% url 'accounts:signup_manager' %}">Create a Manager account</a>
@@ -103,18 +91,15 @@
   </div>
 
   <script>
-    // Hide loader when page is ready
     window.addEventListener('load', function(){
       var el = document.getElementById('page-loader'); if(el) el.classList.add('hidden');
     });
 
-    // Password toggle
+    // Password toggle: find any password input on the page
     (function(){
-      var btn = document.querySelector('.pw-toggle'); var input = document.getElementById('{{ form.password.id_for_label }}');
-      if(!btn) return;
-      // If Django didn't render an id on the password field, fall back to known id.
-      if(!input) input = document.getElementById('id_password');
-      if(!btn||!input) return;
+      var btn = document.querySelector('.pw-toggle');
+      var input = document.querySelector('input[type="password"]');
+      if(!btn || !input) return;
       btn.addEventListener('click', function(){
         var show = this.getAttribute('data-state') !== 'visible';
         input.type = show ? 'text' : 'password';
@@ -137,7 +122,7 @@
       });
     })();
 
-    // --- CSRF hardening on mobile browsers ---
+    // CSRF fallback (mobile/Safari quirks)
     (function ensureCsrfPresent(){
       function getCookie(name){
         var m = document.cookie.match('(^|;)\\s*' + name + '\\s*=\\s*([^;]+)');
@@ -147,17 +132,9 @@
       var metaToken = (document.querySelector('meta[name="csrf-token"]')||{}).content || '';
       var djangoHidden = document.querySelector('input[name="csrfmiddlewaretoken"]');
       var fb = document.getElementById('csrfFallback');
-
-      if (djangoHidden && djangoHidden.value) {
-        fb && (fb.disabled = true);
-        return;
-      }
-
+      if (djangoHidden && djangoHidden.value) { fb && (fb.disabled = true); return; }
       var token = cookieToken || metaToken;
-      if (token) {
-        if (djangoHidden) djangoHidden.value = token;
-        if (fb) fb.value = token;
-      }
+      if (token) { if (djangoHidden) djangoHidden.value = token; if (fb) fb.value = token; }
     })();
   </script>
 </body>
