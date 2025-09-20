@@ -247,15 +247,11 @@ class IdentifierLoginForm(forms.Form):
             "placeholder": "Email or Username",
             "autocomplete": "username email",
             "autofocus": "autofocus",
-            "id": "id_identifier",
         }),
     )
     password = forms.CharField(
         label="Password",
-        widget=forms.PasswordInput(attrs={
-            "autocomplete": "current-password",
-            "id": "id_password",
-        }),
+        widget=forms.PasswordInput(attrs={"autocomplete": "current-password"}),
     )
 
     def clean_identifier(self):
