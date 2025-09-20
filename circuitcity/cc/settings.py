@@ -227,7 +227,10 @@ ROOT_URLCONF = "cc.urls"
 TEMPLATES = [
     {
         "BACKEND": "django.template.backends.django.DjangoTemplates",
-        "DIRS": [BASE_DIR / "templates"],
+        "DIRS": [
+            BASE_DIR / "circuitcity" / "templates",  # 👈 your real template folder
+            BASE_DIR / "templates",                  # optional global fallback
+        ],
         "APP_DIRS": True,
         "OPTIONS": {
             "context_processors": [

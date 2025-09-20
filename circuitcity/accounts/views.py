@@ -55,10 +55,12 @@ log = logging.getLogger(__name__)
 User = get_user_model()
 
 # ============================
-# TEMPLATE USED FOR LOGIN
+# Templates (centralize names)
 # ============================
-# 🔧 Use the template you actually have in your repo:
 LOGIN_TEMPLATE = "accounts/login.html"
+FORGOT_REQUEST_TEMPLATE = "accounts/forgot_password_request.html"
+FORGOT_RESET_TEMPLATE = "accounts/forgot_password_reset.html"
+FORGOT_SENT_TEMPLATE = "accounts/forgot_password_sent.html"  # optional
 
 # ----------------------------
 # OTP config
@@ -246,7 +248,7 @@ def _twofa_links():
 
 
 # ============================
-# Login (custom view — optional; your urls map to Django LoginView)
+# Login (custom)
 # ============================
 @require_http_methods(["GET", "POST"])
 def login_view(request):
@@ -306,6 +308,7 @@ def _render_login(request, form, next_url, origin_path):
 
 def _login_inline_fallback(request, form, next_url, origin_path):
     csrf_val = get_token(request)
+    # Minimal inline login so production never 500s if template missing.
     html = f"""<!doctype html>
 <meta charset="utf-8"><title>Login (Inline Fallback)</title>
 <style>
@@ -447,7 +450,7 @@ def otp_required(view_func):
 
 
 # ----------------------------
-# Debug probe to confirm template origin
+# Debug probe to confirm template origin (only in DEBUG)
 # ----------------------------
 def login_template_probe(request):
     if not settings.DEBUG:
@@ -537,10 +540,13 @@ def upload_agent_avatar(request, agent_id: int):
 
 
 # ----------------------------
-# Forgot password (2-step)
+# Forgot password (2-step) with safe fallbacks
 # ----------------------------
 @require_http_methods(["GET", "POST"])
 def forgot_password_request_view(request):
+    """
+    Step 1: Ask for identifier (email/username). Email a code *if* user exists.
+    """
     form = ForgotPasswordRequestForm(request.POST or None)
     if request.method == "POST" and form.is_valid():
         user = _get_user_by_identifier(form.cleaned_data["identifier"])
@@ -550,26 +556,65 @@ def forgot_password_request_view(request):
             if code:
                 _send_email_otp(user.email, code, purpose="reset")
 
+        # Do not leak whether the account exists
         messages.success(request, "If an account exists, we’ve emailed a reset code.")
-        return redirect("accounts:forgot_password_reset")
+        try:
+            return redirect("accounts:forgot_password_reset")
+        except NoReverseMatch:
+            return redirect("/accounts/password/reset/")
 
-    return render(request, "accounts/forgot_password_request.html", {"form": form})
+    # Render with fallback if template missing
+    try:
+        return render(request, FORGOT_REQUEST_TEMPLATE, {"form": form})
+    except TemplateDoesNotExist:
+        csrf_val = get_token(request)
+        html = f"""<!doctype html>
+<meta charset="utf-8"><title>Forgot password</title>
+<style>
+  body{{font-family:system-ui,Segoe UI,Inter,Roboto,Arial,sans-serif;background:#f7fafc;margin:0;padding:24px}}
+  .card{{max-width:520px;margin:24px auto;background:#fff;border:1px solid #e2e8f0;border-radius:12px;padding:16px}}
+  label{{display:block;margin:.75rem 0 .35rem}}
+  input{{width:100%;padding:10px;border:1px solid #cbd5e1;border-radius:10px}}
+  button{{margin-top:12px;padding:10px 14px;border-radius:10px;border:1px solid #cbd5e1;background:#0ea5e9;color:#fff;cursor:pointer}}
+  a{{color:#2563eb;text-decoration:none}}
+</style>
+<div class="card">
+  <h2>Forgot your password?</h2>
+  <p>Enter your email/username. If we find a match, we will email a reset code.</p>
+  <form method="post">
+    <input type="hidden" name="csrfmiddlewaretoken" value="{csrf_val}">
+    <label for="id_identifier">Email or Username</label>
+    <input id="id_identifier" name="identifier" required>
+    <button type="submit">Send reset code</button>
+  </form>
+  <p style="margin-top:10px"><a href="{reverse('accounts:login')}">Back to sign in</a></p>
+</div>"""
+        return HttpResponse(html, content_type="text/html; charset=utf-8")
 
 
 @require_http_methods(["GET", "POST"])
 def forgot_password_verify_view(request):
+    """
+    Step 2: Verify code + set new password.
+    """
     form = VerifyCodeResetForm(request.POST or None)
     if request.method == "POST" and form.is_valid():
         identifier = form.cleaned_data["identifier"]
         user = _get_user_by_identifier(identifier)
         if not user or not user.email:
             messages.error(request, "Invalid code or identifier.")
-            return redirect("accounts:forgot_password_reset")
+            try:
+                return redirect("accounts:forgot_password_reset")
+            except NoReverseMatch:
+                return redirect("/accounts/password/reset/")
 
         code = form.cleaned_data["code"]
         if not _verify_email_otp(user.email, code, purpose="reset"):
             messages.error(request, "Invalid or expired code.")
-            return redirect("accounts:forgot_password_reset")
+            try:
+                return redirect("accounts:forgot_password_reset")
+            except NoReverseMatch:
+                return redirect("/accounts/password/reset/")
 
         new_password = form.cleaned_data["new_password1"]
         user.set_password(new_password)
@@ -589,7 +634,39 @@ def forgot_password_verify_view(request):
         except NoReverseMatch:
             return redirect(getattr(settings, "LOGIN_URL", "/accounts/login/"))
 
-    return render(request, "accounts/forgot_password_reset.html", {"form": form})
+    # Render with fallback if template missing
+    try:
+        return render(request, FORGOT_RESET_TEMPLATE, {"form": form})
+    except TemplateDoesNotExist:
+        csrf_val = get_token(request)
+        login_url = getattr(settings, "LOGIN_URL", "/accounts/login/")
+        html = f"""<!doctype html>
+<meta charset="utf-8"><title>Reset password</title>
+<style>
+  body{{font-family:system-ui,Segoe UI,Inter,Roboto,Arial,sans-serif;background:#f7fafc;margin:0;padding:24px}}
+  .card{{max-width:520px;margin:24px auto;background:#fff;border:1px solid #e2e8f0;border-radius:12px;padding:16px}}
+  label{{display:block;margin:.75rem 0 .35rem}}
+  input{{width:100%;padding:10px;border:1px solid #cbd5e1;border-radius:10px}}
+  button{{margin-top:12px;padding:10px 14px;border-radius:10px;border:1px solid #cbd5e1;background:#22c55e;color:#fff;cursor:pointer}}
+  a{{color:#2563eb;text-decoration:none}}
+</style>
+<div class="card">
+  <h2>Enter code & new password</h2>
+  <form method="post">
+    <input type="hidden" name="csrfmiddlewaretoken" value="{csrf_val}">
+    <label for="id_identifier">Email or Username</label>
+    <input id="id_identifier" name="identifier" required>
+    <label for="id_code">6-digit code</label>
+    <input id="id_code" name="code" inputmode="numeric" maxlength="6" required>
+    <label for="id_new_password1">New password</label>
+    <input id="id_new_password1" name="new_password1" type="password" required>
+    <label for="id_new_password2">Confirm new password</label>
+    <input id="id_new_password2" name="new_password2" type="password" required>
+    <button type="submit">Update password</button>
+  </form>
+  <p style="margin-top:10px"><a href="{login_url}">Back to sign in</a></p>
+</div>"""
+        return HttpResponse(html, content_type="text/html; charset=utf-8")
 
 
 # ----------------------------
