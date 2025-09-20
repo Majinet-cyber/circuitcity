@@ -21,6 +21,7 @@
     label{display:block;font-size:14px;margin:12px 0 6px}
     input[type="text"],input[type="email"],input[type="password"]{width:100%;padding:10px 12px;border:1px solid #cbd5e1;border-radius:10px;font-size:14px}
     .err{background:#fef2f2;border:1px solid #fecaca;color:#991b1b;padding:.6rem .8rem;border-radius:10px;margin:0 0 12px}
+    .field-error{font-size:12px;color:#991b1b;margin-top:6px}
     .pw-field{position:relative}
     .pw-toggle{position:absolute;right:.55rem;top:50%;transform:translateY(-50%);background:transparent;border:0;color:#64748b;cursor:pointer;width:1.75rem;height:1.75rem}
     #loginSubmit{display:inline-flex;align-items:center;justify-content:center;gap:.5rem;width:100%;padding:.8rem 1.1rem;font-weight:800;letter-spacing:.02em;border-radius:14px;border:1px solid var(--glass-brd);color:#eaf2ff;background:radial-gradient(120% 160% at 30% 20%, rgba(255,255,255,.35), transparent 60%),linear-gradient(135deg, rgba(96,165,250,.65), rgba(37,99,235,.55)), var(--glass-bg);box-shadow:var(--glass-shadow);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);transition:transform .18s, box-shadow .18s, background .18s, color .18s;cursor:pointer;margin-top:.5rem}
@@ -36,7 +37,7 @@
     .btn-outline{background:#fff}
     .cta small{display:block;color:var(--cc-muted);margin-top:6px}
 
-    /* --- Glassmorphic CTA for Manager signup --- */
+    /* --- Glassmorphic CTA --- */
     .glass-cta{
       display:inline-flex;align-items:center;gap:.5rem;
       padding:.85rem 1.1rem;border-radius:14px;font-weight:700;
@@ -79,13 +80,18 @@
       <h1 id="loginTitle" class="brand">Circuit City</h1>
       <p id="loginDesc" class="muted">Sign in to continue. <strong style="color:#2563eb">[v10]</strong></p>
 
-      {% if messages %}{% for m in messages %}<div class="err" role="alert" aria-live="assertive">{{ m }}</div>{% endfor %}{% endif %}
+      {# Django messages #}
+      {% if messages %}
+        {% for m in messages %}
+          <div class="err" role="alert" aria-live="assertive">{{ m }}</div>
+        {% endfor %}
+      {% endif %}
+
+      {# Non-field errors like "Please enter a correct username and password" #}
       {% if form and form.non_field_errors %}
         <div class="err" role="alert" aria-live="assertive">
           {% for e in form.non_field_errors %}{{ e }}{% if not forloop.last %}<br>{% endif %}{% endfor %}
         </div>
-      {% elif form and form.errors %}
-        <div class="err" role="alert" aria-live="assertive">Invalid details. Please try again.</div>
       {% endif %}
 
       <form method="post" action="{% url 'accounts:login' %}" novalidate>
@@ -93,24 +99,26 @@
         <input type="hidden" id="csrfFallback" name="csrfmiddlewaretoken" value="" />
         <input type="hidden" name="next" value="{{ next|default:'' }}"/>
 
-        {# --- First field (identifier/username/email) --- #}
-        {% for f in form %}
-          {% if forloop.first %}
-            <label for="{{ f.id_for_label }}">Email or Username</label>
-            {{ f }}
-          {% endif %}
-        {% endfor %}
+        {# Identifier field #}
+        <label for="{{ form.identifier.id_for_label }}">Email or Username</label>
+        {{ form.identifier }}
+        {% if form.identifier.errors %}
+          <div class="field-error">
+            {% for e in form.identifier.errors %}{{ e }}{% if not forloop.last %}<br>{% endif %}{% endfor %}
+          </div>
+        {% endif %}
 
-        {# --- Password field (by widget type) --- #}
-        {% for f in form %}
-          {% if f.field.widget.input_type == "password" %}
-            <label for="{{ f.id_for_label }}">Password</label>
-            <div class="pw-field">
-              {{ f }}
-              <button class="pw-toggle" type="button" aria-label="Show password" data-state="hidden">👁</button>
-            </div>
-          {% endif %}
-        {% endfor %}
+        {# Password field with eye toggle #}
+        <label for="{{ form.password.id_for_label }}">Password</label>
+        <div class="pw-field">
+          {{ form.password }}
+          <button class="pw-toggle" type="button" aria-label="Show password" data-state="hidden">👁</button>
+        </div>
+        {% if form.password.errors %}
+          <div class="field-error">
+            {% for e in form.password.errors %}{{ e }}{% if not forloop.last %}<br>{% endif %}{% endfor %}
+          </div>
+        {% endif %}
 
         <button id="loginSubmit" type="submit">Sign in</button>
       </form>
@@ -121,15 +129,12 @@
 
       <div class="cta" aria-label="Create account">
         <p class="muted" style="margin:0 0 10px">New here?</p>
-
-        <!-- Glassmorphic Manager CTA -->
         <a class="glass-cta" href="{% url 'accounts:signup_manager' %}">
           <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none">
             <path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
           </svg>
           Create a Manager account
         </a>
-
         <small>Managers create the store and can invite agents later.</small>
         <small>Agents: ask your manager for an invite link.</small>
       </div>
@@ -145,7 +150,7 @@
       var el = document.getElementById('page-loader'); if(el) el.classList.add('hidden');
     });
 
-    // Password toggle: find any password input on the page
+    // Password toggle
     (function(){
       var btn = document.querySelector('.pw-toggle');
       var input = document.querySelector('input[type="password"]');
