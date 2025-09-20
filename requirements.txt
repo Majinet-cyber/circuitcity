@@ -3,7 +3,7 @@ Django==4.2.23
 asgiref==3.9.1
 dj-database-url==3.0.1
 gunicorn==23.0.0
-psycopg2-binary==2.9.10
+psycopg2-binary==2.9.9
 whitenoise==6.9.0
 python-dotenv==1.1.1
 python-json-logger==3.3.0
@@ -40,4 +40,5 @@ sortedcontainers==2.4.0
 soupsieve==2.7
 sqlparse==0.5.3
 websocket-client==1.8.0
+
 xyzservices==2025.1.0
