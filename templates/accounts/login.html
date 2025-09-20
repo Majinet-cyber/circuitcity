@@ -1,194 +1,206 @@
+{% load static %}
 <!doctype html>
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <title>Sign in · Circuit City (v10)</title>
+  <title>Sign in · Imajinet</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <meta name="csrf-token" content="{{ csrf_token }}"/>
 
   <style>
     :root{
-      --cc-bg:#f6f9ff;--cc-card:#fff;--cc-line:#e5e7eb;--cc-ink:#0f172a;--cc-muted:#64748b;
-      --blue-1:#2563eb;--glass-bg:rgba(37,99,235,0.12);--glass-brd:rgba(96,165,250,.55);
-      --glass-shadow:0 10px 30px rgba(37,99,235,.22)
+      --bg1:#f7f9ff; --bg2:#eef4ff;
+      --card:#fff; --ink:#0f172a; --muted:#48566b;
+      --border:#e2e8f0;
+      --btn-a:#6aa8ff; --btn-b:#366eea;
+      --link:#2563eb;
+      --shadow:0 18px 46px rgba(15,23,42,.10);
     }
     *{box-sizing:border-box}
-    body{margin:0;background:linear-gradient(180deg,var(--cc-bg),#fff);font-family:system-ui,Segoe UI,Inter,Roboto,Arial,sans-serif;color:var(--cc-ink)}
-    .auth-wrap{min-height:100vh;display:grid;place-items:center;padding:clamp(16px,4vw,32px)}
-    .auth-card{width:min(520px,92vw);background:var(--cc-card);border:1px solid var(--cc-line);border-radius:16px;padding:28px;box-shadow:0 20px 60px rgba(2,6,23,.06)}
-    .brand{font-weight:800;margin:0 0 .25rem}
-    .muted{color:var(--cc-muted);margin:0 0 12px}
-    label{display:block;font-size:14px;margin:12px 0 6px}
-    input[type="text"],input[type="email"],input[type="password"]{width:100%;padding:10px 12px;border:1px solid #cbd5e1;border-radius:10px;font-size:14px}
-    .err{background:#fef2f2;border:1px solid #fecaca;color:#991b1b;padding:.6rem .8rem;border-radius:10px;margin:0 0 12px}
-    .field-error{font-size:12px;color:#991b1b;margin-top:6px}
-    .pw-field{position:relative}
-    .pw-toggle{position:absolute;right:.55rem;top:50%;transform:translateY(-50%);background:transparent;border:0;color:#64748b;cursor:pointer;width:1.75rem;height:1.75rem}
-    #loginSubmit{display:inline-flex;align-items:center;justify-content:center;gap:.5rem;width:100%;padding:.8rem 1.1rem;font-weight:800;letter-spacing:.02em;border-radius:14px;border:1px solid var(--glass-brd);color:#eaf2ff;background:radial-gradient(120% 160% at 30% 20%, rgba(255,255,255,.35), transparent 60%),linear-gradient(135deg, rgba(96,165,250,.65), rgba(37,99,235,.55)), var(--glass-bg);box-shadow:var(--glass-shadow);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);transition:transform .18s, box-shadow .18s, background .18s, color .18s;cursor:pointer;margin-top:.5rem}
-    #loginSubmit:hover{transform:translateY(-1px);color:#fff;box-shadow:0 14px 34px rgba(37,99,235,.32)}
-    #loginSubmit:disabled{opacity:.65;cursor:not-allowed;box-shadow:0 8px 18px rgba(37,99,235,.18)}
-    #page-loader{position:fixed;inset:0;z-index:3000;display:grid;place-items:center;background:radial-gradient(1200px 800px at 50% 40%, rgba(15,23,42,0.12), transparent 60%);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);transition:opacity .35s, visibility .35s}
-    #page-loader.hidden{opacity:0;visibility:hidden}
-    .loader-ring{width:66px;height:66px;border-radius:50%;border:4px solid rgba(96,165,250,.25);border-top-color:var(--blue-1);animation:spin 1s linear infinite;box-shadow:0 0 0 4px rgba(37,99,235,.06) inset}
-    @keyframes spin{to{transform:rotate(360deg)}}
-    a{color:#2563eb;text-decoration:none}
-    .cta{margin-top:18px;padding-top:16px;border-top:1px dashed var(--cc-line)}
-    .cta .btn{display:inline-block;border:1px solid #cbd5e1;border-radius:12px;padding:.65rem 1rem;font-weight:700}
-    .btn-outline{background:#fff}
-    .cta small{display:block;color:var(--cc-muted);margin-top:6px}
+    html,body{height:100%}
+    body{
+      margin:0;
+      font:16px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, Inter, Arial, "Noto Sans", "Helvetica Neue", sans-serif;
+      color:var(--ink);
+      background:
+        radial-gradient(1200px 700px at 25% -10%, var(--bg2), transparent 60%),
+        radial-gradient(1200px 700px at 120% 120%, var(--bg2), transparent 60%),
+        var(--bg1);
+      display:flex; align-items:flex-start; justify-content:center;
+      padding:28px 16px 40px;
+    }
 
-    /* --- Glassmorphic CTA --- */
-    .glass-cta{
-      display:inline-flex;align-items:center;gap:.5rem;
-      padding:.85rem 1.1rem;border-radius:14px;font-weight:700;
-      color:#0f172a;text-decoration:none;
-      border:1px solid rgba(255,255,255,.45);
-      background:linear-gradient(180deg,rgba(255,255,255,.35),rgba(255,255,255,.18));
-      backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);
-      box-shadow:0 10px 30px rgba(15,23,42,.18), inset 0 1px 0 rgba(255,255,255,.45);
-      transition:transform .15s ease, box-shadow .15s ease, background .15s ease;
+    /* ---------- Header with logo (top-left) ---------- */
+    .page{
+      width:100%; max-width:920px; position:relative;
     }
-    .glass-cta:hover{
-      transform:translateY(-1px);
-      background:linear-gradient(180deg,rgba(255,255,255,.42),rgba(255,255,255,.22));
-      box-shadow:0 16px 36px rgba(15,23,42,.22), inset 0 1px 0 rgba(255,255,255,.55);
+    .brand-row{
+      display:flex; align-items:flex-end; gap:.85rem;
+      margin:4px 0 18px;
+      padding-left:8px;
     }
-    .glass-cta:active{transform:translateY(0)}
+    .brand-row img{height:44px; width:auto; display:block}
+    .tagline{
+      font-weight:700; letter-spacing:.02em; color:#8c96a8;
+      font-size:.9rem; line-height:1; padding-bottom:6px;
+    }
 
-    /* --- Corner badges --- */
-    .corner-pill{
-      position:fixed;bottom:14px;z-index:40;
-      font-size:12px;line-height:1;color:#334155;
-      background:rgba(255,255,255,.75);border:1px solid rgba(148,163,184,.45);
-      backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);
-      border-radius:999px;padding:.45rem .7rem;box-shadow:0 6px 18px rgba(15,23,42,.08);
-      user-select:none
+    /* ---------- Card ---------- */
+    .card{
+      width:min(520px, 92vw);
+      background:var(--card);
+      border:1px solid var(--border);
+      border-radius:18px;
+      box-shadow:var(--shadow);
+      padding:28px;
+      margin-top:10px;
     }
-    .corner-pill.left{left:14px}
-    .corner-pill.right{right:14px}
-    @media (max-width:520px){
-      .corner-pill{font-size:11px;bottom:10px}
-      .corner-pill.left{left:10px}.corner-pill.right{right:10px}
+    @media (min-width:640px){ .card{padding:34px 40px} }
+
+    h1{
+      margin:0 0 10px;
+      font-weight:800;
+      font-size:clamp(28px, 4.6vw, 44px);
+      line-height:1.08;
     }
+    .sub{
+      margin:0 0 22px;
+      color:#5a6b83;
+      font-size:1.125rem;
+    }
+    .sub a{color:var(--link); text-decoration:none}
+
+    label{
+      display:block; margin:14px 0 6px; font-weight:650;
+    }
+    .input{
+      width:100%; padding:14px 16px;
+      border:1px solid var(--border);
+      border-radius:12px; background:#fff; font-size:1rem;
+      outline:none;
+    }
+    .input:focus{border-color:#c8d8ff; box-shadow:0 0 0 3px rgba(37,99,235,.12)}
+
+    .pwd{position:relative}
+    .eye{
+      position:absolute; right:12px; top:50%; transform:translateY(-50%);
+      background:transparent; border:0; cursor:pointer; padding:0; width:28px; height:28px;
+      color:#6b7280;
+    }
+    .eye svg{display:block}
+
+    .btn{
+      width:100%; margin-top:12px;
+      border:0; cursor:pointer; color:#fff; font-weight:800; letter-spacing:.02em;
+      border-radius:14px; padding:14px 16px; font-size:1.05rem;
+      background:linear-gradient(180deg, var(--btn-a), var(--btn-b));
+      box-shadow:0 12px 26px rgba(54,110,234,.28);
+    }
+
+    .links{margin:14px 0 12px}
+    .links a{color:var(--link); text-decoration:none; font-size:1.05rem}
+
+    .rule{border:0; border-top:1px solid var(--border); margin:20px 0}
+
+    .muted{color:#5b6880}
+    .cta-pill{
+      display:inline-block; text-decoration:none; font-weight:800;
+      color:#1d4ed8; background:#f4f7ff;
+      border:1px solid #c9d8ff; border-radius:14px;
+      padding:12px 16px; margin-top:6px;
+    }
+
+    /* messages / errors if any */
+    .msg{background:#e7f2ff; border:1px solid #cfe3ff; color:#0c4a6e;
+         border-radius:10px; padding:.7rem .9rem; margin-bottom:12px}
+    .err{background:#fff1f1; border:1px solid #ffd6d6; color:#9a1b1b}
   </style>
 </head>
 <body>
-  <div id="page-loader" aria-hidden="true"><div class="loader-ring" role="status" aria-label="Loading"></div></div>
+  <div class="page" role="main">
+    <!-- Top-left logo + tagline -->
+    <div class="brand-row">
+      <img src="{% static 'img/imajinet-logo.png' %}" alt="Imajinet">
+      <div class="tagline">DRIVING YOUR PASSION INTO ACTION</div>
+    </div>
 
-  <div class="auth-wrap">
-    <div class="auth-card" role="dialog" aria-labelledby="loginTitle" aria-describedby="loginDesc">
-      <h1 id="loginTitle" class="brand">Circuit City</h1>
-      <p id="loginDesc" class="muted">Sign in to continue. <strong style="color:#2563eb">[v10]</strong></p>
+    <!-- Center card -->
+    <div class="card" role="dialog" aria-labelledby="loginTitle" aria-describedby="loginDesc">
+      <h1 id="loginTitle">Sign in to continue.</h1>
+      <p id="loginDesc" class="sub">Sign in to continue. <a href="#" aria-label="version">[v10]</a></p>
 
-      {# Django messages #}
       {% if messages %}
-        {% for m in messages %}
-          <div class="err" role="alert" aria-live="assertive">{{ m }}</div>
-        {% endfor %}
+        {% for m in messages %}<div class="msg{% if m.tags %} {{ m.tags }}{% endif %}">{{ m }}</div>{% endfor %}
       {% endif %}
-
-      {# Non-field errors like "Please enter a correct username and password" #}
       {% if form and form.non_field_errors %}
-        <div class="err" role="alert" aria-live="assertive">
+        <div class="msg err">
           {% for e in form.non_field_errors %}{{ e }}{% if not forloop.last %}<br>{% endif %}{% endfor %}
         </div>
       {% endif %}
 
       <form method="post" action="{% url 'accounts:login' %}" novalidate>
         {% csrf_token %}
-        <input type="hidden" id="csrfFallback" name="csrfmiddlewaretoken" value="" />
         <input type="hidden" name="next" value="{{ next|default:'' }}"/>
 
-        {# Identifier field #}
-        <label for="{{ form.identifier.id_for_label }}">Email or Username</label>
-        {{ form.identifier }}
+        <!-- Email/Username -->
+        <label for="id_identifier">Email or Username</label>
+        <input id="id_identifier" class="input" type="text" name="identifier"
+               value="{{ form.identifier.value|default_if_none:'' }}">
+
         {% if form.identifier.errors %}
-          <div class="field-error">
+          <div class="msg err">
             {% for e in form.identifier.errors %}{{ e }}{% if not forloop.last %}<br>{% endif %}{% endfor %}
           </div>
         {% endif %}
 
-        {# Password field with eye toggle #}
-        <label for="{{ form.password.id_for_label }}">Password</label>
-        <div class="pw-field">
-          {{ form.password }}
-          <button class="pw-toggle" type="button" aria-label="Show password" data-state="hidden">👁</button>
+        <!-- Password with eye toggle -->
+        <label for="id_password">Password</label>
+        <div class="pwd">
+          <input id="id_password" class="input" type="password" name="password" autocomplete="current-password">
+          <button type="button" class="eye" aria-label="Show password" title="Show/Hide password">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7Z"/>
+              <circle cx="12" cy="12" r="3"/>
+            </svg>
+          </button>
         </div>
+
         {% if form.password.errors %}
-          <div class="field-error">
+          <div class="msg err">
             {% for e in form.password.errors %}{{ e }}{% if not forloop.last %}<br>{% endif %}{% endfor %}
           </div>
         {% endif %}
 
-        <button id="loginSubmit" type="submit">Sign in</button>
+        <button class="btn" type="submit">Sign in</button>
       </form>
 
-      <p class="muted" style="margin-top:12px">
-        <a href="/accounts/password/forgot/">Forgot your password?</a>
-      </p>
-
-      <div class="cta" aria-label="Create account">
-        <p class="muted" style="margin:0 0 10px">New here?</p>
-        <a class="glass-cta" href="{% url 'accounts:signup_manager' %}">
-          <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none">
-            <path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-          </svg>
-          Create a Manager account
-        </a>
-        <small>Managers create the store and can invite agents later.</small>
-        <small>Agents: ask your manager for an invite link.</small>
+      <div class="links">
+        <a href="{% url 'password_reset' %}">Forgot your password?</a>
       </div>
+
+      <hr class="rule">
+
+      <p class="muted" style="margin:0 0 6px">New here?</p>
+      <a class="cta-pill" href="{% url 'accounts:signup_manager' %}">Create a Manager account</a>
+
+      <p class="muted" style="margin-top:12px">
+        Managers create the store and can invite agents later.<br>
+        Agents: ask your manager for an invite link.
+      </p>
     </div>
   </div>
 
-  <!-- Corner badges -->
-  <div class="corner-pill left">v1.6</div>
-  <div class="corner-pill right">© Imajinet 2025</div>
-
   <script>
-    window.addEventListener('load', function(){
-      var el = document.getElementById('page-loader'); if(el) el.classList.add('hidden');
-    });
-
-    // Password toggle
+    // Eye toggle
     (function(){
-      var btn = document.querySelector('.pw-toggle');
-      var input = document.querySelector('input[type="password"]');
+      const btn = document.querySelector('.eye');
+      const input = document.getElementById('id_password');
       if(!btn || !input) return;
-      btn.addEventListener('click', function(){
-        var show = this.getAttribute('data-state') !== 'visible';
-        input.type = show ? 'text' : 'password';
-        this.setAttribute('data-state', show ? 'visible' : 'hidden');
-        this.textContent = show ? '🙈' : '👁';
+      let shown = false;
+      btn.addEventListener('click', () => {
+        shown = !shown;
+        input.type = shown ? 'text' : 'password';
+        btn.setAttribute('aria-label', shown ? 'Hide password' : 'Show password');
       });
-    })();
-
-    // Disable button on submit + tiny spinner
-    (function(){
-      var form=document.querySelector('form[method="post"]'); var btn=document.getElementById('loginSubmit');
-      if(!form||!btn) return;
-      form.addEventListener('submit', function(){
-        btn.disabled=true;
-        var sp=document.createElement('span'); sp.style.display='inline-block';
-        sp.style.width='1em'; sp.style.height='1em'; sp.style.marginLeft='.5rem';
-        sp.style.border='2px solid rgba(255,255,255,.35)'; sp.style.borderTopColor='#fff';
-        sp.style.borderRadius='50%'; sp.style.animation='spin .9s linear infinite';
-        btn.appendChild(sp);
-      });
-    })();
-
-    // CSRF fallback (mobile/Safari quirks)
-    (function ensureCsrfPresent(){
-      function getCookie(name){
-        var m = document.cookie.match('(^|;)\\s*' + name + '\\s*=\\s*([^;]+)'); return m ? decodeURIComponent(m.pop()) : '';
-      }
-      var cookieToken = getCookie('cc_csrftoken') || getCookie('csrftoken') || '';
-      var metaToken = (document.querySelector('meta[name="csrf-token"]')||{}).content || '';
-      var djangoHidden = document.querySelector('input[name="csrfmiddlewaretoken"]');
-      var fb = document.getElementById('csrfFallback');
-      if (djangoHidden && djangoHidden.value) { fb && (fb.disabled = true); return; }
-      var token = cookieToken || metaToken;
-      if (token) { if (djangoHidden) djangoHidden.value = token; if (fb) fb.value = token; }
     })();
   </script>
 </body>

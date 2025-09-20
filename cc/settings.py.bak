@@ -8,6 +8,7 @@ import os
 import re
 import logging
 import sys
+import importlib  # NEW: for resilient app path resolution
 
 # -------------------------------------------------
 # Helpers
@@ -28,6 +29,36 @@ def env_int(key: str, default: int) -> int:
     except Exception:
         return default
 
+def _str_env(name: str, default: str = "") -> str:
+    return os.environ.get(name, default).strip()
+
+# --- NEW: Resolve local apps whether they are top-level or inside `cc/` ---
+def _first_importable(candidates: list[str]) -> str:
+    """Return the first importable module path from candidates."""
+    for dot in candidates:
+        try:
+            importlib.import_module(dot)
+            return dot
+        except Exception:
+            continue
+    # Fall back to the first candidate (useful for helpful crashes)
+    return candidates[0]
+
+def _appconfig(module_bases, config_class: str) -> str:
+    """
+    Resolve an AppConfig path, trying e.g. 'accounts.apps.AccountsConfig'
+    then 'cc.accounts.apps.AccountsConfig'. Falls back to the first
+    importable package if the AppConfig class isn't found.
+    """
+    bases = module_bases if isinstance(module_bases, (list, tuple)) else [module_bases]
+    for base in bases:
+        try:
+            mod = importlib.import_module(f"{base}.apps")
+            if hasattr(mod, config_class):
+                return f"{base}.apps.{config_class}"
+        except Exception:
+            pass
+    return _first_importable(bases)
 
 # -------------------------------------------------
 # Paths & .env
@@ -40,59 +71,84 @@ try:
 except Exception:
     pass
 
-
 # -------------------------------------------------
 # Security / Debug
 # -------------------------------------------------
 SECRET_KEY = os.environ.get(
     "DJANGO_SECRET_KEY",
-    "django-insecure-w#o#i4apw-$iz-3sivw57n=2j6fgku@1pfqfs76@3@7)a0h$ys",  # dev fallback
+    "django-insecure-w#o#i4apw-$iz-3sivw57n=2j6fgku@1pfqfs76@3@7)a0h$ys",
 )
 
+# Default to dev-friendly DEBUG unless overridden
 DEBUG = env_bool("DJANGO_DEBUG", env_bool("DEBUG", True))
 TESTING = any(arg in sys.argv for arg in ("test", "pytest"))
 
+# Make local runserver act like dev unless you opt out
+if "runserver" in sys.argv and not env_bool("FORCE_PROD_BEHAVIOR", False):
+    DEBUG = True
+
+DEBUG_PROPAGATE_EXCEPTIONS = env_bool("DEBUG_PROPAGATE_EXCEPTIONS", DEBUG)
+
+# Hosting hints
 RENDER = bool(os.environ.get("RENDER") or os.environ.get("RENDER_EXTERNAL_URL"))
-RENDER_EXTERNAL_URL = os.environ.get("RENDER_EXTERNAL_URL", "").strip()
+RENDER_EXTERNAL_URL = os.environ.get("RENDER_EXTERNAL_URL", "")
 APP_DOMAIN = os.environ.get("APP_DOMAIN", "").strip()
 LIVE_HOST = os.environ.get("LIVE_HOST", "").strip()
 
 _default_hosts = "localhost,127.0.0.1,0.0.0.0,192.168.1.104,.ngrok-free.app,.trycloudflare.com,.onrender.com"
 ALLOWED_HOSTS = env_csv("ALLOWED_HOSTS", os.environ.get("DJANGO_ALLOWED_HOSTS", _default_hosts))
 
-# Add Render external host if provided
+# Optional LAN/mobile extra hosts
+EXTRA_HOSTS = env_csv("EXTRA_HOSTS", "")
+for h in EXTRA_HOSTS:
+    if h and h not in ALLOWED_HOSTS:
+        ALLOWED_HOSTS.append(h)
+
+LAN_IP = _str_env("LAN_IP")
+if LAN_IP and LAN_IP not in ALLOWED_HOSTS:
+    ALLOWED_HOSTS.append(LAN_IP)
+
+# Add Render host if provided
 if RENDER_EXTERNAL_URL:
-    _parsed = urlparse(RENDER_EXTERNAL_URL)
-    _host = _parsed.netloc.split(":")[0]
-    if _host and _host not in ALLOWED_HOSTS:
-        ALLOWED_HOSTS.append(_host)
+    parsed = urlparse(RENDER_EXTERNAL_URL)
+    host = parsed.netloc.split(":")[0]
+    if host and host not in ALLOWED_HOSTS:
+        ALLOWED_HOSTS.append(host)
 
 # Always allow *.onrender.com
 if ".onrender.com" not in ALLOWED_HOSTS:
     ALLOWED_HOSTS.append(".onrender.com")
 
 # Explicit hosts
-for _h in (LIVE_HOST, APP_DOMAIN):
-    if _h and _h not in ALLOWED_HOSTS:
-        ALLOWED_HOSTS.append(_h)
+if LIVE_HOST and LIVE_HOST not in ALLOWED_HOSTS:
+    ALLOWED_HOSTS.append(LIVE_HOST)
+if APP_DOMAIN and APP_DOMAIN not in ALLOWED_HOSTS:
+    ALLOWED_HOSTS.append(APP_DOMAIN)
 
-# Dev/test convenience
+# Test client host when DEBUG/TESTING
 if DEBUG or TESTING:
-    for _h in ("testserver", "localhost", "127.0.0.1", "[::1]"):
-        if _h not in ALLOWED_HOSTS:
-            ALLOWED_HOSTS.append(_h)
+    for h in ("testserver", "localhost", "127.0.0.1", "[::1]"):
+        if h not in ALLOWED_HOSTS:
+            ALLOWED_HOSTS.append(h)
 
-# SSL policy
 FORCE_SSL = env_bool("FORCE_SSL", env_bool("DJANGO_FORCE_SSL", False))
-USE_SSL = FORCE_SSL or not DEBUG
+ON_HOSTING = bool(RENDER or RENDER_EXTERNAL_URL or LIVE_HOST or APP_DOMAIN)
+USE_SSL = FORCE_SSL or ON_HOSTING  # prod-ish envs default to SSL protections
+
 HEALTHZ_ALLOW_HTTP = env_bool("HEALTHZ_ALLOW_HTTP", False)
 
-# Security headers
+# SSL proxy header if behind proxy
+BEHIND_SSL_PROXY = env_bool("BEHIND_SSL_PROXY", RENDER)
+if BEHIND_SSL_PROXY:
+    SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+    USE_X_FORWARDED_HOST = True
+else:
+    SECURE_PROXY_SSL_HEADER = None
+    USE_X_FORWARDED_HOST = False
+
 SECURE_CONTENT_TYPE_NOSNIFF = True
 SECURE_REFERRER_POLICY = "same-origin"
 SECURE_CROSS_ORIGIN_OPENER_POLICY = "same-origin"
-SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
-USE_X_FORWARDED_HOST = True
 
 SECURE_SSL_REDIRECT = bool(USE_SSL) and not HEALTHZ_ALLOW_HTTP
 SESSION_COOKIE_SECURE = bool(USE_SSL)
@@ -107,24 +163,24 @@ else:
     SECURE_HSTS_INCLUDE_SUBDOMAINS = False
     SECURE_HSTS_PRELOAD = False
 
-SECURE_REDIRECT_EXEMPT = [r"^healthz$"] if HEALTHZ_ALLOW_HTTP else []
+SECURE_REDIRECT_EXEMPT = []
+if HEALTHZ_ALLOW_HTTP:
+    SECURE_REDIRECT_EXEMPT.append(r"^healthz$")
+    SECURE_REDIRECT_EXEMPT.append(r"^dashboard/healthz$")
 
-# -------------------------------------------------
-# Session & CSRF
-# -------------------------------------------------
 SESSION_COOKIE_NAME = os.environ.get("SESSION_COOKIE_NAME", "cc_sessionid")
 CSRF_COOKIE_NAME = os.environ.get("CSRF_COOKIE_NAME", "cc_csrftoken")
 
+# Allow JS to read the CSRF cookie in DEBUG (so fetch can attach X-CSRFToken)
 CSRF_COOKIE_HTTPONLY = False if DEBUG else True
 SESSION_COOKIE_HTTPONLY = True
 SESSION_EXPIRE_AT_BROWSER_CLOSE = True
-SESSION_COOKIE_SAMESITE = os.environ.get("SESSION_COOKIE_SAMESITE", "Lax")
+SESSION_COOKIE_SAMESITE = os.environ.get("CSRF_COOKIE_SAMESITE", "Lax")
 CSRF_COOKIE_SAMESITE = os.environ.get("CSRF_COOKIE_SAMESITE", "Lax")
 SESSION_COOKIE_AGE = 60 * 60 * 4  # 4 hours
 
 SESSION_ENGINE = "django.contrib.sessions.backends.db"
 
-# CSRF trusted origins (must include scheme)
 _default_csrf = ",".join(
     [
         "http://localhost",
@@ -138,22 +194,51 @@ _default_csrf = ",".join(
         "https://*.onrender.com",
     ]
 )
-_csrf_primary = os.environ.get("CSRF_TRUSTED_ORIGINS")
-_csrf_legacy = os.environ.get("DJANGO_CSRF_TRUSTED_ORIGINS", _default_csrf)
-CSRF_TRUSTED_ORIGINS = env_csv("CSRF_TRUSTED_ORIGINS", _csrf_primary or _csrf_legacy)
+_csrf_from_primary = os.environ.get("CSRF_TRUSTED_ORIGINS")
+_csrf_from_legacy = os.environ.get("DJANGO_CSRF_TRUSTED_ORIGINS", _default_csrf)
+CSRF_TRUSTED_ORIGINS = env_csv("CSRF_TRUSTED_ORIGINS", _csrf_from_primary or _csrf_from_legacy)
 
+# Helper to add computed origins
 def _add_origin(url: str):
     if url and url not in CSRF_TRUSTED_ORIGINS:
         CSRF_TRUSTED_ORIGINS.append(url)
 
 if RENDER_EXTERNAL_URL:
-    _p = urlparse(RENDER_EXTERNAL_URL)
-    if _p.scheme and _p.netloc:
-        _add_origin(f"{_p.scheme}://{_p.netloc.split(':')[0]}")
+    parsed = urlparse(RENDER_EXTERNAL_URL)
+    if parsed.scheme and parsed.netloc:
+        _add_origin(f"{parsed.scheme}://{parsed.netloc.split(':')[0]}")
+
 if LIVE_HOST:
     _add_origin(f"https://{LIVE_HOST}")
+
 if APP_DOMAIN:
     _add_origin(f"https://{APP_DOMAIN}")
+
+# Add LAN origins for mobile testing
+if LAN_IP:
+    _add_origin(f"http://{LAN_IP}")
+    _add_origin(f"http://{LAN_IP}:8000")
+    _add_origin(f"https://{LAN_IP}")
+
+# Optional extras via env
+for origin in env_csv("EXTRA_CSRF_ORIGINS", ""):
+    _add_origin(origin)
+
+# Add test client origin
+if DEBUG or TESTING:
+    _add_origin("http://testserver")
+
+# ----------- DEV OVERRIDES FOR LOCAL LOGIN -----------
+if DEBUG:
+    SECURE_SSL_REDIRECT = False
+    SESSION_COOKIE_SECURE = False
+    CSRF_COOKIE_SECURE = False
+    CSRF_COOKIE_HTTPONLY = False
+    SECURE_HSTS_SECONDS = 0
+    SECURE_HSTS_INCLUDE_SUBDOMAINS = False
+    SECURE_HSTS_PRELOAD = False
+# -----------------------------------------------------
+
 
 # -------------------------------------------------
 # Upload limits
@@ -169,8 +254,16 @@ FILE_UPLOAD_DIRECTORY_PERMISSIONS = 0o750
 
 
 # -------------------------------------------------
+# Applications  (ONLY the apps you actually have)
+# -------------------------------------------------
+LOCAL_APPS = [
+    _appconfig(["circuitcity.accounts.apps.AccountsConfig", "cc.accounts"], "AccountsConfig"),
+    _first_importable(["circuitcity.inventory", "cc.inventory"]),
+    _first_importable(["circuitcity.sales", "cc.sales"]),
+    _first_importable(["circuitcity.dashboard", "cc.dashboard"]),
+]
+
 INSTALLED_APPS = [
-    # Django
     "django.contrib.admin",
     "django.contrib.auth",
     "django.contrib.contenttypes",
@@ -178,14 +271,9 @@ INSTALLED_APPS = [
     "django.contrib.messages",
     "django.contrib.staticfiles",
     "django.contrib.humanize",
-
-    # Local apps
-    "tenants.apps.TenantsConfig",  # 👈 NEW: must match the module path 'tenants.models'
-    "circuitcity.accounts.apps.AccountsConfig",
-    "circuitcity.inventory",
-    "circuitcity.sales",
-    "circuitcity.dashboard",
+    *LOCAL_APPS,
 ]
+
 
 # -------------------------------------------------
 # Middleware
@@ -195,7 +283,7 @@ MIDDLEWARE = [
     "whitenoise.middleware.WhiteNoiseMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
 
-    # Observability middlewares present in your repo
+    # Your observability middlewares
     "cc.middleware.RequestIDMiddleware",
     "cc.middleware.AccessLogMiddleware",
 
@@ -203,8 +291,8 @@ MIDDLEWARE = [
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
 
-    # Inventory read-only guard present in your repo
-    "circuitcity.inventory.middleware.AuditorReadOnlyMiddleware",
+    # Inventory read-only guard (exists in your repo)
+    "inventory.middleware.AuditorReadOnlyMiddleware",
 
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
@@ -220,8 +308,8 @@ TEMPLATES = [
     {
         "BACKEND": "django.template.backends.django.DjangoTemplates",
         "DIRS": [
-            BASE_DIR / "circuitcity" / "templates",
-            BASE_DIR / "templates",
+            BASE_DIR / "circuitcity" / "templates",  # if you keep templates here
+            BASE_DIR / "templates",                  # optional fallback
         ],
         "APP_DIRS": True,
         "OPTIONS": {
@@ -238,37 +326,45 @@ WSGI_APPLICATION = "cc.wsgi.application"
 
 
 # -------------------------------------------------
-# Database — SQLite locally; DATABASE_URL supported
+# Database — prefer SQLite locally; allow DATABASE_URL
 # -------------------------------------------------
 DATABASES: dict = {}
 
-FORCE_SQLITE = env_bool("FORCE_SQLITE", False)
-DATABASE_URL = os.environ.get("DATABASE_URL", "").strip()
-USE_LOCAL_SQLITE = env_bool("USE_LOCAL_SQLITE", default=DEBUG)
-REQUIRE_DATABASE_URL = env_bool("REQUIRE_DATABASE_URL", (RENDER or not DEBUG))
+FORCE_SQLITE = env_bool("FORCE_SQLITE", default=not ON_HOSTING)
+if FORCE_SQLITE:
+    os.environ.pop("DATABASE_URL", None)
+    os.environ["USE_LOCAL_SQLITE"] = "1"
 
-if FORCE_SQLITE or (USE_LOCAL_SQLITE and not DATABASE_URL):
-    sqlite_path = str(BASE_DIR / "db.sqlite3")
-    DATABASES["default"] = {"ENGINE": "django.db.backends.sqlite3", "NAME": sqlite_path}
-elif DATABASE_URL:
+DATABASE_URL = _str_env("DATABASE_URL")
+USE_LOCAL_SQLITE = env_bool("USE_LOCAL_SQLITE", default=(DEBUG and not ON_HOSTING))
+
+REQUIRE_DATABASE_URL = env_bool(
+    "REQUIRE_DATABASE_URL",
+    ON_HOSTING and (not DEBUG) and (not USE_LOCAL_SQLITE),
+)
+
+if DATABASE_URL:
     try:
         import dj_database_url  # type: ignore
     except Exception as e:
         raise RuntimeError("dj-database-url must be installed to use DATABASE_URL") from e
+
     DATABASES["default"] = dj_database_url.parse(
         DATABASE_URL,
         conn_max_age=600,
-        ssl_require=bool(USE_SSL and not DEBUG),
+        ssl_require=USE_SSL,
     )
-elif REQUIRE_DATABASE_URL and not USE_LOCAL_SQLITE:
-    raise RuntimeError("DATABASE_URL must be set in production (Render/DEBUG=False).")
+elif USE_LOCAL_SQLITE:
+    sqlite_path = str(BASE_DIR / "db.sqlite3")
+    DATABASES["default"] = {"ENGINE": "django.db.backends.sqlite3", "NAME": sqlite_path}
+elif REQUIRE_DATABASE_URL:
+    raise RuntimeError("DATABASE_URL must be set in production (hosted, DEBUG=False).")
 else:
-    # Optional discrete Postgres env vars
-    NAME = os.environ.get("POSTGRES_DB") or os.environ.get("DB_NAME", "circuitcity")
-    USER = os.environ.get("POSTGRES_USER") or os.environ.get("DB_USER", "ccuser")
-    PASSWORD = os.environ.get("POSTGRES_PASSWORD") or os.environ.get("DB_PASSWORD", "")
-    HOST = os.environ.get("POSTGRES_HOST") or os.environ.get("DB_HOST", "127.0.0.1")
-    PORT = os.environ.get("POSTGRES_PORT") or os.environ.get("DB_PORT", "5432")
+    NAME = _str_env("POSTGRES_DB") or _str_env("DB_NAME", "circuitcity")
+    USER = _str_env("POSTGRES_USER") or _str_env("DB_USER", "ccuser")
+    PASSWORD = _str_env("POSTGRES_PASSWORD") or _str_env("DB_PASSWORD", "")
+    HOST = _str_env("POSTGRES_HOST") or _str_env("DB_HOST", "127.0.0.1")
+    PORT = _str_env("POSTGRES_PORT") or _str_env("DB_PORT", "5432")
     DATABASES["default"] = {
         "ENGINE": "django.db.backends.postgresql",
         "NAME": NAME,
@@ -277,11 +373,22 @@ else:
         "HOST": HOST,
         "PORT": PORT,
         "CONN_MAX_AGE": 600,
+        "OPTIONS": {
+            "connect_timeout": 5,
+            **({"sslmode": "require"} if USE_SSL and HOST not in ("localhost", "127.0.0.1") else {}),
+        },
     }
+
+# Quick visibility in dev
+try:
+    _db = DATABASES.get("default", {})
+    print(f"[cc.settings] DB -> {_db.get('ENGINE')} | NAME={_db.get('NAME')} | DEBUG={DEBUG} | FORCE_SQLITE={FORCE_SQLITE}")
+except Exception:
+    pass
 
 
 # -------------------------------------------------
-# Cache (Redis if REDIS_URL set; else local memory)
+# Caching (Redis if REDIS_URL provided)
 # -------------------------------------------------
 CACHE_TTL_DEFAULT = env_int("CACHE_TTL_DEFAULT", 60)
 REDIS_URL = os.environ.get("REDIS_URL", "")
@@ -306,7 +413,7 @@ else:
 
 
 # -------------------------------------------------
-# Auth & i18n
+# Auth & passwords
 # -------------------------------------------------
 AUTH_PASSWORD_VALIDATORS = [
     {"NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator"},
@@ -315,9 +422,17 @@ AUTH_PASSWORD_VALIDATORS = [
     {"NAME": "django.contrib.auth.password_validation.NumericPasswordValidator"},
 ]
 
-PASSWORD_HASHERS = ["django.contrib.auth.hashers.PBKDF2PasswordHasher"]
+PASSWORD_HASHERS = [
+    "django.contrib.auth.hashers.PBKDF2PasswordHasher",
+]
 
-AUTHENTICATION_BACKENDS = ["django.contrib.auth.backends.ModelBackend"]
+AUTHENTICATION_BACKENDS = [
+    "django.contrib.auth.backends.ModelBackend",
+]
+
+LOGIN_URL = "accounts:login"
+LOGOUT_REDIRECT_URL = "accounts:login"
+LOGIN_REDIRECT_URL = "/"
 
 LANGUAGE_CODE = "en-us"
 TIME_ZONE = "Africa/Blantyre"
@@ -337,25 +452,31 @@ STATIC_ROOT = BASE_DIR / "staticfiles"
 MEDIA_URL = "/media/"
 MEDIA_ROOT = BASE_DIR / "media"
 
-# WhiteNoise storage (manifest only when not DEBUG/TESTING)
-_static_backend = (
-    "django.contrib.staticfiles.storage.StaticFilesStorage"
-    if (DEBUG or TESTING)
-    else "whitenoise.storage.CompressedManifestStaticFilesStorage"
+# Cache-busting helper used in templates (?v={{ STATIC_VERSION }})
+STATIC_VERSION = os.environ.get("STATIC_VERSION", "2025-09-19-1")
+
+# WhiteNoise storage
+DISABLE_MANIFEST = env_bool(
+    "DISABLE_MANIFEST",
+    default=(DEBUG or TESTING or ("runserver" in sys.argv and not env_bool("FORCE_PROD_BEHAVIOR", False)))
 )
+DISABLE_MANIFEST_IN_PROD = env_bool("DISABLE_MANIFEST_IN_PROD", False)
+_use_manifest = not (DISABLE_MANIFEST or DISABLE_MANIFEST_IN_PROD)
+
+_static_backend = (
+    "whitenoise.storage.CompressedManifestStaticFilesStorage"
+    if _use_manifest
+    else "django.contrib.staticfiles.storage.StaticFilesStorage"
+)
+
 STORAGES = {
     "default": {"BACKEND": "django.core.files.storage.FileSystemStorage"},
     "staticfiles": {"BACKEND": _static_backend},
 }
+
 WHITENOISE_AUTOREFRESH = DEBUG
-
-
-# -------------------------------------------------
-# Auth redirects
-# -------------------------------------------------
-LOGIN_URL = "accounts:login"
-LOGIN_REDIRECT_URL = "/"
-LOGOUT_REDIRECT_URL = "accounts:login"
+WHITENOISE_MAX_AGE = 60 * 60 * 24 * 7
+WHITENOISE_MANIFEST_STRICT = False
 
 
 # -------------------------------------------------
@@ -389,9 +510,8 @@ LOW_STOCK_ALERT_RECIPIENTS = [
     if e.strip()
 ]
 
-
 # -------------------------------------------------
-# Logging (IMEI redaction; JSON in prod)
+# Logging (IMEI redaction; JSON logs in prod when available)
 # -------------------------------------------------
 class RedactIMEIFilter(logging.Filter):
     IMEI_RE = re.compile(r"(?<!\d)\d{15}(?!\d)")
@@ -399,7 +519,8 @@ class RedactIMEIFilter(logging.Filter):
         try:
             msg = record.getMessage()
             if msg and self.IMEI_RE.search(msg):
-                record.msg = self.IMEI_RE.sub("[IMEI-REDACTED]", msg)
+                redacted = self.IMEI_RE.sub("[IMEI-REDACTED]", msg)
+                record.msg = redacted
                 record.args = ()
         except Exception:
             pass
@@ -423,8 +544,13 @@ _plain_formatter = {"format": "%(levelname)s %(name)s: %(message)s"}
 LOGGING = {
     "version": 1,
     "disable_existing_loggers": False,
-    "filters": {"redact_imei": {"()": "cc.settings.RedactIMEIFilter"}},
-    "formatters": {"json": _json_formatter, "plain": _plain_formatter},
+    "filters": {
+        "redact_imei": {"()": "cc.settings.RedactIMEIFilter"},
+    },
+    "formatters": {
+        "json": _json_formatter,
+        "plain": _plain_formatter,
+    },
     "handlers": {
         "console_json": {
             "class": "logging.StreamHandler",
@@ -462,6 +588,7 @@ AUDIT_LOG_SETTINGS = {
 
 V1_SIMPLE_DASHBOARD = True
 WARRANTY_CHECK_ENABLED = env_bool("WARRANTY_CHECK_ENABLED", False)
+
 WARRANTY_ENFORCE_COUNTRY = env_bool("WARRANTY_ENFORCE_COUNTRY", True)
 ACTIVATION_ALERT_MINUTES = env_int("ACTIVATION_ALERT_MINUTES", 15)
 WARRANTY_REQUEST_TIMEOUT = env_int("WARRANTY_REQUEST_TIMEOUT", 12)
@@ -474,7 +601,6 @@ FEATURES = {
 }
 
 DATA_IMPORT_MAX_EXPANSION = env_int("DATA_IMPORT_MAX_EXPANSION", 5000)
-
 
 # -------------------------------------------------
 # Sentry (optional)
@@ -492,7 +618,6 @@ if SENTRY_DSN:
         release=os.environ.get("GIT_COMMIT", "local"),
     )
 
-
 # -------------------------------------------------
 # App metadata
 # -------------------------------------------------
@@ -501,7 +626,7 @@ APP_ENV = os.environ.get("APP_ENV", "dev" if DEBUG else "beta")
 BETA_FEEDBACK_MAILTO = os.environ.get("BETA_FEEDBACK_MAILTO", "beta@circuitcity.example")
 
 # -------------------------------------------------
-# Accounts / Auth feature knobs
+# Accounts / Auth feature knobs (used by utils.reset & views)
 # -------------------------------------------------
 ACCOUNTS_RESET_CODE_TTL_SECONDS = env_int("ACCOUNTS_RESET_CODE_TTL_SECONDS", 5 * 60)
 ACCOUNTS_RESET_SEND_WINDOW_MINUTES = env_int("ACCOUNTS_RESET_SEND_WINDOW_MINUTES", 45)

@@ -1,4 +1,4 @@
-# circuitcity/tenants/utils.py
+# tenants/utils.py
 from __future__ import annotations
 
 from functools import wraps
@@ -44,6 +44,8 @@ except Exception:  # pragma: no cover
 TENANT_SESSION_KEY = getattr(settings, "TENANT_SESSION_KEY", "active_business_id")
 ROLE_GROUP_MANAGER_NAMES = set(getattr(settings, "ROLE_GROUP_MANAGER_NAMES", ["Manager", "Admin"]))
 ROLE_GROUP_ADMIN_NAMES = set(getattr(settings, "ROLE_GROUP_ADMIN_NAMES", ["Admin"]))
+# NEW: agent-role names (templates expect tenants.utils.is_agent)
+ROLE_GROUP_AGENT_NAMES = set(getattr(settings, "ROLE_GROUP_AGENT_NAMES", ["Agent"]))
 
 
 # ----------------------------
@@ -238,6 +240,23 @@ def user_is_manager(user) -> bool:
     return bool(names.intersection(ROLE_GROUP_MANAGER_NAMES))
 
 
+def user_is_agent(user) -> bool:
+    """
+    Agents are users in ROLE_GROUP_AGENT_NAMES (default: ["Agent"]).
+    By definition here, superusers/admins/managers are not considered agents.
+    """
+    if user_is_admin(user) or user_is_manager(user):
+        return False
+    names = _user_group_names(user)
+    return bool(names.intersection(ROLE_GROUP_AGENT_NAMES))
+
+
+# —— Aliases expected by template tags / other modules ——
+is_manager = user_is_manager
+is_admin = user_is_admin
+is_agent = user_is_agent
+
+
 def _has_active_membership(user, business) -> bool:
     if Membership is None or business is None or not getattr(user, "is_authenticated", False):
         return False
@@ -323,7 +342,7 @@ def scoped(qs_or_manager, request: "HttpRequest", *, role_aware: bool = True):
 
     # If role-aware scoping is disabled or user is manager/admin, we're done
     user = getattr(request, "user", None)
-    if not role_aware or user_is_manager(user):
+    if not role_aware or is_manager(user):
         return qs
 
     # 2) Agent narrowing (best effort)
@@ -483,7 +502,7 @@ def admin_required(fn: Callable) -> Callable:
 
 
 # ----------------------------
-# NEW: Tenant bootstrap for manager sign-up
+# Tenant bootstrap for manager sign-up
 # ----------------------------
 @transaction.atomic
 def bootstrap_manager_tenant(
@@ -556,3 +575,18 @@ def bootstrap_manager_tenant(
         pass
 
     return b
+
+
+__all__ = [
+    # session/context
+    "set_active_business", "get_active_business", "attach_business",
+    # role checks (export both canonical and aliases)
+    "user_is_manager", "user_is_admin", "user_is_agent",
+    "is_manager", "is_admin", "is_agent",
+    # scoping/binding/assert
+    "scoped", "bind_business", "assert_owns",
+    # decorators
+    "require_business", "require_role", "manager_required", "admin_required",
+    # bootstrap
+    "bootstrap_manager_tenant",
+]

@@ -1,8 +1,8 @@
 # tenants/urls.py
 from __future__ import annotations
 
-from django.shortcuts import redirect
 from django.urls import path
+from django.shortcuts import redirect
 from django.views.generic import RedirectView
 
 from . import views
@@ -29,22 +29,6 @@ if _manager_locations_view is None:
     def _manager_locations_view(request, *args, **kwargs):  # type: ignore
         # Graceful fallback until you implement the page
         return redirect("tenants:choose_business")
-
-# --- Invite-related safe fallbacks (no 500s if view missing) ---
-_create_invite_view = getattr(views, "create_agent_invite", None)
-if _create_invite_view is None:
-    def _create_invite_view(request, *args, **kwargs):  # type: ignore
-        return redirect("tenants:manager_review_agents")
-
-_revoke_invite_view = getattr(views, "revoke_agent_invite", None)
-if _revoke_invite_view is None:
-    def _revoke_invite_view(request, *args, **kwargs):  # type: ignore
-        return redirect("tenants:manager_review_agents")
-
-_accept_invite_view = getattr(views, "accept_invite", None)
-if _accept_invite_view is None:
-    def _accept_invite_view(request, *args, **kwargs):  # type: ignore
-        return redirect("accounts:login")
 
 app_name = "tenants"
 
@@ -92,16 +76,8 @@ urlpatterns = [
 
     # Optional convenience alias: /tenants/manager/ → /tenants/manager/agents/
     path(
-        "manager/",
-        RedirectView.as_view(pattern_name="tenants:manager_review_agents", permanent=False),
-        name="manager_home",
+       "manager/",
+       RedirectView.as_view(pattern_name="tenants:manager_review_agents", permanent=False),
+       name="manager_home",
     ),
-
-    # --- Agent Invite endpoints ---
-    # Create/send a new invite for the active business (POST from agents page)
-    path("manager/agents/invite/new", _create_invite_view, name="create_agent_invite"),
-    # Revoke an existing invite
-    path("manager/agents/invite/<int:pk>/revoke", _revoke_invite_view, name="revoke_agent_invite"),
-    # Public accept URL used by email/WhatsApp links (supports colon in token)
-    path("invite/<str:token>/accept", _accept_invite_view, name="accept_invite"),
 ]

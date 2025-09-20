@@ -6,29 +6,24 @@ from django.apps import AppConfig
 
 class AccountsConfig(AppConfig):
     """
-    App config for the Accounts app.
-    - Ensures modern BigAutoField primary keys.
-    - Imports signal handlers on startup (profile creation, login security, OTP pruning, etc.).
+    AppConfig for the Accounts app.
+
+    - `name` points to the real dotted path (circuitcity.accounts).
+    - `label` is kept as "accounts" so AUTH_USER_MODEL = "accounts.User" works.
     """
+
     default_auto_field = "django.db.models.BigAutoField"
-    # ✅ must use fully-qualified package path
+
+    # Full dotted path to the app package
     name = "circuitcity.accounts"
-    label = "accounts"  # keep short label so DB tables remain accounts_*
+
+    # Stable label regardless of package path
+    label = "accounts"
     verbose_name = "User Accounts"
 
-    def ready(self) -> None:
-        """
-        Import side-effect modules (signals) so their receivers are registered.
-        Keep this import inside ready() to avoid issues during migrations.
-        """
+    def ready(self) -> None:  # type: ignore[override]
+        """Import signals on startup if available, but don’t crash if missing."""
         try:
-            # Registers:
-            # - ensure_user_related_rows (Profile & LoginSecurity auto-creation)
-            # - reset_login_security_on_password_change
-            # - prune_expired_reset_codes
             from . import signals  # noqa: F401
         except Exception:
-            # Fail silently in production to avoid boot-time crashes
-            # if, for example, models aren’t ready during certain commands.
-            # (Django will still log the original exception.)
             pass
