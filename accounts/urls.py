@@ -1,7 +1,7 @@
 # circuitcity/accounts/urls.py
 from django.conf import settings
 from django.urls import path, reverse_lazy
-from django.contrib.auth.views import LogoutView
+from django.contrib.auth.views import LoginView, LogoutView
 
 from . import views
 
@@ -14,7 +14,11 @@ urlpatterns = [
     # -------------------------------
     # Authentication
     # -------------------------------
-    path("login/", views.login_view, name="login"),
+    path(
+        "login/",
+        LoginView.as_view(template_name="accounts/login.html"),
+        name="login",
+    ),
     path("signup/manager/", views.signup_manager, name="signup_manager"),
 
     # Logout that accepts GET or POST (custom view)
@@ -65,7 +69,7 @@ urlpatterns = [
 
 # Optional short aliases some links might use
 urlpatterns += [
-    path("signin/", views.login_view, name="signin_alias"),
+    path("signin/", LoginView.as_view(template_name="accounts/login.html"), name="signin_alias"),
     path("signout/", views.logout_get_or_post, name="signout_alias"),
 ]
 

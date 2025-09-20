@@ -57,7 +57,8 @@ User = get_user_model()
 # ============================
 # TEMPLATE USED FOR LOGIN
 # ============================
-LOGIN_TEMPLATE = "registration/login_v11_fix.html"
+# 🔧 Use the template you actually have in your repo:
+LOGIN_TEMPLATE = "accounts/login.html"
 
 # ----------------------------
 # OTP config

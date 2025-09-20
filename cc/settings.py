@@ -100,6 +100,7 @@ if LAN_IP and LAN_IP not in ALLOWED_HOSTS:
     # ALLOWED_HOSTS must not include the port
     ALLOWED_HOSTS.append(LAN_IP)
 
+# Add Render host if provided
 if RENDER_EXTERNAL_URL:
     parsed = urlparse(RENDER_EXTERNAL_URL)
     host = parsed.netloc
@@ -107,9 +108,11 @@ if RENDER_EXTERNAL_URL:
         # strip port if present
         ALLOWED_HOSTS.append(host.split(":")[0])
 
+# Always allow *.onrender.com in hosted envs
 if ".onrender.com" not in ALLOWED_HOSTS:
     ALLOWED_HOSTS.append(".onrender.com")
 
+# Optional explicit hosts
 if LIVE_HOST and LIVE_HOST not in ALLOWED_HOSTS:
     ALLOWED_HOSTS.append(LIVE_HOST)
 if APP_DOMAIN and APP_DOMAIN not in ALLOWED_HOSTS:
