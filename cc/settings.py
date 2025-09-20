@@ -68,11 +68,11 @@ SECRET_KEY = os.environ.get(
     "django-insecure-w#o#i4apw-$iz-3sivw57n=2j6fgku@1pfqfs76@3@7)a0h$ys",
 )
 
-# Base DEBUG from envs
-DEBUG = env_bool("DJANGO_DEBUG", env_bool("DEBUG", True))
+# Base DEBUG from envs (default False in hosted contexts)
+DEBUG = env_bool("DJANGO_DEBUG", env_bool("DEBUG", False))
 TESTING = any(arg in sys.argv for arg in ("test", "pytest"))
 
-# ⚠️ Make sure local runserver acts like dev unless you opt out
+# ⚠️ Make local runserver act like dev unless you opt out
 if "runserver" in sys.argv and not env_bool("FORCE_PROD_BEHAVIOR", False):
     DEBUG = True
 
@@ -221,7 +221,8 @@ for origin in env_csv("EXTRA_CSRF_ORIGINS", ""):
 if DEBUG or TESTING:
     _add_origin("http://testserver")
 
-# ----------- CRUCIAL FOR LOCAL LOGIN -----------
+# ----------- DEV OVERRIDES FOR LOCAL LOGIN -----------
+// disable hard redirects / secure-only cookies locally
 if DEBUG:
     SECURE_SSL_REDIRECT = False
     SESSION_COOKIE_SECURE = False
@@ -230,7 +231,7 @@ if DEBUG:
     SECURE_HSTS_SECONDS = 0
     SECURE_HSTS_INCLUDE_SUBDOMAINS = False
     SECURE_HSTS_PRELOAD = False
-# ----------------------------------------------
+# -----------------------------------------------------
 
 
 # -------------------------------------------------
@@ -262,7 +263,7 @@ INSTALLED_APPS = [
     "django.contrib.humanize",
     "hq",
 
-    # NEW: multi-tenant core
+    # Multi-tenant core
     "tenants",
 
     # your apps
@@ -270,26 +271,26 @@ INSTALLED_APPS = [
     "inventory",
     "sales",
     "dashboard",
-    "onboarding",                     # ✅ add onboarding flow
+    "onboarding",
     "insights",
     "wallet.apps.WalletConfig",
 
     # Avoid stdlib 'reports' collision on Windows paths.
     "ccreports.apps.ReportsConfig",
 
-    # NEW: notifications app (bell icon + email/WhatsApp fanout)
+    # Notifications
     "notifications",
 
-    # ✅ NEW: AI-CFO module
+    # AI-CFO module
     "cfo",
 
-    # ✅ NEW: Simulator (Scenarios & Simulation)
+    # Simulator
     "simulator",
 
-    # ✅ NEW: Layby module
+    # Layby module
     "layby.apps.LaybyConfig",
 
-    # ✅ NEW: Billing & subscriptions
+    # Billing & subscriptions
     "billing",
 ]
 
@@ -321,7 +322,7 @@ MIDDLEWARE = [
     "whitenoise.middleware.WhiteNoiseMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
 
-    # ✅ Expose current request to inventory audit signals (tamper detection chain)
+    # Expose current request to inventory audit signals (tamper detection chain)
     "inventory.signals.RequestMiddleware",
 
     "cc.middleware.RequestIDMiddleware",
@@ -332,13 +333,13 @@ MIDDLEWARE = [
 
     "django.contrib.auth.middleware.AuthenticationMiddleware",
 
-    # ✅ Attach request.business from session (defense-in-depth; runs before tenant resolver)
+    # Attach request.business from session (defense-in-depth; runs before tenant resolver)
     "tenants.utils.attach_business",
 
-    # ✅ Resolve/override active tenant (if you have a richer resolver)
+    # Resolve/override active tenant
     "tenants.middleware.TenantResolutionMiddleware",
 
-    # ✅ Billing trial/subscription gate (enforced by feature flag)
+    # Billing trial/subscription gate (enforced by feature flag)
     "billing.middleware.SubscriptionGateMiddleware",
 
     # Inventory read-only guard when auditor mode is ON
@@ -365,7 +366,6 @@ ROOT_URLCONF = "cc.urls"
 # -------------------------------------------------
 # Templates  ✅ Keep this simple & reliable
 # -------------------------------------------------
-# Base template config
 TEMPLATES = [
     {
         "BACKEND": "django.template.backends.django.DjangoTemplates",
@@ -373,10 +373,9 @@ TEMPLATES = [
         "APP_DIRS": True,
         "OPTIONS": {
             "debug": DEBUG,
-            # Preload only safe builtins; add optional ones below
             "builtins": [
                 "django.templatetags.static",      # {% static %}
-                "django.contrib.humanize.templatetags.humanize",  # intcomma, naturaltime, etc.
+                "django.contrib.humanize.templatetags.humanize",
             ],
             "context_processors": [
                 "django.template.context_processors.debug",
@@ -384,9 +383,8 @@ TEMPLATES = [
                 "django.contrib.auth.context_processors.auth",
                 "django.contrib.messages.context_processors.messages",
                 "django.template.context_processors.static",
-                "cc.context.globals",               # STATIC_VERSION, APP_NAME, APP_ENV, FEATURES, etc.
+                "cc.context.globals",
             ],
-            # Default OFF to avoid scary ⚠️ markers unless you opt in.
             **(
                 {"string_if_invalid": "⚠️ {{ %s }} ⚠️"}
                 if DEBUG and env_bool("TEMPLATE_WARN_MISSING", False)
@@ -413,13 +411,10 @@ def _maybe_add_builtin(path: str):
     except Exception:
         pass
 
-# Context processors that are nice-to-have but optional
-_maybe_add_ctx("core.context.flags")          # adds IS_MANAGER/IS_OWNER/IS_AGENT + FEATURES if available
-_maybe_add_ctx("tenants.context.globals")     # may expose request.business / BRAND_NAME
-_maybe_add_ctx("tenants.context.business")    # alt name if you create it
-
-# Builtin template tags/filters that are optional
-_maybe_add_builtin("tenants.templatetags.form_extras")  # e.g., |add_class; loaded only if present
+_maybe_add_ctx("core.context.flags")
+_maybe_add_ctx("tenants.context.globals")
+_maybe_add_ctx("tenants.context.business")
+_maybe_add_builtin("tenants.templatetags.form_extras")
 
 WSGI_APPLICATION = "cc.wsgi.application"
 
@@ -429,12 +424,9 @@ WSGI_APPLICATION = "cc.wsgi.application"
 # -------------------------------------------------
 DATABASES: dict = {}
 
-# 🔧 DEFAULT CHANGE: do NOT force SQLite when hosted (Render).
-# - Locally: default True (SQLite)
-# - On hosting (Render/custom domain): default False (use Postgres via DATABASE_URL)
+# Locally: default True (SQLite). On hosting: default False.
 FORCE_SQLITE = env_bool("FORCE_SQLITE", default=not ON_HOSTING)
 if FORCE_SQLITE:
-    # Keep developer convenience locally
     os.environ.pop("DATABASE_URL", None)
     os.environ["USE_LOCAL_SQLITE"] = "1"
 
@@ -516,7 +508,7 @@ else:
 
 
 # -------------------------------------------------
-# Celery (task queue) — uses Redis if available
+# Celery (task queue)
 # -------------------------------------------------
 CELERY_BROKER_URL = os.environ.get("CELERY_BROKER_URL") or REDIS_URL or "redis://127.0.0.1:6379/0"
 CELERY_RESULT_BACKEND = os.environ.get("CELERY_RESULT_BACKEND") or CELERY_BROKER_URL
@@ -531,7 +523,6 @@ CELERY_BEAT_SCHEDULE = {
     "alerts_low_stock": {"task": "insights.tasks.alerts_low_stock", "schedule": crontab(hour=7,  minute=45)},
     "nudges_hourly":    {"task": "insights.tasks.nudges_hourly",    "schedule": crontab(minute=0, hour="8-18")},
     "weekly_reports":   {"task": "insights.tasks.weekly_reports",   "schedule": crontab(hour=7,  minute=30, day_of_week="mon")},
-    # ✅ NEW: Trial ending reminders (runs daily 08:00)
     "billing_trial_reminders": {"task": "billing.tasks.remind_trials_ending_soon", "schedule": crontab(hour=8, minute=0)},
 }
 
@@ -601,12 +592,10 @@ MEDIA_ROOT = BASE_DIR / "media"
 STATIC_VERSION = os.environ.get("STATIC_VERSION", "2025-09-19-1")
 
 # ✅ Manifest hashing toggle:
-#  - Always DISABLE manifest for runserver/DEBUG/TESTING unless you override with FORCE_PROD_BEHAVIOR=1.
 DISABLE_MANIFEST = env_bool(
     "DISABLE_MANIFEST",
     default=(DEBUG or TESTING or ("runserver" in sys.argv and not env_bool("FORCE_PROD_BEHAVIOR", False)))
 )
-# Optional legacy knob for hosted prod environments
 DISABLE_MANIFEST_IN_PROD = env_bool("DISABLE_MANIFEST_IN_PROD", False)
 
 _use_manifest = not (DISABLE_MANIFEST or DISABLE_MANIFEST_IN_PROD)
@@ -774,53 +763,35 @@ FEATURES = {
     "ROLE_ENFORCEMENT": os.environ.get("FEATURE_ROLE_ENFORCEMENT", "1") == "1",
     "REPORTS": os.environ.get("FEATURE_REPORTS", "1") == "1",
     "NOTIFICATIONS": os.environ.get("FEATURE_NOTIFICATIONS", "1") == "1",
-    # ✅ Toggle simulator UI/routes easily if you ever need to: FEATURE_SIMULATOR=0
     "SIMULATOR": os.environ.get("FEATURE_SIMULATOR", "1") == "1",
-    # ✅ Layby feature flag (keeps routes/templates enabled while you iterate)
     "LAYBY": os.environ.get("FEATURE_LAYBY", "1") == "1",
-
-    # ---------- New: role/UI guard rails ----------
-    # Show CFO modules in UI; set to 0 to hide globally (agents never see them anyway in templates)
     "CFO": os.environ.get("FEATURE_CFO", "1") == "1",
-    # Admin Purchase Order / Place Order UI (admin-only area)
     "ADMIN_PO": os.environ.get("FEATURE_ADMIN_PO", "1") == "1",
-    # Let agents submit & view their own budget requests
     "AGENT_BUDGETS": os.environ.get("FEATURE_AGENT_BUDGETS", "1") == "1",
-    # Safety belt to hide any admin affordances from agent templates if accidentally rendered
     "HIDE_ADMIN_UI_FOR_AGENTS": os.environ.get("FEATURE_HIDE_ADMIN_UI_FOR_AGENTS", "1") == "1",
-
-    # ✅ NEW: Multi-tenant feature toggle
     "MULTI_TENANT": os.environ.get("FEATURE_MULTI_TENANT", "1") == "1",
-
-    # ✅ NEW: Billing enforcement toggle (soft by default)
     "BILLING_ENFORCE": os.environ.get("FEATURE_BILLING_ENFORCE", "0") == "1",
 }
 
 DATA_IMPORT_MAX_EXPANSION = env_int("DATA_IMPORT_MAX_EXPANSION", 5000)
 
-# ---------- Reports app knobs (safe defaults) ----------
+# ---------- Reports app knobs ----------
 REPORTS_DEFAULT_CURRENCY = os.environ.get("REPORTS_DEFAULT_CURRENCY", "MWK")
 REPORTS_MAX_ROWS_EXPORT = env_int("REPORTS_MAX_ROWS_EXPORT", 50000)
 
 # ---------- Public knobs used by inventory APIs ----------
-# Currency symbol used by charts/UI when API returns amounts
 CURRENCY_SIGN = os.environ.get("CURRENCY_SIGN", "MK")
-# Owner field(s) that link inventory items to a user/agent. Comma list env override:
-#   AGENT_OWNER_FIELDS="agent,handler,seller"
 AGENT_OWNER_FIELDS = env_csv(
     "AGENT_OWNER_FIELDS",
     "agent,owner,user,assigned_to,sold_by,created_by,added_by,scanned_in_by,checked_in_by,last_modified_by",
 )
 
 # ---------- Agent visibility / scoping (STRICT SELF-ONLY) ----------
-# Enforce that agents cannot see global/business-wide stock or KPIs.
 AGENT_CAN_VIEW_ALL = env_bool("AGENT_CAN_VIEW_ALL", False)  # keep False
 AGENT_SCOPE_MODE = os.environ.get("AGENT_SCOPE_MODE", "self").strip().lower()
 if AGENT_SCOPE_MODE not in ("self", "business"):
     AGENT_SCOPE_MODE = "self"
-# Dashboard for agents must NOT aggregate globally
 DASHBOARD_AGENT_GLOBAL = env_bool("DASHBOARD_AGENT_GLOBAL", False)
-# Optional cache-buster for any dashboard/inventory caches
 INVENTORY_CACHE_BUST_VERSION = os.environ.get("INVENTORY_CACHE_BUST_VERSION", "1")
 
 # -------------------------------------------------
@@ -848,7 +819,7 @@ APP_ENV = os.environ.get("APP_ENV", "dev" if DEBUG else "beta")
 BETA_FEEDBACK_MAILTO = os.environ.get("BETA_FEEDBACK_MAILTO", "beta@circuitcity.example")
 
 # -------------------------------
-# ✅ Tenant/branding preferences
+# Tenant/branding preferences
 # -------------------------------
 TENANT_SESSION_KEY = os.environ.get("TENANT_SESSION_KEY", "active_business_id")
 TENANT_BRAND_FROM_BUSINESS = env_bool("TENANT_BRAND_FROM_BUSINESS", True)
@@ -860,11 +831,7 @@ TENANT_THREADLOCAL_ENABLED = True
 # OTP window (used by accounts.views OTP flow)
 OTP_WINDOW_MINUTES = env_int("OTP_WINDOW_MINUTES", 20)
 
-# --------------------------------
-# ✅ Optional: move Django Admin off /admin
-# --------------------------------
-# Set ADMIN_URL in your .env (e.g. ADMIN_URL=backoffice-4e8f1c/)
-# 🔒 Default to a non-obvious path so managers won't stumble into it.
+# Optional: move Django Admin off /admin
 ADMIN_URL = os.environ.get("ADMIN_URL", "__admin__/")
 
 # -------------------------------------------------
@@ -874,39 +841,29 @@ INTERNAL_IPS = ["127.0.0.1", "localhost"]
 
 
 # -------------------------------------------------
-# ✅ AI-CFO defaults & secrets (safe fallbacks; override in .env)
+# AI-CFO defaults & secrets (safe fallbacks; override in .env)
 # -------------------------------------------------
 AIRTEL_WEBHOOK_SECRET = os.environ.get("AIRTEL_WEBHOOK_SECRET", "replace_me")
 FINANCE_EMAIL = os.environ.get("FINANCE_EMAIL", os.environ.get("ADMIN_EMAIL", "finance@example.com"))
 CFO_OPENING_BALANCE_DEFAULT = os.environ.get("CFO_OPENING_BALANCE_DEFAULT", "0")
 
 # -------------------------------------------------
-# ✅ Layby / Payments knobs (override in .env as you go)
+# Layby / Payments knobs
 # -------------------------------------------------
-# Require an HMAC or shared secret on payment webhooks in prod
 LAYBY_WEBHOOK_REQUIRE_SECRET = env_bool("LAYBY_WEBHOOK_REQUIRE_SECRET", True)
-# If you need a separate secret from Airtel’s, set LAYBY_WEBHOOK_SECRET; else we reuse AIRTEL_WEBHOOK_SECRET
 LAYBY_WEBHOOK_SECRET = os.environ.get("LAYBY_WEBHOOK_SECRET", AIRTEL_WEBHOOK_SECRET)
-# Customer OTP dev mode — when True, we render OTP on screen for quick testing
 LAYBY_CUSTOMER_OTP_DEV = env_bool("LAYBY_CUSTOMER_OTP_DEV", DEBUG)
 
 # -------------------------------------------------
-# ✅ Billing / Subscription knobs
+# Billing / Subscription knobs
 # -------------------------------------------------
-# Default free-trial length (days). Use BILLING_TRIAL_DAYS in .env to override.
 BILLING_TRIAL_DAYS = env_int("BILLING_TRIAL_DAYS", 30)
-# Backward-compat alias for any legacy code that reads TRIAL_DAYS
 TRIAL_DAYS = BILLING_TRIAL_DAYS
 
 
 # -------------------------------------------------
-# ⚠️ DEV-ONLY: migration guard rails to unblock broken local migrations
+# DEV-ONLY: migration guard rails
 # -------------------------------------------------
-# If you created bad placeholder migrations in the `inventory` app (e.g. 0017/0018) and
-# Django refuses to load the migration graph (NodeNotFoundError), you can temporarily
-# disable inventory migrations so `migrate` works for other apps and the server runs.
-# This assumes your local SQLite already has the inventory tables (from earlier work).
-# DO NOT enable this in production; fix the migrations instead.
 DISABLE_INVENTORY_MIGRATIONS = env_bool("DISABLE_INVENTORY_MIGRATIONS", False)
 MIGRATION_MODULES = {}
 if DISABLE_INVENTORY_MIGRATIONS:

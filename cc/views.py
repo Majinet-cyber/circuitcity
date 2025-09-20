@@ -15,13 +15,14 @@ from django.http import JsonResponse, HttpRequest, HttpResponse
 from django.shortcuts import redirect, render, get_object_or_404
 from django.utils import timezone
 from django.views.decorators.http import require_GET, require_http_methods
-from django.views.decorators.csrf import ensure_csrf_cookie, csrf_protect  # NEW
+from django.views.decorators.csrf import ensure_csrf_cookie, csrf_protect
 
 from inventory.models import InventoryItem, TimeLog, WalletTxn
 from sales.models import Sale
 
 User = get_user_model()
 
+# Compensation knobs
 BASE_SALARY = Decimal("40000")          # MK40,000
 EARLY_BIRD_BONUS = Decimal("5000")      # before 08:00
 LATE_STEP_PENALTY = Decimal("5000")     # every 30 min after 08:00
@@ -50,7 +51,7 @@ def healthz(_request: HttpRequest) -> JsonResponse:
 
 
 def temporary_ok(_request: HttpRequest) -> HttpResponse:
-    """Very small page to verify URLConf & server when debugging."""
+    """Tiny page to verify URLConf & server are wired correctly."""
     return HttpResponse(
         "<h3 style='margin:1rem;padding:.75rem;border-radius:8px;"
         "background:#e7f7ec;border:1px solid #b7e5c4'>"
@@ -94,8 +95,9 @@ def logout_now(request: HttpRequest) -> HttpResponse:
     """
     if request.user.is_authenticated:
         logout(request)
-    next_url = getattr(settings, "LOGOUT_REDIRECT_URL", "/accounts/login/") or "/accounts/login/"
-    return redirect(next_url)
+    next_target = getattr(settings, "LOGOUT_REDIRECT_URL", "accounts:login") or "accounts:login"
+    # redirect() accepts a URL pattern name, so passing "accounts:login" is fine.
+    return redirect(next_target)
 
 
 # Back-compat alias (if any code imports logout_view)
@@ -257,22 +259,34 @@ def agent_dashboard(request: HttpRequest) -> HttpResponse:
         local_when = timezone.localtime(when)
 
         if local_when.weekday() == 6:  # Sunday
-            WalletTxn.objects.create(user=user, amount=SUNDAY_BONUS, reason="SUNDAY_BONUS",
-                                     memo="Sunday work bonus")
+            WalletTxn.objects.create(
+                user=user,
+                amount=SUNDAY_BONUS,
+                reason="SUNDAY_BONUS",
+                memo="Sunday work bonus",
+            )
             messages.success(request, "🎉 Sunday bonus MK15,000 added to your wallet!")
         else:
             eight_am = local_when.replace(hour=8, minute=0, second=0, microsecond=0)
             if local_when <= eight_am:
-                WalletTxn.objects.create(user=user, amount=EARLY_BIRD_BONUS, reason="EARLY_BIRD",
-                                         memo="Early-bird before 8am")
+                WalletTxn.objects.create(
+                    user=user,
+                    amount=EARLY_BIRD_BONUS,
+                    reason="EARLY_BIRD",
+                    memo="Early-bird before 8am",
+                )
                 messages.success(request, "😊 Early-bird bonus MK5,000 added to your wallet!")
             else:
                 secs_after = (local_when - eight_am).total_seconds()
                 blocks = int((secs_after + 1799) // 1800)  # 30-min blocks, rounded up
                 penalty = LATE_STEP_PENALTY * blocks
                 if penalty > 0:
-                    WalletTxn.objects.create(user=user, amount=-penalty, reason="LATE_PENALTY",
-                                             memo=f"Late by ~{blocks*30} minutes")
+                    WalletTxn.objects.create(
+                        user=user,
+                        amount=-penalty,
+                        reason="LATE_PENALTY",
+                        memo=f"Late by ~{blocks*30} minutes",
+                    )
                     messages.error(request, f"😢 Late penalty −MK{penalty:,} applied.")
 
         # Stay on this (cc) agent dashboard
@@ -301,9 +315,9 @@ def agent_dashboard(request: HttpRequest) -> HttpResponse:
     month_commission = sum((s.commission_amount for s in my_sales_month), Decimal("0"))
     lifetime_commission = sum((s.commission_amount for s in my_sales_all), Decimal("0"))
 
-    month_txn_total = WalletTxn.objects.filter(user=user, created_at__date__gte=month_start).aggregate(
-        t=Sum("amount")
-    )["t"] or Decimal("0")
+    month_txn_total = WalletTxn.objects.filter(
+        user=user, created_at__date__gte=month_start
+    ).aggregate(t=Sum("amount"))["t"] or Decimal("0")
     lifetime_txn_total = WalletTxn.objects.filter(user=user).aggregate(
         t=Sum("amount")
     )["t"] or Decimal("0")
@@ -348,8 +362,8 @@ def agent_dashboard(request: HttpRequest) -> HttpResponse:
 @require_GET
 def api_recommendations(request: HttpRequest) -> JsonResponse:
     """
-    Very small, safe recommendations endpoint for local/dev.
-    Returns a shape the dashboard expects: {"success": true, "items": [...]}
+    Small, safe recommendations endpoint for local/dev.
+    Returns: {"success": true, "items": [...]}
 
     - Suggest restock if agent has < 10 IN_STOCK items.
     - Flag no recent sales (last 14 days).

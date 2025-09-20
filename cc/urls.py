@@ -53,13 +53,13 @@ def robots_txt(_request):
 
 def root_redirect(request):
     """
-    Clean home router:
-    - If not authenticated -> go to login.
-    - If HQ admin -> go to HQ dashboard (if available).
-    - If no active business -> go to tenants chooser/join.
-    - Else try tenant dashboards in order.
+    Home router:
+    - Anonymous -> login
+    - HQ admin  -> HQ (if present)
+    - No active business -> tenants chooser/join
+    - Else -> first available tenant dashboard
     """
-    # Anonymous -> login
+    # Anonymous -> login (prefer two_factor if enabled)
     if not getattr(request, "user", None) or not request.user.is_authenticated:
         for name in ("two_factor:login", "accounts:login"):
             try:
@@ -74,10 +74,9 @@ def root_redirect(request):
         try:
             return redirect("hq:home")
         except NoReverseMatch:
-            # HQ app not wired yet; fall through to tenant flows
             pass
 
-    # If no active business, push them to choose/join/create flow
+    # If no active business, push chooser/join
     try:
         active = get_active_business(request)
     except Exception:
@@ -90,7 +89,7 @@ def root_redirect(request):
             except NoReverseMatch:
                 continue
 
-    # Active business present -> try likely tenant dashboards
+    # Active business present -> try likely dashboards
     candidates = (
         "dashboard:home",
         "inventory:inventory_dashboard",
@@ -261,8 +260,9 @@ if _enable_2fa:
     except Exception:
         pass
 
-# ---------------- Admin
-urlpatterns += [path("admin/", admin.site.urls)]
+# ---------------- Admin (use configurable ADMIN_URL)
+admin_path = getattr(settings, "ADMIN_URL", "__admin__/")
+urlpatterns += [path(admin_path, admin.site.urls)]
 
 # ---------------- Health / robots / favicon / temporary
 urlpatterns += [
@@ -301,7 +301,6 @@ urlpatterns += [
 # ---------------- Accounts first (so /accounts/login/ works)
 urlpatterns += [
     path("accounts/", include(("accounts.urls", "accounts"), namespace="accounts")),
-
     # direct password helpers
     path("accounts/password/forgot/", accounts_views.forgot_password_request_view, name="forgot_password_request_direct"),
     path("accounts/password/reset/",  accounts_views.forgot_password_verify_view,  name="forgot_password_reset_direct"),
@@ -633,7 +632,6 @@ if settings.DEBUG:
     ]
 
 # ---------------- Back-compat URL names expected by older templates
-# These prevent NoReverseMatch for 'stock_in' etc. and redirect to current namespaced routes.
 urlpatterns += [
     path(
         "stock/in/",

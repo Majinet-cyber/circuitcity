@@ -23,7 +23,7 @@ from django.contrib.auth.decorators import login_required
 from django.contrib.auth.models import Group
 from django.contrib.sessions.models import Session
 from django.core.mail import send_mail
-from django.http import HttpResponse
+from django.http import HttpResponse, HttpResponseForbidden
 from django.shortcuts import redirect, render
 from django.template.exceptions import TemplateDoesNotExist
 from django.template.loader import get_template
@@ -246,7 +246,7 @@ def _twofa_links():
 
 
 # ============================
-# Login
+# Login (custom view — optional; your urls map to Django LoginView)
 # ============================
 @require_http_methods(["GET", "POST"])
 def login_view(request):
@@ -514,7 +514,6 @@ def upload_agent_avatar(request, agent_id: int):
     next_url = request.POST.get("next") or "/"
 
     if not (request.user.is_superuser or request.user.is_staff or request.user.id == agent_id):
-        from django.http import HttpResponseForbidden
         return HttpResponseForbidden("Admins only.")
     form = AvatarForm(request.POST, request.FILES)
     if not form.is_valid():
@@ -600,7 +599,6 @@ def forgot_password_verify_view(request):
 @require_POST
 def admin_unblock_user_view(request):
     if not (request.user.is_staff or request.user.is_superuser):
-        from django.http import HttpResponseForbidden
         return HttpResponseForbidden("Admins only.")
     uid = request.POST.get("user_id")
     try:
