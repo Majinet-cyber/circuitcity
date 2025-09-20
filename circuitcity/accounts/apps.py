@@ -1,4 +1,4 @@
-# accounts/apps.py
+# circuitcity/accounts/apps.py
 from __future__ import annotations
 
 from django.apps import AppConfig
@@ -11,7 +11,9 @@ class AccountsConfig(AppConfig):
     - Imports signal handlers on startup (profile creation, login security, OTP pruning, etc.).
     """
     default_auto_field = "django.db.models.BigAutoField"
-    name = "accounts"
+    # ✅ must use fully-qualified package path
+    name = "circuitcity.accounts"
+    label = "accounts"  # keep short label so DB tables remain accounts_*
     verbose_name = "User Accounts"
 
     def ready(self) -> None:
