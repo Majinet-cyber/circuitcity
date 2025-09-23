@@ -9,7 +9,11 @@ from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.contrib.auth.password_validation import validate_password
 
-from .validators import validate_file_size, validate_mime
+from .validators import (
+    validate_file_size,
+    validate_mime,
+    validate_strong_password,   # <-- strong password policy
+)
 from .utils.images import process_avatar
 from .models import Profile
 
@@ -30,13 +34,22 @@ def _normalize_identifier(value: str) -> str:
 
 def _validate_passwords(p1: str | None, p2: str | None, *, user: object | None = None) -> str:
     """
-    Common enforcement: both provided, must match, and pass Django validators.
+    Common enforcement: both provided, must match, and pass validators.
     Returns the validated password (p1).
+
+    Order:
+      1) Quick presence & match checks
+      2) Our strong policy (≥10 chars + letter + number + special; block weak patterns)
+      3) Django's global validators (AUTH_PASSWORD_VALIDATORS)
     """
     if not p1 or not p2:
         raise forms.ValidationError("Enter your password twice.")
     if p1 != p2:
         raise forms.ValidationError("Passwords do not match.")
+
+    # Enforce your custom policy first (clear, concise error)
+    validate_strong_password(p1)
+    # Then Django's standard validators (e.g., similarity, min length, etc.)
     validate_password(p1, user=user)
     return p1
 
@@ -195,11 +208,22 @@ class PasswordChangeSimpleForm(forms.Form):
     )
     new_password1 = forms.CharField(
         label="New password",
-        widget=forms.PasswordInput(attrs={"autocomplete": "new-password", "class": "form-control", "id": "id_password1"}),
+        help_text="At least 10 characters and include a letter, a number, and a special character.",
+        widget=forms.PasswordInput(attrs={
+            "autocomplete": "new-password",
+            "class": "form-control",
+            "id": "id_password1",
+            "pattern": r"(?=.*[A-Za-z])(?=.*\d)(?=.*[^A-Za-z0-9]).{10,}",
+            "title": "At least 10 characters and include a letter, a number, and a special character."
+        }),
     )
     new_password2 = forms.CharField(
         label="Confirm new password",
-        widget=forms.PasswordInput(attrs={"autocomplete": "new-password", "class": "form-control", "id": "id_password2"}),
+        widget=forms.PasswordInput(attrs={
+            "autocomplete": "new-password",
+            "class": "form-control",
+            "id": "id_password2",
+        }),
     )
 
     def __init__(self, *args, user=None, **kwargs):
@@ -310,11 +334,20 @@ class VerifyCodeResetForm(forms.Form):
     )
     new_password1 = forms.CharField(
         label="New password",
-        widget=forms.PasswordInput(attrs={"autocomplete": "new-password", "id": "id_password1"}),
+        help_text="At least 10 characters and include a letter, a number, and a special character.",
+        widget=forms.PasswordInput(attrs={
+            "autocomplete": "new-password",
+            "id": "id_password1",
+            "pattern": r"(?=.*[A-Za-z])(?=.*\d)(?=.*[^A-Za-z0-9]).{10,}",
+            "title": "At least 10 characters and include a letter, a number, and a special character."
+        }),
     )
     new_password2 = forms.CharField(
         label="Confirm new password",
-        widget=forms.PasswordInput(attrs={"autocomplete": "new-password", "id": "id_password2"}),
+        widget=forms.PasswordInput(attrs={
+            "autocomplete": "new-password",
+            "id": "id_password2",
+        }),
     )
 
     def __init__(self, *args, user: Optional[object] = None, **kwargs):
@@ -350,7 +383,7 @@ class ManagerSignUpForm(forms.Form):
       - email: Used as username; must be unique (case-insensitive).
       - business_name: Name of the store/business to create.
       - subdomain (optional): render-friendly; store/ignore in view as you like.
-      - password1/password2: With Django validators.
+      - password1/password2: With validators (custom + Django).
     """
     full_name = forms.CharField(
         max_length=150,
@@ -375,7 +408,13 @@ class ManagerSignUpForm(forms.Form):
     )
     password1 = forms.CharField(
         label="Password",
-        widget=forms.PasswordInput(attrs={"autocomplete": "new-password", "id": "id_password1"}),
+        help_text="At least 10 characters and include a letter, a number, and a special character.",
+        widget=forms.PasswordInput(attrs={
+            "autocomplete": "new-password",
+            "id": "id_password1",
+            "pattern": r"(?=.*[A-Za-z])(?=.*\d)(?=.*[^A-Za-z0-9]).{10,}",
+            "title": "At least 10 characters and include a letter, a number, and a special character."
+        }),
     )
     password2 = forms.CharField(
         label="Confirm password",

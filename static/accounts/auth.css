@@ -1,0 +1,238 @@
+/* Premium glassmorphic auth styling */
+
+:root{
+  --glass-bg: rgba(255,255,255,0.14);
+  --glass-stroke: rgba(255,255,255,0.28);
+  --glass-shadow: 0 10px 30px rgba(16, 24, 40, 0.25);
+  --radius: 22px;
+  --space: clamp(18px, 2.2vw, 28px);
+  --fg: #0b1220;
+  --fg-dim: #4b5563;
+  --link: #2463eb;
+  --field-bg: rgba(255,255,255,0.6);
+  --field-stroke: rgba(15, 23, 42, 0.08);
+  --focus: 0 0 0 4px rgba(36, 99, 235, .18);
+  --btn-height: 56px;
+}
+
+/* Full-height centered viewport */
+.auth-viewport{
+  min-height: 100dvh;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background:
+    radial-gradient(1200px 600px at 10% -10%, rgba(36,99,235,.20), transparent 55%),
+    radial-gradient(1000px 700px at 110% 0%, rgba(59,130,246,.18), transparent 60%),
+    linear-gradient(180deg, #f7f8fb 0%, #eef2ff 100%);
+}
+
+/* Glass card */
+.auth-card{
+  width: min(880px, 92vw);
+  backdrop-filter: saturate(140%) blur(18px);
+  -webkit-backdrop-filter: saturate(140%) blur(18px);
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-stroke);
+  box-shadow: var(--glass-shadow);
+  border-radius: var(--radius);
+  padding: clamp(22px, 3vw, 34px);
+  position: relative;
+  isolation: isolate;
+}
+
+/* Subtle light border via gradient ring */
+.auth-card::before{
+  content:"";
+  position:absolute; inset:0;
+  border-radius: inherit;
+  padding:1px;
+  background: linear-gradient(135deg, rgba(255,255,255,.65), rgba(255,255,255,.05));
+  -webkit-mask:
+    linear-gradient(#000 0 0) content-box, 
+    linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor; mask-composite: exclude;
+  pointer-events:none;
+}
+
+/* Header with larger logo left-aligned */
+.auth-header{
+  display:flex; align-items:flex-start; gap: clamp(14px, 2vw, 22px);
+  margin-bottom: clamp(12px, 2vw, 18px);
+}
+
+.brand-logo{
+  height: clamp(48px, 8vw, 86px);   /* bigger logo */
+  width:auto; object-fit:contain;
+  margin-top: 4px;
+}
+
+.auth-title{
+  display:flex; flex-direction:column; gap:4px;
+}
+
+.auth-title h1{
+  font-size: clamp(24px, 3.3vw, 40px);
+  line-height: 1.1;
+  margin: 0;
+  color: var(--fg);
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+
+.version{
+  margin: 2px 0 0 0;
+  color: var(--fg-dim);
+}
+.version a{ color: var(--link); text-decoration: none; }
+
+/* Form */
+.auth-form{
+  display:grid;
+  gap: 14px;
+  margin-top: 10px;
+}
+
+.auth-form label{
+  font-weight: 600;
+  color: var(--fg);
+  font-size: 0.95rem;
+}
+
+.auth-form input[type="text"],
+.auth-form input[type="password"]{
+  height: 52px;
+  border-radius: 14px;
+  padding: 0 16px;
+  border: 1px solid var(--field-stroke);
+  background: var(--field-bg);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.6);
+  transition: box-shadow .2s ease, border-color .2s ease, background .2s ease;
+}
+
+.auth-form input:focus{
+  outline: none;
+  border-color: rgba(36,99,235,.35);
+  box-shadow: var(--focus);
+  background: rgba(255,255,255,0.9);
+}
+
+/* Password reveal eye */
+.password-wrap{
+  position: relative;
+}
+.password-wrap .reveal{
+  position: absolute;
+  right: 10px; top: 50%; transform: translateY(-50%);
+  width: 40px; height: 40px; border-radius: 50%;
+  background:
+    radial-gradient(12px 12px at 55% 50%, #0b1220 40%, transparent 42%),
+    radial-gradient(12px 8px at 50% 58%, #0b1220 40%, transparent 42%);
+  border: none; opacity: .4; cursor: pointer;
+  transition: opacity .2s ease, transform .15s ease;
+}
+.password-wrap .reveal:hover{ opacity: .75; transform: translateY(-50%) scale(1.05); }
+
+/* Buttons (glass + responsive to cursor) */
+.btn{
+  position: relative;
+  display: inline-flex;
+  justify-content: center;
+  align-items: center;
+  gap: 8px;
+  height: var(--btn-height);
+  padding: 0 clamp(16px, 4vw, 26px);
+  border-radius: 16px;
+  text-decoration: none;
+  border: 1px solid rgba(255,255,255,.35);
+  background: linear-gradient(180deg, rgba(255,255,255,.55), rgba(255,255,255,.22));
+  color: #0b1220;
+  font-weight: 700;
+  letter-spacing: .01em;
+  box-shadow: 0 6px 14px rgba(15, 23, 42, 0.12);
+  overflow: hidden;
+  transition: transform .16s ease, box-shadow .16s ease, border-color .16s ease, background .16s ease;
+  will-change: transform, box-shadow;
+}
+
+/* Moving light that follows cursor */
+.btn.cursor-react::before{
+  content:"";
+  position:absolute; inset:-1px;
+  border-radius: inherit;
+  background:
+    radial-gradient(120px 120px at var(--mx,50%) var(--my,50%), rgba(255,255,255,0.6), transparent 60%),
+    linear-gradient(180deg, rgba(255,255,255,.6), rgba(255,255,255,.16));
+  mix-blend-mode: screen;
+  pointer-events: none;
+  transition: background-position .06s linear;
+}
+
+/* Primary = gradient tint */
+.btn-primary{
+  background:
+    linear-gradient(180deg, rgba(255,255,255,.65), rgba(255,255,255,.2)),
+    linear-gradient(90deg, #5b8cff, #6dd3ff 60%, #8df0ff);
+  color: #0b1220;
+  border-color: rgba(255,255,255,.55);
+}
+.btn-primary:hover{
+  transform: translateY(-1px);
+  box-shadow: 0 14px 26px rgba(36, 99, 235, .18);
+}
+.btn-primary:active{
+  transform: translateY(0);
+  box-shadow: 0 8px 18px rgba(36, 99, 235, .22) inset;
+}
+
+/* Secondary = outlined / glass */
+.btn-secondary{
+  background:
+    linear-gradient(180deg, rgba(255,255,255,.55), rgba(255,255,255,.18));
+  border-color: rgba(15, 23, 42, 0.08);
+  color: #0b1220;
+}
+.btn-secondary:hover{
+  transform: translateY(-1px);
+  box-shadow: 0 14px 26px rgba(15,23,42,.12);
+  border-color: rgba(15, 23, 42, 0.16);
+}
+
+/* Links & small elements */
+.links{
+  margin-top: 6px;
+}
+.links a{
+  color: var(--link); text-decoration: none; font-weight: 600;
+}
+
+.divider{
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(15,23,42,.12), transparent);
+  margin: 12px 0 2px;
+}
+
+.new-here{
+  display: grid;
+  gap: 8px;
+}
+.new-here p{
+  margin: 0; color: var(--fg-dim); font-weight: 600;
+}
+
+/* Errors */
+.form-errors{
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: rgba(239, 68, 68, .09);
+  border: 1px solid rgba(239, 68, 68, .25);
+  color: #7f1d1d;
+  font-weight: 600;
+}
+
+/* Motion-safe */
+@media (prefers-reduced-motion: reduce){
+  .btn, .btn::before, .password-wrap .reveal{
+    transition: none !important;
+  }
+}

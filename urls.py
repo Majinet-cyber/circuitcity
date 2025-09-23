@@ -1,8 +1,10 @@
-# circuit/urls.py
+# circuitcity/urls.py
 from django.contrib import admin
 from django.urls import path, include, re_path
 from importlib import import_module
-from django.http import JsonResponse  # used for tiny local stubs/fallbacks
+from django.http import JsonResponse
+from django.views.generic.base import RedirectView
+from django.contrib.staticfiles.storage import staticfiles_storage
 
 # Import inventory views for fallbacks
 from inventory import views as inv_views
@@ -110,6 +112,18 @@ if forgot_verify_view is None:
 urlpatterns = [
     path("admin/", admin.site.urls),
 
+    # Public root assets (stop auth redirects & noisy logs)
+    path(
+        "favicon.ico",
+        RedirectView.as_view(url=staticfiles_storage.url("favicon.ico"), permanent=True),
+        name="favicon",
+    ),
+    path(
+        "robots.txt",
+        RedirectView.as_view(url=staticfiles_storage.url("robots.txt"), permanent=True),
+        name="robots",
+    ),
+
     # App (namespaced include so {% url 'inventory:...' %} works)
     path("inventory/", include(("inventory.urls", "inventory"), namespace="inventory")),
 
@@ -133,7 +147,6 @@ urlpatterns = [
     path(   "inventory/api/value_trend/",            value_trend_view),
     re_path(r"^inventory/api/value[_-]trend/?$",     value_trend_view),
 
-    # Helpful extras (line chart, top models bar chart, alerts list)
     # Sales trend – support both legacy underscore and REST-y path with optional hyphen
     re_path(r"^inventory/api_sales_trend/?$",        sales_trend_view),
     path(   "inventory/api/sales_trend/",            sales_trend_view),
@@ -147,15 +160,15 @@ urlpatterns = [
     # Alerts
     re_path(r"^inventory/api/alerts/?$",             alerts_feed_view),
 
-    # Stock Health battery (used on inventory list) — support both underscore & hyphen
+    # Stock Health battery
     path(   "inventory/api/stock_health/",           stock_health_view),
     re_path(r"^inventory/api/stock[-_]health/?$",    stock_health_view),
 
-    # Wallet summary (dashboard chips) — support both underscore & hyphen
+    # Wallet summary
     path(   "inventory/api/wallet-summary/",         wallet_summary_view),
     re_path(r"^inventory/api/wallet[-_]summary/?$",  wallet_summary_view),
 
-    # --- HARD ALIASES FOR SCANNER + TIME CHECK-IN (underscore & hyphen) ---
+    # Scanner + time check-in
     re_path(r"^inventory/api/mark[-_]sold/?$",       mark_sold_view),
     re_path(r"^inventory/api/time[-_]checkin/?$",    time_checkin_view),
 ]

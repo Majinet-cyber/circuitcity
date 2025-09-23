@@ -5,202 +5,194 @@
   <meta charset="utf-8" />
   <title>Sign in · Imajinet</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <!-- Prevent browsers from caching the form response (avoids stale CSRF + re-POSTs) -->
+  <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate, max-age=0">
+  <meta http-equiv="Pragma" content="no-cache">
 
   <style>
     :root{
-      --bg1:#f7f9ff; --bg2:#eef4ff;
-      --card:#fff; --ink:#0f172a; --muted:#48566b;
-      --border:#e2e8f0;
-      --btn-a:#6aa8ff; --btn-b:#366eea;
-      --link:#2563eb;
-      --shadow:0 18px 46px rgba(15,23,42,.10);
+      --ink:#0f172a; --muted:#48566b;
+      --btn-a:#4f8cff; --btn-b:#1e40af; --btn-glow:#3b82f6; --link:#1e40af;
+      --bg1:#f6f9ff; --bg2:#e9f0ff;
+      --card:#ffffffcc; --border:#e2e8f0cc; --shadow:0 24px 60px rgba(15,23,42,.18);
+      --radius:18px;
+      --danger:#b91c1c; --danger-bg:#fff1f1; --danger-br:#ffd6d6;
+      --info-bg:#e7f2ff; --info-br:#cfe3ff; --info-ink:#0c4a6e;
+      --card-scale:.96;  --logo-h:72px;  --card-bottom-pad:34px;
     }
     *{box-sizing:border-box}
     html,body{height:100%}
     body{
-      margin:0;
-      font:16px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, Inter, Arial, "Noto Sans", "Helvetica Neue", sans-serif;
-      color:var(--ink);
+      margin:0; color:var(--ink);
+      font:16px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,Inter,Arial,"Noto Sans","Helvetica Neue",sans-serif;
       background:
         radial-gradient(1200px 700px at 25% -10%, var(--bg2), transparent 60%),
         radial-gradient(1200px 700px at 120% 120%, var(--bg2), transparent 60%),
         var(--bg1);
-      display:flex; align-items:flex-start; justify-content:center;
-      padding:28px 16px 40px;
+      min-height:100svh; display:grid; place-items:center; padding:16px;
     }
-
-    /* ---------- Header with logo (top-left) ---------- */
-    .page{
-      width:100%; max-width:920px; position:relative;
-    }
-    .brand-row{
-      display:flex; align-items:flex-end; gap:.85rem;
-      margin:4px 0 18px;
-      padding-left:8px;
-    }
-    .brand-row img{height:44px; width:auto; display:block}
-    .tagline{
-      font-weight:700; letter-spacing:.02em; color:#8c96a8;
-      font-size:.9rem; line-height:1; padding-bottom:6px;
-    }
-
-    /* ---------- Card ---------- */
     .card{
-      width:min(520px, 92vw);
-      background:var(--card);
+      width:min(560px, 92vw);
+      border-radius:calc(var(--radius) + 6px);
+      background:linear-gradient(180deg, var(--card), #ffffffb0);
       border:1px solid var(--border);
-      border-radius:18px;
       box-shadow:var(--shadow);
-      padding:28px;
-      margin-top:10px;
+      backdrop-filter:saturate(140%) blur(10px);
+      -webkit-backdrop-filter:saturate(140%) blur(10px);
+      padding:18px 18px var(--card-bottom-pad);
+      display:flex; flex-direction:column; gap:10px;
+      transform:scale(var(--card-scale));
     }
-    @media (min-width:640px){ .card{padding:34px 40px} }
-
-    h1{
-      margin:0 0 10px;
-      font-weight:800;
-      font-size:clamp(28px, 4.6vw, 44px);
-      line-height:1.08;
-    }
-    .sub{
-      margin:0 0 22px;
-      color:#5a6b83;
-      font-size:1.125rem;
-    }
-    .sub a{color:var(--link); text-decoration:none}
-
-    label{
-      display:block; margin:14px 0 6px; font-weight:650;
-    }
+    .card-logo{display:block; height:var(--logo-h); width:auto; margin:2px auto 6px}
+    .sub{margin:0 0 8px; color:#55627a}
+    label{display:block; margin:8px 0 4px; font-weight:650; color:#0b1324}
     .input{
-      width:100%; padding:14px 16px;
-      border:1px solid var(--border);
-      border-radius:12px; background:#fff; font-size:1rem;
-      outline:none;
+      width:100%; padding:12px 14px; border:1px solid #d9e2ef; border-radius:12px;
+      background:#fff; font-size:1rem; outline:none; box-shadow:inset 0 1px 0 rgba(255,255,255,.5);
+      transition:border-color .2s, box-shadow .2s;
     }
-    .input:focus{border-color:#c8d8ff; box-shadow:0 0 0 3px rgba(37,99,235,.12)}
-
+    .input:focus{border-color:#c8d8ff; box-shadow:0 0 0 3px rgba(99,102,241,.26)}
     .pwd{position:relative}
-    .eye{
-      position:absolute; right:12px; top:50%; transform:translateY(-50%);
-      background:transparent; border:0; cursor:pointer; padding:0; width:28px; height:28px;
-      color:#6b7280;
-    }
-    .eye svg{display:block}
-
+    .eye{position:absolute; right:10px; top:50%; transform:translateY(-50%);
+      background:transparent; border:0; cursor:pointer; padding:0; width:28px; height:28px; color:#6b7280;}
     .btn{
-      width:100%; margin-top:12px;
-      border:0; cursor:pointer; color:#fff; font-weight:800; letter-spacing:.02em;
-      border-radius:14px; padding:14px 16px; font-size:1.05rem;
+      width:100%; margin-top:8px; border:0; cursor:pointer; color:#fff; font-weight:850; letter-spacing:.2px;
+      border-radius:12px; padding:12px 14px; font-size:1.02rem;
       background:linear-gradient(180deg, var(--btn-a), var(--btn-b));
-      box-shadow:0 12px 26px rgba(54,110,234,.28);
+      box-shadow:0 14px 28px rgba(30,64,175,.35), 0 0 0 1px rgba(255,255,255,.18) inset, 0 16px 36px var(--btn-glow);
+      transition:transform .14s ease, filter .14s ease, opacity .14s ease;
+      display:flex; align-items:center; justify-content:center; gap:10px;
+      text-decoration:none;
     }
-
-    .links{margin:14px 0 12px}
-    .links a{color:var(--link); text-decoration:none; font-size:1.05rem}
-
-    .rule{border:0; border-top:1px solid var(--border); margin:20px 0}
-
-    .muted{color:#5b6880}
-    .cta-pill{
-      display:inline-block; text-decoration:none; font-weight:800;
-      color:#1d4ed8; background:#f4f7ff;
-      border:1px solid #c9d8ff; border-radius:14px;
-      padding:12px 16px; margin-top:6px;
-    }
-
-    /* messages / errors if any */
-    .msg{background:#e7f2ff; border:1px solid #cfe3ff; color:#0c4a6e;
-         border-radius:10px; padding:.7rem .9rem; margin-bottom:12px}
-    .err{background:#fff1f1; border:1px solid #ffd6d6; color:#9a1b1b}
+    .btn:hover{transform:translateY(-1px); filter:brightness(1.03)}
+    .btn:active{transform:none; filter:brightness(.98)}
+    .btn[disabled]{opacity:.75; cursor:default}
+    .spinner{width:18px; height:18px; border-radius:50%; border:2.5px solid rgba(255,255,255,.45); border-top-color:#fff; animation:spin .8s linear infinite; display:none;}
+    .btn.loading .spinner{display:inline-block}
+    .btn.loading .btn-label{opacity:.9}
+    @keyframes spin{to{transform:rotate(360deg)}}
+    .links{margin:4px 0 6px}
+    .links a{color:var(--link); text-decoration:none}
+    .links a:hover{text-decoration:underline}
+    .rule{border:0; border-top:1px solid #dfe4f7; margin:10px 0 8px}
+    .msg{background:var(--info-bg); border:1px solid var(--info-br); color:var(--info-ink);
+         border-radius:10px; padding:.55rem .7rem; margin:2px 0 6px;}
+    .err{background:var(--danger-bg); border:1px solid var(--danger-br); color:var(--danger)}
+    .footnote{color:#64748b; font-size:.92rem; line-height:1.35; margin-top:10px; margin-bottom:2px;}
+    .corner{position:fixed; bottom:8px; font-size:.9rem; color:#7b879a; user-select:none}
+    .corner.left{left:14px} .corner.right{right:14px}
+    @media (max-height: 720px){ :root{ --card-scale:.94; --logo-h:64px; } .corner{display:none} }
+    @media (max-width: 380px){ :root{ --card-scale:.92; } .footnote{font-size:.88rem} }
   </style>
 </head>
 <body>
-  <div class="page" role="main">
-    <!-- Top-left logo + tagline -->
-    <div class="brand-row">
-      <img src="{% static 'img/imajinet-logo.png' %}" alt="Imajinet">
-      <div class="tagline">DRIVING YOUR PASSION INTO ACTION</div>
-    </div>
+  <div class="card" role="dialog" aria-labelledby="loginTitle" aria-describedby="loginDesc">
+    <img class="card-logo" src="{% static 'img/majn.png' %}" alt="Imajinet">
+    <p id="loginDesc" class="sub">Sign in to continue.</p>
 
-    <!-- Center card -->
-    <div class="card" role="dialog" aria-labelledby="loginTitle" aria-describedby="loginDesc">
-      <h1 id="loginTitle">Sign in to continue.</h1>
-      <p id="loginDesc" class="sub">Sign in to continue. <a href="#" aria-label="version">[v10]</a></p>
+    {% if messages %}
+      {% for m in messages %}
+        <div class="msg{% if m.tags %} {{ m.tags }}{% endif %}">{{ m }}</div>
+      {% endfor %}
+    {% endif %}
 
-      {% if messages %}
-        {% for m in messages %}<div class="msg{% if m.tags %} {{ m.tags }}{% endif %}">{{ m }}</div>{% endfor %}
-      {% endif %}
-      {% if form and form.non_field_errors %}
-        <div class="msg err">
-          {% for e in form.non_field_errors %}{{ e }}{% if not forloop.last %}<br>{% endif %}{% endfor %}
-        </div>
-      {% endif %}
+    <form id="loginForm" method="post" action="{% url 'accounts:login' %}" novalidate autocomplete="on">
+      {% csrf_token %}
+      <input type="hidden" name="next" value="{{ next|default:'' }}"/>
 
-      <form method="post" action="{% url 'accounts:login' %}" novalidate>
-        {% csrf_token %}
-        <input type="hidden" name="next" value="{{ next|default:'' }}"/>
+      <label for="id_identifier">Email or Username</label>
+      <input id="id_identifier" class="input" type="text" name="identifier"
+             value="{{ form.identifier.value|default_if_none:'' }}" autocomplete="username email" required>
 
-        <!-- Email/Username -->
-        <label for="id_identifier">Email or Username</label>
-        <input id="id_identifier" class="input" type="text" name="identifier"
-               value="{{ form.identifier.value|default_if_none:'' }}">
-
-        {% if form.identifier.errors %}
-          <div class="msg err">
-            {% for e in form.identifier.errors %}{{ e }}{% if not forloop.last %}<br>{% endif %}{% endfor %}
-          </div>
-        {% endif %}
-
-        <!-- Password with eye toggle -->
-        <label for="id_password">Password</label>
-        <div class="pwd">
-          <input id="id_password" class="input" type="password" name="password" autocomplete="current-password">
-          <button type="button" class="eye" aria-label="Show password" title="Show/Hide password">
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7Z"/>
-              <circle cx="12" cy="12" r="3"/>
-            </svg>
-          </button>
-        </div>
-
-        {% if form.password.errors %}
-          <div class="msg err">
-            {% for e in form.password.errors %}{{ e }}{% if not forloop.last %}<br>{% endif %}{% endfor %}
-          </div>
-        {% endif %}
-
-        <button class="btn" type="submit">Sign in</button>
-      </form>
-
-      <div class="links">
-        <a href="{% url 'password_reset' %}">Forgot your password?</a>
+      <label for="id_password">Password</label>
+      <div class="pwd">
+        <input id="id_password" class="input" type="password" name="password" autocomplete="current-password" required>
+        <button type="button" class="eye" aria-label="Show password" title="Show/Hide password">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7Z"/>
+            <circle cx="12" cy="12" r="3"/>
+          </svg>
+        </button>
       </div>
 
-      <hr class="rule">
+      <button id="submitBtn" class="btn" type="submit" aria-live="polite">
+        <span class="btn-label">Sign in</span>
+        <span class="spinner" aria-hidden="true"></span>
+      </button>
+    </form>
 
-      <p class="muted" style="margin:0 0 6px">New here?</p>
-      <a class="cta-pill" href="{% url 'accounts:signup_manager' %}">Create a Manager account</a>
-
-      <p class="muted" style="margin-top:12px">
-        Managers create the store and can invite agents later.<br>
-        Agents: ask your manager for an invite link.
-      </p>
+    <div class="links">
+      <a href="{% url 'accounts:forgot_password_request' %}">Forgot your password?</a>
     </div>
+
+    <hr class="rule">
+
+    <p class="footnote">
+      Managers create the store and can invite agents later.<br>
+      Agents: ask your manager for an invite link.
+    </p>
+
+    <a class="btn" role="button" href="{% url 'accounts:signup_manager' %}">
+      <span class="btn-label">Create a Manager account</span>
+    </a>
   </div>
 
+  <div class="corner left">v1.1</div>
+  <div class="corner right">© imajinet</div>
+
   <script>
-    // Eye toggle
+    // Ensure a clean GET entry in history so reload never re-POSTs (“Confirm resubmission”)
+    try {
+      if (window.history && window.history.replaceState) {
+        const cleanUrl = window.location.pathname + window.location.search;
+        window.history.replaceState(null, document.title, cleanUrl);
+      }
+      // If we arrive via the back/forward cache, force a real reload to get a fresh CSRF cookie
+      window.addEventListener('pageshow', function (e) {
+        if (e.persisted) window.location.reload();
+      });
+    } catch (e) {}
+
+    // Password eye toggle
     (function(){
       const btn = document.querySelector('.eye');
       const input = document.getElementById('id_password');
-      if(!btn || !input) return;
-      let shown = false;
-      btn.addEventListener('click', () => {
-        shown = !shown;
-        input.type = shown ? 'text' : 'password';
-        btn.setAttribute('aria-label', shown ? 'Hide password' : 'Show password');
-      });
+      if(btn && input){
+        let shown = false;
+        btn.addEventListener('click', function(){
+          shown = !shown;
+          input.type = shown ? 'text' : 'password';
+          btn.setAttribute('aria-label', shown ? 'Hide password' : 'Show password');
+        });
+      }
+    })();
+
+    // Submit state: lock fields, but keep hidden CSRF/next enabled
+    (function(){
+      const form = document.getElementById('loginForm');
+      const submitBtn = document.getElementById('submitBtn');
+      if(form && submitBtn){
+        form.addEventListener('submit', function(){
+          submitBtn.classList.add('loading');
+          submitBtn.setAttribute('disabled','disabled');
+          const controls = form.querySelectorAll('input, button, select, textarea');
+          controls.forEach(el => {
+            if (el === submitBtn) return;
+            if (el.tagName === 'INPUT' && (el.type === 'hidden' || el.name === 'csrfmiddlewaretoken' || el.name === 'next')) return;
+            if (el.tagName === 'BUTTON') el.setAttribute('disabled','disabled');
+            else try { el.readOnly = true; } catch(e) {}
+          });
+          // auto-unlock after a short period (in case of network error)
+          setTimeout(() => {
+            submitBtn.classList.remove('loading');
+            submitBtn.removeAttribute('disabled');
+            controls.forEach(el => {
+              if (el.tagName !== 'BUTTON') try { el.readOnly = false; } catch(e) {}
+              else if (el !== submitBtn) el.removeAttribute('disabled');
+            });
+          }, 10000);
+        });
+      }
     })();
   </script>
 </body>

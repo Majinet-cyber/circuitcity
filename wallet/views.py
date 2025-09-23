@@ -5,14 +5,14 @@ import json
 from calendar import monthrange
 from datetime import date
 from decimal import Decimal, InvalidOperation
-from typing import Tuple, Iterable
+from typing import Tuple
 
 from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.core.mail import send_mail
-from django.db.models import Sum, Q
+from django.db.models import Sum
 from django.http import HttpRequest, JsonResponse, HttpResponseBadRequest
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
@@ -592,10 +592,7 @@ def issue_payslip(request, agent_id: int, year: int, month: int):
 @method_decorator([otp_required, ensure_csrf_cookie], name="dispatch")
 class AdminIssuePayslipView(LoginRequiredMixin, TemplateView):
     """
-    Small helper page to issue a SINGLE payslip from a form:
-    - choose agent
-    - choose year/month
-    - (optional) send_now and payment method
+    Issue a SINGLE payslip via form (agent, year, month, send_now, method).
     """
     template_name = "wallet/admin_issue_payslip.html"
 
@@ -639,8 +636,8 @@ class AdminIssuePayslipView(LoginRequiredMixin, TemplateView):
 @method_decorator([otp_required, ensure_csrf_cookie], name="dispatch")
 class AdminPayslipBulkView(LoginRequiredMixin, TemplateView):
     """
-    GET  -> show a form (template you’ll add) to pick agents + period + send_now flag
-    POST -> issue payslips for selected agents (and optionally email them)
+    GET  -> form to pick agents + period + send_now flag
+    POST -> issue payslips for selected agents (and optionally email)
     """
     template_name = "wallet/admin_payslips.html"
 
@@ -673,7 +670,7 @@ class AdminPayslipBulkView(LoginRequiredMixin, TemplateView):
         year = int(request.POST.get("year"))
         month = int(request.POST.get("month"))
         send_now = request.POST.get("send_now") in ("1", "true", "on", "yes")
-        method = request.POST.get("method")  # optional future: NB / SB / AM
+        method = request.POST.get("method")  # optional
 
         agents = list(U.objects.filter(id__in=agent_ids, is_active=True))
         results = []
@@ -871,3 +868,21 @@ def admin_po_detail(request: HttpRequest, po_id: int):
         "wallet/admin_po_detail.html",
         {"po": po, "form": form, "items": items, "status_choices": PurchaseOrderStatus.choices},
     )
+
+
+# ---------------------------------------------------------------------
+# URL-callable views (expose .as_view() for urls.py)
+# ---------------------------------------------------------------------
+# Agent area
+agent_wallet = AgentWalletView.as_view()
+agent_txns = AgentTxnListView.as_view()
+
+# Admin area
+admin_home = AdminWalletHome.as_view()
+admin_agent = AdminAgentWallet.as_view()
+admin_issue = AdminIssueTxnView.as_view()
+admin_budgets = AdminBudgetsView.as_view()
+admin_issue_payslip = AdminIssuePayslipView.as_view()
+admin_payslips = AdminPayslipBulkView.as_view()
+admin_schedules = AdminPayoutSchedulesView.as_view()
+admin_po_list = AdminPOListView.as_view()

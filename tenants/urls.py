@@ -18,28 +18,47 @@ except Exception:  # pragma: no cover
             return redirect("tenants:join_as_agent")
     views_join = _JoinFallback()  # type: ignore
 
-# ---- Safe fallbacks so URLs never explode if views are missing ----
-_manager_agents_view = getattr(views, "manager_review_agents", None)
-if _manager_agents_view is None:
-    def _manager_agents_view(request, *args, **kwargs):  # type: ignore
-        return redirect("tenants:choose_business")
 
-_manager_locations_view = getattr(views, "manager_locations", None)
-if _manager_locations_view is None:
-    def _manager_locations_view(request, *args, **kwargs):  # type: ignore
-        # Graceful fallback until you implement the page
-        return redirect("tenants:choose_business")
+# ---- Safe fallback helpers ---------------------------------------------------
+def _fallback_redirect(to_name: str):
+    def _v(request, *args, **kwargs):
+        return redirect(to_name)
+    return _v
+
+def _get_or_fallback(name: str, fallback_to: str):
+    fn = getattr(views, name, None)
+    return fn if callable(fn) else _fallback_redirect(fallback_to)
+
+
+# ---- Resolve views with graceful fallbacks (so templates never 500) ----------
+# Core pages
+activate_mine          = _get_or_fallback("activate_mine",          "tenants:choose_business")
+activate               = _get_or_fallback("activate_mine",          "tenants:choose_business")
+clear_active           = _get_or_fallback("clear_active",           "tenants:choose_business")
+choose_business        = _get_or_fallback("choose_business",        "tenants:join_as_agent")
+set_active             = _get_or_fallback("set_active",             "tenants:choose_business")
+create_business        = _get_or_fallback("create_business_as_manager", "tenants:choose_business")
+join_as_agent          = _get_or_fallback("join_as_agent",          "tenants:choose_business")
+
+# Manager pages
+manager_review_agents  = _get_or_fallback("manager_review_agents",  "tenants:choose_business")
+manager_locations      = _get_or_fallback("manager_locations",      "tenants:choose_business")
+
+# Agent invite actions (these are the ones templates often {% url %} to)
+create_agent_invite    = _get_or_fallback("create_agent_invite",    "tenants:manager_review_agents")
+resend_agent_invite    = _get_or_fallback("resend_agent_invite",    "tenants:manager_review_agents")
+revoke_agent_invite    = _get_or_fallback("revoke_agent_invite",    "tenants:manager_review_agents")
 
 app_name = "tenants"
 
 urlpatterns = [
     # Quick entry — decide/activate something sensible for this user
-    path("", views.activate_mine, name="activate_mine"),
-    path("activate/", views.activate_mine, name="activate"),
-    path("clear/", views.clear_active, name="clear_active"),
+    path("",           activate_mine, name="activate_mine"),
+    path("activate/",  activate,      name="activate"),
+    path("clear/",     clear_active,  name="clear_active"),
 
     # Onboarding & switching
-    path("choose/", views.choose_business, name="choose_business"),
+    path("choose/", choose_business, name="choose_business"),
     # Back-compat alias used by some helpers/templates
     path(
         "switcher/",
@@ -48,12 +67,13 @@ urlpatterns = [
     ),
 
     # Accept UUID-like string or numeric pk (slug converter allows both forms)
-    path("set/<slug:biz_id>/", views.set_active, name="set_active"),
+    path("set/<slug:biz_id>/", set_active, name="set_active"),
     # Friendly alias
-    path("switch/<slug:biz_id>/", views.set_active, name="switch_active"),
+    path("switch/<slug:biz_id>/", set_active, name="switch_active"),
 
-    path("create/", views.create_business_as_manager, name="create_business"),
-    path("join/", views.join_as_agent, name="join_as_agent"),
+    # Create / join
+    path("create/", create_business, name="create_business"),
+    path("join/",   join_as_agent,   name="join_as_agent"),
 
     # Self-service: managers creating their own business (optional helper)
     path("join-business/", views_join.join, name="join"),
@@ -66,18 +86,27 @@ urlpatterns = [
     ),
 
     # Staff approvals (supreme control)
-    path("staff/approve/<int:pk>/", views.staff_approve_business, name="staff_approve_business"),
+    path("staff/approve/<int:pk>/", _get_or_fallback("staff_approve_business", "tenants:choose_business"),
+         name="staff_approve_business"),
 
     # Manager: review agent join requests (per active business)
-    path("manager/agents/", _manager_agents_view, name="manager_review_agents"),
+    path("manager/agents/", manager_review_agents, name="manager_review_agents"),
 
     # Manager: manage store locations (per active business)
-    path("manager/locations/", _manager_locations_view, name="manager_locations"),
+    path("manager/locations/", manager_locations, name="manager_locations"),
 
     # Optional convenience alias: /tenants/manager/ → /tenants/manager/agents/
     path(
-       "manager/",
-       RedirectView.as_view(pattern_name="tenants:manager_review_agents", permanent=False),
-       name="manager_home",
+        "manager/",
+        RedirectView.as_view(pattern_name="tenants:manager_review_agents", permanent=False),
+        name="manager_home",
     ),
+
+    # ----- Agent invite actions (names used in templates) -----
+    # POST: create a new invite
+    path("manager/agents/invite/", create_agent_invite, name="create_agent_invite"),
+    # POST: resend an invite (optional)
+    path("manager/agents/invite/<int:pk>/resend/", resend_agent_invite, name="resend_agent_invite"),
+    # POST: revoke an invite (optional)
+    path("manager/agents/invite/<int:pk>/revoke/", revoke_agent_invite, name="revoke_agent_invite"),
 ]

@@ -204,6 +204,95 @@ def user_home_location(user):
         return None
 
 
+# -----------------------
+# Business location helper (NEW)
+# -----------------------
+def ensure_default_location(business) -> Optional[object]:
+    """
+    Return a sensible default location object for the given business.
+
+    Works with either:
+      - inventory.models.Location (preferred), or
+      - inventory.models.Store   (fallback)
+
+    Behaviour:
+      • If an object with is_default=True exists for that business, return it.
+      • Else pick the first object.
+      • Else create one named "<Business Name> — Main" (or "<Business Name>").
+      • If the model supports an 'is_default' field, set it on the chosen object.
+      • If the model supports 'is_active', set True on create.
+      • If the Store model supports 'kind' or 'type', set to "STORE" on create.
+
+    Never raises; returns the chosen/created object or None.
+    """
+    if business is None:
+        return None
+
+    Loc = Sto = None
+    try:
+        from .models import Location as Loc  # type: ignore
+    except Exception:
+        Loc = None
+    try:
+        from .models import Store as Sto  # type: ignore
+    except Exception:
+        Sto = None
+
+    def _mark_default(qs, obj, field="is_default"):
+        try:
+            if hasattr(obj, field):
+                try:
+                    qs.update(**{field: False})
+                except Exception:
+                    pass
+                if not getattr(obj, field, False):
+                    setattr(obj, field, True)
+                    try:
+                        obj.save(update_fields=[field])
+                    except Exception:
+                        obj.save()
+        except Exception:
+            pass
+
+    # Prefer Location first if present
+    if Loc is not None:
+        try:
+            q = Loc.objects.filter(business=business)
+            loc = q.filter(is_default=True).first() or q.first()
+            if not loc:
+                name = getattr(business, "name", "Main")
+                defaults = {}
+                if hasattr(Loc, "is_active"):
+                    defaults["is_active"] = True
+                loc = Loc.objects.create(business=business, name=f"{name} — Main", **defaults)
+            _mark_default(q, loc, "is_default")
+            return loc
+        except Exception:
+            pass
+
+    # Fallback to Store
+    if Sto is not None:
+        try:
+            q = Sto.objects.filter(business=business)
+            loc = q.filter(is_default=True).first() or q.first()
+            if not loc:
+                name = getattr(business, "name", "Main")
+                defaults = {}
+                if hasattr(Sto, "is_active"):
+                    defaults["is_active"] = True
+                if hasattr(Sto, "kind"):
+                    defaults["kind"] = "STORE"
+                if hasattr(Sto, "type"):
+                    defaults["type"] = "STORE"
+                loc = Sto.objects.create(business=business, name=f"{name} — Main", **defaults)
+            _mark_default(q, loc, "is_default")
+            return loc
+        except Exception:
+            pass
+
+    return None
+
+
 __all__ = [
     # roles / access
     "ADMIN",
@@ -219,4 +308,6 @@ __all__ = [
     "apply_inventory_filters",
     # users
     "user_home_location",
+    # business location helper
+    "ensure_default_location",
 ]

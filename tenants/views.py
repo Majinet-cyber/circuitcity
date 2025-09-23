@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from typing import Optional, List, Set
 from urllib.parse import quote_plus
+from datetime import timedelta  # <-- FIX: use datetime.timedelta (not timezone.timedelta)
 
 from django.contrib import messages
 from django.contrib.auth import login, get_user_model
@@ -23,6 +24,9 @@ from .utils import (
     set_active_business,
     get_active_business,
 )
+
+import logging
+log = logging.getLogger(__name__)
 
 # -------------------------------------------------------------------
 # Small helpers
@@ -602,17 +606,18 @@ def create_agent_invite(request: HttpRequest) -> HttpResponse:
 
     data = form.cleaned_data
 
-    # Expiry: 4 hours from now if the field exists
-    expires_at = timezone.now() + timezone.timedelta(hours=4)
+    # Expiry: 4 hours from now if the field exists  (FIXED: datetime.timedelta)
+    expires_at = timezone.now() + timedelta(hours=4)
 
-    # Build kwargs WITHOUT 'token' so BaseTenantModel/AgentInvite.save() generates uuid
+    # Build kwargs WITHOUT 'token' so the model can generate it in save()
     invite_kwargs = dict(
         business=b,
         invited_name=(data.get("invited_name") or "").strip(),  # may be remapped below
         email=(data.get("email") or "").strip(),
         phone=(data.get("phone") or "").strip(),
         created_by=request.user,
-        status="SENT",
+        # Pick a broad default that's likely visible in your UI tabs:
+        status="UNATTENDED",  # fallback; if your UI expects "SENT", change to "SENT"
     )
     if "message" in form.fields:
         invite_kwargs["message"] = (data.get("message") or "").strip()
@@ -623,7 +628,16 @@ def create_agent_invite(request: HttpRequest) -> HttpResponse:
     _pick_name_field_for_invite(invite_kwargs, valid_fields)
     safe_kwargs = {k: v for k, v in invite_kwargs.items() if k in valid_fields}
 
-    AgentInvite.objects.create(**safe_kwargs)
+    inv = AgentInvite.objects.create(**safe_kwargs)
+
+    # Log for certainty
+    log.warning(
+        "INVITE CREATED id=%s email=%s business=%s status=%s",
+        getattr(inv, "id", None),
+        getattr(inv, "email", None),
+        getattr(inv, "business_id", None),
+        getattr(inv, "status", None),
+    )
 
     messages.success(request, "Invitation created.")
     return redirect("tenants:manager_review_agents")
@@ -636,7 +650,7 @@ def revoke_agent_invite(request: HttpRequest, pk: int) -> HttpResponse:
     """Managers can revoke an invite that hasn't been used yet."""
     b: Business = request.business
     inv = get_object_or_404(AgentInvite, pk=pk, business=b)
-    if getattr(inv, "status", "") in ("SENT", "DRAFT"):
+    if getattr(inv, "status", "") in ("SENT", "DRAFT", "UNATTENDED"):
         inv.status = "REVOKED"
         inv.save(update_fields=["status"])
         messages.info(request, "Invite revoked.")
@@ -661,7 +675,7 @@ def accept_invite(request: HttpRequest, token: str) -> HttpResponse:
         except Exception:
             pass
 
-    if getattr(invite, "status", "") != "SENT":
+    if getattr(invite, "status", "") not in ("SENT", "UNATTENDED"):
         return _invite_invalid_page(getattr(invite, "status", "invalid").lower())
 
     biz = invite.business

@@ -1,7 +1,8 @@
 # circuitcity/accounts/urls.py
 from django.conf import settings
 from django.urls import path, reverse_lazy
-from django.contrib.auth.views import LoginView, LogoutView
+from django.contrib.auth.views import LogoutView
+from django.views.generic import RedirectView
 
 from . import views
 
@@ -14,16 +15,11 @@ urlpatterns = [
     # -------------------------------
     # Authentication
     # -------------------------------
-    path(
-        "login/",
-        LoginView.as_view(template_name="accounts/login.html"),
-        name="login",
-    ),
+    path("login/", views.login_view, name="login"),
     path("signup/manager/", views.signup_manager, name="signup_manager"),
 
-    # Logout that accepts GET or POST (custom view)
+    # Logout (supports GET or POST), plus a vanilla CBV option
     path("logout/", views.logout_get_or_post, name="logout"),
-    # Fallback POST-only endpoint (Django built-in)
     path("logout/post/", LogoutView.as_view(next_page=LOGIN_URL_LAZY), name="logout_post"),
 
     # -------------------------------
@@ -34,12 +30,37 @@ urlpatterns = [
     # -------------------------------
     # Password Management
     # -------------------------------
+    # Step 1: enter identifier (email/username) → email a code (if user exists)
     path("password/forgot/", views.forgot_password_request_view, name="forgot_password_request"),
+    # Step 2: verify code + set the new password
     path("password/reset/", views.forgot_password_verify_view, name="forgot_password_reset"),
 
-    # Legacy shims so /accounts/password/change/ keeps working
-    path("password/change/", views.settings_security, name="password_change_shim"),
-    path("password/change/done/", views.settings_security, name="password_change_done_shim"),
+    # ✅ Aliases expected by templates / legacy Django auth URLs
+    path(
+        "password_reset/",
+        RedirectView.as_view(pattern_name="accounts:forgot_password_reset", permanent=False),
+        name="password_reset",
+    ),
+    path(
+        "password_change/",
+        RedirectView.as_view(pattern_name="accounts:settings_security", permanent=False),
+        name="password_change",
+    ),
+    path(
+        "password_change/done/",
+        RedirectView.as_view(pattern_name="accounts:settings_security", permanent=False),
+        name="password_change_done",
+    ),
+    path(
+        "password_reset/done/",
+        RedirectView.as_view(pattern_name="accounts:forgot_password_request", permanent=False),
+        name="password_reset_done",
+    ),
+    path(
+        "reset/<uidb64>/<token>/",
+        RedirectView.as_view(pattern_name="accounts:forgot_password_reset", permanent=False),
+        name="password_reset_confirm",
+    ),
 
     # -------------------------------
     # Avatar Uploads
@@ -53,7 +74,7 @@ urlpatterns = [
     path("admin/unblock/", views.admin_unblock_user_view, name="admin_unblock_user"),
 
     # -------------------------------
-    # User Settings (unified + subpages)
+    # User Settings
     # -------------------------------
     path("settings/", views.settings_unified, name="settings_unified"),
     path("settings/home/", views.settings_home, name="settings_home"),
@@ -67,13 +88,17 @@ urlpatterns = [
     ),
 ]
 
-# Optional short aliases some links might use
+# -------------------------------
+# Optional Short Aliases
+# -------------------------------
 urlpatterns += [
-    path("signin/", LoginView.as_view(template_name="accounts/login.html"), name="signin_alias"),
+    path("signin/", views.login_view, name="signin_alias"),
     path("signout/", views.logout_get_or_post, name="signout_alias"),
 ]
 
-# Debug-only endpoint to confirm which login template is rendering
+# -------------------------------
+# Debug-only helpers
+# -------------------------------
 if settings.DEBUG:
     urlpatterns += [
         path("login/_which/", views.login_template_probe, name="login_template_probe"),

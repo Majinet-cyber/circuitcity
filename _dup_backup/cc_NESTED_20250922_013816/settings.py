@@ -84,7 +84,7 @@ if DEBUG or TESTING:
 
 # SSL policy
 FORCE_SSL = env_bool("FORCE_SSL", env_bool("DJANGO_FORCE_SSL", False))
-USE_SSL = FORCE_SSL or not DEBUG
+USE_SSL = FORCE_SSL or (RENDER and not DEBUG)
 HEALTHZ_ALLOW_HTTP = env_bool("HEALTHZ_ALLOW_HTTP", False)
 
 # Security headers
@@ -108,6 +108,7 @@ else:
     SECURE_HSTS_PRELOAD = False
 
 SECURE_REDIRECT_EXEMPT = [r"^healthz$"] if HEALTHZ_ALLOW_HTTP else []
+
 
 # -------------------------------------------------
 # Session & CSRF
@@ -155,6 +156,7 @@ if LIVE_HOST:
 if APP_DOMAIN:
     _add_origin(f"https://{APP_DOMAIN}")
 
+
 # -------------------------------------------------
 # Upload limits
 # -------------------------------------------------
@@ -169,6 +171,8 @@ FILE_UPLOAD_DIRECTORY_PERMISSIONS = 0o750
 
 
 # -------------------------------------------------
+# Installed apps
+# -------------------------------------------------
 INSTALLED_APPS = [
     # Django
     "django.contrib.admin",
@@ -179,8 +183,11 @@ INSTALLED_APPS = [
     "django.contrib.staticfiles",
     "django.contrib.humanize",
 
-    # Local apps
-    "tenants.apps.TenantsConfig",  # 👈 NEW: must match the module path 'tenants.models'
+    # WhiteNoise helper for dev (prevents double static handling)
+    "whitenoise.runserver_nostatic",
+
+    # Local apps (use full dotted paths for reliability)
+    "circuitcity.tenants.apps.TenantsConfig",
     "circuitcity.accounts.apps.AccountsConfig",
     "circuitcity.inventory",
     "circuitcity.sales",
@@ -313,6 +320,16 @@ AUTH_PASSWORD_VALIDATORS = [
     {"NAME": "django.contrib.auth.password_validation.MinimumLengthValidator", "OPTIONS": {"min_length": 12}},
     {"NAME": "django.contrib.auth.password_validation.CommonPasswordValidator"},
     {"NAME": "django.contrib.auth.password_validation.NumericPasswordValidator"},
+    {
+        "NAME": "circuitcity.accounts.validators.StrongPasswordValidator",
+        "OPTIONS": {
+            "min_len": 12,
+            "require_digit": True,
+            "require_upper": True,
+            "require_lower": True,
+            "require_symbol": True,
+        },
+    },
 ]
 
 PASSWORD_HASHERS = ["django.contrib.auth.hashers.PBKDF2PasswordHasher"]
@@ -348,6 +365,8 @@ STORAGES = {
     "staticfiles": {"BACKEND": _static_backend},
 }
 WHITENOISE_AUTOREFRESH = DEBUG
+# Prevent 500s if a hashed asset is referenced but missing after deploy
+WHITENOISE_MANIFEST_STRICT = False
 
 
 # -------------------------------------------------
@@ -356,6 +375,9 @@ WHITENOISE_AUTOREFRESH = DEBUG
 LOGIN_URL = "accounts:login"
 LOGIN_REDIRECT_URL = "/"
 LOGOUT_REDIRECT_URL = "accounts:login"
+
+# Messages storage (robust across redirects)
+MESSAGE_STORAGE = "django.contrib.messages.storage.session.SessionStorage"
 
 
 # -------------------------------------------------
@@ -499,6 +521,7 @@ if SENTRY_DSN:
 APP_NAME = os.environ.get("APP_NAME", "Circuit City")
 APP_ENV = os.environ.get("APP_ENV", "dev" if DEBUG else "beta")
 BETA_FEEDBACK_MAILTO = os.environ.get("BETA_FEEDBACK_MAILTO", "beta@circuitcity.example")
+
 
 # -------------------------------------------------
 # Accounts / Auth feature knobs

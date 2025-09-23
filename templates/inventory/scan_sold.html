@@ -8,86 +8,60 @@
 
 {% block extra_css %}
 <style>
-  /* ===== Layout helpers ===== */
+  /* ===== Layout ===== */
   .page{margin:0 auto;max-width:1120px;padding:clamp(12px,4vw,24px)}
   .vstack{display:flex;flex-direction:column;gap:.75rem}
   .hstack{display:flex;align-items:center;gap:.75rem;flex-wrap:wrap}
 
-  /* ===== Circuit City design tokens (with safe fallbacks) ===== */
+  /* ===== Theme (blue accent) ===== */
   :root{
-    --cc-bg:      var(--cc-bg, #ffffff);
-    --cc-text:    var(--cc-text, #0f172a);
-    --cc-muted:   var(--cc-muted, #64748b);
-    --cc-border:  var(--cc-border, #e2e8f0);
-    --cc-panel:   var(--cc-panel, #ffffff);
-    --cc-panel-2: var(--cc-panel-2, #f8fafc);
-    --cc-accent:  var(--cc-accent, #2563eb);
-    --cc-shadow:  var(--cc-shadow, 0 6px 18px rgba(2,6,23,.08));
-    --scanline: #00ff5a; /* neon green */
+    --cc-bg:#ffffff; --cc-text:#0f172a; --cc-muted:#64748b; --cc-border:#e2e8f0;
+    --cc-panel:#ffffff; --cc-panel-2:#f8fafc; --cc-shadow:0 6px 18px rgba(2,6,23,.08);
+    --cc-accent:#1f6feb; --cc-accent-600:#1a5fd4; --cc-accent-700:#164fb1;
+    --scanline:#00ff5a;
   }
   body{background:var(--cc-bg);color:var(--cc-text)}
 
   /* ===== Cards & fields ===== */
-  .card{
-    background:var(--cc-panel);color:var(--cc-text);
-    border:1px solid var(--cc-border);border-radius:16px;padding:1.25rem;
-    box-shadow:var(--cc-shadow)
-  }
+  .card{background:var(--cc-panel);border:1px solid var(--cc-border);border-radius:16px;padding:1.25rem;box-shadow:var(--cc-shadow)}
   .row{display:grid;grid-template-columns:1fr 1fr;gap:1rem}
-  @media (max-width: 640px){ .row{grid-template-columns:1fr} }
+  @media (max-width:640px){.row{grid-template-columns:1fr}}
   .field{position:relative;background:var(--cc-panel);border:1px solid var(--cc-border);border-radius:12px;display:flex;align-items:center}
-  .field > input,.field > select,.field > .form-control{
-    flex:1;background:transparent;color:var(--cc-text);border:0;padding:12px 14px;outline:none;font-size:16px;min-height:44px;width:100%;
-  }
+  .field > input,.field > select{flex:1;background:transparent;color:var(--cc-text);border:0;padding:12px 14px;outline:none;font-size:16px;min-height:44px;width:100%}
   label{font-weight:800;margin-bottom:.35rem;display:block}
 
+  /* Inputs focus ring in blue */
+  input[type="text"],input[type="number"],input[type="date"],select{transition:box-shadow .15s,border-color .15s}
+  input:focus,select:focus{outline:none;border-color:var(--cc-accent)!important;box-shadow:0 0 0 .2rem rgba(31,111,235,.25)!important}
+
   /* ===== Buttons ===== */
-  .btn{
-    appearance:none;border:1px solid var(--cc-border);background:var(--cc-panel);color:var(--cc-text);
-    border-radius:10px;padding:10px 14px;cursor:pointer;font-weight:800;font-size:14px;min-height:44px;text-decoration:none;display:inline-flex;align-items:center;gap:.4rem;
-    transition:transform .12s ease, box-shadow .2s ease, background .2s ease;
-  }
+  .btn{appearance:none;border:1px solid var(--cc-border);background:var(--cc-panel);color:var(--cc-text);
+       border-radius:10px;padding:10px 14px;cursor:pointer;font-weight:800;font-size:14px;min-height:44px;
+       text-decoration:none;display:inline-flex;align-items:center;gap:.4rem;transition:transform .12s,box-shadow .2s,background .2s,border-color .2s}
   .btn:hover{transform:translateY(-1px);box-shadow:var(--cc-shadow)}
   .btn[disabled]{opacity:.5;cursor:not-allowed}
-  .btn-primary{background:var(--cc-accent);color:#fff;border-color:transparent}
-  .btn-secondary{background:var(--cc-panel)}
+  .btn-primary{background:var(--cc-accent);color:#fff;border-color:var(--cc-accent)}
+  .btn-primary:hover{background:var(--cc-accent-600);border-color:var(--cc-accent-600)}
   .btn-muted{background:rgba(148,163,184,.18)}
 
-  /* ===== Alerts (messages) ===== */
+  /* Alerts */
   .alert{margin:.5rem 0;padding:.75rem 1rem;border-radius:.75rem;border:1px solid var(--cc-border)}
   .alert-ok{background:rgba(59,130,246,.08)}
   .alert-err{background:rgba(239,68,68,.1);border-color:rgba(239,68,68,.5)}
 
-  /* ===== Hints & text bits ===== */
-  .hint{font-size:.9rem;color:var(--cc-muted)}
-  .error-text{color:#ef4444;font-size:.95rem;margin-top:.25rem}
-
-  /* ===== Modal ===== */
+  /* ===== Scanner Modal ===== */
   #scanModal{position:fixed;inset:0;background:rgba(0,0,0,.6);display:none;align-items:center;justify-content:center;z-index:9999}
   #scanModal .modal-card{width:min(95vw,700px);padding:0;overflow:hidden;border-radius:16px}
-  #scanModal header, #scanModal footer{display:flex;align-items:center;justify-content:space-between;padding:.75rem 1rem;border-color:var(--cc-border);border-style:solid}
+  #scanModal header,#scanModal footer{display:flex;align-items:center;justify-content:space-between;padding:.75rem 1rem;border-color:var(--cc-border);border-style:solid}
   #scanModal header{border-width:0 0 1px 0;background:var(--cc-panel)}
   #scanModal footer{border-width:1px 0 0 0;background:var(--cc-panel)}
-
-  /* Camera shell with animated scanline */
   .cam-shell{position:relative;background:#000}
   #scanVideo{width:100%;height:auto;display:block;background:#000}
-
   .scan-overlay{position:absolute;inset:0;pointer-events:none}
-  .scan-frame{
-    position:absolute; inset:10% 8%;
-    border:2px solid rgba(255,255,255,.25);
-    border-radius:12px;
-    box-shadow: inset 0 0 0 9999px rgba(0,0,0,.20);
-  }
-  .scanline{
-    position:absolute; left:8%; right:8%; height:2px; border-radius:2px;
-    background:linear-gradient(90deg, transparent, var(--scanline), transparent);
-    box-shadow:0 0 10px var(--scanline), 0 0 20px rgba(0,255,90,.6);
-    animation: sweep 2.0s linear infinite alternate;
-  }
-  .scanline.paused{ animation-play-state: paused; }
-  @keyframes sweep { from { top: 10%; } to { top: 90%; } }
+  .scan-frame{position:absolute;inset:10% 8%;border:2px solid rgba(255,255,255,.25);border-radius:12px;box-shadow:inset 0 0 0 9999px rgba(0,0,0,.20)}
+  .scanline{position:absolute;left:8%;right:8%;height:2px;border-radius:2px;background:linear-gradient(90deg,transparent,var(--scanline),transparent);box-shadow:0 0 10px var(--scanline),0 0 20px rgba(0,255,90,.6);animation:sweep 2s linear infinite alternate}
+  .scanline.paused{animation-play-state:paused}
+  @keyframes sweep{from{top:10%}to{top:90%}}
 </style>
 {% endblock %}
 
@@ -97,54 +71,60 @@
   <section class="card vstack" aria-labelledby="sell">
     <h1 id="sell" style="margin:0">Mark item as <span style="color:#ef4444">SOLD</span></h1>
 
-    {# Flash messages #}
     {% if messages %}
       {% for message in messages %}
         <div class="alert {% if 'error' in message.tags or 'danger' in message.tags %}alert-err{% else %}alert-ok{% endif %}">{{ message }}</div>
       {% endfor %}
     {% endif %}
 
-    {# Non-field errors #}
     {% if form.non_field_errors %}
       <div class="alert alert-err">{{ form.non_field_errors }}</div>
     {% endif %}
 
     {% url 'inventory:stock_list' as stock_url %}
-    {% url 'inventory:scan_in'   as scan_in_url %}
+    {% url 'inventory:scan_in' as scan_in_url %}
 
-    <form method="post" novalidate class="vstack" autocomplete="off" style="gap:1rem" id="sellForm">
+    {# Post to the API that finalizes the sale #}
+    <form method="post"
+          action="{% url 'inventory:api_mark_sold' %}"
+          novalidate
+          class="vstack"
+          autocomplete="off"
+          id="sellForm"
+          style="gap:1rem"
+          data-default-location-id="{{ default_location.id|default:request.user.agent_profile.location.id|default:'' }}">
       {% csrf_token %}
 
       <!-- IMEI -->
       <div>
-        <label for="{{ form.imei.id_for_label }}">IMEI / Barcode</label>
-        <div class="field">{{ form.imei }}</div>
+        <label for="id_imei">IMEI / Barcode</label>
+        <div class="field">
+          <input type="text" id="id_imei" name="imei" maxlength="15" inputmode="numeric" autocomplete="off" placeholder="Enter 15-digit IMEI">
+        </div>
         <div class="hstack" style="margin-top:.5rem">
           <button class="btn" type="button" id="btnOpenScanner">📷 Scan with camera</button>
           <button class="btn" type="button" id="btnPaste">📋 Paste</button>
           <button class="btn btn-muted" type="button" id="btnClear">✖ Clear</button>
-          <label class="hint" style="display:inline-flex;align-items:center;gap:.4rem;margin-left:auto">
-            <input type="checkbox" id="autoSubmit" /> Auto-submit on valid IMEI
+          <label class="hstack" style="margin-left:auto;font-weight:600;color:var(--cc-muted)">
+            <input type="checkbox" id="autoSubmit"> Auto-submit on valid IMEI
           </label>
         </div>
-        <div id="imeiHint" class="hint" style="margin-top:.35rem">
-          Tip: Type, paste, or scan. IMEI must be exactly 15 digits. Press <kbd>Enter</kbd> to submit.
-        </div>
-        {% if form.imei.errors %}<div class="error-text">{{ form.imei.errors|striptags }}</div>{% endif %}
+        <div class="hint" style="margin-top:.35rem">Tip: Type, paste, or scan. IMEI must be exactly 15 digits. Press <kbd>Enter</kbd> to submit.</div>
       </div>
 
       <!-- Sold date / Price -->
       <div class="row">
         <div>
-          <label for="{{ form.sold_at.id_for_label }}">Sold date</label>
-          <div class="field">{{ form.sold_at }}</div>
-          {% if form.sold_at.errors %}<div class="error-text">{{ form.sold_at.errors|striptags }}</div>{% endif %}
+          <label for="id_sold_at">Sold date</label>
+          <div class="field">
+            <input type="date" id="id_sold_at" name="sold_date">
+          </div>
         </div>
-
         <div>
-          <label for="{{ form.price.id_for_label }}">Price</label>
-          <div class="field">{{ form.price }}</div>
-          {% if form.price.errors %}<div class="error-text">{{ form.price.errors|striptags }}</div>{% endif %}
+          <label for="id_price">Price</label>
+          <div class="field">
+            <input type="number" id="id_price" name="price" min="0" step="any" autocomplete="off" placeholder="Final selling price">
+          </div>
           <div class="hint">Enter final selling price (non-negative).</div>
         </div>
       </div>
@@ -152,17 +132,19 @@
       <!-- Commission / Location -->
       <div class="row">
         <div>
-          <label for="{{ form.commission_pct.id_for_label }}">Commission %</label>
-          <div class="field">{{ form.commission_pct }}</div>
-          {% if form.commission_pct.errors %}<div class="error-text">{{ form.commission_pct.errors|striptags }}</div>{% endif %}
+          <label for="id_commission_pct">Commission %</label>
+          <div class="field">
+            <input type="number" id="id_commission_pct" name="commission" min="0" max="100" step="any" placeholder="Commission %">
+          </div>
         </div>
-
         <div>
-          <label for="{{ form.location.id_for_label }}">Location</label>
+          <label for="{{ form.location.id_for_label|default:'id_location' }}">Location</label>
           <div class="field">{{ form.location }}</div>
-          {% if form.location.errors %}<div class="error-text">{{ form.location.errors|striptags }}</div>{% endif %}
         </div>
       </div>
+
+      {# hidden field the API expects #}
+      <input type="hidden" id="id_location_id" name="location_id" value="">
 
       <!-- Actions -->
       <div class="hstack">
@@ -182,7 +164,6 @@
       <button class="btn" id="btnCloseScanner" type="button" aria-label="Close scanner">Close</button>
     </header>
 
-    <!-- Camera shell with overlay -->
     <div class="cam-shell">
       <video id="scanVideo" playsinline></video>
       <div class="scan-overlay" aria-hidden="true">
@@ -202,120 +183,91 @@
 <script src="https://unpkg.com/@ericblade/quagga2/dist/quagga.js"></script>
 <script>
 (function(){
-  // Ensure theme-friendly inputs & helpful attributes
-  (function ensureInputClasses() {
-    const ids = ["id_imei","id_sold_at","id_price","id_commission_pct","id_location"];
-    ids.forEach(id => {
-      const el = document.getElementById(id);
-      if (el && !el.classList.contains("input")) el.classList.add("input");
-    });
-    const priceEl = document.getElementById("id_price");
-    if (priceEl){
-      try{
-        priceEl.setAttribute("inputmode","decimal");
-        priceEl.setAttribute("step","any");
-        priceEl.setAttribute("min","0");
-        priceEl.setAttribute("autocomplete","off");
-      }catch(_){}
-    }
-    const commEl = document.getElementById("id_commission_pct");
-    if (commEl){
-      try{
-        commEl.setAttribute("inputmode","decimal");
-        commEl.setAttribute("step","any");
-        commEl.setAttribute("min","0");
-        commEl.setAttribute("max","100");
-      }catch(_){}
-    }
-    const dateEl = document.getElementById("id_sold_at");
-    if (dateEl && !dateEl.value){
-      try{
-        const d = new Date();
-        const yyyy = d.getFullYear();
-        const mm = String(d.getMonth()+1).padStart(2,'0');
-        const dd = String(d.getDate()).padStart(2,'0');
-        dateEl.value = `${yyyy}-${mm}-${dd}`;
-      }catch(_){}
-    }
-  })();
-
   const formEl    = document.getElementById("sellForm");
   const submitBtn = document.getElementById("submitBtn");
   const imeiInput = document.getElementById("id_imei");
   const priceEl   = document.getElementById("id_price");
-  const locEl     = document.getElementById("id_location");
-  const autoBox   = document.getElementById("autoSubmit");
+  const commEl    = document.getElementById("id_commission_pct");
+  const dateEl    = document.getElementById("id_sold_at");
+  const locWidget = document.getElementById("id_location") || document.querySelector("[name='location']");
+  const locHidden = document.getElementById("id_location_id");
+  const defaultLocId = formEl ? formEl.dataset.defaultLocationId : "";
 
-  // Utility
-  const onlyDigits = (s) => (s||"").replace(/\D+/g,"");
-  const looksLikeImei = (s) => /^\d{15}$/.test(onlyDigits(s||""));
-
-  function setImei(val){
-    const digits = onlyDigits(val).slice(0,15);
-    if (imeiInput){
-      imeiInput.value = digits;
-      imeiInput.setCustomValidity(digits.length === 15 ? "" : "IMEI must be exactly 15 digits.");
-    }
-    maybeAutoSubmit();
-    updateValidity();
-  }
-
-  function readyToSubmit(){
-    const imeiOk = imeiInput && looksLikeImei(imeiInput.value);
-    const locOk  = !!(locEl && locEl.value);
-    const priceOk = !priceEl || (priceEl.value === "" || Number(priceEl.value) >= 0);
-    return imeiOk && locOk && priceOk; // server will re-validate everything
-  }
-
-  function updateValidity(){
-    if (submitBtn) submitBtn.disabled = !readyToSubmit();
-  }
-
-  function maybeAutoSubmit(){
-    if (autoBox && autoBox.checked && readyToSubmit() && formEl){
-      formEl.submit();
+  // Defaults / UX
+  function setTodayIfBlank(){
+    if (dateEl && !dateEl.value){
+      const d = new Date();
+      const yyyy = d.getFullYear();
+      const mm = String(d.getMonth()+1).padStart(2,'0');
+      const dd = String(d.getDate()).padStart(2,'0');
+      dateEl.value = `${yyyy}-${mm}-${dd}`;
     }
   }
+  function prepareNumeric(el, {min="0", max=null, step="any"}={}){
+    if (!el) return;
+    try{
+      el.setAttribute("inputmode","decimal");
+      el.setAttribute("step",step);
+      el.setAttribute("min",min);
+      if (max !== null) el.setAttribute("max",max);
+      el.addEventListener("input", ()=>{
+        if (Number(el.value) < 0) el.value = "0";
+        updateValidity();
+      });
+    }catch(_){}
+  }
+  function onlyDigits(s){return (s||"").replace(/\D+/g,"")}
+  function looksLikeImei(s){return /^\d{15}$/.test(onlyDigits(s||""))}
+  function updateValidity(){ submitBtn && (submitBtn.disabled = !looksLikeImei(imeiInput && imeiInput.value)); }
 
-  // IMEI normalization & keyboard helpers
+  // Preselect default location (store) if present
+  function selectDefaultLocation(){
+    if (!locWidget || !defaultLocId) return;
+    const opt = Array.from(locWidget.options||[]).find(o => String(o.value) === String(defaultLocId));
+    if (opt) locWidget.value = opt.value;
+  }
+
+  // Mirror location to hidden field on submit
+  formEl && formEl.addEventListener("submit", ()=>{
+    if (locHidden && locWidget) locHidden.value = (locWidget.value || "").trim();
+  });
+
+  // Inputs boot
+  prepareNumeric(priceEl);
+  prepareNumeric(commEl, {min:"0", max:"100"});
+  setTodayIfBlank();
   if (imeiInput){
     try{
       imeiInput.setAttribute("inputmode","numeric");
       imeiInput.setAttribute("maxlength","15");
       imeiInput.setAttribute("autocomplete","off");
     }catch(_){}
-    const cap15 = (e)=> setImei(e.target.value);
-    imeiInput.addEventListener("input", cap15);
-    imeiInput.addEventListener("blur", cap15);
-    imeiInput.addEventListener("keydown", (e)=>{
-      if (e.key === "Enter"){ e.preventDefault(); if (readyToSubmit()) formEl.submit(); }
+    const cap = e => {
+      const digits = onlyDigits(e.target.value).slice(0,15);
+      e.target.value = digits;
+      updateValidity();
+    };
+    imeiInput.addEventListener("input", cap);
+    imeiInput.addEventListener("blur", cap);
+    imeiInput.addEventListener("keydown", e => {
+      if (e.key === "Enter"){ e.preventDefault(); if (!submitBtn.disabled) formEl.submit(); }
     });
-    // initial cleanup
-    setImei(imeiInput.value || "");
   }
+  window.addEventListener("load", ()=>{ selectDefaultLocation(); updateValidity(); imeiInput && imeiInput.focus(); });
 
-  // Global shortcuts
-  document.addEventListener("keydown", (e)=>{
-    if (e.key === "F2"){ e.preventDefault(); imeiInput && imeiInput.focus(); }
-    if (e.key === "Escape" && scanModal.style.display === "flex"){ e.preventDefault(); closeScanner(); }
-  });
-  window.addEventListener("load", ()=>{ if (imeiInput){ imeiInput.focus(); } updateValidity(); });
-
-  // Paste / Clear
+  // Paste / Clear helpers
   const btnPaste = document.getElementById("btnPaste");
   const btnClear = document.getElementById("btnClear");
-  btnPaste && (btnPaste.onclick = async () => {
+  btnPaste && (btnPaste.onclick = async ()=>{
     try{
       const txt = await navigator.clipboard.readText();
-      setImei(txt);
-    }catch{
-      alert("Clipboard access is blocked by the browser.");
-      imeiInput && imeiInput.focus();
-    }
+      imeiInput.value = onlyDigits(txt).slice(0,15);
+      updateValidity();
+    }catch{ alert("Clipboard access blocked by browser."); imeiInput && imeiInput.focus(); }
   });
-  btnClear && (btnClear.onclick = () => setImei(""));
+  btnClear && (btnClear.onclick = ()=>{ imeiInput.value = ""; updateValidity(); });
 
-  // Modal + Quagga2
+  // ===== Scanner (Quagga2) =====
   const scanModal = document.getElementById("scanModal");
   const btnOpen   = document.getElementById("btnOpenScanner");
   const btnClose  = document.getElementById("btnCloseScanner");
@@ -323,102 +275,63 @@
   const statusEl  = document.getElementById("scanStatus");
   const videoEl   = document.getElementById("scanVideo");
   const scanLine  = document.getElementById("scanline");
+  const autoBox   = document.getElementById("autoSubmit");
 
   let currentDeviceId = null;
   let devices = [];
   let quaggaActive = false;
 
-  btnOpen && btnOpen.addEventListener("click", openScanner);
-  btnClose && btnClose.addEventListener("click", closeScanner);
-  btnSwap  && btnSwap.addEventListener("click", async () => {
-    if (!devices.length) return;
-    const idx = devices.findIndex(d => d.deviceId === currentDeviceId);
-    const next = devices[(idx + 1) % devices.length];
-    currentDeviceId = next.deviceId;
-    await startQuagga();
-  });
-
-  function pauseScanline(ms=900){
-    if(!scanLine) return;
-    scanLine.classList.add('paused');
-    setTimeout(()=> scanLine.classList.remove('paused'), ms);
-  }
-
-  async function openScanner(){
-    scanModal.style.display = "flex";
-    statusEl.textContent = "Starting camera…";
-    await initDevices();
-    await startQuagga();
-  }
-
-  async function closeScanner(){
-    scanModal.style.display = "none";
-    try{ Quagga.stop(); quaggaActive = false; }catch(e){}
-  }
+  function pauseScanline(ms=900){ if(!scanLine) return; scanLine.classList.add('paused'); setTimeout(()=> scanLine.classList.remove('paused'), ms); }
 
   async function initDevices(){
     try{
       const all = await navigator.mediaDevices.enumerateDevices();
       devices = all.filter(d => d.kind === "videoinput");
-      if (!devices.length){ statusEl.textContent = "No camera found (permissions/HTTPS)."; return; }
       const back = devices.find(d => /back|rear|environment/i.test(d.label));
-      currentDeviceId = (back || devices[0]).deviceId;
-    }catch{
-      statusEl.textContent = "Could not enumerate cameras (permissions?).";
-    }
+      currentDeviceId = (back || (devices[0]||{})).deviceId || null;
+    }catch{ statusEl.textContent = "Could not enumerate cameras (permissions?)."; }
   }
-
+  function openScanner(){ scanModal.style.display = "flex"; statusEl.textContent="Starting camera…"; initDevices().then(startQuagga); }
+  function closeScanner(){ scanModal.style.display = "none"; try{ Quagga.stop(); quaggaActive=false; }catch(e){} }
   async function startQuagga(){
     try{ Quagga.stop(); }catch(e){}
-    const constraints = {
-      width: { ideal: 1280 },
-      height: { ideal: 720 },
-      facingMode: "environment",
-      deviceId: currentDeviceId ? { exact: currentDeviceId } : undefined
-    };
     Quagga.init({
-      inputStream: {
-        type: "LiveStream",
-        target: videoEl,
-        constraints
-      },
-      locator: { patchSize: "medium", halfSample: true },
-      numOfWorkers: navigator.hardwareConcurrency ? Math.min(navigator.hardwareConcurrency, 4) : 2,
-      frequency: 10,
-      decoder: { readers: ["code_128_reader","ean_reader","ean_8_reader","upc_reader","upc_e_reader"] }
-    }, (err) => {
+      inputStream:{ type:"LiveStream", target:videoEl, constraints:{ width:{ideal:1280}, height:{ideal:720}, facingMode:"environment", deviceId: currentDeviceId ? {exact: currentDeviceId}:undefined } },
+      locator:{ patchSize:"medium", halfSample:true },
+      numOfWorkers: navigator.hardwareConcurrency ? Math.min(navigator.hardwareConcurrency,4) : 2,
+      frequency:10,
+      decoder:{ readers:["code_128_reader","ean_reader","ean_8_reader","upc_reader","upc_e_reader"] }
+    }, (err)=>{
       if (err){ statusEl.textContent = "Camera error: " + err; return; }
-      Quagga.start(); quaggaActive = true;
-      statusEl.textContent = "Align barcode within the frame…";
-      Quagga.offDetected(handleDetected);
-      Quagga.onDetected(handleDetected);
+      Quagga.start(); quaggaActive=true; statusEl.textContent="Align barcode within the frame…";
+      Quagga.offDetected(handleDetected); Quagga.onDetected(handleDetected);
     });
   }
-
-  function handleDetected(result){
+  function handleDetected(res){
     if(!quaggaActive) return;
-    const code = (result && result.codeResult && result.codeResult.code) || "";
-    if (!code) return;
+    const code = (res && res.codeResult && res.codeResult.code) || "";
     const digits = onlyDigits(code).slice(0,15);
     if (!digits) return;
-
-    setImei(digits);
-    statusEl.textContent = "Scanned: " + digits;
-    pauseScanline(); // pause the green sweep briefly on success
-
-    // Auto-submit if enabled and form is ready; else close and focus Price for quick entry
-    if (autoBox && autoBox.checked && readyToSubmit()){
+    imeiInput.value = digits; updateValidity(); statusEl.textContent = "Scanned: " + digits; pauseScanline();
+    if (autoBox && autoBox.checked && !submitBtn.disabled){
       try{ Quagga.stop(); quaggaActive=false; }catch(e){}
-      scanModal.style.display = "none";
-      formEl.submit();
-    }else{
-      setTimeout(() => {
-        try{ Quagga.stop(); quaggaActive=false; }catch(e){}
-        scanModal.style.display = "none";
-        if (priceEl){ priceEl.focus(); }
-      }, 350);
+      scanModal.style.display="none"; formEl.submit();
     }
   }
+
+  btnOpen && btnOpen.addEventListener("click", openScanner);
+  btnClose && btnClose.addEventListener("click", closeScanner);
+  btnSwap && btnSwap.addEventListener("click", async ()=>{
+    if (!devices.length) return;
+    const idx = devices.findIndex(d=>d.deviceId===currentDeviceId);
+    currentDeviceId = devices[(idx+1)%devices.length].deviceId;
+    await startQuagga();
+  });
+  document.addEventListener("keydown", e=>{
+    if (e.key==="Escape" && scanModal.style.display==="flex"){ e.preventDefault(); closeScanner(); }
+    if (e.key==="F2"){ e.preventDefault(); imeiInput && imeiInput.focus(); }
+  });
+  window.addEventListener("beforeunload", ()=>{ try{ Quagga.stop(); }catch(e){} });
 
 })();
 </script>

@@ -44,7 +44,7 @@ except Exception:  # pragma: no cover
 TENANT_SESSION_KEY = getattr(settings, "TENANT_SESSION_KEY", "active_business_id")
 ROLE_GROUP_MANAGER_NAMES = set(getattr(settings, "ROLE_GROUP_MANAGER_NAMES", ["Manager", "Admin"]))
 ROLE_GROUP_ADMIN_NAMES = set(getattr(settings, "ROLE_GROUP_ADMIN_NAMES", ["Admin"]))
-# NEW: agent-role names (templates expect tenants.utils.is_agent)
+# Agent-role names (templates expect tenants.utils.is_agent)
 ROLE_GROUP_AGENT_NAMES = set(getattr(settings, "ROLE_GROUP_AGENT_NAMES", ["Agent"]))
 
 
@@ -121,6 +121,15 @@ def _user_group_names(user) -> set[str]:
         return set()
 
 
+def _same_path(request, url_path: str) -> bool:
+    """True if the target path equals the current request path (normalized)."""
+    try:
+        cur = getattr(request, "path", "") or "/"
+        return cur.rstrip("/") == (url_path or "/").rstrip("/")
+    except Exception:
+        return False
+
+
 # ----------------------------
 # Public helpers (session / context)
 # ----------------------------
@@ -191,6 +200,44 @@ def get_active_business(request: "HttpRequest"):
     except Exception:
         pass
     return b
+
+
+def get_active_business_id(request: "HttpRequest"):
+    """
+    Convenience: return the active business id (or None).
+    """
+    b = get_active_business(request)
+    return getattr(b, "id", None) if b else None
+
+
+# ----------------------------
+# Default Location helpers (lazy import to avoid cycles)
+# ----------------------------
+def default_location_for(business_or_id):
+    """
+    Return the default Location for the given business (or business id).
+    This lazily imports Location to avoid circular imports.
+    """
+    try:
+        # Import inside the function to avoid import-time circular deps
+        from circuitcity.inventory.models import Location  # your project path
+    except Exception:
+        try:
+            from inventory.models import Location  # fallback if app path differs
+        except Exception:
+            return None
+
+    try:
+        return Location.default_for(business_or_id)
+    except Exception:
+        return None
+
+
+def default_location_for_request(request: "HttpRequest"):
+    """
+    Shortcut: default location for the current request's active business.
+    """
+    return default_location_for(get_active_business_id(request))
 
 
 # ----------------------------
@@ -397,9 +444,10 @@ def require_business(view: Callable) -> Callable:
     Ensure a Business is active (via request.business or session key).
 
     If not:
-      - SUPERUSERS are redirected to the HQ dashboard (never to agent join).
-      - Everyone else is redirected to the activation helper (with ?next=…),
-        or to account settings if tenant URLs aren’t wired.
+      - SUPERUSERS: allow the view to run OR send them to HQ/dashboard,
+        but never redirect to the same path (avoid loops).
+      - Everyone else: redirect to activation (or settings) with ?next=…,
+        also avoiding loops by checking the current path.
     """
     @wraps(view)
     def _wrapped(request: "HttpRequest", *args, **kwargs):
@@ -407,26 +455,43 @@ def require_business(view: Callable) -> Callable:
         if get_active_business(request) is not None:
             return view(request, *args, **kwargs)
 
-        # Superusers should not see onboarding/join
         user = getattr(request, "user", None)
+
+        # Superusers should not be forced into tenant onboarding.
         if getattr(user, "is_authenticated", False) and getattr(user, "is_superuser", False):
-            return redirect(_superuser_home_url())
+            target = _superuser_home_url()
+
+            # If the target resolves to the current path, DO NOT redirect: run the view.
+            if _same_path(request, target):
+                return view(request, *args, **kwargs)
+
+            # If the target is empty/root or equals current route, just render.
+            if not target or target == "/" or _same_path(request, "/"):
+                return view(request, *args, **kwargs)
+
+            return redirect(target)
 
         # Normal users → activation flow with next=
         target = _safe_reverse("tenants:activate_mine", "/tenants/activate/")
         next_q = quote_plus(getattr(request, "get_full_path", lambda: "/")())
-        url = f"{target}?next={next_q}" if next_q else target
 
         # If tenants app not mounted, nudge to unified settings
         if target in ("/", "/tenants/activate/"):
-            fallback = _safe_reverse("accounts:settings_unified", "/accounts/settings/")
-            url = f"{fallback}?next={next_q}"
+            target = _safe_reverse("accounts:settings_unified", "/accounts/settings/")
+
+        # Avoid redirect loop: if we're already on the target, let the page render.
+        if _same_path(request, target):
+            try:
+                messages.info(request, "Select or set up your business to continue.")
+            except Exception:
+                pass
+            return view(request, *args, **kwargs)
 
         try:
             messages.info(request, "Select or set up your business to continue.")
         except Exception:
             pass
-        return redirect(url)
+        return redirect(f"{target}?next={next_q}" if next_q else target)
 
     return _wrapped
 
@@ -579,7 +644,9 @@ def bootstrap_manager_tenant(
 
 __all__ = [
     # session/context
-    "set_active_business", "get_active_business", "attach_business",
+    "set_active_business", "get_active_business", "get_active_business_id",
+    # default location helpers
+    "default_location_for", "default_location_for_request",
     # role checks (export both canonical and aliases)
     "user_is_manager", "user_is_admin", "user_is_agent",
     "is_manager", "is_admin", "is_agent",

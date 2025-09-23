@@ -1,6 +1,5 @@
 # cc/views.py
 from __future__ import annotations
-
 from decimal import Decimal
 from datetime import datetime, timedelta
 from typing import Dict, Any

@@ -14,7 +14,9 @@
 {% url 'inventory:stock_list'          as url_stock %}
 {% url 'inventory:scan_in'             as url_scan_in %}
 {% url 'wallet:agent_wallet'           as url_wallet %}
-{% url 'wallet:admin_wallet'           as url_wallet_admin %}{# may not exist in some installs #}
+{# Wallet ADMIN (canonical) #}
+{% url 'wallet:admin_home'             as url_wallet_admin %}
+{% if not url_wallet_admin %}{% url 'wallet:admin_wallet' as url_wallet_admin %}{% endif %}{# legacy if any #}
 {% url 'reports:home'                  as url_reports %}
 {% url 'simulator:home'                as url_sim_home %}
 {% if not url_sim_home %}{% url 'simulator_placeholder_home' as url_sim_home %}{% endif %}
@@ -38,12 +40,12 @@
 {% if not url_place_order %}{% url 'inventory:place_order' as url_place_order %}{% endif %}
 {% url 'inventory:orders_list' as url_orders %}
 
-{# Payslips links (safe, namespaced→global) #}
-{% url 'wallet:payslip_issue' as url_payslip_issue %}
+{# Payslips links — align with wallet admin names, keep legacy fallbacks #}
+{% url 'wallet:admin_issue_payslip' as url_payslip_issue %}
 {% if not url_payslip_issue %}{% url 'payslip_issue' as url_payslip_issue %}{% endif %}
-{% url 'wallet:payslip_bulk' as url_payslip_bulk %}
+{% url 'wallet:admin_payslips' as url_payslip_bulk %}
 {% if not url_payslip_bulk %}{% url 'payslip_bulk' as url_payslip_bulk %}{% endif %}
-{% url 'wallet:payslip_schedules' as url_payslip_schedules %}
+{% url 'wallet:admin_schedules' as url_payslip_schedules %}
 {% if not url_payslip_schedules %}{% url 'payslip_schedules' as url_payslip_schedules %}{% endif %}
 
 {# TIME (with safe fallbacks) #}
@@ -86,7 +88,6 @@
     border-color: rgba(255,255,255,.16);
     box-shadow: 0 10px 24px rgba(0,0,0,.25), inset 0 0 0 1px rgba(255,255,255,.06);
   }
-  /* Colorful icons; labels stay muted */
   .cc-nav a.navlink .bi{
     background: linear-gradient(120deg,#22d3ee, #10b981 60%, #22d3ee 100%);
     -webkit-background-clip: text;
@@ -203,6 +204,7 @@
         </li>
         {% endif %}
 
+        {# IMPORTANT: Admin Wallet → wallet:admin_home (NOT Django Admin) #}
         {% if request.user.is_staff and not request.user.is_superuser or request.user.profile.is_manager %}
         <li class="{% if request.path|slice:'0:14' == '/wallet/admin/' %}active{% endif %}">
           <a class="navlink" href="{{ url_wallet_admin|default:'/wallet/admin/' }}"><i class="bi bi-briefcase"></i><span>Admin Wallet</span></a>

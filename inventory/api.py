@@ -1,5 +1,4 @@
 # inventory/api.py
-
 from __future__ import annotations
 
 import json
@@ -9,8 +8,8 @@ from decimal import Decimal, InvalidOperation
 from typing import Any, Callable, Optional, Tuple
 
 from django.contrib.auth.decorators import login_required
+from django.db import connection, transaction
 from django.db import models as djmodels
-from django.db import transaction
 from django.db.models import (
     Count, Sum, F, Value, DecimalField, ExpressionWrapper, Q,
 )
@@ -20,7 +19,14 @@ from django.utils import timezone
 from django.views.decorators.cache import never_cache
 from django.views.decorators.csrf import csrf_exempt
 
-from .models import InventoryItem
+# Optional: if tenants.utils is present, we can require an active business for some endpoints
+try:
+    from tenants.utils import require_business  # type: ignore
+except Exception:  # pragma: no cover
+    def require_business(fn):  # type: ignore
+        return fn
+
+from .models import InventoryItem, Product, OrderPrice
 from sales.models import Sale
 
 log = logging.getLogger(__name__)
@@ -146,7 +152,7 @@ def _best_item_price_field() -> str | None:
             return c
     return None
 
-# --------- Ownership logic (CRITICAL FIX) ----------
+# --------- Ownership logic ----------
 
 _OWNER_FIELD_CANDIDATES = [
     # very common
@@ -218,10 +224,21 @@ def date_range_filter(qs, field_name: str, start, end_excl):
     return qs.filter(**{f"{field_name}__gte": start, f"{field_name}__lt": end_excl})
 
 def _amount_sum_expression(afield: str | None):
-    dec = DecimalField(max_digits=14, decimal_places=2)
+    """
+    Cross-DB safe sum for amount-like columns.
+    On SQLite, prefer FloatField inside SUM to avoid Decimal UDF errors.
+    """
     if not afield:
-        return Value(0, output_field=dec)
-    return Coalesce(Sum(Cast(F(afield), dec)), Value(0, output_field=dec))
+        # Provide a typed zero that matches DB vendor characteristics
+        if connection.vendor == "sqlite":
+            return Value(0.0, output_field=djmodels.FloatField())
+        return Value(0, output_field=DecimalField(max_digits=14, decimal_places=2))
+
+    if connection.vendor == "sqlite":
+        return Coalesce(Sum(Cast(F(afield), djmodels.FloatField())), Value(0.0, output_field=djmodels.FloatField()))
+    else:
+        dec = DecimalField(max_digits=14, decimal_places=2)
+        return Coalesce(Sum(Cast(F(afield), dec)), Value(0, output_field=dec))
 
 def _json_body(request: HttpRequest) -> dict:
     try:
@@ -281,6 +298,77 @@ def _currency_payload():
 
 
 # ---------- date utils ----------
+# ---------- Product helpers used by place-order ----------
+
+@never_cache
+@login_required
+def api_order_price(request: HttpRequest, product_id: int):
+    """
+    GET /inventory/api/order-price/<product_id>/
+    Returns the active default *order* price for the product.
+    Falls back to Product.sale_price or cost_price if no OrderPrice row exists.
+    """
+    # Find product
+    try:
+        product = Product.objects.get(pk=int(product_id))
+    except (Product.DoesNotExist, ValueError):
+        return _err("Product not found", status=404)
+
+    # Get active price from catalog, then fallback
+    price = OrderPrice.get_active_price(product.id)
+    if price is None:
+        # prefer sale_price if set, otherwise cost_price, otherwise 0
+        if getattr(product, "sale_price", None) not in (None, ""):
+            price = product.sale_price
+        elif getattr(product, "cost_price", None) not in (None, ""):
+            price = product.cost_price
+        else:
+            price = Decimal("0")
+
+    # Normalize to float for JSON
+    try:
+        price_f = float(price)
+    except Exception:
+        price_f = 0.0
+
+    payload = {
+        "product_id": product.id,
+        "product": str(product),
+        "price": round(price_f, 2),
+        "currency": _currency_payload(),
+    }
+    return _ok(payload)
+
+
+@never_cache
+@login_required
+def api_stock_models(request: HttpRequest):
+    """
+    GET /inventory/api/stock-models/?q=<search>
+    Lightweight product picker for place-order UI.
+    Returns up to 50 products as [{id, label}].
+    """
+    q = (request.GET.get("q") or "").strip()
+    qs = Product.objects.all().order_by("brand", "model")[:50]
+
+    if q:
+        # very forgiving search across brand/model/variant/name/code
+        filt = (
+            Q(brand__icontains=q) |
+            Q(model__icontains=q) |
+            Q(variant__icontains=q) |
+            Q(name__icontains=q) |
+            Q(code__icontains=q)
+        )
+        qs = Product.objects.filter(filt).order_by("brand", "model")[:50]
+
+    items = []
+    for p in qs:
+        label_bits = [p.brand, p.model, p.variant]
+        label = " ".join(b for b in label_bits if b).strip() or (p.name or f"Product {p.id}")
+        items.append({"id": p.id, "label": label})
+
+    return _ok({"items": items})
 
 def _parse_date_loose(s: str | None) -> Optional[date]:
     if not s:
@@ -440,7 +528,7 @@ def _fallback_items_daily(
         val_expr = Count("id")
 
     agg = (
-        qs.annotate(d=TruncDate(date_field, tzinfo=timezone.get_current_timezone()))
+        qs.annotate(d=TruncDate(date_field))
           .values("d").annotate(val=val_expr).order_by("d")
     )
 
@@ -456,11 +544,41 @@ def _fallback_items_daily(
     return _fill_days(start, end_excl, data_map, fmt=label_fmt)
 
 
+# ---------- /inventory/list/ ----------
+@never_cache
+@login_required
+def inventory_list(request: HttpRequest):
+    """
+    Returns inventory for the active business (scoped). Superusers can pass ?all=1 to bypass scope.
+    """
+    use_all = request.GET.get("all") == "1" and getattr(request.user, "is_superuser", False)
+
+    qs = _scoped_stock_qs(request)
+    if use_all and _can_view_all(request.user):
+        qs = InventoryItem.objects.select_related("product")
+
+    data = [{
+        "id": i.id,
+        "imei": i.imei,
+        "product": str(i.product),
+        "status": getattr(i, _item_status_field(), None),
+        "location": getattr(getattr(i, "current_location", None), "name", None),
+        "received_at": i.received_at.isoformat() if getattr(i, "received_at", None) else None,
+        "selling_price": float(i.selling_price) if getattr(i, "selling_price", None) is not None else None,
+    } for i in qs.order_by("-id")[:500]]
+
+    return _ok({"data": data})
+
+
 # ---------- API: AI predictions (last 14d) ----------
 
 @never_cache
 @login_required
 def predictions_summary(request: HttpRequest):
+    """
+    Returns simple next-7-day projections and risky stock.
+    Always uses Python aggregation (safe on SQLite).
+    """
     today = timezone.localdate()
     lookback_days = 14
     start = today - timedelta(days=lookback_days)
@@ -469,18 +587,28 @@ def predictions_summary(request: HttpRequest):
     dfield = _sale_date_field()
     afield = _sale_amount_field()
 
-    sales = date_range_filter(_scoped_sales_qs(request), dfield, start, end_excl)
-    items = _scoped_stock_qs(request)
+    sales_qs = date_range_filter(_scoped_sales_qs(request), dfield, start, end_excl)
+    items_qs = _scoped_stock_qs(request)
 
-    per_day_counts = (sales.annotate(d=TruncDate(dfield, tzinfo=timezone.get_current_timezone()))
-                           .values("d").annotate(c=Count("id")))
-    total_units_14 = sum(r["c"] for r in per_day_counts) or 0
-    daily_units_avg = total_units_14 / float(lookback_days) if lookback_days else 0.0
+    # -------- Python accumulation --------
+    total_units_14 = 0
+    total_rev_14_dec = Decimal("0")
 
-    per_day_rev = (sales.annotate(d=TruncDate(dfield, tzinfo=timezone.get_current_timezone()))
-                        .values("d").annotate(v=_amount_sum_expression(afield)))
-    total_rev_14 = float(sum(r["v"] or 0 for r in per_day_rev))
-    daily_rev_avg = total_rev_14 / float(lookback_days) if lookback_days else 0.0
+    def _dec(x):
+        if x in (None, ""):
+            return Decimal(0)
+        try:
+            return Decimal(str(x).replace(",", "").strip())
+        except Exception:
+            return Decimal(0)
+
+    for s in sales_qs.iterator():
+        total_units_14 += 1
+        if afield:
+            total_rev_14_dec += _dec(getattr(s, afield, 0))
+
+    daily_units_avg = (total_units_14 / float(lookback_days)) if lookback_days else 0.0
+    daily_rev_avg = float(total_rev_14_dec) / float(lookback_days) if lookback_days else 0.0
 
     base, display, rates = _get_currency_setting()
     daily_rev_avg_display = _convert_amount(daily_rev_avg, base, display, rates)
@@ -489,23 +617,39 @@ def predictions_summary(request: HttpRequest):
         "date": (today + timedelta(days=i)).isoformat(),
         "predicted_units": round(daily_units_avg, 2),
         "predicted_revenue": round(daily_rev_avg_display, 2),
-    } for i in range(1, 7 + 1)]
+    } for i in range(1, 8)]
 
-    by_model_14 = sales.values("item__product_id").annotate(c=Count("id"))
-    model_count_map = {r["item__product_id"]: r["c"] for r in by_model_14}
+    # 14-day per-model run-rate (Python)
+    model_count: dict[int, int] = {}
+    for s in sales_qs.values("item__product_id"):
+        pid = s.get("item__product_id")
+        if pid is not None:
+            model_count[pid] = model_count.get(pid, 0) + 1
 
     risky = []
-    by_model_stock = items.values("product_id", "product__brand", "product__model").annotate(on_hand=Count("id")).order_by("product__brand", "product__model")
-    for r in by_model_stock:
-        pid = r["product_id"]
-        on_hand = int(r["on_hand"] or 0)
-        daily_model_avg = (model_count_map.get(pid, 0) / float(lookback_days)) if lookback_days else 0.0
+    # Build a per-product on-hand count via Python (safe across DBs)
+    products = list(items_qs.values("product_id", "product__brand", "product__model"))
+    # group counts
+    onhand_map: dict[int, int] = {}
+    for p in products:
+        pid = p["product_id"]
+        onhand_map[pid] = onhand_map.get(pid, 0) + 1
+
+    seen: set[int] = set()
+    for p in products:
+        pid = p["product_id"]
+        if pid in seen:
+            continue
+        seen.add(pid)
+        name = f'{p["product__brand"]} {p["product__model"]}'
+        on_hand = int(onhand_map.get(pid, 0))
+
+        daily_model_avg = (model_count.get(pid, 0) / float(lookback_days)) if lookback_days else 0.0
         need_next_7 = daily_model_avg * 7.0
 
-        # Flag critical low stock even with zero run-rate
         if on_hand <= 2:
             risky.append({
-                "product": f'{r["product__brand"]} {r["product__model"]}',
+                "product": name,
                 "on_hand": on_hand,
                 "stockout_date": today.isoformat(),
                 "suggested_restock": max(1, 5 - on_hand),
@@ -515,7 +659,7 @@ def predictions_summary(request: HttpRequest):
         elif daily_model_avg > 0 and on_hand < need_next_7:
             days_cover = (on_hand / daily_model_avg) if daily_model_avg else 0
             risky.append({
-                "product": f'{r["product__brand"]} {r["product__model"]}',
+                "product": name,
                 "on_hand": on_hand,
                 "stockout_date": (today + timedelta(days=max(0, int(days_cover)))).isoformat(),
                 "suggested_restock": int(round(max(0.0, need_next_7 - on_hand))),
@@ -524,6 +668,135 @@ def predictions_summary(request: HttpRequest):
             })
 
     return _ok({"overall": overall, "risky": risky, "currency": _currency_payload()})
+
+
+# ---------------------------------------------
+# SAFE: api_value_trend (SQLite-safe with Python fallback)
+# ---------------------------------------------
+@never_cache
+@login_required
+def api_value_trend(request: HttpRequest):
+    """
+    /inventory/api/value_trend/?metric=revenue|cost|profit&period=today|7d|all&model=<product_id?>
+    Also supports:
+      - on=YYYY-MM-DD  (alias: date=YYYY-MM-DD)
+      - start/end (or from/to, df/dt, date_from/date_to)
+      - labels=iso|pretty
+    """
+    metric = (request.GET.get("metric") or "revenue").lower()
+    model_id = (request.GET.get("model") or "").strip() or None
+    labels_fmt = (request.GET.get("labels") or "iso").lower()
+
+    start_incl, end_incl, range_meta = _extract_range(request, default_period="7d")
+    end_excl = end_incl + timedelta(days=1)
+
+    dfield = _sale_date_field()
+    afield = _sale_amount_field()
+    cfield = _sale_cost_field()
+
+    qs = date_range_filter(_scoped_sales_qs(request), dfield, start_incl, end_excl)
+    if model_id:
+        try:
+            qs = qs.filter(item__product_id=int(model_id))
+        except Exception:
+            pass
+
+    # Always prefer Python aggregation on SQLite (safe) — and keep it simple.
+    is_sqlite = (connection.vendor == "sqlite")
+
+    if not is_sqlite:
+        # Non-SQLite: try DB aggregation first, fall back to Python if anything goes wrong.
+        try:
+            dec = DecimalField(max_digits=14, decimal_places=2)
+
+            def _sum_expr(col):
+                if not col:
+                    return Value(0, output_field=dec)
+                return Coalesce(Sum(Cast(F(col), dec)), Value(0, output_field=dec))
+
+            if metric == "revenue":
+                expr = _sum_expr(afield)
+            elif metric == "cost":
+                expr = _sum_expr(cfield)
+            else:
+                rev = _sum_expr(afield)
+                cost = _sum_expr(cfield)
+                expr = ExpressionWrapper(
+                    Coalesce(rev, Value(0, output_field=dec)) - Coalesce(cost, Value(0, output_field=dec)),
+                    output_field=dec,
+                )
+
+            agg = (qs.annotate(d=TruncDate(dfield)).values("d").annotate(val=expr).order_by("d"))
+
+            base, display, rates = _get_currency_setting()
+            data_map: dict[date, float] = {}
+            for r in agg:
+                raw = r.get("val") or 0
+                try:
+                    v = float(raw)
+                except Exception:
+                    try:
+                        v = float(Decimal(str(raw)))
+                    except Exception:
+                        v = 0.0
+                data_map[r["d"]] = round(_convert_amount(v, base, display, rates), 2)
+
+            labels, values = _fill_days(start_incl, end_excl, data_map, fmt=labels_fmt)
+
+            if metric == "revenue" and sum(values) == 0:
+                flabels, fvalues = _fallback_items_daily(
+                    request, start_incl, end_excl, "amount", model_id, label_fmt=labels_fmt
+                )
+                if flabels:
+                    labels, values = flabels, fvalues
+
+            return _ok({"labels": labels, "values": values, "range": range_meta, "currency": _currency_payload()})
+        except Exception as e:
+            log.warning("api_value_trend (DB agg) failed: %s. Falling back to Python.", e)
+
+    # Python accumulation (SQLite-safe and general fallback)
+    def _dec(x):
+        if x in (None, ""):
+            return Decimal(0)
+        try:
+            return Decimal(str(x).replace(",", "").strip())
+        except Exception:
+            return Decimal(0)
+
+    per_day: dict[date, Decimal] = {}
+    for sale in qs.iterator():
+        dval = getattr(sale, dfield, None)
+        try:
+            dkey = dval.date() if hasattr(dval, "date") else dval
+        except Exception:
+            dkey = dval
+
+        if metric == "revenue":
+            amt = _dec(getattr(sale, afield, 0) if afield else 0)
+        elif metric == "cost":
+            amt = _dec(getattr(sale, cfield, 0) if cfield else 0)
+        else:
+            rev_d = _dec(getattr(sale, afield, 0) if afield else 0)
+            cost_d = _dec(getattr(sale, cfield, 0) if cfield else 0)
+            amt = rev_d - cost_d
+
+        per_day[dkey] = per_day.get(dkey, Decimal(0)) + amt
+
+    base, display, rates = _get_currency_setting()
+    data_map: dict[date, float] = {
+        k: round(_convert_amount(float(v), base, display, rates), 2) for k, v in per_day.items()
+    }
+
+    labels, values = _fill_days(start_incl, end_excl, data_map, fmt=labels_fmt)
+
+    if metric == "revenue" and sum(values) == 0:
+        flabels, fvalues = _fallback_items_daily(
+            request, start_incl, end_excl, "amount", model_id, label_fmt=labels_fmt
+        )
+        if flabels:
+            labels, values = flabels, fvalues
+
+    return _ok({"labels": labels, "values": values, "range": range_meta, "currency": _currency_payload()})
 
 
 # ---------- API: Sales trend (line chart) ----------
@@ -556,25 +829,36 @@ def api_sales_trend(request: HttpRequest):
             pass
 
     try:
-        val_expr = _amount_sum_expression(afield) if metric == "amount" else Count("id")
-        agg = (qs.annotate(d=TruncDate(dfield, tzinfo=timezone.get_current_timezone()))
+        if metric == "amount":
+            val_expr = _amount_sum_expression(afield)
+        else:
+            val_expr = Count("id")
+
+        agg = (qs.annotate(d=TruncDate(dfield))
                  .values("d").annotate(val=val_expr).order_by("d"))
 
         base, display, rates = _get_currency_setting()
         data_map: dict[date, float] = {}
         for r in agg:
-            raw = float(r["val"] or 0)
+            raw = r["val"] or 0
+            try:
+                raw_f = float(raw)
+            except Exception:
+                try:
+                    raw_f = float(Decimal(str(raw)))
+                except Exception:
+                    raw_f = 0.0
             if metric == "amount":
-                raw = _convert_amount(raw, base, display, rates)
-                raw = round(float(raw), 2)
-            data_map[r["d"]] = raw
+                raw_f = _convert_amount(raw_f, base, display, rates)
+                raw_f = round(float(raw_f), 2)
+            data_map[r["d"]] = raw_f
 
         labels, values = _fill_days(start_incl, end_excl, data_map, fmt=labels_fmt)
 
-        if sum(values) == 0:
+        if metric == "amount" and sum(values) == 0:
             flabels, fvalues = _fallback_items_daily(
                 request, start_incl, end_excl,
-                "amount" if metric == "amount" else "count",
+                "amount",
                 model_id,
                 label_fmt=labels_fmt,
             )
@@ -616,10 +900,10 @@ def api_sales_trend(request: HttpRequest):
 
     labels, values = _fill_days(start_incl, end_excl, data_map, fmt=labels_fmt)
 
-    if sum(values) == 0:
+    if metric == "amount" and sum(values) == 0:
         flabels, fvalues = _fallback_items_daily(
             request, start_incl, end_excl,
-            "amount" if metric == "amount" else "count",
+            "amount",
             model_id,
             label_fmt=labels_fmt,
         )
@@ -632,69 +916,6 @@ def api_sales_trend(request: HttpRequest):
         "range": range_meta,
         "currency": _currency_payload() if metric == "amount" else None
     })
-
-
-# ---------- API: Value Trend (Revenue / Cost / Profit) ----------
-
-@never_cache
-@login_required
-def api_value_trend(request: HttpRequest):
-    """
-    /inventory/api/value_trend/?metric=revenue|cost|profit&period=today|7d|all&model=<product_id?>
-    Also supports:
-      - on=YYYY-MM-DD  (alias: date=YYYY-MM-DD)
-      - start/end (or from/to, df/dt, date_from/date_to)
-      - labels=iso|pretty
-    """
-    metric = (request.GET.get("metric") or "revenue").lower()
-    model_id = (request.GET.get("model") or "").strip() or None
-    labels_fmt = (request.GET.get("labels") or "iso").lower()
-
-    start_incl, end_incl, range_meta = _extract_range(request, default_period="7d")
-    end_excl = end_incl + timedelta(days=1)
-
-    dfield = _sale_date_field()
-    afield = _sale_amount_field()
-    cfield = _sale_cost_field()
-
-    qs = date_range_filter(_scoped_sales_qs(request), dfield, start_incl, end_excl)
-    if model_id:
-        try:
-            qs = qs.filter(item__product_id=int(model_id))
-        except Exception:
-            pass
-
-    dec = DecimalField(max_digits=14, decimal_places=2)
-    if metric == "revenue":
-        expr = _amount_sum_expression(afield)
-    elif metric == "cost":
-        expr = _amount_sum_expression(cfield)
-    else:
-        rev = _amount_sum_expression(afield)
-        cost = _amount_sum_expression(cfield)
-        expr = ExpressionWrapper(Coalesce(rev, Value(0, output_field=dec)) - Coalesce(cost, Value(0, output_field=dec)),
-                                 output_field=dec)
-
-    agg = (qs.annotate(d=TruncDate(dfield, tzinfo=timezone.get_current_timezone()))
-             .values("d").annotate(val=expr).order_by("d"))
-
-    base, display, rates = _get_currency_setting()
-    data_map: dict[date, float] = {}
-    for r in agg:
-        raw_val = float(r["val"] or 0)
-        conv_val = _convert_amount(raw_val, base, display, rates)
-        data_map[r["d"]] = round(conv_val, 2)
-
-    labels, values = _fill_days(start_incl, end_excl, data_map, fmt=labels_fmt)
-
-    if metric == "revenue" and sum(values) == 0:
-        flabels, fvalues = _fallback_items_daily(
-            request, start_incl, end_excl, "amount", model_id, label_fmt=labels_fmt
-        )
-        if flabels:
-            labels, values = flabels, fvalues
-
-    return _ok({"labels": labels, "values": values, "range": range_meta, "currency": _currency_payload()})
 
 
 # ---------- API: Top models (bar chart) ----------
@@ -1095,6 +1316,25 @@ def api_audit_verify(request: HttpRequest):
     return _ok({"supported": True, "ok_chain": ok_chain, "broken_at": broken_at, "checked": checked})
 
 
-# ---------- Back-compat alias ----------
+# ---------- NEW: Restock heatmap (safe stub) ----------
 
-api_predictions = predictions_summary
+@never_cache
+@login_required
+@require_business
+def restock_heatmap(request: HttpRequest):
+    """
+    GET /inventory/api/restock-heatmap/
+    Safe stub so the dashboard doesn't error. Returns an empty list of points.
+    Replace later with real geo/grid data if you add coordinates to locations.
+    Response shape stays stable: { ok: true, points: [...] }.
+    """
+    return _ok({
+        "points": [],         # e.g. [{ "label": "Area 25", "value": 0.0 }]
+        "generated_at": timezone.now().isoformat(),
+    })
+
+
+# ---------- Back-compat aliases ----------
+
+api_predictions = predictions_summary       # /inventory/api/predictions (no slash) compat
+api_alerts = alerts_feed                    # keep older route names working

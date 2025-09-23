@@ -1,31 +1,40 @@
-# tenants/middleware.py
+# circuitcity/tenants/middleware.py
 from __future__ import annotations
 
 from typing import Optional
 from django.utils.deprecation import MiddlewareMixin
 from django.utils.functional import cached_property
-from django.contrib import messages
 
-# Lazy/defensive imports (so startup never crashes if tenants app isn’t ready)
+# ── Lazy/defensive imports (never crash at startup) ─────────────────────────────
 try:
     from tenants.models import Business, Membership, set_current_business_id  # thread-local setter
 except Exception:  # pragma: no cover
     Business = None  # type: ignore
     Membership = None  # type: ignore
-
     def set_current_business_id(_):  # type: ignore
         return
 
+try:
+    # Use the SAME utils your views use to store/read active biz
+    from tenants.utils import get_active_business, set_active_business
+except Exception:  # pragma: no cover
+    def get_active_business(_request):  # type: ignore
+        return None
+    def set_active_business(_request, _biz):  # type: ignore
+        return
 
 LOCAL_HOSTS = {"127.0.0.1", "localhost"}
-SESSION_KEY = "active_business_id"
+SESSION_KEY = "active_business_id"  # kept as a fallback (legacy)
 
+# ── small helpers ──────────────────────────────────────────────────────────────
+def _is_ajax(request) -> bool:
+    h = request.headers.get("x-requested-with") or ""
+    return h.lower() == "xmlhttprequest"
 
 def _host_without_port(host: str) -> str:
     if not host:
         return ""
     return host.split(":", 1)[0].strip().lower()
-
 
 def _first_label(host: str) -> str:
     host = _host_without_port(host)
@@ -34,7 +43,6 @@ def _first_label(host: str) -> str:
     parts = host.split(".")
     return parts[0] if len(parts) > 1 else ""
 
-
 def _has_field(model, field_name: str) -> bool:
     try:
         model._meta.get_field(field_name)  # type: ignore[attr-defined]
@@ -42,13 +50,11 @@ def _has_field(model, field_name: str) -> bool:
     except Exception:
         return False
 
-
 def _filter_active_business(qs):
     """Respect Business.status == ACTIVE if that field exists; else pass-through."""
     if Business is None:
         return qs
     return qs.filter(status__iexact="ACTIVE") if _has_field(Business, "status") else qs
-
 
 def _is_active_membership(mem) -> bool:
     if mem is None:
@@ -57,7 +63,6 @@ def _is_active_membership(mem) -> bool:
     if _has_field(Membership, "status"):
         return str(getattr(mem, "status", "")).upper() == "ACTIVE"
     return True
-
 
 def _user_has_active_membership(user, business) -> bool:
     """True iff user has ACTIVE membership in given business (if models are available)."""
@@ -71,28 +76,29 @@ def _user_has_active_membership(user, business) -> bool:
     except Exception:
         return False
 
-
 def _activate(request, business) -> None:
     """
-    Set session, request.business, AND thread-local tenant id.
+    Set session (via project util), request.business(+_id) and thread-local tenant id.
     Never raises. If business is None, clears selection.
     """
     try:
-        if business is not None:
-            request.session[SESSION_KEY] = business.pk
-        else:
-            request.session.pop(SESSION_KEY, None)
+        set_active_business(request, business)  # use your canonical util
     except Exception:
-        # Session may be readonly; proceed anyway.
-        pass
+        # Fallback to legacy session key
+        try:
+            if business is not None:
+                request.session[SESSION_KEY] = getattr(business, "pk", None)
+            else:
+                request.session.pop(SESSION_KEY, None)
+        except Exception:
+            pass
 
     request.business = business
+    request.business_id = getattr(business, "pk", None) if business else None
     try:
-        set_current_business_id(business.pk if business else None)
+        set_current_business_id(getattr(business, "pk", None) if business else None)
     except Exception:
-        # Thread-local helper might be unavailable in early boot.
         pass
-
 
 def _pick_owned_business_for_user(user) -> Optional[object]:
     """
@@ -116,11 +122,9 @@ def _pick_owned_business_for_user(user) -> Optional[object]:
 
     return None
 
-
 def _pick_active_membership_business_for_user(user) -> Optional[object]:
     """
-    If Membership model exists, choose the most recent ACTIVE membership's business
-    where the Business itself is ACTIVE.
+    Choose the most recent ACTIVE membership's business where the Business itself is ACTIVE.
     """
     if Membership is None or user is None:
         return None
@@ -134,7 +138,6 @@ def _pick_active_membership_business_for_user(user) -> Optional[object]:
             biz = getattr(mem, "business", None)
             if not biz:
                 continue
-            # Respect Business.status if present
             if _has_field(Business, "status") and str(getattr(biz, "status", "")).upper() != "ACTIVE":
                 continue
             if _is_active_membership(mem):
@@ -143,19 +146,20 @@ def _pick_active_membership_business_for_user(user) -> Optional[object]:
         return None
     return None
 
-
+# ── Middleware ─────────────────────────────────────────────────────────────────
 class TenantResolutionMiddleware(MiddlewareMixin):
     """
     Resolve request.business using (in order):
 
       0) initialize request.business=None and clear thread-local id
-      1) superuser impersonation via ?as_business=<id> (NOT staff)
-      2) session 'active_business_id'  (membership required unless superuser)
-      3) subdomain (ignored on localhost) (for authenticated users: membership required unless superuser)
-      4) ACTIVE membership business for authenticated user
-      5) owned/created ACTIVE business for authenticated user
+      1) canonical util: get_active_business(request)  ← matches your views
+      2) superuser impersonation via ?as_business=<id> (NOT staff)
+      3) legacy session 'active_business_id' (membership required unless superuser)
+      4) subdomain (ignored on localhost) (for authenticated users: membership required unless superuser)
+      5) ACTIVE membership business for authenticated user
+      6) owned/created ACTIVE business for authenticated user
 
-    On success, also writes thread-local tenant id so auto-scoped managers work.
+    On success, also sets request.business_id and writes thread-local tenant id.
     """
 
     @cached_property
@@ -165,6 +169,7 @@ class TenantResolutionMiddleware(MiddlewareMixin):
     def process_request(self, request):
         # Start clean every request
         request.business = None
+        request.business_id = None
         try:
             set_current_business_id(None)  # reset thread-local at request start
         except Exception:
@@ -175,22 +180,29 @@ class TenantResolutionMiddleware(MiddlewareMixin):
 
         user = getattr(request, "user", None)
 
-        # (1) Superuser impersonation (NOT staff)
+        # (1) Canonical: use the same util as your views/templates
+        try:
+            b = get_active_business(request)
+            if b:
+                _activate(request, b)
+                return
+        except Exception:
+            # continue with fallbacks
+            pass
+
+        # (2) Superuser impersonation (NOT staff)
         as_bid = request.GET.get("as_business")
         if as_bid and getattr(user, "is_superuser", False):
             try:
                 b = _filter_active_business(Business.objects).get(pk=as_bid)
                 _activate(request, b)
-                try:
-                    messages.info(request, f"Impersonating {b.name}")
-                except Exception:
-                    pass
+                # (intentionally skip messages in middleware; avoid UI noise/AJAX leaks)
                 return
             except Exception:
                 # Ignore bad ids quietly
                 pass
 
-        # (2) Session selection (validate membership for non-superusers)
+        # (3) Legacy session selection (validate membership for non-superusers)
         bid = None
         try:
             bid = request.session.get(SESSION_KEY)
@@ -204,22 +216,21 @@ class TenantResolutionMiddleware(MiddlewareMixin):
                     _activate(request, b)
                     return
             except Exception:
-                # invalid id or inactive business
-                pass
-            # Session points to a non-existent/inactive/unauthorized business → clear it
+                pass  # invalid id / inactive business
+            # Clear stale session value
             try:
                 request.session.pop(SESSION_KEY, None)
             except Exception:
                 pass
 
-        # (3) Subdomain resolution (production-style)
+        # (4) Subdomain resolution (production-style)
         try:
             host = _host_without_port(request.get_host())
             sub = _first_label(host)
             if sub and _has_field(Business, "subdomain"):
                 b = _filter_active_business(Business.objects).filter(subdomain__iexact=sub).first()
                 if b:
-                    # Allow for anonymous (pre-auth) and superusers; for authenticated users require membership
+                    # Allow anonymous or superusers; require membership for authed users
                     if (not getattr(user, "is_authenticated", False)) or getattr(user, "is_superuser", False) or _user_has_active_membership(user, b):
                         _activate(request, b)
                         return
@@ -227,14 +238,14 @@ class TenantResolutionMiddleware(MiddlewareMixin):
             # get_host() may raise in tests or odd proxies
             pass
 
-        # (4) Active membership (most-recent)
+        # (5) Active membership (most-recent)
         if getattr(user, "is_authenticated", False):
             b = _pick_active_membership_business_for_user(user)
             if b:
                 _activate(request, b)
                 return
 
-        # (5) Owned/created business (fresh signups / dev localhost)
+        # (6) Owned/created business (fresh signups / dev localhost)
         if getattr(user, "is_authenticated", False):
             b = _pick_owned_business_for_user(user)
             if b:
@@ -244,7 +255,7 @@ class TenantResolutionMiddleware(MiddlewareMixin):
         # Unresolved → request.business stays None; thread-local already cleared.
 
     def process_response(self, request, response):
-        # belt & suspenders: clear thread-local after the response is built
+        # Clear thread-local after the response is built (belt & suspenders)
         try:
             set_current_business_id(None)
         except Exception:

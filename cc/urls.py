@@ -1,88 +1,80 @@
-# cc/urls.py
-from importlib import import_module
+# circuitcity/cc/urls.py
+from __future__ import annotations
+
 import os
 import re
+from importlib import import_module
 
 from django.conf import settings
 from django.conf.urls.static import static
 from django.contrib import admin
-from django.contrib.auth import views as auth_views
-from django.http import HttpResponse, JsonResponse
-from django.shortcuts import redirect
+from django.http import HttpResponse, JsonResponse, HttpResponseBase
+from django.shortcuts import redirect, render
 from django.template.loader import get_template
 from django.urls import include, path, re_path, reverse, NoReverseMatch
 from django.views.generic import RedirectView
+from django.templatetags.static import static as static_build  # may raise with Manifest storage
 
-# --- Core views (project-level)
-from cc import views as core_views  # keep as-is (project module is "cc")
-
-
-# ---------- Safe import helpers (prefer fully-qualified circuitcity.* then fallback) ----------
-def _try_import(path_fq: str, path_short: str | None = None):
-    """
-    Import a module by its fully-qualified path, with an optional short fallback.
-    Returns the imported module or None.
-    """
-    try:
-        return import_module(path_fq)
-    except Exception:
-        if path_short:
-            try:
-                return import_module(path_short)
-            except Exception:
-                return None
-        return None
+from cc import views as core_views  # project-level views
 
 
-def _try_from(module_fq: str, attr: str, module_short: str | None = None):
-    mod = _try_import(module_fq, module_short)
-    return getattr(mod, attr, None) if mod else None
-
-
-# ---------- Inventory exports/imports (prefer fqdn) ----------
-export_inventory_csv = _try_from(
-    "circuitcity.inventory.views_export", "export_inventory_csv", "inventory.views_export"
-)
-export_audits_csv = _try_from(
-    "circuitcity.inventory.views_export", "export_audits_csv", "inventory.views_export"
-)
-import_opening_stock = _try_from(
-    "circuitcity.inventory.views_import", "import_opening_stock", "inventory.views_import"
-)
-
-# Legacy inventory fallbacks (for some APIs)
-inv_views_mod = _try_import("circuitcity.inventory.views", "inventory.views")
-
-# Accounts views (optional custom)
-accounts_views = _try_import("circuitcity.accounts.views", "accounts.views")
-
-# --- HQ (platform admin) permission check
-is_hq_admin = _try_from("circuitcity.hq.permissions", "is_hq_admin", "hq.permissions") or (lambda _u: False)
-
-# --- Tenants helpers (for active-business detection)
-get_active_business = _try_from("circuitcity.tenants.utils", "get_active_business", "tenants.utils") or (lambda _r: None)
-
-# Optional polish APIs (guarded imports)
-core_search = _try_import("circuitcity.core.views_search", "core.views_search")
-core_savedview = _try_import("circuitcity.core.views_savedview", "core.views_savedview")
-
-
-# ---------------------------------------------------------------------
-# Basics / utility endpoints
-# ---------------------------------------------------------------------
+# --------------------------------------------------------------------------------------
+# Small helpers
+# --------------------------------------------------------------------------------------
 def robots_txt(_request):
     return HttpResponse("User-agent: *\nDisallow: /", content_type="text/plain")
 
 
+def _try_import(modpath: str):
+    try:
+        return import_module(modpath)
+    except Exception:
+        return None
+
+
+def _try_from(modpath: str, attr: str):
+    mod = _try_import(modpath)
+    return getattr(mod, attr, None) if mod else None
+
+
+def include_or_raise(module_path: str, namespace: str | None = None):
+    import_module(module_path)  # surface import errors immediately in DEBUG
+    return include(module_path, namespace=namespace) if namespace else include(module_path)
+
+
+def _safe_redirect_to(name: str, fallback: str = "/accounts/login/"):
+    def _view(_request, *args, **kwargs):
+        try:
+            return redirect(name)
+        except NoReverseMatch:
+            return redirect(fallback)
+    return _view
+
+
+def _safe_static(path_fragment: str) -> str:
+    """
+    Resolve a static URL but never crash if ManifestStaticFilesStorage
+    can't find the file yet (e.g., before collectstatic).
+    """
+    try:
+        return static_build(path_fragment)
+    except Exception:
+        return settings.STATIC_URL.rstrip("/") + "/" + path_fragment.lstrip("/")
+
+
+# --------------------------------------------------------------------------------------
+# Smart root redirect
+# --------------------------------------------------------------------------------------
+is_hq_admin = _try_from("circuitcity.hq.permissions", "is_hq_admin") or (lambda _u: False)
+get_active_business = _try_from("circuitcity.tenants.utils", "get_active_business") or (lambda _r: None)
+
+# Try to import tenants.activate_mine for a local fallback route
+_tenants_views = _try_import("tenants.views") or _try_import("circuitcity.tenants.views")
+_activate_mine_view = getattr(_tenants_views, "activate_mine", None)
+
+
 def root_redirect(request):
-    """
-    Home router:
-    - Anonymous -> login
-    - HQ admin  -> HQ (if present)
-    - No active business -> tenants chooser/join
-    - Else -> first available tenant dashboard
-    """
-    # Anonymous -> login (prefer two_factor if enabled)
+    # Anonymous -> login (prefer two_factor if present)
     if not getattr(request, "user", None) or not request.user.is_authenticated:
         for name in ("two_factor:login", "accounts:login", "login"):
             try:
@@ -92,27 +84,30 @@ def root_redirect(request):
                 continue
         return redirect("/accounts/login/")
 
-    # HQ admins first
+    # HQ admins
     if is_hq_admin(request.user):
         try:
             return redirect("hq:home")
         except NoReverseMatch:
             pass
 
-    # If no active business, push chooser/join
+    # No active business -> auto-activate first, then chooser/join
     try:
         active = get_active_business(request)
     except Exception:
         active = None
     if not active:
-        for name in ("tenants:choose_business", "tenants:join"):
+        for name in ("tenants:activate_mine", "tenants:choose_business", "tenants:join"):
             try:
                 reverse(name)
                 return redirect(name)
             except NoReverseMatch:
                 continue
+        # If tenants url name isn't present, but we have the view imported, expose local fallback
+        if _activate_mine_view:
+            return redirect("/tenants/activate-mine/")
 
-    # Active business present -> try likely dashboards
+    # Preferred dashboards (first that exists wins)
     candidates = (
         "dashboard:home",
         "inventory:inventory_dashboard",
@@ -130,10 +125,12 @@ def root_redirect(request):
         except NoReverseMatch:
             continue
 
-    return redirect("/inventory/")  # last resort
+    return redirect("/inventory/")
 
 
-# --- Tiny session probe (useful for debugging cookies)
+# --------------------------------------------------------------------------------------
+# Tiny debug probes
+# --------------------------------------------------------------------------------------
 def session_set(request):
     request.session["probe"] = "ok"
     return HttpResponse("set")
@@ -143,7 +140,6 @@ def session_get(request):
     return HttpResponse(request.session.get("probe", "missing"))
 
 
-# --- DEBUG helpers (template origins etc.)
 def __whoami__(request):
     data = {
         "DEBUG": settings.DEBUG,
@@ -274,22 +270,22 @@ def __grep_soon__(request):
     return JsonResponse({"root": root, "patterns": patterns, "hits": hits}, json_dumps_params={"indent": 2})
 
 
+# --------------------------------------------------------------------------------------
+# URL patterns
+# --------------------------------------------------------------------------------------
 urlpatterns = []
 
-# ---------------- Two-Factor (optional)
-_enable_2fa = getattr(settings, "ENABLE_2FA", False)
-if _enable_2fa:
-    try:
-        import two_factor.urls  # noqa: F401
-        urlpatterns.append(path("", include(("two_factor.urls", "two_factor"), namespace="two_factor")))
-    except Exception:
-        pass
+# Two-Factor (optional)
+if getattr(settings, "ENABLE_2FA", False):
+    urlpatterns += [path("", include_or_raise("two_factor.urls", "two_factor"))]
 
-# ---------------- Admin (use configurable ADMIN_URL)
+# Admin (configurable path ONLY; avoid adding a plain /admin/ alias to prevent collisions)
 admin_path = getattr(settings, "ADMIN_URL", "__admin__/")
-urlpatterns += [path(admin_path, admin.site.urls)]
+urlpatterns += [
+    path(admin_path, admin.site.urls),
+]
 
-# ---------------- Health / robots / favicon / temporary
+# Basics / health / robots / favicon / temporary
 urlpatterns += [
     path("healthz", core_views.healthz, name="healthz_noslash"),
     path("healthz/", core_views.healthz, name="healthz"),
@@ -298,26 +294,51 @@ urlpatterns += [
     path("temporary/", core_views.temporary_ok, name="temporary_ok"),
 ]
 
-# ---------------- Landing
-urlpatterns += [path("", root_redirect, name="root")]
-
-# ---------------- Settings alias → Inventory settings
-def _settings_redirect(_request):
-    try:
-        return redirect("inventory:settings")
-    except NoReverseMatch:
-        try:
-            return redirect("inventory:inventory_dashboard")
-        except NoReverseMatch:
-            return redirect("/inventory/")
-
-
+# Legacy static -> brand icons (SAFE even if manifest entry missing)
 urlpatterns += [
-    path("settings/", _settings_redirect, name="settings_root"),
-    path("settings", _settings_redirect),
+    path("static/icons/icon-192.png", RedirectView.as_view(url=_safe_static("brand/mjn-192.png"), permanent=False)),
+    path("static/img/logo-32.png",  RedirectView.as_view(url=_safe_static("brand/mjn-32.png"), permanent=False)),
 ]
 
-# ---------------- CSV export & imports
+# Landing
+urlpatterns += [path("", root_redirect, name="root")]
+
+# ---------------- Accounts (namespaced) ----------------
+_accounts_mod = _try_import("circuitcity.accounts.urls") or _try_import("accounts.urls")
+if _accounts_mod and hasattr(_accounts_mod, "urlpatterns"):
+    urlpatterns += [path("accounts/", include((_accounts_mod.urlpatterns, "accounts"), namespace="accounts"))]
+else:
+    urlpatterns += [path("accounts/", include_or_raise("circuitcity.accounts.urls", "accounts"))]
+
+# Project-level convenient aliases
+urlpatterns += [
+    path("login/", _safe_redirect_to("accounts:login"), name="login"),
+    path("logout/", _safe_redirect_to("accounts:logout"), name="logout"),
+    path("accounts/logout/", _safe_redirect_to("accounts:logout"), name="accounts_logout"),
+    path("password/forgot/", _safe_redirect_to("accounts:forgot_password_request"), name="password_forgot"),
+    path("password/reset/", _safe_redirect_to("accounts:forgot_password_reset"), name="password_reset_flow"),
+    path("password_reset/", _safe_redirect_to("accounts:forgot_password_reset"), name="password_reset"),
+]
+
+# Session probes
+urlpatterns += [
+    path("session-probe/set", session_set, name="session_probe_set"),
+    path("session-probe/get", session_get, name="session_probe_get"),
+]
+
+# Time pages
+urlpatterns += [
+    path("time/check-in/", RedirectView.as_view(pattern_name="inventory:time_checkin_page", permanent=False)),
+    path("time/logs/", RedirectView.as_view(pattern_name="inventory:time_logs", permanent=False)),
+]
+
+# CSV/Import hooks (if present)
+export_inventory_csv = _try_from("circuitcity.inventory.views_export", "export_inventory_csv") or \
+                       _try_from("inventory.views_export", "export_inventory_csv")
+export_audits_csv = _try_from("circuitcity.inventory.views_export", "export_audits_csv") or \
+                    _try_from("inventory.views_export", "export_audits_csv")
+import_opening_stock = _try_from("circuitcity.inventory.views_import", "import_opening_stock") or \
+                       _try_from("inventory.views_import", "import_opening_stock")
 if export_inventory_csv:
     urlpatterns.append(path("exports/inventory.csv", export_inventory_csv, name="export_inventory_csv"))
 if export_audits_csv:
@@ -325,425 +346,277 @@ if export_audits_csv:
 if import_opening_stock:
     urlpatterns.append(path("imports/opening-stock/", import_opening_stock, name="import_opening_stock"))
 
-# ---------------- Accounts include (robust): prefer real urlconf; else fallback patterns
-_accounts_urlconf_fq = _try_import("circuitcity.accounts.urls")
-_accounts_urlconf_short = None if _accounts_urlconf_fq else _try_import("accounts.urls")
-
-if _accounts_urlconf_fq or _accounts_urlconf_short:
-    # Include whichever import succeeded, namespaced as 'accounts'
-    urlpatterns += [
-        path(
-            "accounts/",
-            include(((_accounts_urlconf_fq or _accounts_urlconf_short), "accounts"), namespace="accounts"),
-        )
-    ]
-else:
-    # Fallback: provide a minimal accounts namespace so {% url 'accounts:login' %} works
-    def _accounts_fallback_patterns():
-        return [
-            path(
-                "login/",
-                auth_views.LoginView.as_view(
-                    template_name="accounts/login.html", redirect_authenticated_user=True
-                ),
-                name="login",
-            ),
-            path("logout/", auth_views.LogoutView.as_view(next_page="/"), name="logout"),
-            # Provide password reset so {% url 'password_reset' %} resolves
-            path("password_reset/", auth_views.PasswordResetView.as_view(), name="password_reset"),
-        ]
-
-    urlpatterns += [path("accounts/", include((_accounts_fallback_patterns(), "accounts"), namespace="accounts"))]
-
-# Direct password helpers (call the real views if import succeeded)
-if accounts_views:
-    urlpatterns += [
-        path(
-            "accounts/password/forgot/",
-            accounts_views.forgot_password_request_view,
-            name="forgot_password_request_direct",
-        ),
-        path(
-            "accounts/password/reset/",
-            accounts_views.forgot_password_verify_view,
-            name="forgot_password_reset_direct",
-        ),
-        # Alias so templates using {% url 'password_reset' %} always resolve to your flow
-        path(
-            "accounts/password_reset/",
-            RedirectView.as_view(pattern_name="forgot_password_request_direct", permanent=False),
-            name="password_reset",
-        ),
-    ]
-
-# ---------------- Session probes
-urlpatterns += [
-    path("session-probe/set", session_set, name="session_probe_set"),
-    path("session-probe/get", session_get, name="session_probe_get"),
-]
-
-# ---------------- Convenience top-level redirects for Time pages
-urlpatterns += [
-    path("time/check-in/", RedirectView.as_view(pattern_name="inventory:time_checkin_page", permanent=False)),
-    path("time/logs/", RedirectView.as_view(pattern_name="inventory:time_logs", permanent=False)),
-]
-
-# ---------------- Optional sales CSV export
-export_sales_csv = _try_from("circuitcity.sales.views_export", "export_sales_csv", "sales.views_export")
-if export_sales_csv:
-    urlpatterns.append(path("exports/sales.csv", export_sales_csv, name="export_sales_csv"))
-
-# ---------------------------------------------------------------------
-# Preferred Inventory API endpoints (use inventory.api when present)
-# ---------------------------------------------------------------------
-api_mod = _try_import("circuitcity.inventory.api", "inventory.api")
-
-
-def _choose(pref_mod, name, fallback):
-    if pref_mod:
+# --------------------------------------------------------------------------------------
+# Response normalizer + auto-select helpers
+# --------------------------------------------------------------------------------------
+def _redirect_to_join():
+    for name in ("tenants:activate_mine", "tenants:choose_business", "tenants:join_business", "tenants:join"):
         try:
-            fn = getattr(pref_mod, name, None)
-            if callable(fn):
-                return fn
+            reverse(name)
+            return redirect(name)
+        except NoReverseMatch:
+            continue
+    # last-ditch: local fallback path if we exposed it below
+    return redirect("/tenants/activate-mine/")
+
+
+def _looks_like_biz_loc_tuple(val):
+    if not isinstance(val, tuple) or len(val) == 0:
+        return False
+    first = val[0]
+    return not isinstance(first, (str, bytes)) and hasattr(first, "id")
+
+
+def _set_active_on_request_and_session(request, biz, loc=None):
+    try:
+        request.active_business = biz
+        request.active_business_id = getattr(biz, "id", None)
+        request.session["active_business_id"] = getattr(biz, "id", None)
+        # legacy session key variants for safety
+        request.session["biz_id"] = getattr(biz, "id", None)
+        if loc:
+            request.active_location = loc
+            request.active_location_id = getattr(loc, "id", None)
+    except Exception:
+        pass
+
+
+def _auto_select_single_membership(request):
+    if not getattr(request, "user", None) or not request.user.is_authenticated:
+        return None
+    try:
+        TenantsModels = _try_import("tenants.models") or _try_import("circuitcity.tenants.models")
+        if not TenantsModels:
+            return None
+
+        BM = getattr(TenantsModels, "BusinessMembership", None) or getattr(TenantsModels, "Membership", None)
+        Business = getattr(TenantsModels, "Business", None)
+        if not BM or not Business:
+            return None
+
+        qs = BM.objects.filter(user=request.user)
+        for f in ("is_active", "active", "accepted"):
+            if f in [fld.name for fld in BM._meta.fields]:
+                try:
+                    qs = qs.filter(**{f: True})
+                except Exception:
+                    pass
+
+        count = qs.count()
+        if count != 1:
+            return None
+
+        m = qs.first()
+        biz = getattr(m, "business", None)
+        if biz:
+            _set_active_on_request_and_session(request, biz)
+            return biz
+        return None
+    except Exception:
+        return None
+
+
+def _normalize_response(request, resp):
+    if isinstance(resp, HttpResponseBase):
+        return resp
+
+    if isinstance(resp, tuple):
+        if len(resp) >= 1 and (resp[0] is None or resp[0] == ""):
+            return _redirect_to_join()
+
+        template = resp[0]
+        if isinstance(template, (str, bytes)):
+            context = resp[1] if len(resp) > 1 and isinstance(resp[1], dict) else {}
+            http = render(request, template, context)
+            if len(resp) > 2 and isinstance(resp[2], int):
+                http.status_code = resp[2]
+            return http
+        return HttpResponse(str(resp))
+
+    return HttpResponse(str(resp))
+
+
+def _call_inventory_view_with_legacy_guard(request, view_name, *args, **kwargs):
+    from inventory import views as inv
+    tenants_get_active = _try_from("circuitcity.tenants.utils", "get_active_business") or \
+                         _try_from("tenants.utils", "get_active_business")
+
+    biz = getattr(request, "active_business", None)
+    if not biz and tenants_get_active:
+        try:
+            biz = tenants_get_active(request)
+            if biz:
+                _set_active_on_request_and_session(request, biz)
+        except Exception:
+            biz = None
+
+    if not biz:
+        auto = _auto_select_single_membership(request)
+        if auto:
+            biz = auto
+
+    if hasattr(inv, "_require_active_business"):
+        try:
+            b, l = inv._require_active_business(request)
+            if b and not getattr(request, "active_business", None):
+                _set_active_on_request_and_session(request, b, l)
+            elif l:
+                _set_active_on_request_and_session(request, getattr(request, "active_business", None), l)
         except Exception:
             pass
-    return getattr(inv_views_mod, fallback) if inv_views_mod else None
 
+    view = getattr(inv, view_name)
+    resp = view(request, *args, **kwargs)
 
-predictions_view = _choose(api_mod, "predictions_summary", "api_predictions")
-value_trend_view = _choose(api_mod, "api_value_trend", "api_sales_trend")
-sales_trend_view = _choose(api_mod, "api_sales_trend", "api_sales_trend")
-top_models_view = _choose(api_mod, "api_top_models", "api_top_models")
-alerts_view = _choose(api_mod, "alerts_feed", "api_alerts")
-stock_health_view = _choose(api_mod, "api_stock_health", "restock_heatmap_api")
-profit_bar_view = getattr(api_mod, "api_profit_bar", None) if api_mod else None
-
-api_task_submit = getattr(api_mod, "api_task_submit", None) if api_mod else None
-api_task_status = getattr(api_mod, "api_task_status", None) if api_mod else None
-api_audit_verify = getattr(api_mod, "api_audit_verify", None) if api_mod else None
-
-
-def _add_api(pattern, view, **kwargs):
-    if view:
-        urlpatterns.append(re_path(pattern, view, **kwargs))
-
-
-# Primary API paths (+ aliases)
-_add_api(r"^inventory/api/predictions/?$", predictions_view, name="api_predictions")
-
-# Sales trend (new + legacy)
-_add_api(r"^inventory/api/sales[-_]trend/?$", sales_trend_view, name="api_sales_trend")
-_add_api(r"^inventory/api_sales_trend/?$", sales_trend_view)
-
-# Value trend (underscore + hyphen aliases)
-_add_api(r"^inventory/api/value[_-]trend/?$", value_trend_view, name="api_value_trend")
-
-# Top models (aliases)
-_add_api(r"^inventory/api/top[_-]models/?$", top_models_view, name="api_top_models")
-_add_api(r"^inventory/api_top_models/?$", top_models_view)
-
-# Alerts
-_add_api(r"^inventory/api/alerts/?$", alerts_view, name="api_alerts")
-
-# Stock health (aliases)
-_add_api(r"^inventory/api/stock[-_]health/?$", stock_health_view)
-_add_api(r"^inventory/api/stock_health/?$", stock_health_view)
-
-# Optional: profit bar (aliases) if available
-_add_api(r"^inventory/api/profit[-_]bar/?$", profit_bar_view) if profit_bar_view else None
-_add_api(r"^inventory/api_profit_bar/?$", profit_bar_view) if profit_bar_view else None
-
-# Optional: async task submit/status + audit verify if provided
-if api_task_submit:
-    urlpatterns.append(path("inventory/api/task/submit/", api_task_submit))
-if api_task_status:
-    urlpatterns.append(path("inventory/api/task/status/", api_task_status))
-if api_audit_verify:
-    urlpatterns.append(path("inventory/api/audit-verify/", api_audit_verify))
-
-# Heatmap aliases (restock)
-restock_heatmap_view = stock_health_view
-_add_api(r"^inventory/api/restock[_-]heatmap/?$", restock_heatmap_view)
-_Add = _add_api  # alias
-_Add(r"^inventory/restock[_-]heatmap_api/?$", restock_heatmap_view)
-_Add(r"^inventory/restock[_-]heatmap/?$", restock_heatmap_view)
-
-
-# ---------------------------------------------------------------------
-# App URLConfs (namespaced includes) — ALWAYS present via stubs
-# ---------------------------------------------------------------------
-def _wallet_stub_urls():
-    def _j(name):
-        return lambda r, *a, **k: JsonResponse({"ok": True, "ns": "wallet", "name": name, "stub": True})
-
-    return [
-        path("", _j("agent_wallet"), name="agent_wallet"),
-        path("transactions/", _j("agent_txns"), name="agent_txns"),
-        path("admin/", _j("admin_home"), name="admin_home"),
-    ]
-
-
-def _inventory_stub_urls():
-    def _j(name):
-        return lambda r, *a, **k: JsonResponse({"ok": True, "ns": "inventory", "name": name, "stub": True})
-
-    return [
-        path("", _j("inventory_dashboard"), name="inventory_dashboard"),
-        path("list/", _j("stock_list"), name="stock_list"),
-        path("settings/", _j("settings"), name="settings"),
-        path("time/check-in/", _j("time_checkin_page"), name="time_checkin_page"),
-        path("time/logs/", _j("time_logs"), name="time_logs"),
-        path("scan-sold/", _j("scan_sold"), name="scan_sold"),
-        path("scan-in/", _j("scan_in"), name="scan_in"),
-    ]
-
-
-def _reports_stub_urls():
-    def _j(name):
-        return lambda r, *a, **k: JsonResponse({"ok": True, "ns": "reports", "name": name, "stub": True})
-
-    return [
-        path("", _j("home"), name="home"),
-        path("sales/", _j("sales"), name="sales"),
-        path("stock/", _j("stock"), name="stock"),
-        path("agents/", _j("agents"), name="agents"),
-    ]
-
-
-def _tenants_stub_urls():
-    def _j(name):
-        return lambda r, *a, **k: JsonResponse({"ok": True, "ns": "tenants", "name": name, "stub": True})
-
-    return [
-        path("", _j("home"), name="home"),
-        path("choose/", _j("choose_business"), name="choose_business"),
-        path("join/", _j("join"), name="join"),
-        path("create/", _j("create_business"), name="create_business"),
-    ]
-
-
-def _billing_stub_urls():
-    def _j(name):
-        return lambda r, *a, **k: JsonResponse({"ok": True, "ns": "billing", "name": name, "stub": True})
-
-    return [path("", _j("home"), name="home")]
-
-
-def _notifications_stub_urls():
-    def _j(name):
-        return lambda r, *a, **k: JsonResponse({"ok": True, "ns": "notifications", "name": name, "stub": True})
-
-    return [path("", _j("home"), name="home")]
-
-
-def _patterns_for(modpath_fq: str, modpath_short: str, fallback_patterns: list, ns: str):
-    """
-    Always return a concrete list of URL patterns.
-    If importing the real module fails (during autoreload etc.), use stubs.
-    """
-    mod = _try_import(modpath_fq, modpath_short)
-    if mod:
+    if _looks_like_biz_loc_tuple(resp):
+        b = resp[0]
+        l = resp[1] if len(resp) > 1 else None
+        _set_active_on_request_and_session(request, b, l)
         try:
-            patterns = getattr(mod, "urlpatterns", None)
-            if isinstance(patterns, (list, tuple)) and patterns:
-                return list(patterns)
+            resp = view(request, *args, **kwargs)
         except Exception:
-            pass
-    print(f"[cc.urls] {ns} real urlconf unavailable -> using stub")
-    return list(fallback_patterns)
+            return _redirect_to_join()
+
+    if isinstance(resp, tuple) and len(resp) >= 1 and (resp[0] is None or resp[0] == ""):
+        return _redirect_to_join()
+
+    return _normalize_response(request, resp)
+
+
+# --------------------------------------------------------------------------------------
+# Hard-bind stock list & dashboard entries
+# --------------------------------------------------------------------------------------
+def _stock_list_entry(request, *args, **kwargs):
+    try:
+        return _call_inventory_view_with_legacy_guard(request, "stock_list", *args, **kwargs)
+    except Exception:
+        from inventory.views import stock_list
+        return _normalize_response(request, stock_list(request, *args, **kwargs))
+
+
+def _inventory_dashboard_entry(request, *args, **kwargs):
+    try:
+        return _call_inventory_view_with_legacy_guard(request, "inventory_dashboard", *args, **kwargs)
+    except Exception:
+        from inventory.views import inventory_dashboard
+        return _normalize_response(request, inventory_dashboard(request, *args, **kwargs))
 
 
 urlpatterns += [
-    path("dashboard/", include(("circuitcity.dashboard.urls", "dashboard"), namespace="dashboard")),
-    # ✅ Namespaces are ALWAYS registered (stubs used if real modules fail)
-    path(
-        "inventory/",
-        include(
-            (
-                _patterns_for("circuitcity.inventory.urls", "inventory.urls", _inventory_stub_urls(), "inventory"),
-                "inventory",
-            ),
-            namespace="inventory",
-        ),
-    ),
-    path(
-        "wallet/",
-        include(
-            (_patterns_for("circuitcity.wallet.urls", "wallet.urls", _wallet_stub_urls(), "wallet"), "wallet"),
-            namespace="wallet",
-        ),
-    ),
-    path(
-        "reports/",
-        include(
-            (_patterns_for("circuitcity.ccreports.urls", "ccreports.urls", _reports_stub_urls(), "reports"), "reports"),
-            namespace="reports",
-        ),
-    ),
-    # ✅ Tenants robust include (supports top-level `tenants` or package `circuitcity.tenants`)
-    path(
-        "tenants/",
-        include(
-            (_patterns_for("circuitcity.tenants.urls", "tenants.urls", _tenants_stub_urls(), "tenants"), "tenants"),
-            namespace="tenants",
-        ),
-    ),
-    # ✅ Billing and Notifications robust includes
-    path(
-        "billing/",
-        include(
-            (_patterns_for("circuitcity.billing.urls", "billing.urls", _billing_stub_urls(), "billing"), "billing"),
-            namespace="billing",
-        ),
-    ),
-    path(
-        "notifications/",
-        include(
-            (
-                _patterns_for(
-                    "circuitcity.notifications.urls", "notifications.urls", _notifications_stub_urls(), "notifications"
-                ),
-                "notifications",
-            ),
-            namespace="notifications",
-        ),
-    ),
+    path("inventory/list/", _stock_list_entry, name="inventory_stock_list"),
+    re_path(r"^inventory/list/$", _stock_list_entry, name="inventory_stock_list_re"),
+    path("inventory/dashboard/", _inventory_dashboard_entry, name="inventory_dashboard"),
 ]
 
-# ---------------- HQ (platform admin) include — robust (fq + short)
-if _try_import("circuitcity.hq.urls", "hq.urls"):
-    urlpatterns.append(path("hq/", include(("hq.urls", "hq"), namespace="hq")))
+# Include app urlconfs
+urlpatterns += [
+    path("inventory/", include_or_raise("inventory.urls", "inventory")),
+    path("tenants/",   include_or_raise("tenants.urls", "tenants")),
+    path("dashboard/", include_or_raise("dashboard.urls", "dashboard")),
+]
 
-# ---------------- Onboarding include (guarded)
-if _try_import("circuitcity.onboarding.urls", "onboarding.urls"):
-    urlpatterns.append(
-        path("onboarding/", include(("circuitcity.onboarding.urls", "onboarding"), namespace="onboarding"))
-    )
-    urlpatterns.append(
-        path("get-started/", RedirectView.as_view(pattern_name="onboarding:start", permanent=False), name="get_started")
-    )
-else:
-
-    def _onboarding_placeholder(_req, *args, **kwargs):
-        html = """
-        <main style="max-width:840px;margin:2rem auto;padding:1.25rem;font-family:system-ui,Segoe UI,Inter,Roboto,Arial">
-          <h1>Getting started</h1>
-          <p>The onboarding module isn't installed yet.</p>
-          <ol>
-            <li>Sign up / create an account</li>
-            <li>Verify OTP</li>
-            <li>Create your business</li>
-            <li>Add your first product</li>
-          </ol>
-          <p style="color:#6b7280">Add an <code>onboarding</code> app with <code>onboarding/urls.py</code> to enable the guided flow.</p>
-          <p><a href="/accounts/login/">Go to login</a></p>
-        </main>
-        """.strip()
-        return HttpResponse(html)
-
+# --- Local fallback for activate-mine if tenants urls don’t expose it yet ---
+if _activate_mine_view:
     urlpatterns += [
-        path("onboarding/", _onboarding_placeholder, name="onboarding_placeholder"),
-        path("get-started/", _onboarding_placeholder, name="get_started"),
+        path("tenants/activate-mine/", _activate_mine_view, name="tenants_activate_mine_fallback"),
+        path("tenants/activate/", RedirectView.as_view(url="/tenants/activate-mine/", permanent=False)),
     ]
 
-# ---------------- Optional sales app include — robust (fq + short)
-if _try_import("circuitcity.sales.urls", "sales.urls"):
-    urlpatterns.append(path("sales/", include(("sales.urls", "sales"), namespace="sales")))
+# -------- Wallet include (try both import paths) --------
+_wallet_urls_mod = _try_import("wallet.urls") or _try_import("circuitcity.wallet.urls")
+if _wallet_urls_mod and hasattr(_wallet_urls_mod, "urlpatterns"):
+    urlpatterns += [path("wallet/", include((_wallet_urls_mod.urlpatterns, "wallet"), namespace="wallet"))]
 
-# ---------------- AI-CFO API include (guarded)
-if _try_import("circuitcity.cfo.urls", "cfo.urls"):
-    urlpatterns.append(path("api/v1/", include(("circuitcity.cfo.urls", "cfo"), namespace="cfo_api")))
-else:
+# -------- Robust shim for /wallet/admin/ with DIAGNOSTICS --------
+def _wallet_admin_shim(request, *args, **kwargs):
+    """
+    Try multiple targets; if none import, show WHY with helpful diagnostics.
+    """
+    tried = []
+    last_exc_repr = None
+    exports = {}
 
-    def _stub_view(payload, status=200):
-        def _view(_req, *args, **kwargs):
-            return JsonResponse(payload, status=status, safe=False)
+    def _attempt(modpath: str, attr: str):
+        nonlocal last_exc_repr
+        tried.append(f"{modpath}.{attr}")
+        try:
+            mod = import_module(modpath)
+            # Capture exports for debugging
+            exports[modpath] = [n for n in dir(mod) if n.lower().startswith(("admin", "agent", "admin_"))]
+            obj = getattr(mod, attr, None)
+            if obj is None:
+                return None
+            view_callable = getattr(obj, "as_view", None)
+            return view_callable() if callable(view_callable) else obj
+        except Exception as e:
+            last_exc_repr = f"{e.__class__.__name__}: {e}"
+            return None
 
-        return _view
+    for mp, at in [
+        ("wallet.views", "admin_home"),
+        ("wallet.views", "AdminWalletHome"),
+        ("circuitcity.wallet.views", "admin_home"),
+        ("circuitcity.wallet.views", "AdminWalletHome"),
+    ]:
+        vc = _attempt(mp, at)
+        if callable(vc):
+            return vc(request, *args, **kwargs)
 
-    urlpatterns += [
-        re_path(r"^api/v1/cfo/forecast/?$", _stub_view([])),
-        re_path(r"^api/v1/cfo/forecast/compute/?$", _stub_view({"ok": True})),
-        re_path(r"^api/v1/cfo/alerts/?$", _stub_view([])),
-        re_path(r"^api/v1/cfo/recommendations/?$", _stub_view([])),
-        re_path(r"^api/v1/payouts/?$", _stub_view([])),
+    # Nothing worked -> help the operator
+    details = [
+        "Wallet admin is unavailable.",
+        f"Tried: {', '.join(tried)}",
+        f"Last import error: {last_exc_repr or '(none — modules imported but attributes missing)'}",
+        f"Exports wallet.views: {', '.join(exports.get('wallet.views', [])) or '(module not importable)'}",
+        f"Exports circuitcity.wallet.views: {', '.join(exports.get('circuitcity.wallet.views', [])) or '(module not importable)'}",
+        "",
+        "Hints:",
+        "• Ensure wallet/ is on PYTHONPATH and has __init__.py",
+        "• Confirm wallet/views.py defines either `AdminWalletHome` (class) or `admin_home = AdminWalletHome.as_view()`",
+        "• If wallet.urls imports models that crash, fix that import so wallet.urls can be included.",
     ]
+    return HttpResponse("<br>".join(details), status=404)
 
-# ---------------- Simulator include (guarded + feature-flag aware)
-_SIM_ENABLED = getattr(settings, "FEATURES", {}).get("SIMULATOR", True)
-if _SIM_ENABLED and _try_import("circuitcity.simulator.urls", "simulator.urls"):
-    urlpatterns.append(path("simulator/", include(("simulator.urls", "simulator"), namespace="simulator")))
-elif _SIM_ENABLED:
+urlpatterns += [
+    path("wallet/admin/", _wallet_admin_shim, name="wallet_admin_shim"),
+    path("wallet/admin", RedirectView.as_view(url="/wallet/admin/", permanent=False)),
+]
 
-    def _sim_placeholder(_req, *args, **kwargs):
-        html = """
-        <main style="max-width:860px;margin:2rem auto;padding:1rem;font-family:system-ui,Segoe UI,Inter,Roboto,Arial">
-          <h1 style="margin:.2rem 0 1rem">Simulator (placeholder)</h1>
-          <p>This is a lightweight placeholder because the <code>simulator</code> app isn't installed.</p>
-          <ul>
-            <li><a href="/simulator/new/">Create a new simulation</a></li>
-          </ul>
-          <p style="color:#6b7280">To enable the full experience, add <code>simulator</code> to <strong>INSTALLED_APPS</strong> and provide <code>simulator/urls.py</code>.</p>
-        </main>
-        """.strip()
-        return HttpResponse(html)
-
-    def _sim_new_placeholder(_req, *args, **kwargs):
-        html = """
-        <main style="max-width:860px;margin:2rem auto;padding:1rem;font-family:system-ui,Segoe UI,Inter,Roboto,Arial">
-          <h1 style="margin:.2rem 0 1rem">New Simulation (placeholder)</h1>
-          <p>Define parameters like demand growth %, price changes, lead times, and stock policies here.</p>
-          <p style="color:#6b7280">This page is a placeholder until the full simulator app is installed.</p>
-          <p><a href="/simulator/">Back to Simulator</a></p>
-        </main>
-        """.strip()
-        return HttpResponse(html)
-
-    urlpatterns += [
-        path("simulator/", _sim_placeholder, name="simulator_placeholder_home"),
-        path("simulator/new/", _sim_new_placeholder, name="simulator_placeholder_new"),
+# If wallet.urls NOT included above, add a minimal namespaced fallback so {% url 'wallet:admin_home' %} doesn’t 500
+if not _wallet_urls_mod:
+    wallet_fallback_patterns = [
+        path("admin/", _wallet_admin_shim, name="admin_home"),
     ]
-else:
+    urlpatterns += [path("wallet/", include((wallet_fallback_patterns, "wallet"), namespace="wallet"))]
 
-    def _sim_disabled(_req, *args, **kwargs):
-        return HttpResponse(
-            "<main style='max-width:860px;margin:2rem auto;padding:1rem;font-family:system-ui,Segoe UI,Inter,Roboto,Arial'>"
-            "<h1>Simulator disabled</h1>"
-            "<p>The Simulator feature is currently turned off. Set <code>FEATURE_SIMULATOR=1</code> and restart to enable.</p>"
-            "</main>"
-        )
+# Optional app includes
+if _try_import("ccreports.urls") or _try_import("circuitcity.ccreports.urls"):
+    urlpatterns += [path("reports/", include_or_raise("ccreports.urls", "reports"))]
+if _try_import("sales.urls") or _try_import("circuitcity.sales.urls"):
+    urlpatterns += [path("sales/", include_or_raise("sales.urls", "sales"))]
+if _try_import("layby.urls") or _try_import("circuitcity.layby.urls"):
+    urlpatterns += [path("layby/", include_or_raise("layby.urls", "layby"))]
+if _try_import("hq.urls") or _try_import("circuitcity.hq.urls"):
+    urlpatterns += [path("hq/", include_or_raise("hq.urls", "hq"))]
+if _try_import("onboarding.urls") or _try_import("circuitcity.onboarding.urls"):
+    urlpatterns += [path("onboarding/", include_or_raise("onboarding.urls", "onboarding"))]
+    urlpatterns += [path("get-started/", RedirectView.as_view(pattern_name="onboarding:start", permanent=False),
+                        name="get_started")]
+if _try_import("notifications.urls") or _try_import("circuitcity.notifications.urls"):
+    urlpatterns += [path("notifications/", include_or_raise("notifications.urls", "notifications"))]
+if _try_import("billing.urls") or _try_import("circuitcity.billing.urls"):
+    urlpatterns += [path("billing/", include_or_raise("billing.urls", "billing"))]
+if _try_import("circuitcity.cfo.urls") or _try_import("cfo.urls"):
+    urlpatterns += [path("api/v1/", include_or_raise("circuitcity.cfo.urls", "cfo"))]
+if _try_import("simulator.urls") or _try_import("circuitcity.simulator.urls"):
+    urlpatterns += [path("simulator/", include_or_raise("simulator.urls", "simulator"))]
 
-    urlpatterns += [
-        path("simulator/", _sim_disabled, name="simulator_disabled"),
-        path("simulator/new/", _sim_disabled),
-    ]
+# Global Search + Saved Views
+core_search = _try_import("circuitcity.core.views_search") or _try_import("core.views_search")
+core_savedview = _try_import("circuitcity.core.views_savedview") or _try_import("core.views_savedview")
 
-# ---------------- Layby include (feature-flag aware, robust)
-_LAYBY_ENABLED = getattr(settings, "FEATURES", {}).get("LAYBY", True)
-if _LAYBY_ENABLED:
-    urlpatterns += [path("layby/", include(("layby.urls", "layby"), namespace="layby"))]
-else:
-
-    def _layby_disabled(_req, *args, **kwargs):
-        return HttpResponse(
-            "<main style='max-width:860px;margin:2rem auto;padding:1rem;font-family:system-ui,Segoe UI,Inter,Roboto,Arial'>"
-            "<h1>Layby disabled</h1>"
-            "<p>The Layby feature is turned off. Set <code>FEATURE_LAYBY=1</code> and restart to enable.</p>"
-            "</main>"
-        )
-
-    urlpatterns += [
-        path("layby/", _layby_disabled, name="layby_disabled"),
-        path("layby/agent/", _layby_disabled),
-        path("layby/agent/new/", _layby_disabled),
-        path("layby/admin/", _layby_disabled),
-        path("layby/customer/", _layby_disabled),
-    ]
-
-# ---------------- Global Search + Saved Views (polish APIs)
 def _empty_search(_req):
     return JsonResponse({"skus": [], "agents": [], "invoices": [], "transactions": []})
-
 
 if core_search and hasattr(core_search, "api_global_search"):
     urlpatterns += [path("api/global-search/", core_search.api_global_search, name="api_global_search")]
@@ -753,7 +626,7 @@ else:
 if core_savedview and hasattr(core_savedview, "api_saved_views"):
     urlpatterns += [path("api/saved-views/<str:scope>/", core_savedview.api_saved_views, name="api_saved_views")]
 
-# ---------------- DEBUG-only probes
+# DEBUG-only probes
 if settings.DEBUG:
     urlpatterns += [
         path("__whoami__", __whoami__, name="__whoami__"),
@@ -762,33 +635,27 @@ if settings.DEBUG:
         path("__grep_soon__", __grep_soon__, name="__grep_soon__"),
     ]
 
-# ---------------- Back-compat URL names expected by older templates
+# Back-compat URL names expected by older templates
 urlpatterns += [
-    path(
-        "stock/in/",
-        RedirectView.as_view(pattern_name="inventory:scan_in", permanent=False),
-        name="stock_in",
-    ),
-    path(
-        "stock/out/",
-        RedirectView.as_view(pattern_name="inventory:scan_sold", permanent=False),
-        name="stock_out",
-    ),
-    path(
-        "stock/list/",
-        RedirectView.as_view(pattern_name="inventory:stock_list", permanent=False),
-        name="stock_list",
-    ),
+    path("stock/in/",  RedirectView.as_view(pattern_name="inventory:scan_in",  permanent=False), name="stock_in"),
+    path("stock/out/", RedirectView.as_view(pattern_name="inventory:scan_sold", permanent=False), name="stock_out"),
+    path("stock/list/", RedirectView.as_view(pattern_name="inventory:stock_list", permanent=False), name="stock_list"),
 ]
 
-# ---------------- Convenience short paths (nice aliases)
+# Convenience short paths
 urlpatterns += [
-    path("sell/", RedirectView.as_view(pattern_name="inventory:scan_sold", permanent=False), name="sell_short"),
-    path("scan/", RedirectView.as_view(pattern_name="inventory:scan_sold", permanent=False), name="scan_short"),
+    path("sell/",  RedirectView.as_view(pattern_name="inventory:scan_sold", permanent=False), name="sell_short"),
+    path("scan/",  RedirectView.as_view(pattern_name="inventory:scan_sold", permanent=False), name="scan_short"),
     path("stock/", RedirectView.as_view(pattern_name="inventory:stock_list", permanent=False), name="stock_short"),
 ]
 
-# ---------------- Static / media in DEBUG
+# ---- Legacy API path aliases for restock heatmap ----
+urlpatterns += [
+    path("inventory/restock-heatmap/", RedirectView.as_view(url="/inventory/api/restock-heatmap/", permanent=False)),
+    path("inventory/api/restock_heatmap/", RedirectView.as_view(url="/inventory/api/restock-heatmap/", permanent=False)),
+]
+
+# Static / media in DEBUG
 if settings.DEBUG:
     urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
     urlpatterns += static(settings.STATIC_URL, document_root=settings.STATIC_ROOT)

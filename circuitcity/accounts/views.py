@@ -7,7 +7,7 @@ import random
 import time
 from datetime import timedelta
 from functools import wraps
-from urllib.parse import quote_plus
+from urllib.parse import quote_plus, urlencode
 
 from django.apps import apps
 from django.conf import settings
@@ -31,6 +31,8 @@ from django.urls import NoReverseMatch, reverse
 from django.utils import timezone
 from django.utils.text import slugify
 from django.views.decorators.http import require_http_methods, require_POST
+from django.views.decorators.cache import never_cache
+from django.views.decorators.csrf import ensure_csrf_cookie
 from django.middleware.csrf import get_token
 
 from .forms import (
@@ -61,6 +63,7 @@ LOGIN_TEMPLATE = "accounts/login.html"
 FORGOT_REQUEST_TEMPLATE = "accounts/forgot_password_request.html"
 FORGOT_RESET_TEMPLATE = "accounts/forgot_password_reset.html"
 FORGOT_SENT_TEMPLATE = "accounts/forgot_password_sent.html"  # optional
+SIGNUP_MANAGER_TEMPLATE = "accounts/signup_manager.html"
 
 # ----------------------------
 # OTP config
@@ -68,6 +71,9 @@ FORGOT_SENT_TEMPLATE = "accounts/forgot_password_sent.html"  # optional
 OTP_SESSION_KEY = "otp_verified_at"
 OTP_SESSION_UID = "otp_user_id"
 OTP_WINDOW_MINUTES = int(getattr(settings, "OTP_WINDOW_MINUTES", 20))
+
+# PRG helper: remember what user typed after failed login
+LOGIN_IDENTIFIER_SESSION_KEY = "login_identifier"
 
 
 # ----------------------------
@@ -223,6 +229,33 @@ def _safe_redirect(*candidates: str, default: str = "/"):
     return default
 
 
+def _no_store(resp: HttpResponse) -> HttpResponse:
+    """
+    Ensure browsers won't cache form pages (avoids stale CSRF + resubmission issues).
+    """
+    resp["Cache-Control"] = "no-store"
+    return resp
+
+
+def _post_login_url() -> str:
+    """
+    Best-effort landing page after successful login.
+    Prefers dashboard; falls back to inventory dashboard/list.
+    """
+    for name in (
+        "dashboard:home",
+        "dashboard:dashboard_home",
+        "inventory:inventory_dashboard",
+        "inventory:dashboard",
+        "inventory:stock_list",
+    ):
+        try:
+            return reverse(name)
+        except NoReverseMatch:
+            continue
+    return "/inventory/dashboard/"
+
+
 # ----------------------------
 # Two-factor links (safe if two_factor not installed)
 # ----------------------------
@@ -248,52 +281,85 @@ def _twofa_links():
 
 
 # ============================
-# Login (custom)
+# Login (PRG with messages)
 # ============================
+@ensure_csrf_cookie
+@never_cache
 @require_http_methods(["GET", "POST"])
 def login_view(request):
+    """
+    Implements PRG (Post -> Redirect -> Get) so refresh/back never re-POSTs.
+    Shows clear error messages and repopulates identifier after a failed attempt.
+    """
     next_url = request.POST.get("next") or request.GET.get("next") or ""
 
     if request.user.is_authenticated:
-        return redirect(next_url or getattr(settings, "LOGIN_REDIRECT_URL", "/"))
+        return redirect(next_url or _post_login_url())
 
     origin_path = _debug_template_origin(LOGIN_TEMPLATE)
-    form = IdentifierLoginForm(request.POST or None)
 
-    if request.method == "POST" and form.is_valid():
-        identifier = form.cleaned_data["identifier"]
-        password = form.cleaned_data["password"]
+    if request.method == "POST":
+        form = IdentifierLoginForm(request.POST)
+        if form.is_valid():
+            identifier = form.cleaned_data["identifier"]
+            password = form.cleaned_data["password"]
 
-        user = _get_user_by_identifier(identifier)
-        generic_err = "Invalid credentials or temporarily locked. Please try again."
+            user = _get_user_by_identifier(identifier)
+            generic_err = "Invalid email/username or password."
 
-        if user:
-            sec, _ = LoginSecurity.objects.get_or_create(user=user)
-            if sec.hard_blocked:
-                messages.error(request, "This account is blocked. Contact an admin.")
-                return _render_login(request, form, next_url, origin_path)
-            if sec.is_locked():
-                messages.error(request, generic_err)
-                return _render_login(request, form, next_url, origin_path)
+            if user:
+                sec, _ = LoginSecurity.objects.get_or_create(user=user)
+                if sec.hard_blocked:
+                    messages.error(request, "This account is blocked. Contact an admin.")
+                    request.session[LOGIN_IDENTIFIER_SESSION_KEY] = identifier
+                    return _redirect_back_to_login(next_url)
+                if sec.is_locked():
+                    messages.error(request, generic_err)
+                    request.session[LOGIN_IDENTIFIER_SESSION_KEY] = identifier
+                    return _redirect_back_to_login(next_url)
 
-        auth_user = authenticate(
-            request,
-            username=(user.username if user else identifier),
-            password=password,
-        )
+            auth_user = authenticate(
+                request,
+                username=(user.username if user else identifier),
+                password=password,
+            )
 
-        if auth_user is not None and auth_user.is_active:
-            sec, _ = LoginSecurity.objects.get_or_create(user=auth_user)
-            sec.note_success()
-            login(request, auth_user)
-            return redirect(next_url or getattr(settings, "LOGIN_REDIRECT_URL", "/"))
+            if auth_user is not None and auth_user.is_active:
+                sec, _ = LoginSecurity.objects.get_or_create(user=auth_user)
+                sec.note_success()
+                login(request, auth_user)
+                return redirect(next_url or _post_login_url())
 
-        if user:
-            sec, _ = LoginSecurity.objects.get_or_create(user=user)
-            sec.note_failure()
-        messages.error(request, generic_err)
+            if user:
+                sec, _ = LoginSecurity.objects.get_or_create(user=user)
+                sec.note_failure()
+
+            messages.error(request, generic_err)
+            request.session[LOGIN_IDENTIFIER_SESSION_KEY] = identifier
+            return _redirect_back_to_login(next_url)
+
+        # Form invalid (rare) — still PRG for clean refresh
+        messages.error(request, "Please correct the errors and try again.")
+        request.session[LOGIN_IDENTIFIER_SESSION_KEY] = request.POST.get("identifier", "")
+        return _redirect_back_to_login(next_url)
+
+    # GET — build unbound form and prefill identifier from session after PRG
+    form = IdentifierLoginForm()
+    remembered = request.session.pop(LOGIN_IDENTIFIER_SESSION_KEY, "")
+    if remembered:
+        form.fields["identifier"].initial = remembered
 
     return _render_login(request, form, next_url, origin_path)
+
+
+def _redirect_back_to_login(next_url: str):
+    url = reverse("accounts:login")
+    q = {}
+    if next_url:
+        q["next"] = next_url
+    if q:
+        url += f"?{urlencode(q)}"
+    return redirect(url)
 
 
 def _render_login(request, form, next_url, origin_path):
@@ -303,7 +369,7 @@ def _render_login(request, form, next_url, origin_path):
         return _login_inline_fallback(request, form, next_url, origin_path)
     if origin_path:
         resp["X-Template-Origin"] = origin_path
-    return resp
+    return _no_store(resp)
 
 
 def _login_inline_fallback(request, form, next_url, origin_path):
@@ -335,7 +401,7 @@ def _login_inline_fallback(request, form, next_url, origin_path):
     resp = HttpResponse(html, content_type="text/html; charset=utf-8")
     if origin_path:
         resp["X-Template-Origin"] = origin_path
-    return resp
+    return _no_store(resp)
 
 
 # ----------------------------
@@ -542,6 +608,7 @@ def upload_agent_avatar(request, agent_id: int):
 # ----------------------------
 # Forgot password (2-step) with safe fallbacks
 # ----------------------------
+@never_cache
 @require_http_methods(["GET", "POST"])
 def forgot_password_request_view(request):
     """
@@ -592,6 +659,7 @@ def forgot_password_request_view(request):
         return HttpResponse(html, content_type="text/html; charset=utf-8")
 
 
+@never_cache
 @require_http_methods(["GET", "POST"])
 def forgot_password_verify_view(request):
     """
@@ -871,6 +939,8 @@ def _seed_defaults_for_business(biz) -> None:
 # =========================================
 # Manager sign-up (auto-tenant + auto-select, ACTIVE immediately)
 # =========================================
+@ensure_csrf_cookie
+@never_cache
 @require_http_methods(["GET", "POST"])
 def signup_manager(request):
     # If already signed in, just go to app
@@ -963,7 +1033,42 @@ def signup_manager(request):
         # Straight to the dashboard
         return redirect(_safe_redirect("inventory:inventory_dashboard", default="/inventory/dashboard/"))
 
-    return render(request, "accounts/signup_manager.html", {"form": form})
+    # Render with fallback so this page never 500s
+    try:
+        return render(request, SIGNUP_MANAGER_TEMPLATE, {"form": form})
+    except TemplateDoesNotExist:
+        csrf_val = get_token(request)
+        html = f"""<!doctype html>
+<meta charset="utf-8"><title>Create manager account</title>
+<style>
+  body{{font-family:system-ui,Segoe UI,Inter,Roboto,Arial,sans-serif;background:#f7fafc;margin:0;padding:24px}}
+  .card{{max-width:560px;margin:24px auto;background:#fff;border:1px solid #e2e8f0;border-radius:12px;padding:16px}}
+  label{{display:block;margin:.75rem 0 .35rem}}
+  input{{width:100%;padding:10px;border:1px solid #cbd5e1;border-radius:10px}}
+  button{{margin-top:12px;padding:10px 14px;border-radius:10px;border:1px solid #cbd5e1;background:#2563eb;color:#fff;cursor:pointer}}
+  a{{color:#2563eb;text-decoration:none}}
+</style>
+<div class="card">
+  <h2>Create manager account</h2>
+  <form method="post">
+    <input type="hidden" name="csrfmiddlewaretoken" value="{csrf_val}">
+    <label for="id_full_name">Full name</label>
+    <input id="id_full_name" name="full_name" required>
+    <label for="id_email">Email</label>
+    <input id="id_email" name="email" type="email" required>
+    <label for="id_business_name">Business name</label>
+    <input id="id_business_name" name="business_name" required>
+    <label for="id_subdomain">Subdomain (optional)</label>
+    <input id="id_subdomain" name="subdomain" placeholder="e.g. imajinet">
+    <label for="id_pw1">Password</label>
+    <input id="id_pw1" name="password1" type="password" required>
+    <label for="id_pw2">Confirm password</label>
+    <input id="id_pw2" name="password2" type="password" required>
+    <button type="submit">Create account</button>
+  </form>
+  <p style="margin-top:10px"><a href="{reverse('accounts:login')}">Back to sign in</a></p>
+</div>"""
+        return HttpResponse(html, content_type="text/html; charset=utf-8")
 
 
 # ----------------------------

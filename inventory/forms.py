@@ -44,13 +44,36 @@ class StyledForm(forms.Form):
             f.widget.attrs["class"] = (css + " input").strip()
 
 
+# ---------- Helpers for tenant-aware defaults ----------
+def _default_location_for(user, business, qs):
+    """
+    Given a queryset of locations restricted to a business, pick the best default:
+      1) user's AgentProfile.location (if within qs)
+      2) a location whose name equals the business name
+      3) first in queryset
+    """
+    # 1) Agent's home location
+    if user is not None and hasattr(user, "agent_profile") and user.agent_profile.location_id:
+        if qs.filter(id=user.agent_profile.location_id).exists():
+            return user.agent_profile.location
+
+    # 2) Business name match (your "store name" default)
+    if business is not None and getattr(business, "name", None):
+        match = qs.filter(name=business.name).first()
+        if match:
+            return match
+
+    # 3) First available
+    return qs.first()
+
+
 # ---------- Scan IN ----------
 class ScanInForm(StyledForm):
     """
     Order price is OPTIONAL for scan-in. If omitted, it auto-fills from the
     selected product's model price (Product.cost_price).
 
-    Location is now OPTIONAL (can be assigned later or auto-defaulted by the view).
+    Location is OPTIONAL (we preselect a default based on business/user).
     """
     imei = forms.CharField(
         label="IMEI",
@@ -63,45 +86,73 @@ class ScanInForm(StyledForm):
             "minlength": "15",
             "pattern": r"\d{15}",
             "placeholder": "15-digit IMEI",
+            "id": "id_imei",
         }),
     )
+
+    # Products come from what managers add in the Product table (global list).
     product = forms.ModelChoiceField(
-        queryset=Product.objects.all().order_by("brand", "model", "variant")
+        queryset=Product.objects.all().order_by("brand", "model", "variant"),
+        widget=forms.Select(attrs={"id": "id_product"})
     )
+
     # Optional; will default from Product.cost_price when missing
     order_price = forms.DecimalField(
         label="Order price",
         max_digits=12,
         decimal_places=2,
         required=False,
-        help_text="If left blank, we’ll use the model’s default order price."
+        help_text="If left blank, we’ll use the model’s default order price.",
+        widget=forms.NumberInput(attrs={"id": "id_order_price", "step": "any"})
     )
-    received_at = forms.DateField(
-        widget=forms.DateInput(attrs={"type": "date"}), label="Received date"
-    )
-    # ⬇⬇⬇  Make location optional so saving isn't blocked
-    location = forms.ModelChoiceField(
-        queryset=Location.objects.all().order_by("name"),
-        required=False,  # <- key change
-        empty_label="---------"
-    )
-    assigned_to_me = forms.BooleanField(label="Assign to me", required=False, initial=True)
 
-    def __init__(self, *args, **kwargs):
+    received_at = forms.DateField(
+        widget=forms.DateInput(attrs={"type": "date", "id": "id_received_at"}),
+        label="Received date"
+    )
+
+    # Location is optional but we preselect a tenant-aware default in __init__
+    location = forms.ModelChoiceField(
+        queryset=Location.objects.none(),   # set in __init__
+        required=False,
+        empty_label="---------",
+        widget=forms.Select(attrs={"id": "id_location"})
+    )
+
+    assigned_to_me = forms.BooleanField(
+        label="Assign to me",
+        required=False,
+        initial=True
+    )
+
+    def __init__(self, *args, user=None, business=None, **kwargs):
+        """
+        Accept user & business so we can:
+          - Restrict location choices to the current tenant
+          - Preselect a sensible default (store name / agent home)
+          - Still allow managers to add more locations later
+        """
         super().__init__(*args, **kwargs)
-        # ensure selects also get the .input class
-        self.fields["product"].widget.attrs.setdefault("class", "input")
-        self.fields["location"].widget.attrs.setdefault("class", "input")
+
+        # Restrict locations to tenant
+        loc_qs = Location.objects.all()
+        if business is not None:
+            loc_qs = loc_qs.filter(business=business)
+        loc_qs = loc_qs.order_by("name")
+        self.fields["location"].queryset = loc_qs
+
+        # Set default/initial location intelligently
+        initial_loc = _default_location_for(user, business, loc_qs)
+        if initial_loc:
+            self.fields["location"].initial = initial_loc.id
 
         # Try to set an initial order_price from product if available
-        # Works for initial render when a product is pre-selected server-side
         try:
             product = self.initial.get("product") or self.data.get("product")
             if product and not self.initial.get("order_price") and not self.data.get("order_price"):
                 if isinstance(product, Product):
                     self.fields["order_price"].initial = product.cost_price
                 else:
-                    # product id in POST/GET
                     p = Product.objects.filter(pk=product).only("cost_price").first()
                     if p:
                         self.fields["order_price"].initial = p.cost_price
@@ -131,7 +182,6 @@ class ScanInForm(StyledForm):
             if product:
                 cleaned["order_price"] = product.cost_price or Decimal("0.00")
             else:
-                # Keep a clear error message if product missing (shouldn’t happen due to field)
                 raise ValidationError("Select a product model to auto-fill the order price.")
         # location is optional; no extra validation here
         return cleaned
@@ -150,21 +200,45 @@ class ScanSoldForm(StyledForm):
             "minlength": "15",
             "pattern": r"\d{15}",
             "placeholder": "15-digit IMEI",
+            "id": "id_imei",
         }),
     )
     sold_at = forms.DateField(
-        widget=forms.DateInput(attrs={"type": "date"}), label="Sold date"
+        widget=forms.DateInput(attrs={"type": "date", "id": "id_sold_at"}),
+        label="Sold date"
     )
     # Selling price MUST be entered at scan sold
-    price = forms.DecimalField(max_digits=12, decimal_places=2)
-    commission_pct = forms.DecimalField(label="Commission %", max_digits=5, decimal_places=2, initial=0)
+    price = forms.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        widget=forms.NumberInput(attrs={"id": "id_price", "step": "any", "min": "0"})
+    )
+    commission_pct = forms.DecimalField(
+        label="Commission %",
+        max_digits=5,
+        decimal_places=2,
+        initial=0,
+        widget=forms.NumberInput(attrs={"id": "id_commission_pct", "step": "any", "min": "0", "max": "100"})
+    )
     location = forms.ModelChoiceField(
-        queryset=Location.objects.all().order_by("name")
+        queryset=Location.objects.none(),
+        widget=forms.Select(attrs={"id": "id_location"})
     )
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args, user=None, business=None, **kwargs):
         super().__init__(*args, **kwargs)
-        self.fields["location"].widget.attrs.setdefault("class", "input")
+
+        # Restrict location choices to this business
+        loc_qs = Location.objects.all()
+        if business is not None:
+            loc_qs = loc_qs.filter(business=business)
+        loc_qs = loc_qs.order_by("name")
+        self.fields["location"].queryset = loc_qs
+
+        # Default location (same strategy as ScanInForm)
+        initial_loc = _default_location_for(user, business, loc_qs)
+        if initial_loc:
+            self.fields["location"].initial = initial_loc.id
 
     def clean_imei(self):
         raw = self.cleaned_data.get("imei", "")
@@ -321,7 +395,7 @@ class PurchaseOrderHeaderForm(forms.ModelForm if AdminPurchaseOrder else forms.F
         supplier_email = forms.EmailField(required=False)
         supplier_phone = forms.CharField(max_length=40, required=False)
         agent_name = forms.CharField(max_length=120, required=False)
-        notes = forms.CharField(widget=forms.Textarea(attrs({"rows": 3, "class": "input"})), required=False)
+        notes = forms.CharField(widget=forms.Textarea(attrs={"rows": 3, "class": "input"}), required=False)
         currency = forms.CharField(max_length=8, initial="MWK", required=False)
         tax = forms.DecimalField(max_digits=14, decimal_places=2, required=False, initial=Decimal("0.00"))
 

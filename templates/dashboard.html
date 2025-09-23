@@ -95,9 +95,6 @@
   {# Resolve URLs we need here #}
   {% url 'inventory:scan_in' as url_scan_in %}
 
-  {# Derive a boolean for “manager-like” (admin/staff OR manager) #}
-  {% with is_mgr=(request.user.is_staff or request.user.profile.is_manager) %}
-
   <!-- KPI band -->
   <section class="kpi-row">
     <div class="kpi panel">
@@ -125,7 +122,7 @@
   </section>
 
   {# ✅ Financial Overview (AI-CFO) — managers/admins only #}
-  {% if is_mgr %}
+  {% if request.user.is_staff or request.user.is_superuser or request.user.profile.is_manager %}
   <section class="cfo-band">
     <div class="panel">
       {% include "dashboard/partials/cfo_tiles.html" %}
@@ -170,7 +167,7 @@
       <div class="card-head d-flex justify-content-between align-items-center">
         <div>
           AI-Driven Insights
-          {% if not is_mgr %}
+          {% if not request.user.is_staff and not request.user.is_superuser and not request.user.profile.is_manager %}
             <span class="small text-muted">· for your stock &amp; sales</span>
           {% endif %}
         </div>
@@ -250,7 +247,7 @@
   </section>
 
   {# ✅ Simulation & Scenarios — managers/admins only (agents don’t see this) #}
-  {% if is_mgr %}
+  {% if request.user.is_staff or request.user.is_superuser or request.user.profile.is_manager %}
   <section class="mb-3">
     <div class="panel card">
       <div class="card-head d-flex justify-content-between align-items-center">
@@ -282,7 +279,6 @@
     <i class="bi bi-upc-scan fs-4"></i>
   </a>
 
-  {% endwith %}
 {% endblock %}
 
 {% block extra_js %}

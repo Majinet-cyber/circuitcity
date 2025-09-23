@@ -1,6 +1,12 @@
-{% extends "base.html" %} {# or your dashboard wrapper #}
+{% extends "base.html" %}
 {% block content %}
+
 <h1 class="page-title">Create your store</h1>
+
+{% comment %}
+  Optional: if you also use Django's messages framework, you can show them here.
+  {% if messages %}{% for m in messages %}<div class="alert">{{ m }}</div>{% endfor %}{% endif %}
+{% endcomment %}
 
 <form method="post" novalidate>
   {% csrf_token %}
@@ -8,34 +14,212 @@
   <div class="form-row">
     <label for="id_full_name">Your full name</label>
     <input id="id_full_name" name="full_name" type="text"
-           value="{{ prefill.full_name|default_if_none:'' }}" required>
-    {% if errors.full_name %}<p class="error">{{ errors.full_name }}</p>{% endif %}
+           value="{{ prefill.full_name|default_if_none:'' }}"
+           placeholder="Your full name" autocomplete="name" required>
+    {% if errors.full_name %}<p class="error" role="alert">{{ errors.full_name }}</p>{% endif %}
   </div>
 
   <div class="form-row">
     <label for="id_business_name">Store name</label>
     <input id="id_business_name" name="business_name" type="text"
-           value="{{ prefill.business_name|default_if_none:'' }}" required>
-    {% if errors.business_name %}<p class="error">{{ errors.business_name }}</p>{% endif %}
+           value="{{ prefill.business_name|default_if_none:'' }}"
+           placeholder="e.g., Circuit City Area 25"
+           autocomplete="organization" required>
+    {% if errors.business_name %}<p class="error" role="alert">{{ errors.business_name }}</p>{% endif %}
   </div>
 
   <div class="form-row">
     <label for="id_subdomain">Subdomain (optional)</label>
     <input id="id_subdomain" name="subdomain" type="text"
-           value="{{ prefill.subdomain|default_if_none:'' }}" placeholder="e.g. circuitcity">
+           value="{{ prefill.subdomain|default_if_none:'' }}"
+           placeholder="e.g. circuitcity"
+           inputmode="latin"
+           pattern="[a-z0-9-]{3,40}"
+           title="3–40 lowercase letters, numbers, or hyphens.">
+    {% if errors.subdomain %}<p class="error" role="alert">{{ errors.subdomain }}</p>{% endif %}
   </div>
 
   <div class="form-row">
     <label for="id_password1">Password</label>
-    <input id="id_password1" name="password1" type="password" required>
+    <input id="id_password1" name="password1" type="password"
+           autocomplete="new-password" required
+           pattern="(?=.*[A-Za-z])(?=.*\d)(?=.*[^A-Za-z0-9]).{10,}"
+           title="At least 10 characters and include a letter, a number, and a special character.">
+    {% if errors.password1 %}<p class="error" role="alert">{{ errors.password1 }}</p>{% endif %}
+
+    <!-- Password helper -->
+    <div class="pw-help" id="pwHelp" aria-live="polite">
+      <div class="pw-meter" aria-hidden="true"><div class="pw-meter-fill" id="pwMeter"></div></div>
+      <ul class="pw-req" id="pwReq">
+        <li data-check="len">≥ 10 characters</li>
+        <li data-check="letter">Contains a letter</li>
+        <li data-check="number">Contains a number</li>
+        <li data-check="symbol">Contains a special character</li>
+      </ul>
+      <div class="pw-tip" id="pwTip">Tip: use a mix of words + numbers + symbols.</div>
+
+      <div class="pw-actions">
+        <button type="button" class="btn-secondary" id="pwGenerate">Generate strong password</button>
+        <button type="button" class="btn-secondary" id="pwCopy">Copy</button>
+        <button type="button" class="btn-secondary" id="pwToggle">Show</button>
+      </div>
+    </div>
   </div>
 
   <div class="form-row">
     <label for="id_password2">Confirm password</label>
-    <input id="id_password2" name="password2" type="password" required>
-    {% if errors.password2 %}<p class="error">{{ errors.password2 }}</p>{% endif %}
+    <input id="id_password2" name="password2" type="password"
+           autocomplete="new-password" required>
+    {% if errors.password2 %}<p class="error" role="alert">{{ errors.password2 }}</p>{% endif %}
+    <div class="pw-tip" id="pwMatchTip" aria-live="polite"></div>
   </div>
 
   <button class="btn btn-primary">Create my store</button>
 </form>
+
+<style>
+  /* --- Password helper UI (scoped) --- */
+  .pw-help{margin-top:6px}
+  .pw-req{list-style:none; padding-left:0; margin:8px 0 6px; display:grid; gap:6px}
+  .pw-req li{font-size:.92rem; color:#6b7280; display:flex; align-items:center; gap:8px}
+  .pw-req li.ok{color:#15803d}
+  .pw-req li::before{content:"○"; font-weight:700; color:#a3a3a3}
+  .pw-req li.ok::before{content:"✓"; color:#16a34a}
+
+  .pw-meter{height:8px; background:#eef2ff; border-radius:999px; overflow:hidden; margin:6px 0 4px; border:1px solid #e5e7eb}
+  .pw-meter-fill{height:100%; width:0%; transition:width .2s ease; background:linear-gradient(90deg,#f87171,#22c55e)}
+
+  .pw-tip{font-size:.92rem; color:#6b7280; margin-top:6px}
+
+  .pw-actions{display:flex; gap:8px; margin-top:8px; flex-wrap:wrap}
+  .pw-actions .btn-secondary{
+    padding:8px 10px; border-radius:10px; border:1px solid #dbe4ff;
+    background:#fff; color:#1d4ed8; font-weight:700; cursor:pointer;
+  }
+  .pw-actions .btn-secondary:hover{background:#f8fbff}
+
+  /* Optional: compact error styling if your base doesn't define it */
+  .error{color:#b91c1c; margin:.4rem 0 0; font-size:.92rem}
+</style>
+
+<script>
+(function(){
+  const p1 = document.getElementById('id_password1');
+  const p2 = document.getElementById('id_password2');
+  const meter = document.getElementById('pwMeter');
+  const reqList = document.getElementById('pwReq');
+  const tip = document.getElementById('pwTip');
+  const matchTip = document.getElementById('pwMatchTip');
+  const btnGen = document.getElementById('pwGenerate');
+  const btnCopy = document.getElementById('pwCopy');
+  const btnToggle = document.getElementById('pwToggle');
+
+  const re = {
+    letter: /[A-Za-z]/,
+    number: /\d/,
+    symbol: /[^A-Za-z0-9]/,
+  };
+
+  function commonPatterns(s){
+    s = (s || "").toLowerCase();
+    const bad = [
+      "password","passw0rd","qwerty","admin","welcome","letmein",
+      "imajinet","imajin","majin","123456","abcdef","111111"
+    ];
+    if (bad.some(w => s.includes(w))) return "Avoid common words (e.g., “password”, brand names).";
+    if (/(\d)\1{2,}/.test(s)) return "Avoid repeating the same character 3+ times.";
+    if (/(0123|1234|2345|3456|4567|5678|6789)/.test(s)) return "Avoid obvious sequences like 1234.";
+    return "";
+  }
+
+  function scorePassword(s){
+    let score = 0;
+    const hasLen = (s.length >= 10);
+    const hasL = re.letter.test(s);
+    const hasN = re.number.test(s);
+    const hasS = re.symbol.test(s);
+
+    // checklist UI
+    reqList.querySelectorAll('li').forEach(li => li.classList.remove('ok'));
+    if (hasLen)   reqList.querySelector('[data-check="len"]').classList.add('ok');
+    if (hasL)     reqList.querySelector('[data-check="letter"]').classList.add('ok');
+    if (hasN)     reqList.querySelector('[data-check="number"]').classList.add('ok');
+    if (hasS)     reqList.querySelector('[data-check="symbol"]').classList.add('ok');
+
+    // scoring (0-4)
+    score += hasLen ? 1 : 0;
+    score += hasL ? 1 : 0;
+    score += hasN ? 1 : 0;
+    score += hasS ? 1 : 0;
+
+    const pct = [0, 25, 50, 75, 100][score];
+    meter.style.width = pct + '%';
+
+    const suggests = [];
+    if (!hasLen) suggests.push("Make it at least 10 characters.");
+    if (!hasL)   suggests.push("Add a letter (A–Z).");
+    if (!hasN)   suggests.push("Add a number (0–9).");
+    if (!hasS)   suggests.push("Add a special symbol (e.g., ! @ # $ %).");
+
+    const patternWarn = commonPatterns(s);
+    if (patternWarn) suggests.push(patternWarn);
+
+    if (suggests.length === 0) {
+      tip.textContent = "Strong! Consider a passphrase (e.g., two words + digits + symbol).";
+    } else {
+      tip.textContent = "Suggestions: " + suggests.join(" ");
+    }
+    return score;
+  }
+
+  function checkMatch(){
+    if (p2.value && p1.value !== p2.value) {
+      p2.setCustomValidity("Passwords do not match.");
+      matchTip.textContent = "Passwords do not match.";
+      matchTip.style.color = "#8b1b1b";
+    } else {
+      p2.setCustomValidity("");
+      matchTip.textContent = p2.value ? "Passwords match." : "";
+      matchTip.style.color = p2.value ? "#15803d" : "#6b7280";
+    }
+  }
+
+  function rand(arr){ return arr[Math.floor(Math.random()*arr.length)]; }
+  function generateStrong(){
+    const words = ["nova","orbit","pixel","tiger","river","delta","amber","cobalt","matrix","quantum","rocket","ember","violet","aurora","zenith","neon"];
+    const w1 = rand(words), w2 = rand(words), w3 = rand(words);
+    const num = Math.floor(100 + Math.random()*900); // 3 digits
+    const sym = rand(["!","@","#","$","%","&","*","+","?"]);
+    const cap = s => s.charAt(0).toUpperCase()+s.slice(1);
+    const result = cap(w1) + w2 + cap(w3) + num + sym; // e.g., "NovaorbitZenith523!"
+    p1.value = result;
+    scorePassword(p1.value);
+    p2.value = "";
+    checkMatch();
+  }
+
+  function copyPw(){
+    if (!p1.value) return;
+    navigator.clipboard?.writeText(p1.value);
+    tip.textContent = "Copied to clipboard. Store it in a password manager.";
+  }
+
+  function togglePw(){
+    const show = p1.type === "password";
+    p1.type = show ? "text" : "password";
+    p2.type = show ? "text" : "password";
+    btnToggle.textContent = show ? "Hide" : "Show";
+  }
+
+  p1.addEventListener('input', () => { scorePassword(p1.value); checkMatch(); });
+  p2.addEventListener('input', checkMatch);
+  btnGen.addEventListener('click', generateStrong);
+  btnCopy.addEventListener('click', copyPw);
+  btnToggle.addEventListener('click', togglePw);
+
+  // initial
+  scorePassword("");
+})();
+</script>
+
 {% endblock %}

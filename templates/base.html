@@ -1,6 +1,6 @@
 {% load static %}
 <!doctype html>
-<html lang="en" data-theme="style-2">
+<html lang="en" data-theme="blue">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1, user-scalable=no">
@@ -9,25 +9,38 @@
   <meta name="color-scheme" content="light dark" />
   <meta name="theme-color" content="#0b1220" />
 
+  <!-- Favicon / PWA (paths fixed to existing files) -->
+  <link rel="icon" href="{% static 'favicon.ico' %}">
+  <link rel="icon" type="image/png" sizes="32x32" href="{% static 'img/logo-32.png' %}">
+  <link rel="apple-touch-icon" sizes="192x192" href="{% static 'icons/icon-192.png' %}">
+  <link rel="manifest" href="{% static 'manifest.webmanifest' %}">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+
   <script>
-    (function(){try{
-      const saved = localStorage.getItem("cc-theme");
-      if (saved) document.documentElement.setAttribute("data-theme", saved);
-    }catch(_){}})();
+    // Use saved theme if present; otherwise stay on "blue"
+    (function () {
+      try {
+        const saved = localStorage.getItem("cc-theme");
+        if (saved) document.documentElement.setAttribute("data-theme", saved);
+      } catch (_) {}
+    })();
   </script>
 
   <!-- Bootstrap & Icons -->
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
   <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
 
-  <!-- Core styles -->
+  {# ===== Core styles (order matters) ===== #}
   <link rel="stylesheet" href="{% static 'css/tokens.css' %}?v={{ STATIC_VERSION|default:'1' }}">
   <link rel="stylesheet" href="{% static 'css/ui.css' %}?v={{ STATIC_VERSION|default:'1' }}">
   <link rel="stylesheet" href="{% static 'css/app.css' %}?v={{ STATIC_VERSION|default:'1' }}">
+  <link rel="stylesheet" href="{% static 'css/inventory-glass.css' %}?v={{ STATIC_VERSION|default:'1' }}">
+  <link rel="stylesheet" href="{% static 'css/polish.css' %}?v={{ STATIC_VERSION|default:'1' }}">
   <link rel="stylesheet" href="{% static 'css/v2-overrides.css' %}?v={{ STATIC_VERSION|default:'1' }}">
   <link rel="stylesheet" href="{% static 'css/mobile.css' %}?v={{ STATIC_VERSION|default:'1' }}">
 
   <style>
+    /* ---- Blue theme tokens (light content + midnight sidebar) ---- */
     :root{
       --sidebar-w: 270px; --radius: 12px;
       --shadow-sm: 0 2px 10px rgba(2,8,23,.08);
@@ -38,8 +51,9 @@
       --line:#d9e2ef; --card:#ffffff;
       --chart-grid: rgba(2,6,23,.10);
 
-      /* Brand */
-      --cc-accent:#3b82f6; --cc-accent-2:#60a5fa;
+      /* Brand blues */
+      --cc-accent:#3b82f6;   /* blue-500 */
+      --cc-accent-2:#60a5fa; /* blue-400 */
 
       --font-sans: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Arial, "Noto Sans";
       --fs-2xl: clamp(20px, 2.7vw, 24px);
@@ -59,7 +73,7 @@
       --glass-bd: 1px solid var(--line);
       --glass-shadow: 0 14px 40px rgba(2,6,23,.10);
 
-      /* ========= Midnight Glass Sidebar ========= */
+      /* Midnight Glass Sidebar */
       --mid-bg:#0f172a;                 /* slate-900 */
       --mid-ink:#cbd5e1;                /* text */
       --mid-ink-dim:#94a3b8;            /* dim text */
@@ -70,17 +84,25 @@
       --neon-green:#10b981;
     }
 
+    /* Accessibility: respect reduced motion */
     @media (prefers-reduced-motion: reduce){
       *{ animation-duration:1ms !important; animation-iteration-count:1 !important; transition-duration:1ms !important; scroll-behavior:auto !important; }
     }
+
     html,body{height:100%}
-    body{ margin:0; background:var(--bg); color:var(--ink); font-family:var(--font-sans); -webkit-font-smoothing:antialiased; }
+    body{
+      margin:0; background:var(--bg); color:var(--ink);
+      font-family:var(--font-sans); -webkit-font-smoothing:antialiased;
+    }
     a{text-decoration:none}
+
+    /* --- Safety reset: in case any test overlay dimmed the whole app --- */
+    html, body, .cc-main, .cc-page { filter:none !important; opacity:1 !important; }
 
     /* Shell */
     .cc-shell{ min-height:100dvh; display:flex; width:100%; }
 
-    /* ========= Midnight Glass Sidebar ========= */
+    /* ===== Midnight Glass Sidebar ===== */
     .cc-sidebar{
       position:sticky; top:0; width:var(--sidebar-w); flex:0 0 var(--sidebar-w);
       height:100dvh; overflow:auto; z-index:10; padding:16px;
@@ -92,7 +114,6 @@
         radial-gradient(1000px 600px at 110% 110%, rgba(16,185,129,.06), transparent 45%),
         var(--mid-bg);
       border-right: 1px solid var(--mid-sep);
-
       -webkit-backdrop-filter: blur(14px) saturate(120%);
       backdrop-filter: blur(14px) saturate(120%);
       box-shadow: inset 0 1px 0 rgba(255,255,255,.04);
@@ -103,7 +124,6 @@
       background: linear-gradient(135deg, rgba(34,211,238,.22), rgba(16,185,129,.18));
       color:#e2e8f0; box-shadow: inset 0 1px 0 rgba(255,255,255,.25);
     }
-
     .menu-group{
       font-size:.72rem; font-weight:800; letter-spacing:.08em; text-transform:uppercase;
       margin:8px 6px 6px; color: var(--mid-ink-dim);
@@ -119,17 +139,13 @@
     .navlink:hover{
       background: var(--mid-hover);
       border-color: rgba(34,211,238,.28);
-      box-shadow:
-        0 6px 20px rgba(34,211,238,.12),
-        0 0 0 1px rgba(34,211,238,.22) inset;
+      box-shadow: 0 6px 20px rgba(34,211,238,.12), 0 0 0 1px rgba(34,211,238,.22) inset;
       transform: translateY(-1px);
     }
     .navlink.active{
       background: var(--mid-active);
       border-color: rgba(34,211,238,.35);
-      box-shadow:
-        0 10px 28px rgba(34,211,238,.16),
-        inset 0 0 0 1px rgba(34,211,238,.35);
+      box-shadow: 0 10px 28px rgba(34,211,238,.16), inset 0 0 0 1px rgba(34,211,238,.35);
       color:#eaf2ff;
     }
     .navlink.active .bi{ color:#eaf2ff; }
@@ -148,10 +164,8 @@
       border-bottom:1px solid var(--line);
     }
     .cc-header .topbar{
-      display:grid;
-      grid-template-columns: 1fr auto auto;
-      gap:.75rem; align-items:center;
-      min-height:64px;
+      display:grid; grid-template-columns: 1fr auto auto;
+      gap:.75rem; align-items:center; min-height:64px;
     }
     .cc-header h1{ line-height:var(--lh-tight); letter-spacing:.01em; font-size:var(--fs-xl); font-weight:900; margin:0; }
 
@@ -225,16 +239,14 @@
     .notif-btn:hover{ transform:translateY(-1px); box-shadow:var(--shadow-sm); }
     .notif-dot{
       position:absolute; right:6px; top:6px; width:8px; height:8px; border-radius:50%;
-      background:#ef4444; box-shadow:0 0 0 2px #fff;
-      display:none;
+      background:#ef4444; box-shadow:0 0 0 2px #fff; display:none;
     }
     .notif-menu{
       position:absolute; right:0; top:calc(100% + 8px); min-width:360px; max-width:min(92vw,420px);
       border-radius:14px; border:1px solid var(--line);
       background:color-mix(in oklab, var(--card) 94%, transparent);
       -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px);
-      box-shadow: 0 14px 40px rgba(2,6,23,.18);
-      display:none; overflow:hidden;
+      box-shadow: 0 14px 40px rgba(2,6,23,.18); display:none; overflow:hidden;
     }
     .notif-menu.open{ display:block; animation: fadeIn var(--med) var(--elevate); }
     .notif-item{
@@ -243,10 +255,6 @@
     }
     .notif-item .badge{ height:22px; align-self:center; }
     .notif-empty{ padding:1rem; color:#64748b; }
-    @media (max-width: 576px){
-      .notif-menu{ right:8px; left:8px; min-width:auto; }
-      .cc-search{ max-width:100%; }
-    }
 
     /* Mobile drawer */
     @media (max-width: 992px){
@@ -262,7 +270,7 @@
       .offcanvas, [data-legacy-menu]{ display:none !important; }
     }
 
-    /* Mobile tab bar (Layby tab removed) */
+    /* Mobile tab bar */
     .mobile-tabbar{ position:sticky; bottom:0; left:0; right:0; z-index:1030; backdrop-filter: blur(10px);
       background:color-mix(in oklab, var(--card) 85%, transparent); border-top:1px solid var(--line); }
     .mobile-tabbar .tab{ flex:1; text-align:center; padding:10px 4px; font-size:12px; color:var(--muted); min-height:44px; }
@@ -272,9 +280,46 @@
     .table td, .table th{ vertical-align: middle; }
 
     /* Go button */
-    .go-btn{ position:relative; background: var(--cc-accent); color:#fff; font-weight:800; border:0; min-width:56px;
+    .go-btn{ position:relative; background: var(--cc-accent); color:#fff; font-weight:800; min-width:56px;
       transition: background .2s var(--elevate), transform .2s var(--elevate); }
     .go-btn:focus-visible{ outline: 3px solid color-mix(in oklab, #22c55e 35%, transparent); outline-offset:2px; }
+
+    /* ================= Dashboard visibility / contrast fixes ================= */
+    .cc-page .card,
+    .cc-page .glass-card,
+    .cc-page .kpi,
+    .cc-page .stat-card,
+    .cc-page .dash-card {
+      background: #fff !important;
+      border: 1px solid #d6e0ef !important;
+      box-shadow: 0 8px 22px rgba(2, 6, 23, .06) !important;
+    }
+    .cc-page .card h1, .cc-page .card h2, .cc-page .card h3,
+    .cc-page .kpi h1, .cc-page .kpi h2, .cc-page .kpi h3 { color: #0b1220; }
+    .cc-page .card .text-muted, .cc-page .kpi .text-muted { color: #5a6b82 !important; }
+
+    .cc-page .form-control, .cc-page .form-select {
+      background: #fff !important;
+      border: 1px solid #c9d5e8 !important;
+      color: #0b1220 !important;
+    }
+    .btn.primary {
+      background: #2563eb !important;  /* blue-600 */
+      color: #fff !important; border: 0 !important;
+      box-shadow: 0 10px 22px rgba(37, 99, 235, .25);
+    }
+    .btn.primary:hover, .btn.primary:focus-visible {
+      filter: brightness(1.05); transform: translateY(-1px);
+    }
+    .btn-outline-primary {
+      color: #1d4ed8 !important; border-color: #3b82f6 !important; background: #ffffff !important; font-weight: 800;
+    }
+    .btn-outline-primary:hover, .btn-outline-primary:focus-visible {
+      background: #3b82f6 !important; color: #fff !important; box-shadow: 0 10px 22px rgba(59,130,246,.25);
+    }
+    .dashboard-links .btn, .cc-quick-links .btn {
+      border-radius: 12px; padding: .7rem 1rem; background: #2563eb !important; color: #fff !important; border: 0 !important;
+    }
   </style>
 
   {% block extra_head %}{% endblock %}
@@ -283,10 +328,7 @@
 <body>
 
 <div class="cc-shell">
-  {# ---------- Sidebar: always present (safe fallback) ---------- #}
-  {% block sidebar %}
-    {% include "partials/sidebar.html" %}
-  {% endblock %}
+  {% block sidebar %}{% include "partials/sidebar.html" %}{% endblock %}
 
   <button class="mobile-toggle tap focus-ring" id="sidebarOpen" aria-label="Open menu"><i class="bi bi-list"></i></button>
   <div class="cc-backdrop" id="ccBackdrop" aria-hidden="true"></div>
@@ -308,7 +350,6 @@
     {% url 'tenants:choose_business'     as url_choose_business %}
     {% url 'tenants:manager_review_agents' as url_manager_agents %}
     {% url 'admin:tenants_business_changelist' as url_admin_business %}
-    {# NEW: Time pages for role-aware sidebar links #}
     {% url 'inventory:time_checkin'      as url_time_checkin %}
     {% url 'inventory:time_logs'         as url_time_logs %}
 
@@ -318,7 +359,6 @@
           <div class="cc-page topbar">
             <h1 class="fw-bold">{% block header_title %}Dashboard{% endblock %}</h1>
 
-            {# Search — visible on dashboard or when show_search is set #}
             {% if show_search or "inventory/dashboard" in path %}
               <div class="cc-search">
                 <i class="bi bi-search text-muted"></i>
@@ -330,10 +370,8 @@
             {% endif %}
 
             <div class="cc-actions">
-              {# -------- HQ / Tenant Pill -------- #}
               <div class="position-relative me-1" id="tenantRoot">
                 {% if request.business %}
-                  {# Standard tenant pill when a business is active #}
                   <div class="tenant-pill hover-lift tap" role="button" id="tenantBtn" aria-haspopup="true" aria-expanded="false">
                     <span class="tenant-dot" aria-hidden="true"></span>
                     <span class="tenant-name">{{ request.business.name }}</span>
@@ -361,7 +399,6 @@
                     {% endif %}
                   </div>
                 {% elif request.user.is_superuser %}
-                  {# HQ pill for superusers when no active business is selected #}
                   <a class="tenant-pill hover-lift tap" href="/hq/">
                     <span class="tenant-dot" style="background:#60a5fa"></span>
                     <span class="tenant-name">Platform HQ</span>
@@ -375,6 +412,7 @@
                   </a>
                 {% endif %}
               </div>
+
               {# Notifications #}
               <div class="position-relative" id="ccNotifRoot"
                    data-scope="{% block notif_scope %}dashboard{% endblock %}"
@@ -425,7 +463,6 @@
       {% block main %}{% endblock %}
     </main>
 
-    {# Bottom Tab Bar – Layby tab removed #}
     <nav class="mobile-tabbar d-flex d-md-none">
       <a class="tab {% if active_tab == 'home' %}active{% endif %}" href="{{ url_home|default:'/inventory/dashboard/' }}">
         <i class="bi bi-speedometer2 d-block"></i>Home
@@ -449,7 +486,6 @@
           </a>
         {% endif %}
       {% endif %}
-      {# Layby tab intentionally omitted #}
     </nav>
   </div>
 </div>
@@ -591,29 +627,6 @@
     }
     inp.addEventListener('keydown', (e)=>{ if (e.key === 'Enter'){ e.preventDefault(); handle(); }});
     btn.addEventListener('click', handle);
-  })();
-
-  /* Go button: first-hover hint */
-  (function(){
-    const btn = document.getElementById('global-search-go');
-    if(!btn) return;
-    const SEEN_KEY = 'cc_go_seen';
-    const seen = localStorage.getItem(SEEN_KEY) === '1';
-    btn.title = 'Go';
-    if (!seen){
-      const showOnce = () => {
-        const original = btn.textContent;
-        btn.textContent = 'Go';
-        btn.classList.add('go-first');
-        setTimeout(() => {
-          btn.textContent = original;
-          btn.classList.remove('go-first');
-          localStorage.setItem(SEEN_KEY, '1');
-        }, 1200);
-      };
-      btn.addEventListener('mouseenter', showOnce, { once: true });
-      btn.addEventListener('focus', showOnce, { once: true });
-    }
   })();
 
   /* Notifications bell */

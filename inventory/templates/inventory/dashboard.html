@@ -300,7 +300,6 @@
   const GRID_CLR=()=> cssVar('--chart-grid','#d8e3ff');
   const BRAND  =()=> cssVar('--cc-accent','#3b82f6');
 
-
   // axis helpers
   function chooseMoneyStep(max){
     const c=[100000,200000,250000,500000,1000000,2000000,5000000];
@@ -367,7 +366,7 @@
 
     if(period==='date'){
       if(!dateInp.value){ alert('Pick a date'); return; }
-      dateQS = `&on=${encodeURIComponent(dateInp.value)}`;   // <-- changed to &on=
+      dateQS = `&on=${encodeURIComponent(dateInp.value)}`;   // <-- &on=
     }
 
     const getData=(m)=> fetchJSON(
@@ -420,7 +419,7 @@
     if(p==='date'){
       p='today'; // API accepts a date via &on=...; period can be anything, using 'today' is fine.
       if(!dateInp.value){ alert('Pick a date'); return; }
-      dateQS=`&on=${encodeURIComponent(dateInp.value)}`;     // <-- changed to &on=
+      dateQS=`&on=${encodeURIComponent(dateInp.value)}`;     // <-- &on=
     }
 
     let data=null;
@@ -554,7 +553,7 @@
     let dateQS='';
     if(period==='date'){
       if(!dInp.value){ alert('Pick a date'); return; }
-      dateQS=`&on=${encodeURIComponent(dInp.value)}`;       // <-- changed to &on=
+      dateQS=`&on=${encodeURIComponent(dInp.value)}`;       // <-- &on=
     }
 
     let data=null;

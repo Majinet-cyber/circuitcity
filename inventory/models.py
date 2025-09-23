@@ -1,4 +1,3 @@
-# inventory/models.py
 from datetime import timedelta
 
 from django.conf import settings
@@ -45,11 +44,26 @@ class Location(models.Model):
         help_text="Meters around (lat, lon) considered on-site."
     )
 
+    # ---- business default toggle ----
+    is_default = models.BooleanField(
+        default=False,
+        help_text="When true, this is the default store/location for this business."
+    )
+
     class Meta:
         unique_together = (("business", "name"),)
         indexes = [
             models.Index(fields=["business", "name"], name="loc_biz_name_idx"),
             models.Index(fields=["city"], name="loc_city_idx"),
+            models.Index(fields=["business", "is_default"], name="loc_biz_isdefault_idx"),
+        ]
+        constraints = [
+            # At most one default per business (partial unique)
+            models.UniqueConstraint(
+                fields=["business", "is_default"],
+                condition=Q(is_default=True),
+                name="one_default_location_per_business",
+            ),
         ]
 
     def __str__(self):
@@ -57,6 +71,47 @@ class Location(models.Model):
         if self.business_id:
             label = f"{label} · {getattr(self.business, 'name', self.business_id)}"
         return label
+
+    def save(self, *args, **kwargs):
+        """
+        Ensure only one default per business by unsetting others after save.
+        """
+        super().save(*args, **kwargs)
+        if self.is_default and self.business_id:
+            Location.objects.filter(
+                business_id=self.business_id, is_default=True
+            ).exclude(pk=self.pk).update(is_default=False)
+
+    @classmethod
+    def default_for(cls, business_or_id):
+        """Return the default location if set, else the first one (if any)."""
+        biz_id = business_or_id.id if isinstance(business_or_id, Business) else business_or_id
+        if not biz_id:
+            return None
+        default = cls.objects.filter(business_id=biz_id, is_default=True).first()
+        if default:
+            return default
+        return cls.objects.filter(business_id=biz_id).order_by("name", "id").first()
+
+    @classmethod
+    def ensure_default_for_business(cls, business: Business):
+        """
+        Return a default location for the business; create one if none exist.
+        This prevents NOT NULL errors when callers omit the location.
+        """
+        if not business:
+            return None
+        loc = cls.default_for(business.id)
+        if loc:
+            return loc
+        # Create a sensible first store
+        name = f"{getattr(business, 'name', 'Main')} Store".strip()
+        try:
+            loc = cls.objects.create(business=business, name=name, is_default=True)
+        except Exception:
+            # Fallback if the above name collides
+            loc = cls.objects.create(business=business, name="Main Store", is_default=True)
+        return loc
 
 
 class AgentProfile(models.Model):
@@ -219,9 +274,14 @@ class InventoryItem(models.Model):
         help_text="15-digit IMEI. Unique per business when provided.",
     )
     product = models.ForeignKey("Product", on_delete=models.PROTECT)
-    received_at = models.DateField()  # stock-in date
+
+    # default today
+    received_at = models.DateField(default=timezone.localdate)  # stock-in date
+
+    # give NOT NULL a safe default
     order_price = models.DecimalField(
         max_digits=12, decimal_places=2,
+        default=0,
         validators=[MinValueValidator(0)],
         help_text="Must be zero or positive.",
     )
@@ -305,11 +365,29 @@ class InventoryItem(models.Model):
     def is_sold(self) -> bool:
         return self.status == "SOLD"
 
+    # --- Compatibility helpers for templates / legacy code ---
+    @property
+    def location_safe(self):
+        """
+        Back-compat accessor for templates that previously used `item.location`.
+        Prefer `current_location`, but expose a stable name that won’t break.
+        """
+        return getattr(self, "current_location", None)
+
+    @property
+    def location(self):
+        """
+        Hard back-compat: many older views/serializers may still access .location.
+        Map it to .current_location to prevent AttributeError or select_related errors.
+        """
+        return getattr(self, "current_location", None)
+
     def clean(self):
         errors = {}
 
         if self.status == "SOLD" and not self.sold_at:
-            errors["sold_at"] = "sold_at is required when status is SOLD."
+            # Allow auto-fill in save(); don't hard-require here
+            pass
 
         if self.imei:
             s = str(self.imei).strip()
@@ -324,6 +402,34 @@ class InventoryItem(models.Model):
 
         if errors:
             raise ValidationError(errors)
+
+    # ---- auto-defaults for date/location/sold_at ----
+    def save(self, *args, **kwargs):
+        # Ensure received_at is set (field has default, but just in case)
+        if not getattr(self, "received_at", None):
+            self.received_at = timezone.localdate()
+
+        # Auto-pick or create a default store for the business if missing
+        if not getattr(self, "current_location_id", None) and self.business_id:
+            # We require the Business instance to create a location if needed
+            biz = getattr(self, "business", None)
+            default_loc = None
+            try:
+                # Try strong default first
+                default_loc = Location.default_for(self.business_id)
+                if default_loc is None and biz is not None:
+                    # Create one if the business has zero locations
+                    default_loc = Location.ensure_default_for_business(biz)
+            except Exception:
+                default_loc = None
+            if default_loc:
+                self.current_location = default_loc
+
+        # If it's marked sold without a timestamp, use now
+        if self.status == "SOLD" and not self.sold_at:
+            self.sold_at = timezone.now()
+
+        super().save(*args, **kwargs)
 
 
 # =========================
@@ -460,7 +566,7 @@ class AgentPasswordReset(models.Model):
 
     @staticmethod
     def generate_code() -> str:
-        return "".join(secrets.choice(string.digits) for _ in range(6))
+        return "".join(secrets.choice(string.digits) for _ in 6)
 
 
 class TimeLog(models.Model):
@@ -490,7 +596,7 @@ class TimeLog(models.Model):
         ]
 
     def __str__(self):
-        where = self.location.name if self.location_id else "unknown"
+        where = self.location.name if (self.location_id and getattr(self.location, "name", None)) else "unknown"
         return f"{self.user} {self.checkin_type} @ {self.logged_at:%Y-%m-%d %H:%M} ({where})"
 
 
