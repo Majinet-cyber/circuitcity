@@ -8,6 +8,7 @@ import os
 import re
 import logging
 import sys
+import importlib
 
 # -------------------------------------------------
 # Helpers
@@ -35,6 +36,19 @@ def feature_enabled(code: str, *, default: bool) -> bool:
     Example: FEATURE_LAYBY=1, FEATURE_SIMULATOR=0
     """
     return env_bool(f"FEATURE_{code.upper()}", default)
+
+def _maybe(dotted_path: str) -> str | None:
+    """
+    Return dotted_path if it can be imported; else None.
+    Useful for optional middleware.
+    """
+    try:
+        mod_path, attr = dotted_path.rsplit(".", 1)
+        mod = importlib.import_module(mod_path)
+        getattr(mod, attr)
+        return dotted_path
+    except Exception:
+        return None
 
 # -------------------------------------------------
 # Base paths
@@ -226,10 +240,12 @@ MIDDLEWARE = [
     # Messages / clickjacking
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
-
-    # ---- Friendly error catcher (keep near the end) ----
-    "cc.middleware.FriendlyErrorsMiddleware",
 ]
+
+# Optional friendly error catcher (only include if present)
+_opt_friendly = _maybe("cc.middleware.FriendlyErrorsMiddleware")
+if _opt_friendly:
+    MIDDLEWARE.append(_opt_friendly)
 
 # Let middleware handle exceptions in non-DEBUG environments
 DEBUG_PROPAGATE_EXCEPTIONS = False
@@ -251,11 +267,6 @@ TEMPLATES = [
                 "django.template.context_processors.request",
                 "django.contrib.auth.context_processors.auth",
                 "django.contrib.messages.context_processors.messages",
-                # (Optional) add more defaults if you like:
-                # "django.template.context_processors.i18n",
-                # "django.template.context_processors.tz",
-                # "django.template.context_processors.static",
-                # "django.template.context_processors.media",
             ],
         },
     },
