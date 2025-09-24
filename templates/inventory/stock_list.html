@@ -28,7 +28,7 @@
 
   section{max-width:1200px;margin-inline:auto;color:var(--cc-text)}
 
-  /* ===== Glassmorphic buttons (drop-in; keep your HTML) ===== */
+  /* ===== Glassmorphic buttons ===== */
   .glass-btn,
   .btn-deep{
     --btn-bg: linear-gradient(180deg, rgba(255,255,255,.28), rgba(255,255,255,.12));
@@ -72,20 +72,16 @@
   }
   .glass-btn:active, .btn-deep:active{ transform: translateY(0) scale(.98); }
   .glass-btn:focus-visible, .btn-deep:focus-visible{
-    outline:none;
-    box-shadow: var(--btn-shadow), var(--btn-inset), var(--btn-ring);
+    outline:none; box-shadow: var(--btn-shadow), var(--btn-inset), var(--btn-ring);
   }
   .glass-icon{ width:1.25rem; height:1.25rem; display:inline-grid; place-items:center; }
 
-  /* Color variants */
   .is-primary{ --btn-tint: rgba(37,99,235,.22); --btn-ring: 0 0 0 2px rgba(37,99,235,.35); }
   .is-green  { --btn-tint: rgba(22,163,74,.22);  --btn-ring: 0 0 0 2px rgba(22,163,74,.35); }
   .is-amber  { --btn-tint: rgba(217,119,6,.23);  --btn-ring: 0 0 0 2px rgba(217,119,6,.35); }
   .is-rose   { --btn-tint: rgba(244,63,94,.22);  --btn-ring: 0 0 0 2px rgba(244,63,94,.35); }
   .btn-sm{ min-height:36px; padding:.45rem .7rem; border-radius:12px; }
-  .btn-lg{ min-height:52px; padding:.8rem 1.15rem; border-radius:16px; }
 
-  /* Header row */
   .hero-row{ display:flex; flex-wrap:wrap; gap:.6rem; align-items:center; margin-bottom:.6rem }
   .brand-chip{
     font-weight:800; display:inline-flex; align-items:center; gap:.5rem;
@@ -94,7 +90,6 @@
     color:var(--cc-text);
   }
 
-  /* KPI line */
   .kpi-line{ display:flex; flex-wrap:wrap; gap:.75rem; align-items:center; margin:.35rem 0 1rem }
   .kpi-pill{
     display:inline-flex; align-items:center; gap:.5rem; padding:.45rem .7rem; border-radius:.6rem;
@@ -103,22 +98,17 @@
   }
   .kpi-pill b{ font-weight:800 }
 
-  /* Filters */
   .filters-wrap{ margin:.25rem 0 .85rem }
   .filters-row{ display:flex; gap:.5rem; align-items:center; flex-wrap:wrap }
   .filters-row input[type="text"], .filters-row select, .filters-row input[type="number"]{
     padding:.5rem .6rem; border-radius:.55rem; border:1px solid var(--cc-border); background:var(--cc-panel); color:var(--cc-text);
     min-height:44px;
   }
-  /* keep filters on one line on wide screens */
   @media (min-width: 992px){ .filters-row{ flex-wrap: nowrap; } }
-  /* grow search nicely */
   .filters-row input[name="q"]{ flex:1 1 420px; min-width:260px; }
-  /* keep “Status: All” inline */
   .filters-row .status-inline{ display:inline-flex; align-items:center; gap:.35rem; white-space:nowrap; }
   .filters-right{ margin-left:auto; display:flex; gap:.5rem; align-items:center; flex-wrap:wrap }
 
-  /* Ticker + table */
   .ticker{ background:var(--cc-panel-2); border:1px solid var(--cc-border); border-radius:14px; padding:12px; color:var(--cc-text) }
   .ticker-row{ display:grid; grid-template-columns:1.2fr 1fr .8fr .8fr .8fr 1fr 1fr; gap:12px; align-items:center }
   .ticker-row > div{ overflow:hidden; text-overflow:ellipsis; white-space:nowrap }
@@ -136,7 +126,6 @@
   #stockTable tbody tr:hover td{ background: color-mix(in oklab, var(--cc-accent) 12%, transparent); color:#0b1220 }
   #stockTable td.num{ text-align:right; font-variant-numeric:tabular-nums }
 
-  /* Mobile table */
   .table-mobile{ width:100%; border:1px solid var(--cc-border); border-radius:12px; overflow:hidden; background:var(--cc-panel); box-shadow:var(--cc-shadow) }
   .table-mobile tr{ border-bottom:1px solid var(--cc-border) }
   .table-mobile td{ padding:.6rem .65rem }
@@ -148,7 +137,6 @@
   .badge-chip.green{ background:#ecfdf5; color:#065f46; border-color:#a7f3d0 }
   .badge-chip.red{ background:#fef2f2; color:#991b1b; border-color:#fecaca }
 
-  /* Charts */
   .charts{ display:grid; grid-template-columns:1.4fr 1fr; gap:14px; margin-top:14px }
   .chart-card{ background:var(--cc-panel-2); border:1px solid var(--cc-border); border-radius:14px; padding:12px; position:relative; overflow:hidden; color:var(--cc-text) }
   .chart-card h3{ margin:.25rem 0 .6rem; font-size:.95rem; color:var(--cc-muted) }
@@ -156,7 +144,6 @@
   .chart-canvas{ width:100% !important; max-width:100%; height:240px !important }
   .chart-canvas--sm{ height:200px !important }
 
-  /* Skeletons */
   .chart-skel{
     position:absolute; inset:44px 12px 12px 12px; border-radius:10px;
     background:linear-gradient(90deg, rgba(148,163,184,.18), rgba(255,255,255,.55), rgba(148,163,184,.18));
@@ -164,7 +151,6 @@
   }
   @keyframes skel{ 0%{background-position:200% 0} 100%{background-position:-200% 0} }
 
-  /* Battery */
   .battery-card{ background:var(--cc-panel-2); border:1px solid var(--cc-border); border-radius:14px; padding:12px; margin-top:14px }
   .battery-wrap{ display:flex; align-items:center; gap:1rem; flex-wrap:wrap }
   .battery{ position:relative; width:220px; height:68px; border-radius:14px;
@@ -174,7 +160,6 @@
   .battery-label{ font-weight:800 }
   .battery-hint{ color:var(--cc-muted); font-size:.85rem }
 
-  /* FAB */
   .cc-fab{
     position:fixed; right:18px;
     bottom: calc(var(--tabbar-h,64px) + var(--safe-bottom, 0px) + 18px);
@@ -257,20 +242,24 @@
 
         <label class="status-inline">Status:
           <select name="status">
-            <option value="" {% if not status %}selected{% endif %}>All</option>
+            <option value="all" {% if status == 'all' or not status %}selected{% endif %}>All</option>
             <option value="in_stock" {% if status == 'in_stock' %}selected{% endif %}>In stock</option>
             <option value="sold" {% if status == 'sold' %}selected{% endif %}>Sold</option>
           </select>
         </label>
 
         <label class="ms-1">
-          <input type="checkbox" name="archived" value="1" {% if show_archived %}checked{% endif %}> Include archived
+          <input type="checkbox" name="include_archived" value="1" {% if include_archived %}checked{% endif %}> Include archived
         </label>
 
-        <label>Rows/page: <input type="number" name="page_size" min="10" max="200" value="{{ request.GET.page_size|default:50 }}" inputmode="numeric"></label>
+        <label>Rows/page:
+          <input type="number" name="page_size" min="10" max="200" value="{{ rows_per_page|default:50 }}" inputmode="numeric">
+        </label>
 
         <button class="btn-deep tap is-primary" type="submit" onclick="window.buzz&&buzz(8)">Apply</button>
-        <a class="btn-deep tap is-rose" href="{{ export_csv_url|default:'/inventory/export/' }}?{% for k,v in request.GET.items %}{% if k != 'export' %}{{k}}={{v|urlencode}}&{% endif %}{% endfor %}export=csv" onclick="window.buzz&&buzz(8)">Download CSV</a>
+        <a class="btn-deep tap is-rose"
+           href="{{ export_csv_url|default:'/inventory/export/' }}?{% for k,v in request.GET.items %}{% if k != 'export' %}{{k}}={{v|urlencode}}&{% endif %}{% endfor %}export=csv"
+           onclick="window.buzz&&buzz(8)">Download CSV</a>
 
         {% if place_order_url %}
           {% if IS_MANAGER or request.user.is_staff or request.user.is_superuser or request.user.profile.is_manager %}
@@ -294,7 +283,7 @@
       <button class="btn-deep tap is-primary btn-sm" id="prevRow" type="button" aria-label="Previous" onclick="window.buzz&&buzz(6)">◀ Prev</button>
       <button class="btn-deep tap is-primary btn-sm" id="nextRow" type="button" aria-label="Next" onclick="window.buzz&&buzz(6)">Next ▶</button>
       <a class="btn-deep tap is-green" id="viewAllBtn"
-         href="{{ stock_url|default:'/inventory/list/' }}?view=all{% if q %}&q={{ q|urlencode }}{% endif %}{% if status %}&status={{ status }}{% endif %}{% if show_archived %}&archived=1{% endif %}{% if request.GET.page_size %}&page_size={{ request.GET.page_size }}{% endif %}"
+         href="{{ stock_url|default:'/inventory/list/' }}?view=all{% if q %}&q={{ q|urlencode }}{% endif %}{% if status %}&status={{ status }}{% endif %}{% if include_archived %}&include_archived=1{% endif %}{% if rows_per_page %}&page_size={{ rows_per_page }}{% endif %}"
          onclick="window.buzz&&buzz(6)">
          View all stock
       </a>
@@ -322,7 +311,7 @@
                 <td>{{ it.imei|default:"" }}</td>
                 <td>{{ it.product }}</td>
                 <td>
-                  {% if it.status == 'SOLD' %}
+                  {% if it.status|lower == 'sold' %}
                     <span class="badge-chip red">Sold</span>
                   {% else %}
                     <span class="badge-chip green">In stock</span>
@@ -334,11 +323,9 @@
                 <td>{% if it.assigned_agent_id %}{{ it.assigned_agent.username }}{% else %}—{% endif %}</td>
               </tr>
             {% empty %}
-              <tr>
-                <td colspan="7" style="text-align:center;color:var(--cc-muted)">
-                  No stock yet. <a href="{{ scan_in_url|default:'#' }}" class="ms-1">Scan IN your first item →</a>
-                </td>
-              </tr>
+              <tr><td colspan="7" style="text-align:center;color:var(--cc-muted)">
+                No stock yet. <a href="{{ scan_in_url|default:'#' }}" class="ms-1">Scan IN your first item →</a>
+              </td></tr>
             {% endfor %}
           {% else %}
             {% for row in rows %}
@@ -346,7 +333,7 @@
               <td>{{ row.imei }}</td>
               <td>{{ row.product }}</td>
               <td>
-                {% if row.status == 'SOLD' %}
+                {% if row.status|lower == 'sold' %}
                   <span class="badge-chip red">Sold</span>
                 {% else %}
                   <span class="badge-chip green">In stock</span>
@@ -379,7 +366,7 @@
               <td data-label="IMEI">{{ it.imei|default:"" }}</td>
               <td data-label="Product">{{ it.product }}</td>
               <td data-label="Status">
-                {% if it.status == 'SOLD' %}
+                {% if it.status|lower == 'sold' %}
                   <span class="badge-chip red">Sold</span>
                 {% else %}
                   <span class="badge-chip green">In stock</span>
@@ -397,7 +384,7 @@
               <td data-label="IMEI">{{ row.imei }}</td>
               <td data-label="Product">{{ row.product }}</td>
               <td data-label="Status">
-                {% if row.status == 'SOLD' %}
+                {% if row.status|lower == 'sold' %}
                   <span class="badge-chip red">Sold</span>
                 {% else %}
                   <span class="badge-chip green">In stock</span>
@@ -417,11 +404,11 @@
     {% if page_obj %}
       <nav class="mt-2" style="display:flex;align-items:center;gap:.5rem;flex-wrap:wrap">
         {% if page_obj.has_previous %}
-          <a class="btn-deep tap is-primary" href="{{ stock_url|default:'/inventory/list/' }}?view=all{% if q %}&q={{ q|urlencode }}{% endif %}{% if status %}&status={{ status }}{% endif %}{% if show_archived %}&archived=1{% endif %}{% if request.GET.page_size %}&page_size={{ request.GET.page_size }}{% endif %}&page={{ page_obj.previous_page_number }}" onclick="window.buzz&&buzz(6)">Prev</a>
+          <a class="btn-deep tap is-primary" href="{{ stock_url|default:'/inventory/list/' }}?view=all{% if q %}&q={{ q|urlencode }}{% endif %}{% if status %}&status={{ status }}{% endif %}{% if include_archived %}&include_archived=1{% endif %}{% if rows_per_page %}&page_size={{ rows_per_page }}{% endif %}&page={{ page_obj.previous_page_number }}" onclick="window.buzz&&buzz(6)">Prev</a>
         {% endif %}
         <span class="text-muted">Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span>
         {% if page_obj.has_next %}
-          <a class="btn-deep tap is-primary" href="{{ stock_url|default:'/inventory/list/' }}?view=all{% if q %}&q={{ q|urlencode }}{% endif %}{% if status %}&status={{ status }}{% endif %}{% if show_archived %}&archived=1{% endif %}{% if request.GET.page_size %}&page_size={{ request.GET.page_size }}{% endif %}&page={{ page_obj.next_page_number }}" onclick="window.buzz&&buzz(6)">Next</a>
+          <a class="btn-deep tap is-primary" href="{{ stock_url|default:'/inventory/list/' }}?view=all{% if q %}&q={{ q|urlencode }}{% endif %}{% if status %}&status={{ status }}{% endif %}{% if include_archived %}&include_archived=1{% endif %}{% if rows_per_page %}&page_size={{ rows_per_page }}{% endif %}&page={{ page_obj.next_page_number }}" onclick="window.buzz&&buzz(6)">Next</a>
         {% endif %}
       </nav>
     {% endif %}

@@ -5,6 +5,7 @@ from typing import Optional
 import threading
 from contextlib import contextmanager
 import uuid
+from urllib.parse import quote
 
 from django.apps import apps
 from django.conf import settings
@@ -12,6 +13,7 @@ from django.db import models
 from django.db.models import Q
 from django.utils import timezone
 from django.core.signing import TimestampSigner, BadSignature, SignatureExpired
+from django.urls import reverse, NoReverseMatch
 
 User = settings.AUTH_USER_MODEL
 
@@ -295,7 +297,7 @@ class AgentInvite(BaseTenantModel):
         related_name="agent_invites_created",
     )
 
-    # NEW: friendly display name for the invitee (works with views that read .invited_name)
+    # friendly display name for the invitee (works with views that read .invited_name)
     invited_name = models.CharField(max_length=120, blank=True, default="")
 
     email = models.EmailField(blank=True, default="", db_index=True)
@@ -318,7 +320,7 @@ class AgentInvite(BaseTenantModel):
     # Optional: manager’s custom message
     message = models.CharField(max_length=240, blank=True, default="")
 
-    # NEW: optional expiry timestamp for UI/auto-expiry convenience
+    # Optional expiry timestamp for UI/auto-expiry convenience
     expires_at = models.DateTimeField(null=True, blank=True)
 
     class Meta:
@@ -410,3 +412,63 @@ class AgentInvite(BaseTenantModel):
                 self.save(update_fields=["status"])
             return True
         return False
+
+    # ---- One source of truth for invite state & share links ----
+
+    def is_expired(self) -> bool:
+        """Truthful expiry check that also respects explicit EXPIRED status."""
+        if (self.status or "").upper() == "EXPIRED":
+            return True
+        return bool(self.expires_at and timezone.now() >= self.expires_at)
+
+    def is_pending(self) -> bool:
+        """
+        “Pending” for UI purposes:
+        - status is PENDING or SENT
+        - not expired
+        - not joined
+        """
+        st = (self.status or "").upper()
+        return st in ("PENDING", "SENT") and not self.is_expired() and st != "JOINED"
+
+    def _join_path(self) -> str:
+        """
+        Reverse the accept URL using the token — never raise.
+        Adjust the route name if yours differs.
+        """
+        try:
+            return reverse("tenants:invite_accept", args=[self.token])
+        except NoReverseMatch:
+            # Safe fallback for dev if URL name changes
+            return f"/tenants/invites/accept/{self.token}/"
+
+    def absolute_join_url(self, request) -> str:
+        """
+        Build an absolute URL robustly, even if Sites framework isn't set up.
+        """
+        try:
+            return request.build_absolute_uri(self._join_path())
+        except Exception:
+            path = self._join_path()
+            host = getattr(request, "get_host", lambda: "localhost")()
+            scheme = "https" if getattr(request, "is_secure", lambda: False)() else "http"
+            return f"{scheme}://{host}{path}"
+
+    def share_payload(self, request) -> dict[str, str]:
+        """
+        Centralized share strings/links for Copy, WhatsApp, and Email.
+        Keep templates dumb and consistent.
+        """
+        url = self.absolute_join_url(request)
+        tenant_name = getattr(getattr(self, "business", None), "name", "our team")
+        name = (self.invited_name or "").strip() or "there"
+        text = f"Hi {name}, please click this link to join {tenant_name}: {url}"
+        subject = quote(f"Join {tenant_name}")
+        body = quote(text)
+
+        return {
+            "copy_text": text,
+            "url": url,
+            "wa_url": f"https://wa.me/?text={body}",
+            "mailto_url": f"mailto:?subject={subject}&body={body}",
+        }

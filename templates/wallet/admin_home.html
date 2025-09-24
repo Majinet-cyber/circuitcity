@@ -1,141 +1,189 @@
 {% extends "base.html" %}
 {% load humanize %}
 
-{% block title %}Admin Wallet · Circuit City{% endblock %}
-{% block header_title %}<i class="bi bi-bank2 me-2"></i>Admin Wallet{% endblock %}
+{% block title %}Wallet Admin · Circuit City{% endblock %}
+{% block header_title %}<i class="bi bi-briefcase me-2"></i>Wallet Admin{% endblock %}
 
-{% block nav_actions %}
-  <a class="btn" href="{% url 'inventory:inventory_dashboard' %}">
-    <i class="bi bi-speedometer2"></i> Dashboard
-  </a>
-  <a class="btn" href="{% url 'wallet:admin_budgets' %}">
-    <i class="bi bi-cash-coin"></i> Budgets
-  </a>
-  <a class="btn" href="{% url 'wallet:admin_issue' %}">
-    <i class="bi bi-plus-circle-dotted"></i> Manual Txn
-  </a>
-  <a class="btn" href="{% url 'wallet:admin_payslips' %}">
-    <i class="bi bi-receipt"></i> Payslips
-  </a>
-  <a class="btn" href="{% url 'wallet:admin_schedules' %}">
-    <i class="bi bi-calendar2-check"></i> Schedules
-  </a>
+{% block extra_css %}
+<style>
+  .kpi-card .label{color:var(--muted);font-weight:700}
+  .kpi-card .value{font-size:1.25rem;font-weight:900}
+  .kpi-card .sub{color:var(--muted)}
+  .chart-wrap{position:relative;height:220px}
+  .table td,.table th{vertical-align:middle}
+  .quick-actions .btn{min-width:180px}
+</style>
 {% endblock %}
 
-{% block content %}
+{% block body %}
+{# -------- Resolve URLs safely (don’t crash if missing) -------- #}
+{% url 'wallet:admin_issue'         as url_issue %}
+{% url 'wallet:admin_budgets'       as url_budgets %}
+{% url 'wallet:admin_payslips'      as url_payslips %}
+{% url 'wallet:admin_issue_payslip' as url_issue_payslip %}
+{% url 'wallet:admin_schedules'     as url_schedules %}
+{% url 'wallet:admin_pos'           as url_pos %}
+{% url 'wallet:admin_po_new'        as url_po_new %}
+
 <div class="container-xxl px-0">
 
-  <!-- KPIs -->
+  {# ========== KPI CARDS ========== #}
   <div class="row g-3 mb-3">
-    <div class="col-md-4">
+    <div class="col-6 col-xl-3">
+      <div class="card shadow-sm border-0 h-100 kpi-card">
+        <div class="card-body">
+          <div class="label mb-1">Company Spend (mirror)</div>
+          <div class="value">
+            MWK {{ company_spend|default:0|floatformat:0|intcomma }}
+          </div>
+          <div class="sub small">All time · Company ledger</div>
+        </div>
+      </div>
+    </div>
+    <div class="col-6 col-xl-3">
+      <div class="card shadow-sm border-0 h-100 kpi-card">
+        <div class="card-body">
+          <div class="label mb-1">Pending Budgets</div>
+          <div class="value">{{ budgets_pending|default:0|intcomma }}</div>
+          <div class="sub small">
+            <a href="{{ url_budgets|default:'#' }}" class="text-decoration-none">Review requests</a>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="col-6 col-xl-3">
+      <div class="card shadow-sm border-0 h-100 kpi-card">
+        <div class="card-body">
+          <div class="label mb-1">Recent Transactions Listed</div>
+          <div class="value">{{ recent|length }}</div>
+          <div class="sub small">Latest company-ledger activity</div>
+        </div>
+      </div>
+    </div>
+    <div class="col-6 col-xl-3">
+      <div class="card shadow-sm border-0 h-100 kpi-card">
+        <div class="card-body">
+          <div class="label mb-1">Quick Health</div>
+          <div class="value">OK</div>
+          <div class="sub small">Wallet admin is online</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  {# ========== ACTIONS + CHART ========== #}
+  <div class="row g-3 mb-3">
+    <div class="col-xl-5">
       <div class="card shadow-sm border-0 h-100">
         <div class="card-body">
-          <div class="text-muted small mb-1">Company Spend (All-Time)</div>
-          <div class="fs-4 fw-bold">
-            MWK {{ company_spend|default:0|floatformat:2|intcomma }}
+          <h5 class="mb-3">Quick Actions</h5>
+          <div class="d-grid gap-2 quick-actions">
+            {% if url_issue %}
+              <a class="btn btn-primary" href="{{ url_issue }}"><i class="bi bi-plus-circle me-1"></i>Issue Wallet Transaction</a>
+            {% endif %}
+            {% if url_issue_payslip %}
+              <a class="btn btn-outline-primary" href="{{ url_issue_payslip }}"><i class="bi bi-receipt me-1"></i>Issue Single Payslip</a>
+            {% endif %}
+            {% if url_payslips %}
+              <a class="btn btn-outline-secondary" href="{{ url_payslips }}"><i class="bi bi-files me-1"></i>Issue Payslips (Bulk)</a>
+            {% endif %}
+            {% if url_budgets %}
+              <a class="btn btn-outline-secondary" href="{{ url_budgets }}"><i class="bi bi-cash-coin me-1"></i>Manage Budgets</a>
+            {% endif %}
+            <div class="d-flex gap-2">
+              {% if url_schedules %}
+                <a class="btn btn-outline-secondary flex-fill" href="{{ url_schedules }}"><i class="bi bi-calendar2-check me-1"></i>Payout Schedules</a>
+              {% endif %}
+              {% if url_pos %}
+                <a class="btn btn-outline-secondary flex-fill" href="{{ url_pos }}"><i class="bi bi-cart-check me-1"></i>Purchase Orders</a>
+              {% endif %}
+            </div>
+            {% if url_po_new %}
+              <a class="btn btn-outline-secondary" href="{{ url_po_new }}"><i class="bi bi-plus-square me-1"></i>New Purchase Order</a>
+            {% endif %}
           </div>
-          <div class="small text-muted">Includes payouts, budgets, advances &amp; deductions</div>
+          <div class="small text-muted mt-3">
+            Use these links to post adjustments, manage payslips and approve budgets. Company ledger mirrors payouts automatically.
+          </div>
         </div>
       </div>
     </div>
 
-    <div class="col-md-4">
+    <div class="col-xl-7">
       <div class="card shadow-sm border-0 h-100">
-        <div class="card-body d-flex flex-column justify-content-center">
-          <div class="text-muted small mb-1">Pending Budgets</div>
-          <div class="fs-4 fw-bold">{{ budgets_pending|default:0 }}</div>
-          <div class="small text-muted">Awaiting approval or payment</div>
-        </div>
-      </div>
-    </div>
+        <div class="card-body">
+          <div class="d-flex justify-content-between align-items-center mb-2">
+            <h5 class="mb-0">Company Spend Trend (recent)</h5>
+            <span class="badge text-bg-light">Last {{ recent|length }} entries</span>
+          </div>
+          <div class="chart-wrap">
+            <canvas id="spendChart" role="img" aria-label="Company spend trend"></canvas>
+          </div>
+          <small class="text-muted d-block mt-2">Positive bars = payouts; negatives = recoveries/offsets.</small>
 
-    <div class="col-md-4">
-      <div class="card shadow-sm border-0 h-100">
-        <div class="card-body d-flex flex-column justify-content-center">
-          <div class="text-muted small mb-1">Primary Actions</div>
-          <div class="d-flex flex-wrap gap-2">
-            <a class="btn btn-primary btn-sm" href="{% url 'wallet:admin_payslips' %}">
-              <i class="bi bi-receipt me-1"></i> Issue Payslips (Bulk)
-            </a>
-            <a class="btn btn-outline-primary btn-sm" href="{% url 'wallet:admin_budgets' %}">
-              <i class="bi bi-cash-coin me-1"></i> Manage Budgets
-            </a>
-          </div>
-          <div class="d-flex flex-wrap gap-2 mt-2">
-            <a class="btn btn-outline-secondary btn-sm" href="{% url 'wallet:admin_issue' %}">
-              <i class="bi bi-plus-circle-dotted me-1"></i> Manual Wallet Transaction
-            </a>
-            <a class="btn btn-outline-secondary btn-sm" href="{% url 'wallet:admin_issue_payslip' %}">
-              <i class="bi bi-person-badge me-1"></i> Single Payslip
-            </a>
-            <a class="btn btn-outline-secondary btn-sm" href="{% url 'wallet:admin_schedules' %}">
-              <i class="bi bi-calendar2-check me-1"></i> Payout Schedules
-            </a>
-          </div>
+          {# Embed a simple data payload for chart.js #}
+          <template id="spend-data">
+            [
+            {% for t in recent reversed %}
+              {"d":"{{ t.created_at|date:'Y-m-d H:i' }}","v":{{ t.amount|default:0|floatformat:2 }}}{% if not forloop.last %},{% endif %}
+            {% endfor %}
+            ]
+          </template>
         </div>
       </div>
     </div>
   </div>
 
-  <!-- Quick Agent Lookup -->
-  <div class="card shadow-sm border-0 mb-3">
-    <div class="card-body">
-      <form class="row g-2 align-items-end" action="{% url 'wallet:admin_agent' agent_id=0 %}" onsubmit="return goAgent(event)">
-        <div class="col-sm-6 col-md-4">
-          <label class="form-label small text-muted">Agent ID</label>
-          <input id="agentIdInput" type="number" min="1" class="form-control" placeholder="e.g. 23">
-        </div>
-        <div class="col-sm-6 col-md-3">
-          <button class="btn btn-outline-primary" type="submit">
-            <i class="bi bi-search me-1"></i> Open Agent Wallet
-          </button>
-        </div>
-        <div class="col-12 col-md-auto ms-auto text-muted small">
-          Tip: you can also browse via
-          <a href="{% url 'admin:auth_user_changelist' %}">Django Admin users</a>
-          or <a href="{% url 'admin:index' %}">Admin home</a>.
-        </div>
-      </form>
-    </div>
-  </div>
-
-  <!-- Recent Transactions -->
+  {# ========== RECENT COMPANY WALLET ACTIVITY ========== #}
   <div class="card shadow-sm border-0">
     <div class="card-body">
-      <h5 class="mb-3">Recent Wallet Transactions</h5>
+      <div class="d-flex justify-content-between align-items-center mb-2">
+        <h5 class="mb-0">Recent Company Wallet Activity</h5>
+        <div class="text-muted small">
+          Mirror of payouts/transactions affecting agents
+        </div>
+      </div>
       <div class="table-responsive">
         <table class="table align-middle">
           <thead>
             <tr class="text-muted small">
-              <th>Date</th>
-              <th>Agent</th>
+              <th style="min-width:140px">When</th>
+              <th style="min-width:120px">Agent</th>
               <th>Type</th>
               <th>Note</th>
-              <th class="text-end">Amount (MWK)</th>
+              <th class="text-end" style="min-width:160px">Amount (MWK)</th>
             </tr>
           </thead>
           <tbody>
             {% for t in recent %}
               <tr>
-                <td>{{ t.created_at|date:"M j, Y" }}</td>
+                <td>{{ t.created_at|date:"M j, Y · H:i" }}</td>
                 <td>
                   {% if t.agent %}
-                    {{ t.agent.first_name }} {{ t.agent.last_name }}
+                    {{ t.agent.first_name }} {{ t.agent.last_name }}<span class="text-muted"> (#{{ t.agent.id }})</span>
                   {% else %}
                     <span class="text-muted">—</span>
                   {% endif %}
                 </td>
                 <td class="text-capitalize">{{ t.get_type_display }}</td>
-                <td class="text-truncate" style="max-width:360px">{{ t.note|default:"" }}</td>
+                <td class="text-truncate" style="max-width:520px">{{ t.note }}</td>
                 <td class="text-end fw-semibold {% if t.amount < 0 %}text-danger{% else %}text-success{% endif %}">
-                  {{ t.amount|default:0|floatformat:2|intcomma }}
+                  {{ t.amount|default:0|floatformat:0|intcomma }}
                 </td>
               </tr>
             {% empty %}
-              <tr><td colspan="5" class="text-muted">No transactions yet.</td></tr>
+              <tr><td colspan="5" class="text-muted">No company-ledger transactions yet.</td></tr>
             {% endfor %}
           </tbody>
         </table>
+      </div>
+
+      <div class="alert alert-info d-flex align-items-start gap-2 mt-3" role="alert">
+        <i class="bi bi-info-circle mt-1"></i>
+        <div class="small">
+          <b>Tip:</b> Single-source-of-truth ensures the agent wallet and company mirror stay consistent.
+          Posting a payslip creates the matching entries automatically.
+        </div>
       </div>
     </div>
   </div>
@@ -144,16 +192,39 @@
 {% endblock %}
 
 {% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
 <script>
-function goAgent(e){
-  e.preventDefault();
-  const el = document.getElementById('agentIdInput');
-  const id = (el && el.value) ? parseInt(el.value, 10) : NaN;
-  if (!id || id <= 0) { if (el) el.focus(); return false; }
-  // Use the named URL you provided, swapping the placeholder "0" with the real id.
-  const pattern = "{% url 'wallet:admin_agent' agent_id=0 %}";
-  window.location.href = pattern.replace('/0/', '/' + id + '/');
-  return false;
-}
+(function(){
+  const el = document.getElementById('spendChart');
+  const tpl = document.getElementById('spend-data');
+  const rows = (() => {
+    try { return JSON.parse((tpl?.textContent||'[]').trim() || '[]'); }
+    catch(e){ return []; }
+  })();
+
+  const labels = rows.map(r => r.d);
+  const vals = rows.map(r => Number(r.v||0));
+
+  if(el){
+    new Chart(el, {
+      type: 'bar',
+      data: {
+        labels,
+        datasets: [{ label: 'MWK', data: vals }]
+      },
+      options: {
+        responsive:true, maintainAspectRatio:false,
+        scales:{
+          y:{ beginAtZero:true, grid:{ drawBorder:false }, ticks:{ callback:v => (Number(v)||0).toLocaleString() } },
+          x:{ grid:{ display:false } }
+        },
+        plugins:{
+          legend:{ display:false },
+          tooltip:{ callbacks:{ label:(ctx)=> " MWK " + (ctx.parsed.y||0).toLocaleString() } }
+        }
+      }
+    });
+  }
+})();
 </script>
 {% endblock %}

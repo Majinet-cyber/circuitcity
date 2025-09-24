@@ -13,15 +13,14 @@
 {# Other links #}
 {% url 'inventory:stock_list'          as url_stock %}
 {% url 'inventory:scan_in'             as url_scan_in %}
+
+{# Wallet (agent + admin) #}
 {% url 'wallet:agent_wallet'           as url_wallet %}
-{# Wallet ADMIN (canonical) #}
 {% url 'wallet:admin_home'             as url_wallet_admin %}
-{% if not url_wallet_admin %}{% url 'wallet:admin_wallet' as url_wallet_admin %}{% endif %}{# legacy if any #}
+{% if not url_wallet_admin %}{% url 'wallet:admin_wallet' as url_wallet_admin %}{% endif %}
+
+{# Reports, Tenants, Billing, Admin #}
 {% url 'reports:home'                  as url_reports %}
-{% url 'simulator:home'                as url_sim_home %}
-{% if not url_sim_home %}{% url 'simulator_placeholder_home' as url_sim_home %}{% endif %}
-{% url 'simulator:new'                 as url_sim_new %}
-{% if not url_sim_new %}{% url 'simulator_placeholder_new' as url_sim_new %}{% endif %}
 {% url 'tenants:manager_review_agents' as url_team %}
 {% url 'tenants:manager_locations'     as url_locations %}
 {% url 'billing:admin_dashboard'       as url_billing_admin %}
@@ -56,81 +55,59 @@
 {% url 'accounts:settings_unified' as url_settings %}
 {% if not url_settings %}{% url 'accounts:settings' as url_settings %}{% endif %}
 
+{# LAYBY URLs (safe reversals) #}
+{% url 'layby:dashboard'  as url_layby_dashboard %}
+{% url 'layby:agreements' as url_layby_agreements %}
+{% url 'layby:payments'   as url_layby_payments %}
+{% url 'layby:new'        as url_layby_new %}
+
 <style>
-  /* Midnight Glass + colorful icons (labels muted) */
-  .cc-sidebar{
-    position: sticky; top: 0; height: 100vh; width: 260px; min-width:260px;
-    background: linear-gradient(180deg, #0f172a 0%, #0b1324 100%);
-    color: #cbd5e1;
-    border-right: 1px solid rgba(255,255,255,.06);
-    display:flex; flex-direction:column; gap:14px; padding:16px 14px;
-  }
-  .cc-brand{ display:flex; align-items:center; gap:.6rem; font-weight:800; color:#fff; font-size:1.05rem; text-decoration:none; }
-  .cc-brand .logo{
-    display:grid; place-items:center; width:28px; height:28px; border-radius:8px;
-    background: rgba(255,255,255,.06); border:1px solid rgba(255,255,255,.08);
-    box-shadow: inset 0 1px 0 rgba(255,255,255,.15);
-  }
-  .cc-section{ font-size:.72rem; letter-spacing:.08em; color:#8ea0b5; margin:10px 10px 6px; text-transform:uppercase; }
-  .cc-nav{ list-style:none; padding:0; margin:0; display:flex; flex-direction:column; gap:8px; }
-  .cc-nav a.navlink{
-    display:flex; align-items:center; gap:.65rem; padding:10px 12px; border-radius:12px;
-    color:#cbd5e1; text-decoration:none; background: rgba(255,255,255,0.04);
-    border:1px solid rgba(255,255,255,.05); transition: transform .18s ease, background .18s ease, border-color .18s ease;
-  }
-  .cc-nav a.navlink:hover{
-    background: rgba(34,211,238,.08);
-    border-color: rgba(34,211,238,.28);
-    transform: translateX(2px);
-  }
-  .cc-nav li.active a.navlink{
-    background: rgba(255,255,255,.08);
-    border-color: rgba(255,255,255,.16);
-    box-shadow: 0 10px 24px rgba(0,0,0,.25), inset 0 0 0 1px rgba(255,255,255,.06);
-  }
-  .cc-nav a.navlink .bi{
-    background: linear-gradient(120deg,#22d3ee, #10b981 60%, #22d3ee 100%);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    filter: drop-shadow(0 2px 6px rgba(34,211,238,.15));
-    font-size:1.05rem;
-  }
-  .cc-bottom{ margin-top:auto }
+  .cc-sidebar{position:sticky;top:0;height:100vh;width:260px;min-width:260px;background:linear-gradient(180deg,#0f172a 0%,#0b1324 100%);color:#cbd5e1;border-right:1px solid rgba(255,255,255,.06);display:flex;flex-direction:column;gap:14px;padding:16px 14px}
+  .cc-brand{display:flex;align-items:center;gap:.6rem;font-weight:800;color:#fff;font-size:1.05rem;text-decoration:none}
+  .cc-brand .logo{display:grid;place-items:center;width:28px;height:28px;border-radius:8px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.08);box-shadow:inset 0 1px 0 rgba(255,255,255,.15)}
+  .cc-section{font-size:.72rem;letter-spacing:.08em;color:#8ea0b5;margin:10px 10px 6px;text-transform:uppercase}
+  .cc-nav{list-style:none;padding:0;margin:0;display:flex;flex-direction:column;gap:8px}
+  .cc-nav a.navlink{display:flex;align-items:center;gap:.65rem;padding:10px 12px;border-radius:12px;color:#cbd5e1;text-decoration:none;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,.05);transition:transform .18s ease,background .18s ease,border-color .18s ease}
+  .cc-nav a.navlink:hover{background:rgba(34,211,238,.08);border-color:rgba(34,211,238,.28);transform:translateX(2px)}
+  .cc-nav li.active a.navlink{background:rgba(255,255,255,.08);border-color:rgba(255,255,255,.16);box-shadow:0 10px 24px rgba(0,0,0,.25),inset 0 0 0 1px rgba(255,255,255,.06)}
+  .cc-nav a.navlink .bi{background:linear-gradient(120deg,#22d3ee,#10b981 60%,#22d3ee 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;filter:drop-shadow(0 2px 6px rgba(34,211,238,.15));font-size:1.05rem}
+  .cc-bottom{margin-top:auto}
+  /* small helper for the chevron buttons */
+  .cc-toggle{border:0;background:transparent;color:#8ea0b5;padding:0 .35rem}
+  .cc-toggle:focus{outline:none}
+  .cc-row{display:flex;align-items:center;justify-content:space-between}
 </style>
 
 <aside class="cc-sidebar">
   <a class="cc-brand" href="{{ url_main_dash|default:'/dashboard/' }}">
-    <span class="logo">
-      <img src="{% static 'img/logo-32.png' %}" width="20" height="20" alt="">
-    </span>
+    <span class="logo"><img src="{% static 'img/logo-32.png' %}" width="20" height="20" alt=""></span>
     <span>{% firstof request.business.name APP_NAME 'Circuit City' %}</span>
   </a>
 
-  {# -------- PLATFORM HQ (superusers) -------- #}
   {% if request.user.is_superuser %}
-    <div>
-      <div class="cc-section">Platform</div>
-      <ul class="cc-nav">
-        <li class="{% if request.path|slice:'0:4' == '/hq/' and request.path == '/hq/' %}active{% endif %}">
-          <a class="navlink" href="{{ url_hq_home|default:'/hq/' }}"><i class="bi bi-speedometer2"></i><span>HQ Dashboard</span></a>
-        </li>
-        <li class="{% if request.path|slice:'0:14' == '/hq/businesses' %}active{% endif %}">
-          <a class="navlink" href="{{ url_hq_businesses|default:'/hq/businesses/' }}"><i class="bi bi-buildings"></i><span>Businesses</span></a>
-        </li>
-        <li class="{% if request.path|slice:'0:16' == '/hq/subscriptions' %}active{% endif %}">
-          <a class="navlink" href="{{ url_hq_subscriptions|default:'/hq/subscriptions/' }}"><i class="bi bi-credit-card"></i><span>Subscriptions</span></a>
-        </li>
-        <li class="{% if request.path|slice:'0:11' == '/hq/invoices' %}active{% endif %}">
-          <a class="navlink" href="{{ url_hq_invoices|default:'/hq/invoices/' }}"><i class="bi bi-receipt-cutoff"></i><span>Invoices</span></a>
-        </li>
-        <li class="{% if request.path|slice:'0:9' == '/hq/agents' %}active{% endif %}">
-          <a class="navlink" href="{{ url_hq_agents|default:'/hq/agents/' }}"><i class="bi bi-people"></i><span>Agents</span></a>
-        </li>
-        <li class="{% if request.path|slice:'0:15' == '/hq/stock-trends' %}active{% endif %}">
-          <a class="navlink" href="{{ url_hq_stock_trends|default:'/hq/stock-trends/' }}"><i class="bi bi-graph-up-arrow"></i><span>Stock Trends</span></a>
-        </li>
-      </ul>
-    </div>
+  <div>
+    <div class="cc-section">Platform</div>
+    <ul class="cc-nav">
+      <li class="{% if request.path|slice:'0:4' == '/hq/' and request.path == '/hq/' %}active{% endif %}">
+        <a class="navlink" href="{{ url_hq_home|default:'/hq/' }}"><i class="bi bi-speedometer2"></i><span>HQ Dashboard</span></a>
+      </li>
+      <li class="{% if request.path|slice:'0:14' == '/hq/businesses' %}active{% endif %}">
+        <a class="navlink" href="{{ url_hq_businesses|default:'/hq/businesses/' }}"><i class="bi bi-buildings"></i><span>Businesses</span></a>
+      </li>
+      <li class="{% if request.path|slice:'0:16' == '/hq/subscriptions' %}active{% endif %}">
+        <a class="navlink" href="{{ url_hq_subscriptions|default:'/hq/subscriptions/' }}"><i class="bi bi-credit-card"></i><span>Subscriptions</span></a>
+      </li>
+      <li class="{% if request.path|slice:'0:11' == '/hq/invoices' %}active{% endif %}">
+        <a class="navlink" href="{{ url_hq_invoices|default:'/hq/invoices/' }}"><i class="bi bi-receipt-cutoff"></i><span>Invoices</span></a>
+      </li>
+      <li class="{% if request.path|slice:'0:9' == '/hq/agents' %}active{% endif %}">
+        <a class="navlink" href="{{ url_hq_agents|default:'/hq/agents/' }}"><i class="bi bi-people"></i><span>Agents</span></a>
+      </li>
+      <li class="{% if request.path|slice:'0:15' == '/hq/stock-trends' %}active{% endif %}">
+        <a class="navlink" href="{{ url_hq_stock_trends|default:'/hq/stock-trends/' }}"><i class="bi bi-graph-up-arrow"></i><span>Stock Trends</span></a>
+      </li>
+    </ul>
+  </div>
   {% endif %}
 
   <div>
@@ -166,9 +143,8 @@
     </ul>
   </div>
 
-  {# -------- TIME (role-aware) -------- #}
   {% if request.user.is_authenticated %}
-    {% if IS_MANAGER or request.user.is_staff or request.user.is_superuser or request.user.profile.is_manager %}
+    {% if request.user.is_superuser or request.user.is_staff or request.user.profile.is_manager %}
       <div>
         <div class="cc-section">Time</div>
         <ul class="cc-nav">
@@ -178,7 +154,6 @@
         </ul>
       </div>
     {% else %}
-      {# Agent view: Check-in ABOVE Time Logs. DO NOT gate on URL reverse; use safe defaults #}
       <div>
         <div class="cc-section">Time</div>
         <ul class="cc-nav">
@@ -193,114 +168,173 @@
     {% endif %}
   {% endif %}
 
-  {# -------- BUSINESS (manager/staff/superuser) -------- #}
-  {% if IS_MANAGER or request.user.is_staff or request.user.is_superuser or request.user.profile.is_manager %}
-    <div>
-      <div class="cc-section">Business</div>
-      <ul class="cc-nav">
-        {% if url_wallet %}
-        <li class="{% if request.path|slice:'0:8' == '/wallet/' and not request.path|slice:'0:14' == '/wallet/admin/' %}active{% endif %}">
-          <a class="navlink" href="{{ url_wallet }}"><i class="bi bi-wallet2"></i><span>Wallet</span></a>
-        </li>
-        {% endif %}
+  {# -------- Money (Wallets) -------- #}
+  <div>
+    <div class="cc-section">Money</div>
+    <ul class="cc-nav">
+      {% if url_wallet %}
+      <li class="{% if request.path|slice:'0:8' == '/wallet/' and not request.path|slice:'0:14' == '/wallet/admin/' %}active{% endif %}">
+        <a class="navlink" href="{{ url_wallet }}"><i class="bi bi-wallet2"></i><span>My Wallet</span></a>
+      </li>
+      {% endif %}
 
-        {# IMPORTANT: Admin Wallet → wallet:admin_home (NOT Django Admin) #}
-        {% if request.user.is_staff and not request.user.is_superuser or request.user.profile.is_manager %}
+      {% if request.user.is_superuser or request.user.is_staff or request.user.profile.is_manager %}
         <li class="{% if request.path|slice:'0:14' == '/wallet/admin/' %}active{% endif %}">
           <a class="navlink" href="{{ url_wallet_admin|default:'/wallet/admin/' }}"><i class="bi bi-briefcase"></i><span>Admin Wallet</span></a>
         </li>
-        {% endif %}
+      {% endif %}
+    </ul>
+  </div>
 
-        {% if url_reports %}
-        <li class="{% if request.path|slice:'0:9' == '/reports/' %}active{% endif %}">
-          <a class="navlink" href="{{ url_reports }}"><i class="bi bi-graph-up"></i><span>Reports</span></a>
-        </li>
-        {% endif %}
+  {% if request.user.is_superuser or request.user.is_staff or request.user.profile.is_manager %}
+  <div>
+    <div class="cc-section">Business</div>
+    <ul class="cc-nav">
 
-        {% if url_team %}
-        <li class="{% if '/tenants/manager/agents/' in request.path %}active{% endif %}">
-          <a class="navlink" href="{{ url_team }}"><i class="bi bi-people"></i><span>Team</span></a>
-        </li>
-        {% endif %}
+      {% if url_reports %}
+      <li class="{% if request.path|slice:'0:9' == '/reports/' %}active{% endif %}">
+        <a class="navlink" href="{{ url_reports }}"><i class="bi bi-graph-up"></i><span>Reports</span></a>
+      </li>
+      {% endif %}
 
-        {% if url_locations %}
-        <li class="{% if '/tenants/manager/locations/' in request.path %}active{% endif %}">
-          <a class="navlink" href="{{ url_locations }}"><i class="bi bi-geo"></i><span>Locations</span></a>
-        </li>
-        {% endif %}
+      {% if url_team %}
+      <li class="{% if '/tenants/manager/agents/' in request.path %}active{% endif %}">
+        <a class="navlink" href="{{ url_team }}"><i class="bi bi-people"></i><span>Agents</span></a>
+      </li>
+      {% endif %}
 
-        {% if url_place_order %}
-        <li class="{% if request.path|slice:'0:20' == '/inventory/place-order' or request.path|slice:'0:18' == '/inventory/orders/' %}active{% endif %}">
-          <a class="navlink" href="{{ url_place_order }}"><i class="bi bi-clipboard-plus"></i><span>Place Order</span></a>
-        </li>
-        {% endif %}
-        {% if url_orders %}
-        <li class="{% if request.path|slice:'0:18' == '/inventory/orders/' %}active{% endif %}">
-          <a class="navlink" href="{{ url_orders }}"><i class="bi bi-clipboard-data"></i><span>Orders</span></a>
-        </li>
-        {% endif %}
+      {% if url_locations %}
+      <li class="{% if '/tenants/manager/locations/' in request.path %}active{% endif %}">
+        <a class="navlink" href="{{ url_locations }}"><i class="bi bi-geo"></i><span>Locations</span></a>
+      </li>
+      {% endif %}
 
-        {% if url_payslip_issue or url_payslip_bulk or url_payslip_schedules %}
-          <li class="{% if request.path|slice:'0:9' == '/payslips' %}active{% endif %}">
-            <a class="navlink" href="{{ url_payslip_issue|default:url_payslip_bulk|default:url_payslip_schedules|default:'#' }}">
-              <i class="bi bi-receipt"></i><span>Payslips</span>
-            </a>
-          </li>
-          {% if url_payslip_issue %}
-          <li class="{% if request.path|slice:'0:17' == '/wallet/payslips/' or request.path|slice:'0:16' == '/payslips/issue' %}active{% endif %}">
-            <a class="navlink" href="{{ url_payslip_issue }}"><i class="bi bi-file-earmark-plus"></i><span>Issue (Single)</span></a>
-          </li>
-          {% endif %}
-          {% if url_payslip_bulk %}
-          <li class="{% if request.path|slice:'0:16' == '/payslips/bulk' %}active{% endif %}">
-            <a class="navlink" href="{{ url_payslip_bulk }}"><i class="bi bi-files"></i><span>Issue (Bulk)</span></a>
-          </li>
-          {% endif %}
-          {% if url_payslip_schedules %}
-          <li class="{% if request.path|slice:'0:20' == '/payslips/schedules' %}active{% endif %}">
-            <a class="navlink" href="{{ url_payslip_schedules }}"><i class="bi bi-calendar2-check"></i><span>Auto-Schedules</span></a>
-          </li>
-          {% endif %}
-        {% endif %}
-      </ul>
-    </div>
+      {# ---- Orders (collapsible; parent clickable) ---- #}
+      {% if url_orders or url_place_order %}
+      <li>
+        <div class="cc-row">
+          <a class="navlink flex-grow-1" href="{{ url_orders|default:url_place_order }}"><i class="bi bi-clipboard-data"></i><span>Orders</span></a>
+          <button class="cc-toggle" type="button" data-bs-toggle="collapse" data-bs-target="#menu-orders" aria-expanded="false" aria-controls="menu-orders">
+            <i class="bi bi-chevron-down"></i>
+          </button>
+        </div>
+        <div class="collapse {% if request.path|slice:'0:18' == '/inventory/orders/' or request.path|slice:'0:20' == '/inventory/place-order' %}show{% endif %}" id="menu-orders">
+          <ul class="cc-nav" style="gap:4px;margin-top:6px;margin-left:14px">
+            {% if url_place_order %}
+            <li class="{% if request.path|slice:'0:20' == '/inventory/place-order' %}active{% endif %}">
+              <a class="navlink" href="{{ url_place_order }}"><i class="bi bi-clipboard-plus"></i><span>Place Order</span></a>
+            </li>
+            {% endif %}
+            {% if url_orders %}
+            <li class="{% if request.path|slice:'0:18' == '/inventory/orders/' %}active{% endif %}">
+              <a class="navlink" href="{{ url_orders }}"><i class="bi bi-list-check"></i><span>All Orders</span></a>
+            </li>
+            {% endif %}
+          </ul>
+        </div>
+      </li>
+      {% endif %}
+
+      {# ---- Payslips (collapsible; parent clickable) ---- #}
+      {% if url_payslip_issue or url_payslip_bulk or url_payslip_schedules %}
+      <li>
+        <div class="cc-row">
+          <a class="navlink flex-grow-1" href="{{ url_payslip_issue|default:url_payslip_bulk|default:url_payslip_schedules|default:'#' }}">
+            <i class="bi bi-receipt"></i><span>Payslips</span>
+          </a>
+          <button class="cc-toggle" type="button" data-bs-toggle="collapse" data-bs-target="#menu-payslips" aria-expanded="false" aria-controls="menu-payslips">
+            <i class="bi bi-chevron-down"></i>
+          </button>
+        </div>
+        <div class="collapse {% if request.path|slice:'0:16' == '/payslips/bulk' or request.path|slice:'0:20' == '/payslips/schedules' or request.path|slice:'0:16' == '/payslips/issue' or request.path|slice:'0:22' == '/wallet/admin/payslips' %}show{% endif %}" id="menu-payslips">
+          <ul class="cc-nav" style="gap:4px;margin-top:6px;margin-left:14px">
+            {% if url_payslip_issue %}
+            <li class="{% if request.path|slice:'0:16' == '/payslips/issue' or request.path|slice:'0:29' == '/wallet/admin/payslips/single' %}active{% endif %}">
+              <a class="navlink" href="{{ url_payslip_issue }}"><i class="bi bi-file-earmark-plus"></i><span>Issue (Single)</span></a>
+            </li>
+            {% endif %}
+            {% if url_payslip_bulk %}
+            <li class="{% if request.path|slice:'0:22' == '/wallet/admin/payslips' or request.path|slice:'0:16' == '/payslips/bulk' %}active{% endif %}">
+              <a class="navlink" href="{{ url_payslip_bulk }}"><i class="bi bi-files"></i><span>Issue (Bulk)</span></a>
+            </li>
+            {% endif %}
+            {% if url_payslip_schedules %}
+            <li class="{% if request.path|slice:'0:20' == '/payslips/schedules' or request.path|slice:'0:20' == '/wallet/admin/schedules' %}active{% endif %}">
+              <a class="navlink" href="{{ url_payslip_schedules }}"><i class="bi bi-calendar2-check"></i><span>Auto-Schedules</span></a>
+            </li>
+            {% endif %}
+          </ul>
+        </div>
+      </li>
+      {% endif %}
+    </ul>
+  </div>
   {% endif %}
 
-  {# -------- LAYBY -------- #}
-  {% if FEATURES.LAYBY %}
-    <div>
-      <div class="cc-section">Layby</div>
-      <ul class="cc-nav">
-        <li class="{% if request.path|slice:'0:11' == '/laybys/my/' %}active{% endif %}">
-          <a class="navlink" href="/laybys/my/"><i class="bi bi-journal-check"></i><span>My Laybys</span></a>
-        </li>
-        <li class="{% if request.path|slice:'0:10' == '/laybys/new' %}active{% endif %}">
-          <a class="navlink" href="/laybys/new/"><i class="bi bi-plus-square"></i><span>New Layby</span></a>
-        </li>
-      </ul>
-    </div>
+  {# -------- Layby (collapsible; parent clickable) -------- #}
+  {% with layby_root=url_layby_dashboard|default:'/layby/' %}
+    {% if layby_root %}
+      <div>
+        <div class="cc-section">Layby</div>
+        <ul class="cc-nav">
+          <li>
+            <div class="cc-row">
+              <a class="navlink flex-grow-1" href="{{ layby_root }}"><i class="bi bi-journal-check"></i><span>Layby</span></a>
+              <button class="cc-toggle" type="button" data-bs-toggle="collapse" data-bs-target="#menu-layby" aria-expanded="false" aria-controls="menu-layby">
+                <i class="bi bi-chevron-down"></i>
+              </button>
+            </div>
+            <div class="collapse {% if request.path|slice:'0:7' == '/layby/' %}show{% endif %}" id="menu-layby">
+              <ul class="cc-nav" style="gap:4px;margin-top:6px;margin-left:14px">
+                <li class="{% if '/layby/new/' in request.path or '/laybys/new/' in request.path %}active{% endif %}">
+                  <a class="navlink" href="{{ url_layby_new|default:'/laybys/new/'|default:'/layby/new/' }}">
+                    <i class="bi bi-plus-square"></i><span>New Layby</span>
+                  </a>
+                </li>
+                {% if url_layby_agreements %}
+                <li class="{% if '/layby/agreements' in request.path or '/laybys/my/' in request.path %}active{% endif %}">
+                  <a class="navlink" href="{{ url_layby_agreements }}"><i class="bi bi-folder2-open"></i><span>Agreements</span></a>
+                </li>
+                {% endif %}
+                {% if url_layby_payments %}
+                <li class="{% if '/layby/payments' in request.path or '/laybys/payments/' in request.path %}active{% endif %}">
+                  <a class="navlink" href="{{ url_layby_payments }}"><i class="bi bi-cash-coin"></i><span>Payments</span></a>
+                </li>
+                {% endif %}
+              </ul>
+            </div>
+          </li>
+        </ul>
+      </div>
+    {% endif %}
+  {% endwith %}
+
+  {# -------- Simulator (guarded without parentheses) -------- #}
+  {% if FEATURES.SIMULATOR %}
+    {% if request.user.is_superuser or request.user.is_staff or request.user.profile.is_manager %}
+      <div>
+        <div class="cc-section">Simulator</div>
+        <ul class="cc-nav">
+          {% url 'simulator:home' as url_sim_home %}
+          {% if not url_sim_home %}{% url 'simulator_placeholder_home' as url_sim_home %}{% endif %}
+          {% url 'simulator:new' as url_sim_new %}
+          {% if not url_sim_new %}{% url 'simulator_placeholder_new' as url_sim_new %}{% endif %}
+
+          {% if url_sim_home %}
+          <li class="{% if '/simulator/' in request.path and not '/simulator/new/' in request.path %}active{% endif %}">
+            <a class="navlink" href="{{ url_sim_home }}"><i class="bi bi-activity"></i><span>Scenarios</span></a>
+          </li>
+          {% endif %}
+          {% if url_sim_new %}
+          <li class="{% if '/simulator/new/' in request.path %}active{% endif %}">
+            <a class="navlink" href="{{ url_sim_new }}"><i class="bi bi-stars"></i><span>New Simulation</span></a>
+          </li>
+          {% endif %}
+        </ul>
+      </div>
+    {% endif %}
   {% endif %}
 
-  {# -------- SIMULATOR (role-gated) -------- #}
-  {% if FEATURES.SIMULATOR and IS_MANAGER or FEATURES.SIMULATOR and request.user.is_staff or FEATURES.SIMULATOR and request.user.is_superuser or FEATURES.SIMULATOR and request.user.profile.is_manager %}
-    <div>
-      <div class="cc-section">Simulator</div>
-      <ul class="cc-nav">
-        {% if url_sim_home %}
-        <li class="{% if '/simulator/' in request.path and not '/simulator/new/' in request.path %}active{% endif %}">
-          <a class="navlink" href="{{ url_sim_home }}"><i class="bi bi-activity"></i><span>Scenarios</span></a>
-        </li>
-        {% endif %}
-        {% if url_sim_new %}
-        <li class="{% if '/simulator/new/' in request.path %}active{% endif %}">
-          <a class="navlink" href="{{ url_sim_new }}"><i class="bi bi-stars"></i><span>New Simulation</span></a>
-        </li>
-        {% endif %}
-      </ul>
-    </div>
-  {% endif %}
-
-  {# -------- SETTINGS (single entry) -------- #}
   <div>
     <div class="cc-section">Settings</div>
     <ul class="cc-nav">
@@ -313,9 +347,7 @@
   <div class="cc-bottom">
     <ul class="cc-nav">
       <li><a class="navlink" href="/feedback/"><i class="bi bi-chat-left-text"></i><span>Feedback</span></a></li>
-      <li>
-        <a class="navlink" href="{% url 'accounts:logout' %}?next=/accounts/login/"><i class="bi bi-box-arrow-right"></i><span>Logout</span></a>
-      </li>
+      <li><a class="navlink" href="{% url 'accounts:logout' %}?next=/accounts/login/"><i class="bi bi-box-arrow-right"></i><span>Logout</span></a></li>
     </ul>
   </div>
 </aside>

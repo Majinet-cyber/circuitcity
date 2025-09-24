@@ -18,9 +18,9 @@ from django.templatetags.static import static as static_build  # may raise with 
 from cc import views as core_views  # project-level views
 
 
-# --------------------------------------------------------------------------------------
-# Small helpers
-# --------------------------------------------------------------------------------------
+# ======================================================================================
+# Single Source of Truth — URL + Static helpers
+# ======================================================================================
 def robots_txt(_request):
     return HttpResponse("User-agent: *\nDisallow: /", content_type="text/plain")
 
@@ -42,15 +42,6 @@ def include_or_raise(module_path: str, namespace: str | None = None):
     return include(module_path, namespace=namespace) if namespace else include(module_path)
 
 
-def _safe_redirect_to(name: str, fallback: str = "/accounts/login/"):
-    def _view(_request, *args, **kwargs):
-        try:
-            return redirect(name)
-        except NoReverseMatch:
-            return redirect(fallback)
-    return _view
-
-
 def _safe_static(path_fragment: str) -> str:
     """
     Resolve a static URL but never crash if ManifestStaticFilesStorage
@@ -62,9 +53,36 @@ def _safe_static(path_fragment: str) -> str:
         return settings.STATIC_URL.rstrip("/") + "/" + path_fragment.lstrip("/")
 
 
-# --------------------------------------------------------------------------------------
-# Smart root redirect
-# --------------------------------------------------------------------------------------
+# ---- Centralized reverse helpers (ONE TRUTH for "does this URL name exist?") ----------
+def _reverse_exists(name: str) -> bool:
+    try:
+        reverse(name)
+        return True
+    except NoReverseMatch:
+        return False
+
+
+def _first_working_reverse(names: tuple[str, ...]) -> str | None:
+    for n in names:
+        if _reverse_exists(n):
+            return n
+    return None
+
+
+def _redirect_first(names: tuple[str, ...], fallback: str = "/") -> HttpResponse:
+    name = _first_working_reverse(names)
+    return redirect(name) if name else redirect(fallback)
+
+
+def _safe_redirect_to(name: str, fallback: str = "/accounts/login/"):
+    def _view(_request, *args, **kwargs):
+        return redirect(name) if _reverse_exists(name) else redirect(fallback)
+    return _view
+
+
+# ======================================================================================
+# Smart root redirect (uses centralized helpers)
+# ======================================================================================
 is_hq_admin = _try_from("circuitcity.hq.permissions", "is_hq_admin") or (lambda _u: False)
 get_active_business = _try_from("circuitcity.tenants.utils", "get_active_business") or (lambda _r: None)
 
@@ -76,20 +94,12 @@ _activate_mine_view = getattr(_tenants_views, "activate_mine", None)
 def root_redirect(request):
     # Anonymous -> login (prefer two_factor if present)
     if not getattr(request, "user", None) or not request.user.is_authenticated:
-        for name in ("two_factor:login", "accounts:login", "login"):
-            try:
-                reverse(name)
-                return redirect(name)
-            except NoReverseMatch:
-                continue
-        return redirect("/accounts/login/")
+        return _redirect_first(("two_factor:login", "accounts:login", "login"), "/accounts/login/")
 
     # HQ admins
     if is_hq_admin(request.user):
-        try:
+        if _reverse_exists("hq:home"):
             return redirect("hq:home")
-        except NoReverseMatch:
-            pass
 
     # No active business -> auto-activate first, then chooser/join
     try:
@@ -97,12 +107,13 @@ def root_redirect(request):
     except Exception:
         active = None
     if not active:
-        for name in ("tenants:activate_mine", "tenants:choose_business", "tenants:join"):
-            try:
-                reverse(name)
-                return redirect(name)
-            except NoReverseMatch:
-                continue
+        target = _first_working_reverse((
+            "tenants:activate_mine",
+            "tenants:choose_business",
+            "tenants:join",
+        ))
+        if target:
+            return redirect(target)
         # If tenants url name isn't present, but we have the view imported, expose local fallback
         if _activate_mine_view:
             return redirect("/tenants/activate-mine/")
@@ -118,19 +129,16 @@ def root_redirect(request):
         "reports:home",
         "admin:index",
     )
-    for name in candidates:
-        try:
-            reverse(name)
-            return redirect(name)
-        except NoReverseMatch:
-            continue
+    target = _first_working_reverse(candidates)
+    if target:
+        return redirect(target)
 
     return redirect("/inventory/")
 
 
-# --------------------------------------------------------------------------------------
+# ======================================================================================
 # Tiny debug probes
-# --------------------------------------------------------------------------------------
+# ======================================================================================
 def session_set(request):
     request.session["probe"] = "ok"
     return HttpResponse("set")
@@ -270,9 +278,9 @@ def __grep_soon__(request):
     return JsonResponse({"root": root, "patterns": patterns, "hits": hits}, json_dumps_params={"indent": 2})
 
 
-# --------------------------------------------------------------------------------------
+# ======================================================================================
 # URL patterns
-# --------------------------------------------------------------------------------------
+# ======================================================================================
 urlpatterns = []
 
 # Two-Factor (optional)
@@ -346,16 +354,18 @@ if export_audits_csv:
 if import_opening_stock:
     urlpatterns.append(path("imports/opening-stock/", import_opening_stock, name="import_opening_stock"))
 
-# --------------------------------------------------------------------------------------
+# ======================================================================================
 # Response normalizer + auto-select helpers
-# --------------------------------------------------------------------------------------
+# ======================================================================================
 def _redirect_to_join():
-    for name in ("tenants:activate_mine", "tenants:choose_business", "tenants:join_business", "tenants:join"):
-        try:
-            reverse(name)
-            return redirect(name)
-        except NoReverseMatch:
-            continue
+    target = _first_working_reverse((
+        "tenants:activate_mine",
+        "tenants:choose_business",
+        "tenants:join_business",
+        "tenants:join",
+    ))
+    if target:
+        return redirect(target)
     # last-ditch: local fallback path if we exposed it below
     return redirect("/tenants/activate-mine/")
 
@@ -483,9 +493,9 @@ def _call_inventory_view_with_legacy_guard(request, view_name, *args, **kwargs):
     return _normalize_response(request, resp)
 
 
-# --------------------------------------------------------------------------------------
+# ======================================================================================
 # Hard-bind stock list & dashboard entries
-# --------------------------------------------------------------------------------------
+# ======================================================================================
 def _stock_list_entry(request, *args, **kwargs):
     try:
         return _call_inventory_view_with_legacy_guard(request, "stock_list", *args, **kwargs)
@@ -655,7 +665,22 @@ urlpatterns += [
     path("inventory/api/restock_heatmap/", RedirectView.as_view(url="/inventory/api/restock-heatmap/", permanent=False)),
 ]
 
+# ---- Friendly fallback for unfinished endpoint (501) if app route is missing ----
+# If inventory.urls does not provide it yet, expose a safe "under development" page.
+if not _reverse_exists("restock_heatmap_api"):
+    try:
+        urlpatterns += [path("inventory/api/restock-heatmap/", core_views.feature_unavailable, name="restock_heatmap_api")]
+    except Exception:
+        # If feature_unavailable isn't defined, silently skip (handlers below still catch 500s)
+        pass
+
 # Static / media in DEBUG
 if settings.DEBUG:
     urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
     urlpatterns += static(settings.STATIC_URL, document_root=settings.STATIC_ROOT)
+
+# ======================================================================================
+# Friendly error handlers (module-level; Django uses these when DEBUG=False)
+# ======================================================================================
+handler404 = "cc.views.page_not_found"
+handler500 = "cc.views.server_error"

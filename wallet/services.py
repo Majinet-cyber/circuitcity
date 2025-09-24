@@ -3,9 +3,9 @@ from __future__ import annotations
 
 from calendar import monthrange
 from dataclasses import dataclass
-from datetime import date, datetime
+from datetime import date
 from decimal import Decimal
-from typing import Iterable, Sequence
+from typing import Iterable
 
 from django.conf import settings
 from django.contrib.auth import get_user_model
@@ -23,12 +23,11 @@ from .models import (
     AttendanceLog,
 )
 
-# Optional models (new features). Guarded so your app still loads if they’re not migrated yet.
+# Optional models (guarded so the app still loads if they’re not migrated yet)
 try:
-    from .models import Payslip, PayslipEmailLog, PayoutSchedule  # type: ignore
+    from .models import Payslip, PayoutSchedule  # type: ignore
 except Exception:  # pragma: no cover
     Payslip = None  # type: ignore
-    PayslipEmailLog = None  # type: ignore
     PayoutSchedule = None  # type: ignore
 
 # Existing dependency
@@ -53,11 +52,9 @@ def month_bounds(year: int, month: int) -> tuple[date, date]:
 
 
 def prev_month(today: date | None = None) -> tuple[int, int]:
-    today = today or timezone.now().date()
+    today = today or timezone.localdate()
     y, m = today.year, today.month
-    if m == 1:
-        return y - 1, 12
-    return y, m - 1
+    return (y - 1, 12) if m == 1 else (y, m - 1)
 
 
 def fmt_mk(x: Decimal | int | float) -> str:
@@ -70,7 +67,7 @@ def fmt_mk(x: Decimal | int | float) -> str:
 
 
 # ---------------------------------------------------------------------
-# Core wallet helpers you already had (kept intact)
+# Core wallet helpers (kept intact)
 # ---------------------------------------------------------------------
 def add_txn(
     *,
@@ -91,13 +88,13 @@ def add_txn(
         type=type,
         note=note,
         reference=reference,
-        effective_date=effective_date or timezone.now().date(),
+        effective_date=effective_date or timezone.localdate(),
         created_by=created_by,
         meta=meta or {},
     )
 
 
-# --- Sales → Commission (call from a post_save of Sale or wherever you finalize a sale) ---
+# --- Sales → Commission (call from a post_save of Sale or wherever you finalize a sale)
 def record_sale_commission(sale: Sale, *, created: bool, created_by=None):
     # example: 3% commission of sale.amount  (adjust to your real rule)
     if not created:
@@ -118,9 +115,9 @@ def record_sale_commission(sale: Sale, *, created: bool, created_by=None):
         )
 
 
-# --- Attendance penalties/bonuses (run daily at 18:00 with Celery/cron) ---
+# --- Attendance penalties/bonuses (run daily at 18:00 with Celery/cron)
 def apply_attendance_dispositions(for_date: date | None = None, *, created_by=None):
-    d = for_date or timezone.now().date()
+    d = for_date or timezone.localdate()
     logs = AttendanceLog.objects.filter(date=d).select_related("agent")
     for log in logs:
         if log.check_in:
@@ -137,7 +134,7 @@ def apply_attendance_dispositions(for_date: date | None = None, *, created_by=No
                     reference=f"ATT-{d.isoformat()}",
                     effective_date=d,
                     created_by=created_by,
-                    meta={"late_minutes": late_minutes, "blocks": int(blocks)},
+                    meta={"late_minutes": int(late_minutes), "blocks": int(blocks)},
                 )
             # Weekend bonus
             if log.weekend:
@@ -155,7 +152,7 @@ def apply_attendance_dispositions(for_date: date | None = None, *, created_by=No
             pass
 
 
-# --- Monthly sales target bonus (run on month end OR nightly incremental) ---
+# --- Monthly sales target bonus (run on month end OR nightly incremental)
 def apply_monthly_target_bonus(agent, year: int, month: int, *, created_by=None):
     try:
         t = SalesTarget.objects.get(agent=agent, year=year, month=month)
@@ -182,7 +179,7 @@ def apply_monthly_target_bonus(agent, year: int, month: int, *, created_by=None)
 
 # --- Aggregations for the UI ---
 def agent_wallet_summary(agent, *, today=None):
-    today = today or timezone.now().date()
+    today = today or timezone.localdate()
     start_month = today.replace(day=1)
 
     qs_all = WalletTransaction.objects.filter(ledger=Ledger.AGENT, agent=agent)
@@ -204,7 +201,7 @@ def agent_wallet_summary(agent, *, today=None):
 
 
 def ranking(period: str = "month"):
-    today = timezone.now().date()
+    today = timezone.localdate()
     if period == "all":
         filt = Q()
     else:
@@ -256,7 +253,7 @@ def compute_monthly_payslip(agent, year: int, month: int) -> PayslipBreakdown:
 
 def render_payslip_html(agent, year: int, month: int, b: PayslipBreakdown, company_name: str | None = None) -> str:
     """
-    Renders a small HTML snippet for the email. Falls back to inline HTML if the template is missing.
+    Renders HTML for the email. Falls back to inline HTML if the template is missing.
     """
     ctx = {
         "agent": agent,
@@ -280,7 +277,7 @@ def render_payslip_html(agent, year: int, month: int, b: PayslipBreakdown, compa
         return f"""
         <div>
           <h3>Payslip — {ctx['company_name']}</h3>
-          <p><b>{agent.get_full_name() or agent.username}</b> — {year}-{month:02d}</p>
+          <p><b>{getattr(agent, "get_full_name", lambda: agent.username)()}</b> — {year}-{month:02d}</p>
           <ul>{items}</ul>
           <p><b>Gross:</b> {fmt_mk(b.gross)}<br/>
              <b>Deductions:</b> {fmt_mk(b.deductions)}<br/>
@@ -304,10 +301,6 @@ def send_payslip_email(agent, year: int, month: int, b: PayslipBreakdown, *, sub
     msg = EmailMultiAlternatives(subject=subject, body=" ", to=[to])
     msg.attach_alternative(html, "text/html")
     msg.send(fail_silently=True)
-
-    if PayslipEmailLog:
-        PayslipEmailLog.objects.create(agent=agent, year=year, month=month, to_email=to)
-
     return True
 
 
@@ -326,13 +319,14 @@ def create_and_post_payslip(agent, year: int, month: int, *, created_by=None, po
 
     # Post payout to ledgers
     if post_wallet_payout and b.net and b.net > 0:
+        last_day = month_bounds(year, month)[1]
         add_txn(
             agent=agent,
             amount=-b.net,
             type=TxnType.PAYSLIP,
             note=f"Payslip {year}-{month:02d}",
             created_by=created_by,
-            effective_date=month_bounds(year, month)[1],
+            effective_date=last_day,
             meta={"gross": str(b.gross), "deductions": str(b.deductions)},
         )
         WalletTransaction.objects.create(
@@ -342,7 +336,7 @@ def create_and_post_payslip(agent, year: int, month: int, *, created_by=None, po
             type=TxnType.PAYSLIP,
             note=f"[Agent {agent.id}] Payslip {year}-{month:02d}",
             created_by=created_by,
-            effective_date=month_bounds(year, month)[1],
+            effective_date=last_day,
             meta={"gross": str(b.gross), "deductions": str(b.deductions)},
         )
 
@@ -381,12 +375,11 @@ def bulk_issue_payslips(
             emailed = False
             if email:
                 emailed = send_payslip_email(agent, year, month, b)
-                if emailed and Payslip is not None:
-                    try:
-                        # flag for convenience in UI
-                        Payslip.objects.filter(id=p.id).update(sent_to_email=True)
-                    except Exception:
-                        pass
+                # Best-effort flag for convenience in UI
+                try:
+                    type(p).objects.filter(id=p.id).update(sent_to_email=bool(emailed))
+                except Exception:
+                    pass
             results.append({"agent_id": agent.id, "net": b.net, "emailed": bool(emailed), "ok": True})
             ok += 1
         except Exception as e:  # keep going on errors
@@ -395,45 +388,20 @@ def bulk_issue_payslips(
 
 
 # ---------------------------------------------------------------------
-# Payout schedules (very lightweight runner)
+# Payout schedules (runner using the M2M `users`)
 # ---------------------------------------------------------------------
-def _parse_recipients_filter(f: str | None) -> Q:
-    """
-    Supported forms:
-      - "all"                            -> everyone with an email
-      - "group:Sales,Agents"             -> users in any of these groups
-      - "ids:1,2,5"                      -> explicit user ids
-    """
-    U = get_user_model()
-    if not f or f.strip().lower() == "all":
-        return ~Q(email="")
-
-    f = f.strip()
-    if f.startswith("group:"):
-        names = [x.strip() for x in f.split(":", 1)[1].split(",") if x.strip()]
-        return Q(groups__name__in=names) & ~Q(email="")
-    if f.startswith("ids:"):
-        ids = [int(x) for x in f.split(":", 1)[1].split(",") if x.strip().isdigit()]
-        return Q(id__in=ids) & ~Q(email="")
-
-    # default safe fallback
-    return ~Q(email="")
-
-
 def run_monthly_schedule(schedule, *, when: date | None = None, created_by=None) -> dict:
     """
     Executes a PayoutSchedule for (year, month). If `when` is omitted, uses previous month.
+    Uses the schedule.users M2M as the recipient list.
     """
     if PayoutSchedule is None:
         raise RuntimeError("PayoutSchedule model not available. Run migrations.")
 
-    when = when or timezone.now().date()
+    when = when or timezone.localdate()
     year, month = prev_month(when)
 
-    U = get_user_model()
-    filt = _parse_recipients_filter(schedule.recipients_filter or "all")
-    agents = U.objects.filter(filt).distinct()
-
+    agents = list(schedule.users.filter(is_active=True))
     res = bulk_issue_payslips(
         agents,
         year,

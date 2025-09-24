@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+{% block title %}Budget Requests{% endblock %}
+{% block header_title %}Budget Requests{% endblock %}
+{% block content %}
+<div class="container-fluid">
+  <div class="card">
+    <div class="card-body">
+      <form class="row g-2 mb-3">
+        <div class="col-auto">
+          <select class="form-select" name="status" onchange="this.form.submit()">
+            <option value="">All</option>
+            {% for s in "PENDING,APPROVED,REJECTED,PAID".split(",") %}
+              <option value="{{ s }}" {% if request.GET.status == s %}selected{% endif %}>{{ s|title }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="col-auto">
+          <a class="btn btn-outline-secondary" href="{% url 'wallet:admin_entries_export_csv' %}">Export CSV</a>
+        </div>
+      </form>
+      <div class="table-responsive">
+        <table class="table align-middle">
+          <thead><tr><th>When</th><th>Agent</th><th>Title</th><th class="text-end">Amount</th><th>Status</th><th>Actions</th></tr></thead>
+          <tbody>
+            {% for b in rows %}
+              <tr>
+                <td>{{ b.created_at|date:"M j, Y H:i" }}</td>
+                <td>{{ b.agent.get_full_name|default:b.agent.username }}</td>
+                <td>{{ b.title }}</td>
+                <td class="text-end">{{ b.amount|floatformat:2 }}</td>
+                <td>{{ b.status|title }}</td>
+                <td class="text-nowrap">
+                  <a class="btn btn-sm btn-success" href="{% url 'wallet:admin_budget_set_status' b.id 'approve' %}">Approve</a>
+                  <a class="btn btn-sm btn-warning" href="{% url 'wallet:admin_budget_set_status' b.id 'paid' %}">Mark Paid</a>
+                  <a class="btn btn-sm btn-outline-danger" href="{% url 'wallet:admin_budget_set_status' b.id 'reject' %}">Reject</a>
+                </td>
+              </tr>
+            {% empty %}
+              <tr><td colspan="6" class="text-muted">No budget requests.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

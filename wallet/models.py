@@ -1,4 +1,3 @@
-# wallet/models.py
 from __future__ import annotations
 
 from decimal import Decimal, ROUND_HALF_UP
@@ -17,7 +16,7 @@ User = settings.AUTH_USER_MODEL
 # Utilities
 # ----------------------------------------------------------------------
 def q2(x: Optional[Decimal]) -> Decimal:
-    """Quantize to 2 dp (banker's rounding style we prefer: HALF_UP here)."""
+    """Quantize to 2 dp (HALF_UP)."""
     if x is None:
         return Decimal("0.00")
     if not isinstance(x, Decimal):
@@ -74,7 +73,8 @@ class WalletTransaction(models.Model):
     amount = models.DecimalField(max_digits=12, decimal_places=2)  # signed
     note = models.CharField(max_length=255, blank=True, default="")
     reference = models.CharField(max_length=64, blank=True, default="")
-    effective_date = models.DateField(default=timezone.now)
+    # Use a date callable (not datetime) for DateField defaults
+    effective_date = models.DateField(default=timezone.localdate)
     created_at = models.DateTimeField(auto_now_add=True)
     created_by = models.ForeignKey(
         User, null=True, blank=True, on_delete=models.SET_NULL, related_name="created_wallet_txns"
@@ -202,7 +202,7 @@ class BudgetRequest(models.Model):
 # Payslips + Payments + Schedules
 # ----------------------------------------------------------------------
 def _default_base_salary() -> Decimal:
-    """Global fallback base salary (can be overridden per user in the future)."""
+    """Global fallback base salary (kept for historical migrations)."""
     return Decimal(getattr(settings, "WALLET_BASE_SALARY", "40000.00"))
 
 

@@ -28,6 +28,14 @@ def env_int(key: str, default: int) -> int:
     except Exception:
         return default
 
+def feature_enabled(code: str, *, default: bool) -> bool:
+    """
+    Single source of truth for feature flags.
+    Reads FEATURE_<CODE> from env; falls back to `default`.
+    Example: FEATURE_LAYBY=1, FEATURE_SIMULATOR=0
+    """
+    return env_bool(f"FEATURE_{code.upper()}", default)
+
 # -------------------------------------------------
 # Base paths
 # -------------------------------------------------
@@ -77,8 +85,10 @@ if APP_DOMAIN and APP_DOMAIN not in ALLOWED_HOSTS:
     ALLOWED_HOSTS.append(APP_DOMAIN)
 
 FORCE_SSL = env_bool("FORCE_SSL", env_bool("DJANGO_FORCE_SSL", False))
-USE_SSL = FORCE_SSL or not DEBUG
 HEALTHZ_ALLOW_HTTP = env_bool("HEALTHZ_ALLOW_HTTP", False)
+
+# Use SSL if explicitly forced OR (not DEBUG and not explicitly allowing http for healthz)
+USE_SSL = FORCE_SSL or (not DEBUG)
 
 # -------------------------------------------------
 # Security Headers
@@ -169,6 +179,9 @@ INSTALLED_APPS = [
     "sales",
     "dashboard",
     "layby",
+
+    # Wallet (agent/admin money views)
+    "wallet",
 ]
 
 print("[cc.settings] Final INSTALLED_APPS:", INSTALLED_APPS)
@@ -177,23 +190,49 @@ print("[cc.settings] Final INSTALLED_APPS:", INSTALLED_APPS)
 # Middleware
 # -------------------------------------------------
 MIDDLEWARE = [
+    # Security & static
     "django.middleware.security.SecurityMiddleware",
     "whitenoise.middleware.WhiteNoiseMiddleware",
+
+    # Sessions (needed by everything below)
     "django.contrib.sessions.middleware.SessionMiddleware",
+
+    # Observability
     "cc.middleware.RequestIDMiddleware",
     "cc.middleware.AccessLogMiddleware",
+
+    # Core Django
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
 
-    # Auto-select a business/location when the user has exactly one membership
+    # ---------- Multi-tenant + active context (correct order) ----------
+    # 1) Resolve which tenant this request belongs to.
+    "tenants.middleware.TenantResolutionMiddleware",
+
+    # 2) If the user has exactly one business/location, auto-select it.
     "cc.middleware.AutoSelectBusinessMiddleware",
 
-    "tenants.middleware.TenantResolutionMiddleware",
+    # 3) Single Source of Truth for business/location:
+    #    - sets request.business / request.active_location / *_id
+    #    - syncs legacy session keys
+    #    - adds ?biz=&loc= to list/dashboard when missing
+    "inventory.middleware.ActiveContextMiddleware",
+    # -------------------------------------------------------------------
+
+    # Read-only protections for auditors (must run after context is known)
     "inventory.middleware.AuditorReadOnlyMiddleware",
+
+    # Messages / clickjacking
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
+
+    # ---- Friendly error catcher (keep near the end) ----
+    "cc.middleware.FriendlyErrorsMiddleware",
 ]
+
+# Let middleware handle exceptions in non-DEBUG environments
+DEBUG_PROPAGATE_EXCEPTIONS = False
 
 ROOT_URLCONF = "cc.urls"
 
@@ -212,6 +251,11 @@ TEMPLATES = [
                 "django.template.context_processors.request",
                 "django.contrib.auth.context_processors.auth",
                 "django.contrib.messages.context_processors.messages",
+                # (Optional) add more defaults if you like:
+                # "django.template.context_processors.i18n",
+                # "django.template.context_processors.tz",
+                # "django.template.context_processors.static",
+                # "django.template.context_processors.media",
             ],
         },
     },
@@ -225,11 +269,19 @@ WSGI_APPLICATION = "cc.wsgi.application"
 DATABASES: dict = {}
 
 DATABASE_URL = os.environ.get("DATABASE_URL", "").strip()
-USE_LOCAL_SQLITE = env_bool("USE_LOCAL_SQLITE", default=DEBUG)
-# Require DATABASE_URL only on Render or when DEBUG is False (unless overridden)
-REQUIRE_DATABASE_URL = env_bool("REQUIRE_DATABASE_URL", (RENDER or not DEBUG))
 
-if DATABASE_URL:
+# Strong, explicit switches for local dev:
+FORCE_SQLITE = env_bool("FORCE_SQLITE", False)
+USE_LOCAL_SQLITE = FORCE_SQLITE or env_bool("USE_LOCAL_SQLITE", default=DEBUG)
+
+# Only require DATABASE_URL when we're truly in a non-local mode
+# (i.e., not DEBUG and not explicitly told to use SQLite)
+REQUIRE_DATABASE_URL = env_bool(
+    "REQUIRE_DATABASE_URL",
+    (RENDER or (not DEBUG and not USE_LOCAL_SQLITE))
+)
+
+if DATABASE_URL and not USE_LOCAL_SQLITE:
     try:
         import dj_database_url  # type: ignore
     except Exception as e:
@@ -240,12 +292,12 @@ if DATABASE_URL:
 elif REQUIRE_DATABASE_URL and not USE_LOCAL_SQLITE:
     # Strict in prod/Render without explicit local override
     raise RuntimeError("DATABASE_URL must be set in production.")
-elif USE_LOCAL_SQLITE:
-    # Local/dev default
+elif USE_LOCAL_SQLITE or not DATABASE_URL:
+    # Local/dev default — SQLite
     sqlite_path = str(BASE_DIR / "db.sqlite3")
     DATABASES["default"] = {"ENGINE": "django.db.backends.sqlite3", "NAME": sqlite_path}
 else:
-    # Manual Postgres config (for local PG without DATABASE_URL)
+    # Manual Postgres config (optional path for local PG without DATABASE_URL)
     NAME = os.environ.get("POSTGRES_DB") or os.environ.get("DB_NAME", "circuitcity")
     USER = os.environ.get("POSTGRES_USER") or os.environ.get("DB_USER", "ccuser")
     PASSWORD = os.environ.get("POSTGRES_PASSWORD") or os.environ.get("DB_PASSWORD", "")
@@ -330,7 +382,7 @@ STATIC_ROOT = BASE_DIR / "staticfiles"
 MEDIA_URL = "/media/"
 MEDIA_ROOT = BASE_DIR / "media"
 
-# Ensure default finders are enabled (FileSystem + AppDirectories)
+# Ensure default finders are enabled (FileSystemFinder + AppDirectories)
 STATICFILES_FINDERS = [
     "django.contrib.staticfiles.finders.FileSystemFinder",
     "django.contrib.staticfiles.finders.AppDirectoriesFinder",
@@ -456,12 +508,21 @@ WARRANTY_ENFORCE_COUNTRY = env_bool("WARRANTY_ENFORCE_COUNTRY", True)
 ACTIVATION_ALERT_MINUTES = env_int("ACTIVATION_ALERT_MINUTES", 15)
 WARRANTY_REQUEST_TIMEOUT = env_int("WARRANTY_REQUEST_TIMEOUT", 12)
 
+# ---- Single source of truth: product feature flags --------------------------
 FEATURES = {
-    "CSV_EXPORTS": os.environ.get("FEATURE_CSV_EXPORTS", "1") == "1",
-    "CSV_IMPORT": os.environ.get("FEATURE_CSV_IMPORT", "1") == "1",
-    "LOW_STOCK_DIGEST": os.environ.get("FEATURE_LOW_STOCK_DIGEST", "1") == "1",
-    "ROLE_ENFORCEMENT": os.environ.get("FEATURE_ROLE_ENFORCEMENT", "1") == "1",
+    # Existing flags kept compatible with env overrides
+    "CSV_EXPORTS": env_bool("FEATURE_CSV_EXPORTS", True),
+    "CSV_IMPORT": env_bool("FEATURE_CSV_IMPORT", True),
+    "LOW_STOCK_DIGEST": env_bool("FEATURE_LOW_STOCK_DIGEST", True),
+    "ROLE_ENFORCEMENT": env_bool("FEATURE_ROLE_ENFORCEMENT", True),
+
+    # New clear flags used by templates/navigation
+    # LAYBY is ON by default; can disable via FEATURE_LAYBY=0
+    "LAYBY": feature_enabled("LAYBY", default=True),
+    # SIMULATOR is OFF by default; enable via FEATURE_SIMULATOR=1
+    "SIMULATOR": feature_enabled("SIMULATOR", default=False),
 }
+# -----------------------------------------------------------------------------
 
 DATA_IMPORT_MAX_EXPANSION = env_int("DATA_IMPORT_MAX_EXPANSION", 5000)
 

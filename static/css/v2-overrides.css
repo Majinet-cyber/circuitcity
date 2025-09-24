@@ -76,6 +76,8 @@ body.dark {
 html, body {
   background: var(--cc-bg);
   color: var(--cc-text);
+  max-width: 100%;
+  overflow-x: hidden; /* prevent horizontal scroll on small screens */
 }
 
 h1, h2, h3, h4, h5 {
@@ -322,4 +324,31 @@ input:focus, select:focus, textarea:focus, .form-control:focus {
   .navbar, .sidebar, .btn, .cc-btn, .no-print { display: none !important; }
   body { background: #fff; color: #000; }
   .card, .table, .cc-card { box-shadow: none; border-color: #bbb; }
+}
+
+/* --------------------------------------------------------------------------
+   🔧 Anti-blur footer fix (prevents the “blurry footer” overlay)
+   --------------------------------------------------------------------------
+   We neutralize common sticky/bottom bars used by older templates so they
+   don’t add a frosted glass/box-shadow over your form’s bottom section.
+   Safe if these classes don’t exist.
+   -------------------------------------------------------------------------- */
+.footer-blur,
+.glass-footer,
+.bottom-blur,
+.mobile-fab-bar,
+.sticky-bottom,
+.cc-sticky-bar,
+.cc-bottom-blur,
+.sticky-cta,
+.sticky-actions,
+.tabbar,          /* if a mobile tab bar exists */
+.fab-bar {
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  filter: none !important;
+  box-shadow: none !important;
+  background: var(--cc-card) !important;
+  border-top: 1px solid var(--cc-border) !important;
+  opacity: 1 !important;
 }

@@ -1,69 +1,73 @@
 {% extends "base.html" %}
-{% block title %}Issue Payslip · Admin Wallet{% endblock %}
+{% load humanize %}
 
-{% block header_title %}<i class="bi bi-receipt me-2"></i>Issue Payslip{% endblock %}
+{% block title %}Issue Single Payslip · Wallet Admin{% endblock %}
+{% block header_title %}<i class="bi bi-receipt me-2"></i>Issue Single Payslip{% endblock %}
 
-{% block content %}
+{% block body %}
 <div class="container-xxl px-0">
+
+  <div class="alert alert-light border d-flex align-items-start gap-2 mb-3" role="alert">
+    <i class="bi bi-info-circle mt-1"></i>
+    <div class="small">
+      This will compute <b>base salary + commissions + bonuses</b>, subtract <b>deductions</b> for
+      the chosen period, create/update a payslip, and (optionally) email it immediately.
+    </div>
+  </div>
+
   <div class="card shadow-sm border-0">
     <div class="card-body">
-      <p class="text-muted mb-3">
-        Select an agent and a month. The system will compute Gross/Deductions from wallet
-        transactions for that period, create a <em>Payslip</em> record, and post a <strong>PAYSLIP</strong>
-        wallet transaction (negative on the agent wallet, mirrored on company wallet).
-      </p>
-
-      <form method="post" class="row g-3">
+      <form method="post" action="{% url 'wallet:admin_issue_payslip' %}">
         {% csrf_token %}
 
-        <div class="col-md-6">
-          <label class="form-label fw-semibold">Agent</label>
-          <select name="agent_id" class="form-select" required>
-            <option value="" disabled selected>Choose agent…</option>
-            {% for a in agents %}
-              <option value="{{ a.id }}">
-                {{ a.first_name }} {{ a.last_name }} {% if a.email %}— {{ a.email }}{% endif %}
-              </option>
-            {% endfor %}
-          </select>
+        <div class="row g-3">
+          <div class="col-12">
+            <label class="form-label fw-semibold">Agent</label>
+            <select name="agent_id" class="form-select" required>
+              {% for a in agents %}
+                <option value="{{ a.id }}">{{ a.get_full_name|default:a.username }}</option>
+              {% endfor %}
+            </select>
+          </div>
+
+          <div class="col-md-4">
+            <label class="form-label fw-semibold">Year</label>
+            <input type="number" name="year" class="form-control"
+                   min="2020" max="2100" value="{{ year }}" required>
+          </div>
+
+          <div class="col-md-4">
+            <label class="form-label fw-semibold">Month</label>
+            <input type="number" name="month" class="form-control"
+                   min="1" max="12" value="{{ month }}" required>
+          </div>
+
+          <div class="col-md-4">
+            <label class="form-label fw-semibold">Payment Method (optional / future)</label>
+            <select name="method" class="form-select">
+              <option value="">—</option>
+              <option value="MANUAL">Manual</option>
+              <option value="NB">National Bank</option>
+              <option value="SB">Standard Bank</option>
+              <option value="AM">Airtel Money</option>
+            </select>
+          </div>
+
+          <div class="col-12">
+            <div class="form-check">
+              <input class="form-check-input" type="checkbox" id="send_now" name="send_now" value="1">
+              <label class="form-check-label" for="send_now">Email payslip now</label>
+            </div>
+          </div>
         </div>
 
-        <div class="col-md-3">
-          <label class="form-label fw-semibold">Year</label>
-          <input type="number" name="year" class="form-control"
-                 min="2020" max="2100" value="{{ default_year }}" required>
-        </div>
-
-        <div class="col-md-3">
-          <label class="form-label fw-semibold">Month</label>
-          <select name="month" class="form-select" required>
-            {% for m in "1,2,3,4,5,6,7,8,9,10,11,12".split(",") %}
-              <option value="{{ m|add:0 }}" {% if default_month == m|add:0 %}selected{% endif %}>
-                {{ m|add:0|stringformat:"02d" }}
-              </option>
-            {% endfor %}
-          </select>
-        </div>
-
-        <div class="col-12 d-flex gap-2">
-          <a href="{% url 'wallet:admin_home' %}" class="btn btn-outline-secondary">
-            <i class="bi bi-arrow-left"></i> Back
-          </a>
+        <div class="mt-3">
           <button class="btn btn-primary">
-            <i class="bi bi-send"></i> Issue Payslip
+            <i class="bi bi-send-check me-1"></i>Issue Payslip
           </button>
+          <a href="{% url 'wallet:admin_payslips' %}" class="btn btn-outline-secondary ms-2">Back</a>
         </div>
       </form>
-
-      <hr class="my-4">
-
-      <div class="alert alert-info small mb-0">
-        <div class="fw-semibold mb-1">What’s next?</div>
-        <ul class="mb-0">
-          <li>Bulk issue & scheduling UI will live here (select many agents, auto-send on a chosen day).</li>
-          <li>Future payment methods (National Bank / Standard Bank / Airtel Money) can create a <em>Payment</em> record linked to the payslip.</li>
-        </ul>
-      </div>
     </div>
   </div>
 </div>

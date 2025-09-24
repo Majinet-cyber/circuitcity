@@ -7,7 +7,7 @@ from typing import Iterable
 
 from django.http import JsonResponse
 from django.shortcuts import redirect
-from django.urls import NoReverseMatch, path, re_path, reverse
+from django.urls import NoReverseMatch, path, reverse
 from django.views.generic import TemplateView
 
 # ---------------------------------------------------------------------
@@ -142,6 +142,101 @@ def _get_any(names: tuple[str, ...], *sources, msg: str | None = None):
     return _stub(msg or f"{'/'.join(names)} endpoint not implemented")
 
 # ---------------------------------------------------------------------
+# Single-source-of-truth glue for Stock List
+# ---------------------------------------------------------------------
+# All aliases we’ve seen in older codebases
+_BIZ_KEYS = ("biz", "business", "business_id", "tenant", "tenant_id")
+_LOC_KEYS = ("loc", "location", "location_id", "store", "store_id", "warehouse_id")
+
+# Legacy session mirrors (set by middleware elsewhere)
+_SESS_BIZ = ("active_business_id", "business_id", "tenant_id", "current_business_id")
+_SESS_LOC = ("active_location_id", "location_id", "store_id", "current_location_id")
+
+_VALID_STATUS = {"all", "available", "in_stock", "selling", "sold", "archived"}
+
+def _derive_active_ids(request):
+    """
+    Pull active biz/location id from request attributes first (set by your ActiveContext middleware),
+    then fall back to session, then to any GET alias already present.
+    """
+    # 1) Attributes (preferred)
+    bid = getattr(request, "business_id", None)
+    lid = getattr(request, "active_location_id", None)
+
+    # 2) Session
+    if bid is None:
+        sess = getattr(request, "session", {}) or {}
+        bid = next((sess.get(k) for k in _SESS_BIZ if sess.get(k) is not None), None)
+    if lid is None:
+        sess = getattr(request, "session", {}) or {}
+        lid = next((sess.get(k) for k in _SESS_LOC if sess.get(k) is not None), None)
+
+    # 3) Existing GET
+    if bid is None:
+        for k in _BIZ_KEYS:
+            v = request.GET.get(k)
+            if v:
+                bid = v
+                break
+    if lid is None:
+        for k in _LOC_KEYS:
+            v = request.GET.get(k)
+            if v:
+                lid = v
+                break
+    return bid, lid
+
+def _coerce_int(v):
+    try:
+        return int(v)
+    except Exception:
+        return v
+
+def _stock_list_wrapper(view_func):
+    """
+    Wrap the stock list page so it always sees consistent business/location + sane filters.
+    We don’t change the view’s code; we only normalize GET and mirror typical aliases.
+    """
+    def _wrapped(request, *args, **kwargs):
+        # Only for GET page renders
+        if request.method == "GET":
+            bid, lid = _derive_active_ids(request)
+            # Mutate a copy of the QueryDict
+            qs = request.GET.copy()
+            if bid is not None:
+                bid = _coerce_int(bid)
+                for key in _BIZ_KEYS:
+                    qs[key] = bid
+            if lid is not None:
+                lid = _coerce_int(lid)
+                for key in _LOC_KEYS:
+                    qs[key] = lid
+
+            # Normalize status (some templates show "AI" instead of "All")
+            raw_status = (qs.get("status") or "").strip().lower()
+            if raw_status in ("", "ai") or raw_status not in _VALID_STATUS:
+                qs["status"] = "all"
+
+            # Ensure view=all so nothing is hidden by a default
+            if qs.get("view") not in ("all", "mine", "store"):
+                qs["view"] = "all"
+
+            # If something changed, redirect once with enriched QS
+            if qs.urlencode() != request.GET.urlencode():
+                return redirect(f"{request.path}?{qs.urlencode()}")
+
+            try:
+                print(
+                    "INFO inventory.urls: stock_list context -> "
+                    f"biz={bid} loc={lid} status={qs.get('status')} view={qs.get('view')}"
+                )
+            except Exception:
+                pass
+
+        return view_func(request, *args, **kwargs)
+    return _wrapped
+
+# ---------------------------------------------------------------------
 # Resolve views safely
 # ---------------------------------------------------------------------
 _inventory_dashboard = _get_any(
@@ -155,14 +250,20 @@ _stock_list = _get_any(
     msg="stock_list endpoint not implemented",
 )
 
-# ---- PAGE views (DO NOT require business for these) ----
-_scan_in_page = _resolve_page(
-    ("scan_in_page", "scan_in_view", "scan_in_form", "scan_in"),
+# Page views for Scan IN / Scan SOLD (HTML by default)
+_scan_in_page_view = _get_any(("scan_in",), views,
+                              msg="scan_in page view missing")
+_scan_sold_page_view = _get_any(("scan_sold",), views,
+                                msg="scan_sold page view missing")
+
+# Tiny tester pages (fallback templates if page views are missing)
+_scan_in_tester = _resolve_page(
+    ("scan_in_page", "scan_in_view", "scan_in_form"),
     template_name="inventory/scan_in.html",
     missing_msg="scan_in page view missing",
 )
-_scan_sold_page = _resolve_page(
-    ("scan_sold_page", "scan_sold_view", "scan_sold_form", "scan_sold"),
+_scan_sold_tester = _resolve_page(
+    ("scan_sold_page", "scan_sold_view", "scan_sold_form"),
     template_name="inventory/scan_sold.html",
     missing_msg="scan_sold page view missing",
 )
@@ -200,29 +301,39 @@ _orders_list = _get_any(("orders_list",), views, msg="orders list page not imple
 _po_invoice = _get_any(("po_invoice",), views, msg="invoice view missing")
 
 # ---- API resolvers (require business) ----
-_scan_in_api = _get_any(("api_scan_in", "scan_in"), _api_v2, _api_legacy, msg="scan_in API not implemented")
-_scan_sold_api = _get_any(("api_scan_sold", "scan_sold"), _api_v2, _api_legacy, msg="scan_sold API not implemented")
+_scan_in_api = _get_any(("scan_in", "api_scan_in"), _api_v2, _api_legacy, msg="scan_in API not implemented")
+_scan_sold_api = _get_any(("scan_sold", "api_scan_sold"), _api_v2, _api_legacy, msg="scan_sold API not implemented")
 
-_mark_sold_view = _get_any(("api_mark_sold",), _api_v2, _api_legacy)
-_time_checkin_view = _get_any(("api_time_checkin",), _api_v2, _api_legacy)
-_wallet_summary = _get_any(("api_wallet_summary",), _api_v2, _api_legacy)
-_wallet_add_txn = _get_any(("api_wallet_add_txn",), _api_v2, _api_legacy)
-_sales_trend_view = _get_any(("api_sales_trend", "sales_trend"), _api_v2, _api_legacy)
-_top_models_view = _get_any(("api_top_models",), _api_v2, _api_legacy)
-_profit_bar_view = _get_any(("api_profit_bar",), _api_v2, _api_legacy)
-_value_trend_view = _get_any(("value_trend", "api_value_trend", "api_sales_trend", "sales_trend"), _api_v2, _api_legacy)
-_agent_trend_view = _get_any(("api_agent_trend",), _api_v2, _api_legacy)
-_predictions_view = _get_any(("api_predictions",), _api_v2, _api_legacy)
-_cash_overview_view = _get_any(("api_cash_overview",), _api_v2, _api_legacy)
-_alerts_view = _get_any(("api_alerts",), _api_v2, _api_legacy)
-_restock_heatmap = _get_any(("restock_heatmap_api",), _api_v2, _api_legacy)
-_api_order_price = _get_any(("api_order_price",), _api_v2, _api_legacy)
-_api_stock_models = _get_any(("api_stock_models",), _api_v2, _api_legacy)
-_api_place_order = _get_any(("api_place_order",), _api_v2, _api_legacy)
+_mark_sold_view = _get_any(("api_mark_sold",), _api_v2, _api_legacy, msg="api_mark_sold not implemented")
+_time_checkin_view = _get_any(("api_time_checkin",), _api_v2, _api_legacy, msg="api_time_checkin not implemented")
+_wallet_summary = _get_any(("api_wallet_summary",), _api_v2, _api_legacy, msg="api_wallet_summary not implemented")
+_wallet_add_txn = _get_any(("api_wallet_add_txn",), _api_v2, _api_legacy, msg="api_wallet_add_txn not implemented")
+_sales_trend_view = _get_any(("api_sales_trend", "sales_trend"), _api_v2, _api_legacy, msg="api_sales_trend not implemented")
+_top_models_view = _get_any(("api_top_models",), _api_v2, _api_legacy, msg="api_top_models not implemented")
+_profit_bar_view = _get_any(("api_profit_bar",), _api_v2, _api_legacy, msg="api_profit_bar not implemented")
+_value_trend_view = _get_any(("value_trend", "api_value_trend", "api_sales_trend", "sales_trend"), _api_v2, _api_legacy, msg="api_value_trend not implemented")
+_agent_trend_view = _get_any(("api_agent_trend",), _api_v2, _api_legacy, msg="api_agent_trend not implemented")
+_predictions_view = _get_any(("api_predictions",), _api_v2, _api_legacy, msg="api_predictions not implemented")
+_cash_overview_view = _get_any(("api_cash_overview",), _api_v2, _api_legacy, msg="api_cash_overview not implemented")
+_alerts_view = _get_any(("api_alerts",), _api_v2, _api_legacy, msg="api_alerts not implemented")
 
-_api_product_create = _get_any(("api_product_create",), _api_v2, _api_legacy, msg="api_product_create missing")
+# Heatmap: use the gateway that ALWAYS returns 200
+_restock_heatmap = _get_any(("restock_heatmap", "restock_heatmap_api"), _api_v2, _api_legacy, msg="restock_heatmap not implemented")
+
+_api_order_price = _get_any(("api_order_price",), _api_v2, _api_legacy, msg="api_order_price not implemented")
+_api_stock_models = _get_any(("api_stock_models",), _api_v2, _api_legacy, msg="api_stock_models not implemented")
+_api_place_order = _get_any(("api_place_order",), _api_v2, _api_legacy, msg="api_place_order not implemented")
+
+# NEW: unify product ops (avoid NameError)
+_api_product_create = _get_any(
+    ("api_product_create", "product_create"),
+    _api_v2, _api_legacy,
+    msg="product_create not implemented"
+)
 _api_product_update_price = _get_any(
-    ("api_product_update_price",), _api_v2, _api_legacy, msg="api_product_update_price missing"
+    ("api_product_update_price", "product_update_price", "update_price"),
+    _api_v2, _api_legacy,
+    msg="product_update_price not implemented"
 )
 
 # Optional audit endpoints/pages
@@ -256,28 +367,33 @@ urlpatterns = [
     path("", _home_redirect, name="home"),
 
     # Stock + dashboard (require business)
-    path("list/", _need_biz(_stock_list), name="stock_list"),
-    path("stock/", _need_biz(_stock_list)),
-    path("list/all/", _need_biz(_list_all_redirect), name="stock_list_all"),
+    path("list/", _need_biz(_stock_list_wrapper(_stock_list)), name="stock_list"),
+    path("stock/", _need_biz(_stock_list_wrapper(_stock_list))),
+    path("list/all/", _need_biz(_stock_list_wrapper(_list_all_redirect)), name="stock_list_all"),
     path("stocks/", _redirect_to("inventory:stock_list")),
 
     path("dashboard/", _need_biz(_inventory_dashboard), name="inventory_dashboard"),
     path("dashboard", _need_biz(_inventory_dashboard), name="dashboard"),
     path("dash/", _redirect_to("inventory:inventory_dashboard")),
 
-    # ---- Scanning PAGES (NO business required so the form always opens) ----
-    path("scan-in/", _scan_in_page, name="scan_in"),
-    path("scan-sold/", _scan_sold_page, name="scan_sold"),
+    # ---------------- Scanning ----------------
+    # PAGE endpoints (require business) — HTML by default:
+    path("scan-in/", _need_biz(_scan_in_page_view), name="scan_in"),
+    path("scan-sold/", _need_biz(_scan_sold_page_view), name="scan_sold"),
+
+    # API endpoints (JSON) stay under /api/:
+    path("api/scan-in/", _need_biz(_scan_in_api), name="api_scan_in"),
+    path("api/scan-sold/", _need_biz(_scan_sold_api), name="api_scan_sold"),
+
+    # Tiny tester pages (fallback templates if page views missing):
+    path("scan-in/page/", _scan_in_tester, name="scan_in_page"),
+    path("scan-sold/page/", _scan_sold_tester, name="scan_sold_page"),
     path("scan-web/", _scan_web, name="scan_web"),
 
     # Short links
     path("in/", _redirect_to("inventory:scan_in"), name="short_in"),
     path("sold/", _redirect_to("inventory:scan_sold"), name="short_sold"),
     path("scan/", _redirect_to("inventory:scan_web"), name="short_scan"),
-
-    # ---- JSON APIs (REQUIRE business) ----
-    path("api/scan-in/", _need_biz(_scan_in_api), name="api_scan_in"),
-    path("api/scan-sold/", _need_biz(_scan_sold_api), name="api_scan_sold"),
 
     # CSV export
     path("export/", _need_biz(_export_csv), name="export_csv"),
@@ -314,6 +430,7 @@ urlpatterns += [
     path("api/order-price/<int:product_id>/", manager_required(_need_biz(_api_order_price)), name="api_order_price"),
     path("api/stock-models/", manager_required(_need_biz(_api_stock_models)), name="api_stock_models"),
 
+    # unified names to avoid NameError at import time
     path("api/product/create/", manager_required(_need_biz(_api_product_create)), name="api_product_create"),
     path("api/product/update-price/", manager_required(_need_biz(_api_product_update_price)),
          name="api_product_update_price"),
@@ -321,33 +438,21 @@ urlpatterns += [
 
 # Dashboard/API routes (modern) — all require business
 urlpatterns += [
-    path("api/predictions/", _need_biz(_get_any(("api_predictions", "predictions"), _api_v2, _api_legacy)),
-         name="predictions_summary"),
-    path("api/alerts/", _need_biz(_get_any(("api_alerts",), _api_v2, _api_legacy)), name="api_alerts"),
-    path("api/cash/", _need_biz(_get_any(("api_cash_overview",), _api_v2, _api_legacy)), name="api_cash_overview"),
-    path("api/sales-trend/", _need_biz(_get_any(("api_sales_trend", "sales_trend"), _api_v2, _api_legacy)),
-         name="api_sales_trend"),
-    path("api/top-models/", _need_biz(_get_any(("api_top_models",), _api_v2, _api_legacy)), name="api_top_models"),
-    path("api/value-trend/", _need_biz(_get_any(("value_trend", "api_value_trend"), _api_v2, _api_legacy)),
-         name="api_value_trend"),
-    path("api/profit-bar/", _need_biz(_get_any(("api_profit_bar",), _api_v2, _api_legacy)), name="api_profit_bar"),
-    path("api/agent-trend/", _need_biz(_get_any(("api_agent_trend",), _api_v2, _api_legacy)), name="api_agent_trend"),
-    path("api/restock-heatmap/", _need_biz(_get_any(("restock_heatmap_api",), _api_v2, _api_legacy)),
-         name="restock_heatmap_api"),
-    path("api/wallet-summary/", _need_biz(_get_any(("api_wallet_summary",), _api_v2, _api_legacy)),
-         name="api_wallet_summary"),
-    path("api/wallet-txn/", _need_biz(_get_any(("api_wallet_add_txn",), _api_v2, _api_legacy)),
-         name="api_wallet_add_txn"),
+    path("api/predictions/", _need_biz(_predictions_view), name="predictions_summary"),
+    path("api/alerts/", _need_biz(_alerts_view), name="api_alerts"),
+    path("api/cash/", _need_biz(_cash_overview_view), name="api_cash_overview"),
+    path("api/sales-trend/", _need_biz(_sales_trend_view), name="api_sales_trend"),
+    path("api/top-models/", _need_biz(_top_models_view), name="api_top_models"),
+    path("api/value-trend/", _need_biz(_value_trend_view), name="api_value_trend"),
+    path("api/profit-bar/", _need_biz(_profit_bar_view), name="api_profit_bar"),
+    path("api/agent-trend/", _need_biz(_agent_trend_view), name="api_agent_trend"),
+    path("api/restock-heatmap/", _need_biz(_restock_heatmap), name="restock_heatmap_api"),
+    path("api/wallet-summary/", _need_biz(_wallet_summary), name="api_wallet_summary"),
+    path("api/wallet-txn/", _need_biz(_wallet_add_txn), name="api_wallet_add_txn"),
     path("api/mark-sold/", _need_biz(_mark_sold_view), name="api_mark_sold"),
     path("api/time-checkin/", _need_biz(_time_checkin_view), name="api_time_checkin"),
 
-    path("api/task-submit/",
-         _need_biz(_get_any(("api_task_submit",), _api_v2, _api_legacy, msg="api_task_submit missing")),
-         name="api_task_submit"),
-    path("api/task-status/",
-         _need_biz(_get_any(("api_task_status",), _api_v2, _api_legacy, msg="api_task_status missing")),
-         name="api_task_status"),
-    path("api/audit-verify/",
-         _need_biz(_get_any(("api_audit_verify",), _api_v2, _api_legacy, msg="api_audit_verify missing")),
-         name="api_audit_verify"),
+    path("api/task-submit/", _need_biz(_api_task_submit), name="api_task_submit"),
+    path("api/task-status/", _need_biz(_api_task_status), name="api_task_status"),
+    path("api/audit-verify/", _need_biz(_api_audit_verify), name="api_audit_verify"),
 ]

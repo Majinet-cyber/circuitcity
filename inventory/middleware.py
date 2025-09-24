@@ -1,6 +1,8 @@
 # inventory/middleware.py
 from django.conf import settings
 from django.http import HttpResponseForbidden
+from django.utils.deprecation import MiddlewareMixin
+from inventory.helpers.request_ctx import ensure_request_defaults, _get_active_business
 
 SAFE_METHODS = {"GET", "HEAD", "OPTIONS", "TRACE"}
 
@@ -81,3 +83,20 @@ class AuditorReadOnlyMiddleware:
 
         # Otherwise proceed
         return self.get_response(request)
+
+
+class ActiveContextMiddleware(MiddlewareMixin):
+    """
+    Ensures every request has a business/location if the user has one.
+    If the session has exactly one business+location, it auto-attaches them.
+    """
+
+    def process_request(self, request):
+        try:
+            # Make sure business + location are always attached
+            _, biz_id = _get_active_business(request)
+            if biz_id:
+                ensure_request_defaults(request)
+        except Exception:
+            # Fail silently so it doesn't crash unrelated requests
+            pass

@@ -1,6 +1,8 @@
 # wallet/views.py
 from __future__ import annotations
 
+import csv
+import io
 import json
 from calendar import monthrange
 from datetime import date
@@ -8,12 +10,13 @@ from decimal import Decimal, InvalidOperation
 from typing import Tuple
 
 from django.conf import settings
+from django.contrib import messages
 from django.contrib.auth import get_user_model
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.core.mail import send_mail
 from django.db.models import Sum
-from django.http import HttpRequest, JsonResponse, HttpResponseBadRequest
+from django.http import HttpRequest, JsonResponse, HttpResponseBadRequest, HttpResponse, Http404
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 from django.utils.decorators import method_decorator
@@ -164,6 +167,20 @@ def _json_requested(request: HttpRequest) -> bool:
     """
     accept = (request.headers.get("Accept") or "").lower()
     return accept.startswith("application/json") or request.GET.get("format") == "json"
+
+
+def _csv_http_response(rows, filename: str) -> HttpResponse:
+    """
+    Simple CSV exporter (UTF-8, no BOM). `rows` is an iterable of lists/tuples.
+    """
+    buf = io.StringIO()
+    w = csv.writer(buf)
+    for r in rows:
+        w.writerow(r)
+    data = buf.getvalue().encode("utf-8")
+    resp = HttpResponse(data, content_type="text/csv; charset=utf-8")
+    resp["Content-Disposition"] = f'attachment; filename="{filename}"'
+    return resp
 
 
 # =====================================================================
@@ -407,6 +424,76 @@ def api_ranking(request: HttpRequest):
 
 
 # ---------------------------------------------------------------------
+# Agent extras expected by urls.py
+# ---------------------------------------------------------------------
+@login_required
+def entry_detail(request: HttpRequest, pk: int) -> HttpResponse:
+    """
+    Transaction drill-down. Agents can see their own; staff can see any.
+    """
+    if _staff(request.user):
+        entry = get_object_or_404(WalletTransaction, pk=pk)
+    else:
+        entry = get_object_or_404(WalletTransaction, pk=pk, agent=request.user, ledger=Ledger.AGENT)
+    return render(request, "wallet/entry_detail.html", {"entry": entry})
+
+
+@login_required
+def payslip_download(request: HttpRequest, year: int, month: int) -> HttpResponse:
+    """
+    Lightweight HTML "PDF" fallback for an agent's payslip for a period.
+    (No external PDF dependency; downloads as HTML if PDF lib isn’t present.)
+    """
+    p = get_object_or_404(Payslip, agent=request.user, year=year, month=month)
+    html = f"""<!doctype html>
+<html><head><meta charset="utf-8"><title>Payslip {p.year}-{p.month:02d}</title>
+<style>body{{font-family:system-ui,Segoe UI,Arial,sans-serif}}table{{border-collapse:collapse;width:100%}}td,th{{border:1px solid #eee;padding:6px;text-align:right}}th:first-child,td:first-child{{text-align:left}}</style>
+</head><body>
+<h2>Payslip — {p.year}-{p.month:02d}</h2>
+<p><strong>Agent:</strong> {getattr(request.user, "get_full_name", lambda: request.user.username)()}</p>
+<table>
+<tr><th>Base Salary</th><td>{p.base_salary:.2f}</td></tr>
+<tr><th>Commission</th><td>{p.commission:.2f}</td></tr>
+<tr><th>Bonuses/Fees</th><td>{p.bonuses_fees:.2f}</td></tr>
+<tr><th>Deductions</th><td>{p.deductions:.2f}</td></tr>
+<tr><th>Gross</th><td>{p.gross:.2f}</td></tr>
+<tr><th>Net</th><td><strong>{p.net:.2f}</strong></td></tr>
+</table>
+<p>Reference: {p.reference}</p>
+</body></html>"""
+    resp = HttpResponse(html)
+    resp["Content-Disposition"] = f'attachment; filename="payslip-{p.year}-{p.month:02d}.html"'
+    return resp
+
+
+@login_required
+def budget_new(request: HttpRequest) -> HttpResponse:
+    """
+    Simple agent budget request creator (POST title, amount, reason).
+    """
+    if request.method == "POST":
+        title = (request.POST.get("title") or "").strip() or "Budget Request"
+        reason = (request.POST.get("reason") or "").strip()
+        try:
+            amount = Decimal(str(request.POST.get("amount") or "0"))
+        except (InvalidOperation, ValueError, TypeError):
+            messages.error(request, "Invalid amount.")
+            return redirect("wallet:agent_wallet")
+
+        BudgetRequest.objects.create(
+            agent=request.user,
+            title=title,
+            amount=amount,
+            reason=reason,
+        )
+        messages.success(request, "Budget request submitted.")
+        return redirect("wallet:agent_wallet")
+
+    # GET → minimal form (fallback if you don't have a template)
+    return render(request, "wallet/budget_new.html", {})
+
+
+# ---------------------------------------------------------------------
 # Admin wallet views (OTP-required)
 # ---------------------------------------------------------------------
 @method_decorator([otp_required, ensure_csrf_cookie], name="dispatch")
@@ -557,6 +644,83 @@ class AdminBudgetsView(LoginRequiredMixin, TemplateView):
         b.decided_at = timezone.now()
         b.save()
         return redirect("wallet:admin_budgets")
+
+
+# ---------------------------------------------------------------------
+# Admin extras (for urls.py additive routes)
+# ---------------------------------------------------------------------
+@otp_required
+def admin_budget_list(request: HttpRequest) -> HttpResponse:
+    if not _staff(request.user):
+        return redirect("wallet:agent_wallet")
+
+    biz = get_active_business(request)
+    qs = _maybe_scope_to_business(BudgetRequest.objects.all().select_related("agent"), biz)
+    status = request.GET.get("status")
+    if status and status.lower() in {s for s, _ in BudgetRequest.Status.choices}:
+        qs = qs.filter(status=status.lower())
+    rows = qs.order_by("-created_at")[:200]
+    return render(request, "wallet/admin_budget_list.html", {"rows": rows, "business": biz})
+
+
+@otp_required
+def admin_budget_set_status(request: HttpRequest, pk: int, action: str) -> HttpResponse:
+    if not _staff(request.user):
+        return redirect("wallet:agent_wallet")
+
+    b = get_object_or_404(BudgetRequest, pk=pk)
+    action = (action or "").lower()
+    if action == "approve":
+        b.status = BudgetRequest.Status.APPROVED
+    elif action == "reject":
+        b.status = BudgetRequest.Status.REJECTED
+    elif action == "paid" or action == "pay":
+        b.status = BudgetRequest.Status.PAID
+    else:
+        messages.error(request, "Invalid action.")
+        return redirect("wallet:admin_budget_list")
+    b.decided_by = request.user
+    b.decided_at = timezone.now()
+    b.save(update_fields=["status", "decided_by", "decided_at"])
+    messages.success(request, f"Budget set to {b.status}.")
+    return redirect("wallet:admin_budget_list")
+
+
+@otp_required
+def admin_entries_export_csv(request: HttpRequest) -> HttpResponse:
+    if not _staff(request.user):
+        return redirect("wallet:agent_wallet")
+
+    biz = get_active_business(request)
+    qs = WalletTransaction.objects.all().select_related("agent")
+    qs = _maybe_scope_to_business(qs, biz)
+
+    # Optional filters
+    agent_id = request.GET.get("agent_id")
+    if agent_id:
+        qs = qs.filter(agent_id=agent_id)
+    year = request.GET.get("year")
+    month = request.GET.get("month")
+    if year and month:
+        y, m = int(year), int(month)
+        first, last = _month_bounds(y, m)
+        qs = qs.filter(effective_date__gte=first, effective_date__lte=last)
+
+    rows = [
+        ["created_at", "effective_date", "ledger", "agent_id", "type", "amount", "note", "reference"]
+    ]
+    for t in qs.order_by("effective_date", "agent_id", "created_at", "id").iterator():
+        rows.append([
+            t.created_at.isoformat(timespec="seconds"),
+            t.effective_date.isoformat(),
+            t.ledger,
+            t.agent_id or "",
+            t.type,
+            f"{t.amount:.2f}",
+            t.note or "",
+            t.reference or "",
+        ])
+    return _csv_http_response(rows, "wallet_transactions.csv")
 
 
 # ---------------------------------------------------------------------

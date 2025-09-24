@@ -28,9 +28,25 @@ LATE_STEP_PENALTY = Decimal("5000")     # every 30 min after 08:00
 SUNDAY_BONUS = Decimal("15000")         # any time on Sunday
 
 
-# -------------------------
+# ==============================================================================
+# Single Source of Truth: error rendering helper
+# ==============================================================================
+def _render_error(request: HttpRequest, template: str, status: int, context: Dict[str, Any] | None = None) -> HttpResponse:
+    """
+    Centralized renderer for error pages so all errors:
+      - Share the same template look/feel
+      - Automatically include request_id if middleware set it
+      - Are easy to call from multiple handlers/views
+    """
+    ctx = dict(context or {})
+    # Expose request_id for the template (set by your RequestIDMiddleware)
+    ctx.setdefault("request_id", getattr(request, "request_id", None))
+    return render(request, template, ctx, status=status)
+
+
+# ==============================================================================
 # Health & utility
-# -------------------------
+# ==============================================================================
 def healthz(_request: HttpRequest) -> JsonResponse:
     """
     Lightweight liveness/readiness probe:
@@ -126,9 +142,9 @@ def _totals_for_user(user: User, scope: str = "all") -> Dict[str, Any]:
     }
 
 
-# -------------------------
+# ==============================================================================
 # Back-compat alias for old name
-# -------------------------
+# ==============================================================================
 @login_required
 @user_passes_test(is_admin)
 def admin_dashboard(_request: HttpRequest) -> HttpResponse:
@@ -136,9 +152,9 @@ def admin_dashboard(_request: HttpRequest) -> HttpResponse:
     return redirect("dashboard:dashboard")
 
 
-# -------------------------
+# ==============================================================================
 # Admin → per-agent detail + record advance
-# -------------------------
+# ==============================================================================
 @login_required
 @user_passes_test(is_admin)
 @ensure_csrf_cookie         # set cookie on GET
@@ -213,9 +229,9 @@ def admin_agent_detail(request: HttpRequest, user_id: int) -> HttpResponse:
     return render(request, "dash/admin_agent_detail.html", ctx)
 
 
-# -------------------------
+# ==============================================================================
 # Manager dashboard (placeholder)
-# -------------------------
+# ==============================================================================
 @login_required
 @ensure_csrf_cookie
 def manager_dashboard(request: HttpRequest) -> HttpResponse:
@@ -223,9 +239,9 @@ def manager_dashboard(request: HttpRequest) -> HttpResponse:
     return render(request, "dash/manager_dashboard.html", ctx)
 
 
-# -------------------------
+# ==============================================================================
 # Agent dashboard (enhanced)
-# -------------------------
+# ==============================================================================
 @login_required
 @ensure_csrf_cookie  # set csrftoken cookie for JS/phone before any POST
 @csrf_protect        # enforce token on POST
@@ -354,9 +370,9 @@ def agent_dashboard(request: HttpRequest) -> HttpResponse:
     return render(request, "dash/agent_dashboard.html", ctx)
 
 
-# -------------------------
+# ==============================================================================
 # API: lightweight AI recommendations for dashboard
-# -------------------------
+# ==============================================================================
 @login_required
 @require_GET
 def api_recommendations(request: HttpRequest) -> JsonResponse:
@@ -391,3 +407,34 @@ def api_recommendations(request: HttpRequest) -> JsonResponse:
         })
 
     return JsonResponse({"success": True, "items": items})
+
+
+# ==============================================================================
+# Friendly error views (used by handler404/handler500 and for 501 fallback)
+# ==============================================================================
+def page_not_found(request: HttpRequest, exception, *args, **kwargs) -> HttpResponse:
+    """
+    Global 404 renderer. Django calls this when DEBUG=False and a route isn't found.
+    """
+    return _render_error(
+        request,
+        template="errors/404.html",
+        status=404,
+        context={"path": request.get_full_path()},
+    )
+
+
+def server_error(request: HttpRequest, *args, **kwargs) -> HttpResponse:
+    """
+    Global 500 renderer. Django calls this when DEBUG=False, or our FriendlyErrorsMiddleware
+    decides to render a user-safe page.
+    """
+    return _render_error(request, template="errors/500.html", status=500)
+
+
+def feature_unavailable(request: HttpRequest, *args, **kwargs) -> HttpResponse:
+    """
+    Show a clean 501 'Under Development' page for endpoints we want to expose safely
+    before the real implementation lands.
+    """
+    return _render_error(request, template="errors/501.html", status=501)

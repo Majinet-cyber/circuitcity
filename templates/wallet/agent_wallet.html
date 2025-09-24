@@ -10,13 +10,14 @@
   .kpi-card .value{font-size:1.25rem;font-weight:900}
   .kpi-card .sub{color:var(--muted)}
   .chart-wrap{position:relative;height:220px}
+  .table td,.table th{vertical-align:middle}
 </style>
 {% endblock %}
 
 {% block body %}
 <div class="container-xxl px-0">
 
-  <!-- ===== KPIs ===== -->
+  {# ========== KPIs ========== #}
   <div class="row g-3 mb-3">
     <div class="col-6 col-lg-3">
       <div class="card shadow-sm border-0 h-100 kpi-card">
@@ -61,7 +62,7 @@
     </div>
   </div>
 
-  <!-- ===== Ranking + Quick Panels ===== -->
+  {# ========== Ranking + Quick Panels ========== #}
   <div class="row g-3 mb-3">
     <div class="col-lg-7">
       <div class="card shadow-sm border-0 h-100">
@@ -88,7 +89,8 @@
 
     <div class="col-lg-5">
       <div class="row g-3">
-        <!-- Payslips -->
+
+        {# Payslips #}
         <div class="col-12">
           <div class="card shadow-sm border-0 h-100">
             <div class="card-body">
@@ -103,7 +105,14 @@
                   <tbody>
                     {% for p in payslips %}
                       <tr>
-                        <td>{{ p.year }}-{{ p.month|stringformat:"02d" }}</td>
+                        <td>
+                          {{ p.year }}-{{ p.month|stringformat:"02d" }}
+                          {% if p.pdf %}
+                            <a class="ms-1 small" href="{{ p.pdf.url }}" target="_blank" rel="noopener">
+                              <i class="bi bi-file-earmark-pdf"></i>
+                            </a>
+                          {% endif %}
+                        </td>
                         <td class="text-end">MWK {{ p.gross|default:0|floatformat:0|intcomma }}</td>
                         <td class="text-end">MWK {{ p.deductions|default:0|floatformat:0|intcomma }}</td>
                         <td class="text-end fw-semibold">MWK {{ p.net|default:0|floatformat:0|intcomma }}</td>
@@ -118,7 +127,7 @@
           </div>
         </div>
 
-        <!-- Budget requests -->
+        {# Budget requests #}
         <div class="col-12">
           <div class="card shadow-sm border-0 h-100">
             <div class="card-body">
@@ -166,7 +175,7 @@
     </div>
   </div>
 
-  <!-- ===== Transactions ===== -->
+  {# ========== Transactions ========== #}
   <div class="card shadow-sm border-0">
     <div class="card-body">
       <div class="d-flex justify-content-between align-items-center mb-2">
@@ -202,7 +211,11 @@
         </table>
       </div>
 
-      {% url 'accounts:settings_profile' as profile_url %}
+      {# Safe profile URL fallback #}
+      {% url 'accounts:settings_unified' as profile_url %}
+      {% if not profile_url %}{% url 'accounts:settings' as profile_url %}{% endif %}
+      {% if not profile_url %}{% url 'accounts:settings_profile' as profile_url %}{% endif %}
+
       <div class="alert alert-info d-flex align-items-start gap-2 mt-3" role="alert">
         <i class="bi bi-info-circle mt-1"></i>
         <div class="small">
@@ -227,7 +240,8 @@
 
   async function loadRank(period){
     try{
-      const res = await fetch("{% url 'wallet:api_ranking' %}?period="+encodeURIComponent(period||'month'), {credentials:'same-origin'});
+      const url = "{% url 'wallet:api_ranking' %}" + "?period=" + encodeURIComponent(period||'month');
+      const res = await fetch(url, {credentials:'same-origin', headers:{'Accept':'application/json'}});
       const data = await res.json();
       const rows = Array.isArray(data.rows) ? data.rows : [];
       const labels = rows.map(r => [r.agent__first_name||"", r.agent__last_name||""].join(" ").trim() || "Agent");

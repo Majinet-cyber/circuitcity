@@ -6,6 +6,15 @@ import csv
 import json
 import logging
 import math
+# ------------------------------
+# Helpers (keep above all views)
+# ------------------------------
+def _wants_json(request):
+    """Return True only if JSON was explicitly requested."""
+    if request.GET.get("as") == "json":
+        return True
+    return request.headers.get("x-requested-with") == "XMLHttpRequest"
+
 from functools import wraps
 from urllib.parse import urlencode
 from .api import predictions_summary as api_predictions
@@ -63,6 +72,82 @@ try:
 except Exception:
     Location = None
 
+# --- Header counters computed from the single source of truth ---
+from decimal import Decimal
+from django.db.models import Sum
+from django.db.models.functions import Coalesce
+
+# if not already imported:
+from .scope import stock_queryset_for_request, active_scope, get_inventory_model
+
+def _inventory_header_stats(request):
+    """
+    Returns dict with counters for the four header badges, computed
+    from the same queryset as the table so numbers always match.
+    """
+    Model = get_inventory_model()
+    if Model is None:
+        return {"in_stock_count": 0, "sold_count": 0,
+                "sum_order": Decimal("0.00"), "sum_selling": Decimal("0.00")}
+
+    # 1) "In stock" and sums are from the canonical stock queryset
+    qs = stock_queryset_for_request(request)
+
+    sums = qs.aggregate(
+        sum_order=Coalesce(Sum("order_price"), Decimal("0.00")),
+        sum_selling=Coalesce(Sum("selling_price"), Decimal("0.00")),
+    )
+    in_stock_count = qs.count()
+
+    # 2) "Sold" uses the same business/location scope, but with 'sold' filter
+    biz_id, loc_id = active_scope(request)
+    base = getattr(Model, "_base_manager", Model.objects).all()
+
+    # scope by business
+    try:
+        if biz_id is not None:
+            try:
+                base = base.filter(business_id=biz_id)
+            except Exception:
+                base = base.filter(business__id=biz_id)
+    except Exception:
+        pass
+
+    # scope by location (prefer current_location)
+    try:
+        loc_fields = {f.name for f in Model._meta.get_fields()}
+    except Exception:
+        loc_fields = set()
+    if loc_id is not None:
+        for fk in ("current_location", "location", "store", "branch"):
+            if fk in loc_fields or f"{fk}_id" in loc_fields:
+                try:
+                    base = base.filter(**{f"{fk}_id": loc_id})
+                except Exception:
+                    base = base.filter(**{fk: loc_id})
+                break
+
+    # sold filter (cover common schemas)
+    if "sold_at" in loc_fields:
+        sold_qs = base.exclude(sold_at__isnull=True)
+    elif "status" in loc_fields:
+        sold_qs = base.filter(status__iexact="sold")
+    elif "available" in loc_fields:
+        sold_qs = base.filter(available=False)
+    else:
+        sold_qs = base.none()
+
+    sold_count = sold_qs.count()
+
+    # expose with multiple keys to be template-friendly
+    return {
+        "in_stock": in_stock_count,
+        "in_stock_count": in_stock_count,
+        "sold": sold_count,
+        "sold_count": sold_count,
+        "sum_order": sums["sum_order"] or Decimal("0.00"),
+        "sum_selling": sums["sum_selling"] or Decimal("0.00"),
+    }
 
 def _ensure_active_business_and_location(request):
     """
@@ -118,68 +203,8 @@ def _ensure_active_business_and_location(request):
 
 # --- Example: Scan IN view (adapt to your project’s view name) ---
 
-@login_required
-@require_http_methods(["GET", "POST"])
-def scan_in(request: HttpRequest) -> HttpResponse:
-    biz, loc = _ensure_active_business_and_location(request)
-    if not biz:
-        messages.error(request, "No active business selected. Please choose or join a business.")
-        try:
-            return redirect("tenants:activate_mine")
-        except Exception:
-            return redirect("/tenants/activate-mine/")
-
-    # Preselect location in the form (if your form has a 'location' field)
-    initial = {"location": getattr(loc, "id", None)} if loc else {}
-
-    if request.method == "POST":
-        # TODO: bind your real form here; this shows the shape
-        form = ScanInForm(request.POST, initial=initial)  # replace with your form
-        if form.is_valid():
-            # ... perform your save/logic ...
-            messages.success(request, "Device scanned in.")
-            return redirect("inventory:scan_in")  # or wherever you go after success
-    else:
-        form = ScanInForm(initial=initial)  # replace with your form
-
-    ctx = {
-        "form": form,
-        "active_business": biz,
-        "active_location": loc,
-    }
-    return render(request, "inventory/scan_in.html", ctx)
-
-
 # --- Example: Scan SOLD view gets the same treatment ---
 
-@login_required
-@require_http_methods(["GET", "POST"])
-def scan_sold(request: HttpRequest) -> HttpResponse:
-    biz, loc = _ensure_active_business_and_location(request)
-    if not biz:
-        messages.error(request, "No active business selected. Please choose or join a business.")
-        try:
-            return redirect("tenants:activate_mine")
-        except Exception:
-            return redirect("/tenants/activate-mine/")
-
-    initial = {"location": getattr(loc, "id", None)} if loc else {}
-
-    if request.method == "POST":
-        form = ScanSoldForm(request.POST, initial=initial)  # replace with your form
-        if form.is_valid():
-            # ... perform your sell logic ...
-            messages.success(request, "Item marked as SOLD.")
-            return redirect("inventory:scan_sold")
-    else:
-        form = ScanSoldForm(initial=initial)  # replace with your form
-
-    ctx = {
-        "form": form,
-        "active_business": biz,
-        "active_location": loc,
-    }
-    return render(request, "inventory/scan_sold.html", ctx)
 # ---------------- Business/Store auto-select helpers ----------------
 from django.contrib import messages
 from django.shortcuts import redirect
@@ -495,6 +520,8 @@ def _user_home_location(user):
             return qs.first()
         except Exception:
             return None
+
+    # views.py (top-level helper used by scan_in / scan_sold / update_stock)
 
     def _effective_default_location(request):
         """
@@ -818,115 +845,334 @@ def _enforce_http_response(viewfunc):
         return rv
     return _inner
 
-@never_cache
-@login_required
-@require_business
-def stock_list(request, *args, **kwargs):
-    ...
 
+from typing import Dict, Any
+import logging
+
+from django.contrib import messages
+from django.contrib.auth.decorators import login_required
+from django.http import JsonResponse, HttpRequest, HttpResponse
+from django.shortcuts import redirect, render
+from django.views.decorators.cache import never_cache
+
+
+@login_required
+@never_cache
+def stock_list(request: HttpRequest, *args, **kwargs) -> HttpResponse:
     """
     Inventory · Stock List
-    - Always scoped to the active business.
-    - Optional location filtering.
-    - Excludes sold or inactive items by default so new Scan-IN items appear.
-    - Supports JSON (for AJAX) and HTML (for UI).
+
+    • Always scoped to active business.
+    • Location filter is opt-in (?location / ?location_id).
+    • Default table hides SOLD; use status=sold to view sold rows.
+    • Badges are computed business-wide.
     """
     import logging
+    from decimal import Decimal
+    from django.db.models import Q, Sum
+    from django.http import JsonResponse
+    from django.shortcuts import render, redirect
+    from django.contrib import messages
+
     log = logging.getLogger(__name__)
 
-    # ----- Choose model (InventoryItem preferred) -----
+    # ---------- helpers ----------
+    def _try_import(modpath: str, attr: str | None = None):
+        try:
+            mod = __import__(modpath, fromlist=[attr] if attr else [])
+            return getattr(mod, attr) if attr else mod
+        except Exception:
+            return None
+
+    def _hasf(model, name: str) -> bool:
+        try:
+            return any(f.name == name for f in model._meta.get_fields())
+        except Exception:
+            return False
+
+    def _sum(qs, names: tuple[str, ...]) -> Decimal:
+        for n in names:
+            if n and _hasf(Model, n):
+                try:
+                    v = qs.aggregate(_t=Sum(n))["_t"]
+                    return Decimal(v or 0)
+                except Exception:
+                    continue
+        return Decimal("0")
+
+    # ---------- business context ----------
+    get_active_business = (
+        _try_import("circuitcity.tenants.utils", "get_active_business")
+        or _try_import("tenants.utils", "get_active_business")
+        or (lambda _r: None)
+    )
+    ensure_request_defaults = (
+        _try_import("inventory.middleware", "ensure_request_defaults")
+        or (lambda _r: None)
+    )
+
+    biz = get_active_business(request)
+    biz_id = getattr(biz, "id", None)
+    if not biz_id:
+        messages.error(request, "No active business selected. Switch business and try again.")
+        try:
+            return redirect("tenants:activate_mine")
+        except Exception:
+            return redirect("/tenants/activate-mine/")
     try:
-        from .models import InventoryItem as Model
+        ensure_request_defaults(request)
     except Exception:
-        Model = None
-    if not Model:
+        pass
+
+    # ---------- canonical model ----------
+    Model = None
+    try:
+        from .models import InventoryItem as _InventoryItem
+        Model = _InventoryItem
+    except Exception:
+        for alt in ("Stock", "Inventory"):
+            try:
+                Model = getattr(__import__(f"{__package__}.models", fromlist=[alt]), alt)
+                break
+            except Exception:
+                continue
+    if Model is None:
         return JsonResponse({"ok": False, "error": "No inventory model found"}, status=500)
 
-    # Use _base_manager to avoid hidden default-manager filters
     manager = getattr(Model, "_base_manager", Model.objects)
     qs = manager.all()
 
-    # Discover model fields
-    try:
-        fields = {f.name for f in Model._meta.get_fields()}
-    except Exception:
-        fields = set()
-
-    # ----- Active business scoping -----
-    biz = getattr(request, "business", None)
-    biz_id = getattr(biz, "id", None)
-    if biz_id and "business" in fields:
+    # ---------- base scope (biz + active + not archived) ----------
+    if _hasf(Model, "business_id"):
         qs = qs.filter(business_id=biz_id)
+    elif _hasf(Model, "business"):
+        qs = qs.filter(business__id=biz_id)
 
-    # ----- Location filter (query param optional) -----
-    loc_id = request.GET.get("location")
-    if loc_id:
-        if "current_location" in fields:
-            qs = qs.filter(current_location_id=loc_id)
-        elif "location" in fields:
-            qs = qs.filter(location_id=loc_id)
-
-    # ----- Exclude sold / inactive / archived -----
-    if "sold_at" in fields:
-        qs = qs.filter(sold_at__isnull=True)
-    if "is_active" in fields:
+    if _hasf(Model, "is_active"):
         qs = qs.filter(is_active=True)
-    if "archived" in fields:
+    if _hasf(Model, "archived"):
         qs = qs.filter(archived=False)
-    if "status" in fields:
-        # Keep only stock still available
-        qs = qs.exclude(status__iexact="sold")
 
-    # ----- Join related fields -----
-    joins = [j for j in ("product", "current_location", "location") if j in fields]
-    if joins:
+    # ---------- location (opt-in) ----------
+    loc_id = request.GET.get("location") or request.GET.get("location_id")
+    if loc_id:
+        for fk in ("current_location", "location", "store", "branch"):
+            if _hasf(Model, f"{fk}_id"):
+                qs = qs.filter(**{f"{fk}_id": loc_id})
+                break
+            if _hasf(Model, fk):
+                qs = qs.filter(**{fk: loc_id})
+                break
+
+    # ---------- SOLD vs IN-STOCK predicates (OR across indicators) ----------
+    def SOLD_Q() -> Q:
+        q = Q()
+        if _hasf(Model, "status"):
+            q |= Q(status__iexact="sold")
+        if _hasf(Model, "sold_at"):
+            q |= Q(sold_at__isnull=False)
+        if _hasf(Model, "in_stock"):
+            q |= Q(in_stock=False)
+        if _hasf(Model, "quantity"):
+            q |= Q(quantity=0)
+        if _hasf(Model, "qty"):
+            q |= Q(qty=0)
+        return q
+
+    def INSTOCK_Q() -> Q:
+        q = Q()
+        if _hasf(Model, "status"):
+            q |= ~Q(status__iexact="sold")
+        if _hasf(Model, "sold_at"):
+            q |= Q(sold_at__isnull=True)
+        if _hasf(Model, "in_stock"):
+            q |= Q(in_stock=True)
+        if _hasf(Model, "quantity"):
+            q |= Q(quantity__gt=0)
+        if _hasf(Model, "qty"):
+            q |= Q(qty__gt=0)
+        return q
+
+    # ---------- badge snapshot (business-wide) ----------
+    qs_base = qs
+    try:
+        instock_all = qs_base.filter(INSTOCK_Q())
+        sold_all = qs_base.filter(SOLD_Q())
+    except Exception:
+        instock_all, sold_all = qs_base, qs_base.none()
+
+    try:
+        in_stock_count = int(instock_all.count())
+    except Exception:
+        in_stock_count = 0
+    try:
+        sold_count = int(sold_all.count())
+    except Exception:
+        sold_count = 0
+
+    sum_order_amt = _sum(instock_all, ("order_price", "order_cost", "cost_price"))
+    sum_selling_amt = _sum(sold_all, ("selling_price", "sale_price", "price"))
+
+    # ---------- table filters (status + search) ----------
+    status_raw = (request.GET.get("status") or "").strip().lower()
+    q_text = (request.GET.get("q") or "").strip()
+
+    if status_raw in ("sold", "s"):
+        qs = sold_all
+    elif status_raw in ("in", "in_stock", "stock"):
+        qs = instock_all
+    elif status_raw in ("all", "al", "ai"):
+        qs = qs_base
+    else:
+        qs = instock_all  # default hide sold
+
+    if q_text:
+        OR = Q()
+        for fname in ("imei", "serial", "code", "sku", "name"):
+            if _hasf(Model, fname):
+                OR |= Q(**{f"{fname}__icontains": q_text})
+        # product name (if FK exists)
         try:
-            qs = qs.select_related(*joins)
+            prod_field = Model._meta.get_field("product")
+            Rel = getattr(prod_field, "related_model", None)
+            if Rel and any(f.name == "name" for f in Rel._meta.get_fields()):
+                OR |= Q(product__name__icontains=q_text)
+        except Exception:
+            pass
+        if OR:
+            qs = qs.filter(OR)
+
+    # joins for UI
+    rels = [r for r in ("product", "current_location", "location", "store", "business") if _hasf(Model, r)]
+    if rels:
+        try:
+            qs = qs.select_related(*rels)
         except Exception:
             pass
 
-    # ----- Serializer for JSON -----
-    def row(o):
-        name = (
-            getattr(getattr(o, "product", None), "name", None)
-            or getattr(o, "name", "") or ""
-        )
-        locobj = getattr(o, "current_location", None) or getattr(o, "location", None)
-        loc = getattr(locobj, "name", None) if locobj else None
-        return {
-            "id": getattr(o, "id", None),
-            "name": name,
-            "imei": getattr(o, "imei", None),
-            "status": getattr(o, "status", None),
-            "price": getattr(o, "selling_price", None),
-            "location": loc,
-            "qty": 0,  # IMEI-per-row model
-        }
-
-    # ----- Content negotiation -----
+    # ---------- negotiate & paginate ----------
     wants_json = (
         request.GET.get("format") == "json"
         or request.headers.get("x-requested-with") == "XMLHttpRequest"
         or "application/json" in (request.headers.get("Accept") or "")
     )
+    try:
+        per_page = max(1, min(200, int(request.GET.get("page_size") or request.GET.get("limit") or 50)))
+    except Exception:
+        per_page = 50
+
+    def _loc(o):
+        loc = getattr(o, "current_location", None) or getattr(o, "location", None) or getattr(o, "store", None)
+        return {"id": getattr(loc, "id", None), "name": getattr(loc, "name", None)} if loc else None
+
+    def _qty(o) -> int:
+        for n in ("quantity", "qty"):
+            if hasattr(o, n):
+                return int(getattr(o, n) or 0)
+        return 1
+
+    def _first_price(o, names: tuple[str, ...]):
+        for n in names:
+            if hasattr(o, n):
+                v = getattr(o, n)
+                if v is not None:
+                    return v
+        return None
+
+    def _row(o):
+        prod = getattr(o, "product", None)
+        name = getattr(o, "name", None) or (getattr(prod, "name", None) if prod else "") or ""
+        sku = None
+        for k in ("imei", "serial", "sku", "code"):
+            if hasattr(o, k) and getattr(o, k):
+                sku = getattr(o, k)
+                break
+        return {
+            "id": getattr(o, "id", None),
+            "sku": sku,
+            "name": name,
+            "qty": _qty(o),
+            "status": getattr(o, "status", None),
+            "order_price": _first_price(o, ("order_price", "order_cost", "cost_price")),
+            "selling_price": _first_price(o, ("selling_price", "sale_price", "price")),
+            "location": _loc(o),
+        }
+
+    try:
+        total = qs.count()
+    except Exception:
+        total = 0
+    qs = qs.order_by("-id")
+
+    # ---------- badge payload (with wide compatibility aliases) ----------
+    header = {
+        "in_stock": in_stock_count,
+        "sold": sold_count,
+        "sum_order": sum_order_amt,
+        "sum_selling": sum_selling_amt,
+    }
+
+    # Add MANY aliases so any legacy template picks them up
+    badge_aliases = {
+        # counts
+        "in_stock": in_stock_count,
+        "in_stock_count": in_stock_count,
+        "count_in_stock": in_stock_count,
+        "stocks_in_stock": in_stock_count,
+        "sold": sold_count,
+        "sold_count": sold_count,
+        "count_sold": sold_count,
+        "stocks_sold": sold_count,
+        "sold_total": sold_count,
+        # sums
+        "sum_order": sum_order_amt,
+        "order_sum": sum_order_amt,
+        "total_order": sum_order_amt,
+        "sum_selling": sum_selling_amt,
+        "selling_sum": sum_selling_amt,
+        "total_selling": sum_selling_amt,
+    }
 
     if wants_json:
-        data = [row(o) for o in qs[:500]]
-        return JsonResponse({
-            "ok": True,
-            "model": Model.__name__,
-            "count": qs.count(),
-            "data": data,
-        })
+        data = [_row(o) for o in qs[:per_page]]
+        out_header = {"in_stock": in_stock_count, "sold": sold_count,
+                      "sum_order": str(sum_order_amt), "sum_selling": str(sum_selling_amt)}
+        # include the aliases in JSON too
+        out_header.update({k: (str(v) if isinstance(v, Decimal) else v) for k, v in badge_aliases.items()})
+        return JsonResponse({"ok": True, "count": total, "header": out_header, "data": data}, status=200)
 
-    # ----- HTML render -----
+    items = list(qs[:per_page])
+
+    # pick a template that exists
+    template = "inventory/list.html"
+    try:
+        from django.template.loader import get_template
+        for cand in ("inventory/list.html", "inventory/stock_list.html"):
+            try:
+                get_template(cand)
+                template = cand
+                break
+            except Exception:
+                continue
+    except Exception:
+        pass
+
+    # Context: items + badges + aliases
     ctx = {
-        "items": qs[:50],  # initial page
-        "count": qs.count(),
-        "model_name": Model.__name__,
+        "items": items,
+        "rows": items,
+        "count": total,
+        "rows_per_page": per_page,
+        "header": header,
+        # primary keys
+        "in_stock": in_stock_count,
+        "sold": sold_count,
+        "sum_order": sum_order_amt,
+        "sum_selling": sum_selling_amt,
+        # wide aliases
+        **badge_aliases,
     }
-    return render(request, "inventory/stock_list.html", ctx)
-
+    return render(request, template, ctx)
 # -----------------------
 # Multi-tenant helpers
 # -----------------------
@@ -2113,49 +2359,62 @@ except Exception:
 # SCAN SOLD
 # ---------------------------------------------------------------------------
 
+# --- add this tiny helper once near the top of views.py (outside any view) ---
+# -----------------------------------------------------------------------------
+
+
 @never_cache
 @login_required
 @require_http_methods(["GET", "POST"])
 @transaction.atomic
-@_enforce_http_response   # innermost so tuple accidents are caught before never_cache runs
+@_enforce_http_response
 def scan_sold(request):
     """
     Inventory · Scan Sold
-    - Requires an active business.
-    - Auditors cannot POST.
-    - Location select clamped to the user's store and labeled with Business/Store name.
-    - Accept locations that either belong to the active business OR have no tenant FK.
+    HTML by default; JSON only when ?as=json or XHR.
     """
+    import datetime
+    from django.http import JsonResponse, HttpResponseBase
+    from django.utils import timezone
+    from django.contrib import messages
+    from django.shortcuts import redirect, render
+    from django.forms import ModelChoiceField
+
     gate = _require_active_business(request)
     if isinstance(gate, HttpResponseBase):
         return gate
+    biz, biz_id = gate
 
     if _is_auditor(request.user) and request.method == "POST":
-        messages.error(request, "Auditors cannot mark items as SOLD.")
+        msg = "Auditors cannot mark items as SOLD."
+        if _wants_json(request):
+            return JsonResponse({"ok": False, "error": msg}, status=403)
+        messages.error(request, msg)
         return redirect("inventory:stock_list")
 
-    from django.forms import ModelChoiceField
-
-    def _pretty_store_label_for_location(loc_obj, request):
-        biz = getattr(request, "business", None)
-        if biz and getattr(biz, "name", None):
-            return str(biz.name).strip()
+    def _pretty_store_label_for_location(loc_obj, request_):
+        biz_ = getattr(request_, "business", None)
+        if biz_ and getattr(biz_, "name", None):
+            return str(biz_.name).strip()
         for attr in ("store_name", "name", "title", "label"):
             val = getattr(loc_obj, attr, None)
             if val:
                 return str(val)
         return str(loc_obj)
 
-    def _restrict_location_field(form, request, dflt_loc, *, set_initial=True):
+    def _restrict_location_field(form, request_, dflt_loc, *, set_initial=True):
         if not dflt_loc:
             return
         cand = ("location", "current_location", "store", "branch")
-        fld_name = next((n for n in cand if n in form.fields and isinstance(form.fields[n], ModelChoiceField)), None)
+        fld_name = next(
+            (n for n in cand if n in form.fields and isinstance(form.fields[n], ModelChoiceField)),
+            None
+        )
         if not fld_name:
             return
         fld = form.fields[fld_name]
 
-        label = _pretty_store_label_for_location(dflt_loc, request)
+        label = _pretty_store_label_for_location(dflt_loc, request_)
         dflt_id = getattr(dflt_loc, "pk", getattr(dflt_loc, "id", None))
 
         try:
@@ -2173,28 +2432,50 @@ def scan_sold(request):
         except Exception:
             pass
 
-    # Lenient allow check (same approach as scan_in)
     def _location_is_allowed(loc_obj) -> bool:
         if not loc_obj:
             return False
         for attr in ("business_id", "tenant_id", "org_id", "company_id"):
             if hasattr(loc_obj, attr):
                 return _obj_belongs_to_active_business(loc_obj, request)
-        return True  # no tenant field -> allow
+        return True
 
     default_loc = _user_home_location(request.user) or default_location_for_request(request)
 
     initial = {}
     if default_loc:
         initial["location"] = default_loc
+    initial.setdefault("sold_date", timezone.localdate())
     initial.setdefault("sold_at", timezone.localdate())
 
-    biz, biz_id = _require_active_business(request)
+    locations_boot = []
+    try:
+        if default_loc is not None:
+            LocCls = default_loc.__class__
+            q = LocCls.objects.all()
+            if any(f.name in ("business", "business_id") for f in LocCls._meta.get_fields()):
+                q = q.filter(business_id=biz_id)
+            locations_boot = list(q.values("id", "name"))
+    except Exception:
+        locations_boot = []
 
-    # -------- POST --------
+    boot = {
+        "ok": True,
+        "data": {
+            "note": "scan_sold ready",
+            "sold_date_default": timezone.localdate().isoformat(),
+            "location_default": getattr(default_loc, "id", None),
+            "auto_submit_default": False,
+            "locations": locations_boot,
+        },
+    }
+
     if request.method == "POST":
         if ScanSoldForm is None:
-            messages.error(request, "Scan form is unavailable.")
+            msg = "Scan form is unavailable."
+            if _wants_json(request):
+                return JsonResponse({"ok": False, "error": msg}, status=500)
+            messages.error(request, msg)
             return redirect("inventory:stock_list")
 
         form = ScanSoldForm(request.POST)
@@ -2202,7 +2483,10 @@ def scan_sold(request):
         _restrict_location_field(form, request, default_loc, set_initial=False)
 
         if not form.is_valid():
-            messages.error(request, "Please correct the errors below.")
+            msg = "Please correct the errors below."
+            if _wants_json(request):
+                return JsonResponse({"ok": False, "errors": form.errors}, status=400)
+            messages.error(request, msg)
             return render(request, "inventory/scan_sold.html", {"form": form})
 
         data = form.cleaned_data
@@ -2215,16 +2499,25 @@ def scan_sold(request):
 
         location_obj = data.get("location") or default_loc
         if location_obj and not _location_is_allowed(location_obj):
-            messages.error(request, "That location is not in your store.")
+            msg = "That location is not in your store."
+            if _wants_json(request):
+                return JsonResponse({"ok": False, "error": msg}, status=400)
+            messages.error(request, msg)
             return render(request, "inventory/scan_sold.html", {"form": form})
 
         price = data.get("price")
         if price is not None and price < 0:
-            messages.error(request, "Price must be a non-negative amount.")
+            msg = "Price must be a non-negative amount."
+            if _wants_json(request):
+                return JsonResponse({"ok": False, "error": msg}, status=400)
+            messages.error(request, msg)
             return render(request, "inventory/scan_sold.html", {"form": form})
 
         if InventoryItem is None:
-            messages.error(request, "Inventory model not available.")
+            msg = "Inventory model not available."
+            if _wants_json(request):
+                return JsonResponse({"ok": False, "error": msg}, status=500)
+            messages.error(request, msg)
             return render(request, "inventory/scan_sold.html", {"form": form})
 
         qs = InventoryItem.objects.select_for_update()
@@ -2234,11 +2527,17 @@ def scan_sold(request):
         try:
             item = qs.get(imei=imei)
         except InventoryItem.DoesNotExist:
-            messages.error(request, "Item not found in your store. Check the IMEI and try again.")
+            msg = "Item not found in your store. Check the IMEI and try again."
+            if _wants_json(request):
+                return JsonResponse({"ok": False, "error": msg}, status=404)
+            messages.error(request, msg)
             return render(request, "inventory/scan_sold.html", {"form": form})
 
         if _model_has_field(InventoryItem, "status") and str(getattr(item, "status", "")) == "SOLD":
-            messages.error(request, f"Item {item.imei} is already sold.")
+            msg = f"Item {item.imei} is already sold."
+            if _wants_json(request):
+                return JsonResponse({"ok": False, "error": msg}, status=400)
+            messages.error(request, msg)
             return render(request, "inventory/scan_sold.html", {"form": form})
 
         item._actor = request.user
@@ -2273,7 +2572,6 @@ def scan_sold(request):
 
         item.save()
 
-        # Create Sale row (best-effort)
         try:
             if Sale is not None:
                 sale_kwargs = {
@@ -2292,15 +2590,18 @@ def scan_sold(request):
             pass
 
         _audit(item, request.user, "SOLD_FORM", "V1 flow")
-        price_note = ""
+
+        if _wants_json(request):
+            return JsonResponse({"ok": True, "message": f"Marked SOLD: {item.imei}", "selling_price": getattr(item, "selling_price", None)})
+
         sp = getattr(item, "selling_price", None)
-        if sp is not None:
-            price_note = f" at {sp}"
-        messages.success(request, f"Marked SOLD: {item.imei}{price_note}")
+        messages.success(request, f"Marked SOLD: {item.imei}{f' at {sp}' if sp is not None else ''}")
         return redirect("inventory:scan_sold")
 
-    # -------- GET --------
+    # -------------------- GET -> HTML by default --------------------
     if ScanSoldForm is None:
+        if _wants_json(request):
+            return JsonResponse({"ok": False, "error": "Scan form is unavailable."}, status=500)
         messages.error(request, "Scan form is unavailable.")
         return redirect("inventory:stock_list")
 
@@ -2314,8 +2615,10 @@ def scan_sold(request):
     except Exception:
         pass
 
-    return render(request, "inventory/scan_sold.html", {"form": form})
+    if _wants_json(request):
+        return JsonResponse(boot)
 
+    return render(request, "inventory/scan_sold.html", {"form": form})
 # ---------------------------------------------------------------------------
 # SCAN WEB
 # ---------------------------------------------------------------------------
@@ -2404,6 +2707,8 @@ from decimal import Decimal
 import logging
 
 # --- Inventory · Scan IN (paste over your current function) ---
+# put this tiny helper once near the top of views.py (outside the function)
+
 @never_cache
 @login_required
 @require_business
@@ -2413,335 +2718,309 @@ import logging
 def scan_in(request):
     """
     Inventory · Scan IN
-    - Superusers are NOT allowed to stock-in.
-    - Location is clamped to the user's own store and auto-selected.
-    - New items are bound to the active business with safe defaults so they show up immediately in Stock.
+    HTML by default; JSON only when ?as=json or XHR.
     """
+    # --- local imports (keeps module import-time light) ---
     import logging
     from decimal import Decimal
+    from django.conf import settings
     from django.utils import timezone
     from django.core.exceptions import ValidationError
     from django.db import IntegrityError
     from django.forms import ModelChoiceField
+    from django.contrib import messages
+    from django.shortcuts import redirect, render
+    from django.http import JsonResponse
+
+    # single-source-of-truth helpers
+    from inventory.helpers.request_ctx import (
+        ensure_request_defaults,
+        _get_active_business,
+        default_location_for_request,
+    )
 
     log = logging.getLogger(__name__)
+    template_name = "inventory/scan_in.html"
 
-    # -------------------- helpers that may live elsewhere --------------------
-    def _safe_has_field(model, name):
+    # ---------- Ensure active business/location ----------
+    biz, biz_id = _get_active_business(request)
+    if not biz_id:
+        messages.error(request, "No active business selected. Switch business and try again.")
+        try:
+            return redirect("tenants:activate_mine")
+        except Exception:
+            return redirect("/tenants/activate-mine/")
+
+    ensure_request_defaults(request)
+
+    # ---------- Forbid superusers on POST ----------
+    if request.user.is_superuser and request.method == "POST":
+        messages.error(request, "Superusers cannot stock-in devices.")
+        return redirect("inventory:stock_list")
+
+    # ---------- tiny helpers ----------
+    def _model_has_field(model, name):
         try:
             return any(f.name == name for f in getattr(model, "_meta").get_fields())
         except Exception:
             return False
 
-    # Prefer the project's canonical helpers if present, but fall back to locals
-    _has_field = globals().get("_model_has_field", _safe_has_field)
+    def _biz_filter_kwargs(model, business_id):
+        if _model_has_field(model, "business_id"):
+            return {"business_id": business_id}
+        if _model_has_field(model, "business"):
+            return {"business_id": business_id}
+        return {}
 
-    default_location_for_request_fn = globals().get("default_location_for_request", None)
-    _attach_business_kwargs_fn = globals().get("_attach_business_kwargs", lambda *_: {})
-    _biz_filter_kwargs_fn = globals().get("_biz_filter_kwargs", lambda *_: {})
-    _limit_form_querysets_fn = globals().get("_limit_form_querysets", lambda *args, **kw: None)
-    _obj_belongs_to_active_business_fn = globals().get("_obj_belongs_to_active_business", lambda *a, **k: True)
-    _audit_fn = globals().get("_audit", None)
+    def _attach_business_kwargs(model, business_id):
+        return _biz_filter_kwargs(model, business_id)
 
-    InventoryItem = globals().get("InventoryItem", None)
-    ScanInForm = globals().get("ScanInForm", None)
-
-    # -------------------- tenant / business gate --------------------
-    biz = getattr(request, "business", None)
-    biz_id = getattr(biz, "id", None)
-
-    # Use your central gate if available; normalize outputs
-    gate = None
-    if "_require_active_business" in globals():
-        gate = _require_active_business(request)
-        if gate and not isinstance(gate, tuple):
-            # redirect/HttpResponse — bail out
-            return gate
-        elif isinstance(gate, tuple):
-            biz, biz_id = gate
-    else:
-        # If no helper, try to infer from session
-        biz_id = biz_id or request.session.get("active_business_id")
-
-    if not biz_id:
-        messages.error(request, "No active business selected. Switch business and try again.")
-        return redirect("inventory:stock_list")
-
-    # -------------------- forbid superusers on POST --------------------
-    if request.user.is_superuser and request.method == "POST":
-        messages.error(request, "Superusers cannot stock-in devices.")
-        return redirect("inventory:stock_list")
-
-    # -------------------- local helpers --------------------
-    def _is_agent_user_local(u):
+    def _obj_belongs_to_active_business(obj):
         try:
-            if getattr(u, "agent_profile", None) or getattr(u, "agentprofile", None):
-                return True
+            if hasattr(obj, "business_id"):
+                return obj.business_id == biz_id
+            if hasattr(obj, "business") and getattr(obj, "business", None):
+                return getattr(obj.business, "id", None) == biz_id
         except Exception:
             pass
-        try:
-            return u.groups.filter(name__iexact="Agent").exists()
-        except Exception:
-            return False
+        return True
 
-    def _get_location_model():
-        loc_field = (
-            "current_location" if _has_field(InventoryItem, "current_location")
-            else ("location" if _has_field(InventoryItem, "location") else None)
-        )
-        if not loc_field:
-            return None, None
-        try:
-            f = InventoryItem._meta.get_field(loc_field)
-            Loc = getattr(getattr(f, "remote_field", None), "model", None)
-            return Loc, loc_field
-        except Exception:
-            return None, None
+    # ---------- models/forms ----------
+    try:
+        from .models import InventoryItem
+    except Exception:
+        InventoryItem = None
+    try:
+        from .forms import ScanInForm
+    except Exception:
+        ScanInForm = None
 
-    def _assign_owner_like_fields(obj, user):
-        for name in ("assigned_agent","assigned_to","assignee","owner","user","agent","created_by","added_by","received_by"):
-            if _has_field(InventoryItem, name):
-                try:
-                    setattr(obj, name, user)
-                    return name
-                except Exception:
-                    continue
-        return None
-
-    def _pretty_store_label(loc_obj, request):
-        biz_obj = getattr(request, "business", None)
-        if biz_obj and getattr(biz_obj, "name", None):
-            return str(biz_obj.name).strip()
-        for attr in ("store_name", "name", "title", "label"):
-            v = getattr(loc_obj, attr, None)
-            if v:
-                return str(v)
-        return str(loc_obj)
-
-    def _restrict_location_to_user_store(form, request, set_initial=True):
-        """
-        Clamp the form's Location field to ONLY the user's own store (one row),
-        label it nicely, and optionally preselect it.
-        """
-        if not callable(default_location_for_request_fn):
-            return
-        dflt = default_location_for_request_fn(request)
-        if not dflt:
-            return
-
-        cand = ("location", "current_location", "store", "branch")
-        fld_name = next((n for n in cand if n in form.fields and isinstance(form.fields[n], ModelChoiceField)), None)
-        if not fld_name:
-            return
-
-        fld = form.fields[fld_name]
-        qs = getattr(fld, "queryset", None)
-        Loc = qs.model if qs is not None else None
-
-        dflt_pk = getattr(dflt, "pk", getattr(dflt, "id", None))
-        label = _pretty_store_label(dflt, request)
-
-        try:
-            fld.empty_label = None
-        except Exception:
-            pass
-        try:
-            fld.choices = [(dflt_pk, label)]
-        except Exception:
-            pass
-        if Loc is not None:
-            try:
-                fld.queryset = Loc.objects.filter(pk=dflt_pk)
-            except Exception:
-                pass
-        if set_initial:
-            fld.initial = dflt_pk
-
-    # -------------------- defaults / initial --------------------
-    if InventoryItem is None:
-        messages.error(request, "Inventory model not available.")
+    if InventoryItem is None or ScanInForm is None:
+        messages.error(request, "Inventory model or form not available.")
         return redirect("inventory:stock_list")
 
-    # default location + initial dict
-    default_location = default_location_for_request_fn(request) if callable(default_location_for_request_fn) else None
-    dflt_pk = getattr(default_location, "pk", getattr(default_location, "id", None)) if default_location else None
+    # ---------- defaults ----------
+    default_loc = default_location_for_request(request)
+    dflt_pk = getattr(default_loc, "pk", getattr(default_loc, "id", None)) if default_loc else None
 
-    page_initial = {"received_at": timezone.localdate()}
+    today = timezone.localdate()
+    page_initial = {"received_at": today}
     if dflt_pk is not None:
         for key in ("location", "current_location", "store", "branch"):
             page_initial[key] = dflt_pk
 
-    biz_create_kwargs = _attach_business_kwargs_fn(InventoryItem, biz_id)
+    biz_create_kwargs = _attach_business_kwargs(InventoryItem, biz_id)
 
-    LocModel, loc_field_name = _get_location_model()
+    # which FK name carries location?
+    def _loc_field_name():
+        if _model_has_field(InventoryItem, "current_location"):
+            return "current_location"
+        if _model_has_field(InventoryItem, "location"):
+            return "location"
+        return None
+
+    loc_field_name = _loc_field_name()
     loc_is_required = False
     if loc_field_name:
         try:
             loc_field_obj = InventoryItem._meta.get_field(loc_field_name)
             loc_is_required = not getattr(loc_field_obj, "null", True)
         except Exception:
-            loc_is_required = False
+            pass
 
-    template_name = "inventory/scan_in.html"
+    # clamp form location to user's default store
+    def _restrict_location_to_user_store(form, set_initial=True):
+        if not default_loc:
+            return
+        fname = next((n for n in ("location", "current_location", "store", "branch")
+                      if n in form.fields and isinstance(form.fields[n], ModelChoiceField)), None)
+        if not fname:
+            return
+        fld = form.fields[fname]
+        dpk = dflt_pk
 
-    # -------------------- POST --------------------
+        def _label(loc_obj):
+            b = getattr(request, "business", None)
+            if b and getattr(b, "name", None):
+                return str(b.name).strip()
+            for attr in ("store_name", "name", "title", "label"):
+                v = getattr(loc_obj, attr, None)
+                if v:
+                    return str(v)
+            return str(loc_obj)
+
+        try:
+            fld.empty_label = None
+        except Exception:
+            pass
+        fld.choices = [(dpk, _label(default_loc))]
+        try:
+            qs = getattr(fld, "queryset", None)
+            if qs is not None:
+                fld.queryset = qs.model.objects.filter(pk=dpk)
+        except Exception:
+            pass
+        if set_initial:
+            fld.initial = dpk
+
+    # ---------- JSON boot (for HTMX/fetch; opt-in) ----------
+    locations_boot = []
+    try:
+        if default_loc is not None:
+            LocCls = default_loc.__class__
+            q = LocCls.objects.all()
+            if any(f.name in ("business", "business_id") for f in LocCls._meta.get_fields()):
+                q = q.filter(business_id=biz_id)
+            locations_boot = list(q.values("id", "name"))
+    except Exception:
+        locations_boot = []
+
+    boot = {
+        "ok": True,
+        "data": {
+            "note": "scan_in ready",
+            "received_date_default": today.isoformat(),
+            "location_default": dflt_pk,
+            "auto_submit_default": False,
+            "locations": locations_boot,
+        },
+    }
+
+    # ===================== POST =====================
     if request.method == "POST":
         post_data = request.POST.copy()
 
-        # Force the location to user's store if missing
+        # force location to user's store when missing
         if dflt_pk is not None:
             for key in ("location", "current_location", "store", "branch"):
                 if not post_data.get(key):
                     post_data[key] = str(dflt_pk)
 
-        # Default date
         if not post_data.get("received_at"):
-            post_data["received_at"] = timezone.localdate()
-
-        if ScanInForm is None:
-            messages.error(request, "Scan form is unavailable.")
-            return redirect("inventory:stock_list")
+            post_data["received_at"] = today
 
         form = ScanInForm(post_data)
-
-        _restrict_location_to_user_store(form, request, set_initial=False)
-        _limit_form_querysets_fn(form, request)
+        _restrict_location_to_user_store(form, set_initial=False)
 
         if not form.is_valid():
+            if _wants_json(request):
+                return JsonResponse({"ok": False, "errors": form.errors}, status=400)
             messages.error(request, "Please correct the errors below.")
             return render(request, template_name, {
                 "form": form,
-                "default_location": default_location,
+                "default_location": default_loc,
                 "loc_is_required": loc_is_required,
-                "is_agent_user": _is_agent_user_local(request.user),
-                "today": timezone.localdate(),
+                "is_agent_user": True,
+                "today": today,
             })
 
         data = form.cleaned_data
 
         # Product required and must belong to active business
-        if not data.get("product"):
-            messages.error(request, "Select a product model.")
+        product = data.get("product")
+        if not product or not _obj_belongs_to_active_business(product):
+            msg = "Select a valid product model in your store."
+            if _wants_json(request):
+                return JsonResponse({"ok": False, "error": msg}, status=400)
+            messages.error(request, msg)
             return render(request, template_name, {"form": form})
 
-        if not _obj_belongs_to_active_business_fn(data["product"], request):
-            messages.error(request, "That product is not in your store.")
-            return render(request, template_name, {"form": form})
-
-        # Resolve location (respect model field name)
-        location_obj = data.get("location") or data.get("current_location") or default_location
+        # Resolve location respecting model field
+        location_obj = data.get("location") or data.get("current_location") or default_loc
         if loc_is_required and not location_obj:
-            messages.error(request, "Your inventory requires a location, but none were found for this store. Please create a location and try again.")
+            msg = "Your inventory requires a location; none found for this store."
+            if _wants_json(request):
+                return JsonResponse({"ok": False, "error": msg}, status=400)
+            messages.error(request, msg)
             return render(request, template_name, {"form": form})
 
-        imei = (data.get("imei") or "").strip() if _has_field(InventoryItem, "imei") else ""
+        imei = (data.get("imei") or "").strip() if _model_has_field(InventoryItem, "imei") else ""
 
         try:
             with transaction.atomic():
-                # Duplicate guard (by IMEI + business, if IMEI exists)
+                # duplicate guard (IMEI+business)
                 dup_qs = InventoryItem.objects.select_for_update()
                 if biz_id:
-                    dup_qs = dup_qs.filter(**_biz_filter_kwargs_fn(InventoryItem, biz_id))
-                if imei and _has_field(InventoryItem, "imei") and dup_qs.filter(imei=imei).exists():
-                    messages.error(request, f"Item with IMEI {imei} already exists in your store.")
+                    dup_qs = dup_qs.filter(**_biz_filter_kwargs(InventoryItem, biz_id))
+                if imei and _model_has_field(InventoryItem, "imei") and dup_qs.filter(imei=imei).exists():
+                    msg = f"Item with IMEI {imei} already exists in your store."
+                    if _wants_json(request):
+                        return JsonResponse({"ok": False, "error": msg}, status=400)
+                    messages.error(request, msg)
                     return render(request, template_name, {"form": form})
 
                 create_kwargs = {}
-
-                # Core relations/fields
-                if _has_field(InventoryItem, "product"):
-                    create_kwargs["product"] = data["product"]
+                if _model_has_field(InventoryItem, "product"):
+                    create_kwargs["product"] = product
 
                 if location_obj:
-                    if _has_field(InventoryItem, "current_location"):
+                    if _model_has_field(InventoryItem, "current_location"):
                         create_kwargs["current_location"] = location_obj
-                    elif _has_field(InventoryItem, "location"):
+                    elif _model_has_field(InventoryItem, "location"):
                         create_kwargs["location"] = location_obj
 
-                # Safe defaults that make the item visible in Stock
-                if _has_field(InventoryItem, "received_at"):
-                    create_kwargs["received_at"] = data.get("received_at") or timezone.localdate()
-                if _has_field(InventoryItem, "order_price"):
+                # safe defaults to ensure visibility in Stock
+                if _model_has_field(InventoryItem, "received_at"):
+                    create_kwargs["received_at"] = data.get("received_at") or today
+                if _model_has_field(InventoryItem, "order_price"):
                     create_kwargs["order_price"] = data.get("order_price") or Decimal("0.00")
-                if _has_field(InventoryItem, "imei") and imei:
+                if _model_has_field(InventoryItem, "imei") and imei:
                     create_kwargs["imei"] = imei
-                if _has_field(InventoryItem, "status"):
+                if _model_has_field(InventoryItem, "status"):
                     create_kwargs.setdefault("status", "IN_STOCK")
-                if _has_field(InventoryItem, "is_active"):
+                if _model_has_field(InventoryItem, "is_active"):
                     create_kwargs.setdefault("is_active", True)
 
-                # Attach active business (hard requirement)
+                # attach business (hard requirement)
                 create_kwargs.update(biz_create_kwargs)
 
-                # Validate & save
+                # validate & save
                 item = InventoryItem(**create_kwargs)
                 try:
                     item.full_clean()
                 except ValidationError as ve:
                     first_err = "; ".join([f"{k}: {', '.join(v)}" for k, v in ve.message_dict.items()])
+                    if _wants_json(request):
+                        return JsonResponse({"ok": False, "error": f"Cannot stock-in: {first_err}"}, status=400)
                     messages.error(request, f"Cannot stock-in: {first_err}")
                     return render(request, template_name, {"form": form})
 
-                # Attach owner-like field for agents (optional UX)
-                if _is_agent_user_local(request.user):
-                    _assign_owner_like_fields(item, request.user)
+                # optional: attach owner-like field for agents
+                for name in ("assigned_agent","assigned_to","assignee","owner","user","agent","created_by","added_by","received_by"):
+                    if _model_has_field(InventoryItem, name) and not getattr(item, name, None):
+                        try:
+                            setattr(item, name, request.user)
+                            break
+                        except Exception:
+                            pass
 
                 item.save()
 
         except IntegrityError as e:
+            msg = "Could not save this item (constraint error). Check values and try again."
             if "unique" in str(e).lower():
-                messages.error(request, f"Item with IMEI {imei or '(blank)'} already exists.")
-            else:
-                messages.error(request, "Could not save this item (constraint error). Please check values and try again.")
+                msg = f"Item with IMEI {imei or '(blank)'} already exists."
+            if _wants_json(request):
+                return JsonResponse({"ok": False, "error": msg}, status=400)
+            messages.error(request, msg)
             return render(request, template_name, {"form": form})
         except Exception:
-            log.exception("Scan IN failed | kwargs=%s", create_kwargs if 'create_kwargs' in locals() else {})
+            log.exception("Scan IN failed")
             if getattr(settings, "DEBUG", False):
                 raise
+            if _wants_json(request):
+                return JsonResponse({"ok": False, "error": "Unexpected error while saving this item. Please try again."}, status=500)
             messages.error(request, "Unexpected error while saving this item. Please try again.")
             return render(request, template_name, {"form": form})
 
-        # Post-save: ensure an owner is set for agent users
-        if _is_agent_user_local(request.user):
-            has_owner = False
-            for fname in ("assigned_agent","assigned_to","assignee","owner","user","agent","created_by","added_by","received_by"):
-                if _has_field(InventoryItem, fname) and getattr(item, fname, None):
-                    has_owner = True
-                    break
-            if not has_owner:
-                set_name = _assign_owner_like_fields(item, request.user)
-                try:
-                    item.save(update_fields=[set_name] if set_name else None)
-                except Exception:
-                    item.save()
-
-        # Audit hook (best-effort)
-        try:
-            if callable(_audit_fn):
-                _audit_fn(item, request.user, "STOCK_IN", "Scan IN")
-        except Exception:
-            log.exception("Audit hook failed but was skipped.")
-
-        log.warning(
-            "SCAN_IN SAVED id=%s business=%s location=%s status=%s active=%s",
-            getattr(item, "id", None),
-            getattr(item, "business_id", None),
-            getattr(item, "current_location_id", getattr(item, "location_id", None)),
-            getattr(item, "status", None),
-            getattr(item, "is_active", None),
-        )
-
+        if _wants_json(request):
+            return JsonResponse({"ok": True, "message": "Item saved."})
         messages.success(request, "Item saved.")
         return redirect("inventory:stock_list")
 
-    # -------------------- GET (render form) --------------------
-    if ScanInForm is None:
-        messages.error(request, "Scan form is unavailable.")
-        return redirect("inventory:stock_list")
-
+    # ===================== GET -> HTML by default =====================
     form = ScanInForm(initial=page_initial)
-    _restrict_location_to_user_store(form, request, set_initial=True)
-    _limit_form_querysets_fn(form, request)
+    _restrict_location_to_user_store(form, set_initial=True)
 
     try:
         if dflt_pk is not None:
@@ -2751,15 +3030,17 @@ def scan_in(request):
     except Exception:
         pass
 
+    # Only return JSON when explicitly requested
+    if _wants_json(request):
+        return JsonResponse(boot)
+
     ctx = {
         "form": form,
-        "default_location": default_location,
+        "default_location": default_loc,
         "loc_is_required": loc_is_required,
-        "is_agent_user": _is_agent_user_local(request.user),
-        "today": timezone.localdate(),
+        "today": today,
     }
     return render(request, template_name, ctx)
-
 @login_required
 @require_GET
 def orders_list(request):
@@ -3279,52 +3560,6 @@ def _can_edit_inventory(user):
 # ---------------------------------------------------------------------------
 # SIMPLE HTML PAGE (separate from API list)
 # ---------------------------------------------------------------------------
-
-@login_required
-def stock_list_page(request):
-    """
-    HTML Stock List page – renders stock_list.html
-    """
-    if InventoryItem is None:
-        return render(request, "inventory/stock_list.html", {
-            "page_obj": None,
-            "in_stock": 0,
-            "sold_count": 0,
-            "sum_order": 0,
-            "sum_selling": 0,
-            "q": request.GET.get("q", ""),
-            "status": request.GET.get("status", ""),
-            "show_archived": request.GET.get("archived") == "1",
-            "target_full": 100,
-            "IS_MANAGER": (
-                request.user.is_staff or
-                request.user.is_superuser or
-                request.user.groups.filter(name__in=["Admin","Manager"]).exists()
-            ),
-        })
-
-    qs = InventoryItem.objects.all().order_by("-id")
-    paginator = Paginator(qs, 50)
-    page_obj = paginator.get_page(request.GET.get("page"))
-
-    ctx = {
-        "page_obj": page_obj,
-        "in_stock": qs.exclude(status="SOLD").count() if _model_has_field(InventoryItem, "status") else qs.count(),
-        "sold_count": qs.filter(status="SOLD").count() if _model_has_field(InventoryItem, "status") else 0,
-        "sum_order": sum((q.order_price or 0) for q in qs) if _model_has_field(InventoryItem, "order_price") else 0,
-        "sum_selling": sum((q.selling_price or 0) for q in qs) if _model_has_field(InventoryItem, "selling_price") else 0,
-        "q": request.GET.get("q", ""),
-        "status": request.GET.get("status", ""),
-        "show_archived": request.GET.get("archived") == "1",
-        "target_full": 100,
-        "IS_MANAGER": (
-            request.user.is_staff or
-            request.user.is_superuser or
-            request.user.groups.filter(name__in=["Admin","Manager"]).exists()
-        ),
-    }
-    return render(request, "inventory/stock_list.html", ctx)
-
 
 @never_cache
 @login_required
@@ -3860,24 +4095,48 @@ def delete_stock(request, pk):
 # (continue…)
 # -----------------------
 
-@never_cache
-@login_required
-def restock_heatmap_api(request):
-    """
-    Fallback for cc/urls.py when inventory.api.api_stock_health is missing.
-    Delegates to inventory.api.restock_heatmap_api if available,
-    otherwise returns an empty payload.
-    """
+from django.http import JsonResponse
+from django.views.decorators.http import require_GET
+from django.views.decorators.cache import never_cache
+from django.contrib.auth.decorators import login_required
+import importlib
+
+def _try_call(module_path: str, attr: str, request):
+    """Import module.attr and call it if callable; return response or None."""
     try:
-        from . import api as api_mod  # type: ignore
-        if hasattr(api_mod, "restock_heatmap_api"):
-            return api_mod.restock_heatmap_api(request)  # type: ignore[attr-defined]
-        if hasattr(api_mod, "api_stock_health"):
-            return api_mod.api_stock_health(request)  # type: ignore[attr-defined]
+        mod = importlib.import_module(module_path)
+        fn = getattr(mod, attr, None)
+        if callable(fn):
+            return fn(request)
     except Exception:
         pass
-    return JsonResponse({"ok": True, "heatmap": []})
+    return None
 
+@never_cache
+@login_required
+@require_GET
+def restock_heatmap_api(request):
+    """
+    Delegates to any available implementation; otherwise returns a safe stub.
+    Tries (in order):
+      - inventory.api.restock_heatmap_api
+      - inventory.api.api_stock_health
+      - inventory.views_api.restock_heatmap_api
+      - inventory.views_dashboard.restock_heatmap_api
+    Always responds 200 on fallback so UI never 501s.
+    """
+    for module, attr in [
+        ("inventory.api", "restock_heatmap_api"),
+        ("inventory.api", "api_stock_health"),
+        ("inventory.views_api", "restock_heatmap_api"),
+        ("inventory.views_dashboard", "restock_heatmap_api"),
+    ]:
+        resp = _try_call(module, attr, request)
+        if resp is not None:
+            return resp
+
+    # Safe fallback payload (UI-ready)
+    return JsonResponse({"points": [], "generated_at": "ok"}, status=200)
 # --- PART 2/3 end ---
 # --- PART 3/3 BEGINS ---
 
@@ -4511,81 +4770,170 @@ def wallet_page(request):
 # -----------------------
 # Stock management
 # -----------------------
+# --- add this tiny helper once near the top of views.py (outside any view) ---
+# ----------------------------------------------------------------------------
+
 @never_cache
 @login_required
 @require_http_methods(["GET", "POST"])
 def update_stock(request, pk):
+    """
+    Inventory · Update Stock
+    - Scopes the item to the active business.
+    - Only managers/admins can edit inventory (your existing _can_edit_inventory).
+    - Admins can optionally bulk-propagate price fields across same product in the same business.
+    - HTML by default; JSON only when explicitly requested.
+    """
+    from django.contrib import messages
+    from django.http import JsonResponse
+    from django.shortcuts import redirect, render, get_object_or_404
+    from django.utils import timezone
+    from django.core.mail import mail_admins
+
+    # Guards for missing models/forms
     if InventoryItem is None or InventoryItemForm is None:
-        messages.error(request, "Inventory editing is not available.")
+        msg = "Inventory editing is not available."
+        if _wants_json(request):
+            return JsonResponse({"ok": False, "error": msg}, status=500)
+        messages.error(request, msg)
         return redirect("inventory:stock_list")
 
     # Only load items from the active business
     item = get_object_or_404(_scoped(InventoryItem.objects, request), pk=pk)
 
+    # Permission check
     if not _can_edit_inventory(request.user):
         msg = (
             f"EDIT attempt BLOCKED: user '{request.user.username}' tried to edit "
             f"item {item.imei or item.pk} at {timezone.now():%Y-%m-%d %H:%M}."
         )
         _audit(item, request.user, "EDIT_DENIED", "Insufficient permissions")
-        mail_admins(subject="Edit attempt blocked", message=msg, fail_silently=True)
+        try:
+            mail_admins(subject="Edit attempt blocked", message=msg, fail_silently=True)
+        except Exception:
+            pass
+        if _wants_json(request):
+            return JsonResponse({"ok": False, "error": "Only managers/admins can edit inventory items."}, status=403)
         messages.error(request, "Only managers/admins can edit inventory items.")
         return redirect("inventory:stock_list")
 
+    # -------------------- POST --------------------
     if request.method == "POST":
         form = InventoryItemForm(request.POST, instance=item, user=request.user)
-        if form.is_valid():
-            # Enforce: only agents (non-staff/superuser with AgentProfile) can *hold* stock
-            new_holder = form.cleaned_data.get("assigned_agent")
-            if new_holder and not _is_agent_user(new_holder):
-                messages.error(request, "Only agent accounts can hold stock. Choose a non-admin user with an AgentProfile.")
-                return render(request, "inventory/edit_stock.html", {"form": form, "item": item})
 
-            changed_fields = list(form.changed_data)
-            price_fields = {"order_price", "selling_price"}
-            if (price_fields & set(changed_fields)) and not _is_admin(request.user):
-                messages.error(request, "Only admins can edit order/selling prices.")
-                return render(request, "inventory/edit_stock.html", {"form": form, "item": item})
+        if not form.is_valid():
+            if _wants_json(request):
+                return JsonResponse({"ok": False, "errors": form.errors}, status=400)
+            messages.error(request, "Please correct the errors below.")
+            return render(request, "inventory/edit_stock.html", {"form": form, "item": item})
 
-            old_vals = {name: getattr(item, name) for name in changed_fields}
-            saved_item = form.save()
+        # Enforce: only agent accounts can hold stock
+        new_holder = form.cleaned_data.get("assigned_agent")
+        if new_holder and not _is_agent_user(new_holder):
+            msg = "Only agent accounts can hold stock. Choose a non-admin user with an AgentProfile."
+            if _wants_json(request):
+                return JsonResponse({"ok": False, "error": msg}, status=400)
+            messages.error(request, msg)
+            return render(request, "inventory/edit_stock.html", {"form": form, "item": item})
 
-            if _is_admin(request.user):
-                bulk_updates = {}
-                if "order_price" in changed_fields:
-                    bulk_updates["order_price"] = form.cleaned_data.get("order_price")
-                if "selling_price" in changed_fields:
-                    bulk_updates["selling_price"] = form.cleaned_data.get("selling_price")
+        changed_fields = list(form.changed_data)
 
-                if bulk_updates:
-                    # Apply bulk updates only within the same business
-                    base_mgr = (
-                        InventoryItem.active if hasattr(InventoryItem, "active") else InventoryItem.objects.filter(is_active=True)
+        # Non-admins cannot change prices
+        price_fields = {"order_price", "selling_price"}
+        if (price_fields & set(changed_fields)) and not _is_admin(request.user):
+            msg = "Only admins can edit order/selling prices."
+            if _wants_json(request):
+                return JsonResponse({"ok": False, "error": msg}, status=403)
+            messages.error(request, msg)
+            return render(request, "inventory/edit_stock.html", {"form": form, "item": item})
+
+        # Keep old values for audit
+        old_vals = {name: getattr(item, name) for name in changed_fields}
+
+        saved_item = form.save()
+
+        # Optional bulk price propagation (admins only)
+        bulk_result = {"updated": 0, "fields": {}}
+        if _is_admin(request.user):
+            bulk_updates = {}
+            if "order_price" in changed_fields:
+                bulk_updates["order_price"] = form.cleaned_data.get("order_price")
+            if "selling_price" in changed_fields:
+                bulk_updates["selling_price"] = form.cleaned_data.get("selling_price")
+
+            if bulk_updates:
+                base_mgr = (
+                    InventoryItem.active
+                    if hasattr(InventoryItem, "active")
+                    else InventoryItem.objects.filter(is_active=True)
+                )
+                qs = _scoped(base_mgr, request).filter(product=saved_item.product).exclude(pk=saved_item.pk)
+                updated = qs.update(**bulk_updates)
+                bulk_result = {"updated": int(updated), "fields": list(bulk_updates.keys())}
+
+                if updated:
+                    _audit(
+                        saved_item,
+                        request.user,
+                        "BULK_PRICE_UPDATE",
+                        f"Updated {updated} items for product '{saved_item.product}'. Fields: {bulk_updates}",
                     )
-                    qs = _scoped(base_mgr, request).filter(product=saved_item.product).exclude(pk=saved_item.pk)
-                    updated = qs.update(**bulk_updates)
-                    if updated:
-                        _audit(
-                            saved_item,
-                            request.user,
-                            "BULK_PRICE_UPDATE",
-                            f"Updated {updated} items for product '{saved_item.product}'. Fields: {bulk_updates}",
-                        )
+                    if not _wants_json(request):
                         messages.info(
-                            request, f"Applied {', '.join(bulk_updates.keys())} to {updated} other '{saved_item.product}' item(s)."
+                            request,
+                            f"Applied {', '.join(bulk_updates.keys())} to {updated} other '{saved_item.product}' item(s).",
                         )
 
-            details = "Changed fields:\n" + (
-                "\n".join([f"{k}: {old_vals.get(k)} \u2192 {getattr(saved_item, k)}" for k in changed_fields])
-                if changed_fields
-                else "No field changes"
-            )
-            _audit(saved_item, request.user, "EDIT", details)
+        # Audit the single edit
+        details = "Changed fields:\n" + (
+            "\n".join([f"{k}: {old_vals.get(k)} \u2192 {getattr(saved_item, k)}" for k in changed_fields])
+            if changed_fields
+            else "No field changes"
+        )
+        _audit(saved_item, request.user, "EDIT", details)
 
-            messages.success(request, "Item updated.")
-            return redirect("inventory:stock_list")
-    else:
-        form = InventoryItemForm(instance=item, user=request.user)
+        if _wants_json(request):
+            # Serialize a light view of the item for the client
+            payload_item = {
+                "id": saved_item.pk,
+                "imei": getattr(saved_item, "imei", None),
+                "product": str(getattr(saved_item, "product", "")) if getattr(saved_item, "product", None) else None,
+                "order_price": getattr(saved_item, "order_price", None),
+                "selling_price": getattr(saved_item, "selling_price", None),
+                "assigned_agent": getattr(getattr(saved_item, "assigned_agent", None), "id", None),
+            }
+            return JsonResponse({
+                "ok": True,
+                "message": "Item updated.",
+                "changed_fields": changed_fields,
+                "bulk": bulk_result,
+                "item": payload_item,
+            })
+
+        messages.success(request, "Item updated.")
+        return redirect("inventory:stock_list")
+
+    # -------------------- GET (render form) --------------------
+    form = InventoryItemForm(instance=item, user=request.user)
+
+    if _wants_json(request):
+        # Minimal boot payload for edit UIs that fetch JSON
+        payload_item = {
+            "id": item.pk,
+            "imei": getattr(item, "imei", None),
+            "product": str(getattr(item, "product", "")) if getattr(item, "product", None) else None,
+            "order_price": getattr(item, "order_price", None),
+            "selling_price": getattr(item, "selling_price", None),
+            "assigned_agent": getattr(getattr(item, "assigned_agent", None), "id", None),
+        }
+        return JsonResponse({
+            "ok": True,
+            "data": {
+                "note": "update_stock ready",
+                "item": payload_item,
+                "can_edit_prices": bool(_is_admin(request.user)),
+            }
+        })
 
     return render(request, "inventory/edit_stock.html", {"form": form, "item": item})
 

@@ -21,6 +21,11 @@ urlpatterns = [
     path("",              views.AgentWalletView.as_view(),  name="agent_wallet"),
     path("transactions/", views.AgentTxnListView.as_view(), name="agent_txns"),
 
+    # Agent extras (additive)
+    path("tx/<int:pk>/", views.entry_detail, name="entry_detail"),  # transaction drill-down
+    path("payslip/<int:year>-<int:month>/download/", views.payslip_download, name="payslip_download"),
+    path("budget/new/", views.budget_new, name="budget_new"),
+
     # ------------------------------------------------------------------
     # Wallet Admin Pages (canonical: /wallet/admin/...)
     # ------------------------------------------------------------------
@@ -42,6 +47,11 @@ urlpatterns = [
     path("admin/pos/", views.AdminPOListView.as_view(), name="admin_pos"),
     path("admin/pos/new/", views.admin_po_new, name="admin_po_new"),
     path("admin/pos/<int:po_id>/", views.admin_po_detail, name="admin_po_detail"),
+
+    # Admin extras (additive, non-breaking)
+    path("admin/requests/", views.admin_budget_list, name="admin_budget_list"),
+    path("admin/requests/<int:pk>/set/<str:action>/", views.admin_budget_set_status, name="admin_budget_set_status"),
+    path("admin/entries/export.csv", views.admin_entries_export_csv, name="admin_entries_export_csv"),
 
     # ------------------------------------------------------------------
     # Legacy dashed-path compatibility → redirect to new canonical routes

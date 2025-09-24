@@ -1,9 +1,10 @@
-# circuitcity/inventory/api_views.py
+# inventory/api_views.py
 from __future__ import annotations
 
 from typing import Any, Dict, List
 import json
 import re
+import importlib
 from datetime import date
 
 from django.contrib.auth.decorators import login_required
@@ -12,16 +13,136 @@ from django.http import HttpRequest, HttpResponse, JsonResponse
 from django.utils import timezone
 from django.views.decorators.http import require_http_methods, require_POST
 
-# ---- Tenants helpers (role/tenant aware) ----
-try:
-    from circuitcity.tenants.utils import scoped, get_active_business  # type: ignore
-except Exception:  # pragma: no cover
-    def scoped(qs, _request):
-        return qs
-    def get_active_business(_request):
+# -----------------------------------------------------------------------------
+# Tenants helpers (role/tenant aware)
+# -----------------------------------------------------------------------------
+def _try_import(modpath: str, attr: str | None = None):
+    try:
+        mod = importlib.import_module(modpath)
+        return getattr(mod, attr) if attr else mod
+    except Exception:
         return None
 
-# ---- Try to import inventory models (be defensive) ----
+scoped = _try_import("circuitcity.tenants.utils", "scoped") or \
+         _try_import("tenants.utils", "scoped") or (lambda qs, _request: qs)
+
+get_active_business = _try_import("circuitcity.tenants.utils", "get_active_business") or \
+                      _try_import("tenants.utils", "get_active_business") or (lambda _r: None)
+
+# -----------------------------------------------------------------------------
+# Single-source-of-truth scope + queryset helpers
+# (required for keeping Dashboard, Scan IN, and Stock List in sync)
+# -----------------------------------------------------------------------------
+# IMPORTANT: avoid name shadowing; keep imported callables with *_func suffixes.
+_active_scope_func = _try_import("inventory.scope", "active_scope")
+_stock_qs_for_request_func = _try_import("inventory.scope", "stock_queryset_for_request")
+
+def _active_scope(request: HttpRequest) -> tuple[int | None, int | None]:
+    """
+    Returns (business_id, location_id) for current request, using inventory.scope.active_scope
+    when available; otherwise falls back to request/session-derived values.
+    """
+    if callable(_active_scope_func):
+        try:
+            return _active_scope_func(request)  # type: ignore[misc]
+        except Exception:
+            pass
+    # Fallback: try to infer from request/session
+    biz = get_active_business(request)
+    biz_id = getattr(biz, "id", None)
+    loc_id = getattr(request, "active_location_id", None) or getattr(getattr(request, "active_location", None), "id", None)
+    return biz_id, loc_id
+
+def _stock_queryset_for_request(request: HttpRequest):
+    """
+    Canonical queryset for 'items currently in stock' for the active scope.
+    If inventory.scope.stock_queryset_for_request is present, use it.
+    Else, derive a best-effort fallback that respects business/location and common fields.
+    """
+    if callable(_stock_qs_for_request_func):
+        try:
+            return _stock_qs_for_request_func(request)  # type: ignore[misc]
+        except Exception:
+            pass
+
+    # ----- Best-effort fallback (keeps old behavior but scoped) -----
+    InventoryItem = Stock = None  # late import below
+    try:
+        from .models import InventoryItem as _InventoryItem  # type: ignore
+        InventoryItem = _InventoryItem
+    except Exception:
+        pass
+    if InventoryItem is None:
+        try:
+            from .models import Stock as _Stock  # type: ignore
+            Stock = _Stock
+        except Exception:
+            pass
+
+    model = InventoryItem or Stock
+    if model is None:
+        return None
+
+    qs = scoped(model.objects.all(), request)
+
+    # Discover fields defensively
+    try:
+        fields = {f.name for f in model._meta.get_fields()}  # type: ignore[attr-defined]
+    except Exception:
+        fields = set()
+
+    # Business scoping (if not already applied by scoped())
+    biz_id, loc_id = _active_scope(request)
+    if biz_id and ("business" in fields or "business_id" in fields):
+        try:
+            qs = qs.filter(business_id=biz_id)
+        except Exception:
+            try:
+                qs = qs.filter(business__id=biz_id)
+            except Exception:
+                pass
+
+    # Location scoping (optional)
+    if loc_id:
+        for fk in ("current_location", "location", "store", "branch"):
+            if fk in fields or f"{fk}_id" in fields:
+                try:
+                    qs = qs.filter(**{f"{fk}_id": loc_id})
+                    break
+                except Exception:
+                    try:
+                        qs = qs.filter(**{fk: loc_id})
+                        break
+                    except Exception:
+                        continue
+
+    # Exclude sold/inactive/archived by default
+    if "sold_at" in fields:
+        qs = qs.filter(sold_at__isnull=True)
+    if "is_active" in fields:
+        qs = qs.filter(is_active=True)
+    if "archived" in fields:
+        qs = qs.filter(archived=False)
+    if "status" in fields:
+        try:
+            qs = qs.exclude(status__iexact="sold")
+        except Exception:
+            pass
+
+    # Useful joins
+    joinable = [j for j in ("product", "current_location", "location", "store", "business") if j in fields]
+    if joinable:
+        try:
+            qs = qs.select_related(*joinable)
+        except Exception:
+            pass
+
+    return qs
+
+
+# -----------------------------------------------------------------------------
+# Try to import inventory models (be defensive)
+# -----------------------------------------------------------------------------
 InventoryItem = Stock = Product = AuditLog = Location = None  # type: ignore[assignment]
 
 try:
@@ -56,9 +177,9 @@ except Exception:
     pass
 
 
-# -----------------------------
+# -----------------------------------------------------------------------------
 # Utilities
-# -----------------------------
+# -----------------------------------------------------------------------------
 IMEI_RX = re.compile(r"^\d{15}$")
 
 def _ok(payload: Any = None, **extra) -> JsonResponse:
@@ -69,13 +190,11 @@ def _ok(payload: Any = None, **extra) -> JsonResponse:
         data.update(extra)
     return JsonResponse(data, status=200)
 
-
 def _err(msg: str, status: int = 400, **extra) -> JsonResponse:
     data = {"ok": False, "error": msg}
     if extra:
         data.update(extra)
     return JsonResponse(data, status=status)
-
 
 def _tester_html(title: str, post_path: str) -> HttpResponse:
     # Minimal form that works even without static/templates
@@ -97,7 +216,6 @@ def _tester_html(title: str, post_path: str) -> HttpResponse:
         content_type="text/html",
     )
 
-
 def _parse_json_body(request: HttpRequest) -> Dict[str, Any]:
     try:
         if request.body:
@@ -106,10 +224,9 @@ def _parse_json_body(request: HttpRequest) -> Dict[str, Any]:
         pass
     return {}
 
-
 def _get_code(request: HttpRequest) -> str:
     """
-    Extracts code from JSON or form:
+    Extract code from JSON or form:
     accepts keys: imei, code, sku, serial (first non-empty).
     """
     data = _parse_json_body(request)
@@ -120,10 +237,8 @@ def _get_code(request: HttpRequest) -> str:
     raw = request.POST.get("code") or ""
     return (raw or "").strip()
 
-
 def _get_qty(obj) -> int:
     return int(getattr(obj, "quantity", getattr(obj, "qty", 0)) or 0)
-
 
 def _set_qty(obj, value: int) -> None:
     if hasattr(obj, "quantity"):
@@ -131,14 +246,12 @@ def _set_qty(obj, value: int) -> None:
     elif hasattr(obj, "qty"):
         setattr(obj, "qty", value)
 
-
 def _set_if_has(obj, field: str, value) -> None:
     if hasattr(obj, field):
         setattr(obj, field, value)
 
-
 def _find_by_code(model, code: str):
-    """Find by common identifiers (sku/imei/serial)."""
+    """Find by common identifiers (sku/imei/serial/code)."""
     for field in ("sku", "imei", "serial", "code"):
         if hasattr(model, field):
             try:
@@ -146,7 +259,6 @@ def _find_by_code(model, code: str):
             except model.DoesNotExist:  # type: ignore[attr-defined]
                 continue
     return None
-
 
 def _get_or_create_by_code(model, code: str):
     """Get or create by common identifiers; prefers `sku`, then `imei`, …"""
@@ -158,11 +270,10 @@ def _get_or_create_by_code(model, code: str):
     created = True
     return obj, created
 
-
 def _get_location_from_item(it):
     """
-    Prefer 'current_location' but fall back to 'location' if that's what
-    the model uses. Returns (id, name) or (None, None).
+    Prefer 'current_location' but fall back to 'location'.
+    Returns (id, name) or (None, None).
     """
     loc = None
     if hasattr(it, "current_location"):
@@ -172,7 +283,6 @@ def _get_location_from_item(it):
     if loc:
         return getattr(loc, "id", None), getattr(loc, "name", None)
     return None, None
-
 
 def _serialize_item(it) -> Dict[str, Any]:
     product = getattr(it, "product", None)
@@ -198,10 +308,9 @@ def _serialize_item(it) -> Dict[str, Any]:
         "business_id": getattr(business, "id", None),
     }
 
-
 def _attach_business_and_location(obj, request: HttpRequest) -> None:
     """
-    If object has 'business' and/or 'location/current_location' fields, try to set them.
+    If object has 'business' and/or 'location/current_location' fields, set them if possible.
     """
     b = get_active_business(request)
     if b is not None:
@@ -212,12 +321,10 @@ def _attach_business_and_location(obj, request: HttpRequest) -> None:
     if loc_id and Location is not None:
         try:
             loc = Location.objects.get(pk=int(loc_id))
-            # Support either field name
             _set_if_has(obj, "current_location", loc)
             _set_if_has(obj, "location", loc)
         except Exception:
             pass
-
 
 def _audit(kind: str, request: HttpRequest, **details) -> None:
     if AuditLog is None:
@@ -230,7 +337,6 @@ def _audit(kind: str, request: HttpRequest, **details) -> None:
         )
     except Exception:
         pass
-
 
 def _defaults_for_ui(request: HttpRequest) -> Dict[str, Any]:
     """
@@ -245,8 +351,7 @@ def _defaults_for_ui(request: HttpRequest) -> Dict[str, Any]:
     # If you have locations, return a simple list and pick first as default
     if Location is not None:
         try:
-            qs = scoped(Location.objects.all(), request)
-            qs = qs.order_by("name")
+            qs = scoped(Location.objects.all(), request).order_by("name")
             locs = [{"id": l.id, "name": getattr(l, "name", f"Loc #{l.id}")} for l in qs[:50]]
             defaults["locations"] = locs
             if locs and defaults["location_default"] is None:
@@ -256,9 +361,9 @@ def _defaults_for_ui(request: HttpRequest) -> Dict[str, Any]:
     return defaults
 
 
-# -----------------------------
-# Simple PAGE endpoints (so /inventory/scan-in/, /scan-sold/, /place-order/, /time/logs/ resolve)
-# -----------------------------
+# -----------------------------------------------------------------------------
+# Simple PAGE endpoints (so /inventory/scan-in/, /scan-sold/, etc. resolve)
+# -----------------------------------------------------------------------------
 @login_required
 @require_http_methods(["GET"])
 def scan_in_page(_request: HttpRequest) -> HttpResponse:
@@ -277,45 +382,47 @@ def place_order_page(_request: HttpRequest) -> HttpResponse:
 @login_required
 @require_http_methods(["GET"])
 def time_logs(_request: HttpRequest) -> JsonResponse:
-    # Wire up a minimal working endpoint; replace with real data when ready
     return _ok({"logs": [], "now": timezone.now().isoformat()})
 
 
-# -----------------------------
+# -----------------------------------------------------------------------------
 # API endpoints
-# -----------------------------
+# -----------------------------------------------------------------------------
 @login_required
 @require_http_methods(["GET"])
 def stock_list(request: HttpRequest) -> JsonResponse:
     """
-    GET /inventory/list/
-    Returns up to 200 items the current user is allowed to see (tenant + role scoped).
+    Canonical stock list API (JSON).
+    Uses the SINGLE SOURCE OF TRUTH queryset to match Dashboard & Scan flows.
     """
     try:
-        items: List[Dict[str, Any]] = []
-
-        model = InventoryItem or Stock
-        if model is None:
+        qs = _stock_queryset_for_request(request)
+        if qs is None:
             return _ok([], warning="No inventory model detected; returning empty list.")
 
-        qs = scoped(model.objects.all(), request)
-
-        # Prefer current_location; fall back to location; always pull product & business
+        # Stable ordering
         try:
-            # Try with current_location first
-            qs = qs.select_related("product", "current_location", "business")  # type: ignore[arg-type]
+            qs = qs.order_by("-id")
         except Exception:
-            try:
-                # Fall back to 'location' if model doesn't have 'current_location'
-                qs = qs.select_related("product", "location", "business")  # type: ignore[arg-type]
-            except Exception:
-                # Worst case: just product
-                qs = qs.select_related("product")
+            pass
 
-        for it in qs.order_by("-id")[:200]:
+        # Limit (defensive: 1..200)
+        try:
+            limit = int(request.GET.get("limit", "200"))
+            limit = max(1, min(200, limit))
+        except Exception:
+            limit = 200
+
+        items: List[Dict[str, Any]] = []
+        for it in qs[:limit]:
             items.append(_serialize_item(it))
 
-        return _ok(items)
+        biz_id, loc_id = _active_scope(request)
+        return _ok(
+            items,
+            count=getattr(qs, "count", lambda: len(items))(),
+            scope={"business_id": biz_id, "location_id": loc_id},
+        )
     except Exception as e:
         return _err(f"stock_list failed: {e}", status=500)
 
@@ -331,7 +438,6 @@ def scan_in(request: HttpRequest):
     POST -> Upsert item by code and increment quantity.
     """
     if request.method == "GET":
-        # Return a small payload so the page JS can enable the form.
         return _ok({"note": "scan_in ready"}, **_defaults_for_ui(request))
 
     code = _get_code(request)
@@ -402,7 +508,6 @@ def scan_sold(request: HttpRequest):
         qty_now = _get_qty(obj)
         new_qty = max(0, qty_now - 1)
         _set_qty(obj, new_qty)
-        # Persist cautiously
         try:
             if hasattr(obj, "quantity"):
                 obj.save(update_fields=["quantity"])
@@ -439,7 +544,6 @@ def api_mark_sold(request: HttpRequest):
     sold_date = (data.get("sold_date") or request.POST.get("sold_date") or date.today().isoformat())
     location_id = data.get("location_id") or request.POST.get("location_id")
 
-    # Basic validation
     if not IMEI_RX.match(code) and len(code) < 4:
         return _err("Invalid IMEI/code.", status=400)
 
@@ -450,13 +554,11 @@ def api_mark_sold(request: HttpRequest):
     obj = _find_by_code(model, code)
     if obj is None:
         _audit("mark_sold_missing", request, code=code)
-        # Still succeed to keep UI happy (demo flow)
         return _ok(
             {"code": code, "price": price, "commission": commission, "sold_date": sold_date, "location_id": location_id},
             message="Marked as SOLD (demo: item not found).",
         )
 
-    # Attach business/location if provided
     if location_id:
         try:
             request.POST = request.POST.copy()
@@ -465,11 +567,9 @@ def api_mark_sold(request: HttpRequest):
             pass
     _attach_business_and_location(obj, request)
 
-    # Decrement qty
     qty_now = _get_qty(obj)
     _set_qty(obj, max(0, qty_now - 1))
 
-    # Save price/commission to the object if fields exist (best-effort)
     if price is not None:
         try:
             _set_if_has(obj, "sale_price", float(price))
@@ -511,29 +611,44 @@ def api_mark_sold(request: HttpRequest):
     )
 
 
-# -------------------------------------------------------------------
-#  Restock Heatmap (NEW) — canonical: /inventory/api/restock-heatmap/
-# -------------------------------------------------------------------
+# -----------------------------------------------------------------------------
+#  Restock Heatmap (canonical path: /inventory/api/restock-heatmap/)
+# -----------------------------------------------------------------------------
 @login_required
 @require_http_methods(["GET"])
 def restock_heatmap(request: HttpRequest) -> JsonResponse:
     """
     Minimal-but-valid payload for a heatmap component.
     Replace with real aggregation when ready.
-
-    Response shape:
-      {
-        "labels": ["Mon","Tue",...],
-        "series": [{"name": "Restocks", "data": [0,0,...]}]
-      }
-
-    Optional query params (ignored by stub but reserved):
-      - period: 7d|month|quarter
-      - location_id: int
     """
-    # Safe defaults to unblock the UI
     payload = {
         "labels": ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"],
         "series": [{"name": "Restocks", "data": [0, 0, 0, 0, 0, 0, 0]}],
     }
     return _ok(payload)
+
+@login_required
+@require_http_methods(["GET"])
+def restock_heatmap_api(request: HttpRequest) -> JsonResponse:
+    """
+    Gateway endpoint used by urls.py; ALWAYS returns 200.
+    Delegates to any present implementation (inventory.api or this module).
+    """
+    # Try project-provided implementations first
+    for modpath, attr in [
+        ("inventory.api", "restock_heatmap_api"),
+        ("inventory.api", "api_stock_health"),
+        ("circuitcity.inventory.api", "restock_heatmap_api"),
+        ("circuitcity.inventory.api", "api_stock_health"),
+        ("inventory.views_api", "restock_heatmap_api"),
+        ("inventory.views_dashboard", "restock_heatmap_api"),
+    ]:
+        fn = _try_import(modpath, attr)
+        if callable(fn):
+            try:
+                return fn(request)  # type: ignore[misc]
+            except Exception:
+                break  # fall through to local stub
+
+    # Fall back to local stub
+    return restock_heatmap(request)

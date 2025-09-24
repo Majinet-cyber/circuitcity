@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+{% block title %}Transaction{% endblock %}
+{% block header_title %}Transaction{% endblock %}
+{% block content %}
+<div class="container" style="max-width:900px">
+  <div class="card">
+    <div class="card-body">
+      <h5 class="mb-3">Transaction</h5>
+      <dl class="row">
+        <dt class="col-sm-3">Date</dt><dd class="col-sm-9">{{ entry.occurs_at|date:"M j, Y H:i" }}</dd>
+        <dt class="col-sm-3">Category</dt><dd class="col-sm-9">{{ entry.category|title }}</dd>
+        <dt class="col-sm-3">Amount</dt><dd class="col-sm-9">{{ entry.amount|floatformat:2 }}</dd>
+        <dt class="col-sm-3">Period</dt><dd class="col-sm-9">{{ entry.period|date:"M Y" }}</dd>
+        <dt class="col-sm-3">Description</dt><dd class="col-sm-9">{{ entry.description|default:"—" }}</dd>
+        <dt class="col-sm-3">Source</dt><dd class="col-sm-9">{% if entry.source_ct %}{{ entry.source_ct }} #{{ entry.source_id }}{% else %}—{% endif %}</dd>
+      </dl>
+      <a href="{% url 'wallet:agent_wallet' %}" class="btn btn-secondary">Back</a>
+    </div>
+  </div>
+</div>
+{% endblock %}

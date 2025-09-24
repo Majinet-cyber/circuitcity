@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% block title %}New Budget{% endblock %}
+{% block header_title %}New Budget Request{% endblock %}
+{% block content %}
+<div class="container" style="max-width:700px">
+  <div class="card">
+    <div class="card-body">
+      <form method="post" novalidate>
+        {% csrf_token %}
+        <div class="mb-3">
+          <label class="form-label">Title</label>
+          <input type="text" name="title" class="form-control" value="{{ form.title.value|default:'' }}" required>
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Amount</label>
+          <input type="number" step="0.01" name="amount" class="form-control" value="{{ form.amount.value|default:'' }}" required>
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Note</label>
+          <textarea name="note" class="form-control" rows="3">{{ form.note.value|default:'' }}</textarea>
+        </div>
+        <div class="d-flex gap-2">
+          <button class="btn btn-primary" type="submit">Submit</button>
+          <a class="btn btn-secondary" href="{% url 'wallet:agent_wallet' %}">Cancel</a>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}

@@ -1,3 +1,4 @@
+# cc/middleware.py
 from __future__ import annotations
 
 import time
@@ -5,22 +6,54 @@ import uuid
 import logging
 from typing import Optional
 
+from django.conf import settings
 from django.utils.deprecation import MiddlewareMixin
 from django.utils import timezone
 from django.http import HttpRequest, HttpResponse
+from django.core.exceptions import PermissionDenied, SuspiciousOperation
+from django.http import Http404
+from django.shortcuts import render
 
-logger = logging.getLogger("access")
+# ------------------------------------------------------------------
+# Loggers
+# ------------------------------------------------------------------
+access_logger = logging.getLogger("access")
+django_req_logger = logging.getLogger("django.request")
 
 
 class RequestIDMiddleware(MiddlewareMixin):
-    HEADER_NAME = "HTTP_X_REQUEST_ID"
+    """
+    Attaches a unique request ID to each request and response.
+
+    • Reads incoming X-Request-ID (from proxies) if present,
+      otherwise generates a UUID4.
+    • Exposes request.request_id for views/templates.
+    • Echoes back X-Request-ID on the response headers.
+    """
+    IN_HEADER = "HTTP_X_REQUEST_ID"
+    OUT_HEADER = "X-Request-ID"
 
     def process_request(self, request: HttpRequest):
-        rid = request.META.get(self.HEADER_NAME) or str(uuid.uuid4())
+        rid = request.META.get(self.IN_HEADER) or str(uuid.uuid4())
         request.request_id = rid
+
+    def process_response(self, request: HttpRequest, response: HttpResponse):
+        try:
+            rid = getattr(request, "request_id", None)
+            if rid:
+                response[self.OUT_HEADER] = rid
+        except Exception:
+            # Never block the response on header issues
+            pass
+        return response
 
 
 class AccessLogMiddleware(MiddlewareMixin):
+    """
+    Lightweight structured access logging with latency and user id.
+    Safe: never blocks responses even if logging fails.
+    """
+
     def process_request(self, request: HttpRequest):
         request._start_ts = time.perf_counter()
 
@@ -31,7 +64,7 @@ class AccessLogMiddleware(MiddlewareMixin):
                 * 1000
             )
             user_id = getattr(getattr(request, "user", None), "id", None)
-            logger.info(
+            access_logger.info(
                 "http_request",
                 extra={
                     "ts": timezone.now().isoformat(),
@@ -55,6 +88,7 @@ class AutoSelectBusinessMiddleware(MiddlewareMixin):
     If an authenticated user has exactly one active membership, automatically set:
       - request.active_business / request.session['active_business_id']
       - request.active_location  (first active location for that business)
+
     This makes pages like stock list / scan-in work without the user manually
     choosing a business each time.
     """
@@ -150,3 +184,54 @@ class AutoSelectBusinessMiddleware(MiddlewareMixin):
                 request.active_location_id = getattr(loc, "id", None)
         except Exception:
             pass
+
+
+class FriendlyErrorsMiddleware(MiddlewareMixin):
+    """
+    Converts unexpected exceptions into a branded 500 page for users
+    while keeping full tracebacks in logs. Has no effect when DEBUG=True.
+
+    • Re-raises 404, PermissionDenied, SuspiciousOperation to let Django handle them.
+    • For any other Exception, logs the traceback and renders templates/errors/500.html.
+    • Includes X-Request-ID header (added by RequestIDMiddleware) for easier support.
+
+    Add to settings.MIDDLEWARE near the end, e.g.:
+
+        MIDDLEWARE = [
+            # ... Django defaults ...
+            "cc.middleware.RequestIDMiddleware",
+            "cc.middleware.AccessLogMiddleware",
+            "cc.middleware.AutoSelectBusinessMiddleware",
+            "cc.middleware.FriendlyErrorsMiddleware",  # ← keep near the end
+        ]
+
+        DEBUG_PROPAGATE_EXCEPTIONS = False
+    """
+
+    def process_exception(self, request: HttpRequest, exc: Exception):
+        # In development, let Django show the debug page
+        if getattr(settings, "DEBUG", False):
+            return None
+
+        # Let Django handle these specifically (404/permission/security)
+        if isinstance(exc, (Http404, PermissionDenied, SuspiciousOperation)):
+            return None
+
+        try:
+            # Log full traceback for operators
+            django_req_logger.exception("Unhandled exception at %s", request.get_full_path())
+        except Exception:
+            pass
+
+        # Render friendly 500 page
+        try:
+            context = {"request_id": getattr(request, "request_id", None)}
+            resp = render(request, "errors/500.html", context=context, status=500)
+            # Ensure X-Request-ID header present (in case RequestIDMiddleware not installed)
+            rid = getattr(request, "request_id", None)
+            if rid:
+                resp["X-Request-ID"] = rid
+            return resp
+        except Exception:
+            # As a last resort, return a minimal safe response
+            return HttpResponse("Sorry — something went wrong.", status=500)

@@ -41,13 +41,21 @@ create_business        = _get_or_fallback("create_business_as_manager", "tenants
 join_as_agent          = _get_or_fallback("join_as_agent",          "tenants:choose_business")
 
 # Manager pages
-manager_review_agents  = _get_or_fallback("manager_review_agents",  "tenants:choose_business")
+# Prefer the dedicated view in views_manager.py to avoid redirect loops.
+try:
+    from .views_manager import manager_agents as _manager_agents_view  # type: ignore
+    manager_review_agents = _manager_agents_view
+except Exception:
+    # Fallback to a view in views.py or (last resort) choose_business
+    manager_review_agents = _get_or_fallback("manager_agents", "tenants:choose_business")
+
 manager_locations      = _get_or_fallback("manager_locations",      "tenants:choose_business")
 
-# Agent invite actions (these are the ones templates often {% url %} to)
+# Agent invite actions
 create_agent_invite    = _get_or_fallback("create_agent_invite",    "tenants:manager_review_agents")
 resend_agent_invite    = _get_or_fallback("resend_agent_invite",    "tenants:manager_review_agents")
 revoke_agent_invite    = _get_or_fallback("revoke_agent_invite",    "tenants:manager_review_agents")
+invite_accept          = _get_or_fallback("accept_invite",          "tenants:choose_business")
 
 app_name = "tenants"
 
@@ -86,8 +94,11 @@ urlpatterns = [
     ),
 
     # Staff approvals (supreme control)
-    path("staff/approve/<int:pk>/", _get_or_fallback("staff_approve_business", "tenants:choose_business"),
-         name="staff_approve_business"),
+    path(
+        "staff/approve/<int:pk>/",
+        _get_or_fallback("staff_approve_business", "tenants:choose_business"),
+        name="staff_approve_business",
+    ),
 
     # Manager: review agent join requests (per active business)
     path("manager/agents/", manager_review_agents, name="manager_review_agents"),
@@ -109,4 +120,7 @@ urlpatterns = [
     path("manager/agents/invite/<int:pk>/resend/", resend_agent_invite, name="resend_agent_invite"),
     # POST: revoke an invite (optional)
     path("manager/agents/invite/<int:pk>/revoke/", revoke_agent_invite, name="revoke_agent_invite"),
+
+    # Accept invite (used in links shared with agents)
+    path("invites/accept/<str:token>/", invite_accept, name="invite_accept"),
 ]
