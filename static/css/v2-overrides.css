@@ -48,6 +48,7 @@
   --cc-row-hover: #f3f4f6;
 
   /* ===== Mobile nav & safe-area tokens (additive) ===== */
+  --safe-top: env(safe-area-inset-top, 0px);
   --safe-bottom: max(env(safe-area-inset-bottom), 0px);
   --dock-h: 64px; /* height of the mobile bottom dock/tabbar */
 }
@@ -82,6 +83,7 @@ html, body {
   color: var(--cc-text);
   max-width: 100%;
   overflow-x: hidden; /* prevent horizontal scroll on small screens */
+  -webkit-text-size-adjust: 100%;
 }
 
 /* Stop iOS zoom-on-focus (inputs <16px trigger zoom) */
@@ -360,10 +362,6 @@ input:focus, select:focus, textarea:focus, .form-control:focus {
 
 /* --------------------------------------------------------------------------
    🔧 Anti-blur footer fix (prevents the “blurry footer” overlay)
-   --------------------------------------------------------------------------
-   We neutralize common sticky/bottom bars used by older templates so they
-   don’t add a frosted glass/box-shadow over your form’s bottom section.
-   Safe if these classes don’t exist.
    -------------------------------------------------------------------------- */
 .footer-blur,
 .glass-footer,
@@ -374,7 +372,7 @@ input:focus, select:focus, textarea:focus, .form-control:focus {
 .cc-bottom-blur,
 .sticky-cta,
 .sticky-actions,
-.tabbar,          /* if a mobile tab bar exists */
+.tabbar,
 .fab-bar {
   backdrop-filter: none !important;
   -webkit-backdrop-filter: none !important;
@@ -432,7 +430,8 @@ input:focus, select:focus, textarea:focus, .form-control:focus {
   [class*="col-"] { padding-left: 8px !important; padding-right: 8px !important; }
 
   /* Force multi-column dashboards into a single column on phones */
-  .grid-2, .grid, .dashboard-grid {
+  .grid-2, .grid, .dashboard-grid,
+  .two-col, .layout-2col, .content-grid, .columns {
     display: grid !important;
     grid-template-columns: 1fr !important;
     gap: 12px !important;
@@ -445,6 +444,62 @@ input:focus, select:focus, textarea:focus, .form-control:focus {
   /* Inventory/scan main panels fill the width */
   .scan-page, .scan, .inventory-panel, .content-panel {
     width: 100% !important;
+    max-width: 100% !important;
+  }
+}
+
+/* 3) Hide narrow “intro/help” left rail text on phones (the tall copy beside IMEI) */
+@media (max-width: 768px){
+  .help-rail, .helper-rail, .explain-rail, .side-rail,
+  .intro-rail, .blurb-rail, .left-rail, aside.aside, aside.left {
+    display: none !important;
+  }
+}
+
+/* 4) Header/title safety so it doesn’t overlap the tenant chip/bell */
+@media (max-width: 991.98px){
+  .page-header, .header, .cc-header, .page-title, .title-bar {
+    position: relative !important;
+    display: flex !important;
+    align-items: center !important;
+    flex-wrap: wrap !important;
+    gap: .5rem !important;
+    margin: 0 0 12px !important;
+  }
+  .page-title h1, .page-title h2, .title, h1.page-title, .header .title {
+    position: static !important;
+    transform: none !important;
+    margin: 0 !important;
+    min-width: 0 !important;
+    font-size: clamp(1.125rem, 4.2vw, 1.5rem) !important;
+    line-height: 1.2 !important;
+  }
+  /* Any decorative hero/title card should not float over content */
+  .hero, .title-card, .stat-hero {
+    position: static !important;
+    transform: none !important;
+    margin: 0 0 12px !important;
+  }
+}
+
+/* 5) Kill any horizontal scroll containers that force the page wider */
+@media (max-width: 991.98px){
+  .scroll-x, .overflow-x, .h-scroll {
+    overflow-x: auto !important;
+    -webkit-overflow-scrolling: touch;
+    max-width: 100% !important;
+  }
+}
+
+/* 6) Respect notches/safe areas so headers/docks don’t tuck underneath */
+@supports (padding: max(0px)) {
+  .navbar, .topbar, header, .page-header { padding-top: max(0px, var(--safe-top)); }
+  .bottom-nav, .tabbar, .cc-bottom-nav { padding-bottom: max(8px, var(--safe-bottom)); }
+}
+
+/* 7) Extra guard: any element with inline width/min-width won’t break mobile */
+@media (max-width: 991.98px){
+  [style*="width:"], [style*="min-width:"], [style*="max-width:"] {
     max-width: 100% !important;
   }
 }
