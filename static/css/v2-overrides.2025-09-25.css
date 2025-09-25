@@ -542,3 +542,73 @@ input:focus, select:focus, textarea:focus, .form-control:focus {
     gap: 12px !important;
   }
 }
+
+/* ====================================================================== */
+/* MOBILE HARD OVERRIDES — force single-column & hide helper rail on phones */
+/* ====================================================================== */
+@media (max-width: 991.98px){
+
+  /* 1) Never allow sideways scroll */
+  html, body { overflow-x: hidden !important; }
+
+  /* 2) Any Bootstrap-like grid becomes one column */
+  .cc-page .row,
+  .container .row,
+  .container-fluid .row,
+  main .row {
+    display: block !important;             /* collapse flex grid */
+    margin-left: 0 !important;
+    margin-right: 0 !important;
+  }
+  .cc-page .row > [class^="col"],
+  .cc-page .row > [class*=" col"],
+  .container .row > [class^="col"],
+  .container .row > [class*=" col"],
+  .container-fluid .row > [class^="col"],
+  .container-fluid .row > [class*=" col"],
+  main .row > [class^="col"],
+  main .row > [class*=" col"]{
+    width: 100% !important;
+    max-width: 100% !important;
+    flex: 0 0 100% !important;
+    padding-left: 12px !important;
+    padding-right: 12px !important;
+  }
+
+  /* 3) Hide “helper/intro/rail” columns that cause that skinny vertical text */
+  /* (covers many common names + any tiny 1–3 width columns) */
+  .help-rail,
+  .helper-rail,
+  .explain-rail,
+  .intro-rail,
+  .blurb-rail,
+  .side-rail,
+  .left-rail,
+  .scan-rail,
+  .inventory-rail,
+  aside.aside,
+  aside.left,
+  .cc-page .row > [class*="col-1"],
+  .cc-page .row > [class*="col-2"],
+  .cc-page .row > [class*="col-3"],
+  .cc-page .row > [class*="col-sm-1"],
+  .cc-page .row > [class*="col-sm-2"],
+  .cc-page .row > [class*="col-sm-3"],
+  .cc-page .row > [class*="col-md-1"],
+  .cc-page .row > [class*="col-md-2"],
+  .cc-page .row > [class*="col-md-3"]{
+    display: none !important;
+  }
+
+  /* 4) Scan/Inventory forms use full width, always */
+  .scan-page, .scan, .inventory-panel, .content-panel,
+  .inventory-form, .scan-form, form.inventory, form.scan {
+    width: 100% !important;
+    max-width: 100% !important;
+  }
+
+  /* 5) Defensive: media/tables never push layout */
+  img, svg, video, canvas, iframe { max-width: 100% !important; height: auto !important; display: block; }
+  .table-responsive { overflow-x: auto !important; -webkit-overflow-scrolling: touch; }
+}
+
