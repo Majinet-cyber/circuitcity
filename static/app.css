@@ -1,5 +1,5 @@
 /* =========================================================
-   Circuit City · Inventory Dashboard Styles (v3.0)
+   Circuit City · Inventory Dashboard Styles (v3.1 mobile fix)
    Applies to: Dashboard, Inventory List, Scan pages, Time Check-in
    ========================================================= */
 
@@ -50,6 +50,11 @@
 }
 
 /* ---------- Global Layout ---------- */
+html, body {
+  max-width: 100%;
+  overflow-x: hidden; /* kill phantom horizontal scroll */
+}
+
 body {
   background: var(--cc-bg);
   color: var(--cc-text);
@@ -70,7 +75,13 @@ body {
   width: 100%;
   margin: 0 auto;
   padding: 0.75rem;
+  /* keep room for bottom nav + iOS safe area */
   padding-bottom: calc(76px + env(safe-area-inset-bottom));
+}
+
+/* Containers from frameworks should never force fixed widths */
+.container, .container-lg, .container-xl, .container-fluid {
+  max-width: 100% !important;
 }
 
 /* ---------- Header ---------- */
@@ -154,6 +165,12 @@ body {
 .glass-blue  { color: #1e40af; }
 
 /* ---------- Tables ---------- */
+.table-wrap {
+  width: 100%;
+  overflow-x: auto;             /* allow horizontal scroll on narrow screens */
+  -webkit-overflow-scrolling: touch;
+}
+
 #stockTable {
   width: 100%;
   border-collapse: collapse;
@@ -175,10 +192,9 @@ body {
   padding: 0.6rem 0.65rem;
   border-bottom: 1px solid var(--cc-border);
   vertical-align: middle;
+  white-space: nowrap;          /* looks better with overflow container */
 }
-#stockTable tbody tr:hover td {
-  background: rgba(47, 109, 246, 0.08);
-}
+#stockTable tbody tr:hover td { background: rgba(47, 109, 246, 0.08); }
 #stockTable td.num {
   text-align: right;
   font-variant-numeric: tabular-nums;
@@ -225,13 +241,8 @@ body {
   transition: width 0.45s ease;
   background: linear-gradient(90deg, #22c55e, #06b6d4);
 }
-.battery-label {
-  font-weight: 700;
-}
-.battery-hint {
-  color: var(--cc-muted);
-  font-size: 0.85rem;
-}
+.battery-label { font-weight: 700; }
+.battery-hint  { color: var(--cc-muted); font-size: 0.85rem; }
 
 /* ---------- Mobile Bottom Nav ---------- */
 .cc-bottom-nav {
@@ -244,6 +255,8 @@ body {
   background: color-mix(in oklab, var(--cc-panel) 95%, transparent);
   border-top: 1px solid var(--cc-border);
   padding: 0.35rem 0.5rem calc(0.35rem + env(safe-area-inset-bottom));
+  display: flex;
+  gap: 8px;
 }
 .cc-bottom-nav .tab {
   flex: 1;
@@ -260,10 +273,12 @@ body {
   color: var(--cc-accent);
   font-weight: 600;
 }
+
+/* Floating scan action – keep clear of the nav & safe areas */
 .cc-fab {
   position: fixed;
-  right: 18px;
-  bottom: 88px;
+  right: calc(env(safe-area-inset-right) + 16px);
+  bottom: calc(env(safe-area-inset-bottom) + 88px); /* sits above bottom nav */
   z-index: 1031;
   width: 56px;
   height: 56px;
@@ -278,7 +293,49 @@ body {
 @media (max-width: 992px) {
   .chart-canvas { height: 220px !important; }
 }
-html, body {
-  max-width: 100%;
-  overflow-x: hidden;
+
+/* ===== Mobile-first layout hardening ===== */
+@media (max-width: 768px) {
+  /* Remove any desktop-only left margins that create a gutter */
+  .layout-content,
+  main.content,
+  .content,
+  [class*="ml-sidebar"],
+  [class*=" ml-"][class*="sidebar"],
+  [class^="ml-"][class*="sidebar"] {
+    margin-left: 0 !important;
+    padding-left: 12px;
+    padding-right: 12px;
+  }
+
+  /* Turn fixed multi-column dashboards into a single column */
+  .dashboard-grid,
+  .cards-grid,
+  .grid-fixed,
+  .grid.cols-2,
+  .grid.cols-3,
+  .grid.cols-4 {
+    display: grid !important;
+    grid-template-columns: 1fr !important;
+    gap: 12px !important;
+  }
+
+  .card, .panel, .tile {
+    width: 100% !important;
+    max-width: 100% !important;
+    height: auto !important;
+  }
+
+  /* Off-canvas sidebar behaviour on phones (if present) */
+  .sidebar {
+    position: fixed !important;
+    top: 0; left: 0;
+    height: 100dvh;
+    width: 280px;
+    transform: translateX(-100%);
+    transition: transform .2s ease-in-out;
+    z-index: 1060;
+  }
+  .sidebar.is-open { transform: translateX(0); }
+  body.sidebar-open { overflow: hidden; }
 }
