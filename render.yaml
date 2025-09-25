@@ -5,12 +5,15 @@ services:
     plan: starter
     autoDeploy: true
 
+    # Use && between steps so even if Render flattens newlines, the shell
+    # still executes them as separate commands in sequence.
     buildCommand: |
-      pip install --upgrade pip
-      pip install -r requirements.txt
-      python manage.py collectstatic --noinput || true
+      pip install --upgrade pip && \
+      pip install -r requirements.txt && \
+      python manage.py collectstatic --noinput || true && \
       python manage.py migrate --noinput || true
 
+    # IMPORTANT: no quotes around this line.
     startCommand: gunicorn cc.wsgi:application --preload --workers=${WEB_CONCURRENCY:-3} --timeout 120 --bind 0.0.0.0:$PORT
 
     healthCheckPath: /inventory/healthz/
