@@ -1,0 +1,92 @@
+/* =====================================================================
+   Circuit City — Mobile Fixes (global, safe to keep forever)
+   Purpose:
+   • Prevent bottom nav from overlapping content
+   • Hide vertical rails/ribbons on phones
+   • Remove phantom left gutter
+   • Make forms & cards truly full-width on small screens
+   • Respect iOS/Android safe areas & keyboard
+   ===================================================================== */
+
+/* -------- Root tokens for safe areas & bars -------- */
+:root{
+  /* safe-area fallbacks (Android ignores env() -> 0) */
+  --safe-t: env(safe-area-inset-top, 0px);
+  --safe-b: env(safe-area-inset-bottom, 0px);
+
+  /* bottom nav height (adjust if your bar is taller/shorter) */
+  --bottom-nav-h: 64px;
+
+  /* dynamic viewport for mobile chrome/safari */
+  --vh: 1dvh;
+}
+
+/* Fix the infamous left "ghost" gutter on mobile */
+html, body{
+  overflow-x: hidden;
+  width: 100%;
+}
+
+/* Ensure full-width layout on small screens */
+@media (max-width: 768px){
+  .container, .container-fluid, .container-lg, .container-md, .container-sm, .container-xl{
+    padding-left: 12px;
+    padding-right: 12px;
+    max-width: 100% !important;
+  }
+  .row{ margin-left: -12px; margin-right: -12px; }
+  [class*="col-"]{ padding-left: 12px; padding-right: 12px; }
+
+  /* Cards/panels/forms stretch properly */
+  .card, .panel, .glass, .glass-ghost, .cc-card, .cc-panel{
+    width: 100%;
+  }
+
+  /* Kill tall vertical rails / ribbons that cause sideways scroll */
+  .v-rail, .vertical-rail, .vertical-copy, .hero-rail, .rotate-vertical,
+  [data-vertical="true"], [style*="writing-mode"], [style*="-webkit-writing-mode"]{
+    display: none !important;
+  }
+
+  /* Top spacing accounting for safe area */
+  body{ padding-top: max(0px, var(--safe-t)); }
+}
+
+/* -------- Bottom navigation protection -------- */
+/* Tell the page there is a fixed bottom bar */
+body.has-bottomnav .app-main{
+  /* Keep content clear of bottom bar + iOS chin */
+  padding-bottom: calc(var(--bottom-nav-h) + var(--safe-b) + 8px);
+}
+
+/* If you use a floating action button, keep it above the bar */
+.fab, .scan-fab, .floating-scan{
+  position: fixed;
+  right: 18px;
+  bottom: calc(var(--bottom-nav-h) + var(--safe-b) + 18px);
+  z-index: 1060; /* above nav */
+}
+
+/* Ensure offcanvas / side menu sits above bottom bar and doesn’t shift layout */
+.offcanvas, .offcanvas.show{
+  overscroll-behavior: contain;
+}
+
+/* -------- Form & input ergonomics on phones -------- */
+@media (max-width: 768px){
+  input, select, textarea, .form-control{
+    font-size: 16px;          /* avoid iOS zoom */
+    width: 100%;
+    max-width: 100%;
+  }
+
+  .btn, .btn-lg{
+    min-height: 44px;
+  }
+}
+
+/* -------- Keyboard-aware tweak (class toggled by JS) -------- */
+body.kb-open.has-bottomnav .app-main{
+  padding-bottom: 12px;  /* collapse when keyboard visible */
+}
+
