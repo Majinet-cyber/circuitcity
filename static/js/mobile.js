@@ -1,39 +1,154 @@
-// Fast-tap (modern browsers already do 300ms removal, but ensure no dbl-delay)
-document.addEventListener('touchstart', () => {}, {passive:true});
+/* =========================================================
+ * Circuit City · Mobile UX helpers (v3.1)
+ * Scope: sidebar drawer, bottom dock sizing, active tab, small iOS fixes
+ * Safe to include on every page (idempotent, feature-detected).
+ * ========================================================= */
 
-// Soft haptics helper
-export function buzz(ms=10){ if (navigator.vibrate) navigator.vibrate(ms); }
+(() => {
+  const $$ = (sel, root = document) => Array.from(root.querySelectorAll(sel));
+  const $ = (sel, root = document) => root.querySelector(sel);
 
-// Swipe back (left-edge swipe → history.back)
-(function edgeSwipeBack(){
-  let startX=null, startY=null;
-  window.addEventListener('touchstart',(e)=>{
-    const t=e.touches[0];
-    if (t.clientX < 18){ startX=t.clientX; startY=t.clientY; }
-  },{passive:true});
-  window.addEventListener('touchend',(e)=>{
-    if(startX===null) return;
-    const t=e.changedTouches[0];
-    const dx=t.clientX - startX, dy=Math.abs(t.clientY - startY);
-    if(dx>60 && dy<40){ history.back(); buzz(8); }
-    startX=null; startY=null;
-  },{passive:true});
-})();
+  // -------- Config / selectors (single source of truth) --------
+  const SEL = {
+    sidebar: '.cc-sidebar',
+    openBtn: '#sidebarOpen',
+    backdrop: '#ccBackdrop',
+    mobileDock: '.cc-bottom-nav, .mobile-tabbar', // supports both class names
+    mobileDockTab: '.cc-bottom-nav .tab, .mobile-tabbar .tab',
+    page: '.cc-page, main.cc-page'
+  };
 
-// Pull-to-refresh nudger (visual only; no hijack)
-(function pullToRefreshNudge(){
-  let y0=0, pulled=false;
-  document.addEventListener('touchstart',(e)=>{ y0=e.touches[0].clientY; pulled=false; },{passive:true});
-  document.addEventListener('touchmove',(e)=>{
-    if (window.scrollY===0){
-      const dy=e.touches[0].clientY - y0;
-      if(dy>40 && !pulled){ pulled=true; document.body.classList.add('ptr-hint'); setTimeout(()=>document.body.classList.remove('ptr-hint'),700); }
+  // -------- Safe-area & dock height → CSS variable sync --------
+  function setDockHeightVar() {
+    const dock = $(SEL.mobileDock);
+    const root = document.documentElement;
+    if (!root) return;
+    const h = dock ? dock.getBoundingClientRect().height : 0;
+    // Keep CSS var in sync with actual DOM height (overrides default)
+    if (h) root.style.setProperty('--cc-nav-h', `${Math.round(h)}px`);
+  }
+
+  // -------- Sidebar drawer (collapsible on mobile) -------------
+  function setupSidebarDrawer() {
+    const sidebar = $(SEL.sidebar);
+    const openBtn = $(SEL.openBtn);
+    const backdrop = $(SEL.backdrop);
+    if (!sidebar || !openBtn || !backdrop) return;
+
+    const body = document.body;
+    let savedScrollY = 0;
+
+    const isMobile = () => window.matchMedia('(max-width: 992px)').matches;
+
+    function lockScroll() {
+      // Prevent background scroll while drawer is open (iOS friendly)
+      savedScrollY = window.scrollY || 0;
+      body.style.position = 'fixed';
+      body.style.top = `-${savedScrollY}px`;
+      body.style.left = '0';
+      body.style.right = '0';
+      body.style.overflow = 'hidden';
+      body.style.width = '100%';
     }
-  },{passive:true});
-})();
+    function unlockScroll() {
+      body.style.position = '';
+      body.style.top = '';
+      body.style.left = '';
+      body.style.right = '';
+      body.style.overflow = '';
+      body.style.width = '';
+      window.scrollTo(0, savedScrollY || 0);
+    }
 
-// Auto-focus first input on small screens where safe
-(function autoFocusFirst(){
-  const el = document.querySelector('[data-autofocus="1"]');
-  if(el && window.innerWidth < 600){ setTimeout(()=>el.focus?.(), 150); }
+    function open() {
+      if (!isMobile()) return;
+      sidebar.classList.add('open');
+      backdrop.classList.add('show');
+      lockScroll();
+    }
+    function close() {
+      sidebar.classList.remove('open');
+      backdrop.classList.remove('show');
+      unlockScroll();
+    }
+    function toggle() {
+      if (sidebar.classList.contains('open')) close(); else open();
+    }
+
+    openBtn.addEventListener('click', open);
+    backdrop.addEventListener('click', close);
+    document.addEventListener('keydown', (e) => { if (e.key === 'Escape') close(); });
+
+    // Auto-close drawer after navigating via a sidebar link on mobile
+    $$('.cc-sidebar a[href]').forEach(a => {
+      a.addEventListener('click', () => { if (isMobile()) close(); }, { passive: true });
+    });
+
+    // If we resize to desktop, make sure any mobile state is cleared
+    let rAF = 0;
+    window.addEventListener('resize', () => {
+      cancelAnimationFrame(rAF);
+      rAF = requestAnimationFrame(() => {
+        if (!isMobile()) close();
+        setDockHeightVar();
+      });
+    }, { passive: true });
+
+    // Expose minimal API for other scripts (optional)
+    window.CC_SIDEBAR = { open, close, toggle };
+  }
+
+  // -------- Active state for bottom dock tabs ------------------
+  function setupActiveTabHighlight() {
+    const path = (location.pathname || '/').replace(/\/+$/, '/') || '/';
+    $$(SEL.mobileDockTab).forEach(a => {
+      const href = (a.getAttribute('href') || '').replace(/\/+$/, '/') || '';
+      if (!href) return;
+      if (path === href || (href !== '/' && path.startsWith(href))) {
+        a.classList.add('active');
+        a.setAttribute('aria-current', 'page');
+      } else {
+        a.classList.remove('active');
+        a.removeAttribute('aria-current');
+      }
+    });
+  }
+
+  // -------- iOS viewport & keyboard niceties -------------------
+  function setupFocusIntoView() {
+    // Keep inputs visible when virtual keyboard opens on very small screens
+    document.addEventListener('focusin', (e) => {
+      const el = e.target;
+      if (!(el instanceof HTMLElement)) return;
+      if (!/^(input|textarea|select)$/i.test(el.tagName)) return;
+      // Small delay so keyboard animates first
+      setTimeout(() => {
+        try { el.scrollIntoView({ block: 'center', behavior: 'smooth' }); } catch (_) {}
+      }, 120);
+    });
+  }
+
+  // -------- Initialize -----------------------------------------
+  function init() {
+    // Run as soon as possible (DOM already parsed because script is defer’d)
+    setDockHeightVar();
+    setupSidebarDrawer();
+    setupActiveTabHighlight();
+    setupFocusIntoView();
+
+    // Recompute dock height on orientation changes / content shifts
+    ['orientationchange', 'load'].forEach(ev =>
+      window.addEventListener(ev, setDockHeightVar, { passive: true })
+    );
+
+    // Mutation observer: if the dock is rendered later, sync height
+    const obs = new MutationObserver(() => setDockHeightVar());
+    obs.observe(document.documentElement, { childList: true, subtree: true });
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', init, { once: true });
+  } else {
+    init();
+  }
 })();
