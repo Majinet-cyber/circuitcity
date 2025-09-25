@@ -40,7 +40,7 @@
   <link rel="stylesheet" href="{% static 'css/mobile.css' %}?v={{ STATIC_VERSION|default:'1' }}">
 
   <style>
-    /* ---- Blue theme tokens (light content + midnight sidebar) ---- */
+    /* ---- Mobile-first fixes & single-source layout tokens ---- */
     :root{
       --sidebar-w: 270px; --radius: 12px;
       --shadow-sm: 0 2px 10px rgba(2,8,23,.08);
@@ -56,6 +56,8 @@
       --cc-accent-2:#60a5fa; /* blue-400 */
 
       --font-sans: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Arial, "Noto Sans";
+
+      /* Fluid type (prevents giant headings from forcing zoom-out) */
       --fs-2xl: clamp(20px, 2.7vw, 24px);
       --fs-xl:  clamp(18px, 2.2vw, 20px);
       --fs-lg:  clamp(16px, 1.9vw, 18px);
@@ -82,6 +84,10 @@
       --mid-hover: rgba(255,255,255,.06);
       --neon-cyan:#22d3ee;
       --neon-green:#10b981;
+
+      /* Mobile dock */
+      --safe-bottom: max(env(safe-area-inset-bottom), 0px);
+      --dock-h: 64px;
     }
 
     /* Accessibility: respect reduced motion */
@@ -93,11 +99,17 @@
     body{
       margin:0; background:var(--bg); color:var(--ink);
       font-family:var(--font-sans); -webkit-font-smoothing:antialiased;
+      overflow-x: hidden; /* kill sideways scroll/zoom-out */
     }
-    a{text-decoration:none}
+    /* stop iOS zoom-on-focus */
+    input, select, textarea { font-size:16px; }
 
-    /* --- Safety reset: in case any test overlay dimmed the whole app --- */
+    /* avoid any accidental global dim */
     html, body, .cc-main, .cc-page { filter:none !important; opacity:1 !important; }
+
+    /* universal media guard */
+    img, svg, canvas, video { max-width:100%; height:auto; }
+    table { width:100%; border-collapse:collapse; overflow-x:auto; display:block; }
 
     /* Shell */
     .cc-shell{ min-height:100dvh; display:flex; width:100%; }
@@ -156,7 +168,7 @@
     .cc-main{ flex:1 1 auto; min-width:0; position:relative; z-index:0; background:var(--bg); color:var(--ink); }
     .cc-page{ max-width:1200px; margin:0 auto; padding:18px; }
 
-    /* Sticky header (kept light for contrast) */
+    /* Sticky header */
     .cc-header{
       position:sticky; top:0; z-index:2;
       background:rgba(255,255,255,.98);
@@ -256,7 +268,7 @@
     .notif-item .badge{ height:22px; align-self:center; }
     .notif-empty{ padding:1rem; color:#64748b; }
 
-    /* Mobile drawer */
+    /* Mobile drawer behavior */
     @media (max-width: 992px){
       .cc-sidebar{ position:fixed; left:0; top:0; height:100dvh; transform:translateX(-100%); transition: transform .26s var(--elevate); box-shadow: 0 20px 60px rgba(0,0,0,.35); }
       .cc-sidebar.open{ transform:translateX(0); }
@@ -270,13 +282,29 @@
       .offcanvas, [data-legacy-menu]{ display:none !important; }
     }
 
-    /* Mobile tab bar */
-    .mobile-tabbar{ position:sticky; bottom:0; left:0; right:0; z-index:1030; backdrop-filter: blur(10px);
-      background:color-mix(in oklab, var(--card) 85%, transparent); border-top:1px solid var(--line); }
-    .mobile-tabbar .tab{ flex:1; text-align:center; padding:10px 4px; font-size:12px; color:var(--muted); min-height:44px; }
+    /* ===== Mobile Bottom Dock (fixed, safe-area aware) ===== */
+    .mobile-tabbar{
+      position:fixed; left:0; right:0; bottom:0; z-index:1030;
+      height: calc(var(--dock-h) + var(--safe-bottom));
+      padding-bottom: var(--safe-bottom);
+      display:flex; gap:0; align-items:center; justify-content:space-around;
+      backdrop-filter: blur(10px);
+      background:color-mix(in oklab, var(--card) 90%, transparent);
+      border-top:1px solid var(--line);
+    }
+    .mobile-tabbar .tab{
+      flex:1; text-align:center; padding:8px 4px 6px; font-size:12px; color:var(--muted);
+      min-height:44px; display:flex; flex-direction:column; align-items:center; gap:2px;
+    }
     .mobile-tabbar .tab.active{ color:var(--cc-accent); font-weight:800; }
     @media (min-width: 768px){ .mobile-tabbar{ display:none; } }
 
+    /* Ensure content never sits under the dock */
+    main.cc-page, .cc-page, .content, .page, .container{
+      padding-bottom: calc(var(--dock-h) + var(--safe-bottom) + 16px);
+    }
+
+    /* Tables & form visuals in dashboard */
     .table td, .table th{ vertical-align: middle; }
 
     /* Go button */
@@ -319,6 +347,11 @@
     }
     .dashboard-links .btn, .cc-quick-links .btn {
       border-radius: 12px; padding: .7rem 1rem; background: #2563eb !important; color: #fff !important; border: 0 !important;
+    }
+
+    /* Optional: if you have a floating Scan FAB, keep it above the dock */
+    @media (max-width:991px){
+      .scan-fab{ bottom: calc(var(--dock-h) + var(--safe-bottom) + 16px) !important; }
     }
   </style>
 
@@ -463,6 +496,7 @@
       {% block main %}{% endblock %}
     </main>
 
+    <!-- Mobile bottom dock -->
     <nav class="mobile-tabbar d-flex d-md-none">
       <a class="tab {% if active_tab == 'home' %}active{% endif %}" href="{{ url_home|default:'/inventory/dashboard/' }}">
         <i class="bi bi-speedometer2 d-block"></i>Home
@@ -576,8 +610,8 @@
   const sidebar  = document.querySelector('.cc-sidebar');
   const backdrop = document.getElementById('ccBackdrop');
   const openBtn  = document.getElementById('sidebarOpen');
-  function openSidebar(){ sidebar?.classList.add('open'); backdrop?.classList.add('show'); }
-  function closeSidebar(){ sidebar?.classList.remove('open'); backdrop?.classList.remove('show'); }
+  function openSidebar(){ sidebar?.classList.add('open'); backdrop?.classList.add('show'); document.body.style.overflow='hidden'; }
+  function closeSidebar(){ sidebar?.classList.remove('open'); backdrop?.classList.remove('show'); document.body.style.overflow=''; }
   openBtn?.addEventListener('click', openSidebar);
   backdrop?.addEventListener('click', closeSidebar);
   document.addEventListener('keydown', (e)=>{ if(e.key === 'Escape') closeSidebar(); });
