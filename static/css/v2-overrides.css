@@ -399,8 +399,20 @@ input:focus, select:focus, textarea:focus, .form-control:focus {
 }
 .cc-backdrop.show{ pointer-events: auto; opacity: 1; }
 .mobile-toggle{ z-index: 2010 !important; }
-.tenant-menu{ z-index: 2050 !important; }
+.tenant-menu{ z-index: 2050 !important; pointer-events: auto; }
 .cc-header{ z-index: 1900 !important; }
+
+/* Make the tenant pill feel tappable on mobile */
+.tenant-pill{
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+  user-select: none;
+}
+
+/* Keep the bottom dock below popovers/menus but above content */
+.mobile-tabbar,
+.cc-bottom-nav{ z-index: 1200 !important; }
 
 /* 2) Mobile full-width & orderly layout */
 @media (max-width: 991.98px){
