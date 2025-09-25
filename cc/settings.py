@@ -118,6 +118,7 @@ if APP_DOMAIN:
 
 # --------------------------- apps ---------------------------
 INSTALLED_APPS = [
+    # Django
     "django.contrib.admin",
     "django.contrib.auth",
     "django.contrib.contenttypes",
@@ -125,7 +126,10 @@ INSTALLED_APPS = [
     "django.contrib.messages",
     "django.contrib.staticfiles",
     "django.contrib.humanize",
+
+    # Local apps (order matters if one imports another)
     "circuitcity.accounts.apps.AccountsConfig",
+    "tenants.apps.TenantsConfig",   # <-- add this line
     "inventory",
     "sales",
     "dashboard",
