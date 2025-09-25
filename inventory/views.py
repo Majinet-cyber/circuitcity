@@ -866,6 +866,7 @@ def stock_list(request: HttpRequest, *args, **kwargs) -> HttpResponse:
     • Location filter is opt-in (?location / ?location_id).
     • Default table hides SOLD; use status=sold to view sold rows.
     • Badges are computed business-wide.
+    • Hardened query parsing so bad params never 500.
     """
     import logging
     from decimal import Decimal
@@ -876,7 +877,19 @@ def stock_list(request: HttpRequest, *args, **kwargs) -> HttpResponse:
 
     log = logging.getLogger(__name__)
 
-    # ---------- helpers ----------
+    # ---------- tiny helpers (safe param parsing) ----------
+    def _int(request, key, default, min_=1, max_=200):
+        try:
+            v = int(request.GET.get(key, default))
+            return max(min_, min(v, max_))
+        except (TypeError, ValueError):
+            return default
+
+    def _choice(request, key, allowed, default):
+        v = (request.GET.get(key) or "").lower()
+        return v if v in allowed else default
+
+    # ---------- util helpers ----------
     def _try_import(modpath: str, attr: str | None = None):
         try:
             mod = __import__(modpath, fromlist=[attr] if attr else [])
@@ -891,6 +904,7 @@ def stock_list(request: HttpRequest, *args, **kwargs) -> HttpResponse:
             return False
 
     def _sum(qs, names: tuple[str, ...]) -> Decimal:
+        # uses outer-scope Model at call-time
         for n in names:
             if n and _hasf(Model, n):
                 try:
@@ -967,30 +981,20 @@ def stock_list(request: HttpRequest, *args, **kwargs) -> HttpResponse:
     # ---------- SOLD vs IN-STOCK predicates (OR across indicators) ----------
     def SOLD_Q() -> Q:
         q = Q()
-        if _hasf(Model, "status"):
-            q |= Q(status__iexact="sold")
-        if _hasf(Model, "sold_at"):
-            q |= Q(sold_at__isnull=False)
-        if _hasf(Model, "in_stock"):
-            q |= Q(in_stock=False)
-        if _hasf(Model, "quantity"):
-            q |= Q(quantity=0)
-        if _hasf(Model, "qty"):
-            q |= Q(qty=0)
+        if _hasf(Model, "status"):     q |= Q(status__iexact="sold")
+        if _hasf(Model, "sold_at"):    q |= Q(sold_at__isnull=False)
+        if _hasf(Model, "in_stock"):   q |= Q(in_stock=False)
+        if _hasf(Model, "quantity"):   q |= Q(quantity=0)
+        if _hasf(Model, "qty"):        q |= Q(qty=0)
         return q
 
     def INSTOCK_Q() -> Q:
         q = Q()
-        if _hasf(Model, "status"):
-            q |= ~Q(status__iexact="sold")
-        if _hasf(Model, "sold_at"):
-            q |= Q(sold_at__isnull=True)
-        if _hasf(Model, "in_stock"):
-            q |= Q(in_stock=True)
-        if _hasf(Model, "quantity"):
-            q |= Q(quantity__gt=0)
-        if _hasf(Model, "qty"):
-            q |= Q(qty__gt=0)
+        if _hasf(Model, "status"):     q |= ~Q(status__iexact="sold")
+        if _hasf(Model, "sold_at"):    q |= Q(sold_at__isnull=True)
+        if _hasf(Model, "in_stock"):   q |= Q(in_stock=True)
+        if _hasf(Model, "quantity"):   q |= Q(quantity__gt=0)
+        if _hasf(Model, "qty"):        q |= Q(qty__gt=0)
         return q
 
     # ---------- badge snapshot (business-wide) ----------
@@ -1010,18 +1014,18 @@ def stock_list(request: HttpRequest, *args, **kwargs) -> HttpResponse:
     except Exception:
         sold_count = 0
 
-    sum_order_amt = _sum(instock_all, ("order_price", "order_cost", "cost_price"))
-    sum_selling_amt = _sum(sold_all, ("selling_price", "sale_price", "price"))
+    sum_order_amt   = _sum(instock_all, ("order_price", "order_cost", "cost_price"))
+    sum_selling_amt = _sum(sold_all,   ("selling_price", "sale_price", "price"))
 
     # ---------- table filters (status + search) ----------
-    status_raw = (request.GET.get("status") or "").strip().lower()
+    status = _choice(request, "status", {"sold", "s", "in", "in_stock", "stock", "all", "al", "ai"}, "in_stock")
     q_text = (request.GET.get("q") or "").strip()
 
-    if status_raw in ("sold", "s"):
+    if status in {"sold", "s"}:
         qs = sold_all
-    elif status_raw in ("in", "in_stock", "stock"):
+    elif status in {"in", "in_stock", "stock"}:
         qs = instock_all
-    elif status_raw in ("all", "al", "ai"):
+    elif status in {"all", "al", "ai"}:
         qs = qs_base
     else:
         qs = instock_all  # default hide sold
@@ -1051,15 +1055,15 @@ def stock_list(request: HttpRequest, *args, **kwargs) -> HttpResponse:
             pass
 
     # ---------- negotiate & paginate ----------
+    accept = (request.headers.get("Accept") or "").lower()
     wants_json = (
-        request.GET.get("format") == "json"
-        or request.headers.get("x-requested-with") == "XMLHttpRequest"
-        or "application/json" in (request.headers.get("Accept") or "")
+        (request.GET.get("format") or "").lower() == "json"
+        or (request.headers.get("x-requested-with") or "").lower() == "xmlhttprequest"
+        or "application/json" in accept
     )
-    try:
-        per_page = max(1, min(200, int(request.GET.get("page_size") or request.GET.get("limit") or 50)))
-    except Exception:
-        per_page = 50
+
+    per_page = _int(request, "page_size", default=50, min_=1, max_=200)
+    page     = _int(request, "page", default=1, min_=1, max_=10_000)  # reserved for future server-side paging
 
     def _loc(o):
         loc = getattr(o, "current_location", None) or getattr(o, "location", None) or getattr(o, "store", None)
@@ -1068,7 +1072,10 @@ def stock_list(request: HttpRequest, *args, **kwargs) -> HttpResponse:
     def _qty(o) -> int:
         for n in ("quantity", "qty"):
             if hasattr(o, n):
-                return int(getattr(o, n) or 0)
+                try:
+                    return int(getattr(o, n) or 0)
+                except Exception:
+                    return 0
         return 1
 
     def _first_price(o, names: tuple[str, ...]):
@@ -1084,7 +1091,7 @@ def stock_list(request: HttpRequest, *args, **kwargs) -> HttpResponse:
         name = getattr(o, "name", None) or (getattr(prod, "name", None) if prod else "") or ""
         sku = None
         for k in ("imei", "serial", "sku", "code"):
-            if hasattr(o, k) and getattr(o, k):
+            if getattr(o, k, None):
                 sku = getattr(o, k)
                 break
         return {
@@ -1112,7 +1119,7 @@ def stock_list(request: HttpRequest, *args, **kwargs) -> HttpResponse:
         "sum_selling": sum_selling_amt,
     }
 
-    # Add MANY aliases so any legacy template picks them up
+    # Aliases so legacy templates pick them up
     badge_aliases = {
         # counts
         "in_stock": in_stock_count,
@@ -1135,11 +1142,16 @@ def stock_list(request: HttpRequest, *args, **kwargs) -> HttpResponse:
 
     if wants_json:
         data = [_row(o) for o in qs[:per_page]]
-        out_header = {"in_stock": in_stock_count, "sold": sold_count,
-                      "sum_order": str(sum_order_amt), "sum_selling": str(sum_selling_amt)}
-        # include the aliases in JSON too
+        out_header = {
+            "in_stock": in_stock_count,
+            "sold": sold_count,
+            "sum_order": str(sum_order_amt),
+            "sum_selling": str(sum_selling_amt),
+        }
+        # include the aliases in JSON too (cast Decimals to str)
         out_header.update({k: (str(v) if isinstance(v, Decimal) else v) for k, v in badge_aliases.items()})
-        return JsonResponse({"ok": True, "count": total, "header": out_header, "data": data}, status=200)
+        return JsonResponse({"ok": True, "count": total, "page": page, "limit": per_page,
+                             "header": out_header, "data": data}, status=200)
 
     items = list(qs[:per_page])
 
