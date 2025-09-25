@@ -46,6 +46,10 @@
 
   /* Table */
   --cc-row-hover: #f3f4f6;
+
+  /* ===== Mobile nav & safe-area tokens (additive) ===== */
+  --safe-bottom: max(env(safe-area-inset-bottom), 0px);
+  --dock-h: 64px; /* height of the mobile bottom dock/tabbar */
 }
 
 /* Dark mode (opt-in via body.dark or prefers-color-scheme) */
@@ -80,9 +84,27 @@ html, body {
   overflow-x: hidden; /* prevent horizontal scroll on small screens */
 }
 
+/* Stop iOS zoom-on-focus (inputs <16px trigger zoom) */
+input, select, textarea { font-size: 16px; }
+
 h1, h2, h3, h4, h5 {
   color: var(--cc-heading);
   letter-spacing: -0.01em;
+}
+
+/* Fluid downscale on very small handsets to avoid “zoom out” screenshots */
+@media (max-width: 420px){
+  h1 { font-size: clamp(20px, 6vw, 24px); line-height: 1.2; }
+  h2 { font-size: clamp(18px, 5.2vw, 22px); line-height: 1.25; }
+  .display-1, .display-2, .display-3 { font-size: clamp(24px, 7vw, 30px); line-height: 1.15; }
+}
+
+/* Universal media guard so wide media doesn’t push layout sideways */
+img, svg, video, canvas { max-width: 100%; height: auto; }
+
+/* Ensure page content never sits under the mobile dock/tabbar */
+main, .cc-page, .content, .page, .container, .container-fluid {
+  padding-bottom: calc(var(--dock-h) + var(--safe-bottom) + 16px);
 }
 
 .container, .container-fluid {
@@ -316,6 +338,16 @@ input:focus, select:focus, textarea:focus, .form-control:focus {
 .p-cc       { padding: var(--cc-gap); }
 .py-cc      { padding-block: var(--cc-gap); }
 .px-cc      { padding-inline: var(--cc-gap); }
+
+/* ===== Mobile-only helpers ===== */
+
+/* Keep floating Scan FAB above the mobile dock if present */
+@media (max-width: 991.98px){
+  .scan-fab { bottom: calc(var(--dock-h) + var(--safe-bottom) + 16px) !important; }
+}
+
+/* Make long words/IMEIs wrap gracefully on narrow widths */
+.break-words, .wrap-anywhere { overflow-wrap: anywhere; word-break: break-word; }
 
 /* --------------------------------------------------------------------------
    Print (hide chrome, keep table borders)
