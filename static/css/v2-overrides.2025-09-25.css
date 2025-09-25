@@ -612,3 +612,72 @@ input:focus, select:focus, textarea:focus, .form-control:focus {
   .table-responsive { overflow-x: auto !important; -webkit-overflow-scrolling: touch; }
 }
 
+/* =========================
+   MOBILE KILL-SWITCH (<=992)
+   One column only + hide any “helper/aside” rails
+   ========================= */
+@media (max-width: 991.98px){
+
+  /* Predictable sizing + no sideways scroll */
+  html, body { max-width: 100% !important; overflow-x: hidden !important; }
+
+  /* Containers fill the screen */
+  .cc-page, main.cc-page, .container, .container-fluid {
+    max-width: 100% !important;
+    width: 100% !important;
+    padding-left: 12px !important;
+    padding-right: 12px !important;
+  }
+
+  /* Bootstrap rows & cols: stack everything */
+  .row { margin-left: 0 !important; margin-right: 0 !important; display: block !important; }
+  .row > [class*="col"] { width: 100% !important; max-width: 100% !important; padding-left: 8px !important; padding-right: 8px !important; }
+
+  /* Grids: force single column */
+  .grid, .grid-2, .dashboard-grid, .content-grid, [class*="grid-cols"] {
+    display: grid !important;
+    grid-template-columns: 1fr !important;
+    gap: 12px !important;
+  }
+
+  /* Flex rows that try to sit side-by-side */
+  .d-flex, [class*="flex-row"] { flex-direction: column !important; flex-wrap: nowrap !important; align-items: stretch !important; }
+
+  /* Media/tables never push layout sideways */
+  img, svg, video, canvas, iframe, table { max-width: 100% !important; height: auto !important; }
+  .table-responsive { width: 100% !important; overflow-x: auto !important; -webkit-overflow-scrolling: touch; }
+
+  /* Hide common “left rail / helper” columns on small screens */
+  .page-aside, .left-rail, .left-col, .helper, .help, .explain, .intro, .intro-slab,
+  .sidebar-ghost, .aside, [data-aside], [aria-label="Helper"], [aria-label="Aside"] {
+    display: none !important;
+  }
+
+  /* If a two-column split lives inside a known inventory/scan wrapper, hide its first column */
+  .scan-page .row > [class*="col-"]:first-child,
+  .inventory-panel .row > [class*="col-"]:first-child,
+  .content-panel .row > [class*="col-"]:first-child {
+    display: none !important;
+  }
+
+  /* And make sure the remaining column stretches fully */
+  .scan-page .row > [class*="col-"]:last-child,
+  .inventory-panel .row > [class*="col-"]:last-child,
+  .content-panel .row > [class*="col-"]:last-child {
+    width: 100% !important;
+    max-width: 100% !important;
+  }
+
+  /* Keep content clear of the bottom dock/tabbar */
+  :root { --cc-nav-h: 64px; --cc-safe-bottom: max(env(safe-area-inset-bottom), 0px); }
+  .mobile-tabbar, .cc-bottom-nav {
+    position: fixed; left: 0; right: 0; bottom: 0;
+    height: calc(var(--cc-nav-h) + var(--cc-safe-bottom));
+    padding-bottom: var(--cc-safe-bottom);
+    z-index: 1200 !important;
+    backdrop-filter: blur(10px);
+  }
+  .cc-page, main.cc-page, .container, .container-fluid {
+    padding-bottom: calc(var(--cc-nav-h) + var(--cc-safe-bottom) + 16px) !important;
+  }
+}
