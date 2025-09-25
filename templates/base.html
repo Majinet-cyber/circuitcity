@@ -36,7 +36,8 @@
   <link rel="stylesheet" href="{% static 'css/app.css' %}?v={{ STATIC_VERSION|default:'1' }}">
   <link rel="stylesheet" href="{% static 'css/inventory-glass.css' %}?v={{ STATIC_VERSION|default:'1' }}">
   <link rel="stylesheet" href="{% static 'css/polish.css' %}?v={{ STATIC_VERSION|default:'1' }}">
-  <link rel="stylesheet" href="{% static 'css/v2-overrides.css' %}?v={{ STATIC_VERSION|default:'1' }}">
+  {# IMPORTANT: cache-busted overrides filename so production fetches fresh CSS #}
+  <link rel="stylesheet" href="{% static 'css/v2-overrides.2025-09-25.css' %}?v={{ STATIC_VERSION|default:'1' }}">
   <link rel="stylesheet" href="{% static 'css/mobile.css' %}?v={{ STATIC_VERSION|default:'1' }}">
 
   <style>

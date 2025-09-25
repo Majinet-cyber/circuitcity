@@ -1,0 +1,13 @@
+<nav class="cc-bottom-nav">
+  <div class="container" style="display:flex; gap:.5rem;">
+    <a class="tab {% if nav_active == 'home' %}active{% endif %}" href="{% url 'dashboard:home' %}">
+      <i class="bi bi-speedometer"></i> Home
+    </a>
+    <a class="tab {% if nav_active == 'sell' %}active{% endif %}" href="{% url 'inventory:scan_sold' %}">
+      <i class="bi bi-upc-scan"></i> Sell
+    </a>
+    <a class="tab {% if nav_active == 'stock' %}active{% endif %}" href="{% url 'inventory:stock_list' %}">
+      <i class="bi bi-box-seam"></i> Stock
+    </a>
+  </div>
+</nav>
