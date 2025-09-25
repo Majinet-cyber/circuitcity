@@ -3,6 +3,7 @@
 Django==5.2.5
 gunicorn==23.0.0
 whitenoise==6.9.0
+gunicorn==23.0.0
 
 # Database
 dj-database-url==3.0.1
