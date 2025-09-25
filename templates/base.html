@@ -219,6 +219,11 @@
       box-shadow: 0 8px 26px rgba(0,0,0,.08);
       font-weight:800; line-height:1; cursor:default;
       transition: transform var(--med) var(--elevate), box-shadow var(--med) var(--elevate);
+      /* NEW: mobile tap fidelity */
+      touch-action: manipulation;
+      -webkit-tap-highlight-color: transparent;
+      user-select: none;
+      cursor: pointer;
     }
     .tenant-pill:hover{ transform: translateY(-1px); box-shadow: 0 12px 30px rgba(0,0,0,.12); }
     .tenant-dot{ width:8px; height:8px; border-radius:50%; background: #3ecd87; box-shadow: 0 0 0 3px rgba(62,205,135,.18) inset; }
@@ -227,11 +232,12 @@
     .tenant-caret{ display:inline-grid; place-items:center; width:28px; height:28px; border-radius:999px; }
     .tenant-caret:hover{ background:rgba(2,6,23,.06); }
     .tenant-menu{
-      position:absolute; right:0; top:calc(100% + 8px); min-width:240px; z-index:30;
+      position:absolute; right:0; top:calc(100% + 8px); min-width:240px; z-index:9999; /* NEW z-index */
       border-radius:14px; border:1px solid var(--line);
       background:color-mix(in oklab, var(--card) 92%, transparent);
       -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px);
       box-shadow: 0 14px 40px rgba(2,6,23,.18); padding:6px; display:none;
+      pointer-events:auto; /* NEW: ensure interactive */
     }
     .tenant-menu.open{ display:block; animation: fadeIn var(--med) var(--elevate); }
     .tenant-item{
@@ -797,24 +803,38 @@
     load(); setInterval(load, 60_000);
   })();
 
-  /* Tenant pill dropdown */
-  (function(){
-    const root = document.getElementById('tenantRoot');
-    if(!root) return;
+  /* Tenant pill dropdown (mobile-safe) */
+  (function () {
     const btn  = document.getElementById('tenantBtn');
     const menu = document.getElementById('tenantMenu');
+    if (!btn || !menu) return;
 
-    function open(){ menu?.classList.add('open'); btn?.setAttribute('aria-expanded','true'); }
-    function close(){ menu?.classList.remove('open'); btn?.setAttribute('aria-expanded','false'); }
-    function toggle(){ menu?.classList.contains('open') ? close() : open(); }
+    function open()  { menu.classList.add('open');  btn.setAttribute('aria-expanded','true'); }
+    function close() { menu.classList.remove('open'); btn.setAttribute('aria-expanded','false'); }
+    function isOpen(){ return menu.classList.contains('open'); }
+    function toggle() { isOpen() ? close() : open(); }
 
-    btn?.addEventListener('click', toggle);
-    document.addEventListener('click', (e)=>{
-      if(!menu || !btn) return;
-      if(menu.contains(e.target) || btn.contains(e.target)) return;
+    // Open/close on tap/click — prevent the document handler from seeing this tap
+    const onTrigger = (e) => { e.preventDefault(); e.stopPropagation(); toggle(); };
+    btn.addEventListener('click', onTrigger, { passive: false });
+    btn.addEventListener('pointerdown', (e) => { e.stopPropagation(); }, { passive: true });
+
+    // Close on outside click — capture phase so we run before other handlers
+    const onDoc = (e) => {
+      const t = e.target;
+      if (t && (menu.contains(t) || btn.contains(t))) return;
       close();
+    };
+    document.addEventListener('click', onDoc, { capture: true, passive: true });
+
+    // Keyboard support
+    btn.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') { close(); return; }
+      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggle(); }
     });
-    document.addEventListener('keydown', (e)=>{ if(e.key === 'Escape') close(); });
+
+    // Safety: close on Escape anywhere
+    document.addEventListener('keydown', (e) => { if (e.key === 'Escape') close(); }, { passive: true });
   })();
 </script>
 
