@@ -681,3 +681,24 @@ input:focus, select:focus, textarea:focus, .form-control:focus {
     padding-bottom: calc(var(--cc-nav-h) + var(--cc-safe-bottom) + 16px) !important;
   }
 }
+
+/* ========================================================================== */
+/* FINAL HARD HIDE for tiny first helper columns (<=992px)                    */
+/* ========================================================================== */
+@media (max-width: 991.98px){
+  .cc-page .row > .col-1:first-child,
+  .cc-page .row > .col-2:first-child,
+  .cc-page .row > .col-3:first-child,
+  .cc-page .row > .col-sm-1:first-child,
+  .cc-page .row > .col-sm-2:first-child,
+  .cc-page .row > .col-sm-3:first-child,
+  .cc-page .row > .col-md-1:first-child,
+  .cc-page .row > .col-md-2:first-child,
+  .cc-page .row > .col-md-3:first-child { display: none !important; }
+
+  .cc-page .row > [class*="col-"]:not(:first-child){
+    width: 100% !important;
+    max-width: 100% !important;
+    flex: 0 0 100% !important;
+  }
+}
