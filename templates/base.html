@@ -838,6 +838,159 @@
   })();
 </script>
 
+<!-- ===== MOBILE RESCUE HOTFIX (inline, cache-proof) ===== -->
+<style id="cc-mobile-hotfix">
+  /* 0) Make sizing predictable & kill sideways scroll */
+  *,*::before,*::after{box-sizing:border-box}
+  html,body{max-width:100%;overflow-x:hidden}
+
+  /* 1) Layering so taps land on the right thing */
+  .cc-sidebar{z-index:2000!important}
+  .cc-backdrop{z-index:1990!important;pointer-events:none;opacity:0;transition:opacity .2s ease}
+  .cc-backdrop.show{pointer-events:auto;opacity:1}
+  .mobile-toggle{z-index:2010!important}
+  .tenant-menu{z-index:2050!important}
+  .mobile-tabbar,.cc-bottom-nav{z-index:1200!important}
+
+  /* 2) Mobile column sanity & gutters */
+  @media (max-width:991.98px){
+    .row{margin-left:0!important;margin-right:0!important}
+    .row>[class*="col"]{padding-left:8px!important;padding-right:8px!important;min-width:0}
+    .dashboard-grid,.grid,.grid-2{display:grid!important;grid-template-columns:1fr!important;gap:12px!important}
+    .cc-page,.container,.container-fluid,main.cc-page{max-width:100%!important;width:100%!important}
+  }
+
+  /* 3) Media & tables never push layout */
+  img,svg,video,canvas,iframe{max-width:100%;height:auto;display:block}
+  .table,.table-responsive{width:100%}
+  .table-responsive{-webkit-overflow-scrolling:touch;overflow-x:auto}
+
+  /* 4) Prevent accidental stacking contexts blocking taps */
+  .cc-header,.cc-page,.card,.glass-card{transform:none!important;filter:none!important}
+
+  /* 5) Keep content clear of bottom dock even if its height changes */
+  :root{--cc-nav-h:64px;--cc-safe-bottom:max(env(safe-area-inset-bottom),0px)}
+  .mobile-tabbar,.cc-bottom-nav{
+    position:fixed;left:0;right:0;bottom:0;height:calc(var(--cc-nav-h)+var(--cc-safe-bottom));
+    padding-bottom:var(--cc-safe-bottom);backdrop-filter:blur(10px)
+  }
+  .cc-page,main.cc-page,.container,.container-fluid{
+    padding-bottom:calc(var(--cc-nav-h)+var(--cc-safe-bottom)+16px)
+  }
+</style>
+
+<script id="cc-mobile-hotfix-js">
+(() => {
+  if (window.__CC_HOTFIX_APPLIED__) return;
+  window.__CC_HOTFIX_APPLIED__ = true;
+
+  const $ = (s, r=document) => r.querySelector(s);
+  const $$ = (s, r=document) => Array.from(r.querySelectorAll(s));
+
+  /* 0) Bust stale CSS quickly (adds ?hotfix=xxx to all stylesheets once) */
+  try{
+    const tag='hotfix';
+    if(!sessionStorage.getItem('cc-'+tag)){
+      $$('link[rel="stylesheet"]').forEach(l=>{
+        try{
+          const u=new URL(l.href, location.origin);
+          u.searchParams.set(tag, Date.now().toString().slice(-6));
+          l.href=u.toString();
+        }catch(_){}
+      });
+      sessionStorage.setItem('cc-'+tag, '1');
+    }
+  }catch(_){}
+
+  /* 1) Keep --cc-nav-h in sync with actual dock height */
+  function syncDockVar(){
+    const dock = $('.cc-bottom-nav') || $('.mobile-tabbar');
+    const root = document.documentElement;
+    if(!root) return;
+    const h = dock ? Math.round(dock.getBoundingClientRect().height) : 0;
+    if(h) root.style.setProperty('--cc-nav-h', h+'px');
+  }
+  ['load','orientationchange','resize'].forEach(ev =>
+    window.addEventListener(ev, syncDockVar, {passive:true})
+  );
+  new MutationObserver(syncDockVar).observe(document.body || document.documentElement, {childList:true,subtree:true});
+  syncDockVar();
+
+  /* 2) Sidebar drawer with scroll lock (reliable on iOS/Android) */
+  const sidebar = $('.cc-sidebar');
+  const backdrop= $('#ccBackdrop');
+  const openBtn = $('#sidebarOpen');
+  let savedY = 0;
+  const isMobile = () => matchMedia('(max-width: 992px)').matches;
+
+  function lockScroll(){ savedY=window.scrollY||0; Object.assign(document.body.style,{
+    position:'fixed',top:`-${savedY}px`,left:'0',right:'0',width:'100%',overflow:'hidden'
+  });}
+  function unlockScroll(){ Object.assign(document.body.style,{
+    position:'',top:'',left:'',right:'',width:'',overflow:''
+  }); window.scrollTo(0,savedY||0);}
+
+  function openDrawer(){ if(!sidebar||!backdrop||!isMobile()) return; sidebar.classList.add('open'); backdrop.classList.add('show'); lockScroll(); }
+  function closeDrawer(){ if(!sidebar||!backdrop) return; sidebar.classList.remove('open'); backdrop.classList.remove('show'); unlockScroll(); }
+
+  openBtn && openBtn.addEventListener('click', (e)=>{ e.preventDefault(); e.stopPropagation(); openDrawer(); });
+  backdrop && backdrop.addEventListener('click', closeDrawer);
+  document.addEventListener('keydown', (e)=>{ if(e.key==='Escape') closeDrawer(); });
+
+  $$('.cc-sidebar a[href]').forEach(a=>{
+    a.addEventListener('click', ()=>{ if(isMobile()) closeDrawer(); }, {passive:true});
+  });
+
+  /* 3) Tenant dropdown: fix "tap opens then instantly closes" */
+  (function(){
+    const btn  = $('#tenantBtn');
+    const menu = $('#tenantMenu');
+    if(!btn||!menu) return;
+
+    const open = ()=>{ menu.classList.add('open'); btn.setAttribute('aria-expanded','true'); };
+    const close= ()=>{ menu.classList.remove('open'); btn.setAttribute('aria-expanded','false'); };
+    const toggle=()=> menu.classList.contains('open') ? close() : open();
+
+    btn.addEventListener('click', (e)=>{ e.preventDefault(); e.stopPropagation(); toggle(); });
+
+    // Prevent outside handler from seeing the same tap
+    ['pointerdown','touchstart','mousedown','click'].forEach(ev=>{
+      btn.addEventListener(ev, e=>e.stopPropagation(), {passive:true});
+      menu.addEventListener(ev, e=>e.stopPropagation(), {passive:true});
+    });
+
+    // Close on outside click, deferred so open() wins first
+    document.addEventListener('click', (e)=>{
+      setTimeout(()=>{
+        if(!menu.classList.contains('open')) return;
+        if(menu.contains(e.target) || btn.contains(e.target)) return;
+        close();
+      },0);
+    }, true);
+
+    document.addEventListener('keydown', (e)=>{ if(e.key==='Escape') close(); });
+  })();
+
+  /* 4) Last-resort: ensure service worker doesn’t pin old bundles (TEMP) */
+  try{
+    if('serviceWorker' in navigator){
+      navigator.serviceWorker.getRegistrations?.().then(rs=>{ rs.forEach(r=>r.unregister()); });
+    }
+  }catch(_){}
+
+  /* 5) Tiny on-screen version (remove later) */
+  try{
+    const v = (document.currentScript && (new URL(location.href)).searchParams.get('v')) || Date.now().toString().slice(-6);
+    const b = document.createElement('div');
+    b.style.cssText='position:fixed;right:8px;bottom:calc(var(--cc-nav-h,64px)+10px);background:#111;color:#fff;padding:4px 8px;border-radius:8px;font:600 12px/1 ui-sans-serif,system-ui;opacity:.85;z-index:9999';
+    b.textContent='hotfix:'+v;
+    document.body.appendChild(b);
+    setTimeout(()=>b.remove(),6000);
+  }catch(_){}
+})();
+</script>
+<!-- ===== /MOBILE RESCUE HOTFIX ===== -->
+
 {% block extra_js %}{% endblock %}
 </body>
 </html>
