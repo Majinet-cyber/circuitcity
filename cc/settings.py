@@ -129,7 +129,7 @@ INSTALLED_APPS = [
 
     # Local apps (order matters if one imports another)
     "circuitcity.accounts.apps.AccountsConfig",
-    "tenants.apps.TenantsConfig",   # <-- add this line
+    "tenants.apps.TenantsConfig",
     "inventory",
     "sales",
     "dashboard",
@@ -165,6 +165,8 @@ TEMPLATES = [
                 "django.template.context_processors.request",
                 "django.contrib.auth.context_processors.auth",
                 "django.contrib.messages.context_processors.messages",
+                # Provide BUILD_ID and STATIC_VERSION to templates
+                "cc.context_processors.build_meta",
             ],
         },
     },
@@ -269,6 +271,8 @@ STORAGES = {
     "staticfiles": {"BACKEND": _static_backend},
 }
 WHITENOISE_AUTOREFRESH = DEBUG
+# Optional tuning:
+WHITENOISE_MAX_AGE = 60 * 60 * 24 * 365
 
 # --------------------------- auth redirects ---------------------------
 LOGIN_URL = "login"
