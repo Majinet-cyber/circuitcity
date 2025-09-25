@@ -5,15 +5,11 @@ services:
     plan: starter
     autoDeploy: true
 
-    # Use a single bash -lc one-liner so Render can't flatten/strip operators.
-    buildCommand: >
-      bash -lc "pip install --upgrade pip &&
-      pip install -r requirements.txt &&
-      (python manage.py collectstatic --noinput || true) &&
-      (python manage.py migrate --noinput || true)"
+    # Single-line build; '&&' keeps steps separate even if Render flattens.
+    buildCommand: pip install --upgrade pip && pip install -r requirements.txt && (python manage.py collectstatic --noinput || true) && (python manage.py migrate --noinput || true)
 
-    # Avoid ${VAR:-default} (it was parsed oddly). Use $WEB_CONCURRENCY.
-    startCommand: gunicorn cc.wsgi:application --preload --workers $WEB_CONCURRENCY --timeout 120 --bind 0.0.0.0:$PORT
+    # Run via bash -lc to avoid the single-quote EOF issue.
+    startCommand: bash -lc "exec gunicorn cc.wsgi:application --preload --workers=$WEB_CONCURRENCY --timeout 120 --bind 0.0.0.0:$PORT"
 
     healthCheckPath: /inventory/healthz/
 
