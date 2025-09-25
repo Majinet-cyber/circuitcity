@@ -503,3 +503,42 @@ input:focus, select:focus, textarea:focus, .form-control:focus {
     max-width: 100% !important;
   }
 }
+
+
+/* ===== Mobile warp rescue ===== */
+@media (max-width: 991.98px) {
+  /* Hide the tall helper rail text on small screens */
+  .help-rail,
+  .helper-rail,
+  .explain-rail,
+  .side-rail,
+  .intro-rail,
+  .blurb-rail,
+  .left-rail,
+  aside.aside,
+  aside.left {
+    display: none !important;
+  }
+
+  /* Force inventory/scan panels to full width */
+  .scan-page,
+  .scan,
+  .inventory-panel,
+  .content-panel {
+    width: 100% !important;
+    max-width: 100% !important;
+  }
+
+  /* Stack grids into one column */
+  .grid,
+  .grid-2,
+  .dashboard-grid,
+  .two-col,
+  .layout-2col,
+  .content-grid,
+  .columns {
+    display: grid !important;
+    grid-template-columns: 1fr !important;
+    gap: 12px !important;
+  }
+}
