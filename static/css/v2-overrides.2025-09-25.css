@@ -398,6 +398,9 @@ input:focus, select:focus, textarea:focus, .form-control:focus {
 .cc-backdrop.show{ pointer-events: auto; opacity: 1; }
 .mobile-toggle{ z-index: 2010 !important; }
 .tenant-menu{ z-index: 2050 !important; pointer-events: auto; }
+/* Make sure tenant dropdown participates in toggle semantics even if JS misses */
+.tenant-menu{ display:none; }               /* NEW */
+.tenant-menu.open{ display:block; }         /* NEW */
 .cc-header{ z-index: 1900 !important; }
 
 /* Make the tenant pill feel tappable on mobile */
@@ -684,6 +687,7 @@ input:focus, select:focus, textarea:focus, .form-control:focus {
 
 /* ========================================================================== */
 /* FINAL HARD HIDE for tiny first helper columns (<=992px)                    */
+/* Also hide any deliberate vertical-rl helper rails on phones                */
 /* ========================================================================== */
 @media (max-width: 991.98px){
   .cc-page .row > .col-1:first-child,
@@ -701,4 +705,11 @@ input:focus, select:focus, textarea:focus, .form-control:focus {
     max-width: 100% !important;
     flex: 0 0 100% !important;
   }
+
+  /* NEW: nuke vertical “helper” rails that use writing-mode */
+  [style*="writing-mode:vertical-rl"],
+  [style*="writing-mode: vertical-rl"],
+  .vertical-text,
+  .vtext,
+  .rail-vertical { display: none !important; }
 }
