@@ -1,8 +1,6 @@
-@"
-\"\"\"
+"""
 Django settings for cc project.
-\"\"\"
-
+"""
 from pathlib import Path
 from urllib.parse import urlparse
 import os
@@ -40,7 +38,7 @@ SECRET_KEY = os.environ.get(
     "DJANGO_SECRET_KEY",
     "django-insecure-w#o#i4apw-$iz-3sivw57n=2j6fgku@1pfqfs76@3@7)a0h$ys",
 )
-DEBUG = env_bool("DJANGO_DEBUG", env_bool("DEBUG", True))
+DEBUG = env_bool("DJANGO_DEBUG", env_bool("DEBUG", False))
 TESTING = any(arg in sys.argv for arg in ("test", "pytest"))
 
 RENDER = bool(os.environ.get("RENDER") or os.environ.get("RENDER_EXTERNAL_URL"))
@@ -127,13 +125,12 @@ INSTALLED_APPS = [
     "django.contrib.messages",
     "django.contrib.staticfiles",
     "django.contrib.humanize",
-
     "circuitcity.accounts.apps.AccountsConfig",
     "inventory",
     "sales",
     "dashboard",
 ]
-print("[cc.settings] Final INSTALLED_APPS (expected ~10):", INSTALLED_APPS)
+print("[cc.settings] Final INSTALLED_APPS:", INSTALLED_APPS)
 
 # --------------------------- middleware ---------------------------
 MIDDLEWARE = [
@@ -210,7 +207,6 @@ else:
             **({"sslmode": "require"} if USE_SSL and HOST not in ("localhost", "127.0.0.1") else {}),
         },
     }
-
 try:
     _db = DATABASES.get("default", {})
     print(f"[cc.settings] DB -> {_db.get('ENGINE')} | NAME={_db.get('NAME')} | DEBUG={DEBUG} | FORCE_SQLITE={USE_LOCAL_SQLITE}")
@@ -230,13 +226,9 @@ if REDIS_URL:
         }
     }
 else:
-    CACHES = {
-        "default": {
-            "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
-            "LOCATION": "cc-local-cache",
-            "TIMEOUT": CACHE_TTL_DEFAULT,
-        }
-    }
+    CACHES = {"default": {"BACKEND": "django.core.cache.backends.locmem.LocMemCache",
+                          "LOCATION": "cc-local-cache",
+                          "TIMEOUT": CACHE_TTL_DEFAULT}}
 
 # --------------------------- auth / i18n ---------------------------
 AUTH_PASSWORD_VALIDATORS = [
@@ -374,4 +366,3 @@ if SENTRY_DSN:
 APP_NAME = os.environ.get("APP_NAME", "Circuit City")
 APP_ENV  = os.environ.get("APP_ENV", "dev" if DEBUG else "beta")
 BETA_FEEDBACK_MAILTO = os.environ.get("BETA_FEEDBACK_MAILTO", "beta@circuitcity.example")
-"@ | Set-Content -Encoding UTF8 cc\settings.py
