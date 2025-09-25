@@ -1,3 +1,4 @@
+@"
 services:
   - type: web
     name: circuitcity-main
@@ -6,31 +7,36 @@ services:
     autoDeploy: true
 
     buildCommand: |
+      pip install --upgrade pip
       pip install -r requirements.txt
       python manage.py collectstatic --noinput || true
       python manage.py migrate --noinput || true
 
-    startCommand: gunicorn cc.wsgi:application --preload --workers=3 --timeout=120 --bind 0.0.0.0:$PORT
+    startCommand: gunicorn cc.wsgi:application --preload --workers=${WEB_CONCURRENCY:-3} --timeout 120 --bind 0.0.0.0:$PORT
 
     healthCheckPath: /inventory/healthz/
 
     envVars:
       - key: PYTHON_VERSION
-        value: 3.12.3
+        value: 3.12.5
       - key: DJANGO_SETTINGS_MODULE
         value: cc.settings
-      - key: SECRET_KEY
+      - key: DJANGO_SECRET_KEY
         generateValue: true
       - key: DEBUG
         value: "False"
-      - key: FORCE_SQLITE
+      - key: USE_LOCAL_SQLITE
         value: "0"
+      - key: REQUIRE_DATABASE_URL
+        value: "1"
       - key: HEALTHZ_ALLOW_HTTP
         value: "1"
+      - key: ALLOWED_HOSTS
+        value: ".onrender.com,localhost,127.0.0.1"
       - key: CSRF_TRUSTED_ORIGINS
         value: "https://*.onrender.com"
-      - key: ALLOWED_HOSTS
-        value: "localhost,127.0.0.1,.onrender.com"
+      - key: WEB_CONCURRENCY
+        value: "3"
 
       - key: DATABASE_URL
         fromDatabase:
@@ -40,3 +46,4 @@ services:
 databases:
   - name: circuitcity-db
     plan: free
+"@ | Set-Content -Encoding UTF8 render.yaml
