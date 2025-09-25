@@ -287,11 +287,14 @@ urlpatterns = []
 if getattr(settings, "ENABLE_2FA", False):
     urlpatterns += [path("", include_or_raise("two_factor.urls", "two_factor"))]
 
-# Admin (configurable path ONLY; avoid adding a plain /admin/ alias to prevent collisions)
-admin_path = getattr(settings, "ADMIN_URL", "__admin__/")
-urlpatterns += [
-    path(admin_path, admin.site.urls),
-]
+# Admin
+# Honor ADMIN_URL, default to "admin/". Also expose /admin/ unless it's already the chosen path.
+admin_path = getattr(settings, "ADMIN_URL", "admin/")
+if not admin_path.endswith("/"):
+    admin_path += "/"
+urlpatterns += [path(admin_path, admin.site.urls)]
+if admin_path != "admin/":
+    urlpatterns += [path("admin/", admin.site.urls)]
 
 # Basics / health / robots / favicon / temporary
 urlpatterns += [
