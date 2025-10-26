@@ -242,12 +242,17 @@ STATIC_ROOT = BASE_DIR / "staticfiles"
 MEDIA_URL = "/media/"
 MEDIA_ROOT = BASE_DIR / "media"
 
+# ---- Static storage backend (fix 500 from Manifest storage) ----
+USE_MANIFEST_STATIC = env_bool("USE_MANIFEST_STATIC", False)  # set to 1 when all static paths use {% static %}
 try:
-    _static_backend = (
-        "django.contrib.staticfiles.storage.StaticFilesStorage"
-        if (DEBUG or TESTING)
-        else "whitenoise.storage.CompressedManifestStaticFilesStorage"
-    )
+    if DEBUG or TESTING:
+        _static_backend = "django.contrib.staticfiles.storage.StaticFilesStorage"
+    else:
+        _static_backend = (
+            "whitenoise.storage.CompressedManifestStaticFilesStorage"
+            if USE_MANIFEST_STATIC else
+            "whitenoise.storage.CompressedStaticFilesStorage"
+        )
 except Exception:
     _static_backend = "django.contrib.staticfiles.storage.StaticFilesStorage"
 
