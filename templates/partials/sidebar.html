@@ -137,6 +137,13 @@
       <li class="{% if request.path|slice:'0:15' == '/hq/stock-trends' %}active{% endif %}">
         <a class="navlink" href="{{ url_hq_stock_trends|default:'/hq/stock-trends/' }}"><i class="bi bi-graph-up-arrow"></i><span>Stock Trends</span></a>
       </li>
+
+      {# NEW: Django Admin shortcut (opens in new tab) #}
+      <li class="{% if request.path|slice:'0:7' == '/admin/' %}active{% endif %}">
+        <a class="navlink" href="{{ url_admin|default:'/admin/' }}" target="_blank" rel="noopener">
+          <i class="bi bi-shield-lock"></i><span>Django Admin</span>
+        </a>
+      </li>
     </ul>
   </div>
   {% endif %}

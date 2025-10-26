@@ -611,7 +611,7 @@ body.accounts-auth, body.accounts-forgot {
 .alert-warning { background: #fffbeb !important; border-color: #fcd34d !important; color:#7a4d00 !important; }
 .alert-danger  { background: #fef2f2 !important; border-color: #fca5a5 !important; color:#7f1d1d !important; }
 .btn:disabled, .cc-btn:disabled, .btn-primary:disabled { opacity: .7 !important; color: #e5edff !important; }
-.cc-page .badge, .cc-page .kpi, .cc-page .kpi-chip, .cc-page .btn, .cc-page .cc-btn, .cc-page .form-control, .cc-page .card { backdrop-filter: none !important; }
+.cc-page .card, .cc-page .kpi, .cc-page .kpi-chip, .cc-page .btn, .cc-page .cc-btn, .cc-page .form-control { backdrop-filter: none !important; }
 
 /* =====================================================================
    🔒 FINAL OVERRIDES — body-state drawer + RTL action row
@@ -674,3 +674,37 @@ body.accounts-auth, body.accounts-forgot {
 }
 
 /* End of file */
+
+/* =====================================================================
+   🔹 QUICK UI DECLUTTER (safe, non-destructive)
+   Hide: Scan (Web), Feedback, Place Order, and the “Circuit City” tenant chip
+   ===================================================================== */
+
+/* Hide action buttons/links by common URLs or explicit data-action hooks */
+a[href*="/inventory/scan/web"],
+a[href*="/feedback"],
+a[href*="/inventory/place-order"],
+.btn[href*="/inventory/scan/web"],
+.btn[href*="/feedback"],
+.btn[href*="/inventory/place-order"],
+button[data-action="scan-web"],
+button[data-action="feedback"],
+button[data-action="place-order"] {
+  display: none !important;
+}
+
+/* Hide the tenant/business/location chip (e.g., “Circuit City”) via safe routes */
+a[href*="/tenants/choose_business"],
+a[href*="/tenants/switch"],
+a[href*="/locations/choose"],
+a[href*="/locations/switch"] {
+  display: none !important;
+}
+
+/* Defensive: common chip classes used for the tenant/location pill */
+.tenant-pill,
+.tenant-chip,
+.business-chip,
+.location-chip {
+  display: none !important;
+}
