@@ -1,4 +1,4 @@
-# inventory/signals.py
+﻿# inventory/signals.py
 from __future__ import annotations
 
 from django.db.models.signals import pre_save, post_save, post_delete
@@ -77,7 +77,7 @@ def _invitem_audit(sender, instance: InventoryItem, created: bool, **kwargs):
             continue
         if hasattr(instance, attr) and hasattr(before, attr):
             if getattr(before, attr) != getattr(instance, attr):
-                changed.append(f"{public_name}: {getattr(before, attr)} → {getattr(instance, attr)}")
+                changed.append(f"{public_name}: {getattr(before, attr)} â†’ {getattr(instance, attr)}")
             seen.add(attr)
 
     if changed:
@@ -206,7 +206,7 @@ def _sale_finalize(sender, instance: Sale, created: bool, **kwargs):
                 item=item,
                 by_user=getattr(instance, "agent", None),
                 action="SOLD",
-                details=f"Sale #{instance.pk} – updates: {', '.join(updates) if updates else 'none'}",
+                details=f"Sale #{instance.pk} â€“ updates: {', '.join(updates) if updates else 'none'}",
             )
         except Exception:
             pass
@@ -259,7 +259,7 @@ def _sale_finalize(sender, instance: Sale, created: bool, **kwargs):
             # Never break the request because of wallet side-effects
             pass
 
-    # 4) Sales affect aggregates → bump cache every time
+    # 4) Sales affect aggregates â†’ bump cache every time
     _bump_cache()
 
 
@@ -269,3 +269,7 @@ def _sale_deleted(sender, instance: Sale, **kwargs):
     Sales deletions also impact aggregates; bump the cache version.
     """
     _bump_cache()
+
+
+
+

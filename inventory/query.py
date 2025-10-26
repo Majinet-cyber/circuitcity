@@ -1,4 +1,4 @@
-# inventory/query.py
+﻿# inventory/query.py
 from datetime import timedelta
 from django.db.models import Q, Count, Sum
 from django.db.models.functions import Coalesce
@@ -95,3 +95,5 @@ def sales_in_range(request, *, days: int = 7):
         Sale.objects.filter(business=biz, sold_at__gte=since)
         .aggregate(total=Coalesce(Sum("final_amount"), 0))["total"]
     )
+
+

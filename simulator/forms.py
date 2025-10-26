@@ -1,23 +1,57 @@
-from django import forms
+﻿from django import forms
+from .models import Scenario
 
-class ScenarioForm(forms.Form):
-    name = forms.CharField(max_length=120)
 
-    # Demand / pricing
-    demand_growth_pct = forms.FloatField(initial=0)
-    price_change_pct = forms.FloatField(initial=0)
-    base_price = forms.FloatField(min_value=0, initial=100.0)
-    unit_cost = forms.FloatField(min_value=0, initial=60.0)
+class ScenarioForm(forms.ModelForm):
+    """
+    Form for creating and editing Scenarios.
+    Uses sensible defaults and numeric validations.
+    """
 
-    # Inventory
-    lead_time_days = forms.IntegerField(min_value=0, initial=7)
-    reorder_point = forms.IntegerField(min_value=0, initial=10)
-    initial_stock = forms.IntegerField(min_value=0, initial=50)
-    horizon_days = forms.IntegerField(min_value=1, max_value=365, initial=30)
+    class Meta:
+        model = Scenario
+        fields = [
+            "name",
+            "baseline_monthly_units",
+            "avg_unit_price",
+            "variable_cost_pct",
+            "monthly_fixed_costs",
+            "monthly_growth_pct",
+            "months",
+        ]
+        widgets = {
+            "name": forms.TextInput(attrs={"class": "form-control", "placeholder": "Scenario name"}),
+            "baseline_monthly_units": forms.NumberInput(attrs={"class": "form-control", "step": "1", "min": "0"}),
+            "avg_unit_price": forms.NumberInput(attrs={"class": "form-control", "step": "0.01", "min": "0"}),
+            "variable_cost_pct": forms.NumberInput(attrs={"class": "form-control", "step": "0.01", "min": "0", "max": "100"}),
+            "monthly_fixed_costs": forms.NumberInput(attrs={"class": "form-control", "step": "0.01", "min": "0"}),
+            "monthly_growth_pct": forms.NumberInput(attrs={"class": "form-control", "step": "0.01", "min": "0"}),
+            "months": forms.NumberInput(attrs={"class": "form-control", "step": "1", "min": "1", "max": "60"}),
+        }
+        labels = {
+            "baseline_monthly_units": "Baseline units / month",
+            "avg_unit_price": "Avg unit price (MWK)",
+            "variable_cost_pct": "Variable cost % of price",
+            "monthly_fixed_costs": "Fixed monthly costs (MWK)",
+            "monthly_growth_pct": "Monthly demand growth %",
+            "months": "Months to simulate",
+        }
+        help_texts = {
+            "monthly_growth_pct": "Expected monthly growth rate in demand.",
+        }
 
-    # P&L & cash flow
-    op_ex_pct_of_revenue = forms.FloatField(min_value=0, initial=10.0, label="Opex % of revenue")
-    tax_rate_pct = forms.FloatField(min_value=0, max_value=60, initial=25.0)
-    ar_days = forms.IntegerField(min_value=0, initial=7, label="AR days")
-    ap_days = forms.IntegerField(min_value=0, initial=7, label="AP days")
-    opening_cash = forms.FloatField(initial=0.0)
+    def clean_variable_cost_pct(self):
+        v = self.cleaned_data.get("variable_cost_pct")
+        if v is None:
+            return 0.0
+        if v < 0 or v > 100:
+            raise forms.ValidationError("Variable cost % must be between 0 and 100.")
+        return v
+
+    def clean_months(self):
+        m = self.cleaned_data.get("months")
+        if not m or m <= 0:
+            raise forms.ValidationError("Months must be at least 1.")
+        return m
+
+

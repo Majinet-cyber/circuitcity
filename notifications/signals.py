@@ -1,4 +1,4 @@
-# notifications/signals.py
+﻿# notifications/signals.py
 from __future__ import annotations
 
 from django.db.models.signals import post_save, pre_save
@@ -193,3 +193,5 @@ if WalletTxn is not None:
                     level="success",
                     meta={"wallet_id": instance.id},
                 )
+
+

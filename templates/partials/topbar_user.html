@@ -1,0 +1,37 @@
+{# Requires urls: 'profile:settings' (or your current), 'feedback:form', 'logout' #}
+<div class="topbar-user relative">
+  <button class="user-btn" id="userMenuBtn" aria-haspopup="menu" aria-expanded="false">
+    <img src="{% static 'img/user-circle.svg' %}" alt="Account" class="w-8 h-8"/>
+  </button>
+  <div id="userMenu" class="menu hidden absolute right-0 mt-2 min-w-[220px] rounded-xl border border-slate-200 bg-white shadow-xl">
+    <div class="px-3 py-2 text-sm text-slate-600">
+      {% if user.is_authenticated %}
+        <div class="font-semibold text-slate-900">{{ user.get_full_name|default:user.username }}</div>
+        <div class="text-xs">{{ user.email }}</div>
+      {% endif %}
+    </div>
+    <div class="border-t border-slate-200"></div>
+    <a href="{% url 'profile:settings' %}" class="block px-4 py-2 hover:bg-slate-50">Profile & Settings</a>
+    <a href="{% url 'feedback:form' %}" class="block px-4 py-2 hover:bg-slate-50">Feedback</a>
+    <a href="{% url 'logout' %}" class="block px-4 py-2 text-red-600 hover:bg-red-50">Logout</a>
+  </div>
+</div>
+<script>
+  (function(){
+    const btn = document.getElementById('userMenuBtn');
+    const menu = document.getElementById('userMenu');
+    if(!btn || !menu) return;
+    btn.addEventListener('click', () => {
+      const open = !menu.classList.contains('hidden');
+      menu.classList.toggle('hidden', open);
+      btn.setAttribute('aria-expanded', String(!open));
+    });
+    document.addEventListener('click', (e) => {
+      if (!menu.contains(e.target) && !btn.contains(e.target)) menu.classList.add('hidden');
+    });
+  })();
+</script>
+<style>
+  .topbar-user .menu a { font-size:.925rem }
+  .topbar-user .user-btn{ display:inline-flex; align-items:center; gap:.5rem; }
+</style>

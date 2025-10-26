@@ -1,4 +1,4 @@
-from celery import shared_task
+﻿from celery import shared_task
 from decimal import Decimal
 from django.conf import settings
 from .services.forecast import compute_forecast
@@ -12,3 +12,5 @@ def nightly_cfo_cycle():
     compute_forecast(horizon_days=30, opening_balance=opening)
     run_rules()
     recommend_affordability()
+
+

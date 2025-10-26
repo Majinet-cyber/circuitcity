@@ -1,4 +1,4 @@
-# core/mw_force_root_urlconf.py
+﻿# core/mw_force_root_urlconf.py
 from django.conf import settings
 from django.urls import set_urlconf
 
@@ -21,3 +21,5 @@ class ForceRootURLConf:
         # clean up after response
         set_urlconf(None)
         return response
+
+

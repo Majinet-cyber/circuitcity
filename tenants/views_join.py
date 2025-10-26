@@ -1,4 +1,4 @@
-# tenants/views_join.py
+﻿# tenants/views_join.py
 from __future__ import annotations
 
 from django import forms
@@ -102,9 +102,11 @@ def join(request):
             # Switch context for this session
             request.session["active_business_id"] = str(biz.id)
 
-            messages.success(request, f"{name} created. You’re now managing this business.")
+            messages.success(request, f"{name} created. Youâ€™re now managing this business.")
             return redirect(f"/t/{slug}/")
     else:
         form = CreateBusinessForm()
 
     return render(request, "tenants/join.html", {"form": form})
+
+

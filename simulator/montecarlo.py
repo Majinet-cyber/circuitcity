@@ -1,4 +1,4 @@
-import numpy as np
+﻿import numpy as np
 
 def monte_carlo_simulation(payload, iterations=1000):
     """
@@ -13,7 +13,7 @@ def monte_carlo_simulation(payload, iterations=1000):
 
     results = []
     for _ in range(iterations):
-        # Random demand + price variations (~±15%)
+        # Random demand + price variations (~Â±15%)
         demand_mult = np.random.normal(1.0, 0.15)
         price_mult = np.random.normal(1.0, 0.1)
         variable_cost_mult = np.random.normal(1.0, 0.05)
@@ -34,3 +34,5 @@ def monte_carlo_simulation(payload, iterations=1000):
         "p90": round(np.percentile(results, 90), 2),
         "distribution": results[:200],  # sample for visualization
     }
+
+

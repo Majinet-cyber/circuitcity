@@ -1,7 +1,7 @@
-# inventory/scope.py
+﻿# inventory/scope.py
 from __future__ import annotations
 
-from typing import Optional, Tuple, Iterable, Any, Callable
+from typing import Optional, Tuple, Iterable, Any, Callable, Set
 import importlib
 
 from django.http import HttpRequest
@@ -9,7 +9,7 @@ from django.db.models import QuerySet
 
 
 # ------------------------------
-# Safe optional import helpers
+# Safe optional import helper
 # ------------------------------
 def _try_import(modpath: str, attr: str | None = None):
     try:
@@ -19,16 +19,18 @@ def _try_import(modpath: str, attr: str | None = None):
         return None
 
 
+# ------------------------------
 # Tenant helpers (optional; no-ops if missing)
+# ------------------------------
 scoped: Callable[[QuerySet, HttpRequest], QuerySet] = (
-    _try_import("tenants.utils", "scoped")
-    or _try_import("circuitcity.tenants.utils", "scoped")
+    _try_import("circuitcity.tenants.utils", "scoped")
+    or _try_import("tenants.utils", "scoped")
     or (lambda qs, _r: qs)
 )
 
 get_active_business = (
-    _try_import("tenants.utils", "get_active_business")
-    or _try_import("circuitcity.tenants.utils", "get_active_business")
+    _try_import("circuitcity.tenants.utils", "get_active_business")
+    or _try_import("tenants.utils", "get_active_business")
     or (lambda _r: None)
 )
 
@@ -36,10 +38,10 @@ get_active_business = (
 # ------------------------------
 # Small utilities
 # ------------------------------
-def _field_names(model) -> set[str]:
+def _field_names(model) -> Set[str]:
     """Return the set of concrete field names for a model (safe)."""
     try:
-        return {f.name for f in model._meta.get_fields()}
+        return {f.name for f in model._meta.get_fields()}  # type: ignore[attr-defined]
     except Exception:
         return set()
 
@@ -61,14 +63,17 @@ def _first_present_attr(obj: Any, keys: Iterable[str]):
 
 
 # ------------------------------
-# Model resolution — single source of truth
+# Model resolution â€” single source of truth
 # ------------------------------
 def get_inventory_model():
     """
     Resolve the concrete inventory model without importing a specific class
     at module-import time. We try common names in order.
     """
-    models_mod = _try_import("inventory.models")
+    models_mod = (
+        _try_import("inventory.models")
+        or _try_import("circuitcity.inventory.models")
+    )
     if not models_mod:
         return None
 
@@ -82,7 +87,7 @@ def get_inventory_model():
 # ------------------------------
 # Active scope helpers
 # ------------------------------
-# Common attribute/session/query aliases we’ve seen across your codebase family
+# Common attribute/session/query aliases across the codebase family
 _BIZ_ATTRS = ("business_id", "tenant_id")
 _LOC_ATTRS = ("active_location_id", "location_id", "store_id")
 
@@ -100,7 +105,6 @@ def active_scope(request: HttpRequest) -> Tuple[Optional[int], Optional[int]]:
     Tolerates missing middleware and old links.
     """
     # 1) tenants helper (preferred)
-    biz_obj = None
     try:
         biz_obj = get_active_business(request)
     except Exception:
@@ -161,7 +165,7 @@ def stock_queryset_for_request(request: HttpRequest) -> QuerySet:
       - supports ?status=all|available|selling|sold|archived (case-insensitive)
       - adds select_related for common relations
 
-    This is the ONE place that defines what “in stock” means.
+    This is the ONE place that defines what â€œin stockâ€ means.
     """
     Model = get_inventory_model()
     if Model is None:
@@ -210,10 +214,9 @@ def stock_queryset_for_request(request: HttpRequest) -> QuerySet:
     raw_status = (request.GET.get("status") or "").strip().lower()
 
     if raw_status in ("", "ai", "all"):
-        # Do not filter by status explicitly (but still exclude clearly sold/archived/inactive below)
+        # No explicit status filter; we'll still exclude sold/archived/inactive below
         pass
     elif raw_status in ("available", "in_stock", "in-stock"):
-        # Try common conventions to show only "available"
         if "available" in fields:
             qs = qs.filter(available=True)
         elif "status" in fields:
@@ -222,12 +225,10 @@ def stock_queryset_for_request(request: HttpRequest) -> QuerySet:
         if "status" in fields:
             qs = qs.filter(status__iexact="selling")
     elif raw_status in ("sold",):
-        # Show sold only
         if "status" in fields:
             qs = qs.filter(status__iexact="sold")
-        else:
-            if "sold_at" in fields:
-                qs = qs.exclude(sold_at__isnull=True)
+        elif "sold_at" in fields:
+            qs = qs.exclude(sold_at__isnull=True)
     elif raw_status in ("archived",):
         if "archived" in fields:
             qs = qs.filter(archived=True)
@@ -255,3 +256,5 @@ def stock_queryset_for_request(request: HttpRequest) -> QuerySet:
             pass
 
     return qs
+
+

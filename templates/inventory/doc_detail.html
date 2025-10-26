@@ -1,0 +1,58 @@
+{% load humanize %}
+<!doctype html>
+<html><head><meta charset="utf-8"><title>{{ doc.number }}</title>
+<style>
+ body{font:14px/1.6 system-ui,Segoe UI,Arial;background:#0b1020;color:#eef2ff;margin:0}
+ .wrap{max-width:1000px;margin:24px auto;padding:0 16px}
+ .btn{padding:8px 12px;border-radius:10px;border:1px solid #26304d;background:#171e36;color:#eef2ff;text-decoration:none;margin-right:8px}
+ .card{background:#0e152b;border:1px solid #1c2541;border-radius:14px;padding:14px;margin-top:12px}
+ table{width:100%;border-collapse:collapse}
+ th,td{padding:10px;border-bottom:1px solid #1c2541;text-align:left}
+ th{font-size:12px;color:#cbd5e1;text-transform:uppercase;letter-spacing:.06em}
+</style></head>
+<body>
+<div class="wrap">
+  <h2>{{ doc.get_doc_type_display }} {{ doc.number }}</h2>
+  <div>
+    <a class="btn" href="{% url 'inventory:doc_pdf' doc.id %}">⬇ Download PDF</a>
+    <a class="btn" href="{% url 'inventory:doc_excel' doc.id %}">⬇ Download Excel (CSV)</a>
+    <form style="display:inline" method="post" action="{% url 'inventory:doc_email' doc.id %}">
+      {% csrf_token %}
+      <input name="to" value="{{ doc.customer.email }}" placeholder="customer@email" style="padding:8px;border-radius:8px;border:1px solid #26304d;background:#0b1020;color:#eef2ff">
+      <button class="btn" type="submit">✉ Email</button>
+    </form>
+    <form style="display:inline" method="get" action="{% url 'inventory:doc_whatsapp' doc.id %}">
+      <input name="phone" value="{{ doc.customer.phone }}" placeholder="WhatsApp number" style="padding:8px;border-radius:8px;border:1px solid #26304d;background:#0b1020;color:#eef2ff">
+      <button class="btn" type="submit">🟢 WhatsApp</button>
+    </form>
+  </div>
+
+  <div class="card">
+    <div><strong>Customer:</strong> {{ doc.customer.name }} &middot; {{ doc.customer.email }} &middot; {{ doc.customer.phone }}</div>
+    <div style="opacity:.8">{{ doc.customer.address|linebreaksbr }}</div>
+    <div style="margin-top:8px">Date: {{ doc.created_at|date:"Y-m-d" }} {% if doc.due_date %} &middot; Due: {{ doc.due_date|date:"Y-m-d" }}{% endif %}</div>
+  </div>
+
+  <div class="card">
+    <table>
+      <thead><tr><th>Description</th><th>Qty</th><th>Unit</th><th>Total</th></tr></thead>
+      <tbody>
+        {% for li in doc.lines.all %}
+        <tr>
+          <td>{{ li.description }}</td>
+          <td>{{ li.quantity }}</td>
+          <td>{{ li.unit_price|floatformat:2|intcomma }} {{ doc.currency }}</td>
+          <td>{{ li.line_total|floatformat:2|intcomma }} {{ doc.currency }}</td>
+        </tr>
+        {% endfor %}
+        <tr><td colspan="3" style="text-align:right;opacity:.8">Subtotal</td><td>{{ doc.subtotal|floatformat:2|intcomma }} {{ doc.currency }}</td></tr>
+        <tr><td colspan="3" style="text-align:right;opacity:.8">Tax</td><td>{{ doc.tax|floatformat:2|intcomma }} {{ doc.currency }}</td></tr>
+        <tr><td colspan="3" style="text-align:right"><strong>Total</strong></td><td><strong>{{ doc.total|floatformat:2|intcomma }} {{ doc.currency }}</strong></td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <p style="opacity:.7">Notes: {{ doc.notes|default:"—" }}</p>
+  <p><a class="btn" href="{% url 'inventory:docs_list' %}">← Back to list</a></p>
+</div>
+</body></html>

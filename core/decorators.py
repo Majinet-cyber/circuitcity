@@ -1,4 +1,4 @@
-# circuitcity/core/decorators.py
+﻿# circuitcity/core/decorators.py
 """
 Reusable view decorators for role-gating and safe HTTP usage.
 
@@ -213,3 +213,5 @@ __all__ = [
     "group_required",
     "post_required",
 ]
+
+

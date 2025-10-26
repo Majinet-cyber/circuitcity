@@ -1,5 +1,4 @@
-# circuitcity/cc/urls.py
-from __future__ import annotations
+﻿from __future__ import annotations
 
 import os
 import re
@@ -15,11 +14,12 @@ from django.urls import include, path, re_path, reverse, NoReverseMatch
 from django.views.generic import RedirectView
 from django.templatetags.static import static as static_build  # may raise with Manifest storage
 
-from cc import views as core_views  # project-level views
+from cc import views as core_views
+from billing import views_admin as billing_admin_views  # HQ Subscriptions view
 
 
 # ======================================================================================
-# Single Source of Truth — URL + Static helpers
+# Helpers
 # ======================================================================================
 def robots_txt(_request):
     return HttpResponse("User-agent: *\nDisallow: /", content_type="text/plain")
@@ -43,18 +43,14 @@ def include_or_raise(module_path: str, namespace: str | None = None):
 
 
 def _safe_static(path_fragment: str) -> str:
-    """
-    Resolve a static URL but never crash if ManifestStaticFilesStorage
-    can't find the file yet (e.g., before collectstatic).
-    """
     try:
         return static_build(path_fragment)
     except Exception:
         return settings.STATIC_URL.rstrip("/") + "/" + path_fragment.lstrip("/")
 
 
-# ---- Centralized reverse helpers (ONE TRUTH for "does this URL name exist?") ----------
 def _reverse_exists(name: str) -> bool:
+    # NOTE: safe to use at REQUEST-TIME; avoid at import-time.
     try:
         reverse(name)
         return True
@@ -80,13 +76,34 @@ def _safe_redirect_to(name: str, fallback: str = "/accounts/login/"):
     return _view
 
 
+# NEW: pattern introspection (safe at import-time; no reverse())
+def _patterns_have_name(patterns, name: str) -> bool:
+    try:
+        from django.urls.resolvers import URLPattern, URLResolver
+    except Exception:
+        # Very defensive; if resolvers unavailable, assume missing.
+        return False
+
+    for p in patterns:
+        try:
+            if isinstance(p, URLPattern):
+                if p.name == name:
+                    return True
+            elif isinstance(p, URLResolver):
+                if _patterns_have_name(p.url_patterns, name):
+                    return True
+        except Exception:
+            # keep scanning even if any pattern misbehaves
+            continue
+    return False
+
+
 # ======================================================================================
-# Smart root redirect (uses centralized helpers)
+# Smart root redirect
 # ======================================================================================
 is_hq_admin = _try_from("circuitcity.hq.permissions", "is_hq_admin") or (lambda _u: False)
 get_active_business = _try_from("circuitcity.tenants.utils", "get_active_business") or (lambda _r: None)
 
-# Try to import tenants.activate_mine for a local fallback route
 _tenants_views = _try_import("tenants.views") or _try_import("circuitcity.tenants.views")
 _activate_mine_view = getattr(_tenants_views, "activate_mine", None)
 
@@ -96,29 +113,25 @@ def root_redirect(request):
     if not getattr(request, "user", None) or not request.user.is_authenticated:
         return _redirect_first(("two_factor:login", "accounts:login", "login"), "/accounts/login/")
 
-    # HQ admins
+    # HQ admins -> HQ dashboard
     if is_hq_admin(request.user):
-        if _reverse_exists("hq:home"):
-            return redirect("hq:home")
+        target = _first_working_reverse(("hq:dashboard", "hq:home", "hq:subscriptions", "hq_subscriptions"))
+        if target:
+            return redirect(target)
 
-    # No active business -> auto-activate first, then chooser/join
+    # No active business -> activation/chooser
     try:
         active = get_active_business(request)
     except Exception:
         active = None
     if not active:
-        target = _first_working_reverse((
-            "tenants:activate_mine",
-            "tenants:choose_business",
-            "tenants:join",
-        ))
+        target = _first_working_reverse(("tenants:activate_mine", "tenants:choose_business", "tenants:join"))
         if target:
             return redirect(target)
-        # If tenants url name isn't present, but we have the view imported, expose local fallback
         if _activate_mine_view:
             return redirect("/tenants/activate-mine/")
 
-    # Preferred dashboards (first that exists wins)
+    # Store dashboards
     candidates = (
         "dashboard:home",
         "inventory:inventory_dashboard",
@@ -172,10 +185,7 @@ def __whoami__(request):
     for cand in data["REPORTS_TEMPLATES_CHECKED"]:
         try:
             rt = get_template(cand)
-            data["REPORTS_TEMPLATE_FOUND"] = {
-                "template": cand,
-                "origin": getattr(getattr(rt, "origin", None), "name", None),
-            }
+            data["REPORTS_TEMPLATE_FOUND"] = {"template": cand, "origin": getattr(getattr(rt, "origin", None), "name", None)}
             break
         except Exception:
             continue
@@ -197,10 +207,11 @@ def __render_login__(request):
         </div>
         """
         if "<body" in html:
-            html = html.replace("<body", "<body data-render-probe='1' ", 1)
-            idx = html.find(">")
-            if idx != -1:
-                html = html[: idx + 1] + banner + html[idx + 1 :]
+            body_start = html.lower().find("<body")
+            if body_start != -1:
+                gt = html.find(">", body_start)
+                if gt != -1:
+                    html = html[: gt + 1] + banner + html[gt + 1 :]
         else:
             html = banner + html
         return HttpResponse(html)
@@ -230,10 +241,11 @@ def __render_reports__(request):
             </div>
             """
             if "<body" in html:
-                html = html.replace("<body", "<body data-render-probe='1' ", 1)
-                idx = html.find(">")
-                if idx != -1:
-                    html = html[: idx + 1] + banner + html[idx + 1 :]
+                body_start = html.lower().find("<body")
+                if body_start != -1:
+                    gt = html.find(">", body_start)
+                    if gt != -1:
+                        html = html[: gt + 1] + banner + html[gt + 1 :]
             else:
                 html = banner + html
             return HttpResponse(html)
@@ -265,13 +277,7 @@ def __grep_soon__(request):
                 with open(fpath, "r", encoding="utf-8", errors="ignore") as f:
                     for i, line in enumerate(f, start=1):
                         if rx.search(line):
-                            hits.append(
-                                {
-                                    "file": os.path.relpath(fpath, root),
-                                    "line_no": i,
-                                    "line": line.strip(),
-                                }
-                            )
+                            hits.append({"file": os.path.relpath(fpath, root), "line_no": i, "line": line.strip()})
             except Exception:
                 continue
 
@@ -281,14 +287,13 @@ def __grep_soon__(request):
 # ======================================================================================
 # URL patterns
 # ======================================================================================
-urlpatterns = []
+urlpatterns: list = []
 
 # Two-Factor (optional)
 if getattr(settings, "ENABLE_2FA", False):
     urlpatterns += [path("", include_or_raise("two_factor.urls", "two_factor"))]
 
 # Admin
-# Honor ADMIN_URL, default to "admin/". Also expose /admin/ unless it's already the chosen path.
 admin_path = getattr(settings, "ADMIN_URL", "admin/")
 if not admin_path.endswith("/"):
     admin_path += "/"
@@ -305,7 +310,7 @@ urlpatterns += [
     path("temporary/", core_views.temporary_ok, name="temporary_ok"),
 ]
 
-# Legacy static -> brand icons (SAFE even if manifest entry missing)
+# Legacy static -> brand icons
 urlpatterns += [
     path("static/icons/icon-192.png", RedirectView.as_view(url=_safe_static("brand/mjn-192.png"), permanent=False)),
     path("static/img/logo-32.png",  RedirectView.as_view(url=_safe_static("brand/mjn-32.png"), permanent=False)),
@@ -337,9 +342,9 @@ urlpatterns += [
     path("session-probe/get", session_get, name="session_probe_get"),
 ]
 
-# Time pages
+# Time pages (updated to match inventory URL names)
 urlpatterns += [
-    path("time/check-in/", RedirectView.as_view(pattern_name="inventory:time_checkin_page", permanent=False)),
+    path("time/check-in/", RedirectView.as_view(pattern_name="inventory:time_checkin", permanent=False)),
     path("time/logs/", RedirectView.as_view(pattern_name="inventory:time_logs", permanent=False)),
 ]
 
@@ -361,15 +366,9 @@ if import_opening_stock:
 # Response normalizer + auto-select helpers
 # ======================================================================================
 def _redirect_to_join():
-    target = _first_working_reverse((
-        "tenants:activate_mine",
-        "tenants:choose_business",
-        "tenants:join_business",
-        "tenants:join",
-    ))
+    target = _first_working_reverse(("tenants:activate_mine", "tenants:choose_business", "tenants:join_business", "tenants:join"))
     if target:
         return redirect(target)
-    # last-ditch: local fallback path if we exposed it below
     return redirect("/tenants/activate-mine/")
 
 
@@ -385,7 +384,6 @@ def _set_active_on_request_and_session(request, biz, loc=None):
         request.active_business = biz
         request.active_business_id = getattr(biz, "id", None)
         request.session["active_business_id"] = getattr(biz, "id", None)
-        # legacy session key variants for safety
         request.session["biz_id"] = getattr(biz, "id", None)
         if loc:
             request.active_location = loc
@@ -526,9 +524,16 @@ urlpatterns += [
     path("inventory/", include_or_raise("inventory.urls", "inventory")),
     path("tenants/",   include_or_raise("tenants.urls", "tenants")),
     path("dashboard/", include_or_raise("dashboard.urls", "dashboard")),
+    # ADD: Layby app include (fixes /layby/ 404)
+    path("layby/",     include_or_raise("layby.urls", "layby")),
 ]
 
-# --- Local fallback for activate-mine if tenants urls don’t expose it yet ---
+# >>> Simulator (namespaced; defensive import)
+_sim_urls_mod = _try_import("simulator.urls") or _try_import("circuitcity.simulator.urls")
+if _sim_urls_mod and hasattr(_sim_urls_mod, "urlpatterns"):
+    urlpatterns += [path("simulator/", include((_sim_urls_mod.urlpatterns, "simulator"), namespace="simulator"))]
+
+# --- Local fallback for activate-mine if tenants urls donâ€™t expose it yet ---
 if _activate_mine_view:
     urlpatterns += [
         path("tenants/activate-mine/", _activate_mine_view, name="tenants_activate_mine_fallback"),
@@ -542,9 +547,6 @@ if _wallet_urls_mod and hasattr(_wallet_urls_mod, "urlpatterns"):
 
 # -------- Robust shim for /wallet/admin/ with DIAGNOSTICS --------
 def _wallet_admin_shim(request, *args, **kwargs):
-    """
-    Try multiple targets; if none import, show WHY with helpful diagnostics.
-    """
     tried = []
     last_exc_repr = None
     exports = {}
@@ -554,7 +556,6 @@ def _wallet_admin_shim(request, *args, **kwargs):
         tried.append(f"{modpath}.{attr}")
         try:
             mod = import_module(modpath)
-            # Capture exports for debugging
             exports[modpath] = [n for n in dir(mod) if n.lower().startswith(("admin", "agent", "admin_"))]
             obj = getattr(mod, attr, None)
             if obj is None:
@@ -575,18 +576,17 @@ def _wallet_admin_shim(request, *args, **kwargs):
         if callable(vc):
             return vc(request, *args, **kwargs)
 
-    # Nothing worked -> help the operator
     details = [
         "Wallet admin is unavailable.",
         f"Tried: {', '.join(tried)}",
-        f"Last import error: {last_exc_repr or '(none — modules imported but attributes missing)'}",
+        f"Last import error: {last_exc_repr or '(none â€” modules imported but attributes missing)'}",
         f"Exports wallet.views: {', '.join(exports.get('wallet.views', [])) or '(module not importable)'}",
         f"Exports circuitcity.wallet.views: {', '.join(exports.get('circuitcity.wallet.views', [])) or '(module not importable)'}",
         "",
         "Hints:",
-        "• Ensure wallet/ is on PYTHONPATH and has __init__.py",
-        "• Confirm wallet/views.py defines either `AdminWalletHome` (class) or `admin_home = AdminWalletHome.as_view()`",
-        "• If wallet.urls imports models that crash, fix that import so wallet.urls can be included.",
+        "â€¢ Ensure wallet/ is on PYTHONPATH and has __init__.py",
+        "â€¢ Confirm wallet/views.py defines either `AdminWalletHome` (class) or `admin_home = AdminWalletHome.as_view()`",
+        "â€¢ If wallet.urls imports models that crash, fix that import so wallet.urls can be included.",
     ]
     return HttpResponse("<br>".join(details), status=404)
 
@@ -595,34 +595,92 @@ urlpatterns += [
     path("wallet/admin", RedirectView.as_view(url="/wallet/admin/", permanent=False)),
 ]
 
-# If wallet.urls NOT included above, add a minimal namespaced fallback so {% url 'wallet:admin_home' %} doesn’t 500
+# If wallet.urls NOT included above, add a minimal namespaced fallback so `{% url 'wallet:admin_home' %}` doesnâ€™t 500
 if not _wallet_urls_mod:
     wallet_fallback_patterns = [
         path("admin/", _wallet_admin_shim, name="admin_home"),
     ]
     urlpatterns += [path("wallet/", include((wallet_fallback_patterns, "wallet"), namespace="wallet"))]
 
-# Optional app includes
-if _try_import("ccreports.urls") or _try_import("circuitcity.ccreports.urls"):
-    urlpatterns += [path("reports/", include_or_raise("ccreports.urls", "reports"))]
-if _try_import("sales.urls") or _try_import("circuitcity.sales.urls"):
-    urlpatterns += [path("sales/", include_or_raise("sales.urls", "sales"))]
-if _try_import("layby.urls") or _try_import("circuitcity.layby.urls"):
-    urlpatterns += [path("layby/", include_or_raise("layby.urls", "layby"))]
+# >>> Global alias for `{% url 'wallet' %}` (legacy templates)
+def _wallet_home_shim(_request):
+    target = _first_working_reverse((
+        "wallet:admin_home",
+        "wallet:agent_wallet",
+        "hq:wallet",
+        "dashboard:agent_dashboard",
+        "inventory:inventory_dashboard",
+        "admin:index",
+    ))
+    return redirect(target or "/")
+
+urlpatterns += [path("wallet/home-alias/", _wallet_home_shim, name="wallet")]
+
+# =========================
+# BILLING â€” ALWAYS NAMESPACED
+# =========================
+_billing_urls_mod = _try_import("billing.urls") or _try_import("circuitcity.billing.urls")
+if _billing_urls_mod and hasattr(_billing_urls_mod, "urlpatterns"):
+    urlpatterns += [
+        path("billing/", include((_billing_urls_mod.urlpatterns, "billing"), namespace="billing")),
+    ]
+else:
+    urlpatterns += [
+        path(
+            "billing/",
+            include((
+                [
+                    path("hq/wallet/", _wallet_home_shim, name="wallet"),
+                    path("hq/subscriptions/", billing_admin_views.hq_subscriptions, name="subscriptions"),
+                    path("invoices/", lambda r: redirect("/hq/subscriptions/"), name="invoices"),
+                ],
+                "billing",
+            ), namespace="billing"),
+        )
+    ]
+
+# ---- HQ include or minimal fallback (stay strictly in HQ shell) ----
+def _hq_businesses_shim(request):
+    target = _first_working_reverse(("hq:businesses", "hq:subscriptions", "hq_subscriptions"))
+    return redirect(target or "/hq/subscriptions/")
+
+def _hq_invoices_shim(_request):
+    target = _first_working_reverse(("hq:invoices", "hq:subscriptions", "hq_subscriptions"))
+    return redirect(target or "/hq/subscriptions/")
+
+def _hq_agents_shim(_request):
+    target = _first_working_reverse(("hq:agents", "hq:subscriptions", "hq_subscriptions"))
+    return redirect(target or "/hq/subscriptions/")
+
+def _hq_home_fallback(_request):
+    target = _first_working_reverse(("hq:home", "hq:subscriptions", "hq_subscriptions"))
+    return redirect(target or "/hq/subscriptions/")
+
+# Prefer the real HQ urls if present
 if _try_import("hq.urls") or _try_import("circuitcity.hq.urls"):
     urlpatterns += [path("hq/", include_or_raise("hq.urls", "hq"))]
-if _try_import("onboarding.urls") or _try_import("circuitcity.onboarding.urls"):
-    urlpatterns += [path("onboarding/", include_or_raise("onboarding.urls", "onboarding"))]
-    urlpatterns += [path("get-started/", RedirectView.as_view(pattern_name="onboarding:start", permanent=False),
-                        name="get_started")]
-if _try_import("notifications.urls") or _try_import("circuitcity.notifications.urls"):
-    urlpatterns += [path("notifications/", include_or_raise("notifications.urls", "notifications"))]
-if _try_import("billing.urls") or _try_import("circuitcity.billing.urls"):
-    urlpatterns += [path("billing/", include_or_raise("billing.urls", "billing"))]
-if _try_import("circuitcity.cfo.urls") or _try_import("cfo.urls"):
-    urlpatterns += [path("api/v1/", include_or_raise("circuitcity.cfo.urls", "cfo"))]
-if _try_import("simulator.urls") or _try_import("circuitcity.simulator.urls"):
-    urlpatterns += [path("simulator/", include_or_raise("simulator.urls", "simulator"))]
+else:
+    urlpatterns += [
+        path(
+            "hq/",
+            include((
+                [
+                    path("subscriptions/", billing_admin_views.hq_subscriptions, name="subscriptions"),
+                    path("businesses/", _hq_businesses_shim, name="businesses"),
+                    path("invoices/", _hq_invoices_shim, name="invoices"),
+                    path("agents/", _hq_agents_shim, name="agents"),
+                    path("", _hq_home_fallback, name="home"),
+                    path("home/", _hq_home_fallback, name="home"),
+                ],
+                "hq",
+            ), namespace="hq"),
+        ),
+    ]
+
+# Optional explicit alias (kept; harmless since 'hq/' include matches earlier)
+urlpatterns += [
+    path("hq/subscriptions/", billing_admin_views.hq_subscriptions, name="hq_subscriptions"),
+]
 
 # Global Search + Saved Views
 core_search = _try_import("circuitcity.core.views_search") or _try_import("core.views_search")
@@ -655,27 +713,99 @@ urlpatterns += [
     path("stock/list/", RedirectView.as_view(pattern_name="inventory:stock_list", permanent=False), name="stock_list"),
 ]
 
+# Back-compat for 'stock_trends'
+def _stock_trends_shim(_request):
+    target = _first_working_reverse((
+        "inventory:stock_trends",
+        "inventory:restock_heatmap",
+        "inventory:inventory_dashboard",
+        "inventory:stock_list",
+        "dashboard:home",
+    ))
+    return redirect(target or "/inventory/")
+
+urlpatterns += [path("stock/trends/", _stock_trends_shim, name="stock_trends")]
+
 # Convenience short paths
 urlpatterns += [
-    path("sell/",  RedirectView.as_view(pattern_name="inventory:scan_sold", permanent=False), name="sell_short"),
-    path("scan/",  RedirectView.as_view(pattern_name="inventory:scan_sold", permanent=False), name="scan_short"),
-    path("stock/", RedirectView.as_view(pattern_name="inventory:stock_list", permanent=False), name="stock_short"),
+    path("sell/",        RedirectView.as_view(pattern_name="inventory:scan_sold", permanent=False), name="sell_short"),
+    path("sell/quick/",  RedirectView.as_view(pattern_name="inventory:sell_quick", permanent=False), name="sell_quick_short"),
+    path("scan/",        RedirectView.as_view(pattern_name="inventory:scan_sold", permanent=False), name="scan_short"),
+    path("stock/",       RedirectView.as_view(pattern_name="inventory:stock_list", permanent=False), name="stock_short"),
 ]
 
-# ---- Legacy API path aliases for restock heatmap ----
+# Legacy API path aliases for restock heatmap
 urlpatterns += [
     path("inventory/restock-heatmap/", RedirectView.as_view(url="/inventory/api/restock-heatmap/", permanent=False)),
     path("inventory/api/restock_heatmap/", RedirectView.as_view(url="/inventory/api/restock-heatmap/", permanent=False)),
 ]
 
-# ---- Friendly fallback for unfinished endpoint (501) if app route is missing ----
-# If inventory.urls does not provide it yet, expose a safe "under development" page.
-if not _reverse_exists("restock_heatmap_api"):
-    try:
+# Legacy API path alias for stock status (underscore -> hyphen)
+urlpatterns += [
+    path("inventory/api/stock_status/", RedirectView.as_view(url="/inventory/api/stock-status/", permanent=False)),
+]
+
+# ===== New: Product API aliases & fallbacks (to avoid NoReverseMatch) =====
+# Accept both hyphen and underscore forms; expose global names used by legacy templates.
+urlpatterns += [
+    path(
+        "inventory/api/product/update_price/",
+        RedirectView.as_view(url="/inventory/api/product/update-price/", permanent=False),
+    ),
+]
+
+# Friendly fallback for unfinished endpoints (501) if app route is missing
+# (SAFE at import-time: no reverse(); we inspect included patterns instead)
+try:
+    inv_urls_mod = _try_import("inventory.urls") or _try_import("circuitcity.inventory.urls")
+    has_heatmap = has_stock_status = False
+    has_prod_create = has_prod_update = False
+    if inv_urls_mod and hasattr(inv_urls_mod, "urlpatterns"):
+        has_heatmap = _patterns_have_name(inv_urls_mod.urlpatterns, "restock_heatmap_api")
+        has_stock_status = _patterns_have_name(inv_urls_mod.urlpatterns, "api_stock_status")
+        has_prod_create = _patterns_have_name(inv_urls_mod.urlpatterns, "api_product_create")
+        has_prod_update = _patterns_have_name(inv_urls_mod.urlpatterns, "api_product_update_price")
+
+    # Restock/Stock-status fallbacks
+    if not has_heatmap:
         urlpatterns += [path("inventory/api/restock-heatmap/", core_views.feature_unavailable, name="restock_heatmap_api")]
-    except Exception:
-        # If feature_unavailable isn't defined, silently skip (handlers below still catch 500s)
-        pass
+    if not has_stock_status:
+        urlpatterns += [path("inventory/api/stock-status/", core_views.feature_unavailable, name="api_stock_status")]
+
+    # Product API fallbacks
+    if not has_prod_create:
+        # Try to hook real view if present, else graceful stub.
+        _prod_create_view = _try_from("inventory.api_views", "api_product_create") or \
+                            _try_from("circuitcity.inventory.api_views", "api_product_create")
+        urlpatterns += [
+            path(
+                "inventory/api/product/create/",
+                _prod_create_view or core_views.feature_unavailable,
+                name="api_product_create",
+            )
+        ]
+    if not has_prod_update:
+        _prod_update_view = _try_from("inventory.api_views", "api_product_update_price") or \
+                            _try_from("circuitcity.inventory.api_views", "api_product_update_price")
+        urlpatterns += [
+            path(
+                "inventory/api/product/update-price/",
+                _prod_update_view or core_views.feature_unavailable,
+                name="api_product_update_price",
+            )
+        ]
+except Exception:
+    # In case inventory.urls import fails unexpectedly, still provide graceful fallbacks
+    urlpatterns += [path("inventory/api/restock-heatmap/", core_views.feature_unavailable, name="restock_heatmap_api")]
+    urlpatterns += [path("inventory/api/stock-status/", core_views.feature_unavailable, name="api_stock_status")]
+    _prod_create_view = _try_from("inventory.api_views", "api_product_create") or \
+                        _try_from("circuitcity.inventory.api_views", "api_product_create")
+    _prod_update_view = _try_from("inventory.api_views", "api_product_update_price") or \
+                        _try_from("circuitcity.inventory.api_views", "api_product_update_price")
+    urlpatterns += [
+        path("inventory/api/product/create/", _prod_create_view or core_views.feature_unavailable, name="api_product_create"),
+        path("inventory/api/product/update-price/", _prod_update_view or core_views.feature_unavailable, name="api_product_update_price"),
+    ]
 
 # Static / media in DEBUG
 if settings.DEBUG:
@@ -683,7 +813,9 @@ if settings.DEBUG:
     urlpatterns += static(settings.STATIC_URL, document_root=settings.STATIC_ROOT)
 
 # ======================================================================================
-# Friendly error handlers (module-level; Django uses these when DEBUG=False)
+# Error handlers
 # ======================================================================================
 handler404 = "cc.views.page_not_found"
 handler500 = "cc.views.server_error"
+
+

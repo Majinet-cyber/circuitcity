@@ -1,4 +1,4 @@
-# wallet/admin.py
+﻿# wallet/admin.py
 from django.contrib import admin
 from .models import (
     WalletTransaction,
@@ -92,3 +92,5 @@ class AdminPurchaseOrderItemAdmin(admin.ModelAdmin):
     search_fields = ("product__name", "po__supplier_name")
     autocomplete_fields = ("po", "product")
     ordering = ("-po__created_at",)
+
+

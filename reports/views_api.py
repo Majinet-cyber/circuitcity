@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 from datetime import timedelta
 from django.contrib.auth.decorators import login_required, user_passes_test
 from django.db.models import Sum, Count, F, Q, DecimalField
@@ -79,7 +79,7 @@ def agent_performance_api(request):
 @user_passes_test(_is_staff_or_auditor)
 def inventory_velocity_api(request):
     f = ReportFilters.from_request(request)
-    # sold vs time vs model vs agent → group by model, recent period
+    # sold vs time vs model vs agent â†’ group by model, recent period
     base = _apply_filters(Sale.objects.all(), f)
     rows = (
         base.values("model")
@@ -105,3 +105,5 @@ def ads_roi_api(request):
     agg_noads = no_ads.aggregate(amount=Coalesce(Sum("amount"),0), profit=Coalesce(Sum("profit"),0), orders=Count("id"))
 
     return JsonResponse({"with_ads": agg_ads, "without_ads": agg_noads})
+
+

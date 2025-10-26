@@ -1,4 +1,4 @@
-import pytest
+﻿import pytest
 from django.urls import reverse
 from django.contrib.auth.models import Group, User
 from tenants.models import Business
@@ -52,3 +52,6 @@ def test_crud_and_audit(db, client_as_manager):
     r2 = client_as_manager.post(reverse("inventory:restore", args=[item.pk]))
     assert r2.status_code in (302, 200)
     assert AuditLog.objects.filter(entity_id=str(item.pk)).exists()
+
+
+

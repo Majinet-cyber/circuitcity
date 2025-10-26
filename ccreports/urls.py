@@ -1,4 +1,4 @@
-# ccreports/urls.py
+﻿# ccreports/urls.py
 from django.urls import path
 from django.views.generic import RedirectView
 from django.conf import settings
@@ -10,7 +10,7 @@ urlpatterns = [
     # Landing page for Reports (must RENDER, not redirect)
     path("", views.home, name="home"),
 
-    # Back-compat alias → send /reports/index/ to /reports/
+    # Back-compat alias â†’ send /reports/index/ to /reports/
     path(
         "index/",
         RedirectView.as_view(pattern_name="reports:home", permanent=False),
@@ -27,3 +27,5 @@ if settings.DEBUG:
     urlpatterns += [
         path("which/", views.which_templates, name="which"),
     ]
+
+

@@ -1,4 +1,4 @@
-from django.http import JsonResponse
+﻿from django.http import JsonResponse
 from django.views.decorators.http import require_GET
 from django.utils.timezone import now
 from datetime import timedelta
@@ -39,3 +39,5 @@ def api_alerts(request):
     rows = list(Notification.objects.filter(user=user).order_by("-created_at")[:20]
                 .values("id","kind","title","body","severity","created_at","read_at"))
     return JsonResponse({"alerts": rows})
+
+

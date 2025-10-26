@@ -1,4 +1,4 @@
-# inventory/models_audit.py
+﻿# inventory/models_audit.py
 from __future__ import annotations
 
 import hashlib
@@ -41,7 +41,7 @@ class AuditLog(models.Model):
     action = models.CharField(max_length=10, choices=ACTION_CHOICES)
     payload = models.JSONField(default=dict, blank=True)
 
-    # Tamper-proofing: each row’s hash depends on the previous row’s hash + payload
+    # Tamper-proofing: each rowâ€™s hash depends on the previous rowâ€™s hash + payload
     prev_hash = models.CharField(max_length=64, blank=True, default="")
     hash = models.CharField(max_length=64, unique=True, editable=False)
 
@@ -132,10 +132,12 @@ def log_audit(
 def auto_log_delete_or_update(sender, instance, **kwargs):
     """
     For models we want to track automatically, we can hook in here later.
-    Right now this is a placeholder — we won't automatically log unless explicitly hooked.
+    Right now this is a placeholder â€” we won't automatically log unless explicitly hooked.
     """
     tracked = getattr(settings, "AUDIT_LOG_SETTINGS", {}).get("ENABLED", False)
     if not tracked:
         return
     # Example: we could auto-track certain models like Inventory, Stock, etc.
     return
+
+

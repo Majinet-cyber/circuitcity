@@ -1,4 +1,4 @@
-# ccreports/views.py
+﻿# ccreports/views.py
 from __future__ import annotations
 
 import logging
@@ -58,7 +58,7 @@ def _render_with_candidates(
             resp["X-Template-Origin"] = origin
         return resp
 
-    # Nothing found → return a helpful error page (keeps you out of a raw 500)
+    # Nothing found â†’ return a helpful error page (keeps you out of a raw 500)
     pretty = "\n".join(f"- {e}" for e in errs) or "(no details)"
     html = f"""
       <h1>Reports template not found</h1>
@@ -66,8 +66,8 @@ def _render_with_candidates(
       <pre style="white-space:pre-wrap">{pretty}</pre>
       <p>Create one of these files and refresh:</p>
       <ul>
-        <li><code>templates/ccreports/…</code></li>
-        <li><code>templates/reports/…</code></li>
+        <li><code>templates/ccreports/â€¦</code></li>
+        <li><code>templates/reports/â€¦</code></li>
       </ul>
     """.strip()
     print(">> REPORTS TEMPLATE RESOLVE FAILED\n" + pretty)
@@ -101,7 +101,7 @@ def sales_report(request: HttpRequest) -> HttpResponse:
     Sales report view (safe defaults).
     """
     ctx: Dict[str, Any] = {
-        "title": "Reports · Sales",
+        "title": "Reports Â· Sales",
         "top_models": [],
         "agents": [],
         "recent_sales": [],
@@ -120,7 +120,7 @@ def inventory_report(request: HttpRequest) -> HttpResponse:
     Inventory report view (safe defaults).
     """
     ctx: Dict[str, Any] = {
-        "title": "Reports · Inventory",
+        "title": "Reports Â· Inventory",
         "low_stock": [],
         "ageing": [],
         "turnover": [],
@@ -158,3 +158,5 @@ def which_templates(request: HttpRequest) -> HttpResponse:
         "inventory": origin_for(("ccreports/inventory.html", "reports/inventory.html")),
     }
     return JsonResponse(data, json_dumps_params={"indent": 2})
+
+

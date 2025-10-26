@@ -1,33 +1,125 @@
 {% extends "hq/base.html" %}
+{% load humanize %}
 {% block title %}Agents{% endblock %}
+
 {% block body %}
-<h1 style="margin:0 0 10px">Agents</h1>
 
-<form class="kpis" method="get">
-  <input type="search" name="q" value="{{ q }}" placeholder="Search agent or business">
-  <button class="btn btn-ghost">Go</button>
-</form>
+<h1 class="fw-bold" style="margin:0 0 12px">Agents</h1>
 
-<table>
-  <thead><tr><th>Agent</th><th>Business</th><th>Location</th><th>Joined</th></tr></thead>
-  <tbody>
-  {% for a in page_obj %}
-    <tr>
-      <td>
-        <div style="display:flex;align-items:center;gap:10px">
-          <div style="width:28px;height:28px;border-radius:999px;background:#e9f2ff;display:grid;place-items:center;font-weight:900;color:#2757d8">
-            {{ a.name|first|upper|default:a.user.username|first|upper }}
+<div class="row g-2 align-items-center" style="margin-bottom:12px">
+  <div class="col-auto">
+    <form method="get" class="d-flex gap-2">
+      <input type="search"
+             class="form-control"
+             name="q"
+             value="{{ q|default:'' }}"
+             placeholder="Search agent or business"
+             style="min-width:280px">
+      <button class="btn btn-ghost" type="submit">Go</button>
+      {% if q %}
+        <a class="btn btn-light" href="?">Clear</a>
+      {% endif %}
+    </form>
+  </div>
+  <div class="col ms-auto text-muted">
+    {% if page_obj.paginator.count %}
+      <span>{{ page_obj.paginator.count|intcomma }} result{{ page_obj.paginator.count|pluralize }}</span>
+    {% else %}
+      <span>0 results</span>
+    {% endif %}
+  </div>
+</div>
+
+<div class="table-responsive">
+  <table class="table align-middle">
+    <thead class="table-light">
+      <tr>
+        <th scope="col">Agent</th>
+        <th scope="col">Business</th>
+        <th scope="col">Location</th>
+        <th scope="col" class="text-nowrap">Joined</th>
+      </tr>
+    </thead>
+    <tbody>
+    {% for a in page_obj %}
+      <tr>
+        <td>
+          <div class="d-flex align-items-center gap-2">
+            <div style="width:28px;height:28px;border-radius:999px;background:#e9f2ff;display:grid;place-items:center;font-weight:900;color:#2757d8">
+              {% if a.name %}{{ a.name|first|upper }}{% elif a.user %}{{ a.user.username|first|upper }}{% else %}—{% endif %}
+            </div>
+            <div>
+              <div class="fw-bold">
+                {% if a.name %}{{ a.name }}{% elif a.user %}{{ a.user.username }}{% else %}—{% endif %}
+              </div>
+              <div class="small text-muted">
+                {% if a.user and a.user.email %}{{ a.user.email }}{% endif %}
+              </div>
+            </div>
           </div>
-          <div style="font-weight:800">{% if a.name %}{{ a.name }}{% elif a.user %}{{ a.user.username }}{% else %}—{% endif %}</div>
-        </div>
-      </td>
-      <td><a href="{% url 'hq:business_detail' a.business_id %}">{{ a.business.name }}</a></td>
-      <td>{{ a.location.name|default:"—" }}</td>
-      <td>{{ a.created_at|date:"Y-m-d" }}</td>
-    </tr>
-  {% empty %}
-    <tr><td colspan="4">No agents yet.</td></tr>
-  {% endfor %}
-  </tbody>
-</table>
+        </td>
+
+        <td class="text-nowrap">
+          {% if a.business_id %}
+            <a href="{% url 'hq:business_detail' a.business_id %}">{{ a.business.name|default:"(unknown)" }}</a>
+          {% else %}
+            —
+          {% endif %}
+        </td>
+
+        <td class="text-nowrap">
+          {{ a.location.name|default:"—" }}
+        </td>
+
+        <td class="text-nowrap">
+          {{ a.created_at|date:"Y-m-d" }}
+        </td>
+      </tr>
+    {% empty %}
+      <tr>
+        <td colspan="4" class="text-muted">
+          No agents yet.
+          {% if q %} Try clearing the search.{% endif %}
+        </td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+{% if page_obj.paginator.num_pages > 1 %}
+<nav aria-label="Agents pagination" class="mt-2">
+  <ul class="pagination">
+    <li class="page-item {% if not page_obj.has_previous %}disabled{% endif %}">
+      <a class="page-link" href="?q={{ q|urlencode }}&page={{ page_obj.previous_page_number }}" tabindex="-1">Prev</a>
+    </li>
+
+    {# windowed pager #}
+    {% for p in page_obj.paginator.page_range %}
+      {% if p == 1 or p == page_obj.paginator.num_pages or p >= page_obj.number|add:-2 and p <= page_obj.number|add:2 %}
+        <li class="page-item {% if p == page_obj.number %}active{% endif %}">
+          <a class="page-link" href="?q={{ q|urlencode }}&page={{ p }}">{{ p }}</a>
+        </li>
+      {% elif p == 2 and page_obj.number > 4 %}
+        <li class="page-item disabled"><span class="page-link">…</span></li>
+      {% elif p == page_obj.paginator.num_pages|add:-1 and page_obj.number < page_obj.paginator.num_pages|add:-3 %}
+        <li class="page-item disabled"><span class="page-link">…</span></li>
+      {% endif %}
+    {% endfor %}
+
+    <li class="page-item {% if not page_obj.has_next %}disabled{% endif %}">
+      <a class="page-link" href="?q={{ q|urlencode }}&page={{ page_obj.next_page_number }}">Next</a>
+    </li>
+  </ul>
+</nav>
+{% endif %}
+
+<div class="alert alert-info mt-3" role="alert" style="border-radius:12px">
+  <div class="fw-bold">Managers should appear as agents</div>
+  <div class="small text-muted">
+    Ensure your view’s queryset includes both regular agents and any users with a manager role.
+    (For example, union the agent table with managers, or materialize managers as agent rows.)
+  </div>
+</div>
+
 {% endblock %}

@@ -1,4 +1,4 @@
-from datetime import date, timedelta
+﻿from datetime import date, timedelta
 from decimal import Decimal
 from django.db.models import Sum
 from ..models import CashLedger, ForecastSnapshot
@@ -38,3 +38,5 @@ def compute_forecast(horizon_days=30, opening_balance=Decimal("0")):
         params={"window_days": 14, "safety_in": str(SAFETY_INFLOW), "safety_out": str(SAFETY_OUTFLOW)}
     )
     return snap
+
+

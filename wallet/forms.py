@@ -1,4 +1,4 @@
-# wallet/forms.py
+﻿# wallet/forms.py
 from __future__ import annotations
 from django import forms
 from django.contrib.auth import get_user_model
@@ -36,3 +36,5 @@ class IssuePayslipForm(forms.Form):
         last_prev = first_this - timezone.timedelta(days=1)
         start_prev = last_prev.replace(day=1)
         return {"period_start": start_prev, "period_end": last_prev}
+
+

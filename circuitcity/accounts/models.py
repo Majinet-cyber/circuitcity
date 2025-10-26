@@ -1,4 +1,4 @@
-# accounts/models.py
+﻿# accounts/models.py
 from __future__ import annotations
 
 from datetime import timedelta
@@ -26,14 +26,14 @@ class Profile(models.Model):
     # Visual identity
     avatar = models.ImageField(upload_to=avatar_upload_to, blank=True, null=True)
 
-    # Settings shown on the Settings · Profile page
+    # Settings shown on the Settings Â· Profile page
     display_name = models.CharField(max_length=120, blank=True, default="")
     country      = models.CharField(max_length=80,  blank=True, default="")
     language     = models.CharField(max_length=80,  blank=True, default="English - United States")
     timezone     = models.CharField(max_length=80,  blank=True, default=settings.TIME_ZONE)
 
     # ---- Role flag (no need to replace AUTH_USER_MODEL) ----
-    # Mark “manager” users who can access CFO/approvals/etc.
+    # Mark â€œmanagerâ€ users who can access CFO/approvals/etc.
     # Admins remain those with user.is_staff=True.
     is_manager   = models.BooleanField(default=False)
 
@@ -270,3 +270,5 @@ def _ensure_user_sidecars(sender, instance, created, **kwargs):
         return
     Profile.objects.get_or_create(user=instance)
     LoginSecurity.objects.get_or_create(user=instance)
+
+

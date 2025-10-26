@@ -1,4 +1,4 @@
-# accounts/utils.py
+﻿# accounts/utils.py
 import secrets
 from datetime import timedelta
 from django.core.mail import send_mail
@@ -30,7 +30,9 @@ def create_and_email_otp(user):
         f"Hello {getattr(user, 'first_name', '') or 'there'},\n\n"
         f"Your Circuit City reset code is: {raw}\n"
         f"This code expires in 5 minutes.\n\n"
-        "If you didn’t request this, you can ignore this email."
+        "If you didnâ€™t request this, you can ignore this email."
     )
     send_mail(subject, body, getattr(settings, "DEFAULT_FROM_EMAIL", None), [user.email], fail_silently=False)
     return True, "If that email exists, a code has been sent."
+
+

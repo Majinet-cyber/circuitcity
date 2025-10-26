@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="glass" style="max-width:740px;margin:2rem auto;padding:1.25rem;">
+  <h1>Subscription required</h1>
+  {% if sub and sub.status == 'EXPIRED' %}
+    <p>Your trial has ended. Choose a plan to continue using Circuit City.</p>
+  {% else %}
+    <p>No active subscription found. Pick a plan to get started.</p>
+  {% endif %}
+  <ul>
+    {% for p in plans %}
+      <li style="margin:.5rem 0; padding:.5rem; border:1px solid #e2e8f0; border-radius:10px;">
+        <strong>{{ p.name }}</strong> — MWK {{ p.price_mwk }} / {{ p.period }}
+        {% if p.trial_days %}<em>(includes {{ p.trial_days }}-day trial)</em>{% endif %}
+      </li>
+    {% empty %}
+      <li>No plans configured yet.</li>
+    {% endfor %}
+  </ul>
+</div>
+{% endblock %}

@@ -5,94 +5,124 @@
   <meta charset="utf-8" />
   <title>Sign in · Imajinet</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <!-- Prevent browsers from caching the form response (avoids stale CSRF + re-POSTs) -->
   <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate, max-age=0">
   <meta http-equiv="Pragma" content="no-cache">
 
   <style>
     :root{
-      --ink:#0f172a; --muted:#48566b;
-      --btn-a:#4f8cff; --btn-b:#1e40af; --btn-glow:#3b82f6; --link:#1e40af;
+      --ink:#0f172a;
+      --muted:#48566b;
+
+      /* Flat primary blue (matches your reset page tone, but no gradient/glow) */
+      --blue:#5a86f7;
+      --blue-hover:#4a78ee;
+
+      /* Solid green secondary */
+      --green:#22c55e;
+      --green-hover:#1fb155;
+
+      /* Background + card */
       --bg1:#f6f9ff; --bg2:#e9f0ff;
-      --card:#ffffffcc; --border:#e2e8f0cc; --shadow:0 24px 60px rgba(15,23,42,.18);
+      --card:#ffffffcc; --border:#e2e8f0cc;
       --radius:18px;
-      --danger:#b91c1c; --danger-bg:#fff1f1; --danger-br:#ffd6d6;
-      --info-bg:#e7f2ff; --info-br:#cfe3ff; --info-ink:#0c4a6e;
-      --card-scale:.96;  --logo-h:72px;  --card-bottom-pad:34px;
+
+      --logo-h:64px;
     }
+
+    /* Layout: full viewport, center content; no vertical scroll on typical screens */
     *{box-sizing:border-box}
-    html,body{height:100%}
+    html,body{height:100%; margin:0}
     body{
-      margin:0; color:var(--ink);
+      color:var(--ink);
       font:16px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,Inter,Arial,"Noto Sans","Helvetica Neue",sans-serif;
       background:
         radial-gradient(1200px 700px at 25% -10%, var(--bg2), transparent 60%),
         radial-gradient(1200px 700px at 120% 120%, var(--bg2), transparent 60%),
         var(--bg1);
-      min-height:100svh; display:grid; place-items:center; padding:16px;
+      min-height:100svh;
+      display:grid;
+      place-items:center;          /* centers the card */
+      padding:12px;                /* small safe padding, avoids scrollbars */
+      overflow-y:hidden;           /* hide accidental scroll */
     }
+
     .card{
       width:min(560px, 92vw);
-      border-radius:calc(var(--radius) + 6px);
-      background:linear-gradient(180deg, var(--card), #ffffffb0);
+      border-radius:var(--radius);
+      background:#fff;             /* flat card (no glass to keep it compact) */
       border:1px solid var(--border);
-      box-shadow:var(--shadow);
-      backdrop-filter:saturate(140%) blur(10px);
-      -webkit-backdrop-filter:saturate(140%) blur(10px);
-      padding:18px 18px var(--card-bottom-pad);
+      padding:18px 18px 20px;
       display:flex; flex-direction:column; gap:10px;
-      transform:scale(var(--card-scale));
+      /* tiny shadow to separate from bg but keep “flat” look */
+      box-shadow:0 8px 20px rgba(15,23,42,.08);
     }
+
     .card-logo{display:block; height:var(--logo-h); width:auto; margin:2px auto 6px}
     .sub{margin:0 0 8px; color:#55627a}
+
     label{display:block; margin:8px 0 4px; font-weight:650; color:#0b1324}
     .input{
       width:100%; padding:12px 14px; border:1px solid #d9e2ef; border-radius:12px;
-      background:#fff; font-size:1rem; outline:none; box-shadow:inset 0 1px 0 rgba(255,255,255,.5);
-      transition:border-color .2s, box-shadow .2s;
+      background:#fff; font-size:1rem; outline:none;
     }
-    .input:focus{border-color:#c8d8ff; box-shadow:0 0 0 3px rgba(99,102,241,.26)}
+    .input:focus{border-color:#c8d8ff; box-shadow:0 0 0 3px rgba(99,102,241,.18)}
+
     .pwd{position:relative}
-    .eye{position:absolute; right:10px; top:50%; transform:translateY(-50%);
-      background:transparent; border:0; cursor:pointer; padding:0; width:28px; height:28px; color:#6b7280;}
-    .btn{
-      width:100%; margin-top:8px; border:0; cursor:pointer; color:#fff; font-weight:850; letter-spacing:.2px;
-      border-radius:12px; padding:12px 14px; font-size:1.02rem;
-      background:linear-gradient(180deg, var(--btn-a), var(--btn-b));
-      box-shadow:0 14px 28px rgba(30,64,175,.35), 0 0 0 1px rgba(255,255,255,.18) inset, 0 16px 36px var(--btn-glow);
-      transition:transform .14s ease, filter .14s ease, opacity .14s ease;
-      display:flex; align-items:center; justify-content:center; gap:10px;
-      text-decoration:none;
+    .eye{
+      position:absolute; right:10px; top:50%; transform:translateY(-50%);
+      background:transparent; border:0; cursor:pointer; padding:0; width:28px; height:28px; color:#6b7280;
     }
-    .btn:hover{transform:translateY(-1px); filter:brightness(1.03)}
-    .btn:active{transform:none; filter:brightness(.98)}
-    .btn[disabled]{opacity:.75; cursor:default}
-    .spinner{width:18px; height:18px; border-radius:50%; border:2.5px solid rgba(255,255,255,.45); border-top-color:#fff; animation:spin .8s linear infinite; display:none;}
-    .btn.loading .spinner{display:inline-block}
-    .btn.loading .btn-label{opacity:.9}
-    @keyframes spin{to{transform:rotate(360deg)}}
-    .links{margin:4px 0 6px}
-    .links a{color:var(--link); text-decoration:none}
+
+    /* FLAT primary button */
+    .btn{
+      width:100%; margin-top:8px; border:0; cursor:pointer; color:#fff; font-weight:800;
+      border-radius:12px; padding:12px 14px; font-size:1.02rem;
+      background:var(--blue);
+      transition:background-color .15s ease, opacity .15s ease;
+    }
+    .btn:hover{background:var(--blue-hover)}
+    .btn:active{opacity:.95}
+    .btn[disabled]{opacity:.7; cursor:default}
+
+    /* FLAT green secondary */
+    .btn-green{
+      width:100%; margin-top:12px; border:0; cursor:pointer; color:#fff; font-weight:800;
+      border-radius:12px; padding:12px 14px; font-size:1.02rem;
+      background:var(--green);
+      transition:background-color .15s ease, opacity .15s ease;
+    }
+    .btn-green:hover{background:var(--green-hover)}
+    .btn-green:active{opacity:.95}
+
+    .links{margin:6px 0 8px}
+    .links a{color:#1e40af; text-decoration:none}
     .links a:hover{text-decoration:underline}
-    .rule{border:0; border-top:1px solid #dfe4f7; margin:10px 0 8px}
-    .msg{background:var(--info-bg); border:1px solid var(--info-br); color:var(--info-ink);
-         border-radius:10px; padding:.55rem .7rem; margin:2px 0 6px;}
-    .err{background:var(--danger-bg); border:1px solid var(--danger-br); color:var(--danger)}
-    .footnote{color:#64748b; font-size:.92rem; line-height:1.35; margin-top:10px; margin-bottom:2px;}
-    .corner{position:fixed; bottom:8px; font-size:.9rem; color:#7b879a; user-select:none}
-    .corner.left{left:14px} .corner.right{right:14px}
-    @media (max-height: 720px){ :root{ --card-scale:.94; --logo-h:64px; } .corner{display:none} }
-    @media (max-width: 380px){ :root{ --card-scale:.92; } .footnote{font-size:.88rem} }
+
+    .rule{border:0; border-top:1px solid #eef1fb; margin:8px 0}
+
+    .footnote{color:#64748b; font-size:.92rem; line-height:1.35; margin-top:8px}
+
+    /* Make sure it fits short viewports too */
+    @media (max-height: 680px){
+      :root{ --logo-h:52px }
+      .card{padding:14px}
+      .footnote{font-size:.9rem}
+      body{padding:8px}
+    }
   </style>
 </head>
 <body>
   <div class="card" role="dialog" aria-labelledby="loginTitle" aria-describedby="loginDesc">
+    <!-- Keep your logo -->
     <img class="card-logo" src="{% static 'img/majn.png' %}" alt="Imajinet">
+
     <p id="loginDesc" class="sub">Sign in to continue.</p>
 
     {% if messages %}
       {% for m in messages %}
-        <div class="msg{% if m.tags %} {{ m.tags }}{% endif %}">{{ m }}</div>
+        <div style="background:#e7f2ff;border:1px solid #cfe3ff;color:#0c4a6e;border-radius:10px;padding:.55rem .7rem;margin:2px 0 6px">
+          {{ m }}
+        </div>
       {% endfor %}
     {% endif %}
 
@@ -109,51 +139,33 @@
         <input id="id_password" class="input" type="password" name="password" autocomplete="current-password" required>
         <button type="button" class="eye" aria-label="Show password" title="Show/Hide password">
           <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7Z"/>
-            <circle cx="12" cy="12" r="3"/>
+            <path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7Z"></path>
+            <circle cx="12" cy="12" r="3"></circle>
           </svg>
         </button>
       </div>
 
-      <button id="submitBtn" class="btn" type="submit" aria-live="polite">
-        <span class="btn-label">Sign in</span>
-        <span class="spinner" aria-hidden="true"></span>
-      </button>
+      <button id="submitBtn" class="btn" type="submit">Log In</button>
     </form>
 
     <div class="links">
-      <a href="{% url 'accounts:forgot_password_request' %}">Forgot your password?</a>
+      <a href="{% url 'accounts:forgot_password_request' %}">Forgot password?</a>
     </div>
 
     <hr class="rule">
 
-    <p class="footnote">
-      Managers create the store and can invite agents later.<br>
-      Agents: ask your manager for an invite link.
-    </p>
+    <button class="btn-green" onclick="location.href='{% url 'accounts:signup_manager' %}'">
+      Create a Manager account
+    </button>
 
-    <a class="btn" role="button" href="{% url 'accounts:signup_manager' %}">
-      <span class="btn-label">Create a Manager account</span>
-    </a>
+    <p class="footnote">
+      Managers create the store and invite agents later.<br>
+      Agents should request an invite link.
+    </p>
   </div>
 
-  <div class="corner left">v1.1</div>
-  <div class="corner right">© imajinet</div>
-
   <script>
-    // Ensure a clean GET entry in history so reload never re-POSTs (“Confirm resubmission”)
-    try {
-      if (window.history && window.history.replaceState) {
-        const cleanUrl = window.location.pathname + window.location.search;
-        window.history.replaceState(null, document.title, cleanUrl);
-      }
-      // If we arrive via the back/forward cache, force a real reload to get a fresh CSRF cookie
-      window.addEventListener('pageshow', function (e) {
-        if (e.persisted) window.location.reload();
-      });
-    } catch (e) {}
-
-    // Password eye toggle
+    // Password show/hide
     (function(){
       const btn = document.querySelector('.eye');
       const input = document.getElementById('id_password');
@@ -167,33 +179,13 @@
       }
     })();
 
-    // Submit state: lock fields, but keep hidden CSRF/next enabled
-    (function(){
-      const form = document.getElementById('loginForm');
-      const submitBtn = document.getElementById('submitBtn');
-      if(form && submitBtn){
-        form.addEventListener('submit', function(){
-          submitBtn.classList.add('loading');
-          submitBtn.setAttribute('disabled','disabled');
-          const controls = form.querySelectorAll('input, button, select, textarea');
-          controls.forEach(el => {
-            if (el === submitBtn) return;
-            if (el.tagName === 'INPUT' && (el.type === 'hidden' || el.name === 'csrfmiddlewaretoken' || el.name === 'next')) return;
-            if (el.tagName === 'BUTTON') el.setAttribute('disabled','disabled');
-            else try { el.readOnly = true; } catch(e) {}
-          });
-          // auto-unlock after a short period (in case of network error)
-          setTimeout(() => {
-            submitBtn.classList.remove('loading');
-            submitBtn.removeAttribute('disabled');
-            controls.forEach(el => {
-              if (el.tagName !== 'BUTTON') try { el.readOnly = false; } catch(e) {}
-              else if (el !== submitBtn) el.removeAttribute('disabled');
-            });
-          }, 10000);
-        });
+    // Prevent re-POST on refresh
+    try {
+      if (history.replaceState) {
+        history.replaceState(null, document.title, location.pathname + location.search);
       }
-    })();
+      addEventListener('pageshow', e => { if (e.persisted) location.reload(); });
+    } catch(e){}
   </script>
 </body>
 </html>

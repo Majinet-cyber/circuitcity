@@ -1,4 +1,4 @@
-from django.db import models
+﻿from django.db import models
 from django.contrib.auth import get_user_model
 User = get_user_model()
 
@@ -9,3 +9,5 @@ class SavedView(models.Model):
     query = models.JSONField(default=dict)   # {filters:{...}, sort:"-qty", columns:[...]}
     is_shared = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
+
+

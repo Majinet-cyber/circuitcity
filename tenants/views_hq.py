@@ -1,4 +1,4 @@
-# circuitcity/tenants/views_hq.py
+﻿# circuitcity/tenants/views_hq.py
 from django.shortcuts import render
 from django.http import HttpRequest, HttpResponse
 
@@ -15,7 +15,7 @@ def home(request: HttpRequest) -> HttpResponse:
 
 def agents_list(request: HttpRequest) -> HttpResponse:
     """
-    HQ → Agents management page.
+    HQ â†’ Agents management page.
     """
     try:
         return render(request, "tenants/agents_list.html")
@@ -25,9 +25,11 @@ def agents_list(request: HttpRequest) -> HttpResponse:
 
 def stock_trends(request: HttpRequest) -> HttpResponse:
     """
-    HQ → Stock trends / analytics page.
+    HQ â†’ Stock trends / analytics page.
     """
     try:
         return render(request, "tenants/stock_trends.html")
     except Exception:
         return HttpResponse("<h1>HQ Stock Trends</h1><p>Coming soon.</p>")
+
+

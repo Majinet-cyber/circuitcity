@@ -1,0 +1,162 @@
+{% extends "base.html" %}
+{% load humanize %}
+{% load static %}
+
+{% block title %}Choose a Plan · Billing{% endblock %}
+
+{% block content %}
+<style>
+  :root{
+    --bg:#0b1220; --card:#0f172a; --ring:#1f2a44; --muted:#8aa0b8; --fg:#e5eef7;
+    --ok:#10b981; --info:#22d3ee; --warn:#f59e0b; --danger:#ef4444;
+  }
+  .wrap{max-width:1024px;margin:0 auto;padding:16px}
+  .page-title{display:flex;gap:10px;align-items:center;margin-bottom:12px}
+  .page-title .dot{width:34px;height:34px;border-radius:10px;display:grid;place-items:center;
+    background:rgba(34,197,94,.1);border:1px solid rgba(34,197,94,.25)}
+  .page-title h1{font-size:20px;font-weight:800;margin:0;color:#0f172a}
+  .subtle{color:#64748b}
+  .kpi{display:flex;gap:10px;flex-wrap:wrap;margin:8px 0 18px}
+  .kpi .chip{display:inline-flex;align-items:center;gap:.5rem;padding:.4rem .6rem;border-radius:999px;
+    border:1px solid #e2e8f0;background:#fff;color:#0f172a;font-weight:700;font-size:12px}
+  .grid{display:grid;gap:14px;grid-template-columns:repeat(auto-fit,minmax(250px,1fr))}
+  .plan{background:#fff;border:1px solid #e2e8f0;border-radius:14px;padding:14px;display:flex;flex-direction:column}
+  .plan .head{display:flex;align-items:center;justify-content:space-between}
+  .plan .name{font-weight:800}
+  .plan .badge{font-size:11px;border:1px solid #d1fae5;background:#ecfdf5;color:#065f46;border-radius:999px;padding:.2rem .5rem}
+  .plan .price{font-size:28px;font-weight:900;margin:8px 0}
+  .plan ul{list-style:none;padding-left:0;margin:8px 0 0}
+  .plan ul li{display:flex;gap:.5rem;align-items:flex-start;margin:6px 0;color:#0f172a}
+  .plan ul li i{color:#10b981}
+  .plan .cta{margin-top:auto;display:flex;gap:8px;align-items:center}
+  .btn{border:1px solid #0ea5e9;background:#0ea5e9;color:#fff;border-radius:10px;padding:9px 12px;font-weight:800;text-decoration:none}
+  .btn-ghost{border:1px solid #e2e8f0;background:#fff;color:#0f172a;border-radius:10px;padding:9px 12px;font-weight:700;text-decoration:none}
+  .current{box-shadow:0 0 0 2px rgba(34,197,94,.25), 0 10px 20px rgba(2,6,23,.06)}
+  .hr{height:1px;background:#e2e8f0;margin:12px 0}
+  .note{font-size:13px;color:#475569}
+  .provider-pill{display:inline-flex;align-items:center;gap:.4rem;border:1px dashed #94a3b8;color:#475569;
+    padding:.25rem .5rem;border-radius:999px;background:#f8fafc}
+  .radio-wrap{display:flex;gap:8px;align-items:center}
+  .radio-wrap input[type="radio"]{accent-color:#10b981}
+</style>
+
+<div class="wrap">
+  <div class="page-title">
+    <div class="dot">
+      <i class="bi bi-credit-card" style="color:#16a34a"></i>
+    </div>
+    <div>
+      <h1>Choose your plan</h1>
+      <div class="subtle">
+        {% with now=now|default:None %}
+          {% if request.user.first_name %}
+            <span id="greet">Hello {{ request.user.first_name }}!</span>
+          {% else %}
+            <span id="greet">Welcome!</span>
+          {% endif %}
+          <span>Pick a plan and proceed to checkout.</span>
+        {% endwith %}
+      </div>
+    </div>
+  </div>
+
+  <div class="kpi">
+    {% if sub_badge %}
+      <span class="chip"><i class="bi bi-badge-ad"></i> {{ sub_badge }}</span>
+    {% endif %}
+    {% if days_left is not None %}
+      <span class="chip"><i class="bi bi-hourglass-split"></i> {{ days_left }} day{{ days_left|pluralize }} of trial left</span>
+    {% endif %}
+    <span class="chip"><i class="bi bi-geo-alt"></i> Future providers: <span class="provider-pill"><i class="bi bi-sim"></i> Airtel</span> <span class="provider-pill"><i class="bi bi-sim"></i> TNM</span></span>
+  </div>
+
+  <form method="post" action="{% url 'billing:subscribe' %}">
+    {% csrf_token %}
+
+    <div class="grid">
+      {% for p in plans %}
+      {% with is_current=sub.plan_id == p.id %}
+      <label class="plan {% if is_current %}current{% endif %}">
+        <div class="head">
+          <div class="name">
+            <i class="bi bi-lightning-charge" style="-webkit-text-fill-color:transparent;background:linear-gradient(120deg,#22d3ee,#10b981);-webkit-background-clip:text"></i>
+            {{ p.name }}
+          </div>
+          {% if is_current %}
+            <span class="badge"><i class="bi bi-check2-circle"></i> Current</span>
+          {% endif %}
+        </div>
+
+        <div class="price">
+          {{ p.currency|default:"MWK" }} {{ p.amount|floatformat:0|intcomma }}
+          <span class="subtle" style="font-size:12px;font-weight:700">/ {{ p.get_interval_display|default:"month" }}</span>
+        </div>
+
+        <div class="radio-wrap">
+          {% if form and form.plan %}
+            {{ form.plan.as_widget }}
+          {% else %}
+            <input type="radio" name="plan" value="{{ p.id }}" {% if is_current %}checked{% endif %} id="plan-{{ p.id }}">
+          {% endif %}
+          <label for="plan-{{ p.id }}" class="subtle">Select {{ p.name }}</label>
+        </div>
+
+        <div class="hr"></div>
+
+        <ul>
+          {% comment %} Basic feature hints; customize per plan if you store metadata {% endcomment %}
+          {% if p.code|lower == 'starter' %}
+            <li><i class="bi bi-check2-circle"></i> 1 store</li>
+            <li><i class="bi bi-check2-circle"></i> No agents</li>
+            <li><i class="bi bi-check2-circle"></i> Core inventory</li>
+          {% elif p.code|lower == 'pro' %}
+            <li><i class="bi bi-check2-circle"></i> Up to 5 agents</li>
+            <li><i class="bi bi-check2-circle"></i> Unlimited stores</li>
+            <li><i class="bi bi-check2-circle"></i> Reports & payslips</li>
+          {% else %}
+            <li><i class="bi bi-check2-circle"></i> Unlimited agents</li>
+            <li><i class="bi bi-check2-circle"></i> Unlimited stores</li>
+            <li><i class="bi bi-check2-circle"></i> Priority support</li>
+          {% endif %}
+        </ul>
+
+        <div class="cta">
+          <button class="btn" type="submit" name="plan" value="{{ p.id }}">
+            <i class="bi bi-bag-check"></i> Continue with {{ p.name }}
+          </button>
+          {% if not is_current %}
+            <span class="btn-ghost" onclick="document.getElementById('plan-{{ p.id }}')?.click()" role="button">
+              <i class="bi bi-hand-index-thumb"></i> Select
+            </span>
+          {% endif %}
+        </div>
+      </label>
+      {% endwith %}
+      {% empty %}
+        <div class="plan">
+          <div class="name">No active plans</div>
+          <p class="note">Please contact support to enable plans.</p>
+        </div>
+      {% endfor %}
+    </div>
+
+    <p class="note" style="margin-top:12px">
+      You’ll review and pay on the next step. Card is available today; Airtel &amp; TNM are coming soon.
+    </p>
+  </form>
+</div>
+
+<script>
+  // Friendly greeting based on local time
+  (function(){
+    const el = document.getElementById('greet');
+    if(!el) return;
+    const h = new Date().getHours();
+    let t = 'Hello';
+    if (h < 12) t = 'Good morning';
+    else if (h < 17) t = 'Good afternoon';
+    else t = 'Good evening';
+    el.textContent = t + ' ' + el.textContent.replace(/^Hello\s*/, '');
+  })();
+</script>
+{% endblock %}

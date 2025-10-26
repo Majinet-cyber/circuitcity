@@ -1,4 +1,4 @@
-# accounts/admin.py
+﻿# accounts/admin.py
 from django.contrib import admin
 from django.utils import timezone
 from django.utils.html import format_html
@@ -21,7 +21,7 @@ class ProfileAdmin(admin.ModelAdmin):
     def avatar_preview(self, obj):
         if obj.avatar:
             return format_html('<img src="{}" style="height:40px;width:40px;object-fit:cover;border-radius:50%;">', obj.avatar.url)
-        return "—"
+        return "â€”"
     avatar_preview.short_description = "Avatar"
 
 
@@ -105,3 +105,5 @@ class LoginSecurityAdmin(admin.ModelAdmin):
                 sec.save(update_fields=["stage", "fail_count", "locked_until", "hard_blocked"])
                 updated += 1
         self.message_user(request, f"Unblocked {updated} account(s).")
+
+

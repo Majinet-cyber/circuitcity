@@ -1,6 +1,13 @@
-#--- PART 1/3 START (inventory/views.py) ---# --- PART 1/3 — circuitcity/inventory/views.py ---
+﻿#--- PART 1/3 START (inventory/views.py) ---# --- PART 1/3 â€” circuitcity/inventory/views.py ---
 
 from __future__ import annotations
+from django.contrib import messages
+from .models import BusinessKind
+from django.shortcuts import render, redirect
+from django.urls import reverse
+from .utils import get_invite_token, invite_join_url
+from .forms import MerchProductForm, MerchUnitPriceFormSet
+import logging
 
 import csv
 import json
@@ -14,11 +21,13 @@ def _wants_json(request):
     if request.GET.get("as") == "json":
         return True
     return request.headers.get("x-requested-with") == "XMLHttpRequest"
-
+from django.urls import reverse
+from .forms import MerchProductForm, MerchUnitPriceFormSet
+from .forms import MerchProductForm, MerchUnitPriceFormSet
 from functools import wraps
 from urllib.parse import urlencode
 from .api import predictions_summary as api_predictions
-
+from django.utils.translation import gettext as _
 from decimal import Decimal
 from datetime import datetime, timedelta, date, time  # NOTE: keep 'time' for wallet calc in Part 2
 # ORM bits for subqueries/annotations
@@ -28,6 +37,13 @@ try:
     from sales.models import Sale as Sale  # noqa: F401
 except Exception:
     Sale = None  # type: ignore
+    # ----- Optional Sales models (Order / OrderItem) -------------------
+    try:
+        from sales.models import Order, OrderItem  # type: ignore
+    except Exception:
+        Order = None  # type: ignore[assignment]
+        OrderItem = None  # type: ignore[assignment]
+
 from datetime import datetime, timedelta, time as dtime
 from django.utils import timezone
 from tenants.utils import require_business, require_role
@@ -148,6 +164,52 @@ def _inventory_header_stats(request):
         "sum_order": sums["sum_order"] or Decimal("0.00"),
         "sum_selling": sums["sum_selling"] or Decimal("0.00"),
     }
+# --- Add if these imports are not already present ---
+  # TextChoices you added (PHARMACY, PHONES, LIQUOR, etc.)
+
+def _detect_kind(business: Business) -> str | None:
+    """
+    Return a normalized business kind string that matches BusinessKind values.
+    Tries a few common field names on your Business model.
+    """
+    if not business:
+        return None
+    for attr in ("kind", "business_kind", "industry", "category", "type"):
+        val = getattr(business, attr, None)
+        if val:
+            return str(val)
+    return None
+
+@login_required
+def merch_add_router(request):
+    """
+    One URL that decides WHICH 'Add Products' form to render based on the active business.
+    """
+    biz = getattr(request, "business", None)
+    if not biz:
+        # No active business selected â†’ send user to chooser
+        return redirect("tenants:choose_business")
+
+    kind = _detect_kind(biz)
+
+    # Map business kind â†’ template
+    template_map = {
+        BusinessKind.PHARMACY: "inventory/add_product_pharmacy.html",
+        BusinessKind.PHONES:   "inventory/add_product_phones.html",
+        BusinessKind.LIQUOR:   "inventory/add_product_liquor.html",
+        # If you have a separate TextChoice for clothing, add it; otherwise treat as 'grocery' fallback
+        "clothing":            "inventory/add_product_clothing.html",
+        BusinessKind.GROCERY:  "inventory/add_product_clothing.html",  # change if you have a dedicated grocery template
+    }
+
+    template = template_map.get(kind) or "inventory/add_product_clothing.html"
+
+    ctx = {
+        "page_title": "Add Products",
+        "business": biz,
+        "BUSINESS_KIND": kind,
+    }
+    return render(request, template, ctx)
 
 def _ensure_active_business_and_location(request):
     """
@@ -201,7 +263,7 @@ def _ensure_active_business_and_location(request):
     return biz, loc
 
 
-# --- Example: Scan IN view (adapt to your project’s view name) ---
+# --- Example: Scan IN view (adapt to your projectâ€™s view name) ---
 
 # --- Example: Scan SOLD view gets the same treatment ---
 
@@ -209,6 +271,55 @@ def _ensure_active_business_and_location(request):
 from django.contrib import messages
 from django.shortcuts import redirect
 from django.utils import timezone
+def _resolve_default_location_id(request):
+    """
+    Returns a location id to use when nothing is chosen yet:
+      1) session['active_location_id']
+      2) request.user.agent_profile.location_id (if present)
+      3) business default (if present)
+      4) first Location id for this business
+    """
+    # 1) session
+    sid = request.session.get("active_location_id")
+    if sid:
+        return sid
+
+    # 2) agent home
+    try:
+        ap = getattr(request.user, "agent_profile", None)
+        if ap and ap.location_id:
+            return ap.location_id
+    except Exception:
+        pass
+
+    # 3) business default, then 4) first for business
+    try:
+        biz = getattr(request, "business", None) or getattr(request, "active_business", None)
+        if biz:
+            default = Location.default_for(biz.id)
+            if default:
+                return default.id
+    except Exception:
+        pass
+
+    # Last fallback: any location at all
+    first = Location.objects.values_list("id", flat=True).first()
+    if first:
+        return first
+    return None
+
+
+def with_active_location(view):
+    """Decorator: sets request.active_location(_id) and persists to session."""
+    @wraps(view)
+    def _wrapped(request, *args, **kwargs):
+        lid = _resolve_default_location_id(request)
+        request.active_location_id = lid
+        request.active_location = Location.objects.filter(id=lid).first() if (Location and lid) else None
+        if lid:
+            request.session["active_location_id"] = lid
+        return view(request, *args, **kwargs)
+    return _wrapped
 
 def _get_active_business(request):
     # 1) already attached by middleware or prior selection?
@@ -242,6 +353,46 @@ def _get_active_business(request):
 
     return None
 
+from django.contrib.auth.decorators import login_required
+from django.shortcuts import render, redirect
+from .models import BusinessKind
+
+@login_required
+def merch_add_router(request):
+    """
+    One URL that decides WHICH 'Add Products' form to render based on the active business.
+    """
+    biz = getattr(request, "business", None)
+    if not biz:
+        return redirect("tenants:choose_business")
+
+    # try several field names on your Business model
+    kind = None
+    for attr in ("kind", "business_kind", "industry", "category", "type"):
+        v = getattr(biz, attr, None)
+        if v:
+            kind = str(v)
+            break
+
+    template_map = {
+        BusinessKind.PHARMACY: "inventory/add_product_pharmacy.html",
+        BusinessKind.PHONES:   "inventory/add_product_phones.html",
+        BusinessKind.LIQUOR:   "inventory/add_product_liquor.html",
+        # if you have a dedicated clothing TextChoice, add it; otherwise use clothing as grocery fallback
+        "clothing":            "inventory/add_product_clothing.html",
+        BusinessKind.GROCERY:  "inventory/add_product_clothing.html",
+    }
+    template = template_map.get(kind) or "inventory/add_product_clothing.html"
+
+    # DEBUG breadcrumb so you can confirm the router is actually hit in your runserver console
+    print("ðŸ§­ merch_add_router â†’ business:", getattr(biz, "name", None), "kind:", kind, "template:", template)
+
+    ctx = {
+        "page_title": "Add Products",
+        "BUSINESS_KIND": kind,
+        "business": biz,
+    }
+    return render(request, template, ctx)
 
 def _require_active_business(request):
     """Attach/choose a business for this request, or show error + redirect."""
@@ -352,6 +503,32 @@ except NameError:
             return view(request, *args, **kwargs)
         return _wrapped
 # === END HOTFIX ===============================================================
+# inventory/views.py
+from decimal import Decimal
+from django.db import transaction
+from django.http import JsonResponse
+from django.utils import timezone
+
+try:
+    from sales.models import Sale
+except Exception:
+    Sale = None  # keep app import-safe
+
+def _json_ok(data, **extra):
+    out = {"ok": True, "data": data}
+    out.update(extra)
+    return JsonResponse(out)
+
+def _json_err(msg, status=400):
+    return JsonResponse({"ok": False, "error": msg}, status=status)
+
+def _to_decimal(x, default=Decimal("0")):
+    try:
+        if x is None or str(x).strip() == "":
+            return default
+        return Decimal(str(x))
+    except Exception:
+        return default
 
 # --- Role helper import (safe) ----------------------------------------
 try:
@@ -574,7 +751,7 @@ def _user_home_location(user):
             if loc:
                 return loc
 
-        # 4) final fallback – first for the business
+        # 4) final fallback â€“ first for the business
         return qs.order_by("id").first()
 
     """
@@ -772,7 +949,7 @@ def _in_groups(user, names: list[str]) -> bool:
     return user.groups.filter(name__in=names).exists()
 
 try:
-    # If you have a central roles module, great—use it.
+    # If you have a central roles module, greatâ€”use it.
     # Adjust the import path to wherever your project keeps role predicates.
     from circuitcity.tenants.roles import (
         is_auditor as _pred_is_auditor,
@@ -848,7 +1025,7 @@ def _enforce_http_response(viewfunc):
 
 from typing import Dict, Any
 import logging
-
+from django.shortcuts import render, redirect
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.http import JsonResponse, HttpRequest, HttpResponse
@@ -860,19 +1037,19 @@ from django.views.decorators.cache import never_cache
 @never_cache
 def stock_list(request: HttpRequest, *args, **kwargs) -> HttpResponse:
     """
-    Inventory · Stock List
+    Inventory Â· Stock List
 
-    • Always scoped to active business.
-    • Location filter is opt-in (?location / ?location_id).
-    • Default table hides SOLD; use status=sold to view sold rows.
-    • Badges are computed business-wide.
-    • Hardened query parsing so bad params never 500.
+    â€¢ Always scoped to active business.
+    â€¢ Location filter is opt-in (?location / ?location_id).
+    â€¢ Default table hides SOLD; use status=sold to view sold rows.
+    â€¢ Badges are computed business-wide.
+    â€¢ Hardened query parsing so bad params never 500.
     """
     import logging
     from decimal import Decimal
     from django.db.models import Q, Sum
     from django.http import JsonResponse
-    from django.shortcuts import render, redirect
+
     from django.contrib import messages
 
     log = logging.getLogger(__name__)
@@ -1433,7 +1610,7 @@ def _inv_base(qs: QuerySet, start_dt=None, end_dt=None, time_fields=("created_at
 
 # Put near your other helpers in inventory/views.py
 
-# inventory/views.py  — REPLACE your existing get_preset_window with this
+# inventory/views.py  â€” REPLACE your existing get_preset_window with this
 
 
 
@@ -1444,7 +1621,7 @@ from django.utils import timezone
 def get_preset_window(request, default_preset: str = "month"):
     """
     Returns (range_preset, day_str, start_dt, end_dt)
-    range_preset ∈ {'month','7d','all','day'}
+    range_preset âˆˆ {'month','7d','all','day'}
     start_dt/end_dt are tz-aware datetimes, or None for 'all'.
     """
     qs = request.GET
@@ -1553,7 +1730,7 @@ def default_location_for_request(request):
 
 # ------------------- SCAN SOLD -------------------
 
-# --- Inventory · Scan SOLD (paste over your current function) ---
+# --- Inventory Â· Scan SOLD (paste over your current function) ---
 @never_cache
 @login_required
 @require_business
@@ -1561,42 +1738,87 @@ def default_location_for_request(request):
 def scan_sold(request, *args, **kwargs):
     """
     Scan-to-sell screen.
-    - Guarantees an active business.
-    - Ensures a default location for that business and memoizes it on the request.
-    - Exposes location model/field name so the template can bind correctly.
-    """
 
-    # -------- helpers / fallbacks --------
-    def _safe_has_field(model, name):
+    - Shows correct identifier rules (IMEI/Serial) from the single source of truth
+    - Respects active/default location (same helpers your APIs use)
+    - Exposes the API endpoints the UI should call
+    - If ScanSoldForm exists, renders a clamped Location <select>; otherwise supplies locations[] for a custom UI
+    """
+    from django.shortcuts import render
+    from django.utils import timezone
+
+    # ---------- tiny safe helpers (prefer globals when already provided) ----------
+    def _safe_has_field(model, name: str) -> bool:
         try:
-            return any(f.name == name for f in getattr(model, "_meta").get_fields())
+            return any(getattr(f, "name", None) == name for f in getattr(model, "_meta").get_fields())
         except Exception:
             return False
 
     _has_field = globals().get("_model_has_field", _safe_has_field)
     InventoryItem = globals().get("InventoryItem", None)
+    Location = globals().get("Location", None)
+    scoped = globals().get("scoped", lambda qs, _r: qs)
 
-    def _discover_inv_location_model():
-        if not InventoryItem:
-            return None, None
-        fname = "current_location" if _has_field(InventoryItem, "current_location") else (
-                "location" if _has_field(InventoryItem, "location") else None
+    # Optional: ScanSoldForm and a tiny field-clamper
+    try:
+        from inventory.forms import ScanSoldForm  # type: ignore
+    except Exception:
+        ScanSoldForm = None  # type: ignore
+
+    def _restrict_location_field(form, request_, dflt_loc, *, set_initial=True):
+        """Clamp the form's location-like field to only the user's active/default location."""
+        if not dflt_loc or not form:
+            return
+        from django.forms import ModelChoiceField
+
+        cand = ("location", "current_location", "store", "branch")
+        fld_name = next(
+            (n for n in cand if n in form.fields and isinstance(form.fields[n], ModelChoiceField)),
+            None
         )
-        if not fname:
-            return None, None
-        try:
-            f = InventoryItem._meta.get_field(fname)
-            Loc = getattr(getattr(f, "remote_field", None), "model", None)
-            return Loc, fname
-        except Exception:
-            return None, None
+        if not fld_name:
+            return
+        fld = form.fields[fld_name]
+        dflt_id = getattr(dflt_loc, "pk", getattr(dflt_loc, "id", None))
+        label = (
+            getattr(dflt_loc, "store_name", None)
+            or getattr(dflt_loc, "name", None)
+            or getattr(dflt_loc, "title", None)
+            or f"Loc #{dflt_id}"
+        )
 
+        try:
+            fld.empty_label = None
+        except Exception:
+            pass
+
+        # choices + initial (for non-DB rendered widgets)
+        try:
+            fld.choices = [(dflt_id, label)]
+        except Exception:
+            pass
+        if set_initial:
+            try:
+                fld.initial = dflt_id
+            except Exception:
+                pass
+
+        # queryset clamp (for ModelChoiceField widgets)
+        try:
+            qs = getattr(fld, "queryset", None)
+            if qs is not None:
+                fld.queryset = qs.model.objects.filter(pk=dflt_id)
+        except Exception:
+            pass
+
+    # May be provided by your tenants/helpers layer; use if available
+    _get_active_business = globals().get("_get_active_business", None)
     default_location_for_request_fn = globals().get("default_location_for_request", None)
 
-    # -------- 1) Active business (require_business guarantees it, but fetch cleanly) --------
+    # ---------- 1) Active business ----------
     biz = getattr(request, "business", None)
     biz_id = getattr(biz, "id", None)
-    if "_get_active_business" in globals():
+    if callable(_get_active_business):
         try:
             g_biz, g_id = _get_active_business(request)
             biz = g_biz or biz
@@ -1604,9 +1826,9 @@ def scan_sold(request, *args, **kwargs):
         except Exception:
             pass
 
-    # -------- 2) Ensure request.active_location exists --------
+    # ---------- 2) Ensure request.active_location (memoize) ----------
     loc = getattr(request, "active_location", None)
-    if not loc and callable(default_location_for_request_fn):
+    if loc is None and callable(default_location_for_request_fn):
         try:
             loc = default_location_for_request_fn(request)
         except Exception:
@@ -1617,240 +1839,162 @@ def scan_sold(request, *args, **kwargs):
                 request.active_location_id = getattr(loc, "id", None)
             except Exception:
                 pass
+    loc_id = getattr(loc, "id", None)
 
-    # -------- 3) Discover InventoryItem's location field/model --------
+    # ---------- 3) Discover InventoryItem's location FK ----------
+    def _discover_inv_location_model():
+        if not InventoryItem:
+            return None, None
+        fname = "current_location" if _has_field(InventoryItem, "current_location") else (
+            "location" if _has_field(InventoryItem, "location") else None
+        )
+        if not fname:
+            return None, None
+        try:
+            f = InventoryItem._meta.get_field(fname)
+            LocModel = getattr(getattr(f, "remote_field", None), "model", None)
+            return LocModel, fname
+        except Exception:
+            return None, None
+
     loc_model, loc_field_name = _discover_inv_location_model()
 
-    # -------- 4) Build context --------
+    # ---------- 4) Identifier rules ----------
+    uses_imei = bool(InventoryItem and _has_field(InventoryItem, "imei"))
+    uses_serial = bool(not uses_imei and InventoryItem and _has_field(InventoryItem, "serial"))
+    identifier_field = "imei" if uses_imei else ("serial" if uses_serial else None)
+
+    min_len, max_len, require_imei = 15, 15, True
+    rule_name = "Phone sales"
+
+    biz_code = None
+    try:
+        biz_code = getattr(biz, "business_type", None) or getattr(biz, "type", None) or getattr(biz, "code", None)
+    except Exception:
+        biz_code = None
+
+    try:
+        from inventory.validators import _active_business_code_from_request  # type: ignore
+        try:
+            biz_code = _active_business_code_from_request(request) or biz_code
+        except Exception:
+            pass
+    except Exception:
+        pass
+
+    try:
+        from core.business_rules import get_rule  # type: ignore
+        r = get_rule(biz_code)
+        rule_name = getattr(r, "name", rule_name) or rule_name
+        min_len = int(getattr(r, "serial_min", min_len))
+        max_len = int(getattr(r, "serial_max", max_len))
+        require_imei = bool(getattr(r, "require_imei", require_imei))
+    except Exception:
+        pass
+
+    if identifier_field == "imei":
+        min_len = max_len = 15
+        require_imei = True
+
+    identifier_label = "IMEI" if (require_imei or identifier_field == "imei") else "Serial"
+    if min_len == max_len:
+        identifier_hint = f"{identifier_label} must be exactly {min_len} digits."
+        identifier_pattern = rf"^\d{{{min_len}}}$"
+        identifier_placeholder = f"{identifier_label} ({min_len} digits)"
+    else:
+        identifier_hint = f"{identifier_label} must be {min_len}â€“{max_len} digits."
+        identifier_pattern = rf"^\d{{{min_len},{max_len}}}$"
+        identifier_placeholder = f"{identifier_label} ({min_len}â€“{max_len} digits)"
+
+    # ---------- 5) Locations list (scoped) ----------
+    locations = []
+    location_default = None
+    if Location is not None:
+        try:
+            q = scoped(Location.objects.all(), request)
+            # If tenant-scoped, keep within this biz
+            try:
+                names = {f.name for f in Location._meta.get_fields()}
+            except Exception:
+                names = set()
+            if "business_id" in names or "business" in names:
+                try:
+                    q = q.filter(business_id=biz_id)
+                except Exception:
+                    q = q.filter(business__id=biz_id)
+            q = q.order_by("name")
+            rows = list(q[:50])
+            locations = [{"id": getattr(L, "id", None), "name": getattr(L, "name", f"Loc #{getattr(L, 'id', '')}")} for L in rows]
+            location_default = loc_id or (locations[0]["id"] if locations else None)
+        except Exception:
+            locations = []
+            location_default = loc_id
+
+    # ---------- 6) Optional form (keeps template compatibility with {{ form.location }}) ----------
+    form = None
+    if ScanSoldForm is not None:
+        try:
+            form = ScanSoldForm(initial={"location": loc})
+            _restrict_location_field(form, request, loc, set_initial=True)
+        except Exception:
+            form = None  # fall back to locations[] below
+
+    # ---------- 7) API endpoints ----------
+    api_paths = {
+        "probe": "/inventory/api/stock-status",
+        "sell":  "/inventory/api/mark-sold",
+    }
+
+    # ---------- 8) Context ----------
     ctx = {
         # Business
         "active_business": biz,
         "active_business_id": biz_id,
         "active_business_name": getattr(biz, "display_name", None) or getattr(biz, "name", None),
+        "active_business_code": biz_code,
+        "business_rule_name": rule_name,
 
-        # Location
+        # Location (both form-based and list-based UIs can work)
         "active_location": loc,
-        "active_location_id": getattr(loc, "id", None) if loc else None,
+        "active_location_id": loc_id,
         "active_location_name": (
             getattr(loc, "store_name", None)
             or getattr(loc, "name", None)
             or getattr(loc, "title", None)
         ) if loc else None,
+        "locations": locations,
+        "location_default": location_default,
 
-        # Inventory location metadata for template logic
-        "inventory_location_field": loc_field_name,                 # e.g. "current_location" or "location"
-        "inventory_location_model": loc_model.__name__ if loc_model else None,
+        # Inventory location metadata
+        "inventory_location_field": loc_field_name,
+        "inventory_location_model": getattr(loc_model, "__name__", None),
 
-        # Flags your template may use
-        "can_post": request.method == "GET" or (not getattr(request.user, "is_superuser", False)),
-        "today": timezone.localdate(),
+        # Identifier metadata
+        "identifier_field": identifier_field,
+        "identifier_label": identifier_label,
+        "identifier_min_len": min_len,
+        "identifier_max_len": max_len,
+        "identifier_digits_only": True,
+        "identifier_require_imei": require_imei,
+        "identifier_placeholder": identifier_placeholder,
+        "identifier_hint": identifier_hint,
+        "identifier_regex": identifier_pattern,
+
+        # APIs
+        "api_probe_url": api_paths["probe"],
+        "api_sell_url": api_paths["sell"],
+
+        # UI defaults
+        "sold_date_default": timezone.localdate().isoformat(),
+        "commission_default": 0.0,
+        "auto_submit_default": False,
+
+        # Optional form for templates that expect {{ form }}
+        "form": form,
     }
 
     return render(request, "inventory/scan_sold.html", ctx)
 
-def _user_home_location(request):
-    """
-    Return a Location instance that represents the user's own store,
-    *if* we can find one, else None. (Does not hit tenant filtering yet.)
-    """
-    Loc, _ = _inv_location_model()
-    if not Loc:
-        return None
-
-    u = request.user
-
-    def _from(obj, *attrs):
-        cur = obj
-        for a in attrs:
-            cur = getattr(cur, a, None)
-            if cur is None:
-                return None
-        return cur if isinstance(cur, Loc) else None
-
-    # Try most common attachment points
-    candidates = [
-        _from(u, "profile", "store"),
-        _from(u, "profile", "location"),
-        _from(u, "agent_profile", "store"),
-        _from(u, "agent_profile", "location"),
-        _from(u, "agentprofile", "store"),
-        _from(u, "agentprofile", "location"),
-        _from(u, "store"),
-        _from(u, "location"),
-        _from(u, "current_location"),
-        _from(u, "branch"),
-    ]
-    for c in candidates:
-        if c:
-            return c
-    return None
-
-
-def _allowed_locations_qs(request):
-    """
-    Strict allowlist for the Location field:
-      - Only the user's own store (if resolvable)
-      - Otherwise the first Location *in this active business*
-    Always returns a queryset limited to a single row.
-    """
-    Loc, _ = _inv_location_model()
-    if not Loc:
-        return None
-
-    biz, biz_id = _require_active_business(request)
-
-    # Start with tenant-scoped base
-    base = Loc.objects.all()
-    if biz_id:
-        base = base.filter(**_biz_filter_kwargs(Loc, biz_id))
-
-    # Prefer a direct home location (and still enforce tenant)
-    home = _user_home_location(request)
-    if home:
-        try:
-            return base.filter(pk=getattr(home, "pk", home.id))[:1]
-        except Exception:
-            pass
-
-    # Fallback: any location for this tenant (first by id)
-    return base.order_by("id")[:1]
-from django.forms import ModelChoiceField
-
-def _restrict_location_field(form, request, set_initial: bool = True):
-    """
-    Find the location-like field on the form and restrict it to ONLY the user's own store
-    (or the tenant's first location as a fallback). Optionally set initial to that single row.
-    Works whether your form uses 'location', 'current_location', 'store', or 'branch'.
-    """
-    # Which field name does the form actually use?
-    cand_names = ("location", "current_location", "store", "branch")
-    field_name = next(
-        (n for n in cand_names if n in form.fields and isinstance(form.fields[n], ModelChoiceField)),
-        None,
-    )
-    if not field_name:
-        return  # nothing to clamp
-
-    field = form.fields[field_name]
-    Loc = field.queryset.model  # model behind the field
-
-    # Compute strict allowlist (single row) inside active tenant
-    allowed = _allowed_locations_qs(request)           # (helper you added earlier)
-    if allowed is None:
-        field.queryset = Loc.objects.none()
-        return
-
-    field.queryset = Loc.objects.filter(pk__in=allowed.values("pk"))
-
-    # Optional: remove the "---------" empty choice so it’s clearly fixed
-    try:
-        field.empty_label = None
-    except Exception:
-        pass
-
-    if set_initial:
-        dflt = allowed.first()
-        if dflt:
-            field.initial = dflt.pk
-
-
-def default_location_for_request(request):
-    """
-    Return a single Location instance to use as default (auto-selected),
-    strictly inside the active business and, if possible, the user's own store.
-    """
-    Loc, _ = _inv_location_model()
-    if not Loc:
-        return None
-
-    allowed = _allowed_locations_qs(request)
-    if not allowed:
-        return None
-    return allowed.first()
-
-
-def default_location_for_request(request):
-    """
-    Pick a sensible default Location for the current user **within the active business**.
-    Priority:
-      1) A location directly on user's profile/agent profile/manager field
-      2) A location flagged as default/primary in this business
-      3) A 'store' type location (if the model has a type/kind field)
-      4) A location belonging to the user (manager/created_by)
-      5) First location in this business
-    Returns a Location instance or None.
-    """
-    Loc, _ = _inv_location_model()
-    if not Loc:
-        return None
-
-    # Active tenant
-    biz, biz_id = _require_active_business(request)
-
-    # Base queryset scoped to tenant
-    try:
-        qs = Loc.objects.all()
-        if biz_id:
-            qs = qs.filter(**_biz_filter_kwargs(Loc, biz_id))
-    except Exception:
-        return None
-
-    user = request.user
-
-    # Try direct pointers on the user or user.profile
-    def _from(obj, *attrs):
-        cur = obj
-        for a in attrs:
-            cur = getattr(cur, a, None)
-            if cur is None:
-                return None
-        return cur if isinstance(cur, Loc) else None
-
-    # (profile and agent/manager style attachments)
-    candidates = [
-        _from(user, "profile", "store"),
-        _from(user, "profile", "location"),
-        _from(user, "agent_profile", "store"),
-        _from(user, "agent_profile", "location"),
-        _from(user, "agentprofile", "store"),
-        _from(user, "agentprofile", "location"),
-        _from(user, "store"),
-        _from(user, "location"),
-        _from(user, "current_location"),
-        _from(user, "branch"),
-    ]
-    for c in candidates:
-        if c and (not biz_id or getattr(c, "business_id", None) == biz_id):
-            return c
-
-    # Flagged defaults in this business
-    for flag in ("is_default", "default", "is_primary"):
-        if _model_has_field(Loc, flag):
-            c = qs.filter(**{flag: True}).first()
-            if c:
-                return c
-
-    # 'store' kind if present
-    for kind_field in ("type", "kind", "category"):
-        if _model_has_field(Loc, kind_field):
-            c = qs.filter(**{f"{kind_field}__iexact": "store"}).first()
-            if c:
-                return c
-
-    # Locations owned/managed by this user
-    if _model_has_field(Loc, "manager"):
-        c = qs.filter(manager=user).first()
-        if c:
-            return c
-    if _model_has_field(Loc, "created_by"):
-        c = qs.filter(created_by=user).first()
-        if c:
-            return c
-
-    # Last-resort: first location in this tenant
-    return qs.order_by("id").first()
-# --- Location helpers (put ABOVE scan_in) ------------------------------------
-# --------------------- Small local helpers ---------------------
 
 def _inv_location_model():
     """
@@ -1862,7 +2006,6 @@ def _inv_location_model():
     except Exception:
         return None, None
 
-    # which FK does your InventoryItem use for location?
     if hasattr(InventoryItem, "current_location"):
         return getattr(InventoryItem, "current_location").field.remote_field.model, "current_location"
     if hasattr(InventoryItem, "location"):
@@ -1911,10 +2054,8 @@ def default_location_for_request(request):
     except Exception:
         biz_id = None
 
-    # helper to check if a location belongs to the current business
     def _belongs(loc):
         try:
-            # Typical patterns: loc.business_id or loc.store_id, etc.
             for fk in ("business_id", "store_id", "tenant_id"):
                 if hasattr(loc, fk):
                     return getattr(loc, fk) == biz_id
@@ -1922,32 +2063,29 @@ def default_location_for_request(request):
             pass
         return False
 
-    # 1) user home, if fits
     home = _user_home_location(request)
     if home and _belongs(home):
         return home
 
-    # 2) otherwise pick a sensible first for this business
     try:
         qs = Loc.objects.all()
         if biz_id:
-            # Try common FK names
+            names = {f.name for f in Loc._meta.fields}
             for fk in ("business_id", "store_id", "tenant_id"):
-                if fk in [f.name for f in Loc._meta.fields]:
+                if fk in names:
                     qs = qs.filter(**{fk: biz_id})
                     break
 
-        # Prefer "is_default" / "is_primary" if they exist
-        if "is_default" in {f.name for f in Loc._meta.fields}:
+        names = {f.name for f in Loc._meta.fields}
+        if "is_default" in names:
             first = qs.order_by("-is_default", "id").first()
-        elif "is_primary" in {f.name for f in Loc._meta.fields}:
+        elif "is_primary" in names:
             first = qs.order_by("-is_primary", "id").first()
         else:
             first = qs.order_by("id").first()
         return first
     except Exception:
         return None
-
 
 # A tiny paginator many views use
 from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger  # noqa: E402 (after Django import)
@@ -1968,7 +2106,7 @@ def _paginate_qs(request, qs, per_page=25, page_param="page"):
             page_obj = paginator.page(paginator.num_pages)
         return page_obj, int(page_obj.number)
     except Exception:
-        # Fall back to a trivial shape so callers don’t blow up
+        # Fall back to a trivial shape so callers donâ€™t blow up
         class _Trivial:
             object_list = list(qs) if hasattr(qs, "__iter__") else []
             number = 1
@@ -2301,7 +2439,7 @@ def filter_by_location_and_business(qs, request):
 
 
 # --- PART 1/3 ENDS ---
-# --- PART 2/3 — circuitcity/inventory/views.py (cleaned) ---
+# --- PART 2/3 â€” circuitcity/inventory/views.py (cleaned) ---
 
 # stdlib
 import csv
@@ -2311,7 +2449,8 @@ import datetime
 from decimal import Decimal
 
 # django
-
+from .forms import MerchProductForm, MerchUnitPriceFormSet
+from .models import BusinessKind, MerchProduct
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import ValidationError
@@ -2373,264 +2512,80 @@ except Exception:
 
 # --- add this tiny helper once near the top of views.py (outside any view) ---
 # -----------------------------------------------------------------------------
+# --- Wallet page (agent) ------------------------------------------------------
+from django.shortcuts import get_object_or_404, render, redirect
+from django.core.paginator import Paginator
+from django.utils import timezone
+from django.db.models import Sum
+from django.contrib.auth import get_user_model
 
+from .models import WalletTxn  # make sure this import exists
 
-@never_cache
-@login_required
-@require_http_methods(["GET", "POST"])
-@transaction.atomic
-@_enforce_http_response
-def scan_sold(request):
+def wallet_page(request):
     """
-    Inventory · Scan Sold
-    HTML by default; JSON only when ?as=json or XHR.
+    Simple read-only wallet page for a specific agent.
+    URL expected: /inventory/wallet/?user=<id>  (your urls.py already routes here)
     """
-    import datetime
-    from django.http import JsonResponse, HttpResponseBase
-    from django.utils import timezone
-    from django.contrib import messages
-    from django.shortcuts import redirect, render
-    from django.forms import ModelChoiceField
+    User = get_user_model()
 
-    gate = _require_active_business(request)
-    if isinstance(gate, HttpResponseBase):
-        return gate
-    biz, biz_id = gate
+    # Accept ?user= or ?agent= for convenience
+    uid = request.GET.get("user") or request.GET.get("agent")
+    if not uid:
+        # Nothing to show; send them back to stock list (or anywhere you prefer)
+        return redirect("/inventory/list/")
 
-    if _is_auditor(request.user) and request.method == "POST":
-        msg = "Auditors cannot mark items as SOLD."
-        if _wants_json(request):
-            return JsonResponse({"ok": False, "error": msg}, status=403)
-        messages.error(request, msg)
-        return redirect("inventory:stock_list")
+    target = get_object_or_404(User, pk=uid)
 
-    def _pretty_store_label_for_location(loc_obj, request_):
-        biz_ = getattr(request_, "business", None)
-        if biz_ and getattr(biz_, "name", None):
-            return str(biz_.name).strip()
-        for attr in ("store_name", "name", "title", "label"):
-            val = getattr(loc_obj, attr, None)
-            if val:
-                return str(val)
-        return str(loc_obj)
+    # Balance (lifetime sum)
+    balance = (
+        WalletTxn.objects.filter(user=target)
+        .aggregate(s=Sum("amount"))["s"] or 0
+    )
 
-    def _restrict_location_field(form, request_, dflt_loc, *, set_initial=True):
-        if not dflt_loc:
-            return
-        cand = ("location", "current_location", "store", "branch")
-        fld_name = next(
-            (n for n in cand if n in form.fields and isinstance(form.fields[n], ModelChoiceField)),
-            None
-        )
-        if not fld_name:
-            return
-        fld = form.fields[fld_name]
+    # Monthly window (local time)
+    today = timezone.localdate()
+    month_start = today.replace(day=1)
+    next_month = (month_start.replace(day=28) + timezone.timedelta(days=4)).replace(day=1)
 
-        label = _pretty_store_label_for_location(dflt_loc, request_)
-        dflt_id = getattr(dflt_loc, "pk", getattr(dflt_loc, "id", None))
+    monthly_total = (
+        WalletTxn.objects.filter(user=target, created_at__gte=month_start, created_at__lt=next_month)
+        .aggregate(s=Sum("amount"))["s"] or 0
+    )
 
-        try:
-            fld.empty_label = None
-        except Exception:
-            pass
-        fld.choices = [(dflt_id, label)]
-        if set_initial:
-            fld.initial = dflt_id
+    # Optional breakdowns (you used these in the template)
+    monthly_adv = (
+        WalletTxn.objects.filter(
+            user=target,
+            created_at__gte=month_start, created_at__lt=next_month,
+            reason="ADVANCE",
+        ).aggregate(s=Sum("amount"))["s"] or 0
+    )
+    lifetime_total = balance  # lifetime earnings == balance if no payouts are modeled separately
 
-        try:
-            qs = getattr(fld, "queryset", None)
-            if qs is not None:
-                fld.queryset = qs.model.objects.filter(pk=dflt_id)
-        except Exception:
-            pass
+    # Paginated transaction list
+    txns_qs = WalletTxn.objects.filter(user=target).order_by("-created_at")
+    paginator = Paginator(txns_qs, 25)
+    page = request.GET.get("page") or 1
+    page_obj = paginator.get_page(page)
 
-    def _location_is_allowed(loc_obj) -> bool:
-        if not loc_obj:
-            return False
-        for attr in ("business_id", "tenant_id", "org_id", "company_id"):
-            if hasattr(loc_obj, attr):
-                return _obj_belongs_to_active_business(loc_obj, request)
-        return True
+    # Helper for the pager links
+    def url_for(n):
+        q = request.GET.copy()
+        q["page"] = n
+        return f"{request.path}?{q.urlencode()}"
 
-    default_loc = _user_home_location(request.user) or default_location_for_request(request)
-
-    initial = {}
-    if default_loc:
-        initial["location"] = default_loc
-    initial.setdefault("sold_date", timezone.localdate())
-    initial.setdefault("sold_at", timezone.localdate())
-
-    locations_boot = []
-    try:
-        if default_loc is not None:
-            LocCls = default_loc.__class__
-            q = LocCls.objects.all()
-            if any(f.name in ("business", "business_id") for f in LocCls._meta.get_fields()):
-                q = q.filter(business_id=biz_id)
-            locations_boot = list(q.values("id", "name"))
-    except Exception:
-        locations_boot = []
-
-    boot = {
-        "ok": True,
-        "data": {
-            "note": "scan_sold ready",
-            "sold_date_default": timezone.localdate().isoformat(),
-            "location_default": getattr(default_loc, "id", None),
-            "auto_submit_default": False,
-            "locations": locations_boot,
-        },
+    ctx = {
+        "target": target,
+        "balance": balance,
+        "monthly_total": monthly_total,
+        "monthly_adv": monthly_adv,
+        "lifetime_total": lifetime_total,
+        "txns": page_obj.object_list,
+        "page_obj": page_obj,
+        "url_for": url_for,
     }
+    return render(request, "agents/wallet.html", ctx)
 
-    if request.method == "POST":
-        if ScanSoldForm is None:
-            msg = "Scan form is unavailable."
-            if _wants_json(request):
-                return JsonResponse({"ok": False, "error": msg}, status=500)
-            messages.error(request, msg)
-            return redirect("inventory:stock_list")
-
-        form = ScanSoldForm(request.POST)
-        _limit_form_querysets(form, request)
-        _restrict_location_field(form, request, default_loc, set_initial=False)
-
-        if not form.is_valid():
-            msg = "Please correct the errors below."
-            if _wants_json(request):
-                return JsonResponse({"ok": False, "errors": form.errors}, status=400)
-            messages.error(request, msg)
-            return render(request, "inventory/scan_sold.html", {"form": form})
-
-        data = form.cleaned_data
-
-        imei = (data.get("imei") or "").strip()
-        sold_date = data.get("sold_date") or data.get("sold_at") or timezone.localdate()
-        commission_pct = data.get("commission")
-        if commission_pct is None:
-            commission_pct = data.get("commission_pct")
-
-        location_obj = data.get("location") or default_loc
-        if location_obj and not _location_is_allowed(location_obj):
-            msg = "That location is not in your store."
-            if _wants_json(request):
-                return JsonResponse({"ok": False, "error": msg}, status=400)
-            messages.error(request, msg)
-            return render(request, "inventory/scan_sold.html", {"form": form})
-
-        price = data.get("price")
-        if price is not None and price < 0:
-            msg = "Price must be a non-negative amount."
-            if _wants_json(request):
-                return JsonResponse({"ok": False, "error": msg}, status=400)
-            messages.error(request, msg)
-            return render(request, "inventory/scan_sold.html", {"form": form})
-
-        if InventoryItem is None:
-            msg = "Inventory model not available."
-            if _wants_json(request):
-                return JsonResponse({"ok": False, "error": msg}, status=500)
-            messages.error(request, msg)
-            return render(request, "inventory/scan_sold.html", {"form": form})
-
-        qs = InventoryItem.objects.select_for_update()
-        if biz_id:
-            qs = qs.filter(**_biz_filter_kwargs(InventoryItem, biz_id))
-
-        try:
-            item = qs.get(imei=imei)
-        except InventoryItem.DoesNotExist:
-            msg = "Item not found in your store. Check the IMEI and try again."
-            if _wants_json(request):
-                return JsonResponse({"ok": False, "error": msg}, status=404)
-            messages.error(request, msg)
-            return render(request, "inventory/scan_sold.html", {"form": form})
-
-        if _model_has_field(InventoryItem, "status") and str(getattr(item, "status", "")) == "SOLD":
-            msg = f"Item {item.imei} is already sold."
-            if _wants_json(request):
-                return JsonResponse({"ok": False, "error": msg}, status=400)
-            messages.error(request, msg)
-            return render(request, "inventory/scan_sold.html", {"form": form})
-
-        item._actor = request.user
-
-        if _model_has_field(InventoryItem, "status"):
-            item.status = "SOLD"
-        if _model_has_field(InventoryItem, "selling_price"):
-            item.selling_price = price
-
-        if location_obj:
-            if _model_has_field(InventoryItem, "current_location"):
-                item.current_location = location_obj
-            elif _model_has_field(InventoryItem, "location"):
-                item.location = location_obj
-
-        if _model_has_field(InventoryItem, "sold_at"):
-            if isinstance(sold_date, datetime.date) and not isinstance(sold_date, datetime.datetime):
-                now = timezone.localtime()
-                sold_dt = timezone.make_aware(
-                    datetime.datetime.combine(sold_date, now.time()),
-                    timezone.get_current_timezone(),
-                )
-            else:
-                sold_dt = sold_date or timezone.now()
-            item.sold_at = sold_dt
-
-        if _model_has_field(InventoryItem, "sold_by") and getattr(item, "sold_by", None) is None:
-            try:
-                item.sold_by = request.user
-            except Exception:
-                pass
-
-        item.save()
-
-        try:
-            if Sale is not None:
-                sale_kwargs = {
-                    "item": item,
-                    "agent": request.user,
-                    "price": getattr(item, "selling_price", None) or 0,
-                    "commission_pct": commission_pct,
-                }
-                if _model_has_field(InventoryItem, "sold_at"):
-                    sale_kwargs["sold_at"] = getattr(item, "sold_at", timezone.now())
-                if location_obj:
-                    sale_kwargs["location"] = location_obj
-                sale_kwargs.update(_attach_business_kwargs(Sale, biz_id))
-                Sale.objects.create(**{k: v for k, v in sale_kwargs.items() if v is not None})
-        except Exception:
-            pass
-
-        _audit(item, request.user, "SOLD_FORM", "V1 flow")
-
-        if _wants_json(request):
-            return JsonResponse({"ok": True, "message": f"Marked SOLD: {item.imei}", "selling_price": getattr(item, "selling_price", None)})
-
-        sp = getattr(item, "selling_price", None)
-        messages.success(request, f"Marked SOLD: {item.imei}{f' at {sp}' if sp is not None else ''}")
-        return redirect("inventory:scan_sold")
-
-    # -------------------- GET -> HTML by default --------------------
-    if ScanSoldForm is None:
-        if _wants_json(request):
-            return JsonResponse({"ok": False, "error": "Scan form is unavailable."}, status=500)
-        messages.error(request, "Scan form is unavailable.")
-        return redirect("inventory:stock_list")
-
-    form = ScanSoldForm(initial=initial)
-    _limit_form_querysets(form, request)
-    _restrict_location_field(form, request, default_loc, set_initial=True)
-
-    try:
-        if default_loc and "location" in form.fields:
-            form.fields["location"].initial = getattr(default_loc, "pk", getattr(default_loc, "id", None))
-    except Exception:
-        pass
-
-    if _wants_json(request):
-        return JsonResponse(boot)
-
-    return render(request, "inventory/scan_sold.html", {"form": form})
 # ---------------------------------------------------------------------------
 # SCAN WEB
 # ---------------------------------------------------------------------------
@@ -2663,13 +2618,13 @@ def scan_web(request):
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Scan (Web) — Fallback</title>
+  <title>Scan (Web) â€” Fallback</title>
   <style>body{font-family:system-ui,Segoe UI,Roboto,Arial,sans-serif;padding:24px;}
   .wrap{max-width:640px;margin:auto}.f{display:flex;gap:8px}</style>
 </head>
 <body>
   <div class="wrap">
-    <h2>Scan (Web) — Fallback</h2>
+    <h2>Scan (Web) â€” Fallback</h2>
     <p>If you see this, the template wasn't found. You can still mark SOLD here.</p>
     <div class="f">
       <input id="imei" placeholder="IMEI (15 digits)" inputmode="numeric" maxlength="15" />
@@ -2718,7 +2673,7 @@ from django.core.exceptions import ValidationError
 from decimal import Decimal
 import logging
 
-# --- Inventory · Scan IN (paste over your current function) ---
+# --- Inventory Â· Scan IN (paste over your current function) ---
 # put this tiny helper once near the top of views.py (outside the function)
 
 @never_cache
@@ -2729,8 +2684,13 @@ import logging
 @transaction.atomic
 def scan_in(request):
     """
-    Inventory · Scan IN
+    Inventory Â· Scan IN
     HTML by default; JSON only when ?as=json or XHR.
+
+    Updates:
+      - Validates IMEI/serial length using single source of truth (core.business_rules) via inventory.validators.
+      - Works for models that use either `imei` OR `serial` (or both). Prefers `imei` if present.
+      - Duplicate guard checks the correct identifier field within the active business.
     """
     # --- local imports (keeps module import-time light) ---
     import logging
@@ -2744,6 +2704,12 @@ def scan_in(request):
     from django.shortcuts import redirect, render
     from django.http import JsonResponse
 
+    # serial/IMEI validation (single source of truth)
+    try:
+        from inventory.validators import validate_serial_for_request  # type: ignore
+    except Exception:
+        validate_serial_for_request = None  # type: ignore
+
     # single-source-of-truth helpers
     from inventory.helpers.request_ctx import (
         ensure_request_defaults,
@@ -2751,8 +2717,66 @@ def scan_in(request):
         default_location_for_request,
     )
 
+    # Local fallback for wants-json detection (uses global if present)
+    _wants_json_fn = globals().get("_wants_json")
+    def _wants_json(req):
+        if callable(_wants_json_fn):
+            return _wants_json_fn(req)
+        # Lightweight heuristic fallback
+        return (req.GET.get("as") == "json") or (req.headers.get("X-Requested-With") == "XMLHttpRequest")
+
     log = logging.getLogger(__name__)
     template_name = "inventory/scan_in.html"
+    # ---- Merchandise product create (PAGE) ---------------------------------
+    from django.shortcuts import render, redirect
+    from django.contrib import messages
+
+    def merch_product_create(request):
+        """
+        Renders the Add Product form and saves Product + inline UnitPrice rows.
+        Form classes are imported locally so missing forms won't break module import.
+        """
+        # Local import avoids ImportError on module import time
+        try:
+            from .forms import MerchProductForm, MerchUnitPriceFormSet
+        except Exception:  # keep the page from crashing if forms not present
+            messages.error(request, "Product form not available yet.")
+            return redirect("inventory:stock_list")
+
+        # Try to prefill the current business on the form
+        biz_id = getattr(request, "business_id", None) or (
+            getattr(request, "session", {}).get("active_business_id")
+            if hasattr(request, "session") else None
+        )
+        initial = {"business": biz_id} if biz_id else {}
+
+        if request.method == "POST":
+            form = MerchProductForm(request.POST, initial=initial)
+            formset = MerchUnitPriceFormSet(request.POST, prefix="unitprice_set")
+            if form.is_valid() and formset.is_valid():
+                product = form.save()
+                prices = formset.save(commit=False)
+                for p in prices:
+                    p.product = product
+                    p.save()
+                messages.success(request, "Product created.")
+                return redirect("inventory:stock_list")
+            else:
+                messages.error(request, "Please fix the errors below.")
+        else:
+            form = MerchProductForm(initial=initial)
+            formset = MerchUnitPriceFormSet(prefix="unitprice_set")
+
+        return render(
+            request,
+            "inventory/product_create.html",
+            {
+                "form": form,
+                "formset": formset,
+                # tells the template which variant of the UI to show (phones/liquor/etc.)
+                "PRODUCT_MODE": getattr(request, "product_mode", None) or "generic",
+            },
+        )
 
     # ---------- Ensure active business/location ----------
     biz, biz_id = _get_active_business(request)
@@ -2769,6 +2793,7 @@ def scan_in(request):
     if request.user.is_superuser and request.method == "POST":
         messages.error(request, "Superusers cannot stock-in devices.")
         return redirect("inventory:stock_list")
+
 
     # ---------- tiny helpers ----------
     def _model_has_field(model, name):
@@ -2946,20 +2971,55 @@ def scan_in(request):
             messages.error(request, msg)
             return render(request, template_name, {"form": form})
 
-        imei = (data.get("imei") or "").strip() if _model_has_field(InventoryItem, "imei") else ""
+        # ---- Serial/IMEI (single source of truth rules) ----
+        # Prefer explicit form fields; fall back to empty
+        form_imei = (data.get("imei") or "").strip()
+        form_serial = (data.get("serial") or "").strip()
+        # Choose which identifier field we will use on the model
+        model_uses_imei = _model_has_field(InventoryItem, "imei")
+        model_uses_serial = _model_has_field(InventoryItem, "serial")
 
+        chosen_value_raw = None
+        chosen_field_name = None
+        if model_uses_imei:
+            chosen_value_raw = form_imei or form_serial  # tolerate forms that post "serial"
+            chosen_field_name = "imei"
+        elif model_uses_serial:
+            chosen_value_raw = form_serial or form_imei  # tolerate forms that post "imei"
+            chosen_field_name = "serial"
+
+        cleaned_identifier = None
+        if chosen_field_name and chosen_value_raw:
+            try:
+                if validate_serial_for_request:
+                    cleaned_identifier = validate_serial_for_request(request, chosen_value_raw)
+                else:
+                    # Fallback: minimal guard (digits-only)
+                    s = chosen_value_raw.replace(" ", "")
+                    if not s.isdigit():
+                        raise ValidationError("Serial must contain digits only.")
+                    cleaned_identifier = s
+            except ValidationError as ve:
+                msg = ve.messages[0] if ve.messages else "Invalid serial value."
+                if _wants_json(request):
+                    return JsonResponse({"ok": False, "error": msg}, status=400)
+                messages.error(request, msg)
+                return render(request, template_name, {"form": form})
+
+        # ---- Duplicate guard within this business ----
         try:
             with transaction.atomic():
-                # duplicate guard (IMEI+business)
                 dup_qs = InventoryItem.objects.select_for_update()
                 if biz_id:
                     dup_qs = dup_qs.filter(**_biz_filter_kwargs(InventoryItem, biz_id))
-                if imei and _model_has_field(InventoryItem, "imei") and dup_qs.filter(imei=imei).exists():
-                    msg = f"Item with IMEI {imei} already exists in your store."
-                    if _wants_json(request):
-                        return JsonResponse({"ok": False, "error": msg}, status=400)
-                    messages.error(request, msg)
-                    return render(request, template_name, {"form": form})
+
+                if cleaned_identifier and chosen_field_name and _model_has_field(InventoryItem, chosen_field_name):
+                    if dup_qs.filter(**{chosen_field_name: cleaned_identifier}).exists():
+                        msg = f"Item with {chosen_field_name.upper()} {cleaned_identifier} already exists in your store."
+                        if _wants_json(request):
+                            return JsonResponse({"ok": False, "error": msg}, status=400)
+                        messages.error(request, msg)
+                        return render(request, template_name, {"form": form})
 
                 create_kwargs = {}
                 if _model_has_field(InventoryItem, "product"):
@@ -2976,8 +3036,10 @@ def scan_in(request):
                     create_kwargs["received_at"] = data.get("received_at") or today
                 if _model_has_field(InventoryItem, "order_price"):
                     create_kwargs["order_price"] = data.get("order_price") or Decimal("0.00")
-                if _model_has_field(InventoryItem, "imei") and imei:
-                    create_kwargs["imei"] = imei
+
+                if cleaned_identifier and chosen_field_name and _model_has_field(InventoryItem, chosen_field_name):
+                    create_kwargs[chosen_field_name] = cleaned_identifier
+
                 if _model_has_field(InventoryItem, "status"):
                     create_kwargs.setdefault("status", "IN_STOCK")
                 if _model_has_field(InventoryItem, "is_active"):
@@ -3010,8 +3072,9 @@ def scan_in(request):
 
         except IntegrityError as e:
             msg = "Could not save this item (constraint error). Check values and try again."
-            if "unique" in str(e).lower():
-                msg = f"Item with IMEI {imei or '(blank)'} already exists."
+            # Attempt to give a clearer message
+            if "unique" in str(e).lower() and cleaned_identifier and chosen_field_name:
+                msg = f"Item with {chosen_field_name.upper()} {cleaned_identifier} already exists."
             if _wants_json(request):
                 return JsonResponse({"ok": False, "error": msg}, status=400)
             messages.error(request, msg)
@@ -3053,27 +3116,294 @@ def scan_in(request):
         "today": today,
     }
     return render(request, template_name, ctx)
+
+# inventory/views.py  (append)
+
+from django.contrib.auth.decorators import login_required, user_passes_test
+from django.http import JsonResponse, HttpRequest, HttpResponseBadRequest
+from django.utils import timezone
+from django.shortcuts import get_object_or_404, redirect
+from django.db.models import Sum
+from .models import Location as Store
+# --- put near the top of inventory/views.py (with other helpers) ---
+from django.apps import apps
+
+def _get_inventory_model(*names):
+    """
+    Return the first model that exists in the 'inventory' app from the
+    provided candidate names, else None (so views can degrade gracefully).
+    """
+    for name in names:
+        try:
+            m = apps.get_model('inventory', name)
+            if m:
+                return m
+        except Exception:
+            pass
+    return None
+
+# Try old and new names in order of likelihood
+AgentStore = _get_inventory_model('AgentLocation', 'AgentStore', 'StoreLocation', 'Location')
+
+import json
+from datetime import date
+
+def _is_manager(u):  # adjust to your own permission system
+    return getattr(u, "is_staff", False) or u.groups.filter(name__iexact="Manager").exists()
+
+@login_required
+def api_geo_ping(request: HttpRequest) -> JsonResponse:
+    """
+    Agents call this via JS with current geolocation.
+    Body: {lat, lon, accuracy}
+    Determines agent's current store, updates timer, logs arrival/exit boundaries.
+    """
+    if request.method != "POST":
+        return JsonResponse({"ok": False, "error": "POST required"}, status=405)
+    try:
+        body = json.loads(request.body or "{}")
+        lat = float(body.get("lat"))
+        lon = float(body.get("lon"))
+        acc = float(body.get("accuracy") or 0)
+    except Exception:
+        return JsonResponse({"ok": False, "error": "Invalid payload"}, status=400)
+
+    # Which store is the agent tied to?
+    try:
+        asg = request.user.agent_store
+    except AgentStore.DoesNotExist:
+        return JsonResponse({"ok": False, "error": "No store assignment"}, status=400)
+    store = asg.store
+
+    now = timezone.now()
+    timer, _ = WorkTimer.objects.get_or_create(user=request.user, store=store, day=timezone.localdate())
+
+    # Previous state
+    was_in = timer.in_range
+
+    res = timer.apply_ping(now, lat, lon)  # updates state and accumulators
+
+    # Emit arrival/exit edges
+    now_in = res["in_range"]
+    if now_in != was_in:
+        TimeEvent.objects.create(
+            user=request.user, store=store,
+            kind=(TimeEvent.ARRIVAL if now_in else TimeEvent.EXIT),
+            at=now, latitude=lat, longitude=lon, accuracy_m=acc, distance_m=res["distance_m"]
+        )
+
+    return JsonResponse({"ok": True, **res})
+
+@login_required
+@user_passes_test(_is_manager)
+def api_timers(request: HttpRequest) -> JsonResponse:
+    """
+    Manager: live timers for my stores (today).
+    Optional query: store=<id>
+    """
+    store_id = request.GET.get("store")
+    stores = Store.objects.filter(manager=request.user)
+    if store_id:
+        stores = stores.filter(pk=store_id)
+
+    day = timezone.localdate()
+    data = []
+    for st in stores:
+        tms = WorkTimer.objects.filter(store=st, day=day).select_related("user")
+        for t in tms:
+            data.append({
+                "store": st.name, "user": t.user.get_username(),
+                "in_range": t.in_range, "work_s": t.work_seconds, "away_s": t.away_seconds,
+            })
+    return JsonResponse({"ok": True, "items": data})
+
+@login_required
+@user_passes_test(_is_manager)
+def api_month_summary(request: HttpRequest) -> JsonResponse:
+    """
+    Manager monthly totals per agent for a store.
+    Query: store=<id>&month=YYYY-MM
+    """
+    store_id = request.GET.get("store")
+    if not store_id:
+        return JsonResponse({"ok": False, "error": "store is required"}, status=400)
+    store = get_object_or_404(Store, pk=store_id, manager=request.user)
+
+    month = request.GET.get("month")
+    if month:
+        y, m = map(int, month.split("-"))
+        start = date(y, m, 1)
+    else:
+        today = timezone.localdate()
+        start = date(today.year, today.month, 1)
+    # end boundary
+    if start.month == 12:
+        end = date(start.year + 1, 1, 1)
+    else:
+        end = date(start.year, start.month + 1, 1)
+
+    qs = WorkTimer.objects.filter(store=store, day__gte=start, day__lt=end).select_related("user")
+    # aggregate per user
+    aggregates = {}
+    for t in qs:
+        key = t.user.get_username()
+        agg = aggregates.setdefault(key, {"user": key, "work_s": 0, "away_s": 0})
+        agg["work_s"] += t.work_seconds
+        agg["away_s"] += t.away_seconds
+
+    items = list(aggregates.values())
+    # grand totals for pie
+    total_work = sum(i["work_s"] for i in items)
+    total_away = sum(i["away_s"] for i in items)
+
+    return JsonResponse({"ok": True, "items": items, "totals": {"work_s": total_work, "away_s": total_away}})
+# inventory/views.py (optional simple form)
+from django import forms
+from django.shortcuts import render
+
+class StoreGeoForm(forms.ModelForm):
+    class Meta:
+        model = Store
+        fields = ("name","latitude","longitude","geofence_radius_m")
+
+@login_required
+@user_passes_test(_is_manager)
+def store_settings(request, pk:int):
+    store = get_object_or_404(Store, pk=pk, manager=request.user)
+    if request.method == "POST":
+        form = StoreGeoForm(request.POST, instance=store)
+        if form.is_valid():
+            form.save()
+            return redirect("inventory:time_logs")
+    else:
+        form = StoreGeoForm(instance=store)
+    return render(request, "inventory/store_settings.html", {"form": form, "store": store})
+
+@login_required
+@user_passes_test(_is_manager)
+def transfer_agent(request: HttpRequest, pk: int, user_id: int):
+    """
+    Move an agent to another store (manager-owned only).
+    """
+    store = get_object_or_404(Store, pk=pk, manager=request.user)
+    asg = get_object_or_404(AgentStore, user_id=user_id)
+    asg.store = store
+    asg.save(update_fields=["store"])
+    return redirect("inventory:time_logs")  # adjust to your time logs route name
+
+
+def merch_product_create(request):
+    """
+    Add Product page (renders MerchProductForm + inline price rows).
+    If POST is valid, saves and redirects to stock list.
+    """
+    log = logging.getLogger(__name__)
+    log.info("merch_product_create: %s %s", request.method, request.path)
+
+    # If your middleware attaches an active business to the request,
+    # grab it so the form can scope choices correctly.
+    business = getattr(request, "business", None) or getattr(request, "active_business", None)
+
+    if request.method == "POST":
+        form = MerchProductForm(request.POST, business=business)
+        formset = MerchUnitPriceFormSet(request.POST, prefix="unitprice_set")
+        if form.is_valid() and formset.is_valid():
+            product = form.save()
+            formset.instance = product
+            formset.save()
+            messages.success(request, "Product created.")
+            try:
+                return redirect("inventory:stock_list")
+            except Exception:
+                return redirect("/inventory/list/")
+    else:
+        form = MerchProductForm(business=business)
+        formset = MerchUnitPriceFormSet(prefix="unitprice_set")
+
+    ctx = {"form": form, "formset": formset}
+    return render(request, "inventory/product_create.html", ctx)
+
+
+
+# inventory/views.py
+
+
+
+from django.contrib.auth.decorators import login_required
+from django.core.paginator import Paginator
+from django.http import HttpRequest, HttpResponse
+from django.shortcuts import render
+from django.views.decorators.http import require_GET
+
+# ----- Optional Sales model (Order) ---------------------------------
+# If the sales app (or Order model) isn't available, fall back gracefully.
+try:
+    from sales.models import Order  # type: ignore
+except Exception:
+    Order = None  # type: ignore[assignment]
+
+
+# inventory/views.py
+
+
+from django.contrib.auth.decorators import login_required
+from django.core.paginator import Paginator
+from django.http import HttpRequest, HttpResponse
+from django.shortcuts import render
+from django.views.decorators.http import require_GET
+
+# ---- optional Sales model (Order) ----
+try:
+    from sales.models import Order  # type: ignore
+except Exception:
+    Order = None  # type: ignore[assignment]
+
+
 @login_required
 @require_GET
-def orders_list(request):
+def orders_list(request: HttpRequest) -> HttpResponse:
     """
-    Orders table page. If Order model exists, paginate it;
-    otherwise render a friendly empty state. Never 501.
+    Orders table page. If Order exists, paginate it; otherwise
+    show a friendly empty state. Never 501.
     """
-    if Order is not None:
-        qs = Order.objects.all().order_by("-id")
-        paginator = Paginator(qs, 25)
-        page_obj = paginator.get_page(request.GET.get("page"))
-        return render(request, "inventory/orders_list.html", {
-            "page_obj": page_obj,
-            "orders": page_obj.object_list,
-        })
-    # graceful fallback
-    return render(request, "inventory/orders_list.html", {
-        "page_obj": None,
-        "orders": [],
-        "message": "Orders model not available yet.",
-    })
+    if Order is None:
+        return render(
+            request,
+            "inventory/orders_list.html",
+            {"page_obj": None, "orders": [], "message": "Orders model not available yet."},
+        )
+
+    qs = Order.objects.all().order_by("-id")
+
+    # optional filters
+    status = request.GET.get("status")
+    if status:
+        try:
+            qs = qs.filter(status=status)
+        except Exception:
+            pass
+
+    q = request.GET.get("q")
+    if q:
+        for field in ("reference", "number", "customer_name"):
+            try:
+                qs = qs.filter(**{f"{field}__icontains": q})
+                break
+            except Exception:
+                continue
+
+    try:
+        per_page = int(request.GET.get("per_page") or 25)
+    except Exception:
+        per_page = 25
+
+    paginator = Paginator(qs, per_page)
+    page_obj = paginator.get_page(request.GET.get("page"))
+    return render(
+        request,
+        "inventory/orders_list.html",
+        {"page_obj": page_obj, "orders": page_obj.object_list},
+    )
 
 from django.contrib import messages
 from django.shortcuts import redirect, render
@@ -3097,7 +3427,7 @@ def _normalize_response(request, resp):
         for item in resp:
             if isinstance(item, (HttpResponse, HttpResponseBase)) or hasattr(item, "has_header"):
                 return item
-        # Maybe got (template_name, context) by mistake — render it.
+        # Maybe got (template_name, context) by mistake â€” render it.
         if len(resp) == 2 and isinstance(resp[0], str) and isinstance(resp[1], dict):
             return render(request, resp[0], resp[1])
         # Fallback: just take the first element if it quacks like a response
@@ -3189,164 +3519,566 @@ def place_order_page(request):
         return render(request, "inventory/place_order.html", ctx)
     except TemplateDoesNotExist:
         return render(request, "inventory/place_order_fallback.html", ctx)
+    # --- Agent detail + assignment ----------------------------------------------
+    from django.shortcuts import get_object_or_404, render, redirect
+    from django.contrib import messages
+    from django.core.paginator import Paginator
+    from django.db.models import Sum
+    from django.db import transaction
+    from django.utils import timezone
+    from django.contrib.auth import get_user_model
+
+    from .models import Location, AgentProfile, WalletTxn
+
+    User = get_user_model()
+
+    def _active_business(request):
+        """Best-effort way to discover the tenant/business on the request."""
+        return (
+                getattr(request, "business", None)
+                or getattr(request, "active_business", None)
+                or getattr(getattr(request, "tenant", None), "business", None)
+        )
+
+    def _url_for_page(request, page_num: int) -> str:
+        q = request.GET.copy()
+        q["page"] = page_num
+        sep = "&" if "?" in request.get_full_path() else "?"
+        return f"{request.path}{sep}{q.urlencode()}"
+
+    def agent_detail(request, agent_id: int):
+        """
+        Shows agent info + wallet + simple location assignment UI.
+        Template: inventory/agent_detail.html
+        """
+        target = get_object_or_404(User, pk=agent_id)
+
+        # Limit locations to the active business (if we can detect one)
+        biz = _active_business(request)
+        loc_qs = Location.objects.all().order_by("name")
+        if biz:
+            loc_qs = loc_qs.filter(business=biz)
+
+        # Wallet numbers
+        month_start = timezone.now().replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+        lifetime_total = (WalletTxn.objects.filter(user=target)
+                          .aggregate(s=Sum("amount"))["s"] or 0)
+        monthly_total = (WalletTxn.objects.filter(user=target, created_at__gte=month_start)
+                         .aggregate(s=Sum("amount"))["s"] or 0)
+        monthly_adv = (WalletTxn.objects.filter(
+            user=target, created_at__gte=month_start, reason="ADVANCE"
+        ).aggregate(s=Sum("amount"))["s"] or 0)
+        balance = lifetime_total  # credits minus debits
+
+        # Paginated transactions
+        txns = WalletTxn.objects.filter(user=target).order_by("-created_at")
+        page_obj = Paginator(txns, 25).get_page(request.GET.get("page") or 1)
+
+        ctx = {
+            "target": target,
+            "locations": list(loc_qs),
+            "txns": page_obj.object_list,
+            "page_obj": page_obj,
+            "url_for": lambda p: _url_for_page(request, p),
+            "balance": balance,
+            "monthly_total": monthly_total,
+            "monthly_adv": monthly_adv,
+            "lifetime_total": lifetime_total,
+        }
+        return render(request, "inventory/agent_detail.html", ctx)
+
+    @transaction.atomic
+    def agent_assign_location(request, agent_id: int):
+        """
+        POST handler for the small assignment form in agent_detail.html.
+        Redirects back to the detail page with a flash message.
+        """
+        if request.method != "POST":
+            return redirect("inventory:agent_detail", agent_id=agent_id)
+
+        target = get_object_or_404(User, pk=agent_id)
+        loc_id = request.POST.get("location_id")
+        if not loc_id:
+            messages.error(request, "Choose a location.")
+            return redirect("inventory:agent_detail", agent_id=agent_id)
+
+        loc = get_object_or_404(Location, pk=loc_id)
+
+        # Optional tenant safety: block cross-tenant assignment if we can detect biz
+        biz = _active_business(request)
+        if biz and loc.business_id and loc.business_id != getattr(biz, "id", None):
+            messages.error(request, "That location does not belong to your business.")
+            return redirect("inventory:agent_detail", agent_id=agent_id)
+
+        # Ensure the agent has a profile, then update location
+        profile, _created = AgentProfile.objects.get_or_create(
+            user=target, defaults={"location": loc}
+        )
+        profile.location = loc
+        profile.save()
+
+        messages.success(request, f"Assigned {target.get_username()} to {loc.name}.")
+        return redirect("inventory:agent_detail", agent_id=agent_id)
+
+    # ------------------------------
+    # PAGE: Add Product (manager/admin)
+    # ------------------------------
+    @login_required
+    @require_business
+    def product_create(request):
+        """
+        Form for managers to add new products.
+        Supports both IMEI-based products (phones)
+        and quantity-based items (liquor, groceries, pharmacy).
+        """
+        from .forms import ProductForm  # make sure you add this in forms.py
+
+        if request.method == "POST":
+            form = ProductForm(request.POST)
+            if form.is_valid():
+                product = form.save(commit=False)
+                product.business = request.business  # tenant scope
+                product.save()
+                return redirect("inventory:stock_list")
+        else:
+            form = ProductForm()
+
+        return render(request, "inventory/product_create.html", {"form": form})
+
+
 # ---------------------------------------------------------------------------
 # API: MARK SOLD
 # ---------------------------------------------------------------------------
 
+# inventory/views_api.py  (or wherever api_mark_sold lives)
+
+from django.http import JsonResponse
+from django.utils import timezone
+from django.views.decorators.cache import never_cache
+from django.views.decorators.http import require_POST
+from django.contrib.auth.decorators import login_required
+from django.db import transaction
+from django.db.models import Q
+import json
+
+# assumes these helpers / models already exist in your codebase
+# _require_active_business, _is_auditor, _model_has_field,
+# _biz_filter_kwargs, _attach_business_kwargs, _audit,
+# InventoryItem, Location, Sale
+
+def _parse_sold_date(val):
+    """
+    Accepts 'YYYY-MM-DD' or returns today's local date.
+    """
+    if not val:
+        return timezone.localdate()
+    try:
+        # Be generous about inputâ€”DateInput sends YYYY-MM-DD
+        return timezone.datetime.strptime(str(val), "%Y-%m-%d").date()
+    except Exception:
+        return timezone.localdate()
+
+def _sold_choice_for(model):
+    """
+    If the model defines a SOLD constant/choice (e.g. STATUS_SOLD / SOLD),
+    use it. Otherwise fall back to literal 'SOLD'.
+    """
+    for attr in ("STATUS_SOLD", "STATE_SOLD", "STATUS__SOLD", "SOLD"):
+        if hasattr(model, attr):
+            return getattr(model, attr)
+    # fall back to string
+    return "SOLD"
+
+from django.http import JsonResponse
+from django.views.decorators.cache import never_cache
+from django.views.decorators.http import require_POST
+from django.db import transaction
+from django.utils import timezone
+from django.db.models import Q
+import json
+
+
+from django.http import JsonResponse
+from django.views.decorators.cache import never_cache
+from django.views.decorators.http import require_POST
+from django.db import transaction
+from django.utils import timezone
+
+# ---------------------------
+# tiny local helpers (single source of truth)
+# ---------------------------
+
+def _model_has_field(model, name: str) -> bool:
+    try:
+        model._meta.get_field(name)
+        return True
+    except Exception:
+        return False
+
+def _active_business_from_request(request):
+    """Return (biz, biz_id) without relying on custom middleware."""
+    biz = getattr(request, "business", None)
+    return biz, getattr(biz, "id", None)
+
+def _biz_filter_kwargs(model, biz_id):
+    """Map a business id onto the model using common FK names."""
+    names = {f.name for f in model._meta.get_fields()}
+    if "business_id" in names:
+        return {"business_id": biz_id}
+    if "tenant_id" in names:
+        return {"tenant_id": biz_id}
+    if "store_id" in names:
+        return {"store_id": biz_id}
+    if "business" in names:
+        return {"business_id": biz_id}
+    return {}
+
+def _sold_status_key(model):
+    """
+    Resolve the *internal* choice key for 'sold' on the model.status field.
+    Works with TextChoices/choices list. Falls back to 'SOLD'.
+    """
+    try:
+        f = model._meta.get_field("status")
+        choices = getattr(f, "choices", None)
+        if choices:
+            for pair in choices:
+                try:
+                    key, label = pair
+                except Exception:
+                    key = getattr(pair, "value", None)
+                    label = getattr(pair, "label", None) or getattr(pair, "name", None)
+                if (label and "sold" in str(label).lower()) or (key and str(key).upper() == "SOLD"):
+                    return key
+    except Exception:
+        pass
+    return "SOLD"
+
+def _bool_field_set(obj, name, value):
+    if _model_has_field(obj.__class__, name):
+        try:
+            setattr(obj, name, value)
+            return True
+        except Exception:
+            pass
+    return False
+
+def _parse_date(value):
+    if not value:
+        return timezone.localdate()
+    try:
+        # support "YYYY-MM-DD" or full ISO; strip time if present
+        dt = timezone.datetime.fromisoformat(str(value))
+        return dt.date()
+    except Exception:
+        return timezone.localdate()
+
+def _get_item_for_probe_or_update(InventoryItem, biz_id, code):
+    """
+    Single fetch path used by both endpoints.
+    Looks up by IMEI first, then by serial if present.
+    Uses _base_manager + explicit business scoping.
+    """
+    base = InventoryItem._base_manager
+    if biz_id is not None:
+        base = base.filter(**_biz_filter_kwargs(InventoryItem, biz_id))
+
+    # Decide which identifiers the model supports
+    by = None
+    if _model_has_field(InventoryItem, "imei") and code.isdigit():
+        by = {"imei": code}
+    elif _model_has_field(InventoryItem, "serial"):
+        by = {"serial": code}
+
+    if not by:
+        return None
+
+    try:
+        return base.get(**by)
+    except InventoryItem.DoesNotExist:
+        return None
+
+# ---------------------------
+# PROBE: what is this codeâ€™s stock status?
+# ---------------------------
+
 @never_cache
-@login_required
+def api_stock_status(request):
+    """
+    Return a normalized stock snapshot used by the scan-sold UI.
+    """
+    try:
+        code = (request.GET.get("code") or request.GET.get("q") or "").strip()
+    except Exception:
+        code = ""
+
+    if not code:
+        return JsonResponse({"ok": False, "error": "Missing code"}, status=400)
+
+    from inventory.models import InventoryItem
+
+    _, biz_id = _active_business_from_request(request)
+    item = _get_item_for_probe_or_update(InventoryItem, biz_id, code)
+    if not item:
+        return JsonResponse({"ok": True, "found": False, "code": code})
+
+    sold_key = _sold_status_key(InventoryItem)
+    status_val = getattr(item, "status", None)
+    is_sold = str(status_val) == str(sold_key)
+
+    data = {
+        "ok": True,
+        "found": True,
+        "code": code,
+        "status": str(status_val) if status_val is not None else None,
+        "is_sold": is_sold,
+        "sold_at": getattr(item, "sold_at", None).isoformat() if getattr(item, "sold_at", None) else None,
+        "selling_price": getattr(item, "selling_price", None),
+        "location_id": getattr(item, "current_location_id", None) or getattr(item, "location_id", None),
+        # some UIs expect these mirrors:
+        "in_stock": not is_sold,
+        "is_active": bool(getattr(item, "is_active", True)),
+    }
+    return JsonResponse(data)
+
+# ---------------------------
+# SELL: mark item as SOLD
+# ---------------------------
+
+from django.http import JsonResponse
+from django.utils import timezone
+from django.views.decorators.http import require_POST
+from django.views.decorators.cache import never_cache
+from django.db import transaction
+import json
+
+# ---------- tiny helpers (kept local so this view is self-contained) ----------
+def _model_has_field(model, name: str) -> bool:
+    try:
+        model._meta.get_field(name)
+        return True
+    except Exception:
+        return False
+
+def _bool_field_present(model, name: str) -> bool:
+    return _model_has_field(model, name)
+
+def _active_business_from_request(request):
+    """Best-effort (replace with your global helper if you have one)."""
+    biz = getattr(request, "business", None)
+    return biz, getattr(biz, "id", None)
+
+def _biz_filter_kwargs(model, biz_id):
+    """Map business id onto common FK names the model may use."""
+    names = {f.name for f in model._meta.get_fields()}
+    if "business_id" in names:
+        return {"business_id": biz_id}
+    if "tenant_id" in names:
+        return {"tenant_id": biz_id}
+    if "store_id" in names:
+        return {"store_id": biz_id}
+    if "business" in names:
+        return {"business_id": biz_id}
+    return {}
+
+def _sold_status_key(model):
+    """Return the internal key for 'Sold' from choices; fall back sanely."""
+    try:
+        f = model._meta.get_field("status")
+        choices = getattr(f, "choices", None)
+        if choices:
+            for pair in choices:
+                try:
+                    key, label = pair
+                except Exception:
+                    key = getattr(pair, "value", None)
+                    label = getattr(pair, "label", None) or getattr(pair, "name", None)
+                if label and "sold" in str(label).lower():
+                    return key
+    except Exception:
+        pass
+    # Fallback guesses (upper first tends to match TextChoices.value)
+    return "SOLD"
+
+def _parse_date(d):
+    if not d:
+        return timezone.localdate()
+    try:
+        # Accept YYYY-MM-DD or full ISO datetime; coerce to date
+        return timezone.datetime.fromisoformat(str(d)).date()
+    except Exception:
+        return timezone.localdate()
+
+# -----------------------------------------------------------------------------
+
+@never_cache
 @require_POST
 @transaction.atomic
-@safe_api
 def api_mark_sold(request):
-    # Require business selection
-    gate = _require_active_business(request)
-    if gate:
-        return gate  # safe_api will wrap this into a response
-
-    if _is_auditor(request.user):
-        return JsonResponse({"ok": False, "error": "Auditors cannot modify inventory."}, status=403)
-
-    # Parse body (JSON or form)
+    """
+    Atomically mark one item as SOLD (tenant-scoped) using a single UPDATE.
+    Returns a normalized snapshot your probe understands.
+    """
+    # ---- Parse body (JSON or form) ----
     try:
         ctype = (request.headers.get("Content-Type") or request.content_type or "").lower()
-        if "application/json" in ctype:
-            payload = json.loads(request.body or "{}")
-        else:
-            payload = request.POST
+        payload = json.loads(request.body or "{}") if "application/json" in ctype else request.POST
     except Exception:
         return JsonResponse({"ok": False, "error": "Invalid JSON body."}, status=400)
 
-    imei = (payload.get("imei") or "").strip()
-    comment = (payload.get("comment") or "").strip()
-    raw_price = payload.get("price")
+    code = (payload.get("imei") or payload.get("serial") or payload.get("code") or "").strip()
+    raw_price = payload.get("price", None)
     raw_loc = payload.get("location_id") or payload.get("location")
+    sold_date_in = payload.get("sold_date") or payload.get("soldAt")
 
-    if not (imei.isdigit() and len(imei) == 15):
-        return JsonResponse({"ok": False, "error": "IMEI must be exactly 15 digits."}, status=400)
+    if not code:
+        return JsonResponse({"ok": False, "error": "Missing IMEI/serial."}, status=400)
 
-    # Active business & tenant-scoped fetch
-    biz, biz_id = _require_active_business(request)
-    if InventoryItem is None:
-        return JsonResponse({"ok": False, "error": "Inventory model not available."}, status=500)
-
-    qs = InventoryItem.objects.select_for_update()
-    if biz_id:
-        qs = qs.filter(**_biz_filter_kwargs(InventoryItem, biz_id))
-    try:
-        item = qs.get(imei=imei)
-    except InventoryItem.DoesNotExist:
-        return JsonResponse({"ok": False, "error": "Item not found in your store."}, status=404)
-
-    # If already sold (when model has status)
-    if _model_has_field(InventoryItem, "status") and str(getattr(item, "status", "")) == "SOLD":
-        _audit(item, request.user, "SOLD_API_DUP", f"Duplicate mark-sold via API. Comment: {comment}")
-        return JsonResponse({"ok": True, "imei": imei, "already_sold": True})
-
-    # Validate price (optional)
+    # ---- Validate price if provided ----
     price_val = None
-    if raw_price is not None and raw_price != "":
+    if raw_price not in (None, ""):
         try:
             price_val = float(raw_price)
             if price_val < 0:
-                return JsonResponse({"ok": False, "error": "Price must be a non-negative amount."}, status=400)
+                return JsonResponse({"ok": False, "error": "Price must be non-negative."}, status=400)
         except Exception:
             return JsonResponse({"ok": False, "error": "Invalid price format."}, status=400)
 
-    # Validate location (optional) WITH tenant check
+    sold_date = _parse_date(sold_date_in)
+
+    # ---- Business context ----
+    from inventory.models import InventoryItem
+    try:
+        from inventory.models import Location
+    except Exception:
+        Location = None  # type: ignore
+
+    biz, biz_id = _active_business_from_request(request)
+    if biz_id is None:
+        return JsonResponse({"ok": False, "error": "No active business."}, status=403)
+
+    # ---- Resolve SOLD key and location FK name ----
+    sold_key = _sold_status_key(InventoryItem)
+
+    loc_fk = None
+    if _model_has_field(InventoryItem, "current_location"):
+        loc_fk = "current_location_id"
+    elif _model_has_field(InventoryItem, "location"):
+        loc_fk = "location_id"
+
+    # Optional: validate provided location belongs to this business
     loc_id = None
     if raw_loc not in (None, "", 0, "0"):
         try:
             loc_id = int(raw_loc)
         except Exception:
             return JsonResponse({"ok": False, "error": "Invalid location id."}, status=400)
-        try:
-            if Location is None:
-                raise AttributeError("Location model missing")
-            loc_qs = Location.objects.all()
-            if biz_id:
-                loc_qs = loc_qs.filter(**_biz_filter_kwargs(Location, biz_id))
-            if not loc_qs.filter(id=loc_id).exists():
+        if Location is not None and loc_fk:
+            names = {f.name for f in Location._meta.get_fields()}
+            lqs = getattr(Location, "_base_manager", Location.objects).all()
+            if "business_id" in names:
+                lqs = lqs.filter(business_id=biz_id)
+            elif "tenant_id" in names:
+                lqs = lqs.filter(tenant_id=biz_id)
+            elif "store_id" in names:
+                lqs = lqs.filter(store_id=biz_id)
+            if not lqs.filter(id=loc_id).exists():
                 return JsonResponse({"ok": False, "error": "That location is not in your store."}, status=403)
-        except Exception:
-            # If we cannot check, fail safe
-            return JsonResponse({"ok": False, "error": "Unable to verify location for this store."}, status=400)
 
-    # Apply updates (only existing fields)
-    updates = {}
-    if _model_has_field(InventoryItem, "status"):
-        item.status = "SOLD"
-        updates["status"] = "SOLD"
+    # ---- Build a tenant-scoped queryset via _base_manager ----
+    scoped = InventoryItem._base_manager.filter(**_biz_filter_kwargs(InventoryItem, biz_id))
 
-    if _model_has_field(InventoryItem, "sold_at") and not getattr(item, "sold_at", None):
-        item.sold_at = timezone.localdate()
-        updates["sold_at"] = item.sold_at
+    # Find by IMEI first, otherwise by serial if present in the model
+    find_q = None
+    if _model_has_field(InventoryItem, "imei"):
+        find_q = {"imei": code}
+    elif _model_has_field(InventoryItem, "serial"):
+        find_q = {"serial": code}
+    else:
+        return JsonResponse({"ok": False, "error": "Inventory model lacks imei/serial fields."}, status=500)
 
-    if price_val is not None and _model_has_field(InventoryItem, "selling_price"):
-        item.selling_price = price_val
-        updates["selling_price"] = item.selling_price
-
-    # Location may be 'current_location' or 'location'
-    if loc_id is not None:
-        if _model_has_field(InventoryItem, "current_location"):
-            item.current_location_id = loc_id
-            updates["current_location_id"] = item.current_location_id
-        elif _model_has_field(InventoryItem, "location"):
-            item.location_id = loc_id
-            updates["location_id"] = item.location_id
-
-    if _model_has_field(InventoryItem, "sold_by") and getattr(item, "sold_by", None) is None:
-        try:
-            item.sold_by = request.user
-        except Exception:
-            pass
-
-    item.save()
-    _audit(item, request.user, "SOLD_API", f"via scan_web; comment={comment}")
-
-    # Create Sale record (best-effort, tenant-safe)
+    # ---- Idempotency check: is it already SOLD? ----
     try:
-        if Sale is not None:
-            sale_kwargs = {
-                "item": item,
-                "agent": request.user,
-                "price": getattr(item, "selling_price", None) or 0,
-            }
-            if _model_has_field(InventoryItem, "sold_at"):
-                sale_kwargs["sold_at"] = getattr(item, "sold_at", timezone.localdate())
-            if loc_id is not None:
-                sale_kwargs["location_id"] = (
-                    item.current_location_id if hasattr(item, "current_location_id") else getattr(item, "location_id", None)
-                )
-            sale_kwargs.update(_attach_business_kwargs(Sale, biz_id))
-            Sale.objects.create(**{k: v for k, v in sale_kwargs.items() if v is not None})
+        existing = scoped.only("id", "status", "sold_at", "selling_price", loc_fk or "id").get(**find_q)
+        if str(getattr(existing, "status", "")) == str(sold_key):
+            # Return the same normalized view
+            return JsonResponse({
+                "ok": True,
+                "already_sold": True,
+                "code": code,
+                "status": str(existing.status),
+                "is_sold": True,
+                "sold_at": existing.sold_at.isoformat() if getattr(existing, "sold_at", None) else None,
+                "selling_price": getattr(existing, "selling_price", None),
+                "location_id": getattr(existing, loc_fk, None) if loc_fk else None,
+                "in_stock": False,
+                "is_active": bool(getattr(existing, "is_active", True)),
+            })
+    except InventoryItem.DoesNotExist:
+        return JsonResponse({"ok": False, "error": "Item not found in your store."}, status=404)
+
+    # ---- Compose UPDATE fields (only those that exist on the model) ----
+    update_fields = {}
+    if _model_has_field(InventoryItem, "status"):
+        update_fields["status"] = sold_key
+    if _model_has_field(InventoryItem, "sold_at"):
+        update_fields["sold_at"] = sold_date
+    if _model_has_field(InventoryItem, "selling_price") and (price_val is not None):
+        update_fields["selling_price"] = price_val
+    if _bool_field_present(InventoryItem, "in_stock"):
+        update_fields["in_stock"] = False
+    if _bool_field_present(InventoryItem, "is_active"):
+        update_fields["is_active"] = False
+    if loc_fk and (loc_id is not None):
+        update_fields[loc_fk] = loc_id
+
+    # Safety: nothing to update?
+    if not update_fields:
+        return JsonResponse({"ok": False, "error": "No updatable fields found on model."}, status=500)
+
+    # ---- Perform the UPDATE atomically and check the rowcount ----
+    rows_changed = scoped.filter(**find_q).update(**update_fields)
+    if rows_changed == 0:
+        # Not found under this business after all
+        return JsonResponse({"ok": False, "error": "Item not found or not in your store."}, status=404)
+
+    # ---- Reload the row (via _base_manager) for the response snapshot ----
+    item = scoped.get(**find_q)
+
+    # Best-effort Sale row
+    try:
+        from sales.models import Sale
+        sale_kwargs = {
+            "item": item,
+            "agent": request.user,
+            "price": getattr(item, "selling_price", None) or (price_val or 0),
+            "sold_at": getattr(item, "sold_at", sold_date),
+        }
+        sale_names = {f.name for f in Sale._meta.get_fields()}
+        if "business_id" in sale_names:
+            sale_kwargs["business_id"] = biz_id
+        if "location_id" in sale_names and loc_fk:
+            sale_kwargs["location_id"] = getattr(item, loc_fk, None)
+        Sale.objects.create(**{k: v for k, v in sale_kwargs.items() if v is not None})
     except Exception:
         pass
 
-    return JsonResponse({"ok": True, "imei": imei, "updates": updates})
-
-# ---------------------------------------------------------------------------
-# DATE RANGE HELPERS
-# ---------------------------------------------------------------------------
-
-from datetime import datetime, timedelta, date, time   # (keep these imports)
-
-
-# ---- build a time-range Q() for one model across one or more datetime fields
-def _time_q_for(_model, start_dt, end_dt, fields: tuple[str, ...]):
-    """
-    Returns a Q() that matches records whose any of `fields` fall within
-    [start_dt, end_dt]. If start/end are None, returns an empty Q().
-    Usage: qs.filter(_time_q_for(Model, start_dt, end_dt, ("created_at", "sold_at")))
-    """
-    if not (start_dt and end_dt):
-        return Q()  # no-date filter -> no-op
-
-    q = Q()
-    for f in fields:
-        q |= Q(**{f"{f}__gte": start_dt, f"{f}__lte": end_dt})
-    return q
-
+    # ---- Normalized response (same shape your probe reads) ----
+    resp = {
+        "ok": True,
+        "result": "sold",
+        "code": code,
+        "status": str(getattr(item, "status", "")),
+        "is_sold": True,
+        "sold_at": item.sold_at.isoformat() if getattr(item, "sold_at", None) else None,
+        "selling_price": getattr(item, "selling_price", None),
+        "location_id": getattr(item, loc_fk, None) if loc_fk else None,
+        "in_stock": False if _bool_field_present(InventoryItem, "in_stock") else False,
+        "is_active": bool(getattr(item, "is_active", True)),
+        # Remove this block after confirming end-to-end:
+        "debug": {"rows_changed": rows_changed, "loc_fk": loc_fk, "biz_id": biz_id},
+    }
+    return JsonResponse(resp)
 # ---------------------------------------------------------------------------
 # SAFE DEFAULT LOCATION PICKER + UTILITIES
 # ---------------------------------------------------------------------------
@@ -3379,7 +4111,7 @@ def _render_dashboard_safe(request, context, today=None, mtd_count=0, all_time_c
             "range": context.get("range"),
         }
         html = f"""
-        <html><head><title>Inventory · Dashboard (fallback)</title></head>
+        <html><head><title>Inventory Â· Dashboard (fallback)</title></head>
         <body style="font-family:system-ui,Segoe UI,Arial;margin:24px">
           <h2>Inventory Dashboard</h2>
           <p><em>Template <code>inventory/dashboard.html</code> not found. Showing fallback.</em></p>
@@ -3573,6 +4305,8 @@ def _can_edit_inventory(user):
 # SIMPLE HTML PAGE (separate from API list)
 # ---------------------------------------------------------------------------
 
+
+
 @never_cache
 @login_required
 @require_http_methods(["GET"])
@@ -3704,7 +4438,7 @@ def _two_factor_status(user) -> dict:
 @login_required
 def settings_home(request):
     user = request.user
-    profile = getattr(user, "profile", None)  # ok if you don’t have a Profile model
+    profile = getattr(user, "profile", None)  # ok if you donâ€™t have a Profile model
     avatar_url = getattr(profile, "avatar_url", None) or _gravatar(user.email, 160)
 
     twofa = _two_factor_status(user)
@@ -3729,20 +4463,32 @@ def settings_redirect(request):
 @login_required
 @require_POST
 def api_time_checkin(request):
-    # Ensure an active business and attach it to TimeLog when possible
+    """
+    Create a TimeLog from device/location data.
+    Expects JSON (preferred) or form body with:
+      - checkin_type: ARRIVAL | DEPARTURE (optional, defaults to ARRIVAL)
+      - latitude / longitude (or lat / lon)
+      - accuracy_m (or accuracy)
+      - location_id (optional)
+      - note (optional)
+    """
+    # Ensure there is an active business; the helper returns either an HttpResponse or (biz, biz_id)
     gate = _require_active_business(request)
-    if gate:
+    if hasattr(gate, "status_code"):  # redirect / error response
         return gate
-    biz, biz_id = _require_active_business(request)
+    biz, biz_id = gate
 
+    # ---- Parse payload (JSON or form) ----
     try:
-        if request.content_type and "application/json" in request.content_type.lower():
-            payload = json.loads(request.body or "{}")
+        if (request.content_type or "").lower().find("application/json") != -1:
+            payload = json.loads(request.body.decode("utf-8") or "{}")
         else:
+            # QueryDict -> plain dict-like access is OK
             payload = request.POST
     except Exception:
         return JsonResponse({"ok": False, "error": "Invalid JSON body."}, status=400)
 
+    # ---- Inputs ----
     checkin_type = (payload.get("checkin_type") or payload.get("type") or "ARRIVAL").upper()
     if checkin_type not in (TimeLog.ARRIVAL, TimeLog.DEPARTURE):
         checkin_type = TimeLog.ARRIVAL
@@ -3758,6 +4504,13 @@ def api_time_checkin(request):
     except Exception:
         return JsonResponse({"ok": False, "error": "Invalid lat/lon/accuracy."}, status=400)
 
+    # Optional sanity on ranges (only if provided)
+    if lat is not None and not (-90.0 <= lat <= 90.0):
+        return JsonResponse({"ok": False, "error": "Latitude out of range."}, status=400)
+    if lon is not None and not (-180.0 <= lon <= 180.0):
+        return JsonResponse({"ok": False, "error": "Longitude out of range."}, status=400)
+
+    # ---- Resolve location ----
     loc = None
     loc_id = payload.get("location_id")
     if loc_id:
@@ -3767,16 +4520,24 @@ def api_time_checkin(request):
             return JsonResponse({"ok": False, "error": "Invalid location_id."}, status=400)
     if not loc:
         loc = _user_home_location(request.user)
+        # Ignore locations not in the active business
         if loc and not _obj_belongs_to_active_business(loc, request):
-            loc = None  # ignore foreign-business locations
+            loc = None
 
+    # ---- Distance / geofence ----
     dist = None
     within = False
-    if loc and loc.latitude is not None and loc.longitude is not None and lat is not None and lon is not None:
-        dist = _haversine_m(lat, lon, float(loc.latitude), float(loc.longitude))
-        radius = (loc.geofence_radius_m or 150) + (acc or 0)
-        within = dist <= radius
+    if loc and (loc.latitude is not None) and (loc.longitude is not None) and (lat is not None) and (lon is not None):
+        try:
+            dist = _haversine_m(lat, lon, float(loc.latitude), float(loc.longitude))
+        except Exception:
+            dist = None
+        if dist is not None:
+            # geofence radius + reported GPS accuracy (be generous)
+            radius = (getattr(loc, "geofence_radius_m", None) or 150) + (acc or 0)
+            within = dist <= radius
 
+    # ---- Create log ----
     tl = TimeLog.objects.create(
         user=request.user,
         location=loc,
@@ -3799,8 +4560,238 @@ def api_time_checkin(request):
             "distance_m": dist,
             "within_geofence": within,
             "checkin_type": checkin_type,
-        }
+        },
+        status=201,
     )
+# --- ADD (or keep) these imports at the top of inventory/views.py ---
+
+
+from typing import Any, Iterable, Optional
+
+from django.contrib.auth.decorators import login_required
+from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
+from django.shortcuts import render
+from django.views.decorators.cache import never_cache
+from django.views.decorators.http import require_http_methods
+
+# Defensive, tenant-scoped helpers (use your project's if present)
+def _try_import(modpath: str, attr: str | None = None):
+    import importlib
+    try:
+        mod = importlib.import_module(modpath)
+        return getattr(mod, attr) if attr else mod
+    except Exception:
+        return None
+
+scoped = _try_import("circuitcity.tenants.utils", "scoped") or \
+         _try_import("tenants.utils", "scoped") or (lambda qs, _request: qs)
+
+get_active_business = _try_import("circuitcity.tenants.utils", "get_active_business") or \
+                      _try_import("tenants.utils", "get_active_business") or (lambda _r: None)
+
+# Models (import defensively)
+TimeLog = _try_import("inventory.models", "TimeLog") or _try_import("circuitcity.inventory.models", "TimeLog")
+Location = _try_import("inventory.models", "Location") or _try_import("circuitcity.inventory.models", "Location")
+
+# inventory/views.py
+
+from django.contrib.auth.decorators import login_required
+from django.core.paginator import Paginator
+from django.db.models import Q
+from django.shortcuts import render
+from django.views.decorators.cache import never_cache
+
+try:
+    from .models import TimeLog  # type: ignore
+except Exception:
+    TimeLog = None  # type: ignore
+
+# tenant scoping (safe no-op fallback)
+try:
+    from tenants.utils import scoped as _scoped  # type: ignore
+except Exception:
+    _scoped = lambda qs, _req: qs
+
+
+def _can_view_all(user) -> bool:
+    try:
+        return bool(
+            getattr(user, "is_superuser", False)
+            or getattr(user, "is_staff", False)
+            or getattr(getattr(user, "profile", None), "is_manager", False)
+        )
+    except Exception:
+        return False
+
+
+@never_cache
+@login_required
+def time_logs(request):
+    """
+    Show recent time logs.
+    - Managers/staff/superusers: see all logs (scoped to business when possible).
+    - Agents: only their own logs.
+    - If scoping hides rows (e.g., logs lack business_id), fall back to unscoped.
+    """
+    if TimeLog is None:
+        return render(
+            request,
+            "inventory/time_logs.html",
+            {"logs": [], "page_obj": None, "url_for": (lambda *_a, **_k: "#")},
+        )
+
+    # Count all rows to detect over-strict scoping later
+    try:
+        total_rows = TimeLog.objects.count()
+    except Exception:
+        total_rows = 0
+
+    base = _scoped(TimeLog.objects.select_related("user", "location"), request)
+
+    # Role-based view
+    if _can_view_all(request.user):
+        qs = base.order_by("-logged_at")
+    else:
+        qs = base.filter(user=request.user).order_by("-logged_at")
+
+    # If scoped QS is empty but there ARE rows, try a graceful fallback
+    try:
+        needs_fallback = (not qs.exists()) and (total_rows > 0)
+    except Exception:
+        needs_fallback = False
+
+    if needs_fallback:
+        unscoped = TimeLog.objects.select_related("user", "location")
+        qs = unscoped.order_by("-logged_at") if _can_view_all(request.user) else unscoped.filter(
+            user=request.user
+        ).order_by("-logged_at")
+
+    paginator = Paginator(qs, 50)
+    page_obj = paginator.get_page(request.GET.get("page"))
+
+    def url_for(page_number: int):
+        params = request.GET.copy()
+        params["page"] = str(page_number)
+        return f"{request.path}?{params.urlencode()}"
+
+    return render(
+        request,
+        "inventory/time_logs.html",
+        {"logs": page_obj.object_list, "page_obj": page_obj, "url_for": url_for},
+    )
+
+# ------------- small helpers -------------
+def _can_view_all(user) -> bool:
+    """
+    Managers / staff / superusers can see all logs; agents only see their own.
+    """
+    try:
+        if not user.is_authenticated:
+            return False
+        if getattr(user, "is_superuser", False) or getattr(user, "is_staff", False):
+            return True
+        # common "manager" flag on profile (safe)
+        prof = getattr(user, "profile", None)
+        if prof and getattr(prof, "is_manager", False):
+            return True
+    except Exception:
+        pass
+    return False
+
+
+def _paginate_qs(request, qs, per_page: int = 50):
+    page_no = request.GET.get("page") or 1
+    try:
+        per_page = max(1, min(200, int(request.GET.get("per_page", per_page))))
+    except Exception:
+        pass
+    paginator = Paginator(qs, per_page)
+    try:
+        page = paginator.page(page_no)
+    except PageNotAnInteger:
+        page = paginator.page(1)
+    except EmptyPage:
+        page = paginator.page(paginator.num_pages)
+    return page
+
+
+# ------------- PAGE VIEW: Time Logs -------------
+@never_cache
+@login_required
+@require_http_methods(["GET"])
+def time_logs(request):
+    """
+    Render the time logs table. Scopes to active business automatically (if your
+    'scoped' helper applies it). Managers see all; agents see their own only.
+    """
+    # If the project doesn't have a TimeLog model yet, render the template with no rows.
+    if TimeLog is None:
+        return render(request, "inventory/time_logs.html", {"logs": [], "page_obj": None})
+
+    # Base queryset (join common FKs for performance)
+    try:
+        qs = TimeLog.objects.all()
+        try:
+            qs = qs.select_related("user", "location")
+        except Exception:
+            pass
+    except Exception:
+        # Something odd with the model; fail open with empty list
+        return render(request, "inventory/time_logs.html", {"logs": [], "page_obj": None})
+
+    # Apply tenant/business scoping (your scoped() helper will do the right thing)
+    qs = scoped(qs, request)
+
+    # Agent vs Manager visibility
+    if not _can_view_all(request.user):
+        try:
+            qs = qs.filter(user=request.user)
+        except Exception:
+            pass
+
+    # Order newest first
+    try:
+        qs = qs.order_by("-logged_at")
+    except Exception:
+        try:
+            qs = qs.order_by("-id")
+        except Exception:
+            pass
+
+    # Paginate
+    page_obj = _paginate_qs(request, qs, per_page=50)
+
+    ctx = {
+        "logs": list(page_obj.object_list),
+        "page_obj": page_obj,
+    }
+    return render(request, "inventory/time_logs.html", ctx)
+
+
+# ------------- (optional) PAGE VIEW: Time Check-in -------------
+# If you donâ€™t already have a page view for the check-in screen, this renders
+# templates/inventory/time_checkin.html and passes a default store/home location.
+@never_cache
+@login_required
+@require_http_methods(["GET"])
+def time_checkin_page(request):
+    home_loc = None
+    locations = []
+
+    # Provide a few locations if your project has them
+    if Location is not None:
+        try:
+            loc_qs = scoped(Location.objects.all().order_by("name"), request)
+            locations = list(loc_qs[:50])
+            # heuristic: pick the first as "home_loc"
+            home_loc = locations[0] if locations else None
+        except Exception:
+            pass
+
+    return render(request, "inventory/time_checkin.html", {
+        "home_loc": home_loc,
+        "locations": locations,
+    })
 
 @never_cache
 @login_required
@@ -4104,7 +5095,7 @@ def delete_stock(request, pk):
     return redirect("inventory:stock_list")
 
 # -----------------------
-# (continue…)
+# (continueâ€¦)
 # -----------------------
 
 from django.http import JsonResponse
@@ -4467,7 +5458,7 @@ def _two_factor_status(user) -> dict:
 @login_required
 def settings_home(request):
     user = request.user
-    profile = getattr(user, "profile", None)  # ok if you don’t have a Profile model
+    profile = getattr(user, "profile", None)  # ok if you donâ€™t have a Profile model
     avatar_url = getattr(profile, "avatar_url", None) or _gravatar(user.email, 160)
 
     twofa = _two_factor_status(user)
@@ -4572,33 +5563,84 @@ def api_time_checkin(request):
     )
 
 
+# inventory/views.py (add/replace this section)
+
+
+
+from django.contrib.auth.decorators import login_required
+from django.core.paginator import Paginator
+from django.shortcuts import render
+from django.views.decorators.cache import never_cache
+
+# --- Optional imports (fail-safe) ---
+try:
+    from .models import TimeLog, Location  # type: ignore
+except Exception:
+    TimeLog = None  # type: ignore
+    Location = None  # type: ignore
+
+try:
+    # tenant-aware scoping
+    from tenants.utils import scoped as _scoped  # type: ignore
+except Exception:
+    _scoped = lambda qs, _request: qs  # no-op fallback
+
+
+def _can_view_all(user) -> bool:
+    """Allow managers/staff/superusers to see all logs; agents see their own."""
+    try:
+        if getattr(user, "is_superuser", False) or getattr(user, "is_staff", False):
+            return True
+        profile = getattr(user, "profile", None)
+        return bool(getattr(profile, "is_manager", False))
+    except Exception:
+        return False
+
+
 @never_cache
 @login_required
-@require_http_methods(["GET"])
 def time_logs(request):
+    """
+    Render the Time Logs page.
+    - Managers/staff/superusers: all logs in scope
+    - Agents: only their own logs
+    - Paginates 50 per page
+    """
     if TimeLog is None:
-        return render(request, "inventory/time_logs.html", {"logs": [], "page_obj": None, "url_for": lambda *_a, **_k: "#"})
+        # Safe fallback: render empty page if model doesn't exist
+        return render(
+            request,
+            "inventory/time_logs.html",
+            {"logs": [], "page_obj": None, "url_for": (lambda *_a, **_k: "#")},
+        )
 
-    # Scope TimeLog to business if model supports it
-    base = _scoped(TimeLog.objects.select_related("user", "location"), request)
+    # Scope logs to active business (if your project uses tenant scoping)
+    base_qs = _scoped(TimeLog.objects.select_related("user", "location"), request)
+
     if _can_view_all(request.user):
-        qs = base.order_by("-logged_at")
+        qs = base_qs.order_by("-logged_at")
     else:
-        qs = base.filter(user=request.user).order_by("-logged_at")
+        qs = base_qs.filter(user=request.user).order_by("-logged_at")
 
+    # Pagination
     paginator = Paginator(qs, 50)
     page_obj = paginator.get_page(request.GET.get("page"))
 
-    # Simple url_for compatible with templates expecting a callable
+    # Minimal url_for callable (used by template for pager links)
     def url_for(page_number: int):
         params = request.GET.copy()
         params["page"] = str(page_number)
         return f"{request.path}?{params.urlencode()}"
 
     return render(
-        request, "inventory/time_logs.html", {"logs": page_obj.object_list, "page_obj": page_obj, "url_for": url_for}
+        request,
+        "inventory/time_logs.html",
+        {
+            "logs": page_obj.object_list,
+            "page_obj": page_obj,
+            "url_for": url_for,
+        },
     )
-
 
 @never_cache
 @login_required
@@ -4785,12 +5827,321 @@ def wallet_page(request):
 # --- add this tiny helper once near the top of views.py (outside any view) ---
 # ----------------------------------------------------------------------------
 
+
+
+from django.contrib.auth.decorators import login_required
+from django.views.decorators.http import require_http_methods, require_POST
+from django.views.decorators.cache import never_cache
+from django.http import JsonResponse, HttpRequest
+from django.db import transaction
+from django.utils import timezone
+
+# Reuse the single source of truth helpers
+from inventory.utils import _normalize_code, get_instock_item_for_business
+
+
+# --------------------------------------------------------------------
+# Small local helpers (kept here to avoid coupling to other modules)
+# --------------------------------------------------------------------
+def _ok(data, status=200):
+    return JsonResponse({"ok": True, **data}, status=status)
+
+def _err(msg, status=400):
+    return JsonResponse({"ok": False, "error": msg}, status=status)
+
+def _current_business_from_request(request: HttpRequest):
+    """
+    Heuristics to locate the active business on the request/user.
+    Adjust if you have a canonical accessor.
+    """
+    return (
+        getattr(getattr(request.user, "agent_profile", None), "business", None)
+        or getattr(getattr(request.user, "profile", None), "business", None)
+        or getattr(request, "business", None)
+        or getattr(getattr(request, "tenant", None), "business", None)
+    )
+
+
+# ====================================================================
+# 1) Business-wide status check for Scan SOLD (location never blocks)
+# ====================================================================
+from django.views.decorators.http import require_GET
+
+@never_cache
+@require_GET
+def api_stock_status(request):
+    """
+    Probe endpoint used by the scan UI.
+
+    It reports in_stock for *this business* by looking at the same flags/fields
+    the sale endpoint writes, using _base_manager + explicit business filtering.
+    """
+    code = (request.GET.get("code") or "").strip()
+    raw_loc = request.GET.get("location_id") or request.GET.get("location")
+    if not (code.isdigit() and len(code) == 15):
+        return JsonResponse({"ok": False, "error": "IMEI must be exactly 15 digits."}, status=400)
+
+    # helpers
+    def _model_has_field(model, name: str) -> bool:
+        try:
+            model._meta.get_field(name)
+            return True
+        except Exception:
+            return False
+
+    def _require_active_business(_request):
+        biz = getattr(_request, "business", None)
+        biz_id = getattr(biz, "id", None)
+        return biz, biz_id
+
+    def _biz_filter_kwargs(model, biz_id):
+        names = {f.name for f in model._meta.get_fields()}
+        if "business_id" in names:
+            return {"business_id": biz_id}
+        if "tenant_id" in names:
+            return {"tenant_id": biz_id}
+        if "store_id" in names:
+            return {"store_id": biz_id}
+        if "business" in names:
+            return {"business_id": biz_id}
+        return {}
+
+    def _sold_key_for(model):
+        try:
+            f = model._meta.get_field("status")
+            choices = getattr(f, "choices", None)
+            if choices:
+                for pair in choices:
+                    try:
+                        key, label = pair
+                    except Exception:
+                        key = getattr(pair, "value", None)
+                        label = getattr(pair, "label", None) or getattr(pair, "name", None)
+                    if label and "sold" in str(label).lower():
+                        return key
+        except Exception:
+            pass
+        for guess in ("SOLD", "Sold", "sold", "S"):
+            return guess
+
+    # resolve models
+    from inventory.models import InventoryItem
+
+    # active business
+    biz, biz_id = _require_active_business(request)
+    if biz_id is None:
+        return JsonResponse({"ok": False, "error": "No active business."}, status=403)
+
+    # fetch via base manager + business filter
+    qs = InventoryItem._base_manager.filter(**_biz_filter_kwargs(InventoryItem, biz_id))
+    qs = qs.filter(imei=code)
+
+    # optional location scoping (matches whichever FK exists)
+    loc_id = None
+    if raw_loc not in (None, "", 0, "0"):
+        try:
+            loc_id = int(raw_loc)
+        except Exception:
+            loc_id = None
+
+    if loc_id is not None:
+        if _model_has_field(InventoryItem, "current_location"):
+            qs = qs.filter(current_location_id=loc_id)
+        elif _model_has_field(InventoryItem, "location"):
+            qs = qs.filter(location_id=loc_id)
+
+    item = qs.first()
+    if not item:
+        # Not found in this business => not in stock for this business
+        return JsonResponse({"ok": True, "exists": False, "in_stock": False})
+
+    sold_key = _sold_key_for(InventoryItem)
+
+    # Decide "in_stock" using the same single source of truth as mark_sold()
+    status_raw = str(getattr(item, "status", ""))
+    sold_flag = (status_raw == str(sold_key))
+    in_stock_flag = True
+
+    # If a boolean exists, prefer that
+    if _model_has_field(InventoryItem, "in_stock"):
+        in_stock_flag = bool(getattr(item, "in_stock", False))
+    else:
+        # derive: not sold, no sold_at, and (is_active if present)
+        sold_at = getattr(item, "sold_at", None)
+        is_active = getattr(item, "is_active", True)
+        in_stock_flag = (not sold_flag) and (sold_at is None) and bool(is_active)
+
+    # A mismatch means: item exists but not at the requested location (if location_id provided)
+    mismatch = False
+    if loc_id is not None:
+        cur = getattr(item, "current_location_id", None)
+        if cur is None:
+            cur = getattr(item, "location_id", None)
+        mismatch = (cur != loc_id)
+
+    return JsonResponse({
+        "ok": True,
+        "exists": True,
+        "imei": code,
+        "in_stock": bool(in_stock_flag and not sold_flag),
+        "status": status_raw,
+        "sold_at": getattr(item, "sold_at", None).isoformat() if getattr(item, "sold_at", None) else None,
+        "mismatch": bool(mismatch),
+    })
+
+# ====================================================================
+# 2) Sell endpoint: auto-move (if needed) + mark SOLD atomically
+# ====================================================================
+@login_required
+@require_http_methods(["POST"])
+def scan_sold_submit(request: HttpRequest):
+    """
+    POST fields accepted:
+      - code / imei
+      - price / selling_price / final_price
+      - sale_location_id / location / current_location
+      - commission_percent (optional)
+      - sold_date (optional; default now)
+
+    Behavior:
+      - Finds unsold item by IMEI anywhere in the business (locks row).
+      - If stored elsewhere, writes StockMovement (if available) and sets item's location to sale location.
+      - Marks as SOLD (supports either 'status' or 'sold_at' schema).
+      - Creates a Sale row if your project has one.
+    """
+    # ---- code / imei
+    raw = (request.POST.get("code") or request.POST.get("imei") or "").strip()
+    if not raw:
+        return _err("Missing code", status=400)
+    code = _normalize_code(raw)
+
+    # ---- price
+    price_raw = (
+        request.POST.get("price")
+        or request.POST.get("selling_price")
+        or request.POST.get("final_price")
+        or "0"
+    )
+    try:
+        price = float(price_raw)
+        if price < 0:
+            return _err("Price must be non-negative", status=400)
+    except ValueError:
+        return _err("Invalid price", status=400)
+
+    # ---- sale location
+    sale_loc_id = (
+        request.POST.get("sale_location_id")
+        or request.POST.get("location")
+        or request.POST.get("current_location")
+    )
+    if not sale_loc_id:
+        return _err("Missing sale location", status=400)
+
+    commission_percent = request.POST.get("commission_percent") or None
+    business = _current_business_from_request(request)
+    if business is None:
+        return _err("No business on session/user.", status=400)
+
+    # Resolve models defensively
+    try:
+        from inventory.models import Location
+    except Exception:
+        Location = None
+    try:
+        from inventory.models import StockMovement
+    except Exception:
+        StockMovement = None
+    try:
+        from sales.models import Sale
+    except Exception:
+        try:
+            from inventory.models import Sale
+        except Exception:
+            Sale = None
+
+    # Validate the sale location if we have a Location model
+    sale_loc = None
+    if Location is not None:
+        try:
+            sale_loc = Location.objects.get(id=sale_loc_id, business=business)
+        except Exception:
+            return _err("Invalid sale location", status=400)
+
+    with transaction.atomic():
+        # Lock the row to avoid double-sell races
+        item = get_instock_item_for_business(business, code, for_update=True)
+        if not item:
+            return _err("Item not found or already sold", status=404)
+
+        # Determine which location field we use on the item
+        item_loc_field = "current_location" if hasattr(item, "current_location") else ("location" if hasattr(item, "location") else None)
+        item_loc_id = getattr(item, f"{item_loc_field}_id", None) if item_loc_field else None
+
+        # Auto-move if needed (NEVER block sale if movement fails)
+        if sale_loc is not None and item_loc_field and item_loc_id and int(item_loc_id) != int(sale_loc.id):
+            if StockMovement is not None:
+                try:
+                    StockMovement.objects.create(
+                        business=business if hasattr(StockMovement, "business") else None,
+                        item=item if hasattr(StockMovement, "item") else None,
+                        from_location=getattr(item, item_loc_field, None) if hasattr(StockMovement, "from_location") else None,
+                        to_location=sale_loc if hasattr(StockMovement, "to_location") else None,
+                        reason="auto-move-on-sale" if hasattr(StockMovement, "reason") else None,
+                        moved_by=request.user if hasattr(StockMovement, "moved_by") else None,
+                        moved_at=timezone.now() if hasattr(StockMovement, "moved_at") else None,
+                    )
+                except Exception:
+                    # movement failed â€” do not block the sale
+                    pass
+            try:
+                setattr(item, item_loc_field, sale_loc)
+                item.save(update_fields=[item_loc_field])
+            except Exception:
+                pass
+
+        # Mark SOLD (cover both schemas)
+        updates = []
+        if hasattr(item, "sold_at"):
+            item.sold_at = timezone.now(); updates.append("sold_at")
+        if hasattr(item, "sold_price"):
+            item.sold_price = price; updates.append("sold_price")
+        if hasattr(item, "sold_by"):
+            item.sold_by = request.user; updates.append("sold_by")
+        if hasattr(item, "status"):
+            item.status = "SOLD"; updates.append("status")
+        item.save(update_fields=list(set(updates)) if updates else None)
+
+        # Create Sale record if present
+        if Sale is not None:
+            try:
+                Sale.objects.create(
+                    business=business if hasattr(Sale, "business") else None,
+                    item=item if hasattr(Sale, "item") else None,
+                    code=getattr(item, "imei", None) or getattr(item, "code", code) if hasattr(Sale, "code") else None,
+                    price=price if hasattr(Sale, "price") else None,
+                    location=sale_loc if hasattr(Sale, "location") else None,
+                    sold_at=getattr(item, "sold_at", timezone.now()) if hasattr(Sale, "sold_at") else None,
+                    sold_by=request.user if hasattr(Sale, "sold_by") else None,
+                    commission_percent=commission_percent if hasattr(Sale, "commission_percent") else None,
+                )
+            except Exception:
+                # Donâ€™t block the sale if Sale row fails
+                pass
+
+    return _ok({"sold": True, "code": code, "price": price})
+
+
+# ====================================================================
+# Your existing views (kept; minor safety imports added where needed)
+# ====================================================================
+
 @never_cache
 @login_required
 @require_http_methods(["GET", "POST"])
 def update_stock(request, pk):
     """
-    Inventory · Update Stock
+    Inventory Â· Update Stock
     - Scopes the item to the active business.
     - Only managers/admins can edit inventory (your existing _can_edit_inventory).
     - Admins can optionally bulk-propagate price fields across same product in the same business.
@@ -4801,6 +6152,19 @@ def update_stock(request, pk):
     from django.shortcuts import redirect, render, get_object_or_404
     from django.utils import timezone
     from django.core.mail import mail_admins
+
+    # Guards for missing models/forms (assumes these references exist elsewhere)
+    try:
+        from inventory.models import InventoryItem
+    except Exception:
+        InventoryItem = None
+    try:
+        from inventory.forms import InventoryItemForm
+    except Exception:
+        InventoryItemForm = None
+
+    # External helpers expected in your codebase
+    from .views_helpers import _wants_json, _scoped, _can_edit_inventory, _audit, _is_agent_user, _is_admin  # adjust path if needed
 
     # Guards for missing models/forms
     if InventoryItem is None or InventoryItemForm is None:
@@ -4905,7 +6269,6 @@ def update_stock(request, pk):
         _audit(saved_item, request.user, "EDIT", details)
 
         if _wants_json(request):
-            # Serialize a light view of the item for the client
             payload_item = {
                 "id": saved_item.pk,
                 "imei": getattr(saved_item, "imei", None),
@@ -4929,7 +6292,6 @@ def update_stock(request, pk):
     form = InventoryItemForm(instance=item, user=request.user)
 
     if _wants_json(request):
-        # Minimal boot payload for edit UIs that fetch JSON
         payload_item = {
             "id": item.pk,
             "imei": getattr(item, "imei", None),
@@ -4954,6 +6316,20 @@ def update_stock(request, pk):
 @never_cache
 @login_required
 def delete_stock(request, pk):
+    # Local imports to make this function self-contained
+    from django.contrib import messages
+    from django.shortcuts import redirect, get_object_or_404
+    from django.utils import timezone
+    from django.core.mail import mail_admins
+    from django.db.models.deletion import ProtectedError
+
+    # Expected helpers/models in your codebase
+    try:
+        from inventory.models import InventoryItem
+    except Exception:
+        InventoryItem = None
+    from .views_helpers import _scoped, _is_admin, _audit  # adjust path if needed
+
     if InventoryItem is None:
         messages.error(request, "Inventory model not available.")
         return redirect("inventory:stock_list")
@@ -4993,10 +6369,6 @@ def delete_stock(request, pk):
     return redirect("inventory:stock_list")
 
 
-# -----------------------
-# (continue…)
-# -----------------------
-
 @never_cache
 @login_required
 def restock_heatmap_api(request):
@@ -5014,7 +6386,6 @@ def restock_heatmap_api(request):
     except Exception:
         pass
     return JsonResponse({"ok": True, "heatmap": []})
-
 
 # (INTENTIONALLY no duplicate api_mark_sold / stock_list / export_csv definitions here;
 # keep the versions you already pasted from PART 1 and PART 2.)
@@ -5269,7 +6640,7 @@ def inventory_dashboard(request):
     agent_rows = [
         {
             "agent_id": row["assigned_agent_id"],
-            "agent": row["assigned_agent__username"] or "—",
+            "agent": row["assigned_agent__username"] or "â€”",
             "total_stock": row["total_stock"],
             "sold_units": sold_map.get(row["assigned_agent_id"], 0),
         }
@@ -5403,5 +6774,119 @@ def inventory_dashboard(request):
 
     cache.set(cache_key, context, 60)
     return _render_dashboard_safe(request, context, today, mtd_count, all_time_count)
+# --- Wallet page (agent) ------------------------------------------------------
+def wallet_page(request):
+    """
+    Simple read-only wallet page for a specific agent.
+    Route: /inventory/wallet/?user=<id>
+    """
+    User = get_user_model()
+
+    uid = request.GET.get("user") or request.GET.get("agent")
+    if not uid:
+        return redirect("/inventory/list/")
+
+    target = get_object_or_404(User, pk=uid)
+
+    # Lifetime balance
+    balance = (
+        WalletTxn.objects.filter(user=target)
+        .aggregate(s=Sum("amount"))["s"] or 0
+    )
+
+    # Monthly stats
+    today = timezone.localdate()
+    month_start = today.replace(day=1)
+    next_month = (month_start.replace(day=28) + timezone.timedelta(days=4)).replace(day=1)
+
+    monthly_total = (
+        WalletTxn.objects.filter(user=target, created_at__gte=month_start, created_at__lt=next_month)
+        .aggregate(s=Sum("amount"))["s"] or 0
+    )
+    monthly_adv = (
+        WalletTxn.objects.filter(
+            user=target,
+            created_at__gte=month_start, created_at__lt=next_month,
+            reason="ADVANCE",
+        ).aggregate(s=Sum("amount"))["s"] or 0
+    )
+    lifetime_total = balance
+
+    # Paginated transactions
+    txns_qs = WalletTxn.objects.filter(user=target).order_by("-created_at")
+    paginator = Paginator(txns_qs, 25)
+    page_obj = paginator.get_page(request.GET.get("page") or 1)
+
+    def url_for(n):
+        q = request.GET.copy()
+        q["page"] = n
+        return f"{request.path}?{q.urlencode()}"
+
+    ctx = {
+        "target": target,
+        "balance": balance,
+        "monthly_total": monthly_total,
+        "monthly_adv": monthly_adv,
+        "lifetime_total": lifetime_total,
+        "txns": page_obj.object_list,
+        "page_obj": page_obj,
+        "url_for": url_for,
+    }
+    return render(request, "agents/wallet.html", ctx)
+@with_active_location
+def wallet_page(request):
+    """
+    Simple agent wallet ledger:
+    - /inventory/wallet/?user=<id>  (defaults to current user)
+    - shows monthly totals + paginated transactions
+    """
+    User = get_user_model()
+    user_id = request.GET.get("user") or getattr(request.user, "id", None)
+    target = get_object_or_404(User, id=user_id)
+
+    # Totals
+    now = timezone.localtime()
+    month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+    txns_qs = WalletTxn.objects.filter(user=target).order_by("-created_at")
+
+    def _sum(qs):
+        from django.db.models import Sum
+        return float(qs.aggregate(s=Sum("amount"))["s"] or 0)
+
+    balance = _sum(txns_qs)
+    monthly_total = _sum(txns_qs.filter(created_at__gte=month_start))
+    monthly_adv = _sum(txns_qs.filter(created_at__gte=month_start, reason="ADVANCE"))
+    lifetime_total = _sum(txns_qs)
+
+    # Pagination
+    page = int(request.GET.get("page", 1) or 1)
+    pager = Paginator(txns_qs, 25)
+    page_obj = pager.get_page(page)
+
+    def url_for(n):
+        q = request.GET.copy()
+        q["page"] = n
+        return f"{request.path}?{q.urlencode()}"
+
+    ctx = {
+        "target": target,
+        "balance": balance,
+        "monthly_total": monthly_total,
+        "monthly_adv": monthly_adv,
+        "lifetime_total": lifetime_total,
+        "txns": page_obj.object_list,
+        "page_obj": page_obj,
+        "url_for": url_for,
+    }
+    return render(request, "agents/wallet.html", ctx)
 
 # --- END PART 3/3 ---
+
+
+
+
+
+
+
+
+

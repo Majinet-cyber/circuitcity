@@ -1,4 +1,4 @@
-# inventory/models.py
+﻿# inventory/models.py
 from django.db import models
 from django.contrib.auth import get_user_model
 from django.conf import settings
@@ -198,7 +198,7 @@ class InventoryItem(models.Model):
             models.Index(fields=["warranty_status", "warranty_expires_at"], name="inv_wty_stat_exp_idx"),
             # Helpful for admin date_hierarchy & stock aging reports
             models.Index(fields=["received_at"], name="invitem_received_at_idx"),
-            # NOTE: no extra IMEI index—`unique=True` already creates one.
+            # NOTE: no extra IMEI indexâ€”`unique=True` already creates one.
         ]
         constraints = [
             models.CheckConstraint(check=Q(order_price__gte=0), name="inv_order_price_nonneg"),
@@ -429,7 +429,7 @@ class WalletTxn(models.Model):
         ("PAYOUT", "Payout to agent"),
     ]
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="wallet_txns")
-    amount = models.DecimalField(max_digits=12, decimal_places=2)  # + = bonus/credit, − = deduction
+    amount = models.DecimalField(max_digits=12, decimal_places=2)  # + = bonus/credit, âˆ’ = deduction
     reason = models.CharField(max_length=32, choices=REASON_CHOICES, default="ADJUSTMENT")
     created_at = models.DateTimeField(default=timezone.now)
     memo = models.CharField(max_length=200, blank=True)
@@ -460,3 +460,7 @@ class WalletTxn(models.Model):
             user=user, created_at__gte=start, created_at__lt=end
         ).aggregate(s=Sum("amount"))["s"] or 0
         return float(val)
+
+
+
+

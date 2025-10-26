@@ -1,4 +1,4 @@
-# circuitcity/accounts/apps.py
+﻿# circuitcity/accounts/apps.py
 from __future__ import annotations
 
 from django.apps import AppConfig
@@ -22,8 +22,10 @@ class AccountsConfig(AppConfig):
     verbose_name = "User Accounts"
 
     def ready(self) -> None:  # type: ignore[override]
-        """Import signals on startup if available, but don’t crash if missing."""
+        """Import signals on startup if available, but donâ€™t crash if missing."""
         try:
             from . import signals  # noqa: F401
         except Exception:
             pass
+
+

@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 from datetime import timedelta
 from django.contrib.auth.decorators import login_required, user_passes_test
 from django.views.decorators.http import require_http_methods
@@ -74,7 +74,7 @@ def manager_agents(request):
         return redirect("/")
 
     _, biz_id = get_active_business(request)
-    # “Active agents” = users with recent logs or sales
+    # â€œActive agentsâ€ = users with recent logs or sales
     recent = timezone.now() - timedelta(days=7)
     user_ids = set(TimeLog.objects.filter(business_id=biz_id, ts__gte=recent).values_list("user_id", flat=True))
     # fallback to all business members if needed
@@ -113,3 +113,5 @@ def manager_agent_detail(request, user_id: int):
         "logs": enriched,
         "attendance_net": net,
     })
+
+

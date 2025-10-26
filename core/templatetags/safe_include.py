@@ -1,4 +1,4 @@
-# core/templatetags/safe_include.py
+﻿# core/templatetags/safe_include.py
 from django import template
 from django.template.loader import get_template
 from django.template import TemplateDoesNotExist
@@ -20,3 +20,5 @@ def include_optional(context, template_name, **kwargs):
     ctx = context.flatten()
     ctx.update(kwargs)
     return tpl.render(ctx)
+
+

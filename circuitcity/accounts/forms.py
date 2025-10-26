@@ -1,4 +1,4 @@
-# accounts/forms.py
+﻿# accounts/forms.py
 from __future__ import annotations
 
 import re
@@ -39,7 +39,7 @@ def _validate_passwords(p1: str | None, p2: str | None, *, user: object | None =
 
     Order:
       1) Quick presence & match checks
-      2) Our strong policy (≥10 chars + letter + number + special; block weak patterns)
+      2) Our strong policy (â‰¥10 chars + letter + number + special; block weak patterns)
       3) Django's global validators (AUTH_PASSWORD_VALIDATORS)
     """
     if not p1 or not p2:
@@ -144,7 +144,7 @@ class AvatarForm(forms.Form):
 # ============================================================
 class ProfileForm(forms.ModelForm):
     """
-    Used on Settings → Profile.
+    Used on Settings â†’ Profile.
     Renders select dropdowns for Country / Language / Time zone with sensible defaults.
     """
     # Force these to ChoiceFields so templates render <select> controls
@@ -199,7 +199,7 @@ class ProfileForm(forms.ModelForm):
 
 
 # ============================================================
-# Settings: Security → Password change (simple form)
+# Settings: Security â†’ Password change (simple form)
 # ============================================================
 class PasswordChangeSimpleForm(forms.Form):
     old_password = forms.CharField(
@@ -441,3 +441,5 @@ class ManagerSignUpForm(forms.Form):
         if not (data.get("business_name") or "").strip():
             self.add_error("business_name", "Enter your store name.")
         return data
+
+

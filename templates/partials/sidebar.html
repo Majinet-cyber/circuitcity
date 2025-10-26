@@ -1,7 +1,10 @@
 {% load static %}
 
-{# -------- Resolve URLs SAFELY (no crash if missing) -------- #}
-{# Main dashboard (app) #}
+<!-- =========================
+     SAFE URL RESOLVERS (no crash if missing)
+     ========================= -->
+
+{# Main dashboard (tenant/app) #}
 {% url 'dashboard:home' as url_main_dash %}
 {% if not url_main_dash %}{% url 'dashboard:dashboard' as url_main_dash %}{% endif %}
 {% if not url_main_dash %}{% url 'dashboard:index' as url_main_dash %}{% endif %}
@@ -10,21 +13,20 @@
 {% url 'inventory:inventory_dashboard' as url_inv_dash %}
 {% if not url_inv_dash %}{% url 'inventory:dashboard' as url_inv_dash %}{% endif %}
 
-{# Other links #}
-{% url 'inventory:stock_list'          as url_stock %}
-{% url 'inventory:scan_in'             as url_scan_in %}
+{# Other inventory links #}
+{% url 'inventory:stock_list' as url_stock %}
+{% url 'inventory:scan_in'   as url_scan_in %}
 
-{# Wallet (agent + admin) #}
-{% url 'wallet:agent_wallet'           as url_wallet %}
-{% url 'wallet:admin_home'             as url_wallet_admin %}
+{# Wallets (agent + admin) #}
+{% url 'wallet:agent_wallet' as url_wallet %}
+{% url 'wallet:admin_home'   as url_wallet_admin %}
 {% if not url_wallet_admin %}{% url 'wallet:admin_wallet' as url_wallet_admin %}{% endif %}
 
-{# Reports, Tenants, Billing, Admin #}
+{# Reports, Tenants/Manager, Locations, Admin Billing #}
 {% url 'reports:home'                  as url_reports %}
 {% url 'tenants:manager_review_agents' as url_team %}
 {% url 'tenants:manager_locations'     as url_locations %}
 {% url 'billing:admin_dashboard'       as url_billing_admin %}
-{% url 'admin:index'                   as url_admin %}
 
 {# HQ (platform) links — optional, safe fallbacks #}
 {% url 'hq:home'          as url_hq_home %}
@@ -34,12 +36,12 @@
 {% url 'hq:agents'        as url_hq_agents %}
 {% url 'hq:stock_trends'  as url_hq_stock_trends %}
 
-{# Orders (safe; tries canonical + legacy) #}
+{# Orders (canonical + legacy) #}
 {% url 'inventory:place_order_page' as url_place_order %}
 {% if not url_place_order %}{% url 'inventory:place_order' as url_place_order %}{% endif %}
 {% url 'inventory:orders_list' as url_orders %}
 
-{# Payslips links — align with wallet admin names, keep legacy fallbacks #}
+{# Payslips (canonical + legacy) #}
 {% url 'wallet:admin_issue_payslip' as url_payslip_issue %}
 {% if not url_payslip_issue %}{% url 'payslip_issue' as url_payslip_issue %}{% endif %}
 {% url 'wallet:admin_payslips' as url_payslip_bulk %}
@@ -47,48 +49,77 @@
 {% url 'wallet:admin_schedules' as url_payslip_schedules %}
 {% if not url_payslip_schedules %}{% url 'payslip_schedules' as url_payslip_schedules %}{% endif %}
 
-{# TIME (with safe fallbacks) #}
+{# Time (safe) #}
 {% url 'inventory:time_checkin' as url_time_checkin %}
 {% url 'inventory:time_logs'    as url_time_logs %}
 
-{# SETTINGS (single link) #}
-{% url 'accounts:settings_unified' as url_settings %}
-{% if not url_settings %}{% url 'accounts:settings' as url_settings %}{% endif %}
-
-{# LAYBY URLs (safe reversals) #}
+{# Layby (safe) #}
 {% url 'layby:dashboard'  as url_layby_dashboard %}
 {% url 'layby:agreements' as url_layby_agreements %}
 {% url 'layby:payments'   as url_layby_payments %}
 {% url 'layby:new'        as url_layby_new %}
 
+{# Billing (MANAGER flow — choose plan / checkout) #}
+{% url 'billing:plans'    as url_billing_plans %}
+{% url 'billing:checkout' as url_billing_checkout %}
+
+{# Django admin (always safe) #}
+{% url 'admin:index' as url_admin %}
+
+<!-- =========================
+     STYLES (one visual system for all roles)
+     ========================= -->
 <style>
-  .cc-sidebar{position:sticky;top:0;height:100vh;width:260px;min-width:260px;background:linear-gradient(180deg,#0f172a 0%,#0b1324 100%);color:#cbd5e1;border-right:1px solid rgba(255,255,255,.06);display:flex;flex-direction:column;gap:14px;padding:16px 14px}
+  .cc-sidebar{
+    position:sticky;top:0;height:100vh;width:260px;min-width:260px;
+    background:linear-gradient(180deg,#0f172a 0%,#0b1324 100%);color:#cbd5e1;
+    border-right:1px solid rgba(255,255,255,.06);
+    display:flex;flex-direction:column;gap:14px;padding:16px 14px
+  }
   .cc-brand{display:flex;align-items:center;gap:.6rem;font-weight:800;color:#fff;font-size:1.05rem;text-decoration:none}
-  .cc-brand .logo{display:grid;place-items:center;width:28px;height:28px;border-radius:8px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.08);box-shadow:inset 0 1px 0 rgba(255,255,255,.15)}
+  .cc-brand .logo{
+    display:grid;place-items:center;width:28px;height:28px;border-radius:8px;
+    background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.08);
+    box-shadow:inset 0 1px 0 rgba(255,255,255,.15)
+  }
   .cc-section{font-size:.72rem;letter-spacing:.08em;color:#8ea0b5;margin:10px 10px 6px;text-transform:uppercase}
   .cc-nav{list-style:none;padding:0;margin:0;display:flex;flex-direction:column;gap:8px}
-  .cc-nav a.navlink{display:flex;align-items:center;gap:.65rem;padding:10px 12px;border-radius:12px;color:#cbd5e1;text-decoration:none;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,.05);transition:transform .18s ease,background .18s ease,border-color .18s ease}
+  .cc-nav a.navlink{
+    display:flex;align-items:center;gap:.65rem;padding:10px 12px;border-radius:12px;color:#cbd5e1;text-decoration:none;
+    background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,.05);
+    transition:transform .18s ease,background .18s ease,border-color .18s ease
+  }
   .cc-nav a.navlink:hover{background:rgba(34,211,238,.08);border-color:rgba(34,211,238,.28);transform:translateX(2px)}
-  .cc-nav li.active a.navlink{background:rgba(255,255,255,.08);border-color:rgba(255,255,255,.16);box-shadow:0 10px 24px rgba(0,0,0,.25),inset 0 0 0 1px rgba(255,255,255,.06)}
-  .cc-nav a.navlink .bi{background:linear-gradient(120deg,#22d3ee,#10b981 60%,#22d3ee 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;filter:drop-shadow(0 2px 6px rgba(34,211,238,.15));font-size:1.05rem}
+  .cc-nav li.active a.navlink{
+    background:rgba(255,255,255,.08);border-color:rgba(255,255,255,.16);
+    box-shadow:0 10px 24px rgba(0,0,0,.25),inset 0 0 0 1px rgba(255,255,255,.06)
+  }
+  .cc-nav a.navlink .bi{
+    background:linear-gradient(120deg,#22d3ee,#10b981 60%,#22d3ee 100%);
+    -webkit-background-clip:text;-webkit-text-fill-color:transparent;
+    filter:drop-shadow(0 2px 6px rgba(34,211,238,.15));font-size:1.05rem
+  }
   .cc-bottom{margin-top:auto}
-  /* small helper for the chevron buttons */
   .cc-toggle{border:0;background:transparent;color:#8ea0b5;padding:0 .35rem}
   .cc-toggle:focus{outline:none}
   .cc-row{display:flex;align-items:center;justify-content:space-between}
 </style>
 
+<!-- =========================
+     SIDEBAR
+     ========================= -->
 <aside class="cc-sidebar">
   <a class="cc-brand" href="{{ url_main_dash|default:'/dashboard/' }}">
     <span class="logo"><img src="{% static 'img/logo-32.png' %}" width="20" height="20" alt=""></span>
     <span>{% firstof request.business.name APP_NAME 'Circuit City' %}</span>
   </a>
 
-  {% if request.user.is_superuser %}
+  {# ---------- HQ / Platform (staff & superuser) ---------- #}
+  {% if request.user.is_staff or request.user.is_superuser %}
   <div>
     <div class="cc-section">Platform</div>
     <ul class="cc-nav">
-      <li class="{% if request.path|slice:'0:4' == '/hq/' and request.path == '/hq/' %}active{% endif %}">
+      <li class="{% if request.path == '/hq/' or request.path|slice:'0:13' == '/hq/home' or request.path|slice:'0:12' == '/hq/dashboard' %}active{% endif %}">
         <a class="navlink" href="{{ url_hq_home|default:'/hq/' }}"><i class="bi bi-speedometer2"></i><span>HQ Dashboard</span></a>
       </li>
       <li class="{% if request.path|slice:'0:14' == '/hq/businesses' %}active{% endif %}">
@@ -110,6 +141,7 @@
   </div>
   {% endif %}
 
+  <!-- ---------- Main (tenant) ---------- -->
   <div>
     <div class="cc-section">Main</div>
     <ul class="cc-nav">
@@ -143,6 +175,7 @@
     </ul>
   </div>
 
+  <!-- ---------- Time (role-aware) ---------- -->
   {% if request.user.is_authenticated %}
     {% if request.user.is_superuser or request.user.is_staff or request.user.profile.is_manager %}
       <div>
@@ -168,7 +201,7 @@
     {% endif %}
   {% endif %}
 
-  {# -------- Money (Wallets) -------- #}
+  <!-- ---------- Money ---------- -->
   <div>
     <div class="cc-section">Money</div>
     <ul class="cc-nav">
@@ -186,6 +219,7 @@
     </ul>
   </div>
 
+  <!-- ---------- Business (manager/staff) ---------- -->
   {% if request.user.is_superuser or request.user.is_staff or request.user.profile.is_manager %}
   <div>
     <div class="cc-section">Business</div>
@@ -206,6 +240,13 @@
       {% if url_locations %}
       <li class="{% if '/tenants/manager/locations/' in request.path %}active{% endif %}">
         <a class="navlink" href="{{ url_locations }}"><i class="bi bi-geo"></i><span>Locations</span></a>
+      </li>
+      {% endif %}
+
+      {# --- Subscriptions (MANAGER flow) --- #}
+      {% if url_billing_plans or url_billing_checkout %}
+      <li class="{% if request.path|slice:'0:15' == '/billing/plans/' or request.path|slice:'0:16' == '/billing/checkout' %}active{% endif %}">
+        <a class="navlink" href="{{ url_billing_plans|default:url_billing_checkout|default:'#' }}"><i class="bi bi-credit-card-2-front"></i><span>Choose Plan</span></a>
       </li>
       {% endif %}
 
@@ -246,7 +287,7 @@
             <i class="bi bi-chevron-down"></i>
           </button>
         </div>
-        <div class="collapse {% if request.path|slice:'0:16' == '/payslips/bulk' or request.path|slice:'0:20' == '/payslips/schedules' or request.path|slice:'0:16' == '/payslips/issue' or request.path|slice:'0:22' == '/wallet/admin/payslips' %}show{% endif %}" id="menu-payslips">
+        <div class="collapse {% if request.path|slice:'0:16' == '/payslips/issue' or request.path|slice:'0:22' == '/wallet/admin/payslips' or request.path|slice:'0:16' == '/payslips/bulk' or request.path|slice:'0:20' == '/payslips/schedules' or request.path|slice:'0:20' == '/wallet/admin/schedules' %}show{% endif %}" id="menu-payslips">
           <ul class="cc-nav" style="gap:4px;margin-top:6px;margin-left:14px">
             {% if url_payslip_issue %}
             <li class="{% if request.path|slice:'0:16' == '/payslips/issue' or request.path|slice:'0:29' == '/wallet/admin/payslips/single' %}active{% endif %}">
@@ -271,7 +312,7 @@
   </div>
   {% endif %}
 
-  {# -------- Layby (collapsible; parent clickable) -------- #}
+  <!-- ---------- Layby (collapsible; parent clickable) ---------- -->
   {% with layby_root=url_layby_dashboard|default:'/layby/' %}
     {% if layby_root %}
       <div>
@@ -309,8 +350,8 @@
     {% endif %}
   {% endwith %}
 
-  {# -------- Simulator (guarded without parentheses) -------- #}
-  {% if FEATURES.SIMULATOR %}
+  <!-- ---------- Simulator (feature-flagged) ---------- -->
+  {% if FEATURES and FEATURES.SIMULATOR %}
     {% if request.user.is_superuser or request.user.is_staff or request.user.profile.is_manager %}
       <div>
         <div class="cc-section">Simulator</div>
@@ -335,19 +376,5 @@
     {% endif %}
   {% endif %}
 
-  <div>
-    <div class="cc-section">Settings</div>
-    <ul class="cc-nav">
-      <li class="{% if '/accounts/settings' in request.path or request.path == '/accounts/' %}active{% endif %}">
-        <a class="navlink" href="{{ url_settings|default:'/accounts/settings/' }}"><i class="bi bi-person-gear"></i><span>Profile &amp; Settings</span></a>
-      </li>
-    </ul>
-  </div>
-
-  <div class="cc-bottom">
-    <ul class="cc-nav">
-      <li><a class="navlink" href="/feedback/"><i class="bi bi-chat-left-text"></i><span>Feedback</span></a></li>
-      <li><a class="navlink" href="{% url 'accounts:logout' %}?next=/accounts/login/"><i class="bi bi-box-arrow-right"></i><span>Logout</span></a></li>
-    </ul>
-  </div>
+  <!-- NOTE: Settings / Feedback / Logout live in the top-right avatar menu (base.html) -->
 </aside>

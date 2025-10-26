@@ -1,38 +1,118 @@
 {% extends "hq/base.html" %}
-{% block title %}Businesses{% endblock %}
-{% block body %}
-<h1 style="margin:0 0 10px">Businesses</h1>
+{% load humanize %}
+{% block title %}Businesses · HQ{% endblock %}
 
-<form class="kpis" method="get">
-  <span class="pill {% if range == 'all' %}active{% endif %}" onclick="setRange('all')">All time</span>
-  <span class="pill {% if range == '7d' %}active{% endif %}" onclick="setRange('7d')">Last 7d</span>
-  <span class="pill {% if range == 'custom' %}active{% endif %}">
-    Custom <input type="date" name="start" value="{{ start|date:'Y-m-d' }}"> <input type="date" name="end" value="{{ end|date:'Y-m-d' }}">
-    <button class="btn btn-ghost" type="submit">Apply</button>
-  </span>
-  <input type="hidden" name="range" id="range" value="{{ range|default:'all' }}">
-  <div style="margin-left:auto"></div>
+{% block page_title %}Businesses{% endblock %}
+
+{% block body %}
+<style>
+  .toolbar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:12px}
+  .pill{display:inline-flex;align-items:center;gap:.5rem;padding:.4rem .65rem;border-radius:999px;border:1px solid var(--ring, #e2e8f0);background:#fff;color:#0f172a;font-weight:700;font-size:12px;cursor:pointer}
+  .pill.active{background:#0ea5e9;color:#fff;border-color:#0ea5e9;box-shadow:0 6px 14px rgba(14,165,233,.18)}
+  .toolbar .range{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+  .toolbar .spacer{flex:1}
+  .toolbar input[type="search"]{padding:10px 12px;border-radius:12px;border:1px solid var(--ring, #e2e8f0);background:#fff;min-width:220px}
+  .btn-ghost{border:1px solid var(--ring,#e2e8f0);background:#fff;color:#0f172a;border-radius:10px;padding:9px 12px;font-weight:700;text-decoration:none}
+  .table-wrap{overflow:auto}
+  table{width:100%;border-collapse:separate;border-spacing:0 10px}
+  thead th{color:#475569;font-weight:700;text-align:left;font-size:12px;text-transform:uppercase;letter-spacing:.06em;padding:0 10px}
+  tbody tr{background:#fff;border:1px solid #e2e8f0;border-radius:12px}
+  tbody td{padding:12px 10px;border-top:1px solid #e2e8f0}
+  tbody tr td:first-child{border-left:1px solid #e2e8f0;border-top-left-radius:12px;border-bottom-left-radius:12px}
+  tbody tr td:last-child{border-right:1px solid #e2e8f0;border-top-right-radius:12px;border-bottom-right-radius:12px}
+  tbody tr:hover{box-shadow:0 10px 24px rgba(2,6,23,.06)}
+  .empty{padding:18px;text-align:center;color:#64748b}
+  .pager{display:flex;gap:6px;align-items:center;justify-content:flex-end;margin-top:10px}
+  .pager a,.pager span{display:inline-flex;align-items:center;justify-content:center;min-width:36px;height:36px;border-radius:10px;border:1px solid #e2e8f0;background:#fff;color:#0f172a;text-decoration:none;font-weight:700}
+  .pager .cur{background:#0ea5e9;color:#fff;border-color:#0ea5e9}
+</style>
+
+<h1 style="margin:0 0 6px">Businesses</h1>
+
+<form class="toolbar" method="get">
+  <div class="range">
+    <button class="pill {% if range == 'all' %}active{% endif %}" type="button" onclick="setRange('all')">All time</button>
+    <button class="pill {% if range == '7d' %}active{% endif %}" type="button" onclick="setRange('7d')">Last 7d</button>
+    <span class="pill {% if range == 'custom' %}active{% endif %}">
+      Custom
+      <input type="date" name="start" value="{{ start|date:'Y-m-d' }}">
+      <input type="date" name="end" value="{{ end|date:'Y-m-d' }}">
+      <button class="btn-ghost" type="submit">Apply</button>
+    </span>
+    <input type="hidden" name="range" id="range" value="{{ range|default:'all' }}">
+  </div>
+
+  <div class="spacer"></div>
+
   <input type="search" name="q" value="{{ q }}" placeholder="Search businesses">
-  <button class="btn btn-ghost">Go</button>
+  <button class="btn-ghost" type="submit">Go</button>
 </form>
 
-<table>
-  <thead>
-    <tr><th>Name</th><th>Active Subs</th><th>Invoices</th><th>MRR (sum)</th></tr>
-  </thead>
-  <tbody>
-  {% for b in page_obj %}
-    <tr onclick="location.href='{% url 'hq:business_detail' b.pk %}'" style="cursor:pointer">
-      <td><a href="{% url 'hq:business_detail' b.pk %}">{{ b.name }}</a></td>
-      <td>{{ b.subs_count|default:'—' }}</td>
-      <td>{{ b.invoices_count|default:'—' }}</td>
-      <td>{{ b.mrr_sum|default:'—' }}</td>
-    </tr>
-  {% empty %}
-    <tr><td colspan="4">No businesses yet.</td></tr>
-  {% endfor %}
-  </tbody>
-</table>
+<div class="table-wrap">
+  <table>
+    <thead>
+      <tr>
+        <th>Name</th>
+        <th>Active Subs</th>
+        <th>Invoices</th>
+        <th>MRR (sum)</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% if page_obj and page_obj.object_list %}
+        {% for b in page_obj %}
+        <tr onclick="location.href='{% url 'hq:business_detail' b.pk %}'" style="cursor:pointer">
+          <td>
+            <a href="{% url 'hq:business_detail' b.pk %}" style="text-decoration:none;font-weight:800;color:#0f172a">{{ b.name }}</a>
+            {% if b.created_at %}<div style="font-size:12px;color:#64748b">Joined {{ b.created_at|date:"Y-m-d" }}</div>{% endif %}
+          </td>
+          <td>{{ b.subs_count|default:"—" }}</td>
+          <td>{{ b.invoices_count|default:"—" }}</td>
+          <td>
+            {% if b.mrr_sum %}MWK {{ b.mrr_sum|floatformat:0|intcomma }}{% else %}—{% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      {% else %}
+        <tr><td colspan="4" class="empty">No businesses yet.</td></tr>
+      {% endif %}
+    </tbody>
+  </table>
+</div>
 
-<script>function setRange(r){document.getElementById('range').value=r;document.forms[0].submit();}</script>
+{% if page_obj and page_obj.paginator.num_pages > 1 %}
+  <nav class="pager">
+    {% if page_obj.has_previous %}
+      <a href="?page={{ page_obj.previous_page_number }}&q={{ q|urlencode }}&range={{ range|urlencode }}&start={{ start|date:'Y-m-d' }}&end={{ end|date:'Y-m-d' }}">«</a>
+    {% else %}
+      <span>«</span>
+    {% endif %}
+
+    {% for i in page_obj.paginator.page_range %}
+      {% if page_obj.number == i %}
+        <span class="cur">{{ i }}</span>
+      {% else %}
+        <a href="?page={{ i }}&q={{ q|urlencode }}&range={{ range|urlencode }}&start={{ start|date:'Y-m-d' }}&end={{ end|date:'Y-m-d' }}">{{ i }}</a>
+      {% endif %}
+    {% endfor %}
+
+    {% if page_obj.has_next %}
+      <a href="?page={{ page_obj.next_page_number }}&q={{ q|urlencode }}&range={{ range|urlencode }}&start={{ start|date:'Y-m-d' }}&end={{ end|date:'Y-m-d' }}">»</a>
+    {% else %}
+      <span>»</span>
+    {% endif %}
+  </nav>
+{% endif %}
+
+<script>
+  function setRange(r){
+    document.getElementById('range').value = r;
+    // If switching away from custom, drop date inputs to avoid confusion
+    if (r !== 'custom'){
+      const form = document.forms[0];
+      for (const n of ['start','end']) { const el = form.querySelector(`[name="${n}"]`); if (el) el.value=''; }
+    }
+    document.forms[0].submit();
+  }
+</script>
 {% endblock %}

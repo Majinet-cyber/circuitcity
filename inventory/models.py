@@ -1,11 +1,16 @@
+﻿# circuitcity/inventory/models.py
+from __future__ import annotations
+
 from datetime import timedelta
+from typing import Optional
 
 from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
 from django.core.validators import MinValueValidator, RegexValidator
 from django.db import models
-from django.db.models import Q, Sum
+from django.db.models import Q, Sum, Count
+from django.db.models.functions import TruncDate
 from django.utils import timezone
 
 # --- Tenancy imports (explicit) ---
@@ -14,8 +19,20 @@ from tenants.models import Business, TenantManager, UnscopedManager  # NEW
 import json
 import secrets
 import string
+import re
 
 User = get_user_model()
+
+
+# ==========================================================
+# SINGLE SOURCE OF TRUTH: IMEI normalization (15 digits)
+# ==========================================================
+def normalize_imei(raw: Optional[str]) -> str:
+    """Keep digits only and enforce 15-digit IMEI semantics."""
+    if not raw:
+        return ""
+    digits = re.sub(r"\D+", "", str(raw))
+    return digits[:15]  # scanners sometimes add noise; we clip to 15
 
 
 # =========================
@@ -57,8 +74,8 @@ class Location(models.Model):
             models.Index(fields=["city"], name="loc_city_idx"),
             models.Index(fields=["business", "is_default"], name="loc_biz_isdefault_idx"),
         ]
+    # NOTE: Partial unique below ensures one default per business
         constraints = [
-            # At most one default per business (partial unique)
             models.UniqueConstraint(
                 fields=["business", "is_default"],
                 condition=Q(is_default=True),
@@ -69,7 +86,7 @@ class Location(models.Model):
     def __str__(self):
         label = self.name
         if self.business_id:
-            label = f"{label} · {getattr(self.business, 'name', self.business_id)}"
+            label = f"{label} Â· {getattr(self.business, 'name', self.business_id)}"
         return label
 
     def save(self, *args, **kwargs):
@@ -142,6 +159,116 @@ class AgentProfile(models.Model):
         return (timezone.localdate() - self.joined_on).days
 
 
+# =====================================================================
+# Generic merchandise catalog (non-IMEI) for liquor/grocery/pharmacy/clothing
+# =====================================================================
+class BusinessKind(models.TextChoices):
+    PHONES   = "phones",   "Phones & Electronics"
+    LIQUOR   = "liquor",   "Liquor / Bar"
+    GROCERY  = "grocery",  "Grocery / General"
+    PHARMACY = "pharmacy", "Pharmacy"
+    CLOTHING = "clothing", "Clothing"
+
+
+class BaseUnit(models.TextChoices):
+    UNIT = "unit", "Unit"     # atomic piece (bread, charger, pack, bottle if no shots)
+    SHOT = "shot", "Shot"     # atomic for bars selling shots
+    ML   = "ml",   "ml"       # reserved for future use
+    G    = "g",    "g"        # reserved for future use
+
+
+class MerchProduct(models.Model):
+    """
+    Simple, non-IMEI product used by liquor/grocery/pharmacy/clothing, etc.
+    Phones KEEP using the existing Product + InventoryItem models below.
+    """
+    business = models.ForeignKey(Business, on_delete=models.CASCADE, related_name="merch_products", db_index=True)
+    name = models.CharField(max_length=160)
+    kind = models.CharField(max_length=20, choices=BusinessKind.choices, default=BusinessKind.GROCERY)
+    sku = models.CharField(max_length=64, blank=True, null=True)
+    scan_required = models.BooleanField(default=False)  # set True if you want barcode scanning for some items
+    base_unit = models.CharField(max_length=10, choices=BaseUnit.choices, default=BaseUnit.UNIT)
+    track_inventory = models.BooleanField(default=True)
+
+    # Liquor helpers
+    has_shots = models.BooleanField(default=False)
+    shots_per_bottle = models.PositiveIntegerField(null=True, blank=True)
+
+    is_active = models.BooleanField(default=True)
+
+    class Meta:
+        unique_together = (("business", "name"),)
+        ordering = ["name"]
+        indexes = [
+            models.Index(fields=["business", "name"], name="merchprod_biz_name_idx"),
+            models.Index(fields=["business", "kind"], name="merchprod_biz_kind_idx"),
+            models.Index(fields=["is_active"], name="merchprod_active_idx"),
+        ]
+
+    def __str__(self):
+        return self.name
+
+    def clean(self):
+        if self.has_shots:
+            if not self.shots_per_bottle:
+                raise ValidationError({"shots_per_bottle": "Required when 'has shots' is enabled."})
+            # force atomic to SHOT
+            self.base_unit = BaseUnit.SHOT
+
+
+class MerchUnitPrice(models.Model):
+    """
+    A sellable pack for a MerchProduct. Converts to base units via multiplier.
+    Examples:
+      - Grocery: Unit (Ã—1), Dozen (Ã—12), Box (Ã—N)
+      - Liquor (shots): Shot (Ã—1), Bottle (Ã—shots_per_bottle)
+      - Liquor (no shots): Bottle (Ã—1), Crate (Ã—24)
+    """
+    class Label(models.TextChoices):
+        UNIT   = "unit",   "Unit"
+        DOZEN  = "dozen",  "Dozen (12)"
+        BOX    = "box",    "Box"
+        CRATE  = "crate",  "Crate"
+        BOTTLE = "bottle", "Bottle"
+        SHOT   = "shot",   "Shot"
+
+    product = models.ForeignKey(MerchProduct, on_delete=models.CASCADE, related_name="unit_prices")
+    label = models.CharField(max_length=20, choices=Label.choices)
+    multiplier = models.DecimalField(
+        max_digits=10, decimal_places=3,
+        help_text="How many base units in this pack (e.g., 12 for dozen, 24 for bottle of 24 shots, 1 for unit)."
+    )
+    price = models.DecimalField(max_digits=12, decimal_places=2)
+
+    class Meta:
+        unique_together = (("product", "label"),)
+        indexes = [
+            models.Index(fields=["product", "label"], name="merchprice_prod_label_idx"),
+        ]
+
+    def __str__(self):
+        return f"{self.product.name} Â· {self.get_label_display()} (Ã—{self.multiplier})"
+
+
+# ---- Helpers for POS math (merch) ----
+def merch_price_for(product: MerchProduct, label: str):
+    try:
+        return product.unit_prices.get(label=label).price
+    except MerchUnitPrice.DoesNotExist:
+        return None
+
+
+def merch_base_units_for_qty(product: MerchProduct, label: str, qty: float) -> float:
+    """
+    Convert a sale of 'qty' packs (label) into base-unit quantity to decrement inventory once.
+    """
+    up = product.unit_prices.get(label=label)
+    return float(up.multiplier) * float(qty)
+
+
+# =========================
+# Phones catalog (unchanged)
+# =========================
 class Product(models.Model):
     # FINAL: non-nullable, unique code (backfilled via migration)
     code = models.CharField(
@@ -153,7 +280,8 @@ class Product(models.Model):
     name = models.CharField(max_length=120, blank=True, help_text="Optional display name")
 
     brand = models.CharField(max_length=50, blank=True)
-    model = models.CharField(max_length=80)                # e.g., Spark 10C
+    model = models.CharField(max_length=80)  # âœ… correct
+    # e.g., Spark 10C
     variant = models.CharField(max_length=80, blank=True)  # e.g., (4+128)
 
     cost_price = models.DecimalField(
@@ -212,7 +340,7 @@ class OrderPrice(models.Model):
         ]
 
     def __str__(self):
-        return f"{self.product} — MWK {self.default_order_price:,.2f} ({'active' if self.active else 'old'})"
+        return f"{self.product} â€” MWK {self.default_order_price:,.2f} ({'active' if self.active else 'old'})"
 
     @staticmethod
     def get_active_price(product_id: int):
@@ -225,9 +353,10 @@ class OrderPrice(models.Model):
 
 
 # =========================
-# Inventory
+# Inventory (phones/IMEI)
 # =========================
 class InventoryItemQuerySet(models.QuerySet):
+    # ---------- general helpers ----------
     def with_related(self):
         """Pull common FKs to prevent N+1s in views/admin/templates."""
         return self.select_related("product", "current_location", "assigned_agent")
@@ -237,6 +366,75 @@ class InventoryItemQuerySet(models.QuerySet):
 
     def sold(self):
         return self.filter(status="SOLD")
+
+    # ---------- SINGLE SOURCE OF TRUTH: IMEI lookup ----------
+    def find_in_stock_by_imei(self, business, imei_raw: str):
+        """
+        Normalized, tenant-aware, 'in stock' lookup for an IMEI.
+        This is the ONE place views (scan_in / scan_sold / APIs) should use.
+        """
+        imei = normalize_imei(imei_raw)
+        if len(imei) != 15:
+            return None
+        biz_id = business.id if isinstance(business, Business) else business
+        return (
+            self.in_stock()
+            .filter(business_id=biz_id, imei=imei)
+            .with_related()
+            .first()
+        )
+
+    # ---------- filters for analytics ----------
+    def by_agent(self, user_or_id):
+        uid = user_or_id.id if hasattr(user_or_id, "id") else user_or_id
+        return self.filter(assigned_agent_id=uid) if uid else self
+
+    def by_location(self, location_or_id):
+        lid = location_or_id.id if hasattr(location_or_id, "id") else location_or_id
+        return self.filter(current_location_id=lid) if lid else self
+
+    def by_city(self, city: str):
+        return self.filter(current_location__city__iexact=city.strip()) if city else self
+
+    def received_between(self, start, end):
+        if start and end:
+            return self.filter(received_at__range=(start, end))
+        return self
+
+    def sold_between(self, start, end):
+        if start and end:
+            return self.filter(sold_at__date__range=(start, end))
+        return self
+
+    # ---------- aggregations for charts ----------
+    def daily_in(self, start, end):
+        """
+        Returns rows like: {'day': date, 'count': N}
+        """
+        qs = self.received_between(start, end)
+        return (
+            qs.values("received_at")
+              .order_by("received_at")
+              .annotate(count=Count("id"))
+        )
+
+    def daily_out(self, start, end):
+        """
+        Returns rows like: {'day': date, 'count': N}
+        """
+        qs = self.sold().sold_between(start, end)
+        return (
+            qs.annotate(day=TruncDate("sold_at"))
+              .values("day")
+              .order_by("day")
+              .annotate(count=Count("id"))
+        )
+
+    def totals_in(self, start=None, end=None):
+        return self.received_between(start, end).count()
+
+    def totals_out(self, start=None, end=None):
+        return self.sold_between(start, end).sold().count()
 
 
 # -------- Tenant-aware managers (scoped/global) --------
@@ -323,7 +521,7 @@ class InventoryItem(models.Model):
     class Meta:
         indexes = [
             models.Index(fields=["business", "imei"], name="inv_biz_imei_idx"),
-            # Composite for inventory lists — name <= 30 chars
+            # Composite for inventory lists â€” name <= 30 chars
             models.Index(
                 fields=["business", "product", "current_location", "status"],
                 name="inv_bpls_idx",
@@ -370,7 +568,7 @@ class InventoryItem(models.Model):
     def location_safe(self):
         """
         Back-compat accessor for templates that previously used `item.location`.
-        Prefer `current_location`, but expose a stable name that won’t break.
+        Prefer `current_location`, but expose a stable name that wonâ€™t break.
         """
         return getattr(self, "current_location", None)
 
@@ -382,8 +580,24 @@ class InventoryItem(models.Model):
         """
         return getattr(self, "current_location", None)
 
+    # ---------- SINGLE SOURCE OF TRUTH: exported helpers ----------
+    @classmethod
+    def normalize_imei(cls, raw: Optional[str]) -> str:
+        return normalize_imei(raw)
+
+    @classmethod
+    def lookup_in_stock(cls, business, imei_raw: str):
+        """
+        Tenant-aware, normalized, in-stock lookup. Use this everywhere.
+        """
+        return cls.objects.find_in_stock_by_imei(business, imei_raw)
+
     def clean(self):
         errors = {}
+
+        # Normalize IMEI before validation so storage is consistent
+        if self.imei:
+            self.imei = normalize_imei(self.imei)
 
         if self.status == "SOLD" and not self.sold_at:
             # Allow auto-fill in save(); don't hard-require here
@@ -405,6 +619,10 @@ class InventoryItem(models.Model):
 
     # ---- auto-defaults for date/location/sold_at ----
     def save(self, *args, **kwargs):
+        # Normalize IMEI again at save-time (defense-in-depth)
+        if self.imei:
+            self.imei = normalize_imei(self.imei)
+
         # Ensure received_at is set (field has default, but just in case)
         if not getattr(self, "received_at", None):
             self.received_at = timezone.localdate()
@@ -575,6 +793,10 @@ class TimeLog(models.Model):
     DEPARTURE = "DEPARTURE"
     TYPE_CHOICES = [(ARRIVAL, "Arrival"), (DEPARTURE, "Departure")]
 
+    # --- NEW (non-breaking): event for heartbeat semantics ---
+    # start | ping | end (optional; we still keep checkin_type for legacy arrivals/departures)
+    EVENT_CHOICES = [("start", "Start"), ("ping", "Ping"), ("end", "End")]
+
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="time_logs")
     logged_at = models.DateTimeField(default=timezone.now)
     note = models.CharField(max_length=200, blank=True)
@@ -588,16 +810,64 @@ class TimeLog(models.Model):
     distance_m = models.PositiveIntegerField(null=True, blank=True)
     within_geofence = models.BooleanField(default=False)
 
+    # --- NEW (non-breaking): textual geofence + event (for analytics/UI) ---
+    event = models.CharField(max_length=10, choices=EVENT_CHOICES, blank=True)
+    geofence = models.CharField(max_length=8, blank=True)  # "inside" / "outside" (mirrors within_geofence)
+
     class Meta:
         ordering = ["-logged_at"]
         indexes = [
             models.Index(fields=["user", "logged_at"], name="timelog_user_logged_idx"),
             models.Index(fields=["location", "logged_at"], name="timelog_location_logged_idx"),
+            models.Index(fields=["event", "logged_at"], name="timelog_event_logged_idx"),
         ]
 
     def __str__(self):
         where = self.location.name if (self.location_id and getattr(self.location, "name", None)) else "unknown"
         return f"{self.user} {self.checkin_type} @ {self.logged_at:%Y-%m-%d %H:%M} ({where})"
+
+    @property
+    def business(self):
+        """Convenience: infer business from location (if set)."""
+        return getattr(self.location, "business", None)
+
+
+# ---- NEW: ShiftSession (for inside/outside second counters) ----
+class ShiftSession(models.Model):
+    """
+    Open/closed work session for an agent, used to accumulate inside/outside seconds.
+    Safe additive model: does not change TimeLog behavior; analytics read from here.
+    """
+    STATUS_CHOICES = [("inside", "Inside"), ("outside", "Outside")]
+
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="shift_sessions")
+    business = models.ForeignKey(Business, on_delete=models.CASCADE, null=True, blank=True, db_index=True)
+    location = models.ForeignKey("Location", on_delete=models.SET_NULL, null=True, blank=True)
+
+    started_at = models.DateTimeField()
+    ended_at = models.DateTimeField(null=True, blank=True)
+
+    last_ping_at = models.DateTimeField(null=True, blank=True)
+    last_status = models.CharField(max_length=8, choices=STATUS_CHOICES, null=True, blank=True)
+    last_credited_at = models.DateTimeField(null=True, blank=True)
+
+    inside_seconds = models.IntegerField(default=0)
+    outside_seconds = models.IntegerField(default=0)
+
+    class Meta:
+        ordering = ["-started_at", "-id"]
+        indexes = [
+            models.Index(fields=["user", "started_at"], name="shift_user_started_idx"),
+            models.Index(fields=["business", "started_at"], name="shift_biz_started_idx"),
+            models.Index(fields=["ended_at"], name="shift_ended_idx"),
+        ]
+
+    def __str__(self):
+        return f"Shift #{self.id} Â· {self.user} Â· {self.started_at:%Y-%m-%d %H:%M}"
+
+    @property
+    def total_seconds(self) -> int:
+        return max(0, int(self.inside_seconds) + int(self.outside_seconds))
 
 
 class WalletTxn(models.Model):
@@ -616,7 +886,7 @@ class WalletTxn(models.Model):
         on_delete=models.CASCADE,
         related_name="inventory_wallet_txns",
     )
-    amount = models.DecimalField(max_digits=12, decimal_places=2)  # + = bonus/credit, − = deduction
+    amount = models.DecimalField(max_digits=12, decimal_places=2)  # + = bonus/credit, âˆ’ = deduction
     reason = models.CharField(max_length=32, choices=REASON_CHOICES, default="ADJUSTMENT")
     created_at = models.DateTimeField(default=timezone.now)
     memo = models.CharField(max_length=200, blank=True)
@@ -645,3 +915,94 @@ class WalletTxn(models.Model):
             user=user, created_at__gte=start, created_at__lt=end
         ).aggregate(s=Sum("amount"))["s"] or 0
         return float(val)
+
+
+# ------------------------------------------------------------------
+# Back-compat aliases (fix legacy imports without touching views)
+# ------------------------------------------------------------------
+# Old code may do: from inventory.models import AgentLocation
+AgentLocation = Location
+# Some code referenced AgentStore as an alias for Location
+AgentStore = Location
+
+
+# =====================================================================
+# CATEGORY-SPECIFIC PRODUCT PROXIES (to satisfy helpers & clean imports)
+# =====================================================================
+
+# ---- Managers that pin a MerchProduct proxy to a kind ----
+class _KindLockedManager(models.Manager):
+    """Returns only rows that match the locked kind for the proxy."""
+    KIND_VALUE: Optional[str] = None
+
+    def get_queryset(self):
+        qs = super().get_queryset()
+        if self.KIND_VALUE:
+            return qs.filter(kind=self.KIND_VALUE)
+        return qs
+
+
+class _PharmacyManager(_KindLockedManager):
+    KIND_VALUE = BusinessKind.PHARMACY
+
+
+class _ClothingManager(_KindLockedManager):
+    KIND_VALUE = BusinessKind.CLOTHING
+
+
+class _LiquorManager(_KindLockedManager):
+    KIND_VALUE = BusinessKind.LIQUOR
+
+
+# ---- Proxies over MerchProduct (enforce kind on save) ----
+class PharmacyProduct(MerchProduct):
+    objects = _PharmacyManager()
+
+    class Meta:
+        proxy = True
+        verbose_name = "Pharmacy Product"
+        verbose_name_plural = "Pharmacy Products"
+
+    def save(self, *args, **kwargs):
+        self.kind = BusinessKind.PHARMACY
+        return super().save(*args, **kwargs)
+
+
+class ClothingProduct(MerchProduct):
+    objects = _ClothingManager()
+
+    class Meta:
+        proxy = True
+        verbose_name = "Clothing Product"
+        verbose_name_plural = "Clothing Products"
+
+    def save(self, *args, **kwargs):
+        self.kind = BusinessKind.CLOTHING
+        return super().save(*args, **kwargs)
+
+
+class LiquorProduct(MerchProduct):
+    objects = _LiquorManager()
+
+    class Meta:
+        proxy = True
+        verbose_name = "Liquor Product"
+        verbose_name_plural = "Liquor Products"
+
+    def save(self, *args, **kwargs):
+        self.kind = BusinessKind.LIQUOR
+        return super().save(*args, **kwargs)
+
+
+# ---- PhoneProduct proxy over phones' Product (for uniform import path) ----
+class PhoneProduct(Product):
+    class Meta:
+        proxy = True
+        verbose_name = "Phone Product"
+        verbose_name_plural = "Phone Products"
+
+
+
+
+
+

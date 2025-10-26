@@ -1,4 +1,4 @@
-# cc/context.py
+﻿# cc/context.py
 from __future__ import annotations
 
 from typing import Any, Dict
@@ -84,3 +84,5 @@ def role_flags(request) -> Dict[str, Any]:
         "IS_MANAGER": _is_manager(u),
         "IS_AGENT": _is_agent(u),
     }
+
+

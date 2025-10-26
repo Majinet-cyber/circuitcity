@@ -1,44 +1,160 @@
 {% load static %}
 {% with p=request.path %}
+
+{# ---- Safe URL resolves ---- #}
+{% url 'inventory:inventory_dashboard' as url_inv_dash %}
+{% if not url_inv_dash %}{% url 'inventory:dashboard' as url_inv_dash %}{% endif %}
+
+{% url 'reports:home' as url_reports %}
+{% url 'wallet:agent_wallet' as url_wallet %}
+{% url 'admin:index' as url_admin %}
+
+{# User menu links (with fallbacks) #}
+{% url 'profile:settings' as url_profile_settings %}
+{% if not url_profile_settings %}{% url 'accounts:settings_unified' as url_profile_settings %}{% endif %}
+{% if not url_profile_settings %}{% url 'accounts:settings' as url_profile_settings %}{% endif %}
+
+{% url 'feedback:form' as url_feedback %}
+{% if not url_feedback %}{% url 'feedback' as url_feedback %}{% endif %}
+{% if not url_feedback %}{% url 'feedback_home' as url_feedback %}{% endif %}
+
+{% url 'logout' as url_logout %}
+{% if not url_logout %}{% url 'accounts:logout' as url_logout %}{% endif %}
+
 <style>
-  .cc-topnav{position:sticky;top:0;z-index:40;background:#fff;border-bottom:1px solid #e5e7eb;
-    display:flex;align-items:center;justify-content:space-between;padding:10px 16px}
+  .cc-topnav{
+    position:sticky;top:0;z-index:1040;background:#fff;border-bottom:1px solid #e5e7eb;
+    display:flex;align-items:center;justify-content:space-between;padding:10px 16px
+  }
   .cc-topnav .brand a{font-weight:800;text-decoration:none;color:#0f172a}
   .cc-topnav .links{display:flex;gap:14px;list-style:none;margin:0;padding:0}
-  .cc-topnav .links a{display:inline-block;padding:8px 10px;border-radius:10px;text-decoration:none;
-    color:#0f172a}
+  .cc-topnav .links a{
+    display:inline-block;padding:8px 10px;border-radius:10px;text-decoration:none;color:#0f172a
+  }
   .cc-topnav .links li.active a{background:#eef2ff}
-  .cc-topnav .user{display:flex;align-items:center;gap:10px}
-  .cc-topnav .logout{color:#2563eb;text-decoration:none}
-  @media (max-width:720px){ .cc-topnav{flex-wrap:wrap;gap:8px} .cc-topnav .links{flex-wrap:wrap} }
+  .cc-topnav .right{display:flex;align-items:center;gap:12px}
+
+  /* Avatar & dropdown */
+  .cc-user{position:relative}
+  .cc-avatar-btn{
+    display:inline-flex;align-items:center;justify-content:center;
+    width:36px;height:36px;border-radius:999px;border:1px solid #c7d2fe;
+    background:#eef2ff;color:#1d4ed8;font-weight:900;cursor:pointer
+  }
+  .cc-user-menu{
+    position:absolute;right:0;top:calc(100% + 8px);min-width:220px;background:#fff;
+    border:1px solid #e2e8f0;border-radius:12px;box-shadow:0 14px 40px rgba(2,6,23,.12);
+    display:none;overflow:hidden;z-index:1100
+  }
+  .cc-user-menu.open{display:block;animation:fadeIn .14s ease}
+  .cc-user-menu .head{padding:10px 12px}
+  .cc-user-menu .name{font-weight:800;color:#0f172a}
+  .cc-user-menu .mail{font-size:12px;color:#64748b}
+  .cc-user-menu a{
+    display:block;padding:10px 12px;text-decoration:none;color:#0f172a;font-weight:600
+  }
+  .cc-user-menu a:hover{background:#f8fafc}
+  .cc-user-menu a.danger{color:#b91c1c}
+  @keyframes fadeIn{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:translateY(0)}}
+
+  /* Notifications icon */
+  .cc-icon-btn{
+    width:36px;height:36px;display:grid;place-items:center;border-radius:10px;
+    border:1px solid #e2e8f0;background:#fff;cursor:pointer
+  }
+
+  @media (max-width:720px){
+    .cc-topnav{flex-wrap:wrap;gap:8px}
+    .cc-topnav .links{flex-wrap:wrap}
+  }
 </style>
 
 <nav class="cc-topnav" role="navigation" aria-label="Primary">
-  <div class="brand"><a href="{% url 'inventory:dashboard' %}">⚡ Circuit City</a></div>
+  <div class="brand"><a href="{{ url_inv_dash|default:'/inventory/dashboard/' }}">⚡ Circuit City</a></div>
 
   <ul class="links">
-    <li class="{% if p|slice:'0:11' == '/inventory/' %}active{% endif %}">
-      <a href="{% url 'inventory:dashboard' %}">Dashboard</a>
+    <li class="{% if p|slice:'0:19' == '/inventory/dashboard' or p == '/inventory/dashboard' %}active{% endif %}">
+      <a href="{{ url_inv_dash|default:'/inventory/dashboard/' }}">Dashboard</a>
     </li>
-    <li class="{% if p|slice:'0:11' == '/inventory/' %}active{% endif %}">
-      <a href="{% url 'inventory:dashboard' %}">Inventory</a>
+
+    <li class="{% if '/inventory/list/' in p or p|slice:'0:12' == '/inventory/' %}active{% endif %}">
+      <a href="{% url 'inventory:stock_list' %}">Inventory</a>
     </li>
+
     {% if FEATURES.REPORTS|default:1 %}
       <li class="{% if p|slice:'0:9' == '/reports/' %}active{% endif %}">
-        <a href="{% url 'reports:home' %}">Reports</a>
+        <a href="{{ url_reports|default:'/reports/' }}">Reports</a>
       </li>
     {% endif %}
+
     <li class="{% if p|slice:'0:8' == '/wallet/' %}active{% endif %}">
-      <a href="{% url 'wallet:agent_wallet' %}">Wallet</a>
+      <a href="{{ url_wallet|default:'/wallet/' }}">Wallet</a>
     </li>
+
     {% if request.user.is_staff %}
-      <li><a href="{% url 'admin:index' %}">Admin</a></li>
+      <li class="{% if p|slice:'0:7' == '/admin/' %}active{% endif %}">
+        <a href="{{ url_admin|default:'/admin/' }}">Admin</a>
+      </li>
     {% endif %}
   </ul>
 
-  <div class="user">
-    <span>Hi, {{ request.user.first_name|default:request.user.username }}</span>
-    <a class="logout" href="{% url 'accounts:logout' %}?next=/accounts/login/">Logout</a>
+  <div class="right">
+    <!-- Notifications (optional) -->
+    <button type="button" class="cc-icon-btn" title="Notifications" id="cc-bell">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+        <path d="M15 17H5a2 2 0 0 1-2-2V11a7 7 0 1 1 14 0v4a2 2 0 0 1-2 2Zm-7 0v1a4 4 0 0 0 8 0v-1"
+              stroke="#0f172a" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+    </button>
+
+    <!-- Avatar + dropdown (Profile/Settings/Feedback/Logout) -->
+    <div class="cc-user">
+      <button class="cc-avatar-btn" id="ccUserBtn" aria-haspopup="true" aria-expanded="false" title="Account">
+        {% if request.user.is_authenticated %}
+          {{ request.user.first_name|default:request.user.username|slice:":1"|upper }}
+        {% else %}
+          <i class="bi bi-person"></i>
+        {% endif %}
+      </button>
+      <div class="cc-user-menu" id="ccUserMenu" role="menu" aria-label="Account">
+        <div class="head">
+          {% if request.user.is_authenticated %}
+            <div class="name">{{ request.user.get_full_name|default:request.user.username }}</div>
+            {% if request.user.email %}<div class="mail">{{ request.user.email }}</div>{% endif %}
+          {% else %}
+            <div class="name">Not signed in</div>
+          {% endif %}
+        </div>
+        <div style="border-top:1px solid #e2e8f0"></div>
+        <a href="{{ url_profile_settings|default:'/accounts/settings/' }}">Profile &amp; Settings</a>
+        <a href="{{ url_feedback|default:'/feedback/' }}">Feedback</a>
+        {% if request.user.is_authenticated %}
+          <a class="danger" href="{{ url_logout|default:'/accounts/logout/' }}?next=/accounts/login/">Logout</a>
+        {% endif %}
+      </div>
+    </div>
   </div>
 </nav>
+
+<script>
+  // Optional bell behavior (placeholder)
+  document.getElementById('cc-bell')?.addEventListener('click', () => {
+    alert('No notifications.');
+  });
+
+  // Avatar dropdown: toggle, outside click, Esc close
+  (function(){
+    const btn = document.getElementById('ccUserBtn');
+    const menu = document.getElementById('ccUserMenu');
+    if(!btn || !menu) return;
+
+    const open = ()=>{ menu.classList.add('open'); btn.setAttribute('aria-expanded','true'); };
+    const close = ()=>{ menu.classList.remove('open'); btn.setAttribute('aria-expanded','false'); };
+    const toggle = ()=> menu.classList.contains('open') ? close() : open();
+
+    btn.addEventListener('click', (e)=>{ e.preventDefault(); e.stopPropagation(); toggle(); });
+    document.addEventListener('click', (e)=>{ if(!menu.contains(e.target) && !btn.contains(e.target)) close(); }, {capture:true});
+    document.addEventListener('keydown', (e)=>{ if(e.key==='Escape') close(); }, {passive:true});
+  })();
+</script>
 {% endwith %}

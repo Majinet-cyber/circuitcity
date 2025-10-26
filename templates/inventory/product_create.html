@@ -1,0 +1,213 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Add Product{% endblock %}
+
+{% block content %}
+<style>
+  .cc-page .card input,
+  .cc-page .card select,
+  .cc-page .card textarea {
+    display:block; width:100%;
+    min-height: 40px;
+    padding:.55rem .7rem;
+    border:1px solid var(--line, #d9e2ef);
+    border-radius:10px;
+    background:#fff; color:var(--ink,#0b1220);
+  }
+  .cc-page .card label{font-weight:800;font-size:.92rem;margin-bottom:.25rem}
+  .form-row{margin-bottom:.85rem}
+  .field-help{font-size:.85rem;color:#64748b}
+  .field-errors{font-size:.85rem;color:#b91c1c}
+</style>
+
+<div class="container" style="max-width:980px">
+  <h2 class="mb-3 fw-bold">Add Product</h2>
+
+  {% with MODE=PRODUCT_MODE|default:"generic" %}
+    <p class="text-muted mb-3" id="mode-blurb">
+      {% if MODE == "phones" %}
+        Phones: add model details once (brand, model, specs, price). Individual phones are scanned later via
+        <strong>15-digit IMEI</strong>.
+      {% elif MODE == "liquor" %}
+        Liquor: add bottle price (required). If you serve shots, add shots per bottle and an optional shot price.
+      {% elif MODE == "pharmacy" %}
+        Pharmacy: medicine name and unit price. Optional 12/13-digit barcode. No packs or shots.
+      {% elif MODE == "grocery" %}
+        Groceries: product name and unit price. Optional barcode. No packs.
+      {% else %}
+        Generic products: simple details with optional price packs if enabled.
+      {% endif %}
+    </p>
+
+    <form method="post" novalidate>
+      {% csrf_token %}
+
+      <!-- ========== PRODUCT CORE ========== -->
+      <div class="card p-3 mb-3">
+        <h5 class="mb-2">Product</h5>
+
+        {% for hf in form.hidden_fields %}{{ hf }}{% endfor %}
+        {% if form.non_field_errors %}
+          <div class="field-errors mb-2">{{ form.non_field_errors }}</div>
+        {% endif %}
+
+        <div class="row">
+          {% for field in form.visible_fields %}
+            <div class="col-md-6 form-row" data-field="{{ field.name }}">
+              <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+              {{ field }}
+              {% if field.help_text %}<div class="field-help">{{ field.help_text }}</div>{% endif %}
+              {% for e in field.errors %}<div class="field-errors">{{ e }}</div>{% endfor %}
+            </div>
+          {% endfor %}
+        </div>
+      </div>
+
+      {# Packs/prices ONLY for Liquor #}
+      {% if MODE == "liquor" %}
+      <div class="card p-3 mb-3" id="packs-card">
+        <h5 class="mb-2">Sellable packs &amp; prices</h5>
+        <p class="small text-muted mb-2">
+          If you sell shots, set base unit to <strong>Shot</strong>, then add a <strong>Bottle</strong> row with
+          multiplier = shots per bottle (e.g., 24).
+        </p>
+
+        {{ formset.management_form }}
+        <div id="packs">
+          {% for f in formset.forms %}
+            <div class="border rounded p-2 mb-2 pack-row">
+              <div class="row g-2 align-items-end">
+                <div class="col-md-4">
+                  <label for="{{ f.label.id_for_label }}">{{ f.label.label }}</label>
+                  {{ f.label }}
+                </div>
+                <div class="col-md-4">
+                  <label for="{{ f.multiplier.id_for_label }}">{{ f.multiplier.label }}</label>
+                  {{ f.multiplier }}
+                </div>
+                <div class="col-md-3">
+                  <label for="{{ f.price.id_for_label }}">{{ f.price.label }}</label>
+                  {{ f.price }}
+                </div>
+                <div class="col-md-1 text-end">
+                  {% if f.instance.pk %} {{ f.DELETE }} <span class="small">Delete</span>{% endif %}
+                </div>
+              </div>
+              {% if f.errors %}<div class="field-errors mt-1">{{ f.errors }}</div>{% endif %}
+            </div>
+          {% endfor %}
+        </div>
+
+        <button type="button" class="btn btn-outline" id="add-pack">+ Add another price</button>
+      </div>
+      {% endif %}
+
+      <div class="d-flex gap-2">
+        <button class="btn btn-primary" type="submit">Save</button>
+        <a class="btn" href="{% url 'inventory:stock_list' %}">Cancel</a>
+      </div>
+    </form>
+
+    <script>
+      // ------ Liquor-only dynamic pack add ------
+      (function(){
+        const packs = document.getElementById('packs');
+        const addBtn = document.getElementById('add-pack');
+        const total = document.querySelector('input[name$="-TOTAL_FORMS"]');
+        if (!packs || !addBtn || !total) return;
+        function cloneLastRow(){
+          let src = packs.querySelector('.pack-row:last-of-type');
+          if(!src){
+            const wrap = document.createElement('div');
+            wrap.className = 'border rounded p-2 mb-2 pack-row';
+            wrap.innerHTML = '<div class="text-muted">First row will appear after save if your formset is empty.</div>';
+            packs.appendChild(wrap); src = wrap;
+          }
+          return src.cloneNode(true);
+        }
+        addBtn.addEventListener('click', () => {
+          const idx = parseInt(total.value || '0', 10);
+          const clone = cloneLastRow();
+          clone.querySelectorAll('input,select,textarea,label').forEach(el => {
+            if (el.htmlFor) el.htmlFor = el.htmlFor.replace(/-\d+-/, `-${idx}-`);
+            if (el.id)      el.id      = el.id.replace(/-\d+-/, `-${idx}-`);
+            if (el.name)    el.name    = el.name.replace(/-\d+-/, `-${idx}-`);
+            if (el.tagName === 'INPUT' && el.type !== 'hidden' && el.type !== 'checkbox') el.value = '';
+            if (el.type === 'checkbox') el.checked = false;
+          });
+          const placeholder = clone.querySelector('.text-muted'); if (placeholder) placeholder.remove();
+          packs.appendChild(clone); total.value = idx + 1;
+        });
+      })();
+
+      // ------ Mode-specific labels/visibility/requireds ------
+      (function(){
+        const MODE = "{{ PRODUCT_MODE|default:'generic' }}".trim().toLowerCase();
+        const wrap = (n) => document.querySelector(`[data-field="${n}"]`);
+        const show = (n, on=true) => { const el=wrap(n); if(el){ el.style.display = on ? '' : 'none'; } };
+        const relabel = (n, txt) => { const el=wrap(n)?.querySelector('label'); if(el){ el.textContent = txt; } };
+        const require = (id, on=true) => { const el=document.getElementById('id_'+id); if(el){ el.required = !!on; } };
+        const setVal = (id, v) => { const el=document.getElementById('id_'+id); if(el && (el.value==='' || el.value==null)){ el.value = v; } };
+
+        // Hide shots stuff by default
+        show('has_shots', false);
+        show('shots_per_bottle', false);
+
+        if (MODE === 'phones') {
+          relabel('name', 'Phone name');
+          relabel('sku', 'IMEI (15 digits)');
+          // IMEI is captured on Scan IN; hide the create-time field to avoid confusion
+          show('sku', false);
+          require('name', true);
+          require('brand', true);
+          require('specs', true);
+          require('sale_price', true); require('price', true);
+          show('base_unit', false);
+        } else if (MODE === 'liquor') {
+          relabel('name', 'Liquor name');
+          show('has_shots', true);
+          show('shots_per_bottle', true);
+          setVal('base_unit', 'shot');
+          require('name', true);
+        } else if (MODE === 'pharmacy') {
+          relabel('name', 'Medicine name');
+          relabel('sku', 'Barcode (12–13 digits)');
+          // Pharmacy MUST NOT see Brand:
+          show('brand', false);
+          require('name', true);
+          require('sale_price', true); require('price', true);
+          setVal('base_unit', 'unit'); show('base_unit', true);
+        } else if (MODE === 'grocery') {
+          relabel('name', 'Product name');
+          relabel('sku', 'SKU / Barcode');
+          show('brand', false);
+          require('name', true);
+          require('sale_price', true); require('price', true);
+          setVal('base_unit', 'unit'); show('base_unit', true);
+        } else {
+          // generic/accessories
+          relabel('name','Product name');
+          relabel('sku','SKU / Barcode');
+          require('name', true);
+        }
+
+        // Liquor dependency
+        const hasShots = document.getElementById('id_has_shots');
+        const baseUnit = document.getElementById('id_base_unit');
+        const shotsPer = document.getElementById('id_shots_per_bottle');
+        function syncShots(){
+          if (hasShots && hasShots.checked) {
+            if (baseUnit) baseUnit.value = 'shot';
+            if (shotsPer) { shotsPer.required = true; show('shots_per_bottle', true); }
+          } else if (shotsPer) {
+            shotsPer.required = false;
+          }
+        }
+        hasShots?.addEventListener('change', syncShots);
+        syncShots();
+      })();
+    </script>
+  {% endwith %}
+</div>
+{% endblock %}

@@ -1,14 +1,14 @@
-from flask import Flask, render_template, request, redirect, url_for, session
+﻿from flask import Flask, render_template, request, redirect, url_for, session
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
 import pandas as pd
 import plotly.express as px
 
-# ✅ FIRST: create your Flask app!
+# âœ… FIRST: create your Flask app!
 app = Flask(__name__)
 app.secret_key = 'supersecretkey'
 
-# ✅ THEN: your Google Sheets setup
+# âœ… THEN: your Google Sheets setup
 scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
 creds = ServiceAccountCredentials.from_json_keyfile_name(
     "circuit-city-dashboard-7de3805a57c1.json",
@@ -18,7 +18,7 @@ client = gspread.authorize(creds)
 spreadsheet = client.open("circuit city cashflow")
 sheet = spreadsheet.worksheet("Cash Reserve")
 
-# ✅ NOW: define your routes
+# âœ… NOW: define your routes
 @app.route('/', methods=['GET', 'POST'])
 def login():
     if request.method == 'POST':
@@ -43,6 +43,8 @@ def logout():
     session['logged_in'] = False
     return redirect(url_for('login'))
 
-# ✅ LAST: run your app
+# âœ… LAST: run your app
 if __name__ == '__main__':
     app.run(debug=True)
+
+

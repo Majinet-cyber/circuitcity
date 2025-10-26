@@ -1,4 +1,4 @@
-from django.core.management.base import BaseCommand
+﻿from django.core.management.base import BaseCommand
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Group
 
@@ -47,3 +47,5 @@ class Command(BaseCommand):
                 self.stdout.write(self.style.SUCCESS(f"Created agent {uname}"))
             else:
                 self.stdout.write(f"Agent {uname} exists")
+
+

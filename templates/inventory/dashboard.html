@@ -32,10 +32,38 @@
   /* Simulation quick actions */
   .sim-actions .btn{ min-width: 160px; }
   .muted-note{ color:var(--cc-muted); }
+
+  /* ---- persistent action bar (always show Add Product) ---- */
+  .actionbar{
+    position: sticky; top: 0; z-index: 20;
+    background: color-mix(in oklab, var(--cc-panel) 92%, transparent);
+    backdrop-filter: saturate(1.2) blur(6px);
+    border: 1px solid var(--cc-border);
+    border-radius: var(--radius,12px);
+    padding: .6rem .8rem; margin-bottom: 12px;
+    box-shadow: var(--cc-shadow);
+  }
+  .actionbar .btn{ white-space: nowrap; }
+  @media (max-width: 480px){
+    .actionbar .btn span{ display:none; } /* compact label on tiny screens */
+  }
 </style>
 {% endblock %}
 
 {% block content %}
+
+  <!-- 🔵 Always-visible dashboard actions -->
+  <div class="actionbar d-flex align-items-center justify-content-between">
+    <div class="fw-semibold">Welcome to Marlin</div>
+    <div class="d-flex gap-2">
+      <a href="{% url 'inventory:merch_product_create' %}" class="btn primary">
+        ➕ <span>1) Add your first product</span>
+      </a>
+      <a href="{% url 'inventory:scan_in' %}" class="btn muted">
+        <i class="bi bi-upc-scan"></i> <span>Scan IN</span>
+      </a>
+    </div>
+  </div>
 
   <!-- KPI band -->
   <section class="kpi-row">
@@ -163,7 +191,7 @@
         </div>
       </div>
       <div class="card-body">
-        <canvas id="valueTrend" class="chart-canvas chart-canvas--sm" aria-label="Value trend"></canvas>
+        <canvas id="valueTrend" class="chart-canvas chart-canas--sm" aria-label="Value trend"></canvas>
         <div id="valueEmpty" class="empty-hint d-none">No values to plot.</div>
         <div id="errValue" class="text-danger small mt-2 d-none"></div>
       </div>
@@ -243,6 +271,20 @@
   const GRID_CLR=()=> cssVar('--chart-grid','#d8e3ff');
   const BRAND  =()=> cssVar('--cc-accent','#3b82f6');
 
+  // 🔧 NEW: normalize API shapes (unwrap {ok,data} and series/values)
+  const unwrap = (d)=> (d && typeof d==='object' && d.ok && d.data) ? d.data : d || {};
+  const pickLabels = (d)=> (unwrap(d).labels || []);
+  const pickValues = (d)=>{
+    const u = unwrap(d);
+    if (Array.isArray(u.values)) return u.values.map(v=>Number(v)||0);
+    if (Array.isArray(u.series)) {
+      const s = u.series.find(s=>Array.isArray(s.data)) || u.series[0];
+      return (s?.data || []).map(v=>Number(v)||0);
+    }
+    return [];
+  };
+  const pickCurrencySign = (d)=> (unwrap(d)?.currency?.sign || 'MK');
+
   // axis helpers
   function chooseMoneyStep(max){
     const c=[100000,200000,250000,500000,1000000,2000000,5000000];
@@ -290,20 +332,22 @@
       { legacy:[`/inventory/api_sales_trend/?period=${encodeURIComponent(period)}&metric=${encodeURIComponent(m)}${MODEL_QS}`] }
     );
 
-    let data;
-    try{ data=await getData(metric); }
+    let raw;
+    try{ raw=await getData(metric); }
     catch(e){ show('errSales'); $id('errSales').textContent=`Sales trend error: ${e.message}`; return; }
 
-    let labels=data?.labels||[];
-    let values=(data?.values||[]).map(v=>Number(v)||0);
+    let labels=pickLabels(raw);
+    let values=pickValues(raw);
     const isAmount=(metric==='amount');
-    const sign=isAmount?(data?.currency?.sign||'MK'):'';
+    const sign=isAmount?pickCurrencySign(raw):'';
 
     // If "amount" is all zeros, auto-switch to "count"
     if(isAmount && labels.length && values.every(v=>v===0)){
       try{
-        const alt=await getData('count'); const altVals=(alt?.values||[]).map(v=>Number(v)||0);
-        if(alt?.labels?.length && altVals.some(v=>v>0)){ labels=alt.labels; values=altVals; metric='count'; metricSel.value='count'; }
+        const alt=await getData('count');
+        const altLabels=pickLabels(alt);
+        const altVals=pickValues(alt);
+        if(altLabels.length && altVals.some(v=>v>0)){ labels=altLabels; values=altVals; metric='count'; metricSel.value='count'; }
       }catch{}
     }
 
@@ -319,7 +363,10 @@
       options:{
         responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}},
         animation:{ duration:500, easing:'easeOutCubic' },
-        scales:{ x:{ grid:{ color:GRID_CLR() }}, y:{ min:yCfg.min, max:yCfg.max, grid:{ color:GRID_CLR() }, ticks:{ stepSize:yCfg.stepSize, callback:(v)=> metric==='count'?v:`${sign} ${nf.format(v)}` } } }
+        scales:{
+          x:{ type:'category', grid:{ color:GRID_CLR() }, ticks:{ autoSkip:false, maxRotation:0, callback:(v)=> labels[v] }},
+          y:{ min:yCfg.min, max:yCfg.max, grid:{ color:GRID_CLR() }, ticks:{ stepSize:yCfg.stepSize, callback:(v)=> metric==='count'?v:`${sign} ${nf.format(v)}` } }
+        }
       }
     });
   }
@@ -331,13 +378,13 @@
     hide('errTop'); hide('topEmpty');
 
     const p=periodSel.value;
-    let data=null;
+    let raw=null;
     try{
-      data=await fetchJSON(`/inventory/api/top-models/?period=${encodeURIComponent(p)}${MODEL_QS}`,
+      raw=await fetchJSON(`/inventory/api/top-models/?period=${encodeURIComponent(p)}${MODEL_QS}`,
               { legacy:[`/inventory/api_top_models/?period=${encodeURIComponent(p)}${MODEL_QS}`] });
     }catch(e){ show('errTop'); $id('errTop').textContent=`Top models error: ${e.message}`; return; }
 
-    const labels=data?.labels||[], values=(data?.values||[]).map(v=>Number(v)||0);
+    const labels=pickLabels(raw), values=pickValues(raw);
     topChart?.destroy();
     const el=$id('topModels');
     if(!labels.length || values.every(v=>v===0)){ show('topEmpty'); return; }
@@ -358,7 +405,8 @@
     const ul=$id('alertsList'); if(!ul) return;
     try{
       const d=await fetchJSON(`/inventory/api/alerts/?_=${Date.now()}${MODEL_QS}`);
-      const items=(d.alerts||[]).map(a=>{
+      const dd = unwrap(d);
+      const items=(dd.alerts||[]).map(a=>{
         const sev=a.severity==='high'?'danger':(a.severity==='warn'?'warning':'secondary');
         return `<li class="list-group-item d-flex align-items-center gap-2">
                   <span class="badge text-bg-${sev}">${a.type||'Alert'}</span>
@@ -379,9 +427,10 @@
     const viewport=$id('ai-viewport'); const overallEl=$id('ai-recs-overall'); if(!viewport) return;
     hide('errAI'); viewport.innerHTML='<span class="text-muted">Loading…</span>'; if(overallEl) overallEl.textContent='';
     try{
-      const data=await fetchJSON(`/inventory/api/predictions/?_=${Date.now()}${MODEL_QS}`,
+      const raw=await fetchJSON(`/inventory/api/predictions/?_=${Date.now()}${MODEL_QS}`,
         { legacy:[`/inventory/api/predictions?_=${Date.now()}${MODEL_QS}`, `/inventory/api-predictions/?_=${Date.now()}${MODEL_QS}`, `/inventory/api_predictions/?_=${Date.now()}${MODEL_QS}`] });
 
+      const data=unwrap(raw);
       const risky=(data.risky||[]);
       aiSlides = risky.length ? risky.map(x=>`
           <div class="ai-item">
@@ -419,35 +468,40 @@
 
   async function tryValueTrend(metric, period){
     try{
-      return await fetchJSON(`/inventory/api/value-trend/?metric=${encodeURIComponent(metric)}&period=${encodeURIComponent(period)}${MODEL_QS}`,
+      const raw = await fetchJSON(`/inventory/api/value-trend/?metric=${encodeURIComponent(metric)}&period=${encodeURIComponent(period)}${MODEL_QS}`,
         { legacy:[`/inventory/api/value_trend/?metric=${encodeURIComponent(metric)}&period=${encodeURIComponent(period)}${MODEL_QS}`] });
+      const labels = pickLabels(raw), values = pickValues(raw);
+      if (labels.length) return { labels, values, currency:{sign:pickCurrencySign(raw)} };
     }catch(_){}
 
     if(metric==='profit'){
       try{
-        const d = await fetchJSON(`/inventory/api/profit-bar/?period=${encodeURIComponent(period)}${MODEL_QS}`,
+        const raw = await fetchJSON(`/inventory/api/profit-bar/?period=${encodeURIComponent(period)}${MODEL_QS}`,
                                    { legacy:[`/inventory/api_profit_bar/?period=${encodeURIComponent(period)}${MODEL_QS}`] });
-        if(d?.labels?.length) return { labels:d.labels, values:(d.values||[]), currency:{sign:d?.currency?.sign||'MK'} };
+        const labels = pickLabels(raw), values = pickValues(raw);
+        if(labels.length) return { labels, values, currency:{sign:pickCurrencySign(raw)} };
       }catch(_){}
     }
 
     if(metric==='revenue' || metric==='cost'){
-      let rev=null;
+      let revRaw=null;
       try{
         const p = mapVtToSalesPeriod(period);
-        rev = await fetchJSON(`/inventory/api/sales-trend/?period=${encodeURIComponent(p)}&metric=amount${MODEL_QS}`,
+        revRaw = await fetchJSON(`/inventory/api/sales-trend/?period=${encodeURIComponent(p)}&metric=amount${MODEL_QS}`,
                               { legacy:[`/inventory/api_sales_trend/?period=${encodeURIComponent(p)}&metric=amount${MODEL_QS}`] });
       }catch(_){}
 
-      if(metric==='revenue' && rev?.labels?.length) return { labels:rev.labels, values:(rev.values||[]), currency:{sign:rev?.currency?.sign||'MK'} };
+      const revLabels = pickLabels(revRaw), revValues = pickValues(revRaw);
+      if(metric==='revenue' && revLabels.length) return { labels:revLabels, values:revValues, currency:{sign:pickCurrencySign(revRaw)} };
 
       try{
-        const pr = await fetchJSON(`/inventory/api/profit-bar/?period=${encodeURIComponent(period)}${MODEL_QS}`,
+        const prRaw = await fetchJSON(`/inventory/api/profit-bar/?period=${encodeURIComponent(period)}${MODEL_QS}`,
                                     { legacy:[`/inventory/api_profit_bar/?period=${encodeURIComponent(period)}${MODEL_QS}`] });
-        if(rev?.labels?.length && pr?.labels?.length){
-          const merged=mergeByLabel(rev.labels, rev.values, pr.labels, pr.values);
+        const prLabels = pickLabels(prRaw), prValues = pickValues(prRaw);
+        if(revLabels.length && prLabels.length){
+          const merged=mergeByLabel(revLabels, revValues, prLabels, prValues);
           const cost=merged.labels.map((_,i)=> (merged.A[i]||0) - (merged.B[i]||0));
-          return { labels:merged.labels, values:cost, currency:{sign:rev?.currency?.sign||'MK'} };
+          return { labels:merged.labels, values:cost, currency:{sign:pickCurrencySign(revRaw)} };
         }
       }catch(_){}
     }
@@ -478,7 +532,10 @@
       options:{ responsive:true, maintainAspectRatio:false,
         plugins:{ legend:{ display:true }, tooltip:{ callbacks:{ label:(c)=> `${sign} ${nf.format(c.parsed.y||0)}` } } },
         animation:{ duration:500, easing:'easeOutCubic' },
-        scales:{ x:{ grid:{ color:GRID_CLR() }}, y:{ min:y.min, max:y.max, grid:{ color:GRID_CLR() }, ticks:{ stepSize:y.stepSize, callback:(v)=> `${sign} ${nf.format(v)}` } } }
+        scales:{
+          x:{ type:'category', grid:{ color:GRID_CLR() }, ticks:{ autoSkip:false, maxRotation:0, callback:(v, i, ticks)=> labels[v] }},
+          y:{ min:y.min, max:y.max, grid:{ color:GRID_CLR() }, ticks:{ stepSize:y.stepSize, callback:(v)=> `${sign} ${nf.format(v)}` } }
+        }
       }
     });
   }

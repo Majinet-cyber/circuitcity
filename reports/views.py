@@ -1,4 +1,4 @@
-# reports/views.py
+﻿# reports/views.py
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -140,3 +140,5 @@ def reports_home(request: HttpRequest) -> HttpResponse:
         "filters": filters,
     }
     return _render(request, context)
+
+

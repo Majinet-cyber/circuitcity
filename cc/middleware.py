@@ -1,18 +1,19 @@
-# cc/middleware.py
+﻿# cc/middleware.py
 from __future__ import annotations
 
 import time
 import uuid
 import logging
-from typing import Optional
+from importlib import import_module
 
 from django.conf import settings
 from django.utils.deprecation import MiddlewareMixin
 from django.utils import timezone
-from django.http import HttpRequest, HttpResponse
+from django.http import HttpRequest, HttpResponse, HttpResponseBase, Http404
 from django.core.exceptions import PermissionDenied, SuspiciousOperation
-from django.http import Http404
-from django.shortcuts import render
+from django.shortcuts import render, redirect
+from django.urls import reverse, NoReverseMatch
+
 
 # ------------------------------------------------------------------
 # Loggers
@@ -21,14 +22,34 @@ access_logger = logging.getLogger("access")
 django_req_logger = logging.getLogger("django.request")
 
 
+# ------------------------------------------------------------------
+# Small helpers
+# ------------------------------------------------------------------
+def _reverse_or(path_name: str, fallback: str) -> str:
+    try:
+        return reverse(path_name)
+    except NoReverseMatch:
+        return fallback
+
+
+def _import_optional(path: str):
+    try:
+        return import_module(path)
+    except Exception:
+        return None
+
+
+# ------------------------------------------------------------------
+# Request ID
+# ------------------------------------------------------------------
 class RequestIDMiddleware(MiddlewareMixin):
     """
     Attaches a unique request ID to each request and response.
 
-    • Reads incoming X-Request-ID (from proxies) if present,
+    â€¢ Reads incoming X-Request-ID (from proxies) if present,
       otherwise generates a UUID4.
-    • Exposes request.request_id for views/templates.
-    • Echoes back X-Request-ID on the response headers.
+    â€¢ Exposes request.request_id for views/templates.
+    â€¢ Echoes back X-Request-ID on the response headers.
     """
     IN_HEADER = "HTTP_X_REQUEST_ID"
     OUT_HEADER = "X-Request-ID"
@@ -48,6 +69,9 @@ class RequestIDMiddleware(MiddlewareMixin):
         return response
 
 
+# ------------------------------------------------------------------
+# Access log
+# ------------------------------------------------------------------
 class AccessLogMiddleware(MiddlewareMixin):
     """
     Lightweight structured access logging with latency and user id.
@@ -60,8 +84,7 @@ class AccessLogMiddleware(MiddlewareMixin):
     def process_response(self, request: HttpRequest, response: HttpResponse):
         try:
             latency_ms = int(
-                (time.perf_counter() - getattr(request, "_start_ts", time.perf_counter()))
-                * 1000
+                (time.perf_counter() - getattr(request, "_start_ts", time.perf_counter())) * 1000
             )
             user_id = getattr(getattr(request, "user", None), "id", None)
             access_logger.info(
@@ -83,6 +106,75 @@ class AccessLogMiddleware(MiddlewareMixin):
         return response
 
 
+# ------------------------------------------------------------------
+# HQ guard â€” keep HQ admins out of tenant/store UIs
+# Place this middleware in settings.py immediately AFTER
+# AuthenticationMiddleware and BEFORE tenants middleware.
+# ------------------------------------------------------------------
+def _get_is_hq_admin():
+    """
+    Import canonical is_hq_admin(user) if present.
+    Fallback: treat staff OR superuser as HQ admin.
+    """
+    for mp in ("circuitcity.hq.permissions", "hq.permissions"):
+        try:
+            mod = import_module(mp)
+            fn = getattr(mod, "is_hq_admin", None)
+            if callable(fn):
+                return fn
+        except Exception:
+            continue
+    return lambda u: bool(getattr(u, "is_staff", False) or getattr(u, "is_superuser", False))
+
+
+_is_hq_admin = _get_is_hq_admin()
+
+# Always allowed for HQ shell / admin / static
+_HQ_ALLOW_PREFIXES = (
+    "/hq", "/admin", "/accounts", "/static", "/media",
+    "/favicon.ico", "/robots.txt", "/healthz", "/healthz/",
+    "/api/global-search/",
+)
+
+# Client/tenant entry points we block for HQ admins
+_BLOCK_PREFIXES = (
+    "/tenants", "/inventory", "/dashboard", "/sell", "/scan", "/stock",
+)
+
+
+class PreventHQFromClientUI(MiddlewareMixin):
+    """
+    If user is an HQ admin, redirect any request to tenant/store UI
+    back to the HQ shell.  We redirect directly to **hq:subscriptions**
+    (not hq:home) to avoid alias loops.
+    """
+
+    def process_request(self, request: HttpRequest):
+        user = getattr(request, "user", None)
+        if not user or not user.is_authenticated:
+            return None
+
+        if not _is_hq_admin(user):
+            return None  # non-HQ users are allowed through
+
+        path = (request.path or "")
+
+        # HQ/admin/static/etc. are always allowed
+        for p in _HQ_ALLOW_PREFIXES:
+            if path.startswith(p.rstrip("/")):
+                return None
+
+        # Block classic store/tenant entry points
+        for p in _BLOCK_PREFIXES:
+            if path.startswith(p):
+                return redirect(_reverse_or("hq:subscriptions", "/hq/subscriptions/"))
+
+        return None
+
+
+# ------------------------------------------------------------------
+# Auto-select single business for tenant users
+# ------------------------------------------------------------------
 class AutoSelectBusinessMiddleware(MiddlewareMixin):
     """
     If an authenticated user has exactly one active membership, automatically set:
@@ -186,26 +278,17 @@ class AutoSelectBusinessMiddleware(MiddlewareMixin):
             pass
 
 
+# ------------------------------------------------------------------
+# Friendly 500 page (production)
+# ------------------------------------------------------------------
 class FriendlyErrorsMiddleware(MiddlewareMixin):
     """
     Converts unexpected exceptions into a branded 500 page for users
     while keeping full tracebacks in logs. Has no effect when DEBUG=True.
 
-    • Re-raises 404, PermissionDenied, SuspiciousOperation to let Django handle them.
-    • For any other Exception, logs the traceback and renders templates/errors/500.html.
-    • Includes X-Request-ID header (added by RequestIDMiddleware) for easier support.
-
-    Add to settings.MIDDLEWARE near the end, e.g.:
-
-        MIDDLEWARE = [
-            # ... Django defaults ...
-            "cc.middleware.RequestIDMiddleware",
-            "cc.middleware.AccessLogMiddleware",
-            "cc.middleware.AutoSelectBusinessMiddleware",
-            "cc.middleware.FriendlyErrorsMiddleware",  # ← keep near the end
-        ]
-
-        DEBUG_PROPAGATE_EXCEPTIONS = False
+    â€¢ Re-raises 404, PermissionDenied, SuspiciousOperation to let Django handle them.
+    â€¢ For any other Exception, logs the traceback and renders templates/errors/500.html.
+    â€¢ Includes X-Request-ID header (added by RequestIDMiddleware) for easier support.
     """
 
     def process_exception(self, request: HttpRequest, exc: Exception):
@@ -234,4 +317,6 @@ class FriendlyErrorsMiddleware(MiddlewareMixin):
             return resp
         except Exception:
             # As a last resort, return a minimal safe response
-            return HttpResponse("Sorry — something went wrong.", status=500)
+            return HttpResponse("Sorry â€” something went wrong.", status=500)
+
+

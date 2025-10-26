@@ -1,4 +1,4 @@
-# accounts/validators.py
+﻿# accounts/validators.py
 from __future__ import annotations
 
 import re
@@ -84,9 +84,9 @@ def validate_strong_password(value: Optional[str]) -> None:
     Enforce a strong password policy.
 
     Rules:
-      • ≥ 10 characters
-      • Contains at least one letter, one number, and one special character
-      • Rejects very common patterns/words and simple numeric sequences
+      â€¢ â‰¥ 10 characters
+      â€¢ Contains at least one letter, one number, and one special character
+      â€¢ Rejects very common patterns/words and simple numeric sequences
 
     Raise ValidationError with a clear, user-facing message if invalid.
     """
@@ -122,3 +122,5 @@ __all__ = [
     "PASSWORD_REGEX",
     "validate_strong_password",
 ]
+
+

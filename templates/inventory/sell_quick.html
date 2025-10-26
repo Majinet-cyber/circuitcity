@@ -1,0 +1,152 @@
+{% load static %}
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Quick Sell</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <style>
+    body{font-family:system-ui,Segoe UI,Arial,sans-serif;margin:2rem;line-height:1.45}
+    .card{max-width:720px;border:1px solid #e5e7eb;border-radius:12px;padding:20px;box-shadow:0 2px 10px rgba(0,0,0,.05)}
+    .row{display:flex;gap:12px;flex-wrap:wrap}
+    .row>.col{flex:1 1 200px}
+    label{display:block;font-size:.9rem;margin:.25rem 0 .25rem;color:#374151}
+    input,select,button{width:100%;padding:.6rem .7rem;border:1px solid #d1d5db;border-radius:10px;font-size:1rem}
+    button{cursor:pointer;border-color:#2563eb;background:#2563eb;color:#fff;font-weight:600}
+    button:disabled{opacity:.6;cursor:not-allowed}
+    .muted{color:#6b7280;font-size:.9rem}
+    .pill{display:inline-block;padding:.2rem .55rem;border-radius:999px;font-size:.8rem}
+    .pill-ok{background:#d1fae5;color:#065f46}
+    .pill-bad{background:#fee2e2;color:#991b1b}
+    .toast{position:fixed;right:18px;bottom:18px;background:#111827;color:#fff;padding:.7rem 1rem;border-radius:10px;opacity:0;transform:translateY(8px);transition:.25s}
+    .toast.show{opacity:1;transform:translateY(0)}
+    pre{background:#f9fafb;border:1px solid #e5e7eb;border-radius:10px;padding:10px;overflow:auto}
+  </style>
+</head>
+<body>
+
+  <h2>Inventory · <span style="color:#ef4444">Quick Sell</span></h2>
+  <div class="card">
+    <div class="row">
+      <div class="col">
+        <label>IMEI / Barcode</label>
+        <input id="f-code" placeholder="15-digit IMEI or code" autofocus>
+        <div class="muted">Paste or scan. IMEI should be 15 digits; SKUs/codes ≥ 4 chars are accepted.</div>
+      </div>
+    </div>
+
+    <div class="row" style="margin-top:10px">
+      <div class="col">
+        <label>Sold date</label>
+        <input id="f-date" type="date">
+      </div>
+      <div class="col">
+        <label>Price</label>
+        <input id="f-price" type="number" min="0" step="1" placeholder="Enter final price">
+      </div>
+      <div class="col">
+        <label>Commission %</label>
+        <input id="f-comm" type="number" min="0" step="0.01" placeholder="e.g. 5">
+      </div>
+      <div class="col">
+        <label>Location ID</label>
+        <input id="f-loc" type="number" min="1" step="1" placeholder="e.g. 11">
+      </div>
+    </div>
+
+    <div class="row" style="margin-top:16px">
+      <div class="col">
+        <button id="btn-sell">Mark as SOLD</button>
+      </div>
+    </div>
+
+    <div id="result" style="margin-top:16px;display:none">
+      <div id="pill" class="pill"></div>
+      <div id="msg" style="margin:.4rem 0;color:#111827;font-weight:600"></div>
+      <pre id="json" style="display:none"></pre>
+    </div>
+
+    <div class="muted" style="margin-top:12px">
+      This page posts directly to <code>/inventory/api/mark-sold/</code> and trusts its response.
+      No post-sale stock probe is performed, so you won’t see the old “still in stock” confusion.
+    </div>
+  </div>
+
+  <div id="toast" class="toast"></div>
+
+  <script>
+    (function(){
+      const $ = (id) => document.getElementById(id);
+      const btn = $("btn-sell"), toast = $("toast");
+      const rf = { wrap: $("result"), pill: $("pill"), msg: $("msg"), json: $("json") };
+
+      const isoToday = () => new Date().toISOString().slice(0,10);
+      $("f-date").value = isoToday();
+
+      function showToast(text) {
+        toast.textContent = text;
+        toast.classList.add("show");
+        setTimeout(() => toast.classList.remove("show"), 2000);
+      }
+
+      async function postJSON(url, payload) {
+        const res = await fetch(url, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+          credentials: "same-origin"
+        });
+        const data = await res.json().catch(()=>({}));
+        return { ok: res.ok, data };
+      }
+
+      btn.addEventListener("click", async () => {
+        const code = $("f-code").value.trim();
+        const price = $("f-price").value.trim();
+        const commission = $("f-comm").value.trim();
+        const sold_date = $("f-date").value.trim();
+        const location_id = $("f-loc").value.trim();
+
+        if (!code) { showToast("Enter an IMEI/code"); $("f-code").focus(); return; }
+
+        btn.disabled = true; btn.textContent = "Marking…";
+        rf.wrap.style.display = "none";
+
+        const payload = {
+          imei: code,
+          price: price || undefined,
+          commission: commission || undefined,
+          sold_date: sold_date || undefined,
+          location_id: location_id || undefined
+        };
+
+        const { ok, data } = await postJSON("/inventory/api/mark-sold/", payload);
+
+        btn.disabled = false; btn.textContent = "Mark as SOLD";
+
+        rf.wrap.style.display = "block";
+        rf.json.style.display = "block";
+        rf.json.textContent = JSON.stringify(data, null, 2);
+
+        if (ok && data && data.ok) {
+          rf.pill.className = "pill pill-ok";
+          rf.pill.textContent = "SOLD";
+          rf.msg.textContent = data.message || "Marked as SOLD.";
+          showToast("Saved ✔");
+          // Clear the IMEI to get ready for next scan
+          $("f-code").value = "";
+          $("f-code").focus();
+        } else {
+          rf.pill.className = "pill pill-bad";
+          rf.pill.textContent = "FAILED";
+          rf.msg.textContent = (data && (data.detail || data.error)) || "Sell failed";
+          showToast("Sell failed");
+        }
+      });
+
+      // Enter submits
+      $("f-code").addEventListener("keydown", e => { if (e.key === "Enter") { e.preventDefault(); btn.click(); }});
+    })();
+  </script>
+</body>
+</html>

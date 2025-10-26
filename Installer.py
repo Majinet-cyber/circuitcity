@@ -1,4 +1,4 @@
-import tkinter as tk
+﻿import tkinter as tk
 from tkinter import messagebox
 import subprocess
 
@@ -27,3 +27,5 @@ package_entry.pack(pady=5)
 tk.Button(root, text="Install", command=install_package).pack(pady=10)
 
 root.mainloop()
+
+

@@ -1,106 +1,109 @@
 /* =========================================================
- * Circuit City · Mobile UX helpers (v3.1.2)
- * Sidebar drawer, dock sizing, active tab, iOS/Android niceties
- * Safe to include on every page (idempotent, feature-detected).
+ * Circuit City · Mobile UX helpers (v3.2.0)
+ * Drawer (single source of truth), dock sizing, active tab,
+ * focus/keyboard niceties. Idempotent.
  * ========================================================= */
 
 (() => {
-  // ---- Guard against double-init (e.g., multiple script tags) ----
+  // ---- Guard against double init ----
   if (window.__CC_MOBILE_INIT__) return;
   window.__CC_MOBILE_INIT__ = true;
 
-  const $$ = (sel, root = document) => Array.from(root.querySelectorAll(sel));
-  const $  = (sel, root = document) => root.querySelector(sel);
+  const $$ = (s, r = document) => Array.from(r.querySelectorAll(s));
+  const $  = (s, r = document) => r.querySelector(s);
 
-  // -------- Config / selectors (single source of truth) --------
   const SEL = {
     sidebar:  '.cc-sidebar',
     openBtn:  '#sidebarOpen',
     backdrop: '#ccBackdrop',
-    mobileDock: '.cc-bottom-nav, .mobile-tabbar', // supports both class names
+    mobileDock: '.cc-bottom-nav, .mobile-tabbar',
     mobileDockTab: '.cc-bottom-nav .tab, .mobile-tabbar .tab'
   };
 
-  // Utility
-  const isMobile = () => window.matchMedia('(max-width: 992px)').matches;
+  const isMobile = () => matchMedia('(max-width: 992px)').matches;
 
-  // -------- Safe-area & dock height → CSS variable sync --------
+  // -------- Safe-area & dock height → CSS var --------
   function setDockHeightVar() {
     const dock = $(SEL.mobileDock);
     const root = document.documentElement;
-    if (!root) return;
     const h = dock ? Math.round(dock.getBoundingClientRect().height) : 0;
     if (h) root.style.setProperty('--cc-nav-h', `${h}px`);
   }
 
-  // -------- Sidebar drawer (collapsible on mobile) -------------
-  function setupSidebarDrawer() {
+  // -------- Scroll lock helpers --------
+  let savedScrollY = 0;
+  function lockScroll() {
+    savedScrollY = window.scrollY || 0;
+    Object.assign(document.body.style, {
+      position: 'fixed', top: `-${savedScrollY}px`, left: '0', right: '0', width: '100%', overflow: 'hidden'
+    });
+  }
+  function unlockScroll() {
+    Object.assign(document.body.style, { position: '', top: '', left: '', right: '', width: '', overflow: '' });
+    window.scrollTo(0, savedScrollY || 0);
+  }
+
+  // -------- Drawer (body[data-drawer] drives CSS) --------
+  function setupDrawer() {
     const sidebar  = $(SEL.sidebar);
     const openBtn  = $(SEL.openBtn);
     const backdrop = $(SEL.backdrop);
     if (!sidebar || !openBtn || !backdrop) return;
 
-    const body = document.body;
-    let savedScrollY = 0;
-
-    // Ensure starting state is clean
-    sidebar.classList.remove('open');
+    // Ensure clean starting state
+    document.body.removeAttribute('data-drawer');
     backdrop.classList.remove('show');
+    sidebar.classList.remove('open', 'is-open');
 
-    function lockScroll() {
-      savedScrollY = window.scrollY || 0;
-      body.style.position = 'fixed';
-      body.style.top = `-${savedScrollY}px`;
-      body.style.left = '0';
-      body.style.right = '0';
-      body.style.width = '100%';
-      body.style.overflow = 'hidden';
-    }
-    function unlockScroll() {
-      body.style.position = '';
-      body.style.top = '';
-      body.style.left = '';
-      body.style.right = '';
-      body.style.width = '';
-      body.style.overflow = '';
-      window.scrollTo(0, savedScrollY || 0);
-    }
+    let openedAt = 0; // debounce close-after-open taps
 
-    function open() {
+    const open = () => {
       if (!isMobile()) return;
-      // If any legacy offcanvas/backdrop exists, hide it so it can't steal taps
+      // hide any old backdrops so they don't eat taps
       $$('.offcanvas-backdrop, [data-legacy-menu]').forEach(n => (n.style.pointerEvents = 'none'));
-      sidebar.classList.add('open');
+      document.body.setAttribute('data-drawer', 'open');
+      sidebar.classList.add('open', 'is-open');
       backdrop.classList.add('show');
       lockScroll();
-    }
-    function close() {
-      sidebar.classList.remove('open');
+      openedAt = Date.now();
+    };
+
+    const close = () => {
+      document.body.removeAttribute('data-drawer');
+      sidebar.classList.remove('open', 'is-open');
       backdrop.classList.remove('show');
       unlockScroll();
-    }
-    function toggle(e) {
-      if (e) e.preventDefault();
-      sidebar.classList.contains('open') ? close() : open();
-    }
+    };
 
-    // Make hamburger super-responsive on mobile (tap + click)
-    ['click', 'touchstart'].forEach(ev =>
-      openBtn.addEventListener(ev, toggle, { passive: true })
-    );
+    const toggle = (e) => {
+      if (e) { e.preventDefault(); e.stopPropagation(); }
+      (document.body.getAttribute('data-drawer') === 'open') ? close() : open();
+    };
 
-    // Backdrop to close
-    backdrop.addEventListener('click', close);
+    // Make the hamburger extremely “sticky” to taps
+    ['pointerdown', 'touchstart', 'click'].forEach(ev => {
+      openBtn.addEventListener(ev, (e) => { e.preventDefault(); e.stopPropagation(); toggle(); }, { passive: false });
+    });
 
-    // Escape to close
-    document.addEventListener('keydown', (e) => { if (e.key === 'Escape') close(); });
+    // Stop events inside the sidebar from bubbling out and triggering a close
+    ['pointerdown', 'touchstart', 'click'].forEach(ev => {
+      sidebar.addEventListener(ev, (e) => e.stopPropagation(), { passive: true });
+    });
 
-    // Auto-close drawer after navigating via a sidebar link on mobile
+    // Backdrop to close (with tiny debounce so open→blur doesn’t immediately close)
+    backdrop.addEventListener('click', () => {
+      if (Date.now() - openedAt < 250) return;
+      close();
+    });
+
+    document.addEventListener('keydown', (e) => { if (e.key === 'Escape') close(); }, { passive: true });
+
+    // Auto-close after navigating from a sidebar link on mobile
     $$('.cc-sidebar a[href]').forEach(a => {
       a.addEventListener('click', () => { if (isMobile()) close(); }, { passive: true });
     });
 
-    // If we resize to desktop, make sure any mobile state is cleared
+    // On resize to desktop, clear mobile state
     let rAF = 0;
     window.addEventListener('resize', () => {
       cancelAnimationFrame(rAF);
@@ -110,11 +113,11 @@
       });
     }, { passive: true });
 
-    // Expose minimal API for other scripts (optional)
+    // Minimal API
     window.CC_SIDEBAR = { open, close, toggle };
   }
 
-  // -------- Active state for bottom dock tabs ------------------
+  // -------- Active state for bottom dock tabs --------
   function setupActiveTabHighlight() {
     const path = (location.pathname || '/').replace(/\/+$/, '/') || '/';
     $$(SEL.mobileDockTab).forEach(a => {
@@ -130,9 +133,8 @@
     });
   }
 
-  // -------- iOS/Android viewport & keyboard niceties -----------
+  // -------- Focus into view on mobile keyboards --------
   function setupFocusIntoView() {
-    // Keep inputs visible when virtual keyboard opens on very small screens
     document.addEventListener('focusin', (e) => {
       const el = e.target;
       if (!(el instanceof HTMLElement)) return;
@@ -143,26 +145,21 @@
     });
   }
 
-  // -------- Initialize -----------------------------------------
+  // -------- Init --------
   function init() {
     setDockHeightVar();
-    setupSidebarDrawer();
+    setupDrawer();
     setupActiveTabHighlight();
     setupFocusIntoView();
 
-    // Recompute dock height on orientation changes / content shifts
     ['orientationchange', 'load'].forEach(ev =>
       window.addEventListener(ev, setDockHeightVar, { passive: true })
     );
-
-    // Mutation observer: if the dock is rendered later, sync height
-    const obs = new MutationObserver(setDockHeightVar);
-    obs.observe(document.documentElement, { childList: true, subtree: true });
+    new MutationObserver(setDockHeightVar)
+      .observe(document.documentElement, { childList: true, subtree: true });
   }
 
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', init, { once: true });
-  } else {
-    init();
-  }
+  (document.readyState === 'loading')
+    ? document.addEventListener('DOMContentLoaded', init, { once: true })
+    : init();
 })();

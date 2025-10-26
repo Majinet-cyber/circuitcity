@@ -1,4 +1,4 @@
-# circuitcity/notifications/views.py
+﻿# circuitcity/notifications/views.py
 from __future__ import annotations
 
 from typing import Optional
@@ -73,7 +73,7 @@ def feed(request: HttpRequest):
     if since:
         filtered = filtered.filter(created_at__gt=since)
 
-    # Compute unread BEFORE any slicing to avoid the slice→filter error
+    # Compute unread BEFORE any slicing to avoid the sliceâ†’filter error
     unread = filtered.filter(read_at__isnull=True).count()
 
     # Now fetch the page of items
@@ -116,7 +116,7 @@ def mark_read(request: HttpRequest):
             qs.filter(read_at__isnull=True).update(read_at=n_now)
             return JsonResponse({"ok": True})
         except (OperationalError, ProgrammingError):
-            # Table might be mid-migration—treat as no-op.
+            # Table might be mid-migrationâ€”treat as no-op.
             return JsonResponse({"ok": True, "noop": True})
 
     try:
@@ -129,3 +129,5 @@ def mark_read(request: HttpRequest):
         return JsonResponse({"ok": bool(updated)})
     except (OperationalError, ProgrammingError):
         return JsonResponse({"ok": True, "noop": True})
+
+

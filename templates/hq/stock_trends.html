@@ -1,0 +1,404 @@
+{% load static %}{% load humanize %}
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Stock Trends · Control Center</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <!-- Bootstrap + Icons -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
+
+  <!-- Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+  <!-- jsPDF (for PDF export) -->
+  <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
+
+  <style>
+    :root{
+      --sidebar-w: 268px;
+      --ink: #0f172a;
+      --muted: #64748b;
+      --card: #ffffff;
+      --border: #e5e7eb;
+      --bg: #f7fafc;
+      --accent: #2563eb;
+      --accent-2: #06b6d4;
+      --success: #16a34a;
+    }
+    html, body{ height:100% }
+    body{ background:var(--bg); color:var(--ink) }
+
+    /* ====== SHELL ====== */
+    .cc-shell{ min-height:100%; }
+    .cc-sidebar{
+      position:fixed; inset:0 auto 0 0;
+      width:var(--sidebar-w); background:#0b1321; color:#e5e7eb;
+      border-right:1px solid #0e1a2f; padding:18px 14px; overflow-y:auto;
+    }
+    /* NEVER collapse the sidebar on web */
+    @media (max-width: 9999px){
+      .cc-sidebar{ display:block !important; }
+    }
+    .cc-main{ margin-left:var(--sidebar-w); min-height:100vh; padding:24px 28px; }
+    .cc-brand{ display:flex; align-items:center; gap:.6rem; margin-bottom:8px }
+    .cc-brand .dot{ width:28px; height:28px; display:grid; place-items:center; font-weight:800; border-radius:8px; background:#38bdf8; color:#001 }
+    .cc-nav .item{ display:block; color:#d1d5db; text-decoration:none; padding:10px 10px; border-radius:10px; margin-bottom:6px }
+    .cc-nav .item:hover{ background:#0f1a30 }
+    .cc-nav .active{ background:#111b34; color:#fff }
+
+    /* ====== PAGE ====== */
+    .page-head{
+      background:#0b1321; color:#fff; border-radius:12px;
+      padding:16px 18px; display:flex; align-items:center; justify-content:space-between;
+    }
+    .title{ font-weight:800; margin:0; font-size:22px }
+    .btn-outline-light{ --bs-border-color:#243146; --bs-btn-color:#e5e7eb }
+    .filters .quick button{ border-radius:9999px }
+
+    .kpi-grid{ display:grid; grid-template-columns: repeat(auto-fit, minmax(260px,1fr)); gap:12px; }
+    .kpi{ background:var(--card); border:1px solid var(--border); border-radius:14px; padding:16px }
+    .kpi .label{ font-size:12px; color:var(--muted) }
+    .kpi .value{ font-weight:800; font-size:28px }
+
+    .cardx{ background:var(--card); border:1px solid var(--border); border-radius:14px; padding:16px }
+
+    .legend .badge{ font-weight:600 }
+    .footer-note{ color:var(--muted) }
+
+    /* print */
+    @media print{
+      .page-head button, .filters, .export-actions { display:none !important; }
+      .cc-sidebar{ display:none !important }
+      .cc-main{ margin:0; padding:0 }
+      body{ background:#fff }
+    }
+  </style>
+</head>
+<body>
+<div class="cc-shell">
+
+  <!-- Sidebar (never collapses) -->
+  <aside class="cc-sidebar">
+    <div class="cc-brand">
+      <div class="dot">HQ</div><div class="fw-bold">Control Center</div>
+    </div>
+    <nav class="cc-nav">
+      <a class="item" href="{% url 'hq:dashboard' %}"><i class="bi bi-speedometer2 me-2"></i>Dashboard</a>
+      <a class="item" href="{% url 'hq:businesses' %}"><i class="bi bi-buildings me-2"></i>Businesses</a>
+      <a class="item" href="{% url 'hq:subscriptions' %}"><i class="bi bi-credit-card me-2"></i>Subscriptions</a>
+      <a class="item" href="{% url 'hq:invoices' %}"><i class="bi bi-receipt me-2"></i>Invoices</a>
+      <a class="item" href="{% url 'hq:agents' %}"><i class="bi bi-people me-2"></i>Agents</a>
+      <a class="item active" href="{% url 'hq:stock_trends' %}"><i class="bi bi-bar-chart-line me-2"></i>Stock trends</a>
+      <a class="item" href="/admin/"><i class="bi bi-gear me-2"></i>Django Admin</a>
+    </nav>
+  </aside>
+
+  <!-- Main -->
+  <main class="cc-main">
+
+    <div class="page-head mb-3">
+      <h1 class="title mb-0">Stock Trends</h1>
+      <div class="export-actions d-flex gap-2">
+        <button class="btn btn-outline-light btn-sm" id="btnCSV"><i class="bi bi-filetype-csv me-1"></i>Export CSV</button>
+        <button class="btn btn-primary btn-sm" id="btnPDF"><i class="bi bi-file-earmark-pdf me-1"></i>Download PDF</button>
+      </div>
+    </div>
+
+    <!-- FILTERS -->
+    <form class="filters cardx mb-3" method="get">
+      <div class="row g-2 align-items-end">
+        <div class="col-12 col-md-3">
+          <label class="form-label small text-muted">Start</label>
+          <input type="date" name="start" class="form-control" value="{{ start|date:'Y-m-d' }}">
+        </div>
+        <div class="col-12 col-md-3">
+          <label class="form-label small text-muted">End</label>
+          <input type="date" name="end" class="form-control" value="{{ end|date:'Y-m-d' }}">
+        </div>
+        <div class="col-12 col-md-2">
+          <label class="form-label small text-muted">&nbsp;</label>
+          <button class="btn btn-primary w-100" type="submit"><i class="bi bi-funnel me-1"></i>Filter</button>
+        </div>
+        <div class="col-12 col-md-4">
+          <div class="form-check mt-3">
+            <input class="form-check-input" type="checkbox" id="maToggle" checked>
+            <label class="form-check-label" for="maToggle">Show 7-day moving average (Out)</label>
+          </div>
+        </div>
+
+        <div class="col-12">
+          <div class="quick d-flex flex-wrap gap-2 mt-2">
+            <button type="button" data-days="7"  class="btn btn-outline-secondary btn-sm px-3">Last 7 days</button>
+            <button type="button" data-days="30" class="btn btn-outline-secondary btn-sm px-3">Last 30 days</button>
+            <button type="button" data-days="90" class="btn btn-outline-secondary btn-sm px-3">Last 90 days</button>
+            <button type="button" data-ytd="1" class="btn btn-outline-secondary btn-sm px-3">YTD</button>
+            <!-- Optional narrow-to-day control -->
+            <div class="ms-auto d-flex align-items-center gap-2">
+              <span class="text-muted small">Jump to day:</span>
+              <input type="date" id="jumpDay" class="form-control form-control-sm" style="width: 160px;">
+              <button type="button" id="goDay" class="btn btn-outline-secondary btn-sm">Go</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </form>
+
+    <!-- KPI CARDS -->
+    <section class="kpi-grid mb-3">
+      <div class="kpi">
+        <div class="label">Total Stock In (All Time)</div>
+        <div class="value">{{ total_in|intcomma }}</div>
+        <div class="text-muted small">Cumulative items received</div>
+      </div>
+      <div class="kpi">
+        <div class="label">Total Stock Out (All Time)</div>
+        <div class="value">{{ total_out|intcomma }}</div>
+        <div class="text-muted small">Cumulative items sold</div>
+      </div>
+      <div class="kpi">
+        <div class="label">Sell-through (%)</div>
+        <div class="value">{{ sell_through_pct|floatformat:0 }}%</div>
+        <div class="text-muted small">Out ÷ In (all time)</div>
+      </div>
+      <div class="kpi">
+        <div class="label">Avg Daily Out (Period)</div>
+        <div class="value">{{ avg_daily_out|floatformat:2 }}</div>
+        <div class="text-muted small">Mean daily sales in selected range</div>
+      </div>
+      <div class="kpi">
+        <div class="label">Projected Monthly Run-Rate</div>
+        <div class="value">{{ projected_monthly_run_rate|floatformat:0|intcomma }}</div>
+        <div class="text-muted small">Avg Daily Out × 30</div>
+      </div>
+    </section>
+
+    <!-- CHARTS -->
+    <section class="cardx mb-3">
+      <div class="d-flex justify-content-between align-items-center mb-2">
+        <h6 class="mb-0">Daily Stock Movement</h6>
+        <div class="legend d-flex align-items-center gap-2">
+          <span class="badge rounded-pill text-bg-light border"><i class="bi bi-square-fill me-1" style="color:#60a5fa"></i>Stock In</span>
+          <span class="badge rounded-pill text-bg-light border"><i class="bi bi-square-fill me-1" style="color:#34d399"></i>Stock Out</span>
+          <span class="badge rounded-pill text-bg-light border"><i class="bi bi-dash-square me-1"></i>Out (7d MA)</span>
+        </div>
+      </div>
+      <canvas id="chartDaily" height="120"></canvas>
+    </section>
+
+    <section class="cardx mb-2">
+      <div class="d-flex justify-content-between align-items-center mb-2">
+        <h6 class="mb-0">Cumulative Totals</h6>
+        <div class="text-muted small">With linear trend projection</div>
+      </div>
+      <canvas id="chartCum" height="120"></canvas>
+    </section>
+
+    <div class="footer-note mt-3 small">
+      Tip: Click a quick range above to refocus dates instantly. Use “Jump to day” to pin the page to a specific date window.
+    </div>
+
+  </main>
+</div>
+
+<script>
+(() => {
+  // ----- Helpers -----
+  const qsel = s => document.querySelector(s);
+  function setDates(days){
+    const end = new Date();
+    const start = new Date(end); start.setDate(end.getDate() - (days-1));
+    qsel('input[name="start"]').value = start.toISOString().slice(0,10);
+    qsel('input[name="end"]').value   = end.toISOString().slice(0,10);
+    document.forms[0].submit();
+  }
+  function setYTD(){
+    const end = new Date();
+    const start = new Date(end.getFullYear(), 0, 1);
+    qsel('input[name="start"]').value = start.toISOString().slice(0,10);
+    qsel('input[name="end"]').value   = end.toISOString().slice(0,10);
+    document.forms[0].submit();
+  }
+
+  document.querySelectorAll('.quick button[data-days]').forEach(btn=>{
+    btn.addEventListener('click', () => setDates(parseInt(btn.dataset.days,10)));
+  });
+  document.querySelector('.quick button[data-ytd]')?.addEventListener('click', setYTD);
+
+  // Jump to day = view that single day
+  qsel('#goDay')?.addEventListener('click', () => {
+    const v = qsel('#jumpDay').value;
+    if(!v) return;
+    qsel('input[name="start"]').value = v;
+    qsel('input[name="end"]').value   = v;
+    document.forms[0].submit();
+  });
+
+  // ----- Data from context (safe fallbacks) -----
+  const labels   = JSON.parse('{{ d_labels|default:"[]"|safe }}'.replaceAll("'",'"'));
+  const dailyIn  = JSON.parse('{{ series_in|default:"[]"|safe }}');
+  const dailyOut = JSON.parse('{{ series_out|default:"[]"|safe }}');
+  const ma7      = JSON.parse('{{ ma7|default:"[]"|safe }}');
+  const cumIn    = JSON.parse('{{ cum_in|default:"[]"|safe }}');
+  const cumOut   = JSON.parse('{{ cum_out|default:"[]"|safe }}');
+  const trendOut = JSON.parse('{{ out_trend|default:"[]"|safe }}');
+
+  // Make lengths equal (defensive)
+  function padTo(arr, n){ const out = arr.slice(0,n); while(out.length<n) out.push(0); return out; }
+  const N = labels.length;
+  const DIn  = padTo(dailyIn, N);
+  const DOut = padTo(dailyOut, N);
+  const MA7  = padTo(ma7, N);
+  const CIn  = padTo(cumIn, N);
+  const COut = padTo(cumOut, N);
+  const TOut = padTo(trendOut, N);
+
+  // ----- Charts -----
+  const ctx1 = document.getElementById('chartDaily');
+  const ctx2 = document.getElementById('chartCum');
+
+  const chartDaily = new Chart(ctx1, {
+    type: 'bar',
+    data: {
+      labels: labels,
+      datasets: [
+        {
+          label: 'Stock In',
+          data: DIn,
+          borderWidth: 1,
+          backgroundColor: 'rgba(96,165,250,.45)',
+          borderColor: 'rgba(96,165,250,1)'
+        },
+        {
+          label: 'Stock Out',
+          data: DOut,
+          borderWidth: 1,
+          backgroundColor: 'rgba(52,211,153,.45)',
+          borderColor: 'rgba(52,211,153,1)'
+        },
+        {
+          type: 'line',
+          label: 'Out (7d MA)',
+          data: MA7,
+          borderWidth: 2,
+          borderDash: [6,6],
+          pointRadius: 0,
+          backgroundColor: 'transparent',
+          borderColor: '#111827',
+          hidden: false
+        }
+      ]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      scales: {
+        x: { ticks: { maxRotation: 0, autoSkip: true, maxTicksLimit: 14 } },
+        y: { beginAtZero: true, precision: 0 }
+      },
+      plugins: {
+        legend: { display: false },
+        tooltip: { mode: 'index', intersect: false }
+      }
+    }
+  });
+
+  // toggle 7d MA
+  qsel('#maToggle')?.addEventListener('change', e=>{
+    // dataset index 2 is the MA line
+    chartDaily.data.datasets[2].hidden = !e.target.checked;
+    chartDaily.update();
+  });
+
+  const chartCum = new Chart(ctx2, {
+    type: 'line',
+    data: {
+      labels: labels,
+      datasets: [
+        {
+          label: 'Cumulative In',
+          data: CIn,
+          borderWidth: 2,
+          fill: false
+        },
+        {
+          label: 'Cumulative Out',
+          data: COut,
+          borderWidth: 2,
+          fill: false
+        },
+        {
+          label: 'Out Trend',
+          data: TOut,
+          borderWidth: 2,
+          borderDash: [6,6],
+          pointRadius: 0,
+          fill: false
+        }
+      ]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      scales: { y: { beginAtZero: true, precision: 0 } },
+      plugins: { legend: { position: 'top' } }
+    }
+  });
+
+  // ----- Exports -----
+  // CSV (daily series)
+  qsel('#btnCSV')?.addEventListener('click', () => {
+    const rows = [
+      ['date','stock_in','stock_out','out_ma7','cum_in','cum_out','out_trend'],
+    ];
+    for(let i=0;i<N;i++){
+      rows.push([labels[i], DIn[i], DOut[i], MA7[i], CIn[i], COut[i], TOut[i]]);
+    }
+    const csv = rows.map(r => r.join(',')).join('\n');
+    const blob = new Blob([csv], {type:'text/csv;charset=utf-8;'});
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `stock_trends_${(new Date()).toISOString().slice(0,10)}.csv`;
+    a.click();
+  });
+
+  // PDF (two charts)
+  qsel('#btnPDF')?.addEventListener('click', async () => {
+    const { jsPDF } = window.jspdf;
+    const pdf = new jsPDF({ unit:'pt', format:'a4' });
+
+    const title = 'Stock Trends — {{ start|date:"Y-m-d" }} to {{ end|date:"Y-m-d" }}';
+    pdf.setFont('helvetica','bold'); pdf.setFontSize(16);
+    pdf.text(title, 40, 40);
+
+    // chart images
+    const img1 = chartDaily.toBase64Image('image/png', 1);
+    const img2 = chartCum.toBase64Image('image/png', 1);
+
+    // fit charts width-wise (A4 portrait: 595pt)
+    const w = 515, x = 40, h = 220;
+    pdf.addImage(img1, 'PNG', x, 60, w, h);
+    pdf.addImage(img2, 'PNG', x, 300, w, h);
+
+    // KPIs
+    pdf.setFont('helvetica','normal'); pdf.setFontSize(11);
+    const kpis = [
+      ['Total In (All time)', '{{ total_in|default:"0" }}'],
+      ['Total Out (All time)', '{{ total_out|default:"0" }}'],
+      ['Sell-through (%)', '{{ sell_through_pct|default:"0" }}%'],
+      ['Avg Daily Out (period)', '{{ avg_daily_out|default:"0" }}'],
+      ['Projected Monthly Run-Rate', '{{ projected_monthly_run_rate|default:"0" }}'],
+    ];
+    let y = 540;
+    kpis.forEach(([k,v]) => { pdf.text(`${k}: ${v}`, 40, y); y += 18; });
+
+    pdf.save(`stock_trends_${(new Date()).toISOString().slice(0,10)}.pdf`);
+  });
+
+})();
+</script>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

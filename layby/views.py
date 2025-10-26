@@ -1,4 +1,4 @@
-# layby/views.py
+﻿# layby/views.py
 from __future__ import annotations
 
 from decimal import Decimal
@@ -447,7 +447,7 @@ def admin_dashboard(request: HttpRequest) -> HttpResponse:
           </aside>
           <main style="flex:1;padding:28px;background:#f6f8fc;color:#0b2545">
             <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;gap:12px;flex-wrap:wrap">
-              <h1 style="margin:0">Admin · Laybys</h1>
+              <h1 style="margin:0">Admin Â· Laybys</h1>
             </div>
             <div style="background:#ffffff;border:1px solid #e5e9f2;border-radius:12px;padding:16px;margin-bottom:14px">
               <strong>Total outstanding balance:</strong> {total_outstanding}
@@ -484,7 +484,7 @@ def admin_dashboard(request: HttpRequest) -> HttpResponse:
             "paid_this_week": paid_this_week,
             "total_balance": total_outstanding,
             "color_for": _color_for,
-            "header_title": "Admin · Laybys",
+            "header_title": "Admin Â· Laybys",
             "active_nav": "layby-admin",
             "show_layby_quick": False,
         },
@@ -537,18 +537,18 @@ def admin_customer(request: HttpRequest) -> HttpResponse:
           <aside style="width:240px;background:#13315c;color:#e6eefc;padding:20px;position:sticky;top:0;height:100vh">
             <h2 style="margin:0 0 1rem">Circuit City</h2>
             <nav style="display:flex;flex-direction:column;gap:.6rem">
-              <a href="/layby/admin/dashboard/" style="color:#d7e3ff;text-decoration:none">← Back to Layby Dashboard</a>
+              <a href="/layby/admin/dashboard/" style="color:#d7e3ff;text-decoration:none">â† Back to Layby Dashboard</a>
               <a href="/layby/admin/customer/{from_html}" style="color:#9fb7dd;text-decoration:none">Refresh</a>
             </nav>
           </aside>
           <main style="flex:1;padding:28px;background:#f6f8fc;color:#0b2545">
             <h1 style="margin:0 0 .75rem">
-              Customer · <span style="background:{_color_for(cust_name)};color:#052e2b;padding:.2rem .55rem;border-radius:999px">{escape(cust_name)}</span>
+              Customer Â· <span style="background:{_color_for(cust_name)};color:#052e2b;padding:.2rem .55rem;border-radius:999px">{escape(cust_name)}</span>
             </h1>
             <div style="opacity:.8;margin-bottom:10px">Phone: {escape(cust_phone)}</div>
 
             <div style="background:#ffffff;border:1px solid #e5e9f2;border-radius:12px;padding:14px;margin-bottom:14px">
-              <strong>Totals</strong> — Total: {total} · Paid: {paid} · Balance: <strong>{balance}</strong>
+              <strong>Totals</strong> â€” Total: {total} Â· Paid: {paid} Â· Balance: <strong>{balance}</strong>
             </div>
 
             <div style="background:#ffffff;border:1px solid #e5e9f2;border-radius:12px;overflow:auto">
@@ -583,7 +583,7 @@ def admin_customer(request: HttpRequest) -> HttpResponse:
             "total": total,
             "paid": paid,
             "balance": balance,
-            "header_title": "Layby · Customer",
+            "header_title": "Layby Â· Customer",
             "active_nav": "layby-admin",
             "show_layby_quick": False,
         },
@@ -673,7 +673,7 @@ def customer_portal(request: HttpRequest) -> HttpResponse:
             "orders_data": orders_data,
             "orders": [x["o"] for x in orders_data],  # backwards compat in template
             "customer_phone": phone,
-            "display_name": display_name,  # <-- use this in the template for “Welcome, Tessa”
+            "display_name": display_name,  # <-- use this in the template for â€œWelcome, Tessaâ€
             "show_layby_quick": False,
         },
         lambda: "<p>Customer portal missing template.</p>",
@@ -748,3 +748,5 @@ def agent_add_payment(request: HttpRequest, order_id: int) -> HttpResponse:
         {"order": order, "form": form, "show_layby_quick": False},
         lambda: "<p>Add payment form missing template.</p>",
     )
+
+

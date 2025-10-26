@@ -1,4 +1,4 @@
-# tenants/scoping.py
+﻿# tenants/scoping.py
 from __future__ import annotations
 from typing import Optional
 from django.db.models import QuerySet
@@ -41,3 +41,5 @@ def apply_tenant_scope(qs: QuerySet, business: Optional[object]) -> QuerySet:
             pass
 
     return qs
+
+

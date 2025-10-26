@@ -1,19 +1,63 @@
 {% extends "base.html" %}
 {% load humanize %}
 
-{% block title %}Agent Wallet · {{ target.username }}{% endblock %}
+{% block title %}Agent · {{ target.username }}{% endblock %}
 
 {% block body %}
 <section>
-  <h2 style="margin:0 0 .5rem">Agent: {{ target.get_username }}</h2>
 
+  <!-- Header -->
+  <div style="display:flex; align-items:baseline; justify-content:space-between; gap:1rem;">
+    <h2 style="margin:0">Agent: {{ target.get_username }}</h2>
+    <div>
+      <a class="btn" href="{% url 'inventory:wallet' %}">← Back to Admin Wallet</a>
+    </div>
+  </div>
+
+  <!-- Quick facts -->
   <div style="display:flex; gap:.5rem; flex-wrap:wrap; margin:.5rem 0 1rem">
+    {% with ap=target.agent_profile %}
+      {% if ap and ap.location %}
+        <span class="pill">Current location:
+          <strong>{{ ap.location.name }}</strong>
+          {% if ap.location.city %}<span style="opacity:.7">— {{ ap.location.city }}</span>{% endif %}
+        </span>
+      {% else %}
+        <span class="pill" style="background:var(--cc-amber-50); color:var(--cc-amber-900)">
+          No location assigned
+        </span>
+      {% endif %}
+    {% endwith %}
     <span class="pill">Balance: <strong>MK {{ balance|floatformat:0|intcomma }}</strong></span>
     <span class="pill">Monthly earnings: <strong>MK {{ monthly_total|floatformat:0|intcomma }}</strong></span>
     <span class="pill">Monthly ADV: <strong>MK {{ monthly_adv|floatformat:0|intcomma }}</strong></span>
     <span class="pill">Lifetime earnings: <strong>MK {{ lifetime_total|floatformat:0|intcomma }}</strong></span>
   </div>
 
+  <!-- Assignment UI -->
+  <div class="card" style="margin:.75rem 0 1.25rem; padding:1rem;">
+    <form method="post" action="{% url 'inventory:agent_assign_location' target.id %}" style="display:flex; gap:.75rem; flex-wrap:wrap; align-items:end;">
+      {% csrf_token %}
+      <div style="min-width:260px;">
+        <label for="assign_location" class="label">Assign to location</label>
+        <select id="assign_location" name="location_id" class="input" required>
+          {% for loc in locations %}
+            <option value="{{ loc.id }}"
+              {% if target.agent_profile and target.agent_profile.location_id == loc.id %}selected{% endif %}>
+              {{ loc.name }}{% if loc.city %} — {{ loc.city }}{% endif %}
+            </option>
+          {% endfor %}
+        </select>
+        <div class="hint">Changing this will move the agent’s “home” store.</div>
+      </div>
+
+      <div>
+        <button type="submit" class="btn btn-primary">Save assignment</button>
+      </div>
+    </form>
+  </div>
+
+  <!-- Wallet section -->
   <h3 style="margin:.5rem 0">Wallet transactions (COM/ADV/ADJ)</h3>
   <table class="table">
     <thead>
@@ -51,5 +95,6 @@
       {% endif %}
     </nav>
   {% endif %}
+
 </section>
 {% endblock %}

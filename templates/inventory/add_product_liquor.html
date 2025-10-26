@@ -1,0 +1,280 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Add Products · Liquor{% endblock %}
+{% block header_title %}Add Products (Liquor){% endblock %}
+
+{% block content %}
+<div class="glass-card p-3 p-md-4">
+  <div class="d-flex align-items-center justify-content-between mb-2">
+    <div>
+      <div class="badge bg-primary-subtle text-primary fw-semibold">Liquor</div>
+      <h3 class="mt-2 mb-0">Add Product</h3>
+      <div class="text-muted small">
+        Create a liquor master item for Stock-IN and Sell (bottle & optional shots).
+      </div>
+    </div>
+    <a href="{% url 'inventory:dashboard' %}" class="btn btn-light d-none d-md-inline-flex">
+      <i class="ti ti-arrow-left me-1"></i> Back to Dashboard
+    </a>
+  </div>
+
+  <form method="post" novalidate id="liquor-add-form" class="mt-3">
+    {% csrf_token %}
+
+    <div class="row g-2 g-md-3">
+      <!-- TYPE / NAME -->
+      <div class="col-12 col-md-6">
+        <label class="form-label">Liquor type / name <span class="text-danger">*</span></label>
+        <input type="text" name="liquor_type" class="form-control" placeholder="e.g., Johnnie Walker Red Label 750ml" required>
+        <div class="form-text">Include brand + variant for quick search.</div>
+      </div>
+
+      <!-- CATEGORY -->
+      <div class="col-6 col-md-3">
+        <label class="form-label">Category</label>
+        <select name="category" class="form-select">
+          <option value="" selected>Choose…</option>
+          <option value="whisky">Whisky</option>
+          <option value="vodka">Vodka</option>
+          <option value="gin">Gin</option>
+          <option value="rum">Rum</option>
+          <option value="tequila">Tequila</option>
+          <option value="brandy">Brandy</option>
+          <option value="wine">Wine</option>
+          <option value="beer">Beer</option>
+          <option value="liqueur">Liqueur</option>
+          <option value="other">Other</option>
+        </select>
+      </div>
+
+      <!-- BOTTLE VOLUME & SHOT SIZE (optional but helpful for auto math) -->
+      <div class="col-6 col-md-3">
+        <label class="form-label">Bottle volume (ml)</label>
+        <div class="input-group">
+          <input type="number" min="0" step="1" name="bottle_ml" id="bottle_ml" class="form-control" placeholder="750">
+          <span class="input-group-text">ml</span>
+        </div>
+        <div class="form-text">If set + shot size → shots/bottle auto-computes.</div>
+      </div>
+
+      <div class="col-6 col-md-3">
+        <label class="form-label">Shot size (ml)</label>
+        <div class="input-group">
+          <input type="number" min="0" step="1" name="shot_ml" id="shot_ml" class="form-control" placeholder="25">
+          <span class="input-group-text">ml</span>
+        </div>
+        <div class="form-text">Typical shot: 25–30 ml.</div>
+      </div>
+
+      <!-- SHOTS TOGGLE & COUNT -->
+      <div class="col-6 col-md-3">
+        <label class="form-label">Serve shots?</label>
+        <select name="is_shot" id="is_shot" class="form-select">
+          <option value="false" selected>No</option>
+          <option value="true">Yes</option>
+        </select>
+        <div class="form-text">Enable per-shot pricing & tracking.</div>
+      </div>
+
+      <div class="col-6 col-md-3">
+        <label class="form-label">Shots per bottle</label>
+        <div class="input-group">
+          <input type="number" min="0" step="1" name="shots_per_bottle" id="shots_per_bottle" class="form-control" placeholder="0">
+          <span class="input-group-text">shots</span>
+        </div>
+        <div class="form-text">Auto-fills from volume ÷ shot size if provided.</div>
+      </div>
+
+      <!-- COST / PRICE (BOTTLE + SHOT) -->
+      <div class="col-6 col-md-3">
+        <label class="form-label">Order price (per bottle)</label>
+        <div class="input-group">
+          <span class="input-group-text">MWK</span>
+          <input type="number" min="0" step="0.01" name="order_price" id="order_price" class="form-control" placeholder="0.00">
+        </div>
+        <div class="form-text">Your landed cost per bottle.</div>
+      </div>
+
+      <div class="col-6 col-md-3">
+        <label class="form-label">Selling price (per bottle)</label>
+        <div class="input-group">
+          <span class="input-group-text">MWK</span>
+          <input type="number" min="0" step="0.01" name="price_bottle" id="price_bottle" class="form-control" placeholder="0.00">
+        </div>
+        <div class="form-text">Shelf price for a full bottle.</div>
+      </div>
+
+      <div class="col-6 col-md-3">
+        <label class="form-label">Selling price (per shot)</label>
+        <div class="input-group">
+          <span class="input-group-text">MWK</span>
+          <input type="number" min="0" step="0.01" name="price_shot" id="price_shot" class="form-control" placeholder="0.00">
+        </div>
+        <div class="form-text">If empty, we’ll suggest from bottle price ÷ shots.</div>
+      </div>
+
+      <!-- QUANTITY -->
+      <div class="col-6 col-md-3">
+        <label class="form-label">Initial stock (bottles) <span class="text-danger">*</span></label>
+        <div class="input-group">
+          <input type="number" min="0" step="1" name="quantity" id="quantity" class="form-control" value="0" required>
+          <span class="input-group-text">bottles</span>
+        </div>
+      </div>
+
+      <!-- READ-ONLY CALCS -->
+      <div class="col-12 col-md-3">
+        <label class="form-label">Computed shots / bottle</label>
+        <input type="text" id="computed_shots" class="form-control" value="0" readonly>
+        <div class="form-text">From bottle ml ÷ shot ml (or manual field).</div>
+      </div>
+
+      <div class="col-12 col-md-3">
+        <label class="form-label">Profit/bottle (est.)</label>
+        <div class="input-group">
+          <span class="input-group-text">MWK</span>
+          <input type="text" id="profit_bottle" class="form-control" value="0.00" readonly>
+        </div>
+        <div class="form-text">Bottle selling − cost.</div>
+      </div>
+
+      <div class="col-12 col-md-3">
+        <label class="form-label">Margin/bottle % (est.)</label>
+        <input type="text" id="margin_bottle" class="form-control" value="0%" readonly>
+      </div>
+
+      <div class="col-12 col-md-3">
+        <label class="form-label">Implied price/shot</label>
+        <div class="input-group">
+          <span class="input-group-text">MWK</span>
+          <input type="text" id="implied_shot_price" class="form-control" value="0.00" readonly>
+        </div>
+        <div class="form-text">Bottle price ÷ shots/bottle.</div>
+      </div>
+    </div>
+
+    <!-- ACTIONS -->
+    <div class="d-flex flex-column flex-md-row gap-2 mt-3">
+      <button type="submit" class="btn btn-primary">
+        <i class="ti ti-device-floppy me-1"></i> Save product
+      </button>
+      <button type="submit" name="add_another" value="1" class="btn btn-outline-primary">
+        <i class="ti ti-plus me-1"></i> Save & add another
+      </button>
+      <a href="{% url 'inventory:dashboard' %}" class="btn btn-light">Cancel</a>
+    </div>
+  </form>
+</div>
+
+<!-- Quick tips -->
+<div class="mt-3">
+  <div class="glass-card p-2 p-md-3">
+    <div class="d-flex align-items-center">
+      <i class="ti ti-bulb me-2"></i>
+      <div class="small">
+        <strong>Tips:</strong> If you sell shots, fill <em>shot size</em> and either
+        <em>shots per bottle</em> or <em>bottle volume</em>. The form will suggest a
+        fair <em>price per shot</em> and keep your math consistent.
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Helper: auto calculations (no external deps) -->
+<script>
+(function () {
+  const n = (v) => parseFloat(v || 0);
+  const money = (x) => (isNaN(x) || !isFinite(x)) ? "0.00" : (Math.round(x * 100) / 100).toFixed(2);
+  const pct = (x) => (isNaN(x) || !isFinite(x)) ? "0%" : (Math.round(x * 100) / 100).toFixed(2) + "%";
+
+  const el = (id) => document.getElementById(id);
+
+  const bottleMl = el('bottle_ml');
+  const shotMl   = el('shot_ml');
+  const shotsIn  = el('shots_per_bottle');
+  const isShot   = el('is_shot');
+
+  const cost     = el('order_price');
+  const priceB   = el('price_bottle');
+  const priceS   = el('price_shot');
+
+  const compShots  = el('computed_shots');
+  const profitB    = el('profit_bottle');
+  const marginB    = el('margin_bottle');
+  const impliedS   = el('implied_shot_price');
+
+  function recomputeShots() {
+    let computed = 0;
+
+    const mlB = n(bottleMl?.value);
+    const mlS = n(shotMl?.value);
+
+    if (mlB > 0 && mlS > 0) computed = Math.floor(mlB / mlS);
+
+    // If user already typed shots_per_bottle, prefer that (their intent)
+    const manual = n(shotsIn.value);
+    const finalShots = manual > 0 ? manual : computed;
+
+    compShots.value = finalShots;
+
+    // Suggest price per shot if missing
+    const pb = n(priceB.value);
+    if (finalShots > 0) {
+      impliedS.value = money(pb / finalShots);
+      if (!priceS.dataset.touched && n(priceS.value) === 0) {
+        priceS.value = money(pb / finalShots);
+      }
+    } else {
+      impliedS.value = "0.00";
+    }
+  }
+
+  function recomputeProfit() {
+    const pb = n(priceB.value);
+    const c  = n(cost.value);
+    const p  = pb - c;
+    profitB.value = money(p);
+    marginB.value = (pb > 0) ? pct((p / pb) * 100) : "0%";
+  }
+
+  // Listeners
+  ['input','change'].forEach(ev => {
+    [bottleMl, shotMl, shotsIn, priceB, cost].forEach(x => x && x.addEventListener(ev, () => {
+      recomputeShots();
+      recomputeProfit();
+    }));
+  });
+  if (priceS) priceS.addEventListener('input', () => priceS.dataset.touched = '1');
+
+  // Enable/disable shot-related fields
+  function toggleShotFields() {
+    const on = (isShot.value === 'true');
+    [shotMl, shotsIn, priceS].forEach(x => { if (x) x.disabled = !on; });
+  }
+  isShot.addEventListener('change', toggleShotFields);
+  toggleShotFields();
+
+  // Initial compute
+  recomputeShots();
+  recomputeProfit();
+
+  // Minimal guardrails
+  document.getElementById('liquor-add-form').addEventListener('submit', function(e){
+    const typeOk = (this.querySelector('input[name="liquor_type"]').value || '').trim().length > 1;
+    const qtyOk  = parseInt(this.querySelector('input[name="quantity"]').value || '0', 10) >= 0;
+    if (!typeOk || !qtyOk) {
+      e.preventDefault();
+      alert('Please provide a liquor type/name and a valid bottle quantity.');
+    }
+    if (isShot.value === 'true') {
+      const shots = n(shotsIn.value) || n(compShots.value);
+      if (shots <= 0) {
+        e.preventDefault();
+        alert('Shots are enabled but “shots per bottle” is missing. Provide bottle volume & shot size or fill the field directly.');
+      }
+    }
+  });
+})();
+</script>
+{% endblock %}

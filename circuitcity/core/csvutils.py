@@ -1,4 +1,4 @@
-# core/csvutils.py
+﻿# core/csvutils.py
 import csv
 from django.http import StreamingHttpResponse
 
@@ -12,3 +12,5 @@ def stream_csv(rows_iterable, filename):
                                  content_type="text/csv")
     resp["Content-Disposition"] = f'attachment; filename="{filename}"'
     return resp
+
+

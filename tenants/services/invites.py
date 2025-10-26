@@ -1,4 +1,4 @@
-# tenants/services/invites.py
+﻿# tenants/services/invites.py
 from __future__ import annotations
 
 from typing import Iterable, List, Optional, Tuple, Dict
@@ -35,7 +35,7 @@ def create_agent_invite(
 
     - No schema assumptions beyond AgentInvite fields.
     - Returns the saved invite instance.
-    - If mark_sent=True, status → SENT (kept “pending” by our UI rule).
+    - If mark_sent=True, status â†’ SENT (kept â€œpendingâ€ by our UI rule).
     """
     invited_name = (invited_name or "").strip()
     email = (email or "").strip().lower()
@@ -113,7 +113,7 @@ def resend_invite(
     """
     Resend an invite (no duplication). Optionally extends the expiry window.
     - Keeps the same token so previously shared links still work.
-    - Status → SENT.
+    - Status â†’ SENT.
     """
     if extend_days and extend_days > 0:
         invite.expires_at = timezone.now() + timedelta(days=extend_days)
@@ -212,3 +212,5 @@ def share_bundle(invite: AgentInvite, request) -> Dict[str, str]:
     Delegates to the model to avoid duplication.
     """
     return invite.share_payload(request)
+
+

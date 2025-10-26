@@ -1,4 +1,4 @@
-# wallet/services.py
+﻿# wallet/services.py
 from __future__ import annotations
 
 from calendar import monthrange
@@ -23,7 +23,7 @@ from .models import (
     AttendanceLog,
 )
 
-# Optional models (guarded so the app still loads if they’re not migrated yet)
+# Optional models (guarded so the app still loads if theyâ€™re not migrated yet)
 try:
     from .models import Payslip, PayoutSchedule  # type: ignore
 except Exception:  # pragma: no cover
@@ -94,7 +94,7 @@ def add_txn(
     )
 
 
-# --- Sales → Commission (call from a post_save of Sale or wherever you finalize a sale)
+# --- Sales â†’ Commission (call from a post_save of Sale or wherever you finalize a sale)
 def record_sale_commission(sale: Sale, *, created: bool, created_by=None):
     # example: 3% commission of sale.amount  (adjust to your real rule)
     if not created:
@@ -130,7 +130,7 @@ def apply_attendance_dispositions(for_date: date | None = None, *, created_by=No
                     agent=log.agent,
                     amount=-fine,
                     type=TxnType.PENALTY,
-                    note=f"Late arrival ({late_minutes} min → {blocks}×{LATE_BLOCK_FINE:,})",
+                    note=f"Late arrival ({late_minutes} min â†’ {blocks}Ã—{LATE_BLOCK_FINE:,})",
                     reference=f"ATT-{d.isoformat()}",
                     effective_date=d,
                     created_by=created_by,
@@ -218,7 +218,7 @@ def ranking(period: str = "month"):
 
 
 # ---------------------------------------------------------------------
-# Payslip helpers (compute → post → create record → email)
+# Payslip helpers (compute â†’ post â†’ create record â†’ email)
 # ---------------------------------------------------------------------
 @dataclass
 class PayslipBreakdown:
@@ -276,8 +276,8 @@ def render_payslip_html(agent, year: int, month: int, b: PayslipBreakdown, compa
         )
         return f"""
         <div>
-          <h3>Payslip — {ctx['company_name']}</h3>
-          <p><b>{getattr(agent, "get_full_name", lambda: agent.username)()}</b> — {year}-{month:02d}</p>
+          <h3>Payslip â€” {ctx['company_name']}</h3>
+          <p><b>{getattr(agent, "get_full_name", lambda: agent.username)()}</b> â€” {year}-{month:02d}</p>
           <ul>{items}</ul>
           <p><b>Gross:</b> {fmt_mk(b.gross)}<br/>
              <b>Deductions:</b> {fmt_mk(b.deductions)}<br/>
@@ -297,7 +297,7 @@ def send_payslip_email(agent, year: int, month: int, b: PayslipBreakdown, *, sub
     company = getattr(settings, "APP_NAME", "Circuit City")
     html = render_payslip_html(agent, year, month, b, company_name=company)
 
-    subject = subject or f"{company} • Payslip for {year}-{month:02d}"
+    subject = subject or f"{company} â€¢ Payslip for {year}-{month:02d}"
     msg = EmailMultiAlternatives(subject=subject, body=" ", to=[to])
     msg.attach_alternative(html, "text/html")
     msg.send(fail_silently=True)
@@ -414,3 +414,5 @@ def run_monthly_schedule(schedule, *, when: date | None = None, created_by=None)
     schedule.last_run_at = timezone.now()
     schedule.save(update_fields=["last_run_at"])
     return {"schedule_id": schedule.id, "year": year, "month": month, **res}
+
+

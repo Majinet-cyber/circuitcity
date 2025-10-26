@@ -1,4 +1,4 @@
-# circuitcity/core/templatetags/roles.py
+﻿# circuitcity/core/templatetags/roles.py
 """
 Role helpers for templates.
 
@@ -88,3 +88,5 @@ def role_is_manager(context) -> bool:
 @register.simple_tag(takes_context=True)
 def role_is_agent(context) -> bool:
     return is_agent_(context)
+
+

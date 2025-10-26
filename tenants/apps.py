@@ -1,4 +1,4 @@
-# tenants/apps.py
+﻿# tenants/apps.py
 from __future__ import annotations
 from django.apps import AppConfig
 
@@ -19,8 +19,10 @@ class TenantsConfig(AppConfig):
     verbose_name = "Tenants"
 
     def ready(self) -> None:  # type: ignore[override]
-        # Import signals if present, but don’t crash if missing.
+        # Import signals if present, but donâ€™t crash if missing.
         try:
             from . import signals  # noqa: F401
         except Exception:
             pass
+
+

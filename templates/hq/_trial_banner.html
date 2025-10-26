@@ -1,0 +1,27 @@
+{% load static %}
+{% if request.user.is_authenticated and subscription %}
+  {% if subscription.status == "trial" %}
+    <div class="card" style="margin:10px 0;display:flex;align-items:center;gap:12px;justify-content:space-between">
+      <div>
+        <span class="badge-chip">Trial</span>
+        <strong>{{ subscription.business.name }}</strong> is on trial until
+        <strong>{{ subscription.trial_ends_on|date:"M j, Y" }}</strong>.
+        Choose a plan to keep working without limits.
+      </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <form class="inline-form" method="post" action="{% url 'hq:sub_set_plan' subscription.id %}">{% csrf_token %}
+          <input type="hidden" name="plan_code" value="starter">
+          <button class="glass-btn glass-primary" type="submit">Starter · MWK 20,000/mo</button>
+        </form>
+        <form class="inline-form" method="post" action="{% url 'hq:sub_set_plan' subscription.id %}">{% csrf_token %}
+          <input type="hidden" name="plan_code" value="pro">
+          <button class="glass-btn glass-primary" type="submit">Pro · MWK 35,000/mo</button>
+        </form>
+        <form class="inline-form" method="post" action="{% url 'hq:sub_set_plan' subscription.id %}">{% csrf_token %}
+          <input type="hidden" name="plan_code" value="promax">
+          <button class="glass-btn glass-primary" type="submit">Pro Max · MWK 50,000/mo</button>
+        </form>
+      </div>
+    </div>
+  {% endif %}
+{% endif %}

@@ -1,4 +1,4 @@
-import pandas as pd
+﻿import pandas as pd
 import numpy as np
 from sklearn.linear_model import LinearRegression
 from django.utils import timezone
@@ -41,3 +41,5 @@ def ai_forecast(days=90):
         {"day": int(i + 1), "predicted_sales": max(round(val, 2), 0)}
         for i, val in enumerate(predictions)
     ]
+
+

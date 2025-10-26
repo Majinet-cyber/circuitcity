@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 from typing import Iterable
 from django.conf import settings
 from django.contrib.auth.models import Group
@@ -25,7 +25,7 @@ setattr(user, "business", business)
 user.save(update_fields=["business"]) # noqa
 
 
-# Roles via Django groups (tenant‑scoped group name)
+# Roles via Django groups (tenantâ€‘scoped group name)
 group_name = f"biz:{business.pk}:{role}"
 group, _ = Group.objects.get_or_create(name=group_name)
 user.groups.add(group)
@@ -68,3 +68,4 @@ send_mail(subject, body, getattr(settings, "DEFAULT_FROM_EMAIL", "no-reply@examp
 backend = getattr(settings, "WHATSAPP_BACKEND", "console")
 if invite.phone and backend == "console":
 print(f"[WHATSAPP:console] -> {invite.phone}\n{body}")
+

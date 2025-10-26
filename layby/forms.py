@@ -1,4 +1,4 @@
-# layby/forms.py
+﻿# layby/forms.py
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -117,7 +117,7 @@ class LaybyOrderForm(forms.ModelForm):
         fields = [
             "customer_name",
             "customer_phone",
-            "product",        # virtual field (ChoiceField) – not on model
+            "product",        # virtual field (ChoiceField) â€“ not on model
             "item_name",      # hidden; set from product
             "sku",            # hidden; set from product
             "term_months",
@@ -149,11 +149,11 @@ class LaybyOrderForm(forms.ModelForm):
 
         # Populate product choices from inventory
         qs, _model = _discover_inventory_queryset()
-        choices: List[Tuple[str, str]] = [("", "— Select a product —")]
+        choices: List[Tuple[str, str]] = [("", "â€” Select a product â€”")]
         if qs is not None:
             rows = _rows_from_qs(qs)
             for r in rows:
-                label = f"{r.name} ({r.sku}) – {r.price}"
+                label = f"{r.name} ({r.sku}) â€“ {r.price}"
                 choices.append((_pack_value(r), label))
         else:
             self.fields["product"].disabled = True
@@ -244,3 +244,5 @@ class LaybyOrderForm(forms.ModelForm):
             # No extra work needed here because ModelForm took care of model-bound fields.
 
         return inst
+
+

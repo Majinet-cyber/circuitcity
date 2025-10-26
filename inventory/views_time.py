@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 from django.contrib.auth.decorators import login_required
 from django.views.decorators.http import require_http_methods
 from django.shortcuts import render, redirect, get_object_or_404
@@ -57,7 +57,7 @@ def time_checkin(request):
             if outcome.net_adjustment > 0:
                 messages.success(request, f"+MWK {outcome.net_adjustment:,} attendance bonus applied.")
             else:
-                messages.warning(request, f"−MWK {abs(outcome.net_adjustment):,} late deduction applied.")
+                messages.warning(request, f"âˆ’MWK {abs(outcome.net_adjustment):,} late deduction applied.")
 
         messages.info(request, f"{kind.title()} recorded.")
         return redirect("inventory:my_time_logs")
@@ -75,3 +75,5 @@ def my_time_logs(request):
 
     logs = TimeLog.objects.filter(business_id=biz_id, user=request.user).select_related("location")[:200]
     return render(request, "inventory/time_logs.html", {"logs": logs})
+
+

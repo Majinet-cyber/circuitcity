@@ -1,11 +1,11 @@
-# inventory/views.py
+﻿# inventory/views.py
 from django.contrib.auth.decorators import user_passes_test
 from django.db.models import Sum, Count, Avg, F, Q
 from django.shortcuts import render
 
 @user_passes_test(lambda u: u.is_superuser)
 def super_inventory_dashboard(request):
-    # Example aggregations – adapt to your actual models/fields
+    # Example aggregations â€“ adapt to your actual models/fields
     from .models import InventoryItem, Product, Business, Tenant
 
     by_tenant = (
@@ -38,3 +38,5 @@ def super_inventory_dashboard(request):
         "by_sku": by_sku,
     }
     return render(request, "inventory/super_dashboard.html", ctx)
+
+

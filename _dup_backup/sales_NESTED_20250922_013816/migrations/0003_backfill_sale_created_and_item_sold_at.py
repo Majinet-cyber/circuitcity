@@ -1,4 +1,4 @@
-from django.db import migrations
+﻿from django.db import migrations
 from django.utils import timezone
 
 def forwards(apps, schema_editor):
@@ -32,3 +32,7 @@ class Migration(migrations.Migration):
         ("inventory", "0011_remove_inventoryitem_inventory_i_status_214241_idx_and_more"),
     ]
     operations = [migrations.RunPython(forwards, backwards)]
+
+
+
+

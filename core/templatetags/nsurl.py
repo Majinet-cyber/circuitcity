@@ -1,4 +1,4 @@
-# core/templatetags/nsurl.py
+﻿# core/templatetags/nsurl.py
 from django import template
 from django.urls import reverse, NoReverseMatch
 
@@ -20,3 +20,5 @@ def ns_url(context, viewname, *args, **kwargs):
             except NoReverseMatch:
                 pass
         raise
+
+

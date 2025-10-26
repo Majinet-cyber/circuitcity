@@ -1,4 +1,4 @@
-# accounts/utils/reset.py
+﻿# accounts/utils/reset.py
 from __future__ import annotations
 
 import secrets
@@ -44,7 +44,7 @@ def create_or_reuse_code(user, requester_ip: str | None = None) -> str:
         created_at__gte=window_start,
     ).count()
     if sends_in_window >= max_sends:
-        # Raise a typed exception — your view swallows exceptions and still shows a neutral message
+        # Raise a typed exception â€” your view swallows exceptions and still shows a neutral message
         raise ResetThrottle()
 
     # Create a brand-new code
@@ -104,7 +104,7 @@ def send_reset_code_email(user, code: str) -> None:
     from_email = getattr(settings, "DEFAULT_FROM_EMAIL", "noreply@example.com")
     email = EmailMultiAlternatives(subject, txt_body, from_email, [user.email])
     email.attach_alternative(html_body, "text/html")
-    # Let errors bubble up — your view already catches all exceptions and responds neutrally
+    # Let errors bubble up â€” your view already catches all exceptions and responds neutrally
     email.send(fail_silently=False)
 
 
@@ -136,8 +136,10 @@ def verify_code_and_consume(user, raw_code: str) -> bool:
             rec.save(update_fields=["used", "attempts"])
             return True
 
-        # Wrong code — bump attempts
+        # Wrong code â€” bump attempts
         rec.attempts = rec.attempts + 1
         rec.save(update_fields=["attempts"])
 
     return False
+
+

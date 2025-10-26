@@ -1,4 +1,4 @@
-# circuitcity/accounts/views.py
+﻿# circuitcity/accounts/views.py
 from __future__ import annotations
 
 import hashlib
@@ -79,6 +79,65 @@ LOGIN_IDENTIFIER_SESSION_KEY = "login_identifier"
 # ----------------------------
 # Helpers
 # ----------------------------
+# --- Product Create (business-aware page) ------------------------------------
+from django.shortcuts import render
+
+def _infer_product_mode(business) -> str:
+    """
+    Decide which product vertical the tenant is using.
+    We check several common attributes defensively.
+    Returns one of: "phones", "liquor", "pharmacy", "grocery", "generic".
+    """
+    val = None
+    for attr in ("vertical", "category", "industry", "type", "kind", "sector"):
+        v = getattr(business, attr, None)
+        if isinstance(v, str) and v.strip():
+            val = v.strip().lower()
+            break
+
+    if not val:
+        return "generic"
+
+    if val in {"phone", "phones", "mobile", "mobiles", "electronics"}:
+        return "phones"
+    if val in {"liquor", "bar", "alcohol", "pub", "bottle-store", "bottle store"}:
+        return "liquor"
+    if val in {"pharmacy", "medicine", "chemist", "drugstore"}:
+        return "pharmacy"
+    if val in {"grocery", "groceries", "supermarket", "retail"}:
+        return "grocery"
+    return "generic"
+
+
+def _current_business_from_request(request):
+    """
+    Try common places the active business is stored by middleware.
+    Adjust if your project uses a different attribute.
+    """
+    return (
+        getattr(request, "business", None)
+        or getattr(request, "active_business", None)
+        or getattr(getattr(request, "user", None), "business", None)
+        or getattr(getattr(request, "tenant", None), "business", None)
+    )
+
+
+def merch_product_create(request):
+    """
+    Plain page view that renders templates/inventory/product_create.html
+    with PRODUCT_MODE in the context so the template can show the right form
+    (phones vs liquor vs pharmacy vs generic).
+    """
+    business = _current_business_from_request(request)
+    product_mode = _infer_product_mode(business)
+
+    context = {
+        "PRODUCT_MODE": product_mode,   # use this in the template: {% if PRODUCT_MODE == "phones" %}...
+        "business": business,
+        # put any other context (forms, etc.) here if/when needed
+    }
+    return render(request, "inventory/product_create.html", context)
+
 def _client_ip(request) -> str | None:
     xfwd = request.META.get("HTTP_X_FORWARDED_FOR")
     if xfwd:
@@ -155,7 +214,7 @@ def _send_email_otp(email: str, code: str, *, purpose: str) -> None:
         f"    {code}",
         "",
         "This code will expire in 5 minutes.",
-        "If you didn’t request this, you can ignore this email.",
+        "If you didnâ€™t request this, you can ignore this email.",
     ]
     from_email = getattr(settings, "DEFAULT_FROM_EMAIL", "no-reply@localhost")
     send_mail(subject, "\n".join(msg_lines), from_email, [email], fail_silently=True)
@@ -338,12 +397,12 @@ def login_view(request):
             request.session[LOGIN_IDENTIFIER_SESSION_KEY] = identifier
             return _redirect_back_to_login(next_url)
 
-        # Form invalid (rare) — still PRG for clean refresh
+        # Form invalid (rare) â€” still PRG for clean refresh
         messages.error(request, "Please correct the errors and try again.")
         request.session[LOGIN_IDENTIFIER_SESSION_KEY] = request.POST.get("identifier", "")
         return _redirect_back_to_login(next_url)
 
-    # GET — build unbound form and prefill identifier from session after PRG
+    # GET â€” build unbound form and prefill identifier from session after PRG
     form = IdentifierLoginForm()
     remembered = request.session.pop(LOGIN_IDENTIFIER_SESSION_KEY, "")
     if remembered:
@@ -386,7 +445,7 @@ def _login_inline_fallback(request, form, next_url, origin_path):
   .note{{margin-top:10px;color:#0c4a6e;background:#ecfeff;border:1px solid #bae6fd;border-radius:10px;padding:10px}}
 </style>
 <div class="card">
-  <h2>Circuit City — Inline Login</h2>
+  <h2>Circuit City â€” Inline Login</h2>
   <div class="note"><strong>Template used:</strong> {origin_path or "(missing)"}<br/>This is the emergency inline form.</div>
   <form method="post" action="{reverse('accounts:login')}">
     <input type="hidden" name="csrfmiddlewaretoken" value="{csrf_val}">
@@ -624,7 +683,7 @@ def forgot_password_request_view(request):
                 _send_email_otp(user.email, code, purpose="reset")
 
         # Do not leak whether the account exists
-        messages.success(request, "If an account exists, we’ve emailed a reset code.")
+        messages.success(request, "If an account exists, weâ€™ve emailed a reset code.")
         try:
             return redirect("accounts:forgot_password_reset")
         except NoReverseMatch:
@@ -939,138 +998,163 @@ def _seed_defaults_for_business(biz) -> None:
 # =========================================
 # Manager sign-up (auto-tenant + auto-select, ACTIVE immediately)
 # =========================================
+# =========================================
+# Manager sign-up (auto-tenant + auto-select, ACTIVE immediately)
+# =========================================
+# =========================================
+# Manager sign-up (auto-tenant + auto-select, ACTIVE immediately)
+# =========================================
 @ensure_csrf_cookie
 @never_cache
 @require_http_methods(["GET", "POST"])
 def signup_manager(request):
     # If already signed in, just go to app
     if request.user.is_authenticated:
-        return redirect(_safe_redirect("inventory:inventory_dashboard", "dashboard:home", default="/inventory/dashboard/"))
+        return redirect(_safe_redirect("inventory:inventory_dashboard",
+                                       "dashboard:home",
+                                       default="/inventory/dashboard/"))
 
     form = ManagerSignUpForm(request.POST or None)
-    if request.method == "POST" and form.is_valid():
-        email = form.cleaned_data["email"].strip().lower()
-        full_name = form.cleaned_data["full_name"].strip()
-        biz_name = form.cleaned_data["business_name"].strip()
-        subdomain = (form.cleaned_data.get("subdomain") or "").strip().lower()
-        password = form.cleaned_data["password1"]
 
-        # Create user (username = email)
-        user = User.objects.create_user(username=email, email=email, password=password)
-
-        # Optional name split
+    # Helper to show + log form errors
+    def _render_with_form_errors(msg_prefix: str = "Please fix the errors below."):
+        # Flatten errors
+        parts = []
         try:
-            parts = full_name.split()
-            user.first_name = parts[0]
-            user.last_name = " ".join(parts[1:]) if len(parts) > 1 else ""
-            user.save(update_fields=["first_name", "last_name"])
+            for field, errs in form.errors.items():
+                joined = "; ".join(e for e in errs)
+                parts.append(f"{field}: {joined}")
         except Exception:
             pass
+        err_text = " | ".join(parts) or "(no details)"
+        log.warning("Manager signup form invalid: %s", err_text)
+        messages.error(request, f"{msg_prefix} {err_text}")
+        resp = render(request, SIGNUP_MANAGER_TEMPLATE, {"form": form})
+        # Helpful while debugging in DevTools â†’ Network
+        resp["X-Form-Errors"] = err_text[:512]
+        return resp
 
-        # Add to Manager group
-        try:
-            mgr_group = _get_or_create_manager_group()
-            user.groups.add(mgr_group)
-        except Exception:
-            pass
-
-        # Create ACTIVE business immediately
-        biz = None
-        if Business is not None:
-            base = slugify(biz_name)[:40] or "store"
-            unique = base
-            i = 1
-            while Business.objects.filter(slug=unique).exists():
-                i += 1
-                unique = f"{base}-{i}"
-
-            bkwargs = {"name": biz_name, "slug": unique}
-            if hasattr(Business, "created_by"):
-                bkwargs["created_by"] = user
-            if hasattr(Business, "subdomain") and subdomain:
-                bkwargs["subdomain"] = subdomain
-            if hasattr(Business, "status"):
-                bkwargs["status"] = "ACTIVE"
-
-            biz = Business.objects.create(**bkwargs)
-
-            # Ensure membership MANAGER → ACTIVE
-            try:
-                if Membership is not None:
-                    Membership.objects.update_or_create(
-                        user=user,
-                        business=biz,
-                        defaults={"role": "MANAGER", "status": "ACTIVE"},
-                    )
-            except Exception:
-                pass
-
-            # Seed default Store/Warehouse
-            _seed_defaults_for_business(biz)
-
-        # Ensure Profile exists and flag as manager if field exists
-        try:
-            profile = getattr(user, "profile", None)
-            if profile is None:
-                profile, _ = Profile.objects.get_or_create(user=user)
-            if hasattr(profile, "is_manager"):
-                profile.is_manager = True
-                profile.save(update_fields=["is_manager"])
-        except Exception:
-            pass
-
-        # Auto-login and auto-select their biz in session
-        login(request, user)
-        if biz is not None:
-            try:
-                request.session[getattr(settings, "TENANT_SESSION_KEY", "active_business_id")] = biz.pk
-            except Exception:
-                pass
-            messages.success(request, f"Welcome to {biz.name}! Your store is ready.")
-        else:
-            messages.success(request, "Your manager account is ready.")
-
-        # Straight to the dashboard
-        return redirect(_safe_redirect("inventory:inventory_dashboard", default="/inventory/dashboard/"))
-
-    # Render with fallback so this page never 500s
-    try:
+    # GET
+    if request.method != "POST":
         return render(request, SIGNUP_MANAGER_TEMPLATE, {"form": form})
-    except TemplateDoesNotExist:
-        csrf_val = get_token(request)
-        html = f"""<!doctype html>
-<meta charset="utf-8"><title>Create manager account</title>
-<style>
-  body{{font-family:system-ui,Segoe UI,Inter,Roboto,Arial,sans-serif;background:#f7fafc;margin:0;padding:24px}}
-  .card{{max-width:560px;margin:24px auto;background:#fff;border:1px solid #e2e8f0;border-radius:12px;padding:16px}}
-  label{{display:block;margin:.75rem 0 .35rem}}
-  input{{width:100%;padding:10px;border:1px solid #cbd5e1;border-radius:10px}}
-  button{{margin-top:12px;padding:10px 14px;border-radius:10px;border:1px solid #cbd5e1;background:#2563eb;color:#fff;cursor:pointer}}
-  a{{color:#2563eb;text-decoration:none}}
-</style>
-<div class="card">
-  <h2>Create manager account</h2>
-  <form method="post">
-    <input type="hidden" name="csrfmiddlewaretoken" value="{csrf_val}">
-    <label for="id_full_name">Full name</label>
-    <input id="id_full_name" name="full_name" required>
-    <label for="id_email">Email</label>
-    <input id="id_email" name="email" type="email" required>
-    <label for="id_business_name">Business name</label>
-    <input id="id_business_name" name="business_name" required>
-    <label for="id_subdomain">Subdomain (optional)</label>
-    <input id="id_subdomain" name="subdomain" placeholder="e.g. imajinet">
-    <label for="id_pw1">Password</label>
-    <input id="id_pw1" name="password1" type="password" required>
-    <label for="id_pw2">Confirm password</label>
-    <input id="id_pw2" name="password2" type="password" required>
-    <button type="submit">Create account</button>
-  </form>
-  <p style="margin-top:10px"><a href="{reverse('accounts:login')}">Back to sign in</a></p>
-</div>"""
-        return HttpResponse(html, content_type="text/html; charset=utf-8")
 
+    # POST â€“ first pass validation
+    if not form.is_valid():
+        return _render_with_form_errors()
 
+    # Pull cleaned values
+    email = form.cleaned_data["email"].strip().lower()
+    full_name = form.cleaned_data["full_name"].strip()
+    biz_name = form.cleaned_data["business_name"].strip()
+    subdomain = (form.cleaned_data.get("subdomain") or "").strip().lower()
+    password = form.cleaned_data["password1"]
+
+    # Guard: unique user/email
+    if User.objects.filter(username__iexact=email).exists() or User.objects.filter(email__iexact=email).exists():
+        messages.error(request, "An account with that email already exists. Please sign in instead.")
+        return render(request, SIGNUP_MANAGER_TEMPLATE, {"form": form})
+
+    # Create user
+    try:
+        user = User.objects.create_user(username=email, email=email, password=password)
+    except Exception as e:
+        log.error("Create user failed: %s", e)
+        messages.error(request, "We couldnâ€™t create your account because this email is already in use.")
+        return render(request, SIGNUP_MANAGER_TEMPLATE, {"form": form})
+
+    # Optional name split
+    try:
+        parts = full_name.split()
+        user.first_name = parts[0]
+        user.last_name = " ".join(parts[1:]) if len(parts) > 1 else ""
+        user.save(update_fields=["first_name", "last_name"])
+    except Exception:
+        pass
+
+    # Add to Manager group (best effort)
+    try:
+        mgr_group = _get_or_create_manager_group()
+        user.groups.add(mgr_group)
+    except Exception:
+        pass
+
+    # Create business + membership if tenants app available
+    biz = None
+    if Business is not None:
+        # Validate subdomain early
+        if subdomain:
+            import re
+            if not re.fullmatch(r"[a-z0-9-]+", subdomain):
+                form.add_error("subdomain", "Use lowercase letters, numbers, and hyphens only.")
+                return _render_with_form_errors("Subdomain is invalid.")
+            if Business.objects.filter(subdomain__iexact=subdomain).exists():
+                form.add_error("subdomain", "That subdomain is already taken. Please choose another.")
+                return _render_with_form_errors("Subdomain taken.")
+
+        # Unique slug
+        base = slugify(biz_name)[:40] or "store"
+        unique = base
+        i = 1
+        while Business.objects.filter(slug=unique).exists():
+            i += 1
+            unique = f"{base}-{i}"
+
+        bkwargs = {"name": biz_name, "slug": unique}
+        if hasattr(Business, "created_by"):
+            bkwargs["created_by"] = user
+        if hasattr(Business, "subdomain") and subdomain:
+            bkwargs["subdomain"] = subdomain
+        if hasattr(Business, "status"):
+            bkwargs["status"] = "ACTIVE"
+
+        try:
+            biz = Business.objects.create(**bkwargs)
+        except Exception as e:
+            log.error("Create business failed: %s", e)
+            form.add_error("subdomain", "Could not create business. This subdomain or name may already exist.")
+            # Roll back user to avoid orphaned accounts
+            try:
+                user.delete()
+            except Exception:
+                pass
+            return _render_with_form_errors("Business creation failed.")
+
+        # Membership (best effort)
+        try:
+            if Membership is not None:
+                Membership.objects.update_or_create(
+                    user=user, business=biz,
+                    defaults={"role": "MANAGER", "status": "ACTIVE"},
+                )
+        except Exception:
+            pass
+
+        # Seed defaults
+        _seed_defaults_for_business(biz)
+
+    # Ensure Profile exists and mark as manager if model has that field
+    try:
+        profile = getattr(user, "profile", None)
+        if profile is None:
+            profile, _ = Profile.objects.get_or_create(user=user)
+        if hasattr(profile, "is_manager"):
+            profile.is_manager = True
+            profile.save(update_fields=["is_manager"])
+    except Exception:
+        pass
+
+    # Auto-login + select business
+    login(request, user)
+    if biz is not None:
+        try:
+            request.session[getattr(settings, "TENANT_SESSION_KEY", "active_business_id")] = biz.pk
+        except Exception:
+            pass
+        messages.success(request, f"Welcome to {biz.name}! Your store is ready.")
+    else:
+        messages.success(request, "Your manager account is ready.")
+
+    return redirect(_safe_redirect("inventory:inventory_dashboard", default="/inventory/dashboard/"))
 # ----------------------------
 # Template debugging utilities
 # ----------------------------
@@ -1088,3 +1172,5 @@ def _debug_template_origin(tpl_name: str) -> str | None:
         print(msg)
         log.error(msg)
         return None
+
+

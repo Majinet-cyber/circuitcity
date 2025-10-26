@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 from decimal import Decimal
 from typing import Dict
 from django.db.models import Q, Sum
@@ -100,3 +100,5 @@ def compute_stock_header(request, Model) -> Dict[str, Decimal | int]:
         "sum_order": sum_any(instock_qs, ("order_price", "order_cost", "cost_price", "purchase_price", "buy_price")),
         "sum_selling": sum_any(sold_qs, price_fields),
     }
+
+

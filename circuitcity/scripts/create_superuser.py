@@ -1,4 +1,4 @@
-# scripts/create_superuser.py
+﻿# scripts/create_superuser.py
 import os, django
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "cc.settings")  # change if your settings module is not cc.settings
 django.setup()
@@ -18,3 +18,5 @@ if u and p:
         print(f"Superuser {u} already exists; skipping")
 else:
     print("DJANGO_SUPERUSER_USERNAME/PASSWORD not set; skipping")
+
+

@@ -1,4 +1,4 @@
-# inventory/management/commands/send_low_stock_digest.py
+﻿# inventory/management/commands/send_low_stock_digest.py
 from collections import defaultdict
 from django.conf import settings
 from django.core.mail import send_mail
@@ -64,3 +64,5 @@ class Command(BaseCommand):
 
         send_mail(subject, body, from_email, recips, fail_silently=False)
         self.stdout.write(self.style.SUCCESS(f"Sent low-stock digest to {', '.join(recips)}"))
+
+

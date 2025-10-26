@@ -41,9 +41,35 @@
   <div id="runsBox" class="small text-muted">Loading…</div>
 </div>
 
+<div class="panel p-3 mt-3">
+  <h6 class="fw-bold">Result</h6>
+  <div class="sim-chart-wrap">
+    <canvas id="simChart"></canvas>
+  </div>
+  <div id="kpiBox" class="small text-muted mt-2" style="min-height:1.25rem;"></div>
+</div>
 {% endblock %}
 
 {% block extra_js %}
+<style>
+  .sim-chart-wrap { height: 280px; max-height: 320px; }
+  .sim-chart-wrap canvas { width:100% !important; height:100% !important; }
+</style>
+
+<!-- CSRF shim (safe if also present in base.html) -->
+<script>
+(function () {
+  if (window.CC) return;
+  function getCsrfToken() {
+    const m = document.cookie.match(/(?:^|;\s*)csrftoken=([^;]+)/);
+    if (m) return decodeURIComponent(m[1]);
+    const el = document.querySelector('input[name="csrfmiddlewaretoken"]');
+    return el ? el.value : '';
+  }
+  window.CC = { getCsrfToken };
+})();
+</script>
+
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
 <script>
 async function postJSON(url, payload){
@@ -53,7 +79,7 @@ async function postJSON(url, payload){
     credentials:'same-origin',
     body: JSON.stringify(payload||{})
   });
-  const d = await r.json();
+  const d = await r.json().catch(()=>({}));
   if(!r.ok) throw new Error(d.error||('HTTP '+r.status));
   return d;
 }
@@ -66,10 +92,7 @@ document.querySelectorAll('.run-btn').forEach(btn=>{
   btn.addEventListener('click', async ()=>{
     btn.disabled = true;
     try{
-      const payload = { scenario_id: btn.dataset.id }; // server will load params from DB
-      // Quick fetch of scenario to get the fields (optional; or extend API to accept id only)
-      // Here we’ll do a simple run with only id (views_api handles it by not reading scenario fields).
-      const res = await postJSON("{% url 'simulator:api_run' %}", payload);
+      const res = await postJSON("{% url 'simulator:api_run' %}", { scenario_id: btn.dataset.id });
       renderResult(res);
     }catch(e){ alert("Run failed: "+e.message); }
     finally{ btn.disabled=false; }
@@ -93,28 +116,22 @@ loadRuns();
 let chart=null;
 function renderResult(data){
   const series = data.series||[];
-  if(!series.length){ alert('No series returned'); return; }
+  const canvas = document.getElementById('simChart');
+  const kpis = data.kpis||{};
+  document.getElementById('kpiBox').innerHTML =
+    `Revenue total: <b>${(kpis.revenue_total??0).toLocaleString()}</b> • Stockout days: <b>${kpis.stockouts_days??0}</b>`;
+  if(!series.length){ return; }
+
   const labels = series.map(p=> 'D'+p.day);
   const sold = series.map(p=> p.sold);
   const stock = series.map(p=> p.stock);
 
-  let canvas = document.getElementById('simChart');
-  if(!canvas){
-    const panel = document.createElement('div');
-    panel.className = 'panel p-3 mt-3';
-    panel.innerHTML = `
-      <h6 class="fw-bold">Result</h6>
-      <canvas id="simChart" style="height:260px"></canvas>
-      <div class="small text-muted mt-2">Revenue total: <b>${data.kpis?.revenue_total?.toLocaleString?.()||data.kpis?.revenue_total||0}</b> • Stockout days: <b>${data.kpis?.stockouts_days||0}</b></div>`;
-    document.querySelector('main .cc-page, .cc-page').appendChild(panel);
-    canvas = document.getElementById('simChart');
-  }
   chart?.destroy();
   chart = new Chart(canvas.getContext('2d'), {
     type:'line',
     data:{ labels, datasets:[
-      {label:'Sold (units)', data:sold},
-      {label:'Stock (units)', data:stock}
+      {label:'Sold (units)', data:sold, tension:.25},
+      {label:'Stock (units)', data:stock, tension:.25}
     ]},
     options:{ responsive:true, maintainAspectRatio:false, plugins:{legend:{position:'bottom'}} }
   });

@@ -1,4 +1,4 @@
-from django.core.management.base import BaseCommand
+﻿from django.core.management.base import BaseCommand
 from django.contrib.auth import get_user_model
 import os
 
@@ -21,3 +21,5 @@ class Command(BaseCommand):
         u.set_password(pw)
         u.save()
         self.stdout.write("ensure_superuser: OK")
+
+

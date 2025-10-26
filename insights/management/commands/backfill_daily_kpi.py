@@ -1,4 +1,4 @@
-from django.core.management.base import BaseCommand
+﻿from django.core.management.base import BaseCommand
 from django.db.models import Count, Sum, F
 from django.utils import timezone
 from datetime import timedelta
@@ -27,3 +27,5 @@ class Command(BaseCommand):
             )
             count += 1
         self.stdout.write(self.style.SUCCESS(f"Upserted {count} DailyKPI rows"))
+
+

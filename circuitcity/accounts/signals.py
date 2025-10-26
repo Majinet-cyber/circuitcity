@@ -1,4 +1,4 @@
-# accounts/signals.py
+﻿# accounts/signals.py
 from __future__ import annotations
 
 from django.db import connection
@@ -92,3 +92,5 @@ def prune_expired_reset_codes(sender, instance: PasswordResetCode, created: bool
         used=False,
         expires_at__lt=timezone.now(),
     ).delete()
+
+

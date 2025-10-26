@@ -1,4 +1,4 @@
-# cc/celery.py
+﻿# cc/celery.py
 from __future__ import annotations
 
 import os
@@ -20,3 +20,5 @@ app.autodiscover_tasks()
 @app.task(bind=True)
 def debug_task(self):
     print(f"Request: {self.request!r}")
+
+

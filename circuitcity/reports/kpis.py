@@ -1,4 +1,4 @@
-import calendar
+﻿import calendar
 from datetime import datetime, timedelta, date
 from django.utils import timezone
 from django.db.models import Sum
@@ -54,3 +54,5 @@ def compute_sales_kpis(qs, dt_field: str = "sold_at", amount_field: str = "price
     today = now.date()
 
     # --- Today vs Yesterday (using [sta]()
+
+

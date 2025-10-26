@@ -1,4 +1,4 @@
-# layby/models.py
+﻿# layby/models.py
 from __future__ import annotations
 
 import random
@@ -50,7 +50,7 @@ class LaybyOrder(models.Model):
     customer_name = models.CharField(max_length=120)
     customer_phone = models.CharField(max_length=32, blank=True, validators=[PHONE_RE])
 
-    # National ID — exactly 8 digits
+    # National ID â€” exactly 8 digits
     id_number = models.CharField(
         max_length=8,
         validators=[ID8_RE],
@@ -100,7 +100,7 @@ class LaybyOrder(models.Model):
         ]
 
     def __str__(self) -> str:  # pragma: no cover
-        return f"{self.ref} · {self.customer_name}"
+        return f"{self.ref} Â· {self.customer_name}"
 
     # --------- convenience (not stored in DB) ---------
     @property
@@ -144,4 +144,6 @@ class LaybyPayment(models.Model):
         ]
 
     def __str__(self) -> str:  # pragma: no cover
-        return f"{self.order.ref} · {self.amount}"
+        return f"{self.order.ref} Â· {self.amount}"
+
+

@@ -1,4 +1,4 @@
-# tenants/orm.py
+﻿# tenants/orm.py
 from django.db import models
 from tenants.locals import get_current_business
 
@@ -19,3 +19,5 @@ class TenantOwned(models.Model):
 
     class Meta:
         abstract = True
+
+

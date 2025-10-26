@@ -1,4 +1,4 @@
-# inventory/helpers/request_ctx.py
+﻿# inventory/helpers/request_ctx.py
 from __future__ import annotations
 from typing import Optional, Tuple
 
@@ -81,7 +81,7 @@ def default_location_for_request(request):
         biz, biz_id = _get_active_business(request)
         if not biz_id:
             return None
-        # user’s preferred/home location?
+        # userâ€™s preferred/home location?
         user = getattr(request, "user", None)
         home_loc_id = getattr(getattr(user, "profile", None), "home_location_id", None)
         if home_loc_id:
@@ -103,3 +103,5 @@ def ensure_request_defaults(request):
         loc = default_location_for_request(request)
         if loc:
             _attach_location_to_request(request, loc)
+
+

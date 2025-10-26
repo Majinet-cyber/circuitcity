@@ -1,4 +1,4 @@
-from functools import wraps
+﻿from functools import wraps
 from django.http import HttpResponseForbidden
 
 def user_in_group(user, name: str) -> bool:
@@ -28,3 +28,5 @@ def require_role(*allowed):
             return view(request, *a, **kw)
         return _w
     return deco
+
+

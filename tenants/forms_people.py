@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 from django import forms
 from django.contrib.auth import get_user_model
 from django.contrib.auth.password_validation import validate_password
@@ -47,3 +47,4 @@ fields = ["name", "city", "latitude", "longitude"] # adjust to your actual field
 
 class PasswordResetTriggerForm(forms.Form):
 user_id = forms.IntegerField(widget=forms.HiddenInput)
+

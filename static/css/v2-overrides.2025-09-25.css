@@ -6,6 +6,9 @@
    - Designed to be harmless if classes aren’t present.
    - Light Bootstrap-leaning defaults; works even without Bootstrap loaded.
    - Keep selectors specific but not too heavy to avoid cascade wars.
+   - 2025-10-10: Billing plans polish (1-click cards), stronger glass cards,
+                 mobile drawer (no flash), search popover sticky actions,
+                 perfect-fit grid & spacing, stronger blue glass style.
    ========================================================================== */
 
 /* --------------------------------------------------------------------------
@@ -22,21 +25,21 @@
   --cc-danger: #e03131;
 
   /* Grays */
-  --cc-bg: #f7f8fb;
+  --cc-bg: #f5f7fb;              /* slightly deeper than before */
   --cc-card: #ffffff;
-  --cc-muted: #6c757d;
-  --cc-border: #e5e7eb;
-  --cc-heading: #111827;
-  --cc-text: #1f2937;
+  --cc-muted: #64748b;           /* stronger than #6c757d (less washed) */
+  --cc-border: #d9deea;          /* darker border -> clearer edges */
+  --cc-heading: #0f172a;         /* stronger ink */
+  --cc-text: #111827;            /* stronger body ink */
 
   /* Surfaces */
-  --cc-shadow-sm: 0 1px 2px rgb(0 0 0 / 6%);
-  --cc-shadow-md: 0 8px 24px rgb(0 0 0 / 10%);
+  --cc-shadow-sm: 0 6px 16px rgb(15 23 42 / 10%);
+  --cc-shadow-md: 0 14px 40px rgb(15 23 42 / 16%);
 
   /* Radius & spacing */
-  --cc-radius: 14px;
-  --cc-radius-sm: 10px;
-  --cc-gap: 14px;
+  --cc-radius: 16px;
+  --cc-radius-sm: 12px;
+  --cc-gap: 16px;
 
   /* Charts */
   --cc-chart-1: #4f46e5;
@@ -45,7 +48,12 @@
   --cc-chart-4: #f59e0b;
 
   /* Table */
-  --cc-row-hover: #f3f4f6;
+  --cc-row-hover: #eef2ff;       /* blue-tinted hover (feels “alive”) */
+
+  /* Badges / pills */
+  --cc-badge-ink: #0f172a;
+  --cc-badge-bg: #e7efff;
+  --cc-badge-br: #c8dcff;
 
   /* ===== Mobile nav & safe-area tokens (additive) ===== */
   --safe-top: env(safe-area-inset-top, 0px);
@@ -57,22 +65,28 @@
 @media (prefers-color-scheme: dark) {
   :root {
     --cc-bg: #0f1115;
-    --cc-card: #171a21;
+    --cc-card: #141924;
     --cc-text: #e5e7eb;
     --cc-heading: #f8fafc;
-    --cc-border: #242936;
-    --cc-row-hover: #1b1f2a;
-    --cc-shadow-sm: 0 1px 2px rgb(0 0 0 / 40%);
-    --cc-shadow-md: 0 8px 24px rgb(0 0 0 / 50%);
+    --cc-border: #223049;
+    --cc-row-hover: #182131;
+    --cc-shadow-sm: 0 6px 16px rgb(0 0 0 / 40%);
+    --cc-shadow-md: 0 18px 44px rgb(0 0 0 / 55%);
+    --cc-badge-ink: #e5edff;
+    --cc-badge-bg: #10203b;
+    --cc-badge-br: #1e3356;
   }
 }
 body.dark {
   --cc-bg: #0f1115;
-  --cc-card: #171a21;
+  --cc-card: #141924;
   --cc-text: #e5e7eb;
   --cc-heading: #f8fafc;
-  --cc-border: #242936;
-  --cc-row-hover: #1b1f2a;
+  --cc-border: #223049;
+  --cc-row-hover: #182131;
+  --cc-badge-ink: #e5edff;
+  --cc-badge-bg: #10203b;
+  --cc-badge-br: #1e3356;
 }
 
 /* --------------------------------------------------------------------------
@@ -85,6 +99,7 @@ html, body {
   overflow-x: hidden; /* prevent horizontal scroll on small screens */
   -webkit-text-size-adjust: 100%;
 }
+html, body { min-height: 100svh; }   /* keep height correct with mobile chrome */
 
 /* Stop iOS zoom-on-focus (inputs <16px trigger zoom) */
 input, select, textarea { font-size: 16px; }
@@ -92,9 +107,10 @@ input, select, textarea { font-size: 16px; }
 h1, h2, h3, h4, h5 {
   color: var(--cc-heading);
   letter-spacing: -0.01em;
+  font-weight: 800;
 }
 
-/* Fluid downscale on very small handsets to avoid “zoom out” screenshots */
+/* Fluid downscale on very small handsets to avoid “zoom out” */
 @media (max-width: 420px){
   h1 { font-size: clamp(20px, 6vw, 24px); line-height: 1.2; }
   h2 { font-size: clamp(18px, 5.2vw, 22px); line-height: 1.25; }
@@ -108,53 +124,61 @@ img, svg, video, canvas { max-width: 100%; height: auto; }
 main, .cc-page, .content, .page, .container, .container-fluid {
   padding-bottom: calc(var(--dock-h) + var(--safe-bottom) + 16px);
 }
-
 .container, .container-fluid {
   padding-left: max(12px, 3vw);
   padding-right: max(12px, 3vw);
 }
 
 /* Reduce overly large gaps on dashboards */
-.section,
-.section-sm {
-  margin-block: calc(var(--cc-gap) * 1.2);
-}
+.section, .section-sm { margin-block: calc(var(--cc-gap) * 1.1); }
 
-/* Cards */
-.card,
-.cc-card,
-.stat-card {
-  background: var(--cc-card);
+/* Cards (incl. “glass” cards) */
+.card, .cc-card, .stat-card, .glass-card {
+  background: linear-gradient(180deg, #fff, #f9fbff);
   border: 1px solid var(--cc-border);
   border-radius: var(--cc-radius);
   box-shadow: var(--cc-shadow-sm);
 }
-
-.card:hover,
-.cc-card:hover,
-.stat-card:hover {
-  box-shadow: var(--cc-shadow-md);
-  transition: box-shadow .18s ease;
+body.dark .card,
+body.dark .cc-card,
+body.dark .stat-card,
+body.dark .glass-card {
+  background: linear-gradient(180deg, #171c28, #141924);
 }
-
+.card:hover, .cc-card:hover, .stat-card:hover, .glass-card:hover {
+  box-shadow: var(--cc-shadow-md);
+  transition: box-shadow .18s ease, transform .18s ease;
+  transform: translateY(-1px);
+}
 .card-header {
   background: transparent;
   border-bottom: 1px solid var(--cc-border);
-  font-weight: 600;
+  font-weight: 700;
 }
 
-/* KPI chips */
-.kpi,
-.kpi-chip {
-  display: inline-flex;
-  align-items: baseline;
-  gap: 8px;
-  padding: 8px 12px;
-  border-radius: 999px;
-  background: var(--cc-row-hover);
-  border: 1px solid var(--cc-border);
-  font-variation-settings: "wght" 580;
+/* KPI chips + strong stats */
+.kpi, .kpi-chip {
+  display: inline-flex; align-items: baseline; gap: 8px;
+  padding: 10px 14px; border-radius: 999px;
+  background: color-mix(in srgb, var(--cc-brand) 9%, #fff);
+  border: 1px solid color-mix(in srgb, var(--cc-brand) 35%, var(--cc-border));
+  font-variation-settings: "wght" 700; color: var(--cc-heading);
 }
+body.dark .kpi, body.dark .kpi-chip {
+  background: color-mix(in srgb, var(--cc-brand) 18%, #0f1115);
+}
+.kpi-strong, .stat-card {
+  background: linear-gradient(180deg, color-mix(in srgb, #fff 86%, var(--cc-brand) 6%), #fff);
+  border: 1px solid color-mix(in srgb, var(--cc-brand) 30%, var(--cc-border));
+}
+body.dark .kpi-strong, body.dark .stat-card {
+  background: linear-gradient(180deg, color-mix(in srgb, #161b26 86%, var(--cc-brand) 10%), #141924);
+}
+.stat-card .stat-value {
+  font-size: clamp(22px, 3.2vw, 34px);
+  font-weight: 900; letter-spacing: -0.02em;
+}
+.stat-card .stat-label { color: var(--cc-muted); font-weight: 600; }
 
 /* --------------------------------------------------------------------------
    Buttons (Bootstrap-like without requiring it)
@@ -163,76 +187,70 @@ main, .cc-page, .content, .page, .container, .container-fluid {
   --_bg: var(--cc-brand);
   --_bg-hover: var(--cc-brand-600);
   --_text: #fff;
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  padding: 10px 14px;
-  font-weight: 600;
-  border-radius: 12px;
-  border: 1px solid transparent;
-  background: var(--_bg);
-  color: var(--_text);
-  text-decoration: none;
-  cursor: pointer;
+  display: inline-flex; align-items: center; gap: 8px;
+  padding: 11px 16px; font-weight: 700;
+  border-radius: 14px;
+  border: 1px solid color-mix(in srgb, var(--cc-brand) 42%, #0000);
+  background: var(--_bg); color: var(--_text);
+  text-decoration: none; cursor: pointer;
+  box-shadow: 0 10px 26px color-mix(in srgb, var(--cc-brand) 24%, #0000);
+  transition: transform .12s ease, box-shadow .12s ease, background .12s ease;
 }
-.btn:hover, .button:hover, .cc-btn:hover { background: var(--_bg-hover); }
-
+.btn:hover, .button:hover, .cc-btn:hover {
+  background: var(--_bg-hover);
+  transform: translateY(-1px);
+  box-shadow: 0 14px 36px color-mix(in srgb, var(--cc-brand) 28%, #0000);
+}
 .btn-outline, .btn-outline-primary {
-  --_bg: transparent;
-  --_text: var(--cc-brand);
-  border-color: var(--cc-brand);
-  background: transparent;
-  color: var(--_text);
+  --_bg: transparent; --_text: var(--cc-brand);
+  border-color: var(--cc-brand); background: transparent; color: var(--_text);
 }
 .btn-outline:hover, .btn-outline-primary:hover {
-  background: color-mix(in srgb, var(--cc-brand) 10%, transparent);
+  background: color-mix(in srgb, var(--cc-brand) 12%, transparent);
 }
 
 /* Utility tints */
-.badge-success, .pill-success { background: color-mix(in srgb, var(--cc-accent) 18%, #fff); color: #0f5132; border: 1px solid color-mix(in srgb, var(--cc-accent) 30%, #0000); }
-.badge-warning, .pill-warning { background: color-mix(in srgb, var(--cc-warning) 18%, #fff); color: #7a4d00; border: 1px solid color-mix(in srgb, var(--cc-warning) 30%, #0000); }
-.badge-danger,  .pill-danger  { background: color-mix(in srgb, var(--cc-danger) 18%, #fff);  color: #6b1010; border: 1px solid color-mix(in srgb, var(--cc-danger) 30%, #0000); }
+.badge-success, .pill-success {
+  background: color-mix(in srgb, var(--cc-accent) 18%, #fff);
+  color: #0f5132; border: 1px solid color-mix(in srgb, var(--cc-accent) 34%, #0000);
+}
+.badge-warning, .pill-warning {
+  background: color-mix(in srgb, var(--cc-warning) 20%, #fff);
+  color: #7a4d00; border: 1px solid color-mix(in srgb, var(--cc-warning) 34%, #0000);
+}
+.badge-danger,  .pill-danger  {
+  background: color-mix(in srgb, var(--cc-danger) 20%, #fff);
+  color: #6b1010; border: 1px solid color-mix(in srgb, var(--cc-danger) 34%, #0000);
+}
+
+/* Trial / status badges */
+.badge, .pill, .status-badge {
+  display: inline-flex; align-items: center; gap: .5ch;
+  font-weight: 800; letter-spacing: .2px;
+  padding: 6px 10px; border-radius: 999px;
+  background: var(--cc-badge-bg); color: var(--cc-badge-ink); border: 1px solid var(--cc-badge-br);
+}
 
 /* --------------------------------------------------------------------------
    Tables
    -------------------------------------------------------------------------- */
 .table, table.cc-table {
-  width: 100%;
-  background: var(--cc-card);
-  border: 1px solid var(--cc-border);
-  border-radius: var(--cc-radius);
-  overflow: hidden;
-  border-collapse: separate;
-  border-spacing: 0;
+  width: 100%; background: var(--cc-card);
+  border: 1px solid var(--cc-border); border-radius: var(--cc-radius);
+  overflow: hidden; border-collapse: separate; border-spacing: 0;
 }
-
 .table thead th, table.cc-table thead th {
-  background: var(--cc-row-hover);
-  color: var(--cc-heading);
-  font-weight: 700;
-  border-bottom: 1px solid var(--cc-border);
+  background: var(--cc-row-hover); color: var(--cc-heading);
+  font-weight: 800; border-bottom: 1px solid var(--cc-border);
 }
-
-.table tbody tr:hover,
-table.cc-table tbody tr:hover {
-  background: var(--cc-row-hover);
+.table tbody tr:hover, table.cc-table tbody tr:hover { background: var(--cc-row-hover); }
+.table th, .table td, table.cc-table th, table.cc-table td {
+  padding: 10px 12px; border-bottom: 1px solid var(--cc-border);
+  vertical-align: middle; white-space: nowrap;
 }
-
-.table th, .table td,
-table.cc-table th, table.cc-table td {
-  padding: 10px 12px;
-  border-bottom: 1px solid var(--cc-border);
-  vertical-align: middle;
-  white-space: nowrap;        /* keep numeric columns tidy */
-}
-
 .table td.text-wrap, table.cc-table td.text-wrap { white-space: normal; }
-
-/* Responsive table wrapper */
 .table-responsive {
-  overflow: auto;
-  border: 1px solid var(--cc-border);
-  border-radius: var(--cc-radius);
+  overflow: auto; border: 1px solid var(--cc-border); border-radius: var(--cc-radius);
 }
 
 /* --------------------------------------------------------------------------
@@ -240,91 +258,50 @@ table.cc-table th, table.cc-table td {
    -------------------------------------------------------------------------- */
 input[type="text"], input[type="number"], input[type="email"], input[type="password"],
 select, textarea, .form-control {
-  background: var(--cc-card);
-  border: 1px solid var(--cc-border);
-  border-radius: 12px;
-  padding: 10px 12px;
-  color: var(--cc-text);
+  background: var(--cc-card); border: 1px solid var(--cc-border);
+  border-radius: 12px; padding: 10px 12px; color: var(--cc-text); font-weight: 600;
 }
-
 input:focus, select:focus, textarea:focus, .form-control:focus {
   outline: none;
   border-color: color-mix(in srgb, var(--cc-brand) 60%, var(--cc-border));
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--cc-brand) 15%, transparent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--cc-brand) 18%, transparent);
   transition: box-shadow .18s ease, border-color .18s ease;
 }
-
 /* Fix select2 / datepicker overlapping modals if used */
-.select2-container, .flatpickr-calendar, .datepicker {
-  z-index: 2000 !important;
-}
+.select2-container, .flatpickr-calendar, .datepicker { z-index: 2000 !important; }
 
 /* --------------------------------------------------------------------------
    Dashboard-specific helpers (safe if unused)
    -------------------------------------------------------------------------- */
-.dashboard-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
-  gap: var(--cc-gap);
-}
-
-.stat-card .stat-value {
-  font-size: clamp(22px, 3.2vw, 32px);
-  font-weight: 800;
-  letter-spacing: -0.02em;
-}
-.stat-card .stat-label {
-  color: var(--cc-muted);
-  font-weight: 500;
-}
-
-/* Simple progress bar */
-.cc-progress {
-  height: 8px;
-  background: var(--cc-border);
-  border-radius: 999px;
-  overflow: hidden;
-}
-.cc-progress > span {
-  display: block;
-  height: 100%;
-  width: var(--value, 0%);
-  background: var(--cc-brand);
-  border-radius: inherit;
-}
+.dashboard-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: var(--cc-gap); }
+/* simple progress bar */
+.cc-progress { height: 8px; background: var(--cc-border); border-radius: 999px; overflow: hidden; }
+.cc-progress > span { display: block; height: 100%; width: var(--value, 0%); background: var(--cc-brand); border-radius: inherit; }
 
 /* --------------------------------------------------------------------------
    Charts (generic containers)
    -------------------------------------------------------------------------- */
-.chart-card canvas, .chart, .rechart, .apexchart {
-  width: 100%;
-  height: 280px;
-}
+.chart-card canvas, .chart, .rechart, .apexchart { width: 100%; height: 280px; }
 
 /* --------------------------------------------------------------------------
    Navbar / Sidebar (if present)
    -------------------------------------------------------------------------- */
 .navbar, .app-navbar {
-  background: var(--cc-card);
-  border-bottom: 1px solid var(--cc-border);
+  background: var(--cc-card); border-bottom: 1px solid var(--cc-border);
   backdrop-filter: saturate(1.2) blur(6px);
 }
-.sidebar, .app-sidebar {
-  background: var(--cc-card);
-  border-right: 1px solid var(--cc-border);
-}
+.sidebar, .app-sidebar { background: var(--cc-card); border-right: 1px solid var(--cc-border); }
 
 /* --------------------------------------------------------------------------
    Toasts / Alerts
    -------------------------------------------------------------------------- */
-.alert {
-  border: 1px solid var(--cc-border);
-  border-radius: 12px;
-  box-shadow: var(--cc-shadow-sm);
-}
+.alert { border: 1px solid var(--cc-border); border-radius: 12px; box-shadow: var(--cc-shadow-sm); }
 .alert-success { border-color: color-mix(in srgb, var(--cc-accent) 45%, var(--cc-border)); }
 .alert-warning { border-color: color-mix(in srgb, var(--cc-warning) 45%, var(--cc-border)); }
 .alert-danger  { border-color: color-mix(in srgb, var(--cc-danger)  45%, var(--cc-border)); }
+.alert-list { list-style: none; padding: 0; margin: 0; }
+.alert-list li { padding: 10px 0; border-bottom: 1px dashed var(--cc-border); }
+.alert-list li:last-child { border-bottom: 0; }
 
 /* --------------------------------------------------------------------------
    Misc utilities
@@ -335,24 +312,19 @@ input:focus, select:focus, textarea:focus, .form-control:focus {
 .shadow-md  { box-shadow: var(--cc-shadow-md) !important; }
 .rounded    { border-radius: var(--cc-radius) !important; }
 .rounded-sm { border-radius: var(--cc-radius-sm) !important; }
-
 .gap-cc     { gap: var(--cc-gap); }
 .p-cc       { padding: var(--cc-gap); }
 .py-cc      { padding-block: var(--cc-gap); }
 .px-cc      { padding-inline: var(--cc-gap); }
 
 /* ===== Mobile-only helpers ===== */
-
-/* Keep floating Scan FAB above the mobile dock if present */
 @media (max-width: 991.98px){
-  .scan-fab { bottom: calc(var(--dock-h) + var(--safe-bottom) + 16px) !important; }
+  .scan-fab { bottom: calc(var(--dock-h) + var(--safe-bottom) + 16px) !important; } /* keep FAB above dock */
 }
-
-/* Make long words/IMEIs wrap gracefully on narrow widths */
 .break-words, .wrap-anywhere { overflow-wrap: anywhere; word-break: break-word; }
 
 /* --------------------------------------------------------------------------
-   Print (hide chrome, keep table borders)
+   Print
    -------------------------------------------------------------------------- */
 @media print {
   .navbar, .sidebar, .btn, .cc-btn, .no-print { display: none !important; }
@@ -361,83 +333,70 @@ input:focus, select:focus, textarea:focus, .form-control:focus {
 }
 
 /* --------------------------------------------------------------------------
-   🔧 Anti-blur footer fix (prevents the “blurry footer” overlay)
+   🔧 Footer blur fix
    -------------------------------------------------------------------------- */
-.footer-blur,
-.glass-footer,
-.bottom-blur,
-.mobile-fab-bar,
-.sticky-bottom,
-.cc-sticky-bar,
-.cc-bottom-blur,
-.sticky-cta,
-.sticky-actions,
-.tabbar,
-.fab-bar {
-  backdrop-filter: none !important;
-  -webkit-backdrop-filter: none !important;
-  filter: none !important;
-  box-shadow: none !important;
-  background: var(--cc-card) !important;
-  border-top: 1px solid var(--cc-border) !important;
-  opacity: 1 !important;
+.footer-blur,.glass-footer,.bottom-blur,.mobile-fab-bar,.sticky-bottom,.cc-sticky-bar,
+.cc-bottom-blur,.sticky-cta,.sticky-actions,.tabbar,.fab-bar{
+  backdrop-filter: none !important; -webkit-backdrop-filter: none !important;
+  filter: none !important; box-shadow: none !important; background: var(--cc-card) !important;
+  border-top: 1px solid var(--cc-border) !important; opacity: 1 !important;
 }
 
-/* ========================================================================== */
-/*                           🔧 MOBILE RESCUE PATCHES                         */
-/* ========================================================================== */
+/* ==========================================================================
+                           🔧 MOBILE RESCUE PATCHES
+   ========================================================================== */
+
+/* 0) Sidebar gap killer + content reset (prevents pushed-right pages) */
+@media (max-width: 992px) {
+  :root { --sidebar-w: 0px !important; }
+  .content, .main, .page, .dashboard, .inventory__body {
+    margin-left: 0 !important; padding-left: 0 !important;
+  }
+  /* Off-canvas baseline for any sidebar variants */
+  .sidebar, .cc-sidebar, .nav-sidebar, .cc-drawer {
+    position: fixed !important; top: 0; left: 0; bottom: 0;
+    width: min(85vw, 360px) !important; max-width: 100vw !important;
+    background: var(--sidebar-bg, rgba(0,0,0,0.8)) !important;
+    transform: translateX(-100%) !important;
+    transition: transform .25s ease-out; z-index: 1100;
+  }
+  /* Accept BOTH .open and .is-open (legacy + new) */
+  .sidebar.open, .cc-sidebar.open, .nav-sidebar.open, .cc-drawer.open,
+  .sidebar.is-open, .cc-sidebar.is-open, .nav-sidebar.is-open, .cc-drawer.is-open { transform: translateX(0) !important; }
+}
 
 /* 1) Drawer/HUD layering so taps hit the right thing */
-.cc-sidebar{ z-index: 2000 !important; }
+.cc-sidebar,.cc-drawer{ z-index: 2000 !important; }
 .cc-backdrop{
-  z-index: 1990 !important;
-  pointer-events: none;
-  opacity: 0;
-  transition: opacity .2s ease;
+  z-index: 1990 !important; pointer-events: none; opacity: 0; transition: opacity .2s ease;
 }
 .cc-backdrop.show{ pointer-events: auto; opacity: 1; }
+#ccBackdrop{ position: fixed; inset: 0; background: rgba(0,0,0,.28); display:none; opacity:0; z-index:1990; }
 .mobile-toggle{ z-index: 2010 !important; }
-.tenant-menu{ z-index: 2050 !important; pointer-events: auto; }
-/* Make sure tenant dropdown participates in toggle semantics even if JS misses */
-.tenant-menu{ display:none; }               /* NEW */
-.tenant-menu.open{ display:block; }         /* NEW */
+.tenant-menu{ z-index: 2050 !important; pointer-events: auto; display:none; }
+.tenant-menu.open{ display:block; }
 .cc-header{ z-index: 1900 !important; }
 
-/* Make the tenant pill feel tappable on mobile */
-.tenant-pill{
-  cursor: pointer;
-  -webkit-tap-highlight-color: transparent;
-  touch-action: manipulation;
-  user-select: none;
-}
+/* Tappable tenant pill */
+.tenant-pill{ cursor: pointer; -webkit-tap-highlight-color: transparent; touch-action: manipulation; user-select: none; }
 
 /* Keep the bottom dock below popovers/menus but above content */
-.mobile-tabbar,
-.cc-bottom-nav{ z-index: 1200 !important; }
+.mobile-tabbar, .cc-bottom-nav{ z-index: 1200 !important; }
 
 /* 2) Mobile full-width & orderly layout */
 @media (max-width: 991.98px){
   html, body { overflow-x: hidden; }
 
-  .cc-page,
-  main.cc-page,
-  .container,
-  .container-fluid {
-    max-width: 100% !important;
-    width: 100% !important;
-    padding-left: 12px !important;
-    padding-right: 12px !important;
+  .cc-page, main.cc-page, .container, .container-fluid {
+    max-width: 100% !important; width: 100% !important;
+    padding-left: 12px !important; padding-right: 12px !important;
   }
-
   .row { margin-left: 0 !important; margin-right: 0 !important; }
   [class*="col-"] { padding-left: 8px !important; padding-right: 8px !important; }
 
   /* Force multi-column dashboards into a single column on phones */
-  .grid-2, .grid, .dashboard-grid,
-  .two-col, .layout-2col, .content-grid, .columns {
-    display: grid !important;
-    grid-template-columns: 1fr !important;
-    gap: 12px !important;
+  .grid-2, .grid, .dashboard-grid, .two-col, .layout-2col, .content-grid, .columns {
+    display: grid !important; grid-template-columns: 1fr !important; gap: 12px !important;
   }
 
   /* Defensive: wide media/tables never push layout */
@@ -445,271 +404,273 @@ input:focus, select:focus, textarea:focus, .form-control:focus {
   .table-responsive { width: 100% !important; overflow-x: auto; -webkit-overflow-scrolling: touch; }
 
   /* Inventory/scan main panels fill the width */
-  .scan-page, .scan, .inventory-panel, .content-panel {
-    width: 100% !important;
-    max-width: 100% !important;
-  }
+  .scan-page, .scan, .inventory-panel, .content-panel { width: 100% !important; max-width: 100% !important; }
 }
 
-/* 3) Hide narrow “intro/help” left rail text on phones (the tall copy beside IMEI) */
+/* 3) Hide narrow helper rails on phones */
 @media (max-width: 768px){
   .help-rail, .helper-rail, .explain-rail, .side-rail,
-  .intro-rail, .blurb-rail, .left-rail, aside.aside, aside.left {
-    display: none !important;
-  }
+  .intro-rail, .blurb-rail, .left-rail, aside.aside, aside.left { display: none !important; }
 }
 
-/* 4) Header/title safety so it doesn’t overlap the tenant chip/bell */
+/* 4) Header/title safety so it doesn’t overlap tenant chip/bell */
 @media (max-width: 991.98px){
   .page-header, .header, .cc-header, .page-title, .title-bar {
-    position: relative !important;
-    display: flex !important;
-    align-items: center !important;
-    flex-wrap: wrap !important;
-    gap: .5rem !important;
-    margin: 0 0 12px !important;
+    position: relative !important; display: flex !important; align-items: center !important;
+    flex-wrap: wrap !important; gap: .5rem !important; margin: 0 0 12px !important;
   }
   .page-title h1, .page-title h2, .title, h1.page-title, .header .title {
-    position: static !important;
-    transform: none !important;
-    margin: 0 !important;
-    min-width: 0 !important;
-    font-size: clamp(1.125rem, 4.2vw, 1.5rem) !important;
-    line-height: 1.2 !important;
+    position: static !important; transform: none !important; margin: 0 !important; min-width: 0 !important;
+    font-size: clamp(1.125rem, 4.2vw, 1.5rem) !important; line-height: 1.2 !important;
   }
-  /* Any decorative hero/title card should not float over content */
-  .hero, .title-card, .stat-hero {
-    position: static !important;
-    transform: none !important;
-    margin: 0 0 12px !important;
-  }
+  .hero, .title-card, .stat-hero { position: static !important; transform: none !important; margin: 0 0 12px !important; }
 }
 
 /* 5) Kill any horizontal scroll containers that force the page wider */
 @media (max-width: 991.98px){
-  .scroll-x, .overflow-x, .h-scroll {
-    overflow-x: auto !important;
-    -webkit-overflow-scrolling: touch;
-    max-width: 100% !important;
-  }
+  .scroll-x, .overflow-x, .h-scroll { overflow-x: auto !important; -webkit-overflow-scrolling: touch; max-width: 100% !important; }
 }
 
-/* 6) Respect notches/safe areas so headers/docks don’t tuck underneath */
+/* 6) Respect notches/safe areas */
 @supports (padding: max(0px)) {
   .navbar, .topbar, header, .page-header { padding-top: max(0px, var(--safe-top)); }
   .bottom-nav, .tabbar, .cc-bottom-nav { padding-bottom: max(8px, var(--safe-bottom)); }
 }
 
-/* 7) Extra guard: any element with inline width/min-width won’t break mobile */
+/* 7) Extra guard: inline width/min-width won’t break mobile */
 @media (max-width: 991.98px){
-  [style*="width:"], [style*="min-width:"], [style*="max-width:"] {
-    max-width: 100% !important;
-  }
+  [style*="width:"], [style*="min-width:"], [style*="max-width:"] { max-width: 100% !important; }
 }
 
-
-/* ===== Mobile warp rescue ===== */
+/* ===== Mobile warp rescue (consolidated) ===== */
 @media (max-width: 991.98px) {
-  /* Hide the tall helper rail text on small screens */
-  .help-rail,
-  .helper-rail,
-  .explain-rail,
-  .side-rail,
-  .intro-rail,
-  .blurb-rail,
-  .left-rail,
-  aside.aside,
-  aside.left {
-    display: none !important;
-  }
+  .help-rail, .helper-rail, .explain-rail, .side-rail, .intro-rail, .blurb-rail,
+  .left-rail, aside.aside, aside.left { display: none !important; }
 
-  /* Force inventory/scan panels to full width */
-  .scan-page,
-  .scan,
-  .inventory-panel,
-  .content-panel {
-    width: 100% !important;
-    max-width: 100% !important;
-  }
+  .scan-page, .scan, .inventory-panel, .content-panel { width: 100% !important; max-width: 100% !important; }
 
-  /* Stack grids into one column */
-  .grid,
-  .grid-2,
-  .dashboard-grid,
-  .two-col,
-  .layout-2col,
-  .content-grid,
-  .columns {
-    display: grid !important;
-    grid-template-columns: 1fr !important;
-    gap: 12px !important;
+  .grid, .grid-2, .dashboard-grid, .two-col, .layout-2col, .content-grid, .columns {
+    display: grid !important; grid-template-columns: 1fr !important; gap: 12px !important;
   }
 }
 
-/* ====================================================================== */
-/* MOBILE HARD OVERRIDES — force single-column & hide helper rail on phones */
-/* ====================================================================== */
+/* ======================================================================
+   MOBILE HARD OVERRIDES — force single-column & hide helper rail on phones
+   ====================================================================== */
 @media (max-width: 991.98px){
-
-  /* 1) Never allow sideways scroll */
   html, body { overflow-x: hidden !important; }
 
-  /* 2) Any Bootstrap-like grid becomes one column */
-  .cc-page .row,
-  .container .row,
-  .container-fluid .row,
-  main .row {
-    display: block !important;             /* collapse flex grid */
-    margin-left: 0 !important;
-    margin-right: 0 !important;
-  }
-  .cc-page .row > [class^="col"],
-  .cc-page .row > [class*=" col"],
-  .container .row > [class^="col"],
-  .container .row > [class*=" col"],
-  .container-fluid .row > [class^="col"],
-  .container-fluid .row > [class*=" col"],
-  main .row > [class^="col"],
-  main .row > [class*=" col"]{
-    width: 100% !important;
-    max-width: 100% !important;
-    flex: 0 0 100% !important;
-    padding-left: 12px !important;
-    padding-right: 12px !important;
-  }
-
-  /* 3) Hide “helper/intro/rail” columns that cause that skinny vertical text */
-  /* (covers many common names + any tiny 1–3 width columns) */
-  .help-rail,
-  .helper-rail,
-  .explain-rail,
-  .intro-rail,
-  .blurb-rail,
-  .side-rail,
-  .left-rail,
-  .scan-rail,
-  .inventory-rail,
-  aside.aside,
-  aside.left,
-  .cc-page .row > [class*="col-1"],
-  .cc-page .row > [class*="col-2"],
-  .cc-page .row > [class*="col-3"],
-  .cc-page .row > [class*="col-sm-1"],
-  .cc-page .row > [class*="col-sm-2"],
-  .cc-page .row > [class*="col-sm-3"],
-  .cc-page .row > [class*="col-md-1"],
-  .cc-page .row > [class*="col-md-2"],
-  .cc-page .row > [class*="col-md-3"]{
-    display: none !important;
-  }
-
-  /* 4) Scan/Inventory forms use full width, always */
-  .scan-page, .scan, .inventory-panel, .content-panel,
-  .inventory-form, .scan-form, form.inventory, form.scan {
-    width: 100% !important;
-    max-width: 100% !important;
-  }
-
-  /* 5) Defensive: media/tables never push layout */
-  img, svg, video, canvas, iframe { max-width: 100% !important; height: auto !important; display: block; }
-  .table-responsive { overflow-x: auto !important; -webkit-overflow-scrolling: touch; }
-}
-
-/* =========================
-   MOBILE KILL-SWITCH (<=992)
-   One column only + hide any “helper/aside” rails
-   ========================= */
-@media (max-width: 991.98px){
-
-  /* Predictable sizing + no sideways scroll */
-  html, body { max-width: 100% !important; overflow-x: hidden !important; }
-
-  /* Containers fill the screen */
   .cc-page, main.cc-page, .container, .container-fluid {
-    max-width: 100% !important;
-    width: 100% !important;
-    padding-left: 12px !important;
-    padding-right: 12px !important;
+    max-width: 100% !important; width: 100% !important;
+    padding-left: 12px !important; padding-right: 12px !important;
   }
 
-  /* Bootstrap rows & cols: stack everything */
   .row { margin-left: 0 !important; margin-right: 0 !important; display: block !important; }
   .row > [class*="col"] { width: 100% !important; max-width: 100% !important; padding-left: 8px !important; padding-right: 8px !important; }
 
-  /* Grids: force single column */
   .grid, .grid-2, .dashboard-grid, .content-grid, [class*="grid-cols"] {
-    display: grid !important;
-    grid-template-columns: 1fr !important;
-    gap: 12px !important;
+    display: grid !important; grid-template-columns: 1fr !important; gap: 12px !important;
   }
 
-  /* Flex rows that try to sit side-by-side */
-  .d-flex, [class*="flex-row"] { flex-direction: column !important; flex-wrap: nowrap !important; align-items: stretch !important; }
+  /* ❗️Do NOT force all flex rows to vertical — keep action/icon rows inline */
+  .d-flex:not(.btn-row):not(.keep-row):not(.cc-bottom-nav):not(.mobile-tabbar),
+  [class*="flex-row"]:not(.btn-row):not(.keep-row):not(.cc-bottom-nav):not(.mobile-tabbar) {
+    flex-direction: column !important; flex-wrap: nowrap !important; align-items: stretch !important;
+  }
 
-  /* Media/tables never push layout sideways */
+  /* Ensure bottom dock stays horizontal */
+  .mobile-tabbar, .cc-bottom-nav {
+    display: flex !important; flex-direction: row !important; align-items: center !important; justify-content: space-around !important;
+  }
+  .mobile-tabbar .tab, .cc-bottom-nav .tab { flex: 1 1 0 !important; text-align: center !important; min-width: 0 !important; }
+
   img, svg, video, canvas, iframe, table { max-width: 100% !important; height: auto !important; }
   .table-responsive { width: 100% !important; overflow-x: auto !important; -webkit-overflow-scrolling: touch; }
 
-  /* Hide common “left rail / helper” columns on small screens */
   .page-aside, .left-rail, .left-col, .helper, .help, .explain, .intro, .intro-slab,
-  .sidebar-ghost, .aside, [data-aside], [aria-label="Helper"], [aria-label="Aside"] {
-    display: none !important;
-  }
+  .sidebar-ghost, .aside, [data-aside], [aria-label="Helper"], [aria-label="Aside"] { display: none !important; }
 
-  /* If a two-column split lives inside a known inventory/scan wrapper, hide its first column */
   .scan-page .row > [class*="col-"]:first-child,
   .inventory-panel .row > [class*="col-"]:first-child,
-  .content-panel .row > [class*="col-"]:first-child {
-    display: none !important;
-  }
+  .content-panel .row > [class*="col-"]:first-child { display: none !important; }
 
-  /* And make sure the remaining column stretches fully */
   .scan-page .row > [class*="col-"]:last-child,
   .inventory-panel .row > [class*="col-"]:last-child,
   .content-panel .row > [class*="col-"]:last-child {
-    width: 100% !important;
-    max-width: 100% !important;
+    width: 100% !important; max-width: 100% !important;
   }
 
-  /* Keep content clear of the bottom dock/tabbar */
   :root { --cc-nav-h: 64px; --cc-safe-bottom: max(env(safe-area-inset-bottom), 0px); }
   .mobile-tabbar, .cc-bottom-nav {
     position: fixed; left: 0; right: 0; bottom: 0;
-    height: calc(var(--cc-nav-h) + var(--cc-safe-bottom));
-    padding-bottom: var(--cc-safe-bottom);
-    z-index: 1200 !important;
-    backdrop-filter: blur(10px);
+    height: calc(var(--cc-nav-h) + var(--cc-safe-bottom)); padding-bottom: var(--cc-safe-bottom);
+    z-index: 1200 !important; backdrop-filter: blur(10px);
   }
   .cc-page, main.cc-page, .container, .container-fluid {
     padding-bottom: calc(var(--cc-nav-h) + var(--cc-safe-bottom) + 16px) !important;
   }
 }
 
-/* ========================================================================== */
-/* FINAL HARD HIDE for tiny first helper columns (<=992px)                    */
-/* Also hide any deliberate vertical-rl helper rails on phones                */
-/* ========================================================================== */
-@media (max-width: 991.98px){
-  .cc-page .row > .col-1:first-child,
-  .cc-page .row > .col-2:first-child,
-  .cc-page .row > .col-3:first-child,
-  .cc-page .row > .col-sm-1:first-child,
-  .cc-page .row > .col-sm-2:first-child,
-  .cc-page .row > .col-sm-3:first-child,
-  .cc-page .row > .col-md-1:first-child,
-  .cc-page .row > .col-md-2:first-child,
-  .cc-page .row > .col-md-3:first-child { display: none !important; }
+/* --------------------------------------------------------------------------
+   Perfect-fit fixes (dropdowns & short phones)
+   -------------------------------------------------------------------------- */
+.dropdown-menu{ max-height: calc(100svh - 120px); overflow: auto; overscroll-behavior: contain; }
+/* Keep important chrome stacked correctly */
+.cc-header { z-index: 1600 !important; }
+.mobile-tabbar, .cc-bottom-nav { z-index: 1200 !important; }
 
-  .cc-page .row > [class*="col-"]:not(:first-child){
-    width: 100% !important;
-    max-width: 100% !important;
-    flex: 0 0 100% !important;
-  }
-
-  /* NEW: nuke vertical “helper” rails that use writing-mode */
-  [style*="writing-mode:vertical-rl"],
-  [style*="writing-mode: vertical-rl"],
-  .vertical-text,
-  .vtext,
-  .rail-vertical { display: none !important; }
+/* ==========================================================================
+   🔷 SEARCH POPOVER — keep “Go” & “Logout” visible on mobile
+   -------------------------------------------------------------------------- */
+.cc-search { position: relative; }
+.cc-search-popover{
+  position: absolute; top: 100%; left: 0; right: 0;
+  max-height: 60vh; overflow-y: auto; -webkit-overflow-scrolling: touch;
+  z-index: 2055; /* above drawer/backdrop */
+  background: rgba(255,255,255,.98);
+  border-radius: 14px; box-shadow: 0 12px 40px rgba(0,0,0,.18);
+  border: 1px solid var(--cc-border);
 }
+@media (prefers-color-scheme: dark){
+  .cc-search-popover{ background: rgba(18,22,34,.98); }
+}
+.cc-search-actions{
+  position: sticky; bottom: 0; padding: .5rem .75rem;
+  background: inherit; border-top: 1px solid rgba(125,125,125,.18);
+  display: flex; gap: .5rem; justify-content: flex-end;
+}
+
+/* ==========================================================================
+   Glassmorphic polish for the login/forgot pages
+   -------------------------------------------------------------------------- */
+:root{
+  --glass-bg: color-mix(in oklab, #ffffff 78%, transparent);
+  --glass-br: 16px;
+  --glass-bd: 1px solid rgba(148,163,184,.35);
+  --glass-shadow: 0 20px 60px rgba(2,6,23,.10);
+  --glass-ring: 0 0 0 4px color-mix(in oklab, #3b82f6 18%, transparent);
+}
+body.accounts-auth, body.accounts-forgot {
+  background:
+    radial-gradient(1200px 800px at -10% -10%, rgba(59,130,246,.10), transparent 40%),
+    radial-gradient(900px 600px at 110% 110%, rgba(16,185,129,.10), transparent 45%),
+    var(--cc-bg);
+}
+.auth-glass{
+  position: relative; background: var(--glass-bg) !important; border: var(--glass-bd) !important;
+  border-radius: var(--glass-br) !important; box-shadow: var(--glass-shadow) !important;
+  -webkit-backdrop-filter: blur(16px) saturate(140%); backdrop-filter: blur(16px) saturate(140%);
+}
+.auth-glass::before{
+  content:""; position:absolute; inset:0; border-radius: inherit;
+  background: linear-gradient(180deg, rgba(255,255,255,.35), rgba(255,255,255,.06));
+  pointer-events:none; mix-blend-mode:overlay;
+}
+.auth-glass input[type="text"], .auth-glass input[type="email"], .auth-glass input[type="password"]{
+  background: color-mix(in oklab, #ffffff 60%, transparent);
+  border: 1px solid rgba(148,163,184,.40); border-radius: 12px;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.6);
+}
+.auth-glass input:focus{
+  outline: none; border-color: color-mix(in oklab, #3b82f6 48%, #94a3b8); box-shadow: var(--glass-ring);
+}
+.auth-glass .btn-primary, .auth-glass button[type="submit"]{
+  border-radius: 12px; box-shadow: 0 10px 26px rgba(59,130,246,.28);
+}
+.auth-glass .btn-primary:hover, .auth-glass button[type="submit"]:hover{
+  transform: translateY(-1px); box-shadow: 0 14px 36px rgba(59,130,246,.32);
+}
+.auth-version{ position: fixed; left:10px; bottom:10px; background:#111; color:#fff; border-radius:10px; padding:4px 8px; font:600 12px/1 ui-sans-serif,system-ui; opacity:.85; z-index:9999; }
+
+/* ============================================================
+   🔵 STRONG UI OVERRIDES (higher contrast & weight)
+   Put these at the END of v2-overrides.css
+   ============================================================ */
+.cc-page h1, .cc-page h2, .page-title h1, .page-title .title, .header .title {
+  color: #0b132b !important; font-weight: 900 !important; letter-spacing: -0.015em !important;
+}
+.cc-page .card, .cc-page .cc-card, .cc-page .glass-card, .cc-page .stat-card {
+  background: #ffffff !important; border: 2px solid #c7d2fe !important;
+  box-shadow: 0 14px 40px rgba(59,130,246,.18) !important;
+}
+.kpi, .kpi-chip { background: #e8f0ff !important; border-color: #9bb5ff !important; color: #0b132b !important; font-weight: 800 !important; }
+.stat-card .stat-value { color: #0b132b !important; font-weight: 900 !important; font-size: clamp(24px, 3.4vw, 36px) !important; }
+.stat-card .stat-label { color: #334155 !important; font-weight: 700 !important; }
+.btn, .cc-btn, .btn-primary { background: #2563eb !important; border-color: #1d4ed8 !important; color: #fff !important; font-weight: 800 !important; box-shadow: 0 12px 28px rgba(37,99,235,.25) !important; }
+.btn:hover, .cc-btn:hover, .btn-primary:hover { background: #1d4ed8 !important; transform: translateY(-1px) !important; }
+.btn-outline, .btn-outline-primary { color: #1d4ed8 !important; border-color: #1d4ed8 !important; }
+.btn-outline:hover, .btn-outline-primary:hover { background: rgba(29,78,216,.10) !important; }
+.badge, .pill, .status-badge { background: #dbeafe !important; border: 1px solid #93c5fd !important; color: #0b132b !important; font-weight: 800 !important; }
+.select2-container--default .select2-selection--single, .form-select, select, .form-control { border: 2px solid #c7d2fe !important; color: #0b132b !important; }
+::placeholder { color: #64748b !important; opacity: 1 !important; }
+.table thead th, table.cc-table thead th { background: #e9efff !important; color: #0b132b !important; font-weight: 900 !important; border-bottom: 2px solid #c7d2fe !important; }
+.table, table.cc-table { border: 2px solid #c7d2fe !important; }
+.table tbody tr:hover, table.cc-table tbody tr:hover { background: #eef2ff !important; }
+.cc-page .card-header, .cc-page .section h3, .cc-page .section h4 { color: #0b132b !important; font-weight: 800 !important; }
+.alert-success { background: #ecfdf5 !important; border-color: #86efac !important; color:#065f46 !important; }
+.alert-warning { background: #fffbeb !important; border-color: #fcd34d !important; color:#7a4d00 !important; }
+.alert-danger  { background: #fef2f2 !important; border-color: #fca5a5 !important; color:#7f1d1d !important; }
+.btn:disabled, .cc-btn:disabled, .btn-primary:disabled { opacity: .7 !important; color: #e5edff !important; }
+.cc-page .badge, .cc-page .kpi, .cc-page .kpi-chip, .cc-page .btn, .cc-page .cc-btn, .cc-page .form-control, .cc-page .card { backdrop-filter: none !important; }
+
+/* =====================================================================
+   🔒 FINAL OVERRIDES — body-state drawer + RTL action row
+   ===================================================================== */
+/* Body-state driven drawer (works with JS that toggles body[data-drawer]) */
+@media (max-width: 992px){
+  body[data-drawer="open"] .cc-sidebar,
+  body[data-drawer="open"] .cc-drawer{ transform: translateX(0) !important; }
+  body[data-drawer="open"] #ccBackdrop{
+    display: block !important; opacity: 1 !important; pointer-events: auto !important;
+  }
+}
+/* Action row utilities for Scan/Sell pages */
+.btn-row{ display:flex; gap:.5rem; align-items:center; flex-wrap:nowrap; }
+.rtl-mobile{ flex-direction: row-reverse; }
+@media (min-width: 640px){ .rtl-mobile{ flex-direction: row; } }
+.keep-row{ flex-direction: row !important; flex-wrap: nowrap !important; }
+
+/* =====================================================================
+   💳 BILLING PLANS — one-click card styling (works with subscribe.html)
+   ===================================================================== */
+.bill-wrap{max-width:1100px;margin-inline:auto;display:grid;gap:16px}
+.g{border:1px solid var(--cc-border);border-radius:14px;background:color-mix(in oklab,var(--cc-card) 86%,transparent);backdrop-filter:blur(12px);box-shadow:var(--cc-shadow-sm);padding:16px}
+.plans{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:14px}
+
+/* Card as a form (.plan-card) */
+.plan-card{
+  position:relative;display:flex;flex-direction:column;justify-content:space-between;
+  padding:16px;border-radius:12px;border:1px solid var(--cc-border);
+  background:linear-gradient(180deg,rgba(255,255,255,.12),rgba(255,255,255,.04));
+  box-shadow:0 6px 18px rgba(0,0,0,.06);
+  cursor:pointer;transition:transform .12s ease, box-shadow .12s ease, border-color .12s ease
+}
+.plan-card:hover{transform:translateY(-2px);box-shadow:0 12px 26px rgba(0,0,0,.10);border-color:color-mix(in oklab,var(--cc-brand) 35%, var(--cc-border))}
+.plan-card h3{font-weight:900;margin:0 0 6px}
+.price{font-size:1.6rem;font-weight:900}
+.feat{opacity:.85}
+.feat li{margin:4px 0}
+.feat ul{margin:8px 0 0 1rem}
+.plan-cta{
+  margin-top:12px;width:100%;border:0;border-radius:10px;padding:10px 14px;
+  font-weight:700;color:#fff;box-shadow:0 6px 16px rgba(0,0,0,.12)
+}
+
+/* Distinct accents (Starter/Growth/Pro by order) */
+.plan-card:nth-child(1){border-color:color-mix(in oklab,#20c997 40%, var(--cc-border))}
+.plan-card:nth-child(1) .plan-cta{background:#20c997}
+.plan-card:nth-child(2){border-color:color-mix(in oklab,#f59f00 40%, var(--cc-border))}
+.plan-card:nth-child(2) .plan-cta{background:#f59f00}
+.plan-card:nth-child(3){border-color:color-mix(in oklab,#e03131 40%, var(--cc-border))}
+.plan-card:nth-child(3) .plan-cta{background:#e03131}
+
+/* Hide any legacy “Continue” button on subscribe page */
+.subscribe-footer .btn-continue,.btn-continue, .cc-legacy-continue{display:none !important}
+
+/* Compact on small screens */
+@media (max-width:480px){
+  .plan-card{padding:14px}
+  .plan-card h3{font-size:1rem}
+}
+
+/* End of file */

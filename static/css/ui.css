@@ -1,19 +1,28 @@
 /* ==========================================================================
    Circuit City UI — components + utilities
    (drop-in stylesheet)
+   Works with static/css/tokens.css (design tokens + themes)
    ========================================================================== */
 
-/* ===== Theme aliases (prefer plain tokens if provided, then cc-*, then defaults) ===== */
+/* ===== Theme aliases (prefer tokens → cc-* → local defaults) ===== */
 :root{
+  /* Colors (wired to tokens.css single source of truth) */
   --theme-bg:        var(--bg,        var(--cc-bg, #0b1220));
   --theme-fg:        var(--fg,        var(--cc-text, #e6ecfb));
   --theme-fg-muted:  var(--fg-muted,  var(--cc-muted, #9fb0cf));
-  --theme-brand:     var(--brand,     var(--cc-accent, #46c0ff));
-  --theme-brand-2:   var(--brand-2,   var(--cc-accent-2, #76a9ff));
-  --theme-border:    var(--border,    var(--cc-border, rgba(255,255,255,.15)));
+
+  /* ALL primary CTAs must use the Forgot-Password blue */
+  --theme-brand:     var(--brand,     var(--cc-accent, #2563eb));  /* blue-500 */
+  --theme-brand-2:   var(--brand-2,   var(--cc-accent-2, #1d4ed8));/* blue-600 hover */
+
+  --theme-border:    var(--border,    var(--cc-border, rgba(148,163,184,.22)));
   --theme-card:      var(--card,      var(--cc-panel, rgba(255,255,255,.06)));
   --theme-surface:   var(--surface,   var(--cc-panel-2, rgba(255,255,255,.10)));
 
+  /* Icon standard (green) */
+  --icon-green: var(--icon-green, #16a34a);
+
+  /* Radii / shadows / sizes */
   --radius:     var(--radius, 12px);
   --radius-sm:  var(--radius-sm, 10px);
   --shadow-sm:  var(--shadow-sm, 0 2px 10px rgba(0,0,0,.08));
@@ -37,7 +46,7 @@
   /* Layout width */
   --container-w: 1120px;
 
-  /* Microinteraction helpers */
+  /* Microinteractions */
   --elev-hover: 0 12px 30px rgba(0,0,0,.18);
   --ring-brand: 0 0 0 3px color-mix(in oklab, var(--theme-brand) 35%, transparent);
 }
@@ -58,10 +67,13 @@ body{
   margin:0;
   background:var(--theme-bg);
   color:var(--theme-fg);
-  font-family: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", "Apple Color Emoji","Segoe UI Emoji","Segoe UI Symbol";
+  /* Stock List font = app-wide standard */
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Arial, "Noto Sans";
   -webkit-font-smoothing:antialiased;
   text-rendering:optimizeLegibility;
 }
+a{color:var(--theme-brand); text-decoration:none}
+a:hover{text-decoration:underline}
 
 /* ===== Layout helpers ===== */
 .page{margin:0 auto; max-width:var(--container-w); padding:clamp(12px,4vw,24px)}
@@ -72,17 +84,15 @@ body{
 .grid.cols-3{grid-template-columns:repeat(3,minmax(0,1fr))}
 @media (max-width:900px){ .grid.cols-2,.grid.cols-3{grid-template-columns:1fr} }
 
-/* Equal-height helpers for neat rows */
 .equal-row{ display:flex; gap:var(--gap-3); align-items:stretch; flex-wrap:wrap }
 .equal-row > *{ flex:1 1 0; min-width:280px }
 .h-100{ height:100% }
 
-/* Spacing utilities */
 .mt-1{margin-top:.5rem} .mt-2{margin-top:1rem} .mt-3{margin-top:1.5rem}
 .mb-1{margin-bottom:.5rem} .mb-2{margin-bottom:1rem} .mb-3{margin-bottom:1.5rem}
 .p-1{padding:.5rem} .p-2{padding:1rem} .p-3{padding:1.5rem}
 
-/* ===== Navbar (fixes mobile transparency) ===== */
+/* ===== Navbar ===== */
 .navbar{
   position:sticky; top:0; z-index:50;
   background:var(--navbar-bg);
@@ -102,8 +112,6 @@ body{
 /* ==========================================================================
    CARDS / TILES / KPI
    ========================================================================== */
-
-/* Cards */
 .card{
   background:var(--theme-card);
   border:1px solid var(--theme-border);
@@ -120,18 +128,14 @@ body{
   font-weight:700;
 }
 .card.header .card-body{ padding:1rem }
-
-/* Hover elevation glow (subtle) */
 .card:hover{ transform:translateY(-2px); box-shadow:var(--elev-hover) }
 
-/* Equal-height card grids (auto rows) */
 .card-grid{
   display:grid; gap:var(--gap-3);
   grid-template-columns:repeat(auto-fit, minmax(280px, 1fr));
   grid-auto-rows:1fr;
 }
 
-/* Tiles */
 .tiles{
   display:grid; gap:var(--gap-3);
   grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
@@ -175,7 +179,6 @@ body{
 /* ==========================================================================
    CONTROLS (Buttons / Inputs / Toolbars)
    ========================================================================== */
-
 .btn{
   appearance:none; border:1px solid transparent;
   border-radius:999px; padding:.55rem .95rem;
@@ -187,17 +190,28 @@ body{
 .btn:hover{ filter:brightness(1.05); transform:translateY(-1px) scale(1.01) }
 .btn:active{ transform:translateY(0) scale(0.995) }
 .btn:focus{ outline:none; box-shadow:var(--ring-brand) }
+
+/* Primary CTA — ALWAYS brand blue */
 .btn.primary{
   background:linear-gradient(180deg, var(--theme-brand-2), var(--theme-brand));
   color:#fff; border-color:transparent;
   box-shadow:0 8px 24px color-mix(in oklab, var(--theme-brand) 30%, transparent);
 }
+
+/* Glass/“grassmorphic” call-to-action for dashboards & stocklist */
+.btn.grass{
+  background:
+    radial-gradient(120% 120% at 10% 10%, rgba(255,255,255,.25) 0%, transparent 50%),
+    linear-gradient(180deg, var(--theme-brand-2), var(--theme-brand));
+  color:#fff; border:0;
+  box-shadow: 0 10px 24px color-mix(in oklab, var(--theme-brand) 32%, transparent),
+              inset 0 0 0 1px rgba(255,255,255,.18);
+}
+
 .btn.ghost{background:transparent; border-color:var(--theme-border)}
 .btn.muted{background:var(--theme-surface)}
 .btn.icon{padding:.45rem .6rem; display:inline-flex; align-items:center; gap:.4rem; height:var(--control-h)}
 .btn[disabled], .btn.disabled{ opacity:.6; pointer-events:none; filter:none; transform:none }
-
-/* Compact button groups in tables/toolbars */
 .btn-group-sm .btn{ height:36px; padding:.4rem .7rem; border-radius:10px }
 
 /* Badges / Chips */
@@ -222,7 +236,7 @@ body{
   background:var(--theme-card);
 }
 
-/* Bootstrap bridge (non-invasive) */
+/* Bootstrap bridge */
 .form-control, .form-select{
   background:var(--theme-card); border-color:var(--theme-border); color:var(--theme-fg); height:var(--control-h);
 }
@@ -231,11 +245,11 @@ body{
   box-shadow:0 0 0 3px color-mix(in oklab, var(--theme-brand) 30%, transparent);
 }
 
-/* Simple toolbar with uniform heights */
+/* Uniform toolbar heights */
 .toolbar{ display:flex; flex-wrap:wrap; gap:.5rem; align-items:center }
 .toolbar .form-control, .toolbar .form-select, .toolbar .btn{ height:var(--control-h) }
 
-/* Beautiful “settings” form rows */
+/* Settings rows */
 .form-row{
   display:grid; gap:10px;
   grid-template-columns:minmax(140px, 1fr) 2.5fr;
@@ -260,7 +274,6 @@ body{
 /* ==========================================================================
    TABLES
    ========================================================================== */
-
 .table{
   width:100%; border-collapse:separate; border-spacing:0; font-size:.95rem;
   background:var(--theme-card); border:1px solid var(--theme-border); border-radius:var(--radius);
@@ -275,26 +288,15 @@ body{
 .table tbody td{ padding:.75rem .9rem; border-bottom:1px solid var(--theme-border) }
 .table tbody tr:hover{ background:color-mix(in oklab, var(--theme-brand) 6%, transparent) }
 
-/* Compact variant */
 .table-compact thead th, .table-compact tbody td{ padding:.55rem .7rem }
-
-/* Sticky header opt-in */
 .table.sticky thead th{ position:sticky; top:0; z-index:2 }
-
-/* Reserved width for actions to keep rows aligned */
 .table-actions{ width:112px }
-
-/* Ellipsis helper */
 .cell-ellipsis{ max-width:280px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis }
-
-/* Close up “useless gaps” around tables in sections */
-.section-tight > .table,
-.section-tight .card.header{ margin-top:.25rem }
+.section-tight > .table, .section-tight .card.header{ margin-top:.25rem }
 
 /* ==========================================================================
    ALERTS / TOASTS
    ========================================================================== */
-
 .alert{
   padding:.85rem 1rem; border-radius:12px; border:1px solid var(--theme-border);
   background:var(--theme-surface); color:var(--theme-fg);
@@ -302,14 +304,11 @@ body{
 .alert.success{ border-color:color-mix(in oklab, var(--success) 40%, var(--theme-border)); background:color-mix(in oklab, var(--success) 12%, transparent) }
 .alert.warn{    border-color:color-mix(in oklab, var(--warning) 40%, var(--theme-border)); background:color-mix(in oklab, var(--warning) 12%, transparent) }
 .alert.danger{  border-color:color-mix(in oklab, var(--danger) 40%,  var(--theme-border)); background:color-mix(in oklab, var(--danger) 12%, transparent) }
-
-/* Optional toast container styles (pairs with pushLive/pushNote) */
 .toast{ border-radius:12px; padding:.7rem .9rem; box-shadow:var(--shadow-md); background:var(--theme-card); border:1px solid var(--theme-border) }
 
 /* ==========================================================================
    CHARTS (uniform heights) + Reveal
    ========================================================================== */
-
 .chart-box{ height:var(--chart-h); padding:12px }
 .chart-box--sm{ height:var(--chart-h-sm) }
 .chart-canvas{ width:100% !important; max-width:100%; height:var(--chart-h) !important }
@@ -319,77 +318,54 @@ body{
   .chart-box{ height:220px }
   .chart-canvas{ height:220px !important }
 }
-
-/* Smooth reveal utility for chart containers */
-.reveal{ opacity:0; transform:translateY(8px); }
+.reveal{ opacity:0; transform:translateY(8px) }
 .reveal.in{ opacity:1; transform:translateY(0); transition:opacity .5s ease, transform .5s ease }
 
 /* ==========================================================================
-   SKELETON LOADERS (shimmer)
+   SKELETON LOADERS
    ========================================================================== */
-
-@keyframes shimmer{
-  0%{ background-position:-450px 0 }
-  100%{ background-position:450px 0 }
-}
+@keyframes shimmer{ 0%{background-position:-450px 0} 100%{background-position:450px 0} }
 .skeleton{
   position:relative; overflow:hidden; border-radius:8px;
   background:linear-gradient(90deg, rgba(255,255,255,.06) 25%, rgba(255,255,255,.12) 37%, rgba(255,255,255,.06) 63%);
   background-size:900px 100%;
-  animation:shimmer 1.25s infinite linear;
-  min-height:12px;
+  animation:shimmer 1.25s infinite linear; min-height:12px;
 }
 .skeleton.sm{ height:12px } .skeleton.md{ height:18px } .skeleton.lg{ height:28px }
 .skeleton.round{ border-radius:999px }
 .skeleton-card{ border:1px solid var(--theme-border); background:var(--theme-card); border-radius:var(--radius); padding:var(--card-pad) }
-
-/* Hide real content while loading */
-.is-loading .hide-while-loading{ opacity:0; pointer-events:none }
-.is-loading .show-while-loading{ display:block }
+.is-loading .hide-while-loading{ opacity:0; pointer-events:none } .is-loading .show-while-loading{ display:block }
 .show-while-loading{ display:none }
-
-/* Prebuilt skeleton layouts */
 .skel-kpi{ display:flex; align-items:center; gap:12px }
 .skel-kpi .icon{ width:42px; height:42px; border-radius:12px }
 .skel-kpi .lines{ flex:1 1 auto }
 .skel-chart{ height:var(--chart-h); border-radius:10px; border:1px dashed var(--theme-border) }
 
 /* ==========================================================================
-   AI INSIGHTS — risk/safe highlight cards
+   AI INSIGHTS
    ========================================================================== */
-
 .ai-card{
-  border:1px solid var(--theme-border);
-  background:var(--theme-card);
-  border-radius:12px;
-  padding:12px;
-  box-shadow:var(--shadow-sm);
+  border:1px solid var(--theme-border); background:var(--theme-card);
+  border-radius:12px; padding:12px; box-shadow:var(--shadow-sm);
 }
 .ai-card + .ai-card{ margin-top:.5rem }
-
 .ai-risk{
   border-color: color-mix(in oklab, var(--danger) 45%, var(--theme-border));
-  background:
-    linear-gradient(0deg, color-mix(in oklab, var(--danger) 10%, transparent), transparent),
-    var(--theme-card);
+  background: linear-gradient(0deg, color-mix(in oklab, var(--danger) 10%, transparent), transparent), var(--theme-card);
   box-shadow: 0 10px 28px color-mix(in oklab, var(--danger) 24%, transparent);
 }
 .ai-safe{
   border-color: color-mix(in oklab, var(--success) 45%, var(--theme-border));
-  background:
-    linear-gradient(0deg, color-mix(in oklab, var(--success) 10%, transparent), transparent),
-    var(--theme-card);
+  background: linear-gradient(0deg, color-mix(in oklab, var(--success) 10%, transparent), transparent), var(--theme-card);
   box-shadow: 0 10px 28px color-mix(in oklab, var(--success) 20%, transparent);
 }
 
 /* ==========================================================================
-   PROGRESS / BATTERY (stock level)
+   PROGRESS / BATTERY
    ========================================================================== */
-
 .battery-wrap{ position:relative; width:90px }
 .battery{
-  height:180px; width:90px;
-  border:2px solid #334155; border-radius:16px;
+  height:180px; width:90px; border:2px solid #334155; border-radius:16px;
   position:relative; overflow:hidden; background:var(--theme-surface);
   box-shadow:inset 0 0 8px rgba(0,0,0,.08);
 }
@@ -398,19 +374,13 @@ body{
   width:36px; height:10px; border:2px solid #334155; border-bottom:none;
   border-radius:8px 8px 0 0; background:var(--theme-surface);
 }
-.battery-fill{
-  position:absolute; bottom:0; left:0; right:0;
-  height:0%; transition:height .6s ease, background-color .25s ease;
-}
-.fill-red{ background:#ef4444 }
-.fill-yellow{ background:#f59e0b }
-.fill-mildgreen{ background:#22c55e }
-.fill-lightgreen{ background:#86efac }
+.battery-fill{ position:absolute; bottom:0; left:0; right:0; height:0%; transition:height .6s ease, background-color .25s ease }
+.fill-red{ background:#ef4444 } .fill-yellow{ background:#f59e0b }
+.fill-mildgreen{ background:#22c55e } .fill-lightgreen{ background:#86efac }
 
 /* ==========================================================================
-   HEATMAP (restock planner)
+   HEATMAP
    ========================================================================== */
-
 .heatmap{ width:100%; overflow-x:auto }
 .heatmap-grid{ display:block }
 .heatmap-row{ display:grid; grid-template-columns:180px repeat(12, minmax(36px, 1fr)); gap:6px; margin-bottom:6px }
@@ -437,15 +407,17 @@ body{
 /* ==========================================================================
    ANIMATIONS & HELPERS
    ========================================================================== */
-
 .will-animate{ transform:translateY(8px); opacity:0 }
 .will-animate.in{ transform:translateY(0); opacity:1; transition:transform .5s ease, opacity .5s ease }
-
 .round{border-radius:var(--radius)} .round-sm{border-radius:var(--radius-sm)}
 .shadow{box-shadow:var(--shadow-md)} .soft{box-shadow:var(--shadow-sm)}
 .hidden{display:none !important}
 .center{display:flex; align-items:center; justify-content:center}
-
-/* Subtle hover glow utility for any block */
 .glow-hover{ transition: box-shadow .18s ease, transform .12s ease }
 .glow-hover:hover{ transform: translateY(-2px); box-shadow: var(--elev-hover) }
+
+/* ==========================================================================
+   ICON STANDARDIZATION (green icons globally)
+   ========================================================================== */
+.bi, .icon, svg.icon { color: var(--icon-green) !important; fill: currentColor; stroke: currentColor; }
+.icon-default { color: inherit !important; } /* opt-out */

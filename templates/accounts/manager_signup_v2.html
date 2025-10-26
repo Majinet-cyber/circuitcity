@@ -1,0 +1,288 @@
+{% load static %}
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Create your store · Circuit City</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#0b1220" />
+  <!-- ACTIVE TEMPLATE: accounts/manager_signup_v2.html -->
+  <style>
+    :root{
+      --ink:#0b1220; --muted:#64748b;
+      --line:#dbe3f0; --bg1:#eef4ff; --bg2:#ffffff;
+      --blue:#3b82f6;
+      --shadow: 0 14px 36px rgba(15,23,42,.14), 0 1px 0 rgba(255,255,255,.6) inset;
+      --glass: color-mix(in oklab, #ffffffaa 78%, transparent);
+      --pop: cubic-bezier(.17,.67,.25,1.35); --fast: 160ms; --slow: 420ms;
+    }
+    *{box-sizing:border-box}
+    html,body{height:100%}
+    body{
+      margin:0; color:var(--ink);
+      font: 500 16px/1.45 system-ui, Segoe UI, Inter, Roboto, Arial, "Noto Sans";
+      background:
+        radial-gradient(1200px 800px at -10% -10%, rgba(34,211,238,.12), transparent 45%),
+        radial-gradient(1400px 800px at 110% 110%, rgba(59,130,246,.12), transparent 46%),
+        linear-gradient(180deg, var(--bg1), var(--bg2));
+    }
+    .wrap{ min-height:100dvh; display:grid; place-items:start center; padding:clamp(14px, 2.8vw, 28px); }
+    .card{
+      width:min(1100px, 96vw);
+      background:var(--glass);
+      backdrop-filter: blur(18px) saturate(120%);
+      border:1px solid var(--line);
+      border-radius:24px;
+      box-shadow: var(--shadow);
+      padding: clamp(16px, 3.4vw, 32px);
+      animation: popIn var(--slow) var(--pop) both;
+    }
+    @keyframes popIn{ from{opacity:0; transform: translateY(8px) scale(.985)} to{opacity:1; transform:none} }
+    .brand{ display:flex; align-items:center; gap:.6rem; font-weight:900; color:#0b2868; margin:6px 2px 20px; }
+    .brand img{ width:22px; height:22px }
+    .page-title{ font-size:clamp(26px, 3.6vw, 36px); line-height:1.1; margin:.1rem 0 .5rem; font-weight:900 }
+    .subtitle{ color:var(--muted); margin:0 0 20px; }
+
+    form{ display:grid; gap:14px; }
+    .grid{ display:grid; grid-template-columns: 1fr; gap:14px; }
+    @media (min-width: 860px){ .grid{ grid-template-columns: 1fr 1fr; } }
+
+    .field{ position:relative; }
+    .label{ font-weight:800; font-size:.92rem; margin:0 0 6px; color:#0b2868; }
+    .hint{ font-size:.84rem; color:var(--muted); margin-top:6px }
+
+    .input, .file{
+      width:100%; border:1px solid var(--line); border-radius:14px;
+      padding:12px 14px 12px 42px; background:#f7faff;
+      transition: box-shadow var(--fast) var(--pop), border-color var(--fast);
+      outline:0; font-weight:600;
+    }
+    .input:focus, .file:focus{ border-color:color-mix(in oklab, var(--blue) 68%, white); box-shadow:0 8px 24px rgba(59,130,246,.18); background:#fff; }
+    .addon{ position:absolute; left:10px; top:50%; translate:0 -50%; width:26px; height:26px; display:grid; place-items:center; color:#7586a5; }
+
+    .eye{ position:absolute; right:10px; top:50%; translate:0 -50%; width:30px; height:30px; display:grid; place-items:center; color:#6b7da5; cursor:pointer; border-radius:8px; }
+    .eye:hover{ background:#eef3ff }
+    .meter{ height:6px; border-radius:999px; background:#e9eef8; overflow:hidden; margin-top:8px }
+    .meter>span{ display:block; height:100%; width:0%; background:linear-gradient(90deg, #f59e0b, #10b981); transition:width 260ms var(--pop) }
+
+    .actions{ display:flex; gap:12px; justify-content:flex-end; margin-top:8px; }
+    .btn{
+      border:1px solid color-mix(in oklab, var(--blue) 35%, white);
+      background: linear-gradient(180deg, var(--blue), color-mix(in oklab, var(--blue) 82%, black));
+      color:#fff; padding:12px 18px; font-weight:900; border-radius:14px; min-width:180px;
+      box-shadow: 0 16px 40px rgba(59,130,246,.26);
+      transition: transform 160ms var(--pop), box-shadow 160ms var(--pop);
+      cursor:pointer;
+    }
+    .btn:hover{ transform: translateY(-1px); box-shadow: 0 22px 50px rgba(59,130,246,.32) }
+    .btn:active{ transform: translateY(0) scale(.98) }
+    .btn.muted{ background:linear-gradient(180deg, #f8fafc, #eef2ff); color:#0b1220; border-color:#cdd9f1; box-shadow:0 8px 24px rgba(2,6,23,.06); }
+    .footnote{ margin-top:10px; color:var(--muted); font-size:.9rem }
+
+    .drop{ position:relative; border:2px dashed #cfe; border-radius:14px; padding:12px; background:#f8fbff; transition:border-color 160ms, background 160ms; }
+    .drop.drag{ border-color: var(--blue); background:#eef6ff }
+
+    /* Fancy Icon Select */
+    .cc-select{ position:relative; }
+    .cc-select-btn{
+      width:100%; border:1px solid var(--line); border-radius:14px; background:#f7faff;
+      padding:12px 14px; outline:0; font-weight:700; display:flex; align-items:center; justify-content:space-between; gap:.8rem;
+      transition: box-shadow 160ms var(--pop), border-color 160ms;
+      cursor:pointer;
+    }
+    .cc-select-btn:focus{ border-color:color-mix(in oklab, var(--blue) 68%, white); box-shadow:0 8px 24px rgba(59,130,246,.18); background:#fff; }
+    .cc-value{ display:flex; align-items:center; gap:.6rem; color:#344266 }
+    .cc-icon{ width:20px; height:20px; display:inline-block; color:#344266 }
+    .cc-menu{
+      position:absolute; z-index:30; left:0; right:0; top:calc(100% + 6px);
+      background:#fff; border:1px solid var(--line); border-radius:14px; padding:6px;
+      box-shadow:0 18px 36px rgba(2,8,23,.12);
+      opacity:0; pointer-events:none; transform:translateY(-4px); transition:.18s ease;
+    }
+    .cc-menu.open{ opacity:1; pointer-events:auto; transform:translateY(0); }
+    .cc-option{ display:flex; align-items:center; gap:.7rem; padding:10px 12px; border-radius:10px; cursor:pointer; color:#0b1220; font-weight:700; }
+    .cc-option:hover{ background:#f3f6ff }
+    .cc-option[data-active="true"]{ background:#eef4ff; outline:1px solid #dbe7ff; }
+  </style>
+</head>
+<body>
+<div class="wrap">
+  <section class="card">
+    <div class="brand">
+      <img src="{% static 'brand/mjn-32.png' %}" alt="" />
+      <span>Circuit City</span>
+    </div>
+
+    <h1 class="page-title">Create your store</h1>
+    <p class="subtitle">Managers create the store and can invite agents later.</p>
+
+    {% if messages %}
+      {% for m in messages %}
+        <div style="background:#fef2f2;border:1px solid #fecaca;color:#991b1b;padding:.7rem 1rem;border-radius:12px;margin:0 0 12px">
+          {{ m }}
+        </div>
+      {% endfor %}
+    {% endif %}
+
+    <form method="post" action="{% url 'accounts:signup_manager' %}" enctype="multipart/form-data" novalidate>
+      {% csrf_token %}
+
+      <div class="grid">
+        <div class="field">
+          <div class="label">Email</div>
+          <span class="addon">✉️</span>
+          <input class="input" type="email" name="email" required autocomplete="email" placeholder="you@company.com" value="{{ request.POST.email|default:'' }}">
+        </div>
+
+        <div class="field">
+          <div class="label">Your full name</div>
+          <span class="addon">👤</span>
+          <input class="input" type="text" name="full_name" required autocomplete="name" placeholder="Jane Doe" value="{{ request.POST.full_name|default:'' }}">
+        </div>
+
+        <div class="field">
+          <div class="label">Store name</div>
+          <span class="addon">🏬</span>
+          <input class="input" type="text" name="store_name" required placeholder="e.g. Circuitly" value="{{ request.POST.store_name|default:'' }}">
+          <div class="hint">This becomes your business name in the app.</div>
+        </div>
+
+        <!-- Business type -->
+        <div class="field">
+          <div class="label">Business type</div>
+
+          <!-- Hidden real select (Django posts this) -->
+          <select name="business_type" id="id_business_type" required style="display:none">
+            <option value="" {% if not request.POST.business_type %}selected{% endif %}>---------</option>
+            <option value="electronics" {% if request.POST.business_type == 'electronics' %}selected{% endif %}>Phones & Electronics</option>
+            <option value="pharmacy" {% if request.POST.business_type == 'pharmacy' %}selected{% endif %}>Pharmacy</option>
+            <option value="fashion" {% if request.POST.business_type == 'fashion' %}selected{% endif %}>Fashion & Clothing</option>
+          </select>
+
+          <!-- Fancy control -->
+          <div class="cc-select" id="ccBizSelect">
+            <button type="button" class="cc-select-btn" aria-haspopup="listbox" aria-expanded="false">
+              <span class="cc-value">
+                <span class="cc-icon" id="bizIcon"></span>
+                <span id="bizLabel" style="font-weight:800;color:#344266">Choose business type…</span>
+              </span>
+              <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+            </button>
+
+            <div class="cc-menu" role="listbox" aria-labelledby="bizLabel">
+              <div class="cc-option" data-value="electronics">
+                <span class="cc-icon"><svg viewBox="0 0 24 24"><path d="M4 6h10a2 2 0 012 2v8a2 2 0 01-2 2H4V6zm14 3h2v9h-2z" fill="currentColor"/></svg></span>
+                Phones &amp; Electronics
+              </div>
+              <div class="cc-option" data-value="pharmacy">
+                <span class="cc-icon"><svg viewBox="0 0 24 24"><path d="M10 4h4v6h6v4h-6v6h-4v-6H4v-4h6z" fill="currentColor"/></svg></span>
+                Pharmacy
+              </div>
+              <div class="cc-option" data-value="fashion">
+                <span class="cc-icon"><svg viewBox="0 0 24 24"><path d="M12 6a2 2 0 10-2-2h2a4 4 0 014 4l6 5v3H2v-3l10-8z" fill="currentColor"/></svg></span>
+                Fashion &amp; Clothing
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="field">
+          <div class="label">Subdomain <span style="color:var(--muted)">(optional)</span></div>
+          <span class="addon">🔗</span>
+          <input class="input" type="text" name="subdomain" inputmode="lowercase" placeholder="e.g. circuitly" value="{{ request.POST.subdomain|default:'' }}">
+          <div class="hint">yourstore.imajinet.com</div>
+        </div>
+
+        <div class="field">
+          <div class="label">Logo <span style="color:var(--muted)">(optional)</span></div>
+          <div id="drop" class="drop">
+            <input id="logo" class="file" type="file" name="logo" accept="image/*">
+            <div class="hint">Drag & drop a PNG/SVG here or click to browse.</div>
+          </div>
+        </div>
+
+        <div class="field">
+          <div class="label">Password</div>
+          <span class="addon">🔒</span>
+          <input id="pw1" class="input" type="password" name="password1" required autocomplete="new-password" placeholder="Create a strong password" minlength="12">
+          <span id="eye1" class="eye" title="Show/Hide">👁️</span>
+          <div class="meter"><span id="bar1"></span></div>
+          <div class="hint">Use at least 12 characters (letters, numbers, symbol).</div>
+        </div>
+
+        <div class="field">
+          <div class="label">Confirm password</div>
+          <span class="addon">✅</span>
+          <input id="pw2" class="input" type="password" name="password2" required autocomplete="new-password" placeholder="Repeat your password" minlength="12">
+          <span id="eye2" class="eye" title="Show/Hide">👁️</span>
+          <div class="meter"><span id="bar2"></span></div>
+        </div>
+      </div>
+
+      <label style="display:flex;gap:.6rem;align-items:flex-start;margin-top:4px">
+        <input type="checkbox" name="agree" required style="margin-top:.25rem" />
+        <span class="hint" style="font-size:.95rem">I agree to the Terms and confirm that I’m creating a store for my business.</span>
+      </label>
+
+      <div class="actions">
+        <a href="{% url 'accounts:login' %}" class="btn muted">Back to sign in</a>
+        <button class="btn" type="submit">Create my store</button>
+      </div>
+
+      <div class="footnote">Tip: You can invite agents from the dashboard after creating your store.</div>
+    </form>
+  </section>
+</div>
+
+<script>
+  // Password helpers
+  function toggle(id, eye){ const el=document.getElementById(id); el.type = el.type==='password' ? 'text' : 'password'; eye.style.opacity = el.type==='text'? '.8': '1'; }
+  function strength(pw){ let s=0; if(pw.length>=12)s+=25; if(/[A-Z]/.test(pw))s+=20; if(/[a-z]/.test(pw))s+=20; if(/\d/.test(pw))s+=20; if(/[^A-Za-z0-9]/.test(pw))s+=15; return Math.min(100,s); }
+  const pw1=document.getElementById('pw1'), pw2=document.getElementById('pw2'), bar1=document.getElementById('bar1'), bar2=document.getElementById('bar2');
+  const eye1=document.getElementById('eye1'), eye2=document.getElementById('eye2');
+  eye1.onclick=()=>toggle('pw1',eye1); eye2.onclick=()=>toggle('pw2',eye2);
+  function updateBars(){ bar1.style.width=strength(pw1.value)+'%'; bar2.style.width=Math.min(100,(pw2.value&&pw1.value===pw2.value)?100:20)+'%'; }
+  pw1.addEventListener('input',updateBars); pw2.addEventListener('input',updateBars);
+
+  // Drop highlight
+  const drop=document.getElementById('drop'), file=document.getElementById('logo');
+  drop.addEventListener('dragenter',()=>drop.classList.add('drag'));
+  drop.addEventListener('dragleave',()=>drop.classList.remove('drag'));
+  drop.addEventListener('drop',()=>drop.classList.remove('drag'));
+  drop.addEventListener('click',()=>file.click());
+
+  // Icon dropdown wiring
+  (function(){
+    const host=document.getElementById('ccBizSelect');
+    const real=document.getElementById('id_business_type');
+    if(!host||!real) return;
+    const btn=host.querySelector('.cc-select-btn');
+    const menu=host.querySelector('.cc-menu');
+    const labelEl=host.querySelector('#bizLabel');
+    const iconEl=host.querySelector('#bizIcon');
+    const icons={
+      electronics:'<svg viewBox="0 0 24 24"><path d="M4 6h10a2 2 0 012 2v8a2 2 0 01-2 2H4V6zm14 3h2v9h-2z" fill="currentColor"/></svg>',
+      pharmacy:'<svg viewBox="0 0 24 24"><path d="M10 4h4v6h6v4h-6v6h-4v-6H4v-4h6z" fill="currentColor"/></svg>',
+      fashion:'<svg viewBox="0 0 24 24"><path d="M12 6a2 2 0 10-2-2h2a4 4 0 014 4l6 5v3H2v-3l10-8z" fill="currentColor"/></svg>'
+    };
+    const textMap={
+      electronics:'Phones & Electronics',
+      pharmacy:'Pharmacy',
+      fashion:'Fashion & Clothing'
+    };
+    function setValue(v){
+      real.value=v||'';
+      labelEl.textContent=v?textMap[v]:'Choose business type…';
+      iconEl.innerHTML=v?icons[v]:'';
+      host.querySelectorAll('.cc-option').forEach(o=>o.dataset.active=(o.dataset.value===v));
+      if(real.hasAttribute('required')) real.setCustomValidity(v?'':'Please choose your business type');
+    }
+    btn.addEventListener('click',()=>{ const open=menu.classList.toggle('open'); btn.setAttribute('aria-expanded',open?'true':'false'); });
+    host.querySelectorAll('.cc-option').forEach(opt=>opt.addEventListener('click',()=>{ setValue(opt.dataset.value); menu.classList.remove('open'); btn.setAttribute('aria-expanded','false'); }));
+    document.addEventListener('click',e=>{ if(!host.contains(e.target)){ menu.classList.remove('open'); btn.setAttribute('aria-expanded','false'); }});
+    document.addEventListener('keydown',e=>{ if(e.key==='Escape'){ menu.classList.remove('open'); btn.setAttribute('aria-expanded','false'); }});
+    setValue(real.value);
+  })();
+</script>
+</body>
+</html>

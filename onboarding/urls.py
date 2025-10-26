@@ -1,4 +1,4 @@
-# circuitcity/onboarding/urls.py
+﻿# circuitcity/onboarding/urls.py
 from django.urls import path
 from django.views.generic import RedirectView
 from . import views
@@ -6,7 +6,7 @@ from . import views
 app_name = "onboarding"
 
 urlpatterns = [
-    # Landing → run the smart router
+    # Landing â†’ run the smart router
     path("", views.start, name="start"),
     path("start/", views.start),  # alias
 
@@ -18,6 +18,8 @@ urlpatterns = [
     path("add-product/", views.add_product, name="add_product"),
     path("add/", RedirectView.as_view(pattern_name="onboarding:add_product", permanent=False)),
 
-    # Nice alias for links that say “activate”
+    # Nice alias for links that say â€œactivateâ€
     path("activate/", RedirectView.as_view(pattern_name="onboarding:start", permanent=False)),
 ]
+
+

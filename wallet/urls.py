@@ -1,4 +1,4 @@
-# wallet/urls.py
+﻿# wallet/urls.py
 from django.urls import path
 from django.views.generic import RedirectView
 from django.http import JsonResponse
@@ -54,7 +54,7 @@ urlpatterns = [
     path("admin/entries/export.csv", views.admin_entries_export_csv, name="admin_entries_export_csv"),
 
     # ------------------------------------------------------------------
-    # Legacy dashed-path compatibility → redirect to new canonical routes
+    # Legacy dashed-path compatibility â†’ redirect to new canonical routes
     # ------------------------------------------------------------------
     path("admin-home/", RedirectView.as_view(pattern_name="wallet:admin_home", permanent=False)),
     path("admin-agent/<int:agent_id>/", RedirectView.as_view(pattern_name="wallet:admin_agent", permanent=False)),
@@ -67,7 +67,7 @@ urlpatterns = [
     path("admin-pos/new/", RedirectView.as_view(pattern_name="wallet:admin_po_new", permanent=False)),
     path("admin-pos/<int:po_id>/", RedirectView.as_view(pattern_name="wallet:admin_po_detail", permanent=False)),
 
-    # Convenience alias (without trailing slash → redirects to admin_home)
+    # Convenience alias (without trailing slash â†’ redirects to admin_home)
     path("admin", RedirectView.as_view(pattern_name="wallet:admin_home", permanent=False)),
 
     # ------------------------------------------------------------------
@@ -75,3 +75,5 @@ urlpatterns = [
     # ------------------------------------------------------------------
     path("healthz/", lambda r: JsonResponse({"ok": True}), name="healthz"),
 ]
+
+

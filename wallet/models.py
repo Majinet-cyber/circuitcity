@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 from decimal import Decimal, ROUND_HALF_UP
 from typing import Optional
@@ -53,7 +53,7 @@ class TxnType(models.TextChoices):
 
 class WalletTransactionQuerySet(models.QuerySet):
     def for_user(self, user):
-        """Admin/manager → all; Agent → only their transactions."""
+        """Admin/manager â†’ all; Agent â†’ only their transactions."""
         return self if is_manager_like(user) else self.filter(agent=user)
 
     def balance_for_agent(self, agent_id):
@@ -92,7 +92,7 @@ class WalletTransaction(models.Model):
 
     def __str__(self) -> str:
         who = self.agent_id or "company"
-        return f"{self.type} {self.amount} → {who} {self.effective_date}"
+        return f"{self.type} {self.amount} â†’ {who} {self.effective_date}"
 
     def save(self, *args, **kwargs):
         # Normalize amount to 2dp
@@ -114,7 +114,7 @@ class SalesTarget(models.Model):
         unique_together = [("agent", "year", "month")]
 
     def __str__(self) -> str:
-        return f"{self.agent_id} · {self.year}-{self.month:02d}"
+        return f"{self.agent_id} Â· {self.year}-{self.month:02d}"
 
 
 class AttendanceLog(models.Model):
@@ -128,7 +128,7 @@ class AttendanceLog(models.Model):
         unique_together = [("agent", "date")]
 
     def __str__(self) -> str:
-        return f"{self.agent_id} · {self.date} · {'in' if self.check_in else 'absent'}"
+        return f"{self.agent_id} Â· {self.date} Â· {'in' if self.check_in else 'absent'}"
 
 
 # ----------------------------------------------------------------------
@@ -171,7 +171,7 @@ class BudgetRequest(models.Model):
         ordering = ("-created_at",)
 
     def __str__(self) -> str:
-        return f"{self.title} · {self.agent_id} · {self.amount} · {self.status}"
+        return f"{self.title} Â· {self.agent_id} Â· {self.amount} Â· {self.status}"
 
     def save(self, *args, **kwargs):
         self.amount = q2(self.amount)
@@ -253,7 +253,7 @@ class Payslip(models.Model):
         ordering = ("-issued_at",)
 
     def __str__(self) -> str:
-        return f"{self.reference or 'NOREF'} · {self.agent_id} · {self.year}-{self.month:02d}"
+        return f"{self.reference or 'NOREF'} Â· {self.agent_id} Â· {self.year}-{self.month:02d}"
 
     def _make_reference(self) -> str:
         ts = timezone.now().strftime("%y%m%d%H%M%S")
@@ -316,7 +316,7 @@ class Payment(models.Model):
         ]
 
     def __str__(self) -> str:
-        return f"{self.get_method_display()} · {self.amount} · {self.status}"
+        return f"{self.get_method_display()} Â· {self.amount} Â· {self.status}"
 
     def save(self, *args, **kwargs):
         self.amount = q2(self.amount)
@@ -339,7 +339,7 @@ class PayoutSchedule(models.Model):
         ordering = ("-created_at",)
 
     def __str__(self) -> str:
-        return f"{self.name} · day {self.day_of_month} @ {self.at_hour:02d}:00"
+        return f"{self.name} Â· day {self.day_of_month} @ {self.at_hour:02d}:00"
 
 
 # ----------------------------------------------------------------------
@@ -378,7 +378,7 @@ class AdminPurchaseOrder(models.Model):
         ]
 
     def __str__(self) -> str:
-        return f"PO-{self.id} · {self.supplier_name or 'Supplier'} · {self.total} {self.currency}"
+        return f"PO-{self.id} Â· {self.supplier_name or 'Supplier'} Â· {self.total} {self.currency}"
 
     def recompute_totals(self, save: bool = True):
         agg = self.items.aggregate(s=Sum("line_total"))
@@ -404,7 +404,7 @@ class AdminPurchaseOrderItem(models.Model):
         ]
 
     def __str__(self) -> str:
-        return f"{self.product} × {self.quantity}"
+        return f"{self.product} Ã— {self.quantity}"
 
     def save(self, *args, **kwargs):
         if not self.line_total and self.quantity and self.unit_price is not None:
@@ -413,3 +413,5 @@ class AdminPurchaseOrderItem(models.Model):
             self.line_total = q2(self.line_total)
         self.unit_price = q2(self.unit_price)
         super().save(*args, **kwargs)
+
+

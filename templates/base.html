@@ -10,6 +10,12 @@
   <meta name="theme-color" content="#0b1220" />
   <meta name="apple-mobile-web-app-capable" content="yes">
 
+  {# Provide CSRF to JS in a reliable way #}
+  <meta name="csrf-token" content="{{ csrf_token }}">
+  {# If you ever customize the cookie name in settings, this still works thanks to the shim checking both names below #}
+
+  {% with ASSET_V=BUILD_ID|default:STATIC_VERSION|default:"1" %}
+
   <!-- Favicon / PWA -->
   <link rel="icon" href="{% static 'favicon.ico' %}">
   <link rel="icon" type="image/png" sizes="32x32" href="{% static 'img/logo-32.png' %}">
@@ -17,7 +23,6 @@
   <link rel="manifest" href="{% static 'manifest.webmanifest' %}">
 
   <script>
-    /* Use saved theme if present; otherwise keep "blue" */
     (function () {
       try {
         const saved = localStorage.getItem("cc-theme");
@@ -30,21 +35,20 @@
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
   <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
 
-  {# ===== Core styles (order matters) ===== #}
-  <link rel="stylesheet" href="{% static 'css/tokens.css' %}?v={{ STATIC_VERSION|default:'1' }}">
-  <link rel="stylesheet" href="{% static 'css/ui.css' %}?v={{ STATIC_VERSION|default:'1' }}">
-  <link rel="stylesheet" href="{% static 'css/app.css' %}?v={{ STATIC_VERSION|default:'1' }}">
-  <link rel="stylesheet" href="{% static 'css/inventory-glass.css' %}?v={{ STATIC_VERSION|default:'1' }}">
-  <link rel="stylesheet" href="{% static 'css/polish.css' %}?v={{ STATIC_VERSION|default:'1' }}">
-  {# IMPORTANT: use a stable filename so collectstatic can find it every deploy #}
-  <link rel="stylesheet" href="{% static 'css/v2-overrides.2025-09-25.css' %}?v={{ STATIC_VERSION|default:'1' }}">
+  <!-- Core styles (base → app → feature) -->
+  <link rel="stylesheet" href="{% static 'css/tokens.css' %}?v={{ ASSET_V }}">
+  <link rel="stylesheet" href="{% static 'css/ui.css' %}?v={{ ASSET_V }}">
+  <link rel="stylesheet" href="{% static 'css/app.css' %}?v={{ ASSET_V }}">
+  <link rel="stylesheet" href="{% static 'css/inventory-glass.css' %}?v={{ ASSET_V }}">
+  <link rel="stylesheet" href="{% static 'css/polish.css' %}?v={{ ASSET_V }}">
+  <link rel="stylesheet" href="{% static 'css/mobile.css' %}?v={{ ASSET_V }}">
+  <link rel="stylesheet" href="{% static 'css/mobile-fixes.css' %}?v={{ ASSET_V }}">
 
-  <link rel="stylesheet" href="{% static 'css/mobile.css' %}?v={{ STATIC_VERSION|default:'1' }}">
-  {# Permanent mobile/safe-area/keyboard tweaks #}
-  <link rel="stylesheet" href="{% static 'css/mobile-fixes.css' %}?v={{ STATIC_VERSION|default:'1' }}">
+  <!-- FINAL: versioned overrides must load LAST to win the cascade -->
+  <link rel="stylesheet" href="{% static 'css/v2-overrides.2025-09-25.css' %}?v={{ ASSET_V }}">
+  {% endwith %}
 
   <style>
-    /* ---- Layout tokens & essentials ---- */
     :root{
       --sidebar-w: 270px; --radius: 12px;
       --shadow-sm: 0 2px 10px rgba(2,8,23,.08);
@@ -52,30 +56,18 @@
 
       --bg:#f5f7fe; --ink:#0b1220; --muted:#475569;
       --line:#d9e2ef; --card:#ffffff;
-      --chart-grid: rgba(2,6,23,.10);
 
-      --cc-accent:#3b82f6;   /* blue-500 */
-      --cc-accent-2:#60a5fa; /* blue-400 */
+      --cc-accent: var(--cc-brand, #2563eb);
 
       --font-sans: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Arial, "Noto Sans";
 
-      /* Fluid type */
-      --fs-2xl: clamp(20px, 2.7vw, 24px);
       --fs-xl:  clamp(18px, 2.2vw, 20px);
-      --fs-lg:  clamp(16px, 1.9vw, 18px);
       --fs-md:  clamp(14px, 1.6vw, 16px);
       --fs-sm:  13px;
-      --lh-tight: 1.15; --lh-normal: 1.4;
+      --lh-tight: 1.15;
 
       --elevate: cubic-bezier(.2,.8,.2,1);
-      --pop:     cubic-bezier(.17,.67,.25,1.35);
-      --fast: 140ms; --med: 220ms; --slow: 360ms;
-
-      /* Glass tokens */
-      --glass-bg: color-mix(in oklab, var(--card) 82%, transparent);
-      --glass-br: 14px;
-      --glass-bd: 1px solid var(--line);
-      --glass-shadow: 0 14px 40px rgba(2,6,23,.10);
+      --fast: 140ms;
 
       /* Midnight Glass Sidebar */
       --mid-bg:#0f172a;
@@ -99,19 +91,20 @@
       margin:0; background:var(--bg); color:var(--ink);
       font-family:var(--font-sans); -webkit-font-smoothing:antialiased;
       overflow-x:hidden;
+      -webkit-text-size-adjust:100%;
+      touch-action: manipulation;
     }
-    /* prevent iOS zoom on focus */
-    input, select, textarea { font-size:16px; }
+    input, select, textarea { font-size:16px; } /* prevent iOS zoom on focus */
 
     img, svg, canvas, video { max-width:100%; height:auto; }
     table { width:100%; border-collapse:collapse; overflow-x:auto; display:block; }
 
     .cc-shell{ min-height:100dvh; display:flex; width:100%; }
 
-    /* ===== Midnight Glass Sidebar ===== */
+    /* ===== Sidebar ===== */
     .cc-sidebar{
       position:sticky; top:0; width:var(--sidebar-w); flex:0 0 var(--sidebar-w);
-      height:100dvh; overflow:auto; z-index:10; padding:16px;
+      height:100dvh; overflow:auto; z-index:2000; padding:16px;
       display:flex; flex-direction:column; gap:14px;
       color: var(--mid-ink); color-scheme: dark;
       background:
@@ -123,13 +116,6 @@
       backdrop-filter: blur(14px) saturate(120%);
       box-shadow: inset 0 1px 0 rgba(255,255,255,.04);
     }
-    .brand{ display:flex; align-items:center; gap:.6rem; font-weight:900; font-size:1.2rem; margin:2px 2px 10px; color:#e2e8f0; }
-    .brand .logo{
-      display:grid; place-items:center; width:36px; height:36px; border-radius:12px;
-      background: linear-gradient(135deg, rgba(34,211,238,.22), rgba(16,185,129,.18));
-      color:#e2e8f0; box-shadow: inset 0 1px 0 rgba(255,255,255,.25);
-    }
-    .menu-group{ font-size:.72rem; font-weight:800; letter-spacing:.08em; text-transform:uppercase; margin:8px 6px 6px; color: var(--mid-ink-dim); }
     .navlist{ list-style:none; padding:0; margin:0; display:flex; flex-direction:column; gap:8px; }
     .navlink{
       display:flex; align-items:center; gap:.6rem;
@@ -137,47 +123,16 @@
       color: var(--mid-ink); background: transparent; border:1px solid transparent;
       transition:transform var(--fast) var(--elevate), box-shadow var(--fast) var(--elevate), background var(--fast) var(--elevate), border-color var(--fast) var(--elevate);
     }
-    .navlink .bi{ font-size:1.05rem; color: var(--mid-ink-dim); }
-    .navlink:hover{
-      background: var(--mid-hover);
-      border-color: rgba(34,211,238,.28);
-      box-shadow: 0 6px 20px rgba(34,211,238,.12), 0 0 0 1px rgba(34,211,238,.22) inset;
-      transform: translateY(-1px);
-    }
-    .navlink.active{
-      background: var(--mid-active);
-      border-color: rgba(34,211,238,.35);
-      box-shadow: 0 10px 28px rgba(34,211,238,.16), inset 0 0 0 1px rgba(34,211,238,.35);
-      color:#eaf2ff;
-    }
-    .navlink.active .bi{ color:#eaf2ff; }
-
-    .side-footer{ margin-top:auto; display:flex; gap:8px; align-items:center; justify-content:space-between; color:var(--mid-ink-dim); }
-    .side-footer .logout{ padding:.45rem .6rem; }
+    .navlink:hover{ background: var(--mid-hover); border-color: rgba(34,211,238,.28); }
+    .navlink.active{ background: var(--mid-active); border-color: rgba(34,211,238,.35); color:#eaf2ff; }
 
     .cc-main{ flex:1 1 auto; min-width:0; position:relative; z-index:0; background:var(--bg); color:var(--ink); }
     .cc-page{ max-width:1200px; margin:0 auto; padding:18px; }
 
     /* Sticky header */
-    .cc-header{
-      position:sticky; top:0; z-index:2;
-      background:rgba(255,255,255,.98);
-      backdrop-filter: blur(10px);
-      border-bottom:1px solid var(--line);
-    }
-    .cc-header .topbar{
-      display:grid; grid-template-columns: 1fr auto auto;
-      gap:.75rem; align-items:center; min-height:64px;
-    }
-    .cc-header h1{ line-height:var(--lh-tight); letter-spacing:.01em; font-size:var(--fs-xl); font-weight:900; margin:0; }
-
-    .cc-actions{ display:flex; gap:.5rem; align-items:center; flex-wrap:nowrap; }
-    .cc-actions > *{ flex:0 0 auto; }
-
-    /* Search block */
-    .cc-search{ display:flex; align-items:center; gap:.5rem; width:100%; max-width:640px; margin-left:auto; }
-    .cc-search .input{ flex:1 1 auto; min-width:240px; }
-    #global-search-go{ font-weight:800; }
+    .cc-header{ position:sticky; top:0; z-index:60; background:rgba(255,255,255,.98); backdrop-filter: blur(10px); border-bottom:1px solid var(--line); }
+    .cc-header .topbar{ display:grid; grid-template-columns: 1fr auto auto auto; gap:.75rem; align-items:center; min-height:64px; }
+    .cc-header h1{ line-height:var(--lh-tight); font-size:var(--fs-xl); font-weight:900; margin:0; }
 
     /* Messages */
     .msg { border-radius: 12px; padding: .75rem 1rem; border: 1px solid var(--line); margin-bottom: .75rem; }
@@ -186,57 +141,38 @@
     .msg-warning { background: #fffbeb; border-color:#fde68a; color:#92400e; }
     .msg-danger  { background: #fef2f2; border-color:#fecaca; color:#991b1b; }
 
-    /* Buttons */
-    .btn.primary{ background:var(--cc-accent); color:#fff; border:0; font-weight:800; min-height:44px; }
-    .btn.muted{ background:#e2e8f0; color:#0b1220; border:0; font-weight:700; min-height:44px; }
-    .btn.icon{ background:#eef2ff; color:#1d4ed8; border:1px solid #c7d2fe; font-weight:800; }
-
-    .hover-lift{ transition: transform var(--med) var(--elevate), box-shadow var(--med) var(--elevate); }
-    .hover-lift:where(:hover,:focus-visible){ transform: translateY(-2px); box-shadow: 0 8px 24px rgba(0,0,0,.12); }
-    .tap{ transition: transform var(--fast) var(--elevate); }
-    .tap:active{ transform: scale(.98); }
-    .focus-ring:focus-visible{ outline: 3px solid color-mix(in oklab, #10b981 45%, transparent); outline-offset:2px; }
-    .fade-in{ animation: fadeIn var(--slow) var(--elevate); }
-    @keyframes fadeIn{ from{opacity:0; transform:translateY(6px)} to{opacity:1; transform:translateY(0)} }
-
-    .glass-card{ border-radius:var(--glass-br); border:var(--glass-bd); background:var(--glass-bg); box-shadow:var(--glass-shadow); }
-
-    /* Tenant pill */
-    .tenant-pill{ position:relative; display:flex; align-items:center; gap:.5rem; padding:.35rem .6rem .35rem .45rem;
-      border-radius:999px; border:1px solid var(--line); background:color-mix(in oklab, var(--card) 88%, transparent);
-      -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px);
-      box-shadow: 0 8px 26px rgba(0,0,0,.08); font-weight:800; line-height:1; cursor:pointer; user-select:none;
-      transition: transform var(--med) var(--elevate), box-shadow var(--med) var(--elevate); touch-action: manipulation; }
-    .tenant-pill:hover{ transform: translateY(-1px); box-shadow: 0 12px 30px rgba(0,0,0,.12); }
-    .tenant-dot{ width:8px; height:8px; border-radius:50%; background:#3ecd87; box-shadow:0 0 0 3px rgba(62,205,135,.18) inset; }
-    .tenant-name{ max-width:38ch; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-    .tenant-role{ font-size:.78rem; color:#64748b; font-weight:900; }
-    .tenant-caret{ display:inline-grid; place-items:center; width:28px; height:28px; border-radius:999px; }
-    .tenant-caret:hover{ background:rgba(2,6,23,.06); }
-    .tenant-menu{
-      position:absolute; right:0; top:calc(100% + 8px); min-width:240px; z-index:2050;
-      border-radius:14px; border:1px solid var(--line);
-      background:color-mix(in oklab, var(--card) 92%, transparent);
-      -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px);
-      box-shadow: 0 14px 40px rgba(2,6,23,.18); padding:6px; display:none;
-    }
-    .tenant-menu.open{ display:block; animation: fadeIn var(--med) var(--elevate); }
-    .tenant-item{ display:flex; align-items:center; gap:.6rem; padding:.5rem .6rem; border-radius:10px; color:inherit; text-decoration:none; border:1px solid transparent; font-weight:800; }
-    .tenant-item:hover{ background:rgba(2,6,23,.06); border-color:rgba(2,6,23,.08); }
-    .tenant-divider{ height:1px; background:var(--line); margin:.3rem .25rem; }
-
     /* Mobile drawer behavior */
     @media (max-width: 992px){
-      .cc-sidebar{ position:fixed; left:0; top:0; height:100dvh; transform:translateX(-100%); transition: transform .26s var(--elevate); box-shadow: 0 20px 60px rgba(0,0,0,.35); }
-      .cc-sidebar.open{ transform:translateX(0); }
+      .cc-sidebar{
+        position:fixed; left:0; top:0; height:100dvh;
+        transform:translateX(-100%);
+        transition: transform .26s var(--elevate);
+        box-shadow: 0 20px 60px rgba(0,0,0,.35);
+      }
+      body[data-drawer="open"] .cc-sidebar{ transform:translateX(0) !important; }
       .cc-backdrop{ position:fixed; inset:0; background:rgba(2,6,23,.42); backdrop-filter:blur(2px); display:none; z-index:1990; }
       .cc-backdrop.show{ display:block; }
-      .mobile-toggle{ position:fixed; top:12px; left:12px; z-index:2010; border:0; border-radius:12px; width:42px; height:42px;
-        display:grid; place-items:center; background:var(--cc-accent); color:#fff; box-shadow:0 10px 22px rgba(59,130,246,.35); }
-    }
-    @media (min-width: 992px){ .mobile-toggle{ display:none; } .offcanvas, [data-legacy-menu]{ display:none !important; } }
+      .mobile-toggle{
+        position:fixed; top:12px; left:12px; z-index:2010;
+        border:0; border-radius:12px; width:42px; height:42px;
+        display:grid; place-items:center; background:var(--cc-accent); color:#fff;
+        box-shadow:0 10px 22px rgba(59,130,246,.35);
 
-    /* ===== Mobile Bottom Dock (fixed, safe-area aware) ===== */
+        /* Better tap target */
+        min-width:56px; min-height:56px;
+        touch-action: manipulation;
+        -webkit-tap-highlight-color: transparent;
+      }
+      .mobile-toggle i{ pointer-events:none; }
+      .mobile-toggle::after{
+        content:""; position:absolute; inset:-12px; border-radius:16px;
+      }
+    }
+    @media (min-width: 992px){
+      .mobile-toggle{ display:none; }
+    }
+
+    /* Bottom dock */
     .mobile-tabbar{
       position:fixed; left:0; right:0; bottom:0; z-index:1200;
       height: calc(var(--dock-h) + var(--safe-bottom));
@@ -246,16 +182,80 @@
       background:color-mix(in oklab, var(--card) 90%, transparent);
       border-top:1px solid var(--line);
     }
-    .mobile-tabbar .tab{ flex:1; text-align:center; padding:8px 4px 6px; font-size:12px; color:var(--muted);
-      min-height:44px; display:flex; flex-direction:column; align-items:center; gap:2px; }
+    .mobile-tabbar .tab{ flex:1; text-align:center; padding:8px 4px 6px; font-size:12px; color:var(--muted); min-height:44px; display:flex; flex-direction:column; align-items:center; gap:2px; }
     .mobile-tabbar .tab.active{ color:var(--cc-accent); font-weight:800; }
     @media (min-width: 768px){ .mobile-tabbar{ display:none; } }
 
-    /* Extra spacing so content never sits under the dock (legacy pages) */
     main.cc-page, .cc-page, .content, .page, .container{
       padding-bottom: calc(var(--dock-h) + var(--safe-bottom) + 16px);
     }
+
+    /* Compact mobile spacing */
+    @media (max-width: 480px){
+      .cc-page, .container, .container-fluid, main.cc-page{padding:12px !important}
+      .glass-card, .card{padding:12px !important; margin:10px 0 !important; border-radius:16px}
+      .section, .block, .panel{margin:10px 0 !important}
+      h1,h2{margin:.35rem 0 .25rem}
+      .form-group{margin:.5rem 0}
+      .card > .card-body{padding:12px !important}
+      .dashboard-grid,.grid,.grid-2{display:grid!important;grid-template-columns:1fr!important;gap:12px!important}
+    }
+
+    /* Right→Left utility for Scan/Sold buttons (mobile) */
+    .btn-row{display:flex;gap:.5rem;align-items:center;flex-wrap:nowrap}
+    .rtl-mobile{flex-direction:row-reverse}
+    @media (min-width:640px){ .rtl-mobile{flex-direction:row} }
+
+    /* ========= Polished Mobile Topbar Layout ========= */
+    @media (max-width: 576px){
+      .cc-header .topbar{
+        display:grid;
+        grid-template-columns: 1fr auto;
+        grid-template-areas:
+          "title user"
+          "search search"
+          "actions actions";
+        gap: 8px;
+        align-items: center;
+      }
+      .cc-header .topbar h1{ grid-area: title; font-size:clamp(17px,4.2vw,19px); margin:0; }
+      .cc-header .topbar .topbar-user{ grid-area: user; justify-self:end; }
+      .cc-header .topbar .cc-search{ grid-area: search; width:100%; max-width:none; gap:6px; }
+      .cc-header .topbar .cc-search .input{ min-width:0; width:100%; }
+      .cc-header .topbar .cc-actions{ grid-area: actions; display:flex; gap:.5rem; align-items:center; }
+      .cc-header .topbar .cc-actions > *{ flex:0 0 auto; }
+    }
+
+    /* ========= Presence Dots ========= */
+    .topbar-user .user-btn{ position: relative; }
+    .topbar-user .presence-dot{
+      position:absolute; right:-2px; bottom:-2px;
+      width:10px; height:10px; border-radius:999px;
+      background:#10b981; box-shadow:0 0 0 2px #fff;
+    }
+    .topbar-user .presence-dot.offline{ background:#9ca3af; }
+    .tenant-dot.offline{
+      background:#9ca3af !important;
+      box-shadow:0 0 0 3px rgba(156,163,175,.18) inset !important;
+    }
   </style>
+
+  {# Pin sidebar on HQ pages #}
+  {% with p=request.path|default:'' %}
+  {% if p|slice:":4" == "/hq/" %}
+  <style>
+    .mobile-toggle{ display:none !important; }
+    .cc-backdrop{ display:none !important; }
+    .cc-sidebar{
+      position:sticky !important;
+      left:0 !important; top:0 !important;
+      transform:none !important;
+      height:100dvh !important;
+      box-shadow: inset 0 1px 0 rgba(255,255,255,.04) !important;
+    }
+  </style>
+  {% endif %}
+  {% endwith %}
 
   {% block extra_head %}{% endblock %}
   {% block extra_css %}{% endblock %}
@@ -265,7 +265,10 @@
 <div class="cc-shell">
   {% block sidebar %}{% include "partials/sidebar.html" %}{% endblock %}
 
-  <button class="mobile-toggle tap focus-ring" id="sidebarOpen" aria-label="Open menu"><i class="bi bi-list"></i></button>
+  <!-- Drawer trigger + backdrop -->
+  <button class="mobile-toggle tap focus-ring" id="sidebarOpen" aria-label="Open menu" aria-expanded="false" aria-controls="ccSidebar">
+    <i class="bi bi-list"></i>
+  </button>
   <div class="cc-backdrop" id="ccBackdrop" aria-hidden="true"></div>
 
   <div class="cc-main">
@@ -287,18 +290,44 @@
     {% url 'admin:tenants_business_changelist' as url_admin_business %}
     {% url 'inventory:time_checkin'      as url_time_checkin %}
     {% url 'inventory:time_logs'         as url_time_logs %}
+    {% url 'inventory:api_geo_ping'      as url_geo_ping %}
+    {# Add API time-checkin URL (fallback keeps your failing path working) #}
+    {% url 'inventory:api_time_checkin'  as url_time_checkin_api %}
+    {% url 'billing:subscribe' as url_billing_sub %}
+    {% url 'billing:checkout'  as url_billing_checkout %}
+
+    {% url 'accounts:settings_unified' as url_profile_settings %}
+    {% url 'feedback' as url_feedback_form %}
+    {% url 'logout' as url_logout %}
 
     {% with path=request.path|default:'' %}
       {% if 'accounts/settings' not in path %}
         <header class="cc-header">
           <div class="cc-page topbar">
-            <h1 class="fw-bold">{% block header_title %}Dashboard{% endblock %}</h1>
+            <h1 class="fw-bold d-flex align-items-center gap-2">
+              {% block header_title %}Dashboard{% endblock %}
+              {% if request.business and request.business.subscription %}
+                {% with sub=request.business.subscription %}
+                  {% if sub.status == 'trial' %}
+                    <span class="badge rounded-pill text-bg-info">Trial{% if sub.trial_end %} · ends {{ sub.trial_end|date:'M j' }}{% endif %}</span>
+                  {% elif sub.status == 'active' %}
+                    <span class="badge rounded-pill text-bg-success">Active</span>
+                  {% elif sub.status == 'grace' %}
+                    <span class="badge rounded-pill text-bg-warning">Grace</span>
+                  {% elif sub.status == 'past_due' %}
+                    <span class="badge rounded-pill text-bg-warning">Past due</span>
+                  {% elif sub.status == 'expired' or sub.status == 'canceled' %}
+                    <span class="badge rounded-pill text-bg-danger">Inactive</span>
+                  {% endif %}
+                {% endwith %}
+              {% endif %}
+            </h1>
 
             {% if show_search or "inventory/dashboard" in path %}
-              <div class="cc-search">
+              <div class="cc-search d-flex align-items-center gap-2">
                 <i class="bi bi-search text-muted"></i>
                 <input id="global-search" class="form-control input" type="search" placeholder="Search SKUs, agents, invoices…" autocomplete="off" />
-                <button class="btn primary" type="button" id="global-search-go" title="Go">Go</button>
+                <button class="btn btn-primary" type="button" id="global-search-go" title="Go">Go</button>
               </div>
             {% else %}
               <div></div>
@@ -321,11 +350,7 @@
                   </div>
                   <div class="tenant-menu" id="tenantMenu" role="menu" aria-label="Business menu">
                     <a class="tenant-item" href="{{ url_choose_business|default:'/tenants/choose/' }}"><i class="bi bi-arrow-left-right"></i> Switch business</a>
-                    {% if request.membership and request.membership.role == "MANAGER" %}
-                      <a class="tenant-item" href="{{ url_manager_agents|default:'/tenants/manager/agents/' }}"><i class="bi bi-people"></i> Agents</a>
-                    {% elif IS_MANAGER %}
-                      <a class="tenant-item" href="{{ url_manager_agents|default:'/tenants/manager/agents/' }}"><i class="bi bi-people"></i> Agents</a>
-                    {% elif request.user.is_authenticated and request.user.profile.is_manager %}
+                    {% if request.membership and request.membership.role == "MANAGER" or IS_MANAGER or request.user.is_authenticated and request.user.profile.is_manager %}
                       <a class="tenant-item" href="{{ url_manager_agents|default:'/tenants/manager/agents/' }}"><i class="bi bi-people"></i> Agents</a>
                     {% endif %}
                     {% if request.user.is_staff %}
@@ -348,15 +373,27 @@
                 {% endif %}
               </div>
 
-              {# Notifications #}
-              <div class="position-relative" id="ccNotifRoot"
+              {# Notifications (Bootstrap dropdown) #}
+              <div class="dropdown" id="ccNotifRoot"
                    data-scope="{% block notif_scope %}dashboard{% endblock %}"
                    data-allow="{% block notif_allow %}{% endblock %}">
-                <button class="notif-btn focus-ring" id="ccNotifBtn" type="button" aria-haspopup="true" aria-expanded="false" aria-label="Notifications">
+                <button class="notif-btn focus-ring dropdown-toggle"
+                        id="ccNotifBtn"
+                        type="button"
+                        data-bs-toggle="dropdown"
+                        data-bs-auto-close="outside"
+                        aria-expanded="false"
+                        aria-haspopup="true"
+                        aria-controls="ccNotifMenu"
+                        title="Notifications">
                   <i class="bi bi-bell"></i>
                   <span class="notif-dot" id="ccNotifDot" aria-hidden="true"></span>
                 </button>
-                <div class="notif-menu" id="ccNotifMenu" role="menu" aria-label="Notifications">
+
+                <div class="dropdown-menu dropdown-menu-end p-0 shadow notif-menu"
+                     id="ccNotifMenu"
+                     aria-labelledby="ccNotifBtn"
+                     style="min-width:320px">
                   <div class="p-2 border-bottom d-flex align-items-center justify-content-between">
                     <strong>Notifications</strong>
                     <button class="btn btn-sm btn-light" id="ccNotifRefresh" type="button">
@@ -364,7 +401,7 @@
                     </button>
                   </div>
                   <div id="ccNotifList">
-                    <div class="notif-empty">No notifications.</div>
+                    <div class="notif-empty p-3 text-muted">No notifications.</div>
                   </div>
                   <div class="p-2 text-end border-top">
                     <a class="text-decoration-underline" href="#" id="ccNotifOpen">Open inbox</a>
@@ -373,13 +410,104 @@
               </div>
               {# /Notifications #}
             </div>
+
+            {# User menu #}
+            <div class="dropdown topbar-user">
+              <button class="user-btn dropdown-toggle"
+                      id="userMenuBtn"
+                      type="button"
+                      data-bs-toggle="dropdown"
+                      data-bs-auto-close="outside"
+                      aria-expanded="false"
+                      aria-haspopup="true"
+                      aria-controls="userMenu"
+                      title="Account">
+                <span class="avatar">
+                  {% if request.user.is_authenticated %}
+                    {{ request.user.first_name|default:request.user.username|slice:":1"|upper }}
+                  {% else %}
+                    <i class="bi bi-person"></i>
+                  {% endif %}
+                </span>
+                <span class="presence-dot" aria-hidden="true"></span>
+              </button>
+              <div id="userMenu" class="dropdown-menu dropdown-menu-end p-0 shadow" aria-labelledby="userMenuBtn" style="min-width:260px">
+                <div class="px-3 py-2 text-muted">
+                  {% if request.user.is_authenticated %}
+                    <div class="fw-bold text-dark">{{ request.user.get_full_name|default:request.user.username }}</div>
+                    <div class="small">{{ request.user.email }}</div>
+                  {% else %}
+                    <div class="small">Not signed in</div>
+                  {% endif %}
+                </div>
+                <div class="border-top"></div>
+                <a href="{{ url_profile_settings|default:'/accounts/settings/' }}" class="dropdown-item">
+                  <i class="bi bi-gear me-2"></i> Profile &amp; Settings
+                </a>
+                <a href="{{ url_feedback_form|default:'/feedback/' }}" class="dropdown-item">
+                  <i class="bi bi-chat-left-text me-2"></i> Feedback
+                </a>
+                {% if request.user.is_authenticated %}
+                  <a href="{{ url_logout|default:'/accounts/logout/' }}" class="dropdown-item text-danger">
+                    <i class="bi bi-box-arrow-right me-2"></i> Logout
+                  </a>
+                {% endif %}
+              </div>
+            </div>
+            {# /User menu #}
+
           </div>
         </header>
       {% endif %}
     {% endwith %}
 
-    <!-- Give main an id so mobile-fixes can pad for the bottom dock -->
     <main id="app-main" class="cc-page">
+      {# ===== Billing banners ===== #}
+      {% if request.business and request.business.subscription %}
+        {% with sub=request.business.subscription %}
+          {% if sub.status == 'trial' %}
+            <div class="msg msg-info fade-in d-flex align-items-center justify-content-between">
+              <div>
+                <strong>You're on a free trial.</strong>
+                {% if sub.trial_end %} Trial ends on {{ sub.trial_end|date:"M j, Y" }}.{% endif %}
+              </div>
+              <div class="d-flex gap-2">
+                <a class="btn btn-sm btn-primary" href="{{ url_billing_sub|default:'/billing/subscribe/' }}"><i class="bi bi-lightning-charge"></i> Choose plan</a>
+                <a class="btn btn-sm btn-outline-primary" href="{{ url_billing_checkout|default:'/billing/checkout/' }}"><i class="bi bi-credit-card"></i> Checkout</a>
+              </div>
+            </div>
+          {% elif sub.status == 'grace' %}
+            <div class="msg msg-warning fade-in d-flex align-items-center justify-content-between">
+              <div>
+                <strong>Payment needed.</strong> You're in a grace period to restore access.
+              </div>
+              <div class="d-flex gap-2">
+                <a class="btn btn-sm btn-warning" href="{{ url_billing_checkout|default:'/billing/checkout/' }}"><i class="bi bi-credit-card"></i> Pay now</a>
+                <a class="btn btn-sm btn-outline-secondary" href="{{ url_billing_sub|default:'/billing/subscribe/' }}"><i class="bi bi-gear"></i> Manage plan</a>
+              </div>
+            </div>
+          {% elif sub.status == 'past_due' %}
+            <div class="msg msg-warning fade-in d-flex align-items-center justify-content-between">
+              <div>
+                <strong>Payment is past due.</strong> Some features may be limited.
+              </div>
+              <div class="d-flex gap-2">
+                <a class="btn btn-sm btn-warning" href="{{ url_billing_checkout|default:'/billing/checkout/' }}"><i class="bi bi-credit-card"></i> Retry payment</a>
+              </div>
+            </div>
+          {% elif sub.status == 'expired' or sub.status == 'canceled' %}
+            <div class="msg msg-danger fade-in d-flex align-items-center justify-content-between">
+              <div>
+                <strong>Subscription inactive.</strong> To continue, pick a plan and pay.
+              </div>
+              <div class="d-flex gap-2">
+                <a class="btn btn-sm btn-danger" href="{{ url_billing_sub|default:'/billing/subscribe/' }}"><i class="bi bi-cart-check"></i> Subscribe</a>
+              </div>
+            </div>
+          {% endif %}
+        {% endwith %}
+      {% endif %}
+
       {% if messages %}
         {% for message in messages %}
           <div class="msg
@@ -400,7 +528,7 @@
     </main>
 
     <!-- Mobile bottom dock -->
-    <nav class="mobile-tabbar d-flex d-md-none">
+    <nav class="mobile-tabbar d-flex d-md-none cc-bottom-nav">
       <a class="tab {% if active_tab == 'home' %}active{% endif %}" href="{{ url_home|default:'/inventory/dashboard/' }}">
         <i class="bi bi-speedometer2 d-block"></i>Home
       </a>
@@ -454,38 +582,123 @@
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js" defer></script>
-<script src="{% static 'js/app.js' %}?v={{ STATIC_VERSION|default:'1' }}" defer></script>
-<script src="{% static 'js/mobile.js' %}?v={{ STATIC_VERSION|default:'1' }}" defer></script>
+
+<!-- IMPORTANT: kill legacy sidebar code BEFORE loading your scripts -->
+<script>window.CC_DISABLE_LEGACY_MOBILE = 1;</script>
+
+<script src="{% with v=BUILD_ID|default:STATIC_VERSION|default:'1' %}{% static 'js/app.js' %}?v={{ v }}{% endwith %}" defer></script>
+<script src="{% with v=BUILD_ID|default:STATIC_VERSION|default:'1' %}{% static 'js/mobile.js' %}?v={{ v }}{% endwith %}" defer></script>
 
 <script>
-  /* CSRF + fetch helpers */
+  /* ============================================================
+     CSRF: resilient cookie+meta handling + global fetch shim
+     - Ensures we ALWAYS send a valid X-CSRFToken header for POST/PUT/PATCH/DELETE
+     - Fixes "incorrect length" by avoiding empty headers
+  ============================================================ */
   (function(){
     function readCookie(name){
-      const m = document.cookie.match(new RegExp('(?:^|; )' + name + '=([^;]*)'));
+      const m = document.cookie.match(new RegExp('(?:^|; )' + name.replace(/[-[\]{}()*+?.,\\^$|#\s]/g,'\\$&') + '=([^;]*)'));
       return m ? decodeURIComponent(m[1]) : '';
     }
-    function getCsrfToken(){ return readCookie('cc_csrftoken') || readCookie('csrftoken') || ''; }
-
-    async function ccFetchJSON(url, opts){
-      const resp = await fetch(url, { credentials: 'same-origin',
-        headers: { 'Accept': 'application/json', ...(opts && opts.headers || {}) }, ...(opts || {}) });
-      const ct = (resp.headers.get('content-type') || '').toLowerCase();
-      if (!ct.includes('application/json')){
-        const text = await resp.text();
-        throw new Error(`Expected JSON, got ${ct || 'unknown'} — starts with: ${text.slice(0,80)}`);
+    function setCookie(name, value, days){
+      try{
+        const d = new Date(); d.setTime(d.getTime() + (days||1)*864e5);
+        document.cookie = name + '=' + encodeURIComponent(value) + '; path=/; SameSite=Lax; expires=' + d.toUTCString();
+      }catch(_){}
+    }
+    function metaToken(){
+      const el = document.querySelector('meta[name="csrf-token"]');
+      const val = el && el.getAttribute('content');
+      if (!val || val === 'NOTPROVIDED') return '';
+      return val;
+    }
+    function ensureCookieFromMeta(){
+      // If neither cookie is present, but a meta token exists, seed csrftoken
+      const hasCsrftoken = !!readCookie('csrftoken');
+      const hasCC = !!readCookie('cc_csrftoken');
+      if (!hasCsrftoken && !hasCC){
+        const t = metaToken();
+        if (t && t.length > 20){
+          setCookie('csrftoken', t, 7);
+        } else {
+          // last resort: no token available yet; don't inject empty headers
+          // console.debug('CSRF: token not available yet');
+        }
       }
-      const data = await resp.json();
-      if (!resp.ok){ throw new Error((data && (data.detail || data.error)) || `HTTP ${resp.status}`); }
-      return data;
     }
-    function ccPostJSON(url, payload, extra){
-      return ccFetchJSON(url, { method:'POST',
-        headers:{ 'Content-Type':'application/json','X-CSRFToken': getCsrfToken(),'X-Requested-With':'XMLHttpRequest', ...(extra && extra.headers || {}) },
-        body: JSON.stringify(payload || {}), ...(extra || {}) });
+    ensureCookieFromMeta();
+
+    function getCsrfToken(){
+      // Prefer cookies; fall back to meta if needed
+      return readCookie('cc_csrftoken') || readCookie('csrftoken') || metaToken() || '';
     }
+
+    // Expose helper + URLs + user flags
     window.CC = Object.assign(window.CC || {}, {
-      getCsrfToken, ccFetchJSON, ccPostJSON,
-      URLS: {
+      getCsrfToken,
+      URLS: Object.assign({
+        time_checkin_api: "{{ url_time_checkin_api|default:'/inventory/api/time-checkin/' }}"
+      }, window.CC && CC.URLS || {})
+    });
+
+    // ---- Global fetch shim: auto-attach CSRF on same-origin unsafe methods ----
+    if (!window.__CC_FETCH_SHIM__){
+      window.__CC_FETCH_SHIM__ = true;
+      const _fetch = window.fetch.bind(window);
+
+      function isSameOrigin(url){
+        try{
+          const u = new URL(url, location.href);
+          return u.origin === location.origin;
+        }catch(_){
+          return true; // Request objects or relative URLs: treat as same-origin
+        }
+      }
+      function hasHeader(h, name){
+        if (!h) return false;
+        if (h instanceof Headers) return h.has(name);
+        const lower = name.toLowerCase();
+        for (const k in h){ if (Object.prototype.hasOwnProperty.call(h,k) && k.toLowerCase() === lower) return true; }
+        return false;
+      }
+      function setHeader(h, name, val){
+        if (h instanceof Headers) { h.set(name, val); return h; }
+        const clone = Object.assign({}, h || {});
+        clone[name] = val;
+        return clone;
+      }
+
+      window.fetch = function(input, init){
+        init = init || {};
+        let method = (init.method || (input && input.method) || 'GET').toUpperCase();
+        const same = (typeof input === 'string') ? isSameOrigin(input) : true;
+
+        if (same && method !== 'GET' && method !== 'HEAD'){
+          // Only attach if we actually have a valid token; never send empty string
+          const token = getCsrfToken();
+          if (token && token.length > 20){
+            if (init.headers){
+              if (!hasHeader(init.headers, 'X-CSRFToken')){
+                init.headers = setHeader(init.headers, 'X-CSRFToken', token);
+              }
+            } else {
+              init.headers = {'X-CSRFToken': token};
+            }
+          }
+          // Ensure cookies flow for session auth
+          if (!('credentials' in init)) init.credentials = 'same-origin';
+        }
+        return _fetch(input, init);
+      };
+    }
+  })();
+</script>
+
+<script>
+  /* Helpers (URLs, roles) */
+  (function(){
+    window.CC = Object.assign(window.CC || {}, {
+      URLS: Object.assign({
         home: "{{ url_home|default:'/inventory/dashboard/' }}",
         scan_in: "{{ url_scan_in|default:'/inventory/scan-in/' }}",
         scan_sold: "{{ url_sell|default:'/inventory/scan-sold/' }}",
@@ -498,8 +711,11 @@
         layby_agent: "{{ url_layby_agent|default:'/layby/agent/' }}",
         layby_customer: "{{ url_layby_customer|default:'/layby/customer/' }}",
         time_checkin: "{{ url_time_checkin|default:'/inventory/time/checkin/' }}",
-        time_logs: "{{ url_time_logs|default:'/inventory/time/logs/' }}"
-      },
+        time_logs: "{{ url_time_logs|default:'/inventory/time/logs/' }}",
+        geo_ping: "{{ url_geo_ping|default:'/inventory/api/geo-ping/' }}",
+        billing_subscribe: "{{ url_billing_sub|default:'/billing/subscribe/' }}",
+        billing_checkout: "{{ url_billing_checkout|default:'/billing/checkout/' }}"
+      }, window.CC && CC.URLS || {}),
       USER: {
         is_staff: {{ request.user.is_staff|yesno:"true,false" }},
         is_superuser: {{ request.user.is_superuser|yesno:"true,false" }},
@@ -509,22 +725,119 @@
     });
   })();
 
-  /* Sidebar drawer */
-  const sidebar  = document.querySelector('.cc-sidebar');
-  const backdrop = document.getElementById('ccBackdrop');
-  const openBtn  = document.getElementById('sidebarOpen');
-  function openSidebar(){ sidebar?.classList.add('open'); backdrop?.classList.add('show'); document.body.style.overflow='hidden'; }
-  function closeSidebar(){ sidebar?.classList.remove('open'); backdrop?.classList.remove('show'); document.body.style.overflow=''; }
-  openBtn?.addEventListener('click', openSidebar);
-  backdrop?.addEventListener('click', closeSidebar);
-  document.addEventListener('keydown', (e)=>{ if(e.key === 'Escape') closeSidebar(); });
-  document.querySelectorAll('.cc-sidebar a').forEach(a=>{
-    a.addEventListener('click', () => {
-      if (window.matchMedia('(max-width: 992px)').matches) closeSidebar();
-    });
-  });
+  /* ----- Rock-solid mobile sidebar: single tap open/close, no flash ----- */
+  (function(){
+    if (window.__CC_SIDEBAR_V3__) return; window.__CC_SIDEBAR_V3__ = true;
 
-  /* Active nav highlight */
+    const sidebar = document.querySelector('.cc-sidebar');
+    const backdrop = document.getElementById('ccBackdrop');
+    const toggleBtn = document.getElementById('sidebarOpen');
+
+    if (!sidebar || !backdrop || !toggleBtn) return;
+
+    if (!sidebar.id) sidebar.id = 'ccSidebar';
+    if (!toggleBtn.hasAttribute('aria-controls')) toggleBtn.setAttribute('aria-controls','ccSidebar');
+
+    let openState = false;
+    let busy = false;
+    let savedY = 0;
+
+    function lockScroll(){
+      savedY = window.scrollY || 0;
+      Object.assign(document.body.style,{position:'fixed',top:`-${savedY}px`,left:'0',right:'0',width:'100%',overflow:'hidden'});
+    }
+    function unlockScroll(){
+      Object.assign(document.body.style,{position:'',top:'',left:'',right:'',width:'',overflow:''});
+      window.scrollTo(0, savedY||0);
+    }
+    function applyState(){
+      if (openState){
+        document.body.setAttribute('data-drawer','open');
+        toggleBtn.setAttribute('aria-expanded','true');
+        backdrop.classList.add('show');
+        lockScroll();
+      } else {
+        document.body.removeAttribute('data-drawer');
+        toggleBtn.setAttribute('aria-expanded','false');
+        backdrop.classList.remove('show');
+        unlockScroll();
+      }
+    }
+    function toggle(){
+      if (busy) return;
+      busy = true;
+      openState = !openState;
+      applyState();
+      setTimeout(()=>busy=false, 220);
+    }
+    function close(){ if (openState){ openState=false; applyState(); } }
+
+    const onToggle = (e)=>{ e.preventDefault(); e.stopPropagation(); toggle(); };
+
+    // Debounced cross-input tap binder
+    function bindTap(el, handler){
+      let locked = false, timer = null;
+      function fire(e){
+        e.preventDefault(); e.stopPropagation();
+        if (locked) return;
+        locked = true;
+        handler(e);
+        clearTimeout(timer);
+        timer = setTimeout(()=> locked=false, 220);
+      }
+      el.addEventListener('pointerup', fire, {passive:false});
+      el.addEventListener('touchend', fire, {passive:false});
+      el.addEventListener('click', fire, {passive:false});
+      el.addEventListener('keydown', e=>{
+        if (e.key === 'Enter' || e.key === ' ') fire(e);
+      }, {passive:false});
+    }
+    bindTap(toggleBtn, onToggle);
+
+    ['click','pointerdown','touchstart','mousedown'].forEach(ev=>{
+      sidebar.addEventListener(ev, e=>e.stopPropagation(), {passive:true});
+    });
+
+    backdrop.addEventListener('click', (e)=>{ e.preventDefault(); close(); }, {passive:false});
+    document.addEventListener('keydown', (e)=>{ if (e.key === 'Escape') close(); }, {passive:true});
+
+    sidebar.querySelectorAll('a[href]').forEach(a=>{
+      a.addEventListener('click', ()=> close(), {passive:true});
+    });
+
+    new MutationObserver(()=>{}).observe(document.body, {attributes:true,attributeFilter:['data-drawer']});
+  })();
+
+  /* ===== Tenant menu: clean toggle ===== */
+  (function(){
+    const btn  = document.getElementById('tenantBtn');
+    const menu = document.getElementById('tenantMenu');
+    if (!btn || !menu) return;
+
+    let open = false;
+    function set(state){
+      open = state;
+      menu.style.display = open ? 'block' : 'none';
+      btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+    }
+    function toggle(e){ e && e.preventDefault(); e && e.stopPropagation(); set(!open); }
+    function close(){ if (open) set(false); }
+
+    set(false);
+    btn.addEventListener('click', toggle, {passive:false});
+    menu.addEventListener('click', (e)=> e.stopPropagation(), {passive:true});
+    document.addEventListener('click', close, {passive:true});
+    document.addEventListener('keydown', (e)=>{ if (e.key === 'Escape') close(); }, {passive:true});
+  })();
+
+  /* Scan/Sold action row right→left on phones */
+  (function(){
+    const isScanPage = /\/inventory\/(scan-in|scan-sold)\//.test(location.pathname);
+    if (!isScanPage) return;
+    document.querySelectorAll('.btn-row').forEach(el=> el.classList.add('rtl-mobile'));
+  })();
+
+  /* Nav highlight */
   (function(){
     const path = location.pathname.replace(/\/+$/,'/') || '/';
     document.querySelectorAll('.cc-sidebar a[href]').forEach(a=>{
@@ -535,381 +848,157 @@
     });
   })();
 
-  /* Dashboard global-search routing */
+  /* ===== Global Search: Go button + Enter key ===== */
   (function(){
-    const inp = document.querySelector('#global-search');
-    const btn = document.querySelector('#global-search-go');
-    if (!inp || !btn) return;
+    const input = document.getElementById('global-search');
+    const goBtn = document.getElementById('global-search-go');
+    if (!input || !goBtn) return;
 
-    const go = (path) => { if (path) window.location.assign(path); };
-    const isMgr = !!(CC.USER && (CC.USER.is_staff || CC.USER.is_manager));
-    const map = [
-      {k:/^scan(\s|-)?in$/i, url: CC.URLS.scan_in},
-      {k:/^scan(\s|-)?sold$/i, url: CC.URLS.scan_sold},
-      {k:/^inventory$|^stock$/i, url: CC.URLS.stock_list},
-      {k:/^wallet$/i, url: CC.URLS.wallet},
-      {k:/^dashboard$|^home$/i, url: CC.URLS.home},
-      {k:/^reports?$/i, url: CC.URLS.reports},
-      ...(isMgr ? [{k:/^sim(ulation|ulator)?$|^scenarios?$/i, url: CC.URLS.simulator}] : []),
-      {k:/^layby$|^lay[- ]?by$/i, url: (
-        CC.USER?.is_staff || CC.USER?.is_manager
-          ? CC.URLS.layby_admin
-          : ({{ request.user.is_authenticated|yesno:"true,false" }} ? CC.URLS.layby_agent : CC.URLS.layby_customer)
-      ))}
-    ];
-    function handle(){
-      const q = (inp.value||'').trim();
-      const hit = map.find(m => m.k.test(q));
-      if (hit) go(hit.url);
+    function run(){
+      const q = (input.value || '').trim();
+      if (!q) return;
+      const dest = (window.CC && CC.URLS && CC.URLS.stock_list) || '/inventory/list/';
+      const url  = new URL(dest, location.origin);
+      url.searchParams.set('q', q);
+      location.href = url.toString();
     }
-    inp.addEventListener('keydown', (e)=>{ if (e.key === 'Enter'){ e.preventDefault(); handle(); }});
-    btn.addEventListener('click', handle);
+    goBtn.addEventListener('click', run, {passive:false});
+    input.addEventListener('keydown', (e)=>{
+      if (e.key === 'Enter'){ e.preventDefault(); run(); }
+    }, {passive:false});
   })();
 
-  /* Notifications bell */
+  /* Bottom dock safe-area sync */
   (function(){
-    const btn  = document.getElementById('ccNotifBtn');
-    const dot  = document.getElementById('ccNotifDot');
-    const menu = document.getElementById('ccNotifMenu');
-    const list = document.getElementById('ccNotifList');
-    const refresh = document.getElementById('ccNotifRefresh');
-    const openLink = document.getElementById('ccNotifOpen');
-    const root = document.getElementById('ccNotifRoot');
-
-    const scope = (root?.dataset.scope || 'dashboard').toLowerCase();
-    const allowCSV = (root?.dataset.allow || '').trim();
-    const ALLOW = allowCSV
-      ? allowCSV.split(',').map(s=>s.trim()).filter(Boolean)
-      : (scope==='inventory'
-          ? ['stock_in','stock_sold','low_stock']
-          : ['sale','low_stock','payslip','forecast','alert','payment','order','invoice','wallet','restock','stock_in','stock_sold']);
-
-    function typeBadge(t){
-      const map = {
-        sale:{cls:'text-bg-primary', label:'Sale'},
-        low_stock:{cls:'text-bg-warning', label:'Low stock'},
-        stock_in:{cls:'text-bg-success', label:'Stock IN'},
-        stock_sold:{cls:'text-bg-danger', label:'Sold'},
-        payslip:{cls:'text-bg-success', label:'Payslip'},
-        payment:{cls:'text-bg-info', label:'Payment'},
-        forecast:{cls:'text-bg-info', label:'Forecast'},
-        alert:{cls:'text-bg-danger', label:'Alert'},
-        restock:{cls:'text-bg-secondary', label:'Restock'},
-        wallet:{cls:'text-bg-secondary', label:'Wallet'},
-        order:{cls:'text-bg-secondary', label:'Order'},
-        invoice:{cls:'text-bg-secondary', label:'Invoice'},
-      };
-      return map[t] || {cls:'text-bg-secondary', label:t};
+    function syncDockVar(){
+      const dock = document.querySelector('.cc-bottom-nav') || document.querySelector('.mobile-tabbar');
+      const root = document.documentElement;
+      const h = dock ? Math.round(dock.getBoundingClientRect().height) : 0;
+      if(h) root.style.setProperty('--cc-nav-h', h+'px');
     }
-
-    function render(items){
-      if (!Array.isArray(items) || !items.length){
-        dot.style.display = 'none';
-        list.innerHTML = '<div class="notif-empty">No notifications.</div>';
-        window.CC_NOTIF_ITEMS = [];
-        return;
-      }
-      const filtered = items.filter(it => !ALLOW.length || ALLOW.includes(it.type));
-      if (!filtered.length){
-        dot.style.display = 'none';
-        list.innerHTML = '<div class="notif-empty">No notifications.</div>';
-        window.CC_NOTIF_ITEMS = [];
-        return;
-      }
-      dot.style.display = 'block';
-      list.innerHTML = filtered.map(it=>{
-        const badge = typeBadge(it.type);
-        const when  = it.created_human || '';
-        const body  = (it.body || it.message || '').replace(/\n/g,' ');
-        const url   = it.url || '#';
-        return `
-          <a class="notif-item text-reset" href="${url}">
-            <span class="badge ${badge.cls}">${badge.label}</span>
-            <div>
-              <div class="fw-bold">${it.title || it.heading || 'Notification'}</div>
-              <div class="text-muted" style="font-size:.875rem">${body}</div>
-              <div class="text-muted" style="font-size:.75rem">${when}</div>
-            </div>
-          </a>`;
-      }).join('');
-      window.CC_NOTIF_ITEMS = filtered;
-    }
-
-    async function tryFetchJSON(url){
-      try{
-        const r = await fetch(url, {headers:{Accept:'application/json'}, credentials:'same-origin'});
-        const ct = (r.headers.get('content-type')||'').toLowerCase();
-        if (!ct.includes('application/json')) return null;
-        const data = await r.json();
-        return r.ok ? data : null;
-      }catch(_){ return null; }
-    }
-
-    async function load(){
-      const candidates=['/notifications/inbox.json?limit=50','/notifications/feed/?format=json&limit=50','/notifications/feed/'];
-      let data=null;
-      for(const c of candidates){ data = await tryFetchJSON(c); if(data) break; }
-      let items=[]; if(data){ items = Array.isArray(data) ? data : (data.items || data.results || []); }
-      const isMgr = !!(CC.USER?.is_staff || CC.USER?.is_manager);
-      if (!isMgr){ items = items.filter(it => ['low_stock','stock_in','stock_sold','sale'].includes(it.type)); }
-      render(items);
-    }
-
-    function renderInbox(items){
-      const box = document.getElementById('ccInboxList');
-      if (!box) return;
-      if (!Array.isArray(items) || !items.length){
-        box.innerHTML = '<div class="notif-empty">No notifications.</div>'; return;
-      }
-      box.innerHTML = items.map(it=>{
-        const badge = typeBadge(it.type);
-        const when  = it.created_human || '';
-        const bodyText  = (it.body || it.message || '').replace(/\n/g,' ');
-        const url   = it.url || '#';
-        const title = it.title || it.heading || 'Notification';
-        return `
-          <div class="item-row">
-            <span class="badge ${badge.cls} me-1">${badge.label}</span>
-            <div class="flex-grow-1">
-              <div class="fw-bold">${title}</div>
-              <div class="meta">${when}</div>
-              <div>${bodyText}</div>
-              ${url && url !== '#' ? `<div class="mt-1"><a href="${url}" class="link-primary">Open related page</a></div>` : ''}
-            </div>
-          </div>`;
-      }).join('');
-    }
-
-    async function openInbox(){
-      const pages=['/notifications/feed/','/notifications/','/notifications/read/'];
-      for (const url of pages){
-        try{ const r = await fetch(url, {method:'GET', credentials:'same-origin'}); if (r.ok){ location.assign(url); return; } }catch(_){}
-      }
-      const items = window.CC_NOTIF_ITEMS || [];
-      renderInbox(items);
-      const el = document.getElementById('ccInbox');
-      if (window.bootstrap && el){ const modal = new bootstrap.Modal(el); modal.show(); }
-      else{ alert('No inbox page available right now. The dropdown still shows live notifications.'); }
-    }
-
-    document.getElementById('ccNotifOpen')?.addEventListener('click', (e)=>{ e.preventDefault(); openInbox(); });
-    document.getElementById('ccNotifRefresh')?.addEventListener('click', load);
-    document.getElementById('ccInboxRefresh')?.addEventListener('click', load);
-
-    load(); setInterval(load, 60_000);
+    ['load','orientationchange','resize'].forEach(ev =>
+      window.addEventListener(ev, syncDockVar, {passive:true})
+    );
+    new MutationObserver(syncDockVar).observe(document.body || document.documentElement, {childList:true,subtree:true});
+    syncDockVar();
   })();
 
-  /* Tenant pill dropdown */
-  (function () {
-    const btn  = document.getElementById('tenantBtn');
-    const menu = document.getElementById('tenantMenu');
-    if (!btn || !menu) return;
-
-    let openedAt = 0;
-    function open()  { menu.classList.add('open');  btn.setAttribute('aria-expanded','true'); openedAt = Date.now(); }
-    function close() { menu.classList.remove('open'); btn.setAttribute('aria-expanded','false'); }
-    function isOpen(){ return menu.classList.contains('open'); }
-    function toggle() { isOpen() ? close() : open(); }
-
-    const onTrigger = (e) => { e.preventDefault(); e.stopPropagation(); toggle(); };
-    btn.addEventListener('click', onTrigger, { passive: false });
-
-    ['pointerdown','touchstart','mousedown'].forEach(ev=>{
-      btn.addEventListener(ev, (e)=> e.stopPropagation(), { passive: true });
-      menu.addEventListener(ev, (e)=> e.stopPropagation(), { passive: true });
-    });
-
-    const onDoc = (e) => {
-      if (Date.now() - openedAt < 300) return;
-      const t = e.target;
-      if (t && (menu.contains(t) || btn.contains(t))) return;
-      if (isOpen()) close();
-    };
-    document.addEventListener('click', onDoc, { capture: true, passive: true });
-
-    btn.addEventListener('keydown', (e) => {
-      if (e.key === 'Escape') { close(); return; }
-      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggle(); }
-    });
-    document.addEventListener('keydown', (e) => { if (e.key === 'Escape') close(); }, { passive: true });
-  })();
-</script>
-
-<!-- ===== MOBILE RESCUE HOTFIX (inline, cache-proof) ===== -->
-<style id="cc-mobile-hotfix">
-  *,*::before,*::after{box-sizing:border-box}
-  html,body{max-width:100%;overflow-x:hidden}
-
-  .cc-sidebar{z-index:2000!important}
-  .cc-backdrop{z-index:1990!important;pointer-events:none;opacity:0;transition:opacity .2s ease}
-  .cc-backdrop.show{pointer-events:auto;opacity:1}
-  .mobile-toggle{z-index:2010!important}
-  .tenant-menu{z-index:2050!important}
-  .mobile-tabbar,.cc-bottom-nav{z-index:1200!important}
-
-  @media (max-width:991.98px){
-    .row{margin-left:0!important;margin-right:0!important}
-    .row>[class*="col"]{padding-left:8px!important;padding-right:8px!important;min-width:0}
-    .dashboard-grid,.grid,.grid-2{display:grid!important;grid-template-columns:1fr!important;gap:12px!important}
-    .cc-page,.container,.container-fluid,main.cc-page{max-width:100%!important;width:100%!important}
-  }
-
-  img,svg,video,canvas,iframe{max-width:100%;height:auto;display:block}
-  .table,.table-responsive{width:100%}
-  .table-responsive{-webkit-overflow-scrolling:touch;overflow-x:auto}
-
-  .cc-header,.cc-page,.card,.glass-card{transform:none!important;filter:none!important}
-
-  :root{--cc-nav-h:64px;--cc-safe-bottom:max(env(safe-area-inset-bottom),0px)}
-  .mobile-tabbar,.cc-bottom-nav{
-    position:fixed;left:0;right:0;bottom:0;height:calc(var(--cc-nav-h)+var(--cc-safe-bottom));
-    padding-bottom:var(--cc-safe-bottom);backdrop-filter:blur(10px)
-  }
-  .cc-page,main.cc-page,.container,.container-fluid{
-    padding-bottom:calc(var(--cc-nav-h)+var(--cc-safe-bottom)+16px)
-  }
-</style>
-
-<script id="cc-mobile-hotfix-js">
-(() => {
-  if (window.__CC_HOTFIX_APPLIED__) return;
-  window.__CC_HOTFIX_APPLIED__ = true;
-
-  const $ = (s, r=document) => r.querySelector(s);
-  const $$ = (s, r=document) => Array.from(r.querySelectorAll(s));
-
-  /* Bust stale CSS quickly (adds ?hotfix=xxx once per session) */
-  try{
-    const tag='hotfix';
-    if(!sessionStorage.getItem('cc-'+tag)){
-      $$('link[rel="stylesheet"]').forEach(l=>{
-        try{
-          const u=new URL(l.href, location.origin);
-          u.searchParams.set(tag, Date.now().toString().slice(-6));
-          l.href=u.toString();
-        }catch(_){}
-      });
-      sessionStorage.setItem('cc-'+tag, '1');
-    }
-  }catch(_){}
-
-  /* Keep --cc-nav-h in sync with actual dock height */
-  function syncDockVar(){
-    const dock = $('.cc-bottom-nav') || $('.mobile-tabbar');
-    const root = document.documentElement;
-    if(!root) return;
-    const h = dock ? Math.round(dock.getBoundingClientRect().height) : 0;
-    if(h) root.style.setProperty('--cc-nav-h', h+'px');
-  }
-  ['load','orientationchange','resize'].forEach(ev =>
-    window.addEventListener(ev, syncDockVar, {passive:true})
-  );
-  new MutationObserver(syncDockVar).observe(document.body || document.documentElement, {childList:true,subtree:true});
-  syncDockVar();
-
-  /* Sidebar drawer with scroll lock (mobile) */
-  const sidebar = $('.cc-sidebar');
-  const backdrop= $('#ccBackdrop');
-  const openBtn = $('#sidebarOpen');
-  let savedY = 0;
-  const isMobile = () => matchMedia('(max-width: 992px)').matches;
-
-  function lockScroll(){ savedY=window.scrollY||0; Object.assign(document.body.style,{
-    position:'fixed',top:`-${savedY}px`,left:'0',right:'0',width:'100%',overflow:'hidden'
-  });}
-  function unlockScroll(){ Object.assign(document.body.style,{
-    position:'',top:'',left:'',right:'',width:'',overflow:''
-  }); window.scrollTo(0,savedY||0);}
-
-  function openDrawer(){ if(!sidebar||!backdrop||!isMobile()) return; sidebar.classList.add('open'); backdrop.classList.add('show'); lockScroll(); }
-  function closeDrawer(){ if(!sidebar||!backdrop) return; sidebar.classList.remove('open'); backdrop.classList.remove('show'); unlockScroll(); }
-
-  openBtn && openBtn.addEventListener('click', (e)=>{ e.preventDefault(); e.stopPropagation(); openDrawer(); });
-  backdrop && backdrop.addEventListener('click', closeDrawer);
-  document.addEventListener('keydown', (e)=>{ if(e.key==='Escape') closeDrawer(); });
-
-  $$('.cc-sidebar a[href]').forEach(a=>{
-    a.addEventListener('click', ()=>{ if(isMobile()) closeDrawer(); }, {passive:true});
-  });
-
-  /* Tenant dropdown: extra guard to stop instant close */
-  (function(){
-    const btn  = $('#tenantBtn');
-    const menu = $('#tenantMenu');
-    if(!btn||!menu) return;
-
-    let openedAt = 0;
-
-    const open = ()=>{ menu.classList.add('open'); btn.setAttribute('aria-expanded','true'); openedAt = Date.now(); };
-    const close= ()=>{ menu.classList.remove('open'); btn.setAttribute('aria-expanded','false'); };
-    const toggle=()=> menu.classList.contains('open') ? close() : open();
-
-    btn.addEventListener('click', (e)=>{ e.preventDefault(); e.stopPropagation(); toggle(); });
-
-    ['pointerdown','touchstart','mousedown','click'].forEach(ev=>{
-      btn.addEventListener(ev, e=>e.stopPropagation(), {passive:true});
-      menu.addEventListener(ev, e=>e.stopPropagation(), {passive:true});
-    });
-
-    document.addEventListener('click', (e)=>{
-      if (Date.now() - openedAt < 300) return; /* debounce */
-      if(menu.contains(e.target) || btn.contains(e.target)) return;
-      close();
-    }, true);
-
-    document.addEventListener('keydown', (e)=>{ if(e.key==='Escape') close(); });
-  })();
-
-  /* Last-resort: ensure service worker doesn’t pin old bundles (TEMP) */
-  try{
-    if('serviceWorker' in navigator){
-      navigator.serviceWorker.getRegistrations?.().then(rs=>{ rs.forEach(r=>r.unregister()); });
-    }
-  }catch(_){}
-
-  /* Tiny on-screen version tag (remove later) */
-  try{
-    const v = (document.currentScript && (new URL(location.href)).searchParams.get('v')) || Date.now().toString().slice(-6);
-    const b = document.createElement('div');
-    b.style.cssText='position:fixed;right:8px;bottom:calc(var(--cc-nav-h,64px)+10px);background:#111;color:#fff;padding:4px 8px;border-radius:8px;font:600 12px/1 ui-sans-serif,system-ui;opacity:.85;z-index:9999';
-    b.textContent='hotfix:'+v;
-    document.body.appendChild(b);
-    setTimeout(()=>b.remove(),6000);
-  }catch(_){}
-})();
-</script>
-<!-- ===== /MOBILE RESCUE HOTFIX ===== -->
-
-<!-- Mobile enablement: safe-area padding + keyboard awareness -->
-<script>
+  /* Mobile enablement: add class, vh var, keyboard awareness */
   document.addEventListener('DOMContentLoaded', () => {
-    // Let CSS know a bottom nav exists (pads #app-main in mobile-fixes.css)
     document.body.classList.add('has-bottomnav');
   });
-
-  // Dynamic viewport unit for mobile browser chrome changes
-  function setVH(){
-    const vh = window.visualViewport ? window.visualViewport.height : window.innerHeight;
-    document.documentElement.style.setProperty('--vh', (vh/100) + 'px');
-  }
-  setVH();
-  window.addEventListener('resize', setVH);
-  window.addEventListener('orientationchange', setVH);
-
-  // Keyboard detection to reduce bottom padding while typing
+  (function setVH(){
+    function apply(){
+      const vh = window.visualViewport ? window.visualViewport.height : window.innerHeight;
+      document.documentElement.style.setProperty('--vh', (vh/100) + 'px');
+    }
+    apply();
+    window.addEventListener('resize', apply, {passive:true});
+    window.addEventListener('orientationchange', apply, {passive:true});
+  })();
   (function keyboardAware(){
     const vv = window.visualViewport;
     if (!vv) return;
-    const THRESH = 140; // px shrink that likely indicates keyboard
+    const THRESH = 140;
     let baseHeight = vv.height;
     function onChange(){
       const kbOpen = (baseHeight - vv.height) > THRESH;
       document.body.classList.toggle('kb-open', kbOpen);
     }
-    vv.addEventListener('resize', onChange);
-    vv.addEventListener('scroll', onChange);
+    vv.addEventListener('resize', onChange, {passive:true});
+    vv.addEventListener('scroll', onChange, {passive:true});
+  })();
+
+  /* Presence dots: user + tenant → online/ offline */
+  (function(){
+    const userDot   = document.querySelector('.topbar-user .presence-dot');
+    const tenantDot = document.querySelector('.tenant-dot');
+    function apply(){
+      const on = navigator.onLine;
+      if (userDot){ userDot.classList.toggle('offline', !on); userDot.title = on ? 'Online' : 'Offline'; }
+      if (tenantDot){ tenantDot.classList.toggle('offline', !on); tenantDot.title = on ? 'Online' : 'Offline'; }
+    }
+    window.addEventListener('online',  apply, {passive:true});
+    window.addEventListener('offline', apply, {passive:true});
+    apply();
   })();
 </script>
+
+{# ===== Geo-ping ===== #}
+{% if request.user.is_authenticated %}
+<script>
+(function () {
+  const ENDPOINT = (window.CC && CC.URLS && CC.URLS.geo_ping) || "{{ url_geo_ping|default:'/inventory/api/geo-ping/' }}";
+  const onTimeLogs = location.pathname.indexOf('/inventory/time/logs/') !== -1;
+  const force = localStorage.getItem('cc_ping_force') === '1';
+  const isAgent = !!(window.CC && CC.USER && CC.USER.is_agent === true);
+  const shouldPing = isAgent || onTimeLogs || force;
+  if (!shouldPing) return;
+
+  function getCSRF() {
+    // Always uses the unified helper (now robust)
+    return (window.CC && CC.getCsrfToken && CC.getCsrfToken()) || '';
+  }
+
+  let watchId = null;
+  let lastSent = 0;
+
+  async function sendPing(lat, lon, accuracy) {
+    try {
+      await fetch(ENDPOINT, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Accept": "application/json"
+          // X-CSRFToken is now injected by the global fetch shim if token exists
+        },
+        credentials: "same-origin",
+        body: JSON.stringify({ lat, lon, accuracy })
+      });
+    } catch (_) {}
+  }
+
+  function onPos(pos) {
+    const now = Date.now();
+    if (now - lastSent < 30000) return; // throttle 30s
+    lastSent = now;
+    const { latitude, longitude, accuracy } = pos.coords || {};
+    if (latitude != null && longitude != null) {
+      sendPing(latitude, longitude, accuracy ?? 0);
+    }
+  }
+
+  function onErr(){}
+
+  function startWatch() {
+    if (!navigator.geolocation) return;
+    stopWatch();
+
+    navigator.geolocation.getCurrentPosition(onPos, onErr, {
+      enableHighAccuracy: true, maximumAge: 5000, timeout: 10000
+    });
+
+    watchId = navigator.geolocation.watchPosition(onPos, onErr, {
+      enableHighAccuracy: true,
+      maximumAge: 5000,
+      timeout: 10000
+    });
+  }
+
+  function stopWatch() {
+    if (watchId) navigator.geolocation.clearWatch(watchId);
+    watchId = null;
+  }
+
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "visible") startWatch();
+    else stopWatch();
+  });
+
+  startWatch();
+})();
+</script>
+{% endif %}
 
 {% block extra_js %}{% endblock %}
 </body>

@@ -1,4 +1,4 @@
-# inventory/authz.py
+﻿# inventory/authz.py
 from django.contrib.auth.models import Group
 from django.http import HttpResponseForbidden
 
@@ -23,3 +23,5 @@ def forbid_writes_for_auditors(view_func):
             return HttpResponseForbidden("Auditors are read-only.")
         return view_func(request, *args, **kwargs)
     return _wrapped
+
+

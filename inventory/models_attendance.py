@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 from dataclasses import dataclass
 from datetime import datetime, time, timedelta
 from decimal import Decimal
@@ -94,3 +94,5 @@ def compute_attendance_outcome(at_ts: datetime, kind: str) -> AttendanceOutcome:
         outcome.early_bonus = EARLY_BONUS_PER_30 * blocks
 
     return outcome
+
+

@@ -1,4 +1,4 @@
-# billing/templatetags/billing_tags.py
+﻿# billing/templatetags/billing_tags.py
 from __future__ import annotations
 
 from datetime import datetime
@@ -10,7 +10,7 @@ register = template.Library()
 @register.inclusion_tag("billing/components/subscription_badge.html", takes_context=True)
 def subscription_badge(context):
     """
-    Renders a small "Trial – X days left" / "Active" / "Grace" badge.
+    Renders a small "Trial â€“ X days left" / "Active" / "Grace" badge.
     Expects request.business.subscription if tenants middleware is active.
     """
     request = context.get("request")
@@ -25,7 +25,7 @@ def subscription_badge(context):
             today = timezone.localdate()
             dl = (sub.trial_end.date() - today).days
             days_left = max(dl, 0)
-            label = f"Trial — {days_left} day{'s' if days_left != 1 else ''} left"
+            label = f"Trial â€” {days_left} day{'s' if days_left != 1 else ''} left"
             tone = "warning" if days_left <= 3 else "info"
         elif status == "active":
             label = "Active"
@@ -44,3 +44,5 @@ def subscription_badge(context):
             tone = "secondary"
 
     return {"label": label, "tone": tone}
+
+

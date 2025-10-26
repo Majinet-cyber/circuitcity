@@ -1,0 +1,81 @@
+
+    store = Store.objects.filter(business=biz).order_by("id").first()
+    if not store:
+        store_kwargs = {"business": biz, "name": f"{biz.name} Store"}
+        if hasattr(Store, "is_default"):
+            store_kwargs["is_default"] = True
+        store = Store.objects.create(**store_kwargs)
+
+    wh = Warehouse.objects.filter(business=biz).order_by("id").first()
+    if not wh:
+        wh_kwargs = {"business": biz, "name": "Main Warehouse"}
+        if hasattr(Warehouse, "store"):
+            wh_kwargs["store"] = store
+        if hasattr(Warehouse, "is_default"):
+            wh_kwargs["is_default"] = True
+        Warehouse.objects.create(**wh_kwargs)
+
+
+# =========================================
+# Manager sign-up (auto-tenant + auto-select, ACTIVE immediately)
+# =========================================
+@ensure_csrf_cookie
+@never_cache
+@require_http_methods(["GET", "POST"])
+def signup_manager(request):
+    # If already signed in, just go to app
+    if request.user.is_authenticated:
+        return redirect(_safe_redirect("inventory:inventory_dashboard", "dashboard:home", default="/inventory/dashboard/"))
+
+    form = ManagerSignUpForm(request.POST or None)
+    if request.method == "POST" and form.is_valid():
+        email = form.cleaned_data["email"].strip().lower()
+        full_name = form.cleaned_data["full_name"].strip()
+        biz_name = form.cleaned_data["business_name"].strip()
+        subdomain = (form.cleaned_data.get("subdomain") or "").strip().lower()
+        password = form.cleaned_data["password1"]
+
+        # Create user (username = email)
+        user = User.objects.create_user(username=email, email=email, password=password)
+
+        # Optional name split
+        try:
+            parts = full_name.split()
+            user.first_name = parts[0]
+            user.last_name = " ".join(parts[1:]) if len(parts) > 1 else ""
+            user.save(update_fields=["first_name", "last_name"])
+        except Exception:
+            pass
+
+        # Add to Manager group
+        try:
+            mgr_group = _get_or_create_manager_group()
+            user.groups.add(mgr_group)
+        except Exception:
+            pass
+
+        # Create ACTIVE business immediately
+        biz = None
+        if Business is not None:
+            base = slugify(biz_name)[:40] or "store"
+            unique = base
+            i = 1
+            while Business.objects.filter(slug=unique).exists():
+                i += 1
+                unique = f"{base}-{i}"
+
+            bkwargs = {"name": biz_name, "slug": unique}
+            if hasattr(Business, "created_by"):
+                bkwargs["created_by"] = user
+            if hasattr(Business, "subdomain") and subdomain:
+                bkwargs["subdomain"] = subdomain
+            if hasattr(Business, "status"):
+                bkwargs["status"] = "ACTIVE"
+
+            biz = Business.objects.create(**bkwargs)
+
+            # Ensure membership MANAGER → ACTIVE
+            try:
+                if Membership is not None:
+                    Membership.objects.update_or_create(
+                        user=user,

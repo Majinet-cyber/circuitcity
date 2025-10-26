@@ -1,0 +1,151 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Add Product{% endblock %}
+
+{% block content %}
+<div class="container max-w-5xl mx-auto px-3 py-4">
+  <h2 class="h3 mb-2">Add Product</h2>
+  <p class="text-muted mb-4">
+    Phones: add model details once (brand, model, specs, price). Individual phones are scanned later via <strong>15-digit IMEI</strong>.
+  </p>
+
+  <div class="card shadow-sm border-0 mb-4">
+    <div class="card-body">
+      <form method="post" novalidate>
+        {% csrf_token %}
+        <div class="row g-3">
+          <div class="col-12 col-md-6">
+            <label class="form-label">Brand</label>
+            {{ form.brand }}
+            <input type="text" id="id_brand_other" name="brand_other"
+                   class="form-control mt-2 d-none"
+                   placeholder="Type a brand (e.g., Infinix)" />
+            <small class="text-muted">Tecno, Itel, Samsung, Huawei, iPhone (or choose Other).</small>
+          </div>
+
+          <div class="col-12 col-md-6">
+            <label class="form-label">Model number <span class="text-muted">(optional)</span></label>
+            {{ form.model_number }}
+          </div>
+
+          <div class="col-12">
+            <label class="form-label">Specs</label>
+            {{ form.specs }}
+            <datalist id="specs-list">
+              <option value="64+2"></option>
+              <option value="64+3"></option>
+              <option value="128+4"></option>
+              <option value="128+8"></option>
+              <option value="256+8"></option>
+            </datalist>
+            <small class="text-muted">Editable. Quick picks: 64+2, 64+3, 128+4, 128+8, 256+8</small>
+          </div>
+
+          <div class="col-12 col-md-6">
+            <label class="form-label">Phone name</label>
+            {{ form.phone_name }}
+          </div>
+
+          <div class="col-12 col-md-6">
+            <label class="form-label">Price</label>
+            {{ form.price }}
+          </div>
+        </div>
+
+        <div class="mt-4 d-flex gap-2">
+          <button class="btn btn-primary px-4">Save</button>
+          <a href=".." class="btn btn-outline-secondary">Cancel</a>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div class="card border-0 shadow-sm">
+    <div class="card-body">
+      <div class="d-flex justify-content-between align-items-center mb-2">
+        <h5 class="mb-0">Your Products</h5>
+        <small class="text-muted">Showing latest {{ products|length }} items</small>
+      </div>
+
+      {% if products %}
+      <div class="table-responsive">
+        <table class="table align-middle">
+          <thead class="small text-muted">
+            <tr>
+              <th>Brand</th>
+              <th>Phone name</th>
+              <th>Model #</th>
+              <th>Specs</th>
+              <th class="text-end">Price</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for p in products %}
+            <tr>
+              <td>{{ p.brand }}</td>
+              <td>{% firstof p.phone_name p.name p.variant p.title "—" %}</td>
+              <td>{% firstof p.model_number p.model p.sku "—" %}</td>
+              <td>{{ p.specs|default:"—" }}</td>
+              <td class="text-end">
+                {% if p.price %}
+                  {{ p.price|floatformat:0 }}
+                {% elif p.sale_price %}
+                  {{ p.sale_price|floatformat:0 }}
+                {% else %}
+                  —
+                {% endif %}
+              </td>
+              <td class="text-end">
+                {% if p.pk %}
+                  <div class="d-inline-flex gap-1">
+                    <a class="btn btn-sm btn-outline-primary"
+                       href="{% url 'inventory:product_edit_v2' p.pk %}">Edit</a>
+                    <form method="post"
+                          action="{% url 'inventory:product_delete_v2' p.pk %}"
+                          onsubmit="return confirm('Delete this product? This cannot be undone.');"
+                          style="display:inline;">
+                      {% csrf_token %}
+                      <button type="submit" class="btn btn-sm btn-outline-danger">Delete</button>
+                    </form>
+                  </div>
+                {% else %}
+                  <span class="text-muted">—</span>
+                {% endif %}
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}
+        <p class="text-muted mb-0">No products yet. Add your first one above.</p>
+      {% endif %}
+    </div>
+  </div>
+</div>
+
+<script>
+  (function () {
+    const select = document.getElementById("id_brand_select");
+    const other  = document.getElementById("id_brand_other");
+    if (!select || !other) return;
+
+    function sync() {
+      if (select.value === "Other") {
+        other.classList.remove("d-none");
+        other.name = "brand";
+        select.name = "_brand_ui";
+        other.focus();
+      } else {
+        other.classList.add("d-none");
+        other.name = "brand_other";
+        select.name = "brand";
+      }
+    }
+    select.addEventListener("change", sync);
+    sync();
+  })();
+</script>
+{% endblock %}

@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 import csv
 from datetime import timedelta
 from django.contrib.auth.decorators import login_required, user_passes_test
@@ -72,3 +72,5 @@ def export_management_report_csv(request):
     w.writerow(["Metric","Value"])
     for k,v in kpis.items(): w.writerow([k, v])
     return resp
+
+

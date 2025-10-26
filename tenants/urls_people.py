@@ -1,4 +1,4 @@
-from django.urls import path
+﻿from django.urls import path
 from . import views_people as v
 
 
@@ -21,3 +21,4 @@ path("org/locations/<int:pk>/edit/", v.location_edit, name="location_edit"),
 path("org/locations/<int:pk>/delete/", v.location_delete, name="location_delete"),
 path("org/locations/<int:pk>/default/", v.location_set_default, name="location_set_default"),
 ]
+

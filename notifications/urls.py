@@ -1,4 +1,4 @@
-# circuitcity/notifications/urls.py
+﻿# circuitcity/notifications/urls.py
 from django.urls import path
 from . import views
 
@@ -15,3 +15,5 @@ urlpatterns = [
     path("read/", views.mark_read, name="mark_read"),
     path("mark-read/", views.mark_read, name="mark_read_alt"),
 ]
+
+

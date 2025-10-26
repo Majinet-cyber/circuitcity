@@ -1,3 +1,4 @@
+﻿# simulator/views.py
 from __future__ import annotations
 
 from typing import Any, Dict, List
@@ -33,6 +34,9 @@ def _scenario_payload(s: Scenario) -> Dict[str, Any]:
         "monthly_fixed_costs": float(getattr(s, "monthly_fixed_costs", 0.0) or 0.0),
         "monthly_growth_pct": float(getattr(s, "monthly_growth_pct", 0.0) or 0.0),
         "months": int(getattr(s, "months", 12) or 12),
+        # Optional knobs used by the engine if present:
+        "tax_rate_pct": float(getattr(s, "tax_rate_pct", 0.0) or 0.0),
+        "opening_cash": float(getattr(s, "opening_cash", 0.0) or 0.0),
     }
 
 
@@ -63,12 +67,37 @@ def _create_run(scenario: Scenario, result: Dict[str, Any]) -> SimulationRun:
     return SimulationRun.objects.create(**{"scenario": scenario, field_name: result})
 
 
+def _parse_ids(request: HttpRequest, cap: int = 8) -> List[int]:
+    """
+    Accepts both repeated ?id=1&id=2 and a single comma-delimited ?ids=1,2,3.
+    Returns a de-duplicated, numeric list capped to `cap`.
+    """
+    ids: List[str] = request.GET.getlist("id")
+    if request.GET.get("ids"):
+        ids.extend(x.strip() for x in request.GET["ids"].split(","))
+    clean: List[int] = []
+    for s in ids:
+        if s and s.isdigit():
+            clean.append(int(s))
+    seen = set()
+    ordered: List[int] = []
+    for i in clean:
+        if i not in seen:
+            seen.add(i)
+            ordered.append(i)
+        if len(ordered) >= cap:
+            break
+    return ordered
+
+
 # ------------------------------
 # Views
 # ------------------------------
 @login_required
 def sim_home(request: HttpRequest) -> HttpResponse:
-    # Prefetch latest run for quick “last updated” display if desired
+    """
+    Scenarios list for the current user (latest first).
+    """
     scenarios = (
         Scenario.objects.filter(owner=request.user)
         .order_by("-created_at", "-id")
@@ -79,6 +108,9 @@ def sim_home(request: HttpRequest) -> HttpResponse:
 
 @login_required
 def sim_new(request: HttpRequest) -> HttpResponse:
+    """
+    Create a new scenario.
+    """
     if request.method == "POST":
         form = ScenarioForm(request.POST)
         if form.is_valid():
@@ -87,8 +119,7 @@ def sim_new(request: HttpRequest) -> HttpResponse:
             scenario.save()
             messages.success(request, "Scenario created.")
             return redirect("simulator:detail", pk=scenario.pk)
-        else:
-            messages.error(request, "Please fix the errors and try again.")
+        messages.error(request, "Please fix the errors and try again.")
     else:
         form = ScenarioForm()
     return render(request, "simulator/new.html", {"form": form})
@@ -96,12 +127,23 @@ def sim_new(request: HttpRequest) -> HttpResponse:
 
 @login_required
 def sim_detail(request: HttpRequest, pk: int) -> HttpResponse:
+    """
+    Scenario details with latest run (if any).
+    """
     scenario = get_object_or_404(Scenario, pk=pk, owner=request.user)
     latest = scenario.runs.order_by("-created_at", "-id").first()
+
+    # Provide a ready-to-embed dict for the template (avoid non-existent template filters)
+    latest_payload = _get_results_json(latest) if latest else {}
+
     return render(
         request,
         "simulator/detail.html",
-        {"scenario": scenario, "latest": latest},
+        {
+            "scenario": scenario,
+            "latest": latest,
+            "latest_payload": latest_payload,
+        },
     )
 
 
@@ -124,22 +166,23 @@ def sim_run(request: HttpRequest, pk: int) -> HttpResponse:
         "monthly_fixed_costs",
         "monthly_growth_pct",
         "months",
+        "tax_rate_pct",
+        "opening_cash",
     ):
         if key in request.POST:
             val = request.POST.get(key)
             try:
-                overrides[key] = int(val) if key in ("baseline_monthly_units", "months") else float(val)
+                if key in ("baseline_monthly_units", "months"):
+                    overrides[key] = int(val)
+                else:
+                    overrides[key] = float(val)
             except Exception:
-                # Ignore bad overrides; fallback to scenario value
-                pass
+                pass  # ignore bad overrides; fallback to scenario value
 
     payload = _scenario_payload(scenario)
     payload.update(overrides)
 
-    # Compute
     results = run_deterministic(payload)
-
-    # Persist run (supports results_json or legacy result_json)
     run = _create_run(scenario, results)
 
     if _wants_json(request):
@@ -174,35 +217,43 @@ def sim_results_api(request: HttpRequest, pk: int) -> JsonResponse:
 
 
 @login_required
+@require_GET
 def sim_compare(request: HttpRequest) -> HttpResponse:
     """
     Compare multiple scenarios side-by-side.
     - Accepts multiple ?id= query params (e.g. /simulator/compare/?id=1&id=2&id=3)
+      and/or a single comma-separated ?ids=1,2,3
     - Returns HTML by default, JSON if requested/accepted.
     """
-    raw_ids: List[str] = request.GET.getlist("id")
-    # Sanitize and cap to 8 scenarios
-    ids = [i for i in raw_ids if i.isdigit()][:8]
+    ids: List[int] = _parse_ids(request, cap=8)
 
     if not ids:
         if _wants_json(request):
             return JsonResponse(
-                {"ok": False, "error": "Provide at least one ?id= in the query string"},
+                {"ok": False, "error": "Provide at least one ?id= (or ?ids=1,2,3) in the query string"},
                 status=400,
             )
-        return HttpResponseBadRequest("Provide ?id=1&id=2 to compare")
+        return HttpResponseBadRequest("Provide ?id=1&id=2 (or ?ids=1,2,3) to compare")
 
-    qs = Scenario.objects.filter(owner=request.user, pk__in=ids).order_by("name", "pk")
+    # Only fetch scenarios owned by this user; keep requested order
+    scenarios_qs = Scenario.objects.filter(owner=request.user, pk__in=ids)
+    scenarios_map: Dict[int, Scenario] = {s.pk: s for s in scenarios_qs}
+    ordered: List[Scenario] = [scenarios_map[i] for i in ids if i in scenarios_map]
+
+    if not ordered:
+        if _wants_json(request):
+            return JsonResponse({"ok": False, "error": "No matching scenarios found"}, status=404)
+        return HttpResponseBadRequest("No matching scenarios found")
 
     payload: List[Dict[str, Any]] = []
-    for s in qs:
+    for s in ordered:
         data = _scenario_payload(s)
         res = run_deterministic(data)
         payload.append(
             {
                 "scenario_id": s.id,
                 "scenario_name": s.name,
-                "results": res,
+                "results": res,  # contains 'series' and 'kpis'
             }
         )
 
@@ -210,3 +261,5 @@ def sim_compare(request: HttpRequest) -> HttpResponse:
         return JsonResponse({"ok": True, "items": payload}, status=200)
 
     return render(request, "simulator/compare.html", {"payload": payload})
+
+
