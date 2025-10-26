@@ -1,4 +1,4 @@
-# wallet/tasks.py
+﻿# wallet/tasks.py
 from __future__ import annotations
 from celery import shared_task
 from django.core.mail import EmailMultiAlternatives
@@ -13,7 +13,7 @@ from .services import compute_payslip_numbers, month_range_for_previous_month
 def send_payslip_email(payslip_id: int) -> str:
     ps = Payslip.objects.select_related("user").get(id=payslip_id)
     ctx = {"ps": ps, "user": ps.user}
-    subject = f"Payslip • {ps.period_start:%b %Y} • {ps.user.get_username()}"
+    subject = f"Payslip â€¢ {ps.period_start:%b %Y} â€¢ {ps.user.get_username()}"
     html = render_to_string("wallet/emails/payslip_email.html", ctx)
     text = render_to_string("wallet/emails/payslip_email.txt", ctx)
     msg = EmailMultiAlternatives(subject, text, to=[ps.email_to] if ps.email_to else [])
@@ -57,3 +57,5 @@ def run_payout_schedules() -> int:
         sched.last_run_at = now
         sched.save(update_fields=["last_run_at"])
     return ran
+
+

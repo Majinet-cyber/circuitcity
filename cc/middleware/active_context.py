@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 from typing import Optional
 from urllib.parse import urlencode
 
@@ -149,7 +149,7 @@ class ActiveContextMiddleware:
         path = (request.path or "").rstrip("/")
         if not (path.startswith("/inventory") or path == "/dashboard"):
             return None
-        # Don’t redirect API calls or POSTs
+        # Donâ€™t redirect API calls or POSTs
         if path.startswith("/inventory/api") or request.method != "GET":
             return None
 
@@ -165,3 +165,5 @@ class ActiveContextMiddleware:
         for k, v in need.items():
             qs[k] = v
         return redirect(f"{request.path}?{qs.urlencode()}")
+
+

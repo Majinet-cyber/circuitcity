@@ -1,4 +1,4 @@
-from django.contrib.admin import AdminSite
+﻿from django.contrib.admin import AdminSite
 
 class SuperuserOnlyAdminSite(AdminSite):
     site_header = "Circuit City Superadmin"
@@ -9,3 +9,5 @@ class SuperuserOnlyAdminSite(AdminSite):
         return request.user.is_active and request.user.is_superuser
 
 superadmin_site = SuperuserOnlyAdminSite(name="superadmin")
+
+

@@ -1,4 +1,4 @@
-# billing/utils_send.py
+﻿# billing/utils_send.py
 from __future__ import annotations
 from dataclasses import dataclass
 from typing import Iterable
@@ -6,7 +6,7 @@ from django.conf import settings
 from django.core.mail import EmailMultiAlternatives
 from django.template.loader import render_to_string
 
-# Try to use your notifications app’s WhatsApp dispatcher if available
+# Try to use your notifications appâ€™s WhatsApp dispatcher if available
 try:
     from notifications.backends.whatsapp import send_whatsapp  # type: ignore
 except Exception:
@@ -42,3 +42,5 @@ def send_invoice_whatsapp(*, to_number: str, text: str) -> SendResult:
     # Minimal console fallback
     print(f"[WhatsApp:FALLBACK] -> {to_number}\n{text}")
     return SendResult(True, "whatsapp", "Console fallback")
+
+

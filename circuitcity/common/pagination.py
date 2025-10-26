@@ -1,4 +1,4 @@
-# common/pagination.py
+﻿# common/pagination.py
 from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
 from urllib.parse import urlencode
 
@@ -22,3 +22,5 @@ def paginate_qs(request, qs, default_per_page=50, max_per_page=200):
         return f"?{urlencode(params)}"
 
     return page_obj, url_for
+
+

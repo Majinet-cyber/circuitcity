@@ -1,0 +1,183 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Locations · {{ request.user.get_username }}{% endblock %}
+{% block header_title %}Locations{% endblock %}
+
+{% block content %}
+
+{# ---------- Flash messages (success / errors) ---------- #}
+{% if messages %}
+  <div class="mb-3">
+    {% for m in messages %}
+      <div class="alert {% if m.tags %}alert-{{ m.tags }}{% else %}alert-info{% endif %}">{{ m }}</div>
+    {% endfor %}
+  </div>
+{% endif %}
+
+{# ---------- Create / edit form ---------- #}
+<div class="glass-card p-3 mb-3">
+  <div class="d-flex align-items-center justify-content-between mb-2">
+    <h2 class="m-0">Add a Location</h2>
+    <span class="status-badge badge">Business: {{ request.active_business.name|default:"—" }}</span>
+  </div>
+
+  <p class="text-muted mb-3">
+    Add your shop/branch locations. You can type coordinates or click
+    <em>Use my location</em> to auto-fill GPS from the browser. Set one as <strong>Primary</strong>
+    to use as the default geofence.
+  </p>
+
+  <form method="post" class="row g-3">
+    {% csrf_token %}
+
+    <div class="col-md-4">
+      <label class="form-label">Name</label>
+      {{ form.name|add_class:"form-control" }}
+      {% if form.name.errors %}<div class="text-danger small">{{ form.name.errors|join:", " }}</div>{% endif %}
+      <div class="form-text">e.g., {{ request.active_business.name }} (Main), City Mall, Area 18, etc.</div>
+    </div>
+
+    <div class="col-md-4">
+      <label class="form-label">Address (optional)</label>
+      {{ form.address|add_class:"form-control" }}
+      {% if form.address.errors %}<div class="text-danger small">{{ form.address.errors|join:", " }}</div>{% endif %}
+    </div>
+
+    <div class="col-md-2">
+      <label class="form-label">Latitude</label>
+      {{ form.latitude|add_class:"form-control" }}
+      {% if form.latitude.errors %}<div class="text-danger small">{{ form.latitude.errors|join:", " }}</div>{% endif %}
+    </div>
+
+    <div class="col-md-2">
+      <label class="form-label">Longitude</label>
+      {{ form.longitude|add_class:"form-control" }}
+      {% if form.longitude.errors %}<div class="text-danger small">{{ form.longitude.errors|join:", " }}</div>{% endif %}
+    </div>
+
+    <div class="col-md-3">
+      <label class="form-label">Radius (meters)</label>
+      {{ form.radius_m|add_class:"form-control" }}
+      {% if form.radius_m.errors %}<div class="text-danger small">{{ form.radius_m.errors|join:", " }}</div>{% endif %}
+      <div class="form-text">Distance around the location to allow “in-work” time logs.</div>
+    </div>
+
+    <div class="col-md-3 d-flex align-items-end">
+      <label class="form-check ms-1">
+        {{ form.is_primary }} <span class="ms-1">Set as Primary</span>
+      </label>
+    </div>
+
+    <div class="col-md-6 d-flex align-items-end gap-2">
+      <button class="btn btn-primary" type="submit">Save Location</button>
+      <button class="btn btn-outline-primary" type="button" id="btnUseGPS">Use my location</button>
+      <button class="btn btn-outline-primary" type="button" id="btnCopyBiz">Use business name</button>
+    </div>
+  </form>
+</div>
+
+{# ---------- Locations list ---------- #}
+<div class="glass-card p-3">
+  <div class="d-flex align-items-center justify-content-between mb-2">
+    <h2 class="m-0">Your Locations</h2>
+    <a href="{% url 'inventory:alerts_feed' %}" class="btn btn-outline-primary">View Alerts</a>
+  </div>
+
+  <div class="table-responsive">
+    <table class="table cc-table align-middle">
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Address</th>
+          <th>Coordinates</th>
+          <th>Radius</th>
+          <th>Primary</th>
+          <th>Agents (count)</th>
+          <th>Created</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for L in locations %}
+          <tr>
+            <td class="fw-bold">{{ L.name }}</td>
+            <td class="text-wrap">{{ L.address|default:"—" }}</td>
+            <td>
+              {% if L.latitude %}
+                {{ L.latitude }}, {{ L.longitude }}
+              {% else %}
+                <span class="text-muted">—</span>
+              {% endif %}
+            </td>
+            <td>{{ L.radius_m }} m</td>
+            <td>
+              {% if L.is_primary %}
+                <span class="badge">Primary</span>
+              {% else %}
+                <span class="text-muted">—</span>
+              {% endif %}
+            </td>
+            <td>{{ L.agents.count|default:0 }}</td>
+            <td>{{ L.created_at|date:"M j, Y" }}</td>
+          </tr>
+        {% empty %}
+          <tr>
+            <td colspan="7" class="text-muted">No locations yet. Add your first one above.</td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+{# ---------- Helpful tips panel ---------- #}
+<div class="glass-card p-3 mt-3">
+  <h3 class="mb-2">Tips</h3>
+  <ul class="m-0">
+    <li>Set a <strong>Primary</strong> location to act as the default fence for attendance.</li>
+    <li>You can add more branches (Area 25, Old Town, City Mall) and assign agents to each.</li>
+    <li>Increase the radius if GPS on some phones is noisy (e.g., 75–150 meters).</li>
+  </ul>
+</div>
+
+{# ---------- Minimal JS helpers ---------- #}
+<script>
+(function(){
+  const latInput = document.querySelector('[name="latitude"]');
+  const lngInput = document.querySelector('[name="longitude"]');
+  const nameInput = document.querySelector('[name="name"]');
+  const btnGPS = document.getElementById('btnUseGPS');
+  const btnCopyBiz = document.getElementById('btnCopyBiz');
+
+  function fillCoords(lat, lng){
+    if(latInput) latInput.value = String(lat.toFixed(6));
+    if(lngInput) lngInput.value = String(lng.toFixed(6));
+  }
+
+  if(btnGPS){
+    btnGPS.addEventListener('click', function(){
+      if(!navigator.geolocation){
+        alert('Geolocation not supported on this device/browser.');
+        return;
+      }
+      btnGPS.disabled = true; btnGPS.textContent = 'Locating…';
+      navigator.geolocation.getCurrentPosition(function(pos){
+        fillCoords(pos.coords.latitude, pos.coords.longitude);
+        btnGPS.textContent = 'Use my location'; btnGPS.disabled = false;
+      }, function(err){
+        alert('Unable to get location: ' + err.message);
+        btnGPS.textContent = 'Use my location'; btnGPS.disabled = false;
+      }, { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 });
+    });
+  }
+
+  if(btnCopyBiz && nameInput){
+    btnCopyBiz.addEventListener('click', function(){
+      const bizName = "{{ request.active_business.name|escapejs }}";
+      if(bizName){ nameInput.value = bizName; }
+    });
+  }
+})();
+</script>
+
+{% endblock %}

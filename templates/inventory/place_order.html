@@ -157,6 +157,17 @@ const linesEl = sel('lines');
 let models = [];
 let lines = [];
 
+// --- CSRF helper (cookie fallback) ---
+function getCookie(name){
+  const m = document.cookie.match(new RegExp('(^|; )' + name + '=([^;]*)'));
+  return m ? decodeURIComponent(m[2]) : null;
+}
+const CSRF = (function(){
+  const t = '{{ csrf_token }}';
+  if (t && t !== 'NOTPROVIDED') return t;
+  return getCookie('csrftoken') || '';
+})();
+
 function fmt(n){ try{ return Number(n).toLocaleString(); } catch(e){ return n; } }
 
 function redraw(){
@@ -248,7 +259,7 @@ sel('create_po').onclick = async e => {
 
   const r = await fetch("{% url 'inventory:api_place_order' %}", {
     method: 'POST',
-    headers: {'Content-Type':'application/json','X-CSRFToken': '{{ csrf_token }}'},
+    headers: {'Content-Type':'application/json','X-CSRFToken': CSRF},
     body: JSON.stringify(payload)
   });
 
@@ -276,8 +287,8 @@ sel('create_product').onclick = async e => {
   }
   const r = await fetch("{% url 'inventory:api_product_create' %}", {
     method:'POST',
-    headers:{'Content-Type':'application/json','X-CSRFToken':'{{ csrf_token }}'},
-    body: JSON.stringify({brand, model, variant, cost_price: Number(price)})
+    headers:{'Content-Type':'application/json','X-CSRFToken': CSRF},
+    body: JSON.stringify({brand, model, variant, price: Number(price)})
   });
   const data = await r.json();
   if(!data.ok){ alert(data.error || 'Failed.'); return; }
@@ -285,16 +296,20 @@ sel('create_product').onclick = async e => {
   alert('Product created.');
 };
 
+// ---- IMPORTANT: your url takes product_id in the path ----
+const UPDATE_PRICE_URL = (pid) =>
+  "{% url 'inventory:api_product_update_price' 0 %}".replace(/0\/?$/, String(pid) + "/");
+
 sel('update_price').onclick = async e => {
   e.preventDefault();
   const o = sel('model_select').selectedOptions[0];
   if(!o){ alert('Select a product first.'); return; }
   const price = prompt('New cost price (number):', o.dataset.defaultPrice || '0');
   if(price == null) return;
-  const r = await fetch("{% url 'inventory:api_product_update_price' %}", {
+  const r = await fetch(UPDATE_PRICE_URL(Number(o.value)), {
     method:'POST',
-    headers:{'Content-Type':'application/json','X-CSRFToken':'{{ csrf_token }}'},
-    body: JSON.stringify({product_id: Number(o.value), cost_price: Number(price)})
+    headers:{'Content-Type':'application/json','X-CSRFToken': CSRF},
+    body: JSON.stringify({price: Number(price)})
   });
   const data = await r.json();
   if(!data.ok){ alert(data.error || 'Failed.'); return; }

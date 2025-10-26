@@ -1,4 +1,4 @@
-# circuitcity/accounts/urls.py
+﻿# circuitcity/accounts/urls.py
 from django.conf import settings
 from django.urls import path, reverse_lazy
 from django.contrib.auth.views import LogoutView
@@ -8,7 +8,7 @@ from . import views
 
 app_name = "accounts"
 
-# Default landing after logout (used if ?next= isn’t provided)
+# Default landing after logout (used if ?next= isnâ€™t provided)
 LOGIN_URL_LAZY = reverse_lazy("accounts:login")
 
 urlpatterns = [
@@ -30,12 +30,12 @@ urlpatterns = [
     # -------------------------------
     # Password Management
     # -------------------------------
-    # Step 1: enter identifier (email/username) → email a code (if user exists)
+    # Step 1: enter identifier (email/username) â†’ email a code (if user exists)
     path("password/forgot/", views.forgot_password_request_view, name="forgot_password_request"),
     # Step 2: verify code + set the new password
     path("password/reset/", views.forgot_password_verify_view, name="forgot_password_reset"),
 
-    # ✅ Aliases expected by templates / legacy Django auth URLs
+    # âœ… Aliases expected by templates / legacy Django auth URLs
     path(
         "password_reset/",
         RedirectView.as_view(pattern_name="accounts:forgot_password_reset", permanent=False),
@@ -103,3 +103,5 @@ if settings.DEBUG:
     urlpatterns += [
         path("login/_which/", views.login_template_probe, name="login_template_probe"),
     ]
+
+

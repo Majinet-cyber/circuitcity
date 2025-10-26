@@ -1,4 +1,4 @@
-# core/urls.py
+﻿# core/urls.py
 from django.conf import settings
 from django.conf.urls.static import static
 from django.http import HttpResponse
@@ -28,7 +28,7 @@ urlpatterns = [
     re_path(r"^favicon\.ico$", RedirectView.as_view(url=f"{settings.STATIC_URL}favicon.ico", permanent=False)),
 
     # Core app routes
-    path("", include("dashboard.urls")),            # / → dashboard home
+    path("", include("dashboard.urls")),            # / â†’ dashboard home
     path("accounts/", include("accounts.urls")),
     path("tenants/", include("tenants.urls")),
     path("inventory/", include("inventory.urls")),
@@ -43,7 +43,7 @@ urlpatterns = [
     path("billing/", include("billing.urls")),
 ]
 
-# 🔒 Staff-only Django admin; managers/agents cannot access
+# ðŸ”’ Staff-only Django admin; managers/agents cannot access
 if staff_admin_site is not None:
     urlpatterns.append(path(_admin_url, staff_admin_site.urls))
 
@@ -63,3 +63,5 @@ if settings.DEBUG and "debug_toolbar" in settings.INSTALLED_APPS:
 if settings.DEBUG:
     urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
     urlpatterns += static(settings.STATIC_URL, document_root=settings.STATIC_ROOT)
+
+

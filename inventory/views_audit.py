@@ -1,4 +1,4 @@
-# inventory/views_audit.py
+﻿# inventory/views_audit.py
 from __future__ import annotations
 
 import csv
@@ -230,7 +230,7 @@ def audit_detail(request: HttpRequest, pk: int):
 def audit_export_csv(request: HttpRequest) -> HttpResponse:
     """
     Staff-only CSV export honoring the same filters as audit_list.
-    (Caps at 100k rows for safety unless ?limit=… provided up to 500k.)
+    (Caps at 100k rows for safety unless ?limit=â€¦ provided up to 500k.)
     """
     qs = AuditLog.objects.select_related("actor").order_by("id")
 
@@ -309,3 +309,5 @@ def audit_export_csv(request: HttpRequest) -> HttpResponse:
         count += 1
 
     return response
+
+

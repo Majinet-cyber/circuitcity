@@ -1,4 +1,4 @@
-# tenants/templatetags/form_extras.py
+﻿# tenants/templatetags/form_extras.py
 from __future__ import annotations
 
 from django import template
@@ -56,3 +56,5 @@ def placeholder(field, text: str):
     if not bf:
         return field
     return bf.as_widget(attrs={"placeholder": text})
+
+

@@ -1,4 +1,4 @@
-from django.db.models.signals import post_save
+﻿from django.db.models.signals import post_save
 from django.dispatch import receiver
 from django.utils import timezone
 from sales.models import Sale
@@ -20,3 +20,7 @@ def mark_item_sold(sender, instance: Sale, created, **kwargs):
         by_user=instance.agent,
         details=f"Sold at {instance.location} for MK{instance.price} (commission {instance.commission_pct}%).",
     )
+
+
+
+

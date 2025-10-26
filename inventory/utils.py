@@ -9,6 +9,7 @@ from typing import Optional, Callable
 from django.core.exceptions import PermissionDenied
 from django.db.models import Q, QuerySet
 from django.http import HttpRequest
+from django.urls import reverse  # NEW: for invite URL helper
 
 
 # -----------------------
@@ -293,6 +294,112 @@ def ensure_default_location(business) -> Optional[object]:
     return None
 
 
+# -----------------------
+# Business-wide in-stock lookup (NEW)
+# -----------------------
+def _normalize_code(raw: str) -> str:
+    """
+    Keep only digits/spaces-hyphens removed; useful for IMEI normalization.
+    """
+    if not raw:
+        return ""
+    return "".join(ch for ch in str(raw).strip() if ch.isdigit())
+
+
+def _model_has_field(model, field_name: str) -> bool:
+    try:
+        model._meta.get_field(field_name)
+        return True
+    except Exception:
+        return False
+
+
+def get_instock_item_for_business(business, code_or_imei: str, *, for_update: bool = False):
+    """
+    Return the first UNSOLD inventory item for this business that matches the IMEI/code,
+    regardless of location. Designed to be the SINGLE SOURCE OF TRUTH for "is this
+    in stock anywhere in the business?"
+
+    - Prefers `imei` field; falls back to `code` if present.
+    - Treats 'sold' flexibly:
+        * if there's a 'status' field, excludes status='SOLD'
+        * else if there's a 'sold_at' field, requires sold_at IS NULL
+        * otherwise returns the latest match (best effort).
+    - If for_update=True, uses select_for_update(skip_locked=True) to prevent race conditions.
+    """
+    if business is None:
+        return None
+
+    from .models import InventoryItem  # adjust to your actual item model
+
+    normalized = _normalize_code(code_or_imei)
+
+    # Build the base queryset
+    qs = InventoryItem.objects.filter(business=business)
+
+    # Optional archival filter
+    if _model_has_field(InventoryItem, "is_archived"):
+        qs = qs.filter(is_archived=False)
+
+    # Choose identifier field
+    ident_filter = {}
+    if _model_has_field(InventoryItem, "imei"):
+        ident_filter["imei"] = normalized
+    elif _model_has_field(InventoryItem, "code"):
+        ident_filter["code"] = normalized
+    else:
+        # No known identifier; nothing we can do
+        return None
+
+    qs = qs.filter(**ident_filter)
+
+    # Apply "unsold" semantics
+    if _model_has_field(InventoryItem, "status"):
+        qs = qs.exclude(status="SOLD")
+    elif _model_has_field(InventoryItem, "sold_at"):
+        qs = qs.filter(sold_at__isnull=True)
+
+    # Helpful for UI display but optional
+    if _model_has_field(InventoryItem, "current_location"):
+        qs = qs.select_related("current_location")
+
+    if for_update:
+        try:
+            qs = qs.select_for_update(skip_locked=True)
+        except Exception:
+            # Databases that don't support skip_locked
+            qs = qs.select_for_update()
+
+    return qs.order_by("-id").first()
+
+
+# -----------------------
+# Invite helpers (NEW)
+# -----------------------
+def get_invite_token(inv) -> Optional[str]:
+    """
+    Return the invite's token regardless of field naming differences.
+    Tries 'token', then 'code', then 'key'.
+    """
+    return getattr(inv, "token", None) or getattr(inv, "code", None) or getattr(inv, "key", None)
+
+
+def invite_join_url(request: HttpRequest, token: str, route_name: str = "join_by_token") -> str:
+    """
+    Build a tenant-aware absolute URL for an invite token.
+
+    Args:
+        request: current HttpRequest (used for host/tenant domain).
+        token: the invitation token string.
+        route_name: your urlpattern name for joining by token (default 'join_by_token').
+
+    Returns:
+        Absolute URL string, e.g. https://your-tenant.example.com/tenants/join/<token>/
+    """
+    path = reverse(route_name, args=[token])
+    return request.build_absolute_uri(path)
+
+
 __all__ = [
     # roles / access
     "ADMIN",
@@ -310,4 +417,16 @@ __all__ = [
     "user_home_location",
     # business location helper
     "ensure_default_location",
+    # business-wide stock helpers
+    "_normalize_code",
+    "get_instock_item_for_business",
+    # invites
+    "get_invite_token",
+    "invite_join_url",
 ]
+
+
+
+
+
+

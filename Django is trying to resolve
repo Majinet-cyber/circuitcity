@@ -1,0 +1,20 @@
+[33mc59cb6f[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mfix/hq-ui-and-superuser-guard[m[33m, [m[1;31morigin/feature/mobile-ui[m[33m, [m[1;32mfix/context-and-errors[m[33m, [m[1;32mfeature/mobile-ui[m[33m)[m Add build_meta + role_flags context processors, update 500.html error template
+[33m982bdfe[m[33m ([m[1;31morigin/main[m[33m, [m[1;32mmain[m[33m)[m fix(inventory): update stock_list and add http.py helpers
+[33m1916df3[m fix(500.html): use versioned v2-overrides CSS to stop manifest errors
+[33m3359b29[m templates: point to versioned v2-overrides.2025-09-25.css
+[33m85c8a7c[m static: add alias css/v2-overrides.css -> v2-overrides.2025-09-25.css (prod fix)
+[33mb0b3a0b[m Merge: mobile bottomnav safe-area hotfix
+[33m22568ac[m[33m ([m[1;31morigin/fix/mobile-bottomnav-safearea[m[33m)[m fix(ui): stabilize base.html with mobile hotfix and rescue layout fixes
+[33m5f27672[m Merge pull request #8 from Majinet-cyber/fix/mobile-bottomnav-safearea
+[33mdf9335f[m Mobile UI: safe-area bottom nav + keyboard fixes
+[33mcd7125a[m Update v2-overrides.2025-09-25.css
+[33ma7a8b19[m Update v2-overrides.2025-09-25.css
+[33m63e46c9[m Update v2-overrides.2025-09-25.css
+[33m70b9e55[m Update v2-overrides.2025-09-25.css
+[33m46086bd[m Update v2-overrides.2025-09-25.css
+[33m09e6f55[m[33m ([m[1;31morigin/mobile-hotfix/sidebar-menu[m[33m, [m[1;32mmobile-hotfix/sidebar-menu[m[33m)[m Point base.html to v2-overrides.2025-09-25.css
+[33m3f3d1d8[m Rename v2-overrides.css to v2-overrides.2025-09-25.css
+[33m8ad5152[m Update v2-overrides.css
+[33mf517acc[m Update base.html
+[33m17e964b[m Update v2-overrides.css
+[33mb33e5c6[m Update base.html

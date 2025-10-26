@@ -1,4 +1,4 @@
-# tenants/models.py
+﻿# tenants/models.py
 from __future__ import annotations
 
 from typing import Optional
@@ -165,7 +165,7 @@ class Business(models.Model):
 
 class Membership(models.Model):
     """
-    User ↔ Business with a role and approval status.
+    User → Business with a role and approval status.
     """
     ROLE_CHOICES = [
         ("MANAGER", "Manager"),
@@ -303,7 +303,7 @@ class AgentInvite(BaseTenantModel):
     email = models.EmailField(blank=True, default="", db_index=True)
     phone = models.CharField(max_length=32, blank=True, default="", db_index=True)
 
-    # Expanded to allow signed tokens
+    # Signed token (TimestampSigner). 140 to allow signature payload comfortably.
     token = models.CharField(max_length=140, unique=True, db_index=True)
     status = models.CharField(max_length=10, choices=STATUS_CHOICES, default="PENDING", db_index=True)
 
@@ -375,9 +375,13 @@ class AgentInvite(BaseTenantModel):
             raise e
 
     def ensure_token(self) -> None:
-        """Generate a token if missing (idempotent, unsigned fallback)."""
+        """
+        Generate a **signed** token if missing (idempotent).
+        Uses invited email (if any) + a UUID so tokens are unique and opaque.
+        """
         if not self.token:
-            self.token = uuid.uuid4().hex  # 32 chars; unique + compact
+            base = f"{(self.email or '').lower()}:{uuid.uuid4().hex}"
+            self.token = self.make_token(base)  # signed + timestamped
 
     def save(self, *args, **kwargs):
         self.ensure_token()
@@ -457,18 +461,33 @@ class AgentInvite(BaseTenantModel):
     def share_payload(self, request) -> dict[str, str]:
         """
         Centralized share strings/links for Copy, WhatsApp, and Email.
-        Keep templates dumb and consistent.
+        Adds an HTML body that uses a short anchor text (“here”).
         """
         url = self.absolute_join_url(request)
         tenant_name = getattr(getattr(self, "business", None), "name", "our team")
         name = (self.invited_name or "").strip() or "there"
+
         text = f"Hi {name}, please click this link to join {tenant_name}: {url}"
-        subject = quote(f"Join {tenant_name}")
-        body = quote(text)
+        subject_text = f"Join {tenant_name}"
+
+        # HTML version with short anchor “here”
+        html = (
+            f"<p>Hi {(name or 'there')},</p>"
+            f"<p>You have been invited to join <strong>{tenant_name}</strong> as an <strong>Agent</strong>.</p>"
+            f"<p>Please click <a href=\"{url}\">here</a> to set your password and join.</p>"
+            + (f"<p>This link expires on {self.expires_at:%b %d, %Y %H:%M}.</p>" if self.expires_at else "")
+        )
+
+        subject_q = quote(subject_text)
+        body_q = quote(text)
 
         return {
             "copy_text": text,
             "url": url,
-            "wa_url": f"https://wa.me/?text={body}",
-            "mailto_url": f"mailto:?subject={subject}&body={body}",
+            "wa_url": f"https://wa.me/?text={body_q}",
+            "mailto_url": f"mailto:?subject={subject_q}&body={body_q}",
+            # extras you can use directly in your mailer:
+            "email_subject": subject_text,
+            "email_text": text,
+            "email_html": html,
         }

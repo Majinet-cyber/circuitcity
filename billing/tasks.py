@@ -1,4 +1,4 @@
-# billing/tasks.py
+﻿# billing/tasks.py
 from __future__ import annotations
 
 from datetime import timedelta
@@ -43,3 +43,5 @@ def remind_trials_ending_soon():
         fanout(business=biz, title=title, body=body, ntype="trial_notice")
         count += 1
     return {"reminded": count}
+
+

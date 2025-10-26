@@ -1,4 +1,4 @@
-# billing/middleware.py
+﻿# billing/middleware.py
 from __future__ import annotations
 
 from datetime import timedelta
@@ -51,14 +51,14 @@ class SubscriptionGateMiddleware:
     Enforce basic subscription access rules for multi-tenant SaaS.
 
     Behavior:
-      • Bootstrap: If a Business has no subscription yet, seed a TRIAL for BILLING_TRIAL_DAYS (default 30).
-      • Enforcement (only when FEATURES['BILLING_ENFORCE'] is true):
+      â€¢ Bootstrap: If a Business has no subscription yet, seed a TRIAL for BILLING_TRIAL_DAYS (default 30).
+      â€¢ Enforcement (only when FEATURES['BILLING_ENFORCE'] is true):
           - Allow while TRIAL is active
           - Allow while ACTIVE
           - Allow during GRACE window (GRACE_DAYS, default 30)
           - Otherwise redirect to billing:subscribe
-      • Superusers and staff are never blocked.
-      • SAFE_PREFIXES are always allowed to avoid loops (login, billing, static, etc.).
+      â€¢ Superusers and staff are never blocked.
+      â€¢ SAFE_PREFIXES are always allowed to avoid loops (login, billing, static, etc.).
     """
 
     def __init__(self, get_response):
@@ -133,7 +133,7 @@ class SubscriptionGateMiddleware:
         if sub.in_grace():
             return self.get_response(request)
 
-        # Past grace → expired
+        # Past grace â†’ expired
         if not sub.is_expired():
             # Belt-and-suspenders: mark expired when we detect it
             anchor = sub.next_billing_date or sub.trial_end or sub.current_period_end or timezone.now()
@@ -148,3 +148,5 @@ class SubscriptionGateMiddleware:
             subscribe_url = "/billing/subscribe/"
         reason = "expired" if sub.is_expired() else "inactive"
         return redirect(f"{subscribe_url}?reason={reason}")
+
+

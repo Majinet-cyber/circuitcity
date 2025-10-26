@@ -1,4 +1,4 @@
-from django.db import models
+﻿from django.db import models
 from django.conf import settings
 from django.apps import apps
 
@@ -186,3 +186,5 @@ class PersonalExpense(models.Model):
     date = models.DateField()
     notes = models.TextField(blank=True, null=True)
     created_at = models.DateTimeField(auto_now_add=True)
+
+

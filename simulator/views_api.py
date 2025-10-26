@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 from math import pow
 from typing import Any, Dict, List, Tuple
@@ -524,3 +524,5 @@ def monte_carlo_api(request: HttpRequest):
     bands = _monte_carlo(merged, iterations=max(100, min(iterations, 5000)))
 
     return JsonResponse({"ok": True, "bands": bands}, status=200)
+
+

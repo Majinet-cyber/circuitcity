@@ -1,4 +1,4 @@
-# inventory/api.py
+﻿# inventory/api.py
 from __future__ import annotations
 
 import json
@@ -258,8 +258,8 @@ except Exception:  # pragma: no cover
     CurrencySetting = None  # type: ignore
 
 _CURRENCY_SIGNS = {
-    "MWK": "MK","USD": "$","EUR": "€","GBP": "£","ZAR": "R",
-    "ZMW": "K","TZS": "TSh","KES": "KSh","NGN": "₦",
+    "MWK": "MK","USD": "$","EUR": "â‚¬","GBP": "Â£","ZAR": "R",
+    "ZMW": "K","TZS": "TSh","KES": "KSh","NGN": "â‚¦",
 }
 
 def _normalize_ccy(code: str | None) -> str:
@@ -701,7 +701,7 @@ def api_value_trend(request: HttpRequest):
         except Exception:
             pass
 
-    # Always prefer Python aggregation on SQLite (safe) — and keep it simple.
+    # Always prefer Python aggregation on SQLite (safe) â€” and keep it simple.
     is_sqlite = (connection.vendor == "sqlite")
 
     if not is_sqlite:
@@ -1279,7 +1279,7 @@ def api_audit_verify(request: HttpRequest):
         limit = 5000
     limit = max(100, min(limit, 200000))
 
-    # Verify newest→oldest slice by reversing after fetch to walk forward
+    # Verify newestâ†’oldest slice by reversing after fetch to walk forward
     rows = list(AuditLog.objects.order_by("-id").values(
         "id", "prev_hash", "hash", "actor_id", "entity", "entity_id", "action", "payload"
     )[:limit])
@@ -1338,3 +1338,5 @@ def restock_heatmap(request: HttpRequest):
 
 api_predictions = predictions_summary       # /inventory/api/predictions (no slash) compat
 api_alerts = alerts_feed                    # keep older route names working
+
+

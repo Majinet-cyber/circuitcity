@@ -1,8 +1,8 @@
-from django.db import models
+﻿from django.db import models
 from django.conf import settings
 
 # ============================
-# Phase 4 — Data & Forecasting
+# Phase 4 â€” Data & Forecasting
 # ============================
 
 class DailyKPI(models.Model):
@@ -115,7 +115,7 @@ class ReorderAdvice(models.Model):
 
 
 # ==================================
-# Phase 4.2 — Notifications & Emails
+# Phase 4.2 â€” Notifications & Emails
 # ==================================
 
 class Notification(models.Model):
@@ -176,7 +176,7 @@ class EmailReportLog(models.Model):
 
 
 # =======================
-# Phase 5 — Gamification
+# Phase 5 â€” Gamification
 # =======================
 
 class Badge(models.Model):
@@ -185,7 +185,7 @@ class Badge(models.Model):
     """
     code = models.SlugField(primary_key=True)
     name = models.CharField(max_length=60)
-    emoji = models.CharField(max_length=8, default="🏅")
+    emoji = models.CharField(max_length=8, default="ðŸ…")
     description = models.CharField(max_length=200)
     rule = models.JSONField()  # e.g., {"metric":"units","window":"week","gte":30}
 
@@ -234,7 +234,7 @@ class LeaderboardSnapshot(models.Model):
         ordering = ["-created_at"]
 
     def __str__(self):
-        return f"LeaderboardSnapshot({self.scope} {self.metric} {self.period_start}–{self.period_end})"
+        return f"LeaderboardSnapshot({self.scope} {self.metric} {self.period_start}â€“{self.period_end})"
 
 
 # ==================================================
@@ -266,7 +266,7 @@ class Forecast(models.Model):
 
 
 # =====================================================
-# Currency Setting (singleton) — for display & FX rates
+# Currency Setting (singleton) â€” for display & FX rates
 # =====================================================
 
 class CurrencySetting(models.Model):
@@ -294,3 +294,5 @@ class CurrencySetting(models.Model):
     def get(cls):
         obj, _ = cls.objects.get_or_create(pk=1)
         return obj
+
+

@@ -1,92 +1,304 @@
+{% extends "hq/base.html" %}
+{% load humanize %}
 {% load static %}
-<!doctype html>
-<html lang="en">
-<head>
-  <meta charset="utf-8"/>
-  <meta name="viewport" content="width=device-width,initial-scale=1"/>
-  <title>HQ · Subscriptions</title>
-  <style>
-    :root{
-      --glass: rgba(255,255,255,.65);
-      --ring:#d8e4ff; --ink-900:#0b1b3a; --ink-700:#1c2f57; --ink-500:#476aa0;
-      --brand-600:#2757d8; --shadow: 0 12px 40px rgba(12,36,97,.12);
-      --grad: linear-gradient(135deg, rgba(47,107,255,.35), rgba(255,255,255,.35));
-    }
-    html,body{margin:0;background:radial-gradient(1100px 1100px at 10% -10%, #ffffff 0, #f7fbff 30%, #eef5ff 60%, #e6f0ff 100%); color:var(--ink-900); font:500 15px/1.45 system-ui,-apple-system,Segoe UI,Inter,Roboto,Arial}
-    .wrap{max-width:1180px;margin:24px auto;padding:0 14px}
-    h1{margin:0 0 14px;font-size:28px;letter-spacing:.2px}
-    .toolbar{display:flex;gap:10px;align-items:center;margin:10px 0 16px}
-    .search{flex:1;display:flex;gap:10px;align-items:center;padding:10px 12px;border-radius:999px;background:var(--glass);backdrop-filter:blur(10px);border:1px solid transparent;box-shadow:0 10px 30px rgba(12,36,97,.08); position:relative}
-    .search:before{content:"";position:absolute;inset:0;padding:1px;border-radius:999px;background:var(--grad);-webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);-webkit-mask-composite:xor;mask-composite:exclude}
-    .search input{flex:1;border:none;background:transparent;outline:none;font:inherit}
-    .go{border:none;border-radius:999px;padding:8px 14px;font-weight:800;background:var(--brand-600);color:#fff;cursor:pointer}
-    .chip{padding:.35rem .7rem;border-radius:999px;background:#e9f2ff;border:1px solid var(--ring);color:#1e3a8a;font-weight:800;font-size:12px}
 
-    .card{background:var(--glass);backdrop-filter:blur(10px);border-radius:16px;box-shadow:var(--shadow);border:1px solid transparent;overflow:hidden}
-    .card:before{content:"";position:absolute}
-    table{width:100%;border-collapse:separate;border-spacing:0}
-    thead th{font-size:12px;text-transform:uppercase;letter-spacing:.4px;color:var(--ink-500);text-align:left;padding:12px 14px;background:rgba(255,255,255,.5);position:sticky;top:0;backdrop-filter:blur(8px)}
-    tbody td{padding:14px}
-    tbody tr:not(:last-child) td{border-bottom:1px solid rgba(39,87,216,.12)}
-    .num{font-weight:900}
-    .muted{color:var(--ink-500);font-size:12px}
-    .status{display:inline-flex;gap:6px;align-items:center;padding:.25rem .55rem;border-radius:999px;border:1px solid var(--ring);background:#eef4ff;font-weight:800;color:#2757d8;font-size:12px}
-    .pager{display:flex;gap:8px;justify-content:flex-end;margin-top:12px}
-    .pager a,.pager span{padding:.4rem .7rem;border-radius:10px;border:1px solid var(--ring);text-decoration:none;color:#1e3a8a;background:rgba(255,255,255,.7)}
-    .pager .current{background:#2757d8;color:#fff;border-color:#2757d8}
-  </style>
-</head>
-<body>
-  {% url 'hq:dashboard' as dashboard_url %}
-  {% url 'hq:subscriptions' as subscriptions_url %}
+{% block title %}Subscriptions · Control Center{% endblock %}
+{% block page_title %}Subscriptions{% endblock %}
 
-  <div class="wrap">
-    <h1>Subscriptions <span class="chip">{{ subs.paginator.count }} total</span></h1>
+{% block topbar_actions %}
+  <label class="chip" style="user-select:none;gap:.5rem">
+    <input id="autoHi" type="checkbox" style="accent-color:#2757d8" checked>
+    <span>Auto-highlight</span>
+  </label>
+{% endblock %}
 
-    <form class="toolbar" method="get" action="{{ subscriptions_url|default:'/hq/subscriptions/' }}">
-      <div class="search">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M15.5 15.5L21 21" stroke="#5a78b0" stroke-width="2" stroke-linecap="round"/><circle cx="10.5" cy="10.5" r="6.5" stroke="#5a78b0" stroke-width="2"/></svg>
-        <input type="search" name="q" value="{{ query }}" placeholder="Search business or plan…"/>
-      </div>
-      <button class="go" type="submit">Go</button>
+{% block topbar_right %}
+  <a class="btn-ghost" href="{% url 'hq:subscriptions' %}?{{ request.GET.urlencode }}">Go</a>
+  <a class="btn" href="{% url 'hq:subscriptions' %}?{{ request.GET.urlencode }}&export=pdf">Download PDF</a>
+{% endblock %}
+
+{% block body %}
+<style>
+  .user .menu{
+    display:none; position:absolute; top:100%; right:0; background:#fff; border:1px solid rgba(0,0,0,.08);
+    border-radius:10px; box-shadow:0 10px 30px rgba(2,6,23,.12); padding:6px; z-index:20
+  }
+  .user.open .menu{ display:block }
+  .user .menu a{ display:block; padding:8px 10px; border-radius:8px; text-decoration:none; color:#0f172a; font-size:14px }
+  .user .menu a:hover{ background:#f1f5f9 }
+  .table-wrap table thead th{ color:#475569; font-weight:700; text-align:left; font-size:12px; text-transform:uppercase; letter-spacing:.06em }
+  .table-wrap table tbody tr{ background:#ffffff; border:1px solid #e2e8f0; border-radius:12px }
+  .table-wrap table tbody tr>td{ background:transparent; padding:12px 10px; border-top:1px solid #e2e8f0 }
+  .table-wrap table tbody tr>td:first-child{ border-left:1px solid #e2e8f0; border-top-left-radius:12px; border-bottom-left-radius:12px }
+  .table-wrap table tbody tr>td:last-child{ border-right:1px solid #e2e8f0; border-top-right-radius:12px; border-bottom-right-radius:12px }
+  .badge{ display:inline-flex; align-items:center; gap:.4rem; padding:.25rem .5rem; border-radius:999px; border:1px solid rgba(2,6,23,.08); background:#f8fafc; color:#0f172a; font-weight:700; font-size:12px }
+  .pill .badge{ background:#0ea5e9; color:#fff; border-color:transparent }
+  .btn-ghost[disabled]{ opacity:.5; pointer-events:none }
+</style>
+
+<div class="card" style="padding:18px">
+  <div class="d-grid" style="display:grid;grid-template-columns:1fr auto auto;gap:10px;align-items:center">
+    <form method="get" class="d-flex" style="display:flex;gap:10px;align-items:center">
+      <input name="q" class="form-control" value="{{ q|default:'' }}"
+             placeholder="Search business or plan…"
+             style="flex:1; padding:10px 12px; border-radius:12px; border:1px solid var(--ring); background:#fff; min-width:220px">
+      <select name="status" class="form-select"
+              style="padding:10px 12px; border-radius:12px; border:1px solid var(--ring); background:#fff">
+        <option value="">Any status</option>
+        <option value="trial"   {% if status == 'trial' %}selected{% endif %}>Trial</option>
+        <option value="active"  {% if status == 'active' %}selected{% endif %}>Active</option>
+        <option value="grace"   {% if status == 'grace' %}selected{% endif %}>Grace</option>
+        <option value="expired" {% if status == 'expired' %}selected{% endif %}>Expired</option>
+        <option value="canceled"{% if status == 'canceled' %}selected{% endif %}>Canceled</option>
+      </select>
+      <button class="btn-ghost" type="submit">Go</button>
     </form>
 
-    <div class="card">
-      <table>
-        <thead>
-          <tr>
-            <th>Business</th>
-            <th>Plan</th>
-            <th>Cycle</th>
-            <th>Status</th>
-            <th>Plan amount</th>
-            <th>Started</th>
-          </tr>
-        </thead>
-        <tbody>
-        {% for s in subs %}
-          <tr>
-            <td><a href="{{ s.business.get_absolute_url|default:'#' }}">{{ s.business.name }}</a></td>
-            <td>{{ s.plan_name|default:"—" }}</td>
-            <td>{{ s.billing_interval|default:"—" }}</td>
-            <td><span class="status">{{ s.get_status_display|default:s.status }}</span></td>
-            <td class="num">MWK {{ s.plan_amount|default:"0.00" }}</td>
-            <td class="muted">{{ s.created_at|date:"Y-m-d" }}</td>
-          </tr>
-        {% empty %}
-          <tr><td colspan="6" class="muted" style="padding:24px">No subscriptions.</td></tr>
-        {% endfor %}
-        </tbody>
-      </table>
+    <div class="pill" style="justify-self:end">
+      {% if page_obj %}<span class="badge">{{ page_obj.paginator.count }}</span>
+      {% elif rows %}<span class="badge">{{ rows|length }}</span>
+      {% elif subs %}<span class="badge">{{ subs|length }}</span>
+      {% else %}<span class="badge">0</span>{% endif %}
     </div>
-
-    {% if subs.paginator.num_pages > 1 %}
-    <div class="pager">
-      {% if subs.has_previous %}<a href="?page={{ subs.previous_page_number }}&q={{ query|urlencode }}">Prev</a>{% endif %}
-      <span class="current">{{ subs.number }} / {{ subs.paginator.num_pages }}</span>
-      {% if subs.has_next %}<a href="?page={{ subs.next_page_number }}&q={{ query|urlencode }}">Next</a>{% endif %}
-    </div>
-    {% endif %}
   </div>
-</body>
-</html>
+
+  <div class="table-wrap" style="margin-top:12px;overflow:auto">
+    <table style="width:100%; border-collapse:separate; border-spacing:0 10px">
+      <thead>
+        <tr>
+          <th>Business</th>
+          <th>Plan</th>
+          <th>Cycle</th>
+          <th>Status</th>
+          <th>Plan amount</th>
+          <th>Started</th>
+          <th class="text-end" style="text-align:right">Actions</th>
+        </tr>
+      </thead>
+      <tbody id="subRows">
+      {% with thelist=page_obj|default_if_none:rows|default_if_none:subs %}
+        {% if thelist %}
+          {% for s in thelist %}
+          <tr id="row-{{ s.id }}">
+            <td>
+              {% if s.business %}
+                <a href="{% url 'hq:business_detail' s.business.id %}">{{ s.business.name }}</a>
+              {% else %}—{% endif %}
+            </td>
+            <td>
+              {% if s.plan %}
+                {{ s.plan.name }}
+                <div style="color:#64748b;font-size:12px">({{ s.plan.code|default:"" }})</div>
+              {% else %}
+                {{ s.plan_code|default:"—" }}
+              {% endif %}
+            </td>
+            <td>Monthly</td>
+            <td>
+              {% with st=s.status|default:"" %}
+                {% if st|lower == 'trial' %}
+                  <span class="badge" style="background:#06b6d4;color:#fff;border-color:transparent;font-weight:800">
+                    Trial{% if s.trial_end %} · ends {{ s.trial_end|date:"M d" }}{% endif %}
+                  </span>
+                  {% with dli=s.days_left_in_trial|default:"" %}
+                    {% if dli != "" %}
+                      <div style="color:#64748b;font-size:12px;margin-top:.25rem">
+                        {{ dli }} day{{ dli|pluralize }} left
+                      </div>
+                    {% endif %}
+                  {% endwith %}
+                {% elif st|lower == 'active' %}
+                  <span class="badge" style="background:#16a34a;color:#fff;border-color:transparent;font-weight:800">Active</span>
+                  {% with dlp=s.days_left_current_period|default:"" %}
+                    {% if s.current_period_end and dlp != "" %}
+                      <div style="color:#64748b;font-size:12px;margin-top:.25rem">
+                        {{ dlp }} day{{ dlp|pluralize }} left in period
+                      </div>
+                    {% endif %}
+                  {% endwith %}
+                {% elif st|lower == 'grace' %}
+                  <span class="badge" style="background:#d97706;color:#fff;border-color:transparent;font-weight:800">Grace</span>
+                {% elif st|lower == 'expired' %}
+                  <span class="badge" style="background:#94a3b8;color:#fff;border-color:transparent;font-weight:800">Expired</span>
+                {% elif st %}
+                  <span class="badge">{{ st|title }}</span>
+                {% else %}
+                  <span class="badge">—</span>
+                {% endif %}
+              {% endwith %}
+            </td>
+            <td>
+              {% if s.plan and s.plan.amount %}
+                {{ s.plan.currency|default:"MWK" }} {{ s.plan.amount|floatformat:2|intcomma }}
+              {% elif s.amount %}
+                MWK {{ s.amount|floatformat:2|intcomma }}
+              {% else %}—{% endif %}
+            </td>
+            <td>
+              {% if s.started_at %}{{ s.started_at|date:"Y-m-d" }}
+              {% elif s.created_at %}{{ s.created_at|date:"Y-m-d" }}
+              {% else %}—{% endif %}
+            </td>
+
+            <td class="text-end" style="text-align:right">
+              <div style="display:inline-flex;gap:6px;flex-wrap:wrap;justify-content:flex-end">
+                {# ------- Visible buttons (POST first, fallback to GET) ------- #}
+                <button class="btn-ghost" onclick="extendDays('{{ s.id }}', 7)">+7d</button>
+                <button class="btn-ghost" onclick="extendDays('{{ s.id }}', 30)">+30d</button>
+                <button class="btn-ghost" onclick="openDateModal('{{ s.id }}')">Set date…</button>
+                <button class="btn-ghost" style="border-color:#fecaca;color:#b91c1c" onclick="revoke('{{ s.id }}')">Revoke now</button>
+                <button class="btn" onclick="activateNow('{{ s.id }}')">Activate now</button>
+
+                {% if request.user.is_superuser %}
+                <div class="user" style="position:relative">
+                  <button class="btn-ghost" type="button" onclick="toggleMenu(this)">Change plan ▾</button>
+                  <div class="menu" style="min-width:200px">
+                    <a href="#" onclick="setPlan('{{ s.id }}','starter');return false;">Starter (MWK 20,000)</a>
+                    <a href="#" onclick="setPlan('{{ s.id }}','pro');return false;">Pro (MWK 35,000)</a>
+                    <a href="#" onclick="setPlan('{{ s.id }}','promax');return false;">Pro Max (MWK 50,000)</a>
+                  </div>
+                </div>
+                {% endif %}
+
+                <a class="btn-ghost" href="{% url 'hq:invoices' %}?q={{ s.business.name|urlencode }}">Invoices →</a>
+              </div>
+            </td>
+          </tr>
+          {% endfor %}
+        {% else %}
+          <tr><td colspan="7" style="text-align:center;color:#64748b">No subscriptions.</td></tr>
+        {% endif %}
+      {% endwith %}
+      </tbody>
+    </table>
+  </div>
+
+  {% if page_obj and page_obj.paginator.num_pages > 1 %}
+  <div style="margin-top:6px">
+    <nav>
+      <ul style="display:flex;gap:6px;list-style:none;padding:0;margin:0">
+        {% if page_obj.has_previous %}
+          <li><a class="btn-ghost" href="?page={{ page_obj.previous_page_number }}&q={{ q|urlencode }}&status={{ status|urlencode }}">«</a></li>
+        {% else %}
+          <li><span class="btn-ghost" style="opacity:.5;pointer-events:none">«</span></li>
+        {% endif %}
+        {% for i in page_obj.paginator.page_range %}
+          {% if page_obj.number == i %}
+            <li><span class="btn" style="pointer-events:none">{{ i }}</span></li>
+          {% else %}
+            <li><a class="btn-ghost" href="?page={{ i }}&q={{ q|urlencode }}&status={{ status|urlencode }}">{{ i }}</a></li>
+          {% endif %}
+        {% endfor %}
+        {% if page_obj.has_next %}
+          <li><a class="btn-ghost" href="?page={{ page_obj.next_page_number }}&q={{ q|urlencode }}&status={{ status|urlencode }}">»</a></li>
+        {% else %}
+          <li><span class="btn-ghost" style="opacity:.5;pointer-events:none">»</span></li>
+        {% endif %}
+      </ul>
+    </nav>
+  </div>
+  {% endif %}
+</div>
+
+<dialog id="trialDateDlg">
+  <div class="dlg" style="padding:16px 16px 12px;min-width:320px">
+    <div style="font-weight:800;font-size:16px;margin-bottom:8px">Set trial end date</div>
+    <label style="display:block;color:#475569;font-size:13px;margin-bottom:6px">Trial end</label>
+    <input id="trialDateInput" type="date" style="width:100%;padding:10px 12px;border-radius:12px;border:1px solid var(--ring);background:#fff">
+    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px">
+      <button class="btn-ghost" type="button" onclick="closeDate()">Cancel</button>
+      <button class="btn" type="button" onclick="submitDate()">Save</button>
+    </div>
+  </div>
+</dialog>
+
+<script>
+  // Dropdown helper (plan menu)
+  function toggleMenu(btn){
+    const wrap = btn.parentElement;
+    wrap.classList.toggle('open');
+    const close = (ev) => { if(!wrap.contains(ev.target)){ wrap.classList.remove('open'); document.removeEventListener('click', close); } };
+    setTimeout(() => document.addEventListener('click', close), 0);
+  }
+
+  // Build action URLs by replacing a dummy UUID in reversed paths.
+  const U_EX   = "{% url 'hq:sub_extend'        '00000000-0000-0000-0000-000000000000' %}";
+  const U_RVK  = "{% url 'hq:sub_revoke_trial'  '00000000-0000-0000-0000-000000000000' %}";
+  const U_ACT  = "{% url 'hq:sub_activate_now'  '00000000-0000-0000-0000-000000000000' %}";
+  const U_PLAN = "{% url 'hq:sub_set_plan'      '00000000-0000-0000-0000-000000000000' %}";
+
+  function hardGet(url){ window.location = url; }
+  function okThenReload(){ window.location.reload(); }
+
+  function extendDays(id, days){
+    const url = U_EX.replace('00000000-0000-0000-0000-000000000000', id);
+    window.hqPost(url, {days: days})
+      .then(okThenReload)
+      .catch(()=> hardGet(url + '?days=' + encodeURIComponent(days)));
+  }
+
+  let modalSubId = null;
+  function openDateModal(subId){
+    modalSubId = subId;
+    const dlg = document.getElementById('trialDateDlg');
+    const inp = document.getElementById('trialDateInput');
+    const now = new Date();
+    const iso = new Date(now.getTime() - now.getTimezoneOffset()*60000).toISOString().slice(0,10);
+    if (!inp.value) inp.value = iso;
+    dlg.showModal();
+  }
+  function closeDate(){ document.getElementById('trialDateDlg').close(); }
+  function submitDate(){
+    const val = document.getElementById('trialDateInput').value;
+    if(!val){ alert('Pick a date.'); return; }
+    const url = U_EX.replace('00000000-0000-0000-0000-000000000000', modalSubId);
+    window.hqPost(url, {trial_end: val})
+      .then(okThenReload)
+      .catch(()=> hardGet(url + '?trial_end=' + encodeURIComponent(val)));
+  }
+
+  function revoke(id){
+    if(!confirm('Revoke trial now?')) return;
+    const url = U_RVK.replace('00000000-0000-0000-0000-000000000000', id);
+    window.hqPost(url, {})
+      .then(okThenReload)
+      .catch(()=> hardGet(url));
+  }
+  function activateNow(id){
+    if(!confirm('Activate paid period starting now?')) return;
+    const url = U_ACT.replace('00000000-0000-0000-0000-000000000000', id);
+    window.hqPost(url, {})
+      .then(okThenReload)
+      .catch(()=> hardGet(url));
+  }
+  function setPlan(id, code){
+    const url = U_PLAN.replace('00000000-0000-0000-0000-000000000000', id);
+    window.hqPost(url, {plan_code: code})
+      .then(okThenReload)
+      .catch(()=> hardGet(url + '?plan_code=' + encodeURIComponent(code)));
+  }
+
+  // --- Auto-highlight trials ending soon (<=5 days)
+  (function(){
+    const chk = document.getElementById('autoHi');
+    if (!chk) return;
+    function paint(){
+      const on = chk.checked;
+      for (const tr of document.querySelectorAll('#subRows tr')) {
+        tr.style.boxShadow = '';
+        if (!on) continue;
+        const statusCell = tr.children[3];
+        if (!statusCell) continue;
+        const txt = (statusCell.innerText||'').toLowerCase();
+        const m = txt.match(/(\d+)\s+day/);
+        const days = m ? parseInt(m[1], 10) : null;
+        if (txt.includes('trial') && days !== null && days <= 5){
+          tr.style.boxShadow = '0 0 0 2px rgba(239,68,68,.25), 0 8px 16px rgba(239,68,68,.08)';
+        }
+      }
+    }
+    chk.addEventListener('change', paint);
+    setTimeout(paint, 0);
+  })();
+</script>
+{% endblock %}

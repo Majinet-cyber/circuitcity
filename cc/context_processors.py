@@ -1,4 +1,4 @@
-# cc/context_processors.py
+﻿# cc/context_processors.py
 from __future__ import annotations
 
 import os
@@ -75,3 +75,5 @@ def role_flags(request) -> Dict[str, Any]:
 
 
 __all__ = ["build_meta", "brand", "role_flags"]
+
+

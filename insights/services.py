@@ -1,4 +1,4 @@
-import math
+﻿import math
 from datetime import timedelta, date
 from typing import Optional, List, Tuple, Dict
 
@@ -160,7 +160,7 @@ def daily_sales_qs(product: Optional[Product] = None) -> pd.DataFrame:
 
 
 # ============================================================
-# Forecasting (per product) — statsmodels (if available) else EMA
+# Forecasting (per product) â€” statsmodels (if available) else EMA
 # ============================================================
 
 def _forecast_series(units_series: pd.Series, horizon_days: int) -> List[float]:
@@ -345,7 +345,7 @@ def compute_premium_run(horizon_days: int = 14, days_back: int = 60, alpha: floa
             )
             n_items += 1
 
-        # Reorder advice (ROP = μ*L + z*σ*sqrt(L)), with σ ≈ (hi-lo)/2
+        # Reorder advice (ROP = Î¼*L + z*Ïƒ*sqrt(L)), with Ïƒ â‰ˆ (hi-lo)/2
         on_hand = _current_on_hand(store_id, product_id)
         mu = max(0.1, float(yhat_next))
         lead = 7.0
@@ -362,3 +362,5 @@ def compute_premium_run(horizon_days: int = 14, days_back: int = 60, alpha: floa
         n_advice += 1
 
     return {"run_id": run.id, "items_saved": n_items, "advice_saved": n_advice}
+
+

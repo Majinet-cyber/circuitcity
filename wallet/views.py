@@ -1,4 +1,4 @@
-# wallet/views.py
+﻿# wallet/views.py
 from __future__ import annotations
 
 import csv
@@ -7,7 +7,7 @@ import json
 from calendar import monthrange
 from datetime import date
 from decimal import Decimal, InvalidOperation
-from typing import Tuple
+from typing import Tuple, Any
 
 from django.conf import settings
 from django.contrib import messages
@@ -15,7 +15,7 @@ from django.contrib.auth import get_user_model
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.core.mail import send_mail
-from django.db.models import Sum
+from django.db.models import Sum, QuerySet
 from django.http import HttpRequest, JsonResponse, HttpResponseBadRequest, HttpResponse, Http404
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
@@ -33,7 +33,7 @@ try:
 except Exception:  # pragma: no cover
     from django.contrib.auth.decorators import login_required as otp_required  # type: ignore
 
-# Optional tenant helper (don’t hard-fail if tenants app is unavailable)
+# Optional tenant helper (donâ€™t hard-fail if tenants app is unavailable)
 try:
     from tenants.utils import get_active_business  # type: ignore
 except Exception:  # pragma: no cover
@@ -90,9 +90,8 @@ def _sum(qs, **filters) -> Decimal:
 
 def _maybe_scope_to_business(qs, business):
     """
-    If model has a 'business' field, add business filter;
-    otherwise return qs unchanged. This avoids crashes when some
-    models aren’t tenant-scoped.
+    Legacy helper: if model has a 'business' field, add business filter;
+    otherwise return qs unchanged. (Kept for backward compat.)
     """
     if not business:
         return qs
@@ -102,6 +101,117 @@ def _maybe_scope_to_business(qs, business):
     except Exception:
         pass
     return qs
+
+
+# -------- New: robust scoping to active business (works via multiple relations) --------
+from django.contrib.auth import get_user_model
+from django.db.models import QuerySet
+from typing import Any
+
+def business_users_qs(business):
+    """
+    Best-effort queryset of users that belong to the given business.
+    Tries common relations; returns an empty queryset if we can't match.
+    """
+    U = get_user_model()
+    if not business:
+        return U.objects.none()
+
+    # Try the most likely relations first
+    candidates = (
+        {"profile__business": business},
+        {"business": business},
+        {"store__business": business},
+        {"memberships__business": business},  # if you have a membership/through model
+    )
+
+    # Prefer a path that yields rows; otherwise fall back to the first valid path
+    for filt in candidates:
+        try:
+            qs = U.objects.filter(is_active=True, **filt)
+            if qs.exists():
+                return qs
+        except Exception:
+            continue
+    for filt in candidates:
+        try:
+            return U.objects.filter(is_active=True, **filt)
+        except Exception:
+            continue
+    return U.objects.none()
+
+
+def scope_qs_to_user(qs: QuerySet, request: Any) -> QuerySet:
+    """
+    Superusers: full queryset.
+    Others: restrict to active business via (in order):
+      1) direct FKs: business / business_id
+      2) via store: store__business / store__business_id
+      3) via agent FKs: agent__business / agent__profile__business
+      4) FALLBACK: if model has an 'agent' field, filter agent__in users of the business
+    If we can't determine a safe path, return qs.none() for non-superusers.
+    """
+    user = getattr(request, "user", None)
+    if getattr(user, "is_superuser", False):
+        return qs
+
+    biz = get_active_business(request)
+    biz_id = getattr(biz, "id", None)
+    if not biz_id:
+        return qs.none()
+
+    # 1â€“3: try common relational paths (validate lookups; ignore FieldError)
+    for path in (
+        {"business_id": biz_id},
+        {"business": biz},
+        {"store__business_id": biz_id},
+        {"store__business": biz},
+        {"agent__business_id": biz_id},
+        {"agent__business": biz},
+        {"agent__profile__business_id": biz_id},
+        {"agent__profile__business": biz},
+    ):
+        try:
+            qs.filter(**path)[:0]  # validate lookup
+            return qs.filter(**path)
+        except Exception:
+            continue
+
+    # 4) Fallback by agent membership (works for WalletTransaction with agent FK)
+    try:
+        field_names = {f.name for f in qs.model._meta.get_fields()}
+    except Exception:
+        field_names = set()
+
+    if "agent" in field_names or "agent_id" in field_names:
+        try:
+            users_in_biz = business_users_qs(biz)
+            return qs.filter(agent__in=users_in_biz)
+        except Exception:
+            pass
+
+    return qs.none()
+
+def _agent_belongs_to_business(agent: Any, business: Any) -> bool:
+    """
+    Try a few attributes to determine if the agent belongs to the active business.
+    If we can't determine cleanly (missing relations), allow superusers only.
+    """
+    if business is None:
+        return False
+    try:
+        if getattr(agent, "business_id", None) == business.id:
+            return True
+        prof = getattr(agent, "profile", None)
+        if prof and getattr(prof, "business_id", None) == business.id:
+            return True
+        # If agent has store with business
+        store = getattr(agent, "store", None)
+        if store and getattr(store, "business_id", None) == business.id:
+            return True
+    except Exception:
+        pass
+    return False
 
 
 def _compute_breakdown(agent, first: date, last: date) -> dict:
@@ -143,7 +253,7 @@ def _send_payslip_email(p: Payslip) -> bool:
     if not getattr(p, "email_to", ""):
         return False
 
-    subject = f"Payslip · {p.year}-{p.month:02d} · {getattr(settings, 'APP_NAME', 'Circuit City')}"
+    subject = f"Payslip Â· {p.year}-{p.month:02d} Â· {getattr(settings, 'APP_NAME', 'Circuit City')}"
     body = (
         f"Hello,\n\n"
         f"Here is your payslip for {p.year}-{p.month:02d}.\n\n"
@@ -155,7 +265,7 @@ def _send_payslip_email(p: Payslip) -> bool:
         f"Gross:       MWK {p.gross:,.0f}\n"
         f"Net:         MWK {p.net:,.0f}\n\n"
         f"Ref: {p.reference}\n"
-        f"— {getattr(settings, 'APP_NAME', 'Circuit City')}"
+        f"â€” {getattr(settings, 'APP_NAME', 'Circuit City')}"
     )
     sent = send_mail(subject, body, settings.DEFAULT_FROM_EMAIL, [p.email_to], fail_silently=True)
     return bool(sent)
@@ -270,7 +380,7 @@ def _create_or_update_payslip_and_txn(
     first, last = _month_bounds(year, month)
     breakdown = _compute_breakdown(agent, first, last)
 
-    # Components — base salary default can be configured via settings
+    # Components â€” base salary default can be configured via settings
     base_salary = Decimal(getattr(settings, "WALLET_BASE_SALARY", "40000") or "0")
     commission = breakdown["commission"]
     bonuses_fees = breakdown["bonus"]
@@ -370,7 +480,7 @@ class AgentWalletView(LoginRequiredMixin, TemplateView):
 
     ensure_csrf_cookie -> guarantees a CSRF cookie on first GET so that any
     subsequent fetch/POST from the page has a token (prevents 403 HTML pages
-    that used to surface as “Unexpected token '<'” in the UI).
+    that used to surface as â€œUnexpected token '<'â€ in the UI).
     """
     template_name = "wallet/agent_wallet.html"
 
@@ -442,14 +552,14 @@ def entry_detail(request: HttpRequest, pk: int) -> HttpResponse:
 def payslip_download(request: HttpRequest, year: int, month: int) -> HttpResponse:
     """
     Lightweight HTML "PDF" fallback for an agent's payslip for a period.
-    (No external PDF dependency; downloads as HTML if PDF lib isn’t present.)
+    (No external PDF dependency; downloads as HTML if PDF lib isnâ€™t present.)
     """
     p = get_object_or_404(Payslip, agent=request.user, year=year, month=month)
     html = f"""<!doctype html>
 <html><head><meta charset="utf-8"><title>Payslip {p.year}-{p.month:02d}</title>
 <style>body{{font-family:system-ui,Segoe UI,Arial,sans-serif}}table{{border-collapse:collapse;width:100%}}td,th{{border:1px solid #eee;padding:6px;text-align:right}}th:first-child,td:first-child{{text-align:left}}</style>
 </head><body>
-<h2>Payslip — {p.year}-{p.month:02d}</h2>
+<h2>Payslip â€” {p.year}-{p.month:02d}</h2>
 <p><strong>Agent:</strong> {getattr(request.user, "get_full_name", lambda: request.user.username)()}</p>
 <table>
 <tr><th>Base Salary</th><td>{p.base_salary:.2f}</td></tr>
@@ -489,7 +599,7 @@ def budget_new(request: HttpRequest) -> HttpResponse:
         messages.success(request, "Budget request submitted.")
         return redirect("wallet:agent_wallet")
 
-    # GET → minimal form (fallback if you don't have a template)
+    # GET â†’ minimal form (fallback if you don't have a template)
     return render(request, "wallet/budget_new.html", {})
 
 
@@ -507,13 +617,14 @@ class AdminWalletHome(LoginRequiredMixin, TemplateView):
 
     def get_context_data(self, **kwargs):
         ctx = super().get_context_data(**kwargs)
-        biz = get_active_business(self.request)
+        # Scope company ledger to user (superuser sees all; managers see their business)
         qs = WalletTransaction.objects.filter(ledger=Ledger.COMPANY)
-        qs = _maybe_scope_to_business(qs, biz)
+        qs = scope_qs_to_user(qs, self.request)
+
         ctx["company_spend"] = qs.aggregate(s=Sum("amount"))["s"] or Decimal("0")
         ctx["recent"] = qs.select_related("agent").order_by("-created_at")[:30]
-        pending = BudgetRequest.objects.all()
-        pending = _maybe_scope_to_business(pending, biz)
+
+        pending = scope_qs_to_user(BudgetRequest.objects.all(), self.request)
         ctx["budgets_pending"] = pending.filter(status=BudgetRequest.Status.PENDING).count()
         return ctx
 
@@ -533,16 +644,18 @@ class AdminAgentWallet(LoginRequiredMixin, TemplateView):
         ctx = super().get_context_data(**kwargs)
         biz = get_active_business(self.request)
 
+        # Non-superusers may only access agents in their active business
+        if not self.request.user.is_superuser and not _agent_belongs_to_business(agent, biz):
+            raise Http404("Agent not found")
+
         ctx["agent"] = agent
         ctx["summary"] = agent_wallet_summary(agent)
 
         tx = WalletTransaction.objects.filter(ledger=Ledger.AGENT, agent=agent)
         ctx["txns"] = tx.order_by("-effective_date", "-id")[:100]
 
-        bqs = BudgetRequest.objects.filter(agent=agent)
-        pqs = Payslip.objects.filter(agent=agent)
-        bqs = _maybe_scope_to_business(bqs, biz)
-        pqs = _maybe_scope_to_business(pqs, biz)
+        bqs = scope_qs_to_user(BudgetRequest.objects.filter(agent=agent), self.request)
+        pqs = scope_qs_to_user(Payslip.objects.filter(agent=agent), self.request)
 
         ctx["budgets"] = bqs.order_by("-created_at")
         ctx["payslips"] = pqs.order_by("-year", "-month")
@@ -561,6 +674,10 @@ class AdminIssueTxnView(LoginRequiredMixin, TemplateView):
     def post(self, request):
         U = get_user_model()
         agent = get_object_or_404(U, id=request.POST.get("agent_id"))
+        # Ensure manager can only issue to agents in their business
+        if not request.user.is_superuser and not _agent_belongs_to_business(agent, get_active_business(request)):
+            return HttpResponse("Not allowed for this agent.", status=403)
+
         amount = Decimal(request.POST.get("amount", "0"))
         ttype = request.POST.get("type")
         note = request.POST.get("note", "")
@@ -598,15 +715,16 @@ class AdminBudgetsView(LoginRequiredMixin, TemplateView):
 
     def get_context_data(self, **kwargs):
         ctx = super().get_context_data(**kwargs)
-        biz = get_active_business(self.request)
 
-        pending = BudgetRequest.objects.all()
-        approved = BudgetRequest.objects.all()
-        paid = BudgetRequest.objects.all()
-
-        pending = _maybe_scope_to_business(pending, biz).filter(status=BudgetRequest.Status.PENDING).select_related("agent")
-        approved = _maybe_scope_to_business(approved, biz).filter(status=BudgetRequest.Status.APPROVED).select_related("agent")
-        paid = _maybe_scope_to_business(paid, biz).filter(status=BudgetRequest.Status.PAID).select_related("agent")
+        pending = scope_qs_to_user(BudgetRequest.objects.all(), self.request).filter(
+            status=BudgetRequest.Status.PENDING
+        ).select_related("agent")
+        approved = scope_qs_to_user(BudgetRequest.objects.all(), self.request).filter(
+            status=BudgetRequest.Status.APPROVED
+        ).select_related("agent")
+        paid = scope_qs_to_user(BudgetRequest.objects.all(), self.request).filter(
+            status=BudgetRequest.Status.PAID
+        ).select_related("agent")
 
         ctx["pending"] = pending
         ctx["approved"] = approved
@@ -617,6 +735,12 @@ class AdminBudgetsView(LoginRequiredMixin, TemplateView):
         bid = int(request.POST["budget_id"])
         action = request.POST["action"]  # approve / reject / pay
         b = get_object_or_404(BudgetRequest, id=bid)
+
+        # Enforce manager scope on the object
+        if not request.user.is_superuser:
+            biz = get_active_business(request)
+            if not _agent_belongs_to_business(b.agent, biz):
+                return HttpResponse("Not allowed for this budget.", status=403)
 
         if action == "approve":
             b.status = BudgetRequest.Status.APPROVED
@@ -654,13 +778,12 @@ def admin_budget_list(request: HttpRequest) -> HttpResponse:
     if not _staff(request.user):
         return redirect("wallet:agent_wallet")
 
-    biz = get_active_business(request)
-    qs = _maybe_scope_to_business(BudgetRequest.objects.all().select_related("agent"), biz)
+    qs = scope_qs_to_user(BudgetRequest.objects.all().select_related("agent"), request)
     status = request.GET.get("status")
     if status and status.lower() in {s for s, _ in BudgetRequest.Status.choices}:
         qs = qs.filter(status=status.lower())
     rows = qs.order_by("-created_at")[:200]
-    return render(request, "wallet/admin_budget_list.html", {"rows": rows, "business": biz})
+    return render(request, "wallet/admin_budget_list.html", {"rows": rows, "business": get_active_business(request)})
 
 
 @otp_required
@@ -669,6 +792,10 @@ def admin_budget_set_status(request: HttpRequest, pk: int, action: str) -> HttpR
         return redirect("wallet:agent_wallet")
 
     b = get_object_or_404(BudgetRequest, pk=pk)
+    # Enforce scope
+    if not request.user.is_superuser and not _agent_belongs_to_business(b.agent, get_active_business(request)):
+        return HttpResponse("Not allowed for this budget.", status=403)
+
     action = (action or "").lower()
     if action == "approve":
         b.status = BudgetRequest.Status.APPROVED
@@ -691,9 +818,7 @@ def admin_entries_export_csv(request: HttpRequest) -> HttpResponse:
     if not _staff(request.user):
         return redirect("wallet:agent_wallet")
 
-    biz = get_active_business(request)
-    qs = WalletTransaction.objects.all().select_related("agent")
-    qs = _maybe_scope_to_business(qs, biz)
+    qs = scope_qs_to_user(WalletTransaction.objects.all().select_related("agent"), request)
 
     # Optional filters
     agent_id = request.GET.get("agent_id")
@@ -724,7 +849,7 @@ def admin_entries_export_csv(request: HttpRequest) -> HttpResponse:
 
 
 # ---------------------------------------------------------------------
-# Payslips (single + bulk + schedules) — OTP-required
+# Payslips (single + bulk + schedules) â€” OTP-required
 # ---------------------------------------------------------------------
 @otp_required
 def issue_payslip(request, agent_id: int, year: int, month: int):
@@ -737,6 +862,10 @@ def issue_payslip(request, agent_id: int, year: int, month: int):
 
     U = get_user_model()
     agent = get_object_or_404(U, id=agent_id)
+
+    # Enforce manager scope for target agent
+    if not request.user.is_superuser and not _agent_belongs_to_business(agent, get_active_business(request)):
+        return HttpResponse("Not allowed for this agent.", status=403)
 
     p = _create_or_update_payslip_and_txn(
         agent=agent,
@@ -768,7 +897,18 @@ class AdminIssuePayslipView(LoginRequiredMixin, TemplateView):
     def get_context_data(self, **kwargs):
         ctx = super().get_context_data(**kwargs)
         U = get_user_model()
-        ctx["agents"] = U.objects.filter(is_active=True).order_by("first_name", "last_name", "username")
+        agents_qs = U.objects.filter(is_active=True).order_by("first_name", "last_name", "username")
+        # Managers see only their business agents in the dropdown
+        if not self.request.user.is_superuser:
+            biz = get_active_business(self.request)
+            try:
+                agents_qs = agents_qs.filter(profile__business=biz)
+            except Exception:
+                try:
+                    agents_qs = agents_qs.filter(business=biz)
+                except Exception:
+                    agents_qs = agents_qs.none()
+        ctx["agents"] = agents_qs
         today = timezone.localdate()
         ctx["year"] = int(self.request.GET.get("year", today.year))
         ctx["month"] = int(self.request.GET.get("month", today.month))
@@ -777,6 +917,10 @@ class AdminIssuePayslipView(LoginRequiredMixin, TemplateView):
     def post(self, request: HttpRequest):
         U = get_user_model()
         agent = get_object_or_404(U, id=request.POST.get("agent_id"))
+        # Enforce manager scope
+        if not request.user.is_superuser and not _agent_belongs_to_business(agent, get_active_business(request)):
+            return HttpResponse("Not allowed for this agent.", status=403)
+
         year = int(request.POST.get("year"))
         month = int(request.POST.get("month"))
         send_now = request.POST.get("send_now") in ("1", "true", "on", "yes")
@@ -813,7 +957,17 @@ class AdminPayslipBulkView(LoginRequiredMixin, TemplateView):
     def get_context_data(self, **kwargs):
         ctx = super().get_context_data(**kwargs)
         U = get_user_model()
-        ctx["agents"] = U.objects.filter(is_active=True).order_by("first_name", "last_name", "username")
+        agents_qs = U.objects.filter(is_active=True).order_by("first_name", "last_name", "username")
+        if not self.request.user.is_superuser:
+            biz = get_active_business(self.request)
+            try:
+                agents_qs = agents_qs.filter(profile__business=biz)
+            except Exception:
+                try:
+                    agents_qs = agents_qs.filter(business=biz)
+                except Exception:
+                    agents_qs = agents_qs.none()
+        ctx["agents"] = agents_qs
         today = timezone.localdate()
         ctx["year"] = int(self.request.GET.get("year", today.year))
         ctx["month"] = int(self.request.GET.get("month", today.month))
@@ -837,6 +991,11 @@ class AdminPayslipBulkView(LoginRequiredMixin, TemplateView):
         method = request.POST.get("method")  # optional
 
         agents = list(U.objects.filter(id__in=agent_ids, is_active=True))
+        # Enforce scope: managers can only act on their business agents
+        if not request.user.is_superuser:
+            biz = get_active_business(request)
+            agents = [a for a in agents if _agent_belongs_to_business(a, biz)]
+
         results = []
         for a in agents:
             p = _create_or_update_payslip_and_txn(
@@ -871,8 +1030,30 @@ class AdminPayoutSchedulesView(LoginRequiredMixin, TemplateView):
     def get_context_data(self, **kwargs):
         ctx = super().get_context_data(**kwargs)
         U = get_user_model()
-        ctx["schedules"] = PayoutSchedule.objects.all().prefetch_related("users")
-        ctx["agents"] = U.objects.filter(is_active=True).order_by("first_name", "last_name", "username")
+        # Superusers see all schedules; managers only those for their business (best effort)
+        qs = PayoutSchedule.objects.all().prefetch_related("users")
+        if not self.request.user.is_superuser:
+            biz = get_active_business(self.request)
+            try:
+                qs = qs.filter(users__profile__business=biz).distinct()
+            except Exception:
+                try:
+                    qs = qs.filter(users__business=biz).distinct()
+                except Exception:
+                    qs = qs.none()
+        ctx["schedules"] = qs
+
+        agents_qs = U.objects.filter(is_active=True).order_by("first_name", "last_name", "username")
+        if not self.request.user.is_superuser:
+            biz = get_active_business(self.request)
+            try:
+                agents_qs = agents_qs.filter(profile__business=biz)
+            except Exception:
+                try:
+                    agents_qs = agents_qs.filter(business=biz)
+                except Exception:
+                    agents_qs = agents_qs.none()
+        ctx["agents"] = agents_qs
         return ctx
 
     def post(self, request: HttpRequest):
@@ -913,6 +1094,9 @@ def run_payout_schedule(request: HttpRequest, schedule_id: int):
 
     results = []
     for u in sch.users.all():
+        # Managers: skip users outside their business
+        if not request.user.is_superuser and not _agent_belongs_to_business(u, get_active_business(request)):
+            continue
         p = _create_or_update_payslip_and_txn(
             agent=u,
             year=prev_year,
@@ -929,7 +1113,7 @@ def run_payout_schedule(request: HttpRequest, schedule_id: int):
 
 
 # ---------------------------------------------------------------------
-# Admin Purchase Orders (simple views) — OTP-required
+# Admin Purchase Orders (simple views) â€” OTP-required
 # ---------------------------------------------------------------------
 @method_decorator([otp_required, ensure_csrf_cookie], name="dispatch")
 class AdminPOListView(LoginRequiredMixin, TemplateView):
@@ -947,6 +1131,8 @@ class AdminPOListView(LoginRequiredMixin, TemplateView):
         ctx = super().get_context_data(**kwargs)
         status = self.request.GET.get("status")
         qs = AdminPurchaseOrder.objects.all().order_by("-created_at")
+        # (Optional) scope POs if your model has business/store relations
+        qs = scope_qs_to_user(qs, self.request)
         if status in (
             PurchaseOrderStatus.DRAFT,
             PurchaseOrderStatus.SENT,
@@ -1050,3 +1236,5 @@ admin_issue_payslip = AdminIssuePayslipView.as_view()
 admin_payslips = AdminPayslipBulkView.as_view()
 admin_schedules = AdminPayoutSchedulesView.as_view()
 admin_po_list = AdminPOListView.as_view()
+
+

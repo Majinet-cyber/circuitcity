@@ -1,4 +1,4 @@
-# notifications/models.py
+﻿# notifications/models.py
 from __future__ import annotations
 
 from django.conf import settings
@@ -53,3 +53,5 @@ class Notification(models.Model):
         if not self.read_at:
             self.read_at = timezone.now()
             self.save(update_fields=["read_at"])
+
+

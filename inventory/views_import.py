@@ -1,4 +1,4 @@
-# inventory/views_import.py
+﻿# inventory/views_import.py
 import csv, io
 from decimal import Decimal, InvalidOperation
 from datetime import datetime as dt
@@ -139,3 +139,5 @@ def import_opening_stock(request):
         form = CSVImportForm()
 
     return render(request, "inventory/import_opening_stock.html", {"form": form})
+
+

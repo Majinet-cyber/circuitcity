@@ -1,4 +1,4 @@
-# circuitcity/inventory/queries.py
+﻿# circuitcity/inventory/queries.py
 from __future__ import annotations
 from django.db.models import QuerySet
 from typing import Iterable
@@ -40,12 +40,12 @@ def limit_to_actor(qs: QuerySet, user) -> QuerySet:
             try:
                 return qs.filter(**{field: user})
             except Exception:
-                # If a field exists but isn’t a direct FK to user, try field_id
+                # If a field exists but isnâ€™t a direct FK to user, try field_id
                 try:
                     return qs.filter(**{f"{field}_id": getattr(user, "id", None)})
                 except Exception:
                     continue
-    # No recognizable actor field → safest behavior is "no rows"
+    # No recognizable actor field â†’ safest behavior is "no rows"
     return qs.none()
 
 def scoped_for_user(qs_or_manager, request) -> QuerySet:
@@ -54,3 +54,5 @@ def scoped_for_user(qs_or_manager, request) -> QuerySet:
     """
     qs = scoped(qs_or_manager, request)
     return limit_to_actor(qs, getattr(request, "user", None))
+
+

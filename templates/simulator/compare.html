@@ -7,10 +7,9 @@
   <form class="row g-2 align-items-end" method="get" action="">
     <div class="col-md-8">
       <label class="form-label fw-bold">Scenarios to compare</label>
-      {# Expect ?id=1&id=2... (pre-fill from querystring to keep state) #}
+      <!-- We seed this from the URL via JS so it always reflects ?id=&id=... -->
       <input type="text" class="form-control" id="idsInput"
-             placeholder="Enter scenario IDs separated by commas, e.g. 1,2,3"
-             value="{{ request.GET.id|join:', ' }}">
+             placeholder="Enter scenario IDs separated by commas, e.g. 1,2,3">
       <div class="form-text">Tip: copy–paste IDs from the Scenarios page; supports up to 8 at a time.</div>
     </div>
     <div class="col-md-4">
@@ -37,8 +36,15 @@
 </div>
 
 <div class="panel p-3 mt-3">
-  <h6 class="fw-bold mb-2">Overlay Chart</h6>
-  <canvas id="cmpChart" style="height:320px"></canvas>
+  <div class="d-flex align-items-center justify-content-between">
+    <h6 class="fw-bold mb-0">Overlay Chart</h6>
+    <small class="text-muted">Auto-decimated for large datasets</small>
+  </div>
+
+  <!-- Reasonable, responsive height with hard caps -->
+  <div class="chart-box mt-2">
+    <canvas id="cmpChart"></canvas>
+  </div>
   <div id="emptyMsg" class="small text-muted mt-2 {% if payload %}d-none{% endif %}">
     No scenarios selected. Add IDs above and click Apply.
   </div>
@@ -87,19 +93,35 @@
 </div>
 {% endblock %}
 
+{% block extra_css %}
+<style>
+  /* Keeps chart “reasonable” everywhere */
+  .chart-box{
+    position:relative;
+    height:360px;     /* default desktop */
+    max-height:50vh;  /* never taller than half the viewport */
+    min-height:260px; /* still readable on tiny screens */
+  }
+  @media (max-width: 768px){
+    .chart-box{ height:300px; }
+  }
+</style>
+{% endblock %}
+
 {% block extra_js %}
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
 <script>
-// Seed the IDs field from current query (?id=1&id=2...)
+/* -------------------- URL <-> UI state -------------------- */
 (function seedIds(){
   const url = new URL(location.href);
   const ids = url.searchParams.getAll('id');
   if(ids.length){
     document.getElementById('idsInput').value = ids.join(', ');
   }
+  const m = url.searchParams.get('m');
+  if (m) document.getElementById('metric').value = m;
 })();
 
-// Convert the comma list into ?id=&id=… before submit
 document.getElementById('applyBtn')?.addEventListener('click', (e)=>{
   e.preventDefault();
   const raw = document.getElementById('idsInput').value || '';
@@ -108,19 +130,12 @@ document.getElementById('applyBtn')?.addEventListener('click', (e)=>{
   const url = new URL(location.href);
   url.search = '';
   if(ids.length){ ids.forEach(id=> url.searchParams.append('id', id)); }
-  // Keep chosen metric in URL so the chart restores it
   url.searchParams.set('m', metric);
   location.assign(url.toString());
 });
 
-// Pull server payload (rendered context → JS object)
+/* -------------------- Data & chart rendering -------------------- */
 const PAYLOAD = {{ payload|default:"[]"|safe }};
-const METRIC_FROM_URL = new URL(location.href).searchParams.get('m');
-
-if (METRIC_FROM_URL) {
-  const sel = document.getElementById('metric');
-  if (sel) sel.value = METRIC_FROM_URL;
-}
 
 const COLORS = [
   '#2563eb', '#16a34a', '#f59e0b', '#ef4444',
@@ -141,39 +156,67 @@ function buildDatasets(metric){
       borderColor: COLORS[idx % COLORS.length],
       backgroundColor: COLORS[idx % COLORS.length] + '22',
       fill: false,
-      tension: .3,
+      tension: .25,
       pointRadius: 1.5,
+      borderWidth: 2,
     });
   });
-  return {labels: (PAYLOAD[0]?.results?.series || []).map(p=>'D'+p.day), datasets: sets};
+  const labels = (PAYLOAD[0]?.results?.series || []).map(p => 'D'+p.day);
+  return {labels, datasets: sets};
 }
 
 function renderChart(){
   const metric = document.getElementById('metric').value;
   const {labels, datasets} = buildDatasets(metric);
-  const canvas = document.getElementById('cmpChart').getContext('2d');
+
+  const ctx = document.getElementById('cmpChart').getContext('2d');
   if (cmpChart) cmpChart.destroy();
-  cmpChart = new Chart(canvas, {
+
+  cmpChart = new Chart(ctx, {
     type: 'line',
     data: { labels, datasets },
     options: {
-      responsive: true, maintainAspectRatio: false,
-      plugins: { legend: { position: 'bottom' } },
-      scales: {
-        y: {
-          title: { display: true, text: (metric.includes('_cum') ? 'Currency (cum)' : 'Units / day') }
+      responsive: true,
+      maintainAspectRatio: false,
+      animation: false,
+      interaction: { mode: 'index', intersect: false },
+      plugins: {
+        legend: { position: 'bottom' },
+        tooltip: {
+          callbacks: {
+            label: c => `${c.dataset.label}: ${c.formattedValue}`
+          }
         },
-        x: { grid: { color: getComputedStyle(document.documentElement).getPropertyValue('--chart-grid') || 'rgba(2,6,23,.1)' } }
+        // LTTB decimation keeps performance (and a sane visual) on huge series
+        decimation: { enabled: true, algorithm: 'lttb', samples: 200 }
+      },
+      scales: {
+        x: {
+          ticks: { autoSkip: true, maxRotation: 0 },
+          grid: {
+            color: getComputedStyle(document.documentElement)
+              .getPropertyValue('--chart-grid') || 'rgba(2,6,23,.08)'
+          }
+        },
+        y: {
+          beginAtZero: true,
+          ticks: { precision: 0 },
+          title: {
+            display: true,
+            text: (metric.includes('_cum') ? 'Currency (cumulative)' : 'Units per day')
+          }
+        }
       }
     }
   });
+
   document.getElementById('emptyMsg')?.classList.toggle('d-none', (datasets.length>0));
 }
 
 document.getElementById('metric')?.addEventListener('change', renderChart);
 renderChart();
 
-// -------- Export KPIs table as CSV (client-side) ----------
+/* -------------------- Export KPIs as CSV -------------------- */
 document.getElementById('exportCsv')?.addEventListener('click', ()=>{
   const rows = [];
   rows.push(['Scenario','Price','Unit Cost','Revenue','Gross Profit','Op Profit','Tax','Ending Cash','Stockout Days']);

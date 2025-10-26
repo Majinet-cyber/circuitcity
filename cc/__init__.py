@@ -1,4 +1,4 @@
-# cc/__init__.py
+﻿# cc/__init__.py
 """
 Package init for the cc Django project.
 
@@ -25,3 +25,5 @@ except Exception as exc:  # pragma: no cover
     logger.info("Celery not available; continuing without it: %s", exc)
 
 __all__ = ("celery_app",)
+
+

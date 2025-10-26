@@ -1,4 +1,4 @@
-from celery import shared_task
+﻿from celery import shared_task
 from django.utils import timezone
 from django.db.models import Count, Sum, F
 from datetime import timedelta, date
@@ -14,7 +14,7 @@ from .services import (ema_with_weekday, percentile_bounds, current_on_hand, wee
 @shared_task
 def forecast_daily():
     run = ForecastRun.objects.create()
-    # build series per (store, product) from DailyKPI (last 60–90 days)
+    # build series per (store, product) from DailyKPI (last 60â€“90 days)
     horizon = 14
     today = timezone.localdate()
     start_d = today - timedelta(days=60)
@@ -56,7 +56,7 @@ def alerts_low_stock():
         if on_hand < adv.reorder_point:
             title = f"Low stock: {adv.product.name}"
             body = f"On-hand {on_hand} < ROP {int(adv.reorder_point)}. Recommend order: {int(adv.recommend_qty)}."
-            # send to store manager(s) → adjust how you identify managers/users
+            # send to store manager(s) â†’ adjust how you identify managers/users
             for user in adv.store.managers.all():  # if you have M2M managers
                 Notification.objects.create(user=user, kind="low_stock", title=title, body=body, severity="warn")
 
@@ -83,7 +83,7 @@ def nudges_hourly():
                 agent = Agent.objects.get(id=r["agent_id"])
                 Notification.objects.create(
                     user=agent.user, kind="nudge", severity="info",
-                    title="🏆 Almost there!", body=f"You’re {delta} phones away from #1 this week!"
+                    title="ðŸ† Almost there!", body=f"Youâ€™re {delta} phones away from #1 this week!"
                 )
             except Agent.DoesNotExist:
                 pass
@@ -95,12 +95,14 @@ def weekly_reports():
     this_week_start = week_start(timezone.now())
     this_week_end = this_week_start + timedelta(days=6)
     for m in Manager.objects.all():
-        ctx = build_weekly_ctx_for_manager(m, this_week_start, this_week_end)  # You’ll add this helper
+        ctx = build_weekly_ctx_for_manager(m, this_week_start, this_week_end)  # Youâ€™ll add this helper
         html = render_to_string("emails/weekly_report.html", ctx)
-        text = f"Weekly summary for {m.name} ({this_week_start}–{this_week_end}). Open in Circuit City."
+        text = f"Weekly summary for {m.name} ({this_week_start}â€“{this_week_end}). Open in Circuit City."
         msg = EmailMultiAlternatives(
-            subject=f"Circuit City: Weekly report ({this_week_start}–{this_week_end})",
+            subject=f"Circuit City: Weekly report ({this_week_start}â€“{this_week_end})",
             body=text, from_email="no-reply@circuitcity", to=[m.email]
         )
         msg.attach_alternative(html, "text/html"); msg.send()
         EmailReportLog.objects.create(report_key=ctx["key"], sent_to=m.email, meta={"store_ids": ctx["store_ids"]})
+
+

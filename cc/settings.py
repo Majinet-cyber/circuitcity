@@ -1,4 +1,4 @@
-"""
+﻿"""
 Django settings for cc project.
 """
 from pathlib import Path
@@ -7,6 +7,7 @@ import os
 import re
 import logging
 import sys
+import importlib
 
 # --------------------------- helpers ---------------------------
 def env_bool(key: str, default: bool = False) -> bool:
@@ -25,6 +26,17 @@ def env_int(key: str, default: int) -> int:
     except Exception:
         return default
 
+def _optional_app(app_label: str):
+    """
+    Return the app label if importable, else None.
+    Keeps dev helpers (sslserver, django_extensions) from breaking startup.
+    """
+    try:
+        importlib.import_module(app_label.replace("-", "_"))
+        return app_label
+    except Exception:
+        return None
+
 # --------------------------- base & .env ---------------------------
 BASE_DIR = Path(__file__).resolve().parent.parent
 try:
@@ -38,83 +50,50 @@ SECRET_KEY = os.environ.get(
     "DJANGO_SECRET_KEY",
     "django-insecure-w#o#i4apw-$iz-3sivw57n=2j6fgku@1pfqfs76@3@7)a0h$ys",
 )
-DEBUG = env_bool("DJANGO_DEBUG", env_bool("DEBUG", False))
+DEBUG = True  # forced ON for local testing
 TESTING = any(arg in sys.argv for arg in ("test", "pytest"))
 
-RENDER = bool(os.environ.get("RENDER") or os.environ.get("RENDER_EXTERNAL_URL"))
-RENDER_EXTERNAL_URL = os.environ.get("RENDER_EXTERNAL_URL", "")
-APP_DOMAIN = os.environ.get("APP_DOMAIN", "").strip()
-LIVE_HOST  = os.environ.get("LIVE_HOST", "").strip()
+# Allow everything (for local dev) + specific IPs
+ALLOWED_HOSTS = [
+    "localhost",
+    "127.0.0.1",
+    "0.0.0.0",
+    "192.168.1.104",
+    "192.168.1.105",
+    ".ngrok-free.app",
+    ".trycloudflare.com",
+    ".onrender.com",
+    "*",
+]
 
-_default_hosts = "localhost,127.0.0.1,0.0.0.0,192.168.1.104,.ngrok-free.app,.trycloudflare.com,.onrender.com"
-ALLOWED_HOSTS = env_csv("ALLOWED_HOSTS", os.environ.get("DJANGO_ALLOWED_HOSTS", _default_hosts))
-
-if RENDER_EXTERNAL_URL:
-    parsed = urlparse(RENDER_EXTERNAL_URL)
-    host = parsed.netloc
-    if host and host not in ALLOWED_HOSTS:
-        ALLOWED_HOSTS.append(host)
-if ".onrender.com" not in ALLOWED_HOSTS:
-    ALLOWED_HOSTS.append(".onrender.com")
-for h in (LIVE_HOST, APP_DOMAIN):
-    if h and h not in ALLOWED_HOSTS:
-        ALLOWED_HOSTS.append(h)
-
-FORCE_SSL = env_bool("FORCE_SSL", env_bool("DJANGO_FORCE_SSL", False))
-USE_SSL = FORCE_SSL or not DEBUG
-HEALTHZ_ALLOW_HTTP = env_bool("HEALTHZ_ALLOW_HTTP", False)
-
-SECURE_CONTENT_TYPE_NOSNIFF = True
-SECURE_REFERRER_POLICY = "same-origin"
-SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
-USE_X_FORWARDED_HOST = True
-SECURE_CROSS_ORIGIN_OPENER_POLICY = "same-origin"
-SECURE_SSL_REDIRECT = USE_SSL and not HEALTHZ_ALLOW_HTTP
-SESSION_COOKIE_SECURE = USE_SSL
-CSRF_COOKIE_SECURE = USE_SSL
-if USE_SSL:
-    SECURE_HSTS_SECONDS = env_int("SECURE_HSTS_SECONDS", 31536000)
-    SECURE_HSTS_INCLUDE_SUBDOMAINS = True
-    SECURE_HSTS_PRELOAD = True
-if HEALTHZ_ALLOW_HTTP:
-    SECURE_REDIRECT_EXEMPT = [r"^healthz$"]
-
-# --------------------------- session & csrf ---------------------------
-SESSION_COOKIE_NAME = os.environ.get("SESSION_COOKIE_NAME", "cc_sessionid")
-CSRF_COOKIE_NAME    = os.environ.get("CSRF_COOKIE_NAME", "cc_csrftoken")
-CSRF_COOKIE_HTTPONLY = True
-SESSION_COOKIE_HTTPONLY = True
-SESSION_EXPIRE_AT_BROWSER_CLOSE = True
-SESSION_COOKIE_SAMESITE = os.environ.get("SESSION_COOKIE_SAMESITE", "Lax")
-CSRF_COOKIE_SAMESITE   = os.environ.get("CSRF_COOKIE_SAMESITE", "Lax")
-SESSION_COOKIE_AGE = 60 * 60 * 4
-SESSION_ENGINE   = "django.contrib.sessions.backends.db"
-
-_default_csrf = ",".join([
+# CSRF trusted origins (added your IP)
+CSRF_TRUSTED_ORIGINS = [
     "http://localhost",
     "http://127.0.0.1",
     "http://0.0.0.0",
     "http://192.168.1.104",
+    "http://192.168.1.105",
     "https://*.ngrok-free.app",
     "https://*.trycloudflare.com",
     "https://*.onrender.com",
-])
-_csrf_primary = os.environ.get("CSRF_TRUSTED_ORIGINS")
-_csrf_legacy  = os.environ.get("DJANGO_CSRF_TRUSTED_ORIGINS", _default_csrf)
-CSRF_TRUSTED_ORIGINS = env_csv("CSRF_TRUSTED_ORIGINS", _csrf_primary or _csrf_legacy)
+]
 
-def _add_origin(url: str):
-    if url and url not in CSRF_TRUSTED_ORIGINS:
-        CSRF_TRUSTED_ORIGINS.append(url)
+USE_SSL = False
+FORCE_SSL = False
+SECURE_SSL_REDIRECT = False
+SESSION_COOKIE_SECURE = False
+CSRF_COOKIE_SECURE = False
 
-if RENDER_EXTERNAL_URL:
-    p = urlparse(RENDER_EXTERNAL_URL)
-    if p.scheme and p.netloc:
-        _add_origin(f"{p.scheme}://{p.netloc}")
-if LIVE_HOST:
-    _add_origin(f"https://{LIVE_HOST}")
-if APP_DOMAIN:
-    _add_origin(f"https://{APP_DOMAIN}")
+# --------------------------- session & csrf ---------------------------
+SESSION_COOKIE_NAME = os.environ.get("SESSION_COOKIE_NAME", "cc_sessionid")
+CSRF_COOKIE_NAME = os.environ.get("CSRF_COOKIE_NAME", "cc_csrftoken")
+CSRF_COOKIE_HTTPONLY = True
+SESSION_COOKIE_HTTPONLY = True
+SESSION_EXPIRE_AT_BROWSER_CLOSE = True
+SESSION_COOKIE_SAMESITE = os.environ.get("SESSION_COOKIE_SAMESITE", "Lax")
+CSRF_COOKIE_SAMESITE = os.environ.get("CSRF_COOKIE_SAMESITE", "Lax")
+SESSION_COOKIE_AGE = 60 * 60 * 4
+SESSION_ENGINE = "django.contrib.sessions.backends.db"
 
 # --------------------------- apps ---------------------------
 INSTALLED_APPS = [
@@ -127,13 +106,26 @@ INSTALLED_APPS = [
     "django.contrib.staticfiles",
     "django.contrib.humanize",
 
-    # Local apps (order matters if one imports another)
+    # Local apps
     "circuitcity.accounts.apps.AccountsConfig",
     "tenants.apps.TenantsConfig",
     "inventory",
     "sales",
     "dashboard",
+    "simulator",
+    # Billing
+    "billing",
+    "wallet",
+    # Layby (TOP-LEVEL import, not circuitcity.layby)
+    "layby.apps.LaybyConfig",
 ]
+
+# Optional dev/helper apps (only added if installed in the venv)
+INSTALLED_APPS += [a for a in (
+    _optional_app("sslserver"),
+    _optional_app("django_extensions"),
+) if a]
+
 print("[cc.settings] Final INSTALLED_APPS:", INSTALLED_APPS)
 
 # --------------------------- middleware ---------------------------
@@ -146,6 +138,11 @@ MIDDLEWARE = [
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
+
+    # HQ admins stay in HQ â€” prevent them from viewing store/tenant UI
+    "cc.middleware.PreventHQFromClientUI",
+
+    "tenants.middleware.TenantResolutionMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
 ]
@@ -165,8 +162,9 @@ TEMPLATES = [
                 "django.template.context_processors.request",
                 "django.contrib.auth.context_processors.auth",
                 "django.contrib.messages.context_processors.messages",
-                # Provide BUILD_ID and STATIC_VERSION to templates
                 "cc.context_processors.build_meta",
+                "tenants.context_processors.tenant_context",
+                "billing.context_processors.trial_banner",
             ],
         },
     },
@@ -179,7 +177,7 @@ WSGI_APPLICATION = "cc.wsgi.application"
 DATABASES: dict = {}
 DATABASE_URL = os.environ.get("DATABASE_URL", "").strip()
 USE_LOCAL_SQLITE = env_bool("USE_LOCAL_SQLITE", default=DEBUG)
-REQUIRE_DATABASE_URL = env_bool("REQUIRE_DATABASE_URL", (RENDER or not DEBUG))
+REQUIRE_DATABASE_URL = env_bool("REQUIRE_DATABASE_URL", False)
 
 if DATABASE_URL:
     try:
@@ -187,10 +185,8 @@ if DATABASE_URL:
     except Exception as e:
         raise RuntimeError("dj-database-url must be installed") from e
     DATABASES["default"] = dj_database_url.parse(
-        DATABASE_URL, conn_max_age=600, ssl_require=USE_SSL
+        DATABASE_URL, conn_max_age=600, ssl_require=False
     )
-elif REQUIRE_DATABASE_URL and not USE_LOCAL_SQLITE:
-    raise RuntimeError("DATABASE_URL must be set in production.")
 elif USE_LOCAL_SQLITE:
     sqlite_path = str(BASE_DIR / "db.sqlite3")
     DATABASES["default"] = {"ENGINE": "django.db.backends.sqlite3", "NAME": sqlite_path}
@@ -208,16 +204,8 @@ else:
         "HOST": HOST,
         "PORT": PORT,
         "CONN_MAX_AGE": 600,
-        "OPTIONS": {
-            "connect_timeout": 5,
-            **({"sslmode": "require"} if USE_SSL and HOST not in ("localhost", "127.0.0.1") else {}),
-        },
+        "OPTIONS": {"connect_timeout": 5},
     }
-try:
-    _db = DATABASES.get("default", {})
-    print(f"[cc.settings] DB -> {_db.get('ENGINE')} | NAME={_db.get('NAME')} | DEBUG={DEBUG} | FORCE_SQLITE={USE_LOCAL_SQLITE}")
-except Exception:
-    pass
 
 # --------------------------- cache ---------------------------
 CACHE_TTL_DEFAULT = env_int("CACHE_TTL_DEFAULT", 60)
@@ -232,9 +220,13 @@ if REDIS_URL:
         }
     }
 else:
-    CACHES = {"default": {"BACKEND": "django.core.cache.backends.locmem.LocMemCache",
-                          "LOCATION": "cc-local-cache",
-                          "TIMEOUT": CACHE_TTL_DEFAULT}}
+    CACHES = {
+        "default": {
+            "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
+            "LOCATION": "cc-local-cache",
+            "TIMEOUT": CACHE_TTL_DEFAULT,
+        }
+    }
 
 # --------------------------- auth / i18n ---------------------------
 AUTH_PASSWORD_VALIDATORS = [
@@ -271,13 +263,12 @@ STORAGES = {
     "staticfiles": {"BACKEND": _static_backend},
 }
 WHITENOISE_AUTOREFRESH = DEBUG
-# Optional tuning:
 WHITENOISE_MAX_AGE = 60 * 60 * 24 * 365
 
 # --------------------------- auth redirects ---------------------------
-LOGIN_URL = "login"
-LOGIN_REDIRECT_URL = "dashboard:agent_dashboard"
-LOGOUT_REDIRECT_URL = "login"
+LOGIN_URL = "/login/"
+LOGIN_REDIRECT_URL = "/"
+LOGOUT_REDIRECT_URL = "/login/"
 
 # --------------------------- email ---------------------------
 ADMINS = [("Ops", os.environ.get("ADMIN_EMAIL", "ops@example.com"))]
@@ -296,81 +287,49 @@ else:
     DEFAULT_FROM_EMAIL = os.environ.get("DEFAULT_FROM_EMAIL", EMAIL_HOST_USER or "noreply@example.com")
     EMAIL_TIMEOUT = env_int("EMAIL_TIMEOUT", 10)
 
-LOW_STOCK_ALERT_RECIPIENTS = [
-    e.strip() for e in os.environ.get("LOW_STOCK_ALERT_RECIPIENTS", os.environ.get("ADMIN_EMAIL", "")).split(",") if e.strip()
-]
+# --------------------------- billing ---------------------------
+BILLING = {
+    "PROVIDER": os.environ.get("BILLING_PROVIDER", "stripe"),
+    "DEFAULT_CURRENCY": os.environ.get("BILLING_CURRENCY", "MWK"),
+    "TRIAL_DAYS": env_int("BILLING_TRIAL_DAYS", 30),
+    "GRACE_DAYS": env_int("BILLING_GRACE_DAYS", 30),
+    "INVOICE_FROM": os.environ.get("BILLING_INVOICE_FROM", os.environ.get("DEFAULT_FROM_EMAIL", "noreply@example.com")),
+}
+BILLING_PLANS = {
+    "starter": {"code": "starter", "name": "Starter", "amount": 20000, "currency": "MWK", "max_agents": 0},
+    "pro": {"code": "pro", "name": "Pro", "amount": 35000, "currency": "MWK", "max_agents": 5},
+    "promax": {"code": "promax", "name": "Pro Max", "amount": 50000, "currency": "MWK", "max_agents": None},
+}
 
-# --------------------------- logging ---------------------------
-class RedactIMEIFilter(logging.Filter):
-    IMEI_RE = re.compile(r"(?<!\d)\d{15}(?!\d)")
-    def filter(self, record: logging.LogRecord) -> bool:
-        try:
-            msg = record.getMessage()
-            if msg and self.IMEI_RE.search(msg):
-                record.msg = self.IMEI_RE.sub("[IMEI-REDACTED]", msg)
-                record.args = ()
-        except Exception:
-            pass
-        return True
+REPORTS_DEFAULT_CURRENCY = BILLING["DEFAULT_CURRENCY"]
+BILLING_TRIAL_DAYS = BILLING["TRIAL_DAYS"]
+BILLING_GRACE_DAYS = BILLING["GRACE_DAYS"]
 
-try:
-    import pythonjsonlogger  # type: ignore
-    _have_json_logger = True
-except Exception:
-    _have_json_logger = False
-
-USE_JSON_LOGS = env_bool("USE_JSON_LOGS", True) and not DEBUG and _have_json_logger
-_json_formatter = {"()": "pythonjsonlogger.jsonlogger.JsonFormatter", "fmt": "%(asctime)s %(levelname)s %(name)s %(message)s"}
-_plain_formatter = {"format": "%(levelname)s %(name)s: %(message)s"}
-
-LOGGING = {
-    "version": 1,
-    "disable_existing_loggers": False,
-    "filters": {"redact_imei": {"()": "cc.settings.RedactIMEIFilter"}},
-    "formatters": {"json": _json_formatter, "plain": _plain_formatter},
-    "handlers": {
-        "console_json": {"class": "logging.StreamHandler", "filters": ["redact_imei"], "formatter": "json" if USE_JSON_LOGS else "plain"},
-        "mail_admins": {"level": "ERROR", "class": "django.utils.log.AdminEmailHandler", "include_html": True, "filters": ["redact_imei"]},
-    },
-    "loggers": {
-        "access": {"handlers": ["console_json"], "level": "INFO", "propagate": False},
-        "django.request": {"handlers": ["mail_admins", "console_json"], "level": "ERROR", "propagate": False},
-        "django.security": {"handlers": ["console_json"], "level": "WARNING", "propagate": False},
-        "": {"handlers": ["console_json"], "level": "INFO"},
-    },
+# --------------------------- global UI ---------------------------
+UI = {
+    "SIDEBAR_COLLAPSIBLE": False,
+    "TOPBAR_SHOW_LOGOUT": True,
 }
 
 # --------------------------- misc ---------------------------
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
-AUDIT_LOG_SETTINGS = {"ENABLED": True, "AUDIT_MODEL": "inventory.AuditLog", "TRACK_DELETES": True, "TRACK_EDITS": True, "INCLUDE_USER": True}
-V1_SIMPLE_DASHBOARD = True
+AUDIT_LOG_SETTINGS = {
+    "ENABLED": True,
+    "AUDIT_MODEL": "inventory.AuditLog",
+    "TRACK_DELETES": True,
+    "TRACK_EDITS": True,
+    "INCLUDE_USER": True,
+}
 WARRANTY_CHECK_ENABLED = env_bool("WARRANTY_CHECK_ENABLED", False)
 WARRANTY_ENFORCE_COUNTRY = env_bool("WARRANTY_ENFORCE_COUNTRY", True)
 ACTIVATION_ALERT_MINUTES = env_int("ACTIVATION_ALERT_MINUTES", 15)
 WARRANTY_REQUEST_TIMEOUT = env_int("WARRANTY_REQUEST_TIMEOUT", 12)
-FEATURES = {
-    "CSV_EXPORTS": os.environ.get("FEATURE_CSV_EXPORTS", "1") == "1",
-    "CSV_IMPORT": os.environ.get("FEATURE_CSV_IMPORT", "1") == "1",
-    "LOW_STOCK_DIGEST": os.environ.get("FEATURE_LOW_STOCK_DIGEST", "1") == "1",
-    "ROLE_ENFORCEMENT": os.environ.get("FEATURE_ROLE_ENFORCEMENT", "1") == "1",
-}
-DATA_IMPORT_MAX_EXPANSION = env_int("DATA_IMPORT_MAX_EXPANSION", 5000)
 
-# --------------------------- sentry (optional) ---------------------------
-SENTRY_DSN = os.environ.get("SENTRY_DSN", "")
-if SENTRY_DSN:
-    import sentry_sdk
-    from sentry_sdk.integrations.django import DjangoIntegration
-    sentry_sdk.init(
-        dsn=SENTRY_DSN,
-        integrations=[DjangoIntegration()],
-        traces_sample_rate=float(os.environ.get("SENTRY_TRACES_SAMPLE_RATE", 0.0)),
-        send_default_pii=True,
-        environment=os.environ.get("SENTRY_ENV", "dev" if DEBUG else "prod"),
-        release=os.environ.get("GIT_COMMIT", "local"),
-    )
-
-# --------------------------- metadata ---------------------------
 APP_NAME = os.environ.get("APP_NAME", "Circuit City")
-APP_ENV  = os.environ.get("APP_ENV", "dev" if DEBUG else "beta")
+APP_ENV = os.environ.get("APP_ENV", "dev" if DEBUG else "beta")
 BETA_FEEDBACK_MAILTO = os.environ.get("BETA_FEEDBACK_MAILTO", "beta@circuitcity.example")
+
+# --------------------------- safety toggles ---------------------------
+# Global guard to prevent any AUTO creation of sales.Sale during inventory "mark as SOLD".
+# This helps avoid integrity errors when required Sale fields (e.g., location_id) aren’t present.
+DISABLE_SALES_AUTOCREATE = env_bool("DISABLE_SALES_AUTOCREATE", True)

@@ -1,4 +1,4 @@
-# inventory/auto_location.py
+﻿# inventory/auto_location.py
 from django.apps import apps
 from django.db.models.signals import post_save
 from django.dispatch import receiver
@@ -57,3 +57,5 @@ def register():
             create_kwargs["is_active"] = True
 
         Location.objects.create(**create_kwargs)
+
+

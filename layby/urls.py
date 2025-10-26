@@ -1,10 +1,10 @@
-from django.urls import path
+﻿from django.urls import path
 from . import views
 
 app_name = "layby"
 
 urlpatterns = [
-    # Default: /layby/ → Agent dashboard (list / overview)
+    # Default: /layby/ â†’ Agent dashboard (list / overview)
     path("", views.agent_dashboard, name="home"),
 
     # Canonical "create" endpoint used by sidebar/templates
@@ -40,3 +40,5 @@ urlpatterns = [
     path("pay/<int:order_id>/",    views.pay_now, name="pay_now"),
     path("qr/<int:order_id>.png",  views.qr_png,  name="qr_png"),
 ]
+
+

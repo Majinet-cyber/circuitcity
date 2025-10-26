@@ -1,11 +1,11 @@
-from django.views.generic import ListView
+﻿from django.views.generic import ListView
 from common.pagination import paginate_qs
 from sales.models import Sale
 
 class SaleListView(ListView):
     template_name = "sales/list.html"
     context_object_name = "page_obj"  # so templates match
-    paginate_by = None  # we’ll handle it ourselves
+    paginate_by = None  # weâ€™ll handle it ourselves
 
     def get_queryset(self):
         return (Sale.objects
@@ -18,3 +18,5 @@ class SaleListView(ListView):
         page_obj, url_for = paginate_qs(self.request, self.get_queryset())
         ctx.update({"page_obj": page_obj, "url_for": url_for})
         return ctx
+
+

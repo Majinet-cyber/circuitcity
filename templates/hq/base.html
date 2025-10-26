@@ -1,80 +1,255 @@
+{% extends "base.html" %}
 {% load static %}
-<!doctype html>
-<html lang="en">
-<head>
-<meta charset="utf-8"/>
-<meta name="viewport" content="width=device-width,initial-scale=1"/>
-<title>{% block title %}HQ{% endblock %}</title>
+
+{# ============== Metadata / title ============== #}
+{% block title %}{% block page_title %}HQ{% endblock %} · Circuit City{% endblock %}
+{% block header_title %}{% block header %}HQ{% endblock %}{% endblock %}
+
+{# Let notifications know our scope; sidebar comes from base.html #}
+{% block notif_scope %}hq{% endblock %}
+
+{# If you want the global header to show the search box even off inventory pages, set this: #}
+{% block extra_head %}
+  <meta name="cc-scope" content="hq">
+  <script>
+    /* Make base.html render the global search in the header while on HQ pages */
+    window.__CC_FORCE_SEARCH__ = true;
+  </script>
+{% endblock %}
+
+{% block extra_css %}
 <style>
-  :root{
-    --bg-0:#f7faff; --bg-1:#eef5ff;
-    --ink-900:#0b1b3a; --ink-700:#1c2f57; --ink-500:#476aa0;
-    --brand-500:#2f6bff; --brand-600:#2757d8;
-    --ring:#d8e4ff; --chip:#e9f2ff; --glass:rgba(255,255,255,.65);
-    --shadow-1:0 10px 30px rgba(12,36,97,.08); --shadow-2:0 12px 40px rgba(12,36,97,.12);
-    --radius:18px; --navy:#0f1e35;
+  /* =========================
+     Mobile-first baseline
+     ========================= */
+  :root {
+    --hq-gap: .5rem;
+    --hq-chip-pad-y: .45rem;
+    --hq-chip-pad-x: .8rem;
+    --hq-radius: 999px;
+    --hq-min-tap: 44px; /* iOS/Android tap target */
   }
-  html,body{height:100%;margin:0;background:radial-gradient(1100px 1100px at 10% -10%, #ffffff 0, #f7fbff 30%, #eef5ff 60%, #e6f0ff 100%);color:var(--ink-900);font:500 15px/1.45 system-ui,-apple-system,Segoe UI,Roboto,Inter,"Helvetica Neue",Arial}
-  .layout{display:grid;grid-template-columns:250px 1fr;min-height:100vh}
 
-  /* Sticky sidebar (never disappears) */
-  .sidebar{
-    position:sticky;top:0;height:100dvh;overflow:auto;scrollbar-gutter:stable;
-    background:#0b0f14;color:#cfe0ff;border-right:1px solid rgba(255,255,255,.06);
-    padding:16px 14px;display:flex;flex-direction:column;gap:10px;
+  /* Fluid type that never gets tiny */
+  html { font-size: clamp(14px, 3.2vw, 16px); }
+
+  /* -------- Toolbar wrapper -------- */
+  .hq-toolbar {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    grid-template-rows: auto auto;
+    align-items: center;
+    gap: var(--hq-gap);
+    margin-bottom: .75rem;
   }
-  .brand{display:flex;align-items:center;gap:10px;padding:10px;border-radius:12px;background:rgba(255,255,255,.05);
-    box-shadow:inset 0 0 0 1px rgba(255,255,255,.06);font-weight:800}
-  .brand .dot{width:36px;height:36px;border-radius:9px;background:linear-gradient(160deg,#1f6feb,#58a6ff);display:grid;place-items:center;color:#fff}
-  .nav{margin-top:8px;display:flex;flex-direction:column;gap:8px}
-  .nav a{display:flex;align-items:center;gap:10px;text-decoration:none;color:#c7d2e5;padding:12px 10px;border-radius:12px;background:transparent;border:1px solid rgba(255,255,255,.06);transition:.2s}
-  .nav a:hover{background:var(--navy);color:#fff;border-color:rgba(255,255,255,.12)}
-  .nav a.active{background:linear-gradient(180deg,rgba(255,255,255,.1),rgba(255,255,255,.06));color:#fff;box-shadow:inset 0 0 0 1px rgba(255,255,255,.08)}
 
-  .content{padding:20px}
-  .shell{max-width:1240px;margin:0 auto}
+  /* Chip row becomes a horizontal scroller on small screens */
+  .hq-chiprow {
+    display: flex;
+    gap: var(--hq-gap);
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scroll-snap-type: x proximity;
+    padding-bottom: .25rem; /* make room for scrollbar if shown */
+  }
+  .hq-chiprow::-webkit-scrollbar { height: 6px; }
+  .hq-chiprow::-webkit-scrollbar-thumb { background: var(--line); border-radius: 8px; }
 
-  /* Reusable UI bits */
-  .pill{display:inline-flex;gap:8px;align-items:center;padding:8px 12px;border-radius:999px;background:var(--glass);border:1px solid var(--ring);font-weight:700}
-  .pill.active{background:rgba(47,107,255,.14);color:var(--brand-600);border-color:rgba(47,107,255,.32)}
-  .card{background:var(--glass);backdrop-filter:blur(10px);border-radius:18px;padding:16px;box-shadow:var(--shadow-1);border:1px solid rgba(47,107,255,.16)}
-  .kpis{display:flex;gap:10px;flex-wrap:wrap;margin:8px 0 12px}
-  table{width:100%;border-collapse:separate;border-spacing:0 10px}
-  th{font-size:12px;color:var(--ink-500);text-align:left;padding:0 10px}
-  td{background:#fff;border:1px solid #e7eeff;border-left:none;border-right:none;padding:14px 10px}
-  tr{box-shadow:0 6px 18px rgba(12,36,97,.08)}
-  .btn{border:none;border-radius:10px;padding:8px 12px;font-weight:800;background:var(--brand-600);color:#fff;cursor:pointer}
-  .btn-ghost{background:transparent;border:1px solid var(--ring);color:#153e75}
-  .badge{font-size:12px;padding:.25rem .5rem;border-radius:999px;border:1px solid var(--ring);background:#eef4ff;color:#2757d8}
+  /* Chips */
+  .hq-chip {
+    border: 1px solid var(--line);
+    background: var(--card, #fff);
+    color: var(--text, #111827);
+    padding: var(--hq-chip-pad-y) var(--hq-chip-pad-x);
+    border-radius: var(--hq-radius);
+    font-weight: 600;
+    font-size: .9rem;
+    line-height: 1;
+    white-space: nowrap;
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+    gap: .35rem;
+    scroll-snap-align: start;
+  }
+  .hq-chip:is(a,button){ cursor: pointer; }
+  .hq-chip.is-active {
+    background: color-mix(in oklab, var(--brand,#2757d8) 12%, white);
+    box-shadow: inset 0 0 0 2px color-mix(in oklab, var(--brand,#2757d8) 22%, transparent);
+    color: color-mix(in oklab, var(--brand,#2757d8) 85%, black);
+  }
 
-  /* Dialog */
-  dialog{border:none;border-radius:16px;box-shadow:var(--shadow-2);padding:0}
-  dialog .dlg{padding:16px 16px 12px;min-width:320px}
-  dialog::backdrop{background:rgba(0,8,20,.35)}
+  /* Status chip keeps its tone but uses same sizing */
+  .hq-status { background:#f2f6ff; color:#1e3a8a; }
+
+  /* Divider auto-hides on narrow screens */
+  .hq-sep {
+    width:1px; height:22px; background:var(--line);
+    display:none;
+  }
+
+  /* Actions: drop under the chips on phones */
+  .hq-actions {
+    display:flex; gap: var(--hq-gap);
+    justify-content: flex-end; align-items: center;
+  }
+
+  /* Buttons inside actions should be thumb-friendly */
+  .hq-actions .btn, .hq-actions .btn-ghost, .hq-actions .chip, .hq-chiprow .btn {
+    min-height: var(--hq-min-tap);
+    padding: .6rem .9rem;
+    font-weight: 600;
+  }
+
+  /* Card stays soft and breathable */
+  .hq-card {
+    background: var(--card,#fff);
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    padding: 14px;
+    box-shadow: var(--shadow-sm);
+  }
+
+  /* Layout placement for the grid:
+     Row 1: chips (left) + actions (right)
+     Row 2: filters (full width)
+  */
+  .hq-toolbar .slot-chips   { grid-column: 1 / -1; }
+  .hq-toolbar .slot-actions { grid-column: 1 / -1; }
+  .hq-toolbar .slot-filters { grid-column: 1 / -1; }
+
+  /* Medium+ screens: put chips and actions on one row, filters below */
+  @media (min-width: 720px) {
+    .hq-toolbar {
+      grid-template-columns: 1fr auto;
+      grid-template-rows: auto auto;
+    }
+    .hq-toolbar .slot-chips   { grid-column: 1 / 2; }
+    .hq-toolbar .slot-actions { grid-column: 2 / 3; }
+    .hq-toolbar .slot-filters { grid-column: 1 / -1; }
+    .hq-sep { display:inline-block; margin: 0 .25rem; }
+  }
+
+  /* Edge cases: very narrow screens */
+  @media (max-width: 360px){
+    .hq-actions { flex-wrap: wrap; }
+  }
+
+  /* Respect user color scheme if your base sets variables */
+  @media (prefers-color-scheme: dark){
+    .hq-chip.is-active {
+      background: color-mix(in oklab, var(--brand,#6ea8ff) 16%, black);
+      box-shadow: inset 0 0 0 2px color-mix(in oklab, var(--brand,#6ea8ff) 32%, transparent);
+      color: white;
+    }
+  }
 </style>
-{% block head %}{% endblock %}
-</head>
-<body>
-<div class="layout">
-  <aside class="sidebar">
-    <div class="brand"><div class="dot">HQ</div> <div>Control Center</div></div>
-    <nav class="nav">
-      <a href="{% url 'hq:dashboard' %}" class="{% if request.resolver_match.url_name == 'dashboard' %}active{% endif %}">Dashboard</a>
-      <a href="{% url 'hq:businesses' %}" class="{% if request.resolver_match.url_name == 'businesses' %}active{% endif %}">Businesses</a>
-      <a href="{% url 'hq:subscriptions' %}" class="{% if request.resolver_match.url_name == 'subscriptions' %}active{% endif %}">Subscriptions</a>
-      <a href="{% url 'hq:invoices' %}" class="{% if request.resolver_match.url_name == 'invoices' %}active{% endif %}">Invoices</a>
-      <a href="{% url 'hq:agents' %}" class="{% if request.resolver_match.url_name == 'agents' %}active{% endif %}">Agents</a>
-      <a href="{% url 'hq:wallet' %}" class="{% if request.resolver_match.url_name == 'wallet' %}active{% endif %}">Wallet</a>
-      <a href="{% url 'hq:stock_trends' %}" class="{% if request.resolver_match.url_name == 'stock_trends' %}active{% endif %}">Stock trends</a>
-      {% url 'admin:index' as admin_url %}<a href="{{ admin_url }}">↗ Django Admin</a>
-    </nav>
-  </aside>
-  <main class="content">
-    <div class="shell">
-      {% block body %}{% endblock %}
+{% endblock %}
+
+{# ================= BODY (inside base.html main.cc-page) ================= #}
+{% block body %}
+
+  {# ---------- Top toolbar row (chips, filters, actions). Override blocks as needed. ---------- #}
+  <div class="hq-toolbar" role="toolbar" aria-label="HQ toolbar">
+
+    <div class="slot-chips">
+      <div class="hq-chiprow" aria-label="Quick ranges and status">
+        {% block hq_range %}
+          {% with q=request.GET.range|default:'' %}
+            <a class="hq-chip {% if q == 'all' or not q %}is-active{% endif %}" href="?range=all">All time</a>
+            <a class="hq-chip {% if q == '7d' %}is-active{% endif %}" href="?range=7d">Last 7d</a>
+            <a class="hq-chip {% if q == '30d' %}is-active{% endif %}" href="?range=30d">Last 30d</a>
+            <a class="hq-chip {% if q == 'custom' %}is-active{% endif %}" href="?range=custom">Custom</a>
+          {% endwith %}
+        {% endblock %}
+
+        <span class="hq-sep" aria-hidden="true"></span>
+
+        {% block hq_status %}
+          {% if request.user.is_authenticated %}
+            <span class="hq-chip hq-status" title="You’re staff: HQ access">{{ request.user.is_staff|yesno:"Staff,User" }}</span>
+          {% endif %}
+        {% endblock %}
+      </div>
     </div>
-  </main>
-</div>
-{% block foot %}{% endblock %}
-</body>
-</html>
+
+    <div class="slot-actions">
+      <div class="hq-actions">
+        {# Right-aligned actions (override in child templates) #}
+        {% block hq_actions %}{% endblock %}
+      </div>
+    </div>
+
+    <div class="slot-filters">
+      {# Per-page quick filters (override in child templates) #}
+      {% block hq_filters %}{% endblock %}
+    </div>
+  </div>
+
+  {# Optional info row above content #}
+  {% block hq_notices %}{% endblock %}
+
+  {# ------------------- MAIN PAGE CONTENT (override) ------------------- #}
+  {% block page_content %}
+    <div class="hq-card">
+      <div class="text-muted">This is the HQ base. Extend this template and fill <code>block page_content</code>.</div>
+    </div>
+  {% endblock %}
+
+{% endblock %}
+
+{# ================= Helpers / Scripts just for HQ pages ================= #}
+{% block extra_js %}
+<script>
+  // ----- POST helper with CSRF (usable from any button/link via data-post-url) -----
+  (function(){
+    function getCookie(name){
+      const m = document.cookie.match(new RegExp('(?:^|; )' + name + '=([^;]*)'));
+      return m ? decodeURIComponent(m[1]) : '';
+    }
+    window.hqPost = async function(url, payload){
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-CSRFToken': getCookie('cc_csrftoken') || getCookie('csrftoken') || '',
+          'X-Requested-With': 'XMLHttpRequest',
+          'Accept': 'application/json'
+        },
+        credentials: 'same-origin',
+        body: JSON.stringify(payload || {})
+      });
+      const ct = (res.headers.get('content-type')||'').toLowerCase();
+      const data = ct.includes('application/json') ? await res.json() : ({ ok:false, error:'Non-JSON' });
+      if (!res.ok) throw new Error(data.error || ('HTTP '+res.status));
+      return data;
+    };
+
+    // Any element with data-post-url acts as a POST action.
+    document.addEventListener('click', async (e)=>{
+      const el = e.target.closest('[data-post-url]');
+      if (!el) return;
+      e.preventDefault();
+      try{
+        const payload = el.dataset.payload ? JSON.parse(el.dataset.payload) : {};
+        const redirectTo = el.dataset.redirect || '';
+        await window.hqPost(el.dataset.postUrl, payload);
+        if (redirectTo) location.assign(redirectTo); else location.reload();
+      }catch(err){
+        alert('Action failed: ' + (err && err.message || err));
+        console.error(err);
+      }
+    }, {passive:false});
+  })();
+
+  // ---- (Optional) Force-show global search box on HQ routes ----
+  (function(){
+    try{
+      const path = location.pathname || '';
+      if (path.startsWith('/hq/')) {
+        // base.html checks window.__CC_FORCE_SEARCH__ above; nothing else needed
+      }
+    }catch(_){}
+  })();
+</script>
+{% endblock %}

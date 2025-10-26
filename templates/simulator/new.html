@@ -3,172 +3,392 @@
 {% block header_title %}New Simulation{% endblock %}
 
 {% block content %}
+
 <form method="post" class="glass-card p-3" action="">
   {% csrf_token %}
-  <div class="row g-2">
-    <div class="col-md-6">
-      <label class="form-label">Scenario name</label>
-      <input type="text" name="name" class="form-control" required value="{{ form.name.value|default:'' }}">
+
+  {% if form.non_field_errors %}
+    <div class="alert alert-danger py-2 mb-3">{{ form.non_field_errors }}</div>
+  {% endif %}
+
+  <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-2">
+    <div class="small text-muted">
+      Start with your <b>monthly units</b>, <b>price</b>, <b>variable cost %</b> and <b>fixed costs</b>.
+      Click <b>Preview</b> to see cash & profit curves before saving.
+    </div>
+    <div class="d-flex gap-2">
+      <button class="btn btn-light btn-sm" type="button" data-preset="retail">Preset: Retail</button>
+      <button class="btn btn-light btn-sm" type="button" data-preset="services">Preset: Services</button>
+      <button class="btn btn-light btn-sm" type="button" data-preset="highgrowth">Preset: High Growth</button>
+    </div>
+  </div>
+
+  <div class="row g-3">
+    <!-- Identity -->
+    <div class="col-12 col-lg-6">
+      <label class="form-label fw-bold">Scenario name</label>
+      {{ form.name }}
+      {% for e in form.name.errors %}<div class="text-danger small">{{ e }}</div>{% endfor %}
     </div>
 
-    {# --- Demand & Pricing (growth + price change) --- #}
-    <div class="col-md-3">
-      <label class="form-label">Demand growth %/day</label>
-      <input type="number" step="0.01" name="demand_growth_pct" class="form-control" value="{{ form.demand_growth_pct.value|default:0 }}">
+    <!-- Demand & price -->
+    <div class="col-6 col-lg-3">
+      <label class="form-label fw-bold">Baseline units / month</label>
+      {{ form.baseline_monthly_units }}
+      {% for e in form.baseline_monthly_units.errors %}<div class="text-danger small">{{ e }}</div>{% endfor %}
     </div>
-    <div class="col-md-3">
-      <label class="form-label">Price change %</label>
-      <input type="number" step="0.01" name="price_change_pct" class="form-control" value="{{ form.price_change_pct.value|default:0 }}">
-    </div>
-
-    {# --- Inventory policy --- #}
-    <div class="col-md-3">
-      <label class="form-label">Lead time (days)</label>
-      <input type="number" min="0" name="lead_time_days" class="form-control" value="{{ form.lead_time_days.value|default:7 }}">
-    </div>
-    <div class="col-md-3">
-      <label class="form-label">Reorder point</label>
-      <input type="number" min="0" name="reorder_point" class="form-control" value="{{ form.reorder_point.value|default:10 }}">
-    </div>
-    <div class="col-md-3">
-      <label class="form-label">Initial stock</label>
-      <input type="number" min="0" name="initial_stock" class="form-control" value="{{ form.initial_stock.value|default:50 }}">
-    </div>
-    <div class="col-md-3">
-      <label class="form-label">Horizon (days)</label>
-      <input type="number" min="1" max="365" name="horizon_days" class="form-control" value="{{ form.horizon_days.value|default:30 }}">
+    <div class="col-6 col-lg-3">
+      <label class="form-label fw-bold">Avg unit price</label>
+      {{ form.avg_unit_price }}
+      {% for e in form.avg_unit_price.errors %}<div class="text-danger small">{{ e }}</div>{% endfor %}
     </div>
 
-    {# --- NEW: Pricing & Cost levels --- #}
-    <div class="col-md-3">
-      <label class="form-label">Base price</label>
-      <input type="number" step="0.01" name="base_price" class="form-control" value="{{ form.base_price.value|default:100 }}">
+    <!-- Costs -->
+    <div class="col-6 col-lg-3">
+      <label class="form-label fw-bold">Variable cost % of price</label>
+      {{ form.variable_cost_pct }}
+      <div class="form-text">Est. unit cost: <b id="estUnitCost">—</b></div>
+      {% for e in form.variable_cost_pct.errors %}<div class="text-danger small">{{ e }}</div>{% endfor %}
     </div>
-    <div class="col-md-3">
-      <label class="form-label">Unit cost</label>
-      <input type="number" step="0.01" name="unit_cost" class="form-control" value="{{ form.unit_cost.value|default:60 }}">
+    <div class="col-6 col-lg-3">
+      <label class="form-label fw-bold">Fixed costs / month</label>
+      {{ form.monthly_fixed_costs }}
+      {% for e in form.monthly_fixed_costs.errors %}<div class="text-danger small">{{ e }}</div>{% endfor %}
     </div>
 
-    {# --- NEW: P&L & Cashflow knobs --- #}
-    <div class="col-md-3">
-      <label class="form-label">Opex % of revenue</label>
-      <input type="number" step="0.01" name="op_ex_pct_of_revenue" class="form-control" value="{{ form.op_ex_pct_of_revenue.value|default:10 }}">
+    <!-- Growth & horizon -->
+    <div class="col-6 col-lg-3">
+      <label class="form-label fw-bold">Monthly demand growth %</label>
+      {{ form.monthly_growth_pct }}
+      {% for e in form.monthly_growth_pct.errors %}<div class="text-danger small">{{ e }}</div>{% endfor %}
     </div>
-    <div class="col-md-3">
-      <label class="form-label">Tax rate %</label>
-      <input type="number" step="0.01" name="tax_rate_pct" class="form-control" value="{{ form.tax_rate_pct.value|default:25 }}">
+    <div class="col-6 col-lg-3">
+      <label class="form-label fw-bold">Months to simulate</label>
+      {{ form.months }}
+      {% for e in form.months.errors %}<div class="text-danger small">{{ e }}</div>{% endfor %}
     </div>
-    <div class="col-md-3">
-      <label class="form-label">AR days</label>
-      <input type="number" min="0" name="ar_days" class="form-control" value="{{ form.ar_days.value|default:7 }}">
+
+    <!-- Finance (optional) -->
+    <div class="col-6 col-lg-3">
+      <label class="form-label fw-bold">Tax rate % (optional)</label>
+      {{ form.tax_rate_pct }}
+      {% for e in form.tax_rate_pct.errors %}<div class="text-danger small">{{ e }}</div>{% endfor %}
     </div>
-    <div class="col-md-3">
-      <label class="form-label">AP days</label>
-      <input type="number" min="0" name="ap_days" class="form-control" value="{{ form.ap_days.value|default:7 }}">
-    </div>
-    <div class="col-md-3">
-      <label class="form-label">Opening cash</label>
-      <input type="number" step="0.01" name="opening_cash" class="form-control" value="{{ form.opening_cash.value|default:0 }}">
+    <div class="col-6 col-lg-3">
+      <label class="form-label fw-bold">Opening cash (optional)</label>
+      {{ form.opening_cash }}
+      {% for e in form.opening_cash.errors %}<div class="text-danger small">{{ e }}</div>{% endfor %}
     </div>
   </div>
 
   <div class="mt-3 d-flex gap-2">
-    <button class="btn primary" type="submit"><i class="bi bi-save"></i> Save scenario</button>
-    <button class="btn btn-light" type="button" id="runAdhoc"><i class="bi bi-play"></i> Run ad-hoc</button>
+    <button class="btn btn-primary" type="submit">
+      <i class="bi bi-save"></i> Save scenario
+    </button>
+    <button class="btn btn-light" type="button" id="previewBtn">
+      <i class="bi bi-play"></i> Preview (no save)
+    </button>
   </div>
 </form>
 
-<div id="adhocResult" class="panel p-3 mt-3 d-none">
-  <h6 class="fw-bold">Ad-hoc Result</h6>
-  <canvas id="adhocChart" style="height:260px"></canvas>
-  <div id="adhocKPIs" class="small text-muted mt-2"></div>
+<!-- ===================== QUICK PROFIT CALCULATOR (MWK) ===================== -->
+<div class="glass-card p-3 mt-3">
+  <h6 class="fw-bold mb-1">Quick Profit Calculator (MWK)</h6>
+  <div class="text-muted small mb-2">
+    Calculates 6-month profit from inventory cycles. Turnover = how many times you sell out and restock per month.
+  </div>
+
+  <div class="row g-2">
+    <div class="col-6 col-md-4 col-lg-2">
+      <label class="form-label small text-muted mb-0">Units on hand</label>
+      <input id="qp-units" type="number" min="0" step="1" value="24" class="form-control">
+    </div>
+    <div class="col-6 col-md-4 col-lg-2">
+      <label class="form-label small text-muted mb-0">Turnover / month (×)</label>
+      <input id="qp-turnover" type="number" min="0" step="0.1" value="5" class="form-control">
+    </div>
+    <div class="col-6 col-md-4 col-lg-2">
+      <label class="form-label small text-muted mb-0">Months</label>
+      <input id="qp-months" type="number" min="1" step="1" value="6" class="form-control">
+    </div>
+    <div class="col-6 col-md-4 col-lg-3">
+      <label class="form-label small text-muted mb-0">Avg unit price (MWK)</label>
+      <input id="qp-price" type="number" min="0" step="1" value="150000" class="form-control">
+    </div>
+    <div class="col-6 col-md-4 col-lg-2">
+      <label class="form-label small text-muted mb-0">Margin %</label>
+      <input id="qp-margin" type="number" min="0" max="100" step="0.1" value="18" class="form-control">
+    </div>
+    <div class="col-6 col-md-4 col-lg-1">
+      <label class="form-label small text-muted mb-0">Cost cut %</label>
+      <input id="qp-costcut" type="number" min="0" max="100" step="0.1" value="0" class="form-control">
+    </div>
+  </div>
+
+  <div class="mt-2">
+    <button id="qp-recalc" class="btn btn-primary btn-sm">Calculate</button>
+  </div>
+
+  <div id="qp-out" class="mt-3">
+    <div class="row g-3">
+      <div class="col-6 col-md-4 col-lg-3">
+        <div class="kpi-card">
+          <div class="kpi-title">6-month units</div>
+          <div class="kpi-value"><span id="qp-units-sold">0</span></div>
+        </div>
+      </div>
+      <div class="col-6 col-md-4 col-lg-3">
+        <div class="kpi-card">
+          <div class="kpi-title">Profit / unit</div>
+          <div class="kpi-value" id="qp-profit-unit">MWK 0</div>
+        </div>
+      </div>
+      <div class="col-12 col-md-4 col-lg-3">
+        <div class="kpi-card">
+          <div class="kpi-title">Total profit</div>
+          <div class="kpi-value" id="qp-profit-total">MWK 0</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="table-responsive mt-2">
+      <table class="table table-sm align-middle" style="min-width:520px">
+        <thead>
+          <tr>
+            <th>Turnover / mo</th>
+            <th>Units (6 mo)</th>
+            <th>Margin %</th>
+            <th>Profit / unit</th>
+            <th>Total profit (MWK)</th>
+          </tr>
+        </thead>
+        <tbody id="qp-table"></tbody>
+      </table>
+    </div>
+  </div>
 </div>
+<!-- ======================================================================= -->
+
+<!-- Live preview panel -->
+<div id="previewPanel" class="panel p-3 mt-3 d-none">
+  <div class="d-flex align-items-center justify-content-between">
+    <h6 class="fw-bold mb-0">Ad-hoc Preview</h6>
+    <small class="text-muted">Decimated for smooth rendering</small>
+  </div>
+  <div class="chart-wrap mt-2">
+    <canvas id="previewChart"></canvas>
+  </div>
+  <div class="row g-3 mt-2" id="kpiRow">
+    <!-- KPI cards injected by JS -->
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+  .chart-wrap{ position:relative; height:320px; max-height:50vh; min-height:260px; }
+  .kpi-card{ border-radius: 1rem; padding:.75rem 1rem; background:var(--bs-body-bg);
+             box-shadow:0 1px 0 rgba(2,6,23,.04), 0 0 0 1px rgba(2,6,23,.05) inset; }
+  .kpi-title{ font-size:.8rem; text-transform:uppercase; letter-spacing:.03em; color:var(--bs-secondary-color); }
+  .kpi-value{ font-weight:700; font-size:1.1rem; }
+</style>
 {% endblock %}
 
 {% block extra_js %}
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
 <script>
-async function postJSON(url, payload){
-  const r = await fetch(url, {
-    method: 'POST',
-    headers: {'Content-Type': 'application/json', 'X-CSRFToken': CC.getCsrfToken(), 'Accept':'application/json'},
-    credentials: 'same-origin',
-    body: JSON.stringify(payload||{})
+/* ---------------- Small helpers ---------------- */
+function qs(sel){ return document.querySelector(sel); }
+function valNum(input){ const v=Number(input?.value||0); return isFinite(v)?v:0; }
+const MWK = new Intl.NumberFormat('en-MW',{style:'currency',currency:'MWK',maximumFractionDigits:0});
+function money(n){ try{ return MWK.format(Number(n)||0); }catch(_){ return n; } }
+
+/* Estimate unit cost = price * variable% */
+function updateEstUnitCost(){
+  const price = valNum(qs('[name="avg_unit_price"]'));
+  const varPct = valNum(qs('[name="variable_cost_pct"]'));
+  const est = price * (varPct/100);
+  qs('#estUnitCost').textContent = isFinite(est) ? money(est) : '—';
+}
+['avg_unit_price','variable_cost_pct'].forEach(n=>{
+  qs(`[name="${n}"]`)?.addEventListener('input', updateEstUnitCost);
+});
+updateEstUnitCost();
+
+/* ---------- Presets (quick fills users love) ---------- */
+const presets = {
+  retail: {
+    name: 'Retail – Standard',
+    baseline_monthly_units: 1200, avg_unit_price: 15000, variable_cost_pct: 62,
+    monthly_fixed_costs: 2500000, monthly_growth_pct: 3, months: 12,
+    tax_rate_pct: 25, opening_cash: 1000000
+  },
+  services: {
+    name: 'Services – Low COGS',
+    baseline_monthly_units: 300, avg_unit_price: 50000, variable_cost_pct: 20,
+    monthly_fixed_costs: 3500000, monthly_growth_pct: 2, months: 12,
+    tax_rate_pct: 25, opening_cash: 500000
+  },
+  highgrowth: {
+    name: 'High Growth',
+    baseline_monthly_units: 800, avg_unit_price: 20000, variable_cost_pct: 55,
+    monthly_fixed_costs: 3000000, monthly_growth_pct: 8, months: 18,
+    tax_rate_pct: 25, opening_cash: 1500000
+  }
+};
+document.querySelectorAll('[data-preset]').forEach(btn=>{
+  btn.addEventListener('click', ()=>{
+    const p = presets[btn.dataset.preset];
+    if(!p) return;
+    Object.entries(p).forEach(([k,v])=>{
+      const el = qs(`[name="${k}"]`);
+      if(el) el.value = v;
+    });
+    updateEstUnitCost();
   });
-  const d = await r.json();
-  if(!r.ok) throw new Error(d.error||('HTTP '+r.status));
-  return d;
+});
+
+/* -------------- Preview (no save) --------------- */
+let chart = null;
+function currentPayload(){
+  const f = (name)=>qs(`[name="${name}"]`);
+  return {
+    name: f('name')?.value || '',
+    baseline_monthly_units: valNum(f('baseline_monthly_units')),
+    avg_unit_price: valNum(f('avg_unit_price')),
+    variable_cost_pct: valNum(f('variable_cost_pct')),
+    monthly_fixed_costs: valNum(f('monthly_fixed_costs')),
+    monthly_growth_pct: valNum(f('monthly_growth_pct')),
+    months: valNum(f('months')),
+    tax_rate_pct: valNum(f('tax_rate_pct')),
+    opening_cash: valNum(f('opening_cash')),
+  };
 }
 
-document.getElementById('runAdhoc').addEventListener('click', async ()=>{
-  const form = document.querySelector('form');
-  const payload = Object.fromEntries(new FormData(form).entries());
-
-  // Convert numeric strings -> numbers (keeps blanks as-is)
-  [
-    "demand_growth_pct","price_change_pct","lead_time_days","reorder_point","initial_stock","horizon_days",
-    "base_price","unit_cost","op_ex_pct_of_revenue","tax_rate_pct","ar_days","ap_days","opening_cash"
-  ].forEach(k=>{
-    if(k in payload){
-      const n = +payload[k];
-      if(!Number.isNaN(n)) payload[k] = n;
-    }
+async function previewRun(){
+  const payload = currentPayload();
+  const res = await fetch("{% url 'simulator:api_run' %}", {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-CSRFToken': (document.querySelector('input[name=csrfmiddlewaretoken]')||{}).value || '',
+      'Accept':'application/json'
+    },
+    body: JSON.stringify(payload)
   });
+  const data = await res.json();
+  if(!res.ok || data.ok === false) throw new Error(data.error || 'Preview failed');
+  renderPreview(data);
+}
 
+qs('#previewBtn').addEventListener('click', async ()=>{
   try{
-    // NOTE: This expects the URL name 'simulator:api_run' (views_api.run_simulation).
-    // If you're using the view that returns JSON on POST (sim_run), replace with {% url 'simulator:sim_run' pk=0 %} dynamically, or wire an API route.
-    const res = await postJSON("{% url 'simulator:api_run' %}", payload);
-    renderAdhoc(res);
-  }catch(e){
-    alert("Run failed: "+e.message);
+    qs('#previewPanel').classList.remove('d-none');
+    await previewRun();
+  }catch(err){
+    alert(err.message);
   }
 });
 
-let chart=null;
-function renderAdhoc(data){
-  const box = document.getElementById('adhocResult');
-  box.classList.remove('d-none');
-
-  const series = data.series||[];
+function renderPreview(data){
+  const series = data.series || [];
   const labels = series.map(p=>'D'+p.day);
   const sold   = series.map(p=>p.sold);
-  const stock  = series.map(p=>p.stock);
-
-  // NEW: finance series
   const cash   = series.map(p=>p.cash_cum ?? 0);
   const gpCum  = series.map(p=>p.gross_profit_cum ?? 0);
   const opCum  = series.map(p=>p.op_profit_cum ?? 0);
 
-  const ctx = document.getElementById('adhocChart').getContext('2d');
-  chart?.destroy();
+  const ctx = document.getElementById('previewChart').getContext('2d');
+  if(chart) chart.destroy();
   chart = new Chart(ctx, {
-    type:'line',
-    data:{ labels, datasets:[
-      {label:'Sold (units)', data:sold, yAxisID:'y1'},
-      {label:'Stock (units)', data:stock, yAxisID:'y1'},
-      {label:'Cash (cum)', data:cash, yAxisID:'y2'},
-      {label:'Gross Profit (cum)', data:gpCum, yAxisID:'y2'},
-      {label:'Op Profit (cum)', data:opCum, yAxisID:'y2'}
-    ]},
+    type: 'line',
+    data: {
+      labels,
+      datasets: [
+        {label:'Sold (units)', data:sold, yAxisID:'y1', tension:.25, borderWidth:2},
+        {label:'Cash (cum)', data:cash, yAxisID:'y2', tension:.25, borderWidth:2},
+        {label:'Gross Profit (cum)', data:gpCum, yAxisID:'y2', tension:.25, borderWidth:2},
+        {label:'Op Profit (cum)', data:opCum, yAxisID:'y2', tension:.25, borderWidth:2},
+      ]
+    },
     options:{
-      responsive:true, maintainAspectRatio:false,
-      plugins:{legend:{position:'bottom'}},
+      responsive:true, maintainAspectRatio:false, animation:false,
+      interaction:{mode:'index', intersect:false},
+      plugins:{ legend:{position:'bottom'}, decimation:{enabled:true, algorithm:'lttb', samples:200} },
       scales:{
-        y1:{type:'linear', position:'left', title:{display:true, text:'Units'}},
-        y2:{type:'linear', position:'right', title:{display:true, text:'Currency'}, grid:{drawOnChartArea:false}}
+        y1:{ title:{display:true, text:'Units'} },
+        y2:{ position:'right', title:{display:true, text:'MWK'}, grid:{drawOnChartArea:false} }
       }
     }
   });
 
-  const k = data.kpis||{};
-  document.getElementById('adhocKPIs').innerHTML =
-    `Revenue: <b>${(k.revenue_total??0).toLocaleString()}</b> · `+
-    `Gross Profit: <b>${(k.gross_profit_total??0).toLocaleString()}</b> · `+
-    `Op Profit: <b>${(k.op_profit_total??0).toLocaleString()}</b> · `+
-    `Tax: <b>${(k.tax_total??0).toLocaleString()}</b> · `+
-    `Ending Cash: <b>${(k.ending_cash??0).toLocaleString()}</b> · `+
-    `Stockout days: <b>${(k.stockouts_days??0)}</b>`;
+  // KPI cards
+  const k = data.kpis || {};
+  const cards = [
+    ['Revenue', k.revenue_total],
+    ['Gross Profit', k.gross_profit_total],
+    ['Op Profit', k.op_profit_total],
+    ['Tax', k.tax_total],
+    ['Ending Cash', k.ending_cash],
+    ['Stockout days', k.stockouts_days],
+  ];
+  qs('#kpiRow').innerHTML = cards.map(([t,v])=>`
+    <div class="col-6 col-md-4 col-lg-2">
+      <div class="kpi-card">
+        <div class="kpi-title">${t}</div>
+        <div class="kpi-value">${money(v ?? 0)}</div>
+      </div>
+    </div>
+  `).join('');
 }
+
+/* ---------------- Quick Profit Calculator (MWK) ---------------- */
+(function(){
+  function calcOnce(units, turnover, months, price, marginPct, costCutPct){
+    const margin = (marginPct||0)/100;         // e.g. 0.18
+    const costCut = (costCutPct||0)/100;       // e.g. 0.10
+    // new margin when cost reduces while price fixed:
+    const newMargin = margin + (1 - margin) * costCut;
+    const unitsSold = (units||0) * (turnover||0) * (months||0);
+    const profitPerUnit = (price||0) * newMargin;
+    const total = unitsSold * profitPerUnit;
+    return { unitsSold, profitPerUnit, total, newMargin };
+  }
+
+  function recalc(){
+    const units = valNum(document.getElementById('qp-units'));
+    const turnover = valNum(document.getElementById('qp-turnover'));
+    const months = valNum(document.getElementById('qp-months'));
+    const price = valNum(document.getElementById('qp-price'));
+    const marginPct = valNum(document.getElementById('qp-margin'));
+    const costCutPct = valNum(document.getElementById('qp-costcut'));
+
+    const out = calcOnce(units, turnover, months, price, marginPct, costCutPct);
+
+    document.getElementById('qp-units-sold').textContent = Math.round(out.unitsSold).toLocaleString();
+    document.getElementById('qp-profit-unit').textContent = money(out.profitPerUnit);
+    document.getElementById('qp-profit-total').textContent = money(out.total);
+
+    // Comparison for turnover 2..6 at same price/margin/costcut
+    const tbody = document.getElementById('qp-table');
+    tbody.innerHTML = '';
+    [2,3,4,5,6].forEach(t => {
+      const r = calcOnce(units, t, months, price, marginPct, costCutPct);
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td>${t}×</td>
+        <td>${Math.round(r.unitsSold).toLocaleString()}</td>
+        <td>${(r.newMargin*100).toFixed(1)}%</td>
+        <td>${money(r.profitPerUnit)}</td>
+        <td><strong>${money(r.total)}</strong></td>`;
+      tbody.appendChild(tr);
+    });
+  }
+
+  ['qp-units','qp-turnover','qp-months','qp-price','qp-margin','qp-costcut']
+    .forEach(id => document.getElementById(id).addEventListener('input', recalc));
+  document.getElementById('qp-recalc').addEventListener('click', recalc);
+  recalc();
+})();
 </script>
 {% endblock %}

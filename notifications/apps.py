@@ -1,4 +1,4 @@
-# notifications/apps.py
+﻿# notifications/apps.py
 from django.apps import AppConfig
 
 
@@ -9,3 +9,5 @@ class NotificationsConfig(AppConfig):
     def ready(self):
         # Register signal handlers
         from . import signals  # noqa: F401
+
+

@@ -1,4 +1,4 @@
-from django.contrib import admin
+﻿from django.contrib import admin
 from . import models
 
 def _first_attr(obj, names, default=None):
@@ -86,3 +86,5 @@ class SimulationRunAdmin(admin.ModelAdmin):
                 return ms
         return "-"
     duration_display.short_description = "Duration (s)"
+
+

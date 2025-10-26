@@ -2,7 +2,12 @@
 {% load humanize %}
 
 {% block title %}Wallet Admin · Circuit City{% endblock %}
-{% block header_title %}<i class="bi bi-briefcase me-2"></i>Wallet Admin{% endblock %}
+{% block header_title %}
+  <i class="bi bi-briefcase me-2"></i>Wallet Admin
+  <span class="badge rounded-pill text-bg-light align-middle ms-2">
+    {% if request.user.is_superuser %}All companies{% else %}This business{% endif %}
+  </span>
+{% endblock %}
 
 {% block extra_css %}
 <style>
@@ -11,19 +16,17 @@
   .kpi-card .sub{color:var(--muted)}
   .chart-wrap{position:relative;height:220px}
   .table td,.table th{vertical-align:middle}
-  .quick-actions .btn{min-width:180px}
+  .qa-grid{display:grid;grid-template-columns:1fr;gap:.6rem}
+  @media (min-width: 992px){ .qa-grid{grid-template-columns:1fr 1fr} }
 </style>
 {% endblock %}
 
 {% block body %}
-{# -------- Resolve URLs safely (don’t crash if missing) -------- #}
+{# -------- Resolve URLs safely (only what we still use) -------- #}
 {% url 'wallet:admin_issue'         as url_issue %}
 {% url 'wallet:admin_budgets'       as url_budgets %}
 {% url 'wallet:admin_payslips'      as url_payslips %}
-{% url 'wallet:admin_issue_payslip' as url_issue_payslip %}
 {% url 'wallet:admin_schedules'     as url_schedules %}
-{% url 'wallet:admin_pos'           as url_pos %}
-{% url 'wallet:admin_po_new'        as url_po_new %}
 
 <div class="container-xxl px-0">
 
@@ -32,11 +35,19 @@
     <div class="col-6 col-xl-3">
       <div class="card shadow-sm border-0 h-100 kpi-card">
         <div class="card-body">
-          <div class="label mb-1">Company Spend (mirror)</div>
+          <div class="label mb-1">
+            {% if request.user.is_superuser %}
+              Company Spend (mirror · all)
+            {% else %}
+              Business Spend (mirror)
+            {% endif %}
+          </div>
           <div class="value">
             MWK {{ company_spend|default:0|floatformat:0|intcomma }}
           </div>
-          <div class="sub small">All time · Company ledger</div>
+          <div class="sub small">
+            {% if request.user.is_superuser %}All companies{% else %}This business{% endif %} · Company ledger
+          </div>
         </div>
       </div>
     </div>
@@ -46,7 +57,7 @@
           <div class="label mb-1">Pending Budgets</div>
           <div class="value">{{ budgets_pending|default:0|intcomma }}</div>
           <div class="sub small">
-            <a href="{{ url_budgets|default:'#' }}" class="text-decoration-none">Review requests</a>
+            {% if url_budgets %}<a href="{{ url_budgets }}" class="text-decoration-none">Review requests</a>{% endif %}
           </div>
         </div>
       </div>
@@ -54,7 +65,9 @@
     <div class="col-6 col-xl-3">
       <div class="card shadow-sm border-0 h-100 kpi-card">
         <div class="card-body">
-          <div class="label mb-1">Recent Transactions Listed</div>
+          <div class="label mb-1">
+            {% if request.user.is_superuser %}Recent Transactions Listed{% else %}Recent (this business){% endif %}
+          </div>
           <div class="value">{{ recent|length }}</div>
           <div class="sub small">Latest company-ledger activity</div>
         </div>
@@ -77,33 +90,30 @@
       <div class="card shadow-sm border-0 h-100">
         <div class="card-body">
           <h5 class="mb-3">Quick Actions</h5>
-          <div class="d-grid gap-2 quick-actions">
+          <div class="qa-grid">
             {% if url_issue %}
-              <a class="btn btn-primary" href="{{ url_issue }}"><i class="bi bi-plus-circle me-1"></i>Issue Wallet Transaction</a>
-            {% endif %}
-            {% if url_issue_payslip %}
-              <a class="btn btn-outline-primary" href="{{ url_issue_payslip }}"><i class="bi bi-receipt me-1"></i>Issue Single Payslip</a>
+              <a class="btn btn-primary" href="{{ url_issue }}">
+                <i class="bi bi-plus-circle me-1"></i> Issue Wallet Transaction
+              </a>
             {% endif %}
             {% if url_payslips %}
-              <a class="btn btn-outline-secondary" href="{{ url_payslips }}"><i class="bi bi-files me-1"></i>Issue Payslips (Bulk)</a>
+              <a class="btn btn-outline-primary" href="{{ url_payslips }}">
+                <i class="bi bi-files me-1"></i> Issue Payslips (Bulk)
+              </a>
             {% endif %}
             {% if url_budgets %}
-              <a class="btn btn-outline-secondary" href="{{ url_budgets }}"><i class="bi bi-cash-coin me-1"></i>Manage Budgets</a>
+              <a class="btn btn-outline-secondary" href="{{ url_budgets }}">
+                <i class="bi bi-cash-coin me-1"></i> Manage Budgets
+              </a>
             {% endif %}
-            <div class="d-flex gap-2">
-              {% if url_schedules %}
-                <a class="btn btn-outline-secondary flex-fill" href="{{ url_schedules }}"><i class="bi bi-calendar2-check me-1"></i>Payout Schedules</a>
-              {% endif %}
-              {% if url_pos %}
-                <a class="btn btn-outline-secondary flex-fill" href="{{ url_pos }}"><i class="bi bi-cart-check me-1"></i>Purchase Orders</a>
-              {% endif %}
-            </div>
-            {% if url_po_new %}
-              <a class="btn btn-outline-secondary" href="{{ url_po_new }}"><i class="bi bi-plus-square me-1"></i>New Purchase Order</a>
+            {% if url_schedules %}
+              <a class="btn btn-outline-secondary" href="{{ url_schedules }}">
+                <i class="bi bi-calendar2-check me-1"></i> Payout Schedules
+              </a>
             {% endif %}
           </div>
           <div class="small text-muted mt-3">
-            Use these links to post adjustments, manage payslips and approve budgets. Company ledger mirrors payouts automatically.
+            These are the most-used admin actions. Other tools remain available from the sidebar.
           </div>
         </div>
       </div>
@@ -113,7 +123,9 @@
       <div class="card shadow-sm border-0 h-100">
         <div class="card-body">
           <div class="d-flex justify-content-between align-items-center mb-2">
-            <h5 class="mb-0">Company Spend Trend (recent)</h5>
+            <h5 class="mb-0">
+              {% if request.user.is_superuser %}Company Spend Trend (recent){% else %}Business Spend Trend (recent){% endif %}
+            </h5>
             <span class="badge text-bg-light">Last {{ recent|length }} entries</span>
           </div>
           <div class="chart-wrap">
@@ -134,11 +146,13 @@
     </div>
   </div>
 
-  {# ========== RECENT COMPANY WALLET ACTIVITY ========== #}
+  {# ========== RECENT COMPANY/BUSINESS WALLET ACTIVITY ========== #}
   <div class="card shadow-sm border-0">
     <div class="card-body">
       <div class="d-flex justify-content-between align-items-center mb-2">
-        <h5 class="mb-0">Recent Company Wallet Activity</h5>
+        <h5 class="mb-0">
+          {% if request.user.is_superuser %}Recent Company Wallet Activity{% else %}Recent Business Wallet Activity{% endif %}
+        </h5>
         <div class="text-muted small">
           Mirror of payouts/transactions affecting agents
         </div>
@@ -181,8 +195,9 @@
       <div class="alert alert-info d-flex align-items-start gap-2 mt-3" role="alert">
         <i class="bi bi-info-circle mt-1"></i>
         <div class="small">
-          <b>Tip:</b> Single-source-of-truth ensures the agent wallet and company mirror stay consistent.
-          Posting a payslip creates the matching entries automatically.
+          <b>Tip:</b> Data shown here is scoped to
+          <b>{% if request.user.is_superuser %}all companies{% else %}your current business{% endif %}</b>.
+          Posting a payslip creates matching entries in the agent and company ledgers automatically.
         </div>
       </div>
     </div>
@@ -208,10 +223,7 @@
   if(el){
     new Chart(el, {
       type: 'bar',
-      data: {
-        labels,
-        datasets: [{ label: 'MWK', data: vals }]
-      },
+      data: { labels, datasets: [{ label: 'MWK', data: vals }] },
       options: {
         responsive:true, maintainAspectRatio:false,
         scales:{

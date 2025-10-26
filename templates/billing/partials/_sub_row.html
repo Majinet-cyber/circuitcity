@@ -1,0 +1,39 @@
+{% load humanize %}
+<tr id="row-{{ s.id }}">
+  <td>
+    <a href="{% url 'hq:businesses' %}?q={{ s.business.name|urlencode }}">
+      {{ s.business.name }}
+    </a>
+  </td>
+  <td>{{ s.plan.name }}<div class="text-muted small">({{ s.plan.code }})</div></td>
+  <td>Monthly</td>
+  <td>
+    {% if s.status == 'trial' %}
+      <span class="label label-info">Trial · ends {{ s.trial_end|date:"M d" }}</span>
+      <div class="text-muted small mt-1">{{ s.days_left_in_trial }} day{{ s.days_left_in_trial|pluralize }} left</div>
+    {% elif s.status == 'active' %}
+      <span class="label label-success">Active</span>
+      {% if s.current_period_end %}
+        <div class="text-muted small mt-1">{{ s.days_left_current_period }} day{{ s.days_left_current_period|pluralize }} left in period</div>
+      {% endif %}
+    {% elif s.status == 'grace' %}
+      <span class="label label-warn">Grace</span>
+    {% elif s.status == 'expired' %}
+      <span class="label label-muted">Expired</span>
+    {% else %}
+      <span class="label label-muted">{{ s.status|title }}</span>
+    {% endif %}
+  </td>
+  <td>{{ s.plan.currency }} {{ s.plan.amount|floatformat:2|intcomma }}</td>
+  <td>{{ s.started_at|date:"Y-m-d" }}</td>
+  <td class="text-end actions">
+    <div class="btn-group me-1">
+      <button type="button" class="btn btn-outline-secondary btn-sm js-extend" data-id="{{ s.id }}" data-days="7">+7d</button>
+      <button type="button" class="btn btn-outline-secondary btn-sm js-extend" data-id="{{ s.id }}" data-days="30">+30d</button>
+    </div>
+    <button type="button" class="btn btn-outline-primary btn-sm js-set-date" data-id="{{ s.id }}">Set date…</button>
+    <button type="button" class="btn btn-outline-danger btn-sm js-revoke" data-id="{{ s.id }}">Revoke now</button>
+    <button type="button" class="btn btn-success btn-sm js-activate" data-id="{{ s.id }}">Activate now</button>
+    <a class="btn btn-outline-dark btn-sm" href="{% url 'hq:invoices' %}?q={{ s.business.name|urlencode }}">Invoices →</a>
+  </td>
+</tr>

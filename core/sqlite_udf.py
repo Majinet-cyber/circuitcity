@@ -1,4 +1,4 @@
-# core/sqlite_udf.py
+﻿# core/sqlite_udf.py
 from __future__ import annotations
 import logging
 import math
@@ -73,3 +73,5 @@ def register_sqlite_udfs():
     except Exception:
         # If a function is already registered or connection isn't ready
         log.debug("register_sqlite_udfs() skipped/partial; functions may already be registered.", exc_info=True)
+
+

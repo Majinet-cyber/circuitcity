@@ -1,0 +1,64 @@
+{% extends "base.html" %}
+{% load humanize %}
+
+{% block title %}HQ · Subscriptions{% endblock %}
+{% block header_title %}Subscriptions <span class="badge text-bg-light ms-2">{{ total }}</span>{% endblock %}
+
+{% block body %}
+<div class="card p-3 mb-3">
+  <form method="get" class="d-flex gap-2 align-items-center">
+    <div class="input-group">
+      <span class="input-group-text"><i class="bi bi-search"></i></span>
+      <input name="q" class="form-control" placeholder="Search business or plan…" value="{{ q|default_if_none:'' }}">
+    </div>
+    <button class="btn btn-primary" type="submit">Go</button>
+  </form>
+</div>
+
+<div class="card p-0">
+  <div class="table-responsive">
+    <table class="table align-middle mb-0">
+      <thead class="table-light">
+        <tr>
+          <th>BUSINESS</th>
+          <th>PLAN</th>
+          <th>CYCLE</th>
+          <th>STATUS</th>
+          <th class="text-end">PLAN AMOUNT</th>
+          <th>STARTED</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% if not subs %}
+          <tr><td colspan="6" class="text-muted p-4">No subscriptions.</td></tr>
+        {% else %}
+          {% for s in subs %}
+            <tr>
+              <td>{{ s.business.name }}</td>
+              <td>{{ s.plan.name }} <span class="text-muted">({{ s.plan.code }})</span></td>
+              <td class="text-capitalize">{{ s.get_status_display }}</td>
+              <td>
+                {% if s.status == 'trial' %}
+                  <span class="badge text-bg-info">Trial{% if s.trial_end %} · ends {{ s.trial_end|date:'M j' }}{% endif %}</span>
+                {% elif s.status == 'active' %}
+                  <span class="badge text-bg-success">Active</span>
+                {% elif s.status == 'grace' %}
+                  <span class="badge text-bg-warning">Grace</span>
+                {% elif s.status == 'past_due' %}
+                  <span class="badge text-bg-warning">Past due</span>
+                {% elif s.status == 'canceled' or s.status == 'expired' %}
+                  <span class="badge text-bg-danger">Inactive</span>
+                {% else %}
+                  <span class="badge text-bg-secondary">{{ s.get_status_display }}</span>
+                {% endif %}
+              </td>
+              <td class="text-end">{{ s.plan.currency }} {{ s.plan.amount|floatformat:0|intcomma }}</td>
+              <td>{{ s.started_at|date:"Y-m-d" }}</td>
+            </tr>
+          {% endfor %}
+        {% endif %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

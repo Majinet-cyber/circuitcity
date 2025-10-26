@@ -1,4 +1,4 @@
-import os, tempfile
+﻿import os, tempfile
 from django.core.mail import EmailMessage
 
 def generate_pdf_receipt(intent):
@@ -14,3 +14,5 @@ def send_email(to, subject, body, attachments=None):
         with open(a, "rb") as fh:
             msg.attach(os.path.basename(a), fh.read())
     msg.send(fail_silently=True)
+
+

@@ -1,4 +1,4 @@
-# circuitcity/tenants/decorators.py
+﻿# circuitcity/tenants/decorators.py
 from django.shortcuts import redirect
 from functools import wraps
 
@@ -9,3 +9,5 @@ def require_business(view):
             return redirect("tenants:setup")  # or your business chooser
         return view(request, *a, **kw)
     return _wrap
+
+

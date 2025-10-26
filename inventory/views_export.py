@@ -1,4 +1,4 @@
-# inventory/views_export.py
+﻿# inventory/views_export.py
 from django.contrib.auth.decorators import login_required
 from django.http import HttpRequest
 from django.utils import timezone
@@ -250,3 +250,5 @@ def export_audits_csv(request: HttpRequest):
 
     fname = f"inventory_audits_{timezone.now():%Y%m%d_%H%M}.csv"
     return stream_csv(rows(), fname)
+
+

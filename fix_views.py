@@ -1,9 +1,9 @@
-# fix_views.py  -- run from the "circuitcity" folder (where manage.py is one level below)
+﻿# fix_views.py  -- run from the "circuitcity" folder (where manage.py is one level below)
 import pathlib, re, sys
 
 p = pathlib.Path("inventory/views.py")
 if not p.exists():
-    print("Could not find inventory/views.py — run this from the circuitcity folder.")
+    print("Could not find inventory/views.py â€” run this from the circuitcity folder.")
     sys.exit(1)
 
 src = p.read_text(encoding="utf-8")
@@ -99,3 +99,5 @@ step2 = comment_top_level_js(step1)
 p.write_text(step2, encoding="utf-8")
 
 print(f"Patched {p} (backup at {bak})")
+
+

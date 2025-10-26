@@ -1,4 +1,4 @@
-# billing/notify.py
+﻿# billing/notify.py
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -158,3 +158,5 @@ def fanout(*, business, title: str, body: str, ntype: str = "billing", url: str 
         _notify_in_app(title=title, body=body, ntype=ntype, business=business, url=url)
     except Exception as e:
         print(f"[billing.inapp] error: {e}")
+
+

@@ -1,4 +1,4 @@
-# insights/services_fx.py
+﻿# insights/services_fx.py
 from __future__ import annotations
 import requests
 from django.utils import timezone
@@ -38,3 +38,5 @@ def update_rates(base: str | None = None) -> dict:
         cfg.rates = rates
         cfg.save(update_fields=["base_currency", "rates", "updated_at"])
     return rates
+
+

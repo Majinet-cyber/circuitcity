@@ -1,4 +1,4 @@
-from datetime import date, timedelta
+﻿from datetime import date, timedelta
 from decimal import Decimal
 from django.db.models import Sum
 from ..models import Expense, Budget, Alert, ForecastSnapshot, CashLedger
@@ -31,9 +31,11 @@ def run_rules():
     if avg_14 and today_total > (avg_14 * Decimal("2.0")):
         ensure_alert("unusual_spend","MEDIUM","global","0", f"Unusual spend today: {today_total} vs avg {avg_14}")
 
-    # Rule 4 (optional): Payroll risk – simplistic example
+    # Rule 4 (optional): Payroll risk â€“ simplistic example
     # Assume there is a "commit" total for upcoming payroll this month
     commits = CashLedger.objects.filter(entry_type="commit", ref_type="salary", date__gte=month_start).aggregate(s=Sum("amount"))["s"] or Decimal("0")
     opening = snap.opening_balance if snap else Decimal("0")
     if opening < commits:
         ensure_alert("payroll_risk","HIGH","global","0", f"Projected opening balance < payroll commitments: {opening} < {commits}")
+
+

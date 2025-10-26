@@ -1,4 +1,4 @@
-# accounts/utils.py
+﻿# accounts/utils.py
 import hashlib
 import secrets
 import string
@@ -61,3 +61,5 @@ def require_agent(user):
 
     if user.is_staff or profile.is_manager:
         raise PermissionDenied("Agents only.")
+
+

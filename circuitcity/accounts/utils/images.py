@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 from io import BytesIO
 from django.core.files.base import ContentFile
@@ -34,3 +34,5 @@ def process_avatar(uploaded_file, max_px: int = 512):
     except Exception:
         # Safety first: never block the flow because of image processing.
         return uploaded_file
+
+

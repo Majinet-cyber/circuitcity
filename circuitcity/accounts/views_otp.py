@@ -1,4 +1,4 @@
-# accounts/views_otp.py
+﻿# accounts/views_otp.py
 import os, secrets, time
 from datetime import timedelta
 from django.conf import settings
@@ -80,3 +80,5 @@ def verify_reset_code(request):
         messages.success(request, "Password reset. You can now sign in.")
         return redirect("login")
     return render(request, "accounts/password_reset_verify.html")
+
+

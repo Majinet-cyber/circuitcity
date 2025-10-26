@@ -1,4 +1,4 @@
-# audit/models.py
+﻿# audit/models.py
 from django.db import models
 
 class AuditLog(models.Model):
@@ -15,3 +15,5 @@ class AuditLog(models.Model):
     class Meta:
         indexes = [models.Index(fields=["business", "entity", "entity_id", "action"])]
         ordering = ["-created_at"]
+
+

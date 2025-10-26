@@ -1,4 +1,4 @@
-# tenants/tenant.py
+﻿# tenants/tenant.py
 from threading import local
 from django.db import models
 from django.conf import settings
@@ -37,3 +37,5 @@ class BusinessScopedModel(models.Model):
     class Meta:
         abstract = True
         indexes = [models.Index(fields=["business"])]
+
+

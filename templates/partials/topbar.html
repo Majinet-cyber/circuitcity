@@ -1,7 +1,19 @@
 {# templates/partials/topbar.html #}
+{# --- Safe URL resolves for the user menu --- #}
+{% url 'profile:settings' as url_profile_settings %}
+{% if not url_profile_settings %}{% url 'accounts:settings_unified' as url_profile_settings %}{% endif %}
+{% if not url_profile_settings %}{% url 'accounts:settings' as url_profile_settings %}{% endif %}
+
+{% url 'feedback:form' as url_feedback %}
+{% if not url_feedback %}{% url 'feedback' as url_feedback %}{% endif %}
+{% if not url_feedback %}{% url 'feedback_home' as url_feedback %}{% endif %}
+
+{% url 'logout' as url_logout %}
+{% if not url_logout %}{% url 'accounts:logout' as url_logout %}{% endif %}
+
 <style>
   .cc-topbar-wrap{
-    position:sticky; top:0; z-index:50; background:#fff;
+    position:sticky; top:0; z-index:1050; background:#fff;
     border-bottom:1px solid rgba(15,23,42,.06);
     backdrop-filter:saturate(160%) blur(4px);
   }
@@ -12,13 +24,14 @@
     max-width:1400px; margin:0 auto;
   }
   .cc-brand-min{
-    display:flex; align-items:center; gap:.6rem; font-weight:800; color:#0f172a;
+    display:flex; align-items:center; gap:.6rem; font-weight:800; color:#0f172a; text-decoration:none;
   }
   .cc-brand-min .dot{
     width:28px; height:28px; border-radius:9px;
     background:linear-gradient(135deg,#60a5fa,#3b82f6);
     box-shadow:0 4px 12px rgba(59,130,246,.35);
   }
+
   /* Search */
   .cc-search{
     display:flex; align-items:center; gap:10px;
@@ -30,13 +43,14 @@
   .cc-search input{
     flex:1; border:0; outline:0; background:transparent; font-size:15px; color:#0f172a;
   }
+
   .cc-actions{
     display:flex; align-items:center; gap:10px;
   }
   .cc-chip{
     display:inline-flex; align-items:center; gap:.5rem;
     padding:8px 12px; border-radius:999px; font-weight:700; white-space:nowrap;
-    background:#f1f5f9; color:#0f172a; border:1px solid #e2e8f0;
+    background:#f1f5f9; color:#0f172a; border:1px solid #e2e8f0; text-decoration:none;
   }
   .cc-chip .dot{ width:8px; height:8px; border-radius:50%; background:#f59e0b; }
   .cc-btn{
@@ -51,6 +65,31 @@
     width:40px; height:40px; display:grid; place-items:center; border-radius:12px;
     border:1px solid #e2e8f0; background:#fff; cursor:pointer;
   }
+
+  /* User avatar & menu */
+  .cc-user{ position:relative; }
+  .cc-avatar-btn{
+    display:inline-flex; align-items:center; justify-content:center;
+    width:40px; height:40px; border-radius:999px; border:1px solid #c7d2fe;
+    background:#eef2ff; color:#1d4ed8; font-weight:900; cursor:pointer;
+  }
+  .cc-user-menu{
+    position:absolute; right:0; top:calc(100% + 8px); min-width:240px;
+    background:#fff; border:1px solid #e2e8f0; border-radius:14px;
+    box-shadow:0 14px 40px rgba(2,6,23,.12); display:none; z-index:1100;
+    overflow:hidden;
+  }
+  .cc-user-menu.open{ display:block; animation:fadeIn .16s ease; }
+  .cc-user-menu .head{ padding:10px 14px; }
+  .cc-user-menu .head .name{ font-weight:800; color:#0f172a }
+  .cc-user-menu .head .mail{ font-size:12px; color:#64748b }
+  .cc-user-menu a{
+    display:block; padding:10px 14px; text-decoration:none; color:#0f172a; font-weight:600;
+  }
+  .cc-user-menu a:hover{ background:#f8fafc; }
+  .cc-user-menu a.danger{ color:#b91c1c; }
+  @keyframes fadeIn{ from{opacity:0; transform:translateY(4px)} to{opacity:1; transform:translateY(0)} }
+
   /* Small screen */
   @media (max-width: 900px){
     .cc-topbar{ grid-template-columns:1fr auto; gap:10px; }
@@ -79,7 +118,7 @@
 
     <!-- Right: actions -->
     <div class="cc-actions">
-      <!-- GX shortcut (kept small and neat) -->
+      <!-- GX shortcut -->
       <button type="button" class="cc-btn" title="Command (GX)">GX</button>
 
       <!-- Notifications -->
@@ -102,6 +141,34 @@
           <span>No active business</span>
         </a>
       {% endif %}
+
+      <!-- Avatar + dropdown (Profile/Feedback/Logout) -->
+      <div class="cc-user">
+        <button class="cc-avatar-btn" id="ccUserBtn" aria-haspopup="true" aria-expanded="false" title="Account">
+          {% if request.user.is_authenticated %}
+            {{ request.user.first_name|default:request.user.username|slice:":1"|upper }}
+          {% else %}
+            <i class="bi bi-person"></i>
+          {% endif %}
+        </button>
+        <div class="cc-user-menu" id="ccUserMenu" role="menu" aria-label="Account">
+          <div class="head">
+            {% if request.user.is_authenticated %}
+              <div class="name">{{ request.user.get_full_name|default:request.user.username }}</div>
+              {% if request.user.email %}<div class="mail">{{ request.user.email }}</div>{% endif %}
+            {% else %}
+              <div class="name">Not signed in</div>
+            {% endif %}
+          </div>
+          <div style="border-top:1px solid #e2e8f0"></div>
+          <a href="{{ url_profile_settings|default:'/accounts/settings/' }}">Profile &amp; Settings</a>
+          <a href="{{ url_feedback|default:'/feedback/' }}">Feedback</a>
+          {% if request.user.is_authenticated %}
+            <a class="danger" href="{{ url_logout|default:'/accounts/logout/' }}?next=/accounts/login/">Logout</a>
+          {% endif %}
+        </div>
+      </div>
+      <!-- /Avatar -->
     </div>
   </div>
 </div>
@@ -111,4 +178,19 @@
   document.getElementById('cc-bell')?.addEventListener('click', () => {
     alert('No notifications.');
   });
+
+  // Avatar dropdown toggle (click outside & Esc to close)
+  (function(){
+    const btn = document.getElementById('ccUserBtn');
+    const menu = document.getElementById('ccUserMenu');
+    if(!btn || !menu) return;
+
+    const open = ()=>{ menu.classList.add('open'); btn.setAttribute('aria-expanded','true'); };
+    const close = ()=>{ menu.classList.remove('open'); btn.setAttribute('aria-expanded','false'); };
+    const toggle = ()=> menu.classList.contains('open') ? close() : open();
+
+    btn.addEventListener('click', (e)=>{ e.preventDefault(); e.stopPropagation(); toggle(); });
+    document.addEventListener('click', (e)=>{ if(!menu.contains(e.target) && !btn.contains(e.target)) close(); }, {capture:true});
+    document.addEventListener('keydown', (e)=>{ if(e.key==='Escape') close(); }, {passive:true});
+  })();
 </script>

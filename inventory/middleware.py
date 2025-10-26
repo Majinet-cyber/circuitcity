@@ -1,4 +1,4 @@
-# inventory/middleware.py
+﻿# inventory/middleware.py
 from django.conf import settings
 from django.http import HttpResponseForbidden
 from django.utils.deprecation import MiddlewareMixin
@@ -100,3 +100,5 @@ class ActiveContextMiddleware(MiddlewareMixin):
         except Exception:
             # Fail silently so it doesn't crash unrelated requests
             pass
+
+

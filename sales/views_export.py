@@ -1,4 +1,4 @@
-# sales/views_export.py
+﻿# sales/views_export.py
 from django.contrib.auth.decorators import login_required
 from django.utils import timezone
 from django.db.models import Q
@@ -137,3 +137,5 @@ def export_sales_csv(request):
 
     fname = f"sales_{timezone.now():%Y%m%d_%H%M}.csv"
     return stream_csv(rows(), fname)
+
+

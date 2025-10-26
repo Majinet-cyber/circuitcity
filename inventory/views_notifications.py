@@ -1,4 +1,4 @@
-from django.http import JsonResponse
+﻿from django.http import JsonResponse
 from django.utils import timezone
 
 def inbox_json(request):
@@ -21,7 +21,7 @@ def inbox_json(request):
         {
             "type": "stock_in",  # inventory-type
             "title": "Stock IN",
-            "body": "Tecno Spark 40 · IMEI 35599… added to Store A",
+            "body": "Tecno Spark 40 Â· IMEI 35599â€¦ added to Store A",
             "url": "/inventory/list/",
             "created_human": now.strftime("%Y-%m-%d %H:%M"),
         },
@@ -35,7 +35,7 @@ def inbox_json(request):
         {
             "type": "low_stock",
             "title": "Low stock",
-            "body": "Nokia 105 (Blue) — 3 units left in Store B",
+            "body": "Nokia 105 (Blue) â€” 3 units left in Store B",
             "url": "/inventory/list/?q=Nokia+105",
             "created_human": now.strftime("%Y-%m-%d %H:%M"),
         },
@@ -48,3 +48,5 @@ def inbox_json(request):
         },
     ]
     return JsonResponse({"items": sample[:limit]})
+
+

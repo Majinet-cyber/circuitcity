@@ -1,4 +1,4 @@
-# inventory/helpers/__init__.py
+﻿# inventory/helpers/__init__.py
 from __future__ import annotations
 from typing import Dict
 from django.http import HttpRequest
@@ -71,3 +71,5 @@ def _obj_belongs_to_active_business(obj, request: HttpRequest) -> bool:
         return (obiz is None) or (getattr(obiz, "id", None) == getattr(biz, "id", None))
     except Exception:
         return True
+
+

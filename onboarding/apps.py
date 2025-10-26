@@ -1,4 +1,4 @@
-"""
+﻿"""
 AppConfig for the onboarding app (top-level package).
 
 If you later move the app under the project package, switch:
@@ -40,3 +40,5 @@ class OnboardingConfig(AppConfig):
                 log.debug("Loaded %s", signals_mod)
         except Exception as exc:
             log.warning("Failed to load %s: %s", signals_mod, exc)
+
+

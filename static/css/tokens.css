@@ -7,10 +7,15 @@
 
 /* ============ Core brand + scales (stable) ============ */
 :root{
-  /* Brand */
-  --brand:#0b5bd3;          /* primary */
-  --brand-600:#0a3cd2;
+  /* Brand (SINGLE SOURCE OF TRUTH)
+     Picked from Forgot Password UI — use everywhere for primary buttons/links */
+  --brand:#2563eb;          /* blue-500 */
+  --brand-600:#1d4ed8;      /* blue-600 (hover/active) */
   --brand-50:#eaf2ff;
+
+  /* Icons (standard green across the app) */
+  --icon-green:#16a34a;     /* emerald-600 */
+  --icon-green-2:#22c55e;   /* emerald-500 */
 
   /* Semantic */
   --success:#16a34a;
@@ -56,7 +61,7 @@
   --sp-5:1.25rem; --sp-6:1.5rem; --sp-7:1.75rem; --sp-8:2rem; --sp-10:2.5rem;
   --sp-12:3rem;
 
-  /* Type scale (mobile-first clamp) */
+  /* Type scale (mobile-first clamp) — Stock List as the standard */
   --fs-12:.75rem; --fs-13:.8125rem; --fs-14:.875rem; --fs-16:1rem; --fs-18:1.125rem;
   --fs-20:1.25rem; --fs-24:1.5rem; --fs-28:1.75rem; --fs-32:2rem;
   --fs-xl:clamp(18px, 2.2vw, 20px);
@@ -181,7 +186,8 @@ body{
   font-size:var(--fs-16);
   -webkit-font-smoothing:antialiased;
   -moz-osx-font-smoothing:grayscale;
-  font-family:system-ui,-apple-system,"Segoe UI",Inter,Roboto,sans-serif;
+  /* Stock List font everywhere */
+  font-family:Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Arial, "Noto Sans";
 }
 
 a{color:var(--cc-accent);text-decoration:none}
@@ -253,6 +259,7 @@ a:hover{text-decoration:underline}
 .btn[disabled], .btn.is-loading{opacity:.6;cursor:not-allowed}
 
 .btn-primary{
+  /* ALL primary CTAs use brand blue */
   background:linear-gradient(180deg, var(--cc-accent-2), var(--cc-accent));
   color:#fff; border-color:transparent;
   box-shadow:0 8px 24px color-mix(in oklab, var(--cc-accent) 30%, transparent);
@@ -422,7 +429,7 @@ a:hover{text-decoration:underline}
 /* KPI grid */
 .kpi-grid{display:grid;gap:8px;grid-template-columns:1fr 1fr}
 @media (min-width:576px){.kpi-grid{grid-template-columns:repeat(3,1fr)}}
-@media (min-width:992px){.kpi-grid{grid-template-columns:repeat(4,1fr)}}
+@media (min-width:992px){.kpi-grid{grid-template-columns:repeat(4,1fr)}
 
 /* ----------------------------------------------------------
    Wallet chips + table niceties
@@ -651,3 +658,10 @@ a:hover{text-decoration:underline}
 .text-muted{color:var(--cc-muted)}
 .text-strong{font-weight:800}
 .text-mono{font-family:ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace}
+
+/* ----------------------------------------------------------
+   Icon standardization (green everywhere by default)
+   ---------------------------------------------------------- */
+.bi, .icon, svg.icon { color: var(--icon-green) !important; fill: currentColor; stroke: currentColor; }
+/* Opt-out when needed */
+.icon-default { color: inherit !important; }

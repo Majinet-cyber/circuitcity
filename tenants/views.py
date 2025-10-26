@@ -1,4 +1,4 @@
-# circuitcity/tenants/views.py
+﻿# circuitcity/tenants/views.py
 from __future__ import annotations
 
 from typing import Optional, List, Set
@@ -56,8 +56,8 @@ def _redirect_next_or_home(
 ) -> HttpResponse:
     """
     Respect ?next= when present. Otherwise:
-      - superusers → HQ dashboard
-      - everyone else → fallback (usually the chooser)
+      - superusers â†’ HQ dashboard
+      - everyone else â†’ fallback (usually the chooser)
     """
     nxt = request.GET.get("next") or request.POST.get("next")
     if nxt:
@@ -454,7 +454,8 @@ def manager_review_agents(request: HttpRequest) -> HttpResponse:
         # Build accept URL using the actual token-like field on the model
         tok = _invite_token_value(inv)
         try:
-            accept_path = reverse("tenants:accept_invite", args=[tok])
+            # IMPORTANT: reverse the **URL name** defined in urls.py
+            accept_path = reverse("tenants:invite_accept", args=[tok])
             inv.accept_url = request.build_absolute_uri(accept_path)  # type: ignore[attr-defined]
         except Exception:
             inv.accept_url = ""  # type: ignore[attr-defined]
@@ -490,81 +491,146 @@ def _csrf_input(request: HttpRequest) -> str:
 @require_business
 @require_role(["Manager", "Admin"])
 def manager_locations(request: HttpRequest) -> HttpResponse:
-    """Lightweight, template-free locations page."""
+    """
+    Locations manager (uses base.html so the main sidebar appears).
+    - Create/Update
+    - Delete (or archive if FK blocks)
+    - 'Grab GPS' button fills lat/lng and tries to fill city (handled in template JS)
+    """
     b: Business = request.business
 
-    Store = None  # type: ignore
+    # Prefer inventory.Location; fall back to inventory.Store
+    Model = None  # type: ignore
     try:
-        from inventory.models import Store as _Store  # type: ignore
-        Store = _Store
+        from inventory.models import Location as _Model  # type: ignore
+        Model = _Model
     except Exception:
-        Store = None
-
-    locations: list = []
-    error: Optional[str] = None
-
-    if Store is not None:
         try:
-            try:
-                locations = list(Store.objects.filter(business=b).order_by("name"))
-            except Exception:
-                locations = list(Store.objects.all().order_by("id")[:50])
+            from inventory.models import Store as _Model  # type: ignore
+            Model = _Model
+        except Exception:
+            Model = None
+    if Model is None:
+        return HttpResponse("Define inventory.Location or inventory.Store.", status=501)
+
+    msg = ""
+    # ---------- Create / Update / Delete ----------
+    if request.method == "POST":
+        try:
+            action = (request.POST.get("action") or "upsert").lower()
+            loc_id = request.POST.get("loc_id") or ""
+
+            if action == "delete":
+                if not loc_id:
+                    raise ValueError("Missing location id.")
+                loc = Model.objects.get(pk=loc_id)
+                if hasattr(loc, "business_id") and getattr(loc, "business_id", None) != b.id:
+                    return HttpResponse("Forbidden", status=403)
+                try:
+                    loc.delete()
+                    msg = "Deleted."
+                except Exception:
+                    # FK blocked â€“ archive/disable instead
+                    if hasattr(loc, "is_active"):
+                        setattr(loc, "is_active", False)
+                        loc.save(update_fields=["is_active"])
+                        msg = "Location is in use; archived instead."
+                    else:
+                        msg = "Could not delete (in use)."
+            else:
+                # upsert
+                name = (request.POST.get("name") or "").strip()
+                if not name:
+                    raise ValueError("Name is required.")
+                city = (request.POST.get("city") or "").strip()
+                lat  = (request.POST.get("latitude") or "").replace(",", "").strip() or None
+                lng  = (request.POST.get("longitude") or "").replace(",", "").strip() or None
+                radius = request.POST.get("radius") or request.POST.get("geofence_radius_m") or "150"
+                is_default = request.POST.get("is_default") == "on"
+
+                try:
+                    radius = int(float(radius))
+                except Exception:
+                    radius = 150
+
+                if loc_id:
+                    loc = Model.objects.get(pk=loc_id)
+                    if hasattr(loc, "business_id") and getattr(loc, "business_id", None) != b.id:
+                        return HttpResponse("Forbidden", status=403)
+                else:
+                    kwargs = {}
+                    if hasattr(Model, "business_id"):
+                        kwargs["business"] = b
+                    loc = Model(**kwargs)
+
+                # Assign if field exists on model
+                if hasattr(loc, "name"): loc.name = name
+                if hasattr(loc, "city"): loc.city = city
+                if hasattr(loc, "latitude"): loc.latitude = lat
+                if hasattr(loc, "longitude"): loc.longitude = lng
+                if hasattr(loc, "geofence_radius_m"): loc.geofence_radius_m = radius
+                if hasattr(loc, "is_active") and getattr(loc, "is_active", None) is None:
+                    loc.is_active = True
+
+                loc.save()
+
+                if hasattr(loc, "is_default"):
+                    if is_default:
+                        loc.is_default = True
+                        loc.save(update_fields=["is_default"])
+                        if hasattr(Model, "business_id"):
+                            Model.objects.filter(business=b, is_default=True)\
+                                .exclude(pk=loc.pk).update(is_default=False)
+                    else:
+                        if getattr(loc, "is_default", False):
+                            loc.is_default = False
+                            loc.save(update_fields=["is_default"])
+
+                msg = "Saved."
         except Exception as e:
-            error = f"Could not load locations: {e!s}"
+            msg = f"Error: {e!s}"
 
-    rows = "".join(
-        f"<tr><td>{_esc(getattr(loc, 'name', str(loc)))}</td>"
-        f"<td>{_esc(getattr(loc, 'kind', getattr(loc, 'type', 'STORE') or 'STORE'))}</td>"
-        f"<td>{'Yes' if getattr(loc, 'is_active', True) else 'No'}</td></tr>"
+    # ---------- List ----------
+    qs = Model.objects.all()
+    if hasattr(Model, "business_id"):
+        qs = qs.filter(business=b)
+    locations = list(qs.order_by("name" if hasattr(Model, "name") else "id"))
+
+    def _type_for(loc) -> str:
+        for f in ("kind", "type", "city"):
+            v = getattr(loc, f, None)
+            if isinstance(v, str) and v.strip():
+                return v
+        return "STORE"
+
+    def _active_for(loc) -> bool:
+        if hasattr(loc, "is_active"):
+            return bool(getattr(loc, "is_active"))
+        if hasattr(loc, "is_default"):
+            return bool(getattr(loc, "is_default"))
+        return True
+
+    rows = [
+        {
+            "id": getattr(loc, "id", ""),
+            "name": getattr(loc, "name", str(loc)),
+            "city": getattr(loc, "city", ""),
+            "type": _type_for(loc),
+            "active": "Yes" if _active_for(loc) else "No",
+            "lat": (getattr(loc, "latitude", "") or ""),
+            "lng": (getattr(loc, "longitude", "") or ""),
+            "radius": (getattr(loc, "geofence_radius_m", "") or "150"),
+            "is_default": "1" if getattr(loc, "is_default", False) else "0",
+        }
         for loc in locations
-    ) or '<tr><td colspan="3" style="color:#64748b">No locations found.</td></tr>'
+    ]
 
-    note = ""
-    if Store is None:
-        note = (
-            '<div style="padding:.75rem 1rem; border:1px solid #e2e8f0; '
-            'border-radius:10px; background:#f8fafc; color:#334155; margin-bottom:1rem">'
-            "Locations UI is not wired to a Store model yet. "
-            "Ask a developer to add <code>inventory.Store</code>."
-            "</div>"
-        )
-    elif error:
-        note = (
-            f'<div style="padding:.75rem 1rem; border:1px solid #fee2e2; '
-            f'border-radius:10px; background:#fef2f2; color:#991b1b; margin-bottom:1rem">{_esc(error)}</div>'
-        )
-
-    html = f"""
-<!doctype html>
-<html>
-  <head>
-    <meta charset="utf-8">
-    <title>Locations · { _esc(b.name) }</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <style>
-      body{{font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial; margin:24px; color:#0b1220;}}
-      .h1{{font-weight:800; font-size:22px; margin:0 0 12px}}
-      .muted{{color:#64748b}}
-      table{{border-collapse:collapse; width:100%; background:#fff; border:1px solid #e2e8f0; border-radius:10px; overflow:hidden}}
-      th,td{{padding:.6rem .8rem; border-bottom:1px solid #eef2f7; font-size:14px;}}
-      th{{text-align:left; background:#f8fafc; font-weight:800; color:#0b1220}}
-    </style>
-  </head>
-  <body>
-    <div class="h1">Locations <span class="muted">· { _esc(b.name) }</span></div>
-    {note}
-    <table role="table" aria-label="Locations">
-      <thead><tr><th>Name</th><th>Type</th><th>Active</th></tr></thead>
-      <tbody>
-        {rows}
-      </tbody>
-    </table>
-  </body>
-</html>
-    """.strip()
-
-    return HttpResponse(html)
-
+    ctx = {
+        "biz": b,
+        "rows": rows,
+        "flash": msg,
+    }
+    return render(request, "tenants/manager_locations.html", ctx)
 
 # -------------------------------------------------------------------
 # Agent Invite flows
@@ -704,7 +770,7 @@ def accept_invite(request: HttpRequest, token: str) -> HttpResponse:
             invite._request = request  # type: ignore[attr-defined]
             return _invite_signup_page(invite)
 
-    # Create or update membership → ACTIVE/AGENT
+    # Create or update membership â†’ ACTIVE/AGENT
     mem, _created = Membership.objects.get_or_create(
         business=biz,
         user=request.user,
@@ -775,7 +841,7 @@ def _invite_signup_page(invite: AgentInvite, error: Optional[str] = None) -> Htt
 <html>
   <head>
     <meta charset="utf-8" />
-    <title>Join · {biz_name}</title>
+    <title>Join Â· {biz_name}</title>
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <style>
       body {{ font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial; margin: 24px; color: #0b1220; }}
@@ -799,10 +865,10 @@ def _invite_signup_page(invite: AgentInvite, error: Optional[str] = None) -> Htt
         <input type="text" name="username" placeholder="yourname" required />
         <div style="height:.75rem"></div>
         <label>Password</label>
-        <input type="password" name="password1" placeholder="••••••••" required />
+        <input type="password" name="password1" placeholder="â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢" required />
         <div style="height:.75rem"></div>
         <label>Confirm Password</label>
-        <input type="password" name="password2" placeholder="••••••••" required />
+        <input type="password" name="password2" placeholder="â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢" required />
         <div style="height:1rem"></div>
         <button class="btn">Create & Accept</button>
       </form>
@@ -840,3 +906,5 @@ def _invite_invalid_page(reason: str) -> HttpResponse:
 
 def _csrf_input_placeholder() -> str:
     return "__CSRF__PLACEHOLDER__"
+
+

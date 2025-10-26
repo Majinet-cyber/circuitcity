@@ -1,46 +1,138 @@
+/* ---------- ui.css (plain CSS, no Tailwind @apply) ---------- */
+
+:root{
+  --brand:#2563eb;        /* primary brand blue */
+  --brand-hover:#1d4ed8;
+  --ink:#0f172a;          /* slate-900 */
+  --muted:#475569;        /* slate-600 */
+  --slate-50:#f8fafc;
+  --slate-100:#f1f5f9;
+  --slate-200:#e2e8f0;
+  --slate-700:#334155;
+  --shadow-soft: 0 10px 30px rgba(2,8,23,.08);
+}
+
 /* Cards */
 .card {
-  background: var(--tw-bg-opacity,1) linear-gradient(180deg, rgba(255,255,255,.85), rgba(255,255,255,.75));
+  background: linear-gradient(180deg, rgba(255,255,255,.85), rgba(255,255,255,.75));
   border: 1px solid rgba(30,41,59,.08);
   border-radius: 1rem; /* 16px */
   box-shadow: 0 6px 30px rgba(2,8,23,.06);
+  color: var(--ink);
 }
 
 /* Buttons */
-.btn-primary {
-  @apply inline-flex items-center gap-2 rounded-xl px-4 py-2 bg-brand text-white hover:bg-brand/90 shadow-soft;
+.btn-primary{
+  display:inline-flex;
+  align-items:center;
+  gap:.5rem;
+  border-radius: .75rem;         /* xl */
+  padding:.5rem 1rem;            /* py-2 px-4 */
+  background:var(--brand);
+  color:#fff;
+  border:0;
+  cursor:pointer;
+  box-shadow: var(--shadow-soft);
+  transition: background-color .15s ease, opacity .15s ease, box-shadow .2s ease;
 }
-.btn-subtle {
-  @apply inline-flex items-center gap-2 rounded-xl px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-800;
+.btn-primary:hover{ background:var(--brand-hover) }
+.btn-primary:active{ opacity:.95 }
+
+.btn-subtle{
+  display:inline-flex;
+  align-items:center;
+  gap:.5rem;
+  border-radius:.75rem;
+  padding:.5rem 1rem;
+  background:var(--slate-100);
+  color:#0f172a;                 /* slate-900 text */
+  border:1px solid var(--slate-200);
+  transition: background-color .15s ease, border-color .15s ease;
+}
+.btn-subtle:hover{
+  background:#e5e7eb;           /* slate-200-ish */
+  border-color:#d1d5db;
 }
 
 /* Sidebar links */
-.navlink {
-  @apply block px-3 py-2 rounded-lg text-slate-700 hover:bg-slate-100;
+.navlink{
+  display:block;
+  padding:.5rem .75rem;          /* py-2 px-3 */
+  border-radius:.5rem;           /* lg */
+  color:var(--slate-700);
+  text-decoration:none;
+  transition: background-color .15s ease, color .15s ease;
+}
+.navlink:hover{
+  background:var(--slate-100);
+  color:#0f172a;
 }
 
 /* Pills / small stat chips */
-.pill {
-  @apply flex items-center justify-between bg-slate-50 rounded-lg px-3 py-2 border border-slate-200;
+.pill{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  background:var(--slate-50);
+  border:1px solid var(--slate-200);
+  border-radius:.5rem;
+  padding:.5rem .75rem;          /* py-2 px-3 */
 }
 
 /* Segment control */
-.seg { @apply px-3 py-1.5 text-sm rounded-lg hover:bg-slate-100; }
-.seg.active { @apply bg-slate-900 text-white; }
+.seg{
+  padding:.375rem .75rem;        /* py-1.5 px-3 */
+  font-size:.875rem;             /* text-sm */
+  border-radius:.5rem;
+  color:var(--slate-700);
+  background:transparent;
+  border:1px solid transparent;
+  cursor:pointer;
+  transition: background-color .15s ease, color .15s ease;
+}
+.seg:hover{ background:var(--slate-100) }
+.seg.active{
+  background:#0f172a;            /* slate-900 */
+  color:#fff;
+}
 
 /* Badge */
-.badge { @apply inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium; }
+.badge{
+  display:inline-flex;
+  align-items:center;
+  padding:.25rem .6rem;          /* py-1 px-2.5 */
+  border-radius:999px;           /* full */
+  font-size:.75rem;              /* text-xs */
+  font-weight:600;
+  line-height:1;
+  background:var(--slate-100);
+  color:var(--slate-700);
+}
 
 /* Toasts */
-.toast { @apply bg-white/90 backdrop-blur px-4 py-3 rounded-xl border border-slate-200 shadow-soft; }
-.toast.error { @apply border-rose-200 text-rose-700 bg-rose-50;}
-.toast.success { @apply border-emerald-200 text-emerald-700 bg-emerald-50;}
-.toast.info { @apply border-sky-200 text-sky-700 bg-sky-50;}
-.toast.warning { @apply border-amber-200 text-amber-800 bg-amber-50; }
+.toast{
+  background:rgba(255,255,255,.9);
+  -webkit-backdrop-filter: blur(6px);
+  backdrop-filter: blur(6px);
+  padding:.75rem 1rem;
+  border-radius:.75rem;
+  border:1px solid var(--slate-200);
+  box-shadow: var(--shadow-soft);
+  color:var(--ink);
+}
+.toast.error   { border-color:#fecaca; color:#b91c1c; background:#fef2f2; }
+.toast.success { border-color:#bbf7d0; color:#047857; background:#ecfdf5; }
+.toast.info    { border-color:#bae6fd; color:#075985; background:#eff6ff; }
+.toast.warning { border-color:#fde68a; color:#92400e; background:#fffbeb; }
 
 /* htmx indicator */
-.htmx-indicator { @apply inline-flex items-center justify-center; }
+.htmx-indicator{
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+}
 
-/* Utility @apply requires Tailwind; if your pipeline doesn't process it,
-   replace these with plain CSS equivalents or keep the provided classes
-   directly in your HTML. */
+/* Small utility shadow (used above) */
+.shadow-soft{ box-shadow: var(--shadow-soft); }
+
+/* --------------------------------------------------------------- */

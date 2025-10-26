@@ -1,4 +1,4 @@
-# core/templatetags/include_extras.py
+﻿# core/templatetags/include_extras.py
 from django import template
 from django.template.loader import get_template
 from django.template import TemplateDoesNotExist
@@ -21,3 +21,5 @@ def include_if_exists(context, template_name, **kwargs):
     ctx = context.flatten()
     ctx.update(kwargs)
     return t.render(ctx)
+
+

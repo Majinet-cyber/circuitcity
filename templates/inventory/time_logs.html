@@ -4,12 +4,49 @@
 {% block title %}Time Logs · Circuit City{% endblock %}
 
 {% block content %}
-<div class="cc-container">
-  <h1 style="margin:.5rem 0 1rem;">Time Logs</h1>
+<style>
+  .tl-wrap{max-width:1100px;margin-inline:auto}
+  .glass{
+    background: color-mix(in oklab, #ffffff 78%, transparent);
+    border: 1px solid rgba(148,163,184,.35);
+    border-radius: 14px; padding: 14px;
+    box-shadow: 0 12px 40px rgba(2,6,23,.08);
+    -webkit-backdrop-filter: blur(14px) saturate(140%);
+    backdrop-filter: blur(14px) saturate(140%);
+  }
+  .pill{display:inline-flex;gap:.35rem;align-items:center;border-radius:999px;padding:.18rem .5rem;font-weight:800}
+  .pill-ok{background:#eafff7;border:1px solid #88e0c1;color:#065f46}
+  .pill-warn{background:#fff1f2;border:1px solid #fecdd3;color:#7f1d1d}
+  .pill-info{background:#e7efff;border:1px solid #c8dcff;color:#0b132b}
+  .muted{color:var(--cc-muted)}
+  .mono{font-variant-numeric:tabular-nums}
+  .tl-toolbar{gap:.75rem;margin:.5rem 0 1rem;display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between}
+  .tl-scroller{overflow:auto;border-radius:12px}
+  table.tl{width:100%;border-collapse:collapse;min-width:760px}
+  table.tl th, table.tl td{padding:.55rem .5rem;border-bottom:1px solid var(--cc-border);text-align:left}
+  table.tl thead th{background:#f6f9ff;font-weight:900;border-bottom:2px solid #c7d2fe;position:sticky;top:0}
+  @media (prefers-color-scheme: dark){
+    table.tl thead th{background:#1a2233;border-color:#223049}
+  }
+</style>
 
-  <div class="cc-panel" style="padding:1rem;border:1px solid var(--cc-border);border-radius:.75rem;background:var(--cc-panel);">
-    <div style="overflow:auto">
-      <table aria-label="Recent time logs">
+<div class="tl-wrap">
+  <div class="tl-toolbar">
+    <h1 class="m-0">Time Logs</h1>
+
+    <div class="d-flex align-items-center" style="gap:.6rem">
+      <span class="text-muted small">Local time: <b id="nowClock" class="mono">—:—:—</b></span>
+      <div class="form-check form-switch m-0">
+        <input class="form-check-input" type="checkbox" id="autoRefresh" checked>
+        <label class="form-check-label small" for="autoRefresh">Auto-refresh</label>
+      </div>
+      <button id="btnRefresh" class="btn btn-sm btn-outline">Refresh now</button>
+    </div>
+  </div>
+
+  <div class="glass">
+    <div class="tl-scroller" aria-live="polite">
+      <table class="tl" aria-label="Recent time logs">
         <thead>
           <tr>
             <th>User</th>
@@ -26,48 +63,107 @@
         </thead>
         <tbody>
           {% for l in logs %}
-            <tr>
-              <td>{{ l.user.username }}</td>
-              <td>
-                <time datetime="{{ l.logged_at|date:'c' }}">
-                  {{ l.logged_at|date:"Y-m-d H:i:s" }}
-                </time>
-              </td>
-              <td>
-                {% if l.checkin_type == 'ARRIVAL' %}
-                  Arrival
-                {% else %}
-                  Departure
-                {% endif %}
-              </td>
-              <td>
-                {% if l.location %}
-                  {{ l.location.name }}
-                {% else %}
-                  —
-                {% endif %}
-              </td>
-              <td>{{ l.latitude|default:"" }}</td>
-              <td>{{ l.longitude|default:"" }}</td>
-              <td>{{ l.accuracy_m|default:"" }}</td>
-              <td>{{ l.distance_m|default:"" }}</td>
-              <td>
-                {% if l.within_geofence %}
-                  <span style="padding:.15rem .45rem;border-radius:.5rem;background:#eafff7;border:1px solid #88e0c1;">Inside</span>
-                {% else %}
-                  <span style="padding:.15rem .45rem;border-radius:.5rem;background:#fff1f2;border:1px solid #fecdd3;">Outside</span>
-                {% endif %}
-              </td>
-              <td>{{ l.note|default:"" }}</td>
-            </tr>
+          <tr>
+            <td>
+              {% firstof l.user.get_full_name l.user.username "(user)" %}
+            </td>
+            <td class="mono">
+              <time class="timeago" datetime="{{ l.logged_at|date:'c' }}" title="{{ l.logged_at|date:'Y-m-d H:i:s' }}">
+                {{ l.logged_at|date:"Y-m-d H:i:s" }}
+              </time>
+            </td>
+            <td>
+              {% if l.checkin_type == 'ARRIVAL' %}
+                <span class="pill pill-ok">Arrival</span>
+              {% elif l.checkin_type == 'DEPARTURE' %}
+                <span class="pill pill-warn">Departure</span>
+              {% else %}
+                <span class="pill pill-info">{{ l.checkin_type|default:"PING" }}</span>
+              {% endif %}
+            </td>
+            <td>{% if l.location %}{{ l.location.name }}{% else %}—{% endif %}</td>
+            <td class="mono">{{ l.latitude|default:"" }}</td>
+            <td class="mono">{{ l.longitude|default:"" }}</td>
+            <td class="mono">{{ l.accuracy_m|default:"" }}</td>
+            <td class="mono">{{ l.distance_m|default:"" }}</td>
+            <td>
+              {% if l.within_geofence %}
+                <span class="pill pill-ok">Inside</span>
+              {% else %}
+                <span class="pill pill-warn">Outside</span>
+              {% endif %}
+            </td>
+            <td class="text-wrap">{{ l.note|default:"" }}</td>
+          </tr>
           {% empty %}
-            <tr>
-              <td colspan="10" style="text-align:center;color:var(--cc-muted);padding:1rem;">No logs yet.</td>
-            </tr>
+          <tr>
+            <td colspan="10" style="text-align:center;color:var(--cc-muted);padding:1rem;">No logs yet.</td>
+          </tr>
           {% endfor %}
         </tbody>
       </table>
     </div>
   </div>
 </div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+  // Live clock
+  (function clock(){
+    const el = document.getElementById('nowClock');
+    const pad = n => (n<10?'0':'')+n;
+    function tick(){
+      const d = new Date();
+      if (el) el.textContent = `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+    }
+    tick(); setInterval(tick, 1000);
+  })();
+
+  // Human "time ago" for <time> elements
+  (function timeago(){
+    const els = Array.from(document.querySelectorAll('time.timeago'));
+    function fmt(ms){
+      const s = Math.floor(ms/1000);
+      if (s < 5)  return 'just now';
+      if (s < 60) return `${s}s ago`;
+      const m = Math.floor(s/60);
+      if (m < 60) return `${m}m ago`;
+      const h = Math.floor(m/60);
+      if (h < 24) return `${h}h ago`;
+      const d = Math.floor(h/24);
+      return `${d}d ago`;
+    }
+    function update(){
+      const now = Date.now();
+      els.forEach(t => {
+        const iso = t.getAttribute('datetime');
+        const when = iso ? Date.parse(iso) : NaN;
+        if (!isNaN(when)) {
+          const abs = t.getAttribute('title') || t.textContent.trim();
+          t.innerHTML = `${abs} <span class="text-muted">(${fmt(now - when)})</span>`;
+        }
+      });
+    }
+    update(); setInterval(update, 10000);
+  })();
+
+  // Auto refresh (every 60s while visible)
+  (function autoreload(){
+    const chk = document.getElementById('autoRefresh');
+    const btn = document.getElementById('btnRefresh');
+    let timer = null;
+    function clear(){ if (timer){ clearTimeout(timer); timer=null; } }
+    function schedule(){
+      clear();
+      if (!chk || !chk.checked) return;
+      if (document.visibilityState !== 'visible') return;
+      timer = setTimeout(()=> location.reload(), 60000);
+    }
+    document.addEventListener('visibilitychange', () => { clear(); schedule(); });
+    chk && chk.addEventListener('change', () => { clear(); schedule(); });
+    btn && btn.addEventListener('click', () => { location.reload(); });
+    schedule();
+  })();
+</script>
 {% endblock %}

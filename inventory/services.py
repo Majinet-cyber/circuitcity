@@ -1,4 +1,4 @@
-# inventory/services.py
+﻿# inventory/services.py
 from django.db import transaction
 from django.utils import timezone
 
@@ -42,3 +42,5 @@ def create_sale_and_wallet_for_item(item, sold_by):
             happened_at=getattr(item, "sold_at", None) or timezone.now(),
         )
     return sale
+
+

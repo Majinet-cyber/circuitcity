@@ -1,4 +1,4 @@
-# onboarding/forms.py
+﻿# onboarding/forms.py
 from __future__ import annotations
 from django import forms
 from django.apps import apps
@@ -34,3 +34,5 @@ def make_inventory_item_form():
         except Exception:
             pass
     return Form
+
+

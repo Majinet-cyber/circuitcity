@@ -1,4 +1,4 @@
-# sales/apps.py
+﻿# sales/apps.py
 from django.apps import AppConfig
 
 
@@ -11,3 +11,5 @@ class SalesConfig(AppConfig):
         # Import signals here if you add any later, e.g.:
         # from . import signals  # noqa: F401
         pass
+
+

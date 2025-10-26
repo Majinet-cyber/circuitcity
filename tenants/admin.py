@@ -1,4 +1,4 @@
-# tenants/admin.py
+﻿# tenants/admin.py
 from django.contrib import admin
 from .models import Business, Membership
 
@@ -13,3 +13,5 @@ class MembershipAdmin(admin.ModelAdmin):
     list_display = ("id", "user", "business", "role", "status", "created_at")
     list_filter = ("role", "status")
     search_fields = ("user__username", "business__name")
+
+

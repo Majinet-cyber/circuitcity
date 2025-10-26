@@ -1,4 +1,4 @@
-from flask import Flask, render_template
+﻿from flask import Flask, render_template
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
 import pandas as pd
@@ -25,7 +25,7 @@ def safe_int(cell):
 
 @app.route('/dashboard')
 def dashboard():
-    # ✅ Pull data
+    # âœ… Pull data
     dates = sheet.col_values(1)[1:]  # skip header
     savings_raw = sheet.col_values(2)[1:]
     totals_raw = sheet.col_values(3)[1:]
@@ -33,14 +33,14 @@ def dashboard():
     savings = [safe_int(cell) for cell in savings_raw if safe_int(cell) is not None]
     totals = [safe_int(cell) for cell in totals_raw if safe_int(cell) is not None]
 
-    # ✅ Create DataFrame
+    # âœ… Create DataFrame
     cashflow_df = pd.DataFrame({
         "Date": dates[:len(savings)],
         "Savings": savings,
         "Total Savings": totals[:len(savings)]
     })
 
-    # ✅ Make Plotly chart
+    # âœ… Make Plotly chart
     fig = px.bar(cashflow_df, x="Date", y=["Savings", "Total Savings"],
                  barmode="group", title="Live Cash Reserve")
 
@@ -50,3 +50,5 @@ def dashboard():
 
 if __name__ == '__main__':
     app.run(debug=True)
+
+

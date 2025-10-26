@@ -1,4 +1,4 @@
-# audit/utils.py
+﻿# audit/utils.py
 def audit(request, action: str, obj, message: str = ""):
     from .models import AuditLog
     biz = getattr(request, "business", None)
@@ -12,3 +12,5 @@ def audit(request, action: str, obj, message: str = ""):
         ip=request.META.get("REMOTE_ADDR"),
         ua=request.META.get("HTTP_USER_AGENT", ""),
     )
+
+

@@ -1,4 +1,4 @@
-# billing/views.py
+﻿# billing/views.py
 from __future__ import annotations
 
 from datetime import date, timedelta
@@ -7,11 +7,16 @@ from io import BytesIO
 
 from django.conf import settings
 from django.contrib import messages
+from django.contrib.admin.views.decorators import staff_member_required
 from django.contrib.auth.decorators import login_required
-from django.http import FileResponse, JsonResponse
+from django.http import FileResponse, JsonResponse, HttpRequest, HttpResponse, HttpResponseBadRequest
 from django.shortcuts import get_object_or_404, redirect, render
+from django.template import TemplateDoesNotExist
 from django.urls import reverse
 from django.utils import timezone
+from django.utils.text import slugify
+from django.views.decorators.csrf import csrf_exempt
+from django.views.decorators.http import require_POST
 
 from tenants.models import Business
 from tenants.utils import require_business
@@ -64,10 +69,12 @@ def _first_of_next_month(dt: date) -> date:
 
 
 def _compute_period_end(plan: SubscriptionPlan, start_dt: timezone.datetime) -> timezone.datetime:
-    """Compute the period end aligned to monthly/yearly cycles."""
+    """
+    Compute the period end aligned to monthly/yearly cycles.
+    Yearly = +365d. Monthly aligns to first-of-next-month midnight.
+    """
     if plan.interval == SubscriptionPlan.Interval.YEAR:
         return start_dt + timedelta(days=365)
-    # Monthly: align to first of next month at midnight
     next_month = _first_of_next_month(start_dt.date())
     return timezone.make_aware(
         timezone.datetime.combine(next_month, timezone.datetime.min.time())
@@ -89,6 +96,50 @@ def _ensure_trial_subscription(biz: Business) -> BusinessSubscription:
         plan=plan,
         days=getattr(settings, "BILLING_TRIAL_DAYS", 30),
     )
+
+
+def _sub_badge(sub: BusinessSubscription) -> str:
+    if sub.status == BusinessSubscription.Status.TRIAL:
+        return f"Trial â€” {sub.days_left_in_trial()} days left"
+    if sub.status == BusinessSubscription.Status.ACTIVE:
+        return "Active"
+    if sub.status == BusinessSubscription.Status.GRACE:
+        return "Grace period"
+    return sub.get_status_display()
+
+
+def _plan_slug(plan: SubscriptionPlan) -> str:
+    """Stable slug for plan pages (code preferred, else slugified name)."""
+    code = (getattr(plan, "code", None) or "").strip()
+    return code.lower() if code else slugify(plan.name or "plan")
+
+
+def _create_draft_invoice_for_plan(biz: Business, plan: SubscriptionPlan, *, created_by) -> Invoice:
+    """Centralized draft invoice creation so 'subscribe' and 'select_plan' stay consistent."""
+    now = timezone.now()
+    period_end = _compute_period_end(plan, now)
+
+    inv = Invoice.objects.create(
+        business=biz,
+        created_by=created_by,
+        to_name=getattr(biz, "name", "") or "",
+        to_email=getattr(biz, "manager_email", "") or getattr(biz, "email", ""),
+        to_phone=getattr(biz, "whatsapp_number", "") or getattr(biz, "phone", ""),
+        period_start=now.date(),
+        period_end=period_end.date(),
+        notes=f"{plan.name} subscription ({plan.get_interval_display().lower()})",
+        currency=plan.currency,
+        status=Invoice.Status.DRAFT,
+    )
+    InvoiceItem.objects.create(
+        invoice=inv,
+        description=f"{plan.name} â€” {plan.get_interval_display()} plan",
+        qty=Decimal("1"),
+        unit="mo" if plan.interval == SubscriptionPlan.Interval.MONTH else "yr",
+        unit_price=Decimal(plan.amount),
+    )
+    inv.recalc_totals(save=True)
+    return inv
 
 
 # --------- outbound notifications (email / WhatsApp) -------------------
@@ -114,49 +165,28 @@ def _send_invoice_whatsapp(inv: Invoice) -> None:
 
 
 # ------------------------------------------------------------------------------
-# Views
+# Public/tenant views
 # ------------------------------------------------------------------------------
 @login_required
 @require_business
-def subscribe(request):
+def subscribe(request: HttpRequest) -> HttpResponse:
     """
     Pick a plan (or show current); seed trial if missing; create the first invoice draft.
+    This page now primarily serves GET (the one-click flow posts to select_plan).
     """
     biz: Business = request.business
     sub = _ensure_trial_subscription(biz)
     plans = SubscriptionPlan.objects.filter(is_active=True).order_by("amount", "name")
 
+    # Backward compatibility: still accept POST if old template submits here.
     if request.method == "POST":
         form = ChoosePlanForm(request.POST)
         if form.is_valid():
-            sub.plan = form.cleaned_data["plan"]
+            plan = form.cleaned_data["plan"]
+            sub.plan = plan
             sub.save(update_fields=["plan", "updated_at"])
 
-            now = timezone.now()
-            period_end = _compute_period_end(sub.plan, now)
-
-            # Create an invoice with a single line item for the plan
-            inv = Invoice.objects.create(
-                business=biz,
-                created_by=request.user,
-                to_name=getattr(biz, "name", "") or "",
-                to_email=getattr(biz, "manager_email", "") or getattr(biz, "email", ""),
-                to_phone=getattr(biz, "whatsapp_number", "") or getattr(biz, "phone", ""),
-                period_start=now.date(),
-                period_end=period_end.date(),
-                notes=f"{sub.plan.name} subscription ({sub.plan.get_interval_display().lower()})",
-                currency=sub.plan.currency,
-                status=Invoice.Status.DRAFT,
-            )
-            InvoiceItem.objects.create(
-                invoice=inv,
-                description=f"{sub.plan.name} — {sub.plan.get_interval_display()} plan",
-                qty=Decimal("1"),
-                unit="mo" if sub.plan.interval == SubscriptionPlan.Interval.MONTH else "yr",
-                unit_price=Decimal(sub.plan.amount),
-            )
-            inv.recalc_totals(save=True)
-
+            inv = _create_draft_invoice_for_plan(biz, plan, created_by=request.user)
             request.session["billing_invoice_id"] = str(inv.id)
             return redirect("billing:checkout")
         else:
@@ -164,7 +194,6 @@ def subscribe(request):
     else:
         form = ChoosePlanForm(initial={"plan": sub.plan_id} if sub.plan_id else None)
 
-    days_left = sub.days_left_in_trial()
     return render(
         request,
         "billing/subscribe.html",
@@ -172,19 +201,87 @@ def subscribe(request):
             "plans": plans,
             "form": form,
             "sub": sub,
-            "days_left": days_left,
+            "days_left": sub.days_left_in_trial(),
+            "sub_badge": _sub_badge(sub),
         },
     )
 
 
+# -------- One-click plan selection -> plan page (then checkout) ----------
 @login_required
 @require_business
-def checkout(request):
+@require_POST
+def select_plan(request: HttpRequest) -> HttpResponse:
+    """
+    Receives POST from a plan card. Sets plan, creates draft invoice, and routes
+    to the plan-specific page. That page may immediately link/redirect to checkout.
+    """
+    biz: Business = request.business
+    sub = _ensure_trial_subscription(biz)
+
+    plan_id = request.POST.get("plan")
+    if not plan_id:
+        return HttpResponseBadRequest("Missing plan id")
+
+    try:
+        plan = SubscriptionPlan.objects.get(id=plan_id, is_active=True)
+    except SubscriptionPlan.DoesNotExist:
+        messages.error(request, "Unknown or inactive plan.")
+        return redirect("billing:subscribe")
+
+    # Update subscription plan
+    sub.plan = plan
+    sub.save(update_fields=["plan", "updated_at"])
+
+    # Create a fresh draft invoice
+    inv = _create_draft_invoice_for_plan(biz, plan, created_by=request.user)
+    request.session["billing_invoice_id"] = str(inv.id)
+
+    # Head to the plan-specific landing (with graceful fallback inside).
+    return redirect("billing:plan_detail", slug=_plan_slug(plan))
+
+
+@login_required
+@require_business
+def plan_detail(request: HttpRequest, slug: str) -> HttpResponse:
+    """
+    Shows a per-plan page if a dedicated template exists:
+      - billing/plan_<slug>.html  (e.g., plan_starter.html, plan_growth.html)
+    If missing, falls back to checkout immediately.
+    """
+    biz: Business = request.business
+    sub = _ensure_trial_subscription(biz)
+
+    # If no invoice in session (e.g., user refreshed), ensure there's one for current plan
+    inv_id = request.session.get("billing_invoice_id")
+    if not inv_id and sub.plan_id:
+        inv = _create_draft_invoice_for_plan(biz, sub.plan, created_by=request.user)
+        request.session["billing_invoice_id"] = str(inv.id)
+
+    template_name = f"billing/plan_{slug}.html"
+    try:
+        return render(
+            request,
+            template_name,
+            {
+                "plan_slug": slug,
+                "sub": sub,
+                "sub_badge": _sub_badge(sub),
+            },
+        )
+    except TemplateDoesNotExist:
+        # No bespoke page yet â€” go straight to checkout.
+        return redirect("billing:checkout")
+
+
+@login_required
+@require_business
+def checkout(request: HttpRequest) -> HttpResponse:
     """
     Interactive checkout with tabs:
     - Airtel Money (prompt)
     - Standard Bank (proof/reference)
-    - Card (number/exp/cvv) — stubbed tokenization for now
+    - Card (number/exp/cvv) â€” stubbed tokenization for now
     Shows invoice preview on the side.
     """
     biz: Business = request.business
@@ -218,7 +315,7 @@ def checkout(request):
                 )
                 messages.success(
                     request,
-                    "Airtel Money prompt initiated (stub). Please approve on your phone. We’ll activate once confirmed.",
+                    "Airtel Money prompt initiated (stub). Please approve on your phone. Weâ€™ll activate once confirmed.",
                 )
                 return redirect("billing:success")
 
@@ -236,14 +333,14 @@ def checkout(request):
                     status=Payment.Status.PENDING,
                     reference=ref,
                 )
-                messages.info(request, "Proof submitted. We’ll verify and activate shortly.")
+                messages.info(request, "Proof submitted. Weâ€™ll verify and activate shortly.")
                 return redirect("billing:success")
 
         # ---------------- Card (stub success) --------
         elif method == "card":
             card_form = CardForm(request.POST, prefix="card")
             if card_form.is_valid():
-                # In real flow: tokenize card→charge→webhook. For now, mark success.
+                # In real flow: tokenize cardâ†’chargeâ†’webhook. For now, mark success.
                 Payment.objects.create(
                     business=biz,
                     invoice=invoice,
@@ -273,17 +370,8 @@ def checkout(request):
 
         messages.error(request, "Please check your payment details and try again.")
 
-    # Sidebar badge text (e.g., “Trial – 3 days left”)
+    # Sidebar badge
     sub = _ensure_trial_subscription(biz)
-    if sub.status == BusinessSubscription.Status.TRIAL:
-        badge = f"Trial — {sub.days_left_in_trial()} days left"
-    elif sub.status == BusinessSubscription.Status.ACTIVE:
-        badge = "Active"
-    elif sub.status == BusinessSubscription.Status.GRACE:
-        badge = "Grace period"
-    else:
-        badge = sub.get_status_display()
-
     return render(
         request,
         "billing/checkout.html",
@@ -292,21 +380,25 @@ def checkout(request):
             "airtel_form": airtel_form,
             "bank_form": bank_form,
             "card_form": card_form,
-            "sub_badge": badge,
+            "sub_badge": _sub_badge(sub),
         },
     )
 
 
 @login_required
 @require_business
-def success(request):
+def success(request: HttpRequest) -> HttpResponse:
     return render(request, "billing/success.html")
 
 
 # ---------------- Invoice send/download endpoints ----------------------
 @login_required
 @require_business
-def invoice_send(request, pk: str):
+def invoice_send(request: HttpRequest, pk: str) -> HttpResponse:
+    """
+    Sends invoice via email/WhatsApp and marks it sent.
+    Works with either UUID or INT pk based on your URL conf.
+    """
     biz: Business = request.business
     inv = get_object_or_404(Invoice, id=pk, business=biz)
     _send_invoice_email(inv)
@@ -319,7 +411,7 @@ def invoice_send(request, pk: str):
 
 @login_required
 @require_business
-def invoice_download(request, pk: str):
+def invoice_download(request: HttpRequest, pk: str) -> FileResponse:
     """
     Minimal PDF placeholder (so UI has a real download). Replace with a proper
     generator (WeasyPrint/ReportLab) later.
@@ -330,7 +422,7 @@ def invoice_download(request, pk: str):
     content = f"""
     Invoice: {inv.number}
     Business: {getattr(biz, "name", "")}
-    Period: {inv.period_start} – {inv.period_end}
+    Period: {inv.period_start} â€“ {inv.period_end}
     Amount: {inv.currency} {inv.total}
     Status: {inv.get_status_display()}
     """.strip()
@@ -368,10 +460,8 @@ def _plain_text_to_minimal_pdf(text: str) -> bytes:
 
 
 # ---------------- Minimal webhook endpoint ------------------------------
-from django.views.decorators.csrf import csrf_exempt
-
 @csrf_exempt
-def webhook(request):
+def webhook(request: HttpRequest) -> JsonResponse:
     """
     Minimal idempotent webhook collector.
     Stores raw payload + headers into WebhookEvent.payload (if model is available).
@@ -386,7 +476,7 @@ def webhook(request):
             # Store headers inside payload for auditing; model has no separate headers field
             payload = {
                 "raw": raw,
-                "headers": {k: v for k, v in request.headers.items()},
+                "headers": {k: v for k, v in request.headers.items() },
                 "query": dict(request.GET),
             }
 
@@ -400,3 +490,71 @@ def webhook(request):
             # Never crash a webhook
             pass
     return JsonResponse({"ok": True})
+
+
+# ------------------------------------------------------------------------------
+# Paywall / Manage pages (tenant-facing)
+# ------------------------------------------------------------------------------
+@login_required
+@require_business
+def paywall(request: HttpRequest) -> HttpResponse:
+    """
+    Shown when trial/subscription is not active.
+    """
+    biz: Business = request.business
+    sub = _ensure_trial_subscription(biz)
+    plans = SubscriptionPlan.objects.filter(is_active=True).order_by("amount")
+    return render(request, "billing/paywall.html", {"sub": sub, "plans": plans, "sub_badge": _sub_badge(sub)})
+
+
+@login_required
+@require_business
+def manage(request: HttpRequest) -> HttpResponse:
+    """
+    Basic â€œmanage subscriptionâ€ page (stub). You can add upgrade/downgrade actions here later.
+    """
+    biz: Business = request.business
+    sub = _ensure_trial_subscription(biz)
+    plans = SubscriptionPlan.objects.filter(is_active=True).order_by("amount")
+    return render(request, "billing/manage.html", {"sub": sub, "plans": plans, "sub_badge": _sub_badge(sub)})
+
+
+# ------------------------------------------------------------------------------
+# HQ / Admin views (legacy â€“ prefer hq app views)
+# ------------------------------------------------------------------------------
+@staff_member_required
+def hq_subscriptions(request: HttpRequest) -> HttpResponse:
+    """
+    Admin list to view/enforce. Reachable at /hq/subscriptions (see urls.py).
+    """
+    items = (
+        BusinessSubscription.objects.select_related("business", "plan")
+        .order_by("-started_at")
+    )
+    return render(request, "billing/hq_subscriptions.html", {"items": items})
+
+
+@staff_member_required
+@require_POST
+def force_status(request: HttpRequest, sub_id: str) -> HttpResponse:
+    """
+    Force a subscription status from the HQ list (quick admin tool).
+    """
+    new_status = request.POST.get("status")
+    sub = get_object_or_404(BusinessSubscription, id=sub_id)
+    choices = dict(BusinessSubscription.Status.choices)
+    if new_status in choices:
+        sub.status = new_status
+        if new_status == BusinessSubscription.Status.ACTIVE:
+            # give 30 days by default; tune if needed
+            now = timezone.now()
+            sub.current_period_start = now
+            sub.current_period_end = now + timedelta(days=30)
+            sub.next_billing_date = sub.current_period_end
+        sub.save()
+        messages.success(request, f"Subscription updated to {choices[new_status]}.")
+    else:
+        messages.error(request, "Invalid status.")
+    return redirect("billing:hq")
+
+

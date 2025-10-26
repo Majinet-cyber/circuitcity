@@ -1,4 +1,4 @@
-# config/settings_production.py  <-- adjust "config" to your project package (folder that has settings.py)
+﻿# config/settings_production.py  <-- adjust "config" to your project package (folder that has settings.py)
 from .settings import *  # keep EVERYTHING from your base settings
 import os
 import dj_database_url
@@ -44,3 +44,5 @@ LOGGING = {
     "handlers": {"console": {"class": "logging.StreamHandler"}},
     "root": {"handlers": ["console"], "level": "INFO"},
 }
+
+

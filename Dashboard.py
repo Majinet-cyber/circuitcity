@@ -1,4 +1,4 @@
-import pandas as pd
+﻿import pandas as pd
 import tkinter as tk
 from tkinter import filedialog, messagebox
 import plotly.express as px
@@ -22,7 +22,7 @@ client = gspread.authorize(creds)
 spreadsheet = client.open("circuit city cashflow")
 sheet = spreadsheet.worksheet("Cash Reserve")
 
-# ✅ Safe int helper to skip non-numeric cells
+# âœ… Safe int helper to skip non-numeric cells
 def safe_int(cell):
     try:
         return int(cell.replace(',', '').strip())
@@ -73,7 +73,7 @@ def generate_dashboard(df):
                                   mode="lines+markers", name="Profit Growth"))
         fig2.update_layout(title="Profit Growth Over Time", xaxis_title="Date", yaxis_title="Profit")
 
-        # ✅ Live Cash Reserve chart from Google Sheets with safe data
+        # âœ… Live Cash Reserve chart from Google Sheets with safe data
         cashflow_df = pd.DataFrame({
             "Date": dates[:len(savings)],  # Match lengths in case they differ
             "Savings": savings,
@@ -108,3 +108,5 @@ tk.Button(tk_root, text="Select Sales Data File", command=load_sales_data).pack(
 tk.Button(tk_root, text="Select Output Directory", command=select_output_directory).pack(pady=10)
 
 tk_root.mainloop()
+
+

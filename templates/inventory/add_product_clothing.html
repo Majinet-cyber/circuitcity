@@ -1,0 +1,207 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Add Products · Clothing{% endblock %}
+{% block header_title %}Add Products (Clothing){% endblock %}
+
+{% block content %}
+<div class="glass-card p-3 p-md-4">
+  <div class="d-flex align-items-center justify-content-between mb-2">
+    <div>
+      <div class="badge bg-primary-subtle text-primary fw-semibold">Clothing</div>
+      <h3 class="mt-2 mb-0">Add Product</h3>
+      <div class="text-muted small">
+        Create a clothing master item your team will use for Stock-IN and Sell.
+      </div>
+    </div>
+    <a href="{% url 'inventory:dashboard' %}" class="btn btn-light d-none d-md-inline-flex">
+      <i class="ti ti-arrow-left me-1"></i> Back to Dashboard
+    </a>
+  </div>
+
+  <form method="post" novalidate id="clothing-add-form" class="mt-3">
+    {% csrf_token %}
+
+    <div class="row g-2 g-md-3">
+      <!-- TYPE -->
+      <div class="col-12 col-md-4">
+        <label class="form-label">Type <span class="text-danger">*</span></label>
+        <select name="clothing_type" class="form-select" required>
+          <option value="" selected disabled>Choose…</option>
+          <option value="t_shirt">T-Shirt</option>
+          <option value="shirt">Shirt</option>
+          <option value="dress">Dress</option>
+          <option value="trouser">Trouser</option>
+          <option value="skirt">Skirt</option>
+          <option value="hoodie">Hoodie</option>
+          <option value="jacket">Jacket</option>
+          <option value="shoes">Shoes</option>
+          <option value="hat">Hat / Cap</option>
+          <option value="other">Other</option>
+        </select>
+        <div class="form-text">Used for filters, analytics, and sizing hints.</div>
+      </div>
+
+      <!-- SIZE -->
+      <div class="col-6 col-md-2">
+        <label class="form-label">Size <span class="text-danger">*</span></label>
+        <input type="text" name="size" class="form-control" placeholder="e.g., S, M, L, 32, EU42" required>
+        <div class="form-text">Text is flexible: “M”, “32”, “EU42”, etc.</div>
+      </div>
+
+      <!-- CATEGORY -->
+      <div class="col-6 col-md-2">
+        <label class="form-label">Category</label>
+        <input type="text" name="category" class="form-control" placeholder="e.g., Casual, Formal, Sports">
+      </div>
+
+      <!-- COLOR -->
+      <div class="col-6 col-md-2">
+        <label class="form-label">Color</label>
+        <input type="text" name="color" class="form-control" placeholder="e.g., Black">
+      </div>
+
+      <!-- GENDER -->
+      <div class="col-6 col-md-2">
+        <label class="form-label">Gender</label>
+        <select name="gender" class="form-select">
+          <option value="" selected>Unisex / N/A</option>
+          <option value="women">Women</option>
+          <option value="men">Men</option>
+          <option value="girls">Girls</option>
+          <option value="boys">Boys</option>
+        </select>
+      </div>
+
+      <!-- ORDER PRICE -->
+      <div class="col-6 col-md-3">
+        <label class="form-label">Order price (cost)</label>
+        <div class="input-group">
+          <span class="input-group-text">MWK</span>
+          <input type="number" min="0" step="0.01" name="order_price" id="order_price" class="form-control" placeholder="0.00">
+        </div>
+        <div class="form-text">Your landed cost per unit.</div>
+      </div>
+
+      <!-- SELLING PRICE -->
+      <div class="col-6 col-md-3">
+        <label class="form-label">Selling price</label>
+        <div class="input-group">
+          <span class="input-group-text">MWK</span>
+          <input type="number" min="0" step="0.01" name="price" id="sell_price" class="form-control" placeholder="0.00">
+        </div>
+        <div class="form-text">Current shelf price (can change later).</div>
+      </div>
+
+      <!-- QUANTITY -->
+      <div class="col-6 col-md-3">
+        <label class="form-label">Initial stock (qty) <span class="text-danger">*</span></label>
+        <div class="input-group">
+          <input type="number" min="0" step="1" name="quantity" id="quantity" class="form-control" value="0" required>
+          <span class="input-group-text">units</span>
+        </div>
+        <div class="form-text">How many pieces you currently hold.</div>
+      </div>
+
+      <!-- OPTIONAL SKU -->
+      <div class="col-6 col-md-3">
+        <label class="form-label">SKU (optional)</label>
+        <input type="text" name="sku" class="form-control" placeholder="e.g., DR-BLK-M-2025">
+        <div class="form-text">Useful for labels/barcodes.</div>
+      </div>
+
+      <!-- NAME -->
+      <div class="col-12 col-md-6">
+        <label class="form-label">Product name</label>
+        <input type="text" name="product_name" class="form-control" placeholder="e.g., Denim Jacket" value="{{ form.product_name.value|default_if_none:'' }}">
+        {% if form and form.product_name and form.product_name.errors %}
+          <div class="invalid-feedback d-block">{{ form.product_name.errors.0 }}</div>
+        {% endif %}
+      </div>
+
+      <!-- NOTES -->
+      <div class="col-12">
+        <label class="form-label">Notes</label>
+        <textarea name="notes" class="form-control" rows="2"
+                  placeholder="Fabric, fit, brand, season, washing instructions, etc."></textarea>
+      </div>
+
+      <!-- READ-ONLY CALCS -->
+      <div class="col-12 col-md-3">
+        <label class="form-label">Profit per unit (est.)</label>
+        <div class="input-group">
+          <span class="input-group-text">MWK</span>
+          <input type="text" id="computed_profit" class="form-control" value="0.00" readonly>
+        </div>
+        <div class="form-text">Selling − Cost.</div>
+      </div>
+
+      <div class="col-12 col-md-3">
+        <label class="form-label">Margin % (est.)</label>
+        <input type="text" id="computed_margin" class="form-control" value="0%" readonly>
+        <div class="form-text">Profit ÷ Selling × 100.</div>
+      </div>
+    </div>
+
+    <!-- ACTIONS -->
+    <div class="d-flex flex-column flex-md-row gap-2 mt-3">
+      <button type="submit" class="btn btn-primary">
+        <i class="ti ti-device-floppy me-1"></i> Save product
+      </button>
+      <button type="submit" name="add_another" value="1" class="btn btn-outline-primary">
+        <i class="ti ti-plus me-1"></i> Save & add another
+      </button>
+      <a href="{% url 'inventory:dashboard' %}" class="btn btn-light">Cancel</a>
+    </div>
+  </form>
+</div>
+
+<!-- Quick tips -->
+<div class="mt-3">
+  <div class="glass-card p-2 p-md-3">
+    <div class="d-flex align-items-center">
+      <i class="ti ti-bulb me-2"></i>
+      <div class="small">
+        <strong>Tips:</strong> Keep size text consistent (e.g., S-M-L or numeric).
+        Use descriptive SKUs for fast scanning: <em>TYPE-COLOR-SIZE-YEAR</em>.
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+(function () {
+  const fmtMoney = (n) => (isNaN(n) || !isFinite(n)) ? "0.00" : (Math.round(n * 100) / 100).toFixed(2);
+  const fmtPct   = (n) => (isNaN(n) || !isFinite(n)) ? "0%"   : (Math.round(n * 100) / 100).toFixed(2) + "%";
+
+  const costEl = document.getElementById('order_price');
+  const sellEl = document.getElementById('sell_price');
+  const pEl    = document.getElementById('computed_profit');
+  const mEl    = document.getElementById('computed_margin');
+
+  function recalc() {
+    const c = parseFloat(costEl?.value || 0);
+    const s = parseFloat(sellEl?.value || 0);
+    const p = s - c;
+    if (pEl) pEl.value = fmtMoney(p);
+    if (mEl) mEl.value = (s > 0) ? fmtPct((p / s) * 100) : "0%";
+  }
+
+  ['input','change'].forEach(ev => {
+    costEl?.addEventListener(ev, recalc);
+    sellEl?.addEventListener(ev, recalc);
+  });
+  recalc();
+
+  document.getElementById('clothing-add-form').addEventListener('submit', function(e){
+    const typeOk = (this.querySelector('select[name="clothing_type"]').value || '') !== '';
+    const sizeOk = (this.querySelector('input[name="size"]').value || '').trim().length > 0;
+    const qtyOk  = parseInt(this.querySelector('input[name="quantity"]').value || '0', 10) >= 0;
+    if (!typeOk || !sizeOk || !qtyOk) {
+      e.preventDefault();
+      alert('Please select a clothing type, enter a size, and set a valid quantity.');
+    }
+  });
+})();
+</script>
+{% endblock %}

@@ -1,4 +1,4 @@
-from django.http import JsonResponse
+﻿from django.http import JsonResponse
 from django.views.decorators.http import require_http_methods
 from django.contrib.auth.decorators import login_required
 from django.db.models import Q
@@ -17,3 +17,5 @@ def api_saved_views(request, scope):
         query=data.get("query",{}), is_shared=bool(data.get("shared"))
     )
     return JsonResponse({"ok":True,"id":v.id})
+
+

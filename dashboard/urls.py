@@ -75,3 +75,5 @@ urlpatterns = [
     path("proxy/agent/", agent_dash_proxy, name="agent_dashboard_redirect"),
     path("healthz/", healthz_view, name="healthz"),
 ]
+
+

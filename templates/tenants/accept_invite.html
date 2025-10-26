@@ -35,6 +35,7 @@
       <form method="post" novalidate id="inviteForm">
         {% csrf_token %}
 
+        <!-- Optional friendly display name (not required by backend form) -->
         <div class="mb-3">
           <label for="username" class="form-label fw-semibold">Your name</label>
           <input
@@ -44,55 +45,36 @@
             name="username"
             placeholder="e.g. Chris Mwale"
             value="{{ invite.invited_name|default_if_none:'' }}"
-            required
             autocomplete="name"
           >
           <div class="form-text">Use the name teammates will recognize.</div>
         </div>
 
-        {% if invite.email %}
+        <!-- Email comes from the Django form so it is locked if the invite has an email,
+             or required/editable if the invite was link-only. -->
         <div class="mb-3">
-          <label class="form-label fw-semibold">Email (from invite)</label>
-          <input type="email" class="form-control" value="{{ invite.email }}" readonly>
+          <label for="{{ form.email.id_for_label }}" class="form-label fw-semibold">
+            Email {% if invite.email %}(from invite){% endif %}
+          </label>
+          {{ form.email|add_class:"form-control" }}
           <div class="form-text">Used for notifications and password reset.</div>
         </div>
-        {% endif %}
 
         <div class="mb-3">
-          <label for="password1" class="form-label fw-semibold">Create password</label>
+          <label for="{{ form.password1.id_for_label }}" class="form-label fw-semibold">Create password</label>
           <div class="input-group">
-            <input
-              type="password"
-              class="form-control"
-              id="password1"
-              name="password1"
-              minlength="6"
-              required
-              autocomplete="new-password"
-              placeholder="At least 6 characters"
-              aria-describedby="pwdHelp strengthHint"
-            >
-            <button class="btn btn-outline-secondary" type="button" data-toggle="reveal" data-target="#password1">Show</button>
+            {{ form.password1|add_class:"form-control" }}
+            <button class="btn btn-outline-secondary" type="button" data-toggle="reveal" data-target="[name='password1']">Show</button>
           </div>
-          <div id="pwdHelp" class="form-text">Tip: mix letters and numbers for a stronger password.</div>
+          <div class="form-text">Tip: mix letters and numbers for a stronger password.</div>
           <div id="strengthHint" class="small mt-1"></div>
         </div>
 
         <div class="mb-3">
-          <label for="password2" class="form-label fw-semibold">Confirm password</label>
+          <label for="{{ form.password2.id_for_label }}" class="form-label fw-semibold">Confirm password</label>
           <div class="input-group">
-            <input
-              type="password"
-              class="form-control"
-              id="password2"
-              name="password2"
-              minlength="6"
-              required
-              autocomplete="new-password"
-              placeholder="Re-enter password"
-              aria-describedby="matchHint"
-            >
-            <button class="btn btn-outline-secondary" type="button" data-toggle="reveal" data-target="#password2">Show</button>
+            {{ form.password2|add_class:"form-control" }}
+            <button class="btn btn-outline-secondary" type="button" data-toggle="reveal" data-target="[name='password2']">Show</button>
           </div>
           <div class="form-text" id="matchHint" style="display:none;">Passwords match ✔</div>
         </div>
@@ -118,28 +100,30 @@
   const form = document.getElementById('inviteForm');
   const nameInput = document.getElementById('username');
   const greeting = document.getElementById('greeting');
-  const p1 = document.getElementById('password1');
-  const p2 = document.getElementById('password2');
+  const p1 = form ? form.querySelector("input[name='password1']") : null;
+  const p2 = form ? form.querySelector("input[name='password2']") : null;
   const matchHint = document.getElementById('matchHint');
   const strengthHint = document.getElementById('strengthHint');
   const expiryBadge = document.getElementById('expiryBadge');
 
   // --- Greeting live update ---
   function updateGreeting() {
-    const name = (nameInput.value || '').trim() || defaultInvitee || 'there';
+    if (!greeting) return;
+    const name = (nameInput && nameInput.value || '').trim() || defaultInvitee || 'there';
     greeting.textContent = `Hi ${name}, welcome to ${shopName}.`;
   }
 
   // --- Password strength (simple client-side hint; server still validates) ---
   function strength(s) {
     let score = 0;
-    if (s.length >= 6) score++;
+    if (s.length >= 8) score++;          // align with server min (8)
     if (/[a-z]/.test(s) && /[A-Z]/.test(s)) score++;
     if (/\d/.test(s)) score++;
     if (/[^A-Za-z0-9]/.test(s)) score++;
     return score;
   }
   function updateStrength() {
+    if (!p1 || !strengthHint) return;
     const s = p1.value || "";
     const sc = strength(s);
     let msg = "";
@@ -154,11 +138,12 @@
 
   // --- Match indicator & guard ---
   function updateMatch() {
+    if (!p1 || !p2 || !matchHint) return;
     if (!p1.value || !p2.value) {
       matchHint.style.display = 'none';
       return;
     }
-    const ok = p1.value === p2.value && p1.value.length >= 6;
+    const ok = p1.value === p2.value && p1.value.length >= 8;
     matchHint.style.display = ok ? 'block' : 'none';
     matchHint.className = "form-text " + (ok ? "text-success" : "text-danger");
     matchHint.textContent = ok ? "Passwords match ✔" : "Passwords don't match";
@@ -167,12 +152,12 @@
   // prevent submit if mismatch or too short (client-side nicety; server still authoritative)
   if (form) {
     form.addEventListener('submit', (e) => {
-      const ok = p1.value === p2.value && p1.value.length >= 6;
+      const ok = p1 && p2 && p1.value === p2.value && p1.value.length >= 8;
       if (!ok) {
         e.preventDefault();
         updateMatch();
-        if (p1.value.length < 6) p1.focus();
-        else p2.focus();
+        if (p1 && p1.value.length < 8) p1.focus();
+        else if (p2) p2.focus();
       }
     });
   }

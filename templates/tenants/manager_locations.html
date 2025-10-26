@@ -1,0 +1,206 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Locations · {{ biz.name }}{% endblock %}
+
+{% block body %}
+<div class="cc-wrap">
+  {% if flash %}
+    <div class="cc-flash cc-flash-info">{{ flash }}</div>
+  {% endif %}
+
+  <div class="cc-header">
+    <h2>Locations <span class="cc-muted">· {{ biz.name }}</span></h2>
+  </div>
+
+  <div class="cc-grid">
+    <div class="cc-card">
+      <h3>Create / Update location</h3>
+      <form method="post" id="loc-form" class="cc-form">
+        {% csrf_token %}
+        <input type="hidden" name="loc_id" id="loc_id">
+        <input type="hidden" name="action" id="action" value="upsert">
+
+        <div class="cc-row">
+          <div class="cc-field">
+            <label>Name</label>
+            <input class="cc-input" name="name" id="name" placeholder="Branch or shop name" required>
+          </div>
+          <div class="cc-field">
+            <label>City (optional)</label>
+            <input class="cc-input" name="city" id="city" placeholder="e.g., Lilongwe">
+          </div>
+        </div>
+
+        <div class="cc-row">
+          <div class="cc-field">
+            <label>Latitude</label>
+            <input class="cc-input" name="latitude" id="latitude" inputmode="decimal" placeholder="-13.96">
+          </div>
+          <div class="cc-field">
+            <label>Longitude</label>
+            <input class="cc-input" name="longitude" id="longitude" inputmode="decimal" placeholder="33.77">
+          </div>
+        </div>
+
+        <div class="cc-row">
+          <div class="cc-field">
+            <label>Geofence radius (m)</label>
+            <input class="cc-input" name="radius" id="radius" type="number" min="10" step="1" value="150">
+          </div>
+          <div class="cc-field cc-center">
+            <label class="cc-checkbox">
+              <input type="checkbox" name="is_default" id="is_default">
+              <span>Default store for this business</span>
+            </label>
+          </div>
+        </div>
+
+        <div class="cc-actions">
+          <button type="button" id="gpsBtn" class="cc-btn cc-btn-glass cc-ghost">📍 Grab GPS</button>
+          <button class="cc-btn cc-btn-primary">Save location</button>
+          <button type="button" id="resetBtn" class="cc-btn cc-btn-glass">Reset form</button>
+        </div>
+        <p class="cc-hint">We use your browser’s GPS; allow permission for best accuracy.</p>
+      </form>
+    </div>
+
+    <div class="cc-card">
+      <h3>Existing locations</h3>
+      <table class="cc-table">
+        <thead>
+          <tr>
+            <th>Name</th><th>Type</th><th>Active</th><th style="text-align:right">Actions</th>
+          </tr>
+        </thead>
+        <tbody id="loc-tbody">
+          {% for r in rows %}
+          <tr data-id="{{ r.id }}" data-name="{{ r.name|escape }}" data-city="{{ r.city|escape }}"
+              data-lat="{{ r.lat }}" data-lng="{{ r.lng }}" data-radius="{{ r.radius }}" data-default="{{ r.is_default }}">
+            <td>{{ r.name }}</td>
+            <td>{{ r.type }}</td>
+            <td>{{ r.active }}</td>
+            <td style="text-align:right">
+              <button class="cc-btn cc-btn-xs cc-btn-glass row-edit" data-id="{{ r.id }}">Edit</button>
+              <form method="post" style="display:inline">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="delete">
+                <input type="hidden" name="loc_id" value="{{ r.id }}">
+                <button class="cc-btn cc-btn-xs cc-btn-danger"
+                        onclick="return confirm('Delete {{ r.name|escapejs }}? This cannot be undone.')">
+                  Delete
+                </button>
+              </form>
+            </td>
+          </tr>
+          {% empty %}
+          <tr><td colspan="4" class="cc-muted">No locations found.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<style>
+  /* Layout helpers that match your design language */
+  .cc-wrap{max-width:1100px;margin:0 auto;padding:8px 4px 24px}
+  .cc-header h2{margin:.2rem 0 1rem}
+  .cc-muted{color:#64748b}
+  .cc-grid{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+  @media (max-width: 980px){.cc-grid{grid-template-columns:1fr}}
+
+  .cc-card{background:rgba(255,255,255,.7);backdrop-filter:saturate(180%) blur(8px);
+           border:1px solid rgba(14,165,233,.15);border-radius:14px;padding:16px;
+           box-shadow:0 6px 30px rgba(2,6,23,.05)}
+  .cc-row{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  @media (max-width:680px){.cc-row{grid-template-columns:1fr}}
+
+  .cc-field label{font-weight:700;font-size:12px;color:#334155;display:block;margin:0 0 6px}
+  .cc-input{width:100%;border:1px solid #e2e8f0;border-radius:10px;padding:10px 12px;font-size:14px;background:#fff}
+  .cc-center{display:flex;align-items:end}
+  .cc-checkbox{display:flex;gap:10px;align-items:center;margin:0}
+  .cc-hint{color:#64748b;font-size:12px;margin:.5rem 0 0}
+
+  .cc-actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:8px}
+
+  /* Buttons — primary blue + glassmorphic ghost */
+  .cc-btn{border-radius:12px;padding:10px 14px;font-weight:700;font-size:14px;border:1px solid #e2e8f0;cursor:pointer}
+  .cc-btn-primary{background:#1f6feb;color:#fff;border-color:#1f6feb;box-shadow:0 6px 20px rgba(31,111,235,.25)}
+  .cc-btn-primary:hover{filter:brightness(.98)}
+  .cc-btn-glass{background:rgba(255,255,255,.55);backdrop-filter:saturate(180%) blur(10px)}
+  .cc-ghost{border-color:#dbeafe}
+  .cc-btn-danger{background:rgba(255,255,255,.6);color:#ef4444;border-color:#fecaca}
+  .cc-btn-xs{padding:6px 10px;font-size:12px;border-radius:10px}
+
+  .cc-table{width:100%;border-collapse:collapse;background:#fff;border:1px solid #e2e8f0;border-radius:12px;overflow:hidden}
+  .cc-table th,.cc-table td{padding:.6rem .8rem;border-bottom:1px solid #eef2f7;font-size:14px}
+  .cc-table th{text-align:left;background:#f8fafc;font-weight:800}
+  .cc-flash{padding:.5rem .75rem;border-radius:10px;display:inline-block;margin:.25rem 0}
+  .cc-flash-info{background:#ecfeff;border:1px solid #a5f3fc;color:#0369a1}
+</style>
+
+<script>
+  // Elements
+  const idEl = document.getElementById('loc_id');
+  const nameEl = document.getElementById('name');
+  const cityEl = document.getElementById('city');
+  const latEl = document.getElementById('latitude');
+  const lngEl = document.getElementById('longitude');
+  const radEl = document.getElementById('radius');
+  const defEl = document.getElementById('is_default');
+  const actionEl = document.getElementById('action');
+
+  // Edit loader
+  document.getElementById('loc-tbody').addEventListener('click', (e) => {
+    const btn = e.target.closest('.row-edit');
+    if (!btn) return;
+    const tr = btn.closest('tr');
+    idEl.value = tr.dataset.id || '';
+    nameEl.value = tr.dataset.name || '';
+    cityEl.value = tr.dataset.city || '';
+    latEl.value = tr.dataset.lat || '';
+    lngEl.value = tr.dataset.lng || '';
+    radEl.value = tr.dataset.radius || '150';
+    defEl.checked = (tr.dataset.default === '1');
+    actionEl.value = 'upsert';
+    window.scrollTo({ top:0, behavior:'smooth' });
+  });
+
+  // Reset
+  document.getElementById('resetBtn').addEventListener('click', () => {
+    idEl.value=''; nameEl.value=''; cityEl.value=''; latEl.value=''; lngEl.value='';
+    radEl.value='150'; defEl.checked=false; actionEl.value='upsert';
+  });
+
+  // Reverse geocode (OpenStreetMap)
+  async function reverseGeocode(lat, lng){
+    try{
+      const url = `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=10&addressdetails=1`;
+      const resp = await fetch(url, { headers: { 'Accept-Language': 'en' }});
+      if(!resp.ok) return '';
+      const data = await resp.json();
+      const a = data && data.address ? data.address : {};
+      return a.city || a.town || a.village || a.county || a.state_district || a.state || '';
+    }catch(_){ return ''; }
+  }
+
+  // Grab GPS
+  document.getElementById('gpsBtn').addEventListener('click', async (e) => {
+    const btn = e.currentTarget;
+    if (!navigator.geolocation){ alert('This browser has no GPS support.'); return; }
+    btn.disabled = true; btn.textContent = 'Grabbing…';
+    navigator.geolocation.getCurrentPosition(async (pos) => {
+      const { latitude, longitude } = pos.coords;
+      latEl.value = latitude.toFixed(6);
+      lngEl.value = longitude.toFixed(6);
+      const city = await reverseGeocode(latitude, longitude);
+      if (city && !cityEl.value) cityEl.value = city;
+      btn.disabled = false; btn.textContent = '📍 Grab GPS';
+    }, (err) => {
+      alert('Could not get GPS: ' + (err && err.message ? err.message : 'permission denied'));
+      btn.disabled = false; btn.textContent = '📍 Grab GPS';
+    }, { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 });
+  });
+</script>
+{% endblock %}

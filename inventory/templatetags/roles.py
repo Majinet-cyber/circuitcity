@@ -1,4 +1,4 @@
-# inventory/templatetags/roles.py
+﻿# inventory/templatetags/roles.py
 from django import template
 register = template.Library()
 
@@ -11,3 +11,5 @@ def in_group(context, name: str):
 def is_auditor(context):
     user = context.get("request").user
     return user.groups.filter(name="Auditor").exists()
+
+

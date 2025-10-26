@@ -1,4 +1,4 @@
-# cc/views.py
+﻿# cc/views.py
 from __future__ import annotations
 from decimal import Decimal
 from datetime import datetime, timedelta
@@ -148,12 +148,12 @@ def _totals_for_user(user: User, scope: str = "all") -> Dict[str, Any]:
 @login_required
 @user_passes_test(is_admin)
 def admin_dashboard(_request: HttpRequest) -> HttpResponse:
-    """Old route name → redirect to the new namespaced admin dashboard."""
+    """Old route name â†’ redirect to the new namespaced admin dashboard."""
     return redirect("dashboard:dashboard")
 
 
 # ==============================================================================
-# Admin → per-agent detail + record advance
+# Admin â†’ per-agent detail + record advance
 # ==============================================================================
 @login_required
 @user_passes_test(is_admin)
@@ -280,7 +280,7 @@ def agent_dashboard(request: HttpRequest) -> HttpResponse:
                 reason="SUNDAY_BONUS",
                 memo="Sunday work bonus",
             )
-            messages.success(request, "🎉 Sunday bonus MK15,000 added to your wallet!")
+            messages.success(request, "ðŸŽ‰ Sunday bonus MK15,000 added to your wallet!")
         else:
             eight_am = local_when.replace(hour=8, minute=0, second=0, microsecond=0)
             if local_when <= eight_am:
@@ -290,7 +290,7 @@ def agent_dashboard(request: HttpRequest) -> HttpResponse:
                     reason="EARLY_BIRD",
                     memo="Early-bird before 8am",
                 )
-                messages.success(request, "😊 Early-bird bonus MK5,000 added to your wallet!")
+                messages.success(request, "ðŸ˜Š Early-bird bonus MK5,000 added to your wallet!")
             else:
                 secs_after = (local_when - eight_am).total_seconds()
                 blocks = int((secs_after + 1799) // 1800)  # 30-min blocks, rounded up
@@ -302,7 +302,7 @@ def agent_dashboard(request: HttpRequest) -> HttpResponse:
                         reason="LATE_PENALTY",
                         memo=f"Late by ~{blocks*30} minutes",
                     )
-                    messages.error(request, f"😢 Late penalty −MK{penalty:,} applied.")
+                    messages.error(request, f"ðŸ˜¢ Late penalty âˆ’MK{penalty:,} applied.")
 
         # Stay on this (cc) agent dashboard
         return redirect("agent_dashboard")
@@ -438,3 +438,8 @@ def feature_unavailable(request: HttpRequest, *args, **kwargs) -> HttpResponse:
     before the real implementation lands.
     """
     return _render_error(request, template="errors/501.html", status=501)
+
+
+
+
+

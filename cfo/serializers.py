@@ -1,4 +1,4 @@
-from rest_framework import serializers
+﻿from rest_framework import serializers
 from .models import ExpenseCategory, Expense, Budget, CashLedger, PaymentIntent, ForecastSnapshot, Alert, Recommendation, PersonalExpense
 
 class ExpenseCategorySerializer(serializers.ModelSerializer):
@@ -52,3 +52,5 @@ class PersonalExpenseSerializer(serializers.ModelSerializer):
         model = PersonalExpense
         fields = "__all__"
         read_only_fields = ("created_at",)
+
+

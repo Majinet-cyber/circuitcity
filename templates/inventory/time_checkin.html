@@ -1,147 +1,370 @@
 {% extends "base.html" %}
 {% load static %}
 {% block title %}Time Check-in · Circuit City{% endblock %}
+{% block header_title %}Time Check-in{% endblock %}
 
 {% block body %}
-<div class="card" style="background:var(--cc-panel);border:1px solid var(--cc-border);border-radius:12px;padding:1rem;">
-  <h2 style="margin:0 0 .75rem 0;">Time Check-in</h2>
+<style>
+  /* ===== Glassmorphic, mobile-first polish ===== */
+  .ckn-grid{display:grid;gap:14px}
+  @media (min-width: 920px){ .ckn-grid{grid-template-columns: 1.1fr .9fr} }
 
-  <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;">
-    <!-- Store target info -->
-    <section style="border:1px dashed var(--cc-border);border-radius:10px;padding:.75rem;">
-      <h3 style="margin:.25rem 0 .5rem 0;font-size:1rem;color:var(--cc-muted)">Store target</h3>
-      <div><strong>Name:</strong> {{ home_loc.name|default:"(home location not set)" }}</div>
-      <div><strong>Lat/Lon:</strong>
-        {% if home_loc and home_loc.latitude and home_loc.longitude %}
-          {{ home_loc.latitude }}, {{ home_loc.longitude }}
-        {% else %}
-          —
-        {% endif %}
-      </div>
-      <div><strong>Geofence radius:</strong> {{ home_loc.geofence_radius_m|default:150 }} m</div>
-    </section>
+  .glass{
+    position:relative;
+    border-radius:16px;
+    padding:14px;
+    background:
+      radial-gradient(120% 160% at 0% -20%, rgba(59,130,246,.08), transparent 40%),
+      radial-gradient(120% 140% at 100% 120%, rgba(16,185,129,.08), transparent 40%),
+      color-mix(in oklab, var(--card,#fff) 82%, transparent);
+    border:1px solid color-mix(in oklab, var(--cc-border) 70%, transparent);
+    -webkit-backdrop-filter: blur(10px) saturate(120%);
+    backdrop-filter: blur(10px) saturate(120%);
+    box-shadow: var(--shadow-sm);
+  }
+  .section-title{ font-size:.95rem; font-weight:800; color:var(--cc-muted); margin-bottom:.35rem; }
 
-    <!-- Options -->
-    <section style="border:1px dashed var(--cc-border);border-radius:10px;padding:.75rem;">
-      <h3 style="margin:.25rem 0 .5rem 0;font-size:1rem;color:var(--cc-muted)">Options</h3>
-      <label for="chkType" style="display:block;margin-bottom:.5rem;font-weight:600;">Check-in type</label>
-      <select id="chkType" class="btn" style="width:100%;">
-        <option value="ARRIVAL">Arrival</option>
-        <option value="DEPARTURE">Departure</option>
-      </select>
-      {% if locations %}
-        <label for="locSel" style="display:block;margin:.75rem 0 .5rem 0;font-weight:600;">Location</label>
-        <select id="locSel" class="btn" style="width:100%;">
+  .pill{ padding:.25rem .6rem; border-radius:999px; border:1px solid var(--cc-border); font-weight:800; font-size:.8rem; }
+  .pill-idle{ background:#f8fafc; color:#334155; }
+  .pill-work{ background:#ecfdf5; color:#065f46; border-color:#bbf7d0; }
+
+  .seg{ display:grid; grid-auto-flow:column; gap:8px }
+  .seg .opt{
+    border:1px solid var(--cc-border);
+    background:#fff;
+    border-radius:12px; padding:.6rem .8rem; font-weight:800;
+  }
+  .seg .opt[aria-checked="true"]{ border-color:#93c5fd; box-shadow: inset 0 0 0 2px #e6f2ff; background:#f8fbff }
+
+  .btn-big{ width:100%; border-radius:14px; padding:.95rem 1rem; font-weight:900; letter-spacing:.2px; }
+
+  .muted{ color:var(--cc-muted) }
+  .mono{ font-variant-numeric: tabular-nums; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace; }
+  .row{ display:flex; align-items:center; gap:10px }
+
+  /* ===== Battery (0–100%) ===== */
+  .battery{
+    --lv: 0%;
+    position:relative; display:flex; align-items:center; gap:12px;
+    padding:10px; border-radius:16px; background: color-mix(in oklab, var(--card,#fff) 92%, transparent);
+    border:1px solid var(--cc-border);
+  }
+  .battery .pack{
+    position:relative; flex:1; height:22px; border-radius:999px; overflow:hidden;
+    border:1px solid var(--cc-border); background:#eef2ff;
+  }
+  .battery .fill{
+    position:absolute; inset:0 auto 0 0; width:var(--lv);
+    background: linear-gradient(90deg, #86efac, #60a5fa);
+    transition: width 260ms var(--elevate);
+  }
+  .battery .cap{ width:12px; height:16px; border-radius:3px; background: var(--cc-border); }
+  .battery .pct{ min-width:42px; text-align:right; font-weight:900; }
+
+  /* Compact on phones */
+  @media (max-width:520px){
+    .btn-big{ padding:.85rem .9rem }
+    .battery{ padding:8px }
+  }
+</style>
+
+<div class="ckn-grid">
+  <!-- LEFT: Actions -->
+  <section class="glass">
+    <div class="row" style="justify-content:space-between; margin-bottom:6px">
+      <div class="section-title">Now</div>
+      <button id="btnRefresh" class="btn btn-sm btn-light">Refresh</button>
+    </div>
+    <div id="clock" class="mono" style="font-size:1.4rem; font-weight:900; margin-bottom:8px">—:—:—</div>
+
+    <!-- Store picker -->
+    <div style="margin-top:6px">
+      <div class="section-title">Store</div>
+      <select id="locSel" class="form-select" style="height:44px; border-radius:12px">
+        {% if locations %}
           {% for l in locations %}
             <option value="{{ l.id }}" {% if home_loc and l.id == home_loc.id %}selected{% endif %}>
-              {{ l.name }}{% if l.city %} — {{ l.city }}{% endif %}
+              {{ l.name }}{% if l.city %} · {{ l.city }}{% endif %}
             </option>
           {% endfor %}
-        </select>
-      {% endif %}
-    </section>
-  </div>
+        {% else %}
+          <option value="">(no locations yet)</option>
+        {% endif %}
+      </select>
+      <div class="muted" style="margin-top:6px; font-size:.85rem">
+        Defaulted to your manager store {% if home_loc %}<strong>{{ home_loc.name }}</strong>{% else %}(not set){% endif %}.
+      </div>
+    </div>
 
-  <!-- Check-in button -->
-  <div style="display:flex;gap:.75rem;align-items:center;margin-top:1rem;">
-    <button id="doCheckin" class="btn btn-green" style="font-size:1.05rem;padding:.7rem 1.1rem;">⏱ Check-in now</button>
-    <span id="spin" hidden aria-live="polite">Getting GPS…</span>
-  </div>
+    <!-- Type -->
+    <div style="margin-top:12px">
+      <div class="section-title">Check-in type</div>
+      <div class="seg" role="tablist" aria-label="Check-in type">
+        <button class="opt" id="optArr" role="tab" aria-checked="true">Arrival</button>
+        <button class="opt" id="optDep" role="tab" aria-checked="false">Departure</button>
+      </div>
+    </div>
 
-  <div id="result" style="margin-top:1rem;"></div>
+    <!-- Call to action -->
+    <div class="row" style="margin-top:12px">
+      <button id="btnCheck" class="btn btn-primary btn-big">⏱ Check-in now</button>
+      <span id="spin" class="muted" hidden>Getting GPS…</span>
+    </div>
 
-  <details style="margin-top:1rem;">
-    <summary>What happens?</summary>
-    <p>We grab your device GPS (with permission), then send it to
-      <code>/inventory/api/time-checkin/</code>. If your distance to the store is within the
-      geofence, it’s flagged as “on-site”.</p>
-  </details>
+    <div id="result" style="margin-top:12px"></div>
+
+    <details style="margin-top:10px">
+      <summary class="muted">What happens?</summary>
+      <div class="muted" style="font-size:.9rem">
+        Your GPS (with permission) is posted to
+        <code>/inventory/api/time-checkin/</code>. If you’re inside the store geofence, you’re counted as <em>working</em>.
+      </div>
+      <ul class="muted" style="font-size:.85rem; margin:.5rem 0 0 1rem">
+        <li>If you see a permission prompt, choose <b>Allow</b>.</li>
+        <li>If it times out, enable Location in OS settings and try again near a window.</li>
+      </ul>
+    </details>
+  </section>
+
+  <!-- RIGHT: Battery + Today -->
+  <section class="glass">
+    <div class="row" style="justify-content:space-between; margin-bottom:6px">
+      <div class="section-title">Today</div>
+      <span id="statePill" class="pill pill-idle">Idle</span>
+    </div>
+
+    <div class="battery">
+      <div class="pack"><div id="batFill" class="fill"></div></div>
+      <div class="cap" aria-hidden="true"></div>
+      <div id="batPct" class="pct mono">0%</div>
+    </div>
+
+    <div class="row" style="justify-content:space-between; margin-top:10px">
+      <div>
+        <div class="muted" style="font-size:.8rem">Work</div>
+        <div id="workH" class="mono" style="font-weight:900">00:00:00</div>
+      </div>
+      <div style="text-align:right">
+        <div class="muted" style="font-size:.8rem">Off-site</div>
+        <div id="offH" class="mono" style="font-weight:900">00:00:00</div>
+      </div>
+    </div>
+
+    <div style="margin-top:12px">
+      <div class="section-title">Recent</div>
+      <div id="recentBox" class="muted" style="font-size:.9rem">No logs yet.</div>
+    </div>
+  </section>
 </div>
 
 <script>
 (function(){
-  const $ = (sel)=>document.querySelector(sel);
-  const btn   = $('#doCheckin');
-  const spin  = $('#spin');
-  const out   = $('#result');
-  const type  = $('#chkType');
-  const locSel= $('#locSel');
+  'use strict';
+  const $ = s => document.querySelector(s);
 
-  function line(label, value){
-    return `<div style="padding:.35rem 0;border-bottom:1px solid var(--cc-border)">
-              <strong>${label}:</strong> ${value}
-            </div>`;
+  // ===== Clock =====
+  (function clock(){
+    const el = $('#clock');
+    const pad = n => (n<10?'0':'')+n;
+    function tick(){
+      const d = new Date();
+      if(el) el.textContent = `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+    }
+    tick(); setInterval(tick, 1000);
+    $('#btnRefresh')?.addEventListener('click', tick, {passive:true});
+  })();
+
+  // ===== Toggle (Arrival/Departure) =====
+  const optArr = $('#optArr'), optDep = $('#optDep');
+  function setType(t){ const arr = (t==='ARRIVAL'); optArr.setAttribute('aria-checked', arr?'true':'false'); optDep.setAttribute('aria-checked', arr?'false':'true'); }
+  optArr?.addEventListener('click', ()=> setType('ARRIVAL'), {passive:false});
+  optDep?.addEventListener('click', ()=> setType('DEPARTURE'), {passive:false});
+  const getType = () => optArr.getAttribute('aria-checked') === 'true' ? 'ARRIVAL' : 'DEPARTURE';
+
+  // ===== Battery + Today counters (0–100%) =====
+  const batFill = $('#batFill'), batPct = $('#batPct'), statePill = $('#statePill'), workEl = $('#workH'), offEl = $('#offH');
+  const dayKey = ()=>'cc_time_' + new Date().toISOString().slice(0,10);
+  const readDay = ()=>{ try{ return JSON.parse(localStorage.getItem(dayKey())||'{}'); }catch(_){ return {}; } };
+  const writeDay = d => { try{ localStorage.setItem(dayKey(), JSON.stringify(d)); }catch(_){ } };
+  const fmt = sec => {
+    sec = Math.max(0, Math.floor(sec||0));
+    const h = Math.floor(sec/3600), m = Math.floor((sec%3600)/60), s = sec%60;
+    const pad=n=> (n<10?'0':'')+n; return `${pad(h)}:${pad(m)}:${pad(s)}`;
+  };
+  function setWorking(working){
+    statePill.textContent = working ? 'Working' : 'Idle';
+    statePill.classList.toggle('pill-work', working);
+    statePill.classList.toggle('pill-idle', !working);
+  }
+  function renderDay(){
+    const d = readDay(); const work = d.work||0, off = d.off||0, total = Math.max(1, work+off);
+    const pct = Math.round((work/total)*100);
+    batFill.style.width = pct + '%';
+    batFill.style.setProperty('--lv', pct+'%');
+    batPct.textContent = pct + '%';
+    workEl.textContent = fmt(work); offEl.textContent = fmt(off);
+    setWorking(!!d.working);
+  }
+  // tick counters when visible
+  let last = Date.now();
+  setInterval(()=> {
+    const now = Date.now(); const add = Math.floor((now-last)/1000); last = now;
+    if (document.visibilityState!=='visible' || add<=0) return;
+    const d = readDay();
+    if (d.working) d.work=(d.work||0)+add; else d.off=(d.off||0)+add;
+    writeDay(d); renderDay();
+  }, 1000);
+  renderDay();
+
+  // ===== Recent (local) =====
+  function renderRecent(){
+    const box = $('#recentBox');
+    const rec = JSON.parse(localStorage.getItem('cc_recent_ckn')||'[]');
+    if (!rec.length){ box.textContent = 'No logs yet.'; return; }
+    box.innerHTML = rec.map(r=>{
+      const when = r.t ? new Date(r.t).toLocaleTimeString() : '—';
+      const tag = r.within ? 'Inside' : 'Outside';
+      return `<div class="row" style="justify-content:space-between;border-bottom:1px dashed var(--cc-border);padding:.35rem 0">
+        <div><strong>${r.type||'—'}</strong> · <span class="muted">${r.loc||'—'}</span></div>
+        <div class="muted mono">${when} · ${tag}</div>
+      </div>`;
+    }).join('');
+  }
+  renderRecent();
+
+  // ===== GPS helpers =====
+  const btn = $('#btnCheck'), spin = $('#spin'), out = $('#result'), locSel = $('#locSel');
+
+  // Fallback CSRF getter (base.html already exposes CC.getCsrfToken + fetch shim)
+  const getCsrf = ()=>{
+    try{
+      if (window.CC?.getCsrfToken) return CC.getCsrfToken();
+      const m = document.cookie.match(/(?:^|;\\s*)(?:cc_csrftoken|csrftoken)=([^;]+)/);
+      return m ? decodeURIComponent(m[1]) : '';
+    }catch(_){ return ''; }
+  };
+
+  // Wrap geolocation as promises
+  function gp(opts){ return new Promise((res, rej)=> navigator.geolocation.getCurrentPosition(res, rej, opts)); }
+  function watchOnce(opts){ return new Promise((res, rej)=> {
+    const id = navigator.geolocation.watchPosition(p=>{ navigator.geolocation.clearWatch(id); res(p); }, e=>{ navigator.geolocation.clearWatch(id); rej(e); }, opts);
+    setTimeout(()=>{ try{navigator.geolocation.clearWatch(id);}catch(_){}; rej({code:3, message:'watch timeout'}); }, (opts?.timeout||10000)+1000);
+  });}
+
+  async function getBestPosition(){
+    if (!('geolocation' in navigator)) throw new Error('GPS not supported in this browser');
+
+    try{
+      if (navigator.permissions?.query){
+        const st = await navigator.permissions.query({name:'geolocation'});
+        if (st.state === 'denied') throw new Error('Location permission denied. Enable it in your browser/OS settings.');
+      }
+    }catch(_){}
+
+    const quick = gp({ enableHighAccuracy:false, maximumAge: 120000, timeout: 5000 });
+    const precise = gp({ enableHighAccuracy:true, maximumAge: 0, timeout: 20000 })
+      .catch(()=> watchOnce({ enableHighAccuracy:true, maximumAge:0, timeout: 20000 }));
+
+    try{
+      const r = await Promise.race([precise.then(p=>({p, rank:0})), quick.then(p=>({p, rank:1}))]);
+      if (r.rank===0) return r.p;
+      precise.then(p=>{ window.__lastPrecisePos = p; }).catch(()=>{});
+      return r.p;
+    }catch(e){
+      return await gp({ enableHighAccuracy:false, maximumAge: 300000, timeout: 7000 });
+    }
   }
 
   async function postCheckin(pos){
     const body = {
-      checkin_type: (type?.value || 'ARRIVAL'),
+      checkin_type: getType(),
       latitude: pos?.coords?.latitude ?? null,
       longitude: pos?.coords?.longitude ?? null,
-      accuracy_m: pos?.coords?.accuracy ? Math.round(pos.coords.accuracy) : null
+      accuracy_m: pos?.coords?.accuracy != null ? Math.round(pos.coords.accuracy) : null
     };
-    if (locSel) body.location_id = locSel.value;
+    if (locSel && locSel.value) body.location_id = parseInt(locSel.value, 10);
 
-    const res = await fetch("{% url 'inventory:api_time_checkin' %}", {
+    // Prefer the global fetch shim; add CSRF only if we have a solid token
+    const headers = {'Content-Type':'application/json','Accept':'application/json'};
+    const tok = getCsrf();
+    if (!(window.__CC_FETCH_SHIM__) && tok && tok.length > 20){
+      headers['X-CSRFToken'] = tok; // only when valid
+    }
+
+    const endpoint = (window.CC?.URLS?.time_checkin_api) || "{% url 'inventory:api_time_checkin' %}";
+    const res = await fetch(endpoint, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers,
+      credentials: 'same-origin',
       body: JSON.stringify(body)
     });
-    return await res.json();
+
+    const ct = (res.headers.get('content-type')||'').toLowerCase();
+    const data = ct.includes('application/json') ? await res.json() : { ok:false, error:'Non-JSON response' };
+
+    // Explicit CSRF failure hint
+    if (res.status === 403 && /csrf/i.test(JSON.stringify(data))) {
+      throw new Error('Security check failed (CSRF). Please reload the page and try again.');
+    }
+    if (!res.ok) throw new Error(data.error || ('HTTP '+res.status));
+    return data;
+  }
+
+  function line(label, value){
+    return `<div style="padding:.35rem 0;border-bottom:1px dashed var(--cc-border)">
+      <strong>${label}:</strong> ${value}
+    </div>`;
+  }
+
+  function showError(msg){
+    out.innerHTML = `<div class="msg msg-danger"><strong>Check-in failed:</strong> ${msg}</div>`;
   }
 
   function renderResult(data){
-    if (!data.ok){
-      out.innerHTML = `<div class="cc-alert cc-alert-error">
-        <div><strong>Check-in failed:</strong> ${data.error || 'Unknown error'}</div>
-      </div>`;
-      return;
-    }
+    if (!data || !data.ok){ showError(data?.error || 'Unknown error'); return; }
     const badge = data.within_geofence
-      ? '<span style="background:#eafff7;border:1px solid #88e0c1;border-radius:999px;padding:.2rem .5rem;">Within geofence</span>'
-      : '<span style="background:#fff3cd;border:1px solid #ffe69c;border-radius:999px;padding:.2rem .5rem;">Outside geofence</span>';
-
+      ? '<span class="pill pill-work">Inside</span>'
+      : '<span class="pill">Outside</span>';
     out.innerHTML = `
-      <div class="cc-alert cc-alert-success">
-        <div><strong>Check-in saved.</strong> ${badge}</div>
-      </div>
-      <div style="border:1px solid var(--cc-border);border-radius:10px;padding:.6rem;">
-        ${line('Logged at', new Date(data.logged_at).toLocaleString())}
-        ${line('Type', data.checkin_type)}
+      <div class="msg msg-success"><strong>Check-in saved.</strong> ${badge}</div>
+      <div class="glass" style="padding:.6rem;margin-top:8px">
+        ${line('Logged at', data.logged_at ? new Date(data.logged_at).toLocaleString() : '—')}
+        ${line('Type', data.checkin_type || '—')}
         ${line('Location', data.location || '—')}
-        ${line('Distance', (data.distance_m ?? '—') + (data.distance_m !== null ? ' m' : ''))}
+        ${line('Distance', (data.distance_m != null ? data.distance_m + ' m' : '—'))}
+        ${line('Lat/Lon', (data.latitude != null && data.longitude != null) ? (data.latitude + ', ' + data.longitude) : '—')}
       </div>
     `;
+
+    // Update battery / state
+    const d = readDay(); d.working = !!data.within_geofence; writeDay(d); renderDay();
+
+    // Record recent (local)
+    try{
+      const rec = JSON.parse(localStorage.getItem('cc_recent_ckn')||'[]');
+      rec.unshift({ t:data.logged_at, type:data.checkin_type, loc:data.location, within:data.within_geofence });
+      while(rec.length>5) rec.pop();
+      localStorage.setItem('cc_recent_ckn', JSON.stringify(rec));
+      renderRecent();
+    }catch(_){}
   }
 
-  btn?.addEventListener('click', async ()=>{
-    out.textContent = '';
-    spin.hidden = false;
-    btn.disabled = true;
+  $('#btnCheck')?.addEventListener('click', async ()=>{
+    out.textContent = ''; spin.hidden = false; btn.disabled = true;
 
-    if (!navigator.geolocation){
-      spin.hidden = true;
-      btn.disabled = false;
-      out.innerHTML = '<div class="cc-alert cc-alert-error"><div>GPS not supported in this browser.</div></div>';
-      return;
+    try{
+      const pos = await getBestPosition();
+      const data = await postCheckin(pos);
+      renderResult(data);
+    }catch(e){
+      const m = (e && (e.message || e.toString())) || 'Unknown';
+      if (/denied/i.test(m)) showError('Permission denied. Allow location access for this site and retry.');
+      else if (/timeout/i.test(m)) showError('Timeout. Move to an open area or enable Location, then try again.');
+      else showError(m);
+    }finally{
+      spin.hidden = true; btn.disabled = false;
     }
-
-    navigator.geolocation.getCurrentPosition(async (pos)=>{
-      try{
-        const data = await postCheckin(pos);
-        renderResult(data);
-      } catch(e){
-        out.innerHTML = '<div class="cc-alert cc-alert-error"><div>Network error while saving.</div></div>';
-      } finally {
-        spin.hidden = true;
-        btn.disabled = false;
-      }
-    }, (err)=>{
-      spin.hidden = true;
-      btn.disabled = false;
-      out.innerHTML = `<div class="cc-alert cc-alert-error"><div>GPS error: ${err.message}</div></div>`;
-    }, { enableHighAccuracy:true, maximumAge:0, timeout:12000 });
-  });
+  }, {passive:false});
 })();
 </script>
 {% endblock %}

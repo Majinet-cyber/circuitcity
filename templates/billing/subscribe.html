@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% load static %}
+{% load static humanize %}
 
 {% block title %}Subscribe{% endblock %}
 {% block header_title %}Choose a plan{% endblock %}
@@ -7,42 +7,159 @@
 {% block extra_css %}
 <style>
   .bill-wrap{max-width:1100px;margin-inline:auto;display:grid;gap:16px}
-  .g{border:1px solid var(--line);border-radius:14px;background:color-mix(in oklab,var(--card) 86%,transparent);backdrop-filter:blur(12px);box-shadow:0 10px 30px rgba(0,0,0,.06);padding:16px}
+  .g{border:1px solid var(--line);border-radius:14px;background:color-mix(in oklab,var(--card) 86%,transparent);
+     backdrop-filter:blur(12px);box-shadow:0 10px 30px rgba(0,0,0,.06);padding:16px}
+
+  /* Plans grid */
   .plans{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:14px}
-  .plan{padding:16px;border-radius:12px;border:1px solid var(--line);background:linear-gradient(180deg,rgba(255,255,255,.12),rgba(255,255,255,.04))}
-  .plan h3{font-weight:900;margin:0 0 4px}
-  .price{font-size:1.6rem;font-weight:900}
+
+  /* Plan card (as a form) */
+  .plan-card{
+    position:relative;
+    display:flex;flex-direction:column;justify-content:space-between;
+    padding:16px;border-radius:12px;border:1px solid var(--line);
+    background:linear-gradient(180deg,rgba(255,255,255,.12),rgba(255,255,255,.04));
+    box-shadow:0 6px 18px rgba(0,0,0,.06);
+    cursor:pointer;transition:transform .12s ease, box-shadow .12s ease, border-color .12s ease
+  }
+  .plan-card:hover{transform:translateY(-2px);box-shadow:0 12px 26px rgba(0,0,0,.10);border-color:color-mix(in oklab,var(--brand) 35%, var(--line))}
+  .plan-card h3{font-weight:900;margin:0 0 6px}
+
+  /* Price row */
+  .price{
+    font-size:1.6rem;
+    font-weight:900;
+    display:flex;
+    align-items:baseline;
+    gap:.35rem;
+  }
+  /* Keep currency and amount same size/weight */
+  .price .cc-cur,
+  .price .amt{
+    font-size:1.6rem;
+    font-weight:900;
+    line-height:1;
+  }
+  .price .per{font-size:.95rem;font-weight:600;opacity:.8}
+
+  .desc{margin:.25rem 0 .35rem;font-size:.9rem;opacity:.9}
   .feat{opacity:.85}
-  .go{display:flex;gap:.6rem;justify-content:flex-end;margin-top:12px}
+  .feat li{margin:4px 0}
+  .feat ul{margin:8px 0 0 1rem}
+
+  /* Accent variants by order (Starter / Growth / Pro) */
+  /* Starter → ORANGE */
+  .plan-card:nth-child(1){border-color:color-mix(in oklab,#f59f00 40%, var(--line))}
+  .plan-card:nth-child(1) .plan-cta{background:#f59f00;color:#fff}
+
+  /* Growth → YELLOW (use dark text for contrast) */
+  .plan-card:nth-child(2){border-color:color-mix(in oklab,#facc15 40%, var(--line))}
+  .plan-card:nth-child(2) .plan-cta{background:#facc15;color:#111}
+
+  /* Pro → BRIGHT GREEN */
+  .plan-card:nth-child(3){border-color:color-mix(in oklab,#22c55e 40%, var(--line))}
+  .plan-card:nth-child(3) .plan-cta{background:#22c55e;color:#fff}
+
+  /* CTA */
+  .plan-cta{
+    margin-top:12px; width:100%; border:0; border-radius:10px; padding:10px 14px;
+    font-weight:700; color:#fff; box-shadow:0 6px 16px rgba(0,0,0,.12)
+  }
+
+  /* Header row */
+  .row-top{display:flex;align-items:center;justify-content:space-between;gap:8px}
+  .row-top .pill{font-size:.8rem;padding:.25rem .5rem;border-radius:999px;background:var(--chip-bg, rgba(0,0,0,.06))}
+  .muted{opacity:.8}
+
+  /* Footer actions */
+  .go{display:flex;gap:.6rem;justify-content:flex-start;margin-top:8px}
 </style>
 {% endblock %}
 
 {% block content %}
 <div class="bill-wrap">
   <div class="g">
-    <p class="text-muted m-0">Your trial ends: <strong>{{ sub.trial_ends_at|date:"M j, Y H:i" }}</strong></p>
+    <div class="row-top">
+      <p class="text-muted m-0">Your trial ends: <strong>{{ sub.trial_ends_at|date:"M j, Y H:i" }}</strong></p>
+      {% if sub.status == "trialing" %}
+        <span class="pill">Trial</span>
+      {% endif %}
+    </div>
   </div>
 
-  <form method="post" class="g">
-    {% csrf_token %}
+  <div class="g">
     <div class="plans">
       {% for p in plans %}
-        <label class="plan hover-lift tap">
-          <input type="radio" name="plan" value="{{ p.id }}" {% if forloop.first %}checked{% endif %} hidden>
-          <h3>{{ p.name }}</h3>
-          <div class="price">{{ p.currency }} {{ p.price_mwk }}</div>
-          {% if p.features %}
-            <div class="feat small text-muted mt-1">
-              {% for k,v in p.features.items %}• {{ k|title }}: {{ v }}<br>{% endfor %}
+        <form class="plan-card tap" method="post" action="{% url 'billing:select_plan' %}" data-plan="{{ p.id }}">
+          {% csrf_token %}
+          <input type="hidden" name="plan" value="{{ p.id }}">
+
+          <div>
+            <h3>{{ p.name }}</h3>
+
+            {# --- PRICE: "MWK 20,000 /month" with same-size currency & amount --- #}
+            <div class="price">
+              <span class="cc-cur">MWK</span>
+              <span class="amt">
+                {% if p.name == "Starter" %}20,000
+                {% elif p.name == "Growth" %}60,000
+                {% elif p.name == "Pro" %}120,000
+                {% else %}{{ p.price_mwk|intcomma }}{% endif %}
+              </span>
+              <span class="per">/month</span>
             </div>
-          {% endif %}
-        </label>
+
+            {# --- SHORT DESCRIPTION PER TIER --- #}
+            <div class="desc text-muted">
+              {% if p.name == "Starter" %}
+                1 store, no agents
+              {% elif p.name == "Growth" %}
+                5 stores, 5 agents
+              {% elif p.name == "Pro" %}
+                Unlimited
+              {% endif %}
+            </div>
+
+            {# --- OPTIONAL features list already supported --- #}
+            {% if p.features %}
+              <div class="feat small text-muted mt-1">
+                <ul>
+                  {% for k,v in p.features.items %}
+                    <li><strong>{{ k|title }}:</strong> {{ v }}</li>
+                  {% endfor %}
+                </ul>
+              </div>
+            {% endif %}
+          </div>
+
+          <button class="plan-cta" type="submit" aria-label="Choose {{ p.name }}">
+            Choose {{ p.name }}
+          </button>
+        </form>
       {% endfor %}
     </div>
+
     <div class="go">
       <a href="{% url 'tenants:choose_business' %}" class="btn muted">Back</a>
-      <button class="btn primary">Continue</button>
+      {# No Continue button – one-click selection #}
     </div>
-  </form>
+  </div>
 </div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+  // Make the entire card clickable (submits its own form)
+  (function () {
+    document.querySelectorAll('.plan-card').forEach(function(card){
+      card.addEventListener('click', function(e){
+        // Avoid double-submit if the actual button or a link was clicked
+        const t = (e.target.tagName || '').toLowerCase();
+        if (t === 'button' || t === 'a' || t === 'input' || t === 'label') return;
+        const btn = card.querySelector('button[type="submit"]');
+        if (btn) btn.click();
+      }, {capture:false});
+    });
+  })();
+</script>
 {% endblock %}

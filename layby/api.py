@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 from django.http import JsonResponse, HttpRequest, HttpResponseBadRequest
 from django.views.decorators.http import require_GET, require_POST
 from django.contrib.auth.decorators import login_required
@@ -92,3 +92,5 @@ def api_payment_webhook(request: HttpRequest):
 
     notify("layby.payment", f"Webhook payment {p.amount} for {o.customer_name}", audience="AGENT", user=o.agent)
     return JsonResponse({"ok": True})
+
+

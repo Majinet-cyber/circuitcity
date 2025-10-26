@@ -1,4 +1,4 @@
-# tenants/utils.py
+﻿# tenants/utils.py
 from __future__ import annotations
 
 from functools import wraps
@@ -42,6 +42,13 @@ except Exception:  # pragma: no cover
 # Constants
 # ----------------------------
 TENANT_SESSION_KEY = getattr(settings, "TENANT_SESSION_KEY", "active_business_id")
+# Accept both canonical and legacy session keys when reading:
+TENANT_SESSION_KEYS_READ_ORDER = (
+    TENANT_SESSION_KEY,         # usually "active_business_id"
+    "active_business_id",       # explicit
+    "biz_id",                   # legacy
+)
+
 ROLE_GROUP_MANAGER_NAMES = set(getattr(settings, "ROLE_GROUP_MANAGER_NAMES", ["Manager", "Admin"]))
 ROLE_GROUP_ADMIN_NAMES = set(getattr(settings, "ROLE_GROUP_ADMIN_NAMES", ["Admin"]))
 # Agent-role names (templates expect tenants.utils.is_agent)
@@ -51,18 +58,28 @@ ROLE_GROUP_AGENT_NAMES = set(getattr(settings, "ROLE_GROUP_AGENT_NAMES", ["Agent
 # ----------------------------
 # Internals
 # ----------------------------
-def _has_status_field() -> bool:
-    if Business is None:
-        return False
+def _model_has_field(model, field_name: str) -> bool:
     try:
-        Business._meta.get_field("status")
+        model._meta.get_field(field_name)
         return True
     except Exception:
         return False
 
 
-def _active_filter(qs):
-    if _has_status_field():
+def _business_has_status_field() -> bool:
+    if Business is None:
+        return False
+    return _model_has_field(Business, "status")
+
+
+def _membership_has_status_field() -> bool:
+    if Membership is None:
+        return False
+    return _model_has_field(Membership, "status")
+
+
+def _active_filter_business(qs):
+    if _business_has_status_field():
         try:
             return qs.filter(status__iexact="ACTIVE")
         except Exception:
@@ -74,7 +91,7 @@ def _resolve_business_by_id(pk):
     if Business is None:
         return None
     try:
-        qs = _active_filter(Business.objects.all())
+        qs = _active_filter_business(Business.objects.all())
         return qs.get(pk=pk)
     except Exception:
         return None
@@ -106,14 +123,6 @@ def _superuser_home_url() -> str:
     return "/hq/"
 
 
-def _model_has_field(model, field_name: str) -> bool:
-    try:
-        model._meta.get_field(field_name)
-        return True
-    except Exception:
-        return False
-
-
 def _user_group_names(user) -> set[str]:
     try:
         return set(user.groups.values_list("name", flat=True))
@@ -130,6 +139,46 @@ def _same_path(request, url_path: str) -> bool:
         return False
 
 
+def _read_session_business_id(request: "HttpRequest"):
+    """
+    Read a business id from session using tolerant key order (new + legacy).
+    """
+    try:
+        session = request.session
+    except Exception:
+        return None
+    for k in TENANT_SESSION_KEYS_READ_ORDER:
+        try:
+            bid = session.get(k)
+            if bid:
+                return bid
+        except Exception:
+            continue
+    return None
+
+
+def _single_membership_business(user):
+    """
+    If the user has exactly one membership, return its business.
+    Prefer ACTIVE membership if the field exists.
+    """
+    if Membership is None or not getattr(user, "is_authenticated", False):
+        return None
+    try:
+        qs = Membership.objects.filter(user=user).select_related("business")
+        # Prefer ACTIVE if 'status' exists
+        if _membership_has_status_field():
+            active_qs = qs.filter(status__iexact="ACTIVE")
+            if active_qs.count() == 1:
+                return active_qs.first().business
+        # Fallback: exactly one membership overall
+        if qs.count() == 1:
+            return qs.first().business
+    except Exception:
+        return None
+    return None
+
+
 # ----------------------------
 # Public helpers (session / context)
 # ----------------------------
@@ -143,6 +192,8 @@ def set_active_business(request: "HttpRequest", business) -> None:
             # Clear session + request
             try:
                 request.session.pop(TENANT_SESSION_KEY, None)
+                request.session.pop("active_business_id", None)  # explicit
+                request.session.pop("biz_id", None)             # legacy
             except Exception:
                 pass
             try:
@@ -153,10 +204,13 @@ def set_active_business(request: "HttpRequest", business) -> None:
             set_current_business_id(None)
             return
 
-        # Persist selection
+        # Persist selection (write both canonical and legacy keys to be safe)
         bid = getattr(business, "pk", None)
         try:
             request.session[TENANT_SESSION_KEY] = bid
+            request.session["active_business_id"] = bid
+            request.session["biz_id"] = bid  # legacy compatibility
+            request.session.modified = True
         except Exception:
             pass
 
@@ -179,18 +233,14 @@ def set_active_business(request: "HttpRequest", business) -> None:
 def get_active_business(request: "HttpRequest"):
     """
     Return the Business referenced by request or session, caching onto request.
+    Tries request.business first, then tolerant session keys.
     """
     # If middleware already set request.business, keep it authoritative.
     b = getattr(request, "business", None)
     if b is not None:
         return b
 
-    bid = None
-    try:
-        bid = request.session.get(TENANT_SESSION_KEY)
-    except Exception:
-        bid = None
-
+    bid = _read_session_business_id(request)
     if not bid:
         return None
 
@@ -240,6 +290,71 @@ def default_location_for_request(request: "HttpRequest"):
     return default_location_for(get_active_business_id(request))
 
 
+def get_default_location_for(request: "HttpRequest"):
+    """
+    Preferred location for forms:
+      1) AgentProfile.primary_location (if present and belongs to active business)
+      2) Business default location (Location.default_for)
+      3) First Location for the active business
+    Returns a Location instance or None.
+    """
+    biz = get_active_business(request)
+    biz_id = getattr(biz, "id", None)
+    if not biz_id:
+        return None
+
+    # Lazy imports to avoid cycles
+    AgentProfile = None
+    Location = None
+    try:
+        from circuitcity.accounts.models import AgentProfile as _AP  # type: ignore
+        AgentProfile = _AP
+    except Exception:
+        try:
+            from accounts.models import AgentProfile as _AP  # type: ignore
+            AgentProfile = _AP
+        except Exception:
+            AgentProfile = None
+
+    try:
+        from circuitcity.inventory.models import Location as _Loc  # type: ignore
+        Location = _Loc
+    except Exception:
+        try:
+            from inventory.models import Location as _Loc  # type: ignore
+            Location = _Loc
+        except Exception:
+            Location = None
+
+    # 1) Agent's primary location
+    try:
+        user = getattr(request, "user", None)
+        if AgentProfile and user and getattr(user, "is_authenticated", False):
+            ap = AgentProfile.objects.filter(user=user).select_related("primary_location").first()
+            loc = getattr(ap, "primary_location", None)
+            if loc and getattr(loc, "business_id", None) == biz_id:
+                return loc
+    except Exception:
+        pass
+
+    # 2) Business default location
+    try:
+        loc = default_location_for(biz_id)
+        if loc:
+            return loc
+    except Exception:
+        pass
+
+    # 3) Fallback: first location of business
+    try:
+        if Location:
+            return Location.objects.filter(business_id=biz_id).first()
+    except Exception:
+        pass
+
+    return None
+
+
 # ----------------------------
 # Middleware
 # ----------------------------
@@ -265,7 +380,7 @@ def attach_business(get_response):
 # ----------------------------
 def user_is_admin(user) -> bool:
     """
-    Platform admin ≠ Django staff.
+    Platform admin â‰  Django staff.
     - Superusers are platform-admins.
     - Users in ROLE_GROUP_ADMIN_NAMES (default: ["Admin"]) are platform-admins.
     - Plain is_staff does NOT grant platform-admin power.
@@ -298,7 +413,7 @@ def user_is_agent(user) -> bool:
     return bool(names.intersection(ROLE_GROUP_AGENT_NAMES))
 
 
-# —— Aliases expected by template tags / other modules ——
+# â€”â€” Aliases expected by template tags / other modules â€”â€”
 is_manager = user_is_manager
 is_admin = user_is_admin
 is_agent = user_is_agent
@@ -308,9 +423,11 @@ def _has_active_membership(user, business) -> bool:
     if Membership is None or business is None or not getattr(user, "is_authenticated", False):
         return False
     try:
-        return Membership.objects.filter(
-            user=user, business=business, status="ACTIVE"
-        ).exists()
+        if _membership_has_status_field():
+            return Membership.objects.filter(
+                user=user, business=business, status__iexact="ACTIVE"
+            ).exists()
+        return Membership.objects.filter(user=user, business=business).exists()
     except Exception:
         return False
 
@@ -432,7 +549,7 @@ def assert_owns(obj, request: "HttpRequest"):
     except PermissionDenied:
         raise
     except Exception:
-        # If we can't determine, don't throw here—let the caller decide.
+        # If we can't determine, don't throw hereâ€”let the caller decide.
         pass
 
 
@@ -444,18 +561,26 @@ def require_business(view: Callable) -> Callable:
     Ensure a Business is active (via request.business or session key).
 
     If not:
+      - Try to auto-select if the user has exactly ONE membership (prefers ACTIVE).
       - SUPERUSERS: allow the view to run OR send them to HQ/dashboard,
         but never redirect to the same path (avoid loops).
-      - Everyone else: redirect to activation (or settings) with ?next=…,
-        also avoiding loops by checking the current path.
+      - Everyone else: redirect to activation (or settings) with ?next=â€¦
+        while avoiding loops by checking the current path.
     """
     @wraps(view)
     def _wrapped(request: "HttpRequest", *args, **kwargs):
         # Already selected
-        if get_active_business(request) is not None:
+        biz = get_active_business(request)
+        if biz is not None:
             return view(request, *args, **kwargs)
 
         user = getattr(request, "user", None)
+
+        # Auto-pick if they have exactly one membership
+        auto_biz = _single_membership_business(user)
+        if auto_biz is not None:
+            set_active_business(request, auto_biz)
+            return view(request, *args, **kwargs)
 
         # Superusers should not be forced into tenant onboarding.
         if getattr(user, "is_authenticated", False) and getattr(user, "is_superuser", False):
@@ -471,7 +596,7 @@ def require_business(view: Callable) -> Callable:
 
             return redirect(target)
 
-        # Normal users → activation flow with next=
+        # Normal users â†’ activation flow with next=
         target = _safe_reverse("tenants:activate_mine", "/tenants/activate/")
         next_q = quote_plus(getattr(request, "get_full_path", lambda: "/")())
 
@@ -538,7 +663,7 @@ def require_role(roles: Optional[Iterable[str]] = None) -> Callable:
             # Must be an ACTIVE member of the active business
             if not _has_active_membership(user, biz):
                 try:
-                    messages.error(request, "You don’t have access to this business.")
+                    messages.error(request, "You donâ€™t have access to this business.")
                 except Exception:
                     pass
                 return redirect(_safe_reverse("tenants:choose_business", "/tenants/choose/"))
@@ -646,7 +771,7 @@ __all__ = [
     # session/context
     "set_active_business", "get_active_business", "get_active_business_id",
     # default location helpers
-    "default_location_for", "default_location_for_request",
+    "default_location_for", "default_location_for_request", "get_default_location_for",
     # role checks (export both canonical and aliases)
     "user_is_manager", "user_is_admin", "user_is_agent",
     "is_manager", "is_admin", "is_agent",
@@ -657,3 +782,5 @@ __all__ = [
     # bootstrap
     "bootstrap_manager_tenant",
 ]
+
+

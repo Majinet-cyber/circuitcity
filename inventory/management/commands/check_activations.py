@@ -1,4 +1,4 @@
-from django.core.management.base import BaseCommand
+﻿from django.core.management.base import BaseCommand
 from django.utils import timezone
 from django.core.mail import mail_admins
 from django.conf import settings
@@ -111,3 +111,5 @@ class Command(BaseCommand):
                 + (" (dry-run)" if opts["dry_run"] else "")
             )
         )
+
+

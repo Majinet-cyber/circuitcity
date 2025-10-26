@@ -1,4 +1,4 @@
-# sales/admin.py
+﻿# sales/admin.py
 from django.contrib import admin
 from django.db.models import F, DecimalField, ExpressionWrapper
 from .models import Sale
@@ -24,7 +24,7 @@ class SaleAdmin(admin.ModelAdmin):
 
     def get_queryset(self, request):
         qs = super().get_queryset(request).select_related("item", "agent", "location")
-        # annotate commission in SQL so the list isn’t computing it per row in Python
+        # annotate commission in SQL so the list isnâ€™t computing it per row in Python
         commission_expr = ExpressionWrapper(
             F("price") * F("commission_pct") / 100.0,
             output_field=DecimalField(max_digits=12, decimal_places=2),
@@ -34,3 +34,5 @@ class SaleAdmin(admin.ModelAdmin):
     @admin.display(ordering="_commission", description="Commission")
     def commission(self, obj):
         return obj._commission
+
+

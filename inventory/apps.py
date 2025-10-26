@@ -1,4 +1,4 @@
-# inventory/apps.py
+﻿# inventory/apps.py
 from __future__ import annotations
 
 import importlib
@@ -197,3 +197,5 @@ class InventoryConfig(AppConfig):
                 logger.info("inventory.auto_location module not found; skipping default location wiring.")
         except Exception:
             logger.exception("Error wiring auto default location hook")
+
+

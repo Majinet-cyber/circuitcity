@@ -1,0 +1,51 @@
+{% load humanize %}
+<!doctype html>
+<html><head><meta charset="utf-8"><title>Docs</title>
+<style>
+  body{margin:0;font:14px/1.6 system-ui,Segoe UI,Arial;background:#0b1020;color:#eef2ff}
+  .wrap{max-width:1100px;margin:24px auto;padding:0 16px}
+  h1{margin:0 0 12px;font-size:24px}
+  .card{background:#0e152b;border:1px solid #1c2541;border-radius:14px;padding:12px}
+  .toolbar{display:flex;gap:8px;align-items:end;flex-wrap:wrap;margin-bottom:10px}
+  label{font-size:12px;color:#9aa4b2}
+  input{padding:8px 10px;border-radius:10px;border:1px solid #26304d;background:#0b1020;color:#eef2ff}
+  .btn{padding:8px 12px;border-radius:10px;border:1px solid #26304d;background:#171e36;color:#eef2ff;text-decoration:none}
+  table{width:100%;border-collapse:collapse}
+  th,td{padding:10px;border-bottom:1px solid #1c2541;text-align:left}
+  th{font-size:12px;color:#cbd5e1;text-transform:uppercase;letter-spacing:.06em}
+  .badge{font-size:12px;padding:2px 8px;border:1px solid #ffffff22;border-radius:999px;background:#ffffff10}
+</style></head>
+<body>
+  <div class="wrap">
+    <h1>Documents</h1>
+    <div class="toolbar">
+      <form method="get">
+        <label>Search<br><input name="q" value="{{ q }}"></label>
+        <label>From<br><input type="date" name="from" value="{{ from }}"></label>
+        <label>To<br><input type="date" name="to" value="{{ to }}"></label>
+        <button class="btn" type="submit">Filter</button>
+        <a class="btn" href="{% url 'inventory:doc_new' 'invoice' %}">+ New Invoice</a>
+        <a class="btn" href="{% url 'inventory:doc_new' 'quote' %}">+ New Quote</a>
+      </form>
+    </div>
+    <div class="card">
+      <table>
+        <thead><tr><th>Number</th><th>Type</th><th>Customer</th><th>Created</th><th>Total</th><th>Status</th></tr></thead>
+        <tbody>
+          {% for d in docs %}
+          <tr>
+            <td><a class="btn" href="{% url 'inventory:doc_detail' d.id %}">{{ d.number }}</a></td>
+            <td>{{ d.get_doc_type_display }}</td>
+            <td>{{ d.customer.name }}</td>
+            <td>{{ d.created_at|date:"Y-m-d H:i" }}</td>
+            <td>{{ d.total|floatformat:2|intcomma }} {{ d.currency }}</td>
+            <td><span class="badge">{{ d.status }}</span></td>
+          </tr>
+          {% empty %}
+          <tr><td colspan="6" style="color:#9aa4b2">No documents yet.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</body></html>

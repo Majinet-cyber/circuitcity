@@ -1,4 +1,4 @@
-import hashlib, hmac, json
+﻿import hashlib, hmac, json
 from decimal import Decimal
 from django.conf import settings
 from django.utils import timezone
@@ -55,3 +55,5 @@ def handle_airtel_webhook(payload: bytes, signature: str):
             attachments=[pdf_path]
         )
     return True
+
+

@@ -1,5 +1,8 @@
 {# templates/billing/checkout.html #}
 {% load static %}
+{% load humanize %}
+{% load billing_tags %}
+
 <!doctype html>
 <html lang="en">
 <head>
@@ -92,7 +95,7 @@
         <h1>Complete your subscription</h1>
         <div class="subline">Choose a payment method to activate your plan.</div>
       </div>
-      <div class="mini">{% load billing_tags %}{% subscription_badge %}</div>
+      <div class="mini">{% subscription_badge %}</div>
     </div>
 
     <div class="grid">
@@ -115,10 +118,10 @@
         <section id="airtel" class="section active" aria-labelledby="Airtel Money">
           <form method="post" action="{% url 'billing:checkout' %}" autocomplete="off" novalidate>
             {% csrf_token %}
-            <input type="hidden" name="provider" value="airtel">
+            <input type="hidden" name="method" value="airtel">
             <div class="field">
               <label class="label">Wallet Number (MSISDN)</label>
-              <div class="control"><span>🇲🇼</span><input name="wallet_msisdn" placeholder="e.g. 0991 12 34 56"></div>
+              <div class="control"><span>🇲🇼</span><input name="airtel-msisdn" placeholder="e.g. 0991 12 34 56"></div>
               <div class="hint">We’ll send a push prompt to this Airtel wallet to confirm payment.</div>
             </div>
             <button class="btn" type="submit">Pay with Airtel Money</button>
@@ -129,10 +132,10 @@
         <section id="standard" class="section" aria-labelledby="Standard Bank">
           <form method="post" action="{% url 'billing:checkout' %}" autocomplete="off" novalidate>
             {% csrf_token %}
-            <input type="hidden" name="provider" value="standard_bank">
+            <input type="hidden" name="method" value="standard_bank">
             <div class="field">
               <label class="label">Bank Reference</label>
-              <div class="control"><span>🔖</span><input name="bank_ref" placeholder="Enter your transfer reference"></div>
+              <div class="control"><span>🔖</span><input name="bank-reference" placeholder="Enter your transfer reference"></div>
               <div class="hint">We’ll match your EFT to this reference and activate automatically.</div>
             </div>
             <button class="btn" type="submit">I’ve paid by EFT</button>
@@ -143,22 +146,26 @@
         <section id="card" class="section" aria-labelledby="Card">
           <form method="post" action="{% url 'billing:checkout' %}" autocomplete="off" novalidate id="cardForm">
             {% csrf_token %}
-            <input type="hidden" name="provider" value="card">
+            <input type="hidden" name="method" value="card">
             <div class="field">
               <label class="label">Card number</label>
               <div class="control">
                 <span>💳</span>
-                <input name="card_number" id="cardNumber" inputmode="numeric" autocomplete="cc-number" placeholder="4242 4242 4242 4242" maxlength="19">
+                <input name="card-number" id="cardNumber" inputmode="numeric" autocomplete="cc-number" placeholder="4242 4242 4242 4242" maxlength="19">
               </div>
             </div>
             <div class="grid2">
               <div class="field">
-                <label class="label">Expiry (MM/YY)</label>
-                <div class="control"><span>📅</span><input name="card_exp" id="cardExp" inputmode="numeric" autocomplete="cc-exp" placeholder="MM/YY" maxlength="5"></div>
+                <label class="label">Expiry (MM / YYYY)</label>
+                <div class="control">
+                  <span>📅</span>
+                  <input name="card-exp_month" id="cardExpMonth" inputmode="numeric" placeholder="MM" maxlength="2">
+                  <input name="card-exp_year" id="cardExpYear" inputmode="numeric" placeholder="YYYY" maxlength="4">
+                </div>
               </div>
               <div class="field">
                 <label class="label">CVV</label>
-                <div class="control"><span>🔒</span><input name="card_cvv" id="cardCvv" inputmode="numeric" autocomplete="cc-csc" placeholder="123" maxlength="4"></div>
+                <div class="control"><span>🔒</span><input name="card-cvv" id="cardCvv" inputmode="numeric" autocomplete="cc-csc" placeholder="123" maxlength="4"></div>
               </div>
             </div>
             <div class="hint">Your card details are transmitted securely. We never store CVV.</div>
@@ -168,7 +175,12 @@
 
         <div class="row">
           <div class="mini">By continuing you agree to our terms.</div>
-          <span class="badge">Plan: {{ plan.name }} — {{ plan.currency }} {{ plan.amount }} / {{ plan.get_interval_display }}</span>
+          {% if invoice and invoice.items.all.count %}
+            <span class="badge">
+              {{ invoice.items.all.0.description|default:"Plan" }} ·
+              {{ invoice.currency }} {{ invoice.total|floatformat:0|intcomma }}
+            </span>
+          {% endif %}
         </div>
       </div>
 
@@ -184,23 +196,42 @@
         <div class="divider"></div>
         <div class="invoice">
           {% if invoice %}
-            <div class="mini">Invoice #{{ invoice.number }} · {{ invoice.currency }} {{ invoice.total }}</div>
+            <div class="mini">Invoice #{{ invoice.number }} · {{ invoice.currency }} {{ invoice.total|floatformat:0|intcomma }}</div>
             <table class="table">
-              <thead><tr><th align="left">Description</th><th align="right">Qty</th><th align="right">Unit</th><th align="right">Amount</th></tr></thead>
+              <thead>
+                <tr>
+                  <th align="left">Description</th>
+                  <th align="right">Qty</th>
+                  <th align="right">Unit</th>
+                  <th align="right">Amount</th>
+                </tr>
+              </thead>
               <tbody>
                 {% for it in invoice.items.all %}
                 <tr>
                   <td>{{ it.description }}</td>
                   <td align="right">{{ it.qty }}</td>
                   <td align="right">{{ it.unit }}</td>
-                  <td align="right">{{ invoice.currency }} {{ it.line_total }}</td>
+                  <td align="right">{{ invoice.currency }} {{ it.line_total|floatformat:0|intcomma }}</td>
                 </tr>
                 {% endfor %}
               </tbody>
               <tfoot>
-                <tr><td></td><td></td><td align="right"><strong>Subtotal</strong></td><td align="right">{{ invoice.currency }} {{ invoice.subtotal }}</td></tr>
-                <tr><td></td><td></td><td align="right"><strong>Tax</strong></td><td align="right">{{ invoice.currency }} {{ invoice.tax_amount }}</td></tr>
-                <tr><td></td><td></td><td align="right"><strong>Total</strong></td><td align="right">{{ invoice.currency }} {{ invoice.total }}</td></tr>
+                <tr>
+                  <td></td><td></td>
+                  <td align="right"><strong>Subtotal</strong></td>
+                  <td align="right">{{ invoice.currency }} {{ invoice.subtotal|floatformat:0|intcomma }}</td>
+                </tr>
+                <tr>
+                  <td></td><td></td>
+                  <td align="right"><strong>Tax</strong></td>
+                  <td align="right">{{ invoice.currency }} {{ invoice.tax_total|floatformat:0|intcomma }}</td>
+                </tr>
+                <tr>
+                  <td></td><td></td>
+                  <td align="right"><strong>Total</strong></td>
+                  <td align="right">{{ invoice.currency }} {{ invoice.total|floatformat:0|intcomma }}</td>
+                </tr>
               </tfoot>
             </table>
           {% else %}
@@ -229,14 +260,6 @@
       cc.addEventListener("input", e => {
         let v = e.target.value.replace(/\D/g,"").slice(0,16);
         v = v.replace(/(\d{4})(?=\d)/g, "$1 ");
-        e.target.value = v;
-      });
-    }
-    const exp = document.getElementById("cardExp");
-    if (exp) {
-      exp.addEventListener("input", e => {
-        let v = e.target.value.replace(/\D/g,"").slice(0,4);
-        if (v.length >= 3) v = v.slice(0,2) + "/" + v.slice(2);
         e.target.value = v;
       });
     }

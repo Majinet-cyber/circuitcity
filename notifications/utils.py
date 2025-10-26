@@ -1,4 +1,4 @@
-# circuitcity/notifications/utils.py
+﻿# circuitcity/notifications/utils.py
 from __future__ import annotations
 
 import logging
@@ -241,3 +241,5 @@ def notify_invoice_sent(invoice_no: str, amount: float, to_email: Optional[str] 
     create_notification(audience="ADMIN", message=msg, level="info")
     if to_email:
         _send_email(f"Invoice {invoice_no}", msg, [to_email])
+
+

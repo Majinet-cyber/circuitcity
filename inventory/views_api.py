@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 from typing import Any, Dict, List, Optional
 
 from django.contrib.auth.decorators import login_required
@@ -90,7 +90,7 @@ def stock_list(request: HttpRequest) -> JsonResponse:
                 })
             return _ok(items)
 
-        # No known models found — return empty but successful so UI doesn't break
+        # No known models found â€” return empty but successful so UI doesn't break
         return _ok([], warning="No inventory model detected; returning empty list.")
 
     except Exception as e:
@@ -195,3 +195,5 @@ def scan_sold(request: HttpRequest) -> JsonResponse:
 
     except Exception as e:
         return _err(f"scan_sold failed: {e}", status=500)
+
+

@@ -1,4 +1,4 @@
-from django.core.management.base import BaseCommand
+﻿from django.core.management.base import BaseCommand
 from insights.services import compute_and_store_all
 
 class Command(BaseCommand):
@@ -7,3 +7,5 @@ class Command(BaseCommand):
     def handle(self, *args, **opts):
         n = compute_and_store_all(horizon_days=7)
         self.stdout.write(self.style.SUCCESS(f"Forecast rows upserted: {n}"))
+
+

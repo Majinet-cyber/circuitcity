@@ -1,4 +1,4 @@
-from django.utils import timezone
+﻿from django.utils import timezone
 from typing import Tuple, Dict
 from .scope import active_scope
 from .models import Business, Location  # adjust if your names differ
@@ -43,3 +43,5 @@ def resolve_active_context(request) -> Tuple[Dict, Dict]:
         "auto_submit_default": False,
     }
     return boot, ctx
+
+

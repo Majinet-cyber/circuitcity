@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 return redirect("tenants:locations_index")
 else:
 form = LocationForm()
@@ -29,7 +29,7 @@ loc = get_object_or_404(Location, business=request.business, pk=pk)
 if request.method == "POST":
 name = loc.name
 loc.delete()
-messages.success(request, f"Location ‘{name}’ deleted.")
+messages.success(request, f"Location â€˜{name}â€™ deleted.")
 return redirect("tenants:locations_index")
 return render(request, "tenants/location_delete_confirm.html", {"loc": loc})
 
@@ -47,5 +47,6 @@ return redirect("tenants:locations_index")
 Location.objects.filter(business=request.business).update(is_default=False)
 loc.is_default = True
 loc.save(update_fields=["is_default"])
-messages.success(request, f"‘{loc.name}’ set as default.")
+messages.success(request, f"â€˜{loc.name}â€™ set as default.")
 return redirect("tenants:locations_index")
+

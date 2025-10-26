@@ -1,0 +1,42 @@
+<div class="card p-3">
+  <form class="row g-2">
+    <div class="col-auto">
+      <input type="month" class="form-control" name="month" value="{{month}}">
+    </div>
+    <div class="col-auto"><button class="btn btn-primary">Apply</button></div>
+  </form>
+
+  <div class="table-responsive mt-3">
+    <table class="table align-middle">
+      <thead><tr><th>Agent</th><th>Work (h)</th><th>Away (h)</th></tr></thead>
+      <tbody>
+        {% for r in rows %}
+        <tr>
+          <td>{{ r.agent }}</td>
+          <td>{{ r.work|divisibleby:3600|floatformat:1 }}</td>
+          <td>{{ r.away|divisibleby:3600|floatformat:1 }}</td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="3" class="text-muted">No data.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<div class="card p-3 mt-3">
+  <h6 class="mb-2">Worktime vs Off-time</h6>
+  <canvas id="pie"></canvas>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1"></script>
+<script>
+const work = {{ rows|json_script:"rowsjson" }};
+const totW = work.reduce((s,r)=>s+(r.work||0),0);
+const totA = work.reduce((s,r)=>s+(r.away||0),0);
+new Chart(document.getElementById('pie'), {
+  type:'pie',
+  data:{ labels:['Work','Away'], datasets:[{ data:[totW, totA] }] },
+  options:{ plugins:{legend:{position:'bottom'}} }
+});
+</script>

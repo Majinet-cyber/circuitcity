@@ -1,4 +1,4 @@
-# circuitcity/inventory/views.py
+﻿# circuitcity/inventory/views.py
 from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth import get_user_model
@@ -614,7 +614,7 @@ def inventory_dashboard(request):
     agent_rows = [
         {
             "agent_id": row["assigned_agent_id"],
-            "agent": row["assigned_agent__username"] or "—",
+            "agent": row["assigned_agent__username"] or "â€”",
             "total_stock": row["total_stock"],
             "sold_units": sold_map.get(row["assigned_agent_id"], 0),
         }
@@ -804,8 +804,8 @@ def stock_list(request):
             "status": ("SOLD" if it.status == "SOLD" else "In stock"),
             "order_price": f"{(it.order_price or 0):,.0f}",
             "selling_price": ("" if it.selling_price is None else f"{float(it.selling_price):,.0f}"),
-            "location": it.current_location.name if it.current_location_id else "—",
-            "agent": it.assigned_agent.get_username() if it.assigned_agent_id else "—",
+            "location": it.current_location.name if it.current_location_id else "â€”",
+            "agent": it.assigned_agent.get_username() if it.assigned_agent_id else "â€”",
         }
         for it in page_obj.object_list
     ]
@@ -1162,7 +1162,7 @@ def update_stock(request, pk):
                         )
 
             details = "Changed fields:\n" + (
-                "\n".join([f"{k}: {old_vals.get(k)} → {getattr(saved_item, k)}" for k in changed_fields])
+                "\n".join([f"{k}: {old_vals.get(k)} â†’ {getattr(saved_item, k)}" for k in changed_fields])
                 if changed_fields
                 else "No field changes"
             )
@@ -1241,12 +1241,12 @@ def restore_stock(request, pk):
 # -----------------------
 @never_cache
 def agent_forgot_password(request):
-    return HttpResponse("Forgot password page – not implemented yet.")
+    return HttpResponse("Forgot password page â€“ not implemented yet.")
 
 
 @never_cache
 def agent_reset_confirm(request, token=None):
-    return HttpResponse(f"Reset confirm – token received: {token}")
+    return HttpResponse(f"Reset confirm â€“ token received: {token}")
 
 
 # -----------------------
@@ -1442,3 +1442,10 @@ def healthz(request):
     if err:
         payload["error"] = err
     return JsonResponse(payload, status=200 if ok else 500)
+
+
+
+
+
+
+

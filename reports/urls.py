@@ -1,4 +1,4 @@
-# reports/urls.py
+﻿# reports/urls.py
 from django.urls import path
 from django.views.generic import RedirectView
 from django.conf import settings
@@ -32,9 +32,11 @@ urlpatterns = [
     path("export/management-report.csv", views_export.export_management_report_csv, name="export_management_csv"),
 ]
 
-# 🔎 DEBUG-only alias to easily see the headers from reports_home
-# (Open DevTools → Network → Headers to view X-Template-Origin / X-Template-Name)
+# ðŸ”Ž DEBUG-only alias to easily see the headers from reports_home
+# (Open DevTools â†’ Network â†’ Headers to view X-Template-Origin / X-Template-Name)
 if settings.DEBUG:
     urlpatterns += [
         path("which/", views.reports_home, name="which"),
     ]
+
+

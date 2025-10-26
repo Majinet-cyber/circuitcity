@@ -1,4 +1,4 @@
-# circuitcity/onboarding/views.py
+﻿# circuitcity/onboarding/views.py
 from __future__ import annotations
 
 from typing import Optional
@@ -114,7 +114,7 @@ def start(request: HttpRequest) -> HttpResponse:
     # 2) Business present?
     Business = _business_model()
     if Business is None:
-        # Tenants app not ready — just go to dashboard/home if it exists
+        # Tenants app not ready â€” just go to dashboard/home if it exists
         return redirect(_safe_reverse("dashboard:home", "/"))
 
     fields = {f.name for f in getattr(Business, "_meta", []).get_fields()} if hasattr(Business, "_meta") else set()
@@ -153,7 +153,7 @@ def start(request: HttpRequest) -> HttpResponse:
         if not has_item:
             return redirect(_safe_reverse("onboarding:add_product", "/onboarding/"))
 
-    # 4) Done → dashboard
+    # 4) Done â†’ dashboard
     return redirect(_safe_reverse("dashboard:home", "/"))
 
 
@@ -185,7 +185,7 @@ def create_business(request: HttpRequest) -> HttpResponse:
                     pass
 
             _set_active_business(request, biz)
-            messages.success(request, f'Business “{biz}” created.')
+            messages.success(request, f'Business â€œ{biz}â€ created.')
             return redirect(_safe_reverse("onboarding:add_product", "/"))
         else:
             messages.error(request, "Please fix the errors below.")
@@ -256,3 +256,5 @@ def add_product(request: HttpRequest) -> HttpResponse:
         </main>
         """.format(fields="\n".join(getattr(form, "fields", {}).keys()))
         return HttpResponse(html)
+
+

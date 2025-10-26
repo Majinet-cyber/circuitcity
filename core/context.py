@@ -1,4 +1,4 @@
-# core/context.py
+﻿# core/context.py
 from __future__ import annotations
 
 from types import SimpleNamespace
@@ -143,3 +143,5 @@ def flags(request: HttpRequest) -> dict:
         # Convenience booleans you might like
         "DEBUG": getattr(settings, "DEBUG", False),
     }
+
+

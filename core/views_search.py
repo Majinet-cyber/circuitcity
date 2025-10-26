@@ -1,4 +1,4 @@
-from django.http import JsonResponse
+﻿from django.http import JsonResponse
 from django.contrib.postgres.search import TrigramSimilarity
 from inventory.models import SKU
 from accounts.models import Agent
@@ -20,3 +20,5 @@ def api_global_search(request):
         .values("id","full_name")[:6]
     )
     return JsonResponse({"skus": skus, "agents": agents})
+
+

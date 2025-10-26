@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 import hashlib
 from django import template
@@ -89,3 +89,5 @@ def render_errors(field):
         return ""
     html = "".join([f"<div class='invalid-feedback d-block'>{err}</div>" for err in field.errors])
     return mark_safe(html)
+
+
