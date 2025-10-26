@@ -50,39 +50,32 @@ SECRET_KEY = os.environ.get(
     "DJANGO_SECRET_KEY",
     "django-insecure-w#o#i4apw-$iz-3sivw57n=2j6fgku@1pfqfs76@3@7)a0h$ys",
 )
-DEBUG = True  # forced ON for local testing
+DEBUG = env_bool("DEBUG", False)  # ← read from env (Render: set DEBUG=0)
 TESTING = any(arg in sys.argv for arg in ("test", "pytest"))
 
-# Allow everything (for local dev) + specific IPs
-ALLOWED_HOSTS = [
-    "localhost",
-    "127.0.0.1",
-    "0.0.0.0",
-    "192.168.1.104",
-    "192.168.1.105",
-    ".ngrok-free.app",
-    ".trycloudflare.com",
-    ".onrender.com",
-    "*",
-]
+# Allow from env first, else sane defaults (Render host, localhost, etc.)
+ALLOWED_HOSTS = env_csv(
+    "ALLOWED_HOSTS",
+    "localhost,127.0.0.1,0.0.0.0,.onrender.com"
+)
 
-# CSRF trusted origins (added your IP)
-CSRF_TRUSTED_ORIGINS = [
+# CSRF trusted origins
+_default_csrf = ",".join([
     "http://localhost",
     "http://127.0.0.1",
     "http://0.0.0.0",
-    "http://192.168.1.104",
-    "http://192.168.1.105",
+    "https://*.onrender.com",
     "https://*.ngrok-free.app",
     "https://*.trycloudflare.com",
-    "https://*.onrender.com",
-]
+])
+CSRF_TRUSTED_ORIGINS = env_csv("CSRF_TRUSTED_ORIGINS", _default_csrf)
 
-USE_SSL = False
-FORCE_SSL = False
-SECURE_SSL_REDIRECT = False
-SESSION_COOKIE_SECURE = False
-CSRF_COOKIE_SECURE = False
+# SSL / cookie security (tighten automatically when not DEBUG)
+USE_SSL = env_bool("USE_SSL", not DEBUG)
+FORCE_SSL = env_bool("FORCE_SSL", not DEBUG)
+SECURE_SSL_REDIRECT = FORCE_SSL
+SESSION_COOKIE_SECURE = not DEBUG
+CSRF_COOKIE_SECURE = not DEBUG
 
 # --------------------------- session & csrf ---------------------------
 SESSION_COOKIE_NAME = os.environ.get("SESSION_COOKIE_NAME", "cc_sessionid")
@@ -139,7 +132,7 @@ MIDDLEWARE = [
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
 
-    # HQ admins stay in HQ â€” prevent them from viewing store/tenant UI
+    # HQ admins stay in HQ — prevent them from viewing store/tenant UI
     "cc.middleware.PreventHQFromClientUI",
 
     "tenants.middleware.TenantResolutionMiddleware",
@@ -295,10 +288,20 @@ BILLING = {
     "GRACE_DAYS": env_int("BILLING_GRACE_DAYS", 30),
     "INVOICE_FROM": os.environ.get("BILLING_INVOICE_FROM", os.environ.get("DEFAULT_FROM_EMAIL", "noreply@example.com")),
 }
+# Updated plan definitions to match UI: Starter 20k, Growth 60k, Pro 120k
 BILLING_PLANS = {
-    "starter": {"code": "starter", "name": "Starter", "amount": 20000, "currency": "MWK", "max_agents": 0},
-    "pro": {"code": "pro", "name": "Pro", "amount": 35000, "currency": "MWK", "max_agents": 5},
-    "promax": {"code": "promax", "name": "Pro Max", "amount": 50000, "currency": "MWK", "max_agents": None},
+    "starter": {
+        "code": "starter", "name": "Starter", "amount": 20000, "currency": "MWK",
+        "max_agents": 0, "max_stores": 1
+    },
+    "growth": {
+        "code": "growth", "name": "Growth", "amount": 60000, "currency": "MWK",
+        "max_agents": 5, "max_stores": 5
+    },
+    "pro": {
+        "code": "pro", "name": "Pro", "amount": 120000, "currency": "MWK",
+        "max_agents": None, "max_stores": None
+    },
 }
 
 REPORTS_DEFAULT_CURRENCY = BILLING["DEFAULT_CURRENCY"]
