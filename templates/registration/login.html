@@ -2,21 +2,21 @@
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <title>Sign in · Circuit City (v01 blend)</title>
+  <title>Sign in · Circuit City</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <style>
     :root{
       --cc-bg:#f6f9ff; --cc-card:#fff; --cc-line:#e5e7eb; --cc-ink:#0f172a; --cc-muted:#64748b;
-
       /* Blues tuned down for softer glass */
       --b200:#bfdbfe; --b300:#93c5fd; --b400:#60a5fa; --b500:#3b82f6; --b600:#2563eb;
     }
     *{box-sizing:border-box}
+    html,body{height:100%}
     body{
       margin:0;
-      background:linear-gradient(180deg,var(--cc-bg),#fff);
+      background:linear-gradient(180deg,var(--cc-bg),#ffffff);
       font-family:system-ui,Segoe UI,Inter,Roboto,Arial,sans-serif;
-      color:var(--cc-ink)
+      color:var(--cc-ink);
     }
     .auth-wrap{min-height:100vh;display:grid;place-items:center;padding:clamp(16px,4vw,32px)}
     .auth-card{
@@ -27,7 +27,7 @@
       padding:28px;
       box-shadow:0 10px 28px rgba(2,6,23,.06);
     }
-    h1{margin:0 0 .25rem}
+    h1{margin:0 0 .25rem;font-weight:800;letter-spacing:.2px}
     .muted{color:var(--cc-muted);margin:0 0 12px}
 
     label{display:block;font-size:14px;margin:12px 0 6px}
@@ -43,7 +43,7 @@
     input:focus{
       outline:none;
       border-color:var(--b400);
-      box-shadow:0 0 0 3px color-mix(in srgb, var(--b400) 22%, transparent);
+      box-shadow:0 0 0 3px rgba(96,165,250,.25);
     }
     .err{
       background:#fef2f2;border:1px solid #fecaca;color:#991b1b;
@@ -51,7 +51,6 @@
     }
     a{color:var(--b600);text-decoration:none}
 
-    /* ===== Subtle Glass Buttons (blend with card) ===== */
     .btn-row{ margin-top:12px }
     .glass-btn{
       appearance:none;
@@ -60,16 +59,15 @@
       padding:.8rem 1rem;
       font-weight:800;
       color:#fff;
-      border:1px solid color-mix(in srgb, var(--b400) 40%, #ffffff 60%);
+      border:1px solid rgba(147,197,253,.6);
       background:
         linear-gradient(180deg,
           color-mix(in oklab, var(--b300) 72%, #ffffff 10%) 0%,
           color-mix(in oklab, var(--b500) 78%, #000000 4%) 100%);
-      /* Softer inner gloss, tiny outer lift */
       box-shadow:
         inset 0 1px 0 rgba(255,255,255,.55),
         inset 0 -1px 0 rgba(2,6,23,.08),
-        0 6px 14px rgba(37,99,235,.18);   /* much smaller than before */
+        0 6px 14px rgba(37,99,235,.18);
       -webkit-backdrop-filter: blur(5px) saturate(112%);
       backdrop-filter: blur(5px) saturate(112%);
       transition: transform .14s ease, filter .14s ease, box-shadow .14s ease;
@@ -83,9 +81,8 @@
       transform: translateY(-1px);
     }
     .glass-btn:active{ transform: translateY(0) scale(.995); }
-    .glass-btn:focus-visible{ outline:3px solid color-mix(in srgb, var(--b400) 42%, transparent); outline-offset:2px; }
+    .glass-btn:focus-visible{ outline:3px solid rgba(96,165,250,.42); outline-offset:2px; }
 
-    /* Secondary CTA—slightly lighter gradient, same restrained shadows */
     .glass-btn.secondary{
       background:
         linear-gradient(180deg,
@@ -108,10 +105,13 @@
       <p id="loginDesc" class="muted">Sign in to continue.</p>
 
       {% if messages %}
-        {% for m in messages %}<div class="err" role="alert" aria-live="assertive">{{ m }}</div>{% endfor %}
+        {% for m in messages %}
+          <div class="err" role="alert" aria-live="assertive">{{ m }}</div>
+        {% endfor %}
       {% endif %}
 
-      <form method="post" action="{% url 'accounts:login' %}" novalidate>
+      <!-- Post directly to the canonical path to avoid NoReverseMatch -->
+      <form method="post" action="/accounts/login/" novalidate>
         {% csrf_token %}
         <input type="hidden" name="next" value="{{ next|default:'' }}"/>
 
@@ -136,12 +136,12 @@
       </form>
 
       <p class="muted" style="margin-top:12px">
-        <a href="{% url 'accounts:forgot_password_request' %}">Forgot your password?</a>
+        <a href="/accounts/forgot/">Forgot your password?</a>
       </p>
 
       <div class="cta" aria-label="Create account">
         <p class="muted" style="margin:0 0 10px">New here?</p>
-        <a class="glass-btn secondary" href="{% url 'accounts:signup_manager' %}">Create a Manager account</a>
+        <a class="glass-btn secondary" href="/accounts/signup/manager/">Create a Manager account</a>
         <small class="muted" style="display:block;margin-top:6px">Managers create the store and can invite agents later.</small>
         <small class="muted" style="display:block;margin-top:4px">Agents: ask your manager for an invite link.</small>
       </div>
@@ -149,32 +149,3 @@
   </div>
 </body>
 </html>
-<style>
-  .auth-card .btn-primary,
-  .auth-card .btn-primary:focus,
-  .auth-card .btn-primary:active {
-    background: linear-gradient(180deg, #4f8efc 0%, #2e60ec 100%);
-    color: #fff;
-    border: 1px solid rgba(255,255,255,0.35);
-    border-radius: 14px;
-    box-shadow:
-      0 10px 28px rgba(46, 96, 236, .30),
-      0 0 0 1px rgba(255,255,255,.12) inset;
-    backdrop-filter: blur(8px) saturate(120%);
-    -webkit-backdrop-filter: blur(8px) saturate(120%);
-    font-weight: 800;
-    letter-spacing: .01em;
-    transition: transform .18s ease, box-shadow .18s ease, filter .18s ease;
-  }
-  .auth-card .btn-primary:hover{
-    transform: translateY(-1px);
-    box-shadow:
-      0 14px 36px rgba(46, 96, 236, .38),
-      0 0 0 1px rgba(255,255,255,.16) inset;
-    filter: saturate(1.05);
-  }
-  .auth-card .btn-primary:disabled{
-    opacity:.65; filter: grayscale(.1);
-    box-shadow: none;
-  }
-</style>
