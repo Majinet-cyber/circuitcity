@@ -8,7 +8,7 @@ from importlib import import_module
 from django.conf import settings
 from django.conf.urls.static import static
 from django.contrib import admin
-from django.contrib.auth import views as auth_views  # fallback auth views
+from django.contrib.auth import views as auth_views  # login/logout fallbacks
 from django.http import HttpResponse, JsonResponse, HttpResponseBase
 from django.shortcuts import redirect, render
 from django.template.loader import get_template
@@ -218,6 +218,7 @@ def __render_login__(request):
           Template origin: <code>{origin}</code>
         </div>
         """
+        # ↓↓↓ fixed the quote here
         if "<body" in html:
             body_start = html.lower().find("<body")
             if body_start != -1:
@@ -252,7 +253,7 @@ def __render_reports__(request):
               Origin: <code>{origin}</code>
             </div>
             """
-            if "<body" in html":
+            if "<body" in html:
                 body_start = html.lower().find("<body")
                 if body_start != -1:
                     gt = html.find(">", body_start)
@@ -336,45 +337,43 @@ _accounts_mod = _try_import("circuitcity.accounts.urls") or _try_import("account
 if _accounts_mod and hasattr(_accounts_mod, "urlpatterns"):
     urlpatterns += [path("accounts/", include((_accounts_mod.urlpatterns, "accounts"), namespace="accounts"))]
 else:
-    # Safe include attempt first
     urlpatterns += safe_include("accounts/", "circuitcity.accounts.urls", "accounts")
 
-# ---- Namespaced fallback for accounts (prevents NoReverseMatch in templates) ----
-_have_namespace = False
+# ---- Hard fallbacks so /accounts/login/ & /accounts/logout/ never 404 ----
+_have_login = False
+_have_logout = False
 try:
-    # If include above worked, we will have accounts namespace already.
-    # Try a cheap reverse; if it fails, add the fallback include below.
-    reverse("accounts:login")
-    _have_namespace = True
+    if _accounts_mod and hasattr(_accounts_mod, "urlpatterns"):
+        _have_login = _patterns_have_name(_accounts_mod.urlpatterns, "login")
+        _have_logout = _patterns_have_name(_accounts_mod.urlpatterns, "logout")
 except Exception:
-    _have_namespace = False
+    pass
 
-if not _have_namespace:
-    accounts_fallback_patterns = [
+if not _have_login:
+    urlpatterns += [
         path(
-            "login/",
+            "accounts/login/",
             auth_views.LoginView.as_view(template_name="registration/login_v11_fix.html"),
-            name="login",
-        ),
-        path(
-            "logout/",
-            auth_views.LogoutView.as_view(next_page="/accounts/login/"),
-            name="logout",
-        ),
-        # Optional names your templates may call:
-        path("forgot/", core_views.feature_unavailable, name="forgot_password_request"),
-        path("forgot/reset/", core_views.feature_unavailable, name="forgot_password_reset"),
+            name="accounts_login_fallback",
+        )
     ]
-    urlpatterns += [path("accounts/", include((accounts_fallback_patterns, "accounts"), namespace="accounts"))]
+if not _have_logout:
+    urlpatterns += [
+        path(
+            "accounts/logout/",
+            auth_views.LogoutView.as_view(next_page="/accounts/login/"),
+            name="accounts_logout_fallback",
+        )
+    ]
 
-# Project-level convenient aliases
+# Project-level convenient aliases (literal URLs to avoid reverse errors if namespace missing)
 urlpatterns += [
-    path("login/", _safe_redirect_to("accounts:login"), name="login"),
-    path("logout/", _safe_redirect_to("accounts:logout"), name="logout"),
-    path("accounts/logout/", _safe_redirect_to("accounts:logout"), name="accounts_logout"),
+    path("login/",  RedirectView.as_view(url="/accounts/login/",  permanent=False), name="login"),
+    path("logout/", RedirectView.as_view(url="/accounts/logout/", permanent=False), name="logout"),
+    path("accounts/logout-short/", RedirectView.as_view(url="/accounts/logout/", permanent=False), name="accounts_logout"),
     path("password/forgot/", _safe_redirect_to("accounts:forgot_password_request"), name="password_forgot"),
-    path("password/reset/", _safe_redirect_to("accounts:forgot_password_reset"), name="password_reset_flow"),
-    path("password_reset/", _safe_redirect_to("accounts:forgot_password_reset"), name="password_reset"),
+    path("password/reset/",  _safe_redirect_to("accounts:forgot_password_reset"), name="password_reset_flow"),
+    path("password_reset/",  _safe_redirect_to("accounts:forgot_password_reset"), name="password_reset"),
 ]
 
 # Session probes
@@ -386,7 +385,7 @@ urlpatterns += [
 # Time pages (updated to match inventory URL names)
 urlpatterns += [
     path("time/check-in/", RedirectView.as_view(pattern_name="inventory:time_checkin", permanent=False)),
-    path("time/logs/", RedirectView.as_view(pattern_name="inventory:time_logs", permanent=False)),
+    path("time/logs/",     RedirectView.as_view(pattern_name="inventory:time_logs", permanent=False)),
 ]
 
 # CSV/Import hooks (if present)
