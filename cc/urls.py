@@ -8,7 +8,7 @@ from importlib import import_module
 from django.conf import settings
 from django.conf.urls.static import static
 from django.contrib import admin
-from django.contrib.auth import views as auth_views  # <- for login/logout fallbacks
+from django.contrib.auth import views as auth_views  # fallbacks for login/logout
 from django.http import HttpResponse, JsonResponse, HttpResponseBase
 from django.shortcuts import redirect, render
 from django.template.loader import get_template
@@ -331,18 +331,18 @@ urlpatterns += [
 # Landing
 urlpatterns += [path("", root_redirect, name="root")]
 
-# ---------------- Accounts (namespaced) ----------------
+# ---------------- Accounts (namespaced if available; otherwise fallbacks) ----------------
 _accounts_mod = _try_import("circuitcity.accounts.urls") or _try_import("accounts.urls")
-if _accounts_mod and hasattr(_accounts_mod, "urlpatterns"):
-    urlpatterns += [path("accounts/", include((_accounts_mod.urlpatterns, "accounts"), namespace="accounts"))]
-else:
-    urlpatterns += safe_include("accounts/", "circuitcity.accounts.urls", "accounts")
+_accounts_ok = bool(_accounts_mod and hasattr(_accounts_mod, "urlpatterns"))
 
-# ---- Hard fallbacks so /accounts/login/ & /accounts/logout/ never 404 ----
+if _accounts_ok:
+    urlpatterns += [path("accounts/", include((_accounts_mod.urlpatterns, "accounts"), namespace="accounts"))]
+
+# Guaranteed fallbacks so /accounts/login/ & /accounts/logout/ never 404
 _have_login = False
 _have_logout = False
 try:
-    if _accounts_mod and hasattr(_accounts_mod, "urlpatterns"):
+    if _accounts_ok:
         _have_login = _patterns_have_name(_accounts_mod.urlpatterns, "login")
         _have_logout = _patterns_have_name(_accounts_mod.urlpatterns, "logout")
 except Exception:
@@ -663,6 +663,7 @@ if _billing_urls_mod and hasattr(_billing_urls_mod, "urlpatterns"):
         path("billing/", include((_billing_urls_mod.urlpatterns, "billing"), namespace="billing")),
     ]
 else:
+    # Minimal fallback if full billing urls are unavailable
     subs_view = getattr(billing_admin_views, "hq_subscriptions", None) if billing_admin_views else None
     if subs_view is None:
         subs_view = _wallet_home_shim  # reuse shim as generic target
