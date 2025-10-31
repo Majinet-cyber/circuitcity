@@ -1,3 +1,4 @@
+{% load static %}
 <!doctype html>
 <html lang="en">
 <head>
@@ -54,20 +55,12 @@
     a:hover{color:var(--blueHi)}
     .cta{margin-top:18px;padding-top:16px;border-top:1px dashed var(--line)}
     .btn{
-      display:inline-block;
-      border-radius:12px;
-      padding:.8rem 1.1rem;
-      font-weight:700;
-      transition:.18s transform,.18s box-shadow,.18s filter;
-      text-align:center;
-      width:100%;
+      display:inline-block;border-radius:12px;padding:.8rem 1.1rem;font-weight:700;
+      transition:.18s transform,.18s box-shadow,.18s filter;text-align:center;width:100%;
     }
-    /* polished gradient button */
     .btn-blue{
-      border:1px solid #93c5fd;
-      background:linear-gradient(180deg,#3b82f6,#2563eb);
-      color:#fff;
-      box-shadow:0 10px 28px rgba(37,99,235,.25);
+      border:1px solid #93c5fd;background:linear-gradient(180deg,#3b82f6,#2563eb);
+      color:#fff;box-shadow:0 10px 28px rgba(37,99,235,.25);
     }
     .btn-blue:hover{transform:translateY(-1px);filter:brightness(1.05)}
     .btn-blue:active{transform:translateY(0)}
@@ -79,7 +72,6 @@
     }
     button[type="submit"]:hover{transform:translateY(-1px);filter:brightness(1.03)}
     button[type="submit"]:active{transform:translateY(0)}
-    /* password eye */
     .pw-wrap{position:relative}
     .pw-eye{
       position:absolute;right:10px;top:50%;translate:0 -50%;
@@ -87,14 +79,11 @@
     }
     .pw-eye:focus{outline:none;box-shadow:0 0 0 3px rgba(147,197,253,.5)}
     .pw-eye svg{width:20px;height:20px}
-    /* sticky badges */
-    .badge{
-      position:fixed;bottom:14px;font-size:12.5px;color:#334155;background:#ffffffcc;
+    .badge{position:fixed;bottom:14px;font-size:12.5px;color:#334155;background:#ffffffcc;
       padding:7px 10px;border:1px solid #e2e8f0;border-radius:10px;backdrop-filter:saturate(1.2) blur(6px);
       box-shadow:0 10px 24px rgba(2,6,23,.06)
     }
-    .badge-left{left:14px}
-    .badge-right{right:14px}
+    .badge-left{left:14px}.badge-right{right:14px}
   </style>
 </head>
 <body>
@@ -107,7 +96,20 @@
         {% for m in messages %}<div class="err" role="alert" aria-live="assertive">{{ m }}</div>{% endfor %}
       {% endif %}
 
-      <form method="post" action="{% url 'accounts:login' %}" novalidate>
+      {# ---------- Resolve URLs SAFELY (namespaced -> plain) ---------- #}
+      {% url 'accounts:login' as _login_ns %}{% url 'login' as _login_pl %}
+      {% url 'accounts:forgot_password_request' as _fp_ns %}{% url 'forgot_password_request' as _fp_pl %}
+      {% url 'accounts:signup_manager' as _sm_ns %}{% url 'signup_manager' as _sm_pl %}
+      {% url 'accounts:signup' as _s_ns %}{% url 'signup' as _s_pl %}
+
+      {% with
+        action_url=_login_ns|default:_login_pl
+        forgot_url=_fp_ns|default:_fp_pl
+        signup_manager_url=_sm_ns|default:_sm_pl
+        signup_generic_url=_s_ns|default:_s_pl
+      %}
+
+      <form method="post" action="{{ action_url|default:'/accounts/login/' }}" novalidate>
         {% csrf_token %}
         <input type="hidden" name="next" value="{{ next|default:'' }}"/>
 
@@ -128,20 +130,30 @@
         <button type="submit">Sign in</button>
       </form>
 
-      <p class="muted" style="margin-top:12px">
-        <a href="{% url 'accounts:forgot_password_request' %}">Forgot your password?</a>
-      </p>
+      {% if forgot_url %}
+        <p class="muted" style="margin-top:12px">
+          <a href="{{ forgot_url }}">Forgot your password?</a>
+        </p>
+      {% endif %}
 
       <div class="cta" aria-label="Create account">
         <p class="muted" style="margin:0 0 10px">New here?</p>
-        <a class="btn btn-blue" href="{% url 'accounts:signup_manager' %}">Create a Manager account</a>
-        <small class="muted" style="display:block;margin-top:6px">Managers create the store and can invite agents later.</small>
-        <small class="muted" style="display:block;margin-top:4px">Agents: ask your manager for an invite link.</small>
+
+        {% if signup_manager_url %}
+          <a class="btn btn-blue" href="{{ signup_manager_url }}">Create a Manager account</a>
+          <small class="muted" style="display:block;margin-top:6px">Managers create the store and can invite agents later.</small>
+          <small class="muted" style="display:block;margin-top:4px">Agents: ask your manager for an invite link.</small>
+        {% elif signup_generic_url %}
+          <a class="btn btn-blue" href="{{ signup_generic_url }}">Create an account</a>
+        {% else %}
+          {# No sign-up routes available; show nothing (no exceptions). #}
+        {% endif %}
       </div>
+
+      {% endwith %}
     </div>
   </div>
 
-  <!-- sticky badges -->
   <div class="badge badge-left">v01</div>
   <div class="badge badge-right">&copy; emajinet</div>
 
