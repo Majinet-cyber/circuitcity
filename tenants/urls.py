@@ -7,10 +7,10 @@ from django.views.generic import RedirectView
 
 from . import views
 
-# --- Optional helpers (import if present; never crash in dev) ------------------
+# --- Optional helpers (import if present; never crash) -------------------------
 try:
     from . import views_join  # type: ignore
-except Exception:  # pragma: no cover
+except Exception:
     class _JoinFallback:
         @staticmethod
         def join(request, *args, **kwargs):
@@ -51,6 +51,22 @@ def _is_from_module(fn, module_prefix: str) -> bool:
     We only accept callables whose __module__ starts with the expected prefix.
     """
     return callable(fn) and getattr(fn, "__module__", "").startswith(module_prefix)
+
+
+def _safe_redirect_to(name: str, fallback: str):
+    """
+    Return a view that redirects to `name` if it exists at request time;
+    otherwise redirect to `fallback`. Prevents 500s from NoReverseMatch.
+    """
+    from django.urls import reverse, NoReverseMatch
+
+    def _view(_request, *args, **kwargs):
+        try:
+            reverse(name)
+            return redirect(name)
+        except NoReverseMatch:
+            return redirect(fallback)
+    return _view
 
 
 # --- Resolve core views with graceful fallbacks (so templates never 500) -------
@@ -142,12 +158,8 @@ urlpatterns = [
     path("join/",          join_as_agent,          name="join_as_agent"),
     path("join-business/", views_join.join,        name="join"),  # optional helper
 
-    # Alias /tenants/signup/ → /accounts/signup/
-    path(
-        "signup/",
-        RedirectView.as_view(pattern_name="accounts:signup", permanent=False),
-        name="signup",
-    ),
+    # Alias /tenants/signup/ → /accounts/signup/ (fallback to accounts:login if missing)
+    path("signup/", _safe_redirect_to("accounts:signup", "accounts:login"), name="signup"),
 
     # Staff approvals (supreme control)
     path(

@@ -2,6 +2,7 @@
 
 import os
 import re
+import logging
 from importlib import import_module
 
 from django.conf import settings
@@ -15,8 +16,8 @@ from django.views.generic import RedirectView
 from django.templatetags.static import static as static_build  # may raise with Manifest storage
 
 from cc import views as core_views
-from billing import views_admin as billing_admin_views  # HQ Subscriptions view
 
+log = logging.getLogger(__name__)
 
 # ======================================================================================
 # Helpers
@@ -28,7 +29,8 @@ def robots_txt(_request):
 def _try_import(modpath: str):
     try:
         return import_module(modpath)
-    except Exception:
+    except Exception as e:
+        log.error("Import failed for %s: %s", modpath, e)
         return None
 
 
@@ -37,9 +39,22 @@ def _try_from(modpath: str, attr: str):
     return getattr(mod, attr, None) if mod else None
 
 
-def include_or_raise(module_path: str, namespace: str | None = None):
-    import_module(module_path)  # surface import errors immediately in DEBUG
-    return include(module_path, namespace=namespace) if namespace else include(module_path)
+def safe_include(prefix: str, module_path: str, namespace: str | None = None):
+    """
+    Include a child urlconf without taking the whole site down on import error.
+    Logs errors and continues.
+    """
+    try:
+        # Try to import first so we can control/log the failure gracefully.
+        mod = import_module(module_path)
+        if not hasattr(mod, "urlpatterns"):
+            log.error("URLConf %s has no urlpatterns; skipping include.", module_path)
+            return []
+        inc = include((mod.urlpatterns, namespace) if namespace else mod.urlpatterns)
+        return [path(prefix, inc)]
+    except Exception as e:
+        log.error("URL include failed for %s: %s", module_path, e)
+        return []
 
 
 def _safe_static(path_fragment: str) -> str:
@@ -50,7 +65,6 @@ def _safe_static(path_fragment: str) -> str:
 
 
 def _reverse_exists(name: str) -> bool:
-    # NOTE: safe to use at REQUEST-TIME; avoid at import-time.
     try:
         reverse(name)
         return True
@@ -81,7 +95,6 @@ def _patterns_have_name(patterns, name: str) -> bool:
     try:
         from django.urls.resolvers import URLPattern, URLResolver
     except Exception:
-        # Very defensive; if resolvers unavailable, assume missing.
         return False
 
     for p in patterns:
@@ -93,7 +106,6 @@ def _patterns_have_name(patterns, name: str) -> bool:
                 if _patterns_have_name(p.url_patterns, name):
                     return True
         except Exception:
-            # keep scanning even if any pattern misbehaves
             continue
     return False
 
@@ -291,7 +303,8 @@ urlpatterns: list = []
 
 # Two-Factor (optional)
 if getattr(settings, "ENABLE_2FA", False):
-    urlpatterns += [path("", include_or_raise("two_factor.urls", "two_factor"))]
+    # Safe include: if two_factor not installed, site still runs
+    urlpatterns += safe_include("", "two_factor.urls", "two_factor")
 
 # Admin
 admin_path = getattr(settings, "ADMIN_URL", "admin/")
@@ -324,7 +337,7 @@ _accounts_mod = _try_import("circuitcity.accounts.urls") or _try_import("account
 if _accounts_mod and hasattr(_accounts_mod, "urlpatterns"):
     urlpatterns += [path("accounts/", include((_accounts_mod.urlpatterns, "accounts"), namespace="accounts"))]
 else:
-    urlpatterns += [path("accounts/", include_or_raise("circuitcity.accounts.urls", "accounts"))]
+    urlpatterns += safe_include("accounts/", "circuitcity.accounts.urls", "accounts")
 
 # Project-level convenient aliases
 urlpatterns += [
@@ -519,21 +532,18 @@ urlpatterns += [
     path("inventory/dashboard/", _inventory_dashboard_entry, name="inventory_dashboard"),
 ]
 
-# Include app urlconfs
-urlpatterns += [
-    path("inventory/", include_or_raise("inventory.urls", "inventory")),
-    path("tenants/",   include_or_raise("tenants.urls", "tenants")),
-    path("dashboard/", include_or_raise("dashboard.urls", "dashboard")),
-    # ADD: Layby app include (fixes /layby/ 404)
-    path("layby/",     include_or_raise("layby.urls", "layby")),
-]
+# Include app urlconfs (safe)
+urlpatterns += safe_include("inventory/", "inventory.urls", "inventory")
+urlpatterns += safe_include("tenants/",   "tenants.urls", "tenants")
+urlpatterns += safe_include("dashboard/", "dashboard.urls", "dashboard")
+urlpatterns += safe_include("layby/",     "layby.urls", "layby")
 
 # >>> Simulator (namespaced; defensive import)
 _sim_urls_mod = _try_import("simulator.urls") or _try_import("circuitcity.simulator.urls")
 if _sim_urls_mod and hasattr(_sim_urls_mod, "urlpatterns"):
     urlpatterns += [path("simulator/", include((_sim_urls_mod.urlpatterns, "simulator"), namespace="simulator"))]
 
-# --- Local fallback for activate-mine if tenants urls donâ€™t expose it yet ---
+# --- Local fallback for activate-mine if tenants urls don’t expose it yet ---
 if _activate_mine_view:
     urlpatterns += [
         path("tenants/activate-mine/", _activate_mine_view, name="tenants_activate_mine_fallback"),
@@ -579,14 +589,14 @@ def _wallet_admin_shim(request, *args, **kwargs):
     details = [
         "Wallet admin is unavailable.",
         f"Tried: {', '.join(tried)}",
-        f"Last import error: {last_exc_repr or '(none â€” modules imported but attributes missing)'}",
+        f"Last import error: {last_exc_repr or '(none — modules imported but attributes missing)'}",
         f"Exports wallet.views: {', '.join(exports.get('wallet.views', [])) or '(module not importable)'}",
         f"Exports circuitcity.wallet.views: {', '.join(exports.get('circuitcity.wallet.views', [])) or '(module not importable)'}",
         "",
         "Hints:",
-        "â€¢ Ensure wallet/ is on PYTHONPATH and has __init__.py",
-        "â€¢ Confirm wallet/views.py defines either `AdminWalletHome` (class) or `admin_home = AdminWalletHome.as_view()`",
-        "â€¢ If wallet.urls imports models that crash, fix that import so wallet.urls can be included.",
+        "• Ensure wallet/ is on PYTHONPATH and has __init__.py",
+        "• Confirm wallet/views.py defines either `AdminWalletHome` (class) or `admin_home = AdminWalletHome.as_view()`",
+        "• If wallet.urls imports models that crash, fix that import so wallet.urls can be included.",
     ]
     return HttpResponse("<br>".join(details), status=404)
 
@@ -595,7 +605,7 @@ urlpatterns += [
     path("wallet/admin", RedirectView.as_view(url="/wallet/admin/", permanent=False)),
 ]
 
-# If wallet.urls NOT included above, add a minimal namespaced fallback so `{% url 'wallet:admin_home' %}` doesnâ€™t 500
+# If wallet.urls NOT included above, add a minimal namespaced fallback so `{% url 'wallet:admin_home' %}` doesn’t 500
 if not _wallet_urls_mod:
     wallet_fallback_patterns = [
         path("admin/", _wallet_admin_shim, name="admin_home"),
@@ -617,21 +627,27 @@ def _wallet_home_shim(_request):
 urlpatterns += [path("wallet/home-alias/", _wallet_home_shim, name="wallet")]
 
 # =========================
-# BILLING â€” ALWAYS NAMESPACED
+# BILLING — ALWAYS NAMESPACED
 # =========================
 _billing_urls_mod = _try_import("billing.urls") or _try_import("circuitcity.billing.urls")
+billing_admin_views = _try_import("billing.views_admin") or _try_import("circuitcity.billing.views_admin")
+
 if _billing_urls_mod and hasattr(_billing_urls_mod, "urlpatterns"):
     urlpatterns += [
         path("billing/", include((_billing_urls_mod.urlpatterns, "billing"), namespace="billing")),
     ]
 else:
+    # Minimal fallback if full billing urls are unavailable
+    subs_view = getattr(billing_admin_views, "hq_subscriptions", None) if billing_admin_views else None
+    if subs_view is None:
+        subs_view = _wallet_home_shim  # reuse shim as generic target
     urlpatterns += [
         path(
             "billing/",
             include((
                 [
                     path("hq/wallet/", _wallet_home_shim, name="wallet"),
-                    path("hq/subscriptions/", billing_admin_views.hq_subscriptions, name="subscriptions"),
+                    path("hq/subscriptions/", subs_view, name="subscriptions"),
                     path("invoices/", lambda r: redirect("/hq/subscriptions/"), name="invoices"),
                 ],
                 "billing",
@@ -658,14 +674,14 @@ def _hq_home_fallback(_request):
 
 # Prefer the real HQ urls if present
 if _try_import("hq.urls") or _try_import("circuitcity.hq.urls"):
-    urlpatterns += [path("hq/", include_or_raise("hq.urls", "hq"))]
+    urlpatterns += safe_include("hq/", "hq.urls", "hq")
 else:
     urlpatterns += [
         path(
             "hq/",
             include((
                 [
-                    path("subscriptions/", billing_admin_views.hq_subscriptions, name="subscriptions"),
+                    path("subscriptions/", getattr(billing_admin_views, "hq_subscriptions", _hq_home_fallback), name="subscriptions"),
                     path("businesses/", _hq_businesses_shim, name="businesses"),
                     path("invoices/", _hq_invoices_shim, name="invoices"),
                     path("agents/", _hq_agents_shim, name="agents"),
@@ -678,9 +694,8 @@ else:
     ]
 
 # Optional explicit alias (kept; harmless since 'hq/' include matches earlier)
-urlpatterns += [
-    path("hq/subscriptions/", billing_admin_views.hq_subscriptions, name="hq_subscriptions"),
-]
+if billing_admin_views and hasattr(billing_admin_views, "hq_subscriptions"):
+    urlpatterns += [path("hq/subscriptions/", billing_admin_views.hq_subscriptions, name="hq_subscriptions")]
 
 # Global Search + Saved Views
 core_search = _try_import("circuitcity.core.views_search") or _try_import("core.views_search")
@@ -745,8 +760,7 @@ urlpatterns += [
     path("inventory/api/stock_status/", RedirectView.as_view(url="/inventory/api/stock-status/", permanent=False)),
 ]
 
-# ===== New: Product API aliases & fallbacks (to avoid NoReverseMatch) =====
-# Accept both hyphen and underscore forms; expose global names used by legacy templates.
+# ===== Product API aliases & fallbacks =====
 urlpatterns += [
     path(
         "inventory/api/product/update_price/",
@@ -754,8 +768,7 @@ urlpatterns += [
     ),
 ]
 
-# Friendly fallback for unfinished endpoints (501) if app route is missing
-# (SAFE at import-time: no reverse(); we inspect included patterns instead)
+# Friendly fallbacks for unfinished endpoints if app route is missing
 try:
     inv_urls_mod = _try_import("inventory.urls") or _try_import("circuitcity.inventory.urls")
     has_heatmap = has_stock_status = False
@@ -766,36 +779,24 @@ try:
         has_prod_create = _patterns_have_name(inv_urls_mod.urlpatterns, "api_product_create")
         has_prod_update = _patterns_have_name(inv_urls_mod.urlpatterns, "api_product_update_price")
 
-    # Restock/Stock-status fallbacks
     if not has_heatmap:
         urlpatterns += [path("inventory/api/restock-heatmap/", core_views.feature_unavailable, name="restock_heatmap_api")]
     if not has_stock_status:
         urlpatterns += [path("inventory/api/stock-status/", core_views.feature_unavailable, name="api_stock_status")]
 
-    # Product API fallbacks
     if not has_prod_create:
-        # Try to hook real view if present, else graceful stub.
         _prod_create_view = _try_from("inventory.api_views", "api_product_create") or \
                             _try_from("circuitcity.inventory.api_views", "api_product_create")
         urlpatterns += [
-            path(
-                "inventory/api/product/create/",
-                _prod_create_view or core_views.feature_unavailable,
-                name="api_product_create",
-            )
+            path("inventory/api/product/create/", _prod_create_view or core_views.feature_unavailable, name="api_product_create")
         ]
     if not has_prod_update:
         _prod_update_view = _try_from("inventory.api_views", "api_product_update_price") or \
                             _try_from("circuitcity.inventory.api_views", "api_product_update_price")
         urlpatterns += [
-            path(
-                "inventory/api/product/update-price/",
-                _prod_update_view or core_views.feature_unavailable,
-                name="api_product_update_price",
-            )
+            path("inventory/api/product/update-price/", _prod_update_view or core_views.feature_unavailable, name="api_product_update_price")
         ]
 except Exception:
-    # In case inventory.urls import fails unexpectedly, still provide graceful fallbacks
     urlpatterns += [path("inventory/api/restock-heatmap/", core_views.feature_unavailable, name="restock_heatmap_api")]
     urlpatterns += [path("inventory/api/stock-status/", core_views.feature_unavailable, name="api_stock_status")]
     _prod_create_view = _try_from("inventory.api_views", "api_product_create") or \
@@ -817,5 +818,3 @@ if settings.DEBUG:
 # ======================================================================================
 handler404 = "cc.views.page_not_found"
 handler500 = "cc.views.server_error"
-
-
