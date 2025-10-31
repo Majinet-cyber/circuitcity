@@ -72,6 +72,10 @@
     box-shadow: 0 0 0 .2rem rgba(31,111,235,.25) !important;
   }
 
+  /* ===== IMEI validity colors (border + badge) ===== */
+  .field.state-bad{border-color:#ef4444 !important; box-shadow:0 0 0 .2rem rgba(239,68,68,.15), var(--cc-shadow) !important}
+  .field.state-ok {border-color:#10b981 !important; box-shadow:0 0 0 .2rem rgba(16,185,129,.22), var(--cc-shadow) !important}
+
   /* ===== Misc UI ===== */
   .hint{font-size:12px;color:var(--cc-muted)}
   .help-error{font-size:12px;color:#ef4444}
@@ -142,7 +146,7 @@
       Paste or scan the <strong>IMEI</strong>. Scanners typically “type” digits then send <span class="kbd">Enter</span>.
     </p>
 
-    <div id="secureWarn" class="warn">
+    <div id="secureWarn" class="warn" role="alert">
       Camera requires a secure connection. Open this page over <strong>HTTPS</strong> (or localhost) and allow camera permission.
       On Android Chrome you may enable the dev flag: <code>chrome://flags/#unsafely-treat-insecure-origin-as-secure</code>.
     </div>
@@ -153,23 +157,35 @@
           novalidate
           class="form"
           data-validate
+          aria-describedby="imeiHelp"
           data-default-location-id="{{ default_location.id|default:request.user.agent_profile.location.id|default:'' }}"
-          data-default-location-name="{{ default_location.name|default:request.user.agent_profile.location.name|default:'' }}">
+          data-default-location-name="{{ default_location.name|default:request.user.agent_profile.location.name|default:'' }}"
+          {# Optional: have your view set this to "1" for agents to lock their store #}
+          data-lock-location="{{ lock_location|default:'' }}">
       {% csrf_token %}
       {% if form.non_field_errors %}<div class="help-error">{{ form.non_field_errors }}</div>{% endif %}
 
       <!-- IMEI -->
       <div>
         <label for="id_imei">IMEI</label>
-        <div class="field">
+        <div class="field" id="imeiField">
+          <!-- never more than 15 -->
           <input type="text"
                  id="id_imei"
                  name="imei"
-                 maxlength="15"
                  inputmode="numeric"
                  autocomplete="off"
-                 placeholder="Enter 15-digit IMEI"
+                 placeholder="Scan or paste IMEI (15 digits)"
+                 aria-required="true"
+                 aria-invalid="false"
+                 maxlength="15"
                  style="width:100%;background:transparent;border:0;padding:12px 14px;">
+          <!-- live counter badge -->
+          <span id="imeiLen"
+                class="badge rounded-pill"
+                style="position:absolute;right:12px;top:50%;transform:translateY(-50%);background:#e2e8f0;color:#0f172a;padding:.15rem .5rem;">
+            0/15
+          </span>
         </div>
         <div id="imeiHelp" class="help-error" hidden>Enter a valid IMEI (exactly 15 digits).</div>
         <div class="hstack" style="margin-top:6px">
@@ -181,16 +197,16 @@
         </div>
 
         <!-- Camera shell -->
-        <div id="cameraBox">
+        <div id="cameraBox" aria-live="polite">
           <div class="scan-shell">
             <video id="camera" autoplay playsinline muted></video>
-            <div class="scan-overlay">
+            <div class="scan-overlay" aria-hidden="true">
               <div class="scan-frame"></div>
               <div id="scanline" class="scanline"></div>
             </div>
           </div>
           <div class="hstack" style="margin-top:8px">
-            <select id="cameraSelect" class="btn" style="min-width:200px"></select>
+            <select id="cameraSelect" class="btn" style="min-width:200px" aria-label="Choose camera"></select>
             <button type="button" id="camStop" class="btn">Stop Camera</button>
           </div>
         </div>
@@ -235,6 +251,7 @@
                    min="0"
                    step="any"
                    placeholder="0.00"
+                   aria-describedby="orderPriceHint"
                    style="width:100%;background:transparent;border:0;padding:12px 14px;">
           </div>
           <div class="hint" id="orderPriceHint">Will auto-fill if a default exists for this model.</div>
@@ -283,6 +300,8 @@
   // ===== Element refs =====
   const form       = document.querySelector('form[data-validate]');
   const imeiEl     = document.getElementById('id_imei');
+  const imeiField  = document.getElementById('imeiField');
+  const imeiLen    = document.getElementById('imeiLen');
   const prodEl     = document.getElementById('id_product');
   const locEl      = document.getElementById('id_location');
   const orderEl    = document.getElementById('id_order_price');
@@ -313,28 +332,110 @@
     setTimeout(()=> toast.style.display = 'none', 2600);
   }
   const digitsOnly = (s)=> (s||'').replace(/\D/g,'');
-  const isIMEI15 = (s)=> /^\d{15}$/.test(digitsOnly(s||''));
+  const lenDigits = (s)=> digitsOnly(s).length;
+
+  function setBadgeNeutral(){
+    imeiLen.style.background = '#e2e8f0';
+    imeiLen.style.color = '#0f172a';
+    imeiField.classList.remove('state-ok','state-bad');
+  }
+  function setBadgeBad(){
+    imeiLen.style.background = '#fee2e2';   /* red-100 */
+    imeiLen.style.color = '#991b1b';        /* red-800 */
+    imeiField.classList.add('state-bad');
+    imeiField.classList.remove('state-ok');
+  }
+  function setBadgeOk(){
+    imeiLen.style.background = '#dcfce7';   /* green-100 */
+    imeiLen.style.color = '#065f46';        /* green-800 */
+    imeiField.classList.add('state-ok');
+    imeiField.classList.remove('state-bad');
+  }
+
+  // live counter + validity coloring
+  function updateImeiCounter(){
+    const n = lenDigits(imeiEl.value);
+    if (imeiLen){ imeiLen.textContent = `${n}/15`; }
+    const help = document.getElementById('imeiHelp');
+
+    if (n === 0){
+      setBadgeNeutral();
+      imeiEl.setAttribute('aria-invalid','false');
+      if (help) help.hidden = true;
+    } else if (n < 15){
+      setBadgeBad();
+      imeiEl.setAttribute('aria-invalid','true');
+      if (help) help.hidden = false;
+    } else { // n === 15
+      setBadgeOk();
+      imeiEl.setAttribute('aria-invalid','false');
+      if (help) help.hidden = true;
+    }
+  }
+
+  // ensure we never exceed 15; if pasted/scanned longer, we keep LAST 15
+  function clampTo15KeepLast(){
+    const d = digitsOnly(imeiEl.value);
+    if (d.length > 15){
+      imeiEl.value = d.slice(-15);
+      return true;
+    } else if (d.length !== imeiEl.value.length){
+      imeiEl.value = d;
+      return true;
+    }
+    return false;
+  }
+
   function pauseScanline(ms=900){ scanLine?.classList.add('paused'); setTimeout(()=> scanLine?.classList.remove('paused'), ms); }
 
   // ===== Validation / defaults =====
   const defaultLocId = (form && form.dataset.defaultLocationId) ? form.dataset.defaultLocationId : '';
+  const lockLocation = (form && form.dataset.lockLocation === '1');
+
   if (locEl) { locEl.removeAttribute('required'); locEl.removeAttribute('aria-required'); }
-  function updateValidity(){
-    if (imeiEl){
-      const hasValue = (imeiEl.value || '').length > 0;
-      const good = isIMEI15(imeiEl.value || '');
-      const help = document.getElementById('imeiHelp');
-      if (help) help.hidden = (!hasValue || good);
-    }
-    const ok = isIMEI15(imeiEl?.value||'') && !!(prodEl && prodEl.value) &&
-               (orderEl && orderEl.value !== '' && !Number.isNaN(Number(orderEl.value)));
-    submitBtn && (submitBtn.disabled = !ok);
+
+  function updateFormValidity(){
+    const okImei = lenDigits(imeiEl.value) === 15; // must be exactly 15
+    const hasProduct = !!(prodEl && prodEl.value);
+    const priceOk = (orderEl && orderEl.value !== '' && !Number.isNaN(Number(orderEl.value)));
+    submitBtn && (submitBtn.disabled = !(okImei && hasProduct && priceOk));
   }
+
   function applyDefaultLocation(){
     if (!locEl || !defaultLocId) return;
-    const opt = Array.from(locEl.options).find(o => String(o.value) === String(defaultLocId));
+    const opt = Array.from(locEl.options||[]).find(o => String(o.value) === String(defaultLocId));
     if (opt){ locEl.value = opt.value; }
   }
+
+  function ensureLocationEnabled(){
+    if (!locEl) return;
+    if (!lockLocation) {
+      try { locEl.removeAttribute('disabled'); locEl.classList.remove('is-disabled'); } catch(_){}
+    }
+  }
+
+  function lockLocationIfNeeded(){
+    if (!locEl) return;
+    const existingHidden = document.querySelector('input[type="hidden"][name="location"]');
+    if (lockLocation){
+      const val = (locEl.value || defaultLocId || '');
+      if (!existingHidden){
+        const h = document.createElement('input');
+        h.type = 'hidden';
+        h.name = 'location';
+        h.value = val;
+        form.appendChild(h);
+      } else {
+        existingHidden.value = val;
+      }
+      locEl.setAttribute('disabled', 'disabled');
+      locEl.classList.add('is-disabled');
+    } else {
+      if (existingHidden) existingHidden.remove();
+      try { locEl.removeAttribute('disabled'); locEl.classList.remove('is-disabled'); } catch(_){}
+    }
+  }
+
   const ORDER_PRICE_ENDPOINTS = ['/inventory/api/order-price/', '/inventory/api/order_price/', '/inventory/order-price/'];
   async function fetchFirstOk(bases, productId){
     for (const b of bases){
@@ -363,32 +464,50 @@
     }else{
       setOrderHint('No default price set for this model yet. Enter one manually.');
     }
-    updateValidity();
+    updateFormValidity();
   }
 
   // ===== Input wiring =====
   if (imeiEl) {
     imeiEl.setAttribute('inputmode','numeric');
-    imeiEl.setAttribute('maxlength','15');
     imeiEl.setAttribute('autocomplete','off');
-    imeiEl.addEventListener('input', (e)=>{
-      const v = digitsOnly(e.target.value);
-      const pos = e.target.selectionStart;
-      e.target.value = v.slice(0, 15);
-      try{ e.target.setSelectionRange(pos, pos);}catch(_){}
-      updateValidity();
+
+    // keep digits only, never >15 (keep last 15 when overflow/paste)
+    imeiEl.addEventListener('input', ()=>{
+      const before = imeiEl.value;
+      const onlyDigits = digitsOnly(before);
+      imeiEl.value = onlyDigits.length > 15 ? onlyDigits.slice(-15) : onlyDigits;
+      updateImeiCounter();
+      updateFormValidity();
     });
+
+    imeiEl.addEventListener('paste', ()=>{
+      setTimeout(()=>{
+        clampTo15KeepLast();
+        updateImeiCounter();
+        updateFormValidity();
+      },0);
+    });
+
+    // Enter submits when valid
     imeiEl.addEventListener('keydown', (e)=>{
-      if(e.key==='Enter'){ e.preventDefault(); if(submitBtn && !submitBtn.disabled){ form.submit(); } }
+      if(e.key==='Enter'){
+        e.preventDefault();
+        clampTo15KeepLast();
+        updateImeiCounter();
+        updateFormValidity();
+        if (submitBtn && !submitBtn.disabled){ form.submit(); }
+      }
       if(e.key==='F2'){ e.preventDefault(); imeiEl.focus(); }
     });
   }
+
   if (orderEl){
     orderEl.setAttribute('inputmode', 'decimal');
     orderEl.addEventListener('input', ()=>{
       manualPrice = true;
       if (Number(orderEl.value) < 0) orderEl.value = '0';
-      updateValidity();
+      updateFormValidity();
     });
   }
   if (recvEl && !recvEl.value){
@@ -398,13 +517,20 @@
     const dd = String(today.getDate()).padStart(2,'0');
     recvEl.value = `${yyyy}-${mm}-${dd}`;
   }
-  prodEl && prodEl.addEventListener('change', ()=>{ manualPrice = false; autofillOrderPrice(false); updateValidity(); });
-  locEl && locEl.addEventListener('change', updateValidity);
+  prodEl && prodEl.addEventListener('change', ()=>{ manualPrice = false; autofillOrderPrice(false); updateFormValidity(); });
+  locEl && locEl.addEventListener('change', ()=>{
+    const hidden = document.querySelector('input[type="hidden"][name="location"]');
+    if (hidden) hidden.value = locEl.value || defaultLocId || '';
+    updateFormValidity();
+  });
 
   window.addEventListener('load', ()=>{
     applyDefaultLocation();
+    ensureLocationEnabled();
+    lockLocationIfNeeded();
     imeiEl && imeiEl.focus();
-    updateValidity();
+    updateImeiCounter();
+    updateFormValidity();
     if (prodEl && prodEl.value){ autofillOrderPrice(false); }
   });
 
@@ -414,10 +540,15 @@
       const txt = await navigator.clipboard.readText();
       if(!txt){ showToast('Clipboard is empty.', false); return; }
       if (imeiEl){
-        imeiEl.value = digitsOnly(txt).slice(0,15);
-        updateValidity();
-        if(isIMEI15(imeiEl.value) && submitBtn && !submitBtn.disabled){ form.submit(); }
-        else { showToast('Pasted. Press Save to submit.', true); }
+        const d = digitsOnly(txt);
+        imeiEl.value = d.length > 15 ? d.slice(-15) : d; // keep LAST 15
+        updateImeiCounter();
+        updateFormValidity();
+        if (lenDigits(imeiEl.value) === 15 && submitBtn && !submitBtn.disabled){
+          form.submit();
+        } else {
+          showToast('Pasted. Need 15 digits.', false);
+        }
       }
     }catch{
       showToast('Clipboard blocked. Paste manually (Ctrl+V).', false);
@@ -426,10 +557,7 @@
   });
 
   // ===== Scanner: BarcodeDetector → Quagga fallback =====
-  let mediaStream = null, videoTrack = null, scanning = false;
-  let rafId = null, usingDetector = false, torchOn = false;
-
-  function stopRaf(){ if (rafId) cancelAnimationFrame(rafId); rafId = null; }
+  let mediaStream = null, videoTrack = null;
 
   async function listCameras(){
     try{
@@ -468,13 +596,10 @@
     if (!('torch' in caps)) { showToast('Torch not supported on this camera.', false); return; }
     try{
       await videoTrack.applyConstraints({ advanced:[{ torch: desired }] });
-      torchOn = desired;
     }catch(_){}
   }
 
   function stopAll(){
-    scanning = false;
-    stopRaf();
     if (window.Quagga) try{ Quagga.offDetected && Quagga.offDetected(()=>{}); }catch(_){}
     if (window.Quagga) try{ Quagga.stop(); }catch(_){}
     if (mediaStream){ mediaStream.getTracks().forEach(t=>t.stop()); }
@@ -501,12 +626,12 @@
   }
 
   function handleIMEI(value){
-    const code = digitsOnly(value).slice(0,15);
-    if (!code) return;
-    if (imeiEl){ imeiEl.value = code; updateValidity(); }
-    pauseScanline();
+    const codeRaw = digitsOnly(value);
+    if (!codeRaw) return;
+    const code = (codeRaw.length >= 15) ? codeRaw.slice(-15) : codeRaw;
+    if (imeiEl){ imeiEl.value = code; updateImeiCounter(); updateFormValidity(); }
     try{ navigator.vibrate && navigator.vibrate(20);}catch(_){}
-    if (isIMEI15(code) && submitBtn && !submitBtn.disabled){
+    if (code.length === 15 && submitBtn && !submitBtn.disabled){
       showToast('Scanned IMEI: ' + code, true);
       stopAll(); form.submit();
     } else {
@@ -516,8 +641,7 @@
 
   async function startNativeDetector(deviceId){
     await startMedia(deviceId);
-    usingDetector = ('BarcodeDetector' in window);
-    if (!usingDetector){ return startQuagga(deviceId); }
+    if (!('BarcodeDetector' in window)){ return startQuagga(deviceId); }
 
     const detector = new window.BarcodeDetector({
       formats: [
@@ -528,15 +652,13 @@
 
     const canvas = document.createElement('canvas');
     const ctx = canvas.getContext('2d', { willReadFrequently: true });
-    scanning = true;
-
     let lastPickShownAt = 0;
-    const windowMs = 1200; // aggregate a small window for multi-pick
+    const windowMs = 1200;
     let seen = new Map();   // value -> lastTs
 
     const loop = async () => {
-      if (!scanning) return;
-      rafId = requestAnimationFrame(loop);
+      if (!mediaStream) return;
+      requestAnimationFrame(loop);
       if (camNode.readyState < 2) return;
 
       canvas.width = camNode.videoWidth; canvas.height = camNode.videoHeight;
@@ -548,7 +670,6 @@
           const vals = [...new Set(codes.map(c => (c.rawValue||c.rawValueText||"").trim()).filter(Boolean))];
           const now = Date.now();
           vals.forEach(v=> seen.set(v, now));
-          // Purge stale
           for (const [k,t] of [...seen.entries()]) if (now - t > windowMs) seen.delete(k);
 
           const uniq = [...seen.keys()];
@@ -565,7 +686,6 @@
   }
 
   // ---- Quagga fallback (1-at-a-time) ----
-  let quaggaRunning = false, lastDetected = '';
   async function startQuagga(deviceId){
     if (!window.Quagga) { showToast('Quagga not loaded.', false); return; }
     Quagga.init({
@@ -577,12 +697,11 @@
       numOfWorkers: navigator.hardwareConcurrency ? Math.min(4, navigator.hardwareConcurrency) : 2
     }, (err)=>{
       if(err){ showToast('Camera init failed. Use HTTPS or Android dev flag & allow camera.', false); return; }
-      Quagga.start(); quaggaRunning = true; scanning = true;
+      Quagga.start();
     });
     Quagga.onDetected((result)=>{
       const code = (result && result.codeResult && result.codeResult.code) || '';
-      if(!code || code===lastDetected) return;
-      lastDetected = code;
+      if(!code) return;
       handleIMEI(code);
     });
   }
@@ -616,10 +735,31 @@
     camToggle.textContent='Start Camera';
   });
 
-  torchBtn && torchBtn.addEventListener('click', ()=> enableTorch(!torchOn));
+  torchBtn && torchBtn.addEventListener('click', ()=> enableTorch(true));
 
-  // Pause camera when tab hidden (prevents black resume on some mobiles)
+  // Pause camera when tab hidden
   document.addEventListener('visibilitychange', ()=>{ if (document.hidden) { stopAll(); } });
+
+  // ---- Form submit guard: IMEI must be exactly 15 ----
+  form.addEventListener('submit', (e)=>{
+    clampTo15KeepLast(); // just in case
+    updateImeiCounter();
+    updateFormValidity();
+    if (lenDigits(imeiEl.value) !== 15){
+      e.preventDefault();
+      showToast('Enter 15-digit IMEI.', false);
+    }
+  });
+
+  // initial
+  updateImeiCounter();
+  updateFormValidity();
 })();
 </script>
+
+<noscript>
+  <div class="warn" style="display:block" role="alert">
+    JavaScript is required to use the camera scanner and live validation. You can still type the IMEI and submit.
+  </div>
+</noscript>
 {% endblock %}

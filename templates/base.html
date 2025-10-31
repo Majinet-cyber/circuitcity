@@ -80,6 +80,9 @@
       /* Mobile dock */
       --safe-bottom: max(env(safe-area-inset-bottom), 0px);
       --dock-h: 64px;
+
+      /* Mobile drawer width: true one-third, with sane limits (NO !important here) */
+      --nav-drawer-w: clamp(180px, 33.33vw, 360px);
     }
 
     @media (prefers-reduced-motion: reduce){
@@ -148,6 +151,16 @@
         transform:translateX(-100%);
         transition: transform .26s var(--elevate);
         box-shadow: 0 20px 60px rgba(0,0,0,.35);
+
+        /* NEW: true one-third width with bounds */
+        width: var(--nav-drawer-w) !important;
+        max-width: 100vw !important;
+
+        /* Solid black, no transparency on mobile */
+        background: #0f1115 !important;
+        border-right: 1px solid #1f2937 !important;
+        -webkit-backdrop-filter: none !important;
+        backdrop-filter: none !important;
       }
       body[data-drawer="open"] .cc-sidebar{ transform:translateX(0) !important; }
       .cc-backdrop{ position:fixed; inset:0; background:rgba(2,6,23,.42); backdrop-filter:blur(2px); display:none; z-index:1990; }
@@ -259,6 +272,49 @@
 
   {% block extra_head %}{% endblock %}
   {% block extra_css %}{% endblock %}
+
+  <!-- ======================= MENU RESCUE (CSS) ======================= -->
+  <style>
+    /* Ensure header containers are never display:none on mobile */
+    @media (max-width: 991.98px){
+      header, .topbar, .navbar, .app-navbar, .cc-header, .page-header {
+        display: flex !important;
+        align-items: center !important;
+        min-height: 52px;
+        position: relative;
+        z-index: 1600;
+      }
+      /* Force show any common menu toggle variants */
+      .menu-toggle, .mobile-toggle, .hamburger, .nav-toggle, .navbar-toggler, .btn-menu,
+      .cc-header .menu-toggle, .cc-header .mobile-toggle, .cc-header .hamburger,
+      .cc-header .nav-toggle, .cc-header .navbar-toggler, .cc-header .btn-menu {
+        display: inline-flex !important;
+        visibility: visible !important;
+        opacity: 1 !important;
+        pointer-events: auto !important;
+        align-items: center; justify-content: center;
+        width: 44px; height: 44px;
+        color: #0b132b;
+      }
+      /* Neutralize hidden utilities applied to togglers */
+      .menu-toggle.d-none, .mobile-toggle.d-none, .hamburger.d-none, .nav-toggle.d-none, .navbar-toggler.d-none, .btn-menu.d-none,
+      .menu-toggle.invisible, .mobile-toggle.invisible, .hamburger.invisible, .nav-toggle.invisible, .navbar-toggler.invisible, .btn-menu.invisible,
+      .menu-toggle[hidden], .mobile-toggle[hidden], .hamburger[hidden], .nav-toggle[hidden], .navbar-toggler[hidden], .btn-menu[hidden]{
+        display: inline-flex !important; visibility: visible !important;
+      }
+    }
+    /* Fallback 3-bars if icon font fails */
+    .hamburger-bars{
+      position: relative; display:inline-block; width:22px; height:2px;
+      background: currentColor; border-radius:2px;
+    }
+    .hamburger-bars::before, .hamburger-bars::after{
+      content:""; position:absolute; left:0; right:0; height:2px; background: currentColor; border-radius:2px;
+    }
+    .hamburger-bars::before{ top:-7px; }
+    .hamburger-bars::after { top: 7px; }
+  </style>
+  <!-- =================== /MENU RESCUE (CSS) =================== -->
 </head>
 <body>
 
@@ -267,7 +323,8 @@
 
   <!-- Drawer trigger + backdrop -->
   <button class="mobile-toggle tap focus-ring" id="sidebarOpen" aria-label="Open menu" aria-expanded="false" aria-controls="ccSidebar">
-    <i class="bi bi-list"></i>
+    <i class="bi bi-list" aria-hidden="true"></i>
+    <span class="hamburger-bars" aria-hidden="true"></span>  <!-- fallback bars -->
   </button>
   <div class="cc-backdrop" id="ccBackdrop" aria-hidden="true"></div>
 
@@ -597,7 +654,7 @@
   ============================================================ */
   (function(){
     function readCookie(name){
-      const m = document.cookie.match(new RegExp('(?:^|; )' + name.replace(/[-[\]{}()*+?.,\\^$|#\s]/g,'\\$&') + '=([^;]*)'));
+      const m = document.cookie.match(new RegExp('(?:^|; )' + name.replace(/[-[\]{}()*+?.,\\^$|#\\s]/g,'\\$&') + '=([^;]*)'));
       return m ? decodeURIComponent(m[1]) : '';
     }
     function setCookie(name, value, days){
@@ -622,7 +679,6 @@
           setCookie('csrftoken', t, 7);
         } else {
           // last resort: no token available yet; don't inject empty headers
-          // console.debug('CSRF: token not available yet');
         }
       }
     }
@@ -638,7 +694,7 @@
       getCsrfToken,
       URLS: Object.assign({
         time_checkin_api: "{{ url_time_checkin_api|default:'/inventory/api/time-checkin/' }}"
-      }, window.CC && CC.URLS || {})
+      }, (window.CC && window.CC.URLS) || {})
     });
 
     // ---- Global fetch shim: auto-attach CSRF on same-origin unsafe methods ----
@@ -715,7 +771,7 @@
         geo_ping: "{{ url_geo_ping|default:'/inventory/api/geo-ping/' }}",
         billing_subscribe: "{{ url_billing_sub|default:'/billing/subscribe/' }}",
         billing_checkout: "{{ url_billing_checkout|default:'/billing/checkout/' }}"
-      }, window.CC && CC.URLS || {}),
+      }, (window.CC && window.CC.URLS) || {}),
       USER: {
         is_staff: {{ request.user.is_staff|yesno:"true,false" }},
         is_superuser: {{ request.user.is_superuser|yesno:"true,false" }},
@@ -741,6 +797,7 @@
     let openState = false;
     let busy = false;
     let savedY = 0;
+    let lastToggleAt = 0;       // guard against double-fires
 
     function lockScroll(){
       savedY = window.scrollY || 0;
@@ -765,35 +822,21 @@
     }
     function toggle(){
       if (busy) return;
+      const now = performance.now();
+      if (now - lastToggleAt < 300) return; // 300ms guard to stop "blink"
+      lastToggleAt = now;
+
       busy = true;
       openState = !openState;
       applyState();
-      setTimeout(()=>busy=false, 220);
+      setTimeout(()=>busy=false, 260); // match .26s CSS transition
     }
     function close(){ if (openState){ openState=false; applyState(); } }
 
-    const onToggle = (e)=>{ e.preventDefault(); e.stopPropagation(); toggle(); };
+    // SINGLE handler: pointerup only (no click/touchend duplicates)
+    toggleBtn.addEventListener('pointerup', (e)=>{ e.preventDefault(); e.stopPropagation(); toggle(); }, {passive:false});
 
-    // Debounced cross-input tap binder
-    function bindTap(el, handler){
-      let locked = false, timer = null;
-      function fire(e){
-        e.preventDefault(); e.stopPropagation();
-        if (locked) return;
-        locked = true;
-        handler(e);
-        clearTimeout(timer);
-        timer = setTimeout(()=> locked=false, 220);
-      }
-      el.addEventListener('pointerup', fire, {passive:false});
-      el.addEventListener('touchend', fire, {passive:false});
-      el.addEventListener('click', fire, {passive:false});
-      el.addEventListener('keydown', e=>{
-        if (e.key === 'Enter' || e.key === ' ') fire(e);
-      }, {passive:false});
-    }
-    bindTap(toggleBtn, onToggle);
-
+    // Prevent sidebar content from closing the drawer by bubbling
     ['click','pointerdown','touchstart','mousedown'].forEach(ev=>{
       sidebar.addEventListener(ev, e=>e.stopPropagation(), {passive:true});
     });
@@ -801,6 +844,7 @@
     backdrop.addEventListener('click', (e)=>{ e.preventDefault(); close(); }, {passive:false});
     document.addEventListener('keydown', (e)=>{ if (e.key === 'Escape') close(); }, {passive:true});
 
+    // Close when navigating
     sidebar.querySelectorAll('a[href]').forEach(a=>{
       a.addEventListener('click', ()=> close(), {passive:true});
     });
@@ -857,7 +901,7 @@
     function run(){
       const q = (input.value || '').trim();
       if (!q) return;
-      const dest = (window.CC && CC.URLS && CC.URLS.stock_list) || '/inventory/list/';
+      const dest = (window.CC && window.CC.URLS && window.CC.URLS.stock_list) || '/inventory/list/';
       const url  = new URL(dest, location.origin);
       url.searchParams.set('q', q);
       location.href = url.toString();
@@ -922,26 +966,123 @@
     window.addEventListener('offline', apply, {passive:true});
     apply();
   })();
+
+  /* ======================= MENU RESCUE (JS) ======================= */
+  (function(){
+    // If some stylesheet hides the button, bring it back at runtime (mobile only)
+    function revive(){
+      if (!window.matchMedia('(max-width: 991.98px)').matches) return;
+      var btn = document.getElementById('sidebarOpen');
+      if (!btn) return;
+      var style = window.getComputedStyle(btn);
+      if (style.display === 'none' || style.visibility === 'hidden' || style.opacity === '0'){
+        btn.style.display = 'inline-flex';
+        btn.style.visibility = 'visible';
+        btn.style.opacity = '1';
+        btn.style.pointerEvents = 'auto';
+        // Ensure contrast
+        btn.style.color = '#ffffff';
+      }
+    }
+    document.addEventListener('DOMContentLoaded', revive, {once:true});
+    window.addEventListener('resize', revive, {passive:true});
+  })();
+  /* ===================== /MENU RESCUE (JS) ===================== */
+</script>
+
+{# ===== CC Drawer Hotfix v3.2 — kill double-toggles & blink (non-destructive) ===== #}
+<script>
+(function(){
+  const sidebarEl   = document.querySelector('.cc-sidebar');
+  const oldBtn      = document.getElementById('sidebarOpen');
+  const oldBackdrop = document.getElementById('ccBackdrop');
+  if (!sidebarEl || !oldBtn || !oldBackdrop) return;
+
+  // Replace button & backdrop to drop any previously-attached listeners from other scripts
+  const btn = oldBtn.cloneNode(true);
+  btn.id = oldBtn.id;
+  oldBtn.replaceWith(btn);
+
+  const backdrop = oldBackdrop.cloneNode(true);
+  backdrop.id = oldBackdrop.id;
+  oldBackdrop.replaceWith(backdrop);
+
+  // Single source of truth state
+  let open = document.body.getAttribute('data-drawer') === 'open';
+  let lock = false, savedY = 0;
+  const TRANS_MS = 280;
+
+  function lockScroll(){
+    savedY = window.scrollY || 0;
+    Object.assign(document.body.style,{position:'fixed',top:`-${savedY}px`,left:'0',right:'0',width:'100%',overflow:'hidden'});
+  }
+  function unlockScroll(){
+    Object.assign(document.body.style,{position:'',top:'',left:'',right:'',width:'',overflow:''});
+    window.scrollTo(0, savedY||0);
+  }
+  function apply(){
+    if (open){
+      document.body.setAttribute('data-drawer','open');
+      btn.setAttribute('aria-expanded','true');
+      backdrop.classList.add('show');
+      lockScroll();
+    } else {
+      document.body.removeAttribute('data-drawer');
+      btn.setAttribute('aria-expanded','false');
+      backdrop.classList.remove('show');
+      unlockScroll();
+    }
+  }
+  function set(state){
+    if (lock) return;
+    lock = true;
+    open = !!state;
+    apply();
+    setTimeout(()=> lock=false, TRANS_MS);
+  }
+  function toggle(){ set(!open); }
+
+  // Swallow duplicate events from legacy handlers (capture-phase)
+  const swallow = (e)=>{ e.preventDefault(); e.stopPropagation(); if (e.stopImmediatePropagation) e.stopImmediatePropagation(); };
+
+  btn.addEventListener('click', swallow, {capture:true});
+  btn.addEventListener('touchend', swallow, {capture:true});
+
+  // Primary handler (pointerup only)
+  btn.addEventListener('pointerup', (e)=>{ swallow(e); toggle(); }, {passive:false});
+
+  // Sidebar should not close when tapping inside
+  ['click','pointerdown','touchstart','mousedown'].forEach(ev=>{
+    sidebarEl.addEventListener(ev, e=>e.stopPropagation(), {passive:true});
+  });
+
+  // Close actions
+  backdrop.addEventListener('click', (e)=>{ swallow(e); set(false); }, {passive:false});
+  document.addEventListener('keydown', (e)=>{ if (e.key === 'Escape') set(false); }, {passive:true});
+
+  // Close on nav inside sidebar
+  sidebarEl.querySelectorAll('a[href]').forEach(a=>{
+    a.addEventListener('click', ()=> set(false), {passive:true});
+  });
+
+  // Ensure we start closed
+  set(false);
+
+  // Expose for quick console testing
+  window.ccDrawer = { open: ()=>set(true), close: ()=>set(false), toggle };
+})();
 </script>
 
 {# ===== Geo-ping ===== #}
 {% if request.user.is_authenticated %}
 <script>
 (function () {
-  const ENDPOINT = (window.CC && CC.URLS && CC.URLS.geo_ping) || "{{ url_geo_ping|default:'/inventory/api/geo-ping/' }}";
+  const ENDPOINT = (window.CC && window.CC.URLS && window.CC.URLS.geo_ping) || "{{ url_geo_ping|default:'/inventory/api/geo-ping/' }}";
   const onTimeLogs = location.pathname.indexOf('/inventory/time/logs/') !== -1;
   const force = localStorage.getItem('cc_ping_force') === '1';
-  const isAgent = !!(window.CC && CC.USER && CC.USER.is_agent === true);
+  const isAgent = !!(window.CC && window.CC.USER && window.CC.USER.is_agent === true);
   const shouldPing = isAgent || onTimeLogs || force;
   if (!shouldPing) return;
-
-  function getCSRF() {
-    // Always uses the unified helper (now robust)
-    return (window.CC && CC.getCsrfToken && CC.getCsrfToken()) || '';
-  }
-
-  let watchId = null;
-  let lastSent = 0;
 
   async function sendPing(lat, lon, accuracy) {
     try {
@@ -960,8 +1101,10 @@
 
   function onPos(pos) {
     const now = Date.now();
-    if (now - lastSent < 30000) return; // throttle 30s
-    lastSent = now;
+    if (!window.__cc_last_ping__) window.__cc_last_ping__ = 0;
+    if (now - window.__cc_last_ping__ < 30000) return; // throttle 30s
+    window.__cc_last_ping__ = now;
+
     const { latitude, longitude, accuracy } = pos.coords || {};
     if (latitude != null && longitude != null) {
       sendPing(latitude, longitude, accuracy ?? 0);
@@ -970,6 +1113,7 @@
 
   function onErr(){}
 
+  let watchId = null;
   function startWatch() {
     if (!navigator.geolocation) return;
     stopWatch();

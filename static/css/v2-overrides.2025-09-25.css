@@ -1,36 +1,37 @@
 /* ==========================================================================
-   v2-overrides.css — local dev overrides for Circuit City
-   Safe to keep in repo; tweak styles without touching vendor CSS.
-   --------------------------------------------------------------------------
-   Notes:
-   - Designed to be harmless if classes aren’t present.
-   - Light Bootstrap-leaning defaults; works even without Bootstrap loaded.
-   - Keep selectors specific but not too heavy to avoid cascade wars.
-   - 2025-10-10: Billing plans polish (1-click cards), stronger glass cards,
-                 mobile drawer (no flash), search popover sticky actions,
-                 perfect-fit grid & spacing, stronger blue glass style.
+   v2-overrides.css — Circuit City
+   Rich UI + Mobile full-screen fit + stable dropdowns + bold red alerts
+   Safe overlay (no vendor edits). Order matters; last rules win.
    ========================================================================== */
 
+/* --- Global sanity ------------------------------------------------------- */
+*, *::before, *::after { box-sizing: border-box; }
+html, body { width: 100%; max-width: 100vw; overflow-x: hidden; -webkit-text-size-adjust: 100%; }
+
 /* --------------------------------------------------------------------------
-   CSS Variables (theme tokens)
+   Theme tokens
    -------------------------------------------------------------------------- */
 :root {
   --cc-dev: 1;
 
   /* Brand */
-  --cc-brand: #0d6efd;           /* primary */
-  --cc-brand-600: #0b5ed7;
-  --cc-accent: #20c997;          /* teal-ish success accent */
+  --cc-brand: #0b5ed7;
+  --cc-brand-600: #0a58ca;
+  --cc-brand-700: #094db4;
+
+  /* Accents */
+  --cc-accent:  #1b4a9b;
   --cc-warning: #f59f00;
-  --cc-danger: #e03131;
+  --cc-danger:  #e03131; /* base red */
+  --cc-danger-600: #d01818; /* darker red for borders/hover */
 
   /* Grays */
-  --cc-bg: #f5f7fb;              /* slightly deeper than before */
+  --cc-bg: #eef3fb;
   --cc-card: #ffffff;
-  --cc-muted: #64748b;           /* stronger than #6c757d (less washed) */
-  --cc-border: #d9deea;          /* darker border -> clearer edges */
-  --cc-heading: #0f172a;         /* stronger ink */
-  --cc-text: #111827;            /* stronger body ink */
+  --cc-muted: #64748b;
+  --cc-border: #d9deea;
+  --cc-heading: #0f172a;
+  --cc-text: #111827;
 
   /* Surfaces */
   --cc-shadow-sm: 0 6px 16px rgb(15 23 42 / 10%);
@@ -48,20 +49,23 @@
   --cc-chart-4: #f59e0b;
 
   /* Table */
-  --cc-row-hover: #eef2ff;       /* blue-tinted hover (feels “alive”) */
+  --cc-row-hover: #eaf0ff;
 
   /* Badges / pills */
   --cc-badge-ink: #0f172a;
   --cc-badge-bg: #e7efff;
   --cc-badge-br: #c8dcff;
 
-  /* ===== Mobile nav & safe-area tokens (additive) ===== */
+  /* Safe areas & dock */
   --safe-top: env(safe-area-inset-top, 0px);
   --safe-bottom: max(env(safe-area-inset-bottom), 0px);
-  --dock-h: 64px; /* height of the mobile bottom dock/tabbar */
+  --dock-h: 64px;
+
+  /* Drawer width (~30% screen) */
+  --nav-drawer-w: clamp(260px, 30vw, 420px);
 }
 
-/* Dark mode (opt-in via body.dark or prefers-color-scheme) */
+/* Dark mode */
 @media (prefers-color-scheme: dark) {
   :root {
     --cc-bg: #0f1115;
@@ -95,14 +99,10 @@ body.dark {
 html, body {
   background: var(--cc-bg);
   color: var(--cc-text);
-  max-width: 100%;
-  overflow-x: hidden; /* prevent horizontal scroll on small screens */
-  -webkit-text-size-adjust: 100%;
+  min-height: 100svh;
 }
-html, body { min-height: 100svh; }   /* keep height correct with mobile chrome */
 
-/* Stop iOS zoom-on-focus (inputs <16px trigger zoom) */
-input, select, textarea { font-size: 16px; }
+input, select, textarea { font-size: 16px; } /* prevent iOS zoom */
 
 h1, h2, h3, h4, h5 {
   color: var(--cc-heading);
@@ -110,17 +110,14 @@ h1, h2, h3, h4, h5 {
   font-weight: 800;
 }
 
-/* Fluid downscale on very small handsets to avoid “zoom out” */
 @media (max-width: 420px){
   h1 { font-size: clamp(20px, 6vw, 24px); line-height: 1.2; }
   h2 { font-size: clamp(18px, 5.2vw, 22px); line-height: 1.25; }
   .display-1, .display-2, .display-3 { font-size: clamp(24px, 7vw, 30px); line-height: 1.15; }
 }
 
-/* Universal media guard so wide media doesn’t push layout sideways */
 img, svg, video, canvas { max-width: 100%; height: auto; }
 
-/* Ensure page content never sits under the mobile dock/tabbar */
 main, .cc-page, .content, .page, .container, .container-fluid {
   padding-bottom: calc(var(--dock-h) + var(--safe-bottom) + 16px);
 }
@@ -129,15 +126,15 @@ main, .cc-page, .content, .page, .container, .container-fluid {
   padding-right: max(12px, 3vw);
 }
 
-/* Reduce overly large gaps on dashboards */
 .section, .section-sm { margin-block: calc(var(--cc-gap) * 1.1); }
 
-/* Cards (incl. “glass” cards) */
+/* Cards */
 .card, .cc-card, .stat-card, .glass-card {
   background: linear-gradient(180deg, #fff, #f9fbff);
   border: 1px solid var(--cc-border);
   border-radius: var(--cc-radius);
   box-shadow: var(--cc-shadow-sm);
+  overflow: visible;
 }
 body.dark .card,
 body.dark .cc-card,
@@ -181,14 +178,14 @@ body.dark .kpi-strong, body.dark .stat-card {
 .stat-card .stat-label { color: var(--cc-muted); font-weight: 600; }
 
 /* --------------------------------------------------------------------------
-   Buttons (Bootstrap-like without requiring it)
+   Buttons
    -------------------------------------------------------------------------- */
 .btn, .button, .cc-btn {
   --_bg: var(--cc-brand);
   --_bg-hover: var(--cc-brand-600);
   --_text: #fff;
   display: inline-flex; align-items: center; gap: 8px;
-  padding: 11px 16px; font-weight: 700;
+  padding: 11px 16px; font-weight: 800;
   border-radius: 14px;
   border: 1px solid color-mix(in srgb, var(--cc-brand) 42%, #0000);
   background: var(--_bg); color: var(--_text);
@@ -201,6 +198,10 @@ body.dark .kpi-strong, body.dark .stat-card {
   transform: translateY(-1px);
   box-shadow: 0 14px 36px color-mix(in srgb, var(--cc-brand) 28%, #0000);
 }
+.btn:active, .cc-btn:active, .btn:focus, .cc-btn:focus {
+  background: var(--cc-brand-700);
+  border-color: var(--cc-brand-700);
+}
 .btn-outline, .btn-outline-primary {
   --_bg: transparent; --_text: var(--cc-brand);
   border-color: var(--cc-brand); background: transparent; color: var(--_text);
@@ -209,21 +210,25 @@ body.dark .kpi-strong, body.dark .stat-card {
   background: color-mix(in srgb, var(--cc-brand) 12%, transparent);
 }
 
+/* Danger buttons/pills to match red alert theme */
+.btn-danger, .pill-danger, .badge-danger {
+  background: var(--cc-danger) !important;
+  border-color: var(--cc-danger-600) !important;
+  color: #fff !important;
+}
+.btn-danger:hover { background: var(--cc-danger-600) !important; }
+
 /* Utility tints */
 .badge-success, .pill-success {
-  background: color-mix(in srgb, var(--cc-accent) 18%, #fff);
-  color: #0f5132; border: 1px solid color-mix(in srgb, var(--cc-accent) 34%, #0000);
+  background: color-mix(in srgb, #16a34a 18%, #fff);
+  color: #0f5132; border: 1px solid color-mix(in srgb, #16a34a 34%, #0000);
 }
 .badge-warning, .pill-warning {
   background: color-mix(in srgb, var(--cc-warning) 20%, #fff);
   color: #7a4d00; border: 1px solid color-mix(in srgb, var(--cc-warning) 34%, #0000);
 }
-.badge-danger,  .pill-danger  {
-  background: color-mix(in srgb, var(--cc-danger) 20%, #fff);
-  color: #6b1010; border: 1px solid color-mix(in srgb, var(--cc-danger) 34%, #0000);
-}
 
-/* Trial / status badges */
+/* Status badges */
 .badge, .pill, .status-badge {
   display: inline-flex; align-items: center; gap: .5ch;
   font-weight: 800; letter-spacing: .2px;
@@ -240,8 +245,8 @@ body.dark .kpi-strong, body.dark .stat-card {
   overflow: hidden; border-collapse: separate; border-spacing: 0;
 }
 .table thead th, table.cc-table thead th {
-  background: var(--cc-row-hover); color: var(--cc-heading);
-  font-weight: 800; border-bottom: 1px solid var(--cc-border);
+  background: #ecf2ff; color: var(--cc-heading);
+  font-weight: 900; border-bottom: 1px solid var(--cc-border);
 }
 .table tbody tr:hover, table.cc-table tbody tr:hover { background: var(--cc-row-hover); }
 .table th, .table td, table.cc-table th, table.cc-table td {
@@ -267,24 +272,20 @@ input:focus, select:focus, textarea:focus, .form-control:focus {
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--cc-brand) 18%, transparent);
   transition: box-shadow .18s ease, border-color .18s ease;
 }
-/* Fix select2 / datepicker overlapping modals if used */
 .select2-container, .flatpickr-calendar, .datepicker { z-index: 2000 !important; }
 
 /* --------------------------------------------------------------------------
-   Dashboard-specific helpers (safe if unused)
+   Dashboard helpers
    -------------------------------------------------------------------------- */
 .dashboard-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: var(--cc-gap); }
-/* simple progress bar */
 .cc-progress { height: 8px; background: var(--cc-border); border-radius: 999px; overflow: hidden; }
 .cc-progress > span { display: block; height: 100%; width: var(--value, 0%); background: var(--cc-brand); border-radius: inherit; }
 
-/* --------------------------------------------------------------------------
-   Charts (generic containers)
-   -------------------------------------------------------------------------- */
+/* Charts */
 .chart-card canvas, .chart, .rechart, .apexchart { width: 100%; height: 280px; }
 
 /* --------------------------------------------------------------------------
-   Navbar / Sidebar (if present)
+   Navbar / Sidebar
    -------------------------------------------------------------------------- */
 .navbar, .app-navbar {
   background: var(--cc-card); border-bottom: 1px solid var(--cc-border);
@@ -293,12 +294,19 @@ input:focus, select:focus, textarea:focus, .form-control:focus {
 .sidebar, .app-sidebar { background: var(--cc-card); border-right: 1px solid var(--cc-border); }
 
 /* --------------------------------------------------------------------------
-   Toasts / Alerts
+   Toasts / Alerts — 🔴 strong red theme
    -------------------------------------------------------------------------- */
 .alert { border: 1px solid var(--cc-border); border-radius: 12px; box-shadow: var(--cc-shadow-sm); }
-.alert-success { border-color: color-mix(in srgb, var(--cc-accent) 45%, var(--cc-border)); }
-.alert-warning { border-color: color-mix(in srgb, var(--cc-warning) 45%, var(--cc-border)); }
-.alert-danger  { border-color: color-mix(in srgb, var(--cc-danger)  45%, var(--cc-border)); }
+.alert-success { background: #ecfdf5; border-color: #86efac; color:#065f46; }
+.alert-warning { background: #fffbeb; border-color: #fcd34d; color:#7a4d00; }
+/* Stronger red look (the one you liked) */
+.alert-danger  {
+  background: #ffe8e8;                 /* soft red panel */
+  border-color: var(--cc-danger-600);   /* dark red edge */
+  color: #7f1d1d;
+  box-shadow: 0 10px 24px rgba(224,49,49,.16);
+}
+.alert a { font-weight: 700; }
 .alert-list { list-style: none; padding: 0; margin: 0; }
 .alert-list li { padding: 10px 0; border-bottom: 1px dashed var(--cc-border); }
 .alert-list li:last-child { border-bottom: 0; }
@@ -317,231 +325,138 @@ input:focus, select:focus, textarea:focus, .form-control:focus {
 .py-cc      { padding-block: var(--cc-gap); }
 .px-cc      { padding-inline: var(--cc-gap); }
 
-/* ===== Mobile-only helpers ===== */
-@media (max-width: 991.98px){
-  .scan-fab { bottom: calc(var(--dock-h) + var(--safe-bottom) + 16px) !important; } /* keep FAB above dock */
-}
-.break-words, .wrap-anywhere { overflow-wrap: anywhere; word-break: break-word; }
-
-/* --------------------------------------------------------------------------
-   Print
-   -------------------------------------------------------------------------- */
-@media print {
-  .navbar, .sidebar, .btn, .cc-btn, .no-print { display: none !important; }
-  body { background: #fff; color: #000; }
-  .card, .table, .cc-card { box-shadow: none; border-color: #bbb; }
-}
-
-/* --------------------------------------------------------------------------
-   🔧 Footer blur fix
-   -------------------------------------------------------------------------- */
-.footer-blur,.glass-footer,.bottom-blur,.mobile-fab-bar,.sticky-bottom,.cc-sticky-bar,
-.cc-bottom-blur,.sticky-cta,.sticky-actions,.tabbar,.fab-bar{
-  backdrop-filter: none !important; -webkit-backdrop-filter: none !important;
-  filter: none !important; box-shadow: none !important; background: var(--cc-card) !important;
-  border-top: 1px solid var(--cc-border) !important; opacity: 1 !important;
-}
-
 /* ==========================================================================
-                           🔧 MOBILE RESCUE PATCHES
+   📱 MOBILE FULL-SCREEN FIT (always-on, non-destructive)
+   Brings back the “perfect fit” feel from your previous version.
    ========================================================================== */
-
-/* 0) Sidebar gap killer + content reset (prevents pushed-right pages) */
-@media (max-width: 992px) {
-  :root { --sidebar-w: 0px !important; }
-  .content, .main, .page, .dashboard, .inventory__body {
-    margin-left: 0 !important; padding-left: 0 !important;
-  }
-  /* Off-canvas baseline for any sidebar variants */
-  .sidebar, .cc-sidebar, .nav-sidebar, .cc-drawer {
-    position: fixed !important; top: 0; left: 0; bottom: 0;
-    width: min(85vw, 360px) !important; max-width: 100vw !important;
-    background: var(--sidebar-bg, rgba(0,0,0,0.8)) !important;
-    transform: translateX(-100%) !important;
-    transition: transform .25s ease-out; z-index: 1100;
-  }
-  /* Accept BOTH .open and .is-open (legacy + new) */
-  .sidebar.open, .cc-sidebar.open, .nav-sidebar.open, .cc-drawer.open,
-  .sidebar.is-open, .cc-sidebar.is-open, .nav-sidebar.is-open, .cc-drawer.is-open { transform: translateX(0) !important; }
+body, button, input, select, textarea {
+  letter-spacing: normal;
+  line-height: 1.35;
+  word-break: normal !important;
+  overflow-wrap: normal !important;
+  hyphens: manual;
 }
 
-/* 1) Drawer/HUD layering so taps hit the right thing */
-.cc-sidebar,.cc-drawer{ z-index: 2000 !important; }
-.cc-backdrop{
-  z-index: 1990 !important; pointer-events: none; opacity: 0; transition: opacity .2s ease;
+/* Containers == true full width */
+.container, .container-fluid, .page, .content, .cc-page, main {
+  width: 100% !important; max-width: 100% !important; margin: 0 auto !important;
+  padding-left: 16px; padding-right: 16px;
 }
-.cc-backdrop.show{ pointer-events: auto; opacity: 1; }
-#ccBackdrop{ position: fixed; inset: 0; background: rgba(0,0,0,.28); display:none; opacity:0; z-index:1990; }
-.mobile-toggle{ z-index: 2010 !important; }
-.tenant-menu{ z-index: 2050 !important; pointer-events: auto; display:none; }
-.tenant-menu.open{ display:block; }
-.cc-header{ z-index: 1900 !important; }
 
-/* Tappable tenant pill */
-.tenant-pill{ cursor: pointer; -webkit-tap-highlight-color: transparent; touch-action: manipulation; user-select: none; }
+/* Keep bottom dock from overlapping content */
+main, .page, .content, .cc-page, .container, .container-fluid {
+  padding-bottom: calc(var(--dock-h) + var(--safe-bottom) + 16px);
+}
 
-/* Keep the bottom dock below popovers/menus but above content */
-.mobile-tabbar, .cc-bottom-nav{ z-index: 1200 !important; }
+/* Dropdowns/overlays layering + no clipping */
+.navbar, .topbar, .app-navbar, .page-header, .header, .card, .cc-card, .glass-card { overflow: visible !important; }
+.dropdown-menu, .dropdown-menu.show, .popover, .tooltip, .cc-search-popover, .tenant-menu {
+  position: absolute !important; z-index: 3000 !important; max-width: min(92vw, 420px);
+  white-space: normal !important; will-change: transform;
+}
+.dropdown-item, .menu-item, .popover * { writing-mode: horizontal-tb !important; }
 
-/* 2) Mobile full-width & orderly layout */
+/* Mobile container & grid behavior */
 @media (max-width: 991.98px){
-  html, body { overflow-x: hidden; }
-
-  .cc-page, main.cc-page, .container, .container-fluid {
-    max-width: 100% !important; width: 100% !important;
-    padding-left: 12px !important; padding-right: 12px !important;
-  }
+  html, body { overflow-x: hidden !important; }
   .row { margin-left: 0 !important; margin-right: 0 !important; }
   [class*="col-"] { padding-left: 8px !important; padding-right: 8px !important; }
 
-  /* Force multi-column dashboards into a single column on phones */
-  .grid-2, .grid, .dashboard-grid, .two-col, .layout-2col, .content-grid, .columns {
+  /* Defensive: prevent children from forcing overflow */
+  .cc-page, main, .container, .container-fluid, .row, .d-flex, .flex, [class*="d-flex"] { min-width: 0 !important; }
+
+  /* KPI / tile grids: 2 cols on phones, 1 on tiny phones */
+  .dashboard, .cc-dashboard, .stats, .kpi-tiles, .stat-tiles {
+    display: grid !important; grid-template-columns: repeat(2, minmax(0, 1fr)) !important; gap: 12px !important;
+  }
+  .stat-card, .kpi, .kpi-chip, .dashboard .card, .stats .card {
+    min-height: 120px; display:flex; align-items:center; justify-content:center; text-align:center;
+  }
+}
+@media (max-width: 420px){
+  .dashboard, .cc-dashboard, .stats, .kpi-tiles, .stat-tiles { grid-template-columns: 1fr !important; }
+}
+
+/* Mobile tables: scroll without widening page */
+@media (max-width: 991.98px){
+  table, .table { display: block; width: 100% !important; overflow-x: auto !important; -webkit-overflow-scrolling: touch; }
+}
+
+/* Chips/filters never wrap vertically */
+.chips, .chip-row, .filters, .filter-row, .tabs, .tabs-row, .pill-row, .invite-filters {
+  display: flex; gap: .5rem; flex-wrap: nowrap !important; overflow-x: auto; -webkit-overflow-scrolling: touch;
+}
+.btn, .cc-btn, .badge, .pill, .status-badge, .kpi, .nav-link, .dropdown-item,
+.tabbar a, .cc-bottom-nav a, .form-label, .btn .label, .cc-btn .label {
+  white-space: nowrap !important; text-overflow: ellipsis; overflow: hidden;
+}
+
+/* Force multi-column dashboards to single column only when you opt-in
+   by adding <body class="cc-mobile-fit"> (keeps desktop-like rows otherwise). */
+@media (max-width: 991.98px){
+  body.cc-mobile-fit .grid,
+  body.cc-mobile-fit .grid-2,
+  body.cc-mobile-fit .dashboard-grid,
+  body.cc-mobile-fit .two-col,
+  body.cc-mobile-fit .layout-2col,
+  body.cc-mobile-fit .content-grid,
+  body.cc-mobile-fit .columns {
     display: grid !important; grid-template-columns: 1fr !important; gap: 12px !important;
   }
-
-  /* Defensive: wide media/tables never push layout */
-  img, svg, video, canvas, table { max-width: 100% !important; height: auto !important; }
-  .table-responsive { width: 100% !important; overflow-x: auto; -webkit-overflow-scrolling: touch; }
-
-  /* Inventory/scan main panels fill the width */
-  .scan-page, .scan, .inventory-panel, .content-panel { width: 100% !important; max-width: 100% !important; }
 }
 
-/* 3) Hide narrow helper rails on phones */
-@media (max-width: 768px){
-  .help-rail, .helper-rail, .explain-rail, .side-rail,
-  .intro-rail, .blurb-rail, .left-rail, aside.aside, aside.left { display: none !important; }
-}
-
-/* 4) Header/title safety so it doesn’t overlap tenant chip/bell */
-@media (max-width: 991.98px){
-  .page-header, .header, .cc-header, .page-title, .title-bar {
-    position: relative !important; display: flex !important; align-items: center !important;
-    flex-wrap: wrap !important; gap: .5rem !important; margin: 0 0 12px !important;
-  }
-  .page-title h1, .page-title h2, .title, h1.page-title, .header .title {
-    position: static !important; transform: none !important; margin: 0 !important; min-width: 0 !important;
-    font-size: clamp(1.125rem, 4.2vw, 1.5rem) !important; line-height: 1.2 !important;
-  }
-  .hero, .title-card, .stat-hero { position: static !important; transform: none !important; margin: 0 0 12px !important; }
-}
-
-/* 5) Kill any horizontal scroll containers that force the page wider */
-@media (max-width: 991.98px){
-  .scroll-x, .overflow-x, .h-scroll { overflow-x: auto !important; -webkit-overflow-scrolling: touch; max-width: 100% !important; }
-}
-
-/* 6) Respect notches/safe areas */
-@supports (padding: max(0px)) {
+/* Respect notches/safe areas */
+@supports (padding: max(0px)){
   .navbar, .topbar, header, .page-header { padding-top: max(0px, var(--safe-top)); }
   .bottom-nav, .tabbar, .cc-bottom-nav { padding-bottom: max(8px, var(--safe-bottom)); }
 }
 
-/* 7) Extra guard: inline width/min-width won’t break mobile */
-@media (max-width: 991.98px){
-  [style*="width:"], [style*="min-width:"], [style*="max-width:"] { max-width: 100% !important; }
-}
-
-/* ===== Mobile warp rescue (consolidated) ===== */
-@media (max-width: 991.98px) {
-  .help-rail, .helper-rail, .explain-rail, .side-rail, .intro-rail, .blurb-rail,
-  .left-rail, aside.aside, aside.left { display: none !important; }
-
-  .scan-page, .scan, .inventory-panel, .content-panel { width: 100% !important; max-width: 100% !important; }
-
-  .grid, .grid-2, .dashboard-grid, .two-col, .layout-2col, .content-grid, .columns {
-    display: grid !important; grid-template-columns: 1fr !important; gap: 12px !important;
-  }
-}
-
-/* ======================================================================
-   MOBILE HARD OVERRIDES — force single-column & hide helper rail on phones
-   ====================================================================== */
-@media (max-width: 991.98px){
-  html, body { overflow-x: hidden !important; }
-
-  .cc-page, main.cc-page, .container, .container-fluid {
-    max-width: 100% !important; width: 100% !important;
-    padding-left: 12px !important; padding-right: 12px !important;
-  }
-
-  .row { margin-left: 0 !important; margin-right: 0 !important; display: block !important; }
-  .row > [class*="col"] { width: 100% !important; max-width: 100% !important; padding-left: 8px !important; padding-right: 8px !important; }
-
-  .grid, .grid-2, .dashboard-grid, .content-grid, [class*="grid-cols"] {
-    display: grid !important; grid-template-columns: 1fr !important; gap: 12px !important;
-  }
-
-  /* ❗️Do NOT force all flex rows to vertical — keep action/icon rows inline */
-  .d-flex:not(.btn-row):not(.keep-row):not(.cc-bottom-nav):not(.mobile-tabbar),
-  [class*="flex-row"]:not(.btn-row):not(.keep-row):not(.cc-bottom-nav):not(.mobile-tabbar) {
-    flex-direction: column !important; flex-wrap: nowrap !important; align-items: stretch !important;
-  }
-
-  /* Ensure bottom dock stays horizontal */
-  .mobile-tabbar, .cc-bottom-nav {
-    display: flex !important; flex-direction: row !important; align-items: center !important; justify-content: space-around !important;
-  }
-  .mobile-tabbar .tab, .cc-bottom-nav .tab { flex: 1 1 0 !important; text-align: center !important; min-width: 0 !important; }
-
-  img, svg, video, canvas, iframe, table { max-width: 100% !important; height: auto !important; }
-  .table-responsive { width: 100% !important; overflow-x: auto !important; -webkit-overflow-scrolling: touch; }
-
-  .page-aside, .left-rail, .left-col, .helper, .help, .explain, .intro, .intro-slab,
-  .sidebar-ghost, .aside, [data-aside], [aria-label="Helper"], [aria-label="Aside"] { display: none !important; }
-
-  .scan-page .row > [class*="col-"]:first-child,
-  .inventory-panel .row > [class*="col-"]:first-child,
-  .content-panel .row > [class*="col-"]:first-child { display: none !important; }
-
-  .scan-page .row > [class*="col-"]:last-child,
-  .inventory-panel .row > [class*="col-"]:last-child,
-  .content-panel .row > [class*="col-"]:last-child {
-    width: 100% !important; max-width: 100% !important;
-  }
-
-  :root { --cc-nav-h: 64px; --cc-safe-bottom: max(env(safe-area-inset-bottom), 0px); }
-  .mobile-tabbar, .cc-bottom-nav {
-    position: fixed; left: 0; right: 0; bottom: 0;
-    height: calc(var(--cc-nav-h) + var(--cc-safe-bottom)); padding-bottom: var(--cc-safe-bottom);
-    z-index: 1200 !important; backdrop-filter: blur(10px);
-  }
-  .cc-page, main.cc-page, .container, .container-fluid {
-    padding-bottom: calc(var(--cc-nav-h) + var(--cc-safe-bottom) + 16px) !important;
-  }
-}
-
 /* --------------------------------------------------------------------------
-   Perfect-fit fixes (dropdowns & short phones)
+   Sidebar drawer (30% width on mobile) + backdrop
    -------------------------------------------------------------------------- */
-.dropdown-menu{ max-height: calc(100svh - 120px); overflow: auto; overscroll-behavior: contain; }
-/* Keep important chrome stacked correctly */
+@media (max-width: 991.98px) {
+  .content, .main, .page, .dashboard, .inventory__body { margin-left: 0 !important; padding-left: 0 !important; }
+
+  .sidebar, .cc-sidebar, .nav-sidebar, .cc-drawer {
+    position: fixed !important; top: 0; left: 0; bottom: 0;
+    width: var(--nav-drawer-w) !important; max-width: 100vw !important;
+    background: var(--cc-card) !important; border-right: 1px solid var(--cc-border) !important;
+    transform: translateX(-100%) !important;
+    transition: transform .25s ease-out; z-index: 2000;
+  }
+  .sidebar.open, .cc-sidebar.open, .nav-sidebar.open, .cc-drawer.open,
+  body[data-drawer="open"] .sidebar, body[data-drawer="open"] .cc-sidebar,
+  body[data-drawer="open"] .nav-sidebar, body[data-drawer="open"] .cc-drawer { transform: translateX(0) !important; }
+
+  #ccBackdrop{
+    position: fixed; inset: 0; background: rgba(0,0,0,.28);
+    z-index: 1990; display: none; opacity: 0; pointer-events: none; transition: opacity .2s ease;
+  }
+  body[data-drawer="open"] #ccBackdrop{ display:block; opacity:1; pointer-events:auto; }
+}
 .cc-header { z-index: 1600 !important; }
 .mobile-tabbar, .cc-bottom-nav { z-index: 1200 !important; }
 
-/* ==========================================================================
-   🔷 SEARCH POPOVER — keep “Go” & “Logout” visible on mobile
+/* --------------------------------------------------------------------------
+   Search popover (sticky actions on mobile)
    -------------------------------------------------------------------------- */
 .cc-search { position: relative; }
 .cc-search-popover{
   position: absolute; top: 100%; left: 0; right: 0;
   max-height: 60vh; overflow-y: auto; -webkit-overflow-scrolling: touch;
-  z-index: 2055; /* above drawer/backdrop */
-  background: rgba(255,255,255,.98);
+  z-index: 3055; background: rgba(255,255,255,.98);
   border-radius: 14px; box-shadow: 0 12px 40px rgba(0,0,0,.18);
   border: 1px solid var(--cc-border);
 }
-@media (prefers-color-scheme: dark){
-  .cc-search-popover{ background: rgba(18,22,34,.98); }
-}
+@media (prefers-color-scheme: dark){ .cc-search-popover{ background: rgba(18,22,34,.98); } }
 .cc-search-actions{
   position: sticky; bottom: 0; padding: .5rem .75rem;
   background: inherit; border-top: 1px solid rgba(125,125,125,.18);
   display: flex; gap: .5rem; justify-content: flex-end;
 }
 
-/* ==========================================================================
-   Glassmorphic polish for the login/forgot pages
+/* --------------------------------------------------------------------------
+   Glassmorphic polish for login/forgot
    -------------------------------------------------------------------------- */
 :root{
   --glass-bg: color-mix(in oklab, #ffffff 78%, transparent);
@@ -582,62 +497,63 @@ body.accounts-auth, body.accounts-forgot {
 }
 .auth-version{ position: fixed; left:10px; bottom:10px; background:#111; color:#fff; border-radius:10px; padding:4px 8px; font:600 12px/1 ui-sans-serif,system-ui; opacity:.85; z-index:9999; }
 
-/* ============================================================
-   🔵 STRONG UI OVERRIDES (higher contrast & weight)
-   Put these at the END of v2-overrides.css
-   ============================================================ */
+/* --------------------------------------------------------------------------
+   Strong UI emphasis (keeps your rich look)
+   -------------------------------------------------------------------------- */
 .cc-page h1, .cc-page h2, .page-title h1, .page-title .title, .header .title {
   color: #0b132b !important; font-weight: 900 !important; letter-spacing: -0.015em !important;
 }
 .cc-page .card, .cc-page .cc-card, .cc-page .glass-card, .cc-page .stat-card {
-  background: #ffffff !important; border: 2px solid #c7d2fe !important;
-  box-shadow: 0 14px 40px rgba(59,130,246,.18) !important;
+  background: #ffffff !important; border: 1px solid var(--cc-border) !important;
+  box-shadow: var(--cc-shadow-sm) !important;
 }
-.kpi, .kpi-chip { background: #e8f0ff !important; border-color: #9bb5ff !important; color: #0b132b !important; font-weight: 800 !important; }
+.kpi, .kpi-chip {
+  background: rgba(11,94,215,.08) !important;
+  border-color: rgba(11,94,215,.28) !important;
+  color: #0b132b !important; font-weight: 800 !important;
+}
 .stat-card .stat-value { color: #0b132b !important; font-weight: 900 !important; font-size: clamp(24px, 3.4vw, 36px) !important; }
 .stat-card .stat-label { color: #334155 !important; font-weight: 700 !important; }
-.btn, .cc-btn, .btn-primary { background: #2563eb !important; border-color: #1d4ed8 !important; color: #fff !important; font-weight: 800 !important; box-shadow: 0 12px 28px rgba(37,99,235,.25) !important; }
-.btn:hover, .cc-btn:hover, .btn-primary:hover { background: #1d4ed8 !important; transform: translateY(-1px) !important; }
-.btn-outline, .btn-outline-primary { color: #1d4ed8 !important; border-color: #1d4ed8 !important; }
-.btn-outline:hover, .btn-outline-primary:hover { background: rgba(29,78,216,.10) !important; }
-.badge, .pill, .status-badge { background: #dbeafe !important; border: 1px solid #93c5fd !important; color: #0b132b !important; font-weight: 800 !important; }
-.select2-container--default .select2-selection--single, .form-select, select, .form-control { border: 2px solid #c7d2fe !important; color: #0b132b !important; }
-::placeholder { color: #64748b !important; opacity: 1 !important; }
-.table thead th, table.cc-table thead th { background: #e9efff !important; color: #0b132b !important; font-weight: 900 !important; border-bottom: 2px solid #c7d2fe !important; }
-.table, table.cc-table { border: 2px solid #c7d2fe !important; }
-.table tbody tr:hover, table.cc-table tbody tr:hover { background: #eef2ff !important; }
+.btn, .cc-btn, .btn-primary {
+  background: var(--cc-brand) !important; border-color: var(--cc-brand) !important;
+  color: #fff !important; font-weight: 800 !important;
+  box-shadow: 0 12px 28px rgba(11,94,215,.20) !important;
+}
+.btn:hover, .cc-btn:hover, .btn-primary:hover {
+  background: var(--cc-brand-600) !important; transform: translateY(-1px) !important;
+}
+.btn:active, .cc-btn:active, .btn-primary:active,
+.btn:focus, .cc-btn:focus, .btn-primary:focus {
+  background: var(--cc-brand-700) !important; border-color: var(--cc-brand-700) !important;
+}
+.btn-outline, .btn-outline-primary { color: var(--cc-brand-700) !important; border-color: var(--cc-brand-600) !important; }
+.btn-outline:hover, .btn-outline-primary:hover { background: rgba(11,94,215,.10) !important; }
+.badge, .pill, .status-badge { background: #e0e9ff !important; border: 1px solid #c1d4ff !important; color: #0b132b !important; font-weight: 800 !important; }
+.select2-container--default .select2-selection--single, .form-select, select, .form-control { border: 1px solid var(--cc-border) !important; color: #0b132b !important; }
+::placeholder { color: #6b7280 !important; opacity: 1 !important; }
+.table thead th, table.cc-table thead th { background: #ecf2ff !important; color: #0b132b !important; font-weight: 900 !important; border-bottom: 1px solid var(--cc-border) !important; }
+.table, table.cc-table { border: 1px solid var(--cc-border) !important; }
+.table tbody tr:hover, table.cc-table tbody tr:hover { background: var(--cc-row-hover) !important; }
 .cc-page .card-header, .cc-page .section h3, .cc-page .section h4 { color: #0b132b !important; font-weight: 800 !important; }
-.alert-success { background: #ecfdf5 !important; border-color: #86efac !important; color:#065f46 !important; }
-.alert-warning { background: #fffbeb !important; border-color: #fcd34d !important; color:#7a4d00 !important; }
-.alert-danger  { background: #fef2f2 !important; border-color: #fca5a5 !important; color:#7f1d1d !important; }
 .btn:disabled, .cc-btn:disabled, .btn-primary:disabled { opacity: .7 !important; color: #e5edff !important; }
 .cc-page .card, .cc-page .kpi, .cc-page .kpi-chip, .cc-page .btn, .cc-page .cc-btn, .cc-page .form-control { backdrop-filter: none !important; }
 
-/* =====================================================================
-   🔒 FINAL OVERRIDES — body-state drawer + RTL action row
-   ===================================================================== */
-/* Body-state driven drawer (works with JS that toggles body[data-drawer]) */
-@media (max-width: 992px){
-  body[data-drawer="open"] .cc-sidebar,
-  body[data-drawer="open"] .cc-drawer{ transform: translateX(0) !important; }
-  body[data-drawer="open"] #ccBackdrop{
-    display: block !important; opacity: 1 !important; pointer-events: auto !important;
-  }
+/* --------------------------------------------------------------------------
+   Footer blur fix
+   -------------------------------------------------------------------------- */
+.footer-blur,.glass-footer,.bottom-blur,.mobile-fab-bar,.sticky-bottom,.cc-sticky-bar,
+.cc-bottom-blur,.sticky-cta,.sticky-actions,.tabbar,.fab-bar{
+  backdrop-filter: none !important; -webkit-backdrop-filter: none !important;
+  filter: none !important; box-shadow: none !important; background: var(--cc-card) !important;
+  border-top: 1px solid var(--cc-border) !important; opacity: 1 !important;
 }
-/* Action row utilities for Scan/Sell pages */
-.btn-row{ display:flex; gap:.5rem; align-items:center; flex-wrap:nowrap; }
-.rtl-mobile{ flex-direction: row-reverse; }
-@media (min-width: 640px){ .rtl-mobile{ flex-direction: row; } }
-.keep-row{ flex-direction: row !important; flex-wrap: nowrap !important; }
 
-/* =====================================================================
-   💳 BILLING PLANS — one-click card styling (works with subscribe.html)
-   ===================================================================== */
+/* --------------------------------------------------------------------------
+   Billing Plans (subscribe.html)
+   -------------------------------------------------------------------------- */
 .bill-wrap{max-width:1100px;margin-inline:auto;display:grid;gap:16px}
 .g{border:1px solid var(--cc-border);border-radius:14px;background:color-mix(in oklab,var(--cc-card) 86%,transparent);backdrop-filter:blur(12px);box-shadow:var(--cc-shadow-sm);padding:16px}
 .plans{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:14px}
-
-/* Card as a form (.plan-card) */
 .plan-card{
   position:relative;display:flex;flex-direction:column;justify-content:space-between;
   padding:16px;border-radius:12px;border:1px solid var(--cc-border);
@@ -651,37 +567,22 @@ body.accounts-auth, body.accounts-forgot {
 .feat{opacity:.85}
 .feat li{margin:4px 0}
 .feat ul{margin:8px 0 0 1rem}
-.plan-cta{
-  margin-top:12px;width:100%;border:0;border-radius:10px;padding:10px 14px;
-  font-weight:700;color:#fff;box-shadow:0 6px 16px rgba(0,0,0,.12)
-}
-
-/* Distinct accents (Starter/Growth/Pro by order) */
+.plan-cta{ margin-top:12px;width:100%;border:0;border-radius:10px;padding:10px 14px;font-weight:700;color:#fff;box-shadow:0 6px 16px rgba(0,0,0,.12) }
 .plan-card:nth-child(1){border-color:color-mix(in oklab,#20c997 40%, var(--cc-border))}
 .plan-card:nth-child(1) .plan-cta{background:#20c997}
 .plan-card:nth-child(2){border-color:color-mix(in oklab,#f59f00 40%, var(--cc-border))}
 .plan-card:nth-child(2) .plan-cta{background:#f59f00}
 .plan-card:nth-child(3){border-color:color-mix(in oklab,#e03131 40%, var(--cc-border))}
 .plan-card:nth-child(3) .plan-cta{background:#e03131}
+.subscribe-footer .btn-continue,.btn-continue,.cc-legacy-continue{display:none !important}
+@media (max-width:480px){ .plan-card{padding:14px} .plan-card h3{font-size:1rem} }
 
-/* Hide any legacy “Continue” button on subscribe page */
-.subscribe-footer .btn-continue,.btn-continue, .cc-legacy-continue{display:none !important}
-
-/* Compact on small screens */
-@media (max-width:480px){
-  .plan-card{padding:14px}
-  .plan-card h3{font-size:1rem}
-}
-
-/* End of file */
-
-/* =====================================================================
-   🔹 QUICK UI DECLUTTER (safe, non-destructive)
-   Hide: Scan (Web), Feedback, Place Order, and the “Circuit City” tenant chip
-   ===================================================================== */
-
-/* Hide action buttons/links by common URLs or explicit data-action hooks */
+/* --------------------------------------------------------------------------
+   Quick declutter (safe)
+   -------------------------------------------------------------------------- */
 a[href*="/inventory/scan/web"],
+a[href*="/inventory/scan-web"],
+a[href*="scan_web"],
 a[href*="/feedback"],
 a[href*="/inventory/place-order"],
 .btn[href*="/inventory/scan/web"],
@@ -689,22 +590,129 @@ a[href*="/inventory/place-order"],
 .btn[href*="/inventory/place-order"],
 button[data-action="scan-web"],
 button[data-action="feedback"],
-button[data-action="place-order"] {
-  display: none !important;
-}
+button[data-action="place-order"] { display:none !important; }
 
-/* Hide the tenant/business/location chip (e.g., “Circuit City”) via safe routes */
 a[href*="/tenants/choose_business"],
 a[href*="/tenants/switch"],
 a[href*="/locations/choose"],
-a[href*="/locations/switch"] {
-  display: none !important;
+a[href*="/locations/switch"],
+.tenant-pill,.tenant-chip,.business-chip,.location-chip { display:none !important; }
+
+/* Keep hamburger/mobile toggles visible on phones */
+@media (max-width: 991.98px){
+  .menu-toggle, .mobile-toggle, .hamburger, .nav-toggle, .navbar-toggler, .btn-menu {
+    display: inline-flex !important; visibility: visible !important;
+    min-width: 40px; min-height: 40px; align-items: center; justify-content: center;
+    z-index: 2015 !important;
+  }
+}
+.menu-toggle svg, .mobile-toggle svg, .hamburger svg, .nav-toggle svg, .navbar-toggler svg, .btn-menu svg {
+  width: 22px; height: 22px; stroke: currentColor; fill: none;
 }
 
-/* Defensive: common chip classes used for the tenant/location pill */
-.tenant-pill,
-.tenant-chip,
-.business-chip,
-.location-chip {
-  display: none !important;
+/* --------------------------------------------------------------------------
+   Print
+   -------------------------------------------------------------------------- */
+@media print {
+  .navbar, .sidebar, .btn, .cc-btn, .no-print, .bottom-nav, .tabbar, .cc-bottom-nav { display: none !important; }
+  body { background: #fff; color: #000; }
+  .card, .table, .cc-card { box-shadow: none; border-color: #bbb; }
+}
+
+/* === Sidebar: exactly 30% width on mobile =============================== */
+@media (max-width: 991.98px){
+  :root{
+    /* Force a strict 30% of the viewport width */
+    --nav-drawer-w: 30vw !important;
+  }
+
+  /* Ensure all sidebar variants use the variable */
+  .sidebar, .cc-sidebar, .nav-sidebar, .cc-drawer{
+    width: var(--nav-drawer-w) !important;
+    max-width: 100vw !important;   /* safety */
+  }
+}
+
+/* ======================================================================
+   SIDEBAR: solid black (no transparency) + readable inks (mobile only)
+   ====================================================================== */
+@media (max-width: 991.98px){
+  .sidebar, .cc-sidebar, .nav-sidebar, .cc-drawer{
+    background: #0f1115 !important;        /* solid black */
+    border-right: 1px solid #1f2937 !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+    color: #e5e7eb !important;
+  }
+
+  /* Section labels */
+  .cc-sidebar .nav-title,
+  .nav-sidebar .nav-title,
+  .sidebar .nav-title {
+    color: #9aa3b2 !important;
+  }
+
+  /* Links */
+  .cc-sidebar .nav-link,
+  .nav-sidebar .nav-link,
+  .sidebar .nav-link {
+    color: #e5eaf5 !important;
+    fill: currentColor !important;
+  }
+  /* Icons inside links */
+  .cc-sidebar .nav-link svg,
+  .nav-sidebar .nav-link svg,
+  .sidebar .nav-link svg,
+  .cc-sidebar .nav-link i,
+  .nav-sidebar .nav-link i,
+  .sidebar .nav-link i {
+    color: #bcd0ff !important;
+    stroke: currentColor !important;
+    fill: none !important;
+  }
+
+  /* Hover / active states */
+  .cc-sidebar .nav-link:hover,
+  .nav-sidebar .nav-link:hover,
+  .sidebar .nav-link:hover {
+    background: #111827 !important;
+    color: #ffffff !important;
+  }
+  .cc-sidebar .nav-link.active,
+  .nav-sidebar .nav-link.active,
+  .sidebar .nav-link.active {
+    background: #13203a !important;        /* subtle blue-black */
+    color: #ffffff !important;
+    border-left: 3px solid #3b82f6 !important;
+  }
+
+  /* Dividers */
+  .cc-sidebar hr, .nav-sidebar hr, .sidebar hr {
+    border-color: #1f2a38 !important;
+    opacity: 1 !important;
+  }
+
+  /* Scrollbar tint (Android/Chrome) */
+  .cc-sidebar, .nav-sidebar, .sidebar {
+    scrollbar-color: #42506a #0f1115;      /* thumb / track */
+  }
+}
+
+/* === Sidebar width tweak: smaller than current ========================= */
+@media (max-width: 991.98px){
+  :root{
+    /* From 30vw → much slimmer; keeps usability on tiny screens */
+    --nav-drawer-w: clamp(180px, 18vw, 320px) !important;
+  }
+  .sidebar, .cc-sidebar, .nav-sidebar, .cc-drawer{
+    width: var(--nav-drawer-w) !important;
+  }
+}
+/* Drawer stability patch (keeps animations buttery) */
+@media (max-width: 991.98px){
+  .cc-sidebar, .nav-sidebar, .cc-drawer, .sidebar{
+    will-change: transform;
+    backface-visibility: hidden;
+    contain: layout paint style; /* perf hint; safe */
+  }
 }

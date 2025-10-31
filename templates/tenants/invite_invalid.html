@@ -1,7 +1,85 @@
+{# tenants/templates/tenants/invite_invalid.html #}
 {% extends "base.html" %}
+
+{% block title %}Invite invalid{% endblock %}
+
 {% block content %}
-<div class="container py-5 text-center">
-<h3>Invite not available</h3>
-<p class="text-muted">{{ reason }}</p>
+<div class="container py-5" style="max-width:880px">
+  <div class="alert alert-danger d-flex align-items-start gap-3" role="alert">
+    <div class="flex-grow-1">
+      <h4 class="alert-heading mb-1">This invite is invalid.</h4>
+      <p class="mb-2">
+        {# Prefer 'message' (new views) but fall back to 'reason' (older templates) #}
+        {{ message|default:reason|default:"The invitation link you opened can’t be used. It may be wrong, expired, or already redeemed." }}
+      </p>
+
+      {# Show business context when available #}
+      {% if invite and invite.business %}
+        <p class="mb-2 small text-muted">
+          Business:&nbsp;<strong>{{ invite.business.name }}</strong>
+        </p>
+      {% endif %}
+
+      {# If the invite object exposes a share_url, show it (handy for managers testing) #}
+      {% if invite and invite.share_url %}
+        <div class="input-group my-3">
+          <input id="shareLink" type="text" class="form-control form-control-sm"
+                 value="{{ invite.share_url }}" readonly>
+          <button class="btn btn-outline-secondary btn-sm" type="button" id="copyBtn">
+            Copy link
+          </button>
+        </div>
+        <p class="small text-muted mb-0">
+          If you’re the manager and testing this flow, copy the link above and open it in a
+          <em>private/incognito</em> window, or send a fresh invite to the agent.
+        </p>
+      {% endif %}
+    </div>
+  </div>
+
+  <div class="d-flex flex-wrap gap-2">
+    <a class="btn btn-primary" href="{% url 'tenants:join_as_agent' %}">Join with a new invite</a>
+
+    {# Try to send the person somewhere useful in your app #}
+    {% url 'tenants:choose_business' as choose_url %}
+    {% url 'accounts:login' as login_url %}
+    {% url 'dashboard:home' as dash_url %}
+
+    <a class="btn btn-outline-secondary" href="{{ dash_url|default:'/' }}">Go to dashboard</a>
+    <a class="btn btn-outline-secondary" href="{{ choose_url|default:'/' }}">Switch / choose business</a>
+    <a class="btn btn-outline-secondary" href="{{ login_url|default:'/accounts/login/' }}">Back to sign in</a>
+  </div>
+
+  {# Optional debug details (only helpful during dev) #}
+  {% if invite %}
+    <details class="mt-4">
+      <summary class="text-muted">Debug details</summary>
+      <div class="small text-muted mt-2">
+        <div>Status: {{ invite.status|default:"(unknown)" }}</div>
+        {% if invite.email %}<div>Invited email: {{ invite.email }}</div>{% endif %}
+        {% if invite.expires_at %}<div>Expires: {{ invite.expires_at }}</div>{% endif %}
+      </div>
+    </details>
+  {% endif %}
 </div>
+
+<script>
+  (function () {
+    const btn = document.getElementById('copyBtn');
+    const inp = document.getElementById('shareLink');
+    if (!btn || !inp) return;
+    btn.addEventListener('click', async () => {
+      try {
+        inp.select();
+        inp.setSelectionRange(0, 99999);
+        await navigator.clipboard.writeText(inp.value);
+        btn.textContent = 'Copied';
+        setTimeout(() => (btn.textContent = 'Copy link'), 1200);
+      } catch (e) {
+        btn.textContent = 'Copy failed';
+        setTimeout(() => (btn.textContent = 'Copy link'), 1500);
+      }
+    });
+  })();
+</script>
 {% endblock %}

@@ -24,6 +24,16 @@ try:
 except Exception:  # pragma: no cover
     get_default_location_for = None  # type: ignore
 
+# NEW: try to resolve the active business from request if not passed explicitly
+try:
+    # Prefer a utils location; fall back to middleware if that’s where yours lives.
+    from tenants.utils import get_active_business as _get_active_business  # type: ignore
+except Exception:
+    try:
+        from tenants.middleware import get_active_business as _get_active_business  # type: ignore
+    except Exception:
+        _get_active_business = None  # type: ignore
+
 User = get_user_model()
 
 # ---------------- IMEI helpers ----------------
@@ -153,7 +163,7 @@ class ScanInForm(StyledForm):
         max_digits=12,
         decimal_places=2,
         required=False,
-        help_text="If left blank, weâ€™ll use the modelâ€™s default order price.",
+        help_text="If left blank, we’ll use the model’s default order price.",
         widget=forms.NumberInput(attrs={"id": "id_order_price", "step": "any"})
     )
     received_at = forms.DateField(
@@ -172,12 +182,24 @@ class ScanInForm(StyledForm):
         initial=True
     )
 
-    def __init__(self, *args, request=None, user=None, business=None, **kwargs):
+    def __init__(self, *args, request=None, user=None, business=None, lock_location: bool = True, **kwargs):
         """
-        Prefer passing request=â€¦ so we can use tenants.utils.get_default_location_for().
+        Prefer passing request=… so we can resolve business + default location.
         For backward-compat, user/business still work.
+
+        NEW:
+        - If business is None and we have request + _get_active_business, derive it.
+        - When lock_location=True (default), the select is disabled BUT a value is still
+          submitted (handled in clean()) so your POST stays valid.
         """
         super().__init__(*args, **kwargs)
+
+        # Resolve business from request if not explicitly passed
+        if business is None and request is not None and _get_active_business:
+            try:
+                business = _get_active_business(request)
+            except Exception:
+                business = None
 
         # Product list
         self.fields["product"].queryset = get_product_qs_for_business(business)
@@ -199,11 +221,17 @@ class ScanInForm(StyledForm):
         if not initial_loc:
             initial_loc = _default_location_for(user, business, loc_qs)
 
+        # Store for clean() fallback and optionally lock the widget
+        self._initial_location_obj = initial_loc
         if initial_loc:
             try:
                 self.fields["location"].initial = initial_loc.id
             except Exception:
                 pass
+
+        if lock_location:
+            # Lock visually; we'll still ensure a value posts in clean()
+            self.fields["location"].widget.attrs["disabled"] = "disabled"
 
         # Auto-fill order_price from selected product (initial render only)
         try:
@@ -232,6 +260,10 @@ class ScanInForm(StyledForm):
 
     def clean(self):
         cleaned = super().clean()
+        # If location was disabled, browsers won’t POST its value; ensure it’s set.
+        if not cleaned.get("location"):
+            if self._initial_location_obj is not None:
+                cleaned["location"] = self._initial_location_obj
         product = cleaned.get("product")
         price: Optional[Decimal] = cleaned.get("order_price")
         if price in (None, ""):
@@ -281,10 +313,20 @@ class ScanSoldForm(StyledForm):
 
     def __init__(self, *args, request=None, user=None, business=None, **kwargs):
         """
-        Prefer passing request=â€¦ so we can use tenants.utils.get_default_location_for().
+        Prefer passing request=… so we can use tenants.utils.get_default_location_for().
         For backward-compat, user/business still work.
+
+        NEW:
+        - If business is None and we have request + _get_active_business, derive it.
         """
         super().__init__(*args, **kwargs)
+
+        # Resolve business if not provided
+        if business is None and request is not None and _get_active_business:
+            try:
+                business = _get_active_business(request)
+            except Exception:
+                business = None
 
         loc_qs = Location.objects.all()
         if business is not None:
@@ -457,7 +499,7 @@ class PurchaseOrderItemForm(StyledForm):
     unit_price = forms.DecimalField(
         max_digits=12, decimal_places=2, required=False,
         widget=forms.NumberInput(attrs={"class": "input", "step": "0.01"}),
-        help_text="If blank, uses the modelâ€™s default order price."
+        help_text="If blank, uses the model’s default order price."
     )
 
     def __init__(self, *args, business=None, **kwargs):
@@ -558,7 +600,7 @@ class CCAuthenticationForm(AuthenticationForm):
         widget=forms.PasswordInput(attrs={
             "class": "input",
             "autocomplete": "current-password",
-            "placeholder": "â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢",
+            "placeholder": "•••••••••",
             "id": "password-input",
         })
     )
@@ -665,7 +707,7 @@ if _PRODUCT_FIELDS:
                    if "sku" in _PRODUCT_FIELDS else {}),
                 **({"shots_per_bottle": forms.NumberInput(attrs={"class": "input", "min": "1"})}
                    if "shots_per_bottle" in _PRODUCT_FIELDS else {}),
-                **({"base_unit": forms.TextInput(attrs={"class": "input", "placeholder": "unit, bottle, shotâ€¦"})}
+                **({"base_unit": forms.TextInput(attrs={"class": "input", "placeholder": "unit, bottle, shot…"})}
                    if "base_unit" in _PRODUCT_FIELDS else {}),
                 **({"cost_price": forms.NumberInput(attrs={"class": "input", "step": "0.01"})}
                    if "cost_price" in _PRODUCT_FIELDS else {}),
@@ -831,7 +873,7 @@ class ProductForm(StyledModelForm):
     """
     # UI fields (always shown)
     brand = forms.ChoiceField(
-        choices=[("", "â€” Select brand â€”")] + [(b, b) for b in PHONE_BRANDS] + [("Other", "Otherâ€¦")],
+        choices=[("", "— Select brand —")] + [(b, b) for b in PHONE_BRANDS] + [("Other", "Other…")],
         required=False,
         widget=forms.Select(attrs={"id": "id_brand_select"})
     )
@@ -854,8 +896,8 @@ class ProductForm(StyledModelForm):
 
     class Meta:
         model = Product
-        # Keep real model fields minimal so ModelForm is valid; weâ€™ll set on save()
-        fields = []  # we only use extra fields above and map them manually
+        # Keep real model fields minimal so ModelForm is valid; we only use extra fields above and map them manually
+        fields = []
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -885,7 +927,7 @@ class ProductForm(StyledModelForm):
     def clean_price(self):
         val = self.cleaned_data.get("price")
         if val is not None and val < 0:
-            raise ValidationError("Price must be â‰¥ 0.")
+            raise ValidationError("Price must be ≥ 0.")
         return val
 
     def save(self, commit=True):
@@ -928,5 +970,3 @@ class ProductForm(StyledModelForm):
         if commit:
             obj.save()
         return obj
-
-

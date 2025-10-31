@@ -3,6 +3,10 @@ from __future__ import annotations
 
 from datetime import timedelta
 from typing import Optional
+import json
+import secrets
+import string
+import re
 
 from django.conf import settings
 from django.contrib.auth import get_user_model
@@ -14,25 +18,31 @@ from django.db.models.functions import TruncDate
 from django.utils import timezone
 
 # --- Tenancy imports (explicit) ---
-from tenants.models import Business, TenantManager, UnscopedManager  # NEW
-
-import json
-import secrets
-import string
-import re
+from tenants.models import Business, TenantManager, UnscopedManager
 
 User = get_user_model()
+
+# ---------------------------------------------------------------------
+# Attendance model — SINGLE SOURCE OF TRUTH (avoid duplicate registrations)
+# ---------------------------------------------------------------------
+# We only define TimeLog in models_attendance.py. Re-export it here so legacy
+# imports like `from inventory.models import TimeLog` keep working.
+try:
+    from .models_attendance import TimeLog  # noqa: F401
+except Exception:
+    TimeLog = None  # safe fallback; avoids import-time crashes in edge cases
 
 
 # ==========================================================
 # SINGLE SOURCE OF TRUTH: IMEI normalization (15 digits)
 # ==========================================================
 def normalize_imei(raw: Optional[str]) -> str:
-    """Keep digits only and enforce 15-digit IMEI semantics."""
+    """Keep digits only and enforce 15-digit IMEI semantics (prefer the LAST 15 digits)."""
     if not raw:
         return ""
     digits = re.sub(r"\D+", "", str(raw))
-    return digits[:15]  # scanners sometimes add noise; we clip to 15
+    # Many scanners include prefixes/suffixes; keep the last 15 which is the canonical IMEI.
+    return digits[-15:] if len(digits) >= 15 else digits
 
 
 # =========================
@@ -74,7 +84,7 @@ class Location(models.Model):
             models.Index(fields=["city"], name="loc_city_idx"),
             models.Index(fields=["business", "is_default"], name="loc_biz_isdefault_idx"),
         ]
-    # NOTE: Partial unique below ensures one default per business
+        # Partial unique: one default per business
         constraints = [
             models.UniqueConstraint(
                 fields=["business", "is_default"],
@@ -86,7 +96,7 @@ class Location(models.Model):
     def __str__(self):
         label = self.name
         if self.business_id:
-            label = f"{label} Â· {getattr(self.business, 'name', self.business_id)}"
+            label = f"{label} · {getattr(self.business, 'name', self.business_id)}"
         return label
 
     def save(self, *args, **kwargs):
@@ -132,7 +142,10 @@ class Location(models.Model):
 
 
 class AgentProfile(models.Model):
-    # connects a Django user to a home location
+    """
+    Per-user agent profile anchored to a home location.
+    Managers may not have this.
+    """
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name="agent_profile")
     location = models.ForeignKey("Location", on_delete=models.PROTECT)
     joined_on = models.DateField(null=True, blank=True)  # optional join date
@@ -220,9 +233,9 @@ class MerchUnitPrice(models.Model):
     """
     A sellable pack for a MerchProduct. Converts to base units via multiplier.
     Examples:
-      - Grocery: Unit (Ã—1), Dozen (Ã—12), Box (Ã—N)
-      - Liquor (shots): Shot (Ã—1), Bottle (Ã—shots_per_bottle)
-      - Liquor (no shots): Bottle (Ã—1), Crate (Ã—24)
+      - Grocery: Unit (×1), Dozen (×12), Box (×N)
+      - Liquor (shots): Shot (×1), Bottle (×shots_per_bottle)
+      - Liquor (no shots): Bottle (×1), Crate (×24)
     """
     class Label(models.TextChoices):
         UNIT   = "unit",   "Unit"
@@ -247,7 +260,7 @@ class MerchUnitPrice(models.Model):
         ]
 
     def __str__(self):
-        return f"{self.product.name} Â· {self.get_label_display()} (Ã—{self.multiplier})"
+        return f"{self.product.name} · {self.get_label_display()} (×{self.multiplier})"
 
 
 # ---- Helpers for POS math (merch) ----
@@ -280,7 +293,7 @@ class Product(models.Model):
     name = models.CharField(max_length=120, blank=True, help_text="Optional display name")
 
     brand = models.CharField(max_length=50, blank=True)
-    model = models.CharField(max_length=80)  # âœ… correct
+    model = models.CharField(max_length=80)  # correct
     # e.g., Spark 10C
     variant = models.CharField(max_length=80, blank=True)  # e.g., (4+128)
 
@@ -334,13 +347,13 @@ class OrderPrice(models.Model):
                 name="uniq_active_order_price_per_product",
             )
         ]
-        indexes = [
+    indexes = [
             models.Index(fields=["product", "active"], name="ordprice_prod_active_idx"),
             models.Index(fields=["effective_from"], name="ordprice_effective_idx"),
         ]
 
     def __str__(self):
-        return f"{self.product} â€” MWK {self.default_order_price:,.2f} ({'active' if self.active else 'old'})"
+        return f"{self.product} — MWK {self.default_order_price:,.2f} ({'active' if self.active else 'old'})"
 
     @staticmethod
     def get_active_price(product_id: int):
@@ -362,7 +375,8 @@ class InventoryItemQuerySet(models.QuerySet):
         return self.select_related("product", "current_location", "assigned_agent")
 
     def in_stock(self):
-        return self.filter(is_active=True, status="IN_STOCK")
+        # Be explicit: active, status IN_STOCK and not sold_at
+        return self.filter(is_active=True, status="IN_STOCK", sold_at__isnull=True)
 
     def sold(self):
         return self.filter(status="SOLD")
@@ -496,6 +510,10 @@ class InventoryItem(models.Model):
     # Soft-delete flag (archive instead of hard delete when needed)
     is_active = models.BooleanField(default=True, db_index=True)
 
+    # ✅ Timestamps – use defaults to avoid interactive migration prompts
+    created_at = models.DateTimeField(default=timezone.now, editable=False)
+    updated_at = models.DateTimeField(default=timezone.now)  # we’ll bump this in save()
+
     # ---------- Carlcare warranty/activation tracking ----------
     WARRANTY_CHOICES = [
         ("UNDER_WARRANTY", "Under warranty"),
@@ -514,14 +532,14 @@ class InventoryItem(models.Model):
     # ----------------------------------------------------------------
 
     # Tenant-aware managers
-    objects = TenantInventoryItemManager()    # scoped to active tenant (has QuerySet helpers)
-    active = TenantActiveItemManager()        # scoped + non-archived
+    objects = TenantInventoryItemManager()        # scoped to active tenant (has QuerySet helpers)
+    active = TenantActiveItemManager()            # scoped + non-archived
     all_objects = UnscopedInventoryItemManager()  # global/admin (use sparingly)
 
     class Meta:
         indexes = [
             models.Index(fields=["business", "imei"], name="inv_biz_imei_idx"),
-            # Composite for inventory lists â€” name <= 30 chars
+            # Composite for inventory lists — name <= 30 chars
             models.Index(
                 fields=["business", "product", "current_location", "status"],
                 name="inv_bpls_idx",
@@ -568,7 +586,7 @@ class InventoryItem(models.Model):
     def location_safe(self):
         """
         Back-compat accessor for templates that previously used `item.location`.
-        Prefer `current_location`, but expose a stable name that wonâ€™t break.
+        Prefer `current_location`, but expose a stable name that won’t break.
         """
         return getattr(self, "current_location", None)
 
@@ -591,6 +609,26 @@ class InventoryItem(models.Model):
         Tenant-aware, normalized, in-stock lookup. Use this everywhere.
         """
         return cls.objects.find_in_stock_by_imei(business, imei_raw)
+
+    # --- NEW: guard — only allow IMEI/price changes on IN_STOCK items
+    def _raise_if_sold_fields_changed(self):
+        """
+        If this row already exists and is SOLD, prevent IMEI/selling_price edits.
+        This enforces your rule at the model layer without changing DB schema.
+        """
+        if not self.pk:
+            return
+        try:
+            old = InventoryItem.all_objects.get(pk=self.pk)
+        except InventoryItem.DoesNotExist:
+            return
+        if old.status == "SOLD":
+            changed_imei = (old.imei or "") != (self.imei or "")
+            changed_price = (old.selling_price or 0) != (self.selling_price or 0)
+            if changed_imei or changed_price:
+                raise ValidationError(
+                    {"status": "Cannot edit IMEI or selling price for SOLD items."}
+                )
 
     def clean(self):
         errors = {}
@@ -617,6 +655,9 @@ class InventoryItem(models.Model):
         if errors:
             raise ValidationError(errors)
 
+        # --- NEW: enforce 'no edit fields when SOLD'
+        self._raise_if_sold_fields_changed()
+
     # ---- auto-defaults for date/location/sold_at ----
     def save(self, *args, **kwargs):
         # Normalize IMEI again at save-time (defense-in-depth)
@@ -626,6 +667,21 @@ class InventoryItem(models.Model):
         # Ensure received_at is set (field has default, but just in case)
         if not getattr(self, "received_at", None):
             self.received_at = timezone.localdate()
+
+        # ---------- NEW: inherit business from current_location if missing ----------
+        # This prevents NULL-business items and avoids future uniqueness collisions
+        # when backfilling business later.
+        if not getattr(self, "business_id", None) and getattr(self, "current_location_id", None):
+            try:
+                self.business_id = getattr(self.current_location, "business_id", None)
+            except Exception:
+                # if current_location not hydrated, fetch id from DB
+                self.business_id = (
+                    Location.objects.only("business_id")
+                    .filter(pk=self.current_location_id)
+                    .values_list("business_id", flat=True)
+                    .first()
+                )
 
         # Auto-pick or create a default store for the business if missing
         if not getattr(self, "current_location_id", None) and self.business_id:
@@ -647,7 +703,93 @@ class InventoryItem(models.Model):
         if self.status == "SOLD" and not self.sold_at:
             self.sold_at = timezone.now()
 
+        # ✅ keep updated_at fresh
+        self.updated_at = timezone.now()
+
         super().save(*args, **kwargs)
+
+    # -------------------------
+    # --- NEW: safe helpers ---
+    # -------------------------
+    def can_modify_instock(self) -> bool:
+        """Allowed to edit/delete only when IN_STOCK and active."""
+        return self.is_active and self.status == "IN_STOCK" and (self.sold_at is None)
+
+    def apply_instock_update(self, *, new_imei: Optional[str] = None,
+                             new_price: Optional[float] = None,
+                             by_user=None) -> None:
+        """
+        Update IMEI and/or selling_price ONLY for IN_STOCK items.
+        Creates InventoryAudit rows; raises ValidationError on rule breaks.
+        """
+        if not self.can_modify_instock():
+            raise ValidationError("Only IN_STOCK & active items can be edited.")
+
+        changes = {}
+        if new_imei is not None:
+            norm = normalize_imei(new_imei)
+            if len(norm) != 15 or not norm.isdigit():
+                raise ValidationError("IMEI must be exactly 15 numeric digits.")
+            if (self.imei or "") != norm:
+                old = self.imei or ""
+                self.imei = norm
+                changes["imei"] = {"from": old, "to": norm}
+
+        if new_price is not None:
+            try:
+                # trust Decimal at form layer; here accept float/str for convenience
+                new_val = float(new_price)
+            except Exception:
+                raise ValidationError("Invalid price.")
+            if new_val < 0:
+                raise ValidationError("Price must be non-negative.")
+            oldp = float(self.selling_price or 0)
+            if oldp != new_val:
+                self.selling_price = new_val
+                changes["selling_price"] = {"from": oldp, "to": new_val}
+
+        if not changes:
+            return
+
+        self.full_clean()  # will re-check IMEI/uniqueness/ SOLD rules
+        fields = ["imei", "selling_price", "updated_at"] if hasattr(self, "updated_at") else ["imei", "selling_price"]
+        self.save(update_fields=fields)
+
+        try:
+            AuditLog.objects.create(
+                action="EDIT",
+                by_user=by_user,
+                item=self,
+                business=self.business,
+                details=json.dumps(changes, sort_keys=True),
+            )
+        except Exception:
+            # never block the request on audit failure
+            pass
+
+    def soft_delete_instock(self, *, by_user=None) -> None:
+        """
+        Soft-delete (archive) ONLY when IN_STOCK & active.
+        """
+        if not self.can_modify_instock():
+            raise ValidationError("Only IN_STOCK & active items can be deleted.")
+
+        if not self.is_active:
+            return  # already archived
+
+        self.is_active = False
+        self.save(update_fields=["is_active", "updated_at"] if hasattr(self, "updated_at") else ["is_active"])
+
+        try:
+            AuditLog.objects.create(
+                action="DELETE",
+                by_user=by_user,
+                item=self,
+                business=self.business,
+                details="Soft delete (archive) — IN_STOCK rule",
+            )
+        except Exception:
+            pass
 
 
 # =========================
@@ -658,7 +800,6 @@ class InventoryAudit(models.Model):
         ("CREATE", "Create"),
         ("UPDATE", "Update"),
         ("EDIT", "Edit"),
-        ("EDIT_DENIED", "Edit denied"),
         ("STOCK_IN", "Stock in"),
         ("SOLD", "Sold"),
         ("SOLD_FORM", "Sold via form"),
@@ -787,51 +928,6 @@ class AgentPasswordReset(models.Model):
         return "".join(secrets.choice(string.digits) for _ in 6)
 
 
-class TimeLog(models.Model):
-    """Agent arrival/departure logs with optional GPS verification."""
-    ARRIVAL = "ARRIVAL"
-    DEPARTURE = "DEPARTURE"
-    TYPE_CHOICES = [(ARRIVAL, "Arrival"), (DEPARTURE, "Departure")]
-
-    # --- NEW (non-breaking): event for heartbeat semantics ---
-    # start | ping | end (optional; we still keep checkin_type for legacy arrivals/departures)
-    EVENT_CHOICES = [("start", "Start"), ("ping", "Ping"), ("end", "End")]
-
-    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="time_logs")
-    logged_at = models.DateTimeField(default=timezone.now)
-    note = models.CharField(max_length=200, blank=True)
-
-    # Link to store + GPS fields
-    location = models.ForeignKey("Location", null=True, blank=True, on_delete=models.SET_NULL)
-    checkin_type = models.CharField(max_length=12, choices=TYPE_CHOICES, default=ARRIVAL)
-    latitude = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)
-    longitude = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)
-    accuracy_m = models.PositiveIntegerField(null=True, blank=True)
-    distance_m = models.PositiveIntegerField(null=True, blank=True)
-    within_geofence = models.BooleanField(default=False)
-
-    # --- NEW (non-breaking): textual geofence + event (for analytics/UI) ---
-    event = models.CharField(max_length=10, choices=EVENT_CHOICES, blank=True)
-    geofence = models.CharField(max_length=8, blank=True)  # "inside" / "outside" (mirrors within_geofence)
-
-    class Meta:
-        ordering = ["-logged_at"]
-        indexes = [
-            models.Index(fields=["user", "logged_at"], name="timelog_user_logged_idx"),
-            models.Index(fields=["location", "logged_at"], name="timelog_location_logged_idx"),
-            models.Index(fields=["event", "logged_at"], name="timelog_event_logged_idx"),
-        ]
-
-    def __str__(self):
-        where = self.location.name if (self.location_id and getattr(self.location, "name", None)) else "unknown"
-        return f"{self.user} {self.checkin_type} @ {self.logged_at:%Y-%m-%d %H:%M} ({where})"
-
-    @property
-    def business(self):
-        """Convenience: infer business from location (if set)."""
-        return getattr(self.location, "business", None)
-
-
 # ---- NEW: ShiftSession (for inside/outside second counters) ----
 class ShiftSession(models.Model):
     """
@@ -863,7 +959,7 @@ class ShiftSession(models.Model):
         ]
 
     def __str__(self):
-        return f"Shift #{self.id} Â· {self.user} Â· {self.started_at:%Y-%m-%d %H:%M}"
+        return f"Shift #{self.id} · {self.user} · {self.started_at:%Y-%m-%d %H:%M}"
 
     @property
     def total_seconds(self) -> int:
@@ -886,7 +982,7 @@ class WalletTxn(models.Model):
         on_delete=models.CASCADE,
         related_name="inventory_wallet_txns",
     )
-    amount = models.DecimalField(max_digits=12, decimal_places=2)  # + = bonus/credit, âˆ’ = deduction
+    amount = models.DecimalField(max_digits=12, decimal_places=2)  # + = bonus/credit, - = deduction
     reason = models.CharField(max_length=32, choices=REASON_CHOICES, default="ADJUSTMENT")
     created_at = models.DateTimeField(default=timezone.now)
     memo = models.CharField(max_length=200, blank=True)
@@ -1000,9 +1096,3 @@ class PhoneProduct(Product):
         proxy = True
         verbose_name = "Phone Product"
         verbose_name_plural = "Phone Products"
-
-
-
-
-
-

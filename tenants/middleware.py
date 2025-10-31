@@ -1,11 +1,18 @@
 ﻿# circuitcity/tenants/middleware.py
 from __future__ import annotations
 
-from typing import Optional
+from typing import Optional, Iterable
 from django.utils.deprecation import MiddlewareMixin
 from django.utils.functional import cached_property
 
-# â”€â”€ Lazy/defensive imports (never crash at startup) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# ── Lazy/defensive imports (never crash at startup) ─────────────────────────────
+try:
+    from django.conf import settings
+except Exception:  # pragma: no cover
+    class _S:  # minimal shim
+        TENANT_SESSION_KEY = "active_business_id"
+    settings = _S()  # type: ignore
+
 try:
     from tenants.models import Business, Membership, set_current_business_id  # thread-local setter
 except Exception:  # pragma: no cover
@@ -25,13 +32,32 @@ except Exception:  # pragma: no cover
     def set_active_business(_request, _biz):  # type: ignore
         return
 
+# Optional: scope helpers (location resolution). All guarded.
+try:
+    from tenants.scope import (
+        resolve_location_for_user,
+        serialize_scope_for_ui,
+        set_scope_in_session,
+        get_active_business as scope_get_active_business,  # same behavior as utils-based
+    )
+except Exception:  # pragma: no cover
+    def resolve_location_for_user(_request):  # type: ignore
+        return None
+    def serialize_scope_for_ui(_request):  # type: ignore
+        return {}
+    def set_scope_in_session(_request, *, business_id=None, location_id=None):  # type: ignore
+        return
+    scope_get_active_business = get_active_business  # type: ignore
 
 LOCAL_HOSTS = {"127.0.0.1", "localhost"}
-SESSION_KEY = "active_business_id"                 # kept as a fallback (legacy)
-LEGACY_SESSION_KEYS = ("active_business_id", "biz_id")  # read/clear both
+
+# Canonical session key (configurable) + legacy keys
+CANONICAL_SESSION_KEY = getattr(settings, "TENANT_SESSION_KEY", "active_business_id")
+LEGACY_SESSION_KEYS: Iterable[str] = (CANONICAL_SESSION_KEY, "active_business_id", "biz_id")
+
 PRODUCT_MODE_SESSION_KEY = "product_mode"          # single source of truth for UI mode
 
-# â”€â”€ product/vertical normalization (aliases) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# ── product/vertical normalization (aliases) ────────────────────────────────────
 VERTICAL_ALIASES = {
     # Phones / Electronics
     "phones & electronics": "phones",
@@ -69,7 +95,7 @@ def normalize_vertical(v: str | None) -> str:
     return VERTICAL_ALIASES.get(key, "generic")
 
 
-# â”€â”€ small helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# ── small helpers ───────────────────────────────────────────────────────────────
 def _host_without_port(host: str) -> str:
     if not host:
         return ""
@@ -121,6 +147,28 @@ def _user_has_active_membership(user, business) -> bool:
         return False
 
 
+def _mark_session_modified(request) -> None:
+    try:
+        request.session.modified = True
+    except Exception:
+        pass
+
+
+def _clear_tenant_session_keys(request) -> None:
+    """
+    Clear canonical + legacy tenant keys from the session.
+    """
+    try:
+        for k in LEGACY_SESSION_KEYS:
+            try:
+                request.session.pop(k, None)
+            except Exception:
+                pass
+        _mark_session_modified(request)
+    except Exception:
+        pass
+
+
 def _activate(request, business) -> None:
     """
     Set session (via project util), request.business(+_id) and thread-local tenant id.
@@ -129,16 +177,18 @@ def _activate(request, business) -> None:
     try:
         # Preferred: your canonical util writes both canonical & legacy keys
         set_active_business(request, business)
+        _mark_session_modified(request)
     except Exception:
         # Fallback to legacy session keys
         try:
             if business is not None:
                 bid = getattr(business, "pk", None)
+                request.session[CANONICAL_SESSION_KEY] = bid
                 request.session["active_business_id"] = bid
                 request.session["biz_id"] = bid
             else:
-                for k in LEGACY_SESSION_KEYS:
-                    request.session.pop(k, None)
+                _clear_tenant_session_keys(request)
+            _mark_session_modified(request)
         except Exception:
             pass
 
@@ -250,28 +300,56 @@ def _set_product_mode_on_request(request, business) -> None:
     request.product_mode = mode or "generic"
     try:
         request.session[PRODUCT_MODE_SESSION_KEY] = request.product_mode
+        _mark_session_modified(request)
     except Exception:
         pass
 
 
-# â”€â”€ Middleware â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+def _attach_location_scope(request) -> None:
+    """
+    Optional helper: if tenants.scope is available, compute the effective location,
+    store it on the request for templates, and persist in session.
+    No-ops if the helpers aren’t importable.
+    """
+    try:
+        # Resolve against the same active business we just activated
+        bid = getattr(request, "business_id", None)
+        if not bid:
+            request.location_id = None
+            request.scope = {}
+            return
+
+        lid = resolve_location_for_user(request)
+        request.location_id = lid
+        request.scope = serialize_scope_for_ui(request)
+
+        # Persist chosen scope for UX continuity
+        set_scope_in_session(request, business_id=bid, location_id=lid)
+    except Exception:
+        # Never block request flow if scope helpers fail
+        request.location_id = None
+        request.scope = {}
+
+
+# ── Middleware ─────────────────────────────────────────────────────────────────
 class TenantResolutionMiddleware(MiddlewareMixin):
     """
     Resolve request.business using (in order):
 
       0) initialize request.business=None and clear thread-local id
-      1) canonical util: get_active_business(request)  â† matches your views
+      1) canonical util: get_active_business(request)  ← matches your views
       2) superuser impersonation via ?as_business=<id> (NOT staff)
-      3) legacy session id(s) ('active_business_id' and 'biz_id') (membership required unless superuser)
+      3) session selection via any known keys (membership required unless superuser)
       4) subdomain (ignored on localhost) (for authenticated users: membership required unless superuser)
       5) ACTIVE membership business for authenticated user
       6) owned/created ACTIVE business for authenticated user
 
     Also sets a *single source of truth* for UI vertical:
-      request.product_mode âˆˆ {'phones','pharmacy','liquor','grocery','generic'}
+      request.product_mode ∈ {'phones','pharmacy','liquor','grocery','generic'}
       and persists it under session['product_mode'].
 
-    This gives templates and views a stable signal to render the correct form.
+    Additionally (if tenants.scope is present), attaches:
+      request.location_id and request.scope (JSON) for templates/JS.
     """
 
     @cached_property
@@ -283,6 +361,8 @@ class TenantResolutionMiddleware(MiddlewareMixin):
         request.business = None
         request.business_id = None
         request.product_mode = "generic"
+        request.location_id = None
+        request.scope = {}
         try:
             set_current_business_id(None)  # reset thread-local at request start
         except Exception:
@@ -301,6 +381,7 @@ class TenantResolutionMiddleware(MiddlewareMixin):
             if b:
                 _activate(request, b)
                 _set_product_mode_on_request(request, b)
+                _attach_location_scope(request)  # safe, optional
                 return
         except Exception:
             # continue with fallbacks
@@ -313,14 +394,15 @@ class TenantResolutionMiddleware(MiddlewareMixin):
                 b = _filter_active_business(Business.objects).get(pk=as_bid)
                 _activate(request, b)
                 _set_product_mode_on_request(request, b)
+                _attach_location_scope(request)
                 return
             except Exception:
                 pass  # ignore bad ids quietly
 
-        # (3) Legacy session selection (validate membership for non-superusers)
+        # (3) Session selection (validate membership for non-superusers)
         bid = None
         try:
-            # Try both canonical and legacy keys
+            # Try ANY known keys (canonical + legacy)
             for k in LEGACY_SESSION_KEYS:
                 bid = request.session.get(k)
                 if bid:
@@ -334,16 +416,13 @@ class TenantResolutionMiddleware(MiddlewareMixin):
                 if getattr(user, "is_superuser", False) or _user_has_active_membership(user, b):
                     _activate(request, b)
                     _set_product_mode_on_request(request, b)
+                    _attach_location_scope(request)
                     return
             except Exception:
                 pass  # invalid id / inactive business
 
             # Clear stale session value(s)
-            try:
-                for k in LEGACY_SESSION_KEYS:
-                    request.session.pop(k, None)
-            except Exception:
-                pass
+            _clear_tenant_session_keys(request)
 
         # (4) Subdomain resolution (production-style)
         try:
@@ -356,6 +435,7 @@ class TenantResolutionMiddleware(MiddlewareMixin):
                     if (not getattr(user, "is_authenticated", False)) or getattr(user, "is_superuser", False) or _user_has_active_membership(user, b):
                         _activate(request, b)
                         _set_product_mode_on_request(request, b)
+                        _attach_location_scope(request)
                         return
         except Exception:
             # get_host() may raise in tests or odd proxies
@@ -367,6 +447,7 @@ class TenantResolutionMiddleware(MiddlewareMixin):
             if b:
                 _activate(request, b)
                 _set_product_mode_on_request(request, b)
+                _attach_location_scope(request)
                 return
 
         # (6) Owned/created business (fresh signups / dev localhost)
@@ -375,10 +456,12 @@ class TenantResolutionMiddleware(MiddlewareMixin):
             if b:
                 _activate(request, b)
                 _set_product_mode_on_request(request, b)
+                _attach_location_scope(request)
                 return
 
-        # Unresolved business â†’ still compute/allow mode override so UI is not blocked
+        # Unresolved business → still compute/allow mode override so UI is not blocked
         _set_product_mode_on_request(request, None)
+        _attach_location_scope(request)
 
     def process_response(self, request, response):
         # Clear thread-local after the response is built (belt & suspenders)
@@ -389,3 +472,12 @@ class TenantResolutionMiddleware(MiddlewareMixin):
         return response
 
 
+# ── Compatibility shim ─────────────────────────────────────────────────────────
+# Some settings may still refer to `tenants.middleware.ActiveBusinessMiddleware`.
+# Keep this class name available and delegate to the resolver above.
+class ActiveBusinessMiddleware(TenantResolutionMiddleware):
+    """
+    Backwards-compatible alias for setups that list `ActiveBusinessMiddleware`
+    in MIDDLEWARE. Inherits full behavior from TenantResolutionMiddleware.
+    """
+    pass

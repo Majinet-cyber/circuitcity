@@ -1,0 +1,153 @@
+{% extends "base.html" %}
+{% load humanize %}
+
+{% block title %}Time Monitor · Circuit City{% endblock %}
+{% block header_title %}Time Monitor{% endblock %}
+
+{% block extra_css %}
+<style>
+  .page{max-width:1120px;margin:0 auto;padding:clamp(12px,4vw,24px)}
+  .grid{display:grid;grid-template-columns:repeat(12,1fr);gap:12px}
+  .card{background:#fff;border-radius:16px;box-shadow:0 6px 18px rgba(2,6,23,.06);border:1px solid #e5e7eb}
+  .pad{padding:16px}
+  .muted{color:#6b7280}
+  .hstack{display:flex;align-items:center;gap:10px}
+  .avatar{width:34px;height:34px;border-radius:50%;display:grid;place-items:center;font-weight:700;background:#1f6feb;color:#fff}
+  .tag{font-size:.75rem;border-radius:999px;padding:2px 8px;border:1px solid #e5e7eb;background:#f8fafc}
+  .battery{height:14px;border-radius:10px;background:#eef2ff;overflow:hidden;position:relative;border:1px solid #d0d7ea}
+  .fill{height:100%}
+  .success{background:#16a34a}.primary{background:#2563eb}.warning{background:#f59e0b}.danger{background:#ef4444}
+  .pill{font-size:.75rem;padding:2px 8px;border-radius:999px}
+  .pill.on{background:#ecfdf5;color:#065f46;border:1px solid #a7f3d0}
+  .pill.off{background:#fff1f2;color:#991b1b;border:1px solid #fecdd3}
+  @media (max-width: 720px){
+    .grid{grid-template-columns:repeat(1,1fr)}
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page">
+  <div class="hstack" style="justify-content:space-between;margin-bottom:12px;">
+    <div class="muted">Local time: <span id="lt">{{ now|date:"H:i:s" }}</span></div>
+    <div class="hstack">
+      <label class="muted">Auto-refresh</label>
+      <input id="auto" type="checkbox" checked style="transform:scale(1.1)" />
+      <button id="refresh" class="btn btn-sm btn-outline-primary">Refresh</button>
+    </div>
+  </div>
+
+  <!-- Summary -->
+  <div class="card pad" style="margin-bottom:12px;">
+    <div class="hstack" style="flex-wrap:wrap;gap:16px;">
+      <div><strong>Today:</strong> {{ day_start|date:"M j, Y" }}</div>
+      <div class="muted">Expected shift: {{ expected_shift_seconds|divisibleby:3600|yesno:"8,8" }} hrs (target)</div>
+      <div class="tag">Agents: <span id="count">{{ agents|length }}</span></div>
+    </div>
+  </div>
+
+  <!-- Agents grid -->
+  <div id="agents" class="grid">
+    {% for a in agents %}
+      <div class="card pad" style="grid-column:span 12;display:flex;flex-direction:column;gap:10px">
+        <div class="hstack" style="justify-content:space-between;">
+          <div class="hstack">
+            <div class="avatar">{{ a.avatar_letter }}</div>
+            <div>
+              <div style="font-weight:600">{{ a.name }}</div>
+              <div class="muted small">{{ a.email }}{% if a.location %} · {{ a.location }}{% endif %}</div>
+            </div>
+          </div>
+          <span class="pill {{ a.on_shift|yesno:'on,off' }}">{{ a.on_shift|yesno:"On shift,Off shift" }}</span>
+        </div>
+
+        <div class="hstack" style="gap:12px">
+          <div class="battery" style="flex:1">
+            <div class="fill {{ a.color }}" style="width: {{ a.pct }}%"></div>
+          </div>
+          <div style="min-width:120px;text-align:right">
+            <div><strong>{{ a.pct }}%</strong> of 8h</div>
+            <div class="muted small">
+              Work: {{ a.work_secs|floatformat:0|intcomma }}s ·
+              Idle: {{ a.idle_secs|floatformat:0|intcomma }}s
+            </div>
+          </div>
+        </div>
+
+        <div class="muted small">
+          Last activity: {{ a.last_ts|default:"—" }}
+        </div>
+      </div>
+    {% empty %}
+      <div class="muted">No agents yet.</div>
+    {% endfor %}
+  </div>
+</div>
+
+<script>
+(function(){
+  const $ = (s, r=document)=>r.querySelector(s);
+  const agentsEl = $("#agents");
+  const countEl = $("#count");
+  const auto = $("#auto");
+  const refreshBtn = $("#refresh");
+  const lt = $("#lt");
+
+  function fmtSecs(s){
+    const h = Math.floor(s/3600), m = Math.floor((s%3600)/60);
+    return (h? `${h}h `:"") + `${m}m`;
+  }
+
+  function badge(on){ return `<span class="pill ${on?'on':'off'}">${on?'On shift':'Off shift'}</span>` }
+
+  function card(a){
+    return `
+      <div class="card pad" style="grid-column:span 12;display:flex;flex-direction:column;gap:10px">
+        <div class="hstack" style="justify-content:space-between;">
+          <div class="hstack">
+            <div class="avatar">${a.avatar_letter || 'U'}</div>
+            <div>
+              <div style="font-weight:600">${a.name}</div>
+              <div class="muted small">${a.email}${a.location? ' · ' + a.location : ''}</div>
+            </div>
+          </div>
+          ${badge(a.on_shift)}
+        </div>
+
+        <div class="hstack" style="gap:12px">
+          <div class="battery" style="flex:1"><div class="fill ${a.color}" style="width:${a.pct}%"></div></div>
+          <div style="min-width:120px;text-align:right">
+            <div><strong>${a.pct}%</strong> of 8h</div>
+            <div class="muted small">Work: ${fmtSecs(a.work_secs)} · Idle: ${fmtSecs(a.idle_secs)}</div>
+          </div>
+        </div>
+
+        <div class="muted small">Last activity: ${a.last_ts || '—'}</div>
+      </div>`;
+  }
+
+  async function load(){
+    try{
+      const res = await fetch("{% url 'inventory:manager_time_overview_api' %}", {headers:{"X-Requested-With":"XMLHttpRequest"}});
+      const data = await res.json();
+      if(!data.ok) return;
+
+      lt.textContent = new Date(data.now).toLocaleTimeString();
+      countEl.textContent = data.agents.length;
+
+      // sort on-shift, then lowest pct first (most urgent)
+      data.agents.sort((a,b)=>( (a.on_shift===b.on_shift)? (a.pct-b.pct) : (a.on_shift? -1:1) ));
+
+      agentsEl.innerHTML = data.agents.map(card).join("");
+    }catch(e){
+      console.warn(e);
+    }
+  }
+
+  refreshBtn.addEventListener('click', load);
+  let t = setInterval(()=>{ if(auto.checked) load(); }, 30000);
+
+  load();
+})();
+</script>
+{% endblock %}

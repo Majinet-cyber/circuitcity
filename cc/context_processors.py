@@ -32,7 +32,7 @@ def build_meta(_request) -> Dict[str, Any]:
 def brand(request) -> Dict[str, Any]:
     """
     Provides `brand_name` and `active_business` to all templates.
-    Preserves your existing behavior while remaining defensive.
+    Defensive: if request has no business, we present a sane default.
     """
     biz = getattr(request, "business", None)
     name = getattr(biz, "name", None) or "Circuit City"
@@ -44,36 +44,61 @@ def brand(request) -> Dict[str, Any]:
 
 def role_flags(request) -> Dict[str, Any]:
     """
-    Adds lightweight role booleans commonly used in templates.
-    - IS_MANAGER mirrors the checks you reference in templates.
+    Adds lightweight role booleans commonly used in templates & JS.
+
+    Exposed keys:
+      - IS_MANAGER: True if membership role == MANAGER, or user.profile.is_manager, or user.is_staff
+      - IS_STAFF: True if user.is_staff
+      - IS_SUPERUSER: True if user.is_superuser
+      - IS_AGENT: True for authenticated users who are NOT manager/staff (useful in UI logic)
+
+    Notes:
+      * Keeps logic defensive—any missing attributes won’t raise.
+      * Mirrors checks already used in your base.html and feature templates.
     """
     user = getattr(request, "user", None)
 
-    def _is_manager() -> bool:
+    def _safe_bool(val: Any) -> bool:
         try:
-            # Explicit membership role takes precedence if present
-            membership = getattr(request, "membership", None)
-            if getattr(membership, "role", None) == "MANAGER":
-                return True
-
-            if user and getattr(user, "is_authenticated", False):
-                # App-level manager flag on profile
-                profile = getattr(user, "profile", None)
-                if getattr(profile, "is_manager", False):
-                    return True
-
-                # Staff should be treated as manager in UI logic
-                if getattr(user, "is_staff", False):
-                    return True
+            return bool(val)
         except Exception:
-            pass
-        return False
+            return False
+
+    # Base user flags (defensive)
+    is_auth = _safe_bool(getattr(user, "is_authenticated", False))
+    is_staff = _safe_bool(getattr(user, "is_staff", False))
+    is_superuser = _safe_bool(getattr(user, "is_superuser", False))
+
+    # Membership-derived manager
+    membership = getattr(request, "membership", None)
+    membership_role = getattr(membership, "role", None)
+    is_membership_manager = _safe_bool(
+        (membership_role or "").upper() == "MANAGER"
+    )
+
+    # Profile-derived manager
+    profile = getattr(user, "profile", None)
+    profile_is_manager = _safe_bool(getattr(profile, "is_manager", False))
+
+    # Unified manager flag (order of precedence: membership → profile → staff)
+    is_manager = is_membership_manager or profile_is_manager or is_staff
+
+    # Agent = authenticated but not manager/staff
+    is_agent = _safe_bool(is_auth and not is_manager and not is_staff)
 
     return {
-        "IS_MANAGER": _is_manager(),
+        "IS_MANAGER": is_manager,
+        "IS_STAFF": is_staff,
+        "IS_SUPERUSER": is_superuser,
+        "IS_AGENT": is_agent,
+        # Optional bundle if you ever want a single dict in JS:
+        "ROLE_FLAGS": {
+            "IS_MANAGER": is_manager,
+            "IS_STAFF": is_staff,
+            "IS_SUPERUSER": is_superuser,
+            "IS_AGENT": is_agent,
+        },
     }
 
 
 __all__ = ["build_meta", "brand", "role_flags"]
-
-

@@ -41,7 +41,6 @@
   #toast[data-kind="warn"]{background:#92400e}
   #toast[data-kind="error"]{background:#7f1d1d}
 
-  /* Camera shell (same look & feel as Scan IN) */
   .warn{display:none;margin-top:.5rem;padding:.6rem .8rem;border:1px solid #fbbf24;background:#fffbeb;color:#92400e;border-radius:10px}
   #cameraBox{margin-top:8px;display:none;background:var(--cc-panel);border:1px dashed var(--cc-border);border-radius:14px;padding:12px}
   .scan-shell{position:relative;border-radius:14px;overflow:hidden;background:#000;box-shadow:var(--cc-shadow)}
@@ -58,7 +57,6 @@
   .pill{font-size:12px;color:#164fb1;background:rgba(31,111,235,.10);border:1px solid rgba(31,111,235,.25);padding:4px 8px;border-radius:999px}
   .kbd{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;background:var(--cc-panel);border:1px solid var(--cc-border);color:var(--cc-text);padding:2px 6px;border-radius:6px}
 
-  /* Multiple-code picker overlay */
   #ccscan-picker{position:fixed;inset:0;display:none;align-items:center;justify-content:center;background:rgba(0,0,0,.55);z-index:9999}
   #ccscan-picker .card{background:#fff;max-width:90vw;width:520px;padding:16px;border-radius:12px;box-shadow:0 10px 40px rgba(0,0,0,.35);font-family:system-ui,Segoe UI,Roboto,Arial,sans-serif}
   #ccscan-picker .title{font-weight:600;margin-bottom:10px}
@@ -99,6 +97,7 @@
       autocomplete="off"
       data-default-location-id="{{ default_location.id|default:request.user.agent_profile.location.id|default:'' }}"
       data-stock-status-url="{{ stock_status_url }}"
+      data-lock-location="{{ lock_location|default:'' }}"
     >
       {% csrf_token %}
 
@@ -106,7 +105,7 @@
       <div>
         <label for="id_imei">IMEI / Barcode</label>
         <div class="field">
-          <input type="text" id="id_imei" name="imei" maxlength="15" inputmode="numeric" autocomplete="off" placeholder="Enter 15-digit IMEI">
+          <input type="text" id="id_imei" name="imei" maxlength="15" pattern="\\d{15}" inputmode="numeric" autocomplete="off" placeholder="Enter 15-digit IMEI" aria-required="true" aria-invalid="false">
         </div>
 
         <div class="hstack" style="margin-top:.5rem">
@@ -124,7 +123,7 @@
           </label>
         </div>
 
-        <!-- Camera shell (same as Scan IN) -->
+        <!-- Camera shell -->
         <div id="cameraBox">
           <div class="scan-shell">
             <video id="camera" autoplay playsinline muted></video>
@@ -166,8 +165,22 @@
           <div class="field"><input type="number" id="id_commission_pct" name="commission" min="0" max="100" step="any" placeholder="Commission %"></div>
         </div>
         <div>
-          <label for="{{ form.location.id_for_label|default:'id_location' }}">Location</label>
-          <div class="field">{{ form.location }}</div>
+          <label for="id_location">Location</label>
+          <div class="field">
+            {% if locations %}
+              <select id="id_location" name="location">
+                <option value="">--------</option>
+                {% for l in locations %}
+                  <option value="{{ l.id }}"
+                          {% if default_location and l.id == default_location.id %}selected{% endif %}>
+                    {{ l.name }}
+                  </option>
+                {% endfor %}
+              </select>
+            {% else %}
+              {{ form.location }}
+            {% endif %}
+          </div>
         </div>
       </div>
 
@@ -183,7 +196,6 @@
 
 <div id="toast" hidden></div>
 
-<!-- QuaggaJS fallback (used when BarcodeDetector is unavailable) -->
 <script src="https://unpkg.com/quagga@0.12.1/dist/quagga.min.js"></script>
 
 <script>
@@ -200,7 +212,6 @@
   const lenChip=document.getElementById('lenChip');
   const STOCK_STATUS_URL=formEl.dataset.stockStatusUrl;
 
-  // Camera UI (mirrors Scan IN)
   const camToggle=document.getElementById('camToggle');
   const btnStopCam=document.getElementById('btnStopCam');
   const torchBtn=document.getElementById('torchBtn');
@@ -213,7 +224,9 @@
   const candidatesEl=document.getElementById('candidates');
   const autoSubmit=document.getElementById('autoSubmit');
 
-  // picker overlay
+  const defaultLocId = formEl.dataset.defaultLocationId || '';
+  const lockLocation = formEl.dataset.lockLocation === '1';
+
   function showPicker(values, onPick){
     let wrap=document.getElementById('ccscan-picker');
     if(!wrap){
@@ -239,29 +252,26 @@
     wrap.style.display='flex';
   }
 
-  // toast
   const toastEl=document.getElementById('toast');
   function toast(msg, kind='ok', ms=2400){ toastEl.textContent=msg; toastEl.dataset.kind=kind; toastEl.hidden=false; clearTimeout(toast._t); toast._t=setTimeout(()=>toastEl.hidden=true,ms); }
 
-  // helpers
   const digits=s=>String(s||'').replace(/\D+/g,'');
   const isIMEI15=s=>/^\d{15}$/.test(digits(s));
+  function setAriaValidity(){ imeiInput.setAttribute('aria-invalid', String(!isIMEI15(imeiInput.value))); }
   const validPrice=()=>{ const v=Number(priceEl && priceEl.value); return Number.isFinite(v) && v>=0; };
   function csrf(){ const el=document.querySelector('#sellForm input[name="csrfmiddlewaretoken"]'); return el?el.value:''; }
   function setToday(){ if(dateEl && !dateEl.value){ const d=new Date(); dateEl.value=[d.getFullYear(),String(d.getMonth()+1).padStart(2,'0'),String(d.getDate()).padStart(2,'0')].join('-'); } }
   setToday();
 
-  // secure context note (don’t hard-block; Android dev-flag may allow camera on HTTP)
   const isSecure = window.isSecureContext || location.protocol === 'https:';
   if(!isSecure){ secureWarn.style.display='block'; }
 
-  // state
   let inStockHere=false, inStockElsewhere=false, currentCtrl=null;
 
   function setBadge(kind, text){ stockBadge.classList.remove('badge-warn','badge-ok','badge-wait'); stockBadge.classList.add(kind); stockBadge.textContent=text; }
   function updateSubmitState(){ submitBtn.disabled = !(isIMEI15(imeiInput.value) && validPrice() && (inStockHere || inStockElsewhere)); }
 
-  // parse various stock-status shapes
+  // --- Match the latest api_stock_status (supports {in_stock, data:{location_mismatch}}) ---
   function parseInStock(payload){
     if (!payload) return false;
     if (typeof payload.in_stock === 'boolean') return payload.in_stock;
@@ -271,6 +281,10 @@
   }
   function parseMismatch(payload){
     if (!payload) return false;
+    // Prefer the canonical key from our API
+    if (payload.data && typeof payload.data.location_mismatch === 'boolean') return payload.data.location_mismatch;
+    // Back-compat with older keys
+    if (typeof payload.location_mismatch === 'boolean') return payload.location_mismatch;
     if (typeof payload.mismatch === 'boolean') return payload.mismatch;
     if (payload.data && typeof payload.data.mismatch === 'boolean') return payload.data.mismatch;
     return false;
@@ -323,13 +337,12 @@
     }
   }
 
-  // IMEI input + counter + multi-candidate chips
   const IMEI_RX=/\b\d{15}\b/g;
   function setIMEI(val){
     imeiInput.value = digits(val).slice(0,15);
     handleIMEIInput();
-    if (autoSubmit.checked && isIMEI15(imeiInput.value)) {
-      document.querySelector('[type="submit"], #submitBtn').click();
+    if (autoSubmit.checked && isIMEI15(imeiInput.value) && !submitBtn.disabled) {
+      formEl.requestSubmit ? formEl.requestSubmit() : formEl.submit();
     }
   }
   function renderCandidates(list){
@@ -343,6 +356,7 @@
     if (clean !== raw) imeiInput.value = clean;
     const len = clean.length;
     lenChip.textContent = `${len}/15`;
+    setAriaValidity();
     if (len === 15) { checkStock(); } else { setBadge('badge-warn','Enter 15 digits'); }
     updateSubmitState();
     const many = (raw.match(IMEI_RX) || []);
@@ -352,10 +366,30 @@
   imeiInput.addEventListener('keydown',(e)=>{ if(e.key==='Enter'){ e.preventDefault(); if(!submitBtn.disabled) formEl.submit(); }});
   window.addEventListener('DOMContentLoaded', ()=>{ handleIMEIInput(); });
 
-  // location -> hidden + recheck
-  locWidget?.addEventListener('change',()=>{ locHidden.value=(locWidget.value||'').trim(); if (isIMEI15(imeiInput.value)) checkStock(); });
+  // ---- Location behavior: only lock if explicitly told (no auto-lock by single option) ----
+  function applyDefaultLocation(){
+    if (!locWidget) return;
+    if (defaultLocId){
+      const opt = Array.from(locWidget.options||[]).find(o=>String(o.value)===String(defaultLocId));
+      if (opt) locWidget.value = opt.value;
+    }
+    if (locHidden) locHidden.value = (locWidget.value||'').trim();
 
-  // Paste / Clear
+    if (lockLocation){
+      locWidget.setAttribute('disabled','disabled');
+      // keep hidden mirror updated
+      if (locHidden) locHidden.value = (locWidget.value||'').trim();
+    } else {
+      locWidget.removeAttribute('disabled');
+    }
+  }
+  applyDefaultLocation();
+
+  locWidget?.addEventListener('change',()=>{
+    if (locHidden) locHidden.value=(locWidget.value||'').trim();
+    if (isIMEI15(imeiInput.value)) checkStock();
+  });
+
   document.getElementById('btnPaste')?.addEventListener('click',async()=>{
     try{
       const t=await navigator.clipboard.readText();
@@ -367,8 +401,8 @@
   });
   document.getElementById('btnClear')?.addEventListener('click',()=>{ imeiInput.value=''; inStockHere=false; inStockElsewhere=false; handleIMEIInput(); imeiInput.focus(); });
 
-  // ======= Camera (BarcodeDetector → Quagga fallback) =======
-  const isSecureCtx = window.isSecureContext || location.protocol === 'https:'; // warn but do not block
+  // ===== Camera: BarcodeDetector → Quagga fallback =====
+  const isSecureCtx = window.isSecureContext || location.protocol === 'https:';
   let mediaStream=null, videoTrack=null, rafId=null, scanning=false, usingDetector=false, torchOn=false;
 
   function stopRaf(){ if (rafId) cancelAnimationFrame(rafId); rafId=null; }
@@ -409,7 +443,6 @@
   }
 
   function extractCandidatesFromStrings(arr){
-    // arr: array of raw values; return unique 15-digit candidates
     const set=new Set();
     arr.forEach(s=>{
       String(s||'').match(IMEI_RX)?.forEach(v=>set.add(v));
@@ -426,8 +459,7 @@
       const canvas = document.createElement('canvas');
       const ctx = canvas.getContext('2d', { willReadFrequently: true });
 
-      // small time window to aggregate and offer picker if >1
-      let seen = new Map(); // value -> ts
+      let seen = new Map();
       const windowMs = 1200;
 
       const loop = async () => {
@@ -478,7 +510,6 @@
     Quagga.onDetected((result)=>{
       const code = (result && result.codeResult && result.codeResult.code) || '';
       if(!code) return;
-      // Try to pull all 15-digit sequences from the string
       const list = extractCandidatesFromStrings([code]);
       if (list.length > 1){ pauseScanline(); showPicker(list, (choice)=> setIMEI(choice)); }
       else { setIMEI(list[0] || code); }
@@ -505,7 +536,7 @@
   }
 
   camToggle?.addEventListener('click', async ()=>{
-    if(!isSecureCtx){ toast('Tip: use HTTPS or Android Chrome dev flag to enable camera.','warn'); } // warn, but keep going
+    if(!isSecureCtx){ toast('Tip: use HTTPS or Android Chrome dev flag to enable camera.','warn'); }
     camBox.style.display='block';
     const cams = await listCameras();
     try{
@@ -552,7 +583,6 @@
   window.addEventListener('beforeunload', stopAll);
   document.addEventListener('visibilitychange', ()=>{ if (document.hidden) stopAll(); });
 
-  // ---- Submit (allowed if item exists in business anywhere)
   function parseSoldResult(resp, data, text){
     const msg=(data&&(data.message||data.msg))||text||'';
     const alreadySold=(data&&(data.status==='already_sold'||data.error_code==='ALREADY_SOLD'))||/already\s*sold/i.test(msg||'');
@@ -589,7 +619,7 @@
       sold_date:(dateEl?.value||'').trim(),
       price:priceEl?.value?Number(priceEl.value):'',
       commission:commEl?.value?Number(commEl.value):'',
-      location_id:(locHidden?.value||'').trim()
+      location_id:(locWidget?.value||'').trim()
     };
 
     try{

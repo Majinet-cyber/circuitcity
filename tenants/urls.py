@@ -7,7 +7,7 @@ from django.views.generic import RedirectView
 
 from . import views
 
-# --- Optional helper module (don't crash if missing) --------------------------
+# --- Optional helpers (import if present; never crash in dev) ------------------
 try:
     from . import views_join  # type: ignore
 except Exception:  # pragma: no cover
@@ -17,6 +17,20 @@ except Exception:  # pragma: no cover
             # If the helper isn't installed, send users to the normal join page.
             return redirect("tenants:join_as_agent")
     views_join = _JoinFallback()  # type: ignore
+
+# Prefer a dedicated manager views module if present
+_vm = None
+try:
+    from . import views_manager as _vm  # type: ignore
+except Exception:
+    _vm = None
+
+# Prefer dedicated invite-accept views module if present
+_vinv = None
+try:
+    from . import views_invites as _vinv  # type: ignore
+except Exception:
+    _vinv = None
 
 
 # --- Safe fallback helpers -----------------------------------------------------
@@ -33,9 +47,8 @@ def _get_or_fallback(name: str, fallback_to: str):
 
 def _is_from_module(fn, module_prefix: str) -> bool:
     """
-    Some codebases import a *service* into views_manager with the same name
-    (e.g. tenants.services.invites.create_agent_invite), which is zero-arg and
-    not a Django view. Guard against that by checking the function's module.
+    Guard against accidentally wiring non-view helpers/services that share names.
+    We only accept callables whose __module__ starts with the expected prefix.
     """
     return callable(fn) and getattr(fn, "__module__", "").startswith(module_prefix)
 
@@ -51,17 +64,15 @@ create_business = _get_or_fallback("create_business_as_manager", "tenants:choose
 join_as_agent   = _get_or_fallback("join_as_agent",              "tenants:choose_business")
 
 # Manager pages (prefer dedicated views_manager.py)
-_manager_agents_view = None
-_create_invite_candidate = None
-try:
-    from . import views_manager as _vm  # type: ignore
-    _manager_agents_view    = getattr(_vm, "manager_agents", None)
-    _create_invite_candidate = getattr(_vm, "create_agent_invite", None)
-except Exception:
-    _vm = None
+_manager_agents_view = getattr(_vm, "manager_agents", None) if _vm else None
+_create_invite_candidate = getattr(_vm, "create_agent_invite", None) if _vm else None
 
 # Use manager_agents from views_manager if available; otherwise fall back
-manager_review_agents = _manager_agents_view or _get_or_fallback("manager_agents", "tenants:choose_business")
+manager_review_agents = (
+    _manager_agents_view
+    if _is_from_module(_manager_agents_view, "tenants.views_manager")
+    else _get_or_fallback("manager_agents", "tenants:choose_business")
+)
 
 # ----- Agent invite actions ----------------------------------------------------
 # We must ensure we point to a real Django view (callable(request,...)),
@@ -89,9 +100,22 @@ revoke_agent_invite = _get_or_fallback("revoke_agent_invite", "tenants:manager_r
 # Locations manager (list + create)
 manager_locations = _get_or_fallback("manager_locations", "tenants:choose_business")
 
-# Accept invite link (used in shared URLs)
-invite_accept = _get_or_fallback("accept_invite", "tenants:choose_business")
+# Accept invite link (used in shared URLs).
+# Prefer tenants.views_invites.accept_invite if present; else views.accept_invite; else fallback.
+invite_accept = None
+if _vinv:
+    _accept_candidate = getattr(_vinv, "accept_invite", None)
+    if _is_from_module(_accept_candidate, "tenants.views_invites"):
+        invite_accept = _accept_candidate
+if invite_accept is None:
+    _views_accept = getattr(views, "accept_invite", None)
+    if _is_from_module(_views_accept, "tenants.views"):
+        invite_accept = _views_accept
+if invite_accept is None:
+    invite_accept = _fallback_redirect("tenants:choose_business")
 
+
+# --- URL patterns --------------------------------------------------------------
 app_name = "tenants"
 
 urlpatterns = [
@@ -147,7 +171,7 @@ urlpatterns = [
         name="manager_home",
     ),
 
-    # ----- Agent invite actions (names used in templates) -----
+    # ----- Agent invite actions (names used by templates) -----
     path("manager/agents/invite/",                 create_agent_invite, name="create_agent_invite"),
     path("manager/agents/invite/<int:pk>/resend/", resend_agent_invite, name="resend_agent_invite"),
     path("manager/agents/invite/<int:pk>/revoke/", revoke_agent_invite, name="revoke_agent_invite"),

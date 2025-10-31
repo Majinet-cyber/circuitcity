@@ -8,7 +8,7 @@ from datetime import timedelta  # <-- FIX: use datetime.timedelta (not timezone.
 from django.contrib import messages
 from django.contrib.auth import login, get_user_model
 from django.contrib.auth.decorators import login_required, user_passes_test
-from django.http import HttpRequest, HttpResponse
+from django.http import HttpRequest, HttpResponse, HttpResponseForbidden
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import NoReverseMatch, reverse
 from django.views.decorators.http import require_http_methods
@@ -23,6 +23,10 @@ from .utils import (
     require_role,
     set_active_business,
     get_active_business,
+    # NEW helpers (added, non-breaking)
+    resolve_default_business_for_user,
+    user_highest_role,
+    user_has_membership,
 )
 
 import logging
@@ -56,8 +60,8 @@ def _redirect_next_or_home(
 ) -> HttpResponse:
     """
     Respect ?next= when present. Otherwise:
-      - superusers â†’ HQ dashboard
-      - everyone else â†’ fallback (usually the chooser)
+      - superusers → HQ dashboard
+      - everyone else → fallback (usually the chooser)
     """
     nxt = request.GET.get("next") or request.POST.get("next")
     if nxt:
@@ -166,7 +170,15 @@ def _whatsapp_link(invite: AgentInvite) -> str:
 
 @login_required
 def activate_mine(request: HttpRequest) -> HttpResponse:
-    """Auto-activate a sensible business for the current user."""
+    """
+    Auto-activate a sensible business for the current user.
+
+    HARDENING:
+    - Prefer OWNER/MANAGER/ADMIN memberships (ACTIVE if available).
+    - If none active, still *avoid* sending managers/owners to Join-as-agent.
+    - If the user previously created a PENDING business, never suggest joining.
+    """
+    # If we already have an active business, honor ?next= or chooser
     if get_active_business(request):
         return _redirect_next_or_home(request, fallback="tenants:choose_business")
 
@@ -175,6 +187,17 @@ def activate_mine(request: HttpRequest) -> HttpResponse:
 
     user = request.user
 
+    # Preferred default (owners/managers first; ACTIVE preferred)
+    preferred = resolve_default_business_for_user(user)
+    if preferred:
+        # Ensure only businesses the user actually belongs to can be set
+        if user_has_membership(user, preferred.id):
+            _ensure_seed_on_switch(preferred)
+            set_active_business(request, preferred)
+            messages.success(request, f"Switched to {preferred.name}.")
+            return _redirect_next_or_home(request, fallback="tenants:choose_business")
+
+    # Legacy logic: enumerate ACTIVE memberships (business ACTIVE too)
     active_memberships = list(
         Membership.objects.filter(user=user, status="ACTIVE")
         .select_related("business")
@@ -195,6 +218,7 @@ def activate_mine(request: HttpRequest) -> HttpResponse:
     if len(active_memberships) > 1:
         return redirect("tenants:choose_business")
 
+    # If the user created a pending business, do not suggest joining
     pending_i_created = Business.objects.filter(
         created_by=user, status="PENDING"
     ).order_by("-created_at").first()
@@ -205,6 +229,13 @@ def activate_mine(request: HttpRequest) -> HttpResponse:
         )
         return redirect("tenants:choose_business")
 
+    # If the user is a MANAGER/OWNER anywhere (even non-active), never show agent join
+    role = (user_highest_role(user) or "").upper()
+    if role in {"OWNER", "MANAGER", "ADMIN"}:
+        messages.info(request, "Select or set up your business to continue.")
+        return redirect("tenants:choose_business")
+
+    # True blank-slate agent
     messages.info(request, "Join an existing business to get started.")
     return redirect("tenants:join_as_agent")
 
@@ -218,7 +249,7 @@ def clear_active(request: HttpRequest) -> HttpResponse:
 
 @login_required
 def set_active(request: HttpRequest, biz_id) -> HttpResponse:
-    """Switch active business for this session."""
+    """Switch active business for this session (membership required unless superuser)."""
     b = get_object_or_404(Business, pk=biz_id, status="ACTIVE")
 
     user = request.user
@@ -288,7 +319,12 @@ def choose_business(request: HttpRequest) -> HttpResponse:
 
 @login_required
 def create_business_as_manager(request: HttpRequest) -> HttpResponse:
-    """Manager proposes a new Business (PENDING)."""
+    """
+    Manager proposes a new Business (PENDING).
+    HARDENING:
+    - After creation, set active_business to the new business (even if PENDING)
+      so managers will never be offered the agent-join path.
+    """
     if request.method == "POST":
         form = CreateBusinessForm(request.POST)
         if form.is_valid():
@@ -305,6 +341,9 @@ def create_business_as_manager(request: HttpRequest) -> HttpResponse:
                 status="PENDING",
             )
 
+            # NEW: set active business immediately (privacy-safe; it’s the creator’s)
+            set_active_business(request, b)
+
             messages.success(
                 request,
                 "Business submitted. A developer will approve it shortly."
@@ -318,9 +357,21 @@ def create_business_as_manager(request: HttpRequest) -> HttpResponse:
 
 @login_required
 def join_as_agent(request: HttpRequest) -> HttpResponse:
-    """Agent requests to join an ACTIVE business by name."""
+    """
+    Agent requests to join an ACTIVE business by name.
+
+    HARDENING:
+    - If user is OWNER/MANAGER/ADMIN anywhere, block this view (never allow demotion path).
+    - If user already has an active business, send them home.
+    """
     if request.user.is_superuser:
         return _superuser_landing(request)
+
+    # Never show agent-join to managers/owners/admins
+    role = (user_highest_role(request.user) or "").upper()
+    if role in {"OWNER", "MANAGER", "ADMIN"}:
+        # You can change to redirect("/") if you prefer; 403 is explicit
+        return HttpResponseForbidden("Managers and owners cannot join as agents.")
 
     if get_active_business(request):
         return _home_redirect(request)
@@ -530,7 +581,7 @@ def manager_locations(request: HttpRequest) -> HttpResponse:
                     loc.delete()
                     msg = "Deleted."
                 except Exception:
-                    # FK blocked â€“ archive/disable instead
+                    # FK blocked – archive/disable instead
                     if hasattr(loc, "is_active"):
                         setattr(loc, "is_active", False)
                         loc.save(update_fields=["is_active"])
@@ -770,7 +821,7 @@ def accept_invite(request: HttpRequest, token: str) -> HttpResponse:
             invite._request = request  # type: ignore[attr-defined]
             return _invite_signup_page(invite)
 
-    # Create or update membership â†’ ACTIVE/AGENT
+    # Create or update membership → ACTIVE/AGENT
     mem, _created = Membership.objects.get_or_create(
         business=biz,
         user=request.user,
@@ -841,7 +892,7 @@ def _invite_signup_page(invite: AgentInvite, error: Optional[str] = None) -> Htt
 <html>
   <head>
     <meta charset="utf-8" />
-    <title>Join Â· {biz_name}</title>
+    <title>Join · {biz_name}</title>
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <style>
       body {{ font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial; margin: 24px; color: #0b1220; }}
@@ -865,10 +916,10 @@ def _invite_signup_page(invite: AgentInvite, error: Optional[str] = None) -> Htt
         <input type="text" name="username" placeholder="yourname" required />
         <div style="height:.75rem"></div>
         <label>Password</label>
-        <input type="password" name="password1" placeholder="â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢" required />
+        <input type="password" name="password1" placeholder="••••••••" required />
         <div style="height:.75rem"></div>
         <label>Confirm Password</label>
-        <input type="password" name="password2" placeholder="â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢" required />
+        <input type="password" name="password2" placeholder="••••••••" required />
         <div style="height:1rem"></div>
         <button class="btn">Create & Accept</button>
       </form>
@@ -906,5 +957,3 @@ def _invite_invalid_page(reason: str) -> HttpResponse:
 
 def _csrf_input_placeholder() -> str:
     return "__CSRF__PLACEHOLDER__"
-
-

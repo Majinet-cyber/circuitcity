@@ -1,5 +1,6 @@
 {% extends "base.html" %}
 {% load static %}
+
 {% block content %}
 <div class="container py-4" style="max-width: 860px;">
   <h3 class="mb-3">Invite an Agent</h3>
@@ -27,7 +28,7 @@
             <label class="form-label fw-semibold">Invite link</label>
             <div class="input-group">
               <input id="inviteLink" type="text" class="form-control"
-                     value="{{ invite.accept_url|default:request.build_absolute_uri|default:'' }}"
+                     value="{{ invite.accept_url|default:'' }}"
                      readonly>
               <button class="btn btn-outline-secondary" type="button" id="copyBtn">Copy</button>
             </div>
@@ -50,8 +51,7 @@ Hi {{ invite.invited_name|default:"there" }}, please click this link to join {{ 
              href="#" target="_blank" rel="noopener">
             Share via WhatsApp
           </a>
-          <a id="mailBtn" class="btn btn-primary"
-             href="#">
+          <a id="mailBtn" class="btn btn-primary" href="#">
             Share via Email
           </a>
           <a class="btn btn-link" href="{% url 'tenants:manager_review_agents' %}">Back to Agents</a>
@@ -64,22 +64,25 @@ Hi {{ invite.invited_name|default:"there" }}, please click this link to join {{ 
     <div class="card shadow-sm">
       <div class="card-body">
         <h5 class="card-title mb-3">Send a new invite</h5>
+
         <form method="post" action="{% url 'tenants:create_agent_invite' %}" class="row g-3">
           {% csrf_token %}
 
-          {# Render fields explicitly to avoid .as_widget(attrs=...) in template #}
           <div class="col-sm-6">
             <label class="form-label fw-semibold" for="{{ form.invited_name.id_for_label }}">Invited name</label>
             {{ form.invited_name }}
           </div>
+
           <div class="col-sm-6">
             <label class="form-label fw-semibold" for="{{ form.email.id_for_label }}">Email (optional)</label>
             {{ form.email }}
           </div>
+
           <div class="col-sm-6">
             <label class="form-label fw-semibold" for="{{ form.phone.id_for_label }}">Phone / WhatsApp (optional)</label>
             {{ form.phone }}
           </div>
+
           {% if form.message %}
           <div class="col-sm-6">
             <label class="form-label fw-semibold" for="{{ form.message.id_for_label }}">Message (optional)</label>
@@ -105,7 +108,7 @@ Hi {{ invite.invited_name|default:"there" }}, please click this link to join {{ 
 
 {% if invite %}
 <script>
-(function() {
+(function () {
   const nameInput = document.getElementById('invitedName');
   const linkInput = document.getElementById('inviteLink');
   const preview = document.getElementById('previewBox');
@@ -113,7 +116,8 @@ Hi {{ invite.invited_name|default:"there" }}, please click this link to join {{ 
   const mailBtn = document.getElementById('mailBtn');
   const copyBtn = document.getElementById('copyBtn');
 
-  const shopName = {{ invite.business.name|default:"'our shop'"|safe|escapejs }};
+  // Safer: always a quoted string
+  const shopName = "{{ invite.business.name|default:'our shop'|escapejs }}";
   const initName = nameInput ? nameInput.value.trim() : '';
   const initLink = linkInput ? linkInput.value.trim() : '';
 
@@ -146,6 +150,7 @@ Hi {{ invite.invited_name|default:"there" }}, please click this link to join {{ 
   }
 
   if (nameInput) nameInput.addEventListener('input', updateUI);
+
   if (copyBtn && linkInput) {
     copyBtn.addEventListener('click', function () {
       linkInput.select();
@@ -158,6 +163,7 @@ Hi {{ invite.invited_name|default:"there" }}, please click this link to join {{ 
     });
   }
 
+  // Initialize
   updateUI();
 })();
 </script>

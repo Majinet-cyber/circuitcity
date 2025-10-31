@@ -45,11 +45,13 @@ def _field_names(model) -> Set[str]:
     except Exception:
         return set()
 
+
 def _as_int_or_none(value) -> Optional[int]:
     try:
         return int(value)
     except Exception:
         return None
+
 
 def _first_present_attr(obj: Any, keys: Iterable[str]):
     for k in keys:
@@ -63,7 +65,7 @@ def _first_present_attr(obj: Any, keys: Iterable[str]):
 
 
 # ------------------------------
-# Model resolution â€” single source of truth
+# Model resolution — single source of truth
 # ------------------------------
 def get_inventory_model():
     """
@@ -165,7 +167,7 @@ def stock_queryset_for_request(request: HttpRequest) -> QuerySet:
       - supports ?status=all|available|selling|sold|archived (case-insensitive)
       - adds select_related for common relations
 
-    This is the ONE place that defines what â€œin stockâ€ means.
+    This is the ONE place that defines what "in stock" means.
     """
     Model = get_inventory_model()
     if Model is None:
@@ -213,7 +215,7 @@ def stock_queryset_for_request(request: HttpRequest) -> QuerySet:
     # Default behavior: show items that are *available / in stock*
     raw_status = (request.GET.get("status") or "").strip().lower()
 
-    if raw_status in ("", "ai", "all"):
+    if raw_status in ("", "all"):
         # No explicit status filter; we'll still exclude sold/archived/inactive below
         pass
     elif raw_status in ("available", "in_stock", "in-stock"):
@@ -256,5 +258,3 @@ def stock_queryset_for_request(request: HttpRequest) -> QuerySet:
             pass
 
     return qs
-
-

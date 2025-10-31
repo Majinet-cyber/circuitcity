@@ -10,6 +10,8 @@ from django.shortcuts import redirect, render
 from django.urls import NoReverseMatch, path, re_path, reverse
 from django.views.generic import TemplateView, RedirectView
 from django.contrib.auth.decorators import login_required
+from django.http.response import HttpResponseBase  # type checks
+from django.core.handlers.wsgi import WSGIRequest  # type checks
 
 # ---------------------------------------------------------------------
 # Import page views (your real templates live here)
@@ -40,9 +42,8 @@ def _import_optional(modname: str):
     except Exception:
         return SimpleNamespace()
 
-# Primary (v2) sources
-_api_v2_primary = _import_optional("api_views")
-_api_v2_alt = _import_optional("api_view")
+_api_v2_primary = _import_optional("api_views")   # Primary v2
+_api_v2_alt = _import_optional("api_view")        # Alt v2 module
 
 # Merge v2 sources into one namespace
 _api_v2 = SimpleNamespace()
@@ -107,6 +108,74 @@ def _safe_reverse(view_name: str, *args, **kwargs) -> Optional[str]:
                 pass
     return None
 
+# JSON API safety
+def _ensure_response(view_func):
+    def _wrapped(request, *args, **kwargs):
+        out = view_func(request, *args, **kwargs)
+        if isinstance(out, HttpResponseBase):
+            return out
+        if callable(out) and not isinstance(out, WSGIRequest):
+            name = getattr(out, "__name__", "view")
+            return HttpResponse(f"{name}: callable returned by view (not executed)")
+        return HttpResponse(out if out is not None else "")
+    return _wrapped
+
+# Turn CBVs into callables once.
+def _callable_view(obj):
+    try:
+        as_view = getattr(obj, "as_view", None)
+        if callable(as_view):
+            return as_view()
+    except Exception:
+        pass
+    return obj
+
+# IMPORTANT: Realize only CBVs. Do NOT pre-call functions/factories.
+def _realize_view(obj):
+    return _callable_view(obj)
+
+# UPDATED: page executor with template fallback
+def _page_exec(view_func, template_name: Optional[str] = None):
+    """
+    Execute a page view; if it doesn't return a proper HttpResponse,
+    render `template_name` (if provided) as a safe fallback.
+    """
+    def _wrapped(request, *args, **kwargs):
+        out = view_func(request, *args, **kwargs)
+
+        # Already a proper response (TemplateResponse/HttpResponse)
+        if isinstance(out, HttpResponseBase):
+            return out
+
+        # If a callable leaked through (factory), try calling it once
+        if callable(out):
+            try:
+                resp = out(request, *args, **kwargs)
+                if isinstance(resp, HttpResponseBase):
+                    return resp
+            except TypeError:
+                try:
+                    resp = out()
+                    if isinstance(resp, HttpResponseBase):
+                        return resp
+                except Exception:
+                    pass
+
+        # Fallback to known template if supplied
+        if template_name:
+            try:
+                return render(request, template_name, {})
+            except Exception:
+                pass
+
+        # Strings/bytes → HTML
+        if isinstance(out, (str, bytes)):
+            return HttpResponse(out)
+
+        # Final fallback to an empty but valid page
+        return render(request, "inventory/time_logs.html", {}) if template_name == "inventory/time_logs.html" else HttpResponse("")
+    return _wrapped
+
 _FALLBACKS = {
     "inventory:stock_list": "/inventory/list/",
     "product_list": "/inventory/list/",
@@ -135,26 +204,22 @@ def _forward_to_root_login(request, *args, **kwargs):
 def _resolve_page(candidate_names: Iterable[str], template_name: str, missing_msg: str):
     for nm in candidate_names:
         obj = getattr(views, nm, None)
-        if callable(obj):
-            return obj
-        if obj is not None and hasattr(obj, "as_view"):
-            try:
-                return obj.as_view()
-            except Exception:
-                pass
+        if obj is None:
+            continue
+        rv = _realize_view(obj)
+        if callable(rv):
+            return rv
     return TemplateView.as_view(template_name=template_name) if template_name else _stub(missing_msg)
 
 def _get_any(names: tuple[str, ...], *sources, msg: str | None = None):
     for src in sources:
         for name in names:
             fn = getattr(src, name, None)
-            if callable(fn):
-                return fn
-            if fn is not None and hasattr(fn, "as_view"):
-                try:
-                    return fn.as_view()
-                except Exception:
-                    continue
+            if fn is None:
+                continue
+            rv = _realize_view(fn)
+            if callable(rv):
+                return rv
     return _stub(msg or f"{'/'.join(names)} endpoint not implemented")
 
 # ---------------------------------------------------------------------
@@ -266,20 +331,31 @@ _update_stock = _get_any(("update_stock",), views, msg="update_stock view missin
 _delete_stock = _get_any(("delete_stock",), views, msg="delete_stock view missing")
 _restore_stock = _get_any(("restore_stock",), views, msg="restore_stock view missing")
 
-# ---- Time pages wired to api_views (single source of truth) ----
+# ---- Time pages: import raw, then realize CBVs ONLY ----
 try:
-    from .api_views import time_checkin_page as _time_checkin_page, time_logs_page as _time_logs_page
+    from .views_time import (
+        _time_checkin_page as __time_checkin_page_raw,
+        _time_logs_page as __time_logs_page_raw,
+        _time_logs_api,
+        _mgr_time_overview_page as __mgr_time_overview_page_raw,
+        _mgr_time_overview_api,
+        my_time_logs_page as __my_time_logs_page_raw,
+    )
+    _time_checkin_page = _realize_view(__time_checkin_page_raw)
+    _time_logs_page = _realize_view(__time_logs_page_raw)
+    _mgr_time_overview_page = _realize_view(__mgr_time_overview_page_raw)
+    _my_time_logs_page = _realize_view(__my_time_logs_page_raw)
 except Exception:
-    _time_checkin_page = _resolve_page(
-        ("time_checkin_page", "time_checkin", "time_checkin_view"),
-        template_name="inventory/time_checkin.html",
-        missing_msg="time_checkin page view missing",
-    )
-    _time_logs_page = _resolve_page(
-        ("time_logs",),
-        template_name="inventory/time_logs.html",
-        missing_msg="time_logs page view missing",
-    )
+    _time_checkin_page = TemplateView.as_view(template_name="inventory/time_checkin.html")
+    _time_logs_page = TemplateView.as_view(template_name="inventory/time_logs.html")
+    _time_logs_api = _stub("time_logs_api not implemented")
+    def _mgr_time_overview_page(request, *a, **k):
+        return render(request, "inventory/time_overview.html", {"agents": []})
+    def _mgr_time_overview_api(request, *a, **k):
+        return JsonResponse({"ok": False, "error": "manager_time_overview_api not available"}, status=501)
+    _my_time_logs_page = lambda request, *a, **k: TemplateView.as_view(  # noqa: E731
+        template_name="inventory/time_logs.html"
+    )(request)
 
 _wallet_page = _get_any(("wallet_page",), views, msg="wallet page view missing")
 
@@ -289,9 +365,10 @@ _settings_view = _get_any(("settings_home", "settings"), views, msg="settings vi
 # ---------- ORDERS: resolve directly, no stub shadowing ----------
 def _resolve_orders_list_view():
     fn = getattr(views, "orders_list", None)
-    if callable(fn):
-        return fn
-    # Friendly fallback page (never 501)
+    if fn is not None:
+        rv = _realize_view(fn)
+        if callable(rv):
+            return rv
     def _fallback(request, *args, **kwargs):
         return render(
             request,
@@ -302,12 +379,10 @@ def _resolve_orders_list_view():
 
 _orders_list_view = _resolve_orders_list_view()
 
-# Also provide a JSON API that never 501s by default
 def _resolve_orders_list_api():
     api_fn = getattr(_api_v2_primary, "orders_list_api", None)
     if callable(api_fn):
         return api_fn
-
     def _api_ok(_request, *args, **kwargs):
         return JsonResponse({"ok": True, "count": 0, "orders": []}, status=200)
     return _api_ok
@@ -318,9 +393,8 @@ _po_invoice = _get_any(("po_invoice",), views, msg="invoice view missing")
 
 # -------- APIs (prefer direct -> v2 -> legacy) ----------
 _scan_in_api = _get_any(("scan_in", "api_scan_in"), _api_v2, _api_legacy, msg="scan_in API not implemented")
-_scan_sold_api = _get_any(("scan_sold", "api_scan_sold"), _api_v2, _api_legacy, msg="scan_sold API not implemented")
+_scan_sold_api = _get_any(("scan_sold", "api_scan_sold"), _api_v2, _api_legacy, msg="api_scan_sold API not implemented")
 
-# Prefer NEW api_views for these critical endpoints
 _api_stock_status_direct = getattr(views, "api_stock_status", None)
 _api_stock_status_view = (
     getattr(_api_v2_primary, "api_stock_status", None)
@@ -332,17 +406,22 @@ _mark_sold_view = (
     or _get_any(("api_mark_sold",), _api_v2, _api_legacy, msg="api_mark_sold not implemented")
 )
 
-# NEW: JSON stock list API resolver (explicit)
 _api_stock_list_view = (
     getattr(_api_v2_primary, "stock_list", None)
     or _get_any(("stock_list",), _api_v2, _api_legacy, msg="stock_list API not implemented")
 )
 
-# If you added scan_sold_submit in views, expose it directly (with safe stub).
 _scan_sold_submit_view = getattr(views, "scan_sold_submit", None) or _stub("scan_sold_submit view not implemented")
 
 _time_checkin_view = _get_any(("api_time_checkin",), _api_v2, _api_legacy, msg="api_timecheckin not implemented")
 _geo_ping_view = _get_any(("api_geo_ping", "geo_ping"), _api_v2, _api_legacy, msg="api_geo_ping not implemented")
+
+# NEW: FORCE wire api_views.api_time_logs when present; fall back otherwise
+_api_time_logs_view = (
+    getattr(_api_v2_primary, "api_time_logs", None)  # ✅ primary, exact
+    or getattr(_api_v2_primary, "time_logs_api", None)  # legacy name inside api_views
+    or _get_any(("api_time_logs", "time_logs_api"), _api_v2, _api_legacy, msg="time_logs_api not implemented")
+)
 
 _timeclock_event_view = _get_any(
     ("api_timeclock_event", "api_clock_event"),
@@ -361,6 +440,8 @@ _sales_trend_view = _get_any(("api_sales_trend", "sales_trend"), _api_v2, _api_l
 _top_models_view = _get_any(("api_top_models",), _api_v2, _api_legacy, msg="api_top_models not implemented")
 _profit_bar_view = _get_any(("api_profit_bar",), _api_v2, _api_legacy, msg="api_profit_bar not implemented")
 _value_trend_view = _get_any(("value_trend", "api_value_trend", "api_sales_trend", "sales_trend"), _api_v2, _api_legacy, msg="api_value_trend not implemented")
+
+# >>> ADD THIS MISSING RESOLVER <<<
 _agent_trend_view = _get_any(("api_agent_trend",), _api_v2, _api_legacy, msg="api_agent_trend not implemented")
 
 _restock_heatmap = (
@@ -372,26 +453,21 @@ _api_order_price = _get_any(("api_order_price",), _api_v2, _api_legacy, msg="api
 _api_stock_models = _get_any(("api_stock_models",), _api_v2, _api_legacy, msg="api_stock_models not implemented")
 _api_place_order = _get_any(("api_place_order",), _api_v2, _api_legacy, msg="api_place_order not implemented")
 
-# ---- robust predictions resolver ----
 _predictions_view = _get_any(
     ("predictions_summary", "predictions_view", "predictions_api"),
     views_dashboard, _api_v2, _api_legacy,
     msg="predictions endpoint not implemented",
 )
 
-# ---- ensure cash overview resolver exists BEFORE URL patterns ----
 _cash_overview_view = _get_any(("api_cash_overview",), _api_v2, _api_legacy, msg="api_cash_overview not implemented")
 
-# ---- Alerts API resolver (THIS WAS MISSING) ----
 _alerts_view = _get_any(("api_alerts",), _api_v2, _api_legacy, msg="api_alerts not implemented")
 
-# ---- NEW: Inventory Summary API resolver (single-source numbers) ----
 _inventory_summary_view = (
     getattr(_api_v2_primary, "api_inventory_summary", None)
     or _get_any(("api_inventory_summary",), _api_v2, _api_legacy, msg="api_inventory_summary not implemented")
 )
 
-# ---- Product APIs (create / update price) ----
 _api_product_create = _get_any(
     ("api_product_create", "product_create_api", "api_create_product"),
     _api_v2, _api_legacy,
@@ -403,7 +479,6 @@ _api_product_update_price = _get_any(
     msg="api_product_update_price not implemented",
 )
 
-# ---- Tasks & audit (REST resolvers) ----
 def _json_501(msg: str):
     def _v(_request, *a, **k):
         return JsonResponse({"ok": False, "error": msg}, status=501)
@@ -430,10 +505,21 @@ _api_audit_verify = (
     or _json_501("api_audit_verify missing")
 )
 
-# ---- NEW: Backfill Sale API resolver (added) ----
 _backfill_sale_view = (
     getattr(_api_v2_primary, "api_backfill_sale", None)
     or _get_any(("api_backfill_sale",), _api_v2, _api_legacy, msg="api_backfill_sale not implemented")
+)
+
+# --- NEW: Business-manager stock update/delete resolvers (JSON) ---
+_api_stock_update_instock = _get_any(
+    ("stock_update_instock", "api_stock_update_instock"),
+    _api_v2, _api_legacy,
+    msg="stock_update_instock not implemented",
+)
+_api_stock_delete = _get_any(
+    ("stock_delete", "api_stock_delete"),
+    _api_v2, _api_legacy,
+    msg="api_stock_delete not implemented",
 )
 
 # ---------------------------------------------------------------------
@@ -526,6 +612,20 @@ def _infer_product_mode(request) -> str:
 
     return "generic"
 
+def _coerce_str(v) -> Optional[str]:  # (kept as-is; defined earlier)
+    if v is None:
+        return None
+    if isinstance(v, str):
+        return v
+    for attr in ("value", "label", "name"):
+        try:
+            s = getattr(v, attr)
+            if isinstance(s, str) and s.strip():
+                return s
+        except Exception:
+            pass
+    return None
+
 def product_create_page(request):
     from django import forms
 
@@ -602,7 +702,6 @@ def product_create_page(request):
     }
     return render(request, "inventory/product_create.html", ctx)
 
-# Router (legacy support)
 def product_create_router(request):
     mapping = {
         "phones":   "inventory:product_create_phones",
@@ -649,7 +748,7 @@ except Exception:
             for attr in ("template_key", "vertical", "category", "industry", "type", "kind", "sector"):
                 val = getattr(biz, attr, None)
                 if isinstance(val, str) and val.strip():
-                    v = _norm(val)
+                    v = (val or "").strip().lower()
                     break
         v = v or "phones"
         if v in {"clothing", "fashion", "apparel"}:
@@ -771,24 +870,31 @@ urlpatterns = [
 
 # -------------------- JSON APIs (NO require_business wrapper) --------------------
 urlpatterns += [
-    # Core stock/scan/sell
     path("api/scan-in/", _scan_in_api, name="api_scan_in"),
     path("api/scan-sold/", _scan_sold_api, name="api_scan_sold"),
 
-    # STATUS — support hyphen + underscore
     path("api/stock-status/", _api_stock_status_view, name="api_stock_status"),
-    path("api/stock_status/", _api_stock_status_view),  # alias
+    path("api/stock_status/", _api_stock_status_view),
 
-    # Mark sold (no Sale row)
     path("api/mark-sold/", _mark_sold_view, name="api_mark_sold"),
 
-    # Backfill Sale (create Sale row even if inventory already SOLD)
     path("api/backfill-sale/", _backfill_sale_view, name="api_backfill_sale"),
-    path("api/backfill_sale/", _backfill_sale_view),  # alias
+    path("api/backfill_sale/", _backfill_sale_view),
 
-    # Stock list JSON (hyphen + underscore)
     path("api/stock-list/", _api_stock_list_view, name="api_stock_list"),
-    path("api/stock_list/", _api_stock_list_view),  # alias
+    path("api/stock_list/", _api_stock_list_view),
+]
+
+# --- NEW: Manager-only stock edit/delete (IN_STOCK only; JSON) ---
+urlpatterns += [
+    path("api/stock/<int:pk>/update-instock/", manager_required(_need_biz(_api_stock_update_instock)),
+         name="api_stock_update_instock"),
+    # convenience aliases pointing to same handler (accepts imei and/or selling_price)
+    path("api/stock/<int:pk>/price/", manager_required(_need_biz(_api_stock_update_instock))),
+    path("api/stock/<int:pk>/imei/", manager_required(_need_biz(_api_stock_update_instock))),
+
+    path("api/stock/<int:pk>/delete/", manager_required(_need_biz(_api_stock_delete)),
+         name="api_stock_delete"),
 ]
 
 # Orders — pages + APIs
@@ -799,13 +905,11 @@ urlpatterns += [
     path("orders/<int:po_id>/invoice/", manager_required(_need_biz(_po_invoice)), name="po_invoice"),
     path("orders/<int:po_id>/download/", manager_required(_need_biz(_po_invoice)), name="po_invoice_download"),
 
-    # JSON API (safe default if not implemented)
     path("api/orders/", manager_required(_need_biz(_orders_list_api)), name="orders_list_api"),
 
     path("api/place-order/", manager_required(_need_biz(_api_place_order)), name="api_place_order"),
     path("api/order-price/<int:product_id>/", manager_required(_need_biz(_api_order_price)), name="api_order_price"),
 
-    # ---- Product price update (correct canonical + back-compat redirects) ----
     path("api/product/update-price/", manager_required(_need_biz(_api_product_update_price)), name="api_product_update_price"),
     path("api/product/update-price/<int:product_id>/",
          RedirectView.as_view(pattern_name="inventory:api_product_update_price", permanent=False)),
@@ -848,30 +952,41 @@ urlpatterns += [
     path("api/wallet-summary/", _need_biz(_wallet_summary), name="api_wallet_summary"),
     path("api/wallet-txn/", _need_biz(_wallet_add_txn), name="api_wallet_add_txn"),
 
-    # AFTER – APIs return JSON even if no active business. (Pages remain guarded.)
-    path("api/time-checkin/", _time_checkin_view, name="api_time_checkin"),
+    # AFTER – APIs return JSON even if no active business.
+    path("api/time-checkin/", _ensure_response(_time_checkin_view), name="api_time_checkin"),
     path("api/geo-ping/", _geo_ping_view, name="api_geo_ping"),
 
     path("api/timeclock/bootstrap/", _need_biz(_timeclock_bootstrap_view), name="api_timeclock_bootstrap"),
     path("api/timeclock/event/", _need_biz(_timeclock_event_view), name="api_timeclock_event"),
 
-    # Tasks & audit
     path("api/task-submit/", _need_biz(_api_task_submit), name="api_task_submit"),
     path("api/task-status/", _need_biz(_api_task_status), name="api_task_status"),
     path("api/audit-verify/", _need_biz(_api_audit_verify), name="api_audit_verify"),
 
-    # NEW — single-source inventory summary for dashboard cards
     path("api/summary/", _need_biz(_inventory_summary_view), name="inventory_api_summary"),
+
+    # ✅ Prefer api_views.api_time_logs; keep legacy name too
+    path("api/time-logs/", _ensure_response(_api_time_logs_view), name="time_logs_api"),
+    path("api/time-logs/", _ensure_response(_api_time_logs_view), name="api_time_logs"),  # reverse alias
 ]
 
 # ---------------------------------------------------------------------
-# Time pages — wired to api_views
+# Time pages — execute once if a factory leaks; render template fallback
 # ---------------------------------------------------------------------
 urlpatterns += [
-    path("time/check-in/", _need_biz(_time_checkin_page), name="time_checkin"),
-    path("time/logs/", _need_biz(_time_logs_page), name="time_logs"),
+    path("time/check-in/", _need_biz(_page_exec(_time_checkin_page, "inventory/time_checkin.html")), name="time_checkin"),
+    path("time/logs/",     _need_biz(_page_exec(_time_logs_page, "inventory/time_logs.html")),      name="time_logs"),
+    path("time/my/",       _need_biz(_page_exec(_my_time_logs_page, "inventory/time_logs.html")),   name="my_time_logs"),
     path("timelogs/", _redirect_to("inventory:time_logs"), name="timelogs_short"),
     path("time/log/", _redirect_to("inventory:time_logs")),
+]
+
+# ---------------------------------------------------------------------
+# Manager Work Monitor (page stays manager-only; API is business-member)
+# ---------------------------------------------------------------------
+urlpatterns += [
+    path("time/overview/", manager_required(_need_biz(_mgr_time_overview_page)), name="manager_time_overview"),
+    path("api/time-overview/", _need_biz(_ensure_response(_mgr_time_overview_api)), name="manager_time_overview_api"),
 ]
 
 # ---------------------------------------------------------------------

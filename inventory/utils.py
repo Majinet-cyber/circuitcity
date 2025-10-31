@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import math
+import re
 from datetime import datetime
 from functools import wraps
 from typing import Optional, Callable
@@ -9,7 +10,17 @@ from typing import Optional, Callable
 from django.core.exceptions import PermissionDenied
 from django.db.models import Q, QuerySet
 from django.http import HttpRequest
-from django.urls import reverse  # NEW: for invite URL helper
+from django.urls import reverse  # for invite URL helper
+
+# 🔗 single-source predicates
+try:
+    from .constants import IN_STOCK_Q, SOLD_Q  # predicates are Q(...) trees
+except Exception:
+    # very defensive fallback; if constants.py isn't available for any reason
+    def SOLD_Q():  # type: ignore
+        return Q(status="SOLD") | Q(sold_at__isnull=False) | Q(is_sold=True)
+    def IN_STOCK_Q():  # type: ignore
+        return ~SOLD_Q() & (Q(in_stock=True) | Q(available=True) | Q(availability=True))
 
 
 # -----------------------
@@ -121,8 +132,11 @@ def apply_inventory_filters(request: HttpRequest, qs: QuerySet) -> QuerySet:
     Apply common GET-based filters to an InventoryItem queryset.
 
     Supported params:
-      - status: "in"/"in_stock" -> exclude SOLD, "sold" -> only SOLD, "all" -> no status filter,
-                otherwise matched verbatim (uppercased)
+      - status:
+          "in"/"in_stock"  -> IN_STOCK_Q()
+          "sold"           -> SOLD_Q()
+          "all"            -> no status filter
+          other string     -> filter(status=<UPPER>)
       - location: numeric id or location name (matches current_location)
       - product: numeric product_id or text (matches product code/name/brand/model/variant)
       - date_from / date_to: filter by received_at date
@@ -132,12 +146,13 @@ def apply_inventory_filters(request: HttpRequest, qs: QuerySet) -> QuerySet:
     status = (request.GET.get("status") or "").strip().lower()
     if status:
         if status in ("in", "in_stock"):
-            qs = qs.exclude(status="SOLD")
+            qs = qs.filter(IN_STOCK_Q())
         elif status == "sold":
-            qs = qs.filter(status="SOLD")
+            qs = qs.filter(SOLD_Q())
         elif status == "all":
             pass
         else:
+            # verbatim / custom pipeline (upper) for edge schemas
             qs = qs.filter(status=status.upper())
 
     # ---- location
@@ -206,7 +221,7 @@ def user_home_location(user):
 
 
 # -----------------------
-# Business location helper (NEW)
+# Business location helper
 # -----------------------
 def ensure_default_location(business) -> Optional[object]:
     """
@@ -295,15 +310,46 @@ def ensure_default_location(business) -> Optional[object]:
 
 
 # -----------------------
-# Business-wide in-stock lookup (NEW)
+# Identifier normalization
 # -----------------------
 def _normalize_code(raw: str) -> str:
     """
-    Keep only digits/spaces-hyphens removed; useful for IMEI normalization.
+    Keep only digits; useful for generic code/IMEI cleanup before any logic.
     """
     if not raw:
         return ""
     return "".join(ch for ch in str(raw).strip() if ch.isdigit())
+
+
+def _luhn15(imei14: str) -> int:
+    """
+    Compute the Luhn check digit (15th) for a 14-digit IMEI TAC+SNR.
+    """
+    digits = [int(d) for d in imei14]
+    total = 0
+    for i, d in enumerate(digits, start=1):
+        if i % 2 == 0:
+            d *= 2
+            total += (d // 10) + (d % 10)
+        else:
+            total += d
+    return (10 - (total % 10)) % 10
+
+
+def normalize_imei(raw: str) -> str:
+    """
+    Normalize user input to a 15-digit IMEI:
+      • strip all non-digits
+      • if 14 digits, append Luhn check digit
+      • if 15+ digits, take the first 15 (most scanners put the IMEI first)
+      • otherwise return the digits as-is (likely <14 -> won't match)
+    """
+    digits = _normalize_code(raw)
+    if len(digits) == 14:
+        return digits + str(_luhn15(digits))
+    if len(digits) >= 15:
+        return digits[:15]
+    return digits
 
 
 def _model_has_field(model, field_name: str) -> bool:
@@ -314,50 +360,51 @@ def _model_has_field(model, field_name: str) -> bool:
         return False
 
 
+# -----------------------
+# Business-wide in-stock lookup (UPDATED to use IN_STOCK_Q)
+# -----------------------
 def get_instock_item_for_business(business, code_or_imei: str, *, for_update: bool = False):
     """
     Return the first UNSOLD inventory item for this business that matches the IMEI/code,
     regardless of location. Designed to be the SINGLE SOURCE OF TRUTH for "is this
     in stock anywhere in the business?"
 
-    - Prefers `imei` field; falls back to `code` if present.
-    - Treats 'sold' flexibly:
-        * if there's a 'status' field, excludes status='SOLD'
-        * else if there's a 'sold_at' field, requires sold_at IS NULL
-        * otherwise returns the latest match (best effort).
-    - If for_update=True, uses select_for_update(skip_locked=True) to prevent race conditions.
+    Behavior:
+      - If model has `imei`, we try normalized 15-digit IMEI first, then the raw digits fallback.
+      - Else if model has `code`, match on cleaned digits.
+      - Unsold/Sold semantics are delegated to IN_STOCK_Q().
+      - If for_update=True, uses select_for_update(skip_locked=True) to prevent race conditions.
     """
     if business is None:
         return None
 
     from .models import InventoryItem  # adjust to your actual item model
 
-    normalized = _normalize_code(code_or_imei)
+    raw_digits = _normalize_code(code_or_imei)
+    imei15 = normalize_imei(raw_digits)
 
-    # Build the base queryset
+    # Base queryset (business scoped)
     qs = InventoryItem.objects.filter(business=business)
 
     # Optional archival filter
     if _model_has_field(InventoryItem, "is_archived"):
         qs = qs.filter(is_archived=False)
 
-    # Choose identifier field
-    ident_filter = {}
+    # Choose identifier field and apply filters
     if _model_has_field(InventoryItem, "imei"):
-        ident_filter["imei"] = normalized
+        # Prefer exact 15-digit IMEI; keep a lenient fallback to raw_digits to tolerate legacy data
+        ident_q = Q(imei=imei15)
+        if raw_digits and raw_digits != imei15:
+            ident_q |= Q(imei=raw_digits)
+        qs = qs.filter(ident_q)
     elif _model_has_field(InventoryItem, "code"):
-        ident_filter["code"] = normalized
+        qs = qs.filter(code=raw_digits)
     else:
         # No known identifier; nothing we can do
         return None
 
-    qs = qs.filter(**ident_filter)
-
-    # Apply "unsold" semantics
-    if _model_has_field(InventoryItem, "status"):
-        qs = qs.exclude(status="SOLD")
-    elif _model_has_field(InventoryItem, "sold_at"):
-        qs = qs.filter(sold_at__isnull=True)
+    # Canonical "in stock" predicate
+    qs = qs.filter(IN_STOCK_Q())
 
     # Helpful for UI display but optional
     if _model_has_field(InventoryItem, "current_location"):
@@ -367,14 +414,13 @@ def get_instock_item_for_business(business, code_or_imei: str, *, for_update: bo
         try:
             qs = qs.select_for_update(skip_locked=True)
         except Exception:
-            # Databases that don't support skip_locked
             qs = qs.select_for_update()
 
     return qs.order_by("-id").first()
 
 
 # -----------------------
-# Invite helpers (NEW)
+# Invite helpers
 # -----------------------
 def get_invite_token(inv) -> Optional[str]:
     """
@@ -417,16 +463,11 @@ __all__ = [
     "user_home_location",
     # business location helper
     "ensure_default_location",
-    # business-wide stock helpers
+    # normalization + business-wide stock helpers
     "_normalize_code",
+    "normalize_imei",
     "get_instock_item_for_business",
     # invites
     "get_invite_token",
     "invite_join_url",
 ]
-
-
-
-
-
-

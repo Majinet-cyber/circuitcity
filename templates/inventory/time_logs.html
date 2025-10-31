@@ -2,39 +2,64 @@
 {% load static %}
 
 {% block title %}Time Logs · Circuit City{% endblock %}
+{% block header_title %}{% endblock %}
 
 {% block content %}
 <style>
+  header.page-header,.page-header,.app-header,.dashboard-header,.dashboard-banner,.header-cloud,.page-head{display:none!important}
+  main,.page,.content{padding-top:12px!important}
+
   .tl-wrap{max-width:1100px;margin-inline:auto}
-  .glass{
-    background: color-mix(in oklab, #ffffff 78%, transparent);
-    border: 1px solid rgba(148,163,184,.35);
-    border-radius: 14px; padding: 14px;
-    box-shadow: 0 12px 40px rgba(2,6,23,.08);
-    -webkit-backdrop-filter: blur(14px) saturate(140%);
-    backdrop-filter: blur(14px) saturate(140%);
-  }
+  .glass{background:color-mix(in oklab,#ffffff 78%,transparent);border:1px solid rgba(148,163,184,.35);border-radius:14px;padding:14px;box-shadow:0 12px 40px rgba(2,6,23,.08);backdrop-filter:blur(14px) saturate(140%)}
   .pill{display:inline-flex;gap:.35rem;align-items:center;border-radius:999px;padding:.18rem .5rem;font-weight:800}
   .pill-ok{background:#eafff7;border:1px solid #88e0c1;color:#065f46}
   .pill-warn{background:#fff1f2;border:1px solid #fecdd3;color:#7f1d1d}
   .pill-info{background:#e7efff;border:1px solid #c8dcff;color:#0b132b}
   .muted{color:var(--cc-muted)}
   .mono{font-variant-numeric:tabular-nums}
-  .tl-toolbar{gap:.75rem;margin:.5rem 0 1rem;display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between}
+  .tl-toolbar{gap:.6rem;margin:.5rem 0 1rem;display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between}
+  .tl-filters{display:flex;gap:.5rem;align-items:center;flex-wrap:wrap}
   .tl-scroller{overflow:auto;border-radius:12px}
-  table.tl{width:100%;border-collapse:collapse;min-width:760px}
-  table.tl th, table.tl td{padding:.55rem .5rem;border-bottom:1px solid var(--cc-border);text-align:left}
+  table.tl{width:100%;border-collapse:collapse;min-width:900px}
+  table.tl th,table.tl td{padding:.55rem .5rem;border-bottom:1px solid var(--cc-border);text-align:left;vertical-align:middle}
   table.tl thead th{background:#f6f9ff;font-weight:900;border-bottom:2px solid #c7d2fe;position:sticky;top:0}
-  @media (prefers-color-scheme: dark){
-    table.tl thead th{background:#1a2233;border-color:#223049}
-  }
+  @media (prefers-color-scheme: dark){table.tl thead th{background:#1a2233;border-color:#223049}}
+  .bar{height:8px;border-radius:999px;background:#e2e8f0;position:relative}
+  .bar>span{position:absolute;left:0;top:0;height:8px;border-radius:999px}
+  .bar-success>span{background:#16a34a}
+  .bar-primary>span{background:#2563eb}
+  .bar-warning>span{background:#f59f00}
+  .bar-danger>span{background:#e03131}
+  .small-muted{font-size:.8rem;color:var(--cc-muted)}
+  tr.agent:hover{background:#f8fafc}
+  tr.details td{background:#fbfdff}
 </style>
+
+{# CSRF token to ensure cookie exists for any POSTs triggered from this page #}
+<form id="csrf-form" style="display:none">{% csrf_token %}</form>
+
+{# expose values to JS #}
+<div id="page-data"
+     data-business-id="{{ active_business_id|default:'' }}"
+     data-api-url="{% url 'inventory:time_logs_api' %}"></div>
 
 <div class="tl-wrap">
   <div class="tl-toolbar">
     <h1 class="m-0">Time Logs</h1>
 
-    <div class="d-flex align-items-center" style="gap:.6rem">
+    <div class="tl-filters">
+      <label class="small-muted">Day</label>
+      <input type="date" id="fDay" class="form-control form-control-sm" value="{{ window_start|date:'Y-m-d'|default:'' }}">
+
+      <label class="small-muted">Shift (hrs)</label>
+      {% with sh=expected_shift_seconds|default:28800 %}
+        {% widthratio sh 3600 1 as shift_hours %}
+        <input type="number" id="fShift" class="form-control form-control-sm" min="0" max="24" step="1" value="{{ shift_hours }}">
+      {% endwith %}
+
+      <button id="btnApply" class="btn btn-sm btn-primary">Apply</button>
+      <a id="btnCSV" class="btn btn-sm btn-outline" href="#">Export CSV</a>
+
       <span class="text-muted small">Local time: <b id="nowClock" class="mono">—:—:—</b></span>
       <div class="form-check form-switch m-0">
         <input class="form-check-input" type="checkbox" id="autoRefresh" checked>
@@ -46,60 +71,16 @@
 
   <div class="glass">
     <div class="tl-scroller" aria-live="polite">
-      <table class="tl" aria-label="Recent time logs">
+      <table class="tl" aria-label="Recent time logs" id="tl">
         <thead>
           <tr>
-            <th>User</th>
-            <th>Logged at</th>
-            <th>Type</th>
-            <th>Location</th>
-            <th>Lat</th>
-            <th>Lon</th>
-            <th>Accuracy (m)</th>
-            <th>Distance (m)</th>
-            <th>Geofence</th>
-            <th>Note</th>
+            <th>User</th><th>Logged at</th><th>Type</th><th>Location</th>
+            <th>Lat</th><th>Lon</th><th>Accuracy (m)</th><th>Distance (m)</th>
+            <th>Geofence</th><th>Note</th><th>Work</th><th>Idle</th>
           </tr>
         </thead>
-        <tbody>
-          {% for l in logs %}
-          <tr>
-            <td>
-              {% firstof l.user.get_full_name l.user.username "(user)" %}
-            </td>
-            <td class="mono">
-              <time class="timeago" datetime="{{ l.logged_at|date:'c' }}" title="{{ l.logged_at|date:'Y-m-d H:i:s' }}">
-                {{ l.logged_at|date:"Y-m-d H:i:s" }}
-              </time>
-            </td>
-            <td>
-              {% if l.checkin_type == 'ARRIVAL' %}
-                <span class="pill pill-ok">Arrival</span>
-              {% elif l.checkin_type == 'DEPARTURE' %}
-                <span class="pill pill-warn">Departure</span>
-              {% else %}
-                <span class="pill pill-info">{{ l.checkin_type|default:"PING" }}</span>
-              {% endif %}
-            </td>
-            <td>{% if l.location %}{{ l.location.name }}{% else %}—{% endif %}</td>
-            <td class="mono">{{ l.latitude|default:"" }}</td>
-            <td class="mono">{{ l.longitude|default:"" }}</td>
-            <td class="mono">{{ l.accuracy_m|default:"" }}</td>
-            <td class="mono">{{ l.distance_m|default:"" }}</td>
-            <td>
-              {% if l.within_geofence %}
-                <span class="pill pill-ok">Inside</span>
-              {% else %}
-                <span class="pill pill-warn">Outside</span>
-              {% endif %}
-            </td>
-            <td class="text-wrap">{{ l.note|default:"" }}</td>
-          </tr>
-          {% empty %}
-          <tr>
-            <td colspan="10" style="text-align:center;color:var(--cc-muted);padding:1rem;">No logs yet.</td>
-          </tr>
-          {% endfor %}
+        <tbody id="tl-body">
+          <tr><td colspan="12" style="text-align:center;color:var(--cc-muted);padding:1rem;">Loading…</td></tr>
         </tbody>
       </table>
     </div>
@@ -109,61 +90,218 @@
 
 {% block extra_js %}
 <script>
-  // Live clock
-  (function clock(){
-    const el = document.getElementById('nowClock');
-    const pad = n => (n<10?'0':'')+n;
-    function tick(){
-      const d = new Date();
-      if (el) el.textContent = `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
-    }
-    tick(); setInterval(tick, 1000);
+  // ---------- Clock
+  (function(){
+    const el=document.getElementById('nowClock'), pad=n=>n<10?'0'+n:n;
+    function tick(){ const d=new Date(); if(el) el.textContent=`${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`; }
+    tick(); setInterval(tick,1000);
   })();
 
-  // Human "time ago" for <time> elements
-  (function timeago(){
-    const els = Array.from(document.querySelectorAll('time.timeago'));
-    function fmt(ms){
-      const s = Math.floor(ms/1000);
-      if (s < 5)  return 'just now';
-      if (s < 60) return `${s}s ago`;
-      const m = Math.floor(s/60);
-      if (m < 60) return `${m}m ago`;
-      const h = Math.floor(m/60);
-      if (h < 24) return `${h}h ago`;
-      const d = Math.floor(h/24);
-      return `${d}d ago`;
+  // ---------- CSRF fetch shim
+  (function(){
+    function getCookie(name){
+      const m = document.cookie.match('(^|;)\\s*' + name + '\\s*=\\s*([^;]+)');
+      return m ? m.pop() : '';
     }
-    function update(){
-      const now = Date.now();
-      els.forEach(t => {
-        const iso = t.getAttribute('datetime');
-        const when = iso ? Date.parse(iso) : NaN;
-        if (!isNaN(when)) {
-          const abs = t.getAttribute('title') || t.textContent.trim();
-          t.innerHTML = `${abs} <span class="text-muted">(${fmt(now - when)})</span>`;
-        }
-      });
-    }
-    update(); setInterval(update, 10000);
+    const csrf = (function(){
+      const f = document.getElementById('csrf-form');
+      const i = f ? f.querySelector('input[name="csrfmiddlewaretoken"]') : null;
+      return (i && i.value) || getCookie('csrftoken') || getCookie('CSRF-TOKEN') || '';
+    })();
+
+    const _fetch = window.fetch;
+    window.fetch = function(resource, options){
+      options = options || {};
+      const url = (typeof resource === 'string') ? resource : (resource.url || '');
+      const isSameOrigin = !/^https?:\/\//i.test(url);
+      const method = (options.method || 'GET').toUpperCase();
+      const needsCsrf = isSameOrigin && ['POST','PUT','PATCH','DELETE'].includes(method);
+      if(needsCsrf){
+        options.headers = Object.assign({'X-CSRFToken': csrf}, options.headers || {});
+        options.credentials = options.credentials || 'same-origin';
+      }
+      return _fetch(resource, options);
+    };
   })();
 
-  // Auto refresh (every 60s while visible)
+  // ---------- Utils
+  const pad=n=>n<10?'0'+n:n;
+  const todayYMD=()=>{const d=new Date(); return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;};
+  const esc=s=>(s==null?'':String(s)).replace(/[&<>"']/g,m=>({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[m]));
+
+  const root    = document.getElementById('page-data');
+  const apiUrl  = (root?.dataset.apiUrl||'/inventory/api/time-logs/').trim();
+  const bizId   = (root?.dataset.businessId||'').trim();   // from context
+
+  const fDay    = document.getElementById('fDay');
+  const fShift  = document.getElementById('fShift');
+  const btnApply= document.getElementById('btnApply');
+  const btnCSV  = document.getElementById('btnCSV');
+
+  if(fDay && !fDay.value){ fDay.value = todayYMD(); }
+
+  // includeBiz=true -> includes business_id param, false -> omits
+  function qp(includeBiz=true){
+    const day   = (fDay && fDay.value) ? fDay.value : todayYMD();
+    const shift = (fShift && fShift.value) ? String(parseInt(fShift.value||'8',10)) : '8';
+    const p = new URLSearchParams({ day, shift_hours: shift });
+    if(includeBiz && bizId) p.set('business_id', bizId);
+    return p.toString();
+  }
+
+  function errorRow(msg){
+    const body=document.getElementById('tl-body');
+    body.innerHTML = `<tr><td colspan="12" style="text-align:center;color:#b42318;padding:1rem;">${esc(msg)}</td></tr>`;
+  }
+
+  // ----- timeago for <time> tags
+  function refreshTimeago(){
+    const now=Date.now();
+    document.querySelectorAll('time.timeago').forEach(t=>{
+      const iso=t.getAttribute('datetime'); const when=iso?Date.parse(iso):NaN;
+      if(!isNaN(when)){
+        const abs=t.getAttribute('title')||t.textContent.trim();
+        const s=Math.floor((now-when)/1000), m=Math.floor(s/60), h=Math.floor(m/60), d=Math.floor(h/24);
+        let rel='just now'; if(s>=5&&s<60) rel=`${s}s ago`; else if(m<60) rel=`${m}m ago`; else if(h<24) rel=`${h}h ago`; else rel=`${d}d ago`;
+        t.innerHTML=`${abs} <span class="text-muted">(${rel})</span>`;
+      }
+    });
+  }
+
+  function rowMarkup(a){
+    const pct = Math.max(0, Math.min(100, typeof a.pct==='number'?a.pct:0));
+    const latestTs = a.latest_ts ? a.latest_ts.slice(0,19).replace('T',' ') : '—';
+    const kind = a.latest_kind || '—';
+    const kindPill = (kind==='ARRIVAL') ? `<span class="pill pill-ok">Arrival</span>`
+      : (kind==='DEPARTURE' ? `<span class="pill pill-warn">Departure</span>` : `<span class="pill pill-info">${esc(kind)}</span>`);
+    const geofence = a.latest_geofence ? `<span class="pill pill-ok" title="${esc(a.latest_geofence)}">${esc(a.latest_geofence)}</span>` : `<span class="pill pill-warn">Outside</span>`;
+    const color = a.color || 'primary';
+    const workSecs = Math.max(0, Math.round(a.work_secs||0));
+    const idleSecs = Math.max(0, Math.round(a.idle_secs||0));
+    return `
+      <tr class="agent" data-user-id="${a.user_id}">
+        <td>${esc(a.name)}</td>
+        <td class="mono">${a.latest_ts ? `<time class="timeago" datetime="${esc(a.latest_ts)}" title="${esc(latestTs)}">${esc(latestTs)}</time>` : '<span class="muted">—</span>'}</td>
+        <td>${kindPill}</td>
+        <td>${esc(a.latest_location)||'—'}</td>
+        <td class="mono">${esc(a.latest_lat||'')}</td>
+        <td class="mono">${esc(a.latest_lon||'')}</td>
+        <td class="mono">${esc(a.latest_accuracy_m||'')}</td>
+        <td class="mono">${esc(a.latest_distance_m||'')}</td>
+        <td>${geofence}</td>
+        <td class="text-wrap">${esc(a.latest_note||'')}</td>
+        <td style="min-width:180px">
+          <div class="bar bar-${esc(color)}" title="${pct}% • ${workSecs}s"><span style="width:${pct}%"></span></div>
+          <div class="small-muted mono">${pct}% (${workSecs.toLocaleString()}s)</div>
+        </td>
+        <td style="min-width:180px">
+          <div class="bar bar-warning" title="Idle • ${idleSecs}s"><span style="width: calc(100% - ${pct}%)"></span></div>
+          <div class="small-muted mono">Idle (${idleSecs.toLocaleString()}s)</div>
+        </td>
+      </tr>
+      <tr class="details" data-details-for="${a.user_id}" style="display:none">
+        <td colspan="12">
+          <div class="small-muted">Last 30 logs</div>
+          <div class="table-responsive">
+            <table class="table table-sm mono" style="font-size:.86rem">
+              <thead><tr><th>When</th><th>Type</th><th>Location</th><th>Lat</th><th>Lon</th><th>Acc</th><th>Dist</th><th>Geofence</th><th>Note</th></tr></thead>
+              <tbody class="detail-body"><tr><td colspan="9" class="text-muted">Loading…</td></tr></tbody>
+            </table>
+          </div>
+        </td>
+      </tr>`;
+  }
+
+  function renderAgents(list){
+    const body=document.getElementById('tl-body');
+    if(!Array.isArray(list) || list.length===0){
+      body.innerHTML = `<tr><td colspan="12" style="text-align:center;color:var(--cc-muted);padding:1rem;">No logs yet.</td></tr>`;
+      return;
+    }
+    body.innerHTML = list.map(rowMarkup).join('');
+    refreshTimeago();
+  }
+
+  // ---------- Load overview with fallback:
+  // Try WITH ?business_id=..., if 400 then retry WITHOUT it.
+  async function fetchOverview(){
+    const urlWith = `${apiUrl}?${qp(true)}`;
+    const urlSans = `${apiUrl}?${qp(false)}`;
+    try{
+      let res = await fetch(urlWith, { headers:{ 'X-Requested-With':'XMLHttpRequest' }, credentials:'same-origin' });
+      let txt = await res.text();
+
+      if(res.status === 400 && /no_active_business/.test(txt||'')){
+        // Retry without the param (session-only)
+        res = await fetch(urlSans, { headers:{ 'X-Requested-With':'XMLHttpRequest' }, credentials:'same-origin' });
+        txt = await res.text();
+      }
+
+      if(!res.ok){
+        errorRow(`Failed to load (status ${res.status}). ${txt || 'Check server logs.'}`);
+        return;
+      }
+
+      let data={}; try{ data = JSON.parse(txt); }catch(_){}
+      if(data && data.ok === false){
+        errorRow(data.error || 'Server returned an error.');
+        return;
+      }
+      const list = data.agents || data.rows || [];
+      renderAgents(list);
+    }catch(err){
+      errorRow('Network error loading time logs.');
+      console.error(err);
+    }
+  }
+
+  // CSV link uses the same qp(true) so it carries business_id when present
+  if(btnCSV){
+    btnCSV.href = apiUrl.replace('/api/time-logs/','/api/time-logs/export/') + '?' + qp(true);
+  }
+  if(btnApply){ btnApply.addEventListener('click', fetchOverview); }
+
+  // initial load
+  fetchOverview();
+
+  // auto/Manual refresh
   (function autoreload(){
-    const chk = document.getElementById('autoRefresh');
-    const btn = document.getElementById('btnRefresh');
-    let timer = null;
-    function clear(){ if (timer){ clearTimeout(timer); timer=null; } }
-    function schedule(){
-      clear();
-      if (!chk || !chk.checked) return;
-      if (document.visibilityState !== 'visible') return;
-      timer = setTimeout(()=> location.reload(), 60000);
-    }
-    document.addEventListener('visibilitychange', () => { clear(); schedule(); });
-    chk && chk.addEventListener('change', () => { clear(); schedule(); });
-    btn && btn.addEventListener('click', () => { location.reload(); });
-    schedule();
+    const chk=document.getElementById('autoRefresh'); const btn=document.getElementById('btnRefresh');
+    let timer=null; function stop(){ if(timer){clearInterval(timer); timer=null;} }
+    function start(){ stop(); timer=setInterval(fetchOverview, 30000); }
+    document.addEventListener('visibilitychange', ()=>{ if(document.visibilityState==='visible'){ start(); } else { stop(); } });
+    chk && chk.addEventListener('change', ()=> chk.checked?start():stop());
+    btn && btn.addEventListener('click', fetchOverview);
+    start();
   })();
+
+  // drill-down (honors same includeBiz behavior for consistency: we send with param)
+  document.getElementById('tl').addEventListener('click', async (e)=>{
+    const tr = e.target.closest('tr.agent'); if(!tr) return;
+    const uid = tr.getAttribute('data-user-id');
+    const details = document.querySelector(`tr.details[data-details-for="${uid}"]`);
+    if(!details) return;
+    const box = details.querySelector('.detail-body');
+    details.style.display = details.style.display==='none' ? '' : 'none';
+    if(!box || box.getAttribute('data-loaded')==='1') return;
+    try{
+      const url = `${apiUrl}?${qp(true)}&user_id=${encodeURIComponent(uid)}`;
+      const res = await fetch(url, { headers:{ 'X-Requested-With':'XMLHttpRequest' }, credentials:'same-origin' });
+      if(!res.ok){ box.innerHTML = `<tr><td colspan="9" class="text-muted">Failed to load.</td></tr>`; return; }
+      const data = await res.json();
+      if((data.logs||[]).length===0){ box.innerHTML = `<tr><td colspan="9" class="text-muted">No logs.</td></tr>`; box.setAttribute('data-loaded','1'); return; }
+      box.innerHTML = data.logs.map(l=>{
+        const when = l.ts ? l.ts.slice(0,19).replace('T',' ') : '—';
+        return `<tr>
+          <td>${when}</td><td>${esc(l.kind)||'—'}</td><td>${esc(l.location)||'—'}</td>
+          <td>${esc(l.lat||'')}</td><td>${esc(l.lon||'')}</td><td>${esc(l.accuracy_m||'')}</td>
+          <td>${esc(l.distance_m||'')}</td><td>${esc(l.geofence||'—')}</td><td>${esc(l.note||'')}</td>
+        </tr>`;
+      }).join('');
+      box.setAttribute('data-loaded','1');
+    }catch(_){
+      box.innerHTML = `<tr><td colspan="9" class="text-muted">Network error.</td></tr>`;
+    }
+  });
 </script>
 {% endblock %}

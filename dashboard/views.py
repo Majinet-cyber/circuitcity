@@ -24,6 +24,10 @@ from inventory.models import InventoryItem
 from sales.models import Sale
 from reports.kpis import compute_sales_kpis
 
+# 🔗 Single source of truth (inventory)
+from inventory.constants import IN_STOCK_Q, SOLD_Q
+from inventory.queries import business_metrics, inventory_qs_for_user, inventory_qs_tenant
+
 # Cache optional inventory models module once (safer / faster)
 try:
     inv_models = import_module("inventory.models")
@@ -184,24 +188,6 @@ def _scope_queryset(qs: QuerySet, business):
     return qs
 
 
-def _count_in_stock(qs: QuerySet) -> int:
-    """
-    Count "in stock" safely across schema variants:
-      - prefer status="IN_STOCK"
-      - else is_active=True
-      - else just count all
-    """
-    try:
-        fields = {getattr(f, "name", None) for f in qs.model._meta.get_fields()}
-        if "status" in fields:
-            qs = qs.filter(status="IN_STOCK")
-        elif "is_active" in fields:
-            qs = qs.filter(is_active=True)
-        return qs.count()
-    except Exception:
-        return 0
-
-
 # --------- InventoryItem price helpers (avoid referencing missing fields) ---------
 def _inv_price_field() -> str | None:
     """
@@ -310,9 +296,11 @@ def home(request):
 
     biz = request.business
 
-    # Tenant-scoped counts (robust across schema variants)
+    # Canonical KPI source (tenant-wide for the dashboard tiles)
+    inv_kpis = business_metrics(request, include_agent_scope=False)
+
     products_count = _products_count(biz)
-    stock_count = _count_in_stock(_scope_queryset(InventoryItem.objects.all(), biz))
+    stock_count = inv_kpis["count_instock"]
 
     Warehouse = getattr(inv_models, "Warehouse", None) if inv_models else None
     warehouses_count = _scope_queryset(Warehouse.objects.all(), biz).count() if Warehouse else 0
@@ -334,21 +322,22 @@ def home(request):
     except Exception:
         kpis = {}
     if not kpis or (kpis.get("orders") in (0, None) and kpis.get("revenue") in (0, None)):
-        sold_items = (_scope_queryset(InventoryItem.objects.all(), biz)
-                      .filter(Q(status="SOLD") | Q(sold_at__isnull=False)))
+        sold_items = (
+            _scope_queryset(InventoryItem.objects.all(), biz)
+            .filter(SOLD_Q())
+        )
         mtd_qs = sold_items.filter(sold_at__gte=month_start, sold_at__lt=month_end)
         revenue = _inv_revenue_sum(mtd_qs)
         kpis = {"orders": mtd_qs.count(), "revenue": revenue, "scope": f"{biz.name}"}
     else:
         kpis["scope"] = f"{biz.name}"
 
-    # Sold (MTD) tile
-    sold_mtd_count = sales_qs.filter(sold_at__gte=month_start, sold_at__lt=month_end).count()
-    if sold_mtd_count == 0:
-        sold_mtd_count = (_scope_queryset(InventoryItem.objects.all(), biz)
-                          .filter(Q(status="SOLD") | Q(sold_at__isnull=False))
-                          .filter(sold_at__gte=month_start, sold_at__lt=month_end)
-                          .count())
+    # Sold (MTD) tile — from InventoryItem using SOLD_Q
+    sold_mtd_count = (
+        _scope_queryset(InventoryItem.objects.all(), biz)
+        .filter(SOLD_Q(), sold_at__gte=month_start, sold_at__lt=month_end)
+        .count()
+    )
 
     ctx = {
         "first_run": first_run,
@@ -384,9 +373,19 @@ def admin_dashboard(request):
     if scope == "tenant" and biz is not None:
         sales_qs = _scope_queryset(Sale.objects.select_related("item", "agent"), biz)
         stock_qs = _scope_queryset(InventoryItem.objects.all(), biz)
+        inv_kpis = business_metrics(request, include_agent_scope=False)
     else:
         sales_qs = Sale.objects.select_related("item", "agent").all()
         stock_qs = InventoryItem.objects.all()
+        # Global: compute directly from qs (no request scope)
+        qs_in = stock_qs.filter(IN_STOCK_Q())
+        qs_sold = stock_qs.filter(SOLD_Q())
+        inv_kpis = {
+            "count_instock": qs_in.count(),
+            "count_sold": qs_sold.count(),
+            "sum_order": qs_in.aggregate(total=Sum("order_price"))["total"] or 0,
+            "sum_selling": qs_sold.aggregate(total=Sum("sold_price"))["total"] or 0,
+        }
 
     # Month window (tz-aware bounds)
     month_start = _start_of_day(today.replace(day=1), tz)
@@ -398,7 +397,7 @@ def admin_dashboard(request):
     except Exception:
         kpis = {}
     if not kpis or (kpis.get("orders") in (0, None) and kpis.get("revenue") in (0, None)):
-        sold_items = (stock_qs.filter(Q(status="SOLD") | Q(sold_at__isnull=False)))
+        sold_items = stock_qs.filter(SOLD_Q())
         mtd_qs = sold_items.filter(sold_at__gte=month_start, sold_at__lt=month_end)
         revenue = _inv_revenue_sum(mtd_qs)
         kpis = {"orders": mtd_qs.count(), "revenue": revenue,
@@ -406,27 +405,25 @@ def admin_dashboard(request):
     else:
         kpis["scope"] = (biz.name if (scope == "tenant" and biz) else "All businesses")
 
-    # In stock
-    in_stock_total = _count_in_stock(stock_qs)
+    # In stock (canonical)
+    in_stock_total = inv_kpis["count_instock"]
 
-    # Sold (MTD)
-    month_sales_qs = sales_qs.filter(sold_at__gte=month_start, sold_at__lt=month_end)
-    sold_mtd_count = month_sales_qs.count()
-    if sold_mtd_count == 0:
-        sold_mtd_count = (stock_qs.filter(Q(status="SOLD") | Q(sold_at__isnull=False))
-                          .filter(sold_at__gte=month_start, sold_at__lt=month_end)
-                          .count())
+    # Sold (MTD) (canonical via InventoryItem)
+    sold_mtd_count = (
+        stock_qs.filter(SOLD_Q(), sold_at__gte=month_start, sold_at__lt=month_end)
+        .count()
+    )
 
     # Monthly profit (fallback to InventoryItem if Sale is empty)
     profit_expr = ExpressionWrapper(
         F("price") - F("item__order_price"),
         output_field=DecimalField(max_digits=14, decimal_places=2),
     )
+    month_sales_qs = sales_qs.filter(sold_at__gte=month_start, sold_at__lt=month_end)
     monthly_profit = month_sales_qs.aggregate(p=Sum(profit_expr))["p"] or 0
     if monthly_profit == 0:
         monthly_profit = _inv_profit_sum(
-            stock_qs.filter(Q(status="SOLD") | Q(sold_at__isnull=False))
-                    .filter(sold_at__gte=month_start, sold_at__lt=month_end)
+            stock_qs.filter(SOLD_Q(), sold_at__gte=month_start, sold_at__lt=month_end)
         )
 
     # Global/tenant stock battery (simple heuristic)
@@ -508,15 +505,17 @@ def agent_dashboard(request):
     except Exception:
         kpis = {}
     if not kpis:
-        sold_items = (_scope_queryset(InventoryItem.objects.all(), biz)
-                      .filter(Q(status="SOLD") | Q(sold_at__isnull=False), assigned_agent=request.user))
+        sold_items = (
+            _scope_queryset(InventoryItem.objects.all(), biz)
+            .filter(SOLD_Q(), assigned_agent=request.user)
+        )
         revenue = _inv_revenue_sum(sold_items)
         kpis = {"orders": sold_items.count(), "revenue": revenue, "scope": "My sales"}
     else:
         kpis["scope"] = "My sales"
 
     my_stock_qs = _scope_queryset(InventoryItem.objects.all(), biz).filter(assigned_agent=request.user)
-    my_in_stock = _count_in_stock(my_stock_qs)
+    my_in_stock = my_stock_qs.filter(IN_STOCK_Q()).count()
 
     battery_max = 20
     pct = int(round(min(100, (my_in_stock / battery_max) * 100))) if battery_max else 0
@@ -555,15 +554,17 @@ def agent_detail(request, pk: int):
     except Exception:
         kpis = {}
     if not kpis:
-        sold_items = (_scope_queryset(InventoryItem.objects.all(), biz)
-                      .filter(Q(status="SOLD") | Q(sold_at__isnull=False), assigned_agent=agent))
+        sold_items = (
+            _scope_queryset(InventoryItem.objects.all(), biz)
+            .filter(SOLD_Q(), assigned_agent=agent)
+        )
         revenue = _inv_revenue_sum(sold_items)
         kpis = {"orders": sold_items.count(), "revenue": revenue, "scope": f"{agent.get_username()}'s sales"}
     else:
         kpis["scope"] = f"{agent.get_username()}'s sales"
 
     in_stock_qs = _scope_queryset(InventoryItem.objects.all(), biz).filter(assigned_agent=agent)
-    in_stock = _count_in_stock(in_stock_qs)
+    in_stock = in_stock_qs.filter(IN_STOCK_Q()).count()
 
     battery_max = 20
     pct = int(round(min(100, (in_stock / battery_max) * 100))) if battery_max else 0
@@ -844,8 +845,11 @@ def api_recommendations(request):
     items = []
 
     try:
-        my_in_stock = _count_in_stock(
-            _scope_queryset(InventoryItem.objects.all(), biz).filter(assigned_agent=u)
+        my_in_stock = (
+            _scope_queryset(InventoryItem.objects.all(), biz)
+            .filter(assigned_agent=u)
+            .filter(IN_STOCK_Q())
+            .count()
         )
         if my_in_stock < 10:
             items.append({"message": f"Your stock is low ({my_in_stock}/20). Request replenishment.","confidence": 0.90})
@@ -858,11 +862,14 @@ def api_recommendations(request):
         fields = {getattr(f, "name", None) for f in InventoryItem._meta.get_fields()}
         stale_cutoff = now - timedelta(days=14)
         stale_qs = _scope_queryset(InventoryItem.objects.all(), biz).filter(assigned_agent=u)
-        if "status" in fields: stale_qs = stale_qs.filter(status="IN_STOCK")
-        elif "is_active" in fields: stale_qs = stale_qs.filter(is_active=True)
-        if "updated_at" in fields: stale_qs = stale_qs.filter(updated_at__lt=stale_cutoff)
-        elif "created_at" in fields: stale_qs = stale_qs.filter(created_at__lt=stale_cutoff)
-        else: stale_qs = None
+        # Use IN_STOCK_Q to ensure we probe true in-stock items
+        stale_qs = stale_qs.filter(IN_STOCK_Q())
+        if "updated_at" in fields:
+            stale_qs = stale_qs.filter(updated_at__lt=stale_cutoff)
+        elif "created_at" in fields:
+            stale_qs = stale_qs.filter(created_at__lt=stale_cutoff)
+        else:
+            stale_qs = None
         if stale_qs is not None:
             stale_count = stale_qs.count()
             if stale_count:

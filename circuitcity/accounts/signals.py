@@ -1,96 +1,227 @@
-﻿# accounts/signals.py
+﻿# circuitcity/accounts/signals.py
 from __future__ import annotations
 
-from django.db import connection
-from django.db.models.signals import post_save, pre_save
+from typing import Optional
+
 from django.dispatch import receiver
-from django.contrib.auth import get_user_model
-from django.utils import timezone
+from django.contrib.auth.signals import user_logged_in, user_logged_out
 
-from .models import Profile, LoginSecurity, PasswordResetCode
+# Defensive imports so auth never explodes if tenants app shifts around
+try:
+    from tenants.models import Business, Membership, set_current_business_id  # type: ignore
+except Exception:  # pragma: no cover
+    Business = None  # type: ignore
+    Membership = None  # type: ignore
 
-User = get_user_model()
+    def set_current_business_id(_):  # type: ignore
+        return
+
+try:
+    # Canonical helpers that also write legacy session keys in this project
+    from tenants.utils import set_active_business, get_active_business  # type: ignore
+except Exception:  # pragma: no cover
+    def set_active_business(_request, _biz):  # type: ignore
+        return
+
+    def get_active_business(_request):  # type: ignore
+        return None
 
 
-def _table_exists(model_cls) -> bool:
-    """
-    Return True if the DB table for model_cls exists.
-    Prevents OperationalError during initial migrations.
-    """
+# -------------------------------------------------------------------
+# Small helpers (safe if fields/models are missing)
+# -------------------------------------------------------------------
+
+def _has_field(model, field_name: str) -> bool:
     try:
-        names = set(connection.introspection.table_names())
-        return model_cls._meta.db_table in names
+        model._meta.get_field(field_name)  # type: ignore[attr-defined]
+        return True
     except Exception:
         return False
 
 
-@receiver(post_save, sender=User)
-def ensure_user_related_rows(sender, instance: User, created: bool, **kwargs):
-    """
-    Ensure each user has Profile and LoginSecurity rows.
-    Safe when tables are not created yet (returns early).
-    """
-    # If tables aren't ready, skip silently (e.g., first migrate)
-    if not _table_exists(Profile) or not _table_exists(LoginSecurity):
-        return
+def _filter_active_memberships(qs):
+    """If Membership.status exists, keep only ACTIVE rows; else pass-through."""
+    if Membership is None:
+        return qs
+    if _has_field(Membership, "status"):
+        return qs.filter(status__iexact="ACTIVE")
+    return qs
 
-    if created:
-        Profile.objects.get_or_create(user=instance)
-        LoginSecurity.objects.get_or_create(user=instance)
-        return
 
-    # Profile
+def _business_is_active(biz) -> bool:
+    """If Business.status exists, require ACTIVE; else treat as active."""
+    if biz is None:
+        return False
+    if Business is None:
+        return True
+    if _has_field(Business, "status"):
+        return str(getattr(biz, "status", "")).upper() == "ACTIVE"
+    return True
+
+
+def _pick_business_from_memberships(user) -> Optional[object]:
+    """
+    Most recent ACTIVE membership’s business where Business is ACTIVE (if such fields exist).
+    """
+    if Membership is None or Business is None or user is None:
+        return None
     try:
-        getattr(instance, "profile")
-    except Profile.DoesNotExist:
-        Profile.objects.get_or_create(user=instance)
-    except AttributeError:
+        qs = Membership.objects.filter(user=user).select_related("business")
+        qs = _filter_active_memberships(qs).order_by("-created_at", "-id")
+        for mem in qs:
+            biz = getattr(mem, "business", None)
+            if not biz:
+                continue
+            if _business_is_active(biz):
+                return biz
+    except Exception:
+        return None
+    return None
+
+
+def _pick_owned_or_created_business(user) -> Optional[object]:
+    """
+    Fallback to a Business owned/created by user (prefer newest), restricted to ACTIVE if that field exists.
+    """
+    if Business is None or user is None:
+        return None
+    try:
+        qs = Business.objects.all()
+        if _has_field(Business, "status"):
+            qs = qs.filter(status__iexact="ACTIVE")
+        # Prefer owner
+        if _has_field(Business, "owner"):
+            owned = qs.filter(owner=user).order_by("-id").first()
+            if owned:
+                return owned
+        # Else created_by
+        if _has_field(Business, "created_by"):
+            created = qs.filter(created_by=user).order_by("-id").first()
+            if created:
+                return created
+    except Exception:
+        return None
+    return None
+
+
+def _clear_tenant_session(request) -> None:
+    """
+    Remove all known/legacy tenant session keys and clear thread-local.
+    Never raises (auth flow must not break).
+    """
+    try:
+        # Canonical + legacy keys
+        for k in ("active_business_id", "biz_id"):
+            try:
+                request.session.pop(k, None)
+            except Exception:
+                pass
+        try:
+            # Canonical key may be customized in settings
+            from django.conf import settings
+            key = getattr(settings, "TENANT_SESSION_KEY", "active_business_id")
+            try:
+                request.session.pop(key, None)
+            except Exception:
+                pass
+        except Exception:
+            pass
+
+        # Mirror to thread-local and request attributes
+        try:
+            set_current_business_id(None)
+        except Exception:
+            pass
+        try:
+            request.business = None  # type: ignore[attr-defined]
+            request.business_id = None  # type: ignore[attr-defined]
+        except Exception:
+            pass
+    except Exception:
         pass
 
-    # LoginSecurity
+
+def _activate_on_request(request, business) -> None:
+    """
+    Use canonical util; fall back to writing session keys; set thread-local id.
+    Never raises (auth flow must not break).
+    """
     try:
-        getattr(instance, "login_sec")
-    except LoginSecurity.DoesNotExist:
-        LoginSecurity.objects.get_or_create(user=instance)
-    except AttributeError:
+        set_active_business(request, business)
+    except Exception:
+        try:
+            if business is not None:
+                bid = getattr(business, "pk", None)
+                request.session["active_business_id"] = bid
+                request.session["biz_id"] = bid
+            else:
+                request.session.pop("active_business_id", None)
+                request.session.pop("biz_id", None)
+        except Exception:
+            pass
+
+    try:
+        request.business = business  # type: ignore[attr-defined]
+        request.business_id = getattr(business, "pk", None) if business else None  # type: ignore[attr-defined]
+    except Exception:
+        pass
+
+    try:
+        set_current_business_id(getattr(business, "pk", None) if business else None)
+    except Exception:
         pass
 
 
-@receiver(pre_save, sender=User)
-def reset_login_security_on_password_change(sender, instance: User, **kwargs):
-    """
-    When password changes, reset staged lockouts.
-    Skip if table doesn't exist yet.
-    """
-    if not instance.pk or not _table_exists(LoginSecurity):
-        return
+# -------------------------------------------------------------------
+# Auth signal handlers (privacy-first; defense-in-depth)
+# -------------------------------------------------------------------
 
+@receiver(user_logged_in)
+def _set_default_business(sender, request, user, **kwargs):
+    """
+    After login (privacy-first):
+      0) Cycle the session key to prevent session fixation.
+      1) If a business is already active for this request/session, keep it.
+      2) Else pick the most recent ACTIVE membership’s business (and Business must be ACTIVE, if that field exists).
+      3) Else pick an ACTIVE business the user owns/created.
+      4) Else clear any stale tenant context.
+
+    This avoids ever dropping a manager/owner into the agent-join path by accident,
+    and prevents cross-tenant bleed from a previous session.
+    """
+    # 0) Session fixation defense
     try:
-        old = sender.objects.only("password").get(pk=instance.pk)
-    except sender.DoesNotExist:
-        return
+        if hasattr(request, "session") and request.session is not None:
+            request.session.cycle_key()
+    except Exception:
+        pass
 
-    if old.password != instance.password:
-        sec, _ = LoginSecurity.objects.get_or_create(user=instance)
-        sec.stage = 0
-        sec.fail_count = 0
-        sec.locked_until = None
-        sec.hard_blocked = False
-        sec.save(update_fields=["stage", "fail_count", "locked_until", "hard_blocked"])
+    # 1) Respect any previously chosen business for this session
+    try:
+        existing = get_active_business(request)
+        if existing and _business_is_active(existing):
+            _activate_on_request(request, existing)
+            return
+    except Exception:
+        pass
+
+    # 2) Active membership business
+    biz = _pick_business_from_memberships(user)
+    if not biz:
+        # 3) Owned/created fallback
+        biz = _pick_owned_or_created_business(user)
+
+    if biz:
+        _activate_on_request(request, biz)
+    else:
+        # 4) No safe default → clear any stale context
+        _clear_tenant_session(request)
 
 
-@receiver(post_save, sender=PasswordResetCode)
-def prune_expired_reset_codes(sender, instance: PasswordResetCode, created: bool, **kwargs):
+@receiver(user_logged_out)
+def _purge_tenant_on_logout(sender, request, user, **kwargs):
     """
-    After creating a new code, prune expired unused ones.
-    Skip if table isn't available (early bootstrap).
+    On logout: clear active business markers (session + threadlocal) to avoid
+    cross-tenant bleed when the next user logs in on a shared device.
     """
-    if not created or not _table_exists(PasswordResetCode):
-        return
-    PasswordResetCode.objects.filter(
-        user=instance.user,
-        used=False,
-        expires_at__lt=timezone.now(),
-    ).delete()
-
-
+    _clear_tenant_session(request)

@@ -12,6 +12,7 @@ from django.conf import settings
 from django.db import models
 from django.db.models import Q
 from django.utils import timezone
+from django.core.exceptions import ValidationError
 from django.core.signing import TimestampSigner, BadSignature, SignatureExpired
 from django.urls import reverse, NoReverseMatch
 
@@ -70,6 +71,7 @@ class Business(models.Model):
 
     name = models.CharField(max_length=120, unique=True)
     slug = models.SlugField(max_length=140, unique=True)
+
     created_at = models.DateTimeField(default=timezone.now, db_index=True)
     status = models.CharField(max_length=10, choices=STATUS_CHOICES, default="PENDING", db_index=True)
 
@@ -114,58 +116,75 @@ class Business(models.Model):
     def seed_defaults(self) -> None:
         """
         Idempotently create per-tenant essentials so new managers land on a 'fresh'
-        dashboard with non-empty Stock In pickers.
+        dashboard with non-empty pickers.
 
         Creates:
-          - a default Store if none exists
-          - a default Warehouse (linked to the default Store if that FK exists)
-        Uses apps.get_model to avoid hard dependencies between apps.
+          - a default Location if none exists
+          - optionally a default Warehouse if your inventory app defines one
         """
         try:
-            Store = apps.get_model("inventory", "Store")
-            Warehouse = apps.get_model("inventory", "Warehouse")
+            Location = apps.get_model("inventory", "Location")
         except Exception:
-            # If inventory app isn't installed, just no-op.
+            # If inventory app isn't installed or Location model missing, just no-op.
             return
 
-        # Store
-        store = (
-            Store.all_objects.filter(business=self).order_by("id").first()
-            if hasattr(Store, "all_objects")
-            else Store.objects.filter(business=self).order_by("id").first()
+        # Location
+        loc = (
+            Location.all_objects.filter(business=self).order_by("id").first()
+            if hasattr(Location, "all_objects")
+            else Location.objects.filter(business=self).order_by("id").first()
         )
-        if not store:
+        if not loc:
             kwargs = {"business": self, "name": f"{self.name} Store"}
-            if hasattr(Store, "is_default"):
+            if hasattr(Location, "is_default"):
                 kwargs["is_default"] = True
-            store = (
-                Store.all_objects.create(**kwargs)
-                if hasattr(Store, "all_objects")
-                else Store.objects.create(**kwargs)
+            loc = (
+                Location.all_objects.create(**kwargs)
+                if hasattr(Location, "all_objects")
+                else Location.objects.create(**kwargs)
             )
 
-        # Warehouse
-        wh = (
-            Warehouse.all_objects.filter(business=self).order_by("id").first()
-            if hasattr(Warehouse, "all_objects")
-            else Warehouse.objects.filter(business=self).order_by("id").first()
-        )
-        if not wh:
-            wkwargs = {"business": self, "name": "Main Warehouse"}
-            if hasattr(Warehouse, "store"):
-                wkwargs["store"] = store
-            if hasattr(Warehouse, "is_default"):
-                wkwargs["is_default"] = True
-            (
-                Warehouse.all_objects.create(**wkwargs)
-                if hasattr(Warehouse, "all_objects")
-                else Warehouse.objects.create(**wkwargs)
-            )
+        # Optional: Warehouse if present in your app
+        try:
+            Warehouse = apps.get_model("inventory", "Warehouse")
+        except Exception:
+            Warehouse = None
+
+        if Warehouse:
+            wh_qs = getattr(Warehouse, "all_objects", Warehouse.objects).filter(business=self)
+            wh = wh_qs.order_by("id").first()
+            if not wh:
+                wkwargs = {"business": self, "name": "Main Warehouse"}
+                # If your Warehouse model links to a location field, set it
+                if hasattr(Warehouse, "location"):
+                    wkwargs["location"] = loc
+                if hasattr(Warehouse, "is_default"):
+                    wkwargs["is_default"] = True
+                getattr(Warehouse, "all_objects", Warehouse.objects).create(**wkwargs)
+
+    # Convenience: fetch the default/first location
+    def default_location(self):
+        try:
+            Location = apps.get_model("inventory", "Location")
+        except Exception:
+            return None
+        qs = getattr(Location, "all_objects", Location.objects).filter(business=self)
+        if hasattr(Location, "is_default"):
+            x = qs.filter(is_default=True).first()
+            if x:
+                return x
+        return qs.order_by("id").first()
 
 
 class Membership(models.Model):
     """
     User → Business with a role and approval status.
+
+    NOTE:
+    - Managers: location may be NULL (business-wide access).
+    - Agents: location MUST be set (scoped to that store/branch).
+    - A user may have *multiple* agent memberships under the same business
+      (one per location). This is enabled by the unique_together rule below.
     """
     ROLE_CHOICES = [
         ("MANAGER", "Manager"),
@@ -183,12 +202,51 @@ class Membership(models.Model):
     status = models.CharField(max_length=10, choices=STATUS_CHOICES, default="PENDING", db_index=True)
     created_at = models.DateTimeField(default=timezone.now, db_index=True)
 
+    # Default working location for agents (managers may leave this null)
+    location = models.ForeignKey(
+        "inventory.Location",
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="memberships",
+        help_text="Default store/location for this member. Agents must have this set; managers may leave it blank.",
+    )
+
     class Meta:
-        unique_together = [("user", "business")]
+        # Allow multiple rows per (user, business) as long as location differs.
+        # This enables attaching an agent to multiple locations in the same business.
+        unique_together = [("user", "business", "location")]
+        indexes = [
+            models.Index(fields=["user", "business"]),
+            models.Index(fields=["role"]),
+            models.Index(fields=["status"]),
+        ]
         ordering = ["-created_at", "-id"]
 
     def __str__(self) -> str:
-        return f"{self.user} @ {self.business} ({self.role}, {self.status})"
+        at = f" · {self.location.name}" if self.location_id else ""
+        return f"{self.user} @ {self.business}{at} ({self.role}, {self.status})"
+
+    # ---- Role helpers ----
+    def is_manager(self) -> bool:
+        return (self.role or "").upper() == "MANAGER"
+
+    def is_agent(self) -> bool:
+        return (self.role or "").upper() == "AGENT"
+
+    # ---- Validation: enforce location rules by role ----
+    def clean(self):
+        role = (self.role or "").upper()
+        if role == "AGENT" and not self.location_id:
+            raise ValidationError({"location": "Agents must be assigned to a location."})
+        # Optional: keep managers business-wide (no accidental scoping)
+        # If you want to allow manager-per-location, comment the block below.
+        if role == "MANAGER" and self.location_id:
+            raise ValidationError({"location": "Managers should not be tied to a specific location."})
+
+    def save(self, *args, **kwargs):
+        self.full_clean()
+        return super().save(*args, **kwargs)
 
 
 # ===============================
@@ -266,25 +324,18 @@ class BaseTenantModel(models.Model):
 
 
 # ===============================
-# Agent Invites (new)
+# Agent Invites (with Location assignment)
 # ===============================
 
 class AgentInvite(BaseTenantModel):
     """
     Manager-generated invite that lets an agent create their own account
     and auto-join this Business.
-
-    We keep it intentionally simple:
-      - optional invited_name / email / phone
-      - a token string to embed in links (signed helper provided)
-      - status to track lifecycle
-      - joined_user set when someone uses it successfully
-      - optional expires_at for auto-expiry
     """
     STATUS_CHOICES = [
         ("PENDING", "Pending"),
         ("SENT", "Sent"),
-        ("JOINED", "Joined"),
+        ("JOINED", "Joined"),   # treated as "Accepted" in UI
         ("EXPIRED", "Expired"),
     ]
 
@@ -297,17 +348,24 @@ class AgentInvite(BaseTenantModel):
         related_name="agent_invites_created",
     )
 
-    # friendly display name for the invitee (works with views that read .invited_name)
     invited_name = models.CharField(max_length=120, blank=True, default="")
 
     email = models.EmailField(blank=True, default="", db_index=True)
     phone = models.CharField(max_length=32, blank=True, default="", db_index=True)
 
-    # Signed token (TimestampSigner). 140 to allow signature payload comfortably.
+    # Assign a location at invite time (agents will be bound to this on accept)
+    location = models.ForeignKey(
+        "inventory.Location",
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="agent_invites",
+        help_text="Location for this invite. On accept, the membership will use this location.",
+    )
+
     token = models.CharField(max_length=140, unique=True, db_index=True)
     status = models.CharField(max_length=10, choices=STATUS_CHOICES, default="PENDING", db_index=True)
 
-    # Filled when an invite link is redeemed and a membership is activated
     joined_user = models.ForeignKey(
         User,
         null=True,
@@ -317,10 +375,7 @@ class AgentInvite(BaseTenantModel):
     )
     joined_at = models.DateTimeField(null=True, blank=True)
 
-    # Optional: manager’s custom message
     message = models.CharField(max_length=240, blank=True, default="")
-
-    # Optional expiry timestamp for UI/auto-expiry convenience
     expires_at = models.DateTimeField(null=True, blank=True)
 
     class Meta:
@@ -337,15 +392,13 @@ class AgentInvite(BaseTenantModel):
 
     @property
     def recipient(self) -> str:
-        """Return a human-friendly recipient indicator."""
         return self.email or self.phone or "—"
 
     @property
     def display_name(self) -> str:
-        """Best-effort label for the invitee (name/email/phone fallback)."""
         return (self.invited_name or self.email or self.phone or "").strip()
 
-    # ---- Token helpers (compatible with views.create_agent_invite / accept_invite) ----
+    # ---- Token helpers ----
 
     @staticmethod
     def _signer() -> TimestampSigner:
@@ -353,35 +406,24 @@ class AgentInvite(BaseTenantModel):
 
     @classmethod
     def make_token(cls, payload: str) -> str:
-        """
-        Return a signed token carrying the payload + timestamp.
-        """
         payload = (payload or "").strip() or uuid.uuid4().hex
         return cls._signer().sign(payload)
 
     @classmethod
     def unsign_token(cls, token: str, *, max_age_seconds: int | None = None) -> str:
-        """
-        Verify and return the original payload. Raises on failure.
-        """
         try:
             if max_age_seconds:
                 return cls._signer().unsign(token, max_age=max_age_seconds)
             return cls._signer().unsign(token)
         except SignatureExpired as e:
-            # Re-raise so caller can treat as expired
             raise e
         except BadSignature as e:
             raise e
 
     def ensure_token(self) -> None:
-        """
-        Generate a **signed** token if missing (idempotent).
-        Uses invited email (if any) + a UUID so tokens are unique and opaque.
-        """
         if not self.token:
             base = f"{(self.email or '').lower()}:{uuid.uuid4().hex}"
-            self.token = self.make_token(base)  # signed + timestamped
+            self.token = self.make_token(base)
 
     def save(self, *args, **kwargs):
         self.ensure_token()
@@ -404,10 +446,6 @@ class AgentInvite(BaseTenantModel):
             self.save(update_fields=["status", "joined_user", "joined_at"])
 
     def mark_expired_if_needed(self, *, save: bool = True) -> bool:
-        """
-        If expires_at is in the past and status is not already EXPIRED/JOINED,
-        set status → EXPIRED. Returns True if a change was made.
-        """
         if self.status in ("EXPIRED", "JOINED"):
             return False
         if self.expires_at and timezone.now() >= self.expires_at:
@@ -420,36 +458,29 @@ class AgentInvite(BaseTenantModel):
     # ---- One source of truth for invite state & share links ----
 
     def is_expired(self) -> bool:
-        """Truthful expiry check that also respects explicit EXPIRED status."""
         if (self.status or "").upper() == "EXPIRED":
             return True
         return bool(self.expires_at and timezone.now() >= self.expires_at)
 
     def is_pending(self) -> bool:
-        """
-        “Pending” for UI purposes:
-        - status is PENDING or SENT
-        - not expired
-        - not joined
-        """
         st = (self.status or "").upper()
         return st in ("PENDING", "SENT") and not self.is_expired() and st != "JOINED"
 
+    @property
+    def ui_status(self) -> str:
+        if (self.status or "").upper() == "JOINED":
+            return "ACCEPTED"
+        if self.is_expired():
+            return "EXPIRED"
+        return "PENDING"
+
     def _join_path(self) -> str:
-        """
-        Reverse the accept URL using the token — never raise.
-        Adjust the route name if yours differs.
-        """
         try:
             return reverse("tenants:invite_accept", args=[self.token])
         except NoReverseMatch:
-            # Safe fallback for dev if URL name changes
             return f"/tenants/invites/accept/{self.token}/"
 
     def absolute_join_url(self, request) -> str:
-        """
-        Build an absolute URL robustly, even if Sites framework isn't set up.
-        """
         try:
             return request.build_absolute_uri(self._join_path())
         except Exception:
@@ -459,10 +490,6 @@ class AgentInvite(BaseTenantModel):
             return f"{scheme}://{host}{path}"
 
     def share_payload(self, request) -> dict[str, str]:
-        """
-        Centralized share strings/links for Copy, WhatsApp, and Email.
-        Adds an HTML body that uses a short anchor text (“here”).
-        """
         url = self.absolute_join_url(request)
         tenant_name = getattr(getattr(self, "business", None), "name", "our team")
         name = (self.invited_name or "").strip() or "there"
@@ -470,7 +497,6 @@ class AgentInvite(BaseTenantModel):
         text = f"Hi {name}, please click this link to join {tenant_name}: {url}"
         subject_text = f"Join {tenant_name}"
 
-        # HTML version with short anchor “here”
         html = (
             f"<p>Hi {(name or 'there')},</p>"
             f"<p>You have been invited to join <strong>{tenant_name}</strong> as an <strong>Agent</strong>.</p>"
@@ -486,7 +512,6 @@ class AgentInvite(BaseTenantModel):
             "url": url,
             "wa_url": f"https://wa.me/?text={body_q}",
             "mailto_url": f"mailto:?subject={subject_q}&body={body_q}",
-            # extras you can use directly in your mailer:
             "email_subject": subject_text,
             "email_text": text,
             "email_html": html,

@@ -1,6 +1,9 @@
 {% extends "base.html" %}
 {% load humanize %}
 
+{# -- Ensure active_tab exists for base/header logic -- #}
+{% with "dashboard" as active_tab %}{% endwith %}
+
 {% block title %}Dashboard · {{ request.business.name|default:"Your business" }}{% endblock %}
 {% block header_title %}Dashboard{% endblock %}
 
@@ -27,7 +30,7 @@
   {% url 'tenants:manager_review_agents' as agents_review_url %}
   {% if not agents_review_url %}{% url 'tenants:agents_review' as agents_review_url %}{% endif %}
 
-  {# Inventory dashboard (try new + legacy) #}
+  {# Inventory dashboard (try new + legacy; last fallback to stock list) #}
   {% url 'inventory:inventory_dashboard' as inv_dash_url %}
   {% if not inv_dash_url %}{% url 'inventory:dashboard' as inv_dash_url %}{% endif %}
   {% if not inv_dash_url %}{% url 'inventory:stock_list' as inv_dash_url %}{% endif %}
@@ -84,7 +87,7 @@
     <!-- First-run checklist -->
     <div class="card shadow-sm mb-4">
       <div class="card-body">
-        <h5 class="mb-2">Welcome to {{ request.business.name }}</h5>
+        <h5 class="mb-2">Welcome to {{ request.business.name|default:"your business" }}</h5>
         <p class="text-muted mb-4">Let’s set up your store. Do these in order:</p>
         <div class="row g-3">
           <div class="col-md-4">
@@ -105,25 +108,25 @@
       <div class="col-6 col-md-3">
         <div class="card shadow-sm"><div class="card-body">
           <div class="text-muted small">Products</div>
-          <div class="fs-4 fw-bold">{{ products_count|intcomma }}</div>
+          <div class="fs-4 fw-bold">{{ products_count|default:0|intcomma }}</div>
         </div></div>
       </div>
       <div class="col-6 col-md-3">
         <div class="card shadow-sm"><div class="card-body">
           <div class="text-muted small">Items in stock</div>
-          <div class="fs-4 fw-bold">{{ stock_count|intcomma }}</div>
+          <div class="fs-4 fw-bold">{{ stock_count|default:0|intcomma }}</div>
         </div></div>
       </div>
       <div class="col-6 col-md-3">
         <div class="card shadow-sm"><div class="card-body">
           <div class="text-muted small">Warehouses</div>
-          <div class="fs-4 fw-bold">{{ warehouses_count|intcomma }}</div>
+          <div class="fs-4 fw-bold">{{ warehouses_count|default:0|intcomma }}</div>
         </div></div>
       </div>
       <div class="col-6 col-md-3">
         <div class="card shadow-sm"><div class="card-body">
           <div class="text-muted small">Sales (MTD)</div>
-          <div class="fs-4 fw-bold">{{ sold_mtd_count|intcomma }}</div>
+          <div class="fs-4 fw-bold">{{ sold_mtd_count|default:0|intcomma }}</div>
         </div></div>
       </div>
     </div>
@@ -143,7 +146,7 @@
     <div class="card shadow-sm">
       <div class="card-body">
         <div class="d-flex justify-content-between align-items-center mb-2">
-          <h6 class="mb-0">KPIs · {{ kpis.scope }}</h6>
+          <h6 class="mb-0">KPIs · {{ kpis.scope|default:"" }}</h6>
         </div>
         <div class="row g-3">
           <div class="col-6 col-md-3">
@@ -187,7 +190,6 @@
     if (!sel || !date) return;
     if (sel.value === 'date') {
       date.style.display = 'inline-block';
-      // If empty, default to today
       if (!date.value) {
         const t = new Date();
         const mm = String(t.getMonth()+1).padStart(2,'0');

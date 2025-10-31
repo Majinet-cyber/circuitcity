@@ -75,13 +75,20 @@ OTP_WINDOW_MINUTES = int(getattr(settings, "OTP_WINDOW_MINUTES", 20))
 # PRG helper: remember what user typed after failed login
 LOGIN_IDENTIFIER_SESSION_KEY = "login_identifier"
 
+# Tenant session key (used by middleware in this project)
+TENANT_SESSION_KEY = getattr(settings, "TENANT_SESSION_KEY", "active_business_id")
+
 
 # ----------------------------
 # Helpers
 # ----------------------------
-# --- Product Create (business-aware page) ------------------------------------
-from django.shortcuts import render
+def _agree_flag(request) -> bool:
+    """
+    Safely infer the 'agree' checkbox state without touching QueryDict in templates.
+    """
+    return bool(request.GET.get("agree") or request.POST.get("agree"))
 
+# --- Product Create (business-aware page) ------------------------------------
 def _infer_product_mode(business) -> str:
     """
     Decide which product vertical the tenant is using.
@@ -132,11 +139,11 @@ def merch_product_create(request):
     product_mode = _infer_product_mode(business)
 
     context = {
-        "PRODUCT_MODE": product_mode,   # use this in the template: {% if PRODUCT_MODE == "phones" %}...
+        "PRODUCT_MODE": product_mode,   # use in the template
         "business": business,
-        # put any other context (forms, etc.) here if/when needed
     }
     return render(request, "inventory/product_create.html", context)
+
 
 def _client_ip(request) -> str | None:
     xfwd = request.META.get("HTTP_X_FORWARDED_FOR")
@@ -214,7 +221,7 @@ def _send_email_otp(email: str, code: str, *, purpose: str) -> None:
         f"    {code}",
         "",
         "This code will expire in 5 minutes.",
-        "If you didnâ€™t request this, you can ignore this email.",
+        "If you didn’t request this, you can ignore this email.",
     ]
     from_email = getattr(settings, "DEFAULT_FROM_EMAIL", "no-reply@localhost")
     send_mail(subject, "\n".join(msg_lines), from_email, [email], fail_silently=True)
@@ -339,6 +346,32 @@ def _twofa_links():
     return enabled, manage_url, status
 
 
+# ----------------------------
+# Active business selection (no 'is_active' field assumptions)
+# ----------------------------
+def _select_active_business_for_user(request, user) -> None:
+    """
+    Best-effort: if the user has exactly one membership, store it in session.
+    Avoids filtering by non-existent fields like 'is_active'.
+    """
+    if Membership is None:
+        return
+    try:
+        qs = Membership.objects.filter(user=user)
+        # If the model has 'status', prefer ACTIVE ones
+        if hasattr(Membership, "status"):
+            try:
+                qs = qs.filter(status="ACTIVE")
+            except Exception:
+                pass
+        m = qs.select_related("business").order_by("id")
+        if m.count() == 1:
+            request.session[TENANT_SESSION_KEY] = m.first().business_id  # type: ignore[attr-defined]
+    except Exception:
+        # never break login flow
+        pass
+
+
 # ============================
 # Login (PRG with messages)
 # ============================
@@ -387,6 +420,10 @@ def login_view(request):
                 sec, _ = LoginSecurity.objects.get_or_create(user=auth_user)
                 sec.note_success()
                 login(request, auth_user)
+
+                # Pick an active business for the session if possible
+                _select_active_business_for_user(request, auth_user)
+
                 return redirect(next_url or _post_login_url())
 
             if user:
@@ -397,12 +434,12 @@ def login_view(request):
             request.session[LOGIN_IDENTIFIER_SESSION_KEY] = identifier
             return _redirect_back_to_login(next_url)
 
-        # Form invalid (rare) â€” still PRG for clean refresh
+        # Form invalid — still PRG for clean refresh
         messages.error(request, "Please correct the errors and try again.")
         request.session[LOGIN_IDENTIFIER_SESSION_KEY] = request.POST.get("identifier", "")
         return _redirect_back_to_login(next_url)
 
-    # GET â€” build unbound form and prefill identifier from session after PRG
+    # GET — build unbound form and prefill identifier from session after PRG
     form = IdentifierLoginForm()
     remembered = request.session.pop(LOGIN_IDENTIFIER_SESSION_KEY, "")
     if remembered:
@@ -445,7 +482,7 @@ def _login_inline_fallback(request, form, next_url, origin_path):
   .note{{margin-top:10px;color:#0c4a6e;background:#ecfeff;border:1px solid #bae6fd;border-radius:10px;padding:10px}}
 </style>
 <div class="card">
-  <h2>Circuit City â€” Inline Login</h2>
+  <h2>Circuit City — Inline Login</h2>
   <div class="note"><strong>Template used:</strong> {origin_path or "(missing)"}<br/>This is the emergency inline form.</div>
   <form method="post" action="{reverse('accounts:login')}">
     <input type="hidden" name="csrfmiddlewaretoken" value="{csrf_val}">
@@ -606,7 +643,7 @@ def login_template_probe(request):
         html = banner + html
 
     resp = HttpResponse(html)
-    resp["Content-Type"] = "text/html; charset=utf-8"
+    resp["Content-Type"] = "text/html; charset=utf-8"]
     resp["X-Template-Origin"] = origin
     return resp
 
@@ -683,7 +720,7 @@ def forgot_password_request_view(request):
                 _send_email_otp(user.email, code, purpose="reset")
 
         # Do not leak whether the account exists
-        messages.success(request, "If an account exists, weâ€™ve emailed a reset code.")
+        messages.success(request, "If an account exists, we’ve emailed a reset code.")
         try:
             return redirect("accounts:forgot_password_reset")
         except NoReverseMatch:
@@ -998,12 +1035,6 @@ def _seed_defaults_for_business(biz) -> None:
 # =========================================
 # Manager sign-up (auto-tenant + auto-select, ACTIVE immediately)
 # =========================================
-# =========================================
-# Manager sign-up (auto-tenant + auto-select, ACTIVE immediately)
-# =========================================
-# =========================================
-# Manager sign-up (auto-tenant + auto-select, ACTIVE immediately)
-# =========================================
 @ensure_csrf_cookie
 @never_cache
 @require_http_methods(["GET", "POST"])
@@ -1029,16 +1060,16 @@ def signup_manager(request):
         err_text = " | ".join(parts) or "(no details)"
         log.warning("Manager signup form invalid: %s", err_text)
         messages.error(request, f"{msg_prefix} {err_text}")
-        resp = render(request, SIGNUP_MANAGER_TEMPLATE, {"form": form})
-        # Helpful while debugging in DevTools â†’ Network
+        resp = render(request, SIGNUP_MANAGER_TEMPLATE, {"form": form, "agree": _agree_flag(request)})
+        # Helpful while debugging in DevTools → Network
         resp["X-Form-Errors"] = err_text[:512]
         return resp
 
     # GET
     if request.method != "POST":
-        return render(request, SIGNUP_MANAGER_TEMPLATE, {"form": form})
+        return render(request, SIGNUP_MANAGER_TEMPLATE, {"form": form, "agree": _agree_flag(request)})
 
-    # POST â€“ first pass validation
+    # POST – first pass validation
     if not form.is_valid():
         return _render_with_form_errors()
 
@@ -1052,15 +1083,15 @@ def signup_manager(request):
     # Guard: unique user/email
     if User.objects.filter(username__iexact=email).exists() or User.objects.filter(email__iexact=email).exists():
         messages.error(request, "An account with that email already exists. Please sign in instead.")
-        return render(request, SIGNUP_MANAGER_TEMPLATE, {"form": form})
+        return render(request, SIGNUP_MANAGER_TEMPLATE, {"form": form, "agree": _agree_flag(request)})
 
     # Create user
     try:
         user = User.objects.create_user(username=email, email=email, password=password)
     except Exception as e:
         log.error("Create user failed: %s", e)
-        messages.error(request, "We couldnâ€™t create your account because this email is already in use.")
-        return render(request, SIGNUP_MANAGER_TEMPLATE, {"form": form})
+        messages.error(request, "We couldn’t create your account because this email is already in use.")
+        return render(request, SIGNUP_MANAGER_TEMPLATE, {"form": form, "agree": _agree_flag(request)})
 
     # Optional name split
     try:
@@ -1147,7 +1178,7 @@ def signup_manager(request):
     login(request, user)
     if biz is not None:
         try:
-            request.session[getattr(settings, "TENANT_SESSION_KEY", "active_business_id")] = biz.pk
+            request.session[TENANT_SESSION_KEY] = biz.pk
         except Exception:
             pass
         messages.success(request, f"Welcome to {biz.name}! Your store is ready.")
@@ -1155,6 +1186,8 @@ def signup_manager(request):
         messages.success(request, "Your manager account is ready.")
 
     return redirect(_safe_redirect("inventory:inventory_dashboard", default="/inventory/dashboard/"))
+
+
 # ----------------------------
 # Template debugging utilities
 # ----------------------------
@@ -1172,5 +1205,3 @@ def _debug_template_origin(tpl_name: str) -> str | None:
         print(msg)
         log.error(msg)
         return None
-
-

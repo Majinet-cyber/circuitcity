@@ -13,21 +13,49 @@ from django.db import models as djmodels
 from django.db.models import (
     Count, Sum, F, Value, DecimalField, ExpressionWrapper, Q,
 )
-from django.db.models.functions import TruncDate, Coalesce, Cast
+from django.db.models.functions import TruncDate, Coalesce, Cast, Trim, Concat, NullIf
 from django.http import JsonResponse, HttpRequest
 from django.utils import timezone
 from django.views.decorators.cache import never_cache
 from django.views.decorators.csrf import csrf_exempt
+from django.views.decorators.http import require_POST
 
 # Optional: if tenants.utils is present, we can require an active business for some endpoints
 try:
-    from tenants.utils import require_business  # type: ignore
+    from tenants.utils import require_business, get_active_business  # type: ignore
 except Exception:  # pragma: no cover
     def require_business(fn):  # type: ignore
         return fn
+    def get_active_business(request):  # type: ignore
+        return getattr(request, "business", None)
 
 from .models import InventoryItem, Product, OrderPrice
 from sales.models import Sale
+
+# Optional Location import (works even if Location lives elsewhere or is absent)
+try:
+    from .models import Location as _LocationModel  # inventory.Location (common)
+except Exception:  # pragma: no cover
+    _LocationModel = None  # type: ignore
+
+# Canonical stock predicates
+try:
+    from .constants import IN_STOCK_Q  # our single source of truth for "in stock"
+except Exception:  # pragma: no cover
+    # Very-safe fallback if constants.py isn't present
+    def IN_STOCK_Q():
+        return ~(
+            Q(status__iexact="SOLD")
+            | Q(sold_at__isnull=False)
+            | Q(is_sold=True)
+            | Q(in_stock=False)
+        )
+
+# Canonical updater
+try:
+    from .utils_status import mark_item_sold as _canonical_mark_item_sold
+except Exception:  # pragma: no cover
+    _canonical_mark_item_sold = None  # type: ignore
 
 log = logging.getLogger(__name__)
 
@@ -215,6 +243,131 @@ def _scoped_stock_qs(request: HttpRequest):
             return qs
     return _apply_self_scope_or_none(qs, InventoryItem, request.user)
 
+# ---------- tenant/business helpers (for default location) ----------
+def _get_active_business(request):
+    """
+    Use tenants.utils.get_active_business if available; fallback to request.business.
+    """
+    try:
+        return get_active_business(request)
+    except Exception:
+        return getattr(request, "business", None)
+
+def _locations_for_active_business(request) -> list[dict[str, Any]]:
+    """
+    Return [{'id': ..., 'name': ...}, ...] for locations in the active business.
+    Safe if Location model doesn't exist.
+    """
+    if _LocationModel is None:
+        return []
+    try:
+        qs = _LocationModel.objects.all()
+        biz = _get_active_business(request)
+        for fld in ("business", "tenant", "organization"):
+            if _has_field(_LocationModel, fld) and biz is not None:
+                qs = qs.filter(**{fld: biz})
+                break
+        # order by name if present
+        order_by = "name" if _has_field(_LocationModel, "name") else "id"
+        qs = qs.order_by(order_by)
+        return [{"id": getattr(l, "id", None), "name": getattr(l, "name", str(l))} for l in qs[:200]]
+    except Exception:
+        return []
+
+def _agent_home_location_id(request) -> Optional[int]:
+    try:
+        prof = getattr(request.user, "agent_profile", None)
+        if prof and getattr(prof, "location_id", None):
+            return int(prof.location_id)
+    except Exception:
+        pass
+    return None
+
+def _pick_default_location(request) -> tuple[Optional[int], Optional[str]]:
+    """
+    Priority:
+      1) agent_profile.location (if in business list)
+      2) location with name == active business name
+      3) first available
+    """
+    locs = _locations_for_active_business(request)
+    if not locs:
+        return None, None
+
+    # 1) agent home
+    pref = _agent_home_location_id(request)
+    if pref:
+        for it in locs:
+            if it["id"] == pref:
+                return it["id"], it["name"]
+
+    # 2) business name match
+    biz = _get_active_business(request)
+    biz_name = getattr(biz, "name", None)
+    if biz_name:
+        bn = str(biz_name).strip().lower()
+        for it in locs:
+            if str(it["name"]).strip().lower() == bn:
+                return it["id"], it["name"]
+
+    # 3) first
+    first = locs[0]
+    return first.get("id"), first.get("name")
+
+
+# ---------- local normalization + lookup used by api_mark_sold ----------
+
+def _normalize_code(raw: str | None) -> str:
+    if not raw:
+        return ""
+    return "".join(ch for ch in str(raw).strip() if ch.isdigit())
+
+def _find_instock_for_business(request: HttpRequest, raw: str) -> Optional[InventoryItem]:
+    """
+    Business-scoped, unsold-only lookup by IMEI (15) or code.
+    This mirrors the helper used by the UI so all flows agree.
+    """
+    biz = _get_active_business(request)
+    if biz is None:
+        # fall back to user-scope (already applied by _scoped_stock_qs)
+        base = _scoped_stock_qs(request)
+    else:
+        # tenant scope by business field if present; otherwise rely on _scoped_stock_qs
+        try:
+            if _has_field(InventoryItem, "business"):
+                base = InventoryItem.objects.filter(business=biz)
+            else:
+                base = _scoped_stock_qs(request)
+        except Exception:
+            base = _scoped_stock_qs(request)
+
+    base = base.filter(IN_STOCK_Q())
+
+    digits = _normalize_code(raw)
+    if not digits:
+        return None
+
+    fields = {f.name for f in InventoryItem._meta.get_fields()}
+
+    # Prefer IMEI = last 15 digits (common scanner behavior)
+    if "imei" in fields and len(digits) >= 15:
+        item = base.filter(imei=digits[-15:]).order_by("-id").first()
+        if item:
+            return item
+
+    # Fallback to exact code
+    if "code" in fields:
+        item = base.filter(code=digits).order_by("-id").first()
+        if item:
+            return item
+
+    # Final fallback: try IMEI even when <15 if that's how data was stored
+    if "imei" in fields:
+        return base.filter(imei=digits).order_by("-id").first()
+
+    return None
+
+
 # ---------- utilities ----------
 
 def date_range_filter(qs, field_name: str, start, end_excl):
@@ -258,8 +411,8 @@ except Exception:  # pragma: no cover
     CurrencySetting = None  # type: ignore
 
 _CURRENCY_SIGNS = {
-    "MWK": "MK","USD": "$","EUR": "â‚¬","GBP": "Â£","ZAR": "R",
-    "ZMW": "K","TZS": "TSh","KES": "KSh","NGN": "â‚¦",
+    "MWK": "MK","USD": "$","EUR": "€","GBP": "£","ZAR": "R",
+    "ZMW": "K","TZS": "TSh","KES": "KSh","NGN": "₦",
 }
 
 def _normalize_ccy(code: str | None) -> str:
@@ -298,6 +451,8 @@ def _currency_payload():
 
 
 # ---------- date utils ----------
+
+
 # ---------- Product helpers used by place-order ----------
 
 @never_cache
@@ -701,7 +856,7 @@ def api_value_trend(request: HttpRequest):
         except Exception:
             pass
 
-    # Always prefer Python aggregation on SQLite (safe) â€” and keep it simple.
+    # Always prefer Python aggregation on SQLite (safe) — and keep it simple.
     is_sqlite = (connection.vendor == "sqlite")
 
     if not is_sqlite:
@@ -928,37 +1083,78 @@ def api_top_models(request: HttpRequest):
     Also supports explicit ranges:
       - on=YYYY-MM-DD  (alias: date=YYYY-MM-DD)
       - start/end (or from/to, df/dt, date_from/date_to)
+    Groups by a normalized BRAND + MODEL label with tolerant fallbacks.
+    Treats blank-after-trim as NULL so Coalesce can fall back to 'Unknown'.
     """
-    # Range first; if no explicit range, keep existing behavior for month/today
-    start_incl, end_incl, range_meta = _extract_range(request, default_period="today")
+    # Default to month for dashboard parity; allow overrides via query like &period=today
+    start_incl, end_incl, range_meta = _extract_range(request, default_period="month")
     end_excl = end_incl + timedelta(days=1)
 
     dfield = _sale_date_field()
-    qs = date_range_filter(_scoped_sales_qs(request), dfield, start_incl, end_excl)
+    sales_qs = date_range_filter(_scoped_sales_qs(request), dfield, start_incl, end_excl)
+
+    def _sales_group(qs):
+        brand = Coalesce(
+            NullIf(Trim(F("item__product__brand")), Value("")),
+            NullIf(Trim(F("product__brand")), Value("")),
+        )
+        model = Coalesce(
+            NullIf(Trim(F("item__product__model")), Value("")),
+            NullIf(Trim(F("item__model")), Value("")),
+            NullIf(Trim(F("product__model")), Value("")),
+            NullIf(Trim(F("item__product__name")), Value("")),
+            NullIf(Trim(F("product__name")), Value("")),
+        )
+        label = Coalesce(
+            NullIf(Trim(Concat(brand, Value(" "), model, output_field=djmodels.CharField())), Value("")),
+            model,
+            Value("Unknown", output_field=djmodels.CharField()),
+        )
+        return (
+            qs.annotate(label=label)
+              .values("label")
+              .annotate(c=Count("id"))
+              .order_by("-c", "label")[:12]
+        )
+
+    def _items_group(qs):
+        brand = Coalesce(
+            NullIf(Trim(F("product__brand")), Value("")),
+            NullIf(Trim(F("brand")), Value("")),
+        )
+        model = Coalesce(
+            NullIf(Trim(F("product__model")), Value("")),
+            NullIf(Trim(F("model")), Value("")),
+            NullIf(Trim(F("product__name")), Value("")),
+            NullIf(Trim(F("name")), Value("")),
+        )
+        label = Coalesce(
+            NullIf(Trim(Concat(brand, Value(" "), model, output_field=djmodels.CharField())), Value("")),
+            model,
+            Value("Unknown", output_field=djmodels.CharField()),
+        )
+        return (
+            qs.annotate(label=label)
+              .values("label")
+              .annotate(c=Count("id"))
+              .order_by("-c", "label")[:12]
+        )
 
     labels: list[str] = []
     values: list[int] = []
 
+    # 1) Prefer Sales (most accurate)
     try:
-        agg = (qs.values("item__product__brand", "item__product__model")
-                 .annotate(c=Count("id")).order_by("-c")[:8])
-        labels = [f'{r["item__product__brand"]} {r["item__product__model"]}' for r in agg]
-        values = [int(r["c"]) for r in agg]
+        rows = list(_sales_group(sales_qs))
+        labels = [r["label"] or "Unknown" for r in rows]
+        values = [int(r["c"] or 0) for r in rows]
     except Exception:
-        labels = []; values = []
+        labels, values = [], []
 
+    # 2) Fallback to InventoryItem rows that look sold in the window
     if sum(values) == 0:
-        try:
-            agg2 = (qs.values("product__brand", "product__model")
-                      .annotate(c=Count("id")).order_by("-c")[:8])
-            labels = [f'{r["product__brand"]} {r["product__model"]}' for r in agg2]
-            values = [int(r["c"]) for r in agg2]
-        except Exception:
-            labels = []; values = []
-
-    if sum(values) == 0:
-        date_field = _best_item_date_field()
         status_field = _item_status_field()
+        date_field   = _best_item_date_field()
         iqs = _scoped_stock_qs(request)
         if _has_field(InventoryItem, status_field):
             cond = Q(**{f"{status_field}__in": _SOLD_LIKE}) \
@@ -974,22 +1170,21 @@ def api_top_models(request: HttpRequest):
             iqs = date_range_filter(iqs, date_field, start_incl, end_excl)
 
         try:
-            iagg = (iqs.values("product__brand", "product__model")
-                        .annotate(c=Count("id")).order_by("-c")[:8])
-            labels = [f'{r["product__brand"]} {r["product__model"]}' for r in iagg]
-            values = [int(r["c"]) for r in iagg]
+            rows = list(_items_group(iqs))
+            labels = [r["label"] or "Unknown" for r in rows]
+            values = [int(r["c"] or 0) for r in rows]
         except Exception:
-            labels = []; values = []
+            labels, values = [], []
 
+    # 3) Last resort: group all current stock (helps brand-new installs)
     if sum(values) == 0:
         s_qs = _scoped_stock_qs(request)
         try:
-            sagg = (s_qs.values("product__brand", "product__model")
-                       .annotate(c=Count("id")).order_by("-c")[:8])
-            labels = [f'{r["product__brand"]} {r["product__model"]}' for r in sagg]
-            values = [int(r["c"]) for r in sagg]
+            rows = list(_items_group(s_qs))
+            labels = [r["label"] or "Unknown" for r in rows]
+            values = [int(r["c"] or 0) for r in rows]
         except Exception:
-            labels = []; values = []
+            labels, values = [], []
 
     return _ok({"labels": labels, "values": values, "range": range_meta})
 
@@ -1060,82 +1255,113 @@ def alerts_feed(request: HttpRequest):
 
 @never_cache
 @login_required
+@require_POST
 @transaction.atomic
 def api_mark_sold(request: HttpRequest):
-    if request.method != "POST":
-        return _err("POST required", status=405)
-
+    """
+    POST JSON: { imei|code, price?, sold_date?, location_id? }
+    - Lookup is business-scoped and unsold-only (IN_STOCK_Q()).
+    - Flips all sold flags via the canonical updater.
+    - Creates a Sale row so charts move immediately.
+    """
     body = _json_body(request)
-    imei = _norm_digits(body.get("imei"))
-    if not imei or len(imei) < 10:
-        return _err("Invalid IMEI", status=400)
 
-    imei_field = _item_imei_field()
-    status_field = _item_status_field()
-    sold_at_field = _best_item_date_field()
+    # Accept either "imei" or "code" inputs
+    code = body.get("imei") or body.get("code") or request.POST.get("imei") or request.POST.get("code")
+    code = (code or "").strip()
+    if not code:
+        return _err("Missing code/IMEI", status=400)
 
-    try:
-        item = InventoryItem.objects.get(**{imei_field: imei})
-    except InventoryItem.DoesNotExist:
-        cand = InventoryItem.objects.all()
-        def _digits_or_none(x):
-            try: return _norm_digits(getattr(x, imei_field))
-            except Exception: return ""
-        item = next((x for x in cand if _digits_or_none(x) == imei), None)
-
+    item = _find_instock_for_business(request, code)
     if not item:
-        return _err("IMEI not found", status=404)
+        return _err("Item not found or already sold", status=404)
 
-    loc_id = body.get("location_id")
-    if loc_id and _has_field(InventoryItem, "location_id"):
-        try: setattr(item, "location_id", int(loc_id))
-        except Exception: pass
+    # Location handling (optional)
+    loc_id = body.get("location_id") or body.get("location")
+    if not loc_id:
+        loc_id, _ = _pick_default_location(request)
+    def _set_item_location_by_id(_item, _loc_id):
+        if not _loc_id:
+            return
+        try:
+            _loc_id = int(_loc_id)
+        except Exception:
+            return
+        if _has_field(InventoryItem, "current_location_id"):
+            try:
+                setattr(_item, "current_location_id", _loc_id)
+                return
+            except Exception:
+                pass
+        if _has_field(InventoryItem, "location_id"):
+            try:
+                setattr(_item, "location_id", _loc_id)
+                return
+            except Exception:
+                pass
+        if _LocationModel is not None:
+            try:
+                loc_obj = _LocationModel.objects.filter(id=_loc_id).only("id").first()
+                if loc_obj:
+                    if _has_field(InventoryItem, "current_location"):
+                        setattr(_item, "current_location", loc_obj)
+                    elif _has_field(InventoryItem, "location"):
+                        setattr(_item, "location", loc_obj)
+            except Exception:
+                pass
+    _set_item_location_by_id(item, loc_id)
 
-    already = False
-    try:
-        already = (getattr(item, status_field) != "IN_STOCK")
-    except Exception:
-        already = Sale.objects.filter(item=item).exists()
-    if already:
-        return _ok({"imei": imei, "already_sold": True})
-
+    # Parse price & sold date
     price_val = None
-    try:
-        if body.get("price") not in (None, ""):
+    if body.get("price") not in (None, ""):
+        try:
             price_val = Decimal(str(body.get("price")).replace(",", "").strip())
-    except Exception:
-        price_val = None
+        except Exception:
+            price_val = None
 
+    sold_dt = timezone.now()
+    if body.get("sold_date"):
+        try:
+            sold_dt = datetime.fromisoformat(str(body["sold_date"]))
+            if timezone.is_naive(sold_dt):
+                sold_dt = timezone.make_aware(sold_dt, timezone.get_current_timezone())
+        except Exception:
+            sold_dt = timezone.now()
+
+    # Flip all flags via canonical updater (single source of truth)
+    if _canonical_mark_item_sold is not None:
+        _canonical_mark_item_sold(item, price=price_val, sold_date=sold_dt, user=request.user, loc_id=loc_id)
+    else:
+        # ultra-safe fallback if utils_status isn't available
+        status_field = _item_status_field()
+        try: setattr(item, status_field, "SOLD")
+        except Exception: pass
+        sfield = _best_item_date_field()
+        if _has_field(InventoryItem, sfield):
+            try: setattr(item, sfield, sold_dt)
+            except Exception: pass
+        if _has_field(InventoryItem, "is_sold"):
+            item.is_sold = True
+        if _has_field(InventoryItem, "in_stock"):
+            item.in_stock = False
+        item.save()
+
+    # Create Sale row so charts/kpis move (dashboard also has item fallback)
     afield = _sale_amount_field()
     dfield = _sale_date_field()
-
     sale = Sale(item=item)
     if _has_field(Sale, "agent"):
-        setattr(sale, "agent", request.user)
+        try: setattr(sale, "agent", request.user)
+        except Exception: pass
     if afield and price_val is not None:
         try: setattr(sale, afield, price_val)
         except Exception: pass
-    try: setattr(sale, dfield, timezone.now())
+    try: setattr(sale, dfield, sold_dt)
     except Exception: pass
     sale.save()
 
-    # Mirror agent onto the item when possible
-    for agent_field in ("assigned_agent", "assigned_to", "assignee", "owner", "user", "agent", "created_by", "added_by"):
-        if _has_field(InventoryItem, agent_field):
-            try:
-                setattr(item, agent_field, request.user)
-                break
-            except Exception:
-                pass
+    return _ok({"ok": True, "id": item.id, "sale_id": sale.id})
 
-    try: setattr(item, status_field, "SOLD")
-    except Exception: pass
-    if sold_at_field and _has_field(InventoryItem, sold_at_field):
-        try: setattr(item, sold_at_field, timezone.now())
-        except Exception: pass
-    item.save()
-
-    return _ok({"imei": imei, "sale_id": sale.id, "already_sold": False})
 
 
 @never_cache
@@ -1279,7 +1505,7 @@ def api_audit_verify(request: HttpRequest):
         limit = 5000
     limit = max(100, min(limit, 200000))
 
-    # Verify newestâ†’oldest slice by reversing after fetch to walk forward
+    # Verify newest→oldest slice by reversing after fetch to walk forward
     rows = list(AuditLog.objects.order_by("-id").values(
         "id", "prev_hash", "hash", "actor_id", "entity", "entity_id", "action", "payload"
     )[:limit])
@@ -1338,5 +1564,3 @@ def restock_heatmap(request: HttpRequest):
 
 api_predictions = predictions_summary       # /inventory/api/predictions (no slash) compat
 api_alerts = alerts_feed                    # keep older route names working
-
-

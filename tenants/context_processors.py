@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from typing import Dict, Any
 
-# Defensive/lazy imports so templates never crash if models/utilities are missing
+# Defensive/lazy imports so templates never crash if utilities are missing
 try:
     from tenants.utils import get_active_business
 except Exception:  # pragma: no cover
@@ -70,12 +70,41 @@ def _derive_mode_from_business(biz) -> str:
     return "generic"
 
 
+def _resolve_business(request):
+    """
+    Prefer request.business set by middleware; fall back to utils helper.
+    Never raises.
+    """
+    biz = getattr(request, "business", None)
+    if biz is not None:
+        return biz
+    try:
+        return get_active_business(request)
+    except Exception:
+        return None
+
+
+def active_business(request) -> Dict[str, Any]:
+    """
+    Minimal context processor that matches settings reference:
+    exposes both 'active_business' and 'active_business_id' for templates.
+    Kept small on purpose; product mode is handled by tenant_context().
+    """
+    biz = _resolve_business(request)
+    bid = getattr(biz, "pk", None) if biz is not None else None
+    return {
+        "active_business": biz,
+        "active_business_id": bid,
+    }
+
+
 def tenant_context(request) -> Dict[str, Any]:
     """
     Adds to every template:
-      - business: the active Business (or None)
-      - business_id: its id (or None)
-      - PRODUCT_MODE: one of {'phones','pharmacy','liquor','grocery','generic'}
+      - business / business_id (new keys)
+      - active_business / active_business_id (legacy-friendly mirror)
+      - PRODUCT_MODE ∈ {'phones','pharmacy','liquor','grocery','generic'}
+
     Priority for PRODUCT_MODE:
       1) request.product_mode (set by middleware)
       2) ?mode= override (dev/testing)
@@ -83,7 +112,7 @@ def tenant_context(request) -> Dict[str, Any]:
       4) session fallback
       5) 'generic'
     """
-    biz = getattr(request, "business", None) or get_active_business(request)
+    biz = _resolve_business(request)
     bid = getattr(request, "business_id", None) or (getattr(biz, "pk", None) if biz else None)
 
     # 1) middleware (single source of truth if present)
@@ -112,16 +141,23 @@ def tenant_context(request) -> Dict[str, Any]:
     if not mode:
         mode = "generic"
 
-    # Persist for consistency with middleware
+    # Persist for consistency with middleware (best effort)
     try:
         request.session[PRODUCT_MODE_SESSION_KEY] = mode
     except Exception:
         pass
 
+    # Expose both new and legacy keys so no template breaks
     return {
+        # New names
         "business": biz,
         "business_id": bid,
         "PRODUCT_MODE": mode,
+
+        # Legacy-friendly mirrors
+        "active_business": biz,
+        "active_business_id": bid,
     }
 
 
+__all__ = ["active_business", "tenant_context"]

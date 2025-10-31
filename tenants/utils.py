@@ -54,6 +54,9 @@ ROLE_GROUP_ADMIN_NAMES = set(getattr(settings, "ROLE_GROUP_ADMIN_NAMES", ["Admin
 # Agent-role names (templates expect tenants.utils.is_agent)
 ROLE_GROUP_AGENT_NAMES = set(getattr(settings, "ROLE_GROUP_AGENT_NAMES", ["Agent"]))
 
+# Normalize role priority (case-insensitive match)
+_ROLE_PRIORITY = ["OWNER", "MANAGER", "ADMIN", "AGENT"]
+
 
 # ----------------------------
 # Internals
@@ -157,6 +160,36 @@ def _read_session_business_id(request: "HttpRequest"):
     return None
 
 
+def _read_request_business_id(request: "HttpRequest"):
+    """
+    Read a business id directly from the request (query/header/body-lite).
+    Priority:
+      1) ?business_id= on GET
+      2) X-Business-ID header
+      3) business_id in POST form (if present)
+    """
+    try:
+        bid = request.GET.get("business_id")
+        if bid:
+            return bid
+    except Exception:
+        pass
+    try:
+        bid = request.headers.get("X-Business-ID")
+        if bid:
+            return bid
+    except Exception:
+        pass
+    try:
+        # only cheap access; do not parse JSON here to avoid side effects
+        bid = request.POST.get("business_id")
+        if bid:
+            return bid
+    except Exception:
+        pass
+    return None
+
+
 def _single_membership_business(user):
     """
     If the user has exactly one membership, return its business.
@@ -189,11 +222,12 @@ def set_active_business(request: "HttpRequest", business) -> None:
     """
     try:
         if business is None:
-            # Clear session + request
+            # Clear session + request (canonical + legacy) and mark modified
             try:
                 request.session.pop(TENANT_SESSION_KEY, None)
                 request.session.pop("active_business_id", None)  # explicit
                 request.session.pop("biz_id", None)             # legacy
+                request.session.modified = True
             except Exception:
                 pass
             try:
@@ -258,6 +292,134 @@ def get_active_business_id(request: "HttpRequest"):
     """
     b = get_active_business(request)
     return getattr(b, "id", None) if b else None
+
+
+def ensure_active_business_id(
+    request: "HttpRequest",
+    *,
+    auto_select_single: bool = True,
+) -> Optional[int]:
+    """
+    Robustly determine the active business id for API/views.
+
+    Resolution order:
+      1) business_id from request (GET/POST/header)
+      2) session (tolerant keys)
+      3) if user has EXACTLY ONE membership (pref ACTIVE), set it and return (when auto_select_single=True)
+
+    If a concrete Business cannot be resolved for the id discovered in (1) or (2),
+    this returns None (and does NOT mutate session) unless auto_select_single can resolve one.
+    """
+    # 1) Request-provided id
+    bid = _read_request_business_id(request)
+    if bid:
+        b = _resolve_business_by_id(bid)
+        if b is not None:
+            # Persist as the active business for the session/thread
+            set_active_business(request, b)
+            return int(getattr(b, "id", bid))
+
+    # 2) Session
+    bid = _read_session_business_id(request)
+    if bid:
+        b = _resolve_business_by_id(bid)
+        if b is not None:
+            # Cache onto request and mirror thread-local (idempotent)
+            try:
+                setattr(request, "business", b)
+            except Exception:
+                pass
+            try:
+                set_current_business_id(getattr(b, "pk", None))
+            except Exception:
+                pass
+            return int(getattr(b, "id", bid))
+
+    # 3) Single membership auto-pick
+    if auto_select_single:
+        auto_biz = _single_membership_business(getattr(request, "user", None))
+        if auto_biz is not None:
+            set_active_business(request, auto_biz)
+            return int(getattr(auto_biz, "id", None) or 0) or None
+
+    return None
+
+
+# ----------------------------
+# NEW: membership/role helpers (additive)
+# ----------------------------
+def resolve_default_business_for_user(user) -> Optional["Business"]:
+    """
+    Preferred default for a user:
+      1) First ACTIVE membership with role OWNER/MANAGER/ADMIN (in that order)
+      2) Any ACTIVE membership
+      3) Any membership
+    """
+    if Membership is None or not getattr(user, "is_authenticated", False):
+        return None
+
+    qs = Membership.objects.filter(user=user).select_related("business")
+
+    # Filter ACTIVE where applicable
+    if _membership_has_status_field():
+        qs_active = qs.filter(status__iexact="ACTIVE")
+    else:
+        qs_active = qs
+
+    # 1) Prefer higher roles
+    role_field = "role" if _model_has_field(Membership, "role") else None
+    if role_field:
+        for pref in _ROLE_PRIORITY:
+            m = qs_active.filter(**{f"{role_field}__iexact": pref}).first()
+            if m:
+                return m.business
+
+    # 2) Any ACTIVE membership
+    m = qs_active.first()
+    if m:
+        return m.business
+
+    # 3) Any membership
+    m = qs.first()
+    return m.business if m else None
+
+
+def user_has_membership(user, business_id: int) -> bool:
+    """
+    True if the user has membership in the business (ACTIVE preferred when field exists).
+    """
+    if Membership is None or not getattr(user, "is_authenticated", False) or not business_id:
+        return False
+    try:
+        base = Membership.objects.filter(user=user, business_id=business_id)
+        if _membership_has_status_field():
+            return base.filter(status__iexact="ACTIVE").exists()
+        return base.exists()
+    except Exception:
+        return False
+
+
+def user_highest_role(user) -> Optional[str]:
+    """
+    Return the user's highest role across memberships by priority OWNER>MANAGER>ADMIN>AGENT.
+    If no roles are stored, returns None.
+    """
+    if Membership is None or not getattr(user, "is_authenticated", False):
+        return None
+    if not _model_has_field(Membership, "role"):
+        return None
+    try:
+        roles = list(
+            Membership.objects.filter(user=user)
+            .values_list("role", flat=True)
+        )
+        roles_upper = {(r or "").upper() for r in roles}
+        for pref in _ROLE_PRIORITY:
+            if pref in roles_upper:
+                return pref
+        return next(iter(roles_upper), None)
+    except Exception:
+        return None
 
 
 # ----------------------------
@@ -380,7 +542,7 @@ def attach_business(get_response):
 # ----------------------------
 def user_is_admin(user) -> bool:
     """
-    Platform admin â‰  Django staff.
+    Platform admin ≠ Django staff.
     - Superusers are platform-admins.
     - Users in ROLE_GROUP_ADMIN_NAMES (default: ["Admin"]) are platform-admins.
     - Plain is_staff does NOT grant platform-admin power.
@@ -413,7 +575,7 @@ def user_is_agent(user) -> bool:
     return bool(names.intersection(ROLE_GROUP_AGENT_NAMES))
 
 
-# â€”â€” Aliases expected by template tags / other modules â€”â€”
+# —— Aliases expected by template tags / other modules ——
 is_manager = user_is_manager
 is_admin = user_is_admin
 is_agent = user_is_agent
@@ -549,76 +711,88 @@ def assert_owns(obj, request: "HttpRequest"):
     except PermissionDenied:
         raise
     except Exception:
-        # If we can't determine, don't throw hereâ€”let the caller decide.
+        # If we can't determine, don't throw here—let the caller decide.
         pass
 
 
 # ----------------------------
 # Decorators
 # ----------------------------
-def require_business(view: Callable) -> Callable:
+def require_business(_fn: Optional[Callable] = None) -> Callable:
     """
     Ensure a Business is active (via request.business or session key).
 
-    If not:
+    Flexible usage (to avoid misuse bugs):
+        @require_business
+        def view(...): ...
+
+        @require_business()   # also OK
+        def view(...): ...
+
+        path("...", require_business(view_func), ...)
+
+    If not active:
       - Try to auto-select if the user has exactly ONE membership (prefers ACTIVE).
-      - SUPERUSERS: allow the view to run OR send them to HQ/dashboard,
-        but never redirect to the same path (avoid loops).
-      - Everyone else: redirect to activation (or settings) with ?next=â€¦
-        while avoiding loops by checking the current path.
+      - SUPERUSERS: send to HQ/dashboard unless that would loop, then run the view.
+      - Everyone else: redirect to activation/settings with ?next=…, avoiding loops.
     """
-    @wraps(view)
-    def _wrapped(request: "HttpRequest", *args, **kwargs):
-        # Already selected
-        biz = get_active_business(request)
-        if biz is not None:
-            return view(request, *args, **kwargs)
+    def _decorator(view_func: Callable) -> Callable:
+        @wraps(view_func)
+        def _wrapped(request: "HttpRequest", *args, **kwargs):
+            # Already selected
+            biz = get_active_business(request)
+            if biz is not None:
+                return view_func(request, *args, **kwargs)
 
-        user = getattr(request, "user", None)
+            user = getattr(request, "user", None)
 
-        # Auto-pick if they have exactly one membership
-        auto_biz = _single_membership_business(user)
-        if auto_biz is not None:
-            set_active_business(request, auto_biz)
-            return view(request, *args, **kwargs)
+            # Auto-pick if they have exactly one membership
+            auto_biz = _single_membership_business(user)
+            if auto_biz is not None:
+                set_active_business(request, auto_biz)
+                return view_func(request, *args, **kwargs)
 
-        # Superusers should not be forced into tenant onboarding.
-        if getattr(user, "is_authenticated", False) and getattr(user, "is_superuser", False):
-            target = _superuser_home_url()
+            # Superusers should not be forced into tenant onboarding.
+            if getattr(user, "is_authenticated", False) and getattr(user, "is_superuser", False):
+                target = _superuser_home_url()
 
-            # If the target resolves to the current path, DO NOT redirect: run the view.
+                # If the target resolves to the current path, DO NOT redirect: run the view.
+                if _same_path(request, target):
+                    return view_func(request, *args, **kwargs)
+
+                # If the target is empty/root or equals current route, just render.
+                if not target or target == "/" or _same_path(request, "/"):
+                    return view_func(request, *args, **kwargs)
+
+                return redirect(target)
+
+            # Normal users → activation flow with next=
+            target = _safe_reverse("tenants:activate_mine", "/tenants/activate/")
+            next_q = quote_plus(getattr(request, "get_full_path", lambda: "/")())
+
+            # If tenants app not mounted, nudge to unified settings
+            if target in ("/", "/tenants/activate/"):
+                target = _safe_reverse("accounts:settings_unified", "/accounts/settings/")
+
+            # Avoid redirect loop: if we're already on the target, let the page render.
             if _same_path(request, target):
-                return view(request, *args, **kwargs)
+                try:
+                    messages.info(request, "Select or set up your business to continue.")
+                except Exception:
+                    pass
+                return view_func(request, *args, **kwargs)
 
-            # If the target is empty/root or equals current route, just render.
-            if not target or target == "/" or _same_path(request, "/"):
-                return view(request, *args, **kwargs)
-
-            return redirect(target)
-
-        # Normal users â†’ activation flow with next=
-        target = _safe_reverse("tenants:activate_mine", "/tenants/activate/")
-        next_q = quote_plus(getattr(request, "get_full_path", lambda: "/")())
-
-        # If tenants app not mounted, nudge to unified settings
-        if target in ("/", "/tenants/activate/"):
-            target = _safe_reverse("accounts:settings_unified", "/accounts/settings/")
-
-        # Avoid redirect loop: if we're already on the target, let the page render.
-        if _same_path(request, target):
             try:
                 messages.info(request, "Select or set up your business to continue.")
             except Exception:
                 pass
-            return view(request, *args, **kwargs)
+            return redirect(f"{target}?next={next_q}" if next_q else target)
+        return _wrapped
 
-        try:
-            messages.info(request, "Select or set up your business to continue.")
-        except Exception:
-            pass
-        return redirect(f"{target}?next={next_q}" if next_q else target)
-
-    return _wrapped
+    # Support bare and called usage
+    if _fn is None:
+        return _decorator
+    return _decorator(_fn)
 
 
 def require_role(roles: Optional[Iterable[str]] = None) -> Callable:
@@ -663,7 +837,7 @@ def require_role(roles: Optional[Iterable[str]] = None) -> Callable:
             # Must be an ACTIVE member of the active business
             if not _has_active_membership(user, biz):
                 try:
-                    messages.error(request, "You donâ€™t have access to this business.")
+                    messages.error(request, "You don’t have access to this business.")
                 except Exception:
                     pass
                 return redirect(_safe_reverse("tenants:choose_business", "/tenants/choose/"))
@@ -677,7 +851,6 @@ def require_role(roles: Optional[Iterable[str]] = None) -> Callable:
             except Exception:
                 pass
             return redirect("/")
-
         return _wrapped
     return _decorator
 
@@ -770,6 +943,10 @@ def bootstrap_manager_tenant(
 __all__ = [
     # session/context
     "set_active_business", "get_active_business", "get_active_business_id",
+    # NEW helper (for APIs/views)
+    "ensure_active_business_id",
+    # NEW helpers
+    "resolve_default_business_for_user", "user_has_membership", "user_highest_role",
     # default location helpers
     "default_location_for", "default_location_for_request", "get_default_location_for",
     # role checks (export both canonical and aliases)
@@ -782,5 +959,3 @@ __all__ = [
     # bootstrap
     "bootstrap_manager_tenant",
 ]
-
-
