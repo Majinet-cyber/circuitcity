@@ -135,7 +135,10 @@ SESSION_EXPIRE_AT_BROWSER_CLOSE = True
 SESSION_COOKIE_SAMESITE = os.environ.get("SESSION_COOKIE_SAMESITE", "Lax")
 CSRF_COOKIE_SAMESITE = os.environ.get("CSRF_COOKIE_SAMESITE", "Lax")
 SESSION_COOKIE_AGE = 60 * 60 * 4
-SESSION_ENGINE = "django.contrib.sessions.backends.db"
+
+# Use cached DB sessions to reduce DB roundtrips and survive brief DB blips.
+SESSION_ENGINE = "django.contrib.sessions.backends.cached_db"
+SESSION_SAVE_EVERY_REQUEST = False
 
 # Canonical session key for active tenant (used by middleware/utils)
 TENANT_SESSION_KEY = os.environ.get("TENANT_SESSION_KEY", "active_business_id")
@@ -235,6 +238,9 @@ USE_LOCAL_SQLITE = env_bool("USE_LOCAL_SQLITE", default=not bool(DATABASE_URL))
 REQUIRE_DATABASE_URL = env_bool("REQUIRE_DATABASE_URL", False)
 PGCONNECT_TIMEOUT = env_int("PGCONNECT_TIMEOUT", 5)
 
+# Keep DB connections warm & resilient (Render Postgres can drop idle ones)
+DB_CONN_MAX_AGE = env_int("DB_CONN_MAX_AGE", 300)  # seconds
+
 if TESTING:
     DATABASES["default"] = {
         "ENGINE": "django.db.backends.sqlite3",
@@ -249,11 +255,18 @@ elif DATABASE_URL:
     # TLS for Render/prod
     cfg = dj_database_url.parse(
         DATABASE_URL,
-        conn_max_age=600,
+        conn_max_age=DB_CONN_MAX_AGE,
         ssl_require=not DEBUG,
     )
+    # Enable health checks so Django pings before using a possibly-stale connection.
+    cfg["CONN_MAX_AGE"] = DB_CONN_MAX_AGE
+    cfg["CONN_HEALTH_CHECKS"] = True
+
     opts = dict(cfg.get("OPTIONS") or {})
     opts.setdefault("connect_timeout", PGCONNECT_TIMEOUT)
+    # If DATABASE_URL doesn’t include sslmode, enforce it in prod.
+    if not DEBUG:
+        opts.setdefault("sslmode", "require")
     cfg["OPTIONS"] = opts
     DATABASES["default"] = cfg
 elif USE_LOCAL_SQLITE:
@@ -272,7 +285,8 @@ else:
         "PASSWORD": PASSWORD,
         "HOST": HOST,
         "PORT": PORT,
-        "CONN_MAX_AGE": 600,
+        "CONN_MAX_AGE": DB_CONN_MAX_AGE,
+        "CONN_HEALTH_CHECKS": True,
         "OPTIONS": {"connect_timeout": PGCONNECT_TIMEOUT, **({"sslmode": "require"} if not DEBUG else {})},
     }
 
