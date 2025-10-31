@@ -8,7 +8,7 @@ from importlib import import_module
 from django.conf import settings
 from django.conf.urls.static import static
 from django.contrib import admin
-from django.contrib.auth import views as auth_views  # fallbacks for login/logout
+from django.contrib.auth import views as auth_views  # fallback auth views
 from django.http import HttpResponse, JsonResponse, HttpResponseBase
 from django.shortcuts import redirect, render
 from django.template.loader import get_template
@@ -252,7 +252,7 @@ def __render_reports__(request):
               Origin: <code>{origin}</code>
             </div>
             """
-            if "<body" in html:
+            if "<body" in html":
                 body_start = html.lower().find("<body")
                 if body_start != -1:
                     gt = html.find(">", body_start)
@@ -331,39 +331,41 @@ urlpatterns += [
 # Landing
 urlpatterns += [path("", root_redirect, name="root")]
 
-# ---------------- Accounts (namespaced if available; otherwise fallbacks) ----------------
+# ---------------- Accounts (namespaced) ----------------
 _accounts_mod = _try_import("circuitcity.accounts.urls") or _try_import("accounts.urls")
-_accounts_ok = bool(_accounts_mod and hasattr(_accounts_mod, "urlpatterns"))
-
-if _accounts_ok:
+if _accounts_mod and hasattr(_accounts_mod, "urlpatterns"):
     urlpatterns += [path("accounts/", include((_accounts_mod.urlpatterns, "accounts"), namespace="accounts"))]
+else:
+    # Safe include attempt first
+    urlpatterns += safe_include("accounts/", "circuitcity.accounts.urls", "accounts")
 
-# Guaranteed fallbacks so /accounts/login/ & /accounts/logout/ never 404
-_have_login = False
-_have_logout = False
+# ---- Namespaced fallback for accounts (prevents NoReverseMatch in templates) ----
+_have_namespace = False
 try:
-    if _accounts_ok:
-        _have_login = _patterns_have_name(_accounts_mod.urlpatterns, "login")
-        _have_logout = _patterns_have_name(_accounts_mod.urlpatterns, "logout")
+    # If include above worked, we will have accounts namespace already.
+    # Try a cheap reverse; if it fails, add the fallback include below.
+    reverse("accounts:login")
+    _have_namespace = True
 except Exception:
-    pass
+    _have_namespace = False
 
-if not _have_login:
-    urlpatterns += [
+if not _have_namespace:
+    accounts_fallback_patterns = [
         path(
-            "accounts/login/",
+            "login/",
             auth_views.LoginView.as_view(template_name="registration/login_v11_fix.html"),
-            name="accounts_login_fallback",
-        )
-    ]
-if not _have_logout:
-    urlpatterns += [
+            name="login",
+        ),
         path(
-            "accounts/logout/",
+            "logout/",
             auth_views.LogoutView.as_view(next_page="/accounts/login/"),
-            name="accounts_logout_fallback",
-        )
+            name="logout",
+        ),
+        # Optional names your templates may call:
+        path("forgot/", core_views.feature_unavailable, name="forgot_password_request"),
+        path("forgot/reset/", core_views.feature_unavailable, name="forgot_password_reset"),
     ]
+    urlpatterns += [path("accounts/", include((accounts_fallback_patterns, "accounts"), namespace="accounts"))]
 
 # Project-level convenient aliases
 urlpatterns += [
@@ -663,7 +665,6 @@ if _billing_urls_mod and hasattr(_billing_urls_mod, "urlpatterns"):
         path("billing/", include((_billing_urls_mod.urlpatterns, "billing"), namespace="billing")),
     ]
 else:
-    # Minimal fallback if full billing urls are unavailable
     subs_view = getattr(billing_admin_views, "hq_subscriptions", None) if billing_admin_views else None
     if subs_view is None:
         subs_view = _wallet_home_shim  # reuse shim as generic target
