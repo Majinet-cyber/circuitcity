@@ -1,0 +1,5 @@
+﻿#!/usr/bin/env bash
+set -euo pipefail
+echo "Pre-push: running preflight…"
+"'"$VIRTUAL_ENV"'" >/dev/null 2>&1 || true
+python tools/preflight.py
