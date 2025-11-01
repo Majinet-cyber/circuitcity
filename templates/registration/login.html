@@ -6,10 +6,11 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <style>
     :root{
-      --ink:#0f172a; --muted:#64748b; --line:#e5e7eb;
-      --bg1:#f6f9ff; --card:#fff;
+      --ink:#e5ecff; --muted:#93a4c4; --line:#1f2a44;
+      --bg1:#0b1220; --card:#0f1a2e;
       --blue:#2563eb; --blue-500:#3b82f6;
-      --green:#16a34a;
+      --green:#16a34a; --green-600:#15803d;
+      --ring: rgba(59,130,246,.35);
     }
     *{box-sizing:border-box}
     html,body{height:100%}
@@ -17,71 +18,89 @@
       margin:0;color:var(--ink);
       font-family:system-ui,Segoe UI,Inter,Roboto,Arial,sans-serif;
       background:
-        radial-gradient(1200px 800px at 10% -10%, #e8f0ff 0%, transparent 40%),
-        radial-gradient(1000px 700px at 110% -20%, #eaf6ff 0%, transparent 35%),
-        linear-gradient(180deg,#f6f9ff,#fff);
+        radial-gradient(1200px 800px at 10% -10%, rgba(59,130,246,.15) 0%, transparent 40%),
+        radial-gradient(1000px 700px at 110% -20%, rgba(99,102,241,.14) 0%, transparent 35%),
+        linear-gradient(180deg,var(--bg1),#0d1324 30%, #0b1220);
     }
+    a{color:#8ab4ff;text-decoration:none}
+    a:hover{text-decoration:underline}
     .wrap{min-height:100vh;display:grid;place-items:center;padding:clamp(16px,4vw,32px)}
     .card{
       width:min(520px,92vw);background:var(--card);border:1px solid var(--line);
-      border-radius:18px;padding:28px;box-shadow:0 20px 60px rgba(2,6,23,.06)
+      border-radius:18px;padding:28px;box-shadow:0 20px 60px rgba(2,6,23,.35);
+      outline:1px solid rgba(95,124,255,.08); backdrop-filter: blur(4px);
     }
     .brand{display:flex;align-items:center;gap:.6rem;margin:0 0 .5rem}
     .brand img{width:28px;height:28px}
-    .brand h1{font-size:1.5rem;margin:0}
+    .brand h1{font-size:1.5rem;margin:0;color:#e7efff}
     .muted{color:var(--muted);margin:.25rem 0 12px}
-    label{display:block;font-size:14px;margin:12px 0 6px}
+    label{display:block;font-size:14px;margin:12px 0 6px;color:#c7d4f3}
     input{
-      width:100%;padding:12px 14px;border:1px solid #cbd5e1;border-radius:12px;
-      font-size:15px;background:#fff;transition:.18s border-color,.18s box-shadow
+      width:100%;padding:12px 14px;border:1px solid #1e2a46;border-radius:12px;
+      font-size:15px;background:#0b152a;color:#e9f0ff;transition:.18s border-color,.18s box-shadow
     }
-    input:focus{outline:none;border-color:#93c5fd;box-shadow:0 0 0 4px rgba(147,197,253,.35)}
+    input::placeholder{color:#6c7aa1}
+    input:focus{outline:none;border-color:#3b82f6;box-shadow:0 0 0 4px var(--ring)}
     .row{margin-top:14px}
     .btn{
       display:inline-block;width:100%;text-align:center;border-radius:12px;
       padding:.9rem 1.1rem;font-weight:800;color:#fff;border:1px solid transparent;
       transition:.15s transform,.15s filter,.15s box-shadow
     }
-    .btn-blue{background:linear-gradient(180deg,var(--blue-500),var(--blue));box-shadow:0 10px 28px rgba(37,99,235,.25)}
-    .btn-blue:hover{transform:translateY(-1px);filter:brightness(1.03)}
-    .btn-green{background:linear-gradient(180deg,#22c55e,var(--green));box-shadow:0 10px 28px rgba(22,163,74,.22)}
-    .btn-green:hover{transform:translateY(-1px);filter:brightness(1.03)}
-    .divider{margin-top:18px;padding-top:16px;border-top:1px dashed var(--line)}
-    .err{background:#fef2f2;border:1px solid #fecaca;color:#991b1b;padding:.65rem .8rem;border-radius:12px;margin:0 0 12px}
-    .foot{display:flex;justify-content:space-between;align-items:center;margin-top:12px;color:var(--muted);font-size:12.5px}
+    .btn-blue{
+      background:linear-gradient(180deg,var(--blue-500),var(--blue));
+      border-color:#3b82f6;box-shadow:0 10px 28px rgba(37,99,235,.35)
+    }
+    .btn-blue:hover{transform:translateY(-1px);filter:brightness(1.05)}
+    .btn-green{
+      background:linear-gradient(180deg,#22c55e,var(--green));
+      border-color:#22c55e;box-shadow:0 10px 28px rgba(22,163,74,.28)
+    }
+    .btn-green:hover{transform:translateY(-1px);filter:brightness(1.05)}
+    .divider{margin-top:18px;padding-top:16px;border-top:1px dashed #233054}
+    .err{background:#2a0e12;border:1px solid #7f1d1d;color:#fecaca;padding:.65rem .8rem;border-radius:12px;margin:0 0 12px}
+    .foot{display:flex;justify-content:space-between;align-items:center;margin-top:12px;color:#9db3df;font-size:12.5px}
+    .eye-btn{
+      position:absolute;right:10px;top:50%;translate:0 -50%;border:0;background:transparent;
+      padding:6px;border-radius:8px;cursor:pointer;color:#9fb1df
+    }
+    small.muted{color:#8aa0cf}
   </style>
 </head>
 <body>
   <div class="wrap">
     <div class="card" role="dialog" aria-labelledby="loginTitle" aria-describedby="loginDesc">
+
       <div class="brand">
-        <!-- Avoid {% static %} to prevent Manifest errors; this falls back silently if missing -->
-        <img src="{{ STATIC_URL }}brand/mjn-32.png" alt="emajinet" onerror="this.remove()">
+        <!-- Plain /static/ path; if missing, hide image so the page still renders -->
+        <img src="/static/brand/mjn-32.png" alt="emajinet" onerror="this.style.display='none'">
         <h1 id="loginTitle">Circuit City</h1>
       </div>
-      <p id="loginDesc" class="muted">Sign in to continue. <span style="opacity:.6">[v01 FIX]</span></p>
+      <p id="loginDesc" class="muted">Sign in to continue. <span style="opacity:.7">[v01 FIX]</span></p>
 
       {% if messages %}
         {% for m in messages %}<div class="err" role="alert" aria-live="assertive">{{ m }}</div>{% endfor %}
       {% endif %}
 
+      <!-- Django LoginView expects 'username' & 'password' -->
       <form method="post" action="{% url 'accounts:login' %}">
         {% csrf_token %}
-        <input type="hidden" name="next" value="{{ next|default:'' }}">
-        <label for="id_identifier">Email or Username</label>
-        <input id="id_identifier" name="identifier" type="text" required autocomplete="username email"
-               value="{{ request.POST.identifier|default:'' }}">
+        <input type="hidden" name="next" value="{{ next|default:'' }}"/>
+
+        <label for="id_username">Email or Username</label>
+        <input id="id_username" name="username" type="text" required autocomplete="username"
+               value="{{ request.POST.username|default:'' }}" placeholder="you@example.com"/>
+
         <label for="id_password">Password</label>
         <div style="position:relative">
-          <input id="id_password" name="password" type="password" required autocomplete="current-password">
-          <button type="button" id="pwEye" aria-label="Show password" aria-pressed="false"
-                  style="position:absolute;right:10px;top:50%;translate:0 -50%;border:0;background:transparent;padding:6px;border-radius:8px;cursor:pointer;color:#334155">
-            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"
-                 stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <input id="id_password" name="password" type="password" required autocomplete="current-password" placeholder="••••••••"/>
+          <button type="button" id="pwEye" class="eye-btn" aria-label="Show password" aria-pressed="false">
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
               <path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7Z"/><circle cx="12" cy="12" r="3"/>
             </svg>
           </button>
         </div>
+
         <div class="row"><button type="submit" class="btn btn-blue">Sign in</button></div>
       </form>
 
@@ -91,7 +110,7 @@
 
       <div class="divider">
         <p class="muted" style="margin:0 0 10px">New here?</p>
-        <a class="btn btn-green" href="{% url 'accounts:signup_manager' %}">Create a Manager account</a>
+        <a class="btn btn-green" href="/tenants/activate-mine/">Create a Manager account</a>
         <small class="muted" style="display:block;margin-top:6px">Managers create the store and can invite agents later.</small>
         <small class="muted" style="display:block;margin-top:4px">Agents: ask your manager for an invite link.</small>
       </div>
