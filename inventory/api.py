@@ -218,6 +218,29 @@ def _apply_self_scope_or_none(qs, model, user):
     # No ownership columns we recognize -> show nothing for agents
     return qs.none()
 
+# ---------- SAFE base queryset for InventoryItem ----------
+def _safe_items_qs():
+    """
+    Returns InventoryItem queryset that avoids selecting or ordering by columns
+    that might not exist in prod (e.g., created_at/updated_at), and neutralizes
+    model Meta ordering by forcing a safe order_by('id').
+    """
+    qs = InventoryItem.objects.all()
+    # Neutralize default Meta.ordering that might reference missing fields
+    try:
+        qs = qs.order_by("id")
+    except Exception:
+        pass
+    # Avoid selecting missing timestamp columns (only defer if such fields exist on the model)
+    try:
+        fields = {f.name for f in InventoryItem._meta.get_fields()}
+        to_defer = [f for f in ("created_at", "updated_at", "created", "modified") if f in fields]
+        if to_defer:
+            qs = qs.defer(*to_defer)
+    except Exception:
+        pass
+    return qs
+
 def _scoped_sales_qs(request: HttpRequest):
     qs = Sale.objects.all()
     try:
@@ -232,7 +255,8 @@ def _scoped_sales_qs(request: HttpRequest):
     return _apply_self_scope_or_none(qs, Sale, request.user)
 
 def _scoped_stock_qs(request: HttpRequest):
-    qs = InventoryItem.objects.all()
+    # Use safe base to avoid selecting/ordering missing columns
+    qs = _safe_items_qs()
     try:
         qs = qs.select_related("product")
     except Exception:
@@ -335,7 +359,7 @@ def _find_instock_for_business(request: HttpRequest, raw: str) -> Optional[Inven
         # tenant scope by business field if present; otherwise rely on _scoped_stock_qs
         try:
             if _has_field(InventoryItem, "business"):
-                base = InventoryItem.objects.filter(business=biz)
+                base = _safe_items_qs().filter(business=biz)
             else:
                 base = _scoped_stock_qs(request)
         except Exception:
@@ -710,7 +734,7 @@ def inventory_list(request: HttpRequest):
 
     qs = _scoped_stock_qs(request)
     if use_all and _can_view_all(request.user):
-        qs = InventoryItem.objects.select_related("product")
+        qs = _safe_items_qs().select_related("product")
 
     data = [{
         "id": i.id,
@@ -732,7 +756,8 @@ def inventory_list(request: HttpRequest):
 def predictions_summary(request: HttpRequest):
     """
     Returns simple next-7-day projections and risky stock.
-    Always uses Python aggregation (safe on SQLite).
+    Always uses Python aggregation (safe on SQLite) and a safe items queryset that
+    avoids selecting or ordering by missing columns.
     """
     today = timezone.localdate()
     lookback_days = 14
@@ -743,6 +768,7 @@ def predictions_summary(request: HttpRequest):
     afield = _sale_amount_field()
 
     sales_qs = date_range_filter(_scoped_sales_qs(request), dfield, start, end_excl)
+    # Use SAFE items qs to avoid selecting created_at/updated_at or ordering by them
     items_qs = _scoped_stock_qs(request)
 
     # -------- Python accumulation --------
@@ -1235,7 +1261,7 @@ def alerts_feed(request: HttpRequest):
     alerts = []
     for r in stock:
         brand = r["product__brand"]; model = r["product__model"]
-        name = f"{brand} {model}"
+        name = f"{brand} {model}"]
         on_hand = int(r["on_hand"] or 0)
         daily = runrate_map.get(r["product_id"], 0.0)
         need7 = daily * 7.0
