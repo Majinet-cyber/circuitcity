@@ -44,14 +44,15 @@ def _try_from(modpath: str, attr: str):
 def safe_include(prefix: str, module_path: str, namespace: str | None = None):
     """
     Include a child urlconf without taking the whole site down on import error.
-    Logs errors and continues.
+    Logs errors and continues. Ensures proper app_name + namespace wiring.
     """
     try:
         mod = import_module(module_path)
         if not hasattr(mod, "urlpatterns"):
             log.error("URLConf %s has no urlpatterns; skipping include.", module_path)
             return []
-        inc = include((mod.urlpatterns, namespace) if namespace else mod.urlpatterns)
+        app_name = getattr(mod, "app_name", None) or namespace or module_path.rsplit(".", 1)[0].split(".")[-1]
+        inc = include((mod.urlpatterns, app_name), namespace=namespace or app_name)
         return [path(prefix, inc)]
     except Exception as e:
         log.error("URL include failed for %s: %s", module_path, e)
@@ -74,20 +75,26 @@ def _reverse_exists(name: str) -> bool:
 
 
 def _first_working_reverse(names: tuple[str, ...]) -> str | None:
+    """Return the **URL path** of the first reversable name."""
     for n in names:
-        if _reverse_exists(n):
-            return n
+        try:
+            return reverse(n)
+        except NoReverseMatch:
+            continue
     return None
 
 
 def _safe_redirect_to(name: str, fallback: str = "/accounts/login/"):
     def _view(_request, *args, **kwargs):
-        return redirect(name) if _reverse_exists(name) else redirect(fallback)
+        try:
+            return redirect(reverse(name))
+        except NoReverseMatch:
+            return redirect(fallback)
     return _view
 
 
-# NEW: pattern introspection (safe at import-time; no reverse())
 def _patterns_have_name(patterns, name: str) -> bool:
+    """Pattern introspection (safe at import-time; no reverse())."""
     try:
         from django.urls.resolvers import URLPattern, URLResolver
     except Exception:
@@ -106,12 +113,8 @@ def _patterns_have_name(patterns, name: str) -> bool:
     return False
 
 
-# ---------- NEW: tiny helper used by root_redirect ----------
 def _redirect_first(names: tuple[str, ...], fallback_path: str = "/accounts/login/"):
-    """
-    Redirect to the first resolvable URL name in `names`, or fallback_path.
-    Returns an HttpResponseRedirect (not a view factory).
-    """
+    """Redirect to first resolvable URL name or fallback_path."""
     target = _first_working_reverse(names)
     return redirect(target or fallback_path)
 
@@ -200,10 +203,14 @@ def __whoami__(request):
     except Exception as e:
         data["LOGIN_TEMPLATE_ORIGIN"] = f"(not found) {e.__class__.__name__}: {e}"
 
+    # FIXED: normal loop (no invalid 'as list[str]' syntax)
     for cand in data["REPORTS_TEMPLATES_CHECKED"]:
         try:
             rt = get_template(cand)
-            data["REPORTS_TEMPLATE_FOUND"] = {"template": cand, "origin": getattr(getattr(rt, "origin", None), "name", None)}
+            data["REPORTS_TEMPLATE_FOUND"] = {
+                "template": cand,
+                "origin": getattr(getattr(rt, "origin", None), "name", None),
+            }
             break
         except Exception:
             continue
@@ -312,7 +319,7 @@ if getattr(settings, "ENABLE_2FA", False):
     urlpatterns += safe_include("", "two_factor.urls", "two_factor")
 
 # Admin
-admin_path = getattr(settings, "ADMIN_URL", "admin//")
+admin_path = getattr(settings, "ADMIN_URL", "admin/")
 if not admin_path.endswith("/"):
     admin_path += "/"
 urlpatterns += [path(admin_path, admin.site.urls)]
@@ -341,7 +348,8 @@ urlpatterns += [path("", root_redirect, name="root")]
 # Try to include the real app; otherwise provide a minimal namespaced fallback
 _accounts_mod = _try_import("circuitcity.accounts.urls") or _try_import("accounts.urls")
 if _accounts_mod and hasattr(_accounts_mod, "urlpatterns"):
-    urlpatterns += [path("accounts/", include((_accounts_mod.urlpatterns, "accounts"), namespace="accounts"))]
+    app_name = getattr(_accounts_mod, "app_name", "accounts")
+    urlpatterns += [path("accounts/", include((_accounts_mod.urlpatterns, app_name), namespace="accounts"))]
 else:
     # Minimal namespaced fallbacks so {% url 'accounts:*' %} never 500s
     accounts_fallback_patterns = [
@@ -554,7 +562,8 @@ urlpatterns += safe_include("layby/",     "layby.urls", "layby")
 # >>> Simulator (namespaced; defensive import)
 _sim_urls_mod = _try_import("simulator.urls") or _try_import("circuitcity.simulator.urls")
 if _sim_urls_mod and hasattr(_sim_urls_mod, "urlpatterns"):
-    urlpatterns += [path("simulator/", include((_sim_urls_mod.urlpatterns, "simulator"), namespace="simulator"))]
+    app_name = getattr(_sim_urls_mod, "app_name", "simulator")
+    urlpatterns += [path("simulator/", include((_sim_urls_mod.urlpatterns, app_name), namespace="simulator"))]
 
 # --- Local fallback for activate-mine if tenants urls don’t expose it yet ---
 if _activate_mine_view:
@@ -566,7 +575,8 @@ if _activate_mine_view:
 # -------- Wallet include (try both import paths) --------
 _wallet_urls_mod = _try_import("wallet.urls") or _try_import("circuitcity.wallet.urls")
 if _wallet_urls_mod and hasattr(_wallet_urls_mod, "urlpatterns"):
-    urlpatterns += [path("wallet/", include((_wallet_urls_mod.urlpatterns, "wallet"), namespace="wallet"))]
+    app_name = getattr(_wallet_urls_mod, "app_name", "wallet")
+    urlpatterns += [path("wallet/", include((_wallet_urls_mod.urlpatterns, app_name), namespace="wallet"))]
 
 # -------- Robust shim for /wallet/admin/ with DIAGNOSTICS --------
 def _wallet_admin_shim(request, *args, **kwargs):
@@ -646,8 +656,10 @@ _billing_urls_mod = _try_import("billing.urls") or _try_import("circuitcity.bill
 billing_admin_views = _try_import("billing.views_admin") or _try_import("circuitcity.billing.views_admin")
 
 if _billing_urls_mod and hasattr(_billing_urls_mod, "urlpatterns"):
+    app_name = getattr(_billing_urls_mod, "app_name", "billing")
     urlpatterns += [
-        path("billing/", include((_billing_urls_mod.urlpatterns, "billing"), namespace="billing"))],
+        path("billing/", include((_billing_urls_mod.urlpatterns, app_name), namespace="billing"))
+    ]
 else:
     subs_view = getattr(billing_admin_views, "hq_subscriptions", None) if billing_admin_views else None
     if subs_view is None:
@@ -823,6 +835,18 @@ except Exception:
 if settings.DEBUG:
     urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
     urlpatterns += static(settings.STATIC_URL, document_root=settings.STATIC_ROOT)
+
+# --- Final safety: flatten any accidental nested lists to avoid resolver crashes ---
+def _flatten_urlpatterns(items):
+    flat = []
+    for it in items:
+        if isinstance(it, (list, tuple)):
+            flat.extend(_flatten_urlpatterns(list(it)))
+        else:
+            flat.append(it)
+    return flat
+
+urlpatterns = _flatten_urlpatterns(urlpatterns)
 
 # ======================================================================================
 # Error handlers
