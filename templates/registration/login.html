@@ -1,3 +1,4 @@
+{% load static %}
 <!doctype html>
 <html lang="en">
 <head>
@@ -6,146 +7,122 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <style>
     :root{
-      --cc-bg:#f6f9ff; --cc-card:#fff; --cc-line:#e5e7eb; --cc-ink:#0f172a; --cc-muted:#64748b;
-      /* Blues tuned down for softer glass */
-      --b200:#bfdbfe; --b300:#93c5fd; --b400:#60a5fa; --b500:#3b82f6; --b600:#2563eb;
+      --bg1:#f6f9ff; --bg2:#ffffff;
+      --card:#fff; --line:#e5e7eb; --ink:#0f172a; --muted:#64748b;
+      --blue:#2563eb; --blueHi:#1d4ed8;
+      --green:#22c55e; --greenHi:#16a34a;
+      --shadow:0 20px 60px rgba(2,6,23,.06);
     }
     *{box-sizing:border-box}
     html,body{height:100%}
     body{
-      margin:0;
-      background:linear-gradient(180deg,var(--cc-bg),#ffffff);
+      margin:0; color:var(--ink);
       font-family:system-ui,Segoe UI,Inter,Roboto,Arial,sans-serif;
-      color:var(--cc-ink);
+      background:radial-gradient(1200px 800px at 10% -10%, #e8f0ff 0%, transparent 40%),
+                 radial-gradient(1000px 700px at 110% -20%, #eaf6ff 0%, transparent 35%),
+                 linear-gradient(180deg,var(--bg1),var(--bg2));
     }
-    .auth-wrap{min-height:100vh;display:grid;place-items:center;padding:clamp(16px,4vw,32px)}
-    .auth-card{
-      width:min(520px,92vw);
-      background:var(--cc-card);
-      border:1px solid var(--cc-line);
-      border-radius:16px;
-      padding:28px;
-      box-shadow:0 10px 28px rgba(2,6,23,.06);
+    .wrap{min-height:100vh;display:grid;place-items:center;padding:clamp(16px,4vw,32px)}
+    .card{
+      width:min(520px,92vw); background:var(--card); border:1px solid var(--line);
+      border-radius:18px; padding:28px; box-shadow:var(--shadow);
     }
-    h1{margin:0 0 .25rem;font-weight:800;letter-spacing:.2px}
-    .muted{color:var(--cc-muted);margin:0 0 12px}
+
+    /* brand */
+    .brand{display:flex; align-items:center; gap:.6rem; margin:0 0 .5rem; text-decoration:none}
+    .brand img{width:34px;height:34px; border-radius:10px; box-shadow:0 4px 10px rgba(2,6,23,.08)}
+    .brand-title{font-weight:800; letter-spacing:.2px; font-size:clamp(22px,3.2vw,28px); color:var(--ink)}
+    .brand-sub{margin:.1rem 0 0; color:var(--muted); font-size:14.5px}
 
     label{display:block;font-size:14px;margin:12px 0 6px}
     input{
-      width:100%;
-      padding:10px 12px;
-      border:1px solid #cbd5e1;
-      border-radius:10px;
-      font-size:14px;
-      background:#fff;
-      transition:border-color .15s ease, box-shadow .15s ease;
+      width:100%; padding:12px 14px; border:1px solid #cbd5e1; border-radius:12px; font-size:15px;
+      transition:.18s border-color,.18s box-shadow; background:#fff;
     }
-    input:focus{
-      outline:none;
-      border-color:var(--b400);
-      box-shadow:0 0 0 3px rgba(96,165,250,.25);
-    }
-    .err{
-      background:#fef2f2;border:1px solid #fecaca;color:#991b1b;
-      padding:.6rem .8rem;border-radius:10px;margin:0 0 12px
-    }
-    a{color:var(--b600);text-decoration:none}
+    input:focus{outline:none;border-color:#93c5fd;box-shadow:0 0 0 4px rgba(147,197,253,.35)}
+    .err{background:#fef2f2;border:1px solid #fecaca;color:#991b1b;padding:.65rem .8rem;border-radius:12px;margin:0 0 12px}
+    a{color:var(--blue);text-decoration:none} a:hover{color:var(--blueHi)}
+    .cta{margin-top:18px;padding-top:16px;border-top:1px dashed var(--line)}
 
-    .btn-row{ margin-top:12px }
-    .glass-btn{
-      appearance:none;
-      width:100%;
-      border-radius:12px;
-      padding:.8rem 1rem;
-      font-weight:800;
-      color:#fff;
-      border:1px solid rgba(147,197,253,.6);
-      background:
-        linear-gradient(180deg,
-          color-mix(in oklab, var(--b300) 72%, #ffffff 10%) 0%,
-          color-mix(in oklab, var(--b500) 78%, #000000 4%) 100%);
-      box-shadow:
-        inset 0 1px 0 rgba(255,255,255,.55),
-        inset 0 -1px 0 rgba(2,6,23,.08),
-        0 6px 14px rgba(37,99,235,.18);
-      -webkit-backdrop-filter: blur(5px) saturate(112%);
-      backdrop-filter: blur(5px) saturate(112%);
-      transition: transform .14s ease, filter .14s ease, box-shadow .14s ease;
-    }
-    .glass-btn:hover{
-      filter:brightness(1.02);
-      box-shadow:
-        inset 0 1px 0 rgba(255,255,255,.6),
-        inset 0 -1px 0 rgba(2,6,23,.08),
-        0 8px 18px rgba(37,99,235,.22);
-      transform: translateY(-1px);
-    }
-    .glass-btn:active{ transform: translateY(0) scale(.995); }
-    .glass-btn:focus-visible{ outline:3px solid rgba(96,165,250,.42); outline-offset:2px; }
+    /* buttons */
+    .btn{display:inline-block; width:100%; border-radius:12px; padding:.9rem 1.1rem; font-weight:800; text-align:center}
+    .btn-blue{color:#fff;border:1px solid #93c5fd;background:linear-gradient(180deg,#3b82f6,#2563eb);box-shadow:0 10px 28px rgba(37,99,235,.25)}
+    .btn-blue:hover{filter:brightness(1.03); transform:translateY(-1px)}
+    .btn-blue:active{transform:translateY(0)}
+    .btn-green{color:#fff;border:1px solid #86efac;background:linear-gradient(180deg,var(--green),var(--greenHi));box-shadow:0 10px 26px rgba(34,197,94,.22)}
+    .btn-green:hover{filter:brightness(1.03); transform:translateY(-1px)}
+    .btn-green:active{transform:translateY(0)}
 
-    .glass-btn.secondary{
-      background:
-        linear-gradient(180deg,
-          color-mix(in oklab, var(--b200) 72%, #ffffff 14%),
-          color-mix(in oklab, var(--b400) 78%, #000000 4%));
-      box-shadow:
-        inset 0 1px 0 rgba(255,255,255,.55),
-        inset 0 -1px 0 rgba(2,6,23,.06),
-        0 5px 12px rgba(96,165,250,.20);
-      color:#fff;
-    }
-
-    .cta{margin-top:18px;padding-top:16px;border-top:1px dashed var(--cc-line)}
+    /* password eye */
+    .pw-wrap{position:relative}
+    .pw-eye{position:absolute;right:10px;top:50%;translate:0 -50%;border:0;background:transparent;padding:6px;border-radius:8px;cursor:pointer;color:#334155}
+    .pw-eye:focus{outline:none;box-shadow:0 0 0 3px rgba(147,197,253,.5)}
+    .pw-eye svg{width:20px;height:20px}
   </style>
 </head>
 <body>
-  <div class="auth-wrap">
-    <div class="auth-card" role="dialog" aria-labelledby="loginTitle" aria-describedby="loginDesc">
-      <h1 id="loginTitle">Imajinet</h1>
-      <p id="loginDesc" class="muted">Sign in to continue.</p>
+  <div class="wrap">
+    <div class="card" role="dialog" aria-labelledby="loginTitle" aria-describedby="loginDesc">
+
+      <!-- Brand (logo hides if missing) -->
+      <a class="brand" href="/">
+        <img src="{% static 'brand/imajinet-logo.svg' %}" alt="Imajinet" onerror="this.style.display='none'">
+        <div>
+          <div class="brand-title" id="loginTitle">Circuit City</div>
+          <div class="brand-sub" id="loginDesc">Sign in to continue.</div>
+        </div>
+      </a>
 
       {% if messages %}
-        {% for m in messages %}
-          <div class="err" role="alert" aria-live="assertive">{{ m }}</div>
-        {% endfor %}
+        {% for m in messages %}<div class="err" role="alert" aria-live="assertive">{{ m }}</div>{% endfor %}
       {% endif %}
 
-      <!-- Post directly to the canonical path to avoid NoReverseMatch -->
-      <form method="post" action="/accounts/login/" novalidate>
+      <form method="post" action="{% url 'accounts:login' %}" novalidate>
         {% csrf_token %}
         <input type="hidden" name="next" value="{{ next|default:'' }}"/>
 
         <label for="id_identifier">Email or Username</label>
-        <input id="id_identifier"
-               name="identifier"
-               type="text"
-               required
-               autocomplete="username email"
-               value="{{ request.POST.identifier|default:'' }}" />
+        <input id="id_identifier" name="identifier" type="text" required
+               autocomplete="username email" value="{{ request.POST.identifier|default:'' }}" />
 
         <label for="id_password">Password</label>
-        <input id="id_password"
-               name="password"
-               type="password"
-               required
-               autocomplete="current-password" />
-
-        <div class="btn-row">
-          <button type="submit" class="glass-btn">Sign in</button>
+        <div class="pw-wrap">
+          <input id="id_password" name="password" type="password" required autocomplete="current-password" />
+          <button type="button" class="pw-eye" aria-label="Show password" aria-pressed="false" title="Show/Hide password">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7Z"/><circle cx="12" cy="12" r="3"/>
+            </svg>
+          </button>
         </div>
+
+        <div style="margin-top:14px"><button type="submit" class="btn btn-blue">Sign in</button></div>
       </form>
 
       <p class="muted" style="margin-top:12px">
-        <a href="/accounts/forgot/">Forgot your password?</a>
+        <a href="{% url 'accounts:forgot_password_request' %}">Forgot your password?</a>
       </p>
 
       <div class="cta" aria-label="Create account">
         <p class="muted" style="margin:0 0 10px">New here?</p>
-        <a class="glass-btn secondary" href="/accounts/signup/manager/">Create a Manager account</a>
+        <a class="btn btn-green" href="{% url 'accounts:signup_manager' %}">Create a Manager account</a>
         <small class="muted" style="display:block;margin-top:6px">Managers create the store and can invite agents later.</small>
         <small class="muted" style="display:block;margin-top:4px">Agents: ask your manager for an invite link.</small>
       </div>
     </div>
   </div>
+
+  <script>
+    // password eye toggle (no dependencies)
+    (function () {
+      const pw = document.getElementById('id_password');
+      const btn = document.querySelector('.pw-eye');
+      if (!pw || !btn) return;
+      btn.addEventListener('click', () => {
+        const shown = pw.type === 'text';
+        pw.type = shown ? 'password' : 'text';
+        btn.setAttribute('aria-pressed', String(!shown));
+      });
+    })();
+  </script>
 </body>
 </html>
