@@ -643,7 +643,7 @@ def login_template_probe(request):
         html = banner + html
 
     resp = HttpResponse(html)
-    resp["Content-Type"] = "text/html; charset=utf-8"]
+    resp["Content-Type"] = "text/html; charset=utf-8"
     resp["X-Template-Origin"] = origin
     return resp
 
