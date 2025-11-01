@@ -47,16 +47,17 @@ def role_flags(request) -> Dict[str, Any]:
     Adds lightweight role booleans commonly used in templates & JS.
 
     Exposed keys:
-      - IS_MANAGER: True if membership role == MANAGER, or user.profile.is_manager, or user.is_staff
+      - IS_MANAGER: True if membership role == MANAGER, or (fallback) is_staff
       - IS_STAFF: True if user.is_staff
       - IS_SUPERUSER: True if user.is_superuser
-      - IS_AGENT: True for authenticated users who are NOT manager/staff (useful in UI logic)
+      - IS_AGENT: True for authenticated users who are NOT manager/staff
 
-    Notes:
-      * Keeps logic defensive—any missing attributes won’t raise.
-      * Mirrors checks already used in your base.html and feature templates.
+    Important:
+      * Never evaluates request.user (SimpleLazyObject) to avoid DB/session hits,
+        especially while rendering error pages.
+      * Uses request._cached_user only if AuthenticationMiddleware already resolved it.
+      * Avoids touching user.profile or groups/permissions here (they can trigger queries).
     """
-    user = getattr(request, "user", None)
 
     def _safe_bool(val: Any) -> bool:
         try:
@@ -64,41 +65,42 @@ def role_flags(request) -> Dict[str, Any]:
         except Exception:
             return False
 
-    # Base user flags (defensive)
-    is_auth = _safe_bool(getattr(user, "is_authenticated", False))
+    # Only use the cached user; do NOT touch request.user directly.
+    user = getattr(request, "_cached_user", None)
+
+    if not user:
+        # Treat as anonymous: safe defaults prevent recursive failures on 500s.
+        flags = {
+            "IS_MANAGER": False,
+            "IS_STAFF": False,
+            "IS_SUPERUSER": False,
+            "IS_AGENT": False,
+        }
+        return {**flags, "ROLE_FLAGS": flags}
+
+    # Base user flags (no DB hit once user is cached)
     is_staff = _safe_bool(getattr(user, "is_staff", False))
     is_superuser = _safe_bool(getattr(user, "is_superuser", False))
+    is_auth = _safe_bool(getattr(user, "is_authenticated", False))
 
-    # Membership-derived manager
+    # Membership-derived manager flag (safe: only use if middleware already set it)
     membership = getattr(request, "membership", None)
     membership_role = getattr(membership, "role", None)
-    is_membership_manager = _safe_bool(
-        (membership_role or "").upper() == "MANAGER"
-    )
+    is_membership_manager = _safe_bool((membership_role or "").upper() == "MANAGER")
 
-    # Profile-derived manager
-    profile = getattr(user, "profile", None)
-    profile_is_manager = _safe_bool(getattr(profile, "is_manager", False))
-
-    # Unified manager flag (order of precedence: membership → profile → staff)
-    is_manager = is_membership_manager or profile_is_manager or is_staff
+    # Unified manager flag: membership takes precedence; staff implies manager as fallback.
+    is_manager = is_membership_manager or is_staff
 
     # Agent = authenticated but not manager/staff
     is_agent = _safe_bool(is_auth and not is_manager and not is_staff)
 
-    return {
+    flags = {
         "IS_MANAGER": is_manager,
         "IS_STAFF": is_staff,
         "IS_SUPERUSER": is_superuser,
         "IS_AGENT": is_agent,
-        # Optional bundle if you ever want a single dict in JS:
-        "ROLE_FLAGS": {
-            "IS_MANAGER": is_manager,
-            "IS_STAFF": is_staff,
-            "IS_SUPERUSER": is_superuser,
-            "IS_AGENT": is_agent,
-        },
     }
+    return {**flags, "ROLE_FLAGS": flags}
 
 
 __all__ = ["build_meta", "brand", "role_flags"]
