@@ -1,4 +1,5 @@
-﻿from __future__ import annotations
+﻿# cc/urls.py
+from __future__ import annotations
 
 import os
 import re
@@ -103,6 +104,16 @@ def _patterns_have_name(patterns, name: str) -> bool:
         except Exception:
             continue
     return False
+
+
+# ---------- NEW: tiny helper used by root_redirect ----------
+def _redirect_first(names: tuple[str, ...], fallback_path: str = "/accounts/login/"):
+    """
+    Redirect to the first resolvable URL name in `names`, or fallback_path.
+    Returns an HttpResponseRedirect (not a view factory).
+    """
+    target = _first_working_reverse(names)
+    return redirect(target or fallback_path)
 
 
 # ======================================================================================
@@ -213,7 +224,7 @@ def __render_login__(request):
           Template origin: <code>{origin}</code>
         </div>
         """
-        if "<body" in html:
+        if "<body" in html.lower():
             body_start = html.lower().find("<body")
             if body_start != -1:
                 gt = html.find(">", body_start)
@@ -247,7 +258,7 @@ def __render_reports__(request):
               Origin: <code>{origin}</code>
             </div>
             """
-            if "<body" in html:
+            if "<body" in html.lower():
                 body_start = html.lower().find("<body")
                 if body_start != -1:
                     gt = html.find(">", body_start)
@@ -301,7 +312,7 @@ if getattr(settings, "ENABLE_2FA", False):
     urlpatterns += safe_include("", "two_factor.urls", "two_factor")
 
 # Admin
-admin_path = getattr(settings, "ADMIN_URL", "admin/")
+admin_path = getattr(settings, "ADMIN_URL", "admin//")
 if not admin_path.endswith("/"):
     admin_path += "/"
 urlpatterns += [path(admin_path, admin.site.urls)]
@@ -636,8 +647,7 @@ billing_admin_views = _try_import("billing.views_admin") or _try_import("circuit
 
 if _billing_urls_mod and hasattr(_billing_urls_mod, "urlpatterns"):
     urlpatterns += [
-        path("billing/", include((_billing_urls_mod.urlpatterns, "billing"), namespace="billing")),
-    ]
+        path("billing/", include((_billing_urls_mod.urlpatterns, "billing"), namespace="billing"))],
 else:
     subs_view = getattr(billing_admin_views, "hq_subscriptions", None) if billing_admin_views else None
     if subs_view is None:
