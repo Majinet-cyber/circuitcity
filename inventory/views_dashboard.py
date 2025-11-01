@@ -1,4 +1,5 @@
-﻿# circuitcity/inventory/views_dashboard.py
+# circuitcity/inventory/views_dashboard.py
+from __future__ import annotations
 from django.shortcuts import render
 from django.http import HttpRequest, HttpResponse, JsonResponse
 
@@ -7,14 +8,13 @@ def inventory_dashboard(request: HttpRequest) -> HttpResponse:
     """
     Inventory dashboard view.
 
-    - If Accept header asks for JSON â†’ return a small JSON stub.
+    - If Accept header asks for JSON → return a small JSON stub.
     - Otherwise render a template (inventory/dashboard.html).
     - Falls back to a plain HttpResponse if the template is missing.
     """
     if request.headers.get("accept", "").startswith("application/json"):
         return JsonResponse({"ok": True, "message": "Inventory dashboard ready"})
     # circuitcity/inventory/views_dashboard.py
-    from __future__ import annotations
 
     from typing import Any, Dict
     import logging
