@@ -235,6 +235,10 @@ USE_LOCAL_SQLITE = env_bool("USE_LOCAL_SQLITE", default=not bool(DATABASE_URL))
 REQUIRE_DATABASE_URL = env_bool("REQUIRE_DATABASE_URL", False)
 PGCONNECT_TIMEOUT = env_int("PGCONNECT_TIMEOUT", 5)
 
+# DB connection resiliency
+DB_CONN_MAX_AGE = env_int("DB_CONN_MAX_AGE", 120)  # seconds
+DB_CONN_HEALTH_CHECKS = env_bool("DB_CONN_HEALTH_CHECKS", True)
+
 if TESTING:
     DATABASES["default"] = {
         "ENGINE": "django.db.backends.sqlite3",
@@ -246,15 +250,17 @@ elif DATABASE_URL:
     except Exception as e:
         raise RuntimeError("dj-database-url must be installed") from e
 
-    # TLS for Render/prod
+    # TLS for Render/prod with health checks to avoid stale SSL connections
     cfg = dj_database_url.parse(
         DATABASE_URL,
-        conn_max_age=600,
+        conn_max_age=DB_CONN_MAX_AGE,
         ssl_require=not DEBUG,
     )
+    # OPTIONS & health checks
     opts = dict(cfg.get("OPTIONS") or {})
     opts.setdefault("connect_timeout", PGCONNECT_TIMEOUT)
     cfg["OPTIONS"] = opts
+    cfg["CONN_HEALTH_CHECKS"] = DB_CONN_HEALTH_CHECKS
     DATABASES["default"] = cfg
 elif USE_LOCAL_SQLITE:
     sqlite_path = str(BASE_DIR / "db.sqlite3")
@@ -272,8 +278,12 @@ else:
         "PASSWORD": PASSWORD,
         "HOST": HOST,
         "PORT": PORT,
-        "CONN_MAX_AGE": 600,
-        "OPTIONS": {"connect_timeout": PGCONNECT_TIMEOUT, **({"sslmode": "require"} if not DEBUG else {})},
+        "CONN_MAX_AGE": DB_CONN_MAX_AGE,
+        "CONN_HEALTH_CHECKS": DB_CONN_HEALTH_CHECKS,
+        "OPTIONS": {
+            "connect_timeout": PGCONNECT_TIMEOUT,
+            **({"sslmode": "require"} if not DEBUG else {}),
+        },
     }
 
 # --------------------------- cache ---------------------------
@@ -335,6 +345,8 @@ STORAGES = {
 WHITENOISE_AUTOREFRESH = DEBUG
 WHITENOISE_MAX_AGE = 60 * 60 * 24 * 365
 WHITENOISE_INDEX_FILE = False
+# Don't 500 if a template references a removed/renamed static during a deploy
+WHITENOISE_MANIFEST_STRICT = False
 
 # --------------------------- auth redirects ---------------------------
 LOGIN_URL = "/accounts/login/"

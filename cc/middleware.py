@@ -5,6 +5,7 @@ import time
 import uuid
 import logging
 from importlib import import_module
+from typing import Any, Optional
 
 from django.conf import settings
 from django.utils.deprecation import MiddlewareMixin
@@ -39,6 +40,30 @@ def _import_optional(path: str):
         return None
 
 
+def _safe_is_authenticated(user: Any) -> bool:
+    """
+    Returns True iff the user is authenticated without boolean-casting the
+    SimpleLazyObject. Any error while resolving the user/session -> False.
+    """
+    try:
+        if user is None:
+            return False
+        attr = getattr(user, "is_authenticated", None)
+        if callable(attr):
+            return bool(attr())
+        return bool(attr)
+    except Exception:
+        return False
+
+
+def _safe_user_id(user: Any) -> Optional[int]:
+    """Resolve user.id without forcing auth if it errors; return None on failure."""
+    try:
+        return getattr(user, "id", None)
+    except Exception:
+        return None
+
+
 # ------------------------------------------------------------------
 # Request ID
 # ------------------------------------------------------------------
@@ -46,10 +71,10 @@ class RequestIDMiddleware(MiddlewareMixin):
     """
     Attaches a unique request ID to each request and response.
 
-    â€¢ Reads incoming X-Request-ID (from proxies) if present,
+    • Reads incoming X-Request-ID (from proxies) if present,
       otherwise generates a UUID4.
-    â€¢ Exposes request.request_id for views/templates.
-    â€¢ Echoes back X-Request-ID on the response headers.
+    • Exposes request.request_id for views/templates.
+    • Echoes back X-Request-ID on the response headers.
     """
     IN_HEADER = "HTTP_X_REQUEST_ID"
     OUT_HEADER = "X-Request-ID"
@@ -86,7 +111,8 @@ class AccessLogMiddleware(MiddlewareMixin):
             latency_ms = int(
                 (time.perf_counter() - getattr(request, "_start_ts", time.perf_counter())) * 1000
             )
-            user_id = getattr(getattr(request, "user", None), "id", None)
+            user = getattr(request, "user", None)
+            user_id = _safe_user_id(user)
             access_logger.info(
                 "http_request",
                 extra={
@@ -107,7 +133,7 @@ class AccessLogMiddleware(MiddlewareMixin):
 
 
 # ------------------------------------------------------------------
-# HQ guard â€” keep HQ admins out of tenant/store UIs
+# HQ guard — keep HQ admins out of tenant/store UIs
 # Place this middleware in settings.py immediately AFTER
 # AuthenticationMiddleware and BEFORE tenants middleware.
 # ------------------------------------------------------------------
@@ -145,17 +171,22 @@ _BLOCK_PREFIXES = (
 class PreventHQFromClientUI(MiddlewareMixin):
     """
     If user is an HQ admin, redirect any request to tenant/store UI
-    back to the HQ shell.  We redirect directly to **hq:subscriptions**
+    back to the HQ shell. We redirect directly to **hq:subscriptions**
     (not hq:home) to avoid alias loops.
     """
 
     def process_request(self, request: HttpRequest):
         user = getattr(request, "user", None)
-        if not user or not user.is_authenticated:
+        # ⚠️ Never boolean-cast the lazy user; use the safe helper.
+        if not _safe_is_authenticated(user):
             return None
 
-        if not _is_hq_admin(user):
-            return None  # non-HQ users are allowed through
+        try:
+            if not _is_hq_admin(user):
+                return None  # non-HQ users are allowed through
+        except Exception:
+            # If role resolution fails (e.g., DB hiccup), treat as non-HQ and continue
+            return None
 
         path = (request.path or "")
 
@@ -188,14 +219,18 @@ class AutoSelectBusinessMiddleware(MiddlewareMixin):
     def process_request(self, request: HttpRequest):
         try:
             user = getattr(request, "user", None)
-            if not (user and user.is_authenticated):
+            if not _safe_is_authenticated(user):
                 return
 
             # If already set on request or session, do nothing.
-            if getattr(request, "active_business", None) or request.session.get("active_business_id"):
-                # Ensure a location is present if business exists but location isn't set.
-                if getattr(request, "active_business", None) and not getattr(request, "active_location", None):
-                    self._ensure_location(request)
+            try:
+                if getattr(request, "active_business", None) or request.session.get("active_business_id"):
+                    # Ensure a location is present if business exists but location isn't set.
+                    if getattr(request, "active_business", None) and not getattr(request, "active_location", None):
+                        self._ensure_location(request)
+                    return
+            except Exception:
+                # If session access explodes due to DB, quietly skip auto-select
                 return
 
             # Try tenants models (prefer un-namespaced, then circuitcity.*)
@@ -205,17 +240,32 @@ class AutoSelectBusinessMiddleware(MiddlewareMixin):
 
             qs = BM.objects.filter(user=user)
             # Be defensive about flags
+            try:
+                field_names = [fld.name for fld in BM._meta.fields]
+            except Exception:
+                field_names = []
+
             for f in ("is_active", "active", "accepted"):
-                if f in [fld.name for fld in BM._meta.fields]:
+                if f in field_names:
                     try:
                         qs = qs.filter(**{f: True})
                     except Exception:
                         pass
 
-            if qs.count() != 1:
+            # Avoid expensive count() if DB is unhappy
+            try:
+                count = qs.count()
+            except Exception:
                 return
 
-            membership = qs.first()
+            if count != 1:
+                return
+
+            try:
+                membership = qs.first()
+            except Exception:
+                return
+
             biz = getattr(membership, "business", None)
             if not biz:
                 return
@@ -223,9 +273,13 @@ class AutoSelectBusinessMiddleware(MiddlewareMixin):
             # Set business on request and session
             request.active_business = biz
             request.active_business_id = getattr(biz, "id", None)
-            request.session["active_business_id"] = getattr(biz, "id", None)
-            # legacy keys some old code might read
-            request.session["biz_id"] = getattr(biz, "id", None)
+            try:
+                request.session["active_business_id"] = getattr(biz, "id", None)
+                # legacy keys some old code might read
+                request.session["biz_id"] = getattr(biz, "id", None)
+            except Exception:
+                # If session write fails, still keep request-scoped values
+                pass
 
             # Ensure a default location
             self._ensure_location(request)
@@ -265,12 +319,15 @@ class AutoSelectBusinessMiddleware(MiddlewareMixin):
         if not Location:
             return
         try:
-            loc = (
-                Location.objects.filter(business=biz)
-                .filter(**({"is_active": True} if "is_active" in [f.name for f in Location._meta.fields] else {}))
-                .order_by("name")
-                .first()
-            )
+            field_names = [f.name for f in Location._meta.fields]
+        except Exception:
+            field_names = []
+
+        try:
+            qs = Location.objects.filter(business=biz)
+            if "is_active" in field_names:
+                qs = qs.filter(is_active=True)
+            loc = qs.order_by("name").first()
             if loc:
                 request.active_location = loc
                 request.active_location_id = getattr(loc, "id", None)
@@ -286,9 +343,9 @@ class FriendlyErrorsMiddleware(MiddlewareMixin):
     Converts unexpected exceptions into a branded 500 page for users
     while keeping full tracebacks in logs. Has no effect when DEBUG=True.
 
-    â€¢ Re-raises 404, PermissionDenied, SuspiciousOperation to let Django handle them.
-    â€¢ For any other Exception, logs the traceback and renders templates/errors/500.html.
-    â€¢ Includes X-Request-ID header (added by RequestIDMiddleware) for easier support.
+    • Re-raises 404, PermissionDenied, SuspiciousOperation to let Django handle them.
+    • For any other Exception, logs the traceback and renders templates/errors/500.html.
+    • Includes X-Request-ID header (added by RequestIDMiddleware) for easier support.
     """
 
     def process_exception(self, request: HttpRequest, exc: Exception):
@@ -317,6 +374,4 @@ class FriendlyErrorsMiddleware(MiddlewareMixin):
             return resp
         except Exception:
             # As a last resort, return a minimal safe response
-            return HttpResponse("Sorry â€” something went wrong.", status=500)
-
-
+            return HttpResponse("Sorry — something went wrong.", status=500)
