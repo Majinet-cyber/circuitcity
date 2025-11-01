@@ -1,129 +1,128 @@
-{% load static %}
 <!doctype html>
 <html lang="en">
 <head>
   <meta charset="utf-8" />
   <title>Sign in · Circuit City</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
+  {% load static %}
   <style>
     :root{
-      --bg:#f6f9ff; --card:#fff; --line:#e5e7eb; --ink:#0f172a; --muted:#64748b;
-      --blue:#2563eb; --blueHi:#1d4ed8;
-      --green:#16a34a; --greenHi:#15803d;
-      --shadow:0 20px 60px rgba(2,6,23,.06);
+      --ink:#0f172a; --muted:#64748b; --line:#e5e7eb;
+      --bg1:#f6f9ff; --card:#fff;
+      --blue:#2563eb; --blue-500:#3b82f6;
+      --green:#16a34a; --green-600:#15803d;
     }
     *{box-sizing:border-box}
     html,body{height:100%}
     body{
-      margin:0; color:var(--ink);
+      margin:0;color:var(--ink);
       font-family:system-ui,Segoe UI,Inter,Roboto,Arial,sans-serif;
-      background:radial-gradient(1200px 800px at 10% -10%, #e8f0ff 0%, transparent 40%),
-                 radial-gradient(1000px 700px at 110% -20%, #eaf6ff 0%, transparent 35%),
-                 linear-gradient(180deg,var(--bg),#fff);
+      background:
+        radial-gradient(1200px 800px at 10% -10%, #e8f0ff 0%, transparent 40%),
+        radial-gradient(1000px 700px at 110% -20%, #eaf6ff 0%, transparent 35%),
+        linear-gradient(180deg,var(--bg1),#fff);
     }
     .wrap{min-height:100vh;display:grid;place-items:center;padding:clamp(16px,4vw,32px)}
     .card{
-      width:min(520px,92vw);
-      background:var(--card);
-      border:1px solid var(--line);
-      border-radius:18px;
-      padding:28px;
-      box-shadow:var(--shadow);
+      width:min(520px,92vw);background:var(--card);border:1px solid var(--line);
+      border-radius:18px;padding:28px;box-shadow:0 20px 60px rgba(2,6,23,.06)
     }
-    .brand{display:flex;align-items:center;gap:12px;margin-bottom:4px}
-    .brand img{width:28px;height:28px;object-fit:contain}
-    h1{margin:0;font-weight:800;letter-spacing:.2px}
-    .muted{color:var(--muted);margin:4px 0 14px}
-
+    .brand{display:flex;align-items:center;gap:.6rem;margin:0 0 .5rem}
+    .brand img{width:28px;height:28px}
+    .brand h1{font-size:1.5rem;margin:0}
+    .muted{color:var(--muted);margin:.25rem 0 12px}
     label{display:block;font-size:14px;margin:12px 0 6px}
     input{
       width:100%;padding:12px 14px;border:1px solid #cbd5e1;border-radius:12px;
-      font-size:15px;background:#fff;transition:.18s border-color,.18s box-shadow;
+      font-size:15px;background:#fff;transition:.18s border-color,.18s box-shadow
     }
     input:focus{outline:none;border-color:#93c5fd;box-shadow:0 0 0 4px rgba(147,197,253,.35)}
-    .err{background:#fef2f2;border:1px solid #fecaca;color:#991b1b;padding:.65rem .8rem;border-radius:12px;margin:0 0 12px}
-
     .row{margin-top:14px}
     .btn{
-      display:inline-block;width:100%;text-align:center;
-      border-radius:12px;padding:.9rem 1.1rem;font-weight:800;letter-spacing:.2px;
-      transition:.15s transform,.15s filter,.15s box-shadow;border:1px solid transparent;
+      display:inline-block;width:100%;text-align:center;border-radius:12px;
+      padding:.9rem 1.1rem;font-weight:800;color:#fff;border:1px solid transparent;
+      transition:.15s transform,.15s filter,.15s box-shadow
     }
     .btn-blue{
-      color:#fff;border-color:#93c5fd;
-      background:linear-gradient(180deg,#3b82f6,#2563eb);
-      box-shadow:0 10px 24px rgba(37,99,235,.25);
+      background:linear-gradient(180deg,var(--blue-500),var(--blue));
+      border-color:#93c5fd;box-shadow:0 10px 28px rgba(37,99,235,.25)
     }
     .btn-blue:hover{transform:translateY(-1px);filter:brightness(1.03)}
-    .btn-blue:active{transform:translateY(0)}
-
     .btn-green{
-      color:#fff;border-color:#86efac;
-      background:linear-gradient(180deg,var(--green),var(--greenHi));
-      box-shadow:0 10px 24px rgba(22,163,74,.22);
+      background:linear-gradient(180deg,#22c55e,var(--green));
+      border-color:#86efac;box-shadow:0 10px 28px rgba(22,163,74,.22)
     }
     .btn-green:hover{transform:translateY(-1px);filter:brightness(1.03)}
-    .btn-green:active{transform:translateY(0)}
-
-    .cta{margin-top:18px;padding-top:16px;border-top:1px dashed var(--line)}
-    .pw-wrap{position:relative}
-    .pw-eye{position:absolute;right:10px;top:50%;translate:0 -50%;
-      border:0;background:transparent;padding:6px;border-radius:8px;cursor:pointer;color:#334155}
-    .pw-eye:focus{outline:none;box-shadow:0 0 0 3px rgba(147,197,253,.5)}
-    .pw-eye svg{width:20px;height:20px}
-    .footer{display:flex;justify-content:space-between;align-items:center;margin-top:12px;color:#64748b;font-size:12.5px}
+    .divider{margin-top:18px;padding-top:16px;border-top:1px dashed var(--line)}
+    .err{background:#fef2f2;border:1px solid #fecaca;color:#991b1b;padding:.65rem .8rem;border-radius:12px;margin:0 0 12px}
+    .foot{display:flex;justify-content:space-between;align-items:center;margin-top:12px;color:var(--muted);font-size:12.5px}
+    .help{color:var(--muted);font-size:12.5px;margin-top:8px}
   </style>
 </head>
 <body>
   <div class="wrap">
     <div class="card" role="dialog" aria-labelledby="loginTitle" aria-describedby="loginDesc">
+
       <div class="brand">
-        <!-- If the logo path differs, update the static path below -->
-        <img src="{% static 'brand/imajinet-logo.svg' %}" alt="Imajinet" onerror="this.style.display='none'">
+        <img src="{% static 'img/emajinet-mark.svg' %}" alt="emajinet" onerror="this.style.display='none'">
         <h1 id="loginTitle">Circuit City</h1>
       </div>
       <p id="loginDesc" class="muted">Sign in to continue.</p>
 
+      {# Render server-side form errors (Django LoginView exposes `form`) #}
+      {% if form and form.errors %}
+        <div class="err" role="alert" aria-live="assertive">
+          Invalid credentials or missing fields. Please try again.
+        </div>
+      {% endif %}
       {% if messages %}
-        {% for m in messages %}<div class="err" role="alert" aria-live="assertive">{{ m }}</div>{% endfor %}
+        {% for m in messages %}
+          <div class="err" role="alert" aria-live="assertive">{{ m }}</div>
+        {% endfor %}
       {% endif %}
 
-      <!-- Use path-based URLs so this page never breaks if namespacing changes -->
-      <form method="post" action="/accounts/login/" novalidate>
+      {# Always present thanks to cc/urls namespaced fallback #}
+      <form method="post" action="{% url 'accounts:login' %}">
         {% csrf_token %}
         <input type="hidden" name="next" value="{{ next|default:'' }}"/>
 
-        <label for="id_identifier">Email or Username</label>
-        <input id="id_identifier" name="identifier" type="text" required
-               autocomplete="username email" value="{{ request.POST.identifier|default:'' }}" />
+        <label for="id_username">Email or Username</label>
+        <input
+          id="id_username"
+          name="username"              {# important: default LoginView expects 'username' #}
+          type="text"
+          required
+          autocomplete="username email"
+          value="{{ request.POST.username|default:'' }}"
+        />
 
         <label for="id_password">Password</label>
-        <div class="pw-wrap">
+        <div style="position:relative">
           <input id="id_password" name="password" type="password" required autocomplete="current-password" />
-          <button type="button" class="pw-eye" aria-label="Show password" aria-pressed="false" title="Show/Hide password">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-              <path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7Z"/><circle cx="12" cy="12" r="3"/>
+          <button type="button" id="pwEye" aria-label="Show password" aria-pressed="false"
+                  style="position:absolute;right:10px;top:50%;translate:0 -50%;border:0;background:transparent;padding:6px;border-radius:8px;cursor:pointer;color:#334155">
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7Z"></path>
+              <circle cx="12" cy="12" r="3"></circle>
             </svg>
           </button>
         </div>
 
-        <div class="row">
-          <button type="submit" class="btn btn-blue">Sign in</button>
-        </div>
+        <div class="row"><button type="submit" class="btn btn-blue">Sign in</button></div>
       </form>
 
       <p class="muted" style="margin-top:12px">
-        <a href="/accounts/forgot/">Forgot your password?</a>
+        <a href="{% url 'accounts:forgot_password_request' %}">Forgot your password?</a>
       </p>
 
-      <div class="cta" aria-label="Create account">
+      <div class="divider">
         <p class="muted" style="margin:0 0 10px">New here?</p>
-        <a class="btn btn-green" href="/accounts/signup/manager/">Create a Manager account</a>
-        <small class="muted" style="display:block;margin-top:6px">Managers create the store and can invite agents later.</small>
-        <small class="muted" style="display:block;margin-top:4px">Agents: ask your manager for an invite link.</small>
+        <a class="btn btn-green" href="{% url 'accounts:signup_manager' %}">Create a Manager account</a>
+        <small class="help">Managers create the store and can invite agents later.</small>
+        <small class="help">Agents: ask your manager for an invite link.</small>
       </div>
 
-      <div class="footer">
+      <div class="foot">
         <span>&copy; emajinet</span>
         <span>v01</span>
       </div>
@@ -131,10 +130,9 @@
   </div>
 
   <script>
-    // password eye toggle
     (function () {
       const pw = document.getElementById('id_password');
-      const btn = document.querySelector('.pw-eye');
+      const btn = document.getElementById('pwEye');
       if (!pw || !btn) return;
       btn.addEventListener('click', () => {
         const shown = pw.type === 'text';
