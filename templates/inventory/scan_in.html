@@ -132,8 +132,11 @@
     text-align:left;padding:10px 12px;border-radius:10px;border:1px solid #e5e7eb;
     background:#f9fafb;cursor:pointer;word-break:break-all
   }
-  #ccscan-picker .actions{margin-top:12px;display:flex;justify-content:flex-end}
-  #ccscan-picker .cancel{padding:8px 12px;border-radius:10px;border:1px solid #e5e7eb;background:#fff;cursor:pointer}
+  #ccscan-picker .item small{display:block;color:#6b7280;margin-top:2px}
+  #ccscan-picker .actions{margin-top:12px;display:flex;justify-content:flex-end;gap:8px}
+  #ccscan-picker .cancel,.secondary{
+    padding:8px 12px;border-radius:10px;border:1px solid #e5e7eb;background:#fff;cursor:pointer
+  }
 </style>
 {% endblock %}
 
@@ -386,7 +389,10 @@
     return false;
   }
 
-  function pauseScanline(ms=900){ scanLine?.classList.add('paused'); setTimeout(()=> scanLine?.classList.remove('paused'), ms); }
+  function pauseScanline(ms=900){
+    scanLine?.classList.add('paused');
+    setTimeout(()=> scanLine?.classList.remove('paused'), ms);
+  }
 
   // ===== Validation / defaults =====
   const defaultLocId = (form && form.dataset.defaultLocationId) ? form.dataset.defaultLocationId : '';
@@ -556,7 +562,7 @@
     }
   });
 
-  // ===== Scanner: BarcodeDetector → Quagga fallback =====
+  // ===== Scanner: BarcodeDetector (QR-first, multi-pick) → Quagga fallback =====
   let mediaStream = null, videoTrack = null;
 
   async function listCameras(){
@@ -606,29 +612,33 @@
     mediaStream = null; videoTrack = null;
   }
 
-  function picker(values, onPick){
+  function buildPicker(values, onPick, title='Multiple codes found — pick one'){
     document.getElementById('ccscan-picker')?.remove();
     const wrap = document.createElement('div');
     wrap.id = 'ccscan-picker';
     const card = document.createElement('div'); card.className='card';
-    const h = document.createElement('div'); h.style.fontWeight='600'; h.style.marginBottom='10px'; h.textContent='Multiple codes found — pick one';
+    const h = document.createElement('div'); h.style.fontWeight='600'; h.style.marginBottom='10px'; h.textContent=title;
     const list = document.createElement('div'); list.className='list';
     values.forEach(v=>{
-      const b = document.createElement('button'); b.type='button'; b.className='item'; b.textContent=v;
-      b.onclick = ()=>{ wrap.remove(); onPick(v); };
-      list.appendChild(b);
+      const btn = document.createElement('button'); btn.type='button'; btn.className='item';
+      const main = (v.label ?? v.value ?? '').toString();
+      btn.innerHTML = `${main.replace(/</g,'&lt;').replace(/>/g,'&gt;')}${v.meta ? `<small>${v.meta}</small>` : ''}`;
+      btn.onclick = ()=>{ wrap.remove(); onPick(v.value ?? main); };
+      list.appendChild(btn);
     });
     const actions = document.createElement('div'); actions.className='actions';
     const cancel = document.createElement('button'); cancel.type='button'; cancel.className='cancel'; cancel.textContent='Cancel';
     cancel.onclick = ()=> wrap.remove();
-    actions.appendChild(cancel);
+    const pause = document.createElement('button'); pause.type='button'; pause.className='secondary'; pause.textContent='Pause camera';
+    pause.onclick = ()=> { stopAll(); };
+    actions.append(pause, cancel);
     card.append(h,list,actions); wrap.appendChild(card); document.body.appendChild(wrap);
   }
 
   function handleIMEI(value){
     const codeRaw = digitsOnly(value);
     if (!codeRaw) return;
-    const code = (codeRaw.length >= 15) ? codeRaw.slice(-15) : codeRaw;
+    const code = (codeRaw.length >= 15) ? codeRaw.slice(-15) : codeRaw; // prefer last 15
     if (imeiEl){ imeiEl.value = code; updateImeiCounter(); updateFormValidity(); }
     try{ navigator.vibrate && navigator.vibrate(20);}catch(_){}
     if (code.length === 15 && submitBtn && !submitBtn.disabled){
@@ -637,6 +647,18 @@
     } else {
       showToast('Scanned, but not a 15-digit IMEI.', false);
     }
+  }
+
+  // Extract all possible IMEI-like candidates from a QR payload (e.g., JSON/Text with digits)
+  function imeiCandidatesFromString(s){
+    const d = digitsOnly(s||'');
+    const cands = new Set();
+    // slide a window to capture any 15-digit sequences
+    for (let i=0;i+15<=d.length;i++){
+      const chunk = d.slice(i,i+15);
+      if (chunk.length===15) cands.add(chunk);
+    }
+    return Array.from(cands);
   }
 
   async function startNativeDetector(deviceId){
@@ -652,9 +674,7 @@
 
     const canvas = document.createElement('canvas');
     const ctx = canvas.getContext('2d', { willReadFrequently: true });
-    let lastPickShownAt = 0;
-    const windowMs = 1200;
-    let seen = new Map();   // value -> lastTs
+    let lastPickerAt = 0;
 
     const loop = async () => {
       if (!mediaStream) return;
@@ -665,19 +685,56 @@
       ctx.drawImage(camNode,0,0,canvas.width,canvas.height);
 
       try{
-        const codes = await detector.detect(canvas);
-        if (codes?.length){
-          const vals = [...new Set(codes.map(c => (c.rawValue||c.rawValueText||"").trim()).filter(Boolean))];
-          const now = Date.now();
-          vals.forEach(v=> seen.set(v, now));
-          for (const [k,t] of [...seen.entries()]) if (now - t > windowMs) seen.delete(k);
+        const detections = await detector.detect(canvas);
+        if (!detections || !detections.length) return;
 
-          const uniq = [...seen.keys()];
-          if (uniq.length === 1){
-            handleIMEI(uniq[0]);
-          } else if (uniq.length > 1 && now - lastPickShownAt > 600){
-            lastPickShownAt = now;
-            picker(uniq, (choice)=> handleIMEI(choice));
+        // Prefer QR codes in current frame
+        const qrs = detections.filter(c => (c.format||c.type) === 'qr_code');
+        if (qrs.length > 0){
+          // Build choices with full text; also map IMEI candidates for meta
+          const choices = [];
+          qrs.forEach((c, idx)=>{
+            const raw = (c.rawValue || c.rawValueText || '').trim();
+            if (!raw) return;
+            const imeis = imeiCandidatesFromString(raw);
+            const label = raw.length > 120 ? (raw.slice(0,120) + '…') : raw;
+            choices.push({
+              label,
+              value: raw,
+              meta: imeis.length ? `IMEI candidates: ${imeis.join(', ')}` : 'QR'
+            });
+          });
+
+          if (choices.length === 1){
+            // Single QR found right now → if it contains an IMEI, use that, else let handleIMEI parse it
+            const raw = choices[0].value;
+            const imeis = imeiCandidatesFromString(raw);
+            handleIMEI(imeis[0] || raw);
+          } else if (choices.length > 1){
+            // Show picker immediately (per frame), throttled to avoid spam
+            const now = Date.now();
+            if (now - lastPickerAt > 600){
+              lastPickerAt = now;
+              buildPicker(choices, (picked)=>{
+                const imeis = imeiCandidatesFromString(picked);
+                handleIMEI(imeis[0] || picked);
+              }, 'Multiple QR codes found — pick one');
+            }
+          }
+          return; // don't try 1D if we already had QR
+        }
+
+        // No QR codes this frame → fall back to any detected codes (1D/others)
+        const vals = [...new Set(detections.map(c => (c.rawValue||c.rawValueText||"").trim()).filter(Boolean))];
+        if (vals.length === 1){
+          handleIMEI(vals[0]);
+        } else if (vals.length > 1){
+          const now = Date.now();
+          if (now - lastPickerAt > 600){
+            lastPickerAt = now;
+            buildPicker(vals.map(v=>({label:v.length>120?(v.slice(0,120)+'…'):v, value:v, meta:'Barcode'})),
+                        (picked)=> handleIMEI(picked),
+                        'Multiple barcodes found — pick one');
           }
         }
       }catch(_){}
@@ -685,7 +742,7 @@
     loop();
   }
 
-  // ---- Quagga fallback (1-at-a-time) ----
+  // ---- Quagga fallback (1-at-a-time; no QR support) ----
   async function startQuagga(deviceId){
     if (!window.Quagga) { showToast('Quagga not loaded.', false); return; }
     Quagga.init({

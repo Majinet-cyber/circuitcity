@@ -42,6 +42,7 @@
   #toast[data-kind="error"]{background:#7f1d1d}
 
   .warn{display:none;margin-top:.5rem;padding:.6rem .8rem;border:1px solid #fbbf24;background:#fffbeb;color:#92400e;border-radius:10px}
+
   #cameraBox{margin-top:8px;display:none;background:var(--cc-panel);border:1px dashed var(--cc-border);border-radius:14px;padding:12px}
   .scan-shell{position:relative;border-radius:14px;overflow:hidden;background:#000;box-shadow:var(--cc-shadow)}
   #camera{width:100%;max-height:360px;min-height:220px;background:#000;display:block;object-fit:cover}
@@ -62,8 +63,8 @@
   #ccscan-picker .title{font-weight:600;margin-bottom:10px}
   #ccscan-picker .list{max-height:55vh;overflow:auto;display:flex;flex-direction:column;gap:8px}
   #ccscan-picker .item{text-align:left;padding:10px 12px;border-radius:10px;border:1px solid #e5e7eb;background:#f9fafb;cursor:pointer;word-break:break-all}
-  #ccscan-picker .actions{margin-top:12px;display:flex;justify-content:flex-end}
-  #ccscan-picker .cancel{padding:8px 12px;border-radius:10px;border:1px solid #e5e7eb;background:#fff;cursor:pointer}
+  #ccscan-picker .actions{margin-top:12px;display:flex;justify-content:flex-end;gap:8px}
+  #ccscan-picker .btn{padding:8px 12px;border-radius:10px;border:1px solid #e5e7eb;background:#fff;cursor:pointer}
 </style>
 {% endblock %}
 
@@ -105,7 +106,17 @@
       <div>
         <label for="id_imei">IMEI / Barcode</label>
         <div class="field">
-          <input type="text" id="id_imei" name="imei" maxlength="15" pattern="\\d{15}" inputmode="numeric" autocomplete="off" placeholder="Enter 15-digit IMEI" aria-required="true" aria-invalid="false">
+          <input
+            type="text"
+            id="id_imei"
+            name="imei"
+            maxlength="15"
+            pattern="\d{15}"
+            inputmode="numeric"
+            autocomplete="off"
+            placeholder="Enter 15-digit IMEI"
+            aria-required="true"
+            aria-invalid="false">
         </div>
 
         <div class="hstack" style="margin-top:.5rem">
@@ -194,12 +205,24 @@
   </section>
 </main>
 
+<div id="ccscan-picker">
+  <div class="card">
+    <div class="title">Multiple codes found — pick one</div>
+    <div class="list" id="ccscan-list"></div>
+    <div class="actions">
+      <button type="button" class="btn" id="ccscan-pause">Pause camera</button>
+      <button type="button" class="btn" id="ccscan-cancel">Cancel</button>
+    </div>
+  </div>
+</div>
+
 <div id="toast" hidden></div>
 
 <script src="https://unpkg.com/quagga@0.12.1/dist/quagga.min.js"></script>
 
 <script>
 (function(){
+  // ---------- Elements ----------
   const formEl=document.getElementById('sellForm');
   const submitBtn=document.getElementById('submitBtn');
   const imeiInput=document.getElementById('id_imei');
@@ -210,7 +233,6 @@
   const locHidden=document.getElementById('id_location_id');
   const stockBadge=document.getElementById('stockBadge');
   const lenChip=document.getElementById('lenChip');
-  const STOCK_STATUS_URL=formEl.dataset.stockStatusUrl;
 
   const camToggle=document.getElementById('camToggle');
   const btnStopCam=document.getElementById('btnStopCam');
@@ -220,58 +242,44 @@
   const camSelect=document.getElementById('cameraSelect');
   const scanLine=document.getElementById('scanline');
   const secureWarn=document.getElementById('secureWarn');
-
   const candidatesEl=document.getElementById('candidates');
   const autoSubmit=document.getElementById('autoSubmit');
 
+  const picker=document.getElementById('ccscan-picker');
+  const pickerList=document.getElementById('ccscan-list');
+  const pickerCancel=document.getElementById('ccscan-cancel');
+  const pickerPause=document.getElementById('ccscan-pause');
+
+  const STOCK_STATUS_URL=formEl.dataset.stockStatusUrl;
   const defaultLocId = formEl.dataset.defaultLocationId || '';
   const lockLocation = formEl.dataset.lockLocation === '1';
 
-  function showPicker(values, onPick){
-    let wrap=document.getElementById('ccscan-picker');
-    if(!wrap){
-      wrap=document.createElement('div');
-      wrap.id='ccscan-picker';
-      wrap.innerHTML=`
-        <div class="card">
-          <div class="title">Multiple codes found — pick one</div>
-          <div class="list" id="ccscan-list"></div>
-          <div class="actions"><button type="button" class="cancel" id="ccscan-cancel">Cancel</button></div>
-        </div>`;
-      document.body.appendChild(wrap);
-    }
-    const list=wrap.querySelector('#ccscan-list');
-    list.innerHTML='';
-    values.forEach(v=>{
-      const b=document.createElement('button');
-      b.type='button'; b.className='item'; b.textContent=v;
-      b.onclick=()=>{ wrap.style.display='none'; onPick?.(v); };
-      list.appendChild(b);
-    });
-    wrap.querySelector('#ccscan-cancel').onclick=()=>{ wrap.style.display='none'; };
-    wrap.style.display='flex';
-  }
-
+  // ---------- Helpers ----------
   const toastEl=document.getElementById('toast');
   function toast(msg, kind='ok', ms=2400){ toastEl.textContent=msg; toastEl.dataset.kind=kind; toastEl.hidden=false; clearTimeout(toast._t); toast._t=setTimeout(()=>toastEl.hidden=true,ms); }
-
   const digits=s=>String(s||'').replace(/\D+/g,'');
-  const isIMEI15=s=>/^\d{15}$/.test(digits(s));
-  function setAriaValidity(){ imeiInput.setAttribute('aria-invalid', String(!isIMEI15(imeiInput.value))); }
-  const validPrice=()=>{ const v=Number(priceEl && priceEl.value); return Number.isFinite(v) && v>=0; };
-  function csrf(){ const el=document.querySelector('#sellForm input[name="csrfmiddlewaretoken"]'); return el?el.value:''; }
-  function setToday(){ if(dateEl && !dateEl.value){ const d=new Date(); dateEl.value=[d.getFullYear(),String(d.getMonth()+1).padStart(2,'0'),String(d.getDate()).padStart(2,'0')].join('-'); } }
-  setToday();
-
   const isSecure = window.isSecureContext || location.protocol === 'https:';
   if(!isSecure){ secureWarn.style.display='block'; }
 
-  let inStockHere=false, inStockElsewhere=false, currentCtrl=null;
+  const IMEI_RX=/\b\d{15}\b/g;
+  const isIMEI15 = s => /^\d{15}$/.test(digits(s));
 
-  function setBadge(kind, text){ stockBadge.classList.remove('badge-warn','badge-ok','badge-wait'); stockBadge.classList.add(kind); stockBadge.textContent=text; }
+  function setAriaValidity(){ imeiInput.setAttribute('aria-invalid', String(!isIMEI15(imeiInput.value))); }
+  function validPrice(){ const v=Number(priceEl && priceEl.value); return Number.isFinite(v) && v>=0; }
+  function csrf(){ const el=document.querySelector('#sellForm input[name="csrfmiddlewaretoken"]'); return el?el.value:''; }
+  function setToday(){
+    if(dateEl && !dateEl.value){
+      const d=new Date();
+      dateEl.value=[d.getFullYear(),String(d.getMonth()+1).padStart(2,'0'),String(d.getDate()).padStart(2,'0')].join('-');
+    }
+  }
+  setToday();
+
+  // ---------- Status badge + submit guard ----------
+  let inStockHere=false, inStockElsewhere=false, currentCtrl=null;
+  function setBadge(kind, text){ stockBadge.className='badge '+kind; stockBadge.textContent=text; }
   function updateSubmitState(){ submitBtn.disabled = !(isIMEI15(imeiInput.value) && validPrice() && (inStockHere || inStockElsewhere)); }
 
-  // --- Match the latest api_stock_status (supports {in_stock, data:{location_mismatch}}) ---
   function parseInStock(payload){
     if (!payload) return false;
     if (typeof payload.in_stock === 'boolean') return payload.in_stock;
@@ -281,9 +289,7 @@
   }
   function parseMismatch(payload){
     if (!payload) return false;
-    // Prefer the canonical key from our API
     if (payload.data && typeof payload.data.location_mismatch === 'boolean') return payload.data.location_mismatch;
-    // Back-compat with older keys
     if (typeof payload.location_mismatch === 'boolean') return payload.location_mismatch;
     if (typeof payload.mismatch === 'boolean') return payload.mismatch;
     if (payload.data && typeof payload.data.mismatch === 'boolean') return payload.data.mismatch;
@@ -293,8 +299,8 @@
   async function checkStock(){
     const code=(imeiInput.value||'').trim();
     const locId=(locWidget?.value||'').trim();
-
     if (currentCtrl) currentCtrl.abort();
+
     if (!isIMEI15(code)){
       inStockHere=false; inStockElsewhere=false;
       setBadge('badge-warn','Enter 15 digits');
@@ -310,10 +316,8 @@
     const timer = setTimeout(()=>currentCtrl.abort(), 2500);
 
     try{
-      const res = await fetch(`${formEl.dataset.stockStatusUrl}?${params.toString()}`,{
-        signal: currentCtrl.signal,
-        credentials:'same-origin',
-        cache:'no-store',
+      const res = await fetch(`${STOCK_STATUS_URL}?${params.toString()}`,{
+        signal: currentCtrl.signal, credentials:'same-origin', cache:'no-store',
         headers:{'X-Requested-With':'XMLHttpRequest','Accept':'application/json'}
       });
       clearTimeout(timer);
@@ -337,19 +341,12 @@
     }
   }
 
-  const IMEI_RX=/\b\d{15}\b/g;
-  function setIMEI(val){
-    imeiInput.value = digits(val).slice(0,15);
-    handleIMEIInput();
-    if (autoSubmit.checked && isIMEI15(imeiInput.value) && !submitBtn.disabled) {
-      formEl.requestSubmit ? formEl.requestSubmit() : formEl.submit();
-    }
-  }
   function renderCandidates(list){
     if (!list || !list.length) { candidatesEl.innerHTML=''; return; }
     candidatesEl.innerHTML = list.map(v=>`<button type="button" class="pill" data-imei="${v}">${v}</button>`).join('');
     candidatesEl.querySelectorAll('.pill').forEach(b=>b.addEventListener('click',()=>setIMEI(b.dataset.imei)));
   }
+
   function handleIMEIInput(){
     const raw = imeiInput.value;
     const clean = digits(raw).slice(0,15);
@@ -364,9 +361,17 @@
   }
   imeiInput.addEventListener('input', handleIMEIInput);
   imeiInput.addEventListener('keydown',(e)=>{ if(e.key==='Enter'){ e.preventDefault(); if(!submitBtn.disabled) formEl.submit(); }});
-  window.addEventListener('DOMContentLoaded', ()=>{ handleIMEIInput(); });
+  window.addEventListener('DOMContentLoaded', handleIMEIInput);
 
-  // ---- Location behavior: only lock if explicitly told (no auto-lock by single option) ----
+  function setIMEI(val){
+    imeiInput.value = digits(val).slice(0,15);
+    handleIMEIInput();
+    if (autoSubmit.checked && isIMEI15(imeiInput.value) && !submitBtn.disabled) {
+      formEl.requestSubmit ? formEl.requestSubmit() : formEl.submit();
+    }
+  }
+
+  // ---------- Location ----------
   function applyDefaultLocation(){
     if (!locWidget) return;
     if (defaultLocId){
@@ -377,33 +382,44 @@
 
     if (lockLocation){
       locWidget.setAttribute('disabled','disabled');
-      // keep hidden mirror updated
       if (locHidden) locHidden.value = (locWidget.value||'').trim();
     } else {
       locWidget.removeAttribute('disabled');
     }
   }
   applyDefaultLocation();
+  locWidget?.addEventListener('change',()=>{ if (locHidden) locHidden.value=(locWidget.value||'').trim(); if (isIMEI15(imeiInput.value)) checkStock(); });
 
-  locWidget?.addEventListener('change',()=>{
-    if (locHidden) locHidden.value=(locWidget.value||'').trim();
-    if (isIMEI15(imeiInput.value)) checkStock();
-  });
-
+  // ---------- Paste / Clear ----------
   document.getElementById('btnPaste')?.addEventListener('click',async()=>{
     try{
       const t=await navigator.clipboard.readText();
       const candidates = (t.match(IMEI_RX) || []);
-      if (candidates.length > 1){ showPicker([...new Set(candidates)], (v)=>setIMEI(v)); }
+      if (candidates.length > 1){ openPicker([...new Set(candidates)], (v)=>setIMEI(v)); }
       setIMEI(candidates[0] || t);
       if(isIMEI15(imeiInput.value)) priceEl?.focus();
     }catch{ toast('Clipboard blocked','warn'); }
   });
   document.getElementById('btnClear')?.addEventListener('click',()=>{ imeiInput.value=''; inStockHere=false; inStockElsewhere=false; handleIMEIInput(); imeiInput.focus(); });
 
-  // ===== Camera: BarcodeDetector → Quagga fallback =====
-  const isSecureCtx = window.isSecureContext || location.protocol === 'https:';
+  // ---------- Picker ----------
+  function openPicker(values, onPick){
+    pickerList.innerHTML='';
+    values.forEach(v=>{
+      const b=document.createElement('button');
+      b.type='button'; b.className='item'; b.textContent=v;
+      b.onclick=()=>{ picker.style.display='none'; onPick?.(v); };
+      pickerList.appendChild(b);
+    });
+    picker.style.display='flex';
+    pickerCancel.onclick=()=>{ picker.style.display='none'; };
+    pickerPause.onclick=()=>{ stopAll(); toast('Camera paused','warn'); };
+  }
+
+  // ---------- Camera / Scanner ----------
+  const isSecureCtx = isSecure;
   let mediaStream=null, videoTrack=null, rafId=null, scanning=false, usingDetector=false, torchOn=false;
+  let quaggaHandler=null, detector=null, lastPickerAt=0;
 
   function stopRaf(){ if (rafId) cancelAnimationFrame(rafId); rafId=null; }
   function pauseScanline(ms=900){ if(!scanLine) return; scanLine.classList.add('paused'); setTimeout(()=> scanLine.classList.remove('paused'), ms); }
@@ -424,20 +440,32 @@
     }catch{return [];}
   }
 
-  async function startNativeDetector(deviceId){
-    const constraints = {
-      audio:false,
-      video:{
-        facingMode: deviceId ? undefined : { ideal: 'environment' },
-        deviceId: deviceId ? { exact: deviceId } : undefined,
-        width:{ideal:1280}, height:{ideal:720}, frameRate:{ideal:60,max:60},
-        focusMode:"continuous", advanced:[{focusMode:"continuous"}]
-      }
-    };
+  async function startMedia(constraints){
     mediaStream = await navigator.mediaDevices.getUserMedia(constraints);
     camNode.srcObject = mediaStream;
     await camNode.play();
     videoTrack = mediaStream.getVideoTracks()[0];
+  }
+
+  async function startNativeDetector(deviceId){
+    await startMedia({
+      audio:false,
+      video:{
+        facingMode: deviceId ? undefined : { ideal: 'environment' },
+        deviceId: deviceId ? { exact: deviceId } : undefined,
+        width:{ideal:1280}, height:{ideal:720}, frameRate:{ideal:24,max:30},
+        focusMode:"continuous", advanced:[{focusMode:"continuous"}]
+      }
+    });
+
+    if (!('BarcodeDetector' in window)) throw new Error('NoBarcodeDetector');
+
+    try{
+      detector = new window.BarcodeDetector({
+        formats:['qr_code','aztec','code_128','code_39','code_93','data_matrix','ean_13','ean_8','itf','pdf417','upc_a','upc_e']
+      });
+    }catch(_){ throw new Error('DetectorInitFailed'); }
+
     usingDetector = true; scanning = true;
     detectLoop();
   }
@@ -445,57 +473,91 @@
   function extractCandidatesFromStrings(arr){
     const set=new Set();
     arr.forEach(s=>{
-      String(s||'').match(IMEI_RX)?.forEach(v=>set.add(v));
+      (String(s||'').match(IMEI_RX)||[]).forEach(v=>set.add(v));
     });
     return [...set];
   }
 
+  function uniqueStrings(arr){
+    const set=new Set(arr.filter(Boolean).map(s=>s.trim()));
+    return [...set];
+  }
+
+  function now(){ return Date.now(); }
+
+  function shouldShowPicker(){ const t=now(); if (t-lastPickerAt>700){ lastPickerAt=t; return true; } return false; }
+
   async function detectLoop(){
-    if (!('BarcodeDetector' in window) || !scanning) return;
-    try{
-      const detector = new window.BarcodeDetector({
-        formats:['qr_code','aztec','code_128','code_39','code_93','data_matrix','ean_13','ean_8','itf','pdf417','upc_a','upc_e']
-      });
-      const canvas = document.createElement('canvas');
-      const ctx = canvas.getContext('2d', { willReadFrequently: true });
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d', { willReadFrequently: true });
 
-      let seen = new Map();
-      const windowMs = 1200;
+    let lastTick=0;
+    const tickEveryMs=140; // ~7 fps
 
-      const loop = async () => {
-        if (!scanning) return;
-        rafId = requestAnimationFrame(loop);
-        if (camNode.readyState < 2) return;
-        canvas.width = camNode.videoWidth; canvas.height = camNode.videoHeight;
-        ctx.drawImage(camNode,0,0,canvas.width,canvas.height);
+    const loop = async () => {
+      if (!scanning) return;
+      rafId = requestAnimationFrame(loop);
+      if (camNode.readyState < 2) return;
 
+      const t=performance.now();
+      if (t - lastTick < tickEveryMs) return;
+      lastTick = t;
+
+      canvas.width = camNode.videoWidth; canvas.height = camNode.videoHeight;
+      ctx.drawImage(camNode,0,0,canvas.width,canvas.height);
+
+      try{
         const codes = await detector.detect(canvas);
-        if (codes && codes.length){
-          const rawVals = codes.map(c => (c.rawValue || c.rawValueText || '').trim()).filter(Boolean);
-          const cand = extractCandidatesFromStrings(rawVals);
-          const now = Date.now();
-          cand.forEach(v=> seen.set(v, now));
-          for (const [k,t] of [...seen.entries()]) if (now - t > windowMs) seen.delete(k);
+        if (!codes || !codes.length) return;
 
-          const uniq=[...seen.keys()];
-          if (uniq.length === 1){
-            setIMEI(uniq[0]); pauseScanline(); try{ navigator.vibrate?.(20);}catch(_){}
-            if (autoSubmit.checked && !submitBtn.disabled){ formEl.submit(); }
-          } else if (uniq.length > 1){
+        // Prefer QR payloads for multi-pick
+        const qrVals = uniqueStrings(codes.filter(c => (c.format||c.type)==='qr_code').map(c => c.rawValue||c.rawValueText||''));
+        if (qrVals.length){
+          const imeis = extractCandidatesFromStrings(qrVals);
+          if (imeis.length === 1){
+            setIMEI(imeis[0]); pauseScanline(); try{ navigator.vibrate?.(20);}catch(_){}
+            if (autoSubmit.checked && !submitBtn.disabled) { stopAll(); formEl.submit(); }
+          } else if (imeis.length > 1 && shouldShowPicker()){
             pauseScanline();
-            showPicker(uniq, (choice)=>{ setIMEI(choice); if (autoSubmit.checked && !submitBtn.disabled){ formEl.submit(); } });
+            openPicker(imeis, choice => { setIMEI(choice); if (autoSubmit.checked && !submitBtn.disabled){ stopAll(); formEl.submit(); } });
+          } else if (!imeis.length && qrVals.length === 1){
+            // QR text without clean 15-digit IMEI — still try to parse best 15-digit window
+            const d = digits(qrVals[0]);
+            if (d.length >= 15) { setIMEI(d.slice(-15)); }
           }
+          return; // do not process 1D in the same frame if QR present
         }
-      };
-      loop();
-    }catch(err){
-      usingDetector = false;
-      await startQuagga((camSelect && camSelect.value) || undefined);
-    }
+
+        // Fallback: any barcode values → 15-digit candidates
+        const anyVals = uniqueStrings(codes.map(c => c.rawValue||c.rawValueText||''));
+        const cand = extractCandidatesFromStrings(anyVals);
+        if (cand.length === 1){
+          setIMEI(cand[0]); pauseScanline(); try{ navigator.vibrate?.(20);}catch(_){}
+          if (autoSubmit.checked && !submitBtn.disabled) { stopAll(); formEl.submit(); }
+        } else if (cand.length > 1 && shouldShowPicker()){
+          pauseScanline();
+          openPicker(cand, choice => { setIMEI(choice); if (autoSubmit.checked && !submitBtn.disabled){ stopAll(); formEl.submit(); } });
+        }
+      }catch(_e){
+        // If detect fails repeatedly, fallback will be used when starting again
+      }
+    };
+    loop();
   }
 
   async function startQuagga(deviceId){
     if (!window.Quagga) { toast('Quagga not loaded.', 'warn'); return; }
+    await startMedia({
+      audio:false,
+      video:{
+        facingMode: deviceId ? undefined : 'environment',
+        deviceId: deviceId || undefined,
+        width:{ideal:1280}, height:{ideal:720}
+      }
+    });
+
+    stopRaf(); usingDetector=false; scanning=true;
+
     Quagga.init({
       inputStream: { type: 'LiveStream', target: camNode,
         constraints: { facingMode: deviceId ? undefined : 'environment', deviceId: deviceId || undefined,
@@ -504,25 +566,22 @@
       locate: true,
       numOfWorkers: navigator.hardwareConcurrency ? Math.min(4, navigator.hardwareConcurrency) : 2
     }, (err)=>{
-      if(err){ toast('Camera init failed. Allow camera access.', 'error', 3200); return; }
-      Quagga.start(); scanning=true;
+      if(err){ toast('Camera init failed. Allow camera access.', 'error', 3200); stopAll(); return; }
+      Quagga.start();
     });
-    Quagga.onDetected((result)=>{
+
+    // ensure only one active handler
+    if (quaggaHandler) try{ Quagga.offDetected(quaggaHandler); }catch(_){}
+    quaggaHandler = (result)=>{
+      if(!scanning) return;
       const code = (result && result.codeResult && result.codeResult.code) || '';
       if(!code) return;
       const list = extractCandidatesFromStrings([code]);
-      if (list.length > 1){ pauseScanline(); showPicker(list, (choice)=> setIMEI(choice)); }
+      if (list.length > 1){ pauseScanline(); openPicker(list, (choice)=> setIMEI(choice)); }
       else { setIMEI(list[0] || code); }
-      if (autoSubmit.checked && !submitBtn.disabled){ formEl.submit(); }
-    });
-  }
-
-  function stopAll(){
-    scanning = false;
-    stopRaf();
-    if (window.Quagga){ try{ Quagga.stop(); }catch(_){ } }
-    if (mediaStream){ mediaStream.getTracks().forEach(t=>t.stop()); }
-    mediaStream=null; videoTrack=null;
+      if (autoSubmit.checked && !submitBtn.disabled){ stopAll(); formEl.submit(); }
+    };
+    Quagga.onDetected(quaggaHandler);
   }
 
   async function enableTorch(desired){
@@ -532,9 +591,23 @@
     try{
       await videoTrack.applyConstraints({ advanced:[{ torch: desired }] });
       torchOn = desired;
-    }catch(_){}
+    }catch(_){ toast('Torch toggle failed.','warn'); }
   }
 
+  function stopAll(){
+    scanning = false;
+    stopRaf();
+    if (window.Quagga){
+      try{
+        if (quaggaHandler) { Quagga.offDetected(quaggaHandler); quaggaHandler=null; }
+        Quagga.stop();
+      }catch(_){}
+    }
+    if (mediaStream){ mediaStream.getTracks().forEach(t=>t.stop()); }
+    mediaStream=null; videoTrack=null;
+  }
+
+  // ---------- Camera UI ----------
   camToggle?.addEventListener('click', async ()=>{
     if(!isSecureCtx){ toast('Tip: use HTTPS or Android Chrome dev flag to enable camera.','warn'); }
     camBox.style.display='block';
@@ -579,10 +652,12 @@
     camToggle.textContent='Start Camera';
   });
 
-  torchBtn?.addEventListener('click', ()=> enableTorch(!torchOn));
+  torchBtn?.addEventListener('click', ()=> enableTorch(!(window.torchOn)));
+
   window.addEventListener('beforeunload', stopAll);
   document.addEventListener('visibilitychange', ()=>{ if (document.hidden) stopAll(); });
 
+  // ---------- Form submission ----------
   function parseSoldResult(resp, data, text){
     const msg=(data&&(data.message||data.msg))||text||'';
     const alreadySold=(data&&(data.status==='already_sold'||data.error_code==='ALREADY_SOLD'))||/already\s*sold/i.test(msg||'');
@@ -594,7 +669,7 @@
     for(let i=0;i<tries;i++){
       try{
         const qs=new URLSearchParams({code, _:Date.now()});
-        const res=await fetch(`${formEl.dataset.stockStatusUrl}?${qs.toString()}`,{cache:'no-store',credentials:'same-origin',headers:{'Accept':'application/json'}});
+        const res=await fetch(`${STOCK_STATUS_URL}?${qs.toString()}`,{cache:'no-store',credentials:'same-origin',headers:{'Accept':'application/json'}});
         const data= res.ok ? await res.json() : null;
         const stillInStock = !!parseInStock(data) && !parseMismatch(data);
         if(!stillInStock){ return true; }
