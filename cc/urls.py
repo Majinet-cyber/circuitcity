@@ -192,18 +192,17 @@ def __whoami__(request):
         "INSTALLED_APPS_contains_ccreports": any(a.endswith("ccreports") for a in settings.INSTALLED_APPS),
         "LOGIN_URL": settings.LOGIN_URL,
         "LOGIN_REDIRECT_URL": getattr(settings, "LOGIN_REDIRECT_URL", "/"),
-        "LOGIN_TEMPLATE_PROBED": "registration/login_v11_fix.html",
+        "LOGIN_TEMPLATE_PROBED": "registration/login.html",
         "LOGIN_TEMPLATE_ORIGIN": None,
         "REPORTS_TEMPLATES_CHECKED": ["reports/home.html", "ccreports/home.html", "reports/index.html"],
         "REPORTS_TEMPLATE_FOUND": None,
     }
     try:
-        t = get_template("registration/login_v11_fix.html")
+        t = get_template("registration/login.html")
         data["LOGIN_TEMPLATE_ORIGIN"] = getattr(getattr(t, "origin", None), "name", None)
     except Exception as e:
         data["LOGIN_TEMPLATE_ORIGIN"] = f"(not found) {e.__class__.__name__}: {e}"
 
-    # FIXED: normal loop (no invalid 'as list[str]' syntax)
     for cand in data["REPORTS_TEMPLATES_CHECKED"]:
         try:
             rt = get_template(cand)
@@ -220,7 +219,7 @@ def __whoami__(request):
 
 def __render_login__(request):
     try:
-        t = get_template("registration/login_v11_fix.html")
+        t = get_template("registration/login.html")
         origin = getattr(getattr(t, "origin", None), "name", "(unknown origin)")
         html = t.render({"form": None, "_debug_note": "Rendered by __render_login__ (no auth flow)."})
         banner = f"""
@@ -242,7 +241,7 @@ def __render_login__(request):
         return HttpResponse(html)
     except Exception as e:
         return HttpResponse(
-            f"<pre>registration/login_v11_fix.html could not be loaded:\n{e.__class__.__name__}: {e}</pre>",
+            f"<pre>registration/login.html could not be loaded:\n{e.__class__.__name__}: {e}</pre>",
             status=500,
             content_type="text/html",
         )
@@ -353,7 +352,7 @@ if _accounts_mod and hasattr(_accounts_mod, "urlpatterns"):
 else:
     # Minimal namespaced fallbacks so {% url 'accounts:*' %} never 500s
     accounts_fallback_patterns = [
-        path("login/", auth_views.LoginView.as_view(template_name="registration/login_v11_fix.html"), name="login"),
+        path("login/", auth_views.LoginView.as_view(template_name="registration/login.html"), name="login"),
         path("logout/", auth_views.LogoutView.as_view(next_page="/accounts/login/"), name="logout"),
         path("forgot/", core_views.feature_unavailable, name="forgot_password_request"),
         path("password/reset/", core_views.feature_unavailable, name="forgot_password_reset"),
@@ -510,7 +509,7 @@ def _call_inventory_view_with_legacy_guard(request, view_name, *args, **kwargs):
         except Exception:
             pass
 
-    view = getattr(inv, view_name)
+    view = getattr(inv, "inventory_dashboard" if view_name == "inventory_dashboard" else "stock_list") if not hasattr(inv, view_name) else getattr(inv, view_name)
     resp = view(request, *args, **kwargs)
 
     if _looks_like_biz_loc_tuple(resp):
