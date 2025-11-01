@@ -1,4 +1,4 @@
-﻿# cc/urls.py
+# cc/urls.py
 from __future__ import annotations
 
 import os
@@ -51,6 +51,7 @@ def safe_include(prefix: str, module_path: str, namespace: str | None = None):
         if not hasattr(mod, "urlpatterns"):
             log.error("URLConf %s has no urlpatterns; skipping include.", module_path)
             return []
+        # choose an app_name (prefer module.app_name, else provided namespace, else last module segment)
         app_name = getattr(mod, "app_name", None) or namespace or module_path.rsplit(".", 1)[0].split(".")[-1]
         inc = include((mod.urlpatterns, app_name), namespace=namespace or app_name)
         return [path(prefix, inc)]
@@ -75,7 +76,9 @@ def _reverse_exists(name: str) -> bool:
 
 
 def _first_working_reverse(names: tuple[str, ...]) -> str | None:
-    """Return the **URL path** of the first reversable name."""
+    """
+    Returns the **URL path** of the first reversable name, not the name itself.
+    """
     for n in names:
         try:
             return reverse(n)
@@ -203,8 +206,7 @@ def __whoami__(request):
     except Exception as e:
         data["LOGIN_TEMPLATE_ORIGIN"] = f"(not found) {e.__class__.__name__}: {e}"
 
-    # FIXED: normal loop (no invalid 'as list[str]' syntax)
-    for cand in data["REPORTS_TEMPLATES_CHECKED"]:
+    for cand in data["REPORTS_TEMPLATES_CHECKED"] as list[str]:
         try:
             rt = get_template(cand)
             data["REPORTS_TEMPLATE_FOUND"] = {
