@@ -7,10 +7,9 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <style>
     :root{
-      --bg1:#f6f9ff; --bg2:#ffffff;
-      --card:#fff; --line:#e5e7eb; --ink:#0f172a; --muted:#64748b;
+      --bg:#f6f9ff; --card:#fff; --line:#e5e7eb; --ink:#0f172a; --muted:#64748b;
       --blue:#2563eb; --blueHi:#1d4ed8;
-      --green:#22c55e; --greenHi:#16a34a;
+      --green:#16a34a; --greenHi:#15803d;
       --shadow:0 20px 60px rgba(2,6,23,.06);
     }
     *{box-sizing:border-box}
@@ -20,64 +19,77 @@
       font-family:system-ui,Segoe UI,Inter,Roboto,Arial,sans-serif;
       background:radial-gradient(1200px 800px at 10% -10%, #e8f0ff 0%, transparent 40%),
                  radial-gradient(1000px 700px at 110% -20%, #eaf6ff 0%, transparent 35%),
-                 linear-gradient(180deg,var(--bg1),var(--bg2));
+                 linear-gradient(180deg,var(--bg),#fff);
     }
     .wrap{min-height:100vh;display:grid;place-items:center;padding:clamp(16px,4vw,32px)}
     .card{
-      width:min(520px,92vw); background:var(--card); border:1px solid var(--line);
-      border-radius:18px; padding:28px; box-shadow:var(--shadow);
+      width:min(520px,92vw);
+      background:var(--card);
+      border:1px solid var(--line);
+      border-radius:18px;
+      padding:28px;
+      box-shadow:var(--shadow);
     }
-
-    /* brand */
-    .brand{display:flex; align-items:center; gap:.6rem; margin:0 0 .5rem; text-decoration:none}
-    .brand img{width:34px;height:34px; border-radius:10px; box-shadow:0 4px 10px rgba(2,6,23,.08)}
-    .brand-title{font-weight:800; letter-spacing:.2px; font-size:clamp(22px,3.2vw,28px); color:var(--ink)}
-    .brand-sub{margin:.1rem 0 0; color:var(--muted); font-size:14.5px}
+    .brand{display:flex;align-items:center;gap:12px;margin-bottom:4px}
+    .brand img{width:28px;height:28px;object-fit:contain}
+    h1{margin:0;font-weight:800;letter-spacing:.2px}
+    .muted{color:var(--muted);margin:4px 0 14px}
 
     label{display:block;font-size:14px;margin:12px 0 6px}
     input{
-      width:100%; padding:12px 14px; border:1px solid #cbd5e1; border-radius:12px; font-size:15px;
-      transition:.18s border-color,.18s box-shadow; background:#fff;
+      width:100%;padding:12px 14px;border:1px solid #cbd5e1;border-radius:12px;
+      font-size:15px;background:#fff;transition:.18s border-color,.18s box-shadow;
     }
     input:focus{outline:none;border-color:#93c5fd;box-shadow:0 0 0 4px rgba(147,197,253,.35)}
     .err{background:#fef2f2;border:1px solid #fecaca;color:#991b1b;padding:.65rem .8rem;border-radius:12px;margin:0 0 12px}
-    a{color:var(--blue);text-decoration:none} a:hover{color:var(--blueHi)}
-    .cta{margin-top:18px;padding-top:16px;border-top:1px dashed var(--line)}
 
-    /* buttons */
-    .btn{display:inline-block; width:100%; border-radius:12px; padding:.9rem 1.1rem; font-weight:800; text-align:center}
-    .btn-blue{color:#fff;border:1px solid #93c5fd;background:linear-gradient(180deg,#3b82f6,#2563eb);box-shadow:0 10px 28px rgba(37,99,235,.25)}
-    .btn-blue:hover{filter:brightness(1.03); transform:translateY(-1px)}
+    .row{margin-top:14px}
+    .btn{
+      display:inline-block;width:100%;text-align:center;
+      border-radius:12px;padding:.9rem 1.1rem;font-weight:800;letter-spacing:.2px;
+      transition:.15s transform,.15s filter,.15s box-shadow;border:1px solid transparent;
+    }
+    .btn-blue{
+      color:#fff;border-color:#93c5fd;
+      background:linear-gradient(180deg,#3b82f6,#2563eb);
+      box-shadow:0 10px 24px rgba(37,99,235,.25);
+    }
+    .btn-blue:hover{transform:translateY(-1px);filter:brightness(1.03)}
     .btn-blue:active{transform:translateY(0)}
-    .btn-green{color:#fff;border:1px solid #86efac;background:linear-gradient(180deg,var(--green),var(--greenHi));box-shadow:0 10px 26px rgba(34,197,94,.22)}
-    .btn-green:hover{filter:brightness(1.03); transform:translateY(-1px)}
+
+    .btn-green{
+      color:#fff;border-color:#86efac;
+      background:linear-gradient(180deg,var(--green),var(--greenHi));
+      box-shadow:0 10px 24px rgba(22,163,74,.22);
+    }
+    .btn-green:hover{transform:translateY(-1px);filter:brightness(1.03)}
     .btn-green:active{transform:translateY(0)}
 
-    /* password eye */
+    .cta{margin-top:18px;padding-top:16px;border-top:1px dashed var(--line)}
     .pw-wrap{position:relative}
-    .pw-eye{position:absolute;right:10px;top:50%;translate:0 -50%;border:0;background:transparent;padding:6px;border-radius:8px;cursor:pointer;color:#334155}
+    .pw-eye{position:absolute;right:10px;top:50%;translate:0 -50%;
+      border:0;background:transparent;padding:6px;border-radius:8px;cursor:pointer;color:#334155}
     .pw-eye:focus{outline:none;box-shadow:0 0 0 3px rgba(147,197,253,.5)}
     .pw-eye svg{width:20px;height:20px}
+    .footer{display:flex;justify-content:space-between;align-items:center;margin-top:12px;color:#64748b;font-size:12.5px}
   </style>
 </head>
 <body>
   <div class="wrap">
     <div class="card" role="dialog" aria-labelledby="loginTitle" aria-describedby="loginDesc">
-
-      <!-- Brand (logo hides if missing) -->
-      <a class="brand" href="/">
+      <div class="brand">
+        <!-- If the logo path differs, update the static path below -->
         <img src="{% static 'brand/imajinet-logo.svg' %}" alt="Imajinet" onerror="this.style.display='none'">
-        <div>
-          <div class="brand-title" id="loginTitle">Circuit City</div>
-          <div class="brand-sub" id="loginDesc">Sign in to continue.</div>
-        </div>
-      </a>
+        <h1 id="loginTitle">Circuit City</h1>
+      </div>
+      <p id="loginDesc" class="muted">Sign in to continue.</p>
 
       {% if messages %}
         {% for m in messages %}<div class="err" role="alert" aria-live="assertive">{{ m }}</div>{% endfor %}
       {% endif %}
 
-      <form method="post" action="{% url 'accounts:login' %}" novalidate>
+      <!-- Use path-based URLs so this page never breaks if namespacing changes -->
+      <form method="post" action="/accounts/login/" novalidate>
         {% csrf_token %}
         <input type="hidden" name="next" value="{{ next|default:'' }}"/>
 
@@ -95,24 +107,31 @@
           </button>
         </div>
 
-        <div style="margin-top:14px"><button type="submit" class="btn btn-blue">Sign in</button></div>
+        <div class="row">
+          <button type="submit" class="btn btn-blue">Sign in</button>
+        </div>
       </form>
 
       <p class="muted" style="margin-top:12px">
-        <a href="{% url 'accounts:forgot_password_request' %}">Forgot your password?</a>
+        <a href="/accounts/forgot/">Forgot your password?</a>
       </p>
 
       <div class="cta" aria-label="Create account">
         <p class="muted" style="margin:0 0 10px">New here?</p>
-        <a class="btn btn-green" href="{% url 'accounts:signup_manager' %}">Create a Manager account</a>
+        <a class="btn btn-green" href="/accounts/signup/manager/">Create a Manager account</a>
         <small class="muted" style="display:block;margin-top:6px">Managers create the store and can invite agents later.</small>
         <small class="muted" style="display:block;margin-top:4px">Agents: ask your manager for an invite link.</small>
+      </div>
+
+      <div class="footer">
+        <span>&copy; emajinet</span>
+        <span>v01</span>
       </div>
     </div>
   </div>
 
   <script>
-    // password eye toggle (no dependencies)
+    // password eye toggle
     (function () {
       const pw = document.getElementById('id_password');
       const btn = document.querySelector('.pw-eye');
