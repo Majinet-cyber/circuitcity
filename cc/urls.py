@@ -51,7 +51,6 @@ def safe_include(prefix: str, module_path: str, namespace: str | None = None):
         if not hasattr(mod, "urlpatterns"):
             log.error("URLConf %s has no urlpatterns; skipping include.", module_path)
             return []
-        # choose an app_name (prefer module.app_name, else provided namespace, else last module segment)
         app_name = getattr(mod, "app_name", None) or namespace or module_path.rsplit(".", 1)[0].split(".")[-1]
         inc = include((mod.urlpatterns, app_name), namespace=namespace or app_name)
         return [path(prefix, inc)]
@@ -76,9 +75,7 @@ def _reverse_exists(name: str) -> bool:
 
 
 def _first_working_reverse(names: tuple[str, ...]) -> str | None:
-    """
-    Returns the **URL path** of the first reversable name, not the name itself.
-    """
+    """Return the **URL path** of the first reversable name."""
     for n in names:
         try:
             return reverse(n)
@@ -96,8 +93,8 @@ def _safe_redirect_to(name: str, fallback: str = "/accounts/login/"):
     return _view
 
 
-# NEW: pattern introspection (safe at import-time; no reverse())
 def _patterns_have_name(patterns, name: str) -> bool:
+    """Pattern introspection (safe at import-time; no reverse())."""
     try:
         from django.urls.resolvers import URLPattern, URLResolver
     except Exception:
@@ -116,12 +113,8 @@ def _patterns_have_name(patterns, name: str) -> bool:
     return False
 
 
-# ---------- NEW: tiny helper used by root_redirect ----------
 def _redirect_first(names: tuple[str, ...], fallback_path: str = "/accounts/login/"):
-    """
-    Redirect to the first resolvable URL name in `names`, or fallback_path.
-    Returns an HttpResponseRedirect (not a view factory).
-    """
+    """Redirect to first resolvable URL name or fallback_path."""
     target = _first_working_reverse(names)
     return redirect(target or fallback_path)
 
@@ -210,10 +203,14 @@ def __whoami__(request):
     except Exception as e:
         data["LOGIN_TEMPLATE_ORIGIN"] = f"(not found) {e.__class__.__name__}: {e}"
 
-    for cand in data["REPORTS_TEMPLATES_CHECKED"] as list[str]:
+    # FIXED: normal loop (no invalid 'as list[str]' syntax)
+    for cand in data["REPORTS_TEMPLATES_CHECKED"]:
         try:
             rt = get_template(cand)
-            data["REPORTS_TEMPLATE_FOUND"] = {"template": cand, "origin": getattr(getattr(rt, "origin", None), "name", None)}
+            data["REPORTS_TEMPLATE_FOUND"] = {
+                "template": cand,
+                "origin": getattr(getattr(rt, "origin", None), "name", None),
+            }
             break
         except Exception:
             continue
