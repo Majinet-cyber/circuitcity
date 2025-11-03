@@ -96,7 +96,7 @@
         </div>
       </div>
 
-      <form method="post" novalidate id="inviteForm">
+      <form method="post" novalidate id="inviteForm" autocomplete="on">
         {% csrf_token %}
 
         <div class="mb-3">
@@ -109,32 +109,53 @@
         </div>
 
         <div class="mb-3">
-          <label for="{{ form.email.id_for_label }}" class="form-label">
+          <label class="form-label">
             Email {% if invite.email %}(from invite){% endif %}
           </label>
-          {{ form.email }}
-          {% if form.email.errors %}<div class="text-danger small mt-1">{{ form.email.errors|join:", " }}</div>{% endif %}
+
+          {# If invite has an email, lock it: show disabled field + hidden real field #}
+          {% if invite.email %}
+            <input type="email" class="form-control" value="{{ invite.email }}" disabled>
+            <input type="hidden" name="email" value="{{ invite.email }}">
+          {% else %}
+            {# Use the Django form widget if no fixed email came with the invite #}
+            {% if form.email %}
+              {% if form.email.errors %}<div class="text-danger small mt-0 mb-1">{{ form.email.errors|join:", " }}</div>{% endif %}
+              {{ form.email }}
+            {% else %}
+              <input type="email" class="form-control" name="email" required autocomplete="email" value="">
+            {% endif %}
+          {% endif %}
+
           <div class="form-text">Used for notifications and password reset.</div>
         </div>
 
         <div class="mb-3">
-          <label for="{{ form.password1.id_for_label }}" class="form-label">Create password</label>
+          <label for="{{ form.password1.id_for_label|default:'id_password1' }}" class="form-label">Create password</label>
           <div class="input-group">
-            {{ form.password1 }}
+            {% if form.password1 %}
+              {{ form.password1 }}
+            {% else %}
+              <input type="password" name="password1" id="id_password1" class="form-control" minlength="8" required autocomplete="new-password" autofocus>
+            {% endif %}
             <button class="btn btn-outline-secondary" type="button" data-toggle="reveal" data-target="[name='password1']">Show</button>
           </div>
-          {% if form.password1.errors %}<div class="text-danger small mt-1">{{ form.password1.errors|join:", " }}</div>{% endif %}
+          {% if form.password1 and form.password1.errors %}<div class="text-danger small mt-1">{{ form.password1.errors|join:", " }}</div>{% endif %}
           <div class="form-text">Tip: at least 8 characters.</div>
           <div id="strengthHint" class="small mt-1"></div>
         </div>
 
         <div class="mb-2">
-          <label for="{{ form.password2.id_for_label }}" class="form-label">Confirm password</label>
+          <label for="{{ form.password2.id_for_label|default:'id_password2' }}" class="form-label">Confirm password</label>
           <div class="input-group">
-            {{ form.password2 }}
+            {% if form.password2 %}
+              {{ form.password2 }}
+            {% else %}
+              <input type="password" name="password2" id="id_password2" class="form-control" minlength="8" required autocomplete="new-password">
+            {% endif %}
             <button class="btn btn-outline-secondary" type="button" data-toggle="reveal" data-target="[name='password2']">Show</button>
           </div>
-          {% if form.password2.errors %}<div class="text-danger small mt-1">{{ form.password2.errors|join:", " }}</div>{% endif %}
+          {% if form.password2 and form.password2.errors %}<div class="text-danger small mt-1">{{ form.password2.errors|join:", " }}</div>{% endif %}
           <div class="form-text" id="matchHint" style="display:none;">Passwords match ✔</div>
         </div>
 

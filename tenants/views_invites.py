@@ -16,6 +16,7 @@ from django.views.decorators.http import require_http_methods
 
 from tenants.models import AgentInvite
 from tenants.services.invites import accept_invite_by_token
+from tenants.utils import set_active_business  # <-- ensure active business is mirrored into session + thread-local
 from .forms import AgentInviteAcceptForm
 
 TENANT_SESSION_KEY = getattr(settings, "TENANT_SESSION_KEY", "active_business_id")
@@ -35,10 +36,12 @@ def _reverse_or(path_name: str, default: str = "/") -> str:
 def _best_post_accept_redirect(request: HttpRequest) -> str:
     """
     After successfully joining, send the user somewhere agent-friendly.
+    These views should pick up the ACTIVE BUSINESS from session/thread-local,
+    which we set via set_active_business().
     """
     for name in [
-        "inventory:scan_sold",           # sell screen is the most agent-centric
-        "inventory:inventory_dashboard",  # your inventory hub
+        "inventory:scan_sold",           # most agent-centric
+        "inventory:inventory_dashboard",  # inventory hub
         "dashboard:home",
         "dashboard:dashboard",
         "tenants:activate_mine",
@@ -248,7 +251,7 @@ def accept_invite(request: HttpRequest, token: str) -> HttpResponse:
     Policy:
       • Accept ANY valid email (no domain / no invite-email enforcement).
       • Create user if needed; otherwise authenticate (set password if unusable).
-      • Accept invite, set active business in session, redirect to agent view.
+      • Accept invite, SET ACTIVE BUSINESS (session + thread-local), redirect to agent view.
     """
     invite: Optional[AgentInvite] = _get_invite_any(token)
     if not invite:
@@ -313,14 +316,18 @@ def accept_invite(request: HttpRequest, token: str) -> HttpResponse:
             }
             return _render_safe(request, "tenants/invites/error.html", ctx, status=500)
 
-        # Pin active business into session
+        # Pin ACTIVE BUSINESS for this session + thread-local (authoritative)
         try:
-            biz_id = getattr(getattr(invite, "business", None), "id", None)
-            if biz_id:
-                request.session[TENANT_SESSION_KEY] = biz_id
-                request.session.modified = True
+            set_active_business(request, invite.business)
         except Exception:
-            pass
+            # ultra-safe fallback
+            try:
+                biz_id = getattr(getattr(invite, "business", None), "id", None)
+                if biz_id:
+                    request.session[TENANT_SESSION_KEY] = biz_id
+                    request.session.modified = True
+            except Exception:
+                pass
 
         try:
             messages.success(request, f"You're now part of {_biz_name(invite)}. Welcome!")
@@ -457,7 +464,7 @@ def accept_invite(request: HttpRequest, token: str) -> HttpResponse:
     else:
         login(request, auth_user)
 
-    # Accept the invite and pin business id into session
+    # Accept the invite
     try:
         kw: dict[str, Any] = {"token": token, "user": request.user, "role": "AGENT"}
         location = getattr(invite, "location", None)
@@ -486,14 +493,18 @@ def accept_invite(request: HttpRequest, token: str) -> HttpResponse:
         }
         return _render_safe(request, "tenants/invites/error.html", ctx, status=500)
 
-    # Store active business in session for immediate agent view
+    # AUTHORITATIVE: set active business (session + thread-local) so agent UI opens in the right tenant
     try:
-        biz_id = getattr(getattr(invite, "business", None), "id", None)
-        if biz_id:
-            request.session[TENANT_SESSION_KEY] = biz_id
-            request.session.modified = True
+        set_active_business(request, invite.business)
     except Exception:
-        pass
+        # ultra-safe fallback
+        try:
+            biz_id = getattr(getattr(invite, "business", None), "id", None)
+            if biz_id:
+                request.session[TENANT_SESSION_KEY] = biz_id
+                request.session.modified = True
+        except Exception:
+            pass
 
     try:
         messages.success(request, f"You're now part of {_biz_name(invite)}. Welcome!")
