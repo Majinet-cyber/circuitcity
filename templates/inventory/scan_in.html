@@ -297,6 +297,8 @@
 
 <!-- QuaggaJS fallback -->
 <script src="https://unpkg.com/quagga@0.12.1/dist/quagga.min.js"></script>
+<!-- ZXing fallback for QR & 1D (sits between BarcodeDetector and Quagga) -->
+<script src="https://unpkg.com/@zxing/library@0.20.0"></script>
 
 <script>
 (function(){
@@ -562,7 +564,7 @@
     }
   });
 
-  // ===== Scanner: BarcodeDetector (QR-first, multi-pick) → Quagga fallback =====
+  // ===== Scanner: BarcodeDetector (QR-first, multi-pick) → ZXing → Quagga =====
   let mediaStream = null, videoTrack = null;
 
   async function listCameras(){
@@ -606,8 +608,12 @@
   }
 
   function stopAll(){
+    // Stop ZXing session if any
+    if (startZXing._stop) { try{ startZXing._stop(); }catch(_){} }
+    // Stop Quagga
     if (window.Quagga) try{ Quagga.offDetected && Quagga.offDetected(()=>{}); }catch(_){}
     if (window.Quagga) try{ Quagga.stop(); }catch(_){}
+    // Stop native stream
     if (mediaStream){ mediaStream.getTracks().forEach(t=>t.stop()); }
     mediaStream = null; videoTrack = null;
   }
@@ -663,7 +669,7 @@
 
   async function startNativeDetector(deviceId){
     await startMedia(deviceId);
-    if (!('BarcodeDetector' in window)){ return startQuagga(deviceId); }
+    if (!('BarcodeDetector' in window)){ return startZXing(deviceId).catch(()=>startQuagga(deviceId)); }
 
     const detector = new window.BarcodeDetector({
       formats: [
@@ -706,12 +712,10 @@
           });
 
           if (choices.length === 1){
-            // Single QR found right now → if it contains an IMEI, use that, else let handleIMEI parse it
             const raw = choices[0].value;
             const imeis = imeiCandidatesFromString(raw);
             handleIMEI(imeis[0] || raw);
           } else if (choices.length > 1){
-            // Show picker immediately (per frame), throttled to avoid spam
             const now = Date.now();
             if (now - lastPickerAt > 600){
               lastPickerAt = now;
@@ -742,6 +746,42 @@
     loop();
   }
 
+  // ---- ZXing fallback (handles QR and many 1D symbologies) ----
+  async function startZXing(deviceId){
+    if (!window.ZXing || !ZXing.BrowserMultiFormatReader) {
+      throw new Error('ZXing not available');
+    }
+
+    const codeReader = new ZXing.BrowserMultiFormatReader();
+    const devices = await codeReader.listVideoInputDevices().catch(()=>[]);
+    let chosenId = deviceId || (devices[devices.length-1] || devices[0] || {}).deviceId;
+    if (!chosenId) throw new Error('No camera for ZXing');
+
+    await codeReader.decodeFromVideoDevice(chosenId, camNode, (result, err) => {
+      if (result && result.getText){
+        const raw = result.getText();
+        const imeis = imeiCandidatesFromString(raw);
+        if (imeis.length > 1){
+          buildPicker(imeis.map(v=>({label:v, value:v, meta:'IMEI'})), (picked)=> handleIMEI(picked), 'Multiple IMEIs found — pick one');
+        } else if (imeis.length === 1){
+          handleIMEI(imeis[0]);
+        } else {
+          // No clean IMEI; still try raw
+          handleIMEI(raw);
+        }
+        pauseScanline();
+        try{ navigator.vibrate?.(20); }catch(_){}
+      }
+    });
+
+    const stream = camNode.srcObject;
+    mediaStream = stream || null;
+    videoTrack = stream ? (stream.getVideoTracks()[0] || null) : null;
+
+    // allow stopAll() to reset ZXing
+    startZXing._stop = () => { try { codeReader.reset(); } catch(_){ } };
+  }
+
   // ---- Quagga fallback (1-at-a-time; no QR support) ----
   async function startQuagga(deviceId){
     if (!window.Quagga) { showToast('Quagga not loaded.', false); return; }
@@ -770,7 +810,13 @@
     const firstId = (cams[0] && cams[0].deviceId) || undefined;
 
     try{
-      await startNativeDetector(firstId);
+      if ('BarcodeDetector' in window){
+        await startNativeDetector(firstId);
+      } else if (window.ZXing && ZXing.BrowserMultiFormatReader){
+        await startZXing(firstId);
+      } else {
+        await startQuagga(firstId);
+      }
       camToggle.textContent = 'Restart Camera';
     }catch(err){
       showToast('Could not start camera. Check permission / origin.', false);
@@ -779,10 +825,16 @@
 
   camSelect && camSelect.addEventListener('change', async ()=>{
     stopAll();
-    if ('BarcodeDetector' in window){
-      await startNativeDetector(camSelect.value);
-    } else {
-      await startQuagga(camSelect.value);
+    try{
+      if ('BarcodeDetector' in window){
+        await startNativeDetector(camSelect.value);
+      } else if (window.ZXing && ZXing.BrowserMultiFormatReader){
+        await startZXing(camSelect.value);
+      } else {
+        await startQuagga(camSelect.value);
+      }
+    }catch{
+      showToast('Could not switch camera.', false);
     }
   });
 
