@@ -1261,7 +1261,7 @@ def alerts_feed(request: HttpRequest):
     alerts = []
     for r in stock:
         brand = r["product__brand"]; model = r["product__model"]
-        name = f"{brand} {model}"]
+        name = f"{brand} {model}"
         on_hand = int(r["on_hand"] or 0)
         daily = runrate_map.get(r["product_id"], 0.0)
         need7 = daily * 7.0
