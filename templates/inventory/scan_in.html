@@ -45,6 +45,21 @@
   }
   label{font-weight:700;margin-bottom:6px;display:inline-block}
 
+  /* Small inline input above selects (search) */
+  .inline-search{margin:4px 0 8px}
+  .inline-search input{
+    width:100%;border:1px solid var(--cc-border);border-radius:10px;
+    padding:8px 10px;background:#fff;outline:none
+  }
+  .inline-search input:focus{
+    border-color:var(--cc-accent);box-shadow:0 0 0 .2rem rgba(31,111,235,.18)
+  }
+
+  select#id_product, select#id_location{
+    width:100%; min-height:44px; background:transparent;
+    border:0; padding:8px 10px;
+  }
+
   /* ===== Buttons (blue) ===== */
   .btn{
     appearance:none;border:1px solid var(--cc-border);color:var(--cc-text);
@@ -224,11 +239,18 @@
               <a class="pill" href="/admin/inventory/product/add/" title="Add new product">+ Add</a>
             {% endif %}
           </label>
+
+          <!-- quick search (client-side) -->
+          <div class="inline-search">
+            <input type="search" id="productSearch" placeholder="Search brand / model…" aria-label="Search products">
+          </div>
+
           <div class="field">
             {{ form.product }}
           </div>
           {% if form.product.errors %}<div class="help-error">{{ form.product.errors|striptags }}</div>{% endif %}
           <div class="hint">Managers add products; agents pick from this list. <em>Order price auto-fills if set.</em></div>
+          <div id="productEmptyHint" class="help-error" hidden>No products found. Managers can add products from Admin.</div>
         </div>
         <div>
           <label for="id_location">
@@ -240,6 +262,7 @@
           <div class="field">{{ form.location }}</div>
           {% if form.location.errors %}<div class="help-error">{{ form.location.errors|striptags }}</div>{% endif %}
           <div class="hint">Default is your store. Managers can add new locations.</div>
+          <div id="locationEmptyHint" class="help-error" hidden>No locations available. Add a location in Admin or switch to a business with locations.</div>
         </div>
       </div>
 
@@ -326,6 +349,10 @@
   const secureWarn = document.getElementById('secureWarn');
   const orderPriceHint = document.getElementById('orderPriceHint');
 
+  const productSearch = document.getElementById('productSearch');
+  const productEmptyHint = document.getElementById('productEmptyHint');
+  const locationEmptyHint = document.getElementById('locationEmptyHint');
+
   // ===== Helpers =====
   const isSecure = window.isSecureContext || location.protocol === 'https:';
   if (!isSecure) secureWarn.style.display = 'block';
@@ -398,6 +425,7 @@
 
   // ===== Validation / defaults =====
   const defaultLocId = (form && form.dataset.defaultLocationId) ? form.dataset.defaultLocationId : '';
+  const defaultLocName = (form && form.dataset.defaultLocationName) ? form.dataset.defaultLocationName : '';
   const lockLocation = (form && form.dataset.lockLocation === '1');
 
   if (locEl) { locEl.removeAttribute('required'); locEl.removeAttribute('aria-required'); }
@@ -410,9 +438,21 @@
   }
 
   function applyDefaultLocation(){
-    if (!locEl || !defaultLocId) return;
+    if (!locEl) return;
+    // if empty and we have a default, inject it
+    const hasRealOptions = locEl.options && locEl.options.length > 0 && Array.from(locEl.options).some(o => o.value);
+    if (!hasRealOptions && defaultLocId){
+      const opt = document.createElement('option');
+      opt.value = String(defaultLocId);
+      opt.textContent = defaultLocName || 'My Store';
+      locEl.appendChild(opt);
+    }
+    // select default if present
     const opt = Array.from(locEl.options||[]).find(o => String(o.value) === String(defaultLocId));
     if (opt){ locEl.value = opt.value; }
+    // show hint if still nothing useful
+    const stillEmpty = !(locEl.options && locEl.options.length > 0);
+    if (locationEmptyHint) locationEmptyHint.hidden = !stillEmpty;
   }
 
   function ensureLocationEnabled(){
@@ -475,6 +515,68 @@
     updateFormValidity();
   }
 
+  // ===== PRODUCT LIST FIXES =====
+  // If the server-rendered product select is empty, fetch and populate.
+  const PRODUCT_API = '/inventory/api/stock-models/?q=';
+  let _productCache = []; // {id,label}
+  function hydrateProductsList(items){
+    if (!prodEl) return;
+    // clear options first
+    prodEl.innerHTML = '';
+    const placeholder = document.createElement('option');
+    placeholder.value = '';
+    placeholder.textContent = '— Select a product —';
+    prodEl.appendChild(placeholder);
+
+    items.forEach(it=>{
+      const o = document.createElement('option');
+      o.value = String(it.id);
+      o.textContent = it.label || (`Product ${it.id}`);
+      prodEl.appendChild(o);
+    });
+
+    // show/hide empty hint
+    const empty = items.length === 0;
+    if (productEmptyHint) productEmptyHint.hidden = !empty;
+  }
+
+  async function ensureProductsPresent(){
+    if (!prodEl) return;
+    const hasRealOptions = prodEl.options && prodEl.options.length > 1 && Array.from(prodEl.options).some(o => o.value);
+    if (hasRealOptions){
+      // cache what we already have for client-side search
+      _productCache = Array.from(prodEl.options)
+        .filter(o => o.value)
+        .map(o => ({id:o.value, label:o.textContent || ''}));
+      if (productEmptyHint) productEmptyHint.hidden = true;
+      return;
+    }
+    try{
+      const r = await fetch(PRODUCT_API, {headers:{'Accept':'application/json'}});
+      if (!r.ok) throw new Error('fail');
+      const data = await r.json();
+      const items = (data && data.items) ? data.items : [];
+      _productCache = items.slice();
+      hydrateProductsList(items);
+    }catch(_){
+      // keep existing; show hint
+      if (productEmptyHint) productEmptyHint.hidden = false;
+    }
+  }
+
+  function filterProductsLocal(q){
+    if (!_productCache.length){ return; }
+    const needle = (q||'').trim().toLowerCase();
+    const filtered = !needle ? _productCache
+      : _productCache.filter(p => (p.label||'').toLowerCase().includes(needle));
+    hydrateProductsList(filtered);
+    // keep current selection if it still exists
+    if (prodEl.dataset.prev && Array.from(prodEl.options).some(o => o.value===prodEl.dataset.prev)){
+      prodEl.value = prodEl.dataset.prev;
+    }
+    updateFormValidity();
+  }
+
   // ===== Input wiring =====
   if (imeiEl) {
     imeiEl.setAttribute('inputmode','numeric');
@@ -525,20 +627,44 @@
     const dd = String(today.getDate()).padStart(2,'0');
     recvEl.value = `${yyyy}-${mm}-${dd}`;
   }
-  prodEl && prodEl.addEventListener('change', ()=>{ manualPrice = false; autofillOrderPrice(false); updateFormValidity(); });
-  locEl && locEl.addEventListener('change', ()=>{
-    const hidden = document.querySelector('input[type="hidden"][name="location"]');
-    if (hidden) hidden.value = locEl.value || defaultLocId || '';
-    updateFormValidity();
-  });
 
-  window.addEventListener('load', ()=>{
+  // Product change → auto-price
+  if (prodEl){
+    prodEl.addEventListener('change', ()=>{
+      prodEl.dataset.prev = prodEl.value || '';
+      manualPrice = false;
+      autofillOrderPrice(false);
+      updateFormValidity();
+    });
+  }
+  // Location sync to hidden when locked
+  if (locEl){
+    locEl.addEventListener('change', ()=>{
+      const hidden = document.querySelector('input[type="hidden"][name="location"]');
+      if (hidden) hidden.value = locEl.value || (defaultLocId || '');
+      updateFormValidity();
+    });
+  }
+
+  // On load
+  window.addEventListener('load', async ()=>{
+    // Products list: ensure not empty (fetch if needed), keep client-side search working
+    await ensureProductsPresent();
+    // Wire search
+    if (productSearch){
+      productSearch.addEventListener('input', (e)=> filterProductsLocal(e.target.value));
+    }
+
+    // Location defaults / locking
     applyDefaultLocation();
     ensureLocationEnabled();
     lockLocationIfNeeded();
+
     imeiEl && imeiEl.focus();
     updateImeiCounter();
     updateFormValidity();
+
+    // If a product already selected (edit/redisplay), try to price it
     if (prodEl && prodEl.value){ autofillOrderPrice(false); }
   });
 
@@ -860,9 +986,121 @@
     }
   });
 
-  // initial
-  updateImeiCounter();
-  updateFormValidity();
+  // initial (some run on DOMContentLoaded, but we rely on full load for select population)
+  (async function init(){
+    updateImeiCounter();
+    updateFormValidity();
+  })();
+})();
+</script>
+
+<script>
+/* Keep a tiny separate block to avoid any hoist issues for helpers used earlier */
+(function(){
+  const form       = document.querySelector('form[data-validate]');
+  const prodEl     = document.getElementById('id_product');
+  const productSearch = document.getElementById('productSearch');
+  const productEmptyHint = document.getElementById('productEmptyHint');
+
+  // We reuse functions defined in the previous IIFE by re-locating them via window (safe no-op if not found).
+  // Provide local fallbacks if needed:
+  const PRODUCT_API = '/inventory/api/stock-models/?q=';
+  let _productCache = [];
+
+  function hydrateProductsList(items){
+    if (!prodEl) return;
+    prodEl.innerHTML = '';
+    const placeholder = document.createElement('option');
+    placeholder.value = '';
+    placeholder.textContent = '— Select a product —';
+    prodEl.appendChild(placeholder);
+    items.forEach(it=>{
+      const o = document.createElement('option');
+      o.value = String(it.id);
+      o.textContent = it.label || (`Product ${it.id}`);
+      prodEl.appendChild(o);
+    });
+    if (productEmptyHint) productEmptyHint.hidden = items.length !== 0;
+  }
+
+  async function ensureProductsPresent(){
+    if (!prodEl) return;
+    const hasRealOptions = prodEl.options && prodEl.options.length > 1 && Array.from(prodEl.options).some(o => o.value);
+    if (hasRealOptions){
+      _productCache = Array.from(prodEl.options).filter(o=>o.value).map(o=>({id:o.value,label:o.textContent||''}));
+      if (productEmptyHint) productEmptyHint.hidden = true;
+      return;
+    }
+    try{
+      const r = await fetch(PRODUCT_API, {headers:{'Accept':'application/json'}});
+      if (!r.ok) throw new Error('fail');
+      const data = await r.json();
+      const items = (data && data.items) ? data.items : [];
+      _productCache = items.slice();
+      hydrateProductsList(items);
+    }catch(_){
+      if (productEmptyHint) productEmptyHint.hidden = false;
+    }
+  }
+
+  function filterProductsLocal(q){
+    if (!_productCache.length) return;
+    const needle = (q||'').trim().toLowerCase();
+    const filtered = !needle ? _productCache
+      : _productCache.filter(p => (p.label||'').toLowerCase().includes(needle));
+    hydrateProductsList(filtered);
+  }
+
+  // Kick it now (runs after previous <script>)
+  (async function boot(){
+    await ensureProductsPresent();
+    if (productSearch){
+      productSearch.addEventListener('input', (e)=> filterProductsLocal(e.target.value));
+    }
+  })();
+
+  // LOCATION: run after products to ensure both are visible
+  const locEl      = document.getElementById('id_location');
+  const locationEmptyHint = document.getElementById('locationEmptyHint');
+  const defaultLocId = (form && form.dataset.defaultLocationId) ? form.dataset.defaultLocationId : '';
+  const defaultLocName = (form && form.dataset.defaultLocationName) ? form.dataset.defaultLocationName : '';
+  const lockLocation = (form && form.dataset.lockLocation === '1');
+
+  function applyDefaultLocation(){
+    if (!locEl) return;
+    const hasRealOptions = locEl.options && locEl.options.length > 0 && Array.from(locEl.options).some(o => o.value);
+    if (!hasRealOptions && defaultLocId){
+      const opt = document.createElement('option');
+      opt.value = String(defaultLocId);
+      opt.textContent = defaultLocName || 'My Store';
+      locEl.appendChild(opt);
+    }
+    const opt = Array.from(locEl.options||[]).find(o => String(o.value) === String(defaultLocId));
+    if (opt){ locEl.value = opt.value; }
+
+    const stillEmpty = !(locEl.options && locEl.options.length > 0);
+    if (locationEmptyHint) locationEmptyHint.hidden = !stillEmpty;
+
+    // lock logic
+    const existingHidden = document.querySelector('input[type="hidden"][name="location"]');
+    if (lockLocation){
+      const val = (locEl.value || defaultLocId || '');
+      if (!existingHidden){
+        const h = document.createElement('input');
+        h.type = 'hidden'; h.name = 'location'; h.value = val;
+        form.appendChild(h);
+      } else {
+        existingHidden.value = val;
+      }
+      locEl.setAttribute('disabled', 'disabled');
+      locEl.classList.add('is-disabled');
+    } else {
+      if (existingHidden) existingHidden.remove();
+      try { locEl.removeAttribute('disabled'); locEl.classList.remove('is-disabled'); } catch(_){}
+    }
+  }
+
+  applyDefaultLocation();
 })();
 </script>
 

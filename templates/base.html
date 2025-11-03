@@ -539,7 +539,6 @@
                 <strong>Payment needed.</strong> You're in a grace period to restore access.
               </div>
               <div class="d-flex gap-2">
-                <a class="btn btn-sm btn-warning" href="{{ url_billing_checkout|default:'/billing/checkout/' }}"><i class="bi bi-credit-card"></i> Pay now</a>
                 <a class="btn btn-sm btn-outline-secondary" href="{{ url_billing_sub|default:'/billing/subscribe/' }}"><i class="bi bi-gear"></i> Manage plan</a>
               </div>
             </div>
@@ -842,7 +841,7 @@
     });
 
     backdrop.addEventListener('click', (e)=>{ e.preventDefault(); close(); }, {passive:false});
-    document.addEventListener('keydown', (e)=>{ if (e.key === 'Escape') close(); }, {passive:true});
+    document.addEventListener('keydown', ()=>{ /* esc handled below in hotfix too */ }, {passive:true});
 
     // Close when navigating
     sidebar.querySelectorAll('a[href]').forEach(a=>{

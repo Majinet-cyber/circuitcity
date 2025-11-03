@@ -102,13 +102,35 @@ def _locations_for_active_business(request) -> list[dict[str, Any]]:
         return []
 
 
+def _business_default_location_id(request, locations: list[dict[str, Any]]) -> Optional[int]:
+    """
+    If your Location model has `is_default=True` for a business, prefer that.
+    """
+    if not Location or not locations:
+        return None
+    try:
+        biz = _get_active_business(request)
+        if biz is None:
+            return None
+        if _model_has_field(Location, "is_default"):
+            loc = Location.objects.filter(is_default=True).filter(
+                **({ "business": biz } if _model_has_field(Location, "business") else {})
+            ).first()
+            if loc:
+                return getattr(loc, "id", None)
+    except Exception:
+        return None
+    return None
+
+
 def _pick_default_location(request, locations: list[dict[str, Any]]) -> tuple[Optional[int], Optional[str]]:
     """
     Choose a default location from the already business-filtered list of dicts
     (each dict has {'id', 'name'}).
       1) agent's home location (if present in the list)
-      2) a location whose name == active business name
-      3) first location
+      2) business default (is_default=True) if available
+      3) a location whose name == active business name
+      4) first location
     Returns (id, name) or (None, None) if list empty.
     """
     if not locations:
@@ -121,7 +143,14 @@ def _pick_default_location(request, locations: list[dict[str, Any]]) -> tuple[Op
             if it.get("id") == pref_id:
                 return it["id"], it["name"]
 
-    # 2) Match by business name
+    # 2) Business default
+    def_id = _business_default_location_id(request, locations)
+    if def_id is not None:
+        for it in locations:
+            if it.get("id") == def_id:
+                return it["id"], it["name"]
+
+    # 3) Match by business name
     biz = _get_active_business(request)
     biz_name = getattr(biz, "name", None)
     if biz_name:
@@ -130,7 +159,7 @@ def _pick_default_location(request, locations: list[dict[str, Any]]) -> tuple[Op
             if str(it.get("name", "")).strip().lower() == bn:
                 return it["id"], it["name"]
 
-    # 3) First available
+    # 4) First available
     first = locations[0]
     return first.get("id"), first.get("name")
 
@@ -290,20 +319,26 @@ class ScanInView(TemplateView):
         default_loc_id, default_loc_name = _pick_default_location(request, locations)
         biz = _get_active_business(request)
 
+        # expose both "default_location" (dict) AND the *_id/*_name fields to satisfy older templates
+        default_location_dict = (
+            {"id": default_loc_id, "name": default_loc_name} if default_loc_id else None
+        )
+
         ctx.update(
             {
                 "post_url": reverse_lazy("inventory:api_scan_in"),
-                "products": products,                 # for Product select
-                "locations": locations,               # restricted to active business
-                "default_location_id": default_loc_id,
+                "products": products,                   # for Product select (list of dicts)
+                "locations": locations,                 # restricted to active business (list of dicts)
+                "default_location": default_location_dict,
+                "default_location_id": default_loc_id,  # for data-* attributes
                 "default_location_name": default_loc_name,
                 "active_business_name": getattr(biz, "name", None),
-                "lock_location": True,                # UI hint: render disabled + hidden mirror input
+                "lock_location": True,                  # UI hint: render disabled + hidden mirror input for agents
                 "received_date_default": date.today(),  # default date “today”
                 "rules": {
                     "imei_length": 15,
                     "require_product": True,
-                    "order_price_autofill": True,      # template can use this to auto-fill from product
+                    "order_price_autofill": True,        # template can use this to auto-fill from product
                 },
             }
         )
@@ -322,15 +357,20 @@ class ScanSoldView(TemplateView):
         default_loc_id, default_loc_name = _pick_default_location(request, locations)
         biz = _get_active_business(request)
 
+        default_location_dict = (
+            {"id": default_loc_id, "name": default_loc_name} if default_loc_id else None
+        )
+
         ctx.update(
             {
                 "post_url": reverse_lazy("inventory:api_scan_sold"),
                 "products": products,
-                "locations": locations,               # still a dropdown, but only within active business
+                "locations": locations,                 # dropdown limited to active business
+                "default_location": default_location_dict,
                 "default_location_id": default_loc_id,
                 "default_location_name": default_loc_name,
                 "active_business_name": getattr(biz, "name", None),
-                "lock_location": False,               # UI hint: allow changing on Sell
+                "lock_location": False,                 # allow managers to change on Sell
                 "rules": {
                     "imei_length": 15,
                     "require_product": True,
@@ -379,11 +419,16 @@ def api_scan_in(request: HttpRequest) -> JsonResponse:
     locations = _locations_for_active_business(request)
     default_loc_id, _default_loc_name = _pick_default_location(request, locations)
 
-    loc_id = body.get("location_id") or body.get("location") or default_loc_id
-    try:
-        loc_id = int(loc_id) if loc_id not in (None, "", "0") else None
-    except Exception:
-        loc_id = None
+    # Parse requested location and **enforce** it belongs to active business; otherwise fallback to default
+    def _as_int(val):
+        try:
+            return int(val)
+        except Exception:
+            return None
+
+    requested_loc_id = _as_int(body.get("location_id") or body.get("location"))
+    allowed_ids = {loc["id"] for loc in locations if loc.get("id") is not None}
+    loc_id = requested_loc_id if (requested_loc_id in allowed_ids) else default_loc_id
 
     # Build defaults respecting your schema
     defaults: dict[str, Any] = {"status": "IN_STOCK"}
