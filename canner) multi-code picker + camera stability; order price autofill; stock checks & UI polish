@@ -1,0 +1,813 @@
+[1mdiff --git a/inventory/api.py b/inventory/api.py[m
+[1mindex 5652a73..c737c42 100644[m
+[1m--- a/inventory/api.py[m
+[1m+++ b/inventory/api.py[m
+[36m@@ -218,6 +218,29 @@[m [mdef _apply_self_scope_or_none(qs, model, user):[m
+     # No ownership columns we recognize -> show nothing for agents[m
+     return qs.none()[m
+ [m
+[32m+[m[32m# ---------- SAFE base queryset for InventoryItem ----------[m
+[32m+[m[32mdef _safe_items_qs():[m
+[32m+[m[32m    """[m
+[32m+[m[32m    Returns InventoryItem queryset that avoids selecting or ordering by columns[m
+[32m+[m[32m    that might not exist in prod (e.g., created_at/updated_at), and neutralizes[m
+[32m+[m[32m    model Meta ordering by forcing a safe order_by('id').[m
+[32m+[m[32m    """[m
+[32m+[m[32m    qs = InventoryItem.objects.all()[m
+[32m+[m[32m    # Neutralize default Meta.ordering that might reference missing fields[m
+[32m+[m[32m    try:[m
+[32m+[m[32m        qs = qs.order_by("id")[m
+[32m+[m[32m    except Exception:[m
+[32m+[m[32m        pass[m
+[32m+[m[32m    # Avoid selecting missing timestamp columns (only defer if such fields exist on the model)[m
+[32m+[m[32m    try:[m
+[32m+[m[32m        fields = {f.name for f in InventoryItem._meta.get_fields()}[m
+[32m+[m[32m        to_defer = [f for f in ("created_at", "updated_at", "created", "modified") if f in fields][m
+[32m+[m[32m        if to_defer:[m
+[32m+[m[32m            qs = qs.defer(*to_defer)[m
+[32m+[m[32m    except Exception:[m
+[32m+[m[32m        pass[m
+[32m+[m[32m    return qs[m
+[32m+[m
+ def _scoped_sales_qs(request: HttpRequest):[m
+     qs = Sale.objects.all()[m
+     try:[m
+[36m@@ -232,7 +255,8 @@[m [mdef _scoped_sales_qs(request: HttpRequest):[m
+     return _apply_self_scope_or_none(qs, Sale, request.user)[m
+ [m
+ def _scoped_stock_qs(request: HttpRequest):[m
+[31m-    qs = InventoryItem.objects.all()[m
+[32m+[m[32m    # Use safe base to avoid selecting/ordering missing columns[m
+[32m+[m[32m    qs = _safe_items_qs()[m
+     try:[m
+         qs = qs.select_related("product")[m
+     except Exception:[m
+[36m@@ -335,7 +359,7 @@[m [mdef _find_instock_for_business(request: HttpRequest, raw: str) -> Optional[Inven[m
+         # tenant scope by business field if present; otherwise rely on _scoped_stock_qs[m
+         try:[m
+             if _has_field(InventoryItem, "business"):[m
+[31m-                base = InventoryItem.objects.filter(business=biz)[m
+[32m+[m[32m                base = _safe_items_qs().filter(business=biz)[m
+             else:[m
+                 base = _scoped_stock_qs(request)[m
+         except Exception:[m
+[36m@@ -710,7 +734,7 @@[m [mdef inventory_list(request: HttpRequest):[m
+ [m
+     qs = _scoped_stock_qs(request)[m
+     if use_all and _can_view_all(request.user):[m
+[31m-        qs = InventoryItem.objects.select_related("product")[m
+[32m+[m[32m        qs = _safe_items_qs().select_related("product")[m
+ [m
+     data = [{[m
+         "id": i.id,[m
+[36m@@ -732,7 +756,8 @@[m [mdef inventory_list(request: HttpRequest):[m
+ def predictions_summary(request: HttpRequest):[m
+     """[m
+     Returns simple next-7-day projections and risky stock.[m
+[31m-    Always uses Python aggregation (safe on SQLite).[m
+[32m+[m[32m    Always uses Python aggregation (safe on SQLite) and a safe items queryset that[m
+[32m+[m[32m    avoids selecting or ordering by missing columns.[m
+     """[m
+     today = timezone.localdate()[m
+     lookback_days = 14[m
+[36m@@ -743,6 +768,7 @@[m [mdef predictions_summary(request: HttpRequest):[m
+     afield = _sale_amount_field()[m
+ [m
+     sales_qs = date_range_filter(_scoped_sales_qs(request), dfield, start, end_excl)[m
+[32m+[m[32m    # Use SAFE items qs to avoid selecting created_at/updated_at or ordering by them[m
+     items_qs = _scoped_stock_qs(request)[m
+ [m
+     # -------- Python accumulation --------[m
+[36m@@ -1235,7 +1261,7 @@[m [mdef alerts_feed(request: HttpRequest):[m
+     alerts = [][m
+     for r in stock:[m
+         brand = r["product__brand"]; model = r["product__model"][m
+[31m-        name = f"{brand} {model}"[m
+[32m+[m[32m        name = f"{brand} {model}"][m
+         on_hand = int(r["on_hand"] or 0)[m
+         daily = runrate_map.get(r["product_id"], 0.0)[m
+         need7 = daily * 7.0[m
+[1mdiff --git a/templates/inventory/scan_in.html b/templates/inventory/scan_in.html[m
+[1mindex ce2ae2d..588f63e 100644[m
+[1m--- a/templates/inventory/scan_in.html[m
+[1m+++ b/templates/inventory/scan_in.html[m
+[36m@@ -132,8 +132,11 @@[m
+     text-align:left;padding:10px 12px;border-radius:10px;border:1px solid #e5e7eb;[m
+     background:#f9fafb;cursor:pointer;word-break:break-all[m
+   }[m
+[31m-  #ccscan-picker .actions{margin-top:12px;display:flex;justify-content:flex-end}[m
+[31m-  #ccscan-picker .cancel{padding:8px 12px;border-radius:10px;border:1px solid #e5e7eb;background:#fff;cursor:pointer}[m
+[32m+[m[32m  #ccscan-picker .item small{display:block;color:#6b7280;margin-top:2px}[m
+[32m+[m[32m  #ccscan-picker .actions{margin-top:12px;display:flex;justify-content:flex-end;gap:8px}[m
+[32m+[m[32m  #ccscan-picker .cancel,.secondary{[m
+[32m+[m[32m    padding:8px 12px;border-radius:10px;border:1px solid #e5e7eb;background:#fff;cursor:pointer[m
+[32m+[m[32m  }[m
+ </style>[m
+ {% endblock %}[m
+ [m
+[36m@@ -386,7 +389,10 @@[m
+     return false;[m
+   }[m
+ [m
+[31m-  function pauseScanline(ms=900){ scanLine?.classList.add('paused'); setTimeout(()=> scanLine?.classList.remove('paused'), ms); }[m
+[32m+[m[32m  function pauseScanline(ms=900){[m
+[32m+[m[32m    scanLine?.classList.add('paused');[m
+[32m+[m[32m    setTimeout(()=> scanLine?.classList.remove('paused'), ms);[m
+[32m+[m[32m  }[m
+ [m
+   // ===== Validation / defaults =====[m
+   const defaultLocId = (form && form.dataset.defaultLocationId) ? form.dataset.defaultLocationId : '';[m
+[36m@@ -556,7 +562,7 @@[m
+     }[m
+   });[m
+ [m
+[31m-  // ===== Scanner: BarcodeDetector → Quagga fallback =====[m
+[32m+[m[32m  // ===== Scanner: BarcodeDetector (QR-first, multi-pick) → Quagga fallback =====[m
+   let mediaStream = null, videoTrack = null;[m
+ [m
+   async function listCameras(){[m
+[36m@@ -606,29 +612,33 @@[m
+     mediaStream = null; videoTrack = null;[m
+   }[m
+ [m
+[31m-  function picker(values, onPick){[m
+[32m+[m[32m  function buildPicker(values, onPick, title='Multiple codes found — pick one'){[m
+     document.getElementById('ccscan-picker')?.remove();[m
+     const wrap = document.createElement('div');[m
+     wrap.id = 'ccscan-picker';[m
+     const card = document.createElement('div'); card.className='card';[m
+[31m-    const h = document.createElement('div'); h.style.fontWeight='600'; h.style.marginBottom='10px'; h.textContent='Multiple codes found — pick one';[m
+[32m+[m[32m    const h = document.createElement('div'); h.style.fontWeight='600'; h.style.marginBottom='10px'; h.textContent=title;[m
+     const list = document.createElement('div'); list.className='list';[m
+     values.forEach(v=>{[m
+[31m-      const b = document.createElement('button'); b.type='button'; b.className='item'; b.textContent=v;[m
+[31m-      b.onclick = ()=>{ wrap.remove(); onPick(v); };[m
+[31m-      list.appendChild(b);[m
+[32m+[m[32m      const btn = document.createElement('button'); btn.type='button'; btn.className='item';[m
+[32m+[m[32m      const main = (v.label ?? v.value ?? '').toString();[m
+[32m+[m[32m      btn.innerHTML = `${main.replace(/</g,'&lt;').replace(/>/g,'&gt;')}${v.meta ? `<small>${v.meta}</small>` : ''}`;[m
+[32m+[m[32m      btn.onclick = ()=>{ wrap.remove(); onPick(v.value ?? main); };[m
+[32m+[m[32m      list.appendChild(btn);[m
+     });[m
+     const actions = document.createElement('div'); actions.className='actions';[m
+     const cancel = document.createElement('button'); cancel.type='button'; cancel.className='cancel'; cancel.textContent='Cancel';[m
+     cancel.onclick = ()=> wrap.remove();[m
+[31m-    actions.appendChild(cancel);[m
+[32m+[m[32m    const pause = document.createElement('button'); pause.type='button'; pause.className='secondary'; pause.textContent='Pause camera';[m
+[32m+[m[32m    pause.onclick = ()=> { stopAll(); };[m
+[32m+[m[32m    actions.append(pause, cancel);[m
+     card.append(h,list,actions); wrap.appendChild(card); document.body.appendChild(wrap);[m
+   }[m
+ [m
+   function handleIMEI(value){[m
+     const codeRaw = digitsOnly(value);[m
+     if (!codeRaw) return;[m
+[31m-    const code = (codeRaw.length >= 15) ? codeRaw.slice(-15) : codeRaw;[m
+[32m+[m[32m    const code = (codeRaw.length >= 15) ? codeRaw.slice(-15) : codeRaw; // prefer last 15[m
+     if (imeiEl){ imeiEl.value = code; updateImeiCounter(); updateFormValidity(); }[m
+     try{ navigator.vibrate && navigator.vibrate(20);}catch(_){}[m
+     if (code.length === 15 && submitBtn && !submitBtn.disabled){[m
+[36m@@ -639,6 +649,18 @@[m
+     }[m
+   }[m
+ [m
+[32m+[m[32m  // Extract all possible IMEI-like candidates from a QR payload (e.g., JSON/Text with digits)[m
+[32m+[m[32m  function imeiCandidatesFromString(s){[m
+[32m+[m[32m    const d = digitsOnly(s||'');[m
+[32m+[m[32m    const cands = new Set();[m
+[32m+[m[32m    // slide a window to capture any 15-digit sequences[m
+[32m+[m[32m    for (let i=0;i+15<=d.length;i++){[m
+[32m+[m[32m      const chunk = d.slice(i,i+15);[m
+[32m+[m[32m      if (chunk.length===15) cands.add(chunk);[m
+[32m+[m[32m    }[m
+[32m+[m[32m    return Array.from(cands);[m
+[32m+[m[32m  }[m
+[32m+[m
+   async function startNativeDetector(deviceId){[m
+     await startMedia(deviceId);[m
+     if (!('BarcodeDetector' in window)){ return startQuagga(deviceId); }[m
+[36m@@ -652,9 +674,7 @@[m
+ [m
+     const canvas = document.createElement('canvas');[m
+     const ctx = canvas.getContext('2d', { willReadFrequently: true });[m
+[31m-    let lastPickShownAt = 0;[m
+[31m-    const windowMs = 1200;[m
+[31m-    let seen = new Map();   // value -> lastTs[m
+[32m+[m[32m    let lastPickerAt = 0;[m
+ [m
+     const loop = async () => {[m
+       if (!mediaStream) return;[m
+[36m@@ -665,19 +685,56 @@[m
+       ctx.drawImage(camNode,0,0,canvas.width,canvas.height);[m
+ [m
+       try{[m
+[31m-        const codes = await detector.detect(canvas);[m
+[31m-        if (codes?.length){[m
+[31m-          const vals = [...new Set(codes.map(c => (c.rawValue||c.rawValueText||"").trim()).filter(Boolean))];[m
+[32m+[m[32m        const detections = await detector.detect(canvas);[m
+[32m+[m[32m        if (!detections || !detections.length) return;[m
+[32m+[m
+[32m+[m[32m        // Prefer QR codes in current frame[m
+[32m+[m[32m        const qrs = detections.filter(c => (c.format||c.type) === 'qr_code');[m
+[32m+[m[32m        if (qrs.length > 0){[m
+[32m+[m[32m          // Build choices with full text; also map IMEI candidates for meta[m
+[32m+[m[32m          const choices = [];[m
+[32m+[m[32m          qrs.forEach((c, idx)=>{[m
+[32m+[m[32m            const raw = (c.rawValue || c.rawValueText || '').trim();[m
+[32m+[m[32m            if (!raw) return;[m
+[32m+[m[32m            const imeis = imeiCandidatesFromString(raw);[m
+[32m+[m[32m            const label = raw.length > 120 ? (raw.slice(0,120) + '…') : raw;[m
+[32m+[m[32m            choices.push({[m
+[32m+[m[32m              label,[m
+[32m+[m[32m              value: raw,[m
+[32m+[m[32m              meta: imeis.length ? `IMEI candidates: ${imeis.join(', ')}` : 'QR'[m
+[32m+[m[32m            });[m
+[32m+[m[32m          });[m
+[32m+[m
+[32m+[m[32m          if (choices.length === 1){[m
+[32m+[m[32m            // Single QR found right now → if it contains an IMEI, use that, else let handleIMEI parse it[m
+[32m+[m[32m            const raw = choices[0].value;[m
+[32m+[m[32m            const imeis = imeiCandidatesFromString(raw);[m
+[32m+[m[32m            handleIMEI(imeis[0] || raw);[m
+[32m+[m[32m          } else if (choices.length > 1){[m
+[32m+[m[32m            // Show picker immediately (per frame), throttled to avoid spam[m
+[32m+[m[32m            const now = Date.now();[m
+[32m+[m[32m            if (now - lastPickerAt > 600){[m
+[32m+[m[32m              lastPickerAt = now;[m
+[32m+[m[32m              buildPicker(choices, (picked)=>{[m
+[32m+[m[32m                const imeis = imeiCandidatesFromString(picked);[m
+[32m+[m[32m                handleIMEI(imeis[0] || picked);[m
+[32m+[m[32m              }, 'Multiple QR codes found — pick one');[m
+[32m+[m[32m            }[m
+[32m+[m[32m          }[m
+[32m+[m[32m          return; // don't try 1D if we already had QR[m
+[32m+[m[32m        }[m
+[32m+[m
+[32m+[m[32m        // No QR codes this frame → fall back to any detected codes (1D/others)[m
+[32m+[m[32m        const vals = [...new Set(detections.map(c => (c.rawValue||c.rawValueText||"").trim()).filter(Boolean))];[m
+[32m+[m[32m        if (vals.length === 1){[m
+[32m+[m[32m          handleIMEI(vals[0]);[m
+[32m+[m[32m        } else if (vals.length > 1){[m
+           const now = Date.now();[m
+[31m-          vals.forEach(v=> seen.set(v, now));[m
+[31m-          for (const [k,t] of [...seen.entries()]) if (now - t > windowMs) seen.delete(k);[m
+[31m-[m
+[31m-          const uniq = [...seen.keys()];[m
+[31m-          if (uniq.length === 1){[m
+[31m-            handleIMEI(uniq[0]);[m
+[31m-          } else if (uniq.length > 1 && now - lastPickShownAt > 600){[m
+[31m-            lastPickShownAt = now;[m
+[31m-            picker(uniq, (choice)=> handleIMEI(choice));[m
+[32m+[m[32m          if (now - lastPickerAt > 600){[m
+[32m+[m[32m            lastPickerAt = now;[m
+[32m+[m[32m            buildPicker(vals.map(v=>({label:v.length>120?(v.slice(0,120)+'…'):v, value:v, meta:'Barcode'})),[m
+[32m+[m[32m                        (picked)=> handleIMEI(picked),[m
+[32m+[m[32m                        'Multiple barcodes found — pick one');[m
+           }[m
+         }[m
+       }catch(_){}[m
+[36m@@ -685,7 +742,7 @@[m
+     loop();[m
+   }[m
+ [m
+[31m-  // ---- Quagga fallback (1-at-a-time) ----[m
+[32m+[m[32m  // ---- Quagga fallback (1-at-a-time; no QR support) ----[m
+   async function startQuagga(deviceId){[m
+     if (!window.Quagga) { showToast('Quagga not loaded.', false); return; }[m
+     Quagga.init({[m
+[1mdiff --git a/templates/inventory/scan_sold.html b/templates/inventory/scan_sold.html[m
+[1mindex 422bedc..567ccae 100644[m
+[1m--- a/templates/inventory/scan_sold.html[m
+[1m+++ b/templates/inventory/scan_sold.html[m
+[36m@@ -42,6 +42,7 @@[m
+   #toast[data-kind="error"]{background:#7f1d1d}[m
+ [m
+   .warn{display:none;margin-top:.5rem;padding:.6rem .8rem;border:1px solid #fbbf24;background:#fffbeb;color:#92400e;border-radius:10px}[m
+[32m+[m
+   #cameraBox{margin-top:8px;display:none;background:var(--cc-panel);border:1px dashed var(--cc-border);border-radius:14px;padding:12px}[m
+   .scan-shell{position:relative;border-radius:14px;overflow:hidden;background:#000;box-shadow:var(--cc-shadow)}[m
+   #camera{width:100%;max-height:360px;min-height:220px;background:#000;display:block;object-fit:cover}[m
+[36m@@ -62,8 +63,8 @@[m
+   #ccscan-picker .title{font-weight:600;margin-bottom:10px}[m
+   #ccscan-picker .list{max-height:55vh;overflow:auto;display:flex;flex-direction:column;gap:8px}[m
+   #ccscan-picker .item{text-align:left;padding:10px 12px;border-radius:10px;border:1px solid #e5e7eb;background:#f9fafb;cursor:pointer;word-break:break-all}[m
+[31m-  #ccscan-picker .actions{margin-top:12px;display:flex;justify-content:flex-end}[m
+[31m-  #ccscan-picker .cancel{padding:8px 12px;border-radius:10px;border:1px solid #e5e7eb;background:#fff;cursor:pointer}[m
+[32m+[m[32m  #ccscan-picker .actions{margin-top:12px;display:flex;justify-content:flex-end;gap:8px}[m
+[32m+[m[32m  #ccscan-picker .btn{padding:8px 12px;border-radius:10px;border:1px solid #e5e7eb;background:#fff;cursor:pointer}[m
+ </style>[m
+ {% endblock %}[m
+ [m
+[36m@@ -105,7 +106,17 @@[m
+       <div>[m
+         <label for="id_imei">IMEI / Barcode</label>[m
+         <div class="field">[m
+[31m-          <input type="text" id="id_imei" name="imei" maxlength="15" pattern="\\d{15}" inputmode="numeric" autocomplete="off" placeholder="Enter 15-digit IMEI" aria-required="true" aria-invalid="false">[m
+[32m+[m[32m          <input[m
+[32m+[m[32m            type="text"[m
+[32m+[m[32m            id="id_imei"[m
+[32m+[m[32m            name="imei"[m
+[32m+[m[32m            maxlength="15"[m
+[32m+[m[32m            pattern="\d{15}"[m
+[32m+[m[32m            inputmode="numeric"[m
+[32m+[m[32m            autocomplete="off"[m
+[32m+[m[32m            placeholder="Enter 15-digit IMEI"[m
+[32m+[m[32m            aria-required="true"[m
+[32m+[m[32m            aria-invalid="false">[m
+         </div>[m
+ [m
+         <div class="hstack" style="margin-top:.5rem">[m
+[36m@@ -194,12 +205,24 @@[m
+   </section>[m
+ </main>[m
+ [m
+[32m+[m[32m<div id="ccscan-picker">[m
+[32m+[m[32m  <div class="card">[m
+[32m+[m[32m    <div class="title">Multiple codes found — pick one</div>[m
+[32m+[m[32m    <div class="list" id="ccscan-list"></div>[m
+[32m+[m[32m    <div class="actions">[m
+[32m+[m[32m      <button type="button" class="btn" id="ccscan-pause">Pause camera</button>[m
+[32m+[m[32m      <button type="button" class="btn" id="ccscan-cancel">Cancel</button>[m
+[32m+[m[32m    </div>[m
+[32m+[m[32m  </div>[m
+[32m+[m[32m</div>[m
+[32m+[m
+ <div id="toast" hidden></div>[m
+ [m
+ <script src="https://unpkg.com/quagga@0.12.1/dist/quagga.min.js"></script>[m
+ [m
+ <script>[m
+ (function(){[m
+[32m+[m[32m  // ---------- Elements ----------[m
+   const formEl=document.getElementById('sellForm');[m
+   const submitBtn=document.getElementById('submitBtn');[m
+   const imeiInput=document.getElementById('id_imei');[m
+[36m@@ -210,7 +233,6 @@[m
+   const locHidden=document.getElementById('id_location_id');[m
+   const stockBadge=document.getElementById('stockBadge');[m
+   const lenChip=document.getElementById('lenChip');[m
+[31m-  const STOCK_STATUS_URL=formEl.dataset.stockStatusUrl;[m
+ [m
+   const camToggle=document.getElementById('camToggle');[m
+   const btnStopCam=document.getElementById('btnStopCam');[m
+[36m@@ -220,58 +242,44 @@[m
+   const camSelect=document.getElementById('cameraSelect');[m
+   const scanLine=document.getElementById('scanline');[m
+   const secureWarn=document.getElementById('secureWarn');[m
+[31m-[m
+   const candidatesEl=document.getElementById('candidates');[m
+   const autoSubmit=document.getElementById('autoSubmit');[m
+ [m
+[32m+[m[32m  const picker=document.getElementById('ccscan-picker');[m
+[32m+[m[32m  const pickerList=document.getElementById('ccscan-list');[m
+[32m+[m[32m  const pickerCancel=document.getElementById('ccscan-cancel');[m
+[32m+[m[32m  const pickerPause=document.getElementById('ccscan-pause');[m
+[32m+[m
+[32m+[m[32m  const STOCK_STATUS_URL=formEl.dataset.stockStatusUrl;[m
+   const defaultLocId = formEl.dataset.defaultLocationId || '';[m
+   const lockLocation = formEl.dataset.lockLocation === '1';[m
+ [m
+[31m-  function showPicker(values, onPick){[m
+[31m-    let wrap=document.getElementById('ccscan-picker');[m
+[31m-    if(!wrap){[m
+[31m-      wrap=document.createElement('div');[m
+[31m-      wrap.id='ccscan-picker';[m
+[31m-      wrap.innerHTML=`[m
+[31m-        <div class="card">[m
+[31m-          <div class="title">Multiple codes found — pick one</div>[m
+[31m-          <div class="list" id="ccscan-list"></div>[m
+[31m-          <div class="actions"><button type="button" class="cancel" id="ccscan-cancel">Cancel</button></div>[m
+[31m-        </div>`;[m
+[31m-      document.body.appendChild(wrap);[m
+[31m-    }[m
+[31m-    const list=wrap.querySelector('#ccscan-list');[m
+[31m-    list.innerHTML='';[m
+[31m-    values.forEach(v=>{[m
+[31m-      const b=document.createElement('button');[m
+[31m-      b.type='button'; b.className='item'; b.textContent=v;[m
+[31m-      b.onclick=()=>{ wrap.style.display='none'; onPick?.(v); };[m
+[31m-      list.appendChild(b);[m
+[31m-    });[m
+[31m-    wrap.querySelector('#ccscan-cancel').onclick=()=>{ wrap.style.display='none'; };[m
+[31m-    wrap.style.display='flex';[m
+[31m-  }[m
+[31m-[m
+[32m+[m[32m  // ---------- Helpers ----------[m
+   const toastEl=document.getElementById('toast');[m
+   function toast(msg, kind='ok', ms=2400){ toastEl.textContent=msg; toastEl.dataset.kind=kind; toastEl.hidden=false; clearTimeout(toast._t); toast._t=setTimeout(()=>toastEl.hidden=true,ms); }[m
+[31m-[m
+   const digits=s=>String(s||'').replace(/\D+/g,'');[m
+[31m-  const isIMEI15=s=>/^\d{15}$/.test(digits(s));[m
+[32m+[m[32m  const isSecure = window.isSecureContext || location.protocol === 'https:';[m
+[32m+[m[32m  if(!isSecure){ secureWarn.style.display='block'; }[m
+[32m+[m
+[32m+[m[32m  const IMEI_RX=/\b\d{15}\b/g;[m
+[32m+[m[32m  const isIMEI15 = s => /^\d{15}$/.test(digits(s));[m
+[32m+[m
+   function setAriaValidity(){ imeiInput.setAttribute('aria-invalid', String(!isIMEI15(imeiInput.value))); }[m
+[31m-  const validPrice=()=>{ const v=Number(priceEl && priceEl.value); return Number.isFinite(v) && v>=0; };[m
+[32m+[m[32m  function validPrice(){ const v=Number(priceEl && priceEl.value); return Number.isFinite(v) && v>=0; }[m
+   function csrf(){ const el=document.querySelector('#sellForm input[name="csrfmiddlewaretoken"]'); return el?el.value:''; }[m
+[31m-  function setToday(){ if(dateEl && !dateEl.value){ const d=new Date(); dateEl.value=[d.getFullYear(),String(d.getMonth()+1).padStart(2,'0'),String(d.getDate()).padStart(2,'0')].join('-'); } }[m
+[32m+[m[32m  function setToday(){[m
+[32m+[m[32m    if(dateEl && !dateEl.value){[m
+[32m+[m[32m      const d=new Date();[m
+[32m+[m[32m      dateEl.value=[d.getFullYear(),String(d.getMonth()+1).padStart(2,'0'),String(d.getDate()).padStart(2,'0')].join('-');[m
+[32m+[m[32m    }[m
+[32m+[m[32m  }[m
+   setToday();[m
+ [m
+[31m-  const isSecure = window.isSecureContext || location.protocol === 'https:';[m
+[31m-  if(!isSecure){ secureWarn.style.display='block'; }[m
+[31m-[m
+[32m+[m[32m  // ---------- Status badge + submit guard ----------[m
+   let inStockHere=false, inStockElsewhere=false, currentCtrl=null;[m
+[31m-[m
+[31m-  function setBadge(kind, text){ stockBadge.classList.remove('badge-warn','badge-ok','badge-wait'); stockBadge.classList.add(kind); stockBadge.textContent=text; }[m
+[32m+[m[32m  function setBadge(kind, text){ stockBadge.className='badge '+kind; stockBadge.textContent=text; }[m
+   function updateSubmitState(){ submitBtn.disabled = !(isIMEI15(imeiInput.value) && validPrice() && (inStockHere || inStockElsewhere)); }[m
+ [m
+[31m-  // --- Match the latest api_stock_status (supports {in_stock, data:{location_mismatch}}) ---[m
+   function parseInStock(payload){[m
+     if (!payload) return false;[m
+     if (typeof payload.in_stock === 'boolean') return payload.in_stock;[m
+[36m@@ -281,9 +289,7 @@[m
+   }[m
+   function parseMismatch(payload){[m
+     if (!payload) return false;[m
+[31m-    // Prefer the canonical key from our API[m
+     if (payload.data && typeof payload.data.location_mismatch === 'boolean') return payload.data.location_mismatch;[m
+[31m-    // Back-compat with older keys[m
+     if (typeof payload.location_mismatch === 'boolean') return payload.location_mismatch;[m
+     if (typeof payload.mismatch === 'boolean') return payload.mismatch;[m
+     if (payload.data && typeof payload.data.mismatch === 'boolean') return payload.data.mismatch;[m
+[36m@@ -293,8 +299,8 @@[m
+   async function checkStock(){[m
+     const code=(imeiInput.value||'').trim();[m
+     const locId=(locWidget?.value||'').trim();[m
+[31m-[m
+     if (currentCtrl) currentCtrl.abort();[m
+[32m+[m
+     if (!isIMEI15(code)){[m
+       inStockHere=false; inStockElsewhere=false;[m
+       setBadge('badge-warn','Enter 15 digits');[m
+[36m@@ -310,10 +316,8 @@[m
+     const timer = setTimeout(()=>currentCtrl.abort(), 2500);[m
+ [m
+     try{[m
+[31m-      const res = await fetch(`${formEl.dataset.stockStatusUrl}?${params.toString()}`,{[m
+[31m-        signal: currentCtrl.signal,[m
+[31m-        credentials:'same-origin',[m
+[31m-        cache:'no-store',[m
+[32m+[m[32m      const res = await fetch(`${STOCK_STATUS_URL}?${params.toString()}`,{[m
+[32m+[m[32m        signal: currentCtrl.signal, credentials:'same-origin', cache:'no-store',[m
+         headers:{'X-Requested-With':'XMLHttpRequest','Accept':'application/json'}[m
+       });[m
+       clearTimeout(timer);[m
+[36m@@ -337,19 +341,12 @@[m
+     }[m
+   }[m
+ [m
+[31m-  const IMEI_RX=/\b\d{15}\b/g;[m
+[31m-  function setIMEI(val){[m
+[31m-    imeiInput.value = digits(val).slice(0,15);[m
+[31m-    handleIMEIInput();[m
+[31m-    if (autoSubmit.checked && isIMEI15(imeiInput.value) && !submitBtn.disabled) {[m
+[31m-      formEl.requestSubmit ? formEl.requestSubmit() : formEl.submit();[m
+[31m-    }[m
+[31m-  }[m
+   function renderCandidates(list){[m
+     if (!list || !list.length) { candidatesEl.innerHTML=''; return; }[m
+     candidatesEl.innerHTML = list.map(v=>`<button type="button" class="pill" data-imei="${v}">${v}</button>`).join('');[m
+     candidatesEl.querySelectorAll('.pill').forEach(b=>b.addEventListener('click',()=>setIMEI(b.dataset.imei)));[m
+   }[m
+[32m+[m
+   function handleIMEIInput(){[m
+     const raw = imeiInput.value;[m
+     const clean = digits(raw).slice(0,15);[m
+[36m@@ -364,9 +361,17 @@[m
+   }[m
+   imeiInput.addEventListener('input', handleIMEIInput);[m
+   imeiInput.addEventListener('keydown',(e)=>{ if(e.key==='Enter'){ e.preventDefault(); if(!submitBtn.disabled) formEl.submit(); }});[m
+[31m-  window.addEventListener('DOMContentLoaded', ()=>{ handleIMEIInput(); });[m
+[32m+[m[32m  window.addEventListener('DOMContentLoaded', handleIMEIInput);[m
+[32m+[m
+[32m+[m[32m  function setIMEI(val){[m
+[32m+[m[32m    imeiInput.value = digits(val).slice(0,15);[m
+[32m+[m[32m    handleIMEIInput();[m
+[32m+[m[32m    if (autoSubmit.checked && isIMEI15(imeiInput.value) && !submitBtn.disabled) {[m
+[32m+[m[32m      formEl.requestSubmit ? formEl.requestSubmit() : formEl.submit();[m
+[32m+[m[32m    }[m
+[32m+[m[32m  }[m
+ [m
+[31m-  // ---- Location behavior: only lock if explicitly told (no auto-lock by single option) ----[m
+[32m+[m[32m  // ---------- Location ----------[m
+   function applyDefaultLocation(){[m
+     if (!locWidget) return;[m
+     if (defaultLocId){[m
+[36m@@ -377,33 +382,44 @@[m
+ [m
+     if (lockLocation){[m
+       locWidget.setAttribute('disabled','disabled');[m
+[31m-      // keep hidden mirror updated[m
+       if (locHidden) locHidden.value = (locWidget.value||'').trim();[m
+     } else {[m
+       locWidget.removeAttribute('disabled');[m
+     }[m
+   }[m
+   applyDefaultLocation();[m
+[32m+[m[32m  locWidget?.addEventListener('change',()=>{ if (locHidden) locHidden.value=(locWidget.value||'').trim(); if (isIMEI15(imeiInput.value)) checkStock(); });[m
+ [m
+[31m-  locWidget?.addEventListener('change',()=>{[m
+[31m-    if (locHidden) locHidden.value=(locWidget.value||'').trim();[m
+[31m-    if (isIMEI15(imeiInput.value)) checkStock();[m
+[31m-  });[m
+[31m-[m
+[32m+[m[32m  // ---------- Paste / Clear ----------[m
+   document.getElementById('btnPaste')?.addEventListener('click',async()=>{[m
+     try{[m
+       const t=await navigator.clipboard.readText();[m
+       const candidates = (t.match(IMEI_RX) || []);[m
+[31m-      if (candidates.length > 1){ showPicker([...new Set(candidates)], (v)=>setIMEI(v)); }[m
+[32m+[m[32m      if (candidates.length > 1){ openPicker([...new Set(candidates)], (v)=>setIMEI(v)); }[m
+       setIMEI(candidates[0] || t);[m
+       if(isIMEI15(imeiInput.value)) priceEl?.focus();[m
+     }catch{ toast('Clipboard blocked','warn'); }[m
+   });[m
+   document.getElementById('btnClear')?.addEventListener('click',()=>{ imeiInput.value=''; inStockHere=false; inStockElsewhere=false; handleIMEIInput(); imeiInput.focus(); });[m
+ [m
+[31m-  // ===== Camera: BarcodeDetector → Quagga fallback =====[m
+[31m-  const isSecureCtx = window.isSecureContext || location.protocol === 'https:';[m
+[32m+[m[32m  // ---------- Picker ----------[m
+[32m+[m[32m  function openPicker(values, onPick){[m
+[32m+[m[32m    pickerList.innerHTML='';[m
+[32m+[m[32m    values.forEach(v=>{[m
+[32m+[m[32m      const b=document.createElement('button');[m
+[32m+[m[32m      b.type='button'; b.className='item'; b.textContent=v;[m
+[32m+[m[32m      b.onclick=()=>{ picker.style.display='none'; onPick?.(v); };[m
+[32m+[m[32m      pickerList.appendChild(b);[m
+[32m+[m[32m    });[m
+[32m+[m[32m    picker.style.display='flex';[m
+[32m+[m[32m    pickerCancel.onclick=()=>{ picker.style.display='none'; };[m
+[32m+[m[32m    pickerPause.onclick=()=>{ stopAll(); toast('Camera paused','warn'); };[m
+[32m+[m[32m  }[m
+[32m+[m
+[32m+[m[32m  // ---------- Camera / Scanner ----------[m
+[32m+[m[32m  const isSecureCtx = isSecure;[m
+   let mediaStream=null, videoTrack=null, rafId=null, scanning=false, usingDetector=false, torchOn=false;[m
+[32m+[m[32m  let quaggaHandler=null, detector=null, lastPickerAt=0;[m
+ [m
+   function stopRaf(){ if (rafId) cancelAnimationFrame(rafId); rafId=null; }[m
+   function pauseScanline(ms=900){ if(!scanLine) return; scanLine.classList.add('paused'); setTimeout(()=> scanLine.classList.remove('paused'), ms); }[m
+[36m@@ -424,20 +440,32 @@[m
+     }catch{return [];}[m
+   }[m
+ [m
+[32m+[m[32m  async function startMedia(constraints){[m
+[32m+[m[32m    mediaStream = await navigator.mediaDevices.getUserMedia(constraints);[m
+[32m+[m[32m    camNode.srcObject = mediaStream;[m
+[32m+[m[32m    await camNode.play();[m
+[32m+[m[32m    videoTrack = mediaStream.getVideoTracks()[0];[m
+[32m+[m[32m  }[m
+[32m+[m
+   async function startNativeDetector(deviceId){[m
+[31m-    const constraints = {[m
+[32m+[m[32m    await startMedia({[m
+       audio:false,[m
+       video:{[m
+         facingMode: deviceId ? undefined : { ideal: 'environment' },[m
+         deviceId: deviceId ? { exact: deviceId } : undefined,[m
+[31m-        width:{ideal:1280}, height:{ideal:720}, frameRate:{ideal:60,max:60},[m
+[32m+[m[32m        width:{ideal:1280}, height:{ideal:720}, frameRate:{ideal:24,max:30},[m
+         focusMode:"continuous", advanced:[{focusMode:"continuous"}][m
+       }[m
+[31m-    };[m
+[31m-    mediaStream = await navigator.mediaDevices.getUserMedia(constraints);[m
+[31m-    camNode.srcObject = mediaStream;[m
+[31m-    await camNode.play();[m
+[31m-    videoTrack = mediaStream.getVideoTracks()[0];[m
+[32m+[m[32m    });[m
+[32m+[m
+[32m+[m[32m    if (!('BarcodeDetector' in window)) throw new Error('NoBarcodeDetector');[m
+[32m+[m
+[32m+[m[32m    try{[m
+[32m+[m[32m      detector = new window.BarcodeDetector({[m
+[32m+[m[32m        formats:['qr_code','aztec','code_128','code_39','code_93','data_matrix','ean_13','ean_8','itf','pdf417','upc_a','upc_e'][m
+[32m+[m[32m      });[m
+[32m+[m[32m    }catch(_){ throw new Error('DetectorInitFailed'); }[m
+[32m+[m
+     usingDetector = true; scanning = true;[m
+     detectLoop();[m
+   }[m
+[36m@@ -445,57 +473,91 @@[m
+   function extractCandidatesFromStrings(arr){[m
+     const set=new Set();[m
+     arr.forEach(s=>{[m
+[31m-      String(s||'').match(IMEI_RX)?.forEach(v=>set.add(v));[m
+[32m+[m[32m      (String(s||'').match(IMEI_RX)||[]).forEach(v=>set.add(v));[m
+     });[m
+     return [...set];[m
+   }[m
+ [m
+[32m+[m[32m  function uniqueStrings(arr){[m
+[32m+[m[32m    const set=new Set(arr.filter(Boolean).map(s=>s.trim()));[m
+[32m+[m[32m    return [...set];[m
+[32m+[m[32m  }[m
+[32m+[m
+[32m+[m[32m  function now(){ return Date.now(); }[m
+[32m+[m
+[32m+[m[32m  function shouldShowPicker(){ const t=now(); if (t-lastPickerAt>700){ lastPickerAt=t; return true; } return false; }[m
+[32m+[m
+   async function detectLoop(){[m
+[31m-    if (!('BarcodeDetector' in window) || !scanning) return;[m
+[31m-    try{[m
+[31m-      const detector = new window.BarcodeDetector({[m
+[31m-        formats:['qr_code','aztec','code_128','code_39','code_93','data_matrix','ean_13','ean_8','itf','pdf417','upc_a','upc_e'][m
+[31m-      });[m
+[31m-      const canvas = document.createElement('canvas');[m
+[31m-      const ctx = canvas.getContext('2d', { willReadFrequently: true });[m
+[32m+[m[32m    const canvas = document.createElement('canvas');[m
+[32m+[m[32m    const ctx = canvas.getContext('2d', { willReadFrequently: true });[m
+ [m
+[31m-      let seen = new Map();[m
+[31m-      const windowMs = 1200;[m
+[32m+[m[32m    let lastTick=0;[m
+[32m+[m[32m    const tickEveryMs=140; // ~7 fps[m
+ [m
+[31m-      const loop = async () => {[m
+[31m-        if (!scanning) return;[m
+[31m-        rafId = requestAnimationFrame(loop);[m
+[31m-        if (camNode.readyState < 2) return;[m
+[31m-        canvas.width = camNode.videoWidth; canvas.height = camNode.videoHeight;[m
+[31m-        ctx.drawImage(camNode,0,0,canvas.width,canvas.height);[m
+[32m+[m[32m    const loop = async () => {[m
+[32m+[m[32m      if (!scanning) return;[m
+[32m+[m[32m      rafId = requestAnimationFrame(loop);[m
+[32m+[m[32m      if (camNode.readyState < 2) return;[m
+ [m
+[32m+[m[32m      const t=performance.now();[m
+[32m+[m[32m      if (t - lastTick < tickEveryMs) return;[m
+[32m+[m[32m      lastTick = t;[m
+[32m+[m
+[32m+[m[32m      canvas.width = camNode.videoWidth; canvas.height = camNode.videoHeight;[m
+[32m+[m[32m      ctx.drawImage(camNode,0,0,canvas.width,canvas.height);[m
+[32m+[m
+[32m+[m[32m      try{[m
+         const codes = await detector.detect(canvas);[m
+[31m-        if (codes && codes.length){[m
+[31m-          const rawVals = codes.map(c => (c.rawValue || c.rawValueText || '').trim()).filter(Boolean);[m
+[31m-          const cand = extractCandidatesFromStrings(rawVals);[m
+[31m-          const now = Date.now();[m
+[31m-          cand.forEach(v=> seen.set(v, now));[m
+[31m-          for (const [k,t] of [...seen.entries()]) if (now - t > windowMs) seen.delete(k);[m
+[31m-[m
+[31m-          const uniq=[...seen.keys()];[m
+[31m-          if (uniq.length === 1){[m
+[31m-            setIMEI(uniq[0]); pauseScanline(); try{ navigator.vibrate?.(20);}catch(_){}[m
+[31m-            if (autoSubmit.checked && !submitBtn.disabled){ formEl.submit(); }[m
+[31m-          } else if (uniq.length > 1){[m
+[32m+[m[32m        if (!codes || !codes.length) return;[m
+[32m+[m
+[32m+[m[32m        // Prefer QR payloads for multi-pick[m
+[32m+[m[32m        const qrVals = uniqueStrings(codes.filter(c => (c.format||c.type)==='qr_code').map(c => c.rawValue||c.rawValueText||''));[m
+[32m+[m[32m        if (qrVals.length){[m
+[32m+[m[32m          const imeis = extractCandidatesFromStrings(qrVals);[m
+[32m+[m[32m          if (imeis.length === 1){[m
+[32m+[m[32m            setIMEI(imeis[0]); pauseScanline(); try{ navigator.vibrate?.(20);}catch(_){}[m
+[32m+[m[32m            if (autoSubmit.checked && !submitBtn.disabled) { stopAll(); formEl.submit(); }[m
+[32m+[m[32m          } else if (imeis.length > 1 && shouldShowPicker()){[m
+             pauseScanline();[m
+[31m-            showPicker(uniq, (choice)=>{ setIMEI(choice); if (autoSubmit.checked && !submitBtn.disabled){ formEl.submit(); } });[m
+[32m+[m[32m            openPicker(imeis, choice => { setIMEI(choice); if (autoSubmit.checked && !submitBtn.disabled){ stopAll(); formEl.submit(); } });[m
+[32m+[m[32m          } else if (!imeis.length && qrVals.length === 1){[m
+[32m+[m[32m            // QR text without clean 15-digit IMEI — still try to parse best 15-digit window[m
+[32m+[m[32m            const d = digits(qrVals[0]);[m
+[32m+[m[32m            if (d.length >= 15) { setIMEI(d.slice(-15)); }[m
+           }[m
+[32m+[m[32m          return; // do not process 1D in the same frame if QR present[m
+         }[m
+[31m-      };[m
+[31m-      loop();[m
+[31m-    }catch(err){[m
+[31m-      usingDetector = false;[m
+[31m-      await startQuagga((camSelect && camSelect.value) || undefined);[m
+[31m-    }[m
+[32m+[m
+[32m+[m[32m        // Fallback: any barcode values → 15-digit candidates[m
+[32m+[m[32m        const anyVals = uniqueStrings(codes.map(c => c.rawValue||c.rawValueText||''));[m
+[32m+[m[32m        const cand = extractCandidatesFromStrings(anyVals);[m
+[32m+[m[32m        if (cand.length === 1){[m
+[32m+[m[32m          setIMEI(cand[0]); pauseScanline(); try{ navigator.vibrate?.(20);}catch(_){}[m
+[32m+[m[32m          if (autoSubmit.checked && !submitBtn.disabled) { stopAll(); formEl.submit(); }[m
+[32m+[m[32m        } else if (cand.length > 1 && shouldShowPicker()){[m
+[32m+[m[32m          pauseScanline();[m
+[32m+[m[32m          openPicker(cand, choice => { setIMEI(choice); if (autoSubmit.checked && !submitBtn.disabled){ stopAll(); formEl.submit(); } });[m
+[32m+[m[32m        }[m
+[32m+[m[32m      }catch(_e){[m
+[32m+[m[32m        // If detect fails repeatedly, fallback will be used when starting again[m
+[32m+[m[32m      }[m
+[32m+[m[32m    };[m
+[32m+[m[32m    loop();[m
+   }[m
+ [m
+   async function startQuagga(deviceId){[m
+     if (!window.Quagga) { toast('Quagga not loaded.', 'warn'); return; }[m
+[32m+[m[32m    await startMedia({[m
+[32m+[m[32m      audio:false,[m
+[32m+[m[32m      video:{[m
+[32m+[m[32m        facingMode: deviceId ? undefined : 'environment',[m
+[32m+[m[32m        deviceId: deviceId || undefined,[m
+[32m+[m[32m        width:{ideal:1280}, height:{ideal:720}[m
+[32m+[m[32m      }[m
+[32m+[m[32m    });[m
+[32m+[m
+[32m+[m[32m    stopRaf(); usingDetector=false; scanning=true;[m
+[32m+[m
+     Quagga.init({[m
+       inputStream: { type: 'LiveStream', target: camNode,[m
+         constraints: { facingMode: deviceId ? undefined : 'environment', deviceId: deviceId || undefined,[m
+[36m@@ -504,25 +566,22 @@[m
+       locate: true,[m
+       numOfWorkers: navigator.hardwareConcurrency ? Math.min(4, navigator.hardwareConcurrency) : 2[m
+     }, (err)=>{[m
+[31m-      if(err){ toast('Camera init failed. Allow camera access.', 'error', 3200); return; }[m
+[31m-      Quagga.start(); scanning=true;[m
+[32m+[m[32m      if(err){ toast('Camera init failed. Allow camera access.', 'error', 3200); stopAll(); return; }[m
+[32m+[m[32m      Quagga.start();[m
+     });[m
+[31m-    Quagga.onDetected((result)=>{[m
+[32m+[m
+[32m+[m[32m    // ensure only one active handler[m
+[32m+[m[32m    if (quaggaHandler) try{ Quagga.offDetected(quaggaHandler); }catch(_){}[m
+[32m+[m[32m    quaggaHandler = (result)=>{[m
+[32m+[m[32m      if(!scanning) return;[m
+       const code = (result && result.codeResult && result.codeResult.code) || '';[m
+       if(!code) return;[m
+       const list = extractCandidatesFromStrings([code]);[m
+[31m-      if (list.length > 1){ pauseScanline(); showPicker(list, (choice)=> setIMEI(choice)); }[m
+[32m+[m[32m      if (list.length > 1){ pauseScanline(); openPicker(list, (choice)=> setIMEI(choice)); }[m
+       else { setIMEI(list[0] || code); }[m
+[31m-      if (autoSubmit.checked && !submitBtn.disabled){ formEl.submit(); }[m
+[31m-    });[m
+[31m-  }[m
+[31m-[m
+[31m-  function stopAll(){[m
+[31m-    scanning = false;[m
+[31m-    stopRaf();[m
+[31m-    if (window.Quagga){ try{ Quagga.stop(); }catch(_){ } }[m
+[31m-    if (mediaStream){ mediaStream.getTracks().forEach(t=>t.stop()); }[m
+[31m-    mediaStream=null; videoTrack=null;[m
+[32m+[m[32m      if (autoSubmit.checked && !submitBtn.disabled){ stopAll(); formEl.submit(); }[m
+[32m+[m[32m    };[m
+[32m+[m[32m    Quagga.onDetected(quaggaHandler);[m
+   }[m
+ [m
+   async function enableTorch(desired){[m
+[36m@@ -532,9 +591,23 @@[m
+     try{[m
+       await videoTrack.applyConstraints({ advanced:[{ torch: desired }] });[m
+       torchOn = desired;[m
+[31m-    }catch(_){}[m
+[32m+[m[32m    }catch(_){ toast('Torch toggle failed.','warn'); }[m
+[32m+[m[32m  }[m
+[32m+[m
+[32m+[m[32m  function stopAll(){[m
+[32m+[m[32m    scanning = false;[m
+[32m+[m[32m    stopRaf();[m
+[32m+[m[32m    if (window.Quagga){[m
+[32m+[m[32m      try{[m
+[32m+[m[32m        if (quaggaHandler) { Quagga.offDetected(quaggaHandler); quaggaHandler=null; }[m
+[32m+[m[32m        Quagga.stop();[m
+[32m+[m[32m      }catch(_){}[m
+[32m+[m[32m    }[m
+[32m+[m[32m    if (mediaStream){ mediaStream.getTracks().forEach(t=>t.stop()); }[m
+[32m+[m[32m    mediaStream=null; videoTrack=null;[m
+   }[m
+ [m
+[32m+[m[32m  // ---------- Camera UI ----------[m
+   camToggle?.addEventListener('click', async ()=>{[m
+     if(!isSecureCtx){ toast('Tip: use HTTPS or Android Chrome dev flag to enable camera.','warn'); }[m
+     camBox.style.display='block';[m
+[36m@@ -579,10 +652,12 @@[m
+     camToggle.textContent='Start Camera';[m
+   });[m
+ [m
+[31m-  torchBtn?.addEventListener('click', ()=> enableTorch(!torchOn));[m
+[32m+[m[32m  torchBtn?.addEventListener('click', ()=> enableTorch(!(window.torchOn)));[m
+[32m+[m
+   window.addEventListener('beforeunload', stopAll);[m
+   document.addEventListener('visibilitychange', ()=>{ if (document.hidden) stopAll(); });[m
+ [m
+[32m+[m[32m  // ---------- Form submission ----------[m
+   function parseSoldResult(resp, data, text){[m
+     const msg=(data&&(data.message||data.msg))||text||'';[m
+     const alreadySold=(data&&(data.status==='already_sold'||data.error_code==='ALREADY_SOLD'))||/already\s*sold/i.test(msg||'');[m
+[36m@@ -594,7 +669,7 @@[m
+     for(let i=0;i<tries;i++){[m
+       try{[m
+         const qs=new URLSearchParams({code, _:Date.now()});[m
+[31m-        const res=await fetch(`${formEl.dataset.stockStatusUrl}?${qs.toString()}`,{cache:'no-store',credentials:'same-origin',headers:{'Accept':'application/json'}});[m
+[32m+[m[32m        const res=await fetch(`${STOCK_STATUS_URL}?${qs.toString()}`,{cache:'no-store',credentials:'same-origin',headers:{'Accept':'application/json'}});[m
+         const data= res.ok ? await res.json() : null;[m
+         const stillInStock = !!parseInStock(data) && !parseMismatch(data);[m
+         if(!stillInStock){ return true; }[m
