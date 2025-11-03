@@ -218,7 +218,10 @@
 
 <div id="toast" hidden></div>
 
+<!-- Quagga fallback (1D barcodes) -->
 <script src="https://unpkg.com/quagga@0.12.1/dist/quagga.min.js"></script>
+<!-- ZXing fallback for QR & 1D (between BarcodeDetector and Quagga) -->
+<script src="https://unpkg.com/@zxing/library@0.20.0"></script>
 
 <script>
 (function(){
@@ -470,6 +473,50 @@
     detectLoop();
   }
 
+  // ZXing reader between BarcodeDetector and Quagga
+  async function startZXing(deviceId){
+    if (!window.ZXing || !ZXing.BrowserMultiFormatReader) {
+      throw new Error('ZXingUnavailable');
+    }
+    const reader = new ZXing.BrowserMultiFormatReader();
+    const devices = await reader.listVideoInputDevices().catch(()=>[]);
+    let chosenId = deviceId || (devices[devices.length-1] || devices[0] || {}).deviceId;
+    if (!chosenId) throw new Error('NoCamera');
+
+    await reader.decodeFromVideoDevice(chosenId, camNode, (result, err) => {
+      if (!result || !result.getText) return;
+      const raw = result.getText();
+      const imeis = (raw.match(IMEI_RX) || []);
+      if (imeis.length > 1){
+        pauseScanline();
+        openPicker([...new Set(imeis)], choice => {
+          setIMEI(choice);
+          if (autoSubmit.checked && !submitBtn.disabled){ stopAll(); formEl.submit(); }
+        });
+      } else if (imeis.length === 1){
+        setIMEI(imeis[0]);
+        pauseScanline(); try{ navigator.vibrate?.(20); }catch(_){}
+        if (autoSubmit.checked && !submitBtn.disabled){ stopAll(); formEl.submit(); }
+      } else {
+        // no clean 15-digit — still try to salvage the last 15 digits window
+        const d = digits(raw);
+        if (d.length >= 15){
+          setIMEI(d.slice(-15));
+          pauseScanline();
+          if (autoSubmit.checked && !submitBtn.disabled){ stopAll(); formEl.submit(); }
+        }
+      }
+    });
+
+    // wire stream handles for torch etc.
+    const stream = camNode.srcObject;
+    mediaStream = stream || null;
+    videoTrack = stream ? (stream.getVideoTracks()[0] || null) : null;
+
+    // allow stopAll() to reset ZXing
+    startZXing._stop = () => { try { reader.reset(); } catch(_){ } };
+  }
+
   function extractCandidatesFromStrings(arr){
     const set=new Set();
     arr.forEach(s=>{
@@ -477,14 +524,11 @@
     });
     return [...set];
   }
-
   function uniqueStrings(arr){
-    const set=new Set(arr.filter(Boolean).map(s=>s.trim()));
+    const set=new Set(arr.filter(Boolean).map(s=>String(s).trim()));
     return [...set];
   }
-
   function now(){ return Date.now(); }
-
   function shouldShowPicker(){ const t=now(); if (t-lastPickerAt>700){ lastPickerAt=t; return true; } return false; }
 
   async function detectLoop(){
@@ -521,7 +565,6 @@
             pauseScanline();
             openPicker(imeis, choice => { setIMEI(choice); if (autoSubmit.checked && !submitBtn.disabled){ stopAll(); formEl.submit(); } });
           } else if (!imeis.length && qrVals.length === 1){
-            // QR text without clean 15-digit IMEI — still try to parse best 15-digit window
             const d = digits(qrVals[0]);
             if (d.length >= 15) { setIMEI(d.slice(-15)); }
           }
@@ -539,7 +582,7 @@
           openPicker(cand, choice => { setIMEI(choice); if (autoSubmit.checked && !submitBtn.disabled){ stopAll(); formEl.submit(); } });
         }
       }catch(_e){
-        // If detect fails repeatedly, fallback will be used when starting again
+        // quiet fallback
       }
     };
     loop();
@@ -597,6 +640,10 @@
   function stopAll(){
     scanning = false;
     stopRaf();
+
+    // stop ZXing if running
+    if (startZXing._stop) { try{ startZXing._stop(); }catch(_){ } }
+
     if (window.Quagga){
       try{
         if (quaggaHandler) { Quagga.offDetected(quaggaHandler); quaggaHandler=null; }
@@ -612,11 +659,14 @@
     if(!isSecureCtx){ toast('Tip: use HTTPS or Android Chrome dev flag to enable camera.','warn'); }
     camBox.style.display='block';
     const cams = await listCameras();
+    const firstId = (cams[0] && cams[0].deviceId) || undefined;
     try{
       if ('BarcodeDetector' in window){
-        await startNativeDetector(cams[0] && cams[0].deviceId);
+        await startNativeDetector(firstId);
+      } else if (window.ZXing && ZXing.BrowserMultiFormatReader){
+        await startZXing(firstId);
       } else {
-        await startQuagga(cams[0] && cams[0].deviceId);
+        await startQuagga(firstId);
       }
       camToggle.textContent='Restart Camera';
       btnStopCam.style.display='inline-flex';
@@ -638,6 +688,8 @@
     try{
       if ('BarcodeDetector' in window){
         await startNativeDetector(camSelect.value);
+      } else if (window.ZXing && ZXing.BrowserMultiFormatReader){
+        await startZXing(camSelect.value);
       } else {
         await startQuagga(camSelect.value);
       }
@@ -652,7 +704,7 @@
     camToggle.textContent='Start Camera';
   });
 
-  torchBtn?.addEventListener('click', ()=> enableTorch(!(window.torchOn)));
+  torchBtn?.addEventListener('click', ()=> enableTorch(!torchOn));
 
   window.addEventListener('beforeunload', stopAll);
   document.addEventListener('visibilitychange', ()=>{ if (document.hidden) stopAll(); });
