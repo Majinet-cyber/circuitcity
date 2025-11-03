@@ -176,7 +176,7 @@ print("[cc.settings] Final INSTALLED_APPS:", INSTALLED_APPS)
 # --------------------------- middleware ---------------------------
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
-    "whitenoise.middleware.WhiteNoiseMiddleware",
+    "whitenoise.middleware.WhiteNoiseMiddleware",   # must be right after SecurityMiddleware
     "django.contrib.sessions.middleware.SessionMiddleware",
     "cc.middleware.RequestIDMiddleware",
     "cc.middleware.AccessLogMiddleware",
@@ -250,7 +250,6 @@ elif DATABASE_URL:
     except Exception as e:
         raise RuntimeError("dj-database-url must be installed") from e
 
-    # TLS for Render/prod with health checks to avoid stale SSL connections
     cfg = dj_database_url.parse(
         DATABASE_URL,
         conn_max_age=DB_CONN_MAX_AGE,
@@ -323,29 +322,35 @@ USE_I18N = True
 USE_TZ = True
 
 # --------------------------- static / media ---------------------------
+# IMPORTANT:
+# - STATIC_URL stays "/static/".
+# - STATIC_ROOT is where collectstatic writes (served by WhiteNoise in prod).
+# - STATICFILES_DIRS only includes existing local asset folders.
 STATIC_URL = "/static/"
-STATICFILES_DIRS = [*(p for p in [BASE_DIR / "static", BASE_DIR / "circuitcity" / "static"] if p.exists())]
 STATIC_ROOT = BASE_DIR / "staticfiles"
+STATICFILES_DIRS = [
+    *(p for p in [BASE_DIR / "static", BASE_DIR / "circuitcity" / "static"] if p.exists())
+]
 MEDIA_URL = "/media/"
 MEDIA_ROOT = BASE_DIR / "media"
 
-try:
-    _static_backend = (
-        "django.contrib.staticfiles.storage.StaticFilesStorage"
-        if (DEBUG or TESTING)
-        else "whitenoise.storage.CompressedManifestStaticFilesStorage"
-    )
-except Exception:
+# Django 4.2+ STORAGES API
+if DEBUG or TESTING:
     _static_backend = "django.contrib.staticfiles.storage.StaticFilesStorage"
+else:
+    _static_backend = "whitenoise.storage.CompressedManifestStaticFilesStorage"
 
 STORAGES = {
     "default": {"BACKEND": "django.core.files.storage.FileSystemStorage"},
     "staticfiles": {"BACKEND": _static_backend},
 }
+
+# WhiteNoise tuning
 WHITENOISE_AUTOREFRESH = DEBUG
 WHITENOISE_MAX_AGE = 60 * 60 * 24 * 365
 WHITENOISE_INDEX_FILE = False
-# Don't 500 if a template references a removed/renamed static during a deploy
+# DO NOT hard-fail on manifest mismatches during rolling deploys.
+# (Still, always run: python manage.py collectstatic --clear --noinput)
 WHITENOISE_MANIFEST_STRICT = False
 
 # --------------------------- auth redirects ---------------------------
