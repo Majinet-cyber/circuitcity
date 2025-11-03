@@ -9,7 +9,7 @@ from urllib.parse import quote
 
 from django.apps import apps
 from django.conf import settings
-from django.db import models
+from django.db import models, transaction
 from django.db.models import Q
 from django.utils import timezone
 from django.core.exceptions import ValidationError
@@ -174,6 +174,15 @@ class Business(models.Model):
             if x:
                 return x
         return qs.order_by("id").first()
+
+    # Where to land new agents after accept; used by views after login.
+    def agents_url(self) -> str:
+        for name in ("tenants:agents_home", "tenants:agents", "agents:list"):
+            try:
+                return reverse(name)
+            except NoReverseMatch:
+                continue
+        return "/tenants/agents/"
 
 
 class Membership(models.Model):
@@ -466,13 +475,9 @@ class AgentInvite(BaseTenantModel):
         st = (self.status or "").upper()
         return st in ("PENDING", "SENT") and not self.is_expired() and st != "JOINED"
 
-    @property
-    def ui_status(self) -> str:
-        if (self.status or "").upper() == "JOINED":
-            return "ACCEPTED"
-        if self.is_expired():
-            return "EXPIRED"
-        return "PENDING"
+    def can_use(self) -> bool:
+        """Usable if pending/sent and not expired and not joined."""
+        return self.is_pending()
 
     def _join_path(self) -> str:
         try:
@@ -516,3 +521,48 @@ class AgentInvite(BaseTenantModel):
             "email_text": text,
             "email_html": html,
         }
+
+    # ---- Accept helper (used by the view after validating password/email) ----
+
+    @transaction.atomic
+    def attach_user_as_agent(self, user) -> "Membership":
+        """
+        Idempotently attach `user` to this invite's business as an ACTIVE AGENT,
+        scoped to the invite's location (required for agents).
+        """
+        MembershipModel = apps.get_model("tenants", "Membership")
+        if not self.location_id:
+            # ensure we always have a location for agents
+            loc = self.business.default_location()
+            if loc:
+                self.location = loc
+                self.save(update_fields=["location"])
+
+        membership, _ = MembershipModel.objects.get_or_create(
+            user=user,
+            business=self.business,
+            location=self.location,
+            defaults={"role": "AGENT", "status": "ACTIVE"},
+        )
+        # Ensure the role/status in case it existed differently
+        changed = False
+        if membership.role != "AGENT":
+            membership.role = "AGENT"
+            changed = True
+        if membership.status != "ACTIVE":
+            membership.status = "ACTIVE"
+            changed = True
+        if changed:
+            membership.save(update_fields=["role", "status"])
+        return membership
+
+    @transaction.atomic
+    def accept_for_user(self, user) -> "Membership":
+        """
+        Full accept: validate, attach membership, mark as joined. Returns membership.
+        """
+        if not self.can_use():
+            raise ValidationError("This invite is no longer available.")
+        membership = self.attach_user_as_agent(user)
+        self.mark_joined(user=user, save=True)
+        return membership

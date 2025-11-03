@@ -6,8 +6,35 @@
 {% block title %}Join as Agent{% endblock %}
 {% block header_title %}Join an Existing Business{% endblock %}
 
+{# Hide any global chrome that could crowd the page #}
+{% block sidebar %}{% endblock %}
+{% block header %}{% endblock %}
+{% block nav %}{% endblock %}
+{% block topbar %}{% endblock %}
+
 {% block extra_css %}
 <link rel="stylesheet" href="{% static 'tenants/tenants.css' %}">
+<style>
+  .tenants-wrap.tenants-narrow{
+    max-width: 560px;
+    margin: 0 auto;
+    padding: clamp(12px, 3vw, 24px);
+  }
+  .gcard[data-anim]{
+    border-radius: 16px;
+    box-shadow: 0 10px 30px rgba(2,6,23,.08);
+  }
+  .gtitle{ font-weight: 800; }
+  .gsub{ color: var(--cc-muted); }
+  .ghelp small em{ font-style: normal; font-weight: 600; color: var(--cc-text); }
+  .hint{ color: var(--cc-muted); font-size: .9rem; margin-top: 6px; }
+  .divider{
+    display: flex; align-items: center; gap: 10px; color: var(--cc-muted); margin: 14px 0 6px;
+  }
+  .divider::before, .divider::after{
+    content: ""; flex: 1 1 auto; height: 1px; background: var(--cc-border);
+  }
+</style>
 {% endblock %}
 
 {% block content %}
@@ -17,8 +44,19 @@
 
     <div class="gtitle">Request access</div>
     <div class="gsub">
-      Enter the <strong>exact business name</strong>. A manager will review and approve your request.
+      Enter the <strong>exact business name</strong>. A manager at that shop will review and approve your request.
     </div>
+
+    {# Flash / global messages, if your base doesn’t show them #}
+    {% if messages %}
+      <div style="margin-top:10px">
+        {% for message in messages %}
+          <div class="badge {% if message.tags %}badge-{{ message.tags }}{% else %}badge-info{% endif %}" style="display:block;margin-top:6px">
+            {{ message }}
+          </div>
+        {% endfor %}
+      </div>
+    {% endif %}
 
     {# Non-field errors (e.g., duplicate request, not found, etc.) #}
     {% if form.non_field_errors %}
@@ -35,7 +73,23 @@
           {{ form.business_name.errors.0 }}
         </div>
       {% endif %}
+      <div class="hint">Example: <code>Maren Store</code> or <code>Air Easy Phones</code></div>
     </div>
+
+    {# Optional: support a join/invite code if your form offers it #}
+    {% if form.join_code %}
+      <div class="divider"><span>Or</span></div>
+      <div class="gfield" data-anim>
+        <label class="label" for="{{ form.join_code.id_for_label }}">Join code (optional)</label>
+        {{ form.join_code|add_class:"ginput" }}
+        {% if form.join_code.errors %}
+          <div class="badge badge-warn" style="margin-top:8px">
+            {{ form.join_code.errors.0 }}
+          </div>
+        {% endif %}
+        <div class="hint">Paste the code shared by the shop manager to fast-track approval.</div>
+      </div>
+    {% endif %}
 
     <div class="gactions">
       <a href="{% url 'tenants:choose_business' %}" class="gbtn">Back</a>
@@ -46,7 +100,7 @@
   <div class="ghelp" style="margin-top:16px; color:var(--cc-muted)">
     <small>
       Tip: If you can’t find the exact name, ask the business owner to share their
-      <em>Join Code</em> from the dashboard, or request they add you directly.
+      <em>Join Code</em> from their dashboard, or request they add you directly.
     </small>
   </div>
 </section>
@@ -55,10 +109,25 @@
 {% block extra_js %}
 <script src="{% static 'tenants/tenants.js' %}"></script>
 <script>
-  // Auto-focus the input if empty
+  // Auto-focus the primary input if empty; prefer business_name
   (function () {
-    const el = document.querySelector('.ginput');
+    var el = document.getElementById('{{ form.business_name.id_for_label|default:"" }}');
+    if (!el) {
+      el = document.querySelector('.ginput');
+    }
     if (el && !el.value) el.focus();
+
+    // Enter key should submit the form even if focus is inside custom widgets
+    var form = document.querySelector('form.gcard');
+    if (form) {
+      form.addEventListener('keypress', function (e) {
+        if (e.key === 'Enter') {
+          // avoid accidental submit when inside textarea (not used here, but future-proof)
+          if (e.target && e.target.tagName === 'TEXTAREA') return;
+          form.requestSubmit && form.requestSubmit();
+        }
+      });
+    }
   })();
 </script>
 {% endblock %}

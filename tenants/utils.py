@@ -940,6 +940,42 @@ def bootstrap_manager_tenant(
     return b
 
 
+# ----------------------------
+# NEW: URL helpers for post-accept redirects
+# ----------------------------
+def safe_reverse_many(names: Iterable[str], default: str = "/") -> str:
+    """
+    Try reversing a list of URL names and return the first that resolves.
+    Fallback to `default` if none resolve.
+    """
+    for name in names:
+        try:
+            url = reverse(name)
+            if url:
+                return url
+        except Exception:
+            continue
+    return default
+
+
+def agents_home_url(business: Optional["Business"] = None) -> str:
+    """
+    Compute the Agents landing URL.
+    If the Business model exposes .agents_url(), prefer it; otherwise try common names.
+    """
+    try:
+        if business and hasattr(business, "agents_url"):
+            url = business.agents_url()
+            if url:
+                return url
+    except Exception:
+        pass
+    return safe_reverse_many(
+        ("tenants:agents_home", "tenants:agents", "agents:list"),
+        default="/tenants/agents/",
+    )
+
+
 __all__ = [
     # session/context
     "set_active_business", "get_active_business", "get_active_business_id",
@@ -958,4 +994,6 @@ __all__ = [
     "require_business", "require_role", "manager_required", "admin_required",
     # bootstrap
     "bootstrap_manager_tenant",
+    # urls
+    "safe_reverse_many", "agents_home_url",
 ]
