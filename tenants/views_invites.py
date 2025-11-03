@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from typing import Optional, Any
+
 from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth import get_user_model, login, authenticate
@@ -64,8 +65,49 @@ def _render_safe(request: HttpRequest, template: str, ctx: dict, *, status: int 
         extra = ""
         inv = ctx.get("invite")
         if inv:
-            extra = f"<p><small>Business: {getattr(getattr(inv, 'business', None), 'name', '—')}</small></p>"
+            biz_name = _biz_name(inv)
+            greet = ctx.get("greeting") or f"Welcome to {biz_name}."
+            extra = (
+                f"<p><small>Business: {biz_name}</small></p>"
+                f"<p><small>{greet}</small></p>"
+            )
         return HttpResponse(f"<h1>{title}</h1><p>{body}</p>{extra}", status=status)
+
+
+# ---------------------------------------------------------------------------
+# Business/greeting helpers (for dynamic page copy)
+# ---------------------------------------------------------------------------
+
+def _biz_name(invite: AgentInvite) -> str:
+    try:
+        return (getattr(getattr(invite, "business", None), "name", None) or "").strip() or "this shop"
+    except Exception:
+        return "this shop"
+
+
+def _recipient_short(invite: AgentInvite) -> str:
+    """
+    Choose a friendly recipient label: explicit name → email local-part → 'there'.
+    """
+    try:
+        name = (getattr(invite, "recipient_name", "") or "").strip()
+        if name:
+            return name
+    except Exception:
+        pass
+    try:
+        email = (getattr(invite, "email", "") or "").strip()
+        if email and "@" in email:
+            return email.split("@", 1)[0]
+    except Exception:
+        pass
+    return "there"
+
+
+def _greeting(invite: AgentInvite) -> str:
+    person = _recipient_short(invite)
+    biz = _biz_name(invite)
+    return f"Hi {person}, welcome to {biz}."
 
 
 # ---------------------------------------------------------------------------
@@ -211,6 +253,7 @@ def accept_invite(request: HttpRequest, token: str) -> HttpResponse:
             "title": "Invalid invite",
             "message": "This invitation link is not valid. Please request a new invite from the manager.",
             "invite": None,
+            "compact": True,
         }
         return _render_safe(request, "tenants/invites/invalid.html", ctx, status=404)
 
@@ -230,6 +273,10 @@ def accept_invite(request: HttpRequest, token: str) -> HttpResponse:
             "title": "Invite expired",
             "message": "This invitation has expired. Ask your manager to resend a new link.",
             "invite": invite,
+            "biz_name": _biz_name(invite),
+            "greeting": _greeting(invite),
+            "expires_at": getattr(invite, "expires_at", None),
+            "compact": True,
         }
         return _render_safe(request, "tenants/invites/expired.html", ctx, status=410)
 
@@ -242,6 +289,9 @@ def accept_invite(request: HttpRequest, token: str) -> HttpResponse:
                 "message": "You are signed in as a different user than the invited email. "
                            "Please sign out and open the link again, or ask your manager to resend the invite.",
                 "invite": invite,
+                "biz_name": _biz_name(invite),
+                "greeting": _greeting(invite),
+                "compact": True,
             }
             return _render_safe(request, "tenants/invites/invalid.html", ctx, status=400)
 
@@ -258,6 +308,9 @@ def accept_invite(request: HttpRequest, token: str) -> HttpResponse:
                 "title": "Invite problem",
                 "message": str(e) or "This invitation cannot be used. Please ask for a new one.",
                 "invite": invite,
+                "biz_name": _biz_name(invite),
+                "greeting": _greeting(invite),
+                "compact": True,
             }
             return _render_safe(request, "tenants/invites/invalid.html", ctx, status=400)
         except Exception:
@@ -265,6 +318,9 @@ def accept_invite(request: HttpRequest, token: str) -> HttpResponse:
                 "title": "Something went wrong",
                 "message": "We couldn't complete your invitation right now. Please try again.",
                 "invite": invite,
+                "biz_name": _biz_name(invite),
+                "greeting": _greeting(invite),
+                "compact": True,
             }
             return _render_safe(request, "tenants/invites/error.html", ctx, status=500)
 
@@ -279,7 +335,7 @@ def accept_invite(request: HttpRequest, token: str) -> HttpResponse:
         try:
             messages.success(
                 request,
-                f"You're now part of {getattr(invite.business, 'name', 'the business')}. Welcome!",
+                f"You're now part of {_biz_name(invite)}. Welcome!",
             )
         except Exception:
             pass
@@ -292,7 +348,16 @@ def accept_invite(request: HttpRequest, token: str) -> HttpResponse:
         if not getattr(invite, "email", None):
             form.fields["email"].disabled = False
             form.fields["email"].required = True
-        ctx = {"form": form, "invite": invite, "title": "Join as Agent"}
+
+        ctx = {
+            "form": form,
+            "invite": invite,
+            "title": f"Join {_biz_name(invite)}",
+            "biz_name": _biz_name(invite),
+            "greeting": _greeting(invite),
+            "expires_at": getattr(invite, "expires_at", None),
+            "compact": True,  # template can render a no-scroll mobile layout
+        }
         return _render_safe(request, "tenants/invite_accept.html", ctx, status=200)
 
     # POST: create (or update) user with new password only if needed, then accept
@@ -302,7 +367,15 @@ def accept_invite(request: HttpRequest, token: str) -> HttpResponse:
         form.fields["email"].required = True
 
     if not form.is_valid():
-        ctx = {"form": form, "invite": invite, "title": "Join as Agent"}
+        ctx = {
+            "form": form,
+            "invite": invite,
+            "title": f"Join {_biz_name(invite)}",
+            "biz_name": _biz_name(invite),
+            "greeting": _greeting(invite),
+            "expires_at": getattr(invite, "expires_at", None),
+            "compact": True,
+        }
         return _render_safe(request, "tenants/invite_accept.html", ctx, status=400)
 
     User = get_user_model()
@@ -312,6 +385,9 @@ def accept_invite(request: HttpRequest, token: str) -> HttpResponse:
             "title": "Email required",
             "message": "Please enter a valid email address to continue.",
             "invite": invite,
+            "biz_name": _biz_name(invite),
+            "greeting": _greeting(invite),
+            "compact": True,
         }
         return _render_safe(request, "tenants/invites/invalid.html", ctx, status=400)
 
@@ -331,10 +407,12 @@ def accept_invite(request: HttpRequest, token: str) -> HttpResponse:
                 ctx = {
                     "form": form,
                     "invite": invite,
-                    "title": "Join as Agent",
+                    "title": f"Join {_biz_name(invite)}",
+                    "biz_name": _biz_name(invite),
+                    "greeting": _greeting(invite),
                     "message": "An account with this email already exists. Please enter its correct password.",
+                    "compact": True,
                 }
-                # surface a form error near password field
                 try:
                     form.add_error("password1", "Incorrect password for existing account.")
                 except Exception:
@@ -366,6 +444,9 @@ def accept_invite(request: HttpRequest, token: str) -> HttpResponse:
             "title": "Invite problem",
             "message": str(e) or "This invitation cannot be used. Please ask for a new one.",
             "invite": invite,
+            "biz_name": _biz_name(invite),
+            "greeting": _greeting(invite),
+            "compact": True,
         }
         return _render_safe(request, "tenants/invites/invalid.html", ctx, status=400)
     except Exception:
@@ -373,6 +454,9 @@ def accept_invite(request: HttpRequest, token: str) -> HttpResponse:
             "title": "Something went wrong",
             "message": "We couldn't complete your invitation right now. Please try again.",
             "invite": invite,
+            "biz_name": _biz_name(invite),
+            "greeting": _greeting(invite),
+            "compact": True,
         }
         return _render_safe(request, "tenants/invites/error.html", ctx, status=500)
 
@@ -387,7 +471,7 @@ def accept_invite(request: HttpRequest, token: str) -> HttpResponse:
     try:
         messages.success(
             request,
-            f"You're now part of {getattr(invite.business, 'name', 'the business')}. Welcome!",
+            f"You're now part of {_biz_name(invite)}. Welcome!",
         )
     except Exception:
         pass
