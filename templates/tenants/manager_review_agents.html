@@ -245,7 +245,7 @@
   const src = document.getElementById('inviteSource');
   if (!src) return;
 
-  // Build list (we keep status mapping only for display text)
+  // Build list
   const raw = Array.from(src.querySelectorAll('[data-url]')).map(el => {
     const s = (el.dataset.status || '').toUpperCase();
     return {

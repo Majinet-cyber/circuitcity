@@ -6,45 +6,70 @@ import django.utils.timezone
 
 class Migration(migrations.Migration):
 
+    # Make sure this matches your previous migration
     dependencies = [
-        ('inventory', '0025_backfill_location_non_null'),
+        ("inventory", "0025_backfill_location_non_null"),
     ]
 
     operations = [
+        # --- PRE-FLIGHT: clean up duplicate auto-named indexes left by earlier runs ---
+        migrations.RunSQL(
+            "DROP INDEX IF EXISTS inventory_inventoryitem_is_active_435aae93;",
+            reverse_sql=migrations.RunSQL.noop,
+        ),
+        migrations.RunSQL(
+            "DROP INDEX IF EXISTS inventory_inventoryitem_status_59404d58;",
+            reverse_sql=migrations.RunSQL.noop,
+        ),
+        migrations.RunSQL(
+            "DROP INDEX IF EXISTS inventory_inventoryitem_status_59404d58_like;",
+            reverse_sql=migrations.RunSQL.noop,
+        ),
+
+        # --- Your original operations ---
         migrations.RemoveConstraint(
-            model_name='inventoryitem',
-            name='uniq_imei_per_business',
+            model_name="inventoryitem",
+            name="uniq_imei_per_business",
         ),
         migrations.RemoveIndex(
-            model_name='orderprice',
-            name='ordprice_prod_active_idx',
+            model_name="orderprice",
+            name="ordprice_prod_active_idx",
         ),
         migrations.RemoveIndex(
-            model_name='orderprice',
-            name='ordprice_effective_idx',
+            model_name="orderprice",
+            name="ordprice_effective_idx",
         ),
         migrations.AddField(
-            model_name='inventoryitem',
-            name='created_at',
+            model_name="inventoryitem",
+            name="created_at",
             field=models.DateTimeField(default=django.utils.timezone.now, editable=False),
         ),
         migrations.AddField(
-            model_name='inventoryitem',
-            name='updated_at',
+            model_name="inventoryitem",
+            name="updated_at",
             field=models.DateTimeField(default=django.utils.timezone.now),
         ),
         migrations.AlterField(
-            model_name='inventoryitem',
-            name='is_active',
+            model_name="inventoryitem",
+            name="is_active",
             field=models.BooleanField(db_index=True, default=True),
         ),
         migrations.AlterField(
-            model_name='inventoryitem',
-            name='status',
-            field=models.CharField(choices=[('IN_STOCK', 'In stock'), ('SOLD', 'Sold')], db_index=True, default='IN_STOCK', max_length=10),
+            model_name="inventoryitem",
+            name="status",
+            field=models.CharField(
+                choices=[("IN_STOCK", "In stock"), ("SOLD", "Sold")],
+                db_index=True,
+                default="IN_STOCK",
+                max_length=10,
+            ),
         ),
         migrations.AddConstraint(
-            model_name='inventoryitem',
-            constraint=models.UniqueConstraint(condition=models.Q(('imei__isnull', False), models.Q(('imei', ''), _negated=True)), fields=('business', 'imei'), name='uniq_imei_per_business'),
+            model_name="inventoryitem",
+            constraint=models.UniqueConstraint(
+                condition=models.Q(("imei__isnull", False), models.Q(("imei", ""), _negated=True)),
+                fields=("business", "imei"),
+                name="uniq_imei_per_business",
+            ),
         ),
     ]

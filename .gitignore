@@ -28,3 +28,10 @@ node_modules/
 /start
 /oft Corporation. All rights reserved.
 /e -- to separate paths from revisions, like this*
+
+# editor backups
+*~
+*.swp
+*.swo
+.DS_Store
+
