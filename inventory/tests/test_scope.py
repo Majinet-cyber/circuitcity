@@ -8,7 +8,7 @@ from typing import Optional, Iterable, Tuple, Type
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ImproperlyConfigured
 from django.db import models
-from django.test import TestCase, Client, override_settings
+from django.test import TestCase, Client
 from django.urls import reverse, NoReverseMatch
 
 
@@ -149,13 +149,47 @@ def _create_item_for_business(biz, code: str, location=None):
         if loc_fk:
             kwargs[loc_fk] = location
 
+    # Provide a Product FK if the schema requires it.
+    product_fk = None
+    Product = None
+    try:
+        from inventory import models as inv_models  # type: ignore
+
+        Product = getattr(inv_models, "Product", None)
+    except Exception:
+        Product = None
+
+    if Product:
+        product_fk = _find_fk_field(InventoryItem, Product)
+
+    if product_fk and Product:
+        product = Product.objects.order_by("id").first()
+        if not product:
+            product = Product.objects.create(
+                code=f"autocode-{_rand(10)}",
+                model="Autogen",
+                brand="Autogen",
+            )
+        kwargs[product_fk] = product
+
     # Mark in-stock if schema supports it (tolerant)
     for f in ("in_stock", "available", "availability", "is_active"):
         if _maybe_field(InventoryItem, [f]):
             kwargs[f] = True
-    if _maybe_field(InventoryItem, ["status"]):
-        # avoid 'sold' if choices exist
-        kwargs["status"] = "in_stock"
+
+    status_field_name = _maybe_field(InventoryItem, ["status"])
+    if status_field_name:
+        try:
+            status_field = InventoryItem._meta.get_field(status_field_name)
+            choices = [c[0] for c in getattr(status_field, "choices", [])]
+        except Exception:
+            choices = []
+
+        preferred = "IN_STOCK"
+        if choices:
+            kwargs[status_field_name] = preferred if preferred in choices else choices[0]
+        else:
+            kwargs[status_field_name] = preferred
 
     return InventoryItem.objects.create(**kwargs)
 
@@ -177,7 +211,6 @@ def _try_reverse_api_stock_status() -> str | None:
 
 # -------------------------------------- Tests --------------------------------------
 
-@override_settings(ROOT_URLCONF=None)  # use project urls
 class ScopeTests(TestCase):
     @classmethod
     def setUpTestData(cls):

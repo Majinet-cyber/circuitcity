@@ -25,8 +25,10 @@ from .utils import (
     get_active_business,
     # NEW helpers (added, non-breaking)
     resolve_default_business_for_user,
+    get_manager_bound_business,
     user_highest_role,
     user_has_membership,
+    redirect_manager_safe_choose,
 )
 
 import logging
@@ -70,6 +72,9 @@ def _redirect_next_or_home(
     user = getattr(request, "user", None)
     if user and user.is_authenticated and user.is_superuser:
         return _superuser_landing(request)
+
+    if fallback == "tenants:choose_business":
+        return redirect_manager_safe_choose(request, fallback=fallback)
 
     try:
         return redirect(fallback)
@@ -216,7 +221,7 @@ def activate_mine(request: HttpRequest) -> HttpResponse:
         return _redirect_next_or_home(request, fallback="tenants:choose_business")
 
     if len(active_memberships) > 1:
-        return redirect("tenants:choose_business")
+        return redirect_manager_safe_choose(request)
 
     # If the user created a pending business, do not suggest joining
     pending_i_created = Business.objects.filter(
@@ -227,13 +232,13 @@ def activate_mine(request: HttpRequest) -> HttpResponse:
             request,
             "Your business is pending approval. You can still browse or request to join another.",
         )
-        return redirect("tenants:choose_business")
+        return redirect_manager_safe_choose(request)
 
     # If the user is a MANAGER/OWNER anywhere (even non-active), never show agent join
     role = (user_highest_role(user) or "").upper()
     if role in {"OWNER", "MANAGER", "ADMIN"}:
         messages.info(request, "Select or set up your business to continue.")
-        return redirect("tenants:choose_business")
+        return redirect_manager_safe_choose(request)
 
     # True blank-slate agent
     messages.info(request, "Join an existing business to get started.")
@@ -254,12 +259,18 @@ def set_active(request: HttpRequest, biz_id) -> HttpResponse:
 
     user = request.user
     if not user.is_superuser:
+        bound = get_manager_bound_business(user)
+        if bound and bound.id != b.id:
+            messages.error(request, "Managers are bound to their original business.")
+            return _home_redirect(request)
+
+    if not user.is_superuser:
         has_access = Membership.objects.filter(
             business=b, user=user, status="ACTIVE"
         ).exists()
         if not has_access:
             messages.error(request, "You do not have access to that business.")
-            return redirect("tenants:choose_business")
+            return redirect_manager_safe_choose(request)
 
     _ensure_seed_on_switch(b)
     set_active_business(request, b)
@@ -271,6 +282,14 @@ def set_active(request: HttpRequest, biz_id) -> HttpResponse:
 def choose_business(request: HttpRequest) -> HttpResponse:
     """Chooser page for users with multiple businesses."""
     user = request.user
+
+    if not user.is_superuser:
+        bound = get_manager_bound_business(user)
+        if bound:
+            _ensure_seed_on_switch(bound)
+            set_active_business(request, bound)
+            messages.info(request, f"You are bound to {bound.name}.")
+            return _home_redirect(request)
 
     memberships_qs = (
         Membership.objects.filter(user=user, status="ACTIVE")
@@ -286,7 +305,7 @@ def choose_business(request: HttpRequest) -> HttpResponse:
         bid = request.POST.get("business_id")
         if not bid:
             messages.error(request, "No business selected.")
-            return redirect("tenants:choose_business")
+            return redirect_manager_safe_choose(request)
 
         b = get_object_or_404(Business, pk=bid, status="ACTIVE")
 
@@ -296,7 +315,7 @@ def choose_business(request: HttpRequest) -> HttpResponse:
             ).exists()
             if not ok:
                 messages.error(request, "You cannot switch to that business.")
-                return redirect("tenants:choose_business")
+                return redirect_manager_safe_choose(request)
 
         _ensure_seed_on_switch(b)
         set_active_business(request, b)
@@ -348,7 +367,7 @@ def create_business_as_manager(request: HttpRequest) -> HttpResponse:
                 request,
                 "Business submitted. A developer will approve it shortly."
             )
-            return redirect("tenants:choose_business")
+            return redirect_manager_safe_choose(request)
     else:
         form = CreateBusinessForm()
 
@@ -403,7 +422,7 @@ def join_as_agent(request: HttpRequest) -> HttpResponse:
                     mem.save(update_fields=["status", "role"])
 
             messages.success(request, f"Join request sent to {b.name}'s managers.")
-            return redirect("tenants:choose_business")
+            return redirect_manager_safe_choose(request)
     else:
         form = JoinAsAgentForm()
 

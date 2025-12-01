@@ -67,7 +67,8 @@ SECRET_KEY = os.environ.get(
 
 IS_RUNSERVER = any(arg in sys.argv for arg in ("runserver", "runserver_plus"))
 DEBUG = env_bool("DEBUG", IS_RUNSERVER)
-TESTING = any(arg in sys.argv for arg in ("test", "pytest"))
+_argv = " ".join(sys.argv).lower()
+TESTING = any(token in _argv for token in (" test", "pytest", "py.test")) or os.environ.get("PYTEST_CURRENT_TEST") is not None
 ON_RENDER = env_bool("RENDER", False) or ("RENDER" in os.environ)
 
 # Allow from env first, else sane defaults (Render host, localhost, etc.)
@@ -163,6 +164,11 @@ INSTALLED_APPS = [
     "wallet",
     # Layby (TOP-LEVEL import, not circuitcity.layby)
     "layby.apps.LaybyConfig",
+    # Additional apps
+    "timelogs",
+    "notifications",
+    "hq",
+    "reports",
 ]
 
 # Optional dev/helper apps
@@ -335,7 +341,8 @@ MEDIA_URL = "/media/"
 MEDIA_ROOT = BASE_DIR / "media"
 
 # Django 4.2+ STORAGES API
-if DEBUG or TESTING:
+_force_plain_static = os.environ.get("DJANGO_TEST_FORCE_PLAIN_STATIC") == "1"
+if DEBUG or TESTING or _force_plain_static:
     _static_backend = "django.contrib.staticfiles.storage.StaticFilesStorage"
 else:
     _static_backend = "whitenoise.storage.CompressedManifestStaticFilesStorage"

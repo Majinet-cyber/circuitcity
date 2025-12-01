@@ -7,7 +7,7 @@ from typing import Iterable, Optional
 
 from django.http import HttpResponse, JsonResponse
 from django.shortcuts import redirect, render
-from django.urls import NoReverseMatch, path, re_path, reverse
+from django.urls import NoReverseMatch, include, path, re_path, reverse
 from django.views.generic import TemplateView, RedirectView
 from django.contrib.auth.decorators import login_required
 from django.http.response import HttpResponseBase  # type checks
@@ -69,6 +69,8 @@ try:
     from . import views_docs as _docs
 except Exception:
     _docs = SimpleNamespace()
+
+from .views_dispatch import product_new_entry as product_new_entry_view, vertical_dispatcher
 
 # ---------------------------------------------------------------------
 # Guards (role / tenant)
@@ -557,7 +559,7 @@ def _mode_from_session(session) -> Optional[str]:
     if not session:
         return None
     for key in (
-        "business_type", "business_kind", "business_vertical", "vertical",
+        "business_kind", "business_type", "business_vertical", "vertical",
         "category", "industry", "tenant_vertical", "active_business_vertical"
     ):
         val = _coerce_str(session.get(key))
@@ -592,7 +594,7 @@ def _infer_product_mode(request) -> str:
 
     biz = _current_business_from_request(request)
     if biz:
-        for attr in ("vertical", "category", "industry", "type", "kind", "sector", "business_type"):
+        for attr in ("vertical", "category", "industry", "type", "kind", "sector", "business_kind", "business_type"):
             val = _coerce_str(getattr(biz, attr, None))
             if val:
                 return _normalize_label(val)
@@ -759,7 +761,7 @@ except Exception:
 
 @login_required
 @_need_biz
-def product_new_entry(request):
+def _legacy_product_new_entry(request):
     try:
         sess_v = (request.session.get("active_business_vertical") or "").strip().lower()
     except Exception:
@@ -852,8 +854,8 @@ urlpatterns = [
     path("list/all/", _need_biz(_stock_list_wrapper(_list_all_redirect)), name="stock_list_all"),
     path("stocks/", _redirect_to("inventory:stock_list")),
 
-    path("dashboard/", _need_biz(_inventory_dashboard), name="inventory_dashboard"),
-    path("dashboard", _need_biz(_inventory_dashboard), name="dashboard"),
+    path("dashboard/", vertical_dispatcher, name="inventory_dashboard"),
+    path("dashboard", _redirect_to("inventory:inventory_dashboard"), name="dashboard"),
     path("dash/", _redirect_to("inventory:inventory_dashboard")),
 
     # Scanning — pages
@@ -866,6 +868,11 @@ urlpatterns = [
     # NEW — direct Sell submit endpoint (business-wide; prefers local view)
     path("scan-sold/submit/", _need_biz(_scan_sold_submit_view), name="scan_sold_submit"),
     path("api/scan-sold/submit/", _need_biz(_scan_sold_submit_view), name="api_scan_sold_submit"),
+]
+
+# Vertical dashboards
+urlpatterns += [
+    path("verticals/", include("inventory.urls_verticals")),
 ]
 
 # -------------------- JSON APIs (NO require_business wrapper) --------------------
@@ -993,8 +1000,8 @@ urlpatterns += [
 # Product creator — PAGE (ADMIN/MANAGER)
 # ---------------------------------------------------------------------
 urlpatterns += [
-    path("products/new/", manager_required(_need_biz(product_new_entry)), name="product_new_entry"),
-    path("merch/products/new/", manager_required(_need_biz(product_new_entry)), name="merch_product_create"),
+    path("products/new/", manager_required(_need_biz(product_new_entry_view)), name="product_new_entry"),
+    path("merch/products/new/", manager_required(_need_biz(product_new_entry_view)), name="merch_product_create"),
     path("products/new/generic/", _redirect_to("inventory:product_new_entry"), name="product_create"),
     path("product/new/", _redirect_to("inventory:product_new_entry"), name="product_create_short"),
 

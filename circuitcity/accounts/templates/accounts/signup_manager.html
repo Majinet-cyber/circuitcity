@@ -76,6 +76,17 @@
           <div class="help">{% for e in form.business_name.errors %}{{ e }}{% if not forloop.last %}<br>{% endif %}{% endfor %}</div>
         {% endif %}
 
+        <!-- Business Type -->
+        <label for="{{ form.business_kind.id_for_label }}">Business type</label>
+        <select id="{{ form.business_kind.id_for_label }}" name="business_kind" style="width:100%;padding:10px 12px;border:1px solid #cbd5e1;border-radius:10px;font-size:14px;background:#fff">
+          {% for value, label in form.business_kind.field.choices %}
+            <option value="{{ value }}" {% if form.business_kind.value == value %}selected{% endif %}>{{ label }}</option>
+          {% endfor %}
+        </select>
+        {% if form.business_kind.errors %}
+          <div class="help">{% for e in form.business_kind.errors %}{{ e }}{% if not forloop.last %}<br>{% endif %}{% endfor %}</div>
+        {% endif %}
+
         <!-- Passwords -->
         <div class="row">
           <div>

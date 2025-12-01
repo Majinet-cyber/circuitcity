@@ -29,13 +29,16 @@ def create_agent_invite(
     ttl_days: int = 7,
     message: str = "",
     mark_sent: bool = True,
-) -> AgentInvite:
+    generate_temp_password: bool = True,
+    location=None,
+) -> Tuple[AgentInvite, Optional[str]]:
     """
     Create a new invite scoped to a tenant.
 
     - No schema assumptions beyond AgentInvite fields.
-    - Returns the saved invite instance.
-    - If mark_sent=True, status â†’ SENT (kept â€œpendingâ€ by our UI rule).
+    - Returns (invite instance, temp_password_plaintext or None).
+    - If mark_sent=True, status -> SENT.
+    - If generate_temp_password=True, creates a temp password (returned plaintext).
     """
     invited_name = (invited_name or "").strip()
     email = (email or "").strip().lower()
@@ -43,21 +46,56 @@ def create_agent_invite(
 
     expires_at = timezone.now() + timedelta(days=max(1, int(ttl_days)))
 
-    inv = AgentInvite.all_objects.create(   # all_objects: bypass thread-local if needed
+    inv = AgentInvite.all_objects.create(
         business=tenant,
         created_by=created_by,
         invited_name=invited_name,
         email=email,
         phone=phone,
-        token=uuid.uuid4().hex,             # will be retained; model ensures one exists
+        location=location,
+        token=uuid.uuid4().hex,
         status="PENDING",
         message=(message or "").strip(),
         expires_at=expires_at,
     )
 
+    temp_password = None
+    if generate_temp_password:
+        temp_password = inv.create_and_set_temp_password()
+        inv.save(update_fields=["temp_password_hash", "temp_password_used"])
+
     if mark_sent:
         inv.mark_sent(save=True)
 
+    return inv, temp_password
+
+
+def create_agent_invite_simple(
+    *,
+    tenant: Business,
+    created_by: User | None,
+    invited_name: str = "",
+    email: str = "",
+    phone: str = "",
+    ttl_days: int = 7,
+    message: str = "",
+    mark_sent: bool = True,
+) -> AgentInvite:
+    """
+    Simplified version for backwards compatibility.
+    Returns just the invite (no temp password).
+    """
+    inv, _ = create_agent_invite(
+        tenant=tenant,
+        created_by=created_by,
+        invited_name=invited_name,
+        email=email,
+        phone=phone,
+        ttl_days=ttl_days,
+        message=message,
+        mark_sent=mark_sent,
+        generate_temp_password=False,
+    )
     return inv
 
 
@@ -109,17 +147,24 @@ def resend_invite(
     invite: AgentInvite,
     extend_days: int = 7,
     message: str | None = None,
-) -> AgentInvite:
+    regenerate_password: bool = False,
+) -> Tuple[AgentInvite, Optional[str]]:
     """
     Resend an invite (no duplication). Optionally extends the expiry window.
     - Keeps the same token so previously shared links still work.
-    - Status â†’ SENT.
+    - Status -> SENT.
+    - Returns (invite, new_temp_password or None).
     """
     if extend_days and extend_days > 0:
         invite.expires_at = timezone.now() + timedelta(days=extend_days)
 
+    new_password = None
+    if regenerate_password:
+        new_password = invite.create_and_set_temp_password()
+        invite.save(update_fields=["temp_password_hash", "temp_password_used", "expires_at"])
+    
     invite.mark_sent(message=message, save=True)
-    return invite
+    return invite, new_password
 
 
 @transaction.atomic
@@ -155,6 +200,7 @@ def accept_invite_by_token(
     token: str,
     user: User,
     role: str = "AGENT",
+    force_password_change: bool = True,
 ) -> Tuple[AgentInvite, Membership]:
     """
     Validate and redeem an invite token, attaching the user to the business.
@@ -163,6 +209,7 @@ def accept_invite_by_token(
       - Invite must exist and not be expired.
       - If already JOINED, we still ensure membership is ACTIVE and return it.
       - Idempotent on repeat calls for the same user/invite.
+      - If force_password_change=True, sets user's profile.force_password_change=True.
 
     Returns (invite, membership).
     Raises ValueError on invalid/expired tokens.
@@ -182,6 +229,7 @@ def accept_invite_by_token(
     mem, _created = Membership.objects.get_or_create(
         user=user,
         business=inv.business,
+        location=inv.location,
         defaults={"role": role, "status": "ACTIVE"},
     )
     # If it existed but was not active/role differs, gently fix it (do no harm)
@@ -192,14 +240,90 @@ def accept_invite_by_token(
     if role and mem.role != role:
         mem.role = role
         updates.append("role")
+    if inv.location and not mem.location:
+        mem.location = inv.location
+        updates.append("location")
     if updates:
         mem.save(update_fields=updates)
 
     # Mark invite joined (idempotent)
     if inv.status != "JOINED" or inv.joined_user_id != getattr(user, "id", None):
         inv.mark_joined(user=user, save=True)
+    
+    # Mark temp password as used
+    if inv.temp_password_hash and not inv.temp_password_used:
+        inv.temp_password_used = True
+        inv.save(update_fields=["temp_password_used"])
+    
+    # Force password change if requested
+    if force_password_change:
+        try:
+            profile = user.profile
+            if not profile.force_password_change:
+                profile.force_password_change = True
+                profile.save(update_fields=["force_password_change"])
+        except Exception:
+            pass
 
     return inv, mem
+
+
+@transaction.atomic
+def accept_invite_with_temp_password(
+    *,
+    token: str,
+    temp_password: str,
+    username: str,
+    email: str = "",
+) -> Tuple[AgentInvite, User, Membership]:
+    """
+    Accept an invite using the temp password to create a new user account.
+    
+    - Verifies the temp password matches.
+    - Creates a new user with the temp password (they must change it).
+    - Attaches the user as an agent to the business.
+    
+    Returns (invite, user, membership).
+    Raises ValueError on invalid token/password.
+    """
+    try:
+        inv = AgentInvite.all_objects.get(token=token)
+    except AgentInvite.DoesNotExist:
+        raise ValueError("Invalid invite token")
+    
+    if inv.is_expired():
+        inv.status = "EXPIRED"
+        inv.save(update_fields=["status"])
+        raise ValueError("Invite has expired")
+    
+    if inv.status == "JOINED":
+        raise ValueError("Invite has already been used")
+    
+    # Verify temp password
+    if not inv.check_temp_password(temp_password):
+        raise ValueError("Invalid temporary password")
+    
+    # Check if user already exists
+    if User.objects.filter(username__iexact=username).exists():
+        raise ValueError("Username is already taken")
+    
+    # Create user with temp password (they'll be forced to change it)
+    user = User.objects.create_user(
+        username=username,
+        password=temp_password,
+        email=email or inv.email or "",
+        first_name=inv.invited_name.split()[0] if inv.invited_name else "",
+    )
+    
+    # Accept the invite
+    inv, mem = accept_invite_by_token(
+        token=token,
+        user=user,
+        role="AGENT",
+        force_password_change=True,
+    )
+    
+    return inv, user, mem
 
 
 # ---------------------------------------------------------------------------
@@ -214,3 +338,39 @@ def share_bundle(invite: AgentInvite, request) -> Dict[str, str]:
     return invite.share_payload(request)
 
 
+def get_invite_email_content(invite: AgentInvite, request, temp_password: Optional[str] = None) -> Dict[str, str]:
+    """
+    Generate email content for an invite including the temp password.
+    """
+    payload = invite.share_payload(request)
+    
+    biz_name = invite.business.name if invite.business else "the team"
+    agent_name = invite.invited_name or "there"
+    
+    text = f"""Hi {agent_name},
+
+You have been invited to join {biz_name} as an Agent.
+
+Click here to get started: {payload['url']}
+"""
+    
+    if temp_password:
+        text += f"""
+Your temporary password is: {temp_password}
+
+You will be asked to change this password when you first log in.
+"""
+    
+    text += f"""
+This invite expires on {invite.expires_at:%b %d, %Y at %H:%M}.
+
+Best regards,
+{biz_name}
+"""
+    
+    return {
+        "subject": f"Join {biz_name}",
+        "text": text,
+        "url": payload["url"],
+        "temp_password": temp_password,
+    }

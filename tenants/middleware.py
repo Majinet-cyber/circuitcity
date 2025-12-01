@@ -255,7 +255,7 @@ def _derive_product_mode_from_business(biz) -> str:
     if not biz:
         return "generic"
 
-    for attr in ("vertical", "category", "industry", "type", "kind", "sector", "business_type"):
+    for attr in ("vertical", "category", "industry", "type", "kind", "sector", "business_kind", "business_type"):
         val = getattr(biz, attr, None)
         if isinstance(val, str) and val.strip():
             return normalize_vertical(val)

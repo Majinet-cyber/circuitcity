@@ -16,6 +16,9 @@ from django.db.models.deletion import ProtectedError
 from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_POST
 
+from .authz import require_business_kind
+from .business_kinds import BusinessKind
+
 V2_LOADED = True
 
 try:
@@ -215,6 +218,7 @@ class PhoneProductForm(forms.Form):
 
 @login_required
 @manager_required
+@require_business_kind(BusinessKind.PHONES)
 def product_create_v2(request):
     qs = _product_base_qs(request)
 
@@ -242,6 +246,7 @@ def product_create_v2(request):
 
 @login_required
 @manager_required
+@require_business_kind(BusinessKind.PHONES)
 def product_edit_v2(request, pk: int):
     qs = _product_base_qs(request)
     obj = get_object_or_404(qs, pk=pk)
@@ -266,6 +271,7 @@ def product_edit_v2(request, pk: int):
 # ========================= DELETE (shared) =======================
 @login_required
 @manager_required
+@require_business_kind(BusinessKind.PHONES)
 @require_POST
 def product_delete_v2(request, pk: int):
     qs = _product_base_qs(request)
@@ -329,6 +335,7 @@ def _inflate_liquor(instance: Product, data: dict):
 
 @login_required
 @manager_required
+@require_business_kind(BusinessKind.LIQUOR)
 def product_create_liquor_v2(request):
     qs = _product_base_qs(request)
 
@@ -355,6 +362,7 @@ def product_create_liquor_v2(request):
 
 @login_required
 @manager_required
+@require_business_kind(BusinessKind.LIQUOR)
 def product_edit_liquor_v2(request, pk: int):
     qs = _product_base_qs(request)
     obj = get_object_or_404(qs, pk=pk)
@@ -448,6 +456,7 @@ def _initial_from_clothing(p: Product) -> dict:
 
 @login_required
 @manager_required
+@require_business_kind(BusinessKind.CLOTHING)
 def product_create_clothing_v2(request):
     qs = _product_base_qs(request)
 
@@ -475,6 +484,7 @@ def product_create_clothing_v2(request):
 
 @login_required
 @manager_required
+@require_business_kind(BusinessKind.CLOTHING)
 def product_edit_clothing_v2(request, pk: int):
     qs = _product_base_qs(request)
     obj = get_object_or_404(qs, pk=pk)

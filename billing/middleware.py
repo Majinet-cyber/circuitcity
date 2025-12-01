@@ -141,12 +141,12 @@ class SubscriptionGateMiddleware:
                 sub.status = BusinessSubscription.Status.EXPIRED
                 sub.save(update_fields=["status", "updated_at"])
 
-        # Redirect to subscribe/checkout
+        # Redirect to trial expired page for better UX
         try:
-            subscribe_url = reverse("billing:subscribe")
+            expired_url = reverse("billing:trial_expired")
         except Exception:
-            subscribe_url = "/billing/subscribe/"
+            expired_url = "/billing/trial-expired/"
         reason = "expired" if sub.is_expired() else "inactive"
-        return redirect(f"{subscribe_url}?reason={reason}")
+        return redirect(f"{expired_url}?reason={reason}")
 
 

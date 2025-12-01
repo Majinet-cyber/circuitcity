@@ -1077,6 +1077,7 @@ def signup_manager(request):
     email = form.cleaned_data["email"].strip().lower()
     full_name = form.cleaned_data["full_name"].strip()
     biz_name = form.cleaned_data["business_name"].strip()
+    business_kind = form.cleaned_data["business_kind"]
     subdomain = (form.cleaned_data.get("subdomain") or "").strip().lower()
     password = form.cleaned_data["password1"]
 
@@ -1137,6 +1138,8 @@ def signup_manager(request):
             bkwargs["subdomain"] = subdomain
         if hasattr(Business, "status"):
             bkwargs["status"] = "ACTIVE"
+        if hasattr(Business, "business_kind"):
+            bkwargs["business_kind"] = business_kind
 
         try:
             biz = Business.objects.create(**bkwargs)

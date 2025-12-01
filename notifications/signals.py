@@ -1,24 +1,87 @@
 ﻿# notifications/signals.py
+"""
+Signal handlers that fire notifications on key events:
+- New sale
+- New agent joined
+- Stock zero / low stock
+- Inventory stocked in
+- Wallet transactions
+"""
 from __future__ import annotations
 
 from django.db.models.signals import post_save, pre_save
 from django.dispatch import receiver
 from django.utils import timezone
 from django.conf import settings
-from django.db.models import F
+from django.db.models import F, Count
 
 from inventory.models import InventoryItem, InventoryAudit
 from sales.models import Sale
 try:
-    # Optional wallet model
-    from inventory.models import WalletTxn  # your codebase primary location
+    from inventory.models import WalletTxn
 except Exception:
     try:
-        from wallets.models import WalletTxn  # fallback
+        from wallets.models import WalletTxn
     except Exception:
         WalletTxn = None
 
+# Import tenants models for agent-joined notifications
+try:
+    from tenants.models import Membership, AgentInvite
+except Exception:
+    Membership = None
+    AgentInvite = None
+
 from .utils import create_notification
+
+
+# ---------------------------------------------------------------------------
+# Agent Joined Notifications
+# ---------------------------------------------------------------------------
+
+if Membership is not None:
+    @receiver(post_save, sender=Membership)
+    def _membership_created(sender, instance: Membership, created: bool, **kwargs):
+        """Notify when a new agent joins (membership becomes ACTIVE)."""
+        if not created:
+            # Check if status changed to ACTIVE
+            return
+        
+        if instance.status != "ACTIVE":
+            return
+        
+        if instance.role.upper() != "AGENT":
+            return
+        
+        user = instance.user
+        business = instance.business
+        
+        # Notify the business manager(s)
+        create_notification(
+            audience="ADMIN",
+            message=f"New agent {user.get_full_name() or user.username} joined {business.name}.",
+            level="success",
+            meta={
+                "event": "agent_joined",
+                "user_id": user.id,
+                "business_id": business.id,
+            },
+        )
+
+
+if AgentInvite is not None:
+    @receiver(post_save, sender=AgentInvite)
+    def _invite_accepted(sender, instance: AgentInvite, **kwargs):
+        """Notify when an invite is accepted."""
+        if instance.status != "JOINED":
+            return
+        
+        if not instance.joined_user:
+            return
+        
+        # Only notify if we haven't already (check meta or use a flag)
+        # The membership signal above handles the main notification
+        pass
 
 
 # ---------------------------
@@ -193,5 +256,115 @@ if WalletTxn is not None:
                     level="success",
                     meta={"wallet_id": instance.id},
                 )
+
+
+# ---------------------------------------------------------------------------
+# Stock Zero / Low Stock Notifications
+# ---------------------------------------------------------------------------
+
+def check_and_notify_low_stock(product, location=None, business=None):
+    """
+    Check if a product is at zero or below low_stock_threshold and notify.
+    Called after sales or stock adjustments.
+    """
+    try:
+        from inventory.models import InventoryItem, Product
+        
+        if not product:
+            return
+        
+        # Get threshold from product or use default
+        threshold = getattr(product, "low_stock_threshold", 5)
+        
+        # Build query for remaining stock
+        qs = InventoryItem.objects.filter(product=product, status="IN_STOCK", is_active=True)
+        
+        if location:
+            qs = qs.filter(current_location=location)
+        elif business:
+            qs = qs.filter(business=business)
+        
+        remaining = qs.count()
+        
+        product_name = getattr(product, "name", None) or str(product)
+        location_name = getattr(location, "name", "") if location else ""
+        
+        if remaining == 0:
+            # Stock is zero - critical alert
+            msg = f"STOCK ZERO: {product_name}"
+            if location_name:
+                msg += f" at {location_name}"
+            
+            create_notification(
+                audience="ADMIN",
+                message=msg,
+                level="error",
+                meta={
+                    "event": "stock_zero",
+                    "product_id": product.id,
+                    "location_id": getattr(location, "id", None),
+                    "remaining": 0,
+                },
+            )
+        elif remaining <= threshold:
+            # Low stock warning
+            msg = f"LOW STOCK: {product_name} - only {remaining} left"
+            if location_name:
+                msg += f" at {location_name}"
+            
+            create_notification(
+                audience="ADMIN",
+                message=msg,
+                level="warning",
+                meta={
+                    "event": "low_stock",
+                    "product_id": product.id,
+                    "location_id": getattr(location, "id", None),
+                    "remaining": remaining,
+                    "threshold": threshold,
+                },
+            )
+    except Exception:
+        # Never break the main flow due to notification errors
+        pass
+
+
+# Hook into sale creation to check stock levels
+@receiver(post_save, sender=Sale)
+def _sale_check_stock(sender, instance: Sale, created: bool, **kwargs):
+    """After a sale, check if stock is low or zero."""
+    if not created:
+        return
+    
+    try:
+        item = instance.item
+        product = getattr(item, "product", None)
+        location = instance.location or getattr(item, "current_location", None)
+        business = getattr(location, "business", None) if location else None
+        
+        check_and_notify_low_stock(product, location=location, business=business)
+    except Exception:
+        pass
+
+
+# Hook into inventory item status changes (SOLD) to check stock
+@receiver(post_save, sender=InventoryItem)
+def _invitem_check_stock(sender, instance: InventoryItem, created: bool, **kwargs):
+    """After an item is marked SOLD, check stock levels."""
+    if created:
+        return  # Only check on updates
+    
+    old_status = getattr(instance, "_old_status", None)
+    
+    # Only trigger when transitioning TO SOLD
+    if old_status != "SOLD" and instance.status == "SOLD":
+        try:
+            product = instance.product
+            location = instance.current_location
+            business = instance.business
+            
+            check_and_notify_low_stock(product, location=location, business=business)
+        except Exception:
+            pass
 
 

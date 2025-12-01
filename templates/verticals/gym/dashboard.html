@@ -1,0 +1,70 @@
+{% extends "base.html" %}
+
+{% block title %}Gym · Circuit City{% endblock %}
+
+{% block content %}
+{% url 'tenants:manager_review_agents' as url_team %}
+{% url 'wallet:agent_wallet' as wallet_url %}
+<style>
+  .vertical-page{display:flex;flex-direction:column;gap:18px;padding:18px}
+  .vertical-hero{background:linear-gradient(135deg,#2563eb,#10b981);padding:24px;border-radius:20px;color:#fff;display:flex;flex-wrap:wrap;gap:18px;align-items:center;justify-content:space-between}
+  .vertical-hero h1{margin:0;font-size:clamp(24px,3vw,32px)}
+  .hero-actions{display:flex;gap:12px;flex-wrap:wrap}
+  .hero-actions a{border-radius:999px;padding:10px 16px;font-weight:700;text-decoration:none}
+  .hero-actions .primary{background:#fff;color:#0f172a}
+  .hero-actions .ghost{border:1px solid rgba(255,255,255,.8);color:#fff}
+  .metrics-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:16px}
+  .metric-card{background:#fff;border-radius:18px;padding:18px;box-shadow:0 10px 30px rgba(15,23,42,.08);text-align:center}
+  .metric-card h3{margin:0;font-size:.9rem;text-transform:uppercase;color:#64748b}
+  .metric-card p{margin:6px 0 0;font-size:2rem;font-weight:800;color:#0f172a}
+  .recent-block{background:#fff;border-radius:20px;padding:18px;box-shadow:0 10px 30px rgba(15,23,42,.08)}
+  .recent-list{list-style:none;margin:0;padding:0;display:grid;gap:12px}
+  .recent-item{display:flex;justify-content:space-between;gap:12px;border:1px solid #e2e8f0;border-radius:16px;padding:12px}
+</style>
+
+<div class="vertical-page">
+  <header class="vertical-hero">
+    <div>
+      <p style="margin:0;opacity:.8;text-transform:uppercase;letter-spacing:.08em;font-size:.8rem">{{ business.name }} · {{ location_label }}</p>
+      <h1>{{ hero_title }}</h1>
+      <p>{{ hero_blurb }}</p>
+    </div>
+    <div class="hero-actions">
+      <a class="primary" href="{{ url_team|default:'/tenants/manager/agents/' }}">Manage members</a>
+      <a class="ghost" href="{{ scan_in_url|default:'/inventory/scan-in/' }}">Scan check-ins</a>
+      <a class="ghost" href="{{ wallet_url|default:'/wallet/' }}">Wallet</a>
+    </div>
+  </header>
+
+  <section class="metrics-grid">
+    <article class="metric-card">
+      <h3>Managers</h3>
+      <p>{{ manager_count }}</p>
+    </article>
+    <article class="metric-card">
+      <h3>Coaches / agents</h3>
+      <p>{{ agent_count }}</p>
+    </article>
+  </section>
+
+  <section class="recent-block">
+    <h2 style="margin:0 0 10px;font-size:1.05rem">Recent memberships</h2>
+    {% if recent_members %}
+      <ul class="recent-list">
+        {% for membership in recent_members %}
+          <li class="recent-item">
+            <div>
+              <strong>{{ membership.user.get_full_name|default:membership.user.username }}</strong>
+              <small style="color:#64748b">{{ membership.get_role_display|default:membership.role }}</small>
+            </div>
+            <small style="color:#94a3b8">{{ membership.created_at|date:"M j" }}</small>
+          </li>
+        {% endfor %}
+      </ul>
+    {% else %}
+      <p style="margin:0;color:#64748b">Invite your first coach or member to populate this list.</p>
+    {% endif %}
+  </section>
+</div>
+{% endblock %}
+

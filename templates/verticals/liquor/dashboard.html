@@ -1,0 +1,87 @@
+{% extends "base.html" %}
+
+{% block title %}Liquor · Circuit City{% endblock %}
+
+{% block content %}
+{% url 'inventory:liquor_product_new_v2' as liquor_add_url %}
+<style>
+  .vertical-page{display:flex;flex-direction:column;gap:18px;padding:18px}
+  .vertical-hero{background:linear-gradient(120deg,#a855f7,#ec4899);padding:24px;border-radius:20px;color:#fff;display:flex;flex-wrap:wrap;gap:18px;align-items:center;justify-content:space-between}
+  .vertical-hero h1{margin:0;font-size:clamp(24px,3vw,32px)}
+  .vertical-hero p{margin:4px 0 0}
+  .hero-actions{display:flex;gap:12px;flex-wrap:wrap}
+  .hero-actions a{border-radius:999px;padding:10px 16px;font-weight:700;text-decoration:none}
+  .hero-actions .primary{background:#fff;color:#111827}
+  .hero-actions .ghost{border:1px solid rgba(255,255,255,.8);color:#fff}
+  .metrics-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:16px}
+  .metric-card{background:#fff;border-radius:18px;padding:18px;box-shadow:0 10px 30px rgba(15,23,42,.08)}
+  .metric-card h3{margin:0;font-size:.9rem;text-transform:uppercase;color:#64748b}
+  .metric-card p{margin:6px 0 0;font-size:1.8rem;font-weight:800;color:#0f172a}
+  .recent-block{background:#fff;border-radius:20px;padding:18px;box-shadow:0 10px 30px rgba(15,23,42,.08)}
+  .recent-list{list-style:none;margin:0;padding:0;display:grid;gap:12px}
+  .recent-item{display:flex;justify-content:space-between;gap:12px;border:1px solid #e2e8f0;border-radius:16px;padding:14px}
+  .badge{display:inline-flex;align-items:center;gap:6px;border-radius:20px;padding:4px 10px;font-size:.75rem;font-weight:700}
+  .badge.shots{background:#fef9c3;color:#b45309}
+  .badge.scan{background:#ecfeff;color:#0369a1}
+</style>
+
+<div class="vertical-page">
+  <header class="vertical-hero">
+    <div>
+      <p style="margin:0;opacity:.8;text-transform:uppercase;letter-spacing:.08em;font-size:.8rem">{{ business.name }} · {{ location_label }}</p>
+      <h1>{{ hero_title }}</h1>
+      <p>{{ hero_blurb }}</p>
+    </div>
+    <div class="hero-actions">
+      <a class="primary" href="{{ liquor_add_url|default:'/inventory/liquor/products/new/v2/' }}">Add liquor item</a>
+      <a class="ghost" href="{{ scan_in_url|default:'/inventory/scan-in/' }}">Scan bottles</a>
+      <a class="ghost" href="{{ scan_sold_url|default:'/inventory/scan-sold/' }}">Sell shots</a>
+    </div>
+  </header>
+
+  <section class="metrics-grid">
+    <article class="metric-card">
+      <h3>Bottle SKUs</h3>
+      <p>{{ product_count }}</p>
+    </article>
+    <article class="metric-card">
+      <h3>Active items</h3>
+      <p>{{ active_product_count }}</p>
+    </article>
+    <article class="metric-card">
+      <h3>Shot-enabled</h3>
+      <p>{{ shots_enabled_count }}</p>
+    </article>
+    <article class="metric-card">
+      <h3>Tracked inventory</h3>
+      <p>{{ inventory_tracked_count }}</p>
+    </article>
+  </section>
+
+  <section class="recent-block">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+      <h2 style="margin:0;font-size:1.1rem">Recent liquor items</h2>
+      <a class="btn btn-sm btn-outline-primary" href="{{ stock_url|default:'/inventory/list/' }}">View stock</a>
+    </div>
+    {% if recent_products %}
+      <ul class="recent-list">
+        {% for item in recent_products %}
+          <li class="recent-item">
+            <div>
+              <strong>{{ item.name|default:"Untitled" }}</strong>
+              {% if item.has_shots %}<span class="badge shots"><i class="bi bi-tropical-storm"></i>Shots</span>{% endif %}
+              {% if item.scan_required %}<span class="badge scan"><i class="bi bi-upc"></i>Scan</span>{% endif %}
+            </div>
+            {% if item.shots_per_bottle %}
+              <small style="color:#475569">{{ item.shots_per_bottle }} shots / bottle</small>
+            {% endif %}
+          </li>
+        {% endfor %}
+      </ul>
+    {% else %}
+      <p style="margin:0;color:#64748b">Add liquor products to start forecasting revenue per bottle.</p>
+    {% endif %}
+  </section>
+</div>
+{% endblock %}
+

@@ -36,6 +36,12 @@ class Profile(models.Model):
     # Mark â€œmanagerâ€ users who can access CFO/approvals/etc.
     # Admins remain those with user.is_staff=True.
     is_manager   = models.BooleanField(default=False)
+    
+    # ---- Force password change (for temp passwords) ----
+    force_password_change = models.BooleanField(
+        default=False,
+        help_text="If True, user must change password on next login.",
+    )
 
     class Meta:
         db_table = "accounts_profile"

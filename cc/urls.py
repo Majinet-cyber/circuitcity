@@ -130,6 +130,10 @@ def root_redirect(request):
             return redirect(target)
         if _activate_mine_view:
             return redirect("/tenants/activate-mine/")
+    else:
+        dispatcher = _first_working_reverse(("inventory:inventory_dashboard",))
+        if dispatcher:
+            return redirect(dispatcher)
 
     # Store dashboards
     candidates = (
@@ -507,7 +511,8 @@ def _stock_list_entry(request, *args, **kwargs):
 
 def _inventory_dashboard_entry(request, *args, **kwargs):
     try:
-        return _call_inventory_view_with_legacy_guard(request, "inventory_dashboard", *args, **kwargs)
+        from inventory.views_dispatch import vertical_dispatcher
+        return vertical_dispatcher(request)
     except Exception:
         from inventory.views import inventory_dashboard
         return _normalize_response(request, inventory_dashboard(request, *args, **kwargs))

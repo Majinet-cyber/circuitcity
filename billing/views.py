@@ -493,8 +493,33 @@ def webhook(request: HttpRequest) -> JsonResponse:
 
 
 # ------------------------------------------------------------------------------
-# Paywall / Manage pages (tenant-facing)
+# Trial Expired / Paywall pages (tenant-facing)
 # ------------------------------------------------------------------------------
+@login_required
+def trial_expired(request: HttpRequest) -> HttpResponse:
+    """
+    Shown when a manager's trial has expired and they have no active subscription.
+    This page provides a clear message and CTA to subscribe or contact support.
+    """
+    biz = getattr(request, "business", None)
+    sub = None
+    
+    if biz:
+        sub = getattr(biz, "subscription", None)
+    
+    reason = request.GET.get("reason", "expired")
+    
+    return render(
+        request,
+        "billing/trial_expired.html",
+        {
+            "business": biz,
+            "subscription": sub,
+            "reason": reason,
+        },
+    )
+
+
 @login_required
 @require_business
 def paywall(request: HttpRequest) -> HttpResponse:

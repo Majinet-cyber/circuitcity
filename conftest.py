@@ -5,6 +5,7 @@ import pytest
 
 # Ensure Django settings are discoverable for pytest
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "cc.settings")
+os.environ.setdefault("DJANGO_TEST_FORCE_PLAIN_STATIC", "1")
 
 
 # --- Use syncdb-style DB setup (no migrations) -------------------------------
@@ -35,5 +36,9 @@ def _relaxed_test_settings(settings):
     settings.ALLOWED_HOSTS = ["*", "testserver", "localhost", "127.0.0.1"]
     # Avoid needing hashed-manifest during template/static lookups
     settings.STATICFILES_STORAGE = "django.contrib.staticfiles.storage.StaticFilesStorage"
+    try:
+        settings.STORAGES["staticfiles"]["BACKEND"] = settings.STATICFILES_STORAGE
+    except Exception:
+        pass
     # Speed up password hashing in tests
     settings.PASSWORD_HASHERS = ["django.contrib.auth.hashers.MD5PasswordHasher"]

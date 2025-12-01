@@ -31,6 +31,9 @@ except Exception:  # pragma: no cover
 # ---------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------
+DEFAULT_RULE_CODE = "phone_sales"
+
+
 def _safe_getattr(obj, name: str, default=None):
     try:
         return getattr(obj, name, default)
@@ -71,6 +74,47 @@ def _is_agent(user) -> bool:
     return bool(user and user.is_authenticated and not _is_manager(user) and not _safe_getattr(user, "is_staff", False))
 
 
+_KIND_TO_RULE_CODE = {
+    "phones": "phone_sales",
+    "phone_sales": "phone_sales",
+    "electronics": "phone_sales",
+    "pharmacy": "pharmacy",
+    "chemist": "pharmacy",
+    "medicine": "pharmacy",
+    "drugstore": "pharmacy",
+    "grocery": "grocery",
+    "groceries": "grocery",
+    "supermarket": "grocery",
+    "clothing": "clothing",
+    "fashion": "clothing",
+    "liquor": "grocery",
+    "bar": "grocery",
+    "gym": "grocery",
+    "fitness": "grocery",
+}
+
+
+def _normalize_rule_code(raw: str | None) -> str:
+    code = (raw or "").strip().lower()
+    if not code:
+        return DEFAULT_RULE_CODE
+    if code in BUSINESS_TYPES:
+        return code
+    return _KIND_TO_RULE_CODE.get(code, DEFAULT_RULE_CODE)
+
+
+def _rule_code_for_business(biz) -> str:
+    if not biz:
+        return DEFAULT_RULE_CODE
+    for attr in ("business_kind", "business_type"):
+        val = _safe_getattr(biz, attr, None)
+        if isinstance(val, str) and val.strip():
+            normalized = _normalize_rule_code(val)
+            if normalized:
+                return normalized
+    return DEFAULT_RULE_CODE
+
+
 # ---------------------------------------------------------------------
 # Context processors
 # ---------------------------------------------------------------------
@@ -99,8 +143,8 @@ def biz_context(request) -> Dict[str, Any]:
       cc_business_types   â€” map of available types (for sign-up selector)
     """
     biz = _safe_getattr(request, "active_business", None)
-    biz_code = _safe_getattr(biz, "business_type", None)
-    rule = get_rule(biz_code)
+    rule_code = _rule_code_for_business(biz)
+    rule = get_rule(rule_code)
 
     return {
         "cc_business": biz,

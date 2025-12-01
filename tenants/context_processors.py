@@ -55,7 +55,7 @@ def _derive_mode_from_business(biz) -> str:
     if not biz:
         return "generic"
     # Check a few common attributes (plus their display())
-    for attr in ("vertical", "category", "industry", "type", "kind", "sector", "business_type"):
+    for attr in ("vertical", "category", "industry", "type", "kind", "sector", "business_kind", "business_type"):
         val = getattr(biz, attr, None)
         if isinstance(val, str) and val.strip():
             return _normalize_vertical(val)

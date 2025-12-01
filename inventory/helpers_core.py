@@ -12,6 +12,7 @@ PHARMACY = "pharmacy"
 CLOTHING = "clothing"
 LIQUOR   = "liquor"
 GROCERY  = "grocery"
+GYM      = "gym"
 GENERIC  = "generic"
 
 # Synonyms / legacy labels -> canonical keys
@@ -29,11 +30,13 @@ _ALIASES: Dict[str, str] = {
     # grocery / retail
     "grocery": GROCERY, "groceries": GROCERY, "supermarket": GROCERY, "retail": GROCERY,
     "supermarket & groceries": GROCERY,
+    # gym / fitness
+    "gym": GYM, "fitness": GYM, "fit": GYM,
 }
 
 # Which fields on Business we will probe to determine vertical
 _BIZ_FIELDS: tuple[str, ...] = (
-    "template_key", "vertical", "category", "industry", "type", "kind", "sector", "business_type"
+    "template_key", "vertical", "category", "industry", "type", "kind", "sector", "business_kind", "business_type"
 )
 
 # Session keys that might carry a business id or a vertical override

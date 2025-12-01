@@ -3,6 +3,38 @@ from __future__ import annotations
 from typing import Dict
 from django.http import HttpRequest
 
+# Re-export constants and functions from helpers_core for backwards compatibility
+from inventory.helpers_core import (
+    PHONES,
+    PHARMACY,
+    CLOTHING,
+    LIQUOR,
+    GROCERY,
+    GYM,
+    GENERIC,
+    business_vertical,
+    product_mode_from_business,
+    product_new_url_for_business,
+    add_product_url_for_request,
+    get_active_business,
+)
+
+__all__ = [
+    "PHONES",
+    "PHARMACY",
+    "CLOTHING",
+    "LIQUOR",
+    "GROCERY",
+    "GYM",
+    "GENERIC",
+    "business_vertical",
+    "product_mode_from_business",
+    "product_new_url_for_business",
+    "add_product_url_for_request",
+    "get_active_business",
+    "default_location_for_request",
+]
+
 def default_location_for_request(request: HttpRequest):
     """
     Return the user's default store/location object or None.

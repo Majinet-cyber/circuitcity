@@ -1,8 +1,19 @@
 ﻿# sales/models.py
+"""
+Sales models including commission tracking and bonus/penalty configuration.
+"""
+from __future__ import annotations
+
+from decimal import Decimal
+from typing import Optional
+
+from django.conf import settings
 from django.db import models
+from django.db.models import Sum
 from django.contrib.auth import get_user_model
 from django.core.validators import MinValueValidator, MaxValueValidator
 from django.utils import timezone
+
 from inventory.models import InventoryItem, Location
 
 User = get_user_model()
@@ -42,5 +53,307 @@ class Sale(models.Model):
 
     def __str__(self):
         return f"Sale #{self.pk} - item {self.item_id}"
+
+
+# =========================================================================
+# Commission Configuration
+# =========================================================================
+
+class CommissionConfig(models.Model):
+    """
+    Commission and bonus/penalty configuration per business.
+    ONE active config per business at a time.
+    """
+    business = models.ForeignKey(
+        "tenants.Business",
+        on_delete=models.CASCADE,
+        related_name="commission_configs",
+    )
+    
+    # Base commission rate for phone sales
+    base_commission_pct = models.DecimalField(
+        max_digits=5,
+        decimal_places=2,
+        default=Decimal("2.00"),
+        validators=[MinValueValidator(0), MaxValueValidator(100)],
+        help_text="Default commission percentage for phone sales (e.g., 2.00 = 2%).",
+    )
+    
+    # Alternative: fixed amount per sale
+    fixed_commission_amount = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        validators=[MinValueValidator(0)],
+        help_text="Fixed commission per sale (if set, overrides percentage).",
+    )
+    
+    # Bonus/Penalty configuration for time-based incentives
+    early_bonus_per_30min = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        default=Decimal("5000.00"),
+        validators=[MinValueValidator(0)],
+        help_text="Bonus amount per 30 minutes arrived early (MWK).",
+    )
+    
+    late_penalty_per_30min = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        default=Decimal("7000.00"),
+        validators=[MinValueValidator(0)],
+        help_text="Penalty amount per 30 minutes arrived late (MWK).",
+    )
+    
+    lateness_penalties_enabled = models.BooleanField(
+        default=False,
+        help_text="Enable automatic lateness penalties based on time logs.",
+    )
+    
+    early_bonus_enabled = models.BooleanField(
+        default=True,
+        help_text="Enable automatic early arrival bonuses based on time logs.",
+    )
+    
+    # Active flag for versioning
+    is_active = models.BooleanField(default=True)
+    
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    class Meta:
+        ordering = ["-created_at"]
+        indexes = [
+            models.Index(fields=["business", "is_active"]),
+        ]
+    
+    def __str__(self):
+        return f"Commission Config for {self.business.name} (active={self.is_active})"
+    
+    @classmethod
+    def get_active(cls, business) -> Optional["CommissionConfig"]:
+        """Get the active commission config for a business."""
+        return cls.objects.filter(business=business, is_active=True).first()
+    
+    @classmethod
+    def ensure_config(cls, business) -> "CommissionConfig":
+        """Get or create a commission config for a business."""
+        config = cls.get_active(business)
+        if config:
+            return config
+        return cls.objects.create(business=business, is_active=True)
+
+
+# =========================================================================
+# Sale Commission Tracking
+# =========================================================================
+
+class SaleCommission(models.Model):
+    """
+    Records the computed commission for a sale, including bonuses and penalties.
+    One row per Sale.
+    """
+    sale = models.OneToOneField(
+        Sale,
+        on_delete=models.CASCADE,
+        related_name="commission_record",
+    )
+    agent = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="commissions",
+    )
+    business = models.ForeignKey(
+        "tenants.Business",
+        on_delete=models.CASCADE,
+        related_name="sale_commissions",
+    )
+    
+    # Base commission from the sale
+    base_commission = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        default=Decimal("0.00"),
+        validators=[MinValueValidator(0)],
+    )
+    
+    # Time-based bonuses/penalties
+    early_bonus = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        default=Decimal("0.00"),
+        validators=[MinValueValidator(0)],
+        help_text="Bonus for arriving early.",
+    )
+    late_penalty = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        default=Decimal("0.00"),
+        validators=[MinValueValidator(0)],
+        help_text="Penalty for arriving late.",
+    )
+    
+    # Computed net
+    net_amount = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        default=Decimal("0.00"),
+        help_text="Final commission after bonuses and penalties.",
+    )
+    
+    # Metadata for transparency
+    early_blocks = models.PositiveIntegerField(
+        default=0,
+        help_text="Number of 30-min blocks arrived early.",
+    )
+    late_blocks = models.PositiveIntegerField(
+        default=0,
+        help_text="Number of 30-min blocks arrived late.",
+    )
+    
+    # Link to the work log used for calculation (optional)
+    work_log = models.ForeignKey(
+        "timelogs.AgentWorkLog",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="sale_commissions",
+    )
+    
+    created_at = models.DateTimeField(auto_now_add=True)
+    
+    class Meta:
+        ordering = ["-created_at"]
+        indexes = [
+            models.Index(fields=["agent", "created_at"]),
+            models.Index(fields=["business", "created_at"]),
+        ]
+    
+    def __str__(self):
+        return f"Commission for Sale #{self.sale_id}: {self.net_amount}"
+    
+    def compute_net(self) -> None:
+        """Compute net_amount from base, bonus, and penalty."""
+        self.net_amount = self.base_commission + self.early_bonus - self.late_penalty
+    
+    def save(self, *args, **kwargs):
+        self.compute_net()
+        super().save(*args, **kwargs)
+    
+    @classmethod
+    def create_for_sale(cls, sale: Sale) -> "SaleCommission":
+        """
+        Create a commission record for a sale, applying config and time-based bonuses/penalties.
+        """
+        from timelogs.models import AgentWorkLog
+        
+        business = sale.location.business if sale.location else None
+        if not business:
+            # Try to get from item
+            business = getattr(sale.item, "business", None)
+        
+        config = CommissionConfig.get_active(business) if business else None
+        
+        # Calculate base commission
+        if config and config.fixed_commission_amount:
+            base = config.fixed_commission_amount
+        elif config:
+            base = sale.price * config.base_commission_pct / 100
+        else:
+            base = sale.commission_amount  # Use sale's built-in calculation
+        
+        # Get work log for the sale date
+        work_log = None
+        early_blocks = 0
+        late_blocks = 0
+        early_bonus = Decimal("0.00")
+        late_penalty = Decimal("0.00")
+        
+        if business:
+            try:
+                work_log = AgentWorkLog.objects.get(
+                    agent=sale.agent,
+                    business=business,
+                    work_date=sale.sold_at,
+                )
+                early_blocks = work_log.early_bonus_blocks
+                late_blocks = work_log.late_penalty_blocks
+            except AgentWorkLog.DoesNotExist:
+                pass
+        
+        # Apply bonuses/penalties if config allows
+        if config and work_log:
+            if config.early_bonus_enabled and early_blocks > 0:
+                early_bonus = config.early_bonus_per_30min * early_blocks
+            
+            if config.lateness_penalties_enabled and late_blocks > 0:
+                late_penalty = config.late_penalty_per_30min * late_blocks
+        
+        commission = cls.objects.create(
+            sale=sale,
+            agent=sale.agent,
+            business=business,
+            base_commission=base,
+            early_bonus=early_bonus,
+            late_penalty=late_penalty,
+            early_blocks=early_blocks,
+            late_blocks=late_blocks,
+            work_log=work_log,
+        )
+        
+        return commission
+
+
+# =========================================================================
+# Agent Earnings Summary (helper model for dashboards)
+# =========================================================================
+
+class AgentEarningsSummary:
+    """
+    Non-persisted helper class for computing agent earnings over a period.
+    Use this for dashboard displays.
+    """
+    
+    def __init__(self, agent, business, start_date, end_date):
+        self.agent = agent
+        self.business = business
+        self.start_date = start_date
+        self.end_date = end_date
+        self._compute()
+    
+    def _compute(self):
+        commissions = SaleCommission.objects.filter(
+            agent=self.agent,
+            business=self.business,
+            created_at__date__gte=self.start_date,
+            created_at__date__lte=self.end_date,
+        )
+        
+        agg = commissions.aggregate(
+            total_base=Sum("base_commission"),
+            total_bonus=Sum("early_bonus"),
+            total_penalty=Sum("late_penalty"),
+            total_net=Sum("net_amount"),
+        )
+        
+        self.total_base = agg["total_base"] or Decimal("0.00")
+        self.total_bonus = agg["total_bonus"] or Decimal("0.00")
+        self.total_penalty = agg["total_penalty"] or Decimal("0.00")
+        self.total_net = agg["total_net"] or Decimal("0.00")
+        self.sale_count = commissions.count()
+    
+    def to_dict(self):
+        return {
+            "agent_id": self.agent.id,
+            "agent_name": self.agent.get_full_name() or self.agent.username,
+            "start_date": str(self.start_date),
+            "end_date": str(self.end_date),
+            "sale_count": self.sale_count,
+            "total_base": float(self.total_base),
+            "total_bonus": float(self.total_bonus),
+            "total_penalty": float(self.total_penalty),
+            "total_net": float(self.total_net),
+        }
 
 

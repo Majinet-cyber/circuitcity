@@ -1,0 +1,82 @@
+{% extends "base.html" %}
+
+{% block title %}Pharmacy · Circuit City{% endblock %}
+
+{% block content %}
+{% url 'inventory:pharmacy_product_new' as pharmacy_add_url %}
+<style>
+  .vertical-page{display:flex;flex-direction:column;gap:18px;padding:18px}
+  .vertical-hero{background:linear-gradient(120deg,#22c55e,#4ade80);padding:24px;border-radius:20px;color:#0f172a;display:flex;flex-wrap:wrap;gap:18px;align-items:center;justify-content:space-between}
+  .vertical-hero h1{margin:0;font-size:clamp(24px,3vw,32px)}
+  .hero-actions{display:flex;gap:12px;flex-wrap:wrap}
+  .hero-actions a{border-radius:999px;padding:10px 16px;font-weight:700;text-decoration:none}
+  .hero-actions .primary{background:#0f172a;color:#fff}
+  .hero-actions .ghost{border:1px solid rgba(15,23,42,.4);color:#0f172a}
+  .metrics-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:16px}
+  .metric-card{background:#fff;border-radius:18px;padding:18px;box-shadow:0 10px 30px rgba(15,23,42,.08)}
+  .metric-card h3{margin:0;font-size:.9rem;text-transform:uppercase;color:#64748b}
+  .metric-card p{margin:6px 0 0;font-size:1.8rem;font-weight:800;color:#0f172a}
+  .recent-block{background:#fff;border-radius:20px;padding:18px;box-shadow:0 10px 30px rgba(15,23,42,.08)}
+  .recent-list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:12px}
+  .recent-item{display:flex;justify-content:space-between;gap:12px;border-bottom:1px solid #e2e8f0;padding-bottom:12px}
+  .recent-item:last-child{border-bottom:0;padding-bottom:0}
+  .badge{display:inline-flex;align-items:center;gap:6px;border-radius:20px;padding:4px 10px;font-size:.75rem;font-weight:700}
+  .badge.scan{background:#fefce8;color:#92400e}
+</style>
+
+<div class="vertical-page">
+  <header class="vertical-hero">
+    <div>
+      <p style="margin:0;font-size:.85rem;text-transform:uppercase;letter-spacing:.08em">{{ business.name }} · {{ location_label }}</p>
+      <h1>{{ hero_title }}</h1>
+      <p>{{ hero_blurb }}</p>
+    </div>
+    <div class="hero-actions">
+      <a class="primary" href="{{ pharmacy_add_url|default:'/inventory/pharmacy/products/new/' }}">Add medicine</a>
+      <a class="ghost" href="{{ scan_in_url|default:'/inventory/scan-in/' }}">Scan stock</a>
+      <a class="ghost" href="{{ stock_url|default:'/inventory/list/' }}">Inventory</a>
+    </div>
+  </header>
+
+  <section class="metrics-grid">
+    <article class="metric-card">
+      <h3>Products</h3>
+      <p>{{ product_count }}</p>
+    </article>
+    <article class="metric-card">
+      <h3>Active items</h3>
+      <p>{{ active_product_count }}</p>
+    </article>
+    <article class="metric-card">
+      <h3>Scan required</h3>
+      <p>{{ scan_required_count }}</p>
+    </article>
+    <article class="metric-card">
+      <h3>Tracked inventory</h3>
+      <p>{{ inventory_tracked_count }}</p>
+    </article>
+  </section>
+
+  <section class="recent-block">
+    <h2 style="margin:0 0 10px;font-size:1.05rem">Recently added</h2>
+    {% if recent_products %}
+      <ul class="recent-list">
+        {% for item in recent_products %}
+          <li class="recent-item">
+            <div>
+              <strong>{{ item.name|default:"Unnamed" }}</strong>
+              {% if item.sku %}<small style="color:#64748b">SKU · {{ item.sku }}</small>{% endif %}
+            </div>
+            {% if item.scan_required %}
+              <span class="badge scan"><i class="bi bi-upc-scan"></i>Scan</span>
+            {% endif %}
+          </li>
+        {% endfor %}
+      </ul>
+    {% else %}
+      <p style="margin:0;color:#64748b">Add your first medicine to see it here.</p>
+    {% endif %}
+  </section>
+</div>
+{% endblock %}
+

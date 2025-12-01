@@ -17,6 +17,25 @@ from .validators import (
 from .utils.images import process_avatar
 from .models import Profile
 
+try:
+    from inventory.business_kinds import BusinessKind
+except Exception:  # pragma: no cover
+    class BusinessKind:
+        PHONES = "phones"
+        LIQUOR = "liquor"
+        GROCERY = "grocery"
+        PHARMACY = "pharmacy"
+        CLOTHING = "clothing"
+        GYM = "gym"
+        choices = [
+            (PHONES, "Phones & Electronics"),
+            (LIQUOR, "Liquor / Bar"),
+            (GROCERY, "Grocery / General"),
+            (PHARMACY, "Pharmacy"),
+            (CLOTHING, "Clothing"),
+            (GYM, "Gym / Fitness"),
+        ]
+
 # ============================================================
 # Helpers
 # ============================================================
@@ -398,6 +417,11 @@ class ManagerSignUpForm(forms.Form):
         max_length=200,
         label="Store / Business name",
         widget=forms.TextInput(attrs={"placeholder": "e.g., Circuit City Area 25"}),
+    )
+    business_kind = forms.ChoiceField(
+        label="Business type",
+        choices=BusinessKind.choices,
+        widget=forms.Select(attrs={"autocomplete": "off"}),
     )
     subdomain = forms.CharField(
         max_length=40,

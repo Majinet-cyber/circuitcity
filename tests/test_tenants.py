@@ -1,10 +1,12 @@
 ﻿# tests/test_tenants.py
 import importlib
+import uuid
+
 import pytest
-from django.urls import reverse, NoReverseMatch
 from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Group
+from django.urls import NoReverseMatch, reverse
 
 # -----------------------
 # Optional dependencies
@@ -24,6 +26,7 @@ InventoryItem = getattr(inv_models, "InventoryItem", None)
 ten_models = importlib.import_module("tenants.models")
 Business = getattr(ten_models, "Business", None)
 Location = getattr(ten_models, "Location", None)
+Membership = getattr(ten_models, "Membership", None)
 
 User = get_user_model()
 
@@ -65,14 +68,14 @@ def simpler_static_settings(request):
 def biz_a():
     if Business is None:
         pytest.skip("tenants.Business not available")
-    return Business.objects.create(name="A Store")
+    return Business.objects.create(name="A Store", slug=f"a-store-{uuid.uuid4().hex[:6]}", status="ACTIVE")
 
 
 @pytest.fixture
 def biz_b():
     if Business is None:
         pytest.skip("tenants.Business not available")
-    return Business.objects.create(name="B Store")
+    return Business.objects.create(name="B Store", slug=f"b-store-{uuid.uuid4().hex[:6]}", status="ACTIVE")
 
 
 @pytest.fixture
@@ -82,6 +85,8 @@ def manager(biz_a):
     u = User.objects.create_user("mgr", password="x")
     u.groups.add(g)
     assert not getattr(u, "is_staff", False)
+    if Membership is not None:
+        Membership.objects.get_or_create(user=u, business=biz_a, defaults={"role": "MANAGER", "status": "ACTIVE"})
     return u
 
 
@@ -109,18 +114,25 @@ def test_manager_cannot_access_admin(client_as_manager):
 def test_tenant_isolation_read(client_as_manager, biz_a, biz_b):
     # Create minimal stock rows per business (assumes InventoryItem accepts 'business' only;
     # if your model needs more fields, extend as needed.)
-    a = InventoryItem.objects.create(business=biz_a)
-    b = InventoryItem.objects.create(business=biz_b)
+    if Product is None:
+        pytest.skip("Product model not available")
+
+    prod_a = Product.objects.create(code=f"A-{uuid.uuid4().hex[:6]}", model="ModelA")
+    prod_b = Product.objects.create(code=f"B-{uuid.uuid4().hex[:6]}", model="ModelB")
+
+    a = InventoryItem.objects.create(business=biz_a, product=prod_a)
+    b = InventoryItem.objects.create(business=biz_b, product=prod_b)
 
     if STOCKLIST is None:
         pytest.skip("inventory:stock_list route is not available")
 
-    resp = client_as_manager.get(STOCKLIST)
-    html = resp.content.decode(errors="ignore")
+    resp = client_as_manager.get(f"{STOCKLIST}?format=json")
+    data = resp.json()
+    row_ids = {row.get("id") for row in data.get("data", [])}
 
     # Page should contain only the item from the active business (biz_a)
-    assert str(a.pk) in html
-    assert str(b.pk) not in html
+    assert a.pk in row_ids
+    assert b.pk not in row_ids
 
 
 @pytest.mark.skipif(not AUDIT_AVAILABLE, reason="audit app not installed")

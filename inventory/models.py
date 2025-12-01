@@ -19,6 +19,7 @@ from django.utils import timezone
 
 # --- Tenancy imports (explicit) ---
 from tenants.models import Business, TenantManager, UnscopedManager
+from .business_kinds import BusinessKind
 
 User = get_user_model()
 
@@ -170,17 +171,6 @@ class AgentProfile(models.Model):
         if not self.joined_on:
             return None
         return (timezone.localdate() - self.joined_on).days
-
-
-# =====================================================================
-# Generic merchandise catalog (non-IMEI) for liquor/grocery/pharmacy/clothing
-# =====================================================================
-class BusinessKind(models.TextChoices):
-    PHONES   = "phones",   "Phones & Electronics"
-    LIQUOR   = "liquor",   "Liquor / Bar"
-    GROCERY  = "grocery",  "Grocery / General"
-    PHARMACY = "pharmacy", "Pharmacy"
-    CLOTHING = "clothing", "Clothing"
 
 
 class BaseUnit(models.TextChoices):

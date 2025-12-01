@@ -11,9 +11,9 @@ class SmokeTests(TestCase):
 
     def test_home_redirects_for_agent(self):
         self.client.login(username="agent", password="pass12345")
-        resp = self.client.get(reverse("home"))
+        resp = self.client.get(reverse("dashboard:home"))
         self.assertIn(resp.status_code, (301, 302))
 
         self.client.login(username="staff", password="pass12345")
-        resp = self.client.get(reverse("home"))
+        resp = self.client.get(reverse("dashboard:home"))
         self.assertIn(resp.status_code, (301, 302))

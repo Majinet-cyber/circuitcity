@@ -16,6 +16,17 @@ from django.core.exceptions import ValidationError
 from django.core.signing import TimestampSigner, BadSignature, SignatureExpired
 from django.urls import reverse, NoReverseMatch
 
+try:
+    from inventory.business_kinds import BusinessKind
+except Exception:  # pragma: no cover
+    class BusinessKind(models.TextChoices):  # type: ignore
+        PHONES = "phones", "Phones & Electronics"
+        LIQUOR = "liquor", "Liquor / Bar"
+        GROCERY = "grocery", "Grocery / General"
+        PHARMACY = "pharmacy", "Pharmacy"
+        CLOTHING = "clothing", "Clothing"
+        GYM = "gym", "Gym / Fitness"
+
 User = settings.AUTH_USER_MODEL
 
 # ===============================
@@ -74,6 +85,14 @@ class Business(models.Model):
 
     created_at = models.DateTimeField(default=timezone.now, db_index=True)
     status = models.CharField(max_length=10, choices=STATUS_CHOICES, default="PENDING", db_index=True)
+    business_kind = models.CharField(
+        max_length=20,
+        choices=BusinessKind.choices,
+        null=True,
+        blank=True,
+        db_index=True,
+        help_text="Business vertical (drives tailored dashboards and flows).",
+    )
 
     # Optional for subdomain routing later (e.g., acme.circuit.city)
     subdomain = models.CharField(max_length=63, blank=True, default="", db_index=True)
@@ -253,6 +272,29 @@ class Membership(models.Model):
         if role == "MANAGER" and self.location_id:
             raise ValidationError({"location": "Managers should not be tied to a specific location."})
 
+        # Managers are permanently bound to a single business.
+        if role == "MANAGER" and self.user_id and self.business_id:
+            conflict = (
+                Membership.objects.filter(user_id=self.user_id, role__iexact="MANAGER")
+                .exclude(pk=self.pk)
+                .exclude(business_id=self.business_id)
+            )
+            if conflict.exists():
+                raise ValidationError(
+                    {"business": "Managers are permanently bound to their first business."}
+                )
+
+        # Managers cannot gain memberships (even as agents) in other businesses.
+        if role != "MANAGER" and self.user_id and self.business_id:
+            manager_conflict = (
+                Membership.objects.filter(user_id=self.user_id, role__iexact="MANAGER")
+                .exclude(business_id=self.business_id)
+            )
+            if manager_conflict.exists():
+                raise ValidationError(
+                    {"business": "Managers cannot join or view other businesses."}
+                )
+
     def save(self, *args, **kwargs):
         self.full_clean()
         return super().save(*args, **kwargs)
@@ -386,6 +428,18 @@ class AgentInvite(BaseTenantModel):
 
     message = models.CharField(max_length=240, blank=True, default="")
     expires_at = models.DateTimeField(null=True, blank=True)
+    
+    # Temporary password fields (Task 3)
+    temp_password_hash = models.CharField(
+        max_length=128,
+        blank=True,
+        default="",
+        help_text="Hashed temporary password for agent login.",
+    )
+    temp_password_used = models.BooleanField(
+        default=False,
+        help_text="Whether the temp password has been used.",
+    )
 
     class Meta:
         indexes = [
@@ -437,6 +491,38 @@ class AgentInvite(BaseTenantModel):
     def save(self, *args, **kwargs):
         self.ensure_token()
         super().save(*args, **kwargs)
+
+    # ---- Temp password helpers ----
+    
+    @staticmethod
+    def generate_temp_password(length: int = 8) -> str:
+        """Generate a human-readable temporary password."""
+        import secrets
+        import string
+        # Use a mix that's easy to type and read
+        alphabet = string.ascii_letters + string.digits
+        # Avoid confusing characters like 0/O, 1/l/I
+        alphabet = alphabet.replace("0", "").replace("O", "").replace("1", "").replace("l", "").replace("I", "")
+        return "".join(secrets.choice(alphabet) for _ in range(length))
+    
+    def set_temp_password(self, raw_password: str) -> None:
+        """Hash and store a temporary password."""
+        from django.contrib.auth.hashers import make_password
+        self.temp_password_hash = make_password(raw_password)
+        self.temp_password_used = False
+    
+    def check_temp_password(self, raw_password: str) -> bool:
+        """Verify a temporary password."""
+        from django.contrib.auth.hashers import check_password
+        if not self.temp_password_hash:
+            return False
+        return check_password(raw_password, self.temp_password_hash)
+    
+    def create_and_set_temp_password(self) -> str:
+        """Generate, set, and return a new temp password (plaintext for emailing)."""
+        raw = self.generate_temp_password()
+        self.set_temp_password(raw)
+        return raw
 
     # ---- Status helpers ----
 

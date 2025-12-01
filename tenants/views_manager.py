@@ -18,6 +18,7 @@ from django.template.loader import select_template
 from django.utils import timezone
 
 from tenants.models import Business, Membership
+from tenants.utils import redirect_manager_safe_choose
 
 # Optional: AgentInvite & Location for local fallback
 try:
@@ -349,7 +350,7 @@ def manager_agents(request: HttpRequest) -> HttpResponse:
     biz = _active_business_from_request(request) or _force_pick_any_membership(request)
     if not biz:
         messages.warning(request, "Please choose a business first.")
-        return redirect("tenants:choose_business")
+        return redirect_manager_safe_choose(request)
 
     # Handle POST creation here too (inline create)
     if request.method == "POST":

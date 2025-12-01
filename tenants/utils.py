@@ -384,6 +384,21 @@ def resolve_default_business_for_user(user) -> Optional["Business"]:
     return m.business if m else None
 
 
+def get_manager_bound_business(user) -> Optional["Business"]:
+    """
+    Return the Business a manager user is bound to (ACTIVE membership).
+    Managers are required to operate a single business permanently.
+    """
+    if Membership is None or not getattr(user, "is_authenticated", False):
+        return None
+
+    qs = Membership.objects.filter(user=user, role__iexact="MANAGER")
+    if _membership_has_status_field():
+        qs = qs.filter(status__iexact="ACTIVE")
+    membership = qs.select_related("business").first()
+    return getattr(membership, "business", None) if membership else None
+
+
 def user_has_membership(user, business_id: int) -> bool:
     """
     True if the user has membership in the business (ACTIVE preferred when field exists).
@@ -420,6 +435,23 @@ def user_highest_role(user) -> Optional[str]:
         return next(iter(roles_upper), None)
     except Exception:
         return None
+
+
+def redirect_manager_safe_choose(request, fallback: str = "tenants:choose_business"):
+    """
+    Redirect managers/owners to their dashboard instead of the choose-business view.
+    Agents and other roles still land on the chooser.
+    """
+    user = getattr(request, "user", None)
+    role = (user_highest_role(user) or "").upper() if user else ""
+
+    if role in {"OWNER", "MANAGER"}:
+        target = _safe_reverse("dashboard:home", "/")
+        return redirect(target)
+
+    fallback = fallback or "tenants:choose_business"
+    target = _safe_reverse(fallback, "/tenants/choose/")
+    return redirect(target)
 
 
 # ----------------------------
@@ -832,7 +864,8 @@ def require_role(roles: Optional[Iterable[str]] = None) -> Callable:
                 # Reuse require_business redirection logic
                 target = _safe_reverse("tenants:activate_mine", "/tenants/activate/")
                 next_q = quote_plus(getattr(request, "get_full_path", lambda: "/")())
-                return redirect(f"{target}?next={next_q}")
+                href = f"{target}?next={next_q}" if next_q else target
+                return redirect(href)
 
             # Must be an ACTIVE member of the active business
             if not _has_active_membership(user, biz):
@@ -840,7 +873,7 @@ def require_role(roles: Optional[Iterable[str]] = None) -> Callable:
                     messages.error(request, "You don’t have access to this business.")
                 except Exception:
                     pass
-                return redirect(_safe_reverse("tenants:choose_business", "/tenants/choose/"))
+                return redirect_manager_safe_choose(request)
 
             # Check group role
             if _user_group_names(user).intersection(role_set):
@@ -982,7 +1015,8 @@ __all__ = [
     # NEW helper (for APIs/views)
     "ensure_active_business_id",
     # NEW helpers
-    "resolve_default_business_for_user", "user_has_membership", "user_highest_role",
+    "resolve_default_business_for_user", "get_manager_bound_business",
+    "user_has_membership", "user_highest_role", "redirect_manager_safe_choose",
     # default location helpers
     "default_location_for", "default_location_for_request", "get_default_location_for",
     # role checks (export both canonical and aliases)

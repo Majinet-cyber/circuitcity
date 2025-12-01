@@ -1771,7 +1771,12 @@ def scan_sold(request, *args, **kwargs):
 
     biz_code = None
     try:
-        biz_code = getattr(biz, "business_type", None) or getattr(biz, "type", None) or getattr(biz, "code", None)
+        biz_code = (
+            getattr(biz, "business_kind", None)
+            or getattr(biz, "business_type", None)
+            or getattr(biz, "type", None)
+            or getattr(biz, "code", None)
+        )
     except Exception:
         biz_code = None
 

@@ -16,6 +16,14 @@
 {# Other inventory links #}
 {% url 'inventory:stock_list' as url_stock %}
 {% url 'inventory:scan_in'   as url_scan_in %}
+{% url 'inventory:scan_sold' as url_scan_sold %}
+{% url 'inventory_verticals:clothing_dashboard' as url_clothing_dash %}
+{% url 'inventory_verticals:liquor_dashboard' as url_liquor_dash %}
+{% url 'inventory_verticals:pharmacy_dashboard' as url_pharmacy_dash %}
+{% url 'inventory_verticals:gym_dashboard' as url_gym_dash %}
+{% url 'inventory:clothing_product_new_v2' as url_clothing_new %}
+{% url 'inventory:liquor_product_new_v2' as url_liquor_new %}
+{% url 'inventory:pharmacy_product_new' as url_pharmacy_new %}
 
 {# Wallets (agent + admin) #}
 {% url 'wallet:agent_wallet' as url_wallet %}
@@ -149,6 +157,7 @@
   {% endif %}
 
   <!-- ---------- Main (tenant) ---------- -->
+  {% with vertical=BUSINESS_VERTICAL|default:'phones' %}
   <div>
     <div class="cc-section">Main</div>
     <ul class="cc-nav">
@@ -158,29 +167,130 @@
       </li>
       {% endif %}
 
-      {% if url_inv_dash %}
-      <li class="{% if request.path|slice:'0:19' == '/inventory/dashboard' %}active{% endif %}">
-        <a class="navlink" href="{{ url_inv_dash }}"><i class="bi bi-columns-gap"></i><span>Inventory Dashboard</span></a>
-      </li>
-      {% endif %}
+      {% if vertical == 'gym' %}
+        <li class="{% if url_team and '/tenants/manager/agents/' in request.path %}active{% endif %}">
+          <a class="navlink" href="{{ url_team|default:'/tenants/manager/agents/' }}"><i class="bi bi-people"></i><span>Members</span></a>
+        </li>
+        <li class="{% if request.path|slice:'0:15' == '/inventory/time' %}active{% endif %}">
+          <a class="navlink" href="{{ url_time_logs|default:'/inventory/time/logs/' }}"><i class="bi bi-activity"></i><span>Attendance</span></a>
+        </li>
+        <li class="{% if url_wallet and request.path|slice:'0:8' == '/wallet/' %}active{% endif %}">
+          <a class="navlink" href="{{ url_wallet|default:'/wallet/' }}"><i class="bi bi-wallet2"></i><span>Wallet</span></a>
+        </li>
+      {% else %}
+        {% if url_inv_dash %}
+        <li class="{% if request.path|slice:'0:19' == '/inventory/dashboard' %}active{% endif %}">
+          <a class="navlink" href="{{ url_inv_dash }}"><i class="bi bi-columns-gap"></i><span>Inventory Dashboard</span></a>
+        </li>
+        {% endif %}
 
-      {% if url_stock %}
-      <li class="{% if '/inventory/list/' in request.path %}active{% endif %}">
-        <a class="navlink" href="{{ url_stock }}"><i class="bi bi-box-seam"></i><span>Stock</span></a>
-      </li>
-      {% endif %}
+        {% if url_stock %}
+        <li class="{% if '/inventory/list/' in request.path %}active{% endif %}">
+          <a class="navlink" href="{{ url_stock }}"><i class="bi bi-box-seam"></i><span>Stock</span></a>
+        </li>
+        {% endif %}
 
-      {% if url_scan_in %}
-      <li class="{% if '/inventory/scan' in request.path %}active{% endif %}">
-        <a class="navlink" href="{{ url_scan_in }}"><i class="bi bi-upc-scan"></i><span>Scan IN</span></a>
-      </li>
-      {% endif %}
+        {% if url_scan_in %}
+        <li class="{% if '/inventory/scan' in request.path %}active{% endif %}">
+          <a class="navlink" href="{{ url_scan_in }}"><i class="bi bi-upc-scan"></i><span>Scan IN</span></a>
+        </li>
+        {% endif %}
 
-      <li class="{% if request.path|slice:'0:6' == '/sell/' %}active{% endif %}">
-        <a class="navlink" href="/sell/"><i class="bi bi-bag-check"></i><span>Sell</span></a>
-      </li>
+        <li class="{% if request.path|slice:'0:6' == '/sell/' %}active{% endif %}">
+          <a class="navlink" href="/sell/"><i class="bi bi-bag-check"></i><span>Sell</span></a>
+        </li>
+      {% endif %}
     </ul>
   </div>
+  {% endwith %}
+
+  {% with vertical=BUSINESS_VERTICAL|default:'' %}
+    {% if vertical == 'clothing' %}
+      <div>
+        <div class="cc-section">Clothing</div>
+        <ul class="cc-nav">
+          <li class="{% if request.resolver_match.namespace == 'inventory_verticals' and request.resolver_match.url_name == 'clothing_dashboard' %}active{% endif %}">
+            <a class="navlink" href="{{ url_clothing_dash|default:'/inventory/verticals/clothing/' }}">
+              <i class="bi bi-person-bounding-box"></i><span>Clothing Hub</span>
+            </a>
+          </li>
+          <li>
+            <a class="navlink" href="{{ url_clothing_new|default:'/inventory/clothing/products/new/v2/' }}">
+              <i class="bi bi-plus-square"></i><span>Add clothing item</span>
+            </a>
+          </li>
+          <li>
+            <a class="navlink" href="{{ url_scan_in|default:'/inventory/scan-in/' }}">
+              <i class="bi bi-upc-scan"></i><span>Scan stock</span>
+            </a>
+          </li>
+        </ul>
+      </div>
+    {% elif vertical == 'liquor' %}
+      <div>
+        <div class="cc-section">Liquor</div>
+        <ul class="cc-nav">
+          <li class="{% if request.resolver_match.namespace == 'inventory_verticals' and request.resolver_match.url_name == 'liquor_dashboard' %}active{% endif %}">
+            <a class="navlink" href="{{ url_liquor_dash|default:'/inventory/verticals/liquor/' }}">
+              <i class="bi bi-cup-straw"></i><span>Liquor Hub</span>
+            </a>
+          </li>
+          <li>
+            <a class="navlink" href="{{ url_liquor_new|default:'/inventory/liquor/products/new/v2/' }}">
+              <i class="bi bi-droplet-half"></i><span>Add liquor item</span>
+            </a>
+          </li>
+          <li>
+            <a class="navlink" href="{{ url_scan_sold|default:'/inventory/scan-sold/' }}">
+              <i class="bi bi-lightning-charge"></i><span>Sell shots</span>
+            </a>
+          </li>
+        </ul>
+      </div>
+    {% elif vertical == 'pharmacy' %}
+      <div>
+        <div class="cc-section">Pharmacy</div>
+        <ul class="cc-nav">
+          <li class="{% if request.resolver_match.namespace == 'inventory_verticals' and request.resolver_match.url_name == 'pharmacy_dashboard' %}active{% endif %}">
+            <a class="navlink" href="{{ url_pharmacy_dash|default:'/inventory/verticals/pharmacy/' }}">
+              <i class="bi bi-prescription2"></i><span>Pharmacy Hub</span>
+            </a>
+          </li>
+          <li>
+            <a class="navlink" href="{{ url_pharmacy_new|default:'/inventory/pharmacy/products/new/' }}">
+              <i class="bi bi-capsule"></i><span>Add medicine</span>
+            </a>
+          </li>
+          <li>
+            <a class="navlink" href="{{ url_scan_in|default:'/inventory/scan-in/' }}">
+              <i class="bi bi-upc-scan"></i><span>Scan stock</span>
+            </a>
+          </li>
+        </ul>
+      </div>
+    {% elif vertical == 'gym' %}
+      <div>
+        <div class="cc-section">Gym</div>
+        <ul class="cc-nav">
+          <li class="{% if request.resolver_match.namespace == 'inventory_verticals' and request.resolver_match.url_name == 'gym_dashboard' %}active{% endif %}">
+            <a class="navlink" href="{{ url_gym_dash|default:'/inventory/verticals/gym/' }}">
+              <i class="bi bi-activity"></i><span>Gym Hub</span>
+            </a>
+          </li>
+          <li>
+            <a class="navlink" href="{{ url_team|default:'/tenants/manager/agents/' }}">
+              <i class="bi bi-people"></i><span>Members &amp; staff</span>
+            </a>
+          </li>
+          <li>
+            <a class="navlink" href="{{ url_wallet|default:'/wallet/' }}">
+              <i class="bi bi-wallet2"></i><span>Wallet</span>
+            </a>
+          </li>
+        </ul>
+      </div>
+    {% endif %}
+  {% endwith %}
 
   <!-- ---------- Time (role-aware) ---------- -->
   {% if request.user.is_authenticated %}

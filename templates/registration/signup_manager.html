@@ -180,11 +180,14 @@
           <div class="label">Business type</div>
 
           <!-- Real select posted to Django -->
-          <select name="business_type" id="id_business_type" required style="display:none">
-            <option value="" {% if not request.POST.business_type %}selected{% endif %}>---------</option>
-            <option value="electronics" {% if request.POST.business_type == 'electronics' %}selected{% endif %}>Phones & Electronics</option>
-            <option value="pharmacy" {% if request.POST.business_type == 'pharmacy' %}selected{% endif %}>Pharmacy</option>
-            <option value="fashion" {% if request.POST.business_type == 'fashion' %}selected{% endif %}>Fashion & Clothing</option>
+          <select name="business_kind" id="id_business_kind" required style="display:none">
+            <option value="" {% if not request.POST.business_kind %}selected{% endif %}>---------</option>
+            <option value="phones" {% if request.POST.business_kind == 'phones' %}selected{% endif %}>Phones & Electronics</option>
+            <option value="clothing" {% if request.POST.business_kind == 'clothing' %}selected{% endif %}>Clothing & Fashion</option>
+            <option value="liquor" {% if request.POST.business_kind == 'liquor' %}selected{% endif %}>Liquor / Bar</option>
+            <option value="pharmacy" {% if request.POST.business_kind == 'pharmacy' %}selected{% endif %}>Pharmacy</option>
+            <option value="grocery" {% if request.POST.business_kind == 'grocery' %}selected{% endif %}>Grocery / General</option>
+            <option value="gym" {% if request.POST.business_kind == 'gym' %}selected{% endif %}>Gym & Fitness</option>
           </select>
 
           <!-- Fancy control -->
@@ -198,11 +201,23 @@
             </button>
 
             <div class="cc-menu" role="listbox" aria-labelledby="bizLabel">
-              <div class="cc-option" data-value="electronics">
+              <div class="cc-option" data-value="phones">
                 <span class="cc-icon">
                   <svg viewBox="0 0 24 24"><path d="M4 6h10a2 2 0 012 2v8a2 2 0 01-2 2H4V6zm14 3h2v9h-2z" fill="currentColor"/></svg>
                 </span>
                 Phones &amp; Electronics
+              </div>
+              <div class="cc-option" data-value="clothing">
+                <span class="cc-icon">
+                  <svg viewBox="0 0 24 24"><path d="M12 6a2 2 0 10-2-2h2a4 4 0 014 4l6 5v3H2v-3l10-8z" fill="currentColor"/></svg>
+                </span>
+                Clothing &amp; Fashion
+              </div>
+              <div class="cc-option" data-value="liquor">
+                <span class="cc-icon">
+                  <svg viewBox="0 0 24 24"><path d="M7 3h10v3l-3 5v7a2 2 0 0 1-4 0V11L7 6zM6 21h12" fill="currentColor"/></svg>
+                </span>
+                Liquor / Bar
               </div>
               <div class="cc-option" data-value="pharmacy">
                 <span class="cc-icon">
@@ -210,11 +225,17 @@
                 </span>
                 Pharmacy
               </div>
-              <div class="cc-option" data-value="fashion">
+              <div class="cc-option" data-value="grocery">
                 <span class="cc-icon">
-                  <svg viewBox="0 0 24 24"><path d="M12 6a2 2 0 10-2-2h2a4 4 0 014 4l6 5v3H2v-3l10-8z" fill="currentColor"/></svg>
+                  <svg viewBox="0 0 24 24"><path d="M4 7h16l-2 10H6L4 7zm5 11a2 2 0 110 4 2 2 0 010-4zm6 0a2 2 0 110 4 2 2 0 010-4z" fill="currentColor"/></svg>
                 </span>
-                Fashion &amp; Clothing
+                Grocery / General
+              </div>
+              <div class="cc-option" data-value="gym">
+                <span class="cc-icon">
+                  <svg viewBox="0 0 24 24"><path d="M5 7h2l1-2h8l1 2h2v2h-1l1 3-1 3h1v2h-2l-1 2H8l-1-2H5v-2h1l-1-3 1-3H5z" fill="currentColor"/></svg>
+                </span>
+                Gym &amp; Fitness
               </div>
             </div>
           </div>
@@ -222,11 +243,14 @@
           <!-- No-JS fallback (will show only if JS off) -->
           <noscript>
             <div class="native-select" style="margin-top:8px">
-              <select name="business_type" required class="input" style="padding-left:14px">
+              <select name="business_kind" required class="input" style="padding-left:14px">
                 <option value="">Select a business type…</option>
-                <option value="electronics">Phones & Electronics</option>
+                <option value="phones">Phones & Electronics</option>
+                <option value="clothing">Clothing & Fashion</option>
+                <option value="liquor">Liquor / Bar</option>
                 <option value="pharmacy">Pharmacy</option>
-                <option value="fashion">Fashion & Clothing</option>
+                <option value="grocery">Grocery / General</option>
+                <option value="gym">Gym & Fitness</option>
               </select>
             </div>
           </noscript>
@@ -326,7 +350,7 @@
   // ---------- Fancy Icon Select wiring ----------
   (function(){
     const host = document.getElementById('ccBizSelect');
-    const real = document.getElementById('id_business_type');
+    const real = document.getElementById('id_business_kind');
     if(!host || !real) return;
 
     const btn = host.querySelector('.cc-select-btn');
@@ -335,14 +359,20 @@
     const iconEl = host.querySelector('#bizIcon');
 
     const icons = {
-      electronics: '<svg viewBox="0 0 24 24"><path d="M4 6h10a2 2 0 012 2v8a2 2 0 01-2 2H4V6zm14 3h2v9h-2z" fill="currentColor"/></svg>',
+      phones: '<svg viewBox="0 0 24 24"><path d="M4 6h10a2 2 0 012 2v8a2 2 0 01-2 2H4V6zm14 3h2v9h-2z" fill="currentColor"/></svg>',
+      clothing: '<svg viewBox="0 0 24 24"><path d="M12 6a2 2 0 10-2-2h2a4 4 0 014 4l6 5v3H2v-3l10-8z" fill="currentColor"/></svg>',
+      liquor: '<svg viewBox="0 0 24 24"><path d="M7 3h10v3l-3 5v7a2 2 0 0 1-4 0V11L7 6zM6 21h12" fill="currentColor"/></svg>',
       pharmacy: '<svg viewBox="0 0 24 24"><path d="M10 4h4v6h6v4h-6v6h-4v-6H4v-4h6z" fill="currentColor"/></svg>',
-      fashion: '<svg viewBox="0 0 24 24"><path d="M12 6a2 2 0 10-2-2h2a4 4 0 014 4l6 5v3H2v-3l10-8z" fill="currentColor"/></svg>'
+      grocery: '<svg viewBox="0 0 24 24"><path d="M4 7h16l-2 10H6L4 7zm5 11a2 2 0 110 4 2 2 0 010-4zm6 0a2 2 0 110 4 2 2 0 010-4z" fill="currentColor"/></svg>',
+      gym: '<svg viewBox="0 0 24 24"><path d="M5 7h2l1-2h8l1 2h2v2h-1l1 3-1 3h1v2h-2l-1 2H8l-1-2H5v-2h1l-1-3 1-3H5z" fill="currentColor"/></svg>'
     };
     const textMap = {
-      electronics: 'Phones & Electronics',
+      phones: 'Phones & Electronics',
+      clothing: 'Clothing & Fashion',
+      liquor: 'Liquor / Bar',
       pharmacy: 'Pharmacy',
-      fashion: 'Fashion & Clothing'
+      grocery: 'Grocery / General',
+      gym: 'Gym & Fitness'
     };
 
     function setValue(v){
@@ -350,24 +380,19 @@
       labelEl.textContent = v ? textMap[v] : 'Choose business type…';
       iconEl.innerHTML = v ? icons[v] : '';
       host.querySelectorAll('.cc-option').forEach(o => o.dataset.active = (o.dataset.value===v));
-      // HTML5 validity feedback if needed
       if (real.hasAttribute('required')) real.setCustomValidity(v ? '' : 'Please choose your business type');
     }
 
-    // Open/close
     btn.addEventListener('click', ()=> {
       const open = menu.classList.toggle('open');
       btn.setAttribute('aria-expanded', open ? 'true' : 'false');
     });
-    // Select option
     host.querySelectorAll('.cc-option').forEach(opt=>{
       opt.addEventListener('click', ()=>{ setValue(opt.dataset.value); menu.classList.remove('open'); btn.setAttribute('aria-expanded','false'); });
     });
-    // Close when clicking outside / Esc
     document.addEventListener('click', (e)=>{ if(!host.contains(e.target)) { menu.classList.remove('open'); btn.setAttribute('aria-expanded','false'); }});
     document.addEventListener('keydown', (e)=>{ if(e.key==='Escape'){ menu.classList.remove('open'); btn.setAttribute('aria-expanded','false'); }});
 
-    // Initialize from POSTed value if the page re-renders with errors
     setValue(real.value);
   })();
 </script>

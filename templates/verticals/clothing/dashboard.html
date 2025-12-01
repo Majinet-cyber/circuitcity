@@ -1,0 +1,95 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Clothing · Circuit City{% endblock %}
+
+{% block content %}
+{% url 'inventory:clothing_product_new_v2' as clothing_add_url %}
+<style>
+  .vertical-page{display:flex;flex-direction:column;gap:18px;padding:18px}
+  .vertical-hero{background:linear-gradient(120deg,#0ea5e9,#38bdf8);padding:24px;border-radius:20px;color:#fff;display:flex;flex-wrap:wrap;gap:18px;align-items:center;justify-content:space-between}
+  .vertical-hero .eyebrow{opacity:.8;text-transform:uppercase;font-size:.8rem;letter-spacing:.12em;margin:0}
+  .vertical-hero h1{margin:4px 0;font-size:clamp(24px,3vw,32px)}
+  .vertical-hero p{margin:0}
+  .hero-actions{display:flex;gap:12px;flex-wrap:wrap}
+  .hero-actions a{border-radius:30px;padding:10px 16px;font-weight:700;text-decoration:none}
+  .hero-actions .primary{background:#fff;color:#0f172a}
+  .hero-actions .ghost{border:1px solid rgba(255,255,255,.8);color:#fff}
+  .metrics-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:16px}
+  .metric-card{background:#fff;border-radius:18px;padding:18px;box-shadow:0 10px 30px rgba(15,23,42,.08)}
+  .metric-card h3{margin:0;font-size:.9rem;text-transform:uppercase;color:#64748b;letter-spacing:.08em}
+  .metric-card p{margin:6px 0 0;font-size:1.9rem;font-weight:800;color:#0f172a}
+  .recent-block{background:#fff;border-radius:20px;padding:18px;box-shadow:0 10px 30px rgba(15,23,42,.08)}
+  .recent-list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:12px}
+  .recent-item{display:flex;justify-content:space-between;gap:12px;border-bottom:1px solid #e2e8f0;padding-bottom:12px}
+  .recent-item:last-child{border-bottom:0;padding-bottom:0}
+  .recent-item strong{display:block;font-size:1rem}
+  .badge{display:inline-flex;align-items:center;gap:6px;border-radius:999px;padding:4px 10px;font-size:.75rem;font-weight:700}
+  .badge.scan{background:#ecfeff;color:#0891b2}
+  .badge.track{background:#f0fdf4;color:#15803d}
+</style>
+
+<div class="vertical-page">
+  <header class="vertical-hero">
+    <div>
+      <p class="eyebrow">{{ business.name }} · {{ location_label }}</p>
+      <h1>{{ hero_title }}</h1>
+      <p>{{ hero_blurb }}</p>
+    </div>
+    <div class="hero-actions">
+      <a class="primary" href="{{ clothing_add_url|default:'/inventory/clothing/products/new/v2/' }}">Add clothing item</a>
+      <a class="ghost" href="{{ scan_in_url|default:'/inventory/scan-in/' }}">Scan IN</a>
+      <a class="ghost" href="{{ stock_url|default:'/inventory/list/' }}">Stock list</a>
+    </div>
+  </header>
+
+  <section class="metrics-grid">
+    <article class="metric-card">
+      <h3>Products</h3>
+      <p>{{ product_count }}</p>
+    </article>
+    <article class="metric-card">
+      <h3>Active styles</h3>
+      <p>{{ active_product_count }}</p>
+    </article>
+    <article class="metric-card">
+      <h3>Scan required</h3>
+      <p>{{ scan_required_count }}</p>
+    </article>
+    <article class="metric-card">
+      <h3>Tracking inventory</h3>
+      <p>{{ inventory_tracked_count }}</p>
+    </article>
+  </section>
+
+  <section class="recent-block">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+      <h2 style="margin:0;font-size:1.1rem">Latest drops</h2>
+      <a class="btn btn-sm btn-outline-primary" href="{{ clothing_add_url|default:'/inventory/clothing/products/new/v2/' }}">Add item</a>
+    </div>
+    {% if recent_products %}
+      <ul class="recent-list">
+        {% for item in recent_products %}
+          <li class="recent-item">
+            <div>
+              <strong>{{ item.name|default:item.sku|default:"Unnamed" }}</strong>
+              {% if item.sku %}<small style="color:#64748b">SKU · {{ item.sku }}</small>{% endif %}
+            </div>
+            <div style="display:flex;gap:8px">
+              {% if item.scan_required %}
+                <span class="badge scan"><i class="bi bi-upc-scan"></i>Scan</span>
+              {% endif %}
+              {% if item.track_inventory %}
+                <span class="badge track"><i class="bi bi-archive"></i>Tracked</span>
+              {% endif %}
+            </div>
+          </li>
+        {% endfor %}
+      </ul>
+    {% else %}
+      <p style="margin:0;color:#64748b">Add a few clothing items to see them here.</p>
+    {% endif %}
+  </section>
+</div>
+{% endblock %}
+
