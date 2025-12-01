@@ -523,3 +523,12 @@ if AuditLog is not None:
     _safe_register(AuditLog, AuditLogAdmin)
 
 
+# =====================================================================
+#           Import verticals-specific admins
+# =====================================================================
+try:
+    from . import admin_verticals  # noqa
+except ImportError:
+    pass  # Verticals not yet migrated
+
+

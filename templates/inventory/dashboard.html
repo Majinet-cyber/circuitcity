@@ -99,6 +99,99 @@
     </div>
   </section>
 
+  <!-- Agent Ranking Widget (for agents only) -->
+  {% if is_agent and agent_ranking %}
+  <section class="panel mb-3" style="background: linear-gradient(135deg, color-mix(in oklab, var(--cc-accent) 8%, var(--cc-panel)) 0%, var(--cc-panel) 100%);">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+      <h5 class="m-0 fw-bold"><i class="bi bi-trophy"></i> Your Sales Ranking</h5>
+      <span class="badge" style="background: var(--cc-accent); color: white; font-size: 0.9rem; padding: 0.4rem 0.75rem;">{{ agent_ranking.period }}</span>
+    </div>
+
+    <div class="row g-3">
+      <!-- Agent's Rank Card -->
+      <div class="col-md-4">
+        <div style="background: white; border: 2px solid var(--cc-accent); border-radius: 12px; padding: 1.5rem; text-align: center;">
+          <div style="color: var(--cc-muted); font-size: 0.85rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em;">Your Rank</div>
+          <div style="font-size: 2.5rem; font-weight: 900; color: var(--cc-accent); margin: 0.5rem 0;">
+            {% if agent_ranking.agent_rank %}
+              {{ agent_ranking.agent_rank_formatted|default:agent_ranking.agent_rank }}
+            {% else %}
+              <span style="font-size: 1.2rem; color: var(--cc-muted);">Not ranked</span>
+            {% endif %}
+          </div>
+          <div style="color: var(--cc-muted); font-size: 0.85rem;">
+            {% if agent_ranking.rankings|length > 0 %}
+              out of {{ agent_ranking.rankings|length }} agent{{ agent_ranking.rankings|length|pluralize }}
+            {% endif %}
+          </div>
+        </div>
+      </div>
+
+      <!-- Agent's Total Sales Card -->
+      <div class="col-md-4">
+        <div style="background: white; border: 1px solid var(--cc-line); border-radius: 12px; padding: 1.5rem; text-align: center;">
+          <div style="color: var(--cc-muted); font-size: 0.85rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em;">Your Total Sales</div>
+          <div style="font-size: 2rem; font-weight: 900; color: var(--cc-ink); margin: 0.5rem 0;">
+            MK {{ agent_ranking.agent_total|default:0|floatformat:0|intcomma }}
+          </div>
+          <div style="color: var(--cc-muted); font-size: 0.85rem;">Total sales amount</div>
+        </div>
+      </div>
+
+      <!-- Next Rank Motivation Card -->
+      <div class="col-md-4">
+        <div style="background: white; border: 1px solid var(--cc-line); border-radius: 12px; padding: 1.5rem;">
+          {% if agent_ranking.agent_above %}
+            <div style="color: var(--cc-muted); font-size: 0.85rem; font-weight: 700; margin-bottom: 0.5rem;">
+              <i class="bi bi-arrow-up-circle text-success"></i> Beat this to climb:
+            </div>
+            <div style="font-weight: 700; color: var(--cc-ink);">{{ agent_ranking.agent_above.name }}</div>
+            <div style="font-size: 1.2rem; font-weight: 800; color: var(--success, #10b981);">
+              MK {{ agent_ranking.agent_above.total_sales|floatformat:0|intcomma }}
+            </div>
+            <div style="color: var(--cc-muted); font-size: 0.8rem; margin-top: 0.25rem;">
+              Rank #{{ agent_ranking.agent_above.rank }}
+            </div>
+          {% elif agent_ranking.agent_rank == 1 %}
+            <div style="text-align: center; padding: 0.5rem;">
+              <i class="bi bi-trophy-fill" style="font-size: 2rem; color: gold;"></i>
+              <div style="font-weight: 700; color: var(--cc-ink); margin-top: 0.5rem;">You're #1!</div>
+              <div style="color: var(--cc-muted); font-size: 0.85rem;">Keep up the great work!</div>
+            </div>
+          {% else %}
+            <div style="text-align: center; color: var(--cc-muted); font-size: 0.9rem;">
+              No ranking data available
+            </div>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+
+    <!-- Top 5 Leaderboard -->
+    {% if agent_ranking.rankings %}
+    <div style="margin-top: 1.5rem; border-top: 1px solid var(--cc-line); padding-top: 1.5rem;">
+      <h6 class="fw-bold mb-3"><i class="bi bi-list-ol"></i> Top 5 Leaderboard</h6>
+      <div class="list-group list-group-flush">
+        {% for agent in agent_ranking.rankings|slice:":5" %}
+        <div class="list-group-item d-flex align-items-center gap-3 {% if agent.agent_id == user.id %}bg-light border-primary border-2{% endif %}" style="border-radius: 8px; margin-bottom: 0.5rem; padding: 0.75rem 1rem;">
+          <div style="width: 32px; height: 32px; border-radius: 50%; background: {% if agent.rank == 1 %}gold{% elif agent.rank == 2 %}silver{% elif agent.rank == 3 %}#cd7f32{% else %}var(--cc-accent){% endif %}; color: white; display: grid; place-items: center; font-weight: 900; font-size: 0.9rem;">
+            {{ agent.rank }}
+          </div>
+          <div class="flex-grow-1">
+            <div class="fw-bold">{{ agent.name }}{% if agent.agent_id == user.id %} <span class="badge bg-primary">You</span>{% endif %}</div>
+            <div style="font-size: 0.85rem; color: var(--cc-muted);">{{ agent.sales_count }} sale{{ agent.sales_count|pluralize }}</div>
+          </div>
+          <div class="text-end">
+            <div class="fw-bold" style="font-size: 1.1rem;">MK {{ agent.total_sales|floatformat:0|intcomma }}</div>
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+    {% endif %}
+  </section>
+  {% endif %}
+
   <!-- Filters -->
   <form method="get" class="filters d-flex flex-wrap gap-2 mb-3">
     <label class="visually-hidden" for="f-period">Period</label>

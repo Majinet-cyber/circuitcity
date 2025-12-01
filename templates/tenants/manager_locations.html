@@ -100,6 +100,55 @@
       </table>
     </div>
   </div>
+
+  <!-- Stock Summary by Location (Phones) -->
+  {% if stock_summary %}
+  <div class="cc-card" style="margin-top: 1.5rem;">
+    <h3>📦 Stock Summary by Location (Phones)</h3>
+    <p class="cc-hint" style="margin-bottom: 1rem;">Track inventory and sales performance across your locations</p>
+    <table class="cc-table">
+      <thead>
+        <tr>
+          <th>Location</th>
+          <th style="text-align: center;">Sold</th>
+          <th style="text-align: center;">In Stock</th>
+          <th style="text-align: center;">Total</th>
+          <th style="text-align: right;">Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for r in rows %}
+        <tr>
+          <td>
+            <strong>{{ r.name }}</strong>
+            {% if r.city %}<span class="cc-muted" style="font-size: 0.9em;"> · {{ r.city }}</span>{% endif %}
+          </td>
+          <td style="text-align: center;">
+            <span class="badge" style="background: #10b981; color: white; padding: 0.25rem 0.5rem; border-radius: 6px;">
+              {{ r.stock.sold|default:0 }}
+            </span>
+          </td>
+          <td style="text-align: center;">
+            <span class="badge" style="background: #3b82f6; color: white; padding: 0.25rem 0.5rem; border-radius: 6px;">
+              {{ r.stock.in_stock|default:0 }}
+            </span>
+          </td>
+          <td style="text-align: center;">
+            <span class="badge" style="background: #64748b; color: white; padding: 0.25rem 0.5rem; border-radius: 6px;">
+              {{ r.stock.total|default:0 }}
+            </span>
+          </td>
+          <td style="text-align: right;">
+            <a href="{% url 'tenants:location_detail' r.id %}" class="cc-btn cc-btn-xs cc-btn-glass">View Details</a>
+          </td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="5" class="cc-muted">No stock data available.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% endif %}
 </div>
 
 <style>

@@ -33,6 +33,12 @@ try:
 except Exception:
     TimeLog = None  # safe fallback; avoids import-time crashes in edge cases
 
+# Re-export PhoneStockEditRequest for convenient imports
+try:
+    from .models_approval import PhoneStockEditRequest  # noqa: F401
+except Exception:
+    PhoneStockEditRequest = None  # safe fallback
+
 
 # ==========================================================
 # SINGLE SOURCE OF TRUTH: IMEI normalization (15 digits)
@@ -194,8 +200,17 @@ class MerchProduct(models.Model):
     track_inventory = models.BooleanField(default=True)
 
     # Liquor helpers
+    category = models.CharField(max_length=20, blank=True, default="", help_text="Liquor category: beer, cider, spirits, wine, other")
     has_shots = models.BooleanField(default=False)
     shots_per_bottle = models.PositiveIntegerField(null=True, blank=True)
+    barman_shots_reserved = models.PositiveIntegerField(default=2, help_text="Shots reserved for bartender (typically 2)")
+    price_per_bottle = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True, help_text="Price for a full bottle")
+    price_per_shot = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True, help_text="Price per individual shot")
+
+    # Archive helpers (for clothing and other verticals)
+    is_archived = models.BooleanField(default=False, db_index=True)
+    archived_at = models.DateTimeField(null=True, blank=True)
+    archived_by = models.ForeignKey("auth.User", null=True, blank=True, on_delete=models.SET_NULL, related_name="archived_merch_products")
 
     is_active = models.BooleanField(default=True)
 
@@ -210,6 +225,13 @@ class MerchProduct(models.Model):
 
     def __str__(self):
         return self.name
+
+    @property
+    def sellable_shots_per_bottle(self):
+        """Calculate sellable shots (total - reserved for barman)"""
+        if not self.has_shots or not self.shots_per_bottle:
+            return 0
+        return max(0, self.shots_per_bottle - self.barman_shots_reserved)
 
     def clean(self):
         if self.has_shots:
@@ -338,9 +360,9 @@ class OrderPrice(models.Model):
             )
         ]
     indexes = [
-            models.Index(fields=["product", "active"], name="ordprice_prod_active_idx"),
-            models.Index(fields=["effective_from"], name="ordprice_effective_idx"),
-        ]
+        models.Index(fields=["product", "active"], name="ordprice_prod_active_idx"),
+        models.Index(fields=["effective_from"], name="ordprice_effective_idx"),
+    ]
 
     def __str__(self):
         return f"{self.product} — MWK {self.default_order_price:,.2f} ({'active' if self.active else 'old'})"
@@ -506,16 +528,58 @@ class InventoryItem(models.Model):
 
     # ---------- Carlcare warranty/activation tracking ----------
     WARRANTY_CHOICES = [
-        ("UNDER_WARRANTY", "Under warranty"),
-        ("WAITING_ACTIVATION", "Waiting to be activated"),
-        ("NOT_IN_COUNTRY", "Not in country"),
-        ("UNKNOWN", "Unknown"),
+        ("unknown", "Unknown"),
+        ("no_warranty", "No warranty"),
+        ("in_warranty", "In warranty"),
+        ("expired", "Expired"),
+        ("activated", "Activated"),  # Warranty present + expiration date (already activated)
     ]
-    warranty_status = models.CharField(max_length=32, choices=WARRANTY_CHOICES, default="UNKNOWN")
-    warranty_expires_at = models.DateField(null=True, blank=True)
-    warranty_last_checked_at = models.DateTimeField(null=True, blank=True)
-    activation_detected_at = models.DateTimeField(null=True, blank=True)  # first time we saw it activated
-    warranty_raw = models.JSONField(null=True, blank=True)  # raw scrape metadata for auditing
+    warranty_status = models.CharField(
+        max_length=20,
+        choices=WARRANTY_CHOICES,
+        default="unknown",
+        help_text="Carlcare warranty status for Tecno/Itel phones"
+    )
+    warranty_expiration = models.DateField(
+        null=True,
+        blank=True,
+        db_index=True,
+        help_text="Warranty expiration date if available"
+    )
+    warranty_checked_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text="Last time warranty was checked with Carlcare"
+    )
+    warranty_source = models.CharField(
+        max_length=50,
+        default="carlcare",
+        blank=True,
+        help_text="Source of warranty information (e.g., carlcare)"
+    )
+    warranty_raw = models.JSONField(
+        null=True,
+        blank=True,
+        help_text="Raw warranty check response for auditing"
+    )
+
+    # Backward compatibility aliases (deprecated - remove after migration)
+    @property
+    def warranty_expires_at(self):
+        """Alias for warranty_expiration (backward compatibility)"""
+        return self.warranty_expiration
+
+    @property
+    def warranty_last_checked_at(self):
+        """Alias for warranty_checked_at (backward compatibility)"""
+        return self.warranty_checked_at
+
+    @property
+    def activation_detected_at(self):
+        """Deprecated: use warranty_checked_at when status is 'activated'"""
+        if self.warranty_status == "activated":
+            return self.warranty_checked_at
+        return None
 
     # Marked when a sale is recorded (used by 15-minute theft alert)
     sold_at = models.DateTimeField(null=True, blank=True, db_index=True)  # fast recent-sold lookups
@@ -536,8 +600,8 @@ class InventoryItem(models.Model):
                 condition=Q(is_active=True),
             ),
             models.Index(fields=["business", "is_active", "status"], name="inv_bis_idx"),
-            # Warranty lookups
-            models.Index(fields=["warranty_status", "warranty_expires_at"], name="inv_wty_stat_exp_idx"),
+            # Warranty lookups (use the real DB field: warranty_expiration)
+            models.Index(fields=["warranty_status", "warranty_expiration"], name="inv_wty_stat_exp_idx"),
             # Stock aging
             models.Index(fields=["received_at"], name="inv_received_idx"),
         ]
@@ -1086,3 +1150,31 @@ class PhoneProduct(Product):
         proxy = True
         verbose_name = "Phone Product"
         verbose_name_plural = "Phone Products"
+
+
+# ==============================================================================
+# Import verticals-specific models
+# ==============================================================================
+# Import after all base models are defined to avoid circular imports
+try:
+    from .models_verticals import (
+        # Liquor
+        LiquorSale, LiquorCredit, LiquorCreditPayment, LiquorStockEditRequest,
+        LiquorExpense, LiquorWalletEntry,
+        # Gym
+        GymMember, GymPayment, GymMemberLog, GymSettings, GymWalletEntry,
+        # Clothing
+        ClothingSale, ClothingProductLog,
+    )
+    __all__ = [
+        # Liquor
+        "LiquorSale", "LiquorCredit", "LiquorCreditPayment", "LiquorStockEditRequest",
+        "LiquorExpense", "LiquorWalletEntry",
+        # Gym
+        "GymMember", "GymPayment", "GymMemberLog", "GymSettings", "GymWalletEntry",
+        # Clothing
+        "ClothingSale", "ClothingProductLog",
+    ]
+except ImportError:
+    # Not yet migrated
+    pass

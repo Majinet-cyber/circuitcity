@@ -163,13 +163,17 @@ INSTALLED_APPS = [
     "billing",
     "wallet",
     # Layby (TOP-LEVEL import, not circuitcity.layby)
-    "layby.apps.LaybyConfig",
-    # Additional apps
+        "layby.apps.LaybyConfig",
     "timelogs",
     "notifications",
     "hq",
     "reports",
+
+    # NEW APPS
+    "support",   # ticket system
+    "audit",     # audit logs UI (if you see an audit app folder)
 ]
+
 
 # Optional dev/helper apps
 INSTALLED_APPS += [a for a in (

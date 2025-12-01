@@ -333,7 +333,24 @@ def product_delete_v2(request, pk: int):
 class LiquorProductForm(forms.Form):
     liquor_name = forms.CharField(
         max_length=120,
-        widget=forms.TextInput(attrs={"class": "form-control input", "placeholder": "e.g. Hunterâ€™s Gold"})
+        widget=forms.TextInput(attrs={"class": "form-control input", "placeholder": "e.g. Hunter's Gold"})
+    )
+    category = forms.ChoiceField(
+        choices=[("", "Select category")] + [("beer", "Beer"), ("cider", "Cider"), ("spirits", "Spirits"), ("wine", "Wine"), ("other", "Other")],
+        required=False,
+        widget=forms.Select(attrs={"class": "form-control"})
+    )
+    has_shots = forms.BooleanField(
+        required=False,
+        widget=forms.CheckboxInput(attrs={"class": "form-check-input", "id": "id_has_shots"})
+    )
+    shots_per_bottle = forms.IntegerField(
+        min_value=1, required=False,
+        widget=forms.NumberInput(attrs={"class": "form-control input", "placeholder": "e.g. 25"})
+    )
+    barman_shots_reserved = forms.IntegerField(
+        min_value=0, required=False, initial=2,
+        widget=forms.NumberInput(attrs={"class": "form-control input", "placeholder": "Typically 2"})
     )
     price_bottle = forms.DecimalField(
         max_digits=12, decimal_places=2,
@@ -342,10 +359,6 @@ class LiquorProductForm(forms.Form):
     price_shot = forms.DecimalField(
         max_digits=12, decimal_places=2, required=False,
         widget=forms.NumberInput(attrs={"class": "form-control input", "step": "0.01", "min": "0"})
-    )
-    shots_per_bottle = forms.IntegerField(
-        min_value=1, required=False,
-        widget=forms.NumberInput(attrs={"class": "form-control input", "placeholder": "e.g. 25"})
     )
     qty_bottles = forms.IntegerField(
         min_value=0, required=False,
@@ -362,12 +375,19 @@ def _inflate_liquor(instance: Product, data: dict):
     else:
         _assign_if_has(instance, "variant", data.get("liquor_name") or "")
 
+    # New liquor fields
+    _assign_if_has(instance, "category", data.get("category") or "")
+    _assign_if_has(instance, "has_shots", data.get("has_shots") or False)
+    _assign_if_has(instance, "shots_per_bottle", data.get("shots_per_bottle"))
+    _assign_if_has(instance, "barman_shots_reserved", data.get("barman_shots_reserved") or 2)
+    
     for field, value in (("price_bottle", data.get("price_bottle")),
-                         ("price_shot", data.get("price_shot"))):
+                         ("price_per_bottle", data.get("price_bottle")),
+                         ("price_shot", data.get("price_shot")),
+                         ("price_per_shot", data.get("price_shot"))):
         if value is not None and hasattr(instance, field):
             setattr(instance, field, value)
 
-    _assign_if_has(instance, "shots_per_bottle", data.get("shots_per_bottle"))
     _assign_if_has(instance, "qty_bottles", data.get("qty_bottles"))
 
 @login_required
@@ -425,9 +445,12 @@ def product_edit_liquor_v2(request, pk: int):
 
         initial = {
             "liquor_name": g("liquor_name", "name", "title", "variant", default=""),
-            "price_bottle": g("price_bottle", default=None),
-            "price_shot": g("price_shot", default=None),
+            "category": g("category", default=""),
+            "has_shots": g("has_shots", default=False),
             "shots_per_bottle": g("shots_per_bottle", default=None),
+            "barman_shots_reserved": g("barman_shots_reserved", default=2),
+            "price_bottle": g("price_bottle", "price_per_bottle", default=None),
+            "price_shot": g("price_shot", "price_per_shot", default=None),
             "qty_bottles": g("qty_bottles", default=None),
         }
         form = LiquorProductForm(initial=initial)

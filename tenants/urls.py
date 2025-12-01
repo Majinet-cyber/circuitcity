@@ -32,6 +32,21 @@ try:
 except Exception:
     _vinv = None
 
+# Location detail view (if present)
+try:
+    from .views_location_detail import location_detail
+    # Add it to views module for _get_or_fallback to find it
+    setattr(views, "location_detail", location_detail)
+except ImportError:
+    pass
+
+# Agent detail view (if present)
+try:
+    from .views_agent_detail import agent_detail as agent_detail_view
+    setattr(views, "agent_detail_view", agent_detail_view)
+except ImportError:
+    pass
+
 
 # --- Safe fallback helpers -----------------------------------------------------
 def _fallback_redirect(to_name: str):
@@ -158,11 +173,15 @@ urlpatterns = [
 
     # --- Manager: review agent join requests (per active business)
     path("manager/agents/", manager_review_agents, name="manager_review_agents"),
+    # Agent detail view
+    path("agents/<int:agent_id>/", views._get_or_fallback("agent_detail_view", "tenants:manager_review_agents"), name="agent_detail"),
 
     # --- Manager: manage store locations (per active business)
     path("manager/locations/", manager_locations, name="manager_locations"),
     # Optional convenience: explicitly select a business in the URL
     path("manager/<int:business_id>/locations/", manager_locations, name="manager_locations_for_biz"),
+    # Location detail
+    path("locations/<int:pk>/", _get_or_fallback("location_detail", "tenants:manager_locations"), name="location_detail"),
 
     # Optional convenience alias: /tenants/manager/ → /tenants/manager/agents/
     path(

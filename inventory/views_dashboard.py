@@ -37,6 +37,8 @@ def inventory_dashboard(request: HttpRequest) -> HttpResponse:
     # Prefer the single-source-of-truth helpers if present
     _dashboard_counts = _try_import("inventory.query", "dashboard_counts")
     _sales_in_range = _try_import("inventory.query", "sales_in_range")
+    _compute_agent_ranking = _try_import("inventory.services.agent_ranking", "compute_agent_ranking")
+    _format_rank = _try_import("inventory.services.agent_ranking", "format_rank")
 
     @login_required
     @never_cache
@@ -105,6 +107,33 @@ def inventory_dashboard(request: HttpRequest) -> HttpResponse:
                 status=200,
             )
 
+        # ------------ Agent Ranking (for agents only) ------------
+        ranking_data = None
+        user = getattr(request, "user", None)
+        business = getattr(request, "business", None)
+        
+        # Check if user is an agent (not manager/staff)
+        is_agent = False
+        if user and user.is_authenticated and business:
+            try:
+                from tenants.models import Membership
+                membership = Membership.objects.filter(
+                    user=user, business=business, role="AGENT", status="ACTIVE"
+                ).first()
+                is_agent = membership is not None
+            except Exception:
+                pass
+        
+        if is_agent and callable(_compute_agent_ranking) and business:
+            try:
+                # Default to last 30 days for agent ranking
+                ranking_days = 30
+                ranking_data = _compute_agent_ranking(business, days=ranking_days, agent_user=user)
+                if _format_rank and ranking_data.get("agent_rank"):
+                    ranking_data["agent_rank_formatted"] = _format_rank(ranking_data["agent_rank"])
+            except Exception as e:
+                log.exception("Agent ranking failed: %s", e)
+        
         # ------------ HTML ------------
         ctx: Dict[str, Any] = {
             "products": products,
@@ -113,6 +142,8 @@ def inventory_dashboard(request: HttpRequest) -> HttpResponse:
             "sales_last": sales_last,
             "last_days": last_days,
             "products_in_stock_only": products_in_stock_only,
+            "agent_ranking": ranking_data,
+            "is_agent": is_agent,
         }
 
         try:

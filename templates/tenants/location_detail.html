@@ -1,0 +1,124 @@
+{% extends "base.html" %}
+{% load humanize %}
+
+{% block title %}{{ location.name }} · Location{% endblock %}
+
+{% block body %}
+<div class="cc-wrap">
+  <div class="cc-header">
+    <h2>{{ location.name }} <span class="cc-muted">· Location Detail</span></h2>
+    <p class="cc-muted">{% if location.city %}{{ location.city }} · {% endif %}Stock and agent performance</p>
+  </div>
+
+  <!-- Stock Summary Cards -->
+  <div class="stats-grid">
+    <div class="stat-card">
+      <div class="stat-label">In Stock</div>
+      <div class="stat-value">{{ stock_in_stock_count }}</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Sold</div>
+      <div class="stat-value">{{ stock_sold_count }}</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Total Stock</div>
+      <div class="stat-value">{{ stock_total }}</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Total Sales</div>
+      <div class="stat-value">MK {{ sales_amount|floatformat:0|intcomma }}</div>
+      <div class="stat-sublabel">{{ sales_count }} transaction{{ sales_count|pluralize }}</div>
+    </div>
+  </div>
+
+  <!-- Agents at this location -->
+  <div class="cc-card" style="margin-top: 1.5rem;">
+    <h3>👥 Agents at this Location</h3>
+    <table class="cc-table">
+      <thead>
+        <tr>
+          <th>Agent</th>
+          <th style="text-align: center;">Stock Assigned</th>
+          <th style="text-align: center;">Sales Count</th>
+          <th style="text-align: right;">Sales Amount</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for stat in agent_stats %}
+        <tr>
+          <td><strong>{{ stat.agent.get_full_name|default:stat.agent.username }}</strong></td>
+          <td style="text-align: center;">{{ stat.stock_count }}</td>
+          <td style="text-align: center;">{{ stat.sales_count }}</td>
+          <td style="text-align: right;">MK {{ stat.sales_amount|floatformat:0|intcomma }}</td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="4" class="cc-muted">No agents assigned to this location.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Stock List -->
+  <div class="cc-card" style="margin-top: 1.5rem;">
+    <h3>📦 Stock at this Location (First 100)</h3>
+    <table class="cc-table">
+      <thead>
+        <tr>
+          <th>IMEI</th>
+          <th>Product</th>
+          <th>Assigned Agent</th>
+          <th>Status</th>
+          <th style="text-align: right;">Selling Price</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for item in stock_list %}
+        <tr>
+          <td><code>{{ item.imei|slice:":10" }}...</code></td>
+          <td>{{ item.product }}</td>
+          <td>{{ item.assigned_agent.get_full_name|default:item.assigned_agent.username|default:"—" }}</td>
+          <td>
+            <span class="badge" style="background: {% if item.status == 'IN_STOCK' %}#3b82f6{% else %}#10b981{% endif %}; color: white; padding: 0.25rem 0.5rem; border-radius: 6px;">
+              {{ item.status }}
+            </span>
+          </td>
+          <td style="text-align: right;">MK {{ item.selling_price|default:0|floatformat:0|intcomma }}</td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="5" class="cc-muted">No stock at this location.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <div style="margin-top: 1.5rem; text-align: center;">
+    <a href="{% url 'tenants:manager_locations' %}" class="cc-btn cc-btn-glass">← Back to Locations</a>
+  </div>
+</div>
+
+<style>
+  .cc-wrap{max-width:1200px;margin:0 auto;padding:12px 16px 24px}
+  .cc-header h2{margin:.2rem 0 .5rem}
+  .cc-muted{color:#64748b}
+  
+  .stats-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:16px;margin-bottom:1.5rem}
+  .stat-card{background:linear-gradient(135deg,rgba(59,130,246,.08),rgba(14,165,233,.08));
+             border:1px solid rgba(59,130,246,.2);border-radius:14px;padding:1.25rem;
+             box-shadow:0 6px 24px rgba(2,6,23,.04)}
+  .stat-label{font-size:13px;font-weight:800;color:#64748b;text-transform:uppercase;letter-spacing:.02em;margin-bottom:.5rem}
+  .stat-value{font-size:2rem;font-weight:900;color:#0f172a;line-height:1}
+  .stat-sublabel{font-size:12px;color:#64748b;margin-top:.25rem}
+  
+  .cc-card{background:rgba(255,255,255,.7);backdrop-filter:saturate(180%) blur(8px);
+           border:1px solid rgba(14,165,233,.15);border-radius:14px;padding:16px;
+           box-shadow:0 6px 30px rgba(2,6,23,.05)}
+  
+  .cc-table{width:100%;border-collapse:collapse;background:#fff;border:1px solid #e2e8f0;border-radius:12px;overflow:hidden}
+  .cc-table th,.cc-table td{padding:.6rem .8rem;border-bottom:1px solid #eef2f7;font-size:14px}
+  .cc-table th{text-align:left;background:#f8fafc;font-weight:800}
+  
+  .cc-btn{border-radius:12px;padding:10px 14px;font-weight:700;font-size:14px;border:1px solid #e2e8f0;cursor:pointer;display:inline-block;text-decoration:none;color:inherit}
+  .cc-btn-glass{background:rgba(255,255,255,.55);backdrop-filter:saturate(180%) blur(10px)}
+</style>
+{% endblock %}
+
