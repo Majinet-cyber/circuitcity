@@ -253,7 +253,7 @@ def _send_payslip_email(p: Payslip) -> bool:
     if not getattr(p, "email_to", ""):
         return False
 
-    subject = f"Payslip Â· {p.year}-{p.month:02d} Â· {getattr(settings, 'APP_NAME', 'Circuit City')}"
+    subject = f"Payslip Â· {p.year}-{p.month:02d} Â· {getattr(settings, 'APP_NAME', 'Emajinet')}"
     body = (
         f"Hello,\n\n"
         f"Here is your payslip for {p.year}-{p.month:02d}.\n\n"
@@ -265,7 +265,7 @@ def _send_payslip_email(p: Payslip) -> bool:
         f"Gross:       MWK {p.gross:,.0f}\n"
         f"Net:         MWK {p.net:,.0f}\n\n"
         f"Ref: {p.reference}\n"
-        f"â€” {getattr(settings, 'APP_NAME', 'Circuit City')}"
+        f"â€" {getattr(settings, 'APP_NAME', 'Emajinet')}"
     )
     sent = send_mail(subject, body, settings.DEFAULT_FROM_EMAIL, [p.email_to], fail_silently=True)
     return bool(sent)
@@ -1218,6 +1218,70 @@ def admin_po_detail(request: HttpRequest, po_id: int):
         "wallet/admin_po_detail.html",
         {"po": po, "form": form, "items": items, "status_choices": PurchaseOrderStatus.choices},
     )
+
+
+# ---------------------------------------------------------------------
+# ---------------------------------------------------------------------
+# Agent Earnings View
+# ---------------------------------------------------------------------
+@login_required
+def agent_earnings(request: HttpRequest) -> HttpResponse:
+    """
+    GET /wallet/earnings/
+    
+    Polished "My Earnings" dashboard for agents showing:
+    - Yesterday, last 30 days, lifetime earnings
+    - Unpaid balance
+    - Chart: earnings per day for last 30 days
+    - Table: recent transactions
+    """
+    u = request.user
+    today = timezone.localdate()
+    yesterday = today - timedelta(days=1)
+    thirty_days_ago = today - timedelta(days=30)
+    
+    # Build querysets
+    qs_all = WalletTransaction.objects.filter(ledger=Ledger.AGENT, agent=u)
+    qs_yesterday = qs_all.filter(effective_date=yesterday)
+    qs_last_30 = qs_all.filter(effective_date__gte=thirty_days_ago, effective_date__lte=today)
+    
+    def total(qs):
+        return qs.aggregate(s=Sum("amount"))["s"] or Decimal("0")
+    
+    # Summary stats
+    summary = {
+        "yesterday": total(qs_yesterday.filter(amount__gt=0)),
+        "yesterday_txns": qs_yesterday.count(),
+        "last_30_days": total(qs_last_30.filter(amount__gt=0)),
+        "last_30_txns": qs_last_30.filter(amount__gt=0).count(),
+        "lifetime": total(qs_all.filter(amount__gt=0)),
+        "balance": total(qs_all),  # current wallet balance
+        
+        # Bonus/Penalty breakdown (last 30 days)
+        "bonuses_30d": total(qs_last_30.filter(type=TxnType.BONUS, amount__gt=0)),
+        "penalties_30d": -total(qs_last_30.filter(type=TxnType.PENALTY, amount__lt=0)),
+        "commissions_30d": total(qs_last_30.filter(type=TxnType.COMMISSION, amount__gt=0)),
+    }
+    
+    # Chart data: daily earnings for last 30 days
+    chart_labels = []
+    chart_data = []
+    for i in range(30, -1, -1):
+        day = today - timedelta(days=i)
+        chart_labels.append(day.strftime("%b %d"))
+        daily_earnings = total(qs_all.filter(effective_date=day, amount__gt=0))
+        chart_data.append(float(daily_earnings))
+    
+    # Recent transactions (all types, last 50)
+    txns = qs_all.order_by("-effective_date", "-id")[:50]
+    
+    import json
+    return render(request, "wallet/agent_earnings.html", {
+        "summary": summary,
+        "chart_labels": json.dumps(chart_labels),
+        "chart_data": json.dumps(chart_data),
+        "txns": txns,
+    })
 
 
 # ---------------------------------------------------------------------

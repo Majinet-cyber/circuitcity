@@ -1,0 +1,207 @@
+{% extends "base.html" %}
+{% load static humanize %}
+
+{% block title %}My Earnings · Emajinet{% endblock %}
+
+{% block extra_css %}
+<style>
+  /* Mobile-first earnings dashboard */
+  .earnings-wrap{max-width:1100px;margin:0 auto;padding:clamp(12px,3vw,24px)}
+  .earn-card{background:var(--cc-panel);border:1px solid var(--cc-border);border-radius:var(--radius,12px);
+              box-shadow:var(--cc-shadow);padding:1.2rem;margin-bottom:1rem}
+  .earn-grid{display:grid;gap:1rem;grid-template-columns:repeat(auto-fit,minmax(220px,1fr))}
+  .stat-card{background:linear-gradient(135deg,var(--cc-panel),var(--cc-panel-2));
+             border:1px solid var(--cc-border);border-radius:14px;padding:1.1rem;position:relative;overflow:hidden}
+  .stat-card::before{content:'';position:absolute;top:0;right:0;width:60px;height:60px;
+                      background:radial-gradient(circle at top right,color-mix(in oklab,var(--cc-accent) 15%, transparent),transparent);
+                      pointer-events:none}
+  .stat-label{font-size:.85rem;color:var(--cc-muted);font-weight:700;text-transform:uppercase;letter-spacing:.3px;margin-bottom:.4rem}
+  .stat-value{font-size:clamp(1.6rem,4vw,2rem);font-weight:900;letter-spacing:.3px;margin:0}
+  .stat-sub{font-size:.9rem;color:var(--cc-muted);margin-top:.3rem}
+  .chart-container{position:relative;width:100%;height:240px}
+  @media (min-width: 768px){.chart-container{height:280px}}
+  .txn-table{width:100%;border-collapse:collapse}
+  .txn-table th{text-align:left;font-size:.85rem;color:var(--cc-muted);font-weight:800;
+                padding:.6rem .8rem;border-bottom:2px solid var(--cc-border);text-transform:uppercase;letter-spacing:.3px}
+  .txn-table td{padding:.7rem .8rem;border-bottom:1px solid var(--cc-border)}
+  .txn-table tr:hover{background:var(--cc-panel-2)}
+  .amount-pos{color:#10b981;font-weight:800}
+  .amount-neg{color:#ef4444;font-weight:800}
+  .badge{display:inline-block;padding:.25rem .6rem;border-radius:8px;font-size:.8rem;font-weight:700}
+  .badge-commission{background:#dbeafe;color:#1e40af}
+  .badge-bonus{background:#d1fae5;color:#065f46}
+  .badge-penalty{background:#fee2e2;color:#991b1b}
+  .badge-payslip{background:#e0e7ff;color:#3730a3}
+  h1{font-size:clamp(1.5rem,4vw,2rem);font-weight:900;margin:0 0 1.5rem;letter-spacing:.3px}
+  .section-title{font-size:1.1rem;font-weight:800;margin:1.5rem 0 .8rem;letter-spacing:.2px}
+</style>
+{% endblock %}
+
+{% block body %}
+<div class="earnings-wrap">
+  <h1>💰 My Earnings</h1>
+
+  {# KPI Cards #}
+  <div class="earn-grid">
+    <div class="stat-card">
+      <div class="stat-label">Yesterday</div>
+      <div class="stat-value">MK {{ summary.yesterday|floatformat:0|intcomma }}</div>
+      <div class="stat-sub">{{ summary.yesterday_txns|default:0 }} transaction{{ summary.yesterday_txns|pluralize }}</div>
+    </div>
+    
+    <div class="stat-card">
+      <div class="stat-label">Last 30 Days</div>
+      <div class="stat-value">MK {{ summary.last_30_days|floatformat:0|intcomma }}</div>
+      <div class="stat-sub">{{ summary.last_30_txns|default:0 }} transaction{{ summary.last_30_txns|pluralize }}</div>
+    </div>
+    
+    <div class="stat-card">
+      <div class="stat-label">Lifetime</div>
+      <div class="stat-value">MK {{ summary.lifetime|floatformat:0|intcomma }}</div>
+      <div class="stat-sub">Total earned</div>
+    </div>
+    
+    <div class="stat-card">
+      <div class="stat-label">Unpaid Balance</div>
+      <div class="stat-value" style="color:var(--cc-accent)">MK {{ summary.balance|floatformat:0|intcomma }}</div>
+      <div class="stat-sub">Available to withdraw</div>
+    </div>
+  </div>
+
+  {# Bonus/Penalty Breakdown (Last 30 Days) #}
+  <div class="earn-card">
+    <div class="section-title">🎯 Performance Breakdown (Last 30 Days)</div>
+    <div class="earn-grid">
+      <div class="stat-card" style="border-left: 4px solid #10b981;">
+        <div class="stat-label">💰 Commissions</div>
+        <div class="stat-value">MK {{ summary.commissions_30d|floatformat:0|intcomma }}</div>
+        <div class="stat-sub">From sales</div>
+      </div>
+      
+      <div class="stat-card" style="border-left: 4px solid #14b8a6;">
+        <div class="stat-label">🔥 Early Bonuses</div>
+        <div class="stat-value" style="color: #10b981;">+MK {{ summary.bonuses_30d|floatformat:0|intcomma }}</div>
+        <div class="stat-sub">Arrived early</div>
+      </div>
+      
+      <div class="stat-card" style="border-left: 4px solid #ef4444;">
+        <div class="stat-label">⚠️ Late Penalties</div>
+        <div class="stat-value" style="color: #ef4444;">-MK {{ summary.penalties_30d|floatformat:0|intcomma }}</div>
+        <div class="stat-sub">Arrived late</div>
+      </div>
+      
+      <div class="stat-card" style="border-left: 4px solid #8b5cf6;">
+        <div class="stat-label">💯 Net Performance</div>
+        <div class="stat-value">MK {{ summary.last_30_days|floatformat:0|intcomma }}</div>
+        <div class="stat-sub">Total earned</div>
+      </div>
+    </div>
+  </div>
+
+  {# Earnings Chart #}
+  <div class="earn-card">
+    <div class="section-title">📊 Daily Earnings (Last 30 Days)</div>
+    <div class="chart-container">
+      <canvas id="earningsChart"></canvas>
+    </div>
+  </div>
+
+  {# Recent Transactions #}
+  <div class="earn-card">
+    <div class="section-title">📋 Recent Transactions</div>
+    {% if txns %}
+    <div style="overflow-x:auto">
+      <table class="txn-table">
+        <thead>
+          <tr>
+            <th>Date</th>
+            <th>Type</th>
+            <th>Description</th>
+            <th style="text-align:right">Amount</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for txn in txns %}
+          <tr>
+            <td>{{ txn.effective_date|date:"M d, Y" }}</td>
+            <td>
+              {% if txn.type == "commission" %}
+                <span class="badge badge-commission">Commission</span>
+              {% elif txn.type == "bonus" %}
+                <span class="badge badge-bonus">Bonus</span>
+              {% elif txn.type == "penalty" %}
+                <span class="badge badge-penalty">Penalty</span>
+              {% elif txn.type == "payslip" %}
+                <span class="badge badge-payslip">Payslip</span>
+              {% else %}
+                <span class="badge">{{ txn.type|title }}</span>
+              {% endif %}
+            </td>
+            <td>{{ txn.note|default:"—" }}</td>
+            <td style="text-align:right">
+              <span class="{% if txn.amount >= 0 %}amount-pos{% else %}amount-neg{% endif %}">
+                {% if txn.amount >= 0 %}+{% endif %}MK {{ txn.amount|floatformat:0|intcomma }}
+              </span>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <p style="text-align:center;color:var(--cc-muted);padding:2rem">No transactions yet. Start selling to earn commissions! 🚀</p>
+    {% endif %}
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script>
+(function() {
+  const ctx = document.getElementById('earningsChart');
+  if (!ctx) return;
+
+  const labels = {{ chart_labels|safe }};
+  const data = {{ chart_data|safe }};
+
+  new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: labels,
+      datasets: [{
+        label: 'Earnings (MK)',
+        data: data,
+        backgroundColor: 'rgba(16, 185, 129, 0.7)',
+        borderColor: 'rgba(16, 185, 129, 1)',
+        borderWidth: 2,
+        borderRadius: 8,
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            label: function(context) {
+              return 'MK ' + context.parsed.y.toLocaleString();
+            }
+          }
+        }
+      },
+      scales: {
+        y: {
+          beginAtZero: true,
+          ticks: {
+            callback: function(value) {
+              return 'MK ' + value.toLocaleString();
+            }
+          }
+        }
+      }
+    }
+  });
+})();
+</script>
+{% endblock %}
+

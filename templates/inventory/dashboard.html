@@ -1,8 +1,8 @@
-﻿{% extends "base.html" %}
+{% extends "base.html" %}
 {% load static %}
 {% load humanize %}
 
-{% block title %}Dashboard · Circuit City{% endblock %}
+{% block title %}Dashboard � Emajinet{% endblock %}
 {% block header_title %}Dashboard{% endblock %}
 
 {% block extra_css %}
@@ -52,12 +52,12 @@
 
 {% block content %}
 
-  <!-- 🔵 Always-visible dashboard actions -->
+  <!-- ?? Always-visible dashboard actions -->
   <div class="actionbar d-flex align-items-center justify-content-between">
-    <div class="fw-semibold">Welcome to Marlin</div>
+    <div class="fw-semibold">Welcome to {{ request.business.name|default:"Emajinet" }}</div>
     <div class="d-flex gap-2">
       <a href="{% url 'inventory:merch_product_create' %}" class="btn primary">
-        ➕ <span>1) Add your first product</span>
+        ? <span>1) Add your first product</span>
       </a>
       <a href="{% url 'inventory:scan_in' %}" class="btn muted">
         <i class="bi bi-upc-scan"></i> <span>Scan IN</span>
@@ -69,7 +69,7 @@
   <section class="kpi-row">
     <div class="kpi">
       <div class="label">Revenue ({{ period|default:"month"|title }})</div>
-      {# If no units sold, force MK 0 so agents don’t see phantom revenue #}
+      {# If no units sold, force MK 0 so agents don�t see phantom revenue #}
       <div class="value">
         MK
         {% if total_units|default:0 %}
@@ -119,7 +119,7 @@
     <a href="." class="btn muted"><i class="bi bi-arrow-counterclockwise"></i> Reset</a>
   </form>
 
-  <!-- ✅ Financial Overview (AI-CFO) -->
+  <!-- ? Financial Overview (AI-CFO) -->
   <section class="cfo-band">
     <div class="panel">
       {% include "dashboard/partials/cfo_tiles.html" %}
@@ -222,13 +222,13 @@
       <div class="panel card h-100" id="alertCard">
         <h5 class="m-0 mb-2">Stock Alerts</h5>
         <ul id="alertsList" class="list-group list-group-flush">
-          <li class="list-group-item" style="color:var(--cc-muted)">Loading…</li>
+          <li class="list-group-item" style="color:var(--cc-muted)">Loading�</li>
         </ul>
       </div>
     </div>
   </section>
 
-  <!-- ✅ New: Simulation & Scenarios quick panel -->
+  <!-- ? New: Simulation & Scenarios quick panel -->
   <section class="mb-3">
     <div class="panel card">
       <div class="card-head d-flex justify-content-between align-items-center">
@@ -248,7 +248,7 @@
           </a>
         </div>
         <div class="small mt-2 muted-note">
-          Tip: Use “Compare” like <code>/simulator/compare/?id=12&amp;id=15</code> to overlay Net Profit curves across scenarios.
+          Tip: Use �Compare� like <code>/simulator/compare/?id=12&amp;id=15</code> to overlay Net Profit curves across scenarios.
         </div>
       </div>
     </div>
@@ -271,7 +271,7 @@
   const GRID_CLR=()=> cssVar('--chart-grid','#d8e3ff');
   const BRAND  =()=> cssVar('--cc-accent','#3b82f6');
 
-  // 🔧 NEW: normalize API shapes (unwrap {ok,data} and series/values)
+  // ?? NEW: normalize API shapes (unwrap {ok,data} and series/values)
   const unwrap = (d)=> (d && typeof d==='object' && d.ok && d.data) ? d.data : d || {};
   const pickLabels = (d)=> (unwrap(d).labels || []);
   const pickValues = (d)=>{
@@ -413,7 +413,7 @@
                   <span>${a.message||''}</span>
                 </li>`;
       }).join('');
-      ul.innerHTML = items || '<li class="list-group-item" style="color:var(--cc-muted)">No alerts 🎉</li>';
+      ul.innerHTML = items || '<li class="list-group-item" style="color:var(--cc-muted)">No alerts ??</li>';
     }catch{ ul.innerHTML = `<li class="list-group-item" style="color:var(--cc-muted)">Alerts unavailable</li>`; }
   }
 
@@ -425,7 +425,7 @@
 
   async function loadAI(){
     const viewport=$id('ai-viewport'); const overallEl=$id('ai-recs-overall'); if(!viewport) return;
-    hide('errAI'); viewport.innerHTML='<span class="text-muted">Loading…</span>'; if(overallEl) overallEl.textContent='';
+    hide('errAI'); viewport.innerHTML='<span class="text-muted">Loading�</span>'; if(overallEl) overallEl.textContent='';
     try{
       const raw=await fetchJSON(`/inventory/api/predictions/?_=${Date.now()}${MODEL_QS}`,
         { legacy:[`/inventory/api/predictions?_=${Date.now()}${MODEL_QS}`, `/inventory/api-predictions/?_=${Date.now()}${MODEL_QS}`, `/inventory/api_predictions/?_=${Date.now()}${MODEL_QS}`] });
@@ -437,7 +437,7 @@
             <span class="badge text-bg-danger">Risk</span>
             <div><b>${x.product}</b> likely stockout by ${x.stockout_date}. On-hand ${x.on_hand}. Restock <b>${x.suggested_restock}</b>.</div>
           </div>`)
-        : [`<div class="ai-item"><span class="badge text-bg-success">OK</span><div>All good — no stockouts predicted.</div></div>`];
+        : [`<div class="ai-item"><span class="badge text-bg-success">OK</span><div>All good � no stockouts predicted.</div></div>`];
 
       aiIdx=0; renderAISlide(aiIdx); startAIRotation();
 
@@ -445,7 +445,7 @@
         const total=(data.overall||[]).reduce((s,x)=>s+(x.predicted_units||0),0);
         const rev=(data.overall||[]).reduce((s,x)=>s+(+x.predicted_revenue||0),0);
         const sign=data?.currency?.sign||'MK';
-        overallEl.innerHTML = `Next 7 days: <b>${nf.format(total)}</b> units • <b>${sign} ${nf.format(Math.round(rev))}</b>`;
+        overallEl.innerHTML = `Next 7 days: <b>${nf.format(total)}</b> units � <b>${sign} ${nf.format(Math.round(rev))}</b>`;
       }
     }catch(e){
       show('errAI'); $id('errAI').textContent=`Insights error: ${e.message}`;

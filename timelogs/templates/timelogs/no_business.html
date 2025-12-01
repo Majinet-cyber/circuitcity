@@ -1,0 +1,13 @@
+{% extends "base.html" %}
+
+{% block title %}No Business Selected{% endblock %}
+
+{% block content %}
+<div class="container py-5 text-center">
+  <i class="bi bi-building-slash" style="font-size: 4rem; color: var(--cc-muted);"></i>
+  <h2 class="mt-3">No Active Business</h2>
+  <p class="text-muted">Please select a business to view time logs.</p>
+  <a href="{% url 'tenants:choose_business' %}" class="btn btn-primary mt-3">Choose Business</a>
+</div>
+{% endblock %}
+

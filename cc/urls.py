@@ -531,6 +531,10 @@ urlpatterns += [
     path("dashboard/", include_or_raise("dashboard.urls", "dashboard")),
     # ADD: Layby app include (fixes /layby/ 404)
     path("layby/",     include_or_raise("layby.urls", "layby")),
+    # Support & Audit
+    path("support/",   include_or_raise("support.urls", "support")),
+    path("audit/",     include_or_raise("audit.urls", "audit")),
+    path("notifications/", include_or_raise("notifications.urls", "notifications")),
 ]
 
 # >>> Simulator (namespaced; defensive import)

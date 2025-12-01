@@ -281,5 +281,46 @@ if Sale is not None:
                 _post_wallet_commission(instance)
             except Exception:
                 pass
+            
+            # Create SaleCommission record with bonuses/penalties
+            try:
+                SaleCommission = _try_import("sales.models", "SaleCommission")
+                if SaleCommission and not hasattr(instance, "commission_record"):
+                    commission = SaleCommission.create_for_sale(instance)
+                    
+                    # Create wallet transactions for bonuses and penalties
+                    if commission.early_bonus > 0 and add_txn and TxnType and Ledger:
+                        try:
+                            add_txn(
+                                agent=instance.agent,
+                                amount=commission.early_bonus,
+                                type=TxnType.BONUS,
+                                note=f"Early arrival bonus: {commission.early_blocks} × 30min",
+                                reference=f"BONUS-SALE-{instance.pk}",
+                                effective_date=instance.sold_at,
+                                created_by=None,
+                                meta={"sale_id": instance.pk, "early_blocks": commission.early_blocks},
+                                ledger=Ledger.AGENT,
+                            )
+                        except Exception:
+                            pass
+                    
+                    if commission.late_penalty > 0 and add_txn and TxnType and Ledger:
+                        try:
+                            add_txn(
+                                agent=instance.agent,
+                                amount=-commission.late_penalty,  # Negative for penalty
+                                type=TxnType.PENALTY,
+                                note=f"Late arrival penalty: {commission.late_blocks} × 30min",
+                                reference=f"PENALTY-SALE-{instance.pk}",
+                                effective_date=instance.sold_at,
+                                created_by=None,
+                                meta={"sale_id": instance.pk, "late_blocks": commission.late_blocks},
+                                ledger=Ledger.AGENT,
+                            )
+                        except Exception:
+                            pass
+            except Exception:
+                pass
 
 

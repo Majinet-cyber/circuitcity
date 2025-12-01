@@ -420,9 +420,9 @@ WARRANTY_ENFORCE_COUNTRY = env_bool("WARRANTY_ENFORCE_COUNTRY", True)
 ACTIVATION_ALERT_MINUTES = env_int("ACTIVATION_ALERT_MINUTES", 15)
 WARRANTY_REQUEST_TIMEOUT = env_int("WARRANTY_REQUEST_TIMEOUT", 12)
 
-APP_NAME = os.environ.get("APP_NAME", "Circuit City")
+APP_NAME = os.environ.get("APP_NAME", "Emajinet")
 APP_ENV = os.environ.get("APP_ENV", "dev" if DEBUG else "beta")
-BETA_FEEDBACK_MAILTO = os.environ.get("BETA_FEEDBACK_MAILTO", "beta@circuitcity.example")
+BETA_FEEDBACK_MAILTO = os.environ.get("BETA_FEEDBACK_MAILTO", "beta@emajinet.africa")
 
 # --------------------------- safety toggles ---------------------------
 DISABLE_SALES_AUTOCREATE = env_bool("DISABLE_SALES_AUTOCREATE", True)

@@ -121,7 +121,7 @@ def flags(request: HttpRequest) -> dict:
     roles = _extract_roles_for(user, business)
     features = _features_for(request, business)
 
-    app_name = getattr(settings, "APP_NAME", "Circuit City")
+    app_name = getattr(settings, "APP_NAME", "Emajinet")
 
     return {
         # App/brand

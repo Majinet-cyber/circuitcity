@@ -1,133 +1,83 @@
-﻿# circuitcity/notifications/views.py
-from __future__ import annotations
-
-from typing import Optional
-
+﻿# notifications/views.py
+"""
+Views for managing user notifications.
+"""
+from django.shortcuts import render, redirect
 from django.contrib.auth.decorators import login_required
-from django.http import JsonResponse, HttpRequest, HttpResponseBadRequest
-from django.utils.dateparse import parse_datetime
+from django.http import JsonResponse
+from django.core.paginator import Paginator
+from .models import Notification
+
+
+@login_required
+def notification_list(request):
+    """Full page listing all notifications for the current user."""
+    notifications = Notification.objects.filter(user=request.user)
+    
+    # Filter by read/unread
+    filter_type = request.GET.get('filter', 'all')
+    if filter_type == 'unread':
+        notifications = notifications.filter(read_at__isnull=True)
+    elif filter_type == 'read':
+        notifications = notifications.filter(read_at__isnull=False)
+    
+    paginator = Paginator(notifications, 20)
+    page = request.GET.get('page', 1)
+    notifications_page = paginator.get_page(page)
+    
+    return render(request, 'notifications/notification_list.html', {
+        'notifications': notifications_page,
+        'filter_type': filter_type,
+    })
+
+
+@login_required
+def notification_dropdown(request):
+    """API endpoint for the notification dropdown (latest 10)."""
+    notifications = Notification.objects.filter(user=request.user)[:10]
+    unread_count = Notification.objects.filter(user=request.user, read_at__isnull=True).count()
+    
+    data = {
+        'unread_count': unread_count,
+        'notifications': [
+            {
+                'id': n.id,
+                'message': n.message,
+                'level': n.level,
+                'is_read': n.is_read,
+                'created_at': n.created_at.isoformat(),
+                'meta': n.meta,
+            }
+            for n in notifications
+        ]
+    }
+    
+    return JsonResponse(data)
+
+
+@login_required
+def mark_as_read(request, pk):
+    """Mark a single notification as read."""
+    try:
+        notification = Notification.objects.get(pk=pk, user=request.user)
+        notification.mark_read()
+    except Notification.DoesNotExist:
+        pass
+    
+    return redirect(request.META.get('HTTP_REFERER', 'notifications:list'))
+
+
+@login_required
+def mark_all_as_read(request):
+    """Mark all user's notifications as read."""
+    Notification.objects.filter(user=request.user, read_at__isnull=True).update(
+        read_at=timezone.now()
+    )
+    
+    if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+        return JsonResponse({'success': True})
+    
+    return redirect('notifications:list')
+
+
 from django.utils import timezone
-from django.db import connection
-from django.db.utils import OperationalError, ProgrammingError
-
-# Try to import the model, but allow the app to run even if migrations aren't applied yet.
-try:
-    from .models import Notification  # type: ignore
-except Exception:  # app not ready / import error
-    Notification = None  # type: ignore
-
-
-# ---------------------------
-# Helpers
-# ---------------------------
-def _table_exists(model) -> bool:
-    try:
-        if not model:
-            return False
-        return model._meta.db_table in connection.introspection.table_names()
-    except Exception:
-        return False
-
-
-def _base_qs_for_user(request) -> Optional["Notification"].__class__:
-    """
-    Returns a queryset filtered for the current user's audience,
-    or None if the table/model is unavailable.
-    """
-    if not (Notification and _table_exists(Notification)):
-        return None
-    if request.user.is_staff:
-        return Notification.objects.filter(audience="ADMIN")
-    return Notification.objects.filter(audience="AGENT", user=request.user)
-
-
-# ---------------------------
-# Views
-# ---------------------------
-@login_required
-def feed(request: HttpRequest):
-    """
-    Returns latest notifications for the current user.
-    Admins: ADMIN audience
-    Agents: AGENT audience for self
-    Optional:
-      - ?since=<iso8601>
-      - ?limit=<int> (default 50, max 200)
-    """
-    qs_all = _base_qs_for_user(request)
-    now_iso = timezone.now().isoformat()
-
-    # If notifications aren't ready, return an empty feed gracefully.
-    if qs_all is None:
-        return JsonResponse({"items": [], "unread": 0, "now": now_iso})
-
-    # Parse optional filters & limits (do NOT slice before computing unread)
-    since_s = request.GET.get("since")
-    since = parse_datetime(since_s) if since_s else None
-    try:
-        limit = max(1, min(int(request.GET.get("limit", "50")), 200))
-    except (TypeError, ValueError):
-        limit = 50
-
-    filtered = qs_all
-    if since:
-        filtered = filtered.filter(created_at__gt=since)
-
-    # Compute unread BEFORE any slicing to avoid the sliceâ†’filter error
-    unread = filtered.filter(read_at__isnull=True).count()
-
-    # Now fetch the page of items
-    items_qs = filtered.order_by("-created_at")[:limit]
-
-    data = [
-        {
-            "id": n.id,
-            "message": n.message,
-            "level": n.level,
-            "created_at": n.created_at.isoformat(),
-            "read": n.is_read,
-        }
-        for n in items_qs
-    ]
-
-    return JsonResponse({"items": data, "unread": unread, "now": now_iso})
-
-
-@login_required
-def mark_read(request: HttpRequest):
-    """
-    POST:
-      - id=<int>  mark one
-      - all=1     mark visible set as read
-    """
-    if request.method != "POST":
-        return HttpResponseBadRequest("POST required")
-
-    qs = _base_qs_for_user(request)
-
-    # If notifications aren't ready, succeed as a no-op so UI doesn't break.
-    if qs is None:
-        return JsonResponse({"ok": True, "noop": True})
-
-    n_now = timezone.now()
-
-    if request.POST.get("all") == "1":
-        try:
-            qs.filter(read_at__isnull=True).update(read_at=n_now)
-            return JsonResponse({"ok": True})
-        except (OperationalError, ProgrammingError):
-            # Table might be mid-migrationâ€”treat as no-op.
-            return JsonResponse({"ok": True, "noop": True})
-
-    try:
-        nid = int(request.POST.get("id", "0"))
-    except (TypeError, ValueError):
-        return HttpResponseBadRequest("Invalid id")
-
-    try:
-        updated = qs.filter(pk=nid, read_at__isnull=True).update(read_at=n_now)
-        return JsonResponse({"ok": bool(updated)})
-    except (OperationalError, ProgrammingError):
-        return JsonResponse({"ok": True, "noop": True})
-
-

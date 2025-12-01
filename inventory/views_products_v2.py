@@ -214,6 +214,37 @@ class PhoneProductForm(forms.Form):
                 self.add_error("brand", "Type a brand name for 'Other'.")
             else:
                 cleaned["brand"] = other
+        
+        # Check for duplicate brand+model+specs combination
+        brand = cleaned.get("brand", "").strip()
+        model_number = cleaned.get("model_number", "").strip()
+        specs = cleaned.get("specs", "").strip()
+        
+        if brand and model_number and specs:
+            # Check if this combination already exists
+            from inventory.models import Product
+            from tenants.utils import get_active_business
+            
+            biz = None
+            if hasattr(self, 'request'):
+                biz = get_active_business(self.request)
+            
+            qs = Product.objects.filter(
+                brand__iexact=brand,
+                model__iexact=model_number,
+                variant__iexact=specs,
+            )
+            
+            if biz and hasattr(Product, 'business'):
+                qs = qs.filter(business=biz)
+            
+            if qs.exists():
+                existing = qs.first()
+                raise forms.ValidationError(
+                    f"A product with this combination already exists: {existing}. "
+                    f"Please use a different brand, model, or specs combination."
+                )
+        
         return cleaned
 
 @login_required
@@ -224,6 +255,7 @@ def product_create_v2(request):
 
     if request.method == "POST":
         form = PhoneProductForm(request.POST)
+        form.request = request  # Pass request to form for validation
         if form.is_valid():
             p = Product()
             if hasattr(Product, "business_id"):
@@ -235,8 +267,13 @@ def product_create_v2(request):
                 p.save()
                 messages.success(request, "Product saved.")
                 return redirect(URL_NAME_PHONES)
-            except IntegrityError:
-                messages.error(request, "Could not save item due to a uniqueness constraint.")
+            except IntegrityError as e:
+                # Catch any remaining IntegrityErrors (e.g., from unique 'code' field)
+                if 'unique' in str(e).lower() or 'duplicate' in str(e).lower():
+                    messages.error(request, 
+                        "This product already exists. Please check the brand, model, and specs combination.")
+                else:
+                    messages.error(request, f"Could not save product: {str(e)}")
     else:
         form = PhoneProductForm()
 

@@ -19,6 +19,7 @@ urlpatterns = [
     # Agent Pages (default landing for non-staff)
     # ------------------------------------------------------------------
     path("",              views.AgentWalletView.as_view(),  name="agent_wallet"),
+    path("earnings/",     views.agent_earnings,             name="agent_earnings"),
     path("transactions/", views.AgentTxnListView.as_view(), name="agent_txns"),
 
     # Agent extras (additive)

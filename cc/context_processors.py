@@ -24,7 +24,7 @@ def build_meta(_request) -> Dict[str, Any]:
     return {
         "BUILD_ID": build_id,
         "STATIC_VERSION": static_version,
-        "APP_NAME": os.getenv("APP_NAME", "Circuit City"),
+        "APP_NAME": os.getenv("APP_NAME", "Emajinet"),
         "APP_ENV": os.getenv("APP_ENV", "dev"),
     }
 

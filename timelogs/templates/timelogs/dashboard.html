@@ -1,0 +1,361 @@
+{% extends "base.html" %}
+{% load humanize %}
+
+{% block title %}Time Logs · {{ selected_date|date:"F j, Y" }} · {{ request.business.name|default:"Emajinet" }}{% endblock %}
+{% block header_title %}Time Logs{% endblock %}
+
+{% block extra_css %}
+<style>
+  :root {
+    --work-color: #10b981;
+    --idle-color: #d1d5db;
+    --radius: 12px;
+  }
+  
+  .panel {
+    background: var(--cc-panel);
+    border: 1px solid var(--cc-border);
+    border-radius: var(--radius);
+    box-shadow: var(--cc-shadow);
+    padding: 1.5rem;
+    margin-bottom: 1rem;
+  }
+  
+  .battery-container {
+    width: 100%;
+    height: 60px;
+    background: var(--idle-color);
+    border-radius: var(--radius);
+    overflow: hidden;
+    position: relative;
+    display: flex;
+    margin: 1.5rem 0;
+  }
+  
+  .battery-segment {
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-weight: 700;
+    font-size: 0.9rem;
+    transition: all 0.3s ease;
+  }
+  
+  .battery-segment.work {
+    background: var(--work-color);
+  }
+  
+  .battery-segment.idle {
+    background: var(--idle-color);
+    color: #6b7280;
+  }
+  
+  .stat-card {
+    background: linear-gradient(135deg, var(--cc-accent) 0%, color-mix(in oklab, var(--cc-accent) 80%, black) 100%);
+    color: white;
+    border-radius: var(--radius);
+    padding: 1.5rem;
+    text-align: center;
+  }
+  
+  .stat-value {
+    font-size: 2.5rem;
+    font-weight: 900;
+    line-height: 1;
+    margin: 0.5rem 0;
+  }
+  
+  .stat-label {
+    font-size: 0.875rem;
+    opacity: 0.9;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+  
+  .ping-table {
+    width: 100%;
+    margin-top: 1rem;
+  }
+  
+  .ping-table th {
+    background: var(--cc-border);
+    padding: 0.75rem;
+    text-align: left;
+    font-weight: 700;
+    font-size: 0.875rem;
+    text-transform: uppercase;
+  }
+  
+  .ping-table td {
+    padding: 0.75rem;
+    border-bottom: 1px solid var(--cc-border);
+  }
+  
+  .badge-inside {
+    background: var(--work-color);
+    color: white;
+    padding: 0.25rem 0.75rem;
+    border-radius: 9999px;
+    font-size: 0.75rem;
+    font-weight: 700;
+  }
+  
+  .badge-outside {
+    background: var(--idle-color);
+    color: #6b7280;
+    padding: 0.25rem 0.75rem;
+    border-radius: 9999px;
+    font-size: 0.75rem;
+    font-weight: 700;
+  }
+  
+  .date-picker-form {
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+    flex-wrap: wrap;
+  }
+  
+  .date-picker-form input[type="date"] {
+    padding: 0.5rem 0.75rem;
+    border: 1px solid var(--cc-border);
+    border-radius: 8px;
+    font-size: 0.875rem;
+  }
+  
+  .empty-state {
+    text-align: center;
+    padding: 3rem 1rem;
+    color: var(--cc-muted);
+  }
+  
+  .empty-state i {
+    font-size: 3rem;
+    opacity: 0.5;
+    margin-bottom: 1rem;
+  }
+  
+  @media (max-width: 768px) {
+    .stat-value {
+      font-size: 2rem;
+    }
+    
+    .battery-segment {
+      font-size: 0.75rem;
+    }
+    
+    .ping-table {
+      font-size: 0.875rem;
+    }
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container py-3" style="max-width: 1100px;">
+  
+  <!-- Header with date picker -->
+  <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+    <h1 class="h3 mb-0">Time Logs</h1>
+    
+    <form method="get" class="date-picker-form">
+      <input type="date" name="date" value="{{ selected_date|date:'Y-m-d' }}" max="{{ today|date:'Y-m-d' }}" required>
+      <button type="submit" class="btn btn-primary btn-sm">View</button>
+      <a href="?" class="btn btn-outline-secondary btn-sm">Today</a>
+    </form>
+  </div>
+  
+  {% if work_log %}
+    <!-- Summary Cards -->
+    <div class="row g-3 mb-3">
+      <div class="col-12 col-sm-6 col-lg-3">
+        <div class="stat-card">
+          <div class="stat-label">On-Site Work</div>
+          <div class="stat-value">{{ work_log.total_on_site_minutes }}</div>
+          <div class="stat-label">Minutes</div>
+        </div>
+      </div>
+      
+      <div class="col-12 col-sm-6 col-lg-3">
+        <div class="stat-card" style="background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);">
+          <div class="stat-label">Idle Time</div>
+          <div class="stat-value">{{ work_log.total_idle_minutes }}</div>
+          <div class="stat-label">Minutes</div>
+        </div>
+      </div>
+      
+      <div class="col-12 col-sm-6 col-lg-3">
+        <div class="stat-card" style="background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%);">
+          <div class="stat-label">First Seen</div>
+          <div class="stat-value" style="font-size: 1.5rem;">
+            {{ work_log.first_seen_at|date:"H:i"|default:"--:--" }}
+          </div>
+          <div class="stat-label">Time</div>
+        </div>
+      </div>
+      
+      <div class="col-12 col-sm-6 col-lg-3">
+        <div class="stat-card" style="background: linear-gradient(135deg, #ec4899 0%, #db2777 100%);">
+          <div class="stat-label">Last Seen</div>
+          <div class="stat-value" style="font-size: 1.5rem;">
+            {{ work_log.last_seen_at|date:"H:i"|default:"--:--" }}
+          </div>
+          <div class="stat-label">Time</div>
+        </div>
+      </div>
+    </div>
+    
+    <!-- Battery Bar Visualization -->
+    <div class="panel">
+      <h5 class="mb-3">Work vs Idle Time</h5>
+      
+      {% if battery_segments %}
+        <div class="battery-container">
+          {% for segment in battery_segments %}
+            <div class="battery-segment {{ segment.type }}" style="width: {{ segment.percent }}%;">
+              {% if segment.percent > 10 %}
+                {{ segment.label }}
+              {% endif %}
+            </div>
+          {% endfor %}
+        </div>
+        
+        <div class="d-flex justify-content-around text-center mt-3">
+          <div>
+            <div style="width: 20px; height: 20px; background: var(--work-color); border-radius: 4px; display: inline-block;"></div>
+            <span class="ms-2">On-Site: {{ work_log.total_on_site_minutes }} min</span>
+          </div>
+          <div>
+            <div style="width: 20px; height: 20px; background: var(--idle-color); border-radius: 4px; display: inline-block;"></div>
+            <span class="ms-2">Idle: {{ work_log.total_idle_minutes }} min</span>
+          </div>
+        </div>
+      {% else %}
+        <div class="empty-state">
+          <i class="bi bi-hourglass-split"></i>
+          <p>No time data available yet for this day.</p>
+        </div>
+      {% endif %}
+    </div>
+    
+    <!-- Additional Stats -->
+    <div class="panel">
+      <h5 class="mb-3">Details</h5>
+      
+      <div class="row g-3">
+        <div class="col-md-6">
+          <div class="d-flex justify-content-between border-bottom pb-2">
+            <span class="text-muted">Scheduled Start:</span>
+            <strong>{{ work_log.scheduled_start|default:"--:--" }}</strong>
+          </div>
+        </div>
+        
+        <div class="col-md-6">
+          <div class="d-flex justify-content-between border-bottom pb-2">
+            <span class="text-muted">Scheduled End:</span>
+            <strong>{{ work_log.scheduled_end|default:"--:--" }}</strong>
+          </div>
+        </div>
+        
+        <div class="col-md-6">
+          <div class="d-flex justify-content-between border-bottom pb-2">
+            <span class="text-muted">Arrived Early:</span>
+            <strong class="text-success">+{{ work_log.arrived_early_minutes }} min</strong>
+          </div>
+        </div>
+        
+        <div class="col-md-6">
+          <div class="d-flex justify-content-between border-bottom pb-2">
+            <span class="text-muted">Arrived Late:</span>
+            <strong class="text-danger">-{{ work_log.arrived_late_minutes }} min</strong>
+          </div>
+        </div>
+        
+        <div class="col-md-6">
+          <div class="d-flex justify-content-between border-bottom pb-2">
+            <span class="text-muted">Location:</span>
+            <strong>{{ work_log.location.name|default:"N/A" }}</strong>
+          </div>
+        </div>
+        
+        <div class="col-md-6">
+          <div class="d-flex justify-content-between border-bottom pb-2">
+            <span class="text-muted">Total Pings:</span>
+            <strong>{{ total_pings }}</strong>
+          </div>
+        </div>
+      </div>
+    </div>
+    
+    <!-- Ping History Table -->
+    {% if pings %}
+      <div class="panel">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+          <h5 class="mb-0">Ping History</h5>
+          <a href="{% url 'timelogs:export_csv' %}?from_date={{ selected_date|date:'Y-m-d' }}&to_date={{ selected_date|date:'Y-m-d' }}" 
+             class="btn btn-sm btn-outline-primary">
+            <i class="bi bi-download"></i> Export CSV
+          </a>
+        </div>
+        
+        <div style="overflow-x: auto;">
+          <table class="ping-table">
+            <thead>
+              <tr>
+                <th>Time</th>
+                <th>Status</th>
+                <th>Coordinates</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for ping in pings %}
+                <tr>
+                  <td>{{ ping.timestamp|date:"H:i:s" }}</td>
+                  <td>
+                    {% if ping.is_inside_geofence %}
+                      <span class="badge-inside">Inside</span>
+                    {% else %}
+                      <span class="badge-outside">Outside</span>
+                    {% endif %}
+                  </td>
+                  <td class="text-muted small">
+                    {{ ping.latitude|floatformat:6 }}, {{ ping.longitude|floatformat:6 }}
+                  </td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    {% endif %}
+    
+  {% else %}
+    <!-- Empty State -->
+    <div class="panel">
+      <div class="empty-state">
+        <i class="bi bi-calendar-x"></i>
+        <h4>No Time Log for {{ selected_date|date:"F j, Y" }}</h4>
+        <p>You haven't logged any work time on this day.</p>
+        {% if selected_date == today %}
+          <p class="text-muted small">Your location pings will appear here automatically once you're on-site.</p>
+        {% endif %}
+      </div>
+    </div>
+  {% endif %}
+  
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+  // Auto-refresh if viewing today
+  {% if selected_date == today and work_log %}
+    setTimeout(() => {
+      window.location.reload();
+    }, 60000); // Refresh every 60 seconds
+  {% endif %}
+</script>
+{% endblock %}
+

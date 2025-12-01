@@ -1,0 +1,109 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}My Tickets - Emajinet{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+  <div class="d-flex justify-content-between align-items-center mb-4">
+    <h1 class="h3">My Support Tickets</h1>
+    <a href="{% url 'support:manager_ticket_create' %}" class="btn btn-primary">
+      <i class="bi bi-plus-circle"></i> Create Ticket
+    </a>
+  </div>
+
+  <!-- Filter tabs -->
+  <ul class="nav nav-tabs mb-3">
+    <li class="nav-item">
+      <a class="nav-link {% if not current_status %}active{% endif %}" href="?">All</a>
+    </li>
+    <li class="nav-item">
+      <a class="nav-link {% if current_status == 'OPEN' %}active{% endif %}" href="?status=OPEN">Open</a>
+    </li>
+    <li class="nav-item">
+      <a class="nav-link {% if current_status == 'IN_PROGRESS' %}active{% endif %}" href="?status=IN_PROGRESS">In Progress</a>
+    </li>
+    <li class="nav-item">
+      <a class="nav-link {% if current_status == 'RESOLVED' %}active{% endif %}" href="?status=RESOLVED">Resolved</a>
+    </li>
+    <li class="nav-item">
+      <a class="nav-link {% if current_status == 'CLOSED' %}active{% endif %}" href="?status=CLOSED">Closed</a>
+    </li>
+  </ul>
+
+  <!-- Tickets table -->
+  <div class="card shadow-sm">
+    <div class="card-body">
+      {% if tickets %}
+        <div class="table-responsive">
+          <table class="table table-hover">
+            <thead>
+              <tr>
+                <th>Reference</th>
+                <th>Subject</th>
+                <th>Status</th>
+                <th>Priority</th>
+                <th>Created</th>
+                <th>Updated</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for ticket in tickets %}
+              <tr onclick="window.location='{% url 'support:manager_ticket_detail' ticket.pk %}'" style="cursor:pointer;">
+                <td><strong>{{ ticket.reference }}</strong></td>
+                <td>{{ ticket.subject }}</td>
+                <td>
+                  <span class="badge 
+                    {% if ticket.status == 'OPEN' %}bg-info
+                    {% elif ticket.status == 'IN_PROGRESS' %}bg-warning
+                    {% elif ticket.status == 'RESOLVED' %}bg-success
+                    {% else %}bg-secondary{% endif %}">
+                    {{ ticket.get_status_display }}
+                  </span>
+                </td>
+                <td>
+                  <span class="badge 
+                    {% if ticket.priority == 'URGENT' %}bg-danger
+                    {% elif ticket.priority == 'HIGH' %}bg-warning
+                    {% else %}bg-secondary{% endif %}">
+                    {{ ticket.get_priority_display }}
+                  </span>
+                </td>
+                <td>{{ ticket.created_at|date:"Y-m-d H:i" }}</td>
+                <td>{{ ticket.updated_at|date:"Y-m-d H:i" }}</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+
+        <!-- Pagination -->
+        {% if tickets.has_other_pages %}
+        <nav>
+          <ul class="pagination justify-content-center">
+            {% if tickets.has_previous %}
+            <li class="page-item">
+              <a class="page-link" href="?page={{ tickets.previous_page_number }}{% if current_status %}&status={{ current_status }}{% endif %}">Previous</a>
+            </li>
+            {% endif %}
+            
+            <li class="page-item disabled">
+              <span class="page-link">Page {{ tickets.number }} of {{ tickets.paginator.num_pages }}</span>
+            </li>
+            
+            {% if tickets.has_next %}
+            <li class="page-item">
+              <a class="page-link" href="?page={{ tickets.next_page_number }}{% if current_status %}&status={{ current_status }}{% endif %}">Next</a>
+            </li>
+            {% endif %}
+          </ul>
+        </nav>
+        {% endif %}
+      {% else %}
+        <p class="text-muted text-center py-4">No tickets yet. Create one to get support from HQ.</p>
+      {% endif %}
+    </div>
+  </div>
+</div>
+{% endblock %}
+

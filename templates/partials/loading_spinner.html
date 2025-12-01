@@ -1,0 +1,193 @@
+<!-- Global Loading Spinner Overlay -->
+<div id="global-loader" class="global-loader hidden" aria-live="polite" aria-busy="false">
+  <div class="loader-backdrop"></div>
+  <div class="loader-content">
+    <div class="spinner-ring"></div>
+    <div class="loader-text">Loading...</div>
+  </div>
+</div>
+
+<style>
+  .global-loader {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 9999;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: opacity 0.3s ease;
+  }
+  
+  .global-loader.hidden {
+    opacity: 0;
+    pointer-events: none;
+  }
+  
+  .global-loader:not(.hidden) {
+    opacity: 1;
+    pointer-events: auto;
+  }
+  
+  .loader-backdrop {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.5);
+    backdrop-filter: blur(4px);
+  }
+  
+  .loader-content {
+    position: relative;
+    z-index: 1;
+    background: white;
+    padding: 2rem;
+    border-radius: 16px;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+    text-align: center;
+    min-width: 200px;
+  }
+  
+  .spinner-ring {
+    width: 48px;
+    height: 48px;
+    margin: 0 auto 1rem;
+    border: 4px solid rgba(59, 130, 246, 0.2);
+    border-top-color: #3b82f6;
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+  }
+  
+  @keyframes spin {
+    to { transform: rotate(360deg); }
+  }
+  
+  .loader-text {
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: #6b7280;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+  }
+  
+  /* Dark mode support */
+  @media (prefers-color-scheme: dark) {
+    .loader-content {
+      background: #1f2937;
+    }
+    
+    .loader-text {
+      color: #9ca3af;
+    }
+  }
+</style>
+
+<script>
+(function() {
+  const loader = document.getElementById('global-loader');
+  if (!loader) return;
+  
+  let activeRequests = 0;
+  let showTimeout = null;
+  const DELAY_MS = 300; // Only show loader if request takes longer than 300ms
+  
+  function showLoader() {
+    if (showTimeout) return; // Already scheduled
+    
+    showTimeout = setTimeout(() => {
+      if (activeRequests > 0) {
+        loader.classList.remove('hidden');
+        loader.setAttribute('aria-busy', 'true');
+      }
+      showTimeout = null;
+    }, DELAY_MS);
+  }
+  
+  function hideLoader() {
+    if (showTimeout) {
+      clearTimeout(showTimeout);
+      showTimeout = null;
+    }
+    
+    if (activeRequests <= 0) {
+      loader.classList.add('hidden');
+      loader.setAttribute('aria-busy', 'false');
+    }
+  }
+  
+  function requestStart() {
+    activeRequests++;
+    showLoader();
+  }
+  
+  function requestEnd() {
+    activeRequests--;
+    if (activeRequests < 0) activeRequests = 0;
+    hideLoader();
+  }
+  
+  // Intercept fetch requests
+  const originalFetch = window.fetch;
+  window.fetch = function(...args) {
+    requestStart();
+    return originalFetch.apply(this, args).finally(requestEnd);
+  };
+  
+  // Intercept XMLHttpRequest
+  const originalOpen = XMLHttpRequest.prototype.open;
+  const originalSend = XMLHttpRequest.prototype.send;
+  
+  XMLHttpRequest.prototype.open = function(...args) {
+    this._shouldShowLoader = true;
+    return originalOpen.apply(this, args);
+  };
+  
+  XMLHttpRequest.prototype.send = function(...args) {
+    if (this._shouldShowLoader) {
+      requestStart();
+      this.addEventListener('loadend', () => requestEnd());
+    }
+    return originalSend.apply(this, args);
+  };
+  
+  // Show loader on navigation (links and forms)
+  document.addEventListener('click', function(e) {
+    const link = e.target.closest('a');
+    if (link && 
+        !link.hasAttribute('data-no-loader') &&
+        !link.hasAttribute('href') === false &&
+        link.getAttribute('href') !== '#' &&
+        !link.getAttribute('href').startsWith('javascript:') &&
+        !link.getAttribute('target') === '_blank') {
+      requestStart();
+      // Auto-hide after 10 seconds as fallback
+      setTimeout(requestEnd, 10000);
+    }
+  }, true);
+  
+  document.addEventListener('submit', function(e) {
+    const form = e.target;
+    if (form && !form.hasAttribute('data-no-loader')) {
+      requestStart();
+      // Auto-hide after 10 seconds as fallback
+      setTimeout(requestEnd, 10000);
+    }
+  }, true);
+  
+  // Hide loader on page load complete
+  if (document.readyState === 'complete') {
+    hideLoader();
+  } else {
+    window.addEventListener('load', hideLoader);
+  }
+  
+  // Expose global functions for manual control
+  window.showGlobalLoader = requestStart;
+  window.hideGlobalLoader = requestEnd;
+})();
+</script>
+

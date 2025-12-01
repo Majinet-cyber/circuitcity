@@ -11,11 +11,12 @@ from datetime import timedelta
 from decimal import Decimal
 
 from django.contrib.auth.decorators import login_required
-from django.http import JsonResponse, HttpResponseBadRequest
-from django.shortcuts import get_object_or_404
+from django.http import JsonResponse, HttpResponseBadRequest, HttpResponse
+from django.shortcuts import get_object_or_404, render
 from django.utils import timezone
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_POST
+import csv
 
 from tenants.utils import get_active_business
 from tenants.scope import get_membership, resolve_location_for_user
@@ -386,3 +387,124 @@ def gps_ping(request, timelog_id):
     
     TimeLogSegment.objects.create(timelog=tl, in_range=in_range, started_at=now)
     return JsonResponse({"ok": True, "in_range": in_range})
+
+
+# =========================================================================
+# Time Logs UI Dashboard
+# =========================================================================
+
+@login_required
+def time_logs_dashboard(request):
+    """
+    Rich Time Logs UI showing work vs idle time for the selected day.
+    """
+    business = get_active_business(request)
+    if not business:
+        return render(request, "timelogs/no_business.html")
+    
+    # Get date from query param or default to today
+    date_str = request.GET.get("date")
+    if date_str:
+        try:
+            from datetime import datetime
+            selected_date = datetime.strptime(date_str, "%Y-%m-%d").date()
+        except ValueError:
+            selected_date = timezone.localdate()
+    else:
+        selected_date = timezone.localdate()
+    
+    # Get work log for the selected date
+    try:
+        work_log = AgentWorkLog.objects.get(
+            agent=request.user,
+            business=business,
+            work_date=selected_date,
+        )
+        pings = work_log.pings.order_by("timestamp")
+    except AgentWorkLog.DoesNotExist:
+        work_log = None
+        pings = []
+    
+    # Calculate battery segments for visualization
+    battery_segments = []
+    if work_log:
+        total_minutes = work_log.total_on_site_minutes + work_log.total_idle_minutes
+        if total_minutes > 0:
+            work_percent = (work_log.total_on_site_minutes / total_minutes) * 100
+            idle_percent = (work_log.total_idle_minutes / total_minutes) * 100
+            battery_segments = [
+                {"type": "work", "percent": work_percent, "label": f"{work_log.total_on_site_minutes} min"},
+                {"type": "idle", "percent": idle_percent, "label": f"{work_log.total_idle_minutes} min"},
+            ]
+    
+    context = {
+        "selected_date": selected_date,
+        "today": timezone.localdate(),
+        "work_log": work_log,
+        "pings": pings,
+        "battery_segments": battery_segments,
+        "total_pings": pings.count() if work_log else 0,
+    }
+    
+    return render(request, "timelogs/dashboard.html", context)
+
+
+@login_required
+def export_time_logs_csv(request):
+    """
+    Export time logs as CSV for the selected date range.
+    """
+    business = get_active_business(request)
+    if not business:
+        return HttpResponseBadRequest("No active business")
+    
+    # Get date range from query params
+    from_date = request.GET.get("from_date", timezone.localdate())
+    to_date = request.GET.get("to_date", timezone.localdate())
+    
+    if isinstance(from_date, str):
+        from datetime import datetime
+        from_date = datetime.strptime(from_date, "%Y-%m-%d").date()
+    if isinstance(to_date, str):
+        from datetime import datetime
+        to_date = datetime.strptime(to_date, "%Y-%m-%d").date()
+    
+    # Query work logs
+    work_logs = AgentWorkLog.objects.filter(
+        agent=request.user,
+        business=business,
+        work_date__gte=from_date,
+        work_date__lte=to_date,
+    ).order_by("work_date")
+    
+    # Create CSV response
+    response = HttpResponse(content_type="text/csv")
+    response["Content-Disposition"] = f'attachment; filename="timelogs_{from_date}_{to_date}.csv"'
+    
+    writer = csv.writer(response)
+    writer.writerow([
+        "Date",
+        "First Seen",
+        "Last Seen",
+        "On-Site Minutes",
+        "Idle Minutes",
+        "Effective Work Minutes",
+        "Arrived Early (min)",
+        "Arrived Late (min)",
+        "Location",
+    ])
+    
+    for wl in work_logs:
+        writer.writerow([
+            wl.work_date.strftime("%Y-%m-%d"),
+            wl.first_seen_at.strftime("%H:%M:%S") if wl.first_seen_at else "-",
+            wl.last_seen_at.strftime("%H:%M:%S") if wl.last_seen_at else "-",
+            wl.total_on_site_minutes,
+            wl.total_idle_minutes,
+            wl.effective_work_minutes,
+            wl.arrived_early_minutes,
+            wl.arrived_late_minutes,
+            wl.location.name if wl.location else "-",
+        ])
+    
+    return response

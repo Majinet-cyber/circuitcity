@@ -1,0 +1,134 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}All Tickets - HQ - Emajinet{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+  <h1 class="h3 mb-4">All Support Tickets</h1>
+
+  <!-- Filters -->
+  <div class="card shadow-sm mb-3">
+    <div class="card-body">
+      <form method="get" class="row g-3">
+        <div class="col-md-2">
+          <label class="form-label small fw-bold">Status</label>
+          <select name="status" class="form-select form-select-sm">
+            <option value="">All</option>
+            {% for val, label in status_choices %}
+            <option value="{{ val }}" {% if current_status == val %}selected{% endif %}>{{ label }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="col-md-2">
+          <label class="form-label small fw-bold">Priority</label>
+          <select name="priority" class="form-select form-select-sm">
+            <option value="">All</option>
+            {% for val, label in priority_choices %}
+            <option value="{{ val }}" {% if current_priority == val %}selected{% endif %}>{{ label }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="col-md-3">
+          <label class="form-label small fw-bold">Business</label>
+          <select name="business" class="form-select form-select-sm">
+            <option value="">All</option>
+            {% for biz in businesses %}
+            <option value="{{ biz.id }}" {% if current_business == biz.id|stringformat:"s" %}selected{% endif %}>
+              {{ biz.name }}
+            </option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="col-md-3">
+          <label class="form-label small fw-bold">Search</label>
+          <input type="text" name="search" class="form-control form-control-sm" placeholder="Reference or subject..." value="{{ search_query }}">
+        </div>
+        <div class="col-md-2">
+          <label class="form-label small fw-bold">&nbsp;</label>
+          <button type="submit" class="btn btn-primary btn-sm w-100">Filter</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Tickets -->
+  <div class="card shadow-sm">
+    <div class="card-body">
+      <div class="table-responsive">
+        <table class="table table-hover">
+          <thead>
+            <tr>
+              <th>Reference</th>
+              <th>Business</th>
+              <th>Subject</th>
+              <th>Status</th>
+              <th>Priority</th>
+              <th>Created</th>
+              <th>Creator</th>
+              <th>Assigned</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for ticket in tickets %}
+            <tr onclick="window.location='{% url 'support:hq_ticket_detail' ticket.pk %}'" style="cursor:pointer;">
+              <td><strong>{{ ticket.reference }}</strong></td>
+              <td>{{ ticket.business.name }}</td>
+              <td>{{ ticket.subject }}</td>
+              <td>
+                <span class="badge 
+                  {% if ticket.status == 'OPEN' %}bg-info
+                  {% elif ticket.status == 'IN_PROGRESS' %}bg-warning
+                  {% elif ticket.status == 'RESOLVED' %}bg-success
+                  {% else %}bg-secondary{% endif %}">
+                  {{ ticket.get_status_display }}
+                </span>
+              </td>
+              <td>
+                <span class="badge 
+                  {% if ticket.priority == 'URGENT' %}bg-danger
+                  {% elif ticket.priority == 'HIGH' %}bg-warning
+                  {% else %}bg-secondary{% endif %}">
+                  {{ ticket.get_priority_display }}
+                </span>
+              </td>
+              <td>{{ ticket.created_at|date:"Y-m-d H:i" }}</td>
+              <td>{{ ticket.creator.username|default:"-" }}</td>
+              <td>{{ ticket.assigned_to.username|default:"-" }}</td>
+            </tr>
+            {% empty %}
+            <tr>
+              <td colspan="8" class="text-center text-muted py-4">No tickets found.</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Pagination -->
+      {% if tickets.has_other_pages %}
+      <nav>
+        <ul class="pagination justify-content-center">
+          {% if tickets.has_previous %}
+          <li class="page-item">
+            <a class="page-link" href="?page={{ tickets.previous_page_number }}{% if current_status %}&status={{ current_status }}{% endif %}{% if current_business %}&business={{ current_business }}{% endif %}{% if search_query %}&search={{ search_query }}{% endif %}">Previous</a>
+          </li>
+          {% endif %}
+          
+          <li class="page-item disabled">
+            <span class="page-link">Page {{ tickets.number }} of {{ tickets.paginator.num_pages }}</span>
+          </li>
+          
+          {% if tickets.has_next %}
+          <li class="page-item">
+            <a class="page-link" href="?page={{ tickets.next_page_number }}{% if current_status %}&status={{ current_status }}{% endif %}{% if current_business %}&business={{ current_business }}{% endif %}{% if search_query %}&search={{ search_query }}{% endif %}">Next</a>
+          </li>
+          {% endif %}
+        </ul>
+      </nav>
+      {% endif %}
+    </div>
+  </div>
+</div>
+{% endblock %}
+

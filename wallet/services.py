@@ -264,7 +264,7 @@ def render_payslip_html(agent, year: int, month: int, b: PayslipBreakdown, compa
         "net": b.net,
         "by_type": b.by_type,
         "fmt_mk": fmt_mk,
-        "company_name": company_name or getattr(settings, "APP_NAME", "Circuit City"),
+        "company_name": company_name or getattr(settings, "APP_NAME", "Emajinet"),
     }
     try:
         return render_to_string("wallet/payslip_email.html", ctx)
@@ -294,7 +294,7 @@ def send_payslip_email(agent, year: int, month: int, b: PayslipBreakdown, *, sub
     if not to:
         return False
 
-    company = getattr(settings, "APP_NAME", "Circuit City")
+    company = getattr(settings, "APP_NAME", "Emajinet")
     html = render_payslip_html(agent, year, month, b, company_name=company)
 
     subject = subject or f"{company} â€¢ Payslip for {year}-{month:02d}"

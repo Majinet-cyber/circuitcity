@@ -13,7 +13,7 @@ def globals(request) -> Dict[str, Any]:  # noqa: A001 - keep name for Django set
     Injects app-wide constants and feature flags into every template.
     """
     return {
-        "APP_NAME": getattr(settings, "APP_NAME", "Circuit City"),
+        "APP_NAME": getattr(settings, "APP_NAME", "Emajinet"),
         "APP_ENV": getattr(settings, "APP_ENV", "dev"),
         "STATIC_VERSION": getattr(settings, "STATIC_VERSION", "dev"),
         # Useful across many templates (e.g., base.html, dashboards)
