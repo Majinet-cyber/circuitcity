@@ -103,4 +103,12 @@ def role_flags(request) -> Dict[str, Any]:
     return {**flags, "ROLE_FLAGS": flags}
 
 
-__all__ = ["build_meta", "brand", "role_flags"]
+def app_version(request) -> Dict[str, Any]:
+    """
+    Expose APP_VERSION to all templates for version display and update checking.
+    """
+    from django.conf import settings
+    return {"APP_VERSION": getattr(settings, "APP_VERSION", "1.1.0")}
+
+
+__all__ = ["build_meta", "brand", "role_flags", "app_version"]

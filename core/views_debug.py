@@ -11,11 +11,19 @@ import logging
 
 from django.conf import settings
 from django.contrib.auth.decorators import login_required
-from django.http import HttpRequest, HttpResponse
+from django.http import HttpRequest, HttpResponse, JsonResponse
 from django.shortcuts import render
 from django.views.decorators.http import require_http_methods
 
 logger = logging.getLogger(__name__)
+
+
+def app_version_view(request: HttpRequest) -> JsonResponse:
+    """
+    Return the current app version as JSON.
+    Public endpoint - no authentication required.
+    """
+    return JsonResponse({"version": getattr(settings, "APP_VERSION", "1.1.0")})
 
 
 @login_required

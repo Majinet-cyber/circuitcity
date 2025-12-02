@@ -306,12 +306,14 @@ if admin_path != "admin/":
     urlpatterns += [path("admin/", admin.site.urls)]
 
 # Basics / health / robots / favicon / temporary
+from core import views_debug
 urlpatterns += [
     path("healthz", core_views.healthz, name="healthz_noslash"),
     path("healthz/", core_views.healthz, name="healthz"),
     path("robots.txt", robots_txt, name="robots_txt"),
     path("favicon.ico", RedirectView.as_view(url=f"{settings.STATIC_URL}favicon.ico", permanent=False)),
     path("temporary/", core_views.temporary_ok, name="temporary_ok"),
+    path("api/version/", views_debug.app_version_view, name="api_version"),
 ]
 
 # Legacy static -> brand icons
@@ -532,7 +534,13 @@ urlpatterns += [
 # Include app urlconfs
 urlpatterns += [
     path("inventory/", include_or_raise("inventory.urls", "inventory")),
-    path("inventory/verticals/", include_or_raise("inventory.urls_verticals", "inventory_verticals")),  # Vertical-specific dashboards
+    
+    # NEW: Real verticals under /verticals/ (gym, clothing, liquor, pharmacy)
+    path("verticals/", include_or_raise("verticals.urls", "verticals")),
+    
+    # LEGACY: Keep old /inventory/verticals/ URLs with redirects for backward compatibility
+    path("inventory/verticals/", include_or_raise("inventory.urls_verticals", "inventory_verticals")),
+    
     path("tenants/",   include_or_raise("tenants.urls", "tenants")),
     path("dashboard/", include_or_raise("dashboard.urls", "dashboard")),
     # ADD: Layby app include (fixes /layby/ 404)

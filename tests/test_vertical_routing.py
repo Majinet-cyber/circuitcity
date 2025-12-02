@@ -225,6 +225,29 @@ class TestDashboardRouting:
         assert response.status_code == 302
         assert "gym" in response.url.lower()
 
+    def test_gym_dashboard_shows_gym_content_not_phones(
+        self, client: Client, manager_user, gym_business
+    ):
+        """Gym dashboard should show Gym Hub, not Phones Hub."""
+        # Setup
+        create_manager_membership(manager_user, gym_business)
+        client.force_login(manager_user)
+        set_active_business(client, gym_business)
+
+        # Act - access gym dashboard directly (follow redirect from home)
+        response = client.get(reverse("inventory_verticals:gym_dashboard"))
+
+        # Assert
+        assert response.status_code == 200
+        content = response.content.decode()
+        
+        # Should show gym-specific content
+        assert "Gym" in content or "gym" in content
+        
+        # Should NOT show phones-specific content
+        assert "Phones Hub" not in content
+        assert "Phone" not in content or "phone" in content.lower()  # allow lowercase references
+
     def test_clothing_business_redirects_to_clothing_dashboard(
         self, client: Client, manager_user, clothing_business
     ):

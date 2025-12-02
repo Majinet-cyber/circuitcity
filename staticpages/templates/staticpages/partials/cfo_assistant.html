@@ -1,0 +1,12 @@
+{% load static %}
+<!-- CFO Assistant Card - In-layout version -->
+<div class="cfo-assistant-card">
+  <div class="cfo-avatar">
+    <img src="{% static 'img/cfo_'|add:cfo_mood|add:'.gif' %}" alt="CFO" class="avatar-img">
+  </div>
+  <div class="cfo-content">
+    <h4 class="cfo-title">CFO Assistant</h4>
+    <p class="cfo-message" id="cfo-message">{{ cfo_message }}</p>
+  </div>
+</div>
+

@@ -1,0 +1,213 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>About Emajinet</title>
+  <link rel="icon" href="{% static 'favicon.ico' %}">
+  <style>
+    :root {
+      --primary: #4f46e5;
+      --primary-dark: #4338ca;
+      --text-primary: #1f2937;
+      --text-secondary: #6b7280;
+      --bg-light: #f9fafb;
+      --white: #ffffff;
+      --shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, Roboto, Helvetica, Arial, sans-serif;
+      line-height: 1.6;
+      color: var(--text-primary);
+      background: var(--bg-light);
+    }
+
+    .navbar {
+      background: var(--white);
+      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+      padding: 1rem 2rem;
+      position: sticky;
+      top: 0;
+      z-index: 1000;
+    }
+
+    .navbar-content {
+      max-width: 1280px;
+      margin: 0 auto;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .logo-section {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+    }
+
+    .logo {
+      height: 40px;
+      width: auto;
+    }
+
+    .logo-text {
+      font-size: 1.5rem;
+      font-weight: 700;
+      color: var(--primary);
+    }
+
+    .btn {
+      padding: 0.75rem 1.5rem;
+      border-radius: 100px;
+      font-weight: 600;
+      font-size: 0.95rem;
+      text-decoration: none;
+      cursor: pointer;
+      border: none;
+      transition: all 0.3s ease;
+      display: inline-block;
+    }
+
+    .btn-primary {
+      background: var(--primary);
+      color: var(--white);
+      box-shadow: 0 4px 12px rgba(79, 70, 229, 0.3);
+    }
+
+    .btn-primary:hover {
+      background: var(--primary-dark);
+      transform: translateY(-2px);
+      box-shadow: 0 6px 20px rgba(79, 70, 229, 0.4);
+    }
+
+    .btn-text {
+      background: transparent;
+      color: var(--text-secondary);
+    }
+
+    .btn-text:hover {
+      color: var(--primary);
+    }
+
+    .container {
+      max-width: 800px;
+      margin: 0 auto;
+      padding: 4rem 2rem;
+    }
+
+    .about-hero {
+      text-align: center;
+      padding: 3rem 0;
+      background: var(--white);
+      border-radius: 20px;
+      box-shadow: var(--shadow);
+      margin-bottom: 3rem;
+    }
+
+    .about-hero h1 {
+      font-size: 3rem;
+      font-weight: 800;
+      margin-bottom: 2rem;
+      color: var(--text-primary);
+      background: linear-gradient(135deg, var(--primary) 0%, #10b981 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    .about-hero p {
+      font-size: 1.25rem;
+      line-height: 1.8;
+      color: var(--text-secondary);
+      margin-bottom: 1.5rem;
+      padding: 0 2rem;
+    }
+
+    .about-hero p:last-child {
+      font-size: 1.5rem;
+      font-weight: 600;
+      font-style: italic;
+      color: var(--primary);
+      margin-top: 2rem;
+    }
+
+    .footer {
+      padding: 2rem;
+      background: var(--text-primary);
+      color: var(--white);
+      text-align: center;
+      margin-top: 4rem;
+    }
+
+    .footer-text {
+      opacity: 0.8;
+    }
+
+    @media (max-width: 768px) {
+      .about-hero h1 {
+        font-size: 2rem;
+      }
+
+      .about-hero p {
+        font-size: 1.125rem;
+        padding: 0 1rem;
+      }
+
+      .about-hero p:last-child {
+        font-size: 1.25rem;
+      }
+    }
+  </style>
+</head>
+<body>
+  <!-- Navigation -->
+  <nav class="navbar">
+    <div class="navbar-content">
+      <div class="logo-section">
+        <img src="{% static 'img/majn.png' %}" alt="Emajinet Logo" class="logo">
+        <span class="logo-text">Emajinet</span>
+      </div>
+      <div style="display: flex; gap: 1rem; align-items: center;">
+        <a href="{% url 'staticpages:home' %}" class="btn btn-text">Home</a>
+        <a href="{% url 'accounts:login' %}" class="btn btn-primary">Get Started</a>
+      </div>
+    </div>
+  </nav>
+
+  <!-- Content -->
+  <div class="container">
+    <section class="about-hero">
+      <h1>About Emajinet</h1>
+      <p>
+        We are pioneers determined to simplify business for everyday merchants.
+      </p>
+      <p>
+        We are motivated by the common men and women who give their all to survive,
+        support their families, and build society through business.
+      </p>
+      <p>
+        May they never lose.
+      </p>
+    </section>
+  </div>
+
+  <!-- Footer -->
+  <footer class="footer">
+    <p class="footer-text">&copy; 2025 Emajinet. All rights reserved.</p>
+    <div style="margin-top: 1rem; display: flex; gap: 2rem; justify-content: center; flex-wrap: wrap;">
+      <a href="{% url 'staticpages:about' %}" style="color: rgba(255,255,255,0.7); text-decoration: none; font-size: 0.9rem;">About</a>
+      <a href="{% url 'staticpages:privacy' %}" style="color: rgba(255,255,255,0.7); text-decoration: none; font-size: 0.9rem;">Privacy Policy</a>
+      <a href="{% url 'staticpages:terms' %}" style="color: rgba(255,255,255,0.7); text-decoration: none; font-size: 0.9rem;">Terms of Service</a>
+    </div>
+  </footer>
+</body>
+</html>
+

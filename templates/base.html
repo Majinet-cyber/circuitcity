@@ -1144,6 +1144,64 @@
 {% endif %}
 
 {% block extra_js %}{% endblock %}
+
+<!-- App Version Check -->
+{% if APP_VERSION %}
+<script>
+  (function() {
+    const CURRENT_VERSION = "{{ APP_VERSION }}";
+    // Minimal: check once every 5 minutes
+    const CHECK_INTERVAL_MS = 5 * 60 * 1000;
+
+    async function checkForNewVersion() {
+      try {
+        const res = await fetch("/api/version/?_=" + Date.now(), { cache: "no-store" });
+        if (!res.ok) return;
+        const data = await res.json();
+        if (data.version && data.version !== CURRENT_VERSION) {
+          const barId = "app-update-banner";
+          if (document.getElementById(barId)) return;
+
+          const banner = document.createElement("div");
+          banner.id = barId;
+          banner.style.position = "fixed";
+          banner.style.bottom = "1rem";
+          banner.style.right = "1rem";
+          banner.style.zIndex = "9999";
+          banner.style.padding = "0.75rem 1.5rem";
+          banner.style.borderRadius = "999px";
+          banner.style.backdropFilter = "blur(12px)";
+          banner.style.background = "rgba(0,0,0,0.7)";
+          banner.style.color = "#fff";
+          banner.style.fontSize = "0.875rem";
+          banner.style.boxShadow = "0 10px 30px rgba(0,0,0,0.25)";
+          banner.innerHTML = `
+            <span style="margin-right: 0.75rem;">New version of Emajinet is available.</span>
+            <button type="button" style="border:none; cursor:pointer; border-radius:999px; padding:0.25rem 0.9rem; background:#4f46e5; color:#fff; font-size:0.8rem;">
+              Refresh
+            </button>
+          `;
+
+          banner.querySelector("button").addEventListener("click", function() {
+            window.location.reload(true);
+          });
+
+          document.body.appendChild(banner);
+        }
+      } catch (e) {
+        console && console.warn && console.warn("Version check failed", e);
+      }
+    }
+
+    // Start polling after page load
+    window.addEventListener("load", function() {
+      setTimeout(checkForNewVersion, 5_000);
+      setInterval(checkForNewVersion, CHECK_INTERVAL_MS);
+    });
+  })();
+</script>
+{% endif %}
+
   {% include "partials/loading_spinner.html" %}
 </body>
 </html>

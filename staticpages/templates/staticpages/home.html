@@ -420,8 +420,14 @@
         grid-template-columns: 1fr;
       }
 
+      .nav-actions {
+        flex-wrap: wrap;
+        gap: 0.5rem;
+      }
+
       .nav-actions .btn-text {
-        display: none;
+        font-size: 0.875rem;
+        padding: 0.5rem 0.75rem;
       }
     }
   </style>
@@ -436,6 +442,8 @@
       </div>
       <div class="nav-actions">
         <a href="#how-it-works" class="btn btn-text">How It Works</a>
+        <a href="{% url 'staticpages:about' %}" class="btn btn-text">About</a>
+        <a href="{% url 'login' %}" class="btn btn-text">Login</a>
         <a href="{% url 'login' %}" class="btn btn-primary">Get Started</a>
       </div>
     </div>
@@ -573,6 +581,7 @@
   <footer class="footer">
     <p class="footer-text">&copy; 2025 Emajinet. All rights reserved.</p>
     <div style="margin-top: 1rem; display: flex; gap: 2rem; justify-content: center; flex-wrap: wrap;">
+      <a href="{% url 'staticpages:about' %}" style="color: rgba(255,255,255,0.7); text-decoration: none; font-size: 0.9rem;">About</a>
       <a href="{% url 'staticpages:privacy' %}" style="color: rgba(255,255,255,0.7); text-decoration: none; font-size: 0.9rem;">Privacy Policy</a>
       <a href="{% url 'staticpages:terms' %}" style="color: rgba(255,255,255,0.7); text-decoration: none; font-size: 0.9rem;">Terms of Service</a>
     </div>

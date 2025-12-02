@@ -60,11 +60,11 @@ def get_vertical_dashboard_url(vertical_kind: str) -> Optional[str]:
         str: URL name to redirect to, or None if default dashboard should be used
     """
     vertical_dashboard_map = {
-        "gym": "inventory_verticals:gym_dashboard",
-        "pharmacy": "inventory_verticals:pharmacy_dashboard",
-        "clothing": "inventory_verticals:clothing_dashboard",
-        "liquor": "inventory_verticals:liquor_dashboard",
-        # "phones" uses the default dashboard
+        "gym": "verticals:gym_dashboard",
+        "pharmacy": "verticals:pharmacy_dashboard",
+        "clothing": "verticals:clothing_dashboard",
+        "liquor": "verticals:liquor_dashboard",
+        # "phones" uses the default dashboard at /inventory/dashboard/
         # "grocery" uses default dashboard (for now)
     }
     return vertical_dashboard_map.get(vertical_kind)
@@ -237,7 +237,7 @@ def get_vertical_sidebar_items(business_kind: str) -> list[dict]:
         return [
             # MAIN section
             {"section": "MAIN", "url": "dashboard:home", "label": "Dashboard", "icon": "bi-speedometer2", "active_pattern": "/dashboard/"},
-            {"section": "MAIN", "url": "inventory_verticals:gym_dashboard", "label": "Gym Hub", "icon": "bi-activity", "active_pattern": "/verticals/gym/"},
+            {"section": "MAIN", "url": "verticals:gym_dashboard", "label": "Gym Hub", "icon": "bi-activity", "active_pattern": "/verticals/gym/"},
             {"section": "MAIN", "url": "tenants:manager_review_agents", "label": "Members", "icon": "bi-people", "active_pattern": "/tenants/manager/agents/"},
             {"section": "MAIN", "url": "inventory:time_logs", "label": "Check-ins", "icon": "bi-clipboard-check", "active_pattern": "/inventory/time"},
             {"section": "MAIN", "url": "wallet:agent_wallet", "label": "Wallet", "icon": "bi-wallet2", "active_pattern": "/wallet/"},
@@ -259,7 +259,7 @@ def get_vertical_sidebar_items(business_kind: str) -> list[dict]:
         return [
             # MAIN section
             {"section": "MAIN", "url": "dashboard:home", "label": "Dashboard", "icon": "bi-speedometer2", "active_pattern": "/dashboard/"},
-            {"section": "MAIN", "url": "inventory_verticals:clothing_dashboard", "label": "Clothing Hub", "icon": "bi-person-bounding-box", "active_pattern": "/verticals/clothing/"},
+            {"section": "MAIN", "url": "verticals:clothing_dashboard", "label": "Clothing Hub", "icon": "bi-person-bounding-box", "active_pattern": "/verticals/clothing/"},
             {"section": "MAIN", "url": "inventory:clothing_product_new_v2", "label": "Add Product", "icon": "bi-plus-square", "active_pattern": "/clothing/products/new"},
             {"section": "MAIN", "url": "inventory:scan_in", "label": "Stock In", "icon": "bi-upc-scan", "active_pattern": "/inventory/scan"},
             {"section": "MAIN", "url": "inventory:scan_sold", "label": "Sell", "icon": "bi-bag-check", "active_pattern": "/sell/"},

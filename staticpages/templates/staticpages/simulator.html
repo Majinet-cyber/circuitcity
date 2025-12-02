@@ -273,6 +273,53 @@
       flex-shrink: 0;
     }
 
+    /* CFO Assistant Card - Glassmorphic in-layout design */
+    .cfo-assistant-card {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      margin-top: 2rem;
+      padding: 1.25rem;
+      background: rgba(255, 255, 255, 0.7);
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+      border-radius: 16px;
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+      border: 1px solid rgba(79, 70, 229, 0.15);
+    }
+
+    .cfo-avatar {
+      flex-shrink: 0;
+    }
+
+    .avatar-img {
+      width: 64px;
+      height: 64px;
+      border-radius: 50%;
+      object-fit: cover;
+      background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
+      border: 3px solid rgba(255, 255, 255, 0.8);
+      box-shadow: 0 2px 8px rgba(79, 70, 229, 0.3);
+    }
+
+    .cfo-content {
+      flex: 1;
+    }
+
+    .cfo-title {
+      font-size: 0.95rem;
+      font-weight: 700;
+      color: var(--primary);
+      margin: 0 0 0.5rem 0;
+    }
+
+    .cfo-message {
+      font-size: 0.875rem;
+      line-height: 1.5;
+      color: var(--text-secondary);
+      margin: 0;
+    }
+
     @media (max-width: 968px) {
       .simulator-grid {
         grid-template-columns: 1fr;
@@ -284,6 +331,11 @@
 
       .metrics {
         grid-template-columns: 1fr;
+      }
+
+      .cfo-assistant-card {
+        flex-direction: column;
+        text-align: center;
       }
     }
   </style>
@@ -298,7 +350,9 @@
       </div>
       <div style="display: flex; gap: 1rem; align-items: center;">
         <a href="{% url 'staticpages:home' %}" class="btn btn-text">Home</a>
-        <a href="{% url 'accounts:login' %}" class="btn btn-primary">Get Started</a>
+        <a href="{% url 'staticpages:about' %}" class="btn btn-text">About</a>
+        <a href="{% url 'login' %}" class="btn btn-text">Login</a>
+        <a href="{% url 'login' %}" class="btn btn-primary">Get Started</a>
       </div>
     </div>
   </nav>
@@ -321,33 +375,33 @@
         <div class="control-group">
           <div class="control-label">
             <span>Monthly units sold</span>
-            <span class="control-value" id="units-value">200</span>
+            <span class="control-value" id="units-value">50</span>
           </div>
-          <input type="range" min="0" max="2000" value="200" step="10" class="slider" id="units-slider">
+          <input type="range" min="0" max="1000" value="50" step="5" class="slider" id="units-slider">
         </div>
 
         <div class="control-group">
           <div class="control-label">
             <span>Average selling price (MWK)</span>
-            <span class="control-value" id="price-value">120,000</span>
+            <span class="control-value" id="price-value">25,000</span>
           </div>
-          <input type="range" min="0" max="500000" value="120000" step="1000" class="slider" id="price-slider">
+          <input type="range" min="0" max="200000" value="25000" step="1000" class="slider" id="price-slider">
         </div>
 
         <div class="control-group">
           <div class="control-label">
             <span>Average cost per unit (MWK)</span>
-            <span class="control-value" id="cost-value">90,000</span>
+            <span class="control-value" id="cost-value">18,000</span>
           </div>
-          <input type="range" min="0" max="500000" value="90000" step="1000" class="slider" id="cost-slider">
+          <input type="range" min="0" max="200000" value="18000" step="1000" class="slider" id="cost-slider">
         </div>
 
         <div class="control-group">
           <div class="control-label">
             <span>Stock on hand</span>
-            <span class="control-value" id="stock-value">500</span>
+            <span class="control-value" id="stock-value">200</span>
           </div>
-          <input type="range" min="0" max="5000" value="500" step="10" class="slider" id="stock-slider">
+          <input type="range" min="0" max="2000" value="200" step="10" class="slider" id="stock-slider">
         </div>
 
         <div class="control-group">
@@ -357,6 +411,9 @@
           </div>
           <input type="range" min="1" max="12" value="6" step="1" class="slider" id="months-slider">
         </div>
+
+        <!-- CFO Assistant Card (in-layout) -->
+        {% include "staticpages/partials/cfo_assistant.html" %}
       </div>
 
       <!-- Chart and Metrics Card -->
@@ -365,15 +422,15 @@
         <div class="metrics">
           <div class="metric-card revenue">
             <div class="metric-label">Total Revenue</div>
-            <div class="metric-value" id="total-revenue">MWK 144M</div>
+            <div class="metric-value" id="total-revenue">MWK 7.5M</div>
           </div>
           <div class="metric-card cost">
             <div class="metric-label">Total Cost</div>
-            <div class="metric-value" id="total-cost">MWK 108M</div>
+            <div class="metric-value" id="total-cost">MWK 5.4M</div>
           </div>
           <div class="metric-card profit">
             <div class="metric-label">Total Profit</div>
-            <div class="metric-value" id="total-profit">MWK 36M</div>
+            <div class="metric-value" id="total-profit">MWK 2.1M</div>
           </div>
         </div>
 
@@ -399,11 +456,11 @@
   </div>
 
   <script>
-    // Initialize values
-    let units = 200;
-    let price = 120000;
-    let cost = 90000;
-    let stock = 500;
+    // Initialize values - adjusted for realistic small-medium merchant scale
+    let units = 50;
+    let price = 25000;
+    let cost = 18000;
+    let stock = 200;
     let months = 6;
 
     // Format number with commas
@@ -411,12 +468,14 @@
       return num.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",");
     }
 
-    // Format currency (MWK)
+    // Format currency (MWK) - human-friendly axis labels
     function formatCurrency(num) {
       if (num >= 1000000) {
-        return 'MWK ' + (num / 1000000).toFixed(1) + 'M';
+        const millions = num / 1000000;
+        return 'MWK ' + (millions % 1 === 0 ? millions.toFixed(0) : millions.toFixed(1)) + 'M';
       } else if (num >= 1000) {
-        return 'MWK ' + (num / 1000).toFixed(1) + 'K';
+        const thousands = num / 1000;
+        return 'MWK ' + (thousands % 1 === 0 ? thousands.toFixed(0) : thousands.toFixed(0)) + 'k';
       } else {
         return 'MWK ' + formatNumber(num);
       }
@@ -437,6 +496,35 @@
         monthlyProfit,
         profitMargin: monthlyRevenue > 0 ? (monthlyProfit / monthlyRevenue * 100) : 0,
       };
+    }
+
+    // Generate CFO message
+    function generateCFOMessage(totalProfit) {
+      if (totalProfit <= 0) {
+        const messages = [
+          "At this rate you're running at a loss. Consider raising your price, reducing costs, or increasing your monthly units sold.",
+          "Your current settings show a loss. Try trimming your costs or adjusting your prices to break even and move to profit.",
+        ];
+        return messages[Math.floor(Math.random() * messages.length)];
+      } else if (totalProfit < 400000) {
+        const messages = [
+          "You're slightly profitable. A bit more volume or a small price tweak could help you hit your first big milestone.",
+          "Not bad – you're above water. Test new sales tactics to grow your monthly profit.",
+        ];
+        return messages[Math.floor(Math.random() * messages.length)];
+      } else if (totalProfit < 2000000) {
+        const messages = [
+          "Nice – this profit can comfortably cover better equipment or small team upgrades.",
+          "Good progress. You could reinvest this profit into marketing, inventory, or staff training.",
+        ];
+        return messages[Math.floor(Math.random() * messages.length)];
+      } else {
+        const messages = [
+          "Wow. With this profit you can start planning that car upgrade or major equipment purchase.",
+          "Strong numbers – this level of profit can fund serious expansion or a well-deserved vacation.",
+        ];
+        return messages[Math.floor(Math.random() * messages.length)];
+      }
     }
 
     // Generate insights
@@ -463,7 +551,7 @@
       }
 
       // Revenue insights
-      if (metrics.totalRevenue >= 50000000) {
+      if (metrics.totalRevenue >= 10000000) {
         insights.push("Great revenue performance! Think about reinvesting in inventory or new locations.");
       }
 
@@ -494,6 +582,12 @@
       document.getElementById('total-revenue').textContent = formatCurrency(metrics.totalRevenue);
       document.getElementById('total-cost').textContent = formatCurrency(metrics.totalCost);
       document.getElementById('total-profit').textContent = formatCurrency(metrics.totalProfit);
+
+      // Update CFO message
+      const cfoMessageEl = document.getElementById('cfo-message');
+      if (cfoMessageEl) {
+        cfoMessageEl.textContent = generateCFOMessage(metrics.totalProfit);
+      }
 
       // Update insights
       const insights = generateInsights(metrics);

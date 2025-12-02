@@ -127,6 +127,9 @@ if IS_RUNSERVER:
     SECURE_HSTS_INCLUDE_SUBDOMAINS = False
     SECURE_HSTS_PRELOAD = False
 
+# --------------------------- app version ---------------------------
+APP_VERSION = os.environ.get("APP_VERSION", "1.1.0")
+
 # --------------------------- session & csrf ---------------------------
 SESSION_COOKIE_NAME = os.environ.get("SESSION_COOKIE_NAME", "cc_sessionid")
 CSRF_COOKIE_NAME = os.environ.get("CSRF_COOKIE_NAME", "cc_csrftoken")
@@ -226,6 +229,7 @@ TEMPLATES = [
                 "django.contrib.auth.context_processors.auth",
                 "django.contrib.messages.context_processors.messages",
                 "cc.context_processors.build_meta",
+                "cc.context_processors.app_version",
                 "cc.context_processors.role_flags",
                 "cc.context_processors.brand",
                 "tenants.context_processors.tenant_context",
