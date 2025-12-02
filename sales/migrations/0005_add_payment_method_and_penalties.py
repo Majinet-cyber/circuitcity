@@ -10,19 +10,62 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
-        migrations.AddField(
-            model_name="sale",
-            name="payment_method",
-            field=models.CharField(
-                choices=[
-                    ("CASH", "Cash"),
-                    ("BANK", "Bank"),
-                    ("MOBILE_MONEY", "Mobile Money"),
-                ],
-                db_index=True,
-                default="CASH",
-                help_text="Payment method used for this sale",
-                max_length=20,
-            ),
+        migrations.SeparateDatabaseAndState(
+            database_operations=[
+                # Drop existing indexes before table remake
+                migrations.RunSQL(
+                    sql="""
+                        DROP INDEX IF EXISTS sale_created_at_idx;
+                        DROP INDEX IF EXISTS sale_sold_at_idx;
+                        DROP INDEX IF EXISTS sale_loc_created_idx;
+                        DROP INDEX IF EXISTS sale_agent_created_idx;
+                        DROP INDEX IF EXISTS sales_sale_payment_method_abc123_idx;
+                    """,
+                    reverse_sql=migrations.RunSQL.noop,
+                ),
+                # Manually add payment_method column using ALTER TABLE
+                migrations.RunSQL(
+                    sql='ALTER TABLE sales_sale ADD COLUMN payment_method VARCHAR(20) NOT NULL DEFAULT "CASH"',
+                    reverse_sql='ALTER TABLE sales_sale DROP COLUMN payment_method',
+                ),
+                # Create index on payment_method
+                migrations.RunSQL(
+                    sql='CREATE INDEX IF NOT EXISTS sales_sale_payment_method_idx ON sales_sale (payment_method)',
+                    reverse_sql='DROP INDEX IF EXISTS sales_sale_payment_method_idx',
+                ),
+                # Recreate the original indexes
+                migrations.RunSQL(
+                    sql="""
+                        CREATE INDEX IF NOT EXISTS sale_created_at_idx ON sales_sale (created_at);
+                        CREATE INDEX IF NOT EXISTS sale_sold_at_idx ON sales_sale (sold_at);
+                        CREATE INDEX IF NOT EXISTS sale_loc_created_idx ON sales_sale (location_id, created_at);
+                        CREATE INDEX IF NOT EXISTS sale_agent_created_idx ON sales_sale (agent_id, created_at);
+                    """,
+                    reverse_sql="""
+                        DROP INDEX IF EXISTS sale_created_at_idx;
+                        DROP INDEX IF EXISTS sale_sold_at_idx;
+                        DROP INDEX IF EXISTS sale_loc_created_idx;
+                        DROP INDEX IF EXISTS sale_agent_created_idx;
+                    """,
+                ),
+            ],
+            state_operations=[
+                # Update migration state to reflect the new field
+                migrations.AddField(
+                    model_name="sale",
+                    name="payment_method",
+                    field=models.CharField(
+                        choices=[
+                            ("CASH", "Cash"),
+                            ("BANK", "Bank"),
+                            ("MOBILE_MONEY", "Mobile Money"),
+                        ],
+                        db_index=True,
+                        default="CASH",
+                        help_text="Payment method used for this sale",
+                        max_length=20,
+                    ),
+                ),
+            ],
         ),
     ]

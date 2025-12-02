@@ -282,7 +282,7 @@ def get_vertical_sidebar_items(business_kind: str) -> list[dict]:
         return [
             # MAIN section
             {"section": "MAIN", "url": "dashboard:home", "label": "Dashboard", "icon": "bi-speedometer2", "active_pattern": "/dashboard/"},
-            {"section": "MAIN", "url": "inventory_verticals:liquor_dashboard", "label": "Liquor Hub", "icon": "bi-cup-straw", "active_pattern": "/verticals/liquor/"},
+            {"section": "MAIN", "url": "verticals:liquor_dashboard", "label": "Liquor Hub", "icon": "bi-cup-straw", "active_pattern": "/verticals/liquor/"},
             {"section": "MAIN", "url": "inventory:liquor_product_new_v2", "label": "Add Product", "icon": "bi-droplet-half", "active_pattern": "/liquor/products/new"},
             {"section": "MAIN", "url": "inventory:scan_in", "label": "Stock In", "icon": "bi-upc-scan", "active_pattern": "/inventory/scan"},
             {"section": "MAIN", "url": "inventory:scan_sold", "label": "Sell", "icon": "bi-lightning-charge", "active_pattern": "/sell/"},
@@ -304,7 +304,7 @@ def get_vertical_sidebar_items(business_kind: str) -> list[dict]:
         return [
             # MAIN section
             {"section": "MAIN", "url": "dashboard:home", "label": "Dashboard", "icon": "bi-speedometer2", "active_pattern": "/dashboard/"},
-            {"section": "MAIN", "url": "inventory_verticals:pharmacy_dashboard", "label": "Pharmacy Hub", "icon": "bi-prescription2", "active_pattern": "/verticals/pharmacy/"},
+            {"section": "MAIN", "url": "verticals:pharmacy_dashboard", "label": "Pharmacy Hub", "icon": "bi-prescription2", "active_pattern": "/verticals/pharmacy/"},
             {"section": "MAIN", "url": "inventory:pharmacy_product_new", "label": "Add Medicine", "icon": "bi-capsule", "active_pattern": "/pharmacy/products/new"},
             {"section": "MAIN", "url": "inventory:pharmacy_batches", "label": "Batches", "icon": "bi-boxes", "active_pattern": "/pharmacy/batches"},
             {"section": "MAIN", "url": "inventory:scan_in", "label": "Stock In", "icon": "bi-upc-scan", "active_pattern": "/inventory/scan"},

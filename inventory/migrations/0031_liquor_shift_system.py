@@ -256,21 +256,9 @@ class Migration(migrations.Migration):
             new_name="inventory_l_entry_t_a28c64_idx",
             old_name="liquor_wallet_type_idx",
         ),
-        migrations.RenameIndex(
-            model_name="phonestockeditrequest",
-            new_name="inventory_p_busines_4d3f26_idx",
-            old_name="inv_phone_edit_biz_status",
-        ),
-        migrations.RenameIndex(
-            model_name="phonestockeditrequest",
-            new_name="inventory_p_request_c5c279_idx",
-            old_name="inv_phone_edit_req_status",
-        ),
-        migrations.RenameIndex(
-            model_name="phonestockeditrequest",
-            new_name="inventory_p_stock_i_48c135_idx",
-            old_name="inv_phone_edit_stock_status",
-        ),
+        # Removed 3 RenameIndex operations for deleted PhoneStockEditRequest model
+        # to avoid KeyError: ('inventory', 'phonestockeditrequest')
+        migrations.RunSQL(sql="", reverse_sql=""),
         migrations.AddField(
             model_name="liquorcredit",
             name="customer_description",

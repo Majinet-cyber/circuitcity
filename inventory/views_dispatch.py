@@ -16,13 +16,13 @@ from .helpers import (
 )
 
 _VERTICAL_ROUTES = {
-    PHONES: "inventory:inventory_verticals:phones_dashboard",
-    CLOTHING: "inventory:inventory_verticals:clothing_dashboard",
-    LIQUOR: "inventory:inventory_verticals:liquor_dashboard",
-    PHARMACY: "inventory:inventory_verticals:pharmacy_dashboard",
-    GYM: "inventory:inventory_verticals:gym_dashboard",
+    PHONES: "inventory:inventory_dashboard",  # Phones use core inventory dashboard
+    CLOTHING: "verticals:clothing_dashboard",
+    LIQUOR: "verticals:liquor_dashboard",
+    PHARMACY: "verticals:pharmacy_dashboard",
+    GYM: "verticals:gym_dashboard",
 }
-_DEFAULT_ROUTE = "inventory:inventory_verticals:no_business"
+_DEFAULT_ROUTE = "verticals:no_business"
 
 
 def _safe_reverse(name: str, default: str) -> str:
