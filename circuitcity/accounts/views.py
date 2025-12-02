@@ -43,8 +43,12 @@ from .forms import (
     ProfileForm,
     PasswordChangeSimpleForm,
     ManagerSignUpForm,
+    WizardStep1Form,
+    WizardStep2Form,
+    WizardStep3Form,
+    WizardStep4Form,
 )
-from .models import EmailOTP, LoginSecurity, Profile
+from .models import EmailOTP, LoginSecurity, Profile, OnboardingProfile
 
 # Optional tenants (graceful fallbacks if app not installed)
 try:
@@ -1189,6 +1193,286 @@ def signup_manager(request):
         messages.success(request, "Your manager account is ready.")
 
     return redirect(_safe_redirect("inventory:inventory_dashboard", default="/inventory/dashboard/"))
+
+
+# =========================================
+# Multi-step Signup Wizard
+# =========================================
+WIZARD_SESSION_KEY = "signup_wizard_data"
+
+def _get_wizard_data(request):
+    """Get wizard data from session"""
+    return request.session.get(WIZARD_SESSION_KEY, {})
+
+def _set_wizard_data(request, data):
+    """Save wizard data to session"""
+    request.session[WIZARD_SESSION_KEY] = data
+    request.session.modified = True
+
+def _clear_wizard_data(request):
+    """Clear wizard data from session"""
+    if WIZARD_SESSION_KEY in request.session:
+        del request.session[WIZARD_SESSION_KEY]
+        request.session.modified = True
+
+@ensure_csrf_cookie
+@never_cache
+@require_http_methods(["GET", "POST"])
+def signup_wizard(request, step=0):
+    """
+    Multi-step signup wizard with gamification.
+    
+    Steps:
+    0 - Welcome (no form, just intro)
+    1 - Your Account (user credentials)
+    2 - Your Business (business details)
+    3 - First Location (shop setup)
+    4 - Goals & Finish (onboarding goals)
+    """
+    # If already authenticated, redirect to dashboard
+    if request.user.is_authenticated:
+        return redirect(_safe_redirect("inventory:inventory_dashboard", "dashboard:home", default="/inventory/dashboard/"))
+    
+    # Validate step
+    step = int(step)
+    if step < 0 or step > 4:
+        return redirect("accounts:signup_wizard_step", step=0)
+    
+    wizard_data = _get_wizard_data(request)
+    
+    # Step 0: Welcome page (no form)
+    if step == 0:
+        if request.method == "POST":
+            # Just move to step 1
+            return redirect("accounts:signup_wizard_step", step=1)
+        return render(request, "registration/signup_wizard_step0.html", {
+            "step": step,
+            "total_steps": 5,
+        })
+    
+    # Step 1: Your Account
+    elif step == 1:
+        form = WizardStep1Form(request.POST or None, initial=wizard_data.get("step1", {}))
+        if request.method == "POST":
+            if form.is_valid():
+                wizard_data["step1"] = form.cleaned_data
+                _set_wizard_data(request, wizard_data)
+                return redirect("accounts:signup_wizard_step", step=2)
+        return render(request, "registration/signup_wizard_step1.html", {
+            "form": form,
+            "step": step,
+            "total_steps": 5,
+            "wizard_data": wizard_data,
+        })
+    
+    # Step 2: Your Business
+    elif step == 2:
+        # Must have completed step 1
+        if "step1" not in wizard_data:
+            return redirect("accounts:signup_wizard_step", step=1)
+        
+        form = WizardStep2Form(request.POST or None, initial=wizard_data.get("step2", {}))
+        if request.method == "POST":
+            if form.is_valid():
+                wizard_data["step2"] = form.cleaned_data
+                _set_wizard_data(request, wizard_data)
+                return redirect("accounts:signup_wizard_step", step=3)
+        return render(request, "registration/signup_wizard_step2.html", {
+            "form": form,
+            "step": step,
+            "total_steps": 5,
+            "wizard_data": wizard_data,
+        })
+    
+    # Step 3: First Location
+    elif step == 3:
+        # Must have completed steps 1 & 2
+        if "step1" not in wizard_data or "step2" not in wizard_data:
+            return redirect("accounts:signup_wizard_step", step=1)
+        
+        form = WizardStep3Form(request.POST or None, initial=wizard_data.get("step3", {}))
+        if request.method == "POST":
+            if form.is_valid():
+                wizard_data["step3"] = form.cleaned_data
+                _set_wizard_data(request, wizard_data)
+                return redirect("accounts:signup_wizard_step", step=4)
+        return render(request, "registration/signup_wizard_step3.html", {
+            "form": form,
+            "step": step,
+            "total_steps": 5,
+            "wizard_data": wizard_data,
+        })
+    
+    # Step 4: Goals & Finish
+    elif step == 4:
+        # Must have completed steps 1, 2, & 3
+        if "step1" not in wizard_data or "step2" not in wizard_data or "step3" not in wizard_data:
+            return redirect("accounts:signup_wizard_step", step=1)
+        
+        form = WizardStep4Form(request.POST or None, initial=wizard_data.get("step4", {}))
+        if request.method == "POST":
+            if form.is_valid():
+                wizard_data["step4"] = form.cleaned_data
+                _set_wizard_data(request, wizard_data)
+                
+                # Now create everything: User, Business, Location, Membership, OnboardingProfile
+                try:
+                    return _complete_wizard_signup(request, wizard_data)
+                except Exception as e:
+                    log.error("Wizard signup failed: %s", e, exc_info=True)
+                    messages.error(request, "Something went wrong. Please try again or contact support.")
+                    return render(request, "registration/signup_wizard_step4.html", {
+                        "form": form,
+                        "step": step,
+                        "total_steps": 5,
+                        "wizard_data": wizard_data,
+                    })
+        
+        return render(request, "registration/signup_wizard_step4.html", {
+            "form": form,
+            "step": step,
+            "total_steps": 5,
+            "wizard_data": wizard_data,
+        })
+    
+    # Fallback
+    return redirect("accounts:signup_wizard_step", step=0)
+
+
+def _complete_wizard_signup(request, wizard_data):
+    """
+    Complete the wizard signup by creating all entities.
+    This keeps all the existing business logic intact.
+    """
+    from django.db import transaction
+    
+    step1 = wizard_data.get("step1", {})
+    step2 = wizard_data.get("step2", {})
+    step3 = wizard_data.get("step3", {})
+    step4 = wizard_data.get("step4", {})
+    
+    with transaction.atomic():
+        # 1. Create User
+        email = step1["email"].strip().lower()
+        full_name = step1["full_name"].strip()
+        password = step1["password1"]
+        
+        # Guard: unique user/email (double-check)
+        if User.objects.filter(username__iexact=email).exists() or User.objects.filter(email__iexact=email).exists():
+            messages.error(request, "An account with that email already exists. Please sign in instead.")
+            return redirect("accounts:signup_wizard_step", step=1)
+        
+        user = User.objects.create_user(username=email, email=email, password=password)
+        
+        # Split name
+        try:
+            parts = full_name.split()
+            user.first_name = parts[0]
+            user.last_name = " ".join(parts[1:]) if len(parts) > 1 else ""
+            user.save(update_fields=["first_name", "last_name"])
+        except Exception:
+            pass
+        
+        # Add to Manager group
+        try:
+            mgr_group = _get_or_create_manager_group()
+            user.groups.add(mgr_group)
+        except Exception:
+            pass
+        
+        # 2. Create Business
+        biz = None
+        if Business is not None:
+            biz_name = step2["business_name"].strip()
+            business_kind = step2["business_kind"]
+            
+            # Unique slug
+            base = slugify(biz_name)[:40] or "store"
+            unique = base
+            i = 1
+            while Business.objects.filter(slug=unique).exists():
+                i += 1
+                unique = f"{base}-{i}"
+            
+            bkwargs = {"name": biz_name, "slug": unique}
+            if hasattr(Business, "created_by"):
+                bkwargs["created_by"] = user
+            if hasattr(Business, "status"):
+                bkwargs["status"] = "ACTIVE"
+            if hasattr(Business, "business_kind"):
+                bkwargs["business_kind"] = business_kind
+            
+            biz = Business.objects.create(**bkwargs)
+            
+            # Membership
+            if Membership is not None:
+                Membership.objects.update_or_create(
+                    user=user, business=biz,
+                    defaults={"role": "MANAGER", "status": "ACTIVE"},
+                )
+            
+            # Seed defaults
+            _seed_defaults_for_business(biz)
+            
+            # 3. Create first Location
+            try:
+                from inventory.models import Location as InvLocation
+                location_name = step3["location_name"].strip()
+                city = step3.get("city", "").strip()
+                
+                InvLocation.objects.create(
+                    business=biz,
+                    name=location_name,
+                    city=city,
+                    is_default=True,
+                )
+            except Exception as e:
+                log.warning("Failed to create location during wizard: %s", e)
+        
+        # 4. Create OnboardingProfile
+        try:
+            OnboardingProfile.objects.create(
+                user=user,
+                goal_stop_theft=step4.get("goal_stop_theft", False),
+                goal_see_profit=step4.get("goal_see_profit", False),
+                goal_track_performance=step4.get("goal_track_performance", False),
+                goal_move_off_notebooks=step4.get("goal_move_off_notebooks", False),
+                completed_at=timezone.now(),
+                wizard_version="v1",
+                first_business_name=step2.get("business_name", ""),
+                first_location_name=step3.get("location_name", ""),
+                chosen_vertical=step2.get("business_kind", ""),
+            )
+        except Exception as e:
+            log.warning("Failed to create onboarding profile: %s", e)
+        
+        # 5. Ensure Profile exists and mark as manager
+        try:
+            profile = getattr(user, "profile", None)
+            if profile is None:
+                profile, _ = Profile.objects.get_or_create(user=user)
+            if hasattr(profile, "is_manager"):
+                profile.is_manager = True
+                profile.save(update_fields=["is_manager"])
+        except Exception:
+            pass
+        
+        # 6. Auto-login + select business
+        login(request, user)
+        if biz is not None:
+            try:
+                request.session[TENANT_SESSION_KEY] = biz.pk
+            except Exception:
+                pass
+            messages.success(request, f"🎉 Welcome to {biz.name}! Your dashboard is ready.")
+        else:
+            messages.success(request, "🎉 Your account is ready!")
+        
+        # Clear wizard data
+        _clear_wizard_data(request)
+        
+        # Redirect to dashboard
+        return redirect(_safe_redirect("inventory:inventory_dashboard", default="/inventory/dashboard/"))
 
 
 # ----------------------------

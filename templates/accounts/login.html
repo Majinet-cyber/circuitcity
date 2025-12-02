@@ -131,12 +131,12 @@
       <input type="hidden" name="next" value="{{ next|default:'' }}"/>
 
       <label for="id_identifier">Email or Username</label>
-      <input id="id_identifier" class="input" type="text" name="identifier"
+      <input id="id_identifier" class="input" type="text" name="identifier" data-cy="login-email"
              value="{{ form.identifier.value|default_if_none:'' }}" autocomplete="username email" required>
 
       <label for="id_password">Password</label>
       <div class="pwd">
-        <input id="id_password" class="input" type="password" name="password" autocomplete="current-password" required>
+        <input id="id_password" class="input" type="password" name="password" data-cy="login-password" autocomplete="current-password" required>
         <button type="button" class="eye" aria-label="Show password" title="Show/Hide password">
           <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
             <path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7Z"></path>
@@ -145,7 +145,7 @@
         </button>
       </div>
 
-      <button id="submitBtn" class="btn" type="submit">Log In</button>
+      <button id="submitBtn" class="btn" type="submit" data-cy="login-submit">Log In</button>
     </form>
 
     <div class="links">

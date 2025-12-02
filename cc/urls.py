@@ -540,6 +540,8 @@ urlpatterns += [
     path("support/",   include_or_raise("support.urls", "support")),
     path("audit/",     include_or_raise("audit.urls", "audit")),
     path("notifications/", include_or_raise("notifications.urls", "notifications")),
+    # Debug views (staff-only)
+    path("debug/",     include_or_raise("core.urls_debug", "debug")),
 ]
 
 # >>> Simulator (namespaced; defensive import)

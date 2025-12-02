@@ -263,6 +263,67 @@ class LoginSecurity(models.Model):
         self.save(update_fields=["stage", "fail_count", "locked_until", "hard_blocked"])
 
 
+# -----------------------------
+# Onboarding Profile (wizard goals & completion)
+# -----------------------------
+class OnboardingProfile(models.Model):
+    """
+    Tracks user goals selected during the signup wizard.
+    Helps personalize the dashboard and track onboarding progress.
+    """
+    user = models.OneToOneField(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="onboarding_profile",
+    )
+    
+    # Goals selected in Step 4
+    goal_stop_theft = models.BooleanField(default=False, help_text="Stop theft and missing stock")
+    goal_see_profit = models.BooleanField(default=False, help_text="See profit and losses clearly")
+    goal_track_performance = models.BooleanField(default=False, help_text="Track agent performance and rankings")
+    goal_move_off_notebooks = models.BooleanField(default=False, help_text="Move off hardcover notebooks")
+    
+    # Wizard completion tracking
+    completed_at = models.DateTimeField(null=True, blank=True)
+    wizard_version = models.CharField(max_length=20, default="v1", help_text="Wizard version for A/B testing")
+    
+    # Business context captured during onboarding
+    first_business_name = models.CharField(max_length=200, blank=True, default="")
+    first_location_name = models.CharField(max_length=200, blank=True, default="")
+    chosen_vertical = models.CharField(max_length=50, blank=True, default="")
+    
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    class Meta:
+        db_table = "accounts_onboarding_profile"
+        indexes = [
+            models.Index(fields=["user"]),
+            models.Index(fields=["completed_at"]),
+        ]
+    
+    def __str__(self) -> str:
+        return f"Onboarding: {self.user.get_username()}"
+    
+    @property
+    def is_complete(self) -> bool:
+        return self.completed_at is not None
+    
+    @property
+    def selected_goals(self) -> list[str]:
+        """Returns a list of selected goal descriptions."""
+        goals = []
+        if self.goal_stop_theft:
+            goals.append("Stop theft and missing stock")
+        if self.goal_see_profit:
+            goals.append("See profit and losses clearly")
+        if self.goal_track_performance:
+            goals.append("Track agent performance and rankings")
+        if self.goal_move_off_notebooks:
+            goals.append("Move off hardcover notebooks")
+        return goals
+
+
 # ---------------------------------------------------
 # Signals: auto-provision Profile & LoginSecurity
 # ---------------------------------------------------

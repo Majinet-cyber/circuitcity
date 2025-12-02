@@ -474,3 +474,171 @@ class ManagerSignUpForm(forms.Form):
         return data
 
 
+# ================================================================
+# Multi-step Signup Wizard Forms
+# ================================================================
+
+class WizardStep1Form(forms.Form):
+    """Step 1: Your Account - collect user credentials"""
+    full_name = forms.CharField(
+        max_length=150,
+        label="Full name",
+        widget=forms.TextInput(attrs={
+            "placeholder": "Your full name",
+            "class": "wizard-input",
+            "autocomplete": "name",
+        }),
+    )
+    email = forms.EmailField(
+        label="Email address",
+        widget=forms.EmailInput(attrs={
+            "placeholder": "you@company.com",
+            "class": "wizard-input",
+            "autocomplete": "email",
+        }),
+    )
+    password1 = forms.CharField(
+        label="Password",
+        help_text="At least 8 characters – more is stronger.",
+        widget=forms.PasswordInput(attrs={
+            "autocomplete": "new-password",
+            "class": "wizard-input",
+            "minlength": "8",
+            "placeholder": "Create a strong password",
+        }),
+    )
+    password2 = forms.CharField(
+        label="Confirm password",
+        widget=forms.PasswordInput(attrs={
+            "autocomplete": "new-password",
+            "class": "wizard-input",
+            "minlength": "8",
+            "placeholder": "Type your password again",
+        }),
+    )
+
+    def clean_email(self):
+        email = (self.cleaned_data.get("email") or "").strip().lower()
+        if User.objects.filter(email__iexact=email).exists() or User.objects.filter(username__iexact=email).exists():
+            raise forms.ValidationError(
+                "You already have an account with this email. Please sign in instead."
+            )
+        return email
+
+    def clean(self):
+        data = super().clean()
+        dummy_user = User(username=(data.get("email") or "").strip().lower())
+        try:
+            _validate_passwords(data.get("password1"), data.get("password2"), user=dummy_user)
+        except forms.ValidationError as e:
+            self.add_error("password2", e)
+        return data
+
+
+class WizardStep2Form(forms.Form):
+    """Step 2: Your Business - collect business details"""
+    business_name = forms.CharField(
+        max_length=200,
+        label="Business name",
+        widget=forms.TextInput(attrs={
+            "placeholder": "e.g., Circuit City Area 25",
+            "class": "wizard-input",
+        }),
+    )
+    country = forms.CharField(
+        max_length=100,
+        required=False,
+        label="Country",
+        widget=forms.TextInput(attrs={
+            "placeholder": "e.g., Zambia",
+            "class": "wizard-input",
+            "autocomplete": "country",
+        }),
+    )
+    currency = forms.ChoiceField(
+        label="Currency",
+        choices=[
+            ("ZMW", "ZMW - Zambian Kwacha"),
+            ("USD", "USD - US Dollar"),
+            ("GBP", "GBP - British Pound"),
+            ("EUR", "EUR - Euro"),
+            ("ZAR", "ZAR - South African Rand"),
+            ("KES", "KES - Kenyan Shilling"),
+            ("TZS", "TZS - Tanzanian Shilling"),
+            ("UGX", "UGX - Ugandan Shilling"),
+            ("MWK", "MWK - Malawian Kwacha"),
+        ],
+        initial="ZMW",
+        widget=forms.Select(attrs={"class": "wizard-select"}),
+    )
+    business_kind = forms.ChoiceField(
+        label="Main vertical / business type",
+        choices=[("", "Select your business type...")] + list(BusinessKind.choices),
+        widget=forms.Select(attrs={"class": "wizard-select"}),
+    )
+
+    def clean_business_name(self):
+        name = (self.cleaned_data.get("business_name") or "").strip()
+        if not name:
+            raise forms.ValidationError("Enter your business name.")
+        return name
+
+
+class WizardStep3Form(forms.Form):
+    """Step 3: First Location / Shop"""
+    location_name = forms.CharField(
+        max_length=200,
+        label="Location / Shop name",
+        widget=forms.TextInput(attrs={
+            "placeholder": "e.g., Main Store or Area 25 Branch",
+            "class": "wizard-input",
+        }),
+    )
+    city = forms.CharField(
+        max_length=100,
+        required=False,
+        label="City",
+        widget=forms.TextInput(attrs={
+            "placeholder": "e.g., Lusaka",
+            "class": "wizard-input",
+            "autocomplete": "address-level2",
+        }),
+    )
+    staff_count = forms.IntegerField(
+        required=False,
+        label="Number of staff / agents (optional)",
+        widget=forms.NumberInput(attrs={
+            "placeholder": "e.g., 5",
+            "class": "wizard-input",
+            "min": "1",
+            "max": "1000",
+        }),
+    )
+
+    def clean_location_name(self):
+        name = (self.cleaned_data.get("location_name") or "").strip()
+        if not name:
+            raise forms.ValidationError("Enter your location name.")
+        return name
+
+
+class WizardStep4Form(forms.Form):
+    """Step 4: Goals & Finish - collect user goals"""
+    goal_stop_theft = forms.BooleanField(
+        required=False,
+        label="Stop theft and missing stock",
+    )
+    goal_see_profit = forms.BooleanField(
+        required=False,
+        label="See profit and losses clearly",
+    )
+    goal_track_performance = forms.BooleanField(
+        required=False,
+        label="Track agent performance and rankings",
+    )
+    goal_move_off_notebooks = forms.BooleanField(
+        required=False,
+        label="Move off hardcover notebooks",
+    )
+
+

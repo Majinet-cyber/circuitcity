@@ -1,0 +1,527 @@
+{% load static %}
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>{% block title %}Welcome to Emajinet{% endblock %}</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#3b82f6" />
+  <style>
+    :root {
+      --ink: #0b1220;
+      --muted: #64748b;
+      --line: #dbe3f0;
+      --card: #ffffffdd;
+      --bg1: #eef4ff;
+      --bg2: #ffffff;
+      --blue: #3b82f6;
+      --blue-light: #60a5fa;
+      --green: #10b981;
+      --rose: #ef4444;
+      --yellow: #f59e0b;
+      
+      --shadow: 0 20px 50px rgba(15, 23, 42, 0.15), 0 1px 0 rgba(255, 255, 255, 0.7) inset;
+      --glass: color-mix(in oklab, var(--card) 85%, transparent);
+      --radius: 20px;
+      --pop: cubic-bezier(0.17, 0.67, 0.25, 1.35);
+      --fast: 180ms;
+      --med: 280ms;
+      --slow: 450ms;
+    }
+    
+    * { box-sizing: border-box; }
+    html, body { height: 100%; }
+    
+    body {
+      margin: 0;
+      color: var(--ink);
+      font: 500 16px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, Roboto, "Noto Sans", Arial, sans-serif;
+      background:
+        radial-gradient(1400px 900px at -10% -10%, rgba(96, 165, 250, 0.14), transparent 50%),
+        radial-gradient(1600px 900px at 110% 110%, rgba(59, 130, 246, 0.12), transparent 52%),
+        linear-gradient(180deg, var(--bg1), var(--bg2));
+      overflow-x: hidden;
+    }
+    
+    /* Layout */
+    .wizard-wrap {
+      min-height: 100dvh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: clamp(16px, 3vw, 40px);
+    }
+    
+    /* Progress indicator */
+    .progress-bar {
+      width: 100%;
+      max-width: 680px;
+      margin-bottom: 2rem;
+      animation: fadeInDown 0.5s var(--pop) both;
+    }
+    
+    .progress-steps {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      position: relative;
+      margin-bottom: 1rem;
+    }
+    
+    .progress-line {
+      position: absolute;
+      top: 50%;
+      left: 0;
+      right: 0;
+      height: 3px;
+      background: #e5e7eb;
+      border-radius: 999px;
+      transform: translateY(-50%);
+      z-index: 0;
+    }
+    
+    .progress-fill {
+      height: 100%;
+      background: linear-gradient(90deg, var(--blue), var(--blue-light));
+      border-radius: 999px;
+      transition: width 0.5s var(--pop);
+    }
+    
+    .progress-step {
+      position: relative;
+      z-index: 1;
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      background: #e5e7eb;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 800;
+      font-size: 0.9rem;
+      color: #9ca3af;
+      transition: all var(--med) var(--pop);
+    }
+    
+    .progress-step.active {
+      background: linear-gradient(135deg, var(--blue), var(--blue-light));
+      color: white;
+      box-shadow: 0 8px 24px rgba(59, 130, 246, 0.3);
+      transform: scale(1.15);
+    }
+    
+    .progress-step.completed {
+      background: var(--green);
+      color: white;
+    }
+    
+    .progress-step.completed::after {
+      content: "✓";
+      font-size: 1.2rem;
+    }
+    
+    .progress-label {
+      text-align: center;
+      font-size: 0.75rem;
+      color: var(--muted);
+      margin-top: 0.5rem;
+      font-weight: 600;
+    }
+    
+    /* Card */
+    .wizard-card {
+      width: min(680px, 95vw);
+      background: var(--glass);
+      backdrop-filter: blur(20px) saturate(130%);
+      border: 1px solid rgba(255, 255, 255, 0.5);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      padding: clamp(20px, 4vw, 48px);
+      animation: popIn var(--slow) var(--pop) both 0.15s;
+    }
+    
+    @keyframes popIn {
+      from { opacity: 0; transform: translateY(12px) scale(0.97); }
+      to { opacity: 1; transform: none; }
+    }
+    
+    @keyframes fadeInDown {
+      from { opacity: 0; transform: translateY(-12px); }
+      to { opacity: 1; transform: none; }
+    }
+    
+    /* Brand */
+    .wizard-brand {
+      display: flex;
+      align-items: center;
+      gap: 0.7rem;
+      font-weight: 900;
+      font-size: 1.1rem;
+      color: #0b2868;
+      margin-bottom: 1.5rem;
+    }
+    
+    .wizard-brand img {
+      width: 28px;
+      height: 28px;
+    }
+    
+    /* Level badge */
+    .level-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+      padding: 0.4rem 0.9rem;
+      background: linear-gradient(135deg, #fbbf24, #f59e0b);
+      color: #78350f;
+      font-weight: 800;
+      font-size: 0.8rem;
+      border-radius: 999px;
+      margin-bottom: 1rem;
+      box-shadow: 0 4px 12px rgba(245, 158, 11, 0.25);
+    }
+    
+    /* Typography */
+    .wizard-title {
+      font-size: clamp(28px, 4vw, 42px);
+      line-height: 1.15;
+      font-weight: 900;
+      margin: 0.5rem 0 1rem;
+      color: #0b2868;
+    }
+    
+    .wizard-subtitle {
+      color: var(--muted);
+      margin: 0 0 2rem;
+      font-size: 1.05rem;
+      line-height: 1.6;
+    }
+    
+    /* Forms */
+    .wizard-form {
+      display: flex;
+      flex-direction: column;
+      gap: 1.5rem;
+    }
+    
+    .form-field {
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+    }
+    
+    .form-label {
+      font-weight: 800;
+      font-size: 0.95rem;
+      color: #0b2868;
+    }
+    
+    .wizard-input, .wizard-select {
+      width: 100%;
+      border: 2px solid var(--line);
+      border-radius: 14px;
+      padding: 14px 16px;
+      background: #f8faff;
+      font-weight: 600;
+      font-size: 1rem;
+      transition: all var(--fast) var(--pop);
+      outline: 0;
+    }
+    
+    .wizard-input:focus, .wizard-select:focus {
+      border-color: var(--blue);
+      background: #fff;
+      box-shadow: 0 8px 28px rgba(59, 130, 246, 0.2);
+      transform: translateY(-1px);
+    }
+    
+    .wizard-input::placeholder {
+      color: #94a3b8;
+    }
+    
+    .form-hint {
+      font-size: 0.88rem;
+      color: var(--muted);
+    }
+    
+    .form-error {
+      color: var(--rose);
+      font-weight: 600;
+      font-size: 0.9rem;
+    }
+    
+    /* Checkboxes */
+    .checkbox-group {
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+    }
+    
+    .checkbox-item {
+      display: flex;
+      align-items: center;
+      gap: 0.8rem;
+      padding: 1rem;
+      background: #f8faff;
+      border: 2px solid var(--line);
+      border-radius: 12px;
+      cursor: pointer;
+      transition: all var(--fast) var(--pop);
+    }
+    
+    .checkbox-item:hover {
+      border-color: var(--blue-light);
+      background: #fff;
+    }
+    
+    .checkbox-item input[type="checkbox"] {
+      width: 20px;
+      height: 20px;
+      cursor: pointer;
+    }
+    
+    .checkbox-item label {
+      font-weight: 600;
+      cursor: pointer;
+      flex: 1;
+    }
+    
+    /* Buttons */
+    .wizard-actions {
+      display: flex;
+      gap: 1rem;
+      margin-top: 2rem;
+    }
+    
+    .btn {
+      flex: 1;
+      padding: 14px 24px;
+      border: 2px solid;
+      border-radius: 14px;
+      font-weight: 900;
+      font-size: 1rem;
+      cursor: pointer;
+      transition: all var(--fast) var(--pop);
+      text-decoration: none;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.5rem;
+    }
+    
+    .btn-primary {
+      background: linear-gradient(135deg, var(--blue), var(--blue-light));
+      color: white;
+      border-color: transparent;
+      box-shadow: 0 16px 42px rgba(59, 130, 246, 0.3);
+    }
+    
+    .btn-primary:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 20px 50px rgba(59, 130, 246, 0.4);
+    }
+    
+    .btn-secondary {
+      background: #f1f5f9;
+      color: #475569;
+      border-color: #e2e8f0;
+    }
+    
+    .btn-secondary:hover {
+      background: #e2e8f0;
+      transform: translateY(-1px);
+    }
+    
+    .btn:active {
+      transform: scale(0.98);
+    }
+    
+    .btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+    
+    /* Benefits list */
+    .benefits-list {
+      list-style: none;
+      padding: 0;
+      margin: 2rem 0;
+    }
+    
+    .benefits-list li {
+      padding: 1rem 1rem 1rem 3rem;
+      margin-bottom: 0.8rem;
+      background: #f8faff;
+      border-radius: 12px;
+      border: 1px solid var(--line);
+      position: relative;
+      font-weight: 600;
+      color: #334155;
+    }
+    
+    .benefits-list li::before {
+      content: "✓";
+      position: absolute;
+      left: 1rem;
+      top: 50%;
+      transform: translateY(-50%);
+      width: 28px;
+      height: 28px;
+      background: var(--green);
+      color: white;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 900;
+    }
+    
+    /* Summary card */
+    .summary-card {
+      background: #f8faff;
+      border: 2px solid var(--line);
+      border-radius: 14px;
+      padding: 1.5rem;
+      margin: 2rem 0;
+    }
+    
+    .summary-title {
+      font-weight: 800;
+      color: #0b2868;
+      margin-bottom: 1rem;
+    }
+    
+    .summary-item {
+      display: flex;
+      justify-content: space-between;
+      padding: 0.75rem 0;
+      border-bottom: 1px solid var(--line);
+    }
+    
+    .summary-item:last-child {
+      border-bottom: none;
+    }
+    
+    .summary-label {
+      color: var(--muted);
+      font-weight: 600;
+    }
+    
+    .summary-value {
+      font-weight: 800;
+      color: #0b2868;
+    }
+    
+    /* Messages */
+    .messages {
+      margin-bottom: 1.5rem;
+    }
+    
+    .message {
+      padding: 1rem 1.25rem;
+      border-radius: 12px;
+      margin-bottom: 0.75rem;
+      font-weight: 600;
+      animation: slideInDown 0.4s var(--pop);
+    }
+    
+    @keyframes slideInDown {
+      from { opacity: 0; transform: translateY(-10px); }
+      to { opacity: 1; transform: none; }
+    }
+    
+    .message.error {
+      background: #fef2f2;
+      border: 2px solid #fecaca;
+      color: #991b1b;
+    }
+    
+    .message.success {
+      background: #f0fdf4;
+      border: 2px solid #bbf7d0;
+      color: #166534;
+    }
+    
+    /* Confetti animation */
+    .confetti {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      z-index: 9999;
+    }
+    
+    @keyframes confetti-fall {
+      to {
+        transform: translateY(100vh) rotate(360deg);
+        opacity: 0;
+      }
+    }
+    
+    /* Responsive */
+    @media (max-width: 640px) {
+      .wizard-actions {
+        flex-direction: column-reverse;
+      }
+      
+      .btn {
+        width: 100%;
+      }
+      
+      .progress-step {
+        width: 32px;
+        height: 32px;
+        font-size: 0.8rem;
+      }
+    }
+  </style>
+  {% block extra_styles %}{% endblock %}
+</head>
+<body>
+  <div class="wizard-wrap">
+    <!-- Progress Bar -->
+    <div class="progress-bar">
+      <div class="progress-steps">
+        <div class="progress-line">
+          <div class="progress-fill" style="width: {{ step|add:"-0" }}0%"></div>
+        </div>
+        {% for i in "01234" %}
+        <div class="progress-step {% if step >= forloop.counter0 %}{% if step > forloop.counter0 %}completed{% else %}active{% endif %}{% endif %}">
+          {% if step > forloop.counter0 %}{% else %}{{ forloop.counter }}{% endif %}
+        </div>
+        {% endfor %}
+      </div>
+      <div class="progress-label">Step {{ step|add:"1" }} of {{ total_steps }}</div>
+    </div>
+    
+    <!-- Card -->
+    <div class="wizard-card">
+      <!-- Brand -->
+      <div class="wizard-brand">
+        <img src="{% static 'brand/mjn-32.png' %}" alt="Emajinet" />
+        <span>Emajinet</span>
+      </div>
+      
+      <!-- Messages -->
+      {% if messages %}
+      <div class="messages">
+        {% for message in messages %}
+        <div class="message {% if message.tags %}{{ message.tags }}{% endif %}">
+          {{ message }}
+        </div>
+        {% endfor %}
+      </div>
+      {% endif %}
+      
+      <!-- Content -->
+      {% block content %}{% endblock %}
+    </div>
+  </div>
+  
+  {% block extra_scripts %}{% endblock %}
+</body>
+</html>
+

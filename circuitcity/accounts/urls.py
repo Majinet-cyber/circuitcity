@@ -16,6 +16,12 @@ urlpatterns = [
     # Authentication
     # -------------------------------
     path("login/", views.login_view, name="login"),
+    
+    # New multi-step wizard (primary signup flow)
+    path("signup/", views.signup_wizard, {"step": 0}, name="signup"),
+    path("signup/wizard/<int:step>/", views.signup_wizard, name="signup_wizard_step"),
+    
+    # Legacy single-page signup (kept for backwards compatibility)
     path("signup/manager/", views.signup_manager, name="signup_manager"),
 
     # Logout (supports GET or POST), plus a vanilla CBV option

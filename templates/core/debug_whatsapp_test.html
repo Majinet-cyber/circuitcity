@@ -1,0 +1,96 @@
+{% extends "base.html" %}
+
+{% block title %}WhatsApp Test - Debug{% endblock %}
+
+{% block header_title %}WhatsApp Test (Debug){% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+  <div class="row">
+    <div class="col-md-8 offset-md-2">
+      <div class="card">
+        <div class="card-header bg-dark text-white">
+          <h5 class="mb-0">
+            <i class="bi bi-whatsapp"></i> WhatsApp Cloud API Test
+          </h5>
+        </div>
+        <div class="card-body">
+          {% if success %}
+            <div class="alert alert-success" role="alert">
+              <i class="bi bi-check-circle-fill"></i>
+              <strong>Message sent successfully!</strong>
+              <p class="mb-0 mt-2">Check your WhatsApp for the test message.</p>
+            </div>
+            
+            {% if response_data %}
+              <div class="mt-3">
+                <h6>API Response:</h6>
+                <pre class="bg-light p-3 rounded"><code>{{ response_data }}</code></pre>
+              </div>
+            {% endif %}
+          {% endif %}
+          
+          {% if error %}
+            <div class="alert alert-danger" role="alert">
+              <i class="bi bi-exclamation-triangle-fill"></i>
+              <strong>Error:</strong> {{ error }}
+            </div>
+          {% endif %}
+          
+          <form method="post" class="mt-3">
+            {% csrf_token %}
+            
+            <div class="mb-3">
+              <label for="to_number" class="form-label">
+                WhatsApp Number <span class="text-danger">*</span>
+              </label>
+              <input 
+                type="text" 
+                class="form-control" 
+                id="to_number" 
+                name="to_number" 
+                value="{{ to_number }}"
+                placeholder="265883596135"
+                required
+              >
+              <div class="form-text">
+                Enter the WhatsApp number in international format (digits only, no + or spaces).
+                Example: 265883596135
+              </div>
+            </div>
+            
+            <div class="alert alert-info">
+              <small>
+                <strong>Test Message:</strong> "Emajinet test: your WhatsApp integration is live ✅"
+              </small>
+            </div>
+            
+            <button type="submit" class="btn btn-primary">
+              <i class="bi bi-send-fill"></i> Send Test Message
+            </button>
+            
+            <a href="{% url 'inventory:stock_list' %}" class="btn btn-secondary">
+              Back to Dashboard
+            </a>
+          </form>
+          
+          <hr class="my-4">
+          
+          <div class="text-muted small">
+            <p><strong>Environment Variables:</strong></p>
+            <ul>
+              <li><code>WHATSAPP_TOKEN</code>: {{ WHATSAPP_TOKEN|default:"Not set"|slice:":20" }}{% if WHATSAPP_TOKEN %}...{% endif %}</li>
+              <li><code>WHATSAPP_PHONE_NUMBER_ID</code>: {{ WHATSAPP_PHONE_NUMBER_ID|default:"Not set" }}</li>
+            </ul>
+            <p class="mb-0">
+              <i class="bi bi-shield-lock-fill"></i> 
+              This page is restricted to staff/superuser only.
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+

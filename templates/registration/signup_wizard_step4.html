@@ -1,0 +1,102 @@
+{% extends "registration/wizard_base.html" %}
+
+{% block title %}Step 4: Almost Done - Emajinet{% endblock %}
+
+{% block content %}
+<div class="level-badge">
+  🎯 Level 4 – Unlock Your Dashboard
+</div>
+
+<h1 class="wizard-title">You're Almost There!</h1>
+<p class="wizard-subtitle">
+  You're 1 step away from real-time dashboards. Let us know what you want to achieve:
+</p>
+
+<form method="post" class="wizard-form" novalidate>
+  {% csrf_token %}
+  
+  <div class="checkbox-group">
+    <div class="checkbox-item">
+      {{ form.goal_stop_theft }}
+      <label for="id_goal_stop_theft">
+        Stop theft and missing stock
+      </label>
+    </div>
+    
+    <div class="checkbox-item">
+      {{ form.goal_see_profit }}
+      <label for="id_goal_see_profit">
+        See profit and losses clearly
+      </label>
+    </div>
+    
+    <div class="checkbox-item">
+      {{ form.goal_track_performance }}
+      <label for="id_goal_track_performance">
+        Track agent performance and rankings
+      </label>
+    </div>
+    
+    <div class="checkbox-item">
+      {{ form.goal_move_off_notebooks }}
+      <label for="id_goal_move_off_notebooks">
+        Move off hardcover notebooks
+      </label>
+    </div>
+  </div>
+  
+  <!-- Summary Card -->
+  <div class="summary-card">
+    <div class="summary-title">📋 Your Setup Summary</div>
+    
+    <div class="summary-item">
+      <span class="summary-label">Account</span>
+      <span class="summary-value">{{ wizard_data.step1.full_name }}</span>
+    </div>
+    
+    <div class="summary-item">
+      <span class="summary-label">Business</span>
+      <span class="summary-value">{{ wizard_data.step2.business_name }}</span>
+    </div>
+    
+    <div class="summary-item">
+      <span class="summary-label">First Location</span>
+      <span class="summary-value">{{ wizard_data.step3.location_name }}</span>
+    </div>
+    
+    <div class="summary-item">
+      <span class="summary-label">Vertical</span>
+      <span class="summary-value">{{ wizard_data.step2.business_kind|title }}</span>
+    </div>
+  </div>
+  
+  {% if form.non_field_errors %}
+    <div class="form-error">
+      {% for error in form.non_field_errors %}
+        {{ error }}
+      {% endfor %}
+    </div>
+  {% endif %}
+  
+  <div class="wizard-actions">
+    <a href="{% url 'accounts:signup_wizard_step' step=3 %}" class="btn btn-secondary">
+      ← Back
+    </a>
+    <button type="submit" class="btn btn-primary" id="launchBtn">
+      🚀 Launch My Dashboard
+    </button>
+  </div>
+</form>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+  // Add loading state to button on submit
+  document.querySelector('form').addEventListener('submit', function(e) {
+    const btn = document.getElementById('launchBtn');
+    btn.innerHTML = '🚀 Launching...';
+    btn.disabled = true;
+  });
+</script>
+{% endblock %}
+

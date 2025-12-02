@@ -1,0 +1,79 @@
+{% extends "registration/wizard_base.html" %}
+
+{% block title %}Step 2: Your Business - Emajinet{% endblock %}
+
+{% block content %}
+<div class="level-badge">
+  🏢 Level 2 – Name Your Empire
+</div>
+
+<h1 class="wizard-title">Your Business</h1>
+<p class="wizard-subtitle">
+  Tell us about your business. This helps us customize your dashboard and features.
+</p>
+
+<form method="post" class="wizard-form" novalidate>
+  {% csrf_token %}
+  
+  <div class="form-field">
+    <label class="form-label" for="id_business_name">Business Name</label>
+    {{ form.business_name }}
+    {% if form.business_name.errors %}
+      {% for error in form.business_name.errors %}
+        <div class="form-error">{{ error }}</div>
+      {% endfor %}
+    {% endif %}
+    <div class="form-hint">This will appear on your dashboard and reports</div>
+  </div>
+  
+  <div class="form-field">
+    <label class="form-label" for="id_country">Country</label>
+    {{ form.country }}
+    {% if form.country.errors %}
+      {% for error in form.country.errors %}
+        <div class="form-error">{{ error }}</div>
+      {% endfor %}
+    {% endif %}
+  </div>
+  
+  <div class="form-field">
+    <label class="form-label" for="id_currency">Currency</label>
+    {{ form.currency }}
+    {% if form.currency.errors %}
+      {% for error in form.currency.errors %}
+        <div class="form-error">{{ error }}</div>
+      {% endfor %}
+    {% endif %}
+    <div class="form-hint">This will be used for all pricing and reports</div>
+  </div>
+  
+  <div class="form-field">
+    <label class="form-label" for="id_business_kind">Main Vertical / Business Type</label>
+    {{ form.business_kind }}
+    {% if form.business_kind.errors %}
+      {% for error in form.business_kind.errors %}
+        <div class="form-error">{{ error }}</div>
+      {% endfor %}
+    {% endif %}
+    <div class="form-hint">We'll customize features based on your business type</div>
+  </div>
+  
+  {% if form.non_field_errors %}
+    <div class="form-error">
+      {% for error in form.non_field_errors %}
+        {{ error }}
+      {% endfor %}
+    </div>
+  {% endif %}
+  
+  <div class="wizard-actions">
+    <a href="{% url 'accounts:signup_wizard_step' step=1 %}" class="btn btn-secondary">
+      ← Back
+    </a>
+    <button type="submit" class="btn btn-primary">
+      Continue →
+    </button>
+  </div>
+</form>
+{% endblock %}
+
