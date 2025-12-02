@@ -870,10 +870,8 @@ urlpatterns = [
     path("api/scan-sold/submit/", _need_biz(_scan_sold_submit_view), name="api_scan_sold_submit"),
 ]
 
-# Vertical dashboards
-urlpatterns += [
-    path("verticals/", include("inventory.urls_verticals")),
-]
+# Vertical dashboards are now included directly in cc/urls.py at the root level
+# to ensure the namespace is properly registered
 
 # -------------------- JSON APIs (NO require_business wrapper) --------------------
 urlpatterns += [

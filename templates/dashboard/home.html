@@ -84,21 +84,25 @@
   </div>
 
   {% if first_run %}
-    <!-- First-run checklist -->
+    <!-- First-run checklist (business-kind aware) -->
     <div class="card shadow-sm mb-4">
       <div class="card-body">
         <h5 class="mb-2">Welcome to {{ request.business.name|default:"your business" }}</h5>
-        <p class="text-muted mb-4">Let’s set up your store. Do these in order:</p>
+        <p class="text-muted mb-4">Let's set up your 
+          {% if vertical_kind == "gym" %}gym
+          {% elif vertical_kind == "clothing" %}clothing store
+          {% elif vertical_kind == "liquor" %}liquor store
+          {% elif vertical_kind == "pharmacy" %}pharmacy
+          {% else %}business{% endif %}. Do these in order:</p>
         <div class="row g-3">
+          {% for step in onboarding_steps %}
           <div class="col-md-4">
-            <a class="btn btn-primary w-100" href="{{ product_new_url|default:'#' }}">1) Add your first product</a>
+            <a class="btn {% if step.number == '1' %}btn-primary{% else %}btn-outline-primary{% endif %} w-100" 
+               href="{{ step.url }}">
+              <i class="bi {{ step.icon }}"></i> {{ step.number }}) {{ step.label }}
+            </a>
           </div>
-          <div class="col-md-4">
-            <a class="btn btn-outline-primary w-100" href="{{ stock_in_url|default:'#' }}">2) Stock in items</a>
-          </div>
-          <div class="col-md-4">
-            <a class="btn btn-outline-primary w-100" href="{{ agents_review_url|default:'#' }}">3) Invite/approve agents</a>
-          </div>
+          {% endfor %}
         </div>
       </div>
     </div>

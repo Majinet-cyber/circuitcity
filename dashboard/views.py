@@ -23,6 +23,7 @@ from tenants.utils import require_business  # ✅ tenant guard
 from inventory.models import InventoryItem
 from sales.models import Sale
 from reports.kpis import compute_sales_kpis
+from inventory.utils_verticals import get_vertical_kind, get_vertical_dashboard_url, get_onboarding_steps
 
 # Gamification imports
 try:
@@ -302,13 +303,29 @@ def _products_count(biz) -> int:
 def home(request):
     """
     Default dashboard for managers/agents within an active business.
-    Shows a 'first-run' checklist when there’s no data yet; otherwise normal KPIs.
+    Shows a 'first-run' checklist when there's no data yet; otherwise normal KPIs.
     Staff users are redirected to the staff dashboard (per-tenant view if business is set).
+    
+    Routes to vertical-specific dashboards for gym, clothing, liquor, and pharmacy.
     """
     if request.user.is_staff:
         return redirect("dashboard:admin_dashboard")
 
     biz = request.business
+    
+    # ==============================================================================
+    # VERTICAL ROUTING: Redirect to vertical-specific dashboards
+    # ==============================================================================
+    vertical_kind = get_vertical_kind(biz)
+    vertical_dashboard_url = get_vertical_dashboard_url(vertical_kind)
+    
+    if vertical_dashboard_url:
+        # Redirect to vertical-specific dashboard (gym, pharmacy, clothing, liquor)
+        try:
+            return redirect(vertical_dashboard_url)
+        except NoReverseMatch:
+            # If the URL doesn't exist, fall through to default dashboard
+            pass
 
     # Canonical KPI source (tenant-wide for the dashboard tiles)
     inv_kpis = business_metrics(request, include_agent_scope=False)
@@ -353,6 +370,9 @@ def home(request):
         .count()
     )
 
+    # Onboarding steps tailored to business vertical
+    onboarding_steps = get_onboarding_steps(vertical_kind, request)
+    
     ctx = {
         "first_run": first_run,
         "products_count": products_count,
@@ -362,6 +382,8 @@ def home(request):
         "kpis": kpis,
         "sold_mtd_count": sold_mtd_count,
         "staff_view": False,
+        "vertical_kind": vertical_kind,
+        "onboarding_steps": onboarding_steps,
     }
     return render(request, "dashboard/home.html", ctx)
 

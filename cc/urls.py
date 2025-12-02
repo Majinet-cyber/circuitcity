@@ -532,6 +532,7 @@ urlpatterns += [
 # Include app urlconfs
 urlpatterns += [
     path("inventory/", include_or_raise("inventory.urls", "inventory")),
+    path("inventory/verticals/", include_or_raise("inventory.urls_verticals", "inventory_verticals")),  # Vertical-specific dashboards
     path("tenants/",   include_or_raise("tenants.urls", "tenants")),
     path("dashboard/", include_or_raise("dashboard.urls", "dashboard")),
     # ADD: Layby app include (fixes /layby/ 404)
