@@ -17,8 +17,17 @@ from tenants.decorators import hq_only
 @login_required
 @hq_only
 def audit_log_list(request):
-    """HQ view: List and filter audit logs."""
-    logs = AuditLog.objects.all().select_related('business', 'user')
+    """
+    HQ view: List and filter audit logs.
+    
+    STAFF-ONLY SCOPE: This page shows platform staff/superuser activity only,
+    not merchant/tenant activity. Purpose: prove we don't snoop merchant data
+    unless we're fixing something.
+    """
+    # Base queryset: ONLY staff/superuser activity (HQ transparency requirement)
+    logs = AuditLog.objects.filter(
+        Q(user__is_staff=True) | Q(user__is_superuser=True)
+    ).select_related('business', 'user')
     
     # Date range filter
     start_date = request.GET.get('start_date')
@@ -79,7 +88,11 @@ def audit_log_list(request):
     User = get_user_model()
     
     businesses = Business.objects.filter(status='ACTIVE').order_by('name')
-    users = User.objects.filter(is_active=True).order_by('username')[:100]
+    # Only show staff/superuser in filter dropdown (consistent with queryset)
+    users = User.objects.filter(
+        Q(is_staff=True) | Q(is_superuser=True),
+        is_active=True
+    ).order_by('username')[:100]
     
     # Common actions
     common_actions = ['VIEW', 'EXPORT', 'UPDATE', 'DELETE', 'CREATE']
@@ -131,10 +144,13 @@ def export_audit_logs_csv(queryset, start_date=None, end_date=None):
 @login_required
 @hq_only
 def audit_log_stats(request):
-    """HQ view: Audit log statistics and insights."""
-    # Last 30 days
+    """HQ view: Audit log statistics and insights (staff activity only)."""
+    # Last 30 days, staff/superuser only
     thirty_days_ago = timezone.now() - timedelta(days=30)
-    recent_logs = AuditLog.objects.filter(created_at__gte=thirty_days_ago)
+    recent_logs = AuditLog.objects.filter(
+        Q(user__is_staff=True) | Q(user__is_superuser=True),
+        created_at__gte=thirty_days_ago
+    )
     
     stats = {
         'total_recent': recent_logs.count(),

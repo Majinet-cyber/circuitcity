@@ -216,10 +216,146 @@ def get_vertical_display_name(vertical_kind: str) -> str:
     return display_names.get(vertical_kind, vertical_kind.title())
 
 
+def get_vertical_sidebar_items(business_kind: str) -> list[dict]:
+    """
+    Returns a list of sidebar navigation items for the given business kind.
+    
+    Each item is a dict with keys:
+        - section: str (e.g., "MAIN", "TIME", "MONEY", "BUSINESS", "LAYBY")
+        - url: str (URL or named route)
+        - label: str (display label)
+        - icon: str (Bootstrap icon class, e.g., "bi-speedometer2")
+        - active_pattern: str (optional, for path matching)
+    
+    Args:
+        business_kind: Vertical code (e.g., "phones", "gym", "clothing", "liquor", "pharmacy")
+    
+    Returns:
+        List of nav items organized by section
+    """
+    if business_kind == "gym":
+        return [
+            # MAIN section
+            {"section": "MAIN", "url": "dashboard:home", "label": "Dashboard", "icon": "bi-speedometer2", "active_pattern": "/dashboard/"},
+            {"section": "MAIN", "url": "inventory_verticals:gym_dashboard", "label": "Gym Hub", "icon": "bi-activity", "active_pattern": "/verticals/gym/"},
+            {"section": "MAIN", "url": "tenants:manager_review_agents", "label": "Members", "icon": "bi-people", "active_pattern": "/tenants/manager/agents/"},
+            {"section": "MAIN", "url": "inventory:time_logs", "label": "Check-ins", "icon": "bi-clipboard-check", "active_pattern": "/inventory/time"},
+            {"section": "MAIN", "url": "wallet:agent_wallet", "label": "Wallet", "icon": "bi-wallet2", "active_pattern": "/wallet/"},
+            
+            # TIME section
+            {"section": "TIME", "url": "inventory:time_logs", "label": "Time Logs", "icon": "bi-journal-text", "active_pattern": "/inventory/time/logs"},
+            
+            # MONEY section (for managers)
+            {"section": "MONEY", "url": "wallet:agent_wallet", "label": "My Wallet", "icon": "bi-wallet2", "active_pattern": "/wallet/"},
+            {"section": "MONEY", "url": "wallet:admin_home", "label": "Admin Wallet", "icon": "bi-briefcase", "active_pattern": "/wallet/admin/", "require_manager": True},
+            
+            # BUSINESS section (for managers)
+            {"section": "BUSINESS", "url": "tenants:manager_review_agents", "label": "Trainers", "icon": "bi-people", "active_pattern": "/tenants/manager/agents/", "require_manager": True},
+            {"section": "BUSINESS", "url": "tenants:manager_locations", "label": "Locations", "icon": "bi-geo", "active_pattern": "/tenants/manager/locations/", "require_manager": True},
+            {"section": "BUSINESS", "url": "billing:plans", "label": "Choose Plan", "icon": "bi-credit-card-2-front", "active_pattern": "/billing/plans", "require_manager": True},
+        ]
+    
+    elif business_kind == "clothing":
+        return [
+            # MAIN section
+            {"section": "MAIN", "url": "dashboard:home", "label": "Dashboard", "icon": "bi-speedometer2", "active_pattern": "/dashboard/"},
+            {"section": "MAIN", "url": "inventory_verticals:clothing_dashboard", "label": "Clothing Hub", "icon": "bi-person-bounding-box", "active_pattern": "/verticals/clothing/"},
+            {"section": "MAIN", "url": "inventory:clothing_product_new_v2", "label": "Add Product", "icon": "bi-plus-square", "active_pattern": "/clothing/products/new"},
+            {"section": "MAIN", "url": "inventory:scan_in", "label": "Stock In", "icon": "bi-upc-scan", "active_pattern": "/inventory/scan"},
+            {"section": "MAIN", "url": "inventory:scan_sold", "label": "Sell", "icon": "bi-bag-check", "active_pattern": "/sell/"},
+            
+            # TIME section
+            {"section": "TIME", "url": "inventory:time_logs", "label": "Time Logs", "icon": "bi-journal-text", "active_pattern": "/inventory/time/logs"},
+            
+            # MONEY section
+            {"section": "MONEY", "url": "wallet:agent_wallet", "label": "My Wallet", "icon": "bi-wallet2", "active_pattern": "/wallet/"},
+            {"section": "MONEY", "url": "wallet:admin_home", "label": "Admin Wallet", "icon": "bi-briefcase", "active_pattern": "/wallet/admin/", "require_manager": True},
+            
+            # BUSINESS section (for managers)
+            {"section": "BUSINESS", "url": "tenants:manager_review_agents", "label": "Agents", "icon": "bi-people", "active_pattern": "/tenants/manager/agents/", "require_manager": True},
+            {"section": "BUSINESS", "url": "tenants:manager_locations", "label": "Locations", "icon": "bi-geo", "active_pattern": "/tenants/manager/locations/", "require_manager": True},
+            {"section": "BUSINESS", "url": "billing:plans", "label": "Choose Plan", "icon": "bi-credit-card-2-front", "active_pattern": "/billing/plans", "require_manager": True},
+            {"section": "BUSINESS", "url": "inventory:orders_list", "label": "Orders", "icon": "bi-clipboard-data", "active_pattern": "/inventory/orders/", "require_manager": True},
+        ]
+    
+    elif business_kind == "liquor":
+        return [
+            # MAIN section
+            {"section": "MAIN", "url": "dashboard:home", "label": "Dashboard", "icon": "bi-speedometer2", "active_pattern": "/dashboard/"},
+            {"section": "MAIN", "url": "inventory_verticals:liquor_dashboard", "label": "Liquor Hub", "icon": "bi-cup-straw", "active_pattern": "/verticals/liquor/"},
+            {"section": "MAIN", "url": "inventory:liquor_product_new_v2", "label": "Add Product", "icon": "bi-droplet-half", "active_pattern": "/liquor/products/new"},
+            {"section": "MAIN", "url": "inventory:scan_in", "label": "Stock In", "icon": "bi-upc-scan", "active_pattern": "/inventory/scan"},
+            {"section": "MAIN", "url": "inventory:scan_sold", "label": "Sell", "icon": "bi-lightning-charge", "active_pattern": "/sell/"},
+            
+            # TIME section
+            {"section": "TIME", "url": "inventory:time_logs", "label": "Time Logs", "icon": "bi-journal-text", "active_pattern": "/inventory/time/logs"},
+            
+            # MONEY section
+            {"section": "MONEY", "url": "wallet:agent_wallet", "label": "My Wallet", "icon": "bi-wallet2", "active_pattern": "/wallet/"},
+            {"section": "MONEY", "url": "wallet:admin_home", "label": "Admin Wallet", "icon": "bi-briefcase", "active_pattern": "/wallet/admin/", "require_manager": True},
+            
+            # BUSINESS section (for managers)
+            {"section": "BUSINESS", "url": "tenants:manager_review_agents", "label": "Agents", "icon": "bi-people", "active_pattern": "/tenants/manager/agents/", "require_manager": True},
+            {"section": "BUSINESS", "url": "tenants:manager_locations", "label": "Locations", "icon": "bi-geo", "active_pattern": "/tenants/manager/locations/", "require_manager": True},
+            {"section": "BUSINESS", "url": "billing:plans", "label": "Choose Plan", "icon": "bi-credit-card-2-front", "active_pattern": "/billing/plans", "require_manager": True},
+        ]
+    
+    elif business_kind == "pharmacy":
+        return [
+            # MAIN section
+            {"section": "MAIN", "url": "dashboard:home", "label": "Dashboard", "icon": "bi-speedometer2", "active_pattern": "/dashboard/"},
+            {"section": "MAIN", "url": "inventory_verticals:pharmacy_dashboard", "label": "Pharmacy Hub", "icon": "bi-prescription2", "active_pattern": "/verticals/pharmacy/"},
+            {"section": "MAIN", "url": "inventory:pharmacy_product_new", "label": "Add Medicine", "icon": "bi-capsule", "active_pattern": "/pharmacy/products/new"},
+            {"section": "MAIN", "url": "inventory:pharmacy_batches", "label": "Batches", "icon": "bi-boxes", "active_pattern": "/pharmacy/batches"},
+            {"section": "MAIN", "url": "inventory:scan_in", "label": "Stock In", "icon": "bi-upc-scan", "active_pattern": "/inventory/scan"},
+            {"section": "MAIN", "url": "inventory:scan_sold", "label": "Sell", "icon": "bi-bag-check", "active_pattern": "/sell/"},
+            
+            # TIME section
+            {"section": "TIME", "url": "inventory:time_logs", "label": "Time Logs", "icon": "bi-journal-text", "active_pattern": "/inventory/time/logs"},
+            
+            # MONEY section
+            {"section": "MONEY", "url": "wallet:agent_wallet", "label": "My Wallet", "icon": "bi-wallet2", "active_pattern": "/wallet/"},
+            {"section": "MONEY", "url": "wallet:admin_home", "label": "Admin Wallet", "icon": "bi-briefcase", "active_pattern": "/wallet/admin/", "require_manager": True},
+            
+            # BUSINESS section (for managers)
+            {"section": "BUSINESS", "url": "tenants:manager_review_agents", "label": "Agents", "icon": "bi-people", "active_pattern": "/tenants/manager/agents/", "require_manager": True},
+            {"section": "BUSINESS", "url": "tenants:manager_locations", "label": "Locations", "icon": "bi-geo", "active_pattern": "/tenants/manager/locations/", "require_manager": True},
+            {"section": "BUSINESS", "url": "billing:plans", "label": "Choose Plan", "icon": "bi-credit-card-2-front", "active_pattern": "/billing/plans", "require_manager": True},
+        ]
+    
+    else:  # "phones" or default
+        return [
+            # MAIN section
+            {"section": "MAIN", "url": "dashboard:home", "label": "Dashboard", "icon": "bi-speedometer2", "active_pattern": "/dashboard/"},
+            {"section": "MAIN", "url": "inventory:inventory_dashboard", "label": "Inventory Dashboard", "icon": "bi-columns-gap", "active_pattern": "/inventory/dashboard"},
+            {"section": "MAIN", "url": "inventory:stock_list", "label": "Stock", "icon": "bi-box-seam", "active_pattern": "/inventory/list/"},
+            {"section": "MAIN", "url": "inventory:scan_in", "label": "Scan IN", "icon": "bi-upc-scan", "active_pattern": "/inventory/scan"},
+            {"section": "MAIN", "url": "sell:sell_index", "label": "Sell", "icon": "bi-bag-check", "active_pattern": "/sell/"},
+            
+            # TIME section
+            {"section": "TIME", "url": "inventory:time_logs", "label": "Time Logs", "icon": "bi-journal-text", "active_pattern": "/inventory/time/logs"},
+            
+            # MONEY section
+            {"section": "MONEY", "url": "wallet:agent_wallet", "label": "My Wallet", "icon": "bi-wallet2", "active_pattern": "/wallet/"},
+            {"section": "MONEY", "url": "wallet:admin_home", "label": "Admin Wallet", "icon": "bi-briefcase", "active_pattern": "/wallet/admin/", "require_manager": True},
+            
+            # BUSINESS section (for managers)
+            {"section": "BUSINESS", "url": "reports:home", "label": "Reports", "icon": "bi-graph-up", "active_pattern": "/reports/", "require_manager": True},
+            {"section": "BUSINESS", "url": "tenants:manager_review_agents", "label": "Agents", "icon": "bi-people", "active_pattern": "/tenants/manager/agents/", "require_manager": True},
+            {"section": "BUSINESS", "url": "tenants:manager_locations", "label": "Locations", "icon": "bi-geo", "active_pattern": "/tenants/manager/locations/", "require_manager": True},
+            {"section": "BUSINESS", "url": "billing:plans", "label": "Choose Plan", "icon": "bi-credit-card-2-front", "active_pattern": "/billing/plans", "require_manager": True},
+            {"section": "BUSINESS", "url": "inventory:orders_list", "label": "Orders", "icon": "bi-clipboard-data", "active_pattern": "/inventory/orders/", "require_manager": True},
+            
+            # LAYBY section (phones specific)
+            {"section": "LAYBY", "url": "layby:dashboard", "label": "Layby", "icon": "bi-journal-check", "active_pattern": "/layby/"},
+        ]
+
+
 __all__ = [
     "get_vertical_kind",
     "get_vertical_dashboard_url",
     "get_onboarding_steps",
     "get_vertical_display_name",
+    "get_vertical_sidebar_items",
 ]
 

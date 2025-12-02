@@ -1,23 +1,10 @@
-{% extends "hq/base.html" %}
+{% extends "hq/base_hq.html" %}
 {% load humanize %}
 {% load static %}
 
 {% block title %}Subscriptions · Control Center{% endblock %}
-{% block page_title %}Subscriptions{% endblock %}
 
-{% block topbar_actions %}
-  <label class="chip" style="user-select:none;gap:.5rem">
-    <input id="autoHi" type="checkbox" style="accent-color:#2757d8" checked>
-    <span>Auto-highlight</span>
-  </label>
-{% endblock %}
-
-{% block topbar_right %}
-  <a class="btn-ghost" href="{% url 'hq:subscriptions' %}?{{ request.GET.urlencode }}">Go</a>
-  <a class="btn" href="{% url 'hq:subscriptions' %}?{{ request.GET.urlencode }}&export=pdf">Download PDF</a>
-{% endblock %}
-
-{% block body %}
+{% block content %}
 <style>
   .user .menu{
     display:none; position:absolute; top:100%; right:0; background:#fff; border:1px solid rgba(0,0,0,.08);

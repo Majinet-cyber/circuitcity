@@ -104,6 +104,8 @@ def tenant_context(request) -> Dict[str, Any]:
       - business / business_id (new keys)
       - active_business / active_business_id (legacy-friendly mirror)
       - PRODUCT_MODE ∈ {'phones','pharmacy','liquor','grocery','generic'}
+      - BUSINESS_VERTICAL (alias for PRODUCT_MODE)
+      - sidebar_items (vertical-aware navigation config)
 
     Priority for PRODUCT_MODE:
       1) request.product_mode (set by middleware)
@@ -147,12 +149,22 @@ def tenant_context(request) -> Dict[str, Any]:
     except Exception:
         pass
 
+    # Get vertical-aware sidebar items
+    sidebar_items = []
+    try:
+        from inventory.utils_verticals import get_vertical_sidebar_items
+        sidebar_items = get_vertical_sidebar_items(mode)
+    except Exception:
+        pass  # Fail gracefully if utils_verticals is not available
+
     # Expose both new and legacy keys so no template breaks
     return {
         # New names
         "business": biz,
         "business_id": bid,
         "PRODUCT_MODE": mode,
+        "BUSINESS_VERTICAL": mode,  # Alias for sidebar compatibility
+        "sidebar_items": sidebar_items,  # Vertical-aware navigation config
 
         # Legacy-friendly mirrors
         "active_business": biz,

@@ -113,6 +113,14 @@
 </head>
 <body>
   <div class="card" role="dialog" aria-labelledby="loginTitle" aria-describedby="loginDesc">
+    <!-- Back to Home button -->
+    <div style="margin-bottom:8px">
+      <a href="{% url 'staticpages:home' %}" style="display:inline-flex;align-items:center;gap:.4rem;color:#1e40af;text-decoration:none;font-size:14px;font-weight:650;transition:color .15s ease">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+        Back to home
+      </a>
+    </div>
+    
     <!-- Keep your logo -->
     <img class="card-logo" src="{% static 'img/majn.png' %}" alt="Imajinet">
 

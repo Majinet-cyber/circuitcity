@@ -104,6 +104,14 @@
 <body>
   <div class="auth-wrap">
     <div class="auth-card" role="dialog" aria-labelledby="loginTitle" aria-describedby="loginDesc">
+      <!-- Back to Home button -->
+      <div style="margin-bottom:14px">
+        <a href="{% url 'staticpages:home' %}" style="display:inline-flex;align-items:center;gap:.4rem;color:var(--b600);text-decoration:none;font-size:14px;font-weight:700;transition:color .15s ease">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+          Back to home
+        </a>
+      </div>
+      
       <h1 id="loginTitle">Emajinet</h1>
       <p id="loginDesc" class="muted">Sign in to continue.</p>
 
