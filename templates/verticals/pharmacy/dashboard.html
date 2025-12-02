@@ -1,82 +1,159 @@
 {% extends "base.html" %}
+{% load humanize %}
 
 {% block title %}Pharmacy · Emajinet{% endblock %}
 
 {% block content %}
-{% url 'inventory:pharmacy_product_new' as pharmacy_add_url %}
 <style>
   .vertical-page{display:flex;flex-direction:column;gap:18px;padding:18px}
-  .vertical-hero{background:linear-gradient(120deg,#22c55e,#4ade80);padding:24px;border-radius:20px;color:#0f172a;display:flex;flex-wrap:wrap;gap:18px;align-items:center;justify-content:space-between}
+  .vertical-hero{background:linear-gradient(120deg,#06b6d4,#3b82f6);padding:24px;border-radius:20px;color:#fff;display:flex;flex-wrap:wrap;gap:18px;align-items:center;justify-content:space-between}
   .vertical-hero h1{margin:0;font-size:clamp(24px,3vw,32px)}
+  .vertical-hero p{margin:4px 0 0}
   .hero-actions{display:flex;gap:12px;flex-wrap:wrap}
   .hero-actions a{border-radius:999px;padding:10px 16px;font-weight:700;text-decoration:none}
-  .hero-actions .primary{background:#0f172a;color:#fff}
-  .hero-actions .ghost{border:1px solid rgba(15,23,42,.4);color:#0f172a}
+  .hero-actions .primary{background:#fff;color:#111827}
+  .hero-actions .ghost{border:1px solid rgba(255,255,255,.8);color:#fff}
   .metrics-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:16px}
   .metric-card{background:#fff;border-radius:18px;padding:18px;box-shadow:0 10px 30px rgba(15,23,42,.08)}
   .metric-card h3{margin:0;font-size:.9rem;text-transform:uppercase;color:#64748b}
   .metric-card p{margin:6px 0 0;font-size:1.8rem;font-weight:800;color:#0f172a}
   .recent-block{background:#fff;border-radius:20px;padding:18px;box-shadow:0 10px 30px rgba(15,23,42,.08)}
-  .recent-list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:12px}
-  .recent-item{display:flex;justify-content:space-between;gap:12px;border-bottom:1px solid #e2e8f0;padding-bottom:12px}
-  .recent-item:last-child{border-bottom:0;padding-bottom:0}
+  .recent-list{list-style:none;margin:0;padding:0;display:grid;gap:12px}
+  .recent-item{display:flex;justify-content:space-between;gap:12px;border:1px solid #e2e8f0;border-radius:16px;padding:14px;align-items:center}
   .badge{display:inline-flex;align-items:center;gap:6px;border-radius:20px;padding:4px 10px;font-size:.75rem;font-weight:700}
-  .badge.scan{background:#fefce8;color:#92400e}
+  .badge.warning{background:#fef9c3;color:#b45309}
+  .badge.danger{background:#fee2e2;color:#dc2626}
+  .badge.info{background:#dbeafe;color:#2563eb}
 </style>
 
 <div class="vertical-page">
   <header class="vertical-hero">
     <div>
-      <p style="margin:0;font-size:.85rem;text-transform:uppercase;letter-spacing:.08em">{{ business.name }} · {{ location_label }}</p>
-      <h1>{{ hero_title }}</h1>
-      <p>{{ hero_blurb }}</p>
+      <h1>💊 Pharmacy Dashboard</h1>
+      <p>Batch tracking, expiry management & sales</p>
     </div>
     <div class="hero-actions">
-      <a class="primary" href="{{ pharmacy_add_url|default:'/inventory/pharmacy/products/new/' }}">Add medicine</a>
-      <a class="ghost" href="{{ scan_in_url|default:'/inventory/scan-in/' }}">Scan stock</a>
-      <a class="ghost" href="{{ stock_url|default:'/inventory/list/' }}">Inventory</a>
+      <a class="primary" href="{% url 'inventory:pharmacy_batch_create' %}">Add Batch</a>
+      <a class="ghost" href="{% url 'inventory:pharmacy_sale_create' %}">Record Sale</a>
+      <a class="ghost" href="{% url 'inventory:pharmacy_batch_list' %}">View Batches</a>
     </div>
   </header>
 
+  {# Key Metrics #}
   <section class="metrics-grid">
     <article class="metric-card">
-      <h3>Products</h3>
-      <p>{{ product_count }}</p>
+      <h3>📦 Total Batches</h3>
+      <p>{{ total_batches|intcomma }}</p>
     </article>
     <article class="metric-card">
-      <h3>Active items</h3>
-      <p>{{ active_product_count }}</p>
+      <h3>💰 Stock Value</h3>
+      <p>MWK {{ total_stock_value|floatformat:0|intcomma }}</p>
     </article>
     <article class="metric-card">
-      <h3>Scan required</h3>
-      <p>{{ scan_required_count }}</p>
+      <h3>💵 Today's Revenue</h3>
+      <p>MWK {{ today_revenue|floatformat:0|intcomma }}</p>
     </article>
     <article class="metric-card">
-      <h3>Tracked inventory</h3>
-      <p>{{ inventory_tracked_count }}</p>
+      <h3>📈 Today's Profit</h3>
+      <p>MWK {{ today_profit|floatformat:0|intcomma }}</p>
+    </article>
+    <article class="metric-card">
+      <h3>🛒 Today's Sales</h3>
+      <p>{{ today_sales_count|intcomma }}</p>
+    </article>
+    <article class="metric-card">
+      <h3>💊 Products</h3>
+      <p>{{ products_count|intcomma }}</p>
     </article>
   </section>
 
-  <section class="recent-block">
-    <h2 style="margin:0 0 10px;font-size:1.05rem">Recently added</h2>
-    {% if recent_products %}
-      <ul class="recent-list">
-        {% for item in recent_products %}
-          <li class="recent-item">
-            <div>
-              <strong>{{ item.name|default:"Unnamed" }}</strong>
-              {% if item.sku %}<small style="color:#64748b">SKU · {{ item.sku }}</small>{% endif %}
-            </div>
-            {% if item.scan_required %}
-              <span class="badge scan"><i class="bi bi-upc-scan"></i>Scan</span>
-            {% endif %}
-          </li>
-        {% endfor %}
-      </ul>
-    {% else %}
-      <p style="margin:0;color:#64748b">Add your first medicine to see it here.</p>
-    {% endif %}
-  </section>
+  {# Alerts Section #}
+  <div style="display: grid; gap: 16px; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));">
+    
+    {# Near Expiry #}
+    <section class="recent-block">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+        <h2 style="margin:0;font-size:1.1rem">⚠️ Near Expiry (30 days)</h2>
+        <a class="btn btn-sm btn-outline-warning" href="{% url 'inventory:pharmacy_near_expiry' %}">View all</a>
+      </div>
+      {% if near_expiry_batches %}
+        <ul class="recent-list">
+          {% for batch in near_expiry_batches|slice:":5" %}
+            <li class="recent-item">
+              <div>
+                <strong>{{ batch.merch_product.name }}</strong>
+                <br>
+                <small style="color:#64748b">Batch: {{ batch.batch_number }}</small>
+              </div>
+              <div style="text-align:right">
+                <span class="badge warning">{{ batch.days_to_expiry }} days</span>
+                <br>
+                <small style="color:#64748b">Qty: {{ batch.quantity }}</small>
+              </div>
+            </li>
+          {% endfor %}
+        </ul>
+      {% else %}
+        <p style="color:#64748b;text-align:center;padding:20px">No batches expiring soon ✅</p>
+      {% endif %}
+    </section>
+
+    {# Expired #}
+    <section class="recent-block">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+        <h2 style="margin:0;font-size:1.1rem">🚫 Expired Batches</h2>
+        <a class="btn btn-sm btn-outline-danger" href="{% url 'inventory:pharmacy_expired' %}">View all</a>
+      </div>
+      {% if expired_batches %}
+        <ul class="recent-list">
+          {% for batch in expired_batches|slice:":5" %}
+            <li class="recent-item">
+              <div>
+                <strong>{{ batch.merch_product.name }}</strong>
+                <br>
+                <small style="color:#64748b">Batch: {{ batch.batch_number }}</small>
+              </div>
+              <div style="text-align:right">
+                <span class="badge danger">Expired</span>
+                <br>
+                <small style="color:#64748b">{{ batch.expiry_date }}</small>
+              </div>
+            </li>
+          {% endfor %}
+        </ul>
+      {% else %}
+        <p style="color:#64748b;text-align:center;padding:20px">No expired batches ✅</p>
+      {% endif %}
+    </section>
+
+    {# Low Stock #}
+    <section class="recent-block">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+        <h2 style="margin:0;font-size:1.1rem">📉 Low Stock</h2>
+        <a class="btn btn-sm btn-outline-info" href="{% url 'inventory:pharmacy_low_stock' %}">View all</a>
+      </div>
+      {% if low_stock_batches %}
+        <ul class="recent-list">
+          {% for batch in low_stock_batches|slice:":5" %}
+            <li class="recent-item">
+              <div>
+                <strong>{{ batch.merch_product.name }}</strong>
+                <br>
+                <small style="color:#64748b">Batch: {{ batch.batch_number }}</small>
+              </div>
+              <div style="text-align:right">
+                <span class="badge info">{{ batch.quantity }} left</span>
+                <br>
+                <small style="color:#64748b">Reorder: {{ batch.reorder_level }}</small>
+              </div>
+            </li>
+          {% endfor %}
+        </ul>
+      {% else %}
+        <p style="color:#64748b;text-align:center;padding:20px">All stock levels OK ✅</p>
+      {% endif %}
+    </section>
+  </div>
+
 </div>
 {% endblock %}
-

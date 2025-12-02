@@ -4,6 +4,7 @@ from django.views.generic import RedirectView
 
 from . import views as v
 from . import views_admin as va  # Keep import in case you still use parts of it.
+from . import views_providers as vp  # Stripe + Pesapal
 
 app_name = "billing"
 
@@ -20,6 +21,20 @@ urlpatterns = [
     # NEW: one-click plan selection + per-plan page
     path("select-plan/", v.select_plan, name="select_plan"),
     path("plan/<slug:slug>/", v.plan_detail, name="plan_detail"),
+
+    # ------------------------------------------------------------------
+    # Stripe checkout & webhooks
+    # ------------------------------------------------------------------
+    path("stripe/checkout/", vp.stripe_checkout, name="stripe_checkout"),
+    path("stripe/success/", vp.stripe_success, name="stripe_success"),
+    path("stripe/webhook/", vp.stripe_webhook, name="stripe_webhook"),
+
+    # ------------------------------------------------------------------
+    # Pesapal checkout, callback & IPN
+    # ------------------------------------------------------------------
+    path("pesapal/checkout/", vp.pesapal_checkout, name="pesapal_checkout"),
+    path("pesapal/callback/", vp.pesapal_callback, name="pesapal_callback"),
+    path("pesapal/ipn/", vp.pesapal_ipn, name="pesapal_ipn"),
 
     # Invoice utilities (inline preview/actions)
     path("invoice/<uuid:pk>/send/",     v.invoice_send,     name="invoice_send"),

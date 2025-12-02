@@ -24,6 +24,20 @@ from inventory.models import InventoryItem
 from sales.models import Sale
 from reports.kpis import compute_sales_kpis
 
+# Gamification imports
+try:
+    from hq.utils_gamification import (
+        get_agent_rank_for_user,
+        get_gamification_message,
+        get_current_milestone,
+        get_next_milestone,
+        check_and_award_milestones
+    )
+    from hq.utils_dates import get_period_from_request
+    GAMIFICATION_AVAILABLE = True
+except ImportError:
+    GAMIFICATION_AVAILABLE = False
+
 # 🔗 Single source of truth (inventory)
 from inventory.constants import IN_STOCK_Q, SOLD_Q
 from inventory.queries import business_metrics, inventory_qs_for_user, inventory_qs_tenant
@@ -528,11 +542,80 @@ def agent_dashboard(request):
 
     wallet = _wallet_summary_for(request.user)
 
+    # Agent Ranking & Milestones
+    agent_ranking = None
+    gamification_message = None
+    current_milestone = None
+    next_milestone = None
+    try:
+        from hq.utils_gamification import (
+            get_agent_rank_for_user, 
+            get_gamification_message,
+            get_current_milestone,
+            get_next_milestone
+        )
+        from hq.utils_dates import get_month_range
+        from django.utils import timezone
+        
+        if biz:
+            # Get MTD date range
+            today = timezone.now().date()
+            month_start, month_end = get_month_range(today.year, today.month)
+            
+            # Get agent's ranking
+            rank = get_agent_rank_for_user(
+                user_id=request.user.id,
+                business=biz,
+                location=None,
+                start_date=month_start,
+                end_date=month_end
+            )
+            
+            if rank:
+                agent_ranking = rank
+                gamification_message = get_gamification_message(rank)
+                
+                # Get milestones
+                current_milestone = get_current_milestone(rank.sales_count)
+                next_milestone = get_next_milestone(rank.sales_count)
+                
+                # Build agent ranking dict
+                agent_ranking = {
+                    "rank": rank.rank,
+                    "sales_count": rank.sales_count,
+                    "revenue": rank.revenue,
+                    "behind_count": rank.behind_count,
+                    "gamification_message": gamification_message,
+                }
+                
+                # Format milestones
+                if current_milestone:
+                    threshold, name, emoji = current_milestone
+                    agent_ranking["current_milestone"] = {
+                        "name": name,
+                        "emoji": emoji,
+                        "threshold": threshold,
+                    }
+                
+                if next_milestone:
+                    threshold, name, emoji, sales_needed = next_milestone
+                    agent_ranking["next_milestone"] = {
+                        "name": name,
+                        "emoji": emoji,
+                        "threshold": threshold,
+                        "sales_needed": sales_needed,
+                    }
+    except Exception as e:
+        import logging
+        log = logging.getLogger(__name__)
+        log.exception("Failed to calculate agent ranking/milestones: %s", e)
+
     ctx = {
         "kpis": kpis,
         "agent_battery": {"count": my_in_stock, "max": battery_max, "pct": pct, "label": label, "color": color},
         "wallet": wallet,
         "staff_view": False,
+        "agent_ranking": agent_ranking,
     }
     return render(request, "dashboard.html", ctx)
 

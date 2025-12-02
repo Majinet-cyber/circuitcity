@@ -42,27 +42,172 @@ class LiquorSaleType(models.TextChoices):
     """Type of liquor sale"""
     SALE = "sale", "Cash Sale"
     CREDIT = "credit", "Credit Sale"
+    FREE = "free", "Free (Barman/Complimentary)"
     UNDECIDED = "undecided", "Undecided"
+
+
+class PaymentMethod(models.TextChoices):
+    """Payment method for sales (consistent across all verticals)"""
+    CASH = "CASH", "Cash"
+    BANK = "BANK", "Bank"
+    MOBILE_MONEY = "MOBILE_MONEY", "Mobile Money"
+
+
+class LiquorShiftStatus(models.TextChoices):
+    """Status of a shift"""
+    OPEN = "open", "Open"
+    CLOSED = "closed", "Closed"
+
+
+class LiquorShift(models.Model):
+    """
+    Represents a barman's work shift with opening and closing stock counts.
+    Tracks all sales, credits, and stock variance during the shift.
+    """
+    business = models.ForeignKey(Business, on_delete=models.CASCADE, related_name="liquor_shifts", db_index=True)
+    location = models.ForeignKey("inventory.Location", null=True, blank=True, on_delete=models.SET_NULL, related_name="liquor_shifts")
+    
+    # Shift personnel
+    barman = models.ForeignKey(User, on_delete=models.PROTECT, related_name="liquor_shifts_worked")
+    created_by = models.ForeignKey(User, on_delete=models.PROTECT, related_name="liquor_shifts_created")
+    
+    # Timing
+    started_at = models.DateTimeField(default=timezone.now, db_index=True)
+    ended_at = models.DateTimeField(null=True, blank=True)
+    
+    # Status
+    status = models.CharField(max_length=10, choices=LiquorShiftStatus.choices, default=LiquorShiftStatus.OPEN, db_index=True)
+    
+    # Aggregated metrics (computed when shift closes)
+    total_sales_amount = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal("0.00"))
+    total_cost_amount = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal("0.00"))
+    total_profit_amount = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal("0.00"))
+    total_credit_amount = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal("0.00"))
+    total_free_amount = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal("0.00"))
+    missing_stock_value = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal("0.00"))
+    
+    # Notes
+    opening_notes = models.TextField(blank=True, default="")
+    closing_notes = models.TextField(blank=True, default="")
+    
+    class Meta:
+        ordering = ["-started_at"]
+        indexes = [
+            models.Index(fields=["business", "status", "-started_at"]),
+            models.Index(fields=["barman", "-started_at"]),
+            models.Index(fields=["business", "-started_at"]),
+        ]
+    
+    def __str__(self):
+        status_text = self.get_status_display()
+        barman_name = getattr(self.barman, "username", "Unknown")
+        date = self.started_at.strftime("%Y-%m-%d %H:%M")
+        return f"Shift {self.id} - {barman_name} - {status_text} ({date})"
+    
+    def duration_hours(self) -> Optional[float]:
+        """Calculate shift duration in hours"""
+        if not self.ended_at:
+            # Shift still open - calculate from now
+            duration = timezone.now() - self.started_at
+        else:
+            duration = self.ended_at - self.started_at
+        return duration.total_seconds() / 3600
+    
+    def is_stale(self) -> bool:
+        """Check if shift is open but started more than 24 hours ago"""
+        if self.status != LiquorShiftStatus.OPEN:
+            return False
+        hours_open = (timezone.now() - self.started_at).total_seconds() / 3600
+        return hours_open > 24
+
+
+class LiquorShiftStock(models.Model):
+    """
+    Snapshot of stock levels at the start or end of a shift.
+    Each product gets two records: one at opening, one at closing.
+    """
+    shift = models.ForeignKey(LiquorShift, on_delete=models.CASCADE, related_name="stock_snapshots")
+    product = models.ForeignKey("inventory.MerchProduct", on_delete=models.CASCADE, related_name="shift_stock_snapshots")
+    
+    # Stock counts
+    bottles_count = models.IntegerField(default=0, help_text="Full bottles in stock")
+    shots_count = models.IntegerField(default=0, help_text="Individual shots available (from open bottles)")
+    
+    # Snapshot timing
+    snapshot_type = models.CharField(
+        max_length=10,
+        choices=[("opening", "Opening Stock"), ("closing", "Closing Stock")],
+        db_index=True
+    )
+    recorded_at = models.DateTimeField(default=timezone.now)
+    recorded_by = models.ForeignKey(User, null=True, blank=True, on_delete=models.SET_NULL)
+    
+    # Adjustment tracking (if barman adjusts from system count)
+    was_adjusted = models.BooleanField(default=False)
+    adjustment_reason = models.TextField(blank=True, default="")
+    
+    class Meta:
+        ordering = ["shift", "product"]
+        indexes = [
+            models.Index(fields=["shift", "snapshot_type"]),
+            models.Index(fields=["product", "shift"]),
+        ]
+        unique_together = [("shift", "product", "snapshot_type")]
+    
+    def __str__(self):
+        return f"{self.product.name} - {self.get_snapshot_type_display()} - Shift {self.shift_id}"
+    
+    def total_sellable_shots(self) -> int:
+        """Calculate total sellable shots (from full bottles + loose shots)"""
+        if not self.product.has_shots:
+            return 0
+        
+        sellable_per_bottle = self.product.sellable_shots_per_bottle
+        return (self.bottles_count * sellable_per_bottle) + self.shots_count
+
+
+class PaymentMethod(models.TextChoices):
+    """Payment methods for sales"""
+    CASH = "cash", "Cash"
+    BANK = "bank", "Bank"
+    MOBILE_MONEY = "mobile_money", "Mobile Money"
 
 
 class LiquorSale(models.Model):
     """
     Records a sale of liquor product.
-    Can be bottle or shot, cash or credit.
+    Can be bottle or shot, cash or credit or free.
     """
     business = models.ForeignKey(Business, on_delete=models.CASCADE, related_name="liquor_sales", db_index=True)
     product = models.ForeignKey("inventory.MerchProduct", on_delete=models.PROTECT, related_name="liquor_sales")
     
+    # Shift tracking (nullable for legacy sales)
+    shift = models.ForeignKey(LiquorShift, null=True, blank=True, on_delete=models.SET_NULL, related_name="sales", db_index=True)
+    
     # Sale details
     unit = models.CharField(max_length=10, choices=LiquorUnitType.choices, default=LiquorUnitType.BOTTLE)
     quantity = models.PositiveIntegerField(default=1)
-    unit_price = models.DecimalField(max_digits=10, decimal_places=2, validators=[MinValueValidator(Decimal("0.01"))])
+    unit_price = models.DecimalField(max_digits=10, decimal_places=2, validators=[MinValueValidator(Decimal("0.00"))])
     total_price = models.DecimalField(max_digits=12, decimal_places=2)
+    
+    # Cost tracking for profit calculation
+    unit_cost = models.DecimalField(max_digits=10, decimal_places=2, default=Decimal("0.00"), help_text="Cost per unit sold")
+    total_cost = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal("0.00"))
     
     # Payment type
     sale_type = models.CharField(max_length=10, choices=LiquorSaleType.choices, default=LiquorSaleType.SALE)
     is_credit = models.BooleanField(default=False, db_index=True)
+    is_free = models.BooleanField(default=False, db_index=True, help_text="True for barman shots or complimentary drinks")
     linked_credit = models.ForeignKey("LiquorCredit", null=True, blank=True, on_delete=models.SET_NULL, related_name="sales")
+    
+    # Payment method (for cash mix tracking)
+    payment_method = models.CharField(
+        max_length=20,
+        choices=PaymentMethod.choices,
+        default=PaymentMethod.CASH,
+        db_index=True,
+        help_text="Payment method used for this sale"
+    )
     
     # Metadata
     sold_by = models.ForeignKey(User, null=True, blank=True, on_delete=models.SET_NULL, related_name="liquor_sales_made")
@@ -75,18 +220,31 @@ class LiquorSale(models.Model):
             models.Index(fields=["business", "-sold_at"]),
             models.Index(fields=["business", "sale_type", "-sold_at"]),
             models.Index(fields=["is_credit", "-sold_at"]),
+            models.Index(fields=["shift", "-sold_at"]),
+            models.Index(fields=["business", "is_free", "-sold_at"]),
+            models.Index(fields=["business", "payment_method", "-sold_at"]),
         ]
     
     def __str__(self):
         return f"{self.product.name} ({self.quantity} {self.unit}) - {self.total_price}"
+    
+    @property
+    def profit(self) -> Decimal:
+        """Calculate profit on this sale"""
+        return self.total_price - self.total_cost
     
     def save(self, *args, **kwargs):
         # Auto-calculate total if not set
         if not self.total_price:
             self.total_price = Decimal(self.quantity) * self.unit_price
         
-        # Sync is_credit with sale_type
+        # Auto-calculate total cost if not set
+        if not self.total_cost and self.unit_cost:
+            self.total_cost = Decimal(self.quantity) * self.unit_cost
+        
+        # Sync is_credit and is_free with sale_type
         self.is_credit = self.sale_type == LiquorSaleType.CREDIT
+        self.is_free = self.sale_type == LiquorSaleType.FREE
         
         super().save(*args, **kwargs)
 
@@ -109,6 +267,17 @@ class LiquorCredit(models.Model):
     # Customer info
     customer_name = models.CharField(max_length=120)
     customer_phone = models.CharField(max_length=20, blank=True, default="")
+    customer_description = models.TextField(
+        blank=True, 
+        default="", 
+        help_text="Physical description or identifying info (e.g., 'short guy, red jacket, comes Fridays')"
+    )
+    customer_photo = models.ImageField(
+        upload_to="liquor/customer_photos/", 
+        null=True, 
+        blank=True,
+        help_text="Optional photo to help identify customer"
+    )
     
     # Amount details
     amount = models.DecimalField(max_digits=12, decimal_places=2, validators=[MinValueValidator(Decimal("0.01"))])
@@ -124,6 +293,7 @@ class LiquorCredit(models.Model):
     created_by = models.ForeignKey(User, null=True, blank=True, on_delete=models.SET_NULL, related_name="liquor_credits_created")
     created_at = models.DateTimeField(default=timezone.now, db_index=True)
     settled_at = models.DateTimeField(null=True, blank=True)
+    settled_by = models.ForeignKey(User, null=True, blank=True, on_delete=models.SET_NULL, related_name="liquor_credits_settled")
     notes = models.TextField(blank=True, default="")
     
     class Meta:
@@ -493,6 +663,15 @@ class ClothingSale(models.Model):
     unit_price = models.DecimalField(max_digits=10, decimal_places=2, validators=[MinValueValidator(Decimal("0.01"))])
     total_price = models.DecimalField(max_digits=12, decimal_places=2)
     
+    # Payment method (for cash mix tracking)
+    payment_method = models.CharField(
+        max_length=20,
+        choices=PaymentMethod.choices,
+        default=PaymentMethod.CASH,
+        db_index=True,
+        help_text="Payment method used for this sale"
+    )
+    
     # Metadata
     sold_by = models.ForeignKey(User, null=True, blank=True, on_delete=models.SET_NULL, related_name="clothing_sales_made")
     sold_at = models.DateTimeField(default=timezone.now, db_index=True)
@@ -502,6 +681,7 @@ class ClothingSale(models.Model):
         ordering = ["-sold_at"]
         indexes = [
             models.Index(fields=["business", "-sold_at"]),
+            models.Index(fields=["business", "payment_method", "-sold_at"]),
         ]
     
     def __str__(self):

@@ -1,0 +1,214 @@
+{% extends "base.html" %}
+{% load static %}
+{% load humanize %}
+
+{% block title %}Adjust Agent Wallet - {{ business.name|default:"Emajinet" }}{% endblock %}
+{% block header_title %}Adjust Agent Wallet{% endblock %}
+
+{% block content %}
+<div class="container py-4" style="max-width: 800px;">
+    <!-- Back Button -->
+    <div class="mb-3">
+        <a href="{% url 'dashboard:admin_dashboard' %}" class="btn btn-outline-secondary">
+            <i class="bi bi-arrow-left"></i> Back to Dashboard
+        </a>
+    </div>
+
+    <!-- Agent Info Card -->
+    <div class="card mb-4">
+        <div class="card-header bg-primary text-white">
+            <h5 class="mb-0">
+                <i class="bi bi-person-circle"></i> Agent: {{ membership.user.get_full_name|default:membership.user.username }}
+            </h5>
+        </div>
+        <div class="card-body">
+            <div class="row">
+                <div class="col-md-6">
+                    <p class="mb-2">
+                        <strong>Email:</strong> {{ membership.user.email }}
+                    </p>
+                    <p class="mb-2">
+                        <strong>Business:</strong> {{ membership.business.name }}
+                    </p>
+                    {% if membership.location %}
+                    <p class="mb-0">
+                        <strong>Location:</strong> {{ membership.location.name }}
+                    </p>
+                    {% endif %}
+                </div>
+                <div class="col-md-6">
+                    <div class="alert alert-info mb-0">
+                        <h6 class="mb-2">Current Balance:</h6>
+                        <h3 class="mb-0">MK {{ wallet.balance|default:0|floatformat:2|intcomma }}</h3>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Adjustment Form Card -->
+    <div class="card">
+        <div class="card-header bg-warning text-dark">
+            <h5 class="mb-0">
+                <i class="bi bi-pencil-square"></i> Manual Wallet Adjustment
+            </h5>
+        </div>
+        <div class="card-body">
+            <!-- Warning Message -->
+            <div class="alert alert-warning" role="alert">
+                <i class="bi bi-exclamation-triangle"></i>
+                <strong>Important:</strong> This action will directly affect the agent's wallet balance.
+                All adjustments are logged for audit purposes. Please provide a clear reason.
+            </div>
+
+            {% if messages %}
+                {% for message in messages %}
+                <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+                    {{ message }}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>
+                {% endfor %}
+            {% endif %}
+
+            <form method="post">
+                {% csrf_token %}
+                
+                <!-- Hidden membership field -->
+                {{ form.membership }}
+                
+                <!-- Amount Field -->
+                <div class="mb-3">
+                    <label for="{{ form.amount.id_for_label }}" class="form-label">
+                        <strong>Amount (MK)</strong>
+                        <span class="text-danger">*</span>
+                    </label>
+                    {{ form.amount }}
+                    {% if form.amount.errors %}
+                        <div class="text-danger small mt-1">
+                            {{ form.amount.errors }}
+                        </div>
+                    {% endif %}
+                    <div class="form-text">{{ form.amount.help_text }}</div>
+                </div>
+
+                <!-- Is Deduction Checkbox -->
+                <div class="mb-3">
+                    <div class="form-check">
+                        {{ form.is_deduction }}
+                        <label class="form-check-label" for="{{ form.is_deduction.id_for_label }}">
+                            <strong>Deduct from wallet (debit)</strong>
+                        </label>
+                    </div>
+                    <div class="form-text">
+                        Leave unchecked to add money (credit). Check to deduct money (debit).
+                    </div>
+                    {% if form.is_deduction.errors %}
+                        <div class="text-danger small mt-1">
+                            {{ form.is_deduction.errors }}
+                        </div>
+                    {% endif %}
+                </div>
+
+                <!-- Reason Field -->
+                <div class="mb-3">
+                    <label for="{{ form.reason.id_for_label }}" class="form-label">
+                        <strong>Reason for Adjustment</strong>
+                        <span class="text-danger">*</span>
+                    </label>
+                    {{ form.reason }}
+                    {% if form.reason.errors %}
+                        <div class="text-danger small mt-1">
+                            {{ form.reason.errors }}
+                        </div>
+                    {% endif %}
+                    <div class="form-text">{{ form.reason.help_text }}</div>
+                </div>
+
+                <!-- Form-level Errors -->
+                {% if form.non_field_errors %}
+                    <div class="alert alert-danger" role="alert">
+                        {{ form.non_field_errors }}
+                    </div>
+                {% endif %}
+
+                <!-- Action Buttons -->
+                <div class="d-flex gap-2 justify-content-end">
+                    <a href="{% url 'dashboard:admin_dashboard' %}" class="btn btn-secondary">
+                        <i class="bi bi-x-circle"></i> Cancel
+                    </a>
+                    <button type="submit" class="btn btn-warning">
+                        <i class="bi bi-check-circle"></i> Confirm Adjustment
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Recent Transactions (optional) -->
+    {% if wallet.transactions.all %}
+    <div class="card mt-4">
+        <div class="card-header">
+            <h6 class="mb-0">Recent Wallet Transactions</h6>
+        </div>
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-sm mb-0">
+                    <thead>
+                        <tr>
+                            <th>Date</th>
+                            <th>Type</th>
+                            <th>Amount</th>
+                            <th>Description</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for txn in wallet.transactions.all|slice:":10" %}
+                        <tr>
+                            <td class="text-nowrap">{{ txn.created_at|date:"Y-m-d H:i" }}</td>
+                            <td>
+                                <span class="badge bg-{{ txn.is_debit|yesno:'danger,success' }}">
+                                    {{ txn.transaction_type }}
+                                </span>
+                            </td>
+                            <td class="text-end text-nowrap">
+                                <span class="{% if txn.is_debit %}text-danger{% else %}text-success{% endif %}">
+                                    {{ txn.is_debit|yesno:'-,+' }}MK {{ txn.amount|floatformat:2|intcomma }}
+                                </span>
+                            </td>
+                            <td>{{ txn.description|truncatewords:10 }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Real-time balance preview
+document.addEventListener('DOMContentLoaded', function() {
+    const amountInput = document.querySelector('input[name="amount"]');
+    const isDeductionCheckbox = document.querySelector('input[name="is_deduction"]');
+    const currentBalance = {{ wallet.balance|default:0 }};
+    
+    function updatePreview() {
+        const amount = parseFloat(amountInput.value) || 0;
+        const isDeduction = isDeductionCheckbox.checked;
+        const newBalance = isDeduction ? currentBalance - amount : currentBalance + amount;
+        
+        // You can add a preview element if desired
+        console.log('New balance will be:', newBalance);
+    }
+    
+    if (amountInput && isDeductionCheckbox) {
+        amountInput.addEventListener('input', updatePreview);
+        isDeductionCheckbox.addEventListener('change', updatePreview);
+    }
+});
+</script>
+{% endblock %}
+

@@ -99,6 +99,10 @@
     </div>
   </section>
 
+  <!-- Profit & Payment Mix Panels -->
+  {% include "partials/profit_panel.html" %}
+  {% include "partials/payment_mix_panel.html" %}
+
   <!-- Agent Ranking Widget (for agents only) -->
   {% if is_agent and agent_ranking %}
   <section class="panel mb-3" style="background: linear-gradient(135deg, color-mix(in oklab, var(--cc-accent) 8%, var(--cc-panel)) 0%, var(--cc-panel) 100%);">

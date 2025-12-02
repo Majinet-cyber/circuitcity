@@ -194,6 +194,12 @@ def subscribe(request: HttpRequest) -> HttpResponse:
     else:
         form = ChoosePlanForm(initial={"plan": sub.plan_id} if sub.plan_id else None)
 
+    # Check if Stripe is configured
+    stripe_configured = bool(
+        getattr(settings, "STRIPE_SECRET_KEY", "")
+        and getattr(settings, "STRIPE_PUBLISHABLE_KEY", "")
+    )
+    
     return render(
         request,
         "billing/subscribe.html",
@@ -203,6 +209,7 @@ def subscribe(request: HttpRequest) -> HttpResponse:
             "sub": sub,
             "days_left": sub.days_left_in_trial(),
             "sub_badge": _sub_badge(sub),
+            "stripe_configured": stripe_configured,
         },
     )
 

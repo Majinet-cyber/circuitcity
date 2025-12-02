@@ -1,0 +1,127 @@
+{% extends "base.html" %}
+
+{% block title %}{{ editing|yesno:"Edit,Add" }} Cost - {{ business.name|default:"CircuitCity" }}{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+    <div class="row">
+        <div class="col-md-8 mx-auto">
+            <h2 class="fw-bold mb-4">{{ editing|yesno:"Edit,Add New" }} Cost</h2>
+
+            {% if messages %}
+                {% for message in messages %}
+                    <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+                        {{ message }}
+                        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                    </div>
+                {% endfor %}
+            {% endif %}
+
+            <div class="card">
+                <div class="card-body">
+                    <form method="post">
+                        {% csrf_token %}
+                        
+                        <div class="mb-3">
+                            <label for="{{ form.amount.id_for_label }}" class="form-label fw-bold">
+                                Cost Amount (MWK) <span class="text-danger">*</span>
+                            </label>
+                            {{ form.amount }}
+                            {% if form.amount.errors %}
+                                <div class="text-danger small">{{ form.amount.errors.0 }}</div>
+                            {% endif %}
+                            <small class="form-text text-muted">{{ form.amount.help_text }}</small>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="{{ form.note.id_for_label }}" class="form-label fw-bold">
+                                Description <span class="text-danger">*</span>
+                            </label>
+                            {{ form.note }}
+                            {% if form.note.errors %}
+                                <div class="text-danger small">{{ form.note.errors.0 }}</div>
+                            {% endif %}
+                            <small class="form-text text-muted">Brief description of this cost (e.g., "Office Rent", "Electricity Bill")</small>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="{{ form.effective_date.id_for_label }}" class="form-label fw-bold">
+                                Date <span class="text-danger">*</span>
+                            </label>
+                            {{ form.effective_date }}
+                            {% if form.effective_date.errors %}
+                                <div class="text-danger small">{{ form.effective_date.errors.0 }}</div>
+                            {% endif %}
+                            <small class="form-text text-muted">Date when this cost was incurred</small>
+                        </div>
+
+                        <div class="mb-3 form-check">
+                            {{ form.is_recurring }}
+                            <label class="form-check-label fw-bold" for="{{ form.is_recurring.id_for_label }}">
+                                This is a recurring cost
+                            </label>
+                            {% if form.is_recurring.errors %}
+                                <div class="text-danger small">{{ form.is_recurring.errors.0 }}</div>
+                            {% endif %}
+                            <small class="form-text text-muted d-block">{{ form.is_recurring.help_text }}</small>
+                        </div>
+
+                        <div class="mb-3" id="recurring-fields" style="display: none;">
+                            <label for="{{ form.effective_from.id_for_label }}" class="form-label fw-bold">
+                                Start Date (for recurring costs) <span class="text-danger">*</span>
+                            </label>
+                            {{ form.effective_from }}
+                            {% if form.effective_from.errors %}
+                                <div class="text-danger small">{{ form.effective_from.errors.0 }}</div>
+                            {% endif %}
+                            <small class="form-text text-muted">{{ form.effective_from.help_text }}</small>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="{{ form.recurrence.id_for_label }}" class="form-label fw-bold">
+                                Recurrence Pattern
+                            </label>
+                            {{ form.recurrence }}
+                            {% if form.recurrence.errors %}
+                                <div class="text-danger small">{{ form.recurrence.errors.0 }}</div>
+                            {% endif %}
+                            <small class="form-text text-muted">Currently only monthly recurrence is supported</small>
+                        </div>
+
+                        <div class="d-flex gap-2">
+                            <button type="submit" class="btn btn-primary">
+                                <i class="bi bi-save"></i> {{ editing|yesno:"Update,Save" }} Cost
+                            </button>
+                            <a href="{% url 'wallet:admin_costs' %}" class="btn btn-secondary">
+                                <i class="bi bi-x-circle"></i> Cancel
+                            </a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const recurringCheckbox = document.getElementById('{{ form.is_recurring.id_for_label }}');
+    const recurringFields = document.getElementById('recurring-fields');
+    
+    function toggleRecurringFields() {
+        if (recurringCheckbox.checked) {
+            recurringFields.style.display = 'block';
+        } else {
+            recurringFields.style.display = 'none';
+        }
+    }
+    
+    // Initialize on load
+    toggleRecurringFields();
+    
+    // Toggle when checkbox changes
+    recurringCheckbox.addEventListener('change', toggleRecurringFields);
+});
+</script>
+{% endblock %}
+

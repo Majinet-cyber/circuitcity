@@ -472,6 +472,31 @@ class ClothingProductForm(forms.Form):
         max_digits=12, decimal_places=2,
         widget=forms.NumberInput(attrs={"class": "form-control input", "step": "0.01", "min": "0"})
     )
+    confirm_high_price = forms.BooleanField(
+        required=False,
+        widget=forms.CheckboxInput(attrs={"class": "form-check-input"}),
+        label="I am sure about this high price",
+        help_text="Check this if the price is intentionally high (above MK 1,000,000)"
+    )
+    
+    def clean_price(self):
+        """Validate that price is reasonable."""
+        from decimal import Decimal
+        
+        price = self.cleaned_data.get('price')
+        confirm = self.cleaned_data.get('confirm_high_price', False)
+        
+        # Define maximum reasonable price for clothing
+        MAX_REASONABLE_PRICE = Decimal('1000000.00')  # MK 1 million
+        
+        if price and price > MAX_REASONABLE_PRICE and not confirm:
+            raise forms.ValidationError(
+                f"This price (MK {price:,.0f}) looks unusually high for clothing. "
+                f"Typical max is MK {MAX_REASONABLE_PRICE:,.0f}. "
+                "If correct, tick 'I am sure about this high price' and submit again."
+            )
+        
+        return price
 
 def _inflate_clothing(instance: Product, data: dict):
     name = data.get("product_name") or ""

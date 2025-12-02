@@ -31,6 +31,11 @@ urlpatterns = [
     path("businesses/<int:pk>/", views.business_detail, name="business_detail"),
 
     # =========================
+    # API Endpoints
+    # =========================
+    path("api/monthly-drill-down/", views.monthly_drill_down_api, name="monthly_drill_down_api"),
+
+    # =========================
     # Wallet (HQ shell)
     # =========================
     path("wallet/", views.wallet_home, name="wallet"),

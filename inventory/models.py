@@ -39,6 +39,13 @@ try:
 except Exception:
     PhoneStockEditRequest = None  # safe fallback
 
+# Re-export StockActivityLog for audit trail
+try:
+    from .models_audit import StockActivityLog, StockAction  # noqa: F401
+except Exception:
+    StockActivityLog = None  # safe fallback
+    StockAction = None
+
 
 # ==========================================================
 # SINGLE SOURCE OF TRUTH: IMEI normalization (15 digits)
@@ -200,12 +207,21 @@ class MerchProduct(models.Model):
     track_inventory = models.BooleanField(default=True)
 
     # Liquor helpers
-    category = models.CharField(max_length=20, blank=True, default="", help_text="Liquor category: beer, cider, spirits, wine, other")
+    category = models.CharField(
+        max_length=20, 
+        blank=True, 
+        default="", 
+        help_text="Liquor category: beer, cider, spirits, wine, other"
+    )
     has_shots = models.BooleanField(default=False)
     shots_per_bottle = models.PositiveIntegerField(null=True, blank=True)
     barman_shots_reserved = models.PositiveIntegerField(default=2, help_text="Shots reserved for bartender (typically 2)")
     price_per_bottle = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True, help_text="Price for a full bottle")
     price_per_shot = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True, help_text="Price per individual shot")
+    
+    # Cost price for profit calculation (nullable for backwards compatibility)
+    cost_per_bottle = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True, help_text="Cost price for a full bottle")
+    cost_per_shot = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True, help_text="Cost price per shot")
 
     # Archive helpers (for clothing and other verticals)
     is_archived = models.BooleanField(default=False, db_index=True)
@@ -232,6 +248,24 @@ class MerchProduct(models.Model):
         if not self.has_shots or not self.shots_per_bottle:
             return 0
         return max(0, self.shots_per_bottle - self.barman_shots_reserved)
+    
+    def get_cost_for_unit(self, unit_type: str):
+        """Get cost price based on unit type (bottle or shot)"""
+        from decimal import Decimal
+        if unit_type == "bottle":
+            return self.cost_per_bottle or Decimal("0.00")
+        elif unit_type == "shot":
+            return self.cost_per_shot or Decimal("0.00")
+        return Decimal("0.00")
+    
+    def get_price_for_unit(self, unit_type: str):
+        """Get selling price based on unit type (bottle or shot)"""
+        from decimal import Decimal
+        if unit_type == "bottle":
+            return self.price_per_bottle or Decimal("0.00")
+        elif unit_type == "shot":
+            return self.price_per_shot or Decimal("0.00")
+        return Decimal("0.00")
 
     def clean(self):
         if self.has_shots:
@@ -521,6 +555,20 @@ class InventoryItem(models.Model):
     )
     # Soft-delete flag (archive instead of hard delete when needed)
     is_active = models.BooleanField(default=True, db_index=True)
+    
+    # Payment method (for phones sold)
+    PAYMENT_METHOD_CHOICES = [
+        ("CASH", "Cash"),
+        ("BANK", "Bank"),
+        ("MOBILE_MONEY", "Mobile Money"),
+    ]
+    payment_method = models.CharField(
+        max_length=20,
+        choices=PAYMENT_METHOD_CHOICES,
+        default="CASH",
+        blank=True,
+        help_text="Payment method used when sold"
+    )
 
     # ✅ Timestamps – use defaults to avoid interactive migration prompts
     created_at = models.DateTimeField(default=timezone.now, editable=False)

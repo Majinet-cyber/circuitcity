@@ -155,12 +155,22 @@ class InventoryConfig(AppConfig):
         try:
             importlib.import_module("inventory.signals")
             logger.debug("inventory.signals loaded successfully.")
-            self.__class__._signals_loaded = True
         except ModuleNotFoundError:
             if getattr(settings, "DEBUG", False):
                 logger.info("inventory.signals not found; skipping signal wiring.")
         except Exception:
             logger.exception("Error loading inventory.signals")
+        
+        # Import audit signals for stock integrity
+        try:
+            importlib.import_module("inventory.signals_audit")
+            logger.debug("inventory.signals_audit loaded successfully.")
+            self.__class__._signals_loaded = True
+        except ModuleNotFoundError:
+            if getattr(settings, "DEBUG", False):
+                logger.info("inventory.signals_audit not found; skipping audit signal wiring.")
+        except Exception:
+            logger.exception("Error loading inventory.signals_audit")
 
     # -----------------------------
     # 3) Auto-create default Location for new stores

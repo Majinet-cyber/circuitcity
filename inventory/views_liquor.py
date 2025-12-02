@@ -5,12 +5,13 @@ Views for liquor store operations: sales, credits, payments, stock edit requests
 from __future__ import annotations
 
 from decimal import Decimal
-from typing import Optional
+from typing import Optional, Any
 
 from django import forms
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.db import transaction
+from django.db.models import Sum, F
 from django.http import HttpRequest, JsonResponse
 from django.shortcuts import render, redirect, get_object_or_404
 from django.utils import timezone
@@ -56,7 +57,7 @@ class LiquorSellForm(forms.Form):
     sale_type = forms.ChoiceField(
         choices=LiquorSaleType.choices,
         initial=LiquorSaleType.SALE,
-        widget=forms.Select(attrs={"class": "form-control"})
+        widget=forms.Select(attrs={"class": "form-control", "id": "id_sale_type"})
     )
     customer_name = forms.CharField(
         max_length=120,
@@ -107,23 +108,40 @@ def sell_liquor(request):
     """Sell liquor (bottle or shot)"""
     business = get_active_business(request)
     
+    # Get active shift (if any)
+    active_shift = get_active_shift(request)
+    
+    # Warn if no active shift
+    if not active_shift:
+        messages.warning(request, "You don't have an active shift. Start a shift first to track sales properly.")
+    
     if request.method == "POST":
         form = LiquorSellForm(business, request.POST)
         if form.is_valid():
             data = form.cleaned_data
+            product = data["product"]
+            unit = data["unit"]
+            quantity = data["quantity"]
             
             with transaction.atomic():
-                # Calculate total
-                total = Decimal(data["quantity"]) * data["unit_price"]
+                # Calculate cost for profit tracking
+                unit_cost = product.get_cost_for_unit(unit)
+                total_cost = Decimal(quantity) * unit_cost
+                
+                # Calculate total price
+                total = Decimal(quantity) * data["unit_price"]
                 
                 # Create sale
                 sale = LiquorSale.objects.create(
                     business=business,
-                    product=data["product"],
-                    unit=data["unit"],
-                    quantity=data["quantity"],
+                    product=product,
+                    shift=active_shift,  # Attach to active shift
+                    unit=unit,
+                    quantity=quantity,
                     unit_price=data["unit_price"],
                     total_price=total,
+                    unit_cost=unit_cost,
+                    total_cost=total_cost,
                     sale_type=data["sale_type"],
                     sold_by=request.user,
                     notes=data.get("notes", "")
@@ -141,28 +159,30 @@ def sell_liquor(request):
                     )
                     sale.linked_credit = credit
                     sale.save(update_fields=["linked_credit"])
-                else:
-                    # Create wallet entry for cash sale
+                elif data["sale_type"] != LiquorSaleType.FREE:
+                    # Create wallet entry for cash sale (not for free sales)
                     LiquorWalletEntry.objects.create(
                         business=business,
                         amount=total,
-                        description=f"Sale: {data['product'].name} ({data['quantity']} {data['unit']})",
+                        description=f"Sale: {product.name} ({quantity} {unit})",
                         entry_type="income",
                         related_sale=sale,
                         created_by=request.user
                     )
             
-            messages.success(request, f"Sale recorded: {data['quantity']} {data['unit']} of {data['product'].name}")
-            return redirect("inventory:liquor_sales_list")
+            sale_type_display = dict(LiquorSaleType.choices).get(data["sale_type"], data["sale_type"])
+            messages.success(request, f"{sale_type_display} recorded: {quantity} {unit} of {product.name}")
+            return redirect("inventory:liquor_sell")  # Stay on sell page for quick successive sales
     else:
         form = LiquorSellForm(business)
     
-    recent_sales = LiquorSale.objects.filter(business=business).select_related("product", "sold_by")[:10]
+    recent_sales = LiquorSale.objects.filter(business=business).select_related("product", "sold_by", "shift")[:10]
     
     return render(request, "inventory/liquor/sell.html", {
         "form": form,
         "recent_sales": recent_sales,
         "business": business,
+        "active_shift": active_shift,
     })
 
 
@@ -540,3 +560,351 @@ def stock_edit_requests(request):
         "business": business,
     })
 
+
+# ==============================================================================
+# SHIFT MANAGEMENT
+# ==============================================================================
+
+def get_active_shift(request) -> Optional[Any]:
+    """Get the currently active shift for the logged-in user"""
+    from inventory.models_verticals import LiquorShift, LiquorShiftStatus
+    business = get_active_business(request)
+    return LiquorShift.objects.filter(
+        business=business,
+        barman=request.user,
+        status=LiquorShiftStatus.OPEN
+    ).order_by("-started_at").first()
+
+
+@login_required
+@require_business
+@require_business_kind(BusinessKind.LIQUOR)
+def active_shift_status(request):
+    """API endpoint to check if user has an active shift"""
+    shift = get_active_shift(request)
+    if shift:
+        return JsonResponse({
+            "has_active_shift": True,
+            "shift_id": shift.id,
+            "started_at": shift.started_at.isoformat(),
+            "is_stale": shift.is_stale(),
+        })
+    return JsonResponse({"has_active_shift": False})
+
+
+class StartShiftForm(forms.Form):
+    """Form for starting a new shift"""
+    location = forms.ModelChoiceField(
+        queryset=None,
+        required=False,
+        widget=forms.Select(attrs={"class": "form-control"})
+    )
+    opening_notes = forms.CharField(
+        required=False,
+        widget=forms.Textarea(attrs={"class": "form-control", "rows": 2, "placeholder": "Any notes about the opening stock..."})
+    )
+    
+    def __init__(self, business=None, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        if business:
+            from inventory.models import Location
+            self.fields["location"].queryset = Location.objects.filter(business=business)
+
+
+@login_required
+@require_business
+@require_business_kind(BusinessKind.LIQUOR)
+def start_shift(request):
+    """Start a new shift with opening stock count"""
+    from inventory.models_verticals import LiquorShift, LiquorShiftStock
+    from inventory.models import Location
+    
+    business = get_active_business(request)
+    
+    # Check if user already has an active shift
+    existing_shift = get_active_shift(request)
+    if existing_shift:
+        messages.warning(request, f"You already have an active shift (started {existing_shift.started_at.strftime('%H:%M %d/%m/%Y')}). Close it before starting a new one.")
+        return redirect("inventory:liquor_close_shift", shift_id=existing_shift.id)
+    
+    if request.method == "POST":
+        form = StartShiftForm(business, request.POST)
+        if form.is_valid():
+            with transaction.atomic():
+                location = form.cleaned_data.get("location") or Location.default_for(business)
+                
+                # Create the shift
+                shift = LiquorShift.objects.create(
+                    business=business,
+                    location=location,
+                    barman=request.user,
+                    created_by=request.user,
+                    opening_notes=form.cleaned_data.get("opening_notes", "")
+                )
+                
+                # Get all active liquor products
+                products = MerchProduct.objects.filter(
+                    business=business,
+                    kind=BusinessKind.LIQUOR,
+                    is_active=True
+                ).order_by("category", "name")
+                
+                # Create opening stock snapshots for each product
+                for product in products:
+                    # Get current stock counts from POST data
+                    bottles_key = f"bottles_{product.id}"
+                    shots_key = f"shots_{product.id}"
+                    
+                    bottles_count = int(request.POST.get(bottles_key, 0))
+                    shots_count = int(request.POST.get(shots_key, 0)) if product.has_shots else 0
+                    
+                    LiquorShiftStock.objects.create(
+                        shift=shift,
+                        product=product,
+                        bottles_count=bottles_count,
+                        shots_count=shots_count,
+                        snapshot_type="opening",
+                        recorded_by=request.user
+                    )
+                
+                messages.success(request, f"Shift started successfully! Record all sales during your shift.")
+                return redirect("inventory:liquor_sell")
+    else:
+        form = StartShiftForm(business)
+    
+    # Get all active liquor products grouped by category
+    products = MerchProduct.objects.filter(
+        business=business,
+        kind=BusinessKind.LIQUOR,
+        is_active=True
+    ).order_by("category", "name")
+    
+    # Group products by category
+    from itertools import groupby
+    products_by_category = {}
+    for category, items in groupby(products, key=lambda p: p.category or "other"):
+        products_by_category[category] = list(items)
+    
+    return render(request, "inventory/liquor/start_shift.html", {
+        "form": form,
+        "business": business,
+        "products_by_category": products_by_category,
+    })
+
+
+@login_required
+@require_business
+@require_business_kind(BusinessKind.LIQUOR)
+def close_shift(request, shift_id):
+    """Close a shift with closing stock count and variance calculation"""
+    from inventory.models_verticals import LiquorShift, LiquorShiftStock, LiquorShiftStatus
+    
+    business = get_active_business(request)
+    shift = get_object_or_404(
+        LiquorShift,
+        pk=shift_id,
+        business=business,
+        status=LiquorShiftStatus.OPEN
+    )
+    
+    # Only the barman or a manager can close the shift
+    if not (shift.barman == request.user or _is_manager(request.user)):
+        messages.error(request, "You can only close your own shifts.")
+        return redirect("inventory:liquor_dashboard")
+    
+    if request.method == "POST":
+        with transaction.atomic():
+            # Get opening stock
+            opening_stock = {
+                stock.product_id: stock 
+                for stock in shift.stock_snapshots.filter(snapshot_type="opening")
+            }
+            
+            # Record closing stock
+            products = MerchProduct.objects.filter(
+                business=business,
+                kind=BusinessKind.LIQUOR,
+                is_active=True
+            )
+            
+            total_variance_value = Decimal("0.00")
+            
+            for product in products:
+                bottles_key = f"bottles_{product.id}"
+                shots_key = f"shots_{product.id}"
+                
+                bottles_count = int(request.POST.get(bottles_key, 0))
+                shots_count = int(request.POST.get(shots_key, 0)) if product.has_shots else 0
+                
+                # Create closing stock snapshot
+                LiquorShiftStock.objects.create(
+                    shift=shift,
+                    product=product,
+                    bottles_count=bottles_count,
+                    shots_count=shots_count,
+                    snapshot_type="closing",
+                    recorded_by=request.user
+                )
+                
+                # Calculate variance
+                opening = opening_stock.get(product.id)
+                if opening:
+                    # Expected: opening + purchases - sales
+                    # For now, assume no purchases during shift (can enhance later)
+                    
+                    # Calculate sold from shift sales
+                    shift_sales = shift.sales.filter(product=product)
+                    sold_bottles = shift_sales.filter(unit="bottle").aggregate(total=Sum("quantity"))["total"] or 0
+                    sold_shots = shift_sales.filter(unit="shot").aggregate(total=Sum("quantity"))["total"] or 0
+                    
+                    # Expected closing
+                    expected_bottles = opening.bottles_count - sold_bottles
+                    expected_shots = opening.shots_count - sold_shots
+                    
+                    # Handle shot/bottle conversion if needed
+                    if product.has_shots and expected_shots < 0:
+                        # Convert bottles to shots
+                        bottles_needed = abs(expected_shots) // product.sellable_shots_per_bottle + 1
+                        expected_bottles -= bottles_needed
+                        expected_shots += bottles_needed * product.sellable_shots_per_bottle
+                    
+                    # Variance (negative = missing stock)
+                    variance_bottles = bottles_count - expected_bottles
+                    variance_shots = shots_count - expected_shots
+                    
+                    # Calculate monetary value of variance
+                    if product.cost_per_bottle and variance_bottles != 0:
+                        total_variance_value += variance_bottles * product.cost_per_bottle
+                    if product.cost_per_shot and variance_shots != 0:
+                        total_variance_value += variance_shots * product.cost_per_shot
+            
+            # Calculate shift totals
+            shift_sales = shift.sales.all()
+            
+            total_sales = shift_sales.aggregate(total=Sum("total_price"))["total"] or Decimal("0.00")
+            total_cost = shift_sales.aggregate(total=Sum("total_cost"))["total"] or Decimal("0.00")
+            total_credit = shift_sales.filter(is_credit=True).aggregate(total=Sum("total_price"))["total"] or Decimal("0.00")
+            total_free = shift_sales.filter(is_free=True).aggregate(total=Sum("total_price"))["total"] or Decimal("0.00")
+            
+            # Update shift
+            shift.ended_at = timezone.now()
+            shift.status = LiquorShiftStatus.CLOSED
+            shift.total_sales_amount = total_sales
+            shift.total_cost_amount = total_cost
+            shift.total_profit_amount = total_sales - total_cost
+            shift.total_credit_amount = total_credit
+            shift.total_free_amount = total_free
+            shift.missing_stock_value = abs(total_variance_value) if total_variance_value < 0 else Decimal("0.00")
+            shift.closing_notes = request.POST.get("closing_notes", "")
+            shift.save()
+            
+            messages.success(request, f"Shift closed successfully! Total sales: MK {total_sales:,.2f}, Profit: MK {shift.total_profit_amount:,.2f}")
+            return redirect("inventory:liquor_shift_report", shift_id=shift.id)
+    
+    # Get opening stock to display
+    opening_stock = shift.stock_snapshots.filter(snapshot_type="opening").select_related("product")
+    
+    # Group by category
+    from itertools import groupby
+    stock_by_category = {}
+    for category, items in groupby(opening_stock, key=lambda s: s.product.category or "other"):
+        stock_by_category[category] = list(items)
+    
+    return render(request, "inventory/liquor/close_shift.html", {
+        "shift": shift,
+        "business": business,
+        "stock_by_category": stock_by_category,
+    })
+
+
+def _is_manager(user):
+    """Check if user is a manager"""
+    try:
+        from core.decorators import _is_manager as core_is_manager
+        return core_is_manager(user)
+    except ImportError:
+        # Fallback
+        return user.is_staff or user.is_superuser
+
+
+@login_required
+@require_business
+@require_business_kind(BusinessKind.LIQUOR)
+def shift_report(request, shift_id):
+    """View detailed shift report with variance analysis"""
+    from inventory.models_verticals import LiquorShift
+    from django.db.models import Sum, F
+    
+    business = get_active_business(request)
+    shift = get_object_or_404(LiquorShift, pk=shift_id, business=business)
+    
+    # Get opening and closing stock
+    opening_stock = {
+        stock.product_id: stock 
+        for stock in shift.stock_snapshots.filter(snapshot_type="opening").select_related("product")
+    }
+    closing_stock = {
+        stock.product_id: stock 
+        for stock in shift.stock_snapshots.filter(snapshot_type="closing").select_related("product")
+    }
+    
+    # Calculate variance for each product
+    variance_data = []
+    for product_id, opening in opening_stock.items():
+        closing = closing_stock.get(product_id)
+        if not closing:
+            continue
+        
+        product = opening.product
+        
+        # Calculate sales
+        sales = shift.sales.filter(product=product)
+        sold_bottles = sales.filter(unit="bottle").aggregate(total=Sum("quantity"))["total"] or 0
+        sold_shots = sales.filter(unit="shot").aggregate(total=Sum("quantity"))["total"] or 0
+        
+        # Expected closing
+        expected_bottles = opening.bottles_count - sold_bottles
+        expected_shots = opening.shots_count - sold_shots
+        
+        # Variance
+        variance_bottles = closing.bottles_count - expected_bottles
+        variance_shots = closing.shots_count - expected_shots if product.has_shots else 0
+        
+        # Monetary value
+        variance_value = Decimal("0.00")
+        if variance_bottles != 0 and product.cost_per_bottle:
+            variance_value += variance_bottles * product.cost_per_bottle
+        if variance_shots != 0 and product.cost_per_shot:
+            variance_value += variance_shots * product.cost_per_shot
+        
+        if variance_bottles != 0 or variance_shots != 0:
+            variance_data.append({
+                "product": product,
+                "opening_bottles": opening.bottles_count,
+                "opening_shots": opening.shots_count,
+                "sold_bottles": sold_bottles,
+                "sold_shots": sold_shots,
+                "expected_bottles": expected_bottles,
+                "expected_shots": expected_shots,
+                "closing_bottles": closing.bottles_count,
+                "closing_shots": closing.shots_count,
+                "variance_bottles": variance_bottles,
+                "variance_shots": variance_shots,
+                "variance_value": variance_value,
+            })
+    
+    # Top products by profit
+    top_products = shift.sales.values(
+        "product__name"
+    ).annotate(
+        total_profit=Sum(F("total_price") - F("total_cost")),
+        total_sales=Sum("total_price"),
+        quantity_sold=Sum("quantity")
+    ).order_by("-total_profit")[:5]
+    
+    return render(request, "inventory/liquor/shift_report.html", {
+        "shift": shift,
+        "business": business,
+        "variance_data": variance_data,
+        "top_products": top_products,
+    })

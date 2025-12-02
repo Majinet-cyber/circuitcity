@@ -8,6 +8,12 @@ from . import views_liquor
 app_name = "liquor"
 
 urlpatterns = [
+    # Shifts
+    path("shifts/start/", views_liquor.start_shift, name="start_shift"),
+    path("shifts/<int:shift_id>/close/", views_liquor.close_shift, name="close_shift"),
+    path("shifts/<int:shift_id>/report/", views_liquor.shift_report, name="shift_report"),
+    path("api/shifts/active/", views_liquor.active_shift_status, name="active_shift_status"),
+    
     # Sales
     path("sell/", views_liquor.sell_liquor, name="sell"),
     path("sales/", views_liquor.sales_list, name="sales_list"),

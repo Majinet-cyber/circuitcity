@@ -134,18 +134,78 @@ def inventory_dashboard(request: HttpRequest) -> HttpResponse:
             except Exception as e:
                 log.exception("Agent ranking failed: %s", e)
         
-        # ------------ HTML ------------
-        ctx: Dict[str, Any] = {
-            "products": products,
-            "items_in_stock": items_in_stock,
-            "sales_mtd": sales_mtd,
-            "sales_last": sales_last,
-            "last_days": last_days,
-            "products_in_stock_only": products_in_stock_only,
-            "agent_ranking": ranking_data,
-            "is_agent": is_agent,
-        }
+        # ------------ Profit & Payment Mix (MTD) ------------
+        # Import helpers locally to avoid circular imports
+        try:
+            from dashboard.dashboard_metrics import (
+                add_profit_context,
+                add_payment_mix_context,
+                get_mtd_dates,
+            )
+            from sales.models import Sale
+            from decimal import Decimal
+            
+            # Get MTD date range
+            start_date, end_date = get_mtd_dates()
+            business = getattr(request, "business", None)
+            
+            # Build sales queryset for MTD
+            sales_qs = None
+            if business and Sale is not None:
+                sales_qs = Sale.objects.filter(
+                    location__business=business,
+                    sold_at__gte=start_date,
+                    sold_at__lte=end_date,
+                )
+            
+            # Revenue is already calculated as sales_mtd
+            revenue_total = Decimal(str(sales_mtd))
+            
+            # Create initial context
+            ctx: Dict[str, Any] = {
+                "products": products,
+                "items_in_stock": items_in_stock,
+                "sales_mtd": sales_mtd,
+                "sales_last": sales_last,
+                "last_days": last_days,
+                "products_in_stock_only": products_in_stock_only,
+                "agent_ranking": ranking_data,
+                "is_agent": is_agent,
+            }
+            
+            # Add profit context
+            if business:
+                ctx = add_profit_context(
+                    ctx,
+                    business=business,
+                    revenue=revenue_total,
+                    start_date=start_date,
+                    end_date=end_date,
+                    period_label="MTD",
+                )
+            
+            # Add payment mix context
+            if sales_qs is not None:
+                ctx = add_payment_mix_context(
+                    ctx,
+                    sales_queryset=sales_qs,
+                    period_label="MTD",
+                )
+        except Exception as e:
+            # If profit/payment mix fails, continue with basic context
+            log.exception("Failed to add profit/payment mix context: %s", e)
+            ctx: Dict[str, Any] = {
+                "products": products,
+                "items_in_stock": items_in_stock,
+                "sales_mtd": sales_mtd,
+                "sales_last": sales_last,
+                "last_days": last_days,
+                "products_in_stock_only": products_in_stock_only,
+                "agent_ranking": ranking_data,
+                "is_agent": is_agent,
+            }
 
+        # ------------ HTML ------------
         try:
             return render(request, "inventory/dashboard.html", ctx)
         except Exception:

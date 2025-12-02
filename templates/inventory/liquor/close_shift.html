@@ -1,0 +1,100 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Close Shift - {{ business.name }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <div class="row mb-4">
+        <div class="col">
+            <h2>Close Shift</h2>
+            <p class="text-muted">
+                Started: {{ shift.started_at|date:"d/m/Y H:i" }} by {{ shift.barman.get_full_name|default:shift.barman.username }}
+                <br>
+                Duration: {{ shift.duration_hours|floatformat:1 }} hours
+            </p>
+        </div>
+    </div>
+
+    <form method="post" id="closeShiftForm">
+        {% csrf_token %}
+        
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">Closing Stock Count</h5>
+            </div>
+            <div class="card-body">
+                {% if stock_by_category %}
+                    {% for category, stocks in stock_by_category.items %}
+                        <div class="mb-4">
+                            <h6 class="text-uppercase text-muted mb-3">{{ category|title }}</h6>
+                            <div class="row g-3">
+                                {% for stock in stocks %}
+                                    <div class="col-md-6 col-lg-4">
+                                        <div class="border rounded p-3">
+                                            <h6 class="mb-2">{{ stock.product.name }}</h6>
+                                            <div class="mb-2 small text-muted">
+                                                Opening: {{ stock.bottles_count }} bottles
+                                                {% if stock.product.has_shots %}
+                                                    + {{ stock.shots_count }} shots
+                                                {% endif %}
+                                            </div>
+                                            
+                                            <div class="mb-2">
+                                                <label for="bottles_{{ stock.product.id }}" class="form-label small fw-bold">Closing Bottles</label>
+                                                <input type="number" 
+                                                       name="bottles_{{ stock.product.id }}" 
+                                                       id="bottles_{{ stock.product.id }}"
+                                                       class="form-control" 
+                                                       value="{{ stock.bottles_count }}" 
+                                                       min="0" 
+                                                       required>
+                                            </div>
+                                            
+                                            {% if stock.product.has_shots %}
+                                                <div>
+                                                    <label for="shots_{{ stock.product.id }}" class="form-label small fw-bold">Closing Shots</label>
+                                                    <input type="number" 
+                                                           name="shots_{{ stock.product.id }}" 
+                                                           id="shots_{{ stock.product.id }}"
+                                                           class="form-control" 
+                                                           value="{{ stock.shots_count }}" 
+                                                           min="0">
+                                                </div>
+                                            {% endif %}
+                                        </div>
+                                    </div>
+                                {% endfor %}
+                            </div>
+                        </div>
+                    {% endfor %}
+                {% endif %}
+                
+                <div class="mt-4">
+                    <label for="closing_notes" class="form-label">Closing Notes</label>
+                    <textarea name="closing_notes" 
+                              id="closing_notes" 
+                              class="form-control" 
+                              rows="3" 
+                              placeholder="Any issues, stock discrepancies, or notes about the shift..."></textarea>
+                </div>
+            </div>
+            <div class="card-footer">
+                <button type="submit" class="btn btn-danger btn-lg">
+                    <i class="bi bi-stop-circle"></i> Close Shift
+                </button>
+                <a href="{% url 'inventory:liquor_sell' %}" class="btn btn-secondary">Back to Selling</a>
+            </div>
+        </div>
+    </form>
+</div>
+
+<script>
+document.getElementById('closeShiftForm').addEventListener('submit', function(e) {
+    if (!confirm('Are you sure you want to close this shift? This action cannot be undone.')) {
+        e.preventDefault();
+    }
+});
+</script>
+{% endblock %}
+

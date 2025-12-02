@@ -432,24 +432,31 @@ class ManagerSignUpForm(forms.Form):
     )
     password1 = forms.CharField(
         label="Password",
-        help_text="At least 10 characters and include a letter, a number, and a special character.",
+        help_text="At least 8 characters – more is stronger.",
         widget=forms.PasswordInput(attrs={
             "autocomplete": "new-password",
             "id": "id_password1",
-            "pattern": r"(?=.*[A-Za-z])(?=.*\d)(?=.*[^A-Za-z0-9]).{10,}",
-            "title": "At least 10 characters and include a letter, a number, and a special character."
+            "minlength": "8",
+            "pattern": r".{8,}",
+            "title": "At least 8 characters. Use a mix of letters, numbers, and symbols for better security."
         }),
     )
     password2 = forms.CharField(
         label="Confirm password",
-        widget=forms.PasswordInput(attrs={"autocomplete": "new-password", "id": "id_password2"}),
+        widget=forms.PasswordInput(attrs={
+            "autocomplete": "new-password",
+            "id": "id_password2",
+            "minlength": "8",
+        }),
     )
 
     def clean_email(self):
         email = (self.cleaned_data.get("email") or "").strip().lower()
         # We use email as username; block duplicates in either field.
         if User.objects.filter(email__iexact=email).exists() or User.objects.filter(username__iexact=email).exists():
-            raise forms.ValidationError("An account with this email already exists.")
+            raise forms.ValidationError(
+                "You already have an account with this email. Please log in instead."
+            )
         return email
 
     def clean(self):

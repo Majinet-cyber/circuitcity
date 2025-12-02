@@ -90,33 +90,25 @@
   <div class="g">
     <div class="plans">
       {% for p in plans %}
-        <form class="plan-card tap" method="post" action="{% url 'billing:select_plan' %}" data-plan="{{ p.id }}">
-          {% csrf_token %}
-          <input type="hidden" name="plan" value="{{ p.id }}">
-
+        <div class="plan-card" data-plan="{{ p.id }}">
           <div>
             <h3>{{ p.name }}</h3>
 
             {# --- PRICE: "MWK 20,000 /month" with same-size currency & amount --- #}
             <div class="price">
-              <span class="cc-cur">MWK</span>
-              <span class="amt">
-                {% if p.name == "Starter" %}20,000
-                {% elif p.name == "Growth" %}60,000
-                {% elif p.name == "Pro" %}120,000
-                {% else %}{{ p.price_mwk|intcomma }}{% endif %}
-              </span>
+              <span class="cc-cur">{{ p.currency }}</span>
+              <span class="amt">{{ p.amount|floatformat:0|intcomma }}</span>
               <span class="per">/month</span>
             </div>
 
             {# --- SHORT DESCRIPTION PER TIER --- #}
             <div class="desc text-muted">
-              {% if p.name == "Starter" %}
-                1 store, no agents
-              {% elif p.name == "Growth" %}
-                5 stores, 5 agents
-              {% elif p.name == "Pro" %}
+              {% if p.max_stores == 1 %}
+                {{ p.max_stores }} store{% if p.max_agents > 0 %}, {{ p.max_agents }} agent{{ p.max_agents|pluralize }}{% else %}, no agents{% endif %}
+              {% elif p.max_stores == -1 %}
                 Unlimited
+              {% else %}
+                {{ p.max_stores }} stores, {{ p.max_agents|default:"unlimited" }} agents
               {% endif %}
             </div>
 
@@ -132,10 +124,38 @@
             {% endif %}
           </div>
 
-          <button class="plan-cta" type="submit" aria-label="Choose {{ p.name }}">
-            Choose {{ p.name }}
-          </button>
-        </form>
+          {# Payment method buttons #}
+          <div style="display: flex; flex-direction: column; gap: 8px; margin-top: 12px;">
+            {# Pesapal button (always show for Malawi) #}
+            <form method="post" action="{% url 'billing:pesapal_checkout' %}" style="margin: 0;">
+              {% csrf_token %}
+              <input type="hidden" name="plan_code" value="{{ p.code }}">
+              <button class="plan-cta" type="submit" style="width: 100%; background: #2563eb; font-size: 0.9rem;">
+                💳 Pay with Card/Mobile (Pesapal)
+              </button>
+            </form>
+
+            {# Stripe button (only if configured) #}
+            {% if stripe_configured %}
+            <form method="post" action="{% url 'billing:stripe_checkout' %}" style="margin: 0;">
+              {% csrf_token %}
+              <input type="hidden" name="plan_code" value="{{ p.code }}">
+              <button class="plan-cta" type="submit" style="width: 100%; background: #6366f1; font-size: 0.9rem;">
+                💳 Pay with Card (Stripe)
+              </button>
+            </form>
+            {% endif %}
+
+            {# Manual/other payment methods (existing flow) #}
+            <form method="post" action="{% url 'billing:select_plan' %}" style="margin: 0;">
+              {% csrf_token %}
+              <input type="hidden" name="plan" value="{{ p.id }}">
+              <button class="plan-cta" type="submit" style="width: 100%; background: #64748b; font-size: 0.85rem; opacity: 0.9;">
+                Other Payment Methods
+              </button>
+            </form>
+          </div>
+        </div>
       {% endfor %}
     </div>
 
@@ -149,17 +169,6 @@
 
 {% block extra_js %}
 <script>
-  // Make the entire card clickable (submits its own form)
-  (function () {
-    document.querySelectorAll('.plan-card').forEach(function(card){
-      card.addEventListener('click', function(e){
-        // Avoid double-submit if the actual button or a link was clicked
-        const t = (e.target.tagName || '').toLowerCase();
-        if (t === 'button' || t === 'a' || t === 'input' || t === 'label') return;
-        const btn = card.querySelector('button[type="submit"]');
-        if (btn) btn.click();
-      }, {capture:false});
-    });
-  })();
+  // Removed card-click-to-submit since we now have multiple buttons per card
 </script>
 {% endblock %}

@@ -10,6 +10,7 @@ from decimal import Decimal
 from typing import Optional
 
 from django.conf import settings
+from django.core.validators import MinValueValidator
 from django.db import models
 from django.db.models import Sum, F, ExpressionWrapper, DurationField
 from django.utils import timezone
@@ -171,6 +172,28 @@ class AgentWorkLog(models.Model):
     arrived_late_minutes = models.IntegerField(
         default=0,
         help_text="Minutes arrived after scheduled_start (positive = late).",
+    )
+    
+    # Penalty/bonus amounts (in currency, e.g. MWK)
+    penalty_amount = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        default=Decimal("0.00"),
+        validators=[MinValueValidator(Decimal("0.00"))],
+        help_text="Penalty amount deducted for lateness/absence (MWK).",
+    )
+    bonus_amount = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        default=Decimal("0.00"),
+        validators=[MinValueValidator(Decimal("0.00"))],
+        help_text="Bonus amount added for early arrival (MWK).",
+    )
+    
+    # Flag to track if penalties/bonuses have been applied to wallet
+    wallet_processed = models.BooleanField(
+        default=False,
+        help_text="True if penalty/bonus has been applied to agent wallet.",
     )
     
     # Timestamp tracking

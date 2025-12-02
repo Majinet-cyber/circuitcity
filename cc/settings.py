@@ -161,7 +161,7 @@ INSTALLED_APPS = [
     "simulator",
     # Billing
     "billing",
-    "wallet",
+    "wallet.apps.WalletConfig",
     # Layby (TOP-LEVEL import, not circuitcity.layby)
         "layby.apps.LaybyConfig",
     "timelogs",
@@ -172,6 +172,7 @@ INSTALLED_APPS = [
     # NEW APPS
     "support",   # ticket system
     "audit",     # audit logs UI (if you see an audit app folder)
+    "staticpages",  # Public home page with hero section
 ]
 
 
@@ -319,8 +320,8 @@ else:
 # --------------------------- auth / i18n ---------------------------
 AUTH_PASSWORD_VALIDATORS = [
     {"NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator"},
-    # keep 12 for now
-    {"NAME": "django.contrib.auth.password_validation.MinimumLengthValidator", "OPTIONS": {"min_length": 12}},
+    # Minimum 8 characters for better UX (as per requirements)
+    {"NAME": "django.contrib.auth.password_validation.MinimumLengthValidator", "OPTIONS": {"min_length": 8}},
     {"NAME": "django.contrib.auth.password_validation.CommonPasswordValidator"},
     {"NAME": "django.contrib.auth.password_validation.NumericPasswordValidator"},
 ]
@@ -403,6 +404,33 @@ BILLING_PLANS = {
 REPORTS_DEFAULT_CURRENCY = BILLING["DEFAULT_CURRENCY"]
 BILLING_TRIAL_DAYS = BILLING["TRIAL_DAYS"]
 BILLING_GRACE_DAYS = BILLING["GRACE_DAYS"]
+
+# --------------------------- payment providers ---------------------------
+# Stripe (card payments)
+STRIPE_SECRET_KEY = os.environ.get("STRIPE_SECRET_KEY", "")
+STRIPE_PUBLISHABLE_KEY = os.environ.get("STRIPE_PUBLISHABLE_KEY", "")
+STRIPE_WEBHOOK_SECRET = os.environ.get("STRIPE_WEBHOOK_SECRET", "")
+
+# Configure Stripe if keys are present
+if STRIPE_SECRET_KEY:
+    try:
+        import stripe  # type: ignore
+        stripe.api_key = STRIPE_SECRET_KEY
+    except ImportError:
+        pass  # Stripe not installed; skip config
+
+# Pesapal (mobile money + cards for Africa)
+PESAPAL_CONSUMER_KEY = os.environ.get("PESAPAL_CONSUMER_KEY", "")
+PESAPAL_CONSUMER_SECRET = os.environ.get("PESAPAL_CONSUMER_SECRET", "")
+PESAPAL_BASE_URL = os.environ.get("PESAPAL_BASE_URL", "https://cybqa.pesapal.com/pesapalv3/api/")  # sandbox default
+PESAPAL_IPN_ID = os.environ.get("PESAPAL_IPN_ID", "")
+
+# --------------------------- whatsapp notifications ---------------------------
+# Using WhatsApp Cloud API (Meta)
+WHATSAPP_API_BASE_URL = os.environ.get("WHATSAPP_API_BASE_URL", "https://graph.facebook.com/v21.0/")
+WHATSAPP_PHONE_NUMBER_ID = os.environ.get("WHATSAPP_PHONE_NUMBER_ID", "")
+WHATSAPP_ACCESS_TOKEN = os.environ.get("WHATSAPP_ACCESS_TOKEN", "")
+WHATSAPP_DEFAULT_COUNTRY_CODE = os.environ.get("WHATSAPP_DEFAULT_COUNTRY_CODE", "+265")  # Malawi
 
 # --------------------------- global UI ---------------------------
 UI = {

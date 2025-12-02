@@ -6,4 +6,10 @@ class WalletConfig(AppConfig):
     name = "wallet"
     verbose_name = "Wallet"
 
+    def ready(self):
+        """Import signals when the app is ready."""
+        try:
+            from . import signals  # noqa: F401
+        except ImportError:
+            pass
 

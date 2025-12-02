@@ -11,7 +11,7 @@ try:
     from .models_verticals import (
         # Liquor
         LiquorSale, LiquorCredit, LiquorCreditPayment, LiquorStockEditRequest,
-        LiquorExpense, LiquorWalletEntry,
+        LiquorExpense, LiquorWalletEntry, LiquorShift, LiquorShiftStock,
         # Gym
         GymMember, GymPayment, GymMemberLog, GymSettings, GymWalletEntry,
         # Clothing
@@ -20,7 +20,7 @@ try:
 except ImportError:
     # Models not yet migrated
     LiquorSale = LiquorCredit = LiquorCreditPayment = LiquorStockEditRequest = None
-    LiquorExpense = LiquorWalletEntry = None
+    LiquorExpense = LiquorWalletEntry = LiquorShift = LiquorShiftStock = None
     GymMember = GymPayment = GymMemberLog = GymSettings = GymWalletEntry = None
     ClothingSale = ClothingProductLog = None
 
@@ -38,7 +38,7 @@ if LiquorSale:
         date_hierarchy = "sold_at"
         ordering = ("-sold_at",)
         list_select_related = ("product", "sold_by", "business")
-        autocomplete_fields = ("product", "sold_by")
+        raw_id_fields = ("product", "sold_by")
         list_per_page = 50
 
 
@@ -86,7 +86,7 @@ if LiquorStockEditRequest:
         date_hierarchy = "created_at"
         ordering = ("-created_at",)
         list_select_related = ("product", "requested_by", "reviewed_by", "business")
-        autocomplete_fields = ("product", "requested_by", "reviewed_by")
+        raw_id_fields = ("product", "requested_by", "reviewed_by")
         list_per_page = 50
 
 
@@ -112,6 +112,48 @@ if LiquorWalletEntry:
         ordering = ("-created_at",)
         list_select_related = ("business", "created_by")
         list_per_page = 50
+
+
+if LiquorShift:
+    @admin.register(LiquorShift)
+    class LiquorShiftAdmin(admin.ModelAdmin):
+        list_display = ("id", "barman", "status", "started_at", "ended_at", "total_sales_amount", "total_profit_amount", "missing_stock_value")
+        list_filter = ("status", "started_at")
+        search_fields = ("barman__username", "barman__first_name", "barman__last_name")
+        date_hierarchy = "started_at"
+        ordering = ("-started_at",)
+        list_select_related = ("business", "location", "barman", "created_by")
+        raw_id_fields = ("barman", "created_by", "location")
+        readonly_fields = ("started_at", "ended_at", "total_sales_amount", "total_cost_amount", "total_profit_amount", "total_credit_amount", "total_free_amount", "missing_stock_value")
+        list_per_page = 50
+        
+        fieldsets = (
+            ("Shift Info", {
+                "fields": ("business", "location", "barman", "created_by", "status")
+            }),
+            ("Timing", {
+                "fields": ("started_at", "ended_at")
+            }),
+            ("Financials", {
+                "fields": ("total_sales_amount", "total_cost_amount", "total_profit_amount", "total_credit_amount", "total_free_amount", "missing_stock_value")
+            }),
+            ("Notes", {
+                "fields": ("opening_notes", "closing_notes")
+            }),
+        )
+
+
+if LiquorShiftStock:
+    @admin.register(LiquorShiftStock)
+    class LiquorShiftStockAdmin(admin.ModelAdmin):
+        list_display = ("shift", "product", "snapshot_type", "bottles_count", "shots_count", "recorded_at")
+        list_filter = ("snapshot_type", "recorded_at")
+        search_fields = ("product__name", "shift__id")
+        date_hierarchy = "recorded_at"
+        ordering = ("-recorded_at",)
+        list_select_related = ("shift", "product", "recorded_by")
+        raw_id_fields = ("shift", "product", "recorded_by")
+        list_per_page = 100
 
 
 # ==============================================================================
@@ -201,7 +243,7 @@ if ClothingSale:
         date_hierarchy = "sold_at"
         ordering = ("-sold_at",)
         list_select_related = ("product", "sold_by", "business")
-        autocomplete_fields = ("product", "sold_by")
+        raw_id_fields = ("product", "sold_by")
         list_per_page = 50
 
 

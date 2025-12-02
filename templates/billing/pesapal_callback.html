@@ -1,0 +1,65 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Payment Confirmation{% endblock %}
+{% block header_title %}Payment Confirmation{% endblock %}
+
+{% block content %}
+<div style="max-width: 600px; margin: 60px auto; text-align: center; padding: 24px;">
+  <div style="background: linear-gradient(135deg, rgba(37, 99, 235, 0.1), rgba(59, 130, 246, 0.1)); 
+              border: 1px solid rgba(37, 99, 235, 0.3); 
+              border-radius: 16px; 
+              padding: 40px 32px;
+              backdrop-filter: blur(12px);">
+    
+    {# Icon based on status #}
+    {% if 'successful' in status_msg|lower %}
+      <div style="font-size: 64px; margin-bottom: 16px;">✅</div>
+    {% elif 'failed' in status_msg|lower %}
+      <div style="font-size: 64px; margin-bottom: 16px;">❌</div>
+    {% else %}
+      <div style="font-size: 64px; margin-bottom: 16px;">⏳</div>
+    {% endif %}
+    
+    <h2 style="margin: 0 0 12px; font-weight: 800; color: var(--heading);">
+      {% if 'successful' in status_msg|lower %}
+        Payment Successful!
+      {% elif 'failed' in status_msg|lower %}
+        Payment Failed
+      {% else %}
+        Processing Payment
+      {% endif %}
+    </h2>
+    
+    <p style="font-size: 1.1rem; margin: 0 0 24px; opacity: 0.9;">
+      {{ status_msg }}
+    </p>
+    
+    {% if tracking_id %}
+    <p style="font-size: 0.85rem; opacity: 0.6; margin-bottom: 8px; font-family: monospace;">
+      Transaction ID: {{ tracking_id }}
+    </p>
+    {% endif %}
+    
+    {% if merchant_ref %}
+    <p style="font-size: 0.85rem; opacity: 0.6; margin-bottom: 24px; font-family: monospace;">
+      Reference: {{ merchant_ref }}
+    </p>
+    {% endif %}
+    
+    <a href="{% url 'dashboard:index' %}" 
+       class="btn" 
+       style="display: inline-block; 
+              padding: 12px 32px; 
+              background: linear-gradient(135deg, #2563eb, #3b82f6); 
+              color: white; 
+              border-radius: 10px; 
+              text-decoration: none; 
+              font-weight: 700;
+              box-shadow: 0 6px 20px rgba(37, 99, 235, 0.3);">
+      Go to Dashboard
+    </a>
+  </div>
+</div>
+{% endblock %}
+

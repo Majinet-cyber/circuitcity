@@ -109,9 +109,9 @@ _activate_mine_view = getattr(_tenants_views, "activate_mine", None)
 
 
 def root_redirect(request):
-    # Anonymous -> login (prefer two_factor if present)
+    # Anonymous -> public home page
     if not getattr(request, "user", None) or not request.user.is_authenticated:
-        return _redirect_first(("two_factor:login", "accounts:login", "login"), "/accounts/login/")
+        return _redirect_first(("staticpages:home",), "/home/")
 
     # HQ admins -> HQ dashboard
     if is_hq_admin(request.user):
@@ -320,7 +320,12 @@ urlpatterns += [
     path("static/img/logo-32.png",  RedirectView.as_view(url=_safe_static("brand/mjn-32.png"), permanent=False)),
 ]
 
-# Landing
+# Landing - Public home page
+urlpatterns += [
+    path("home/", include_or_raise("staticpages.urls", "staticpages")),
+]
+
+# Root redirect (for authenticated users)
 urlpatterns += [path("", root_redirect, name="root")]
 
 # ---------------- Accounts (namespaced) ----------------

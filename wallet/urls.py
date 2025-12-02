@@ -49,6 +49,15 @@ urlpatterns = [
     path("admin/pos/new/", views.admin_po_new, name="admin_po_new"),
     path("admin/pos/<int:po_id>/", views.admin_po_detail, name="admin_po_detail"),
 
+    # Cost Management
+    path("admin/costs/", views.admin_costs, name="admin_costs"),
+    path("admin/costs/new/", views.admin_cost_create, name="admin_cost_create"),
+    path("admin/costs/<int:cost_id>/edit/", views.admin_cost_edit, name="admin_cost_edit"),
+    path("admin/costs/<int:cost_id>/delete/", views.admin_cost_delete, name="admin_cost_delete"),
+    
+    # Agent Wallet Adjustment
+    path("admin/agent/<int:membership_id>/adjust/", views.wallet_adjust_agent, name="wallet_adjust_agent"),
+
     # Admin extras (additive, non-breaking)
     path("admin/requests/", views.admin_budget_list, name="admin_budget_list"),
     path("admin/requests/<int:pk>/set/<str:action>/", views.admin_budget_set_status, name="admin_budget_set_status"),

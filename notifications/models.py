@@ -55,3 +55,74 @@ class Notification(models.Model):
             self.save(update_fields=["read_at"])
 
 
+# ==============================================================================
+# WhatsApp Notification Preferences
+# ==============================================================================
+
+class WhatsAppPreference(models.Model):
+    """
+    WhatsApp notification preferences for managers and agents.
+    Allows opt-in/opt-out for real-time alerts via WhatsApp.
+    """
+    user = models.OneToOneField(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="whatsapp_preference"
+    )
+    
+    # Contact info
+    phone_number = models.CharField(
+        max_length=20,
+        help_text="International format (e.g. +265888123456)"
+    )
+    
+    # Global toggle
+    is_enabled = models.BooleanField(
+        default=True,
+        help_text="Master switch for all WhatsApp notifications"
+    )
+    
+    # Notification types
+    receive_sale_alerts = models.BooleanField(
+        default=True,
+        help_text="Notify on sales (for managers)"
+    )
+    receive_profit_milestones = models.BooleanField(
+        default=True,
+        help_text="Notify when profit milestones are reached (for managers)"
+    )
+    receive_low_stock_alerts = models.BooleanField(
+        default=True,
+        help_text="Notify when stock is low (for managers)"
+    )
+    receive_commission_alerts = models.BooleanField(
+        default=False,
+        help_text="Notify on commission earnings (for agents)"
+    )
+    
+    # Timestamps
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    class Meta:
+        verbose_name = "WhatsApp Preference"
+        verbose_name_plural = "WhatsApp Preferences"
+        indexes = [
+            models.Index(fields=["user", "is_enabled"]),
+        ]
+    
+    def __str__(self):
+        status = "enabled" if self.is_enabled else "disabled"
+        return f"{self.user.username} WhatsApp ({status})"
+    
+    @classmethod
+    def get_or_default(cls, user):
+        """
+        Get preference for user or return a default (unsaved) instance.
+        """
+        try:
+            return cls.objects.get(user=user)
+        except cls.DoesNotExist:
+            return cls(user=user, phone_number="", is_enabled=False)
+
+

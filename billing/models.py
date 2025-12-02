@@ -82,6 +82,8 @@ class BusinessSubscription(models.Model):
         AIRTEL = "airtel", "Airtel Money"
         STANDARD_BANK = "standard_bank", "Standard Bank"
         CARD = "card", "Card (VISA/Mastercard)"
+        STRIPE = "stripe", "Stripe"
+        PESAPAL = "pesapal", "Pesapal"
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     business = models.OneToOneField(
@@ -104,6 +106,12 @@ class BusinessSubscription(models.Model):
     last_payment_at = models.DateTimeField(null=True, blank=True)
     meta = models.JSONField(default=dict, blank=True)
 
+    # Provider-specific identifiers
+    stripe_subscription_id = models.CharField(max_length=255, blank=True, default="", help_text="Stripe subscription ID")
+    stripe_customer_id = models.CharField(max_length=255, blank=True, default="", help_text="Stripe customer ID")
+    pesapal_order_tracking_id = models.CharField(max_length=255, blank=True, default="", help_text="Pesapal order tracking ID")
+    pesapal_merchant_reference = models.CharField(max_length=255, blank=True, default="", help_text="Pesapal merchant reference")
+
     # Light audit when revoking/canceling via HQ
     canceled_at = models.DateTimeField(null=True, blank=True)
     canceled_by = models.ForeignKey(
@@ -119,6 +127,8 @@ class BusinessSubscription(models.Model):
             models.Index(fields=["status"]),
             models.Index(fields=["business"]),
             models.Index(fields=["plan", "status"]),
+            models.Index(fields=["stripe_subscription_id"]),
+            models.Index(fields=["pesapal_order_tracking_id"]),
         ]
 
     # ---- Convenience constructors -------------------------------------
@@ -537,6 +547,8 @@ class Payment(models.Model):
         AIRTEL = "airtel", "Airtel Money"
         STANDARD_BANK = "standard_bank", "Standard Bank"
         CARD = "card", "Card (VISA/Mastercard)"
+        STRIPE = "stripe", "Stripe"
+        PESAPAL = "pesapal", "Pesapal"
 
     class Status(models.TextChoices):
         PENDING = "pending", "Pending"
@@ -610,6 +622,8 @@ class PaymentMethod(models.Model):
         ("airtel", "Airtel Money"),
         ("standard_bank", "Standard Bank"),
         ("card", "Card"),
+        ("stripe", "Stripe"),
+        ("pesapal", "Pesapal"),
     )
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     business = models.ForeignKey("tenants.Business", on_delete=models.CASCADE, related_name="payment_methods")

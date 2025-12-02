@@ -174,7 +174,7 @@ urlpatterns = [
     # --- Manager: review agent join requests (per active business)
     path("manager/agents/", manager_review_agents, name="manager_review_agents"),
     # Agent detail view
-    path("agents/<int:agent_id>/", views._get_or_fallback("agent_detail_view", "tenants:manager_review_agents"), name="agent_detail"),
+    path("agents/<int:agent_id>/", _get_or_fallback("agent_detail_view", "tenants:manager_review_agents"), name="agent_detail"),
 
     # --- Manager: manage store locations (per active business)
     path("manager/locations/", manager_locations, name="manager_locations"),

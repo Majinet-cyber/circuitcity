@@ -1302,3 +1302,266 @@ admin_schedules = AdminPayoutSchedulesView.as_view()
 admin_po_list = AdminPOListView.as_view()
 
 
+# ---------------------------------------------------------------------
+# Admin Cost Management
+# ---------------------------------------------------------------------
+@method_decorator([otp_required, ensure_csrf_cookie], name="dispatch")
+class AdminCostListView(LoginRequiredMixin, TemplateView):
+    """
+    List and manage admin costs (once-off and recurring) for the active business.
+    """
+    template_name = "wallet/admin_costs.html"
+
+    def dispatch(self, request, *args, **kwargs):
+        if not _staff(request.user):
+            messages.error(request, "Access denied.")
+            return redirect("wallet:agent_wallet")
+        return super().dispatch(request, *args, **kwargs)
+
+    def get_context_data(self, **kwargs):
+        ctx = super().get_context_data(**kwargs)
+        biz = get_active_business(self.request)
+        
+        # Get all cost transactions for this business
+        costs_qs = WalletTransaction.objects.filter(
+            ledger=Ledger.COMPANY,
+            type__in=[TxnType.COST_ONCE_OFF, TxnType.COST_RECURRING],
+        )
+        costs_qs = _maybe_scope_to_business(costs_qs, biz)
+        
+        # Separate once-off and recurring
+        once_off = costs_qs.filter(is_recurring=False).order_by("-effective_date")
+        recurring = costs_qs.filter(is_recurring=True).order_by("-effective_from")
+        
+        ctx["once_off_costs"] = once_off
+        ctx["recurring_costs"] = recurring
+        ctx["business"] = biz
+        return ctx
+
+
+@otp_required
+def admin_cost_create(request: HttpRequest):
+    """
+    Create a new cost transaction (once-off or recurring).
+    """
+    if not _staff(request.user):
+        messages.error(request, "Access denied.")
+        return redirect("wallet:agent_wallet")
+    
+    biz = get_active_business(request)
+    
+    if request.method == "POST":
+        from .forms import AdminCostForm
+        form = AdminCostForm(request.POST, business=biz)
+        if form.is_valid():
+            cost = form.save(commit=False)
+            cost.created_by = request.user
+            if biz:
+                cost.business = biz
+            cost.save()
+            
+            cost_type = "recurring" if cost.is_recurring else "once-off"
+            messages.success(request, f"{cost_type.title()} cost added successfully.")
+            return redirect("wallet:admin_costs")
+        else:
+            # Return form with errors
+            ctx = {"form": form, "business": biz}
+            return render(request, "wallet/admin_cost_form.html", ctx)
+    else:
+        from .forms import AdminCostForm
+        form = AdminCostForm(business=biz)
+        ctx = {"form": form, "business": biz}
+        return render(request, "wallet/admin_cost_form.html", ctx)
+
+
+@otp_required
+def admin_cost_edit(request: HttpRequest, cost_id: int):
+    """
+    Edit an existing cost transaction.
+    """
+    if not _staff(request.user):
+        messages.error(request, "Access denied.")
+        return redirect("wallet:agent_wallet")
+    
+    cost = get_object_or_404(WalletTransaction, id=cost_id)
+    biz = get_active_business(request)
+    
+    # Ensure cost belongs to the active business
+    if biz and cost.business_id != biz.id:
+        messages.error(request, "You cannot edit costs from another business.")
+        return redirect("wallet:admin_costs")
+    
+    if request.method == "POST":
+        from .forms import AdminCostForm
+        # Note: amount needs to be positive in the form
+        initial_data = {
+            'type': cost.type,
+            'amount': abs(cost.amount),  # Convert negative to positive for editing
+            'note': cost.note,
+            'effective_date': cost.effective_date,
+            'is_recurring': cost.is_recurring,
+            'recurrence': cost.recurrence,
+            'effective_from': cost.effective_from,
+        }
+        form = AdminCostForm(request.POST, instance=cost, business=biz)
+        if form.is_valid():
+            updated_cost = form.save(commit=False)
+            updated_cost.created_by = request.user  # Track who last modified
+            updated_cost.save()
+            
+            messages.success(request, "Cost updated successfully.")
+            return redirect("wallet:admin_costs")
+        else:
+            ctx = {"form": form, "cost": cost, "business": biz}
+            return render(request, "wallet/admin_cost_form.html", ctx)
+    else:
+        from .forms import AdminCostForm
+        # Pre-populate form with existing data (convert amount to positive)
+        initial_data = {
+            'type': cost.type,
+            'amount': abs(cost.amount),
+            'note': cost.note,
+            'effective_date': cost.effective_date,
+            'is_recurring': cost.is_recurring,
+            'recurrence': cost.recurrence,
+            'effective_from': cost.effective_from,
+        }
+        form = AdminCostForm(instance=cost, initial=initial_data, business=biz)
+        ctx = {"form": form, "cost": cost, "business": biz, "editing": True}
+        return render(request, "wallet/admin_cost_form.html", ctx)
+
+
+@otp_required
+@require_POST
+def admin_cost_delete(request: HttpRequest, cost_id: int):
+    """
+    Delete a cost transaction.
+    """
+    if not _staff(request.user):
+        messages.error(request, "Access denied.")
+        return redirect("wallet:agent_wallet")
+    
+    cost = get_object_or_404(WalletTransaction, id=cost_id)
+    biz = get_active_business(request)
+    
+    # Ensure cost belongs to the active business
+    if biz and cost.business_id != biz.id:
+        messages.error(request, "You cannot delete costs from another business.")
+        return redirect("wallet:admin_costs")
+    
+    # Only allow deletion of cost transactions
+    if cost.type not in [TxnType.COST_ONCE_OFF, TxnType.COST_RECURRING]:
+        messages.error(request, "You can only delete cost transactions.")
+        return redirect("wallet:admin_costs")
+    
+    cost.delete()
+    messages.success(request, "Cost deleted successfully.")
+    return redirect("wallet:admin_costs")
+
+
+# ---------------------------------------------------------------------
+# Agent Wallet Adjustment (Manual)
+# ---------------------------------------------------------------------
+@otp_required
+def wallet_adjust_agent(request: HttpRequest, membership_id: int):
+    """
+    Admin/manager view to manually adjust an agent's wallet balance.
+    
+    Can add money (credit) or deduct money (debit) with a required reason.
+    All adjustments are logged for audit trail.
+    """
+    if not _staff(request.user):
+        messages.error(request, "Access denied. Only managers/admins can adjust agent wallets.")
+        return redirect("dashboard:agent_dashboard")
+    
+    # Get membership
+    try:
+        from tenants.models import Membership
+        membership = get_object_or_404(Membership, pk=membership_id)
+    except ImportError:
+        messages.error(request, "Tenants app not available.")
+        return redirect("dashboard:admin_dashboard")
+    
+    # Get business (for scoping)
+    biz = get_active_business(request)
+    
+    # Ensure membership belongs to the active business
+    if biz and membership.business_id != biz.id:
+        messages.error(request, "You cannot adjust wallets from another business.")
+        return redirect("dashboard:admin_dashboard")
+    
+    # Get agent's current wallet
+    from wallet.agent_models import get_or_create_agent_wallet
+    wallet = get_or_create_agent_wallet(membership)
+    
+    if request.method == "POST":
+        from .forms import AgentWalletAdjustmentForm
+        form = AgentWalletAdjustmentForm(request.POST)
+        
+        if form.is_valid():
+            amount = form.cleaned_data['amount']
+            is_deduction = form.cleaned_data['is_deduction']
+            reason = form.cleaned_data['reason']
+            
+            try:
+                from wallet.agent_models import add_manual_adjustment
+                
+                # Perform the adjustment
+                txn = add_manual_adjustment(
+                    membership=membership,
+                    amount=amount,
+                    is_debit=is_deduction,
+                    reason=reason,
+                    created_by=request.user,
+                )
+                
+                action = "deducted from" if is_deduction else "added to"
+                messages.success(
+                    request,
+                    f"Successfully {action} {membership.user.get_username()}'s wallet: "
+                    f"MK {amount:,.2f}. New balance: MK {wallet.balance:,.2f}"
+                )
+                
+                # Redirect to agent detail or back to list
+                try:
+                    from django.urls import reverse
+                    return redirect(reverse('dashboard:admin_agent_detail', args=[membership.user.id]))
+                except Exception:
+                    return redirect("dashboard:admin_dashboard")
+                    
+            except Exception as e:
+                messages.error(request, f"Error processing adjustment: {e}")
+                ctx = {
+                    "form": form,
+                    "membership": membership,
+                    "wallet": wallet,
+                    "business": biz,
+                }
+                return render(request, "wallet/agent_adjustment_form.html", ctx)
+        else:
+            # Form has errors, re-render with errors
+            ctx = {
+                "form": form,
+                "membership": membership,
+                "wallet": wallet,
+                "business": biz,
+            }
+            return render(request, "wallet/agent_adjustment_form.html", ctx)
+    else:
+        # GET request - show form
+        from .forms import AgentWalletAdjustmentForm
+        form = AgentWalletAdjustmentForm(initial={'membership': membership_id})
+        
+        ctx = {
+            "form": form,
+            "membership": membership,
+            "wallet": wallet,
+            "business": biz,
+        }
+        return render(request, "wallet/agent_adjustment_form.html", ctx)
+
+
+# View aliases for urls.py
+admin_costs = AdminCostListView.as_view()
+
+

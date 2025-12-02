@@ -1,0 +1,82 @@
+{% load humanize %}
+
+<!-- Revenue / Costs / Profit Panel -->
+<div class="row g-3 mb-4">
+    <div class="col-md-4">
+        <div class="card h-100 border-success">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <h6 class="card-title text-success mb-0">
+                        <i class="bi bi-graph-up-arrow"></i> Revenue
+                    </h6>
+                    <span class="badge bg-success-subtle text-success">{{ period|default:"MTD" }}</span>
+                </div>
+                <h3 class="mb-0 text-success">
+                    MK {{ revenue|default:0|floatformat:0|intcomma }}
+                </h3>
+                {% if revenue_prev %}
+                <small class="text-muted">
+                    Previous: MK {{ revenue_prev|floatformat:0|intcomma }}
+                    {% if revenue_delta %}
+                        <span class="badge {% if revenue_delta > 0 %}bg-success{% else %}bg-danger{% endif %} ms-1">
+                            {{ revenue_delta|floatformat:1 }}%
+                        </span>
+                    {% endif %}
+                </small>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-4">
+        <div class="card h-100 border-warning">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <h6 class="card-title text-warning mb-0">
+                        <i class="bi bi-cash-stack"></i> Costs
+                    </h6>
+                    <span class="badge bg-warning-subtle text-warning">{{ period|default:"MTD" }}</span>
+                </div>
+                <h3 class="mb-0 text-warning">
+                    MK {{ costs|default:0|floatformat:0|intcomma }}
+                </h3>
+                {% if costs_breakdown %}
+                <small class="text-muted">
+                    Once-off: MK {{ costs_breakdown.once_off_total|floatformat:0|intcomma }}
+                    <br>
+                    Recurring: MK {{ costs_breakdown.recurring_total|floatformat:0|intcomma }}
+                </small>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-4">
+        <div class="card h-100 {% if profit >= 0 %}border-primary{% else %}border-danger{% endif %}">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <h6 class="card-title {% if profit >= 0 %}text-primary{% else %}text-danger{% endif %} mb-0">
+                        <i class="bi bi-piggy-bank"></i> Profit
+                    </h6>
+                    <span class="badge {% if profit >= 0 %}bg-primary-subtle text-primary{% else %}bg-danger-subtle text-danger{% endif %}">
+                        {{ period|default:"MTD" }}
+                    </span>
+                </div>
+                <h3 class="mb-0 {% if profit >= 0 %}text-primary{% else %}text-danger{% endif %}">
+                    MK {{ profit|default:0|floatformat:0|intcomma }}
+                </h3>
+                {% if profit_margin is not None %}
+                <small class="text-muted">
+                    Margin: {{ profit_margin|floatformat:1 }}%
+                    {% if revenue > 0 %}
+                        <span class="badge {% if profit_margin >= 20 %}bg-success{% elif profit_margin >= 10 %}bg-warning{% else %}bg-danger{% endif %} ms-1">
+                            {% if profit_margin >= 20 %}Excellent{% elif profit_margin >= 10 %}Good{% else %}Low{% endif %}
+                        </span>
+                    {% endif %}
+                </small>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+

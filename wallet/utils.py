@@ -1,40 +1,166 @@
-﻿from typing import Any
-from django.db.models import QuerySet
+﻿# wallet/utils.py
+"""
+Utility functions for wallet operations and financial calculations.
+"""
+from __future__ import annotations
 
-def scope_qs_to_user(qs: QuerySet, request: Any) -> QuerySet:
+from decimal import Decimal
+from typing import Dict, Optional
+from datetime import date
+
+from django.db.models import Sum, Q
+from django.utils import timezone
+
+from .models import WalletTransaction, Ledger, TxnType
+
+
+def q2(x: Optional[Decimal]) -> Decimal:
+    """Quantize to 2 decimal places."""
+    from decimal import ROUND_HALF_UP
+    if x is None:
+        return Decimal("0.00")
+    if not isinstance(x, Decimal):
+        x = Decimal(str(x))
+    return x.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+
+
+def compute_business_costs(
+    business,
+    start_date: date,
+    end_date: date,
+) -> Dict[str, Decimal]:
     """
-    Superusers: full queryset.
-    Others: restricted to active business (and store if model supports it).
-    Works with models having business_id and/or store_id (or store__business_id).
+    Compute total costs for a business within a date range.
+    
+    Includes:
+    - Once-off costs within the period
+    - Recurring costs that are active during the period
+    
+    Args:
+        business: Business instance
+        start_date: Start of period (inclusive)
+        end_date: End of period (inclusive)
+    
+    Returns:
+        dict with keys:
+            - once_off_total: Sum of one-time costs
+            - recurring_total: Sum of recurring monthly costs (pro-rated if needed)
+            - total: Combined total
     """
-    user = getattr(request, "user", None)
-    if getattr(user, "is_superuser", False):
-        return qs
+    # Once-off costs within the period
+    once_off_qs = WalletTransaction.objects.filter(
+        ledger=Ledger.COMPANY,
+        type=TxnType.COST_ONCE_OFF,
+        is_recurring=False,
+        effective_date__gte=start_date,
+        effective_date__lte=end_date,
+    )
+    if business:
+        once_off_qs = once_off_qs.filter(business=business)
+    
+    once_off_total = once_off_qs.aggregate(total=Sum("amount"))["total"] or Decimal("0.00")
+    once_off_total = abs(once_off_total)  # Costs are stored as negative, convert to positive
+    
+    # Recurring costs that are active during this period
+    # Include costs where effective_from <= end_date
+    recurring_qs = WalletTransaction.objects.filter(
+        ledger=Ledger.COMPANY,
+        type=TxnType.COST_RECURRING,
+        is_recurring=True,
+        effective_from__lte=end_date,
+    )
+    if business:
+        recurring_qs = recurring_qs.filter(business=business)
+    
+    # For simplicity, sum all active recurring costs
+    # In a more sophisticated system, you'd calculate how many months overlap
+    recurring_total = Decimal("0.00")
+    for cost in recurring_qs:
+        # Check if this cost is active in our period
+        if cost.effective_from <= end_date:
+            # Simple approach: include full monthly cost if active anytime during period
+            # More sophisticated: pro-rate based on days in period
+            recurring_total += abs(cost.amount)
+    
+    return {
+        "once_off_total": q2(once_off_total),
+        "recurring_total": q2(recurring_total),
+        "total": q2(once_off_total + recurring_total),
+    }
 
-    biz = getattr(request, "business", None)
-    biz_id = getattr(biz, "id", None)
 
-    if biz_id is None:
-        # No business context; safest is to return nothing for non-superusers
-        return qs.none()
+def compute_revenue_costs_profit(
+    business,
+    revenue: Decimal,
+    start_date: date,
+    end_date: date,
+) -> Dict[str, Decimal]:
+    """
+    Compute Revenue, Costs, and Profit for a business within a period.
+    
+    Args:
+        business: Business instance
+        revenue: Total revenue for the period (computed externally)
+        start_date: Start of period
+        end_date: End of period
+    
+    Returns:
+        dict with keys:
+            - revenue: Total revenue
+            - costs: Total costs (once-off + recurring)
+            - profit: Revenue minus costs
+            - profit_margin: Profit as percentage of revenue
+    """
+    costs = compute_business_costs(business, start_date, end_date)
+    total_costs = costs["total"]
+    profit = q2(revenue - total_costs)
+    
+    # Calculate profit margin
+    profit_margin = Decimal("0.00")
+    if revenue > Decimal("0.00"):
+        profit_margin = q2((profit / revenue) * Decimal("100.00"))
+    
+    return {
+        "revenue": q2(revenue),
+        "costs": total_costs,
+        "profit": profit,
+        "profit_margin": profit_margin,
+        "costs_breakdown": costs,  # Include detailed breakdown
+    }
 
-    Model = qs.model
 
-    # Prefer direct business FK
-    if hasattr(Model, "business_id"):
-        qs = qs.filter(business_id=biz_id)
-    elif hasattr(Model, "store") and hasattr(Model, "store_id"):
-        # If model links to store, try store->business
-        try:
-            qs = qs.filter(store__business_id=biz_id)
-        except Exception:
-            pass
+def get_mtd_financial_summary(business) -> Dict[str, Decimal]:
+    """
+    Get month-to-date (MTD) financial summary for a business.
+    
+    Note: Revenue must be calculated externally based on sales data.
+    This function computes costs only.
+    
+    Args:
+        business: Business instance
+    
+    Returns:
+        dict with keys for costs
+    """
+    today = timezone.localdate()
+    month_start = today.replace(day=1)
+    
+    return compute_business_costs(business, month_start, today)
 
-    # Optional store scoping (if you later add request.store or ?store=)
-    store_id = getattr(getattr(request, "store", None), "id", None) or request.GET.get("store")
-    if store_id and hasattr(Model, "store_id"):
-        qs = qs.filter(store_id=store_id)
 
-    return qs
-
-
+def get_agent_wallet_balance(user) -> Decimal:
+    """
+    Get the wallet balance for an agent (sum of all agent ledger transactions).
+    
+    Args:
+        user: User instance
+    
+    Returns:
+        Decimal balance
+    """
+    balance = WalletTransaction.objects.filter(
+        ledger=Ledger.AGENT,
+        agent=user,
+    ).aggregate(total=Sum("amount"))["total"] or Decimal("0.00")
+    
+    return q2(balance)

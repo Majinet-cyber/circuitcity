@@ -21,9 +21,12 @@ from django.urls import reverse
 from django.utils import timezone
 
 from hq.permissions import hq_admin_required
+from hq.utils_dates import get_period_from_request, get_year_from_request, get_month_range
+from hq.utils_gamification import get_agent_rankings
 from tenants.models import Business, Membership
 from billing.models import Subscription, Invoice  # BusinessSubscription alias
 from inventory.models import InventoryItem
+from sales.models import Sale
 
 # Try to import Plan model if you have one
 try:
@@ -251,6 +254,10 @@ def dashboard(request):
     now = timezone.now()
     seven = now - timedelta(days=7)
     thirty = now - timedelta(days=30)
+    
+    # Get date filtering parameters
+    start_date, end_date, period_type = get_period_from_request(request, default_to_current_month=True)
+    year = get_year_from_request(request)
 
     ctx = {}
     ctx["total_biz"] = Business.objects.count()
@@ -285,8 +292,233 @@ def dashboard(request):
     ctx["stock_out_7d"] = inv_mgr.filter(sold_at__isnull=False, sold_at__gte=seven).count()
 
     ctx["any_trials"] = Subscription.objects.filter(status__in=["TRIAL", "trial"]).exists()
+    
+    # === NEW: Sales metrics for the selected period ===
+    sales_qs = Sale.objects.all()
+    if start_date and end_date:
+        sales_qs = sales_qs.filter(sold_at__gte=start_date, sold_at__lt=end_date)
+    
+    ctx["sales_count"] = sales_qs.count()
+    ctx["sales_revenue"] = sales_qs.aggregate(
+        total=Coalesce(Sum("price"), zero_dec)
+    )["total"]
+    
+    # === Monthly aggregates for the selected year ===
+    year_start = datetime(year, 1, 1).date()
+    year_end = datetime(year + 1, 1, 1).date()
+    
+    sales_by_month = Sale.objects.filter(
+        sold_at__gte=year_start,
+        sold_at__lt=year_end
+    ).annotate(
+        month=TruncMonth('sold_at')
+    ).values('month').annotate(
+        count=Count('id'),
+        revenue=Coalesce(Sum('price'), zero_dec)
+    ).order_by('month')
+    
+    # Prepare chart data (monthly sales)
+    monthly_sales_labels = []
+    monthly_sales_data = []
+    monthly_revenue_data = []
+    
+    for item in sales_by_month:
+        month_date = item['month']
+        monthly_sales_labels.append(month_date.strftime('%B'))
+        monthly_sales_data.append(item['count'])
+        monthly_revenue_data.append(float(item['revenue']))
+    
+    ctx["monthly_sales_labels"] = json.dumps(monthly_sales_labels)
+    ctx["monthly_sales_data"] = json.dumps(monthly_sales_data)
+    ctx["monthly_revenue_data"] = json.dumps(monthly_revenue_data)
+    
+    # === New agent onboardings by month ===
+    if _field(Membership, "created_at"):
+        onboardings_by_month = Membership.objects.filter(
+            role="AGENT",
+            created_at__gte=year_start,
+            created_at__lt=year_end
+        ).annotate(
+            month=TruncMonth('created_at')
+        ).values('month').annotate(
+            count=Count('id')
+        ).order_by('month')
+        
+        monthly_onboardings_labels = []
+        monthly_onboardings_data = []
+        
+        for item in onboardings_by_month:
+            month_date = item['month']
+            monthly_onboardings_labels.append(month_date.strftime('%B'))
+            monthly_onboardings_data.append(item['count'])
+        
+        ctx["monthly_onboardings_labels"] = json.dumps(monthly_onboardings_labels)
+        ctx["monthly_onboardings_data"] = json.dumps(monthly_onboardings_data)
+    else:
+        ctx["monthly_onboardings_labels"] = json.dumps([])
+        ctx["monthly_onboardings_data"] = json.dumps([])
+    
+    # === Daily drill-down if month is selected ===
+    if period_type == "month" and start_date and end_date:
+        sales_by_day = Sale.objects.filter(
+            sold_at__gte=start_date,
+            sold_at__lt=end_date
+        ).annotate(
+            day=TruncDate('sold_at')
+        ).values('day').annotate(
+            count=Count('id'),
+            revenue=Coalesce(Sum('price'), zero_dec)
+        ).order_by('day')
+        
+        daily_sales_labels = []
+        daily_sales_data = []
+        daily_revenue_data = []
+        
+        for item in sales_by_day:
+            day_date = item['day']
+            daily_sales_labels.append(day_date.strftime('%d'))
+            daily_sales_data.append(item['count'])
+            daily_revenue_data.append(float(item['revenue']))
+        
+        ctx["daily_sales_labels"] = json.dumps(daily_sales_labels)
+        ctx["daily_sales_data"] = json.dumps(daily_sales_data)
+        ctx["daily_revenue_data"] = json.dumps(daily_revenue_data)
+    
+    # === Top 10 agents (global) ===
+    # For simplicity, we'll aggregate across all businesses
+    # In a real multi-tenant setup, you might want to scope this differently
+    top_agents = get_agent_rankings(
+        business=None,  # We'll handle this in the utility
+        start_date=start_date,
+        end_date=end_date,
+        limit=10
+    ) if start_date and end_date else []
+    
+    # For now, let's do a simple global aggregate instead
+    from django.contrib.auth import get_user_model
+    User = get_user_model()
+    
+    agent_memberships = Membership.objects.filter(role="AGENT")
+    agent_users = [m.user_id for m in agent_memberships]
+    
+    top_agents_data = Sale.objects.filter(
+        agent_id__in=agent_users
+    )
+    if start_date and end_date:
+        top_agents_data = top_agents_data.filter(sold_at__gte=start_date, sold_at__lt=end_date)
+    
+    top_agents_data = top_agents_data.values('agent').annotate(
+        sales_count=Count('id'),
+        revenue=Coalesce(Sum('price'), zero_dec)
+    ).order_by('-sales_count')[:10]
+    
+    top_agents_list = []
+    for item in top_agents_data:
+        try:
+            agent = User.objects.get(id=item['agent'])
+            top_agents_list.append({
+                'name': agent.get_full_name() or agent.username,
+                'sales_count': item['sales_count'],
+                'revenue': item['revenue']
+            })
+        except User.DoesNotExist:
+            pass
+    
+    ctx["top_agents"] = top_agents_list
+    
+    # Context for filters
+    ctx["selected_year"] = year
+    ctx["selected_period"] = period_type
+    ctx["start_date"] = start_date
+    ctx["end_date"] = end_date
+    
+    # Year range for selector
+    current_year = timezone.now().year
+    ctx["year_range"] = range(current_year - 5, current_year + 2)
 
     return _render_safe(request, "hq/dashboard.html", ctx, _dashboard_inline)
+
+
+# -------------------------------------------------------------------
+# API: Monthly Drill-Down
+# -------------------------------------------------------------------
+@hq_admin_required
+def monthly_drill_down_api(request):
+    """
+    JSON API endpoint for monthly drill-down data.
+    Returns daily sales data for a specific month.
+    
+    Query params:
+    - year (int): Year to query
+    - month (int): Month to query (1-12)
+    """
+    try:
+        year = int(request.GET.get("year", timezone.now().year))
+        month = int(request.GET.get("month", timezone.now().month))
+        
+        if not (1 <= month <= 12 and 1900 <= year <= 2100):
+            return JsonResponse({"error": "Invalid year or month"}, status=400)
+        
+        # Get date range for the month
+        start_date, end_date = get_month_range(year, month)
+        
+        # Aggregate sales by day
+        zero_dec = Value(0, output_field=DecimalField(max_digits=18, decimal_places=2))
+        sales_by_day = Sale.objects.filter(
+            sold_at__gte=start_date,
+            sold_at__lt=end_date
+        ).annotate(
+            day=TruncDate('sold_at')
+        ).values('day').annotate(
+            count=Count('id'),
+            revenue=Coalesce(Sum('price'), zero_dec)
+        ).order_by('day')
+        
+        # Format response
+        daily_data = [
+            {
+                "date": item['day'].isoformat(),
+                "day": item['day'].day,
+                "sales_count": item['count'],
+                "revenue": float(item['revenue'])
+            }
+            for item in sales_by_day
+        ]
+        
+        # Aggregate new onboardings by day (if available)
+        if _field(Membership, "created_at"):
+            onboardings_by_day = Membership.objects.filter(
+                role="AGENT",
+                created_at__gte=start_date,
+                created_at__lt=end_date
+            ).annotate(
+                day=TruncDate('created_at')
+            ).values('day').annotate(
+                count=Count('id')
+            ).order_by('day')
+            
+            onboarding_data = [
+                {
+                    "date": item['day'].isoformat(),
+                    "day": item['day'].day,
+                    "count": item['count']
+                }
+                for item in onboardings_by_day
+            ]
+        else:
+            onboarding_data = []
+        
+        return JsonResponse({
+            "year": year,
+            "month": month,
+            "daily_sales": daily_data,
+            "daily_onboardings": onboarding_data,
+        })
+    
+    except (ValueError, TypeError) as e:
+        return JsonResponse({"error": f"Invalid parameters: {str(e)}"}, status=400)
+    except Exception as e:
+        return JsonResponse({"error": f"Server error: {str(e)}"}, status=500)
 
 
 # -------------------------------------------------------------------

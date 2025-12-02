@@ -19,6 +19,12 @@ from inventory.models import InventoryItem, Location
 User = get_user_model()
 
 
+class PaymentMethod(models.TextChoices):
+    CASH = "CASH", "Cash"
+    BANK = "BANK", "Bank"
+    MOBILE_MONEY = "MOBILE_MONEY", "Mobile Money"
+
+
 class Sale(models.Model):
     """
     Created when an InventoryItem is sold on credit.
@@ -30,6 +36,13 @@ class Sale(models.Model):
     price           = models.DecimalField(max_digits=12, decimal_places=2, validators=[MinValueValidator(0)])
     commission_pct  = models.DecimalField(max_digits=5, decimal_places=2, default=0,
                                           validators=[MinValueValidator(0), MaxValueValidator(100)])
+    payment_method  = models.CharField(
+        max_length=20,
+        choices=PaymentMethod.choices,
+        default=PaymentMethod.CASH,
+        db_index=True,
+        help_text="Payment method used for this sale"
+    )
     # Phase 5: index for fast dashboards / recents
     created_at      = models.DateTimeField(default=timezone.now, db_index=True, editable=False)
 

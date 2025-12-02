@@ -1,0 +1,167 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Shift Report - {{ business.name }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <!-- Shift Summary -->
+    <div class="row mb-4">
+        <div class="col">
+            <h2>Shift Report #{{ shift.id }}</h2>
+            <p class="text-muted">
+                <strong>Barman:</strong> {{ shift.barman.get_full_name|default:shift.barman.username }}<br>
+                <strong>Started:</strong> {{ shift.started_at|date:"d/m/Y H:i" }}<br>
+                <strong>Ended:</strong> {{ shift.ended_at|date:"d/m/Y H:i"|default:"In Progress" }}<br>
+                <strong>Duration:</strong> {{ shift.duration_hours|floatformat:1 }} hours
+            </p>
+        </div>
+    </div>
+
+    <!-- Financial Summary Cards -->
+    <div class="row mb-4">
+        <div class="col-md-3">
+            <div class="card text-white bg-primary">
+                <div class="card-body">
+                    <h6 class="card-title">Total Sales</h6>
+                    <h3>MK {{ shift.total_sales_amount|floatformat:2 }}</h3>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card text-white bg-success">
+                <div class="card-body">
+                    <h6 class="card-title">Profit</h6>
+                    <h3>MK {{ shift.total_profit_amount|floatformat:2 }}</h3>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card text-white bg-warning">
+                <div class="card-body">
+                    <h6 class="card-title">Credit Given</h6>
+                    <h3>MK {{ shift.total_credit_amount|floatformat:2 }}</h3>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card text-white {% if shift.missing_stock_value > 0 %}bg-danger{% else %}bg-secondary{% endif %}">
+                <div class="card-body">
+                    <h6 class="card-title">Missing Stock</h6>
+                    <h3>MK {{ shift.missing_stock_value|floatformat:2 }}</h3>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Stock Variance -->
+    {% if variance_data %}
+    <div class="card mb-4">
+        <div class="card-header">
+            <h5 class="mb-0">Stock Variance Analysis</h5>
+        </div>
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-sm table-hover">
+                    <thead>
+                        <tr>
+                            <th>Product</th>
+                            <th class="text-end">Opening</th>
+                            <th class="text-end">Sold</th>
+                            <th class="text-end">Expected</th>
+                            <th class="text-end">Actual</th>
+                            <th class="text-end">Variance</th>
+                            <th class="text-end">Value</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for item in variance_data %}
+                        <tr class="{% if item.variance_value < 0 %}table-danger{% endif %}">
+                            <td><strong>{{ item.product.name }}</strong></td>
+                            <td class="text-end">
+                                {{ item.opening_bottles }}b
+                                {% if item.product.has_shots %}+ {{ item.opening_shots }}s{% endif %}
+                            </td>
+                            <td class="text-end">
+                                {{ item.sold_bottles }}b
+                                {% if item.product.has_shots %}+ {{ item.sold_shots }}s{% endif %}
+                            </td>
+                            <td class="text-end">
+                                {{ item.expected_bottles }}b
+                                {% if item.product.has_shots %}+ {{ item.expected_shots }}s{% endif %}
+                            </td>
+                            <td class="text-end">
+                                {{ item.closing_bottles }}b
+                                {% if item.product.has_shots %}+ {{ item.closing_shots }}s{% endif %}
+                            </td>
+                            <td class="text-end">
+                                <span class="badge {% if item.variance_bottles < 0 or item.variance_shots < 0 %}bg-danger{% elif item.variance_bottles > 0 or item.variance_shots > 0 %}bg-success{% else %}bg-secondary{% endif %}">
+                                    {{ item.variance_bottles }}b
+                                    {% if item.product.has_shots %}{{ item.variance_shots }}s{% endif %}
+                                </span>
+                            </td>
+                            <td class="text-end">
+                                <strong class="{% if item.variance_value < 0 %}text-danger{% endif %}">
+                                    MK {{ item.variance_value|floatformat:2 }}
+                                </strong>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Top Products by Profit -->
+    {% if top_products %}
+    <div class="card mb-4">
+        <div class="card-header">
+            <h5 class="mb-0">Top Products by Profit</h5>
+        </div>
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-sm">
+                    <thead>
+                        <tr>
+                            <th>Product</th>
+                            <th class="text-end">Qty Sold</th>
+                            <th class="text-end">Sales</th>
+                            <th class="text-end">Profit</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for item in top_products %}
+                        <tr>
+                            <td>{{ item.product__name }}</td>
+                            <td class="text-end">{{ item.quantity_sold }}</td>
+                            <td class="text-end">MK {{ item.total_sales|floatformat:2 }}</td>
+                            <td class="text-end"><strong>MK {{ item.total_profit|floatformat:2 }}</strong></td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Actions -->
+    <div class="row">
+        <div class="col">
+            <a href="{% url 'inventory:liquor_dashboard' %}" class="btn btn-primary">Back to Dashboard</a>
+            <button onclick="window.print()" class="btn btn-secondary">
+                <i class="bi bi-printer"></i> Print Report
+            </button>
+        </div>
+    </div>
+</div>
+
+<style>
+@media print {
+    .btn, .card-header { display: none; }
+}
+</style>
+{% endblock %}
+

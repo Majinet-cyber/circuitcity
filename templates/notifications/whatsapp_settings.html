@@ -1,0 +1,154 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}WhatsApp Settings{% endblock %}
+{% block header_title %}WhatsApp Notifications{% endblock %}
+
+{% block content %}
+<div style="max-width: 800px; margin: 40px auto; padding: 24px;">
+  
+  {% if not whatsapp_configured %}
+  <div style="background: #fef9c3; border: 1px solid #facc15; border-radius: 12px; padding: 16px; margin-bottom: 24px;">
+    <strong>⚠️ WhatsApp Not Configured</strong>
+    <p style="margin: 8px 0 0;">WhatsApp notifications are not configured on this server. Contact your administrator.</p>
+  </div>
+  {% endif %}
+
+  <div style="background: #fff; border-radius: 16px; padding: 32px; box-shadow: 0 10px 30px rgba(0,0,0,.08);">
+    
+    <h2 style="margin: 0 0 8px;">📱 WhatsApp Notification Settings</h2>
+    <p style="color: #64748b; margin: 0 0 24px;">Get real-time alerts about sales, profits, stock, and commissions via WhatsApp.</p>
+
+    <form method="post">
+      {% csrf_token %}
+      
+      {# Phone Number #}
+      <div style="margin-bottom: 20px;">
+        <label for="phone_number" style="display: block; font-weight: 600; margin-bottom: 8px;">
+          Phone Number (International Format)
+        </label>
+        <input 
+          type="tel" 
+          id="phone_number" 
+          name="phone_number" 
+          value="{{ pref.phone_number }}" 
+          placeholder="+265888123456"
+          style="width: 100%; padding: 12px; border: 1px solid #e2e8f0; border-radius: 8px; font-size: 1rem;"
+          {% if not whatsapp_configured %}disabled{% endif %}
+        >
+        <small style="color: #64748b; display: block; margin-top: 4px;">
+          Include country code (e.g. +265 for Malawi). Local numbers starting with 0 will be auto-converted.
+        </small>
+      </div>
+
+      {# Master Toggle #}
+      <div style="margin-bottom: 24px; padding: 16px; background: #f8fafc; border-radius: 8px;">
+        <label style="display: flex; align-items: center; gap: 12px; cursor: pointer;">
+          <input 
+            type="checkbox" 
+            name="is_enabled" 
+            {% if pref.is_enabled %}checked{% endif %}
+            {% if not whatsapp_configured %}disabled{% endif %}
+            style="width: 20px; height: 20px; cursor: pointer;"
+          >
+          <div>
+            <strong>Enable WhatsApp Notifications</strong>
+            <br>
+            <small style="color: #64748b;">Master switch for all WhatsApp alerts</small>
+          </div>
+        </label>
+      </div>
+
+      {# Notification Types #}
+      <h3 style="margin: 24px 0 12px; font-size: 1.1rem;">Notification Types</h3>
+      
+      <div style="display: grid; gap: 12px;">
+        <label style="display: flex; align-items: center; gap: 12px; padding: 12px; border: 1px solid #e2e8f0; border-radius: 8px; cursor: pointer;">
+          <input 
+            type="checkbox" 
+            name="receive_sale_alerts" 
+            {% if pref.receive_sale_alerts %}checked{% endif %}
+            {% if not whatsapp_configured %}disabled{% endif %}
+            style="width: 18px; height: 18px; cursor: pointer;"
+          >
+          <div>
+            <strong>🛒 Sale Alerts</strong>
+            <br>
+            <small style="color: #64748b;">Get notified when sales are made (for managers)</small>
+          </div>
+        </label>
+
+        <label style="display: flex; align-items: center; gap: 12px; padding: 12px; border: 1px solid #e2e8f0; border-radius: 8px; cursor: pointer;">
+          <input 
+            type="checkbox" 
+            name="receive_profit_milestones" 
+            {% if pref.receive_profit_milestones %}checked{% endif %}
+            {% if not whatsapp_configured %}disabled{% endif %}
+            style="width: 18px; height: 18px; cursor: pointer;"
+          >
+          <div>
+            <strong>🎉 Profit Milestones</strong>
+            <br>
+            <small style="color: #64748b;">Celebrate when you hit profit targets</small>
+          </div>
+        </label>
+
+        <label style="display: flex; align-items: center; gap: 12px; padding: 12px; border: 1px solid #e2e8f0; border-radius: 8px; cursor: pointer;">
+          <input 
+            type="checkbox" 
+            name="receive_low_stock_alerts" 
+            {% if pref.receive_low_stock_alerts %}checked{% endif %}
+            {% if not whatsapp_configured %}disabled{% endif %}
+            style="width: 18px; height: 18px; cursor: pointer;"
+          >
+          <div>
+            <strong>⚠️ Low Stock & Expiry Alerts</strong>
+            <br>
+            <small style="color: #64748b;">Stay on top of inventory levels and expiry dates</small>
+          </div>
+        </label>
+
+        <label style="display: flex; align-items: center; gap: 12px; padding: 12px; border: 1px solid #e2e8f0; border-radius: 8px; cursor: pointer;">
+          <input 
+            type="checkbox" 
+            name="receive_commission_alerts" 
+            {% if pref.receive_commission_alerts %}checked{% endif %}
+            {% if not whatsapp_configured %}disabled{% endif %}
+            style="width: 18px; height: 18px; cursor: pointer;"
+          >
+          <div>
+            <strong>💰 Commission Alerts</strong>
+            <br>
+            <small style="color: #64748b;">Get notified when you earn commission (for agents)</small>
+          </div>
+        </label>
+      </div>
+
+      {# Submit Button #}
+      <div style="margin-top: 32px; display: flex; gap: 12px;">
+        <button 
+          type="submit" 
+          {% if not whatsapp_configured %}disabled{% endif %}
+          style="padding: 12px 32px; background: linear-gradient(135deg, #3b82f6, #2563eb); color: white; border: none; border-radius: 10px; font-weight: 700; cursor: pointer; box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);"
+        >
+          Save Settings
+        </button>
+        
+        {% if pref.is_enabled and whatsapp_configured %}
+        <form method="post" action="{% url 'notifications:whatsapp_test' %}" style="display: inline;">
+          {% csrf_token %}
+          <button 
+            type="submit"
+            style="padding: 12px 24px; background: #fff; color: #3b82f6; border: 1px solid #3b82f6; border-radius: 10px; font-weight: 700; cursor: pointer;"
+          >
+            Send Test Message
+          </button>
+        </form>
+        {% endif %}
+      </div>
+    </form>
+
+  </div>
+</div>
+{% endblock %}
+

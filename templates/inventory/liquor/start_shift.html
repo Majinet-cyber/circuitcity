@@ -1,0 +1,106 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Start Shift - {{ business.name }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <div class="row mb-4">
+        <div class="col">
+            <h2>Start New Shift</h2>
+            <p class="text-muted">Count your opening stock to begin tracking sales for this shift.</p>
+        </div>
+    </div>
+
+    <form method="post" id="startShiftForm">
+        {% csrf_token %}
+        
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="mb-0">Shift Details</h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-6">
+                        {{ form.location.label_tag }}
+                        {{ form.location }}
+                    </div>
+                </div>
+                <div class="row mt-3">
+                    <div class="col-12">
+                        {{ form.opening_notes.label_tag }}
+                        {{ form.opening_notes }}
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">Opening Stock Count</h5>
+            </div>
+            <div class="card-body">
+                {% if products_by_category %}
+                    {% for category, products in products_by_category.items %}
+                        <div class="mb-4">
+                            <h6 class="text-uppercase text-muted mb-3">{{ category|title }}</h6>
+                            <div class="row g-3">
+                                {% for product in products %}
+                                    <div class="col-md-6 col-lg-4">
+                                        <div class="border rounded p-3">
+                                            <h6 class="mb-2">{{ product.name }}</h6>
+                                            
+                                            <div class="mb-2">
+                                                <label for="bottles_{{ product.id }}" class="form-label small">Bottles</label>
+                                                <input type="number" 
+                                                       name="bottles_{{ product.id }}" 
+                                                       id="bottles_{{ product.id }}"
+                                                       class="form-control" 
+                                                       value="0" 
+                                                       min="0" 
+                                                       required>
+                                            </div>
+                                            
+                                            {% if product.has_shots %}
+                                                <div>
+                                                    <label for="shots_{{ product.id }}" class="form-label small">Loose Shots</label>
+                                                    <input type="number" 
+                                                           name="shots_{{ product.id }}" 
+                                                           id="shots_{{ product.id }}"
+                                                           class="form-control" 
+                                                           value="0" 
+                                                           min="0">
+                                                    <small class="text-muted">{{ product.sellable_shots_per_bottle }} shots/bottle</small>
+                                                </div>
+                                            {% endif %}
+                                        </div>
+                                    </div>
+                                {% endfor %}
+                            </div>
+                        </div>
+                    {% endfor %}
+                {% else %}
+                    <div class="alert alert-warning">
+                        No active liquor products found. Add products first before starting a shift.
+                    </div>
+                {% endif %}
+            </div>
+            <div class="card-footer">
+                <button type="submit" class="btn btn-primary btn-lg">
+                    <i class="bi bi-play-circle"></i> Start Shift
+                </button>
+                <a href="{% url 'inventory:inventory_dashboard' %}" class="btn btn-secondary">Cancel</a>
+            </div>
+        </div>
+    </form>
+</div>
+
+<script>
+document.getElementById('startShiftForm').addEventListener('submit', function(e) {
+    if (!confirm('Confirm opening stock counts are correct?')) {
+        e.preventDefault();
+    }
+});
+</script>
+{% endblock %}
+

@@ -1,0 +1,82 @@
+{% load humanize %}
+
+<!-- Payment Mix Panel -->
+{% if payment_mix %}
+<div class="card mb-4">
+    <div class="card-header bg-info text-white">
+        <h6 class="mb-0">
+            <i class="bi bi-wallet2"></i> Payment Mix - {{ period|default:"MTD" }}
+        </h6>
+    </div>
+    <div class="card-body">
+        <div class="row g-3">
+            <!-- Cash -->
+            <div class="col-md-4">
+                <div class="d-flex align-items-center">
+                    <div class="me-3">
+                        <i class="bi bi-cash-coin text-success" style="font-size: 2rem;"></i>
+                    </div>
+                    <div>
+                        <small class="text-muted d-block">Cash</small>
+                        <strong>MK {{ payment_mix.CASH|default:0|floatformat:0|intcomma }}</strong>
+                        {% if payment_mix.total > 0 %}
+                        <br>
+                        <span class="badge bg-success-subtle text-success">
+                            {{ payment_mix.CASH|default:0|floatformat:0|default:"0" |floatformat:0|safe }}
+                            {% widthratio payment_mix.CASH payment_mix.total 100 %}%
+                        </span>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Bank -->
+            <div class="col-md-4">
+                <div class="d-flex align-items-center">
+                    <div class="me-3">
+                        <i class="bi bi-bank text-primary" style="font-size: 2rem;"></i>
+                    </div>
+                    <div>
+                        <small class="text-muted d-block">Bank</small>
+                        <strong>MK {{ payment_mix.BANK|default:0|floatformat:0|intcomma }}</strong>
+                        {% if payment_mix.total > 0 %}
+                        <br>
+                        <span class="badge bg-primary-subtle text-primary">
+                            {% widthratio payment_mix.BANK payment_mix.total 100 %}%
+                        </span>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Mobile Money -->
+            <div class="col-md-4">
+                <div class="d-flex align-items-center">
+                    <div class="me-3">
+                        <i class="bi bi-phone text-warning" style="font-size: 2rem;"></i>
+                    </div>
+                    <div>
+                        <small class="text-muted d-block">Mobile Money</small>
+                        <strong>MK {{ payment_mix.MOBILE_MONEY|default:0|floatformat:0|intcomma }}</strong>
+                        {% if payment_mix.total > 0 %}
+                        <br>
+                        <span class="badge bg-warning-subtle text-warning">
+                            {% widthratio payment_mix.MOBILE_MONEY payment_mix.total 100 %}%
+                        </span>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        {% if payment_mix.total > 0 %}
+        <hr class="my-3">
+        <div class="d-flex justify-content-between align-items-center">
+            <strong>Total Sales:</strong>
+            <strong class="text-primary">MK {{ payment_mix.total|floatformat:0|intcomma }}</strong>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endif %}
+

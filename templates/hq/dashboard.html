@@ -248,6 +248,7 @@
       </div>
 
       <nav class="nav">
+        <a href="{% url 'staticpages:home' %}">🏠 Home</a>
         <a class="active" href="{{ dashboard_url|default:'/hq/' }}">Dashboard</a>
         <a href="{{ subscriptions_url|default:'/hq/subscriptions/' }}">Subscriptions</a>
         <a href="{{ invoices_url|default:'/hq/invoices/' }}">Invoices</a>
@@ -323,6 +324,75 @@
           <a class="card link reveal d4" href="{{ agents_url|default:'/hq/agents/' }}?filter=new30"><h3>Agents New (30d)</h3><div class="num">{{ agents_new_30d|default:"0" }}</div></a>
           <a class="card link reveal" href="{{ businesses_url|default:'/hq/businesses/' }}?tab=inventory&view=in"><h3>Stock In (7d)</h3><div class="num">{{ stock_in_7d|default:"0" }}</div></a>
           <a class="card link reveal d2" href="{{ businesses_url|default:'/hq/businesses/' }}?tab=inventory&view=out"><h3>Stock Out (7d)</h3><div class="num">{{ stock_out_7d|default:"0" }}</div></a>
+        </div>
+
+        <!-- Sales & Onboarding Charts -->
+        <div class="section-title reveal">Sales Overview ({{ selected_year }})</div>
+        <div class="wallet">
+          <div class="card chart-card reveal">
+            <div class="filters">
+              <strong>Monthly Sales</strong>
+              <select id="yearSelect" class="input" style="margin-left:auto">
+                {% for y in year_range %}
+                <option value="{{ y }}" {% if y == selected_year %}selected{% endif %}>{{ y }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            <div class="legend"><div class="lg-dot" style="background:#2563eb"></div><span class="muted">Sales Count</span></div>
+            <canvas id="salesChart" height="200"></canvas>
+          </div>
+          <div class="card chart-card reveal d2">
+            <div class="filters">
+              <strong>New Onboardings</strong>
+            </div>
+            <div class="legend"><div class="lg-dot" style="background:#10b981"></div><span class="muted">New Agents</span></div>
+            <canvas id="onboardingsChart" height="200"></canvas>
+          </div>
+          <div class="card reveal d3">
+            <h3>Period Metrics</h3>
+            <div style="margin-top:10px">
+              <div style="display:flex;justify-content:space-between;margin-bottom:8px">
+                <span class="muted">Total Sales:</span>
+                <span style="font-weight:800">{{ sales_count|default:"0" }}</span>
+              </div>
+              <div style="display:flex;justify-content:space-between">
+                <span class="muted">Total Revenue:</span>
+                <span style="font-weight:800">MWK {{ sales_revenue|default:"0.00" }}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Top Agents Leaderboard -->
+        <div class="section-title reveal">Top Performers</div>
+        <div class="card reveal d2" style="padding:16px">
+          <h3 style="margin-bottom:12px">🏆 Top 10 Agents ({{ start_date|date:"M Y" }} - {{ end_date|date:"M Y" }})</h3>
+          {% if top_agents %}
+          <div style="overflow-x:auto">
+            <table style="width:100%;border-collapse:collapse">
+              <thead>
+                <tr style="border-bottom:2px solid var(--ring)">
+                  <th style="text-align:left;padding:8px;font-size:13px;color:var(--ink-500)">#</th>
+                  <th style="text-align:left;padding:8px;font-size:13px;color:var(--ink-500)">Agent</th>
+                  <th style="text-align:right;padding:8px;font-size:13px;color:var(--ink-500)">Sales</th>
+                  <th style="text-align:right;padding:8px;font-size:13px;color:var(--ink-500)">Revenue</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for agent in top_agents %}
+                <tr style="border-bottom:1px solid var(--ring)">
+                  <td style="padding:10px;font-weight:800;color:var(--brand-600)">{{ forloop.counter }}</td>
+                  <td style="padding:10px;font-weight:700">{{ agent.name }}</td>
+                  <td style="padding:10px;text-align:right;font-weight:700">{{ agent.sales_count }}</td>
+                  <td style="padding:10px;text-align:right;font-weight:700">MWK {{ agent.revenue|floatformat:2 }}</td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+          {% else %}
+          <div class="muted">No sales data for the selected period.</div>
+          {% endif %}
         </div>
 
         <!-- AI Insights -->
@@ -675,6 +745,134 @@
       $('#apply').addEventListener('click', apply);
       apply(); new ResizeObserver(apply).observe(canvas);
     }catch(e){}
+
+    /* Year selector */
+    try{
+      const yearSelect = $('#yearSelect');
+      if(yearSelect){
+        yearSelect.addEventListener('change', ()=>{
+          const url = new URL(window.location.href);
+          url.searchParams.set('year', yearSelect.value);
+          window.location = url.pathname + url.search;
+        });
+      }
+    }catch(e){}
+
+    /* Sales Chart (Monthly) */
+    try{
+      const salesCanvas = document.getElementById('salesChart');
+      if(salesCanvas){
+        const salesCtx = salesCanvas.getContext('2d');
+        const labels = {{ monthly_sales_labels|default:"[]"|safe }};
+        const data = {{ monthly_sales_data|default:"[]"|safe }};
+        
+        function drawSalesChart(){
+          const w = salesCanvas.width = salesCanvas.clientWidth * devicePixelRatio;
+          const h = salesCanvas.height = salesCanvas.clientHeight * devicePixelRatio;
+          salesCtx.clearRect(0,0,w,h);
+          if(!data || data.length===0) {
+            salesCtx.fillStyle='#6b7280';
+            salesCtx.font = `${14*devicePixelRatio}px system-ui`;
+            salesCtx.textAlign='center';
+            salesCtx.fillText('No sales data available', w/2, h/2);
+            return;
+          }
+          
+          const pad={l:48,t:14,r:12,b:46}, innerW=w-pad.l-pad.r, innerH=h-pad.t-pad.b;
+          const yMax=Math.max(10, Math.max(...data)*1.2);
+          const barWidth = innerW/(data.length+1);
+          
+          // Axes
+          salesCtx.strokeStyle='rgba(39,87,216,.25)'; salesCtx.lineWidth=1*devicePixelRatio;
+          salesCtx.beginPath(); salesCtx.moveTo(pad.l,pad.t); salesCtx.lineTo(pad.l,pad.t+innerH); salesCtx.stroke();
+          salesCtx.beginPath(); salesCtx.moveTo(pad.l,pad.t+innerH); salesCtx.lineTo(pad.l+innerW,pad.t+innerH); salesCtx.stroke();
+          
+          // Bars
+          data.forEach((val,i)=>{
+            const x = pad.l + (i+0.5)*barWidth;
+            const barH = (val/yMax)*innerH;
+            const y = pad.t+innerH-barH;
+            const barW = barWidth*0.7;
+            
+            salesCtx.fillStyle='#2563eb';
+            salesCtx.fillRect(x-barW/2, y, barW, barH);
+            
+            // Labels
+            if(labels[i]){
+              salesCtx.save();
+              salesCtx.translate(x, pad.t+innerH+12*devicePixelRatio);
+              salesCtx.rotate(-Math.PI/4);
+              salesCtx.fillStyle='#476aa0';
+              salesCtx.font = `${11*devicePixelRatio}px system-ui`;
+              salesCtx.textAlign='right';
+              salesCtx.fillText(labels[i], 0, 0);
+              salesCtx.restore();
+            }
+          });
+        }
+        
+        drawSalesChart();
+        new ResizeObserver(drawSalesChart).observe(salesCanvas);
+      }
+    }catch(e){console.error('Sales chart error:', e);}
+
+    /* Onboardings Chart (Monthly) */
+    try{
+      const onboardingsCanvas = document.getElementById('onboardingsChart');
+      if(onboardingsCanvas){
+        const onbCtx = onboardingsCanvas.getContext('2d');
+        const labels = {{ monthly_onboardings_labels|default:"[]"|safe }};
+        const data = {{ monthly_onboardings_data|default:"[]"|safe }};
+        
+        function drawOnboardingsChart(){
+          const w = onboardingsCanvas.width = onboardingsCanvas.clientWidth * devicePixelRatio;
+          const h = onboardingsCanvas.height = onboardingsCanvas.clientHeight * devicePixelRatio;
+          onbCtx.clearRect(0,0,w,h);
+          if(!data || data.length===0) {
+            onbCtx.fillStyle='#6b7280';
+            onbCtx.font = `${14*devicePixelRatio}px system-ui`;
+            onbCtx.textAlign='center';
+            onbCtx.fillText('No onboarding data available', w/2, h/2);
+            return;
+          }
+          
+          const pad={l:48,t:14,r:12,b:46}, innerW=w-pad.l-pad.r, innerH=h-pad.t-pad.b;
+          const yMax=Math.max(5, Math.max(...data)*1.2);
+          const barWidth = innerW/(data.length+1);
+          
+          // Axes
+          onbCtx.strokeStyle='rgba(39,87,216,.25)'; onbCtx.lineWidth=1*devicePixelRatio;
+          onbCtx.beginPath(); onbCtx.moveTo(pad.l,pad.t); onbCtx.lineTo(pad.l,pad.t+innerH); onbCtx.stroke();
+          onbCtx.beginPath(); onbCtx.moveTo(pad.l,pad.t+innerH); onbCtx.lineTo(pad.l+innerW,pad.t+innerH); onbCtx.stroke();
+          
+          // Bars
+          data.forEach((val,i)=>{
+            const x = pad.l + (i+0.5)*barWidth;
+            const barH = (val/yMax)*innerH;
+            const y = pad.t+innerH-barH;
+            const barW = barWidth*0.7;
+            
+            onbCtx.fillStyle='#10b981';
+            onbCtx.fillRect(x-barW/2, y, barW, barH);
+            
+            // Labels
+            if(labels[i]){
+              onbCtx.save();
+              onbCtx.translate(x, pad.t+innerH+12*devicePixelRatio);
+              onbCtx.rotate(-Math.PI/4);
+              onbCtx.fillStyle='#476aa0';
+              onbCtx.font = `${11*devicePixelRatio}px system-ui`;
+              onbCtx.textAlign='right';
+              onbCtx.fillText(labels[i], 0, 0);
+              onbCtx.restore();
+            }
+          });
+        }
+        
+        drawOnboardingsChart();
+        new ResizeObserver(drawOnboardingsChart).observe(onboardingsCanvas);
+      }
+    }catch(e){console.error('Onboardings chart error:', e);}
   })();
   </script>
 </body>
