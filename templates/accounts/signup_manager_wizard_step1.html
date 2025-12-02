@@ -1,0 +1,226 @@
+{% load static %}
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Create your store · Step 1 of 4 · Emajinet</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#0b1220" />
+  <style>
+    :root{
+      --ink:#0b1220;
+      --muted:#54627a;
+      --line:#d6dfed;
+      --bg1:#eef4ff; --bg2:#ffffff;
+      --blue:#3b82f6;
+      --green:#10b981;       /* signature green */
+      --rose:#ef4444;
+
+      --shadow: 0 14px 36px rgba(15,23,42,.14), 0 1px 0 rgba(255,255,255,.6) inset;
+      --glass: color-mix(in oklab, #ffffffaa 78%, transparent);
+      --pop: cubic-bezier(.17,.67,.25,1.35);
+      --fast:160ms; --slow:420ms;
+    }
+    *{box-sizing:border-box}
+    html,body{height:100%}
+    body{
+      margin:0; color:var(--ink);
+      font:500 16px/1.45 system-ui, Segoe UI, Inter, Roboto, Arial, "Noto Sans";
+      background:
+        radial-gradient(1200px 800px at -10% -10%, rgba(34,211,238,.12), transparent 45%),
+        radial-gradient(1400px 800px at 110% 110%, rgba(59,130,246,.12), transparent 46%),
+        linear-gradient(180deg, var(--bg1), var(--bg2));
+    }
+
+    .wrap{ min-height:100dvh; display:grid; place-items:start center; padding:clamp(14px, 2.8vw, 28px); }
+    .card{
+      width:min(720px, 96vw);
+      background:var(--glass); backdrop-filter: blur(18px) saturate(120%);
+      border:1px solid var(--line); border-radius:24px; box-shadow:var(--shadow);
+      padding:clamp(16px,3.4vw,32px); animation:popIn var(--slow) var(--pop) both;
+    }
+    @keyframes popIn{ from{opacity:0; transform:translateY(8px) scale(.985)} to{opacity:1; transform:none} }
+
+    .brand{ display:flex; align-items:center; gap:.6rem; font-weight:900; color:#0b2868; margin:6px 2px 20px; }
+    .brand img{ width:22px; height:22px }
+    .page-title{ font-size:clamp(26px,3.6vw,36px); line-height:1.1; margin:.1rem 0 .5rem; font-weight:900 }
+    .subtitle{ color:var(--muted); margin:0 0 20px; }
+    .step-indicator{ color:var(--blue); font-weight:800; font-size:.9rem; margin:0 0 10px; }
+
+    /* top banner messages */
+    .alert{ background:#fef2f2;border:1px solid #fecaca;color:#991b1b;
+            padding:.7rem 1rem;border-radius:12px;margin:0 0 12px;font-weight:700 }
+
+    form{ display:grid; gap:14px; }
+    .grid{ display:grid; grid-template-columns: 1fr; gap:14px; }
+
+    .field{ position:relative; }
+    .label{ font-weight:800; font-size:.92rem; margin:0 0 6px; color:#08224e; }
+    .hint{ font-size:.84rem; color:#6b7e99; margin-top:6px }
+
+    /* === Inputs: pure white for better contrast === */
+    .input, .file{
+      width:100%; border:1px solid var(--line); border-radius:14px;
+      padding:12px 14px 12px 42px; background:#fff;            /* white fields */
+      transition: box-shadow var(--fast) var(--pop), border-color var(--fast);
+      outline:0; font-weight:600;
+    }
+    .input:focus, .file:focus{
+      border-color:color-mix(in oklab, var(--blue) 70%, white);
+      box-shadow:0 8px 24px rgba(59,130,246,.18);
+      background:#fff;
+    }
+    .addon{
+      position:absolute; left:10px; top:50%; translate:0 -50%;
+      width:26px; height:26px; display:grid; place-items:center;
+      color:var(--green); /* signature green */
+      font-size:18px;
+    }
+
+    /* Password eye + strength */
+    .eye{ position:absolute; right:10px; top:50%; translate:0 -50%; width:30px; height:30px; display:grid; place-items:center; color:#6b7da5; cursor:pointer; border-radius:8px; }
+    .eye:hover{ background:#eef3ff }
+    .meter{ height:6px; border-radius:999px; background:#e9eef8; overflow:hidden; margin-top:8px }
+    .meter>span{ display:block; height:100%; width:0%; background:linear-gradient(90deg,#f59e0b,var(--green)); transition:width 260ms var(--pop) }
+
+    /* Buttons */
+    .actions{ display:flex; gap:12px; justify-content:flex-end; margin-top:8px; }
+    .btn, .btn:link, .btn:visited{ text-decoration:none; }      /* no underline */
+    .btn{
+      border:1px solid color-mix(in oklab, var(--blue) 35%, white);
+      background:linear-gradient(180deg, var(--blue), color-mix(in oklab, var(--blue) 82%, black));
+      color:#fff; padding:12px 18px; font-weight:900; border-radius:14px; min-width:180px;
+      box-shadow:0 16px 40px rgba(59,130,246,.26);
+      transition: transform var(--fast) var(--pop), box-shadow var(--fast) var(--pop);
+      cursor:pointer;
+    }
+    .btn:hover{ transform:translateY(-1px); box-shadow:0 22px 50px rgba(59,130,246,.32) }
+    .btn:active{ transform:translateY(0) scale(.98) }
+
+    .btn.secondary{
+      background:linear-gradient(180deg,#f9fbff,#eef2ff);
+      color:#0b1f46; border-color:#cdd9f1; box-shadow:0 10px 24px rgba(2,6,23,.08);
+      min-width:auto;
+    }
+    .btn.secondary:hover{ filter:brightness(0.98) }
+
+    .footer-links{ margin-top:20px; padding-top:20px; border-top:1px solid var(--line); display:flex; gap:1rem; justify-content:center; flex-wrap:wrap; }
+    .footer-link{ color:var(--muted); text-decoration:none; font-size:.9rem; }
+    .footer-link:hover{ color:var(--blue); text-decoration:underline; }
+    .terms-text{ margin-top:10px; color:var(--muted); font-size:.85rem; text-align:center; }
+
+    /* Ensure inputs are always white */
+    .input, .file { background:#fff!important; border:1px solid var(--line); color:var(--ink); }
+    /* Always green icons */
+    .addon, .eye { color:var(--green)!important; }
+
+    /* Inline error visuals */
+    .is-error{ border-color:var(--rose)!important; box-shadow:0 0 0 3px rgba(239,68,68,.12)!important; }
+    .err{ color:var(--rose); font-size:.85rem; margin-top:6px; font-weight:700 }
+  </style>
+</head>
+<body>
+<div class="wrap">
+  <section class="card">
+    <div class="brand">
+      <img src="{% static 'brand/mjn-32.png' %}" alt="" />
+      <span>Emajinet</span>
+    </div>
+
+    <div class="step-indicator">Step 1 of 4</div>
+    <h1 class="page-title">Your account</h1>
+    <p class="subtitle">Let's start with your email and password.</p>
+
+    {% if messages %}
+      {% for m in messages %}
+        <div class="alert">{{ m }}</div>
+      {% endfor %}
+    {% endif %}
+
+    <form method="post" action="{% url 'accounts:signup_manager' %}?step=1" novalidate>
+      {% csrf_token %}
+      <input type="hidden" name="step" value="1">
+      <input type="hidden" name="action" value="next">
+
+      <div class="grid">
+        <!-- Email -->
+        {% with has_err=form.errors.email %}
+        <div class="field">
+          <div class="label">Email</div>
+          <span class="addon">✉️</span>
+          <input class="input{% if has_err %} is-error{% endif %}" aria-invalid="{% if has_err %}true{% else %}false{% endif %}"
+                 type="email" name="email" required autocomplete="email" placeholder="you@company.com"
+                 value="{{ form.email.value|default:'' }}">
+          {% if has_err %}<div class="err">{{ form.errors.email|striptags }}</div>{% endif %}
+        </div>
+        {% endwith %}
+
+        <!-- Full name -->
+        {% with has_err=form.errors.full_name %}
+        <div class="field">
+          <div class="label">Your full name</div>
+          <span class="addon">👤</span>
+          <input class="input{% if has_err %} is-error{% endif %}" aria-invalid="{% if has_err %}true{% else %}false{% endif %}"
+                 type="text" name="full_name" required autocomplete="name" placeholder="Jane Doe"
+                 value="{{ form.full_name.value|default:'' }}">
+          {% if has_err %}<div class="err">{{ form.errors.full_name|striptags }}</div>{% endif %}
+        </div>
+        {% endwith %}
+
+        <!-- Password -->
+        {% with has_err=form.errors.password1 %}
+        <div class="field">
+          <div class="label">Password</div>
+          <span class="addon">🔒</span>
+          <input id="pw1" class="input{% if has_err %} is-error{% endif %}" aria-invalid="{% if has_err %}true{% else %}false{% endif %}"
+                 type="password" name="password1" required autocomplete="new-password"
+                 placeholder="Create a strong password" minlength="12">
+          <span id="eye1" class="eye" title="Show/Hide">👁️</span>
+          <div class="meter"><span id="bar1"></span></div>
+          {% if has_err %}<div class="err">{{ form.errors.password1|striptags }}</div>{% else %}
+          <div class="hint">Use at least 12 characters (letters, numbers, symbol).</div>{% endif %}
+        </div>
+        {% endwith %}
+
+        <!-- Confirm Password -->
+        {% with has_err=form.errors.password2 %}
+        <div class="field">
+          <div class="label">Confirm password</div>
+          <span class="addon">✅</span>
+          <input id="pw2" class="input{% if has_err %} is-error{% endif %}" aria-invalid="{% if has_err %}true{% else %}false{% endif %}"
+                 type="password" name="password2" required autocomplete="new-password"
+                 placeholder="Repeat your password" minlength="12">
+          <span id="eye2" class="eye" title="Show/Hide">👁️</span>
+          <div class="meter"><span id="bar2"></span></div>
+          {% if has_err %}<div class="err">{{ form.errors.password2|striptags }}</div>{% endif %}
+        </div>
+        {% endwith %}
+      </div>
+
+      <div class="actions">
+        <button class="btn" type="submit">Next →</button>
+      </div>
+    </form>
+
+    <div class="footer-links">
+      <a href="{% url 'accounts:login' %}" class="footer-link">Login</a>
+      <a href="{% url 'staticpages:privacy' %}" class="footer-link">Privacy Policy</a>
+      <a href="{% url 'staticpages:terms' %}" class="footer-link">Terms & Legal</a>
+    </div>
+    <div class="terms-text">By creating an account, you agree to our Terms of Service and Privacy Policy.</div>
+  </section>
+</div>
+
+<script>
+  // Password helpers
+  function toggle(id, eye){ const el=document.getElementById(id); el.type = el.type==='password' ? 'text' : 'password'; eye.style.opacity = el.type==='text'? '.8': '1'; }
+  function strength(pw){ let s=0; if(pw.length>=12)s+=25; if(/[A-Z]/.test(pw))s+=20; if(/[a-z]/.test(pw))s+=20; if(/\d/.test(pw))s+=20; if(/[^A-Za-z0-9]/.test(pw))s+=15; return Math.min(100,s); }
+  const pw1=document.getElementById('pw1'), pw2=document.getElementById('pw2'), bar1=document.getElementById('bar1'), bar2=document.getElementById('bar2');
+  const eye1=document.getElementById('eye1'), eye2=document.getElementById('eye2');
+  if(eye1) eye1.onclick=()=>toggle('pw1',eye1); if(eye2) eye2.onclick=()=>toggle('pw2',eye2);
+  function updateBars(){ if(bar1) bar1.style.width=strength(pw1.value)+'%'; if(bar2) bar2.style.width=Math.min(100,(pw2.value&&pw1.value===pw2.value)?100:20)+'%'; }
+  if(pw1) pw1.addEventListener('input',updateBars); if(pw2) pw2.addEventListener('input',updateBars);
+</script>
+</body>
+</html>
+

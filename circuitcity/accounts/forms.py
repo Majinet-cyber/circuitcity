@@ -642,3 +642,122 @@ class WizardStep4Form(forms.Form):
     )
 
 
+# ================================================================
+# Manager Signup Wizard Forms (4 steps for /accounts/signup/manager/)
+# ================================================================
+
+class ManagerWizardStep1Form(forms.Form):
+    """Manager Signup Step 1: Account credentials"""
+    email = forms.EmailField(
+        label="Email",
+        widget=forms.EmailInput(attrs={
+            "placeholder": "you@company.com",
+            "autocomplete": "email",
+        }),
+    )
+    full_name = forms.CharField(
+        max_length=150,
+        label="Your full name",
+        widget=forms.TextInput(attrs={
+            "placeholder": "Jane Doe",
+            "autocomplete": "name",
+        }),
+    )
+    password1 = forms.CharField(
+        label="Password",
+        help_text="Use at least 12 characters (letters, numbers, symbol).",
+        widget=forms.PasswordInput(attrs={
+            "autocomplete": "new-password",
+            "minlength": "12",
+            "placeholder": "Create a strong password",
+        }),
+    )
+    password2 = forms.CharField(
+        label="Confirm password",
+        widget=forms.PasswordInput(attrs={
+            "autocomplete": "new-password",
+            "minlength": "12",
+            "placeholder": "Repeat your password",
+        }),
+    )
+
+    def clean_email(self):
+        email = (self.cleaned_data.get("email") or "").strip().lower()
+        if User.objects.filter(email__iexact=email).exists() or User.objects.filter(username__iexact=email).exists():
+            raise forms.ValidationError(
+                "You already have an account with this email. Please sign in instead."
+            )
+        return email
+
+    def clean(self):
+        data = super().clean()
+        dummy_user = User(username=(data.get("email") or "").strip().lower())
+        try:
+            _validate_passwords(data.get("password1"), data.get("password2"), user=dummy_user)
+        except forms.ValidationError as e:
+            self.add_error("password2", e)
+        return data
+
+
+class ManagerWizardStep2Form(forms.Form):
+    """Manager Signup Step 2: Store basics"""
+    business_name = forms.CharField(
+        max_length=200,
+        label="Store name",
+        widget=forms.TextInput(attrs={
+            "placeholder": "e.g. Circuitly",
+        }),
+    )
+    business_kind = forms.ChoiceField(
+        label="Business type",
+        choices=BusinessKind.choices,
+        widget=forms.Select(attrs={"autocomplete": "off"}),
+    )
+    subdomain = forms.CharField(
+        max_length=40,
+        required=False,
+        label="Subdomain (optional)",
+        widget=forms.TextInput(attrs={
+            "placeholder": "e.g. circuitly",
+            "inputmode": "lowercase",
+        }),
+        help_text="yourstore.imajinet.com",
+    )
+
+    def clean_business_name(self):
+        name = (self.cleaned_data.get("business_name") or "").strip()
+        if not name:
+            raise forms.ValidationError("Enter your store name.")
+        return name
+
+
+class ManagerWizardStep3Form(forms.Form):
+    """Manager Signup Step 3: Brand (logo upload)"""
+    logo = forms.ImageField(
+        required=False,
+        label="Logo (optional)",
+        widget=forms.FileInput(attrs={"accept": "image/*"}),
+    )
+
+    def clean_logo(self):
+        f = self.cleaned_data.get("logo")
+        if not f:
+            return f
+        validate_file_size(f)
+        ctype = getattr(f, "content_type", "")
+        if ctype:
+            validate_mime(ctype)
+        try:
+            return process_avatar(f)
+        except Exception:
+            raise forms.ValidationError("Could not process image. Use a valid JPEG/PNG/WEBP.")
+
+
+class ManagerWizardStep4Form(forms.Form):
+    """Manager Signup Step 4: Review & Create (no additional fields, just confirmation)"""
+    agree = forms.BooleanField(
+        required=True,
+        label="I agree to the Terms and confirm that I'm creating a store for my business.",
+    )
+
+

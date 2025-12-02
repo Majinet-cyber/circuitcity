@@ -97,6 +97,7 @@ def subscriptions(request):
         "start": start,
         "end": end,
         "plan_catalog": PLAN_CATALOG,
+        "active_tab": "subscriptions",
     }
 
     tpl = select_template(["hq/subscriptions.html", "billing/hq_subscriptions.html"])

@@ -304,8 +304,8 @@ def dashboard(request):
     )["total"]
     
     # === Monthly aggregates for the selected year ===
-    year_start = datetime(year, 1, 1).date()
-    year_end = datetime(year + 1, 1, 1).date()
+    year_start = dt(year, 1, 1).date()
+    year_end = dt(year + 1, 1, 1).date()
     
     sales_by_month = Sale.objects.filter(
         sold_at__gte=year_start,
@@ -435,6 +435,9 @@ def dashboard(request):
     # Year range for selector
     current_year = timezone.now().year
     ctx["year_range"] = range(current_year - 5, current_year + 2)
+    
+    # active_tab for base.html mobile nav
+    ctx["active_tab"] = "home"
 
     return _render_safe(request, "hq/dashboard.html", ctx, _dashboard_inline)
 
@@ -536,7 +539,7 @@ def businesses(request):
         rows = rows.filter(Q(name__icontains=q) | Q(slug__icontains=q))
 
     page_obj = _paginate(request, rows, per_page=25)
-    ctx = {"rows": rows, "page_obj": page_obj, "q": q, "range": rng, "start": start, "end": end}
+    ctx = {"rows": rows, "page_obj": page_obj, "q": q, "range": rng, "start": start, "end": end, "active_tab": "businesses"}
     return _render_safe(request, "hq/businesses.html", ctx, lambda c: "<h1 style='font-family:system-ui'>Businesses</h1>")
 
 
@@ -591,6 +594,7 @@ def business_detail(request, pk: int):
         "agents_qs": agents_qs,
         "series_paid": [{"label": (r["m"].strftime("%Y-%m") if r["m"] else ""), "amount": float(r["amount"] or 0)} for r in paid_series_qs],
         "limits": limits,
+        "active_tab": "businesses",
     }
     return _render_safe(request, "hq/business_detail.html", ctx, lambda c: f"<h1 style='font-family:system-ui'>{_esc(biz.name)}</h1>")
 
@@ -637,6 +641,7 @@ def subscriptions(request):
         "q": q, "status": status,
         "range": rng, "start": start, "end": end,
         "plan_catalog": PLAN_CATALOG,
+        "active_tab": "subscriptions",
     }
 
     tpl = select_template(["hq/subscriptions.html", "billing/hq_subscriptions.html"])
@@ -663,7 +668,7 @@ def invoices(request):
     qs = qs.order_by(order_field)
 
     page_obj = Paginator(qs, 25).get_page(request.GET.get('page'))
-    return render(request, 'hq/invoices.html', {'page_obj': page_obj, 'invoices': page_obj})
+    return render(request, 'hq/invoices.html', {'page_obj': page_obj, 'invoices': page_obj, 'active_tab': 'invoices'})
 
 
 # -------------------------------------------------------------------
@@ -690,7 +695,7 @@ def agents(request):
         except Exception:
             biz_limits[b_id] = None
 
-    ctx = {"rows": rows, "page_obj": _paginate(request, rows, per_page=30), "q": q, "biz_limits": biz_limits}
+    ctx = {"rows": rows, "page_obj": _paginate(request, rows, per_page=30), "q": q, "biz_limits": biz_limits, "active_tab": "agents"}
     return _render_safe(request, "hq/agents.html", ctx, lambda c: "<h1 style='font-family:system-ui'>Agents</h1>")
 
 
@@ -819,6 +824,7 @@ def stock_trends(request):
         "sell_through_pct": sell_through_pct,
         "avg_daily_out": avg_daily_out,
         "projected_monthly_run_rate": projected_monthly_run_rate,
+        "active_tab": "stock",
     }
     return _render_safe(
         request,
@@ -847,7 +853,7 @@ def wallet_home(request):
 
     ctx = {"income": income, "expense": expense, "balance": balance,
            "range": rng, "start": start, "end": end,
-           "tx_page": None}
+           "tx_page": None, "active_tab": "wallet"}
     return _render_safe(request, "hq/wallet.html", ctx, lambda c: "<h1 style='font-family:system-ui'>Wallet</h1>")
 
 

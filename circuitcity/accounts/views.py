@@ -47,6 +47,10 @@ from .forms import (
     WizardStep2Form,
     WizardStep3Form,
     WizardStep4Form,
+    ManagerWizardStep1Form,
+    ManagerWizardStep2Form,
+    ManagerWizardStep3Form,
+    ManagerWizardStep4Form,
 )
 from .models import EmailOTP, LoginSecurity, Profile, OnboardingProfile
 
@@ -1037,162 +1041,285 @@ def _seed_defaults_for_business(biz) -> None:
 
 
 # =========================================
-# Manager sign-up (auto-tenant + auto-select, ACTIVE immediately)
+# Manager sign-up WIZARD (4 steps, auto-tenant + auto-select, ACTIVE immediately)
 # =========================================
+MANAGER_WIZARD_SESSION_KEY = "manager_wizard_data"
+
+def _get_manager_wizard_data(request):
+    """Get manager wizard data from session"""
+    return request.session.get(MANAGER_WIZARD_SESSION_KEY, {})
+
+def _set_manager_wizard_data(request, data):
+    """Save manager wizard data to session"""
+    request.session[MANAGER_WIZARD_SESSION_KEY] = data
+    request.session.modified = True
+
+def _clear_manager_wizard_data(request):
+    """Clear manager wizard data from session"""
+    if MANAGER_WIZARD_SESSION_KEY in request.session:
+        del request.session[MANAGER_WIZARD_SESSION_KEY]
+        request.session.modified = True
+
+
 @ensure_csrf_cookie
 @never_cache
 @require_http_methods(["GET", "POST"])
 def signup_manager(request):
+    """
+    4-step wizard for manager signup:
+    Step 1: Account (email, full name, password)
+    Step 2: Store basics (business name, type, subdomain)
+    Step 3: Brand (logo upload)
+    Step 4: Review & Create
+    """
     # If already signed in, just go to app
     if request.user.is_authenticated:
         return redirect(_safe_redirect("inventory:inventory_dashboard",
                                        "dashboard:home",
                                        default="/inventory/dashboard/"))
 
-    form = ManagerSignUpForm(request.POST or None)
+    # Determine current step from query param or POST
+    step = int(request.GET.get("step", request.POST.get("step", 1)))
+    if step < 1 or step > 4:
+        step = 1
 
-    # Helper to show + log form errors
-    def _render_with_form_errors(msg_prefix: str = "Please fix the errors below."):
-        # Flatten errors
-        parts = []
+    wizard_data = _get_manager_wizard_data(request)
+
+    # Step 1: Account
+    if step == 1:
+        form = ManagerWizardStep1Form(request.POST or None, initial=wizard_data.get("step1", {}))
+        if request.method == "POST":
+            action = request.POST.get("action", "next")
+            if action == "next" and form.is_valid():
+                wizard_data["step1"] = form.cleaned_data
+                _set_manager_wizard_data(request, wizard_data)
+                return redirect(f"{reverse('accounts:signup_manager')}?step=2")
+        return render(request, "accounts/signup_manager_wizard_step1.html", {
+            "form": form,
+            "step": step,
+            "total_steps": 4,
+            "wizard_data": wizard_data,
+        })
+
+    # Step 2: Store basics
+    elif step == 2:
+        # Must have completed step 1
+        if "step1" not in wizard_data:
+            return redirect(f"{reverse('accounts:signup_manager')}?step=1")
+
+        form = ManagerWizardStep2Form(request.POST or None, initial=wizard_data.get("step2", {}))
+        if request.method == "POST":
+            action = request.POST.get("action", "next")
+            if action == "back":
+                return redirect(f"{reverse('accounts:signup_manager')}?step=1")
+            elif action == "next" and form.is_valid():
+                wizard_data["step2"] = form.cleaned_data
+                _set_manager_wizard_data(request, wizard_data)
+                return redirect(f"{reverse('accounts:signup_manager')}?step=3")
+        return render(request, "accounts/signup_manager_wizard_step2.html", {
+            "form": form,
+            "step": step,
+            "total_steps": 4,
+            "wizard_data": wizard_data,
+        })
+
+    # Step 3: Brand
+    elif step == 3:
+        # Must have completed steps 1 & 2
+        if "step1" not in wizard_data or "step2" not in wizard_data:
+            return redirect(f"{reverse('accounts:signup_manager')}?step=1")
+
+        form = ManagerWizardStep3Form(request.POST or None, request.FILES or None, initial=wizard_data.get("step3", {}))
+        if request.method == "POST":
+            action = request.POST.get("action", "next")
+            if action == "back":
+                return redirect(f"{reverse('accounts:signup_manager')}?step=2")
+            elif action == "next" and form.is_valid():
+                # Store logo file in session (as base64 if provided)
+                logo_file = form.cleaned_data.get("logo")
+                if logo_file:
+                    import base64
+                    wizard_data["step3"] = {
+                        "logo_name": logo_file.name,
+                        "logo_content_type": logo_file.content_type,
+                        "logo_data": base64.b64encode(logo_file.read()).decode("utf-8"),
+                    }
+                else:
+                    wizard_data["step3"] = {}
+                _set_manager_wizard_data(request, wizard_data)
+                return redirect(f"{reverse('accounts:signup_manager')}?step=4")
+        return render(request, "accounts/signup_manager_wizard_step3.html", {
+            "form": form,
+            "step": step,
+            "total_steps": 4,
+            "wizard_data": wizard_data,
+        })
+
+    # Step 4: Review & Create
+    elif step == 4:
+        # Must have completed steps 1, 2, & 3
+        if "step1" not in wizard_data or "step2" not in wizard_data or "step3" not in wizard_data:
+            return redirect(f"{reverse('accounts:signup_manager')}?step=1")
+
+        form = ManagerWizardStep4Form(request.POST or None)
+        if request.method == "POST":
+            action = request.POST.get("action", "create")
+            if action == "back":
+                return redirect(f"{reverse('accounts:signup_manager')}?step=3")
+            elif action == "create" and form.is_valid():
+                # Create everything
+                try:
+                    return _complete_manager_wizard_signup(request, wizard_data)
+                except Exception as e:
+                    log.error("Manager wizard signup failed: %s", e, exc_info=True)
+                    messages.error(request, f"Something went wrong: {str(e)}. Please try again or contact support.")
+
+        # Prepare summary data for review
+        summary = {
+            "email": wizard_data.get("step1", {}).get("email"),
+            "full_name": wizard_data.get("step1", {}).get("full_name"),
+            "business_name": wizard_data.get("step2", {}).get("business_name"),
+            "business_kind": wizard_data.get("step2", {}).get("business_kind"),
+            "subdomain": wizard_data.get("step2", {}).get("subdomain"),
+            "has_logo": bool(wizard_data.get("step3", {}).get("logo_data")),
+        }
+
+        return render(request, "accounts/signup_manager_wizard_step4.html", {
+            "form": form,
+            "step": step,
+            "total_steps": 4,
+            "wizard_data": wizard_data,
+            "summary": summary,
+        })
+
+    # Fallback
+    return redirect(f"{reverse('accounts:signup_manager')}?step=1")
+
+
+def _complete_manager_wizard_signup(request, wizard_data):
+    """
+    Complete the manager wizard signup by creating all entities.
+    This keeps all the existing business logic intact.
+    """
+    from django.db import transaction
+    from django.core.files.base import ContentFile
+    import base64
+
+    step1 = wizard_data.get("step1", {})
+    step2 = wizard_data.get("step2", {})
+    step3 = wizard_data.get("step3", {})
+
+    with transaction.atomic():
+        # 1. Create User
+        email = step1["email"].strip().lower()
+        full_name = step1["full_name"].strip()
+        password = step1["password1"]
+
+        # Guard: unique user/email (double-check)
+        if User.objects.filter(username__iexact=email).exists() or User.objects.filter(email__iexact=email).exists():
+            messages.error(request, "An account with that email already exists. Please sign in instead.")
+            return redirect(f"{reverse('accounts:signup_manager')}?step=1")
+
+        user = User.objects.create_user(username=email, email=email, password=password)
+
+        # Split name
         try:
-            for field, errs in form.errors.items():
-                joined = "; ".join(e for e in errs)
-                parts.append(f"{field}: {joined}")
+            parts = full_name.split()
+            user.first_name = parts[0]
+            user.last_name = " ".join(parts[1:]) if len(parts) > 1 else ""
+            user.save(update_fields=["first_name", "last_name"])
         except Exception:
             pass
-        err_text = " | ".join(parts) or "(no details)"
-        log.warning("Manager signup form invalid: %s", err_text)
-        messages.error(request, f"{msg_prefix} {err_text}")
-        resp = render(request, SIGNUP_MANAGER_TEMPLATE, {"form": form, "agree": _agree_flag(request)})
-        # Helpful while debugging in DevTools → Network
-        resp["X-Form-Errors"] = err_text[:512]
-        return resp
 
-    # GET
-    if request.method != "POST":
-        return render(request, SIGNUP_MANAGER_TEMPLATE, {"form": form, "agree": _agree_flag(request)})
-
-    # POST – first pass validation
-    if not form.is_valid():
-        return _render_with_form_errors()
-
-    # Pull cleaned values
-    email = form.cleaned_data["email"].strip().lower()
-    full_name = form.cleaned_data["full_name"].strip()
-    biz_name = form.cleaned_data["business_name"].strip()
-    business_kind = form.cleaned_data["business_kind"]
-    subdomain = (form.cleaned_data.get("subdomain") or "").strip().lower()
-    password = form.cleaned_data["password1"]
-
-    # Guard: unique user/email
-    if User.objects.filter(username__iexact=email).exists() or User.objects.filter(email__iexact=email).exists():
-        messages.error(request, "An account with that email already exists. Please sign in instead.")
-        return render(request, SIGNUP_MANAGER_TEMPLATE, {"form": form, "agree": _agree_flag(request)})
-
-    # Create user
-    try:
-        user = User.objects.create_user(username=email, email=email, password=password)
-    except Exception as e:
-        log.error("Create user failed: %s", e)
-        messages.error(request, "We couldn’t create your account because this email is already in use.")
-        return render(request, SIGNUP_MANAGER_TEMPLATE, {"form": form, "agree": _agree_flag(request)})
-
-    # Optional name split
-    try:
-        parts = full_name.split()
-        user.first_name = parts[0]
-        user.last_name = " ".join(parts[1:]) if len(parts) > 1 else ""
-        user.save(update_fields=["first_name", "last_name"])
-    except Exception:
-        pass
-
-    # Add to Manager group (best effort)
-    try:
-        mgr_group = _get_or_create_manager_group()
-        user.groups.add(mgr_group)
-    except Exception:
-        pass
-
-    # Create business + membership if tenants app available
-    biz = None
-    if Business is not None:
-        # Validate subdomain early
-        if subdomain:
-            import re
-            if not re.fullmatch(r"[a-z0-9-]+", subdomain):
-                form.add_error("subdomain", "Use lowercase letters, numbers, and hyphens only.")
-                return _render_with_form_errors("Subdomain is invalid.")
-            if Business.objects.filter(subdomain__iexact=subdomain).exists():
-                form.add_error("subdomain", "That subdomain is already taken. Please choose another.")
-                return _render_with_form_errors("Subdomain taken.")
-
-        # Unique slug
-        base = slugify(biz_name)[:40] or "store"
-        unique = base
-        i = 1
-        while Business.objects.filter(slug=unique).exists():
-            i += 1
-            unique = f"{base}-{i}"
-
-        bkwargs = {"name": biz_name, "slug": unique}
-        if hasattr(Business, "created_by"):
-            bkwargs["created_by"] = user
-        if hasattr(Business, "subdomain") and subdomain:
-            bkwargs["subdomain"] = subdomain
-        if hasattr(Business, "status"):
-            bkwargs["status"] = "ACTIVE"
-        if hasattr(Business, "business_kind"):
-            bkwargs["business_kind"] = business_kind
-
+        # Add to Manager group
         try:
+            mgr_group = _get_or_create_manager_group()
+            user.groups.add(mgr_group)
+        except Exception:
+            pass
+
+        # 2. Create Business
+        biz = None
+        if Business is not None:
+            biz_name = step2["business_name"].strip()
+            business_kind = step2["business_kind"]
+            subdomain = (step2.get("subdomain") or "").strip().lower()
+
+            # Validate subdomain
+            if subdomain:
+                import re
+                if not re.fullmatch(r"[a-z0-9-]+", subdomain):
+                    raise ValueError("Invalid subdomain format")
+                if Business.objects.filter(subdomain__iexact=subdomain).exists():
+                    raise ValueError("Subdomain already taken")
+
+            # Unique slug
+            base = slugify(biz_name)[:40] or "store"
+            unique = base
+            i = 1
+            while Business.objects.filter(slug=unique).exists():
+                i += 1
+                unique = f"{base}-{i}"
+
+            bkwargs = {"name": biz_name, "slug": unique}
+            if hasattr(Business, "created_by"):
+                bkwargs["created_by"] = user
+            if hasattr(Business, "subdomain") and subdomain:
+                bkwargs["subdomain"] = subdomain
+            if hasattr(Business, "status"):
+                bkwargs["status"] = "ACTIVE"
+            if hasattr(Business, "business_kind"):
+                bkwargs["business_kind"] = business_kind
+
             biz = Business.objects.create(**bkwargs)
-        except Exception as e:
-            log.error("Create business failed: %s", e)
-            form.add_error("subdomain", "Could not create business. This subdomain or name may already exist.")
-            # Roll back user to avoid orphaned accounts
-            try:
-                user.delete()
-            except Exception:
-                pass
-            return _render_with_form_errors("Business creation failed.")
 
-        # Membership (best effort)
-        try:
+            # Membership
             if Membership is not None:
                 Membership.objects.update_or_create(
                     user=user, business=biz,
                     defaults={"role": "MANAGER", "status": "ACTIVE"},
                 )
-        except Exception:
-            pass
 
-        # Seed defaults
-        _seed_defaults_for_business(biz)
+            # Seed defaults
+            _seed_defaults_for_business(biz)
 
-    # Ensure Profile exists and mark as manager if model has that field
-    try:
-        profile = getattr(user, "profile", None)
-        if profile is None:
-            profile, _ = Profile.objects.get_or_create(user=user)
-        if hasattr(profile, "is_manager"):
-            profile.is_manager = True
-            profile.save(update_fields=["is_manager"])
-    except Exception:
-        pass
+            # 3. Save logo if provided
+            logo_data = step3.get("logo_data")
+            if logo_data and hasattr(biz, "logo"):
+                try:
+                    logo_bytes = base64.b64decode(logo_data)
+                    logo_name = step3.get("logo_name", "logo.png")
+                    biz.logo.save(logo_name, ContentFile(logo_bytes), save=True)
+                except Exception as e:
+                    log.warning("Failed to save logo during manager wizard: %s", e)
 
-    # Auto-login + select business
-    login(request, user)
-    if biz is not None:
+        # 4. Ensure Profile exists and mark as manager
         try:
-            request.session[TENANT_SESSION_KEY] = biz.pk
+            profile = getattr(user, "profile", None)
+            if profile is None:
+                profile, _ = Profile.objects.get_or_create(user=user)
+            if hasattr(profile, "is_manager"):
+                profile.is_manager = True
+                profile.save(update_fields=["is_manager"])
         except Exception:
             pass
-        messages.success(request, f"Welcome to {biz.name}! Your store is ready.")
-    else:
-        messages.success(request, "Your manager account is ready.")
 
-    return redirect(_safe_redirect("inventory:inventory_dashboard", default="/inventory/dashboard/"))
+        # 5. Auto-login + select business
+        login(request, user)
+        if biz is not None:
+            try:
+                request.session[TENANT_SESSION_KEY] = biz.pk
+            except Exception:
+                pass
+            messages.success(request, f"🎉 Welcome to {biz.name}! Your store is ready.")
+        else:
+            messages.success(request, "🎉 Your manager account is ready!")
+
+        # Clear wizard data
+        _clear_manager_wizard_data(request)
+
+        # Redirect to dashboard
+        return redirect(_safe_redirect("inventory:inventory_dashboard", default="/inventory/dashboard/"))
 
 
 # =========================================

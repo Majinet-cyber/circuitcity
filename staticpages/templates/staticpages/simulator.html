@@ -1,0 +1,625 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Business Simulator - Emajinet</title>
+  <link rel="icon" href="{% static 'favicon.ico' %}">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <style>
+    :root {
+      --primary: #4f46e5;
+      --primary-dark: #4338ca;
+      --secondary: #10b981;
+      --text-primary: #1f2937;
+      --text-secondary: #6b7280;
+      --bg-light: #f9fafb;
+      --white: #ffffff;
+      --shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+      --shadow-lg: 0 20px 50px rgba(0, 0, 0, 0.15);
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, Roboto, Helvetica, Arial, sans-serif;
+      line-height: 1.6;
+      color: var(--text-primary);
+      background: var(--bg-light);
+    }
+
+    .navbar {
+      background: var(--white);
+      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+      padding: 1rem 2rem;
+      position: sticky;
+      top: 0;
+      z-index: 1000;
+    }
+
+    .navbar-content {
+      max-width: 1280px;
+      margin: 0 auto;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .logo-section {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+    }
+
+    .logo {
+      height: 40px;
+      width: auto;
+    }
+
+    .logo-text {
+      font-size: 1.5rem;
+      font-weight: 700;
+      color: var(--primary);
+    }
+
+    .btn {
+      padding: 0.75rem 1.5rem;
+      border-radius: 100px;
+      font-weight: 600;
+      font-size: 0.95rem;
+      text-decoration: none;
+      cursor: pointer;
+      border: none;
+      transition: all 0.3s ease;
+      display: inline-block;
+    }
+
+    .btn-primary {
+      background: var(--primary);
+      color: var(--white);
+      box-shadow: 0 4px 12px rgba(79, 70, 229, 0.3);
+    }
+
+    .btn-primary:hover {
+      background: var(--primary-dark);
+      transform: translateY(-2px);
+      box-shadow: 0 6px 20px rgba(79, 70, 229, 0.4);
+    }
+
+    .btn-text {
+      background: transparent;
+      color: var(--text-secondary);
+    }
+
+    .btn-text:hover {
+      color: var(--primary);
+    }
+
+    .container {
+      max-width: 1280px;
+      margin: 0 auto;
+      padding: 2rem;
+    }
+
+    .hero {
+      text-align: center;
+      padding: 3rem 0;
+    }
+
+    h1 {
+      font-size: 3rem;
+      font-weight: 800;
+      margin-bottom: 1rem;
+      color: var(--text-primary);
+    }
+
+    .subtitle {
+      font-size: 1.25rem;
+      color: var(--text-secondary);
+      margin-bottom: 2rem;
+    }
+
+    .simulator-grid {
+      display: grid;
+      grid-template-columns: 1fr 1.5fr;
+      gap: 2rem;
+      margin-top: 2rem;
+    }
+
+    .card {
+      background: var(--white);
+      border-radius: 20px;
+      padding: 2rem;
+      box-shadow: var(--shadow);
+    }
+
+    .card h2 {
+      font-size: 1.5rem;
+      font-weight: 700;
+      margin-bottom: 1.5rem;
+      color: var(--text-primary);
+    }
+
+    .control-group {
+      margin-bottom: 1.5rem;
+    }
+
+    .control-label {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 0.5rem;
+      font-weight: 600;
+      color: var(--text-primary);
+    }
+
+    .control-value {
+      color: var(--primary);
+      font-weight: 700;
+    }
+
+    .slider {
+      width: 100%;
+      height: 8px;
+      border-radius: 5px;
+      background: #e2e8f0;
+      outline: none;
+      -webkit-appearance: none;
+    }
+
+    .slider::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      background: var(--primary);
+      cursor: pointer;
+      box-shadow: 0 2px 8px rgba(79, 70, 229, 0.4);
+    }
+
+    .slider::-moz-range-thumb {
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      background: var(--primary);
+      cursor: pointer;
+      border: none;
+      box-shadow: 0 2px 8px rgba(79, 70, 229, 0.4);
+    }
+
+    .metrics {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 1rem;
+      margin-bottom: 2rem;
+    }
+
+    .metric-card {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      border-radius: 15px;
+      padding: 1.5rem;
+      color: var(--white);
+      text-align: center;
+    }
+
+    .metric-card.revenue {
+      background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
+    }
+
+    .metric-card.cost {
+      background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+    }
+
+    .metric-card.profit {
+      background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+    }
+
+    .metric-label {
+      font-size: 0.85rem;
+      opacity: 0.9;
+      margin-bottom: 0.5rem;
+    }
+
+    .metric-value {
+      font-size: 2rem;
+      font-weight: 800;
+    }
+
+    .chart-container {
+      position: relative;
+      height: 350px;
+      margin-bottom: 2rem;
+    }
+
+    .insights-card {
+      background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%);
+      border-radius: 15px;
+      padding: 1.5rem;
+      margin-top: 2rem;
+      border-left: 4px solid var(--primary);
+    }
+
+    .insights-card h3 {
+      font-size: 1.25rem;
+      font-weight: 700;
+      margin-bottom: 1rem;
+      color: var(--text-primary);
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .insights-list {
+      list-style: none;
+      padding: 0;
+    }
+
+    .insights-list li {
+      padding: 0.5rem 0;
+      color: var(--text-secondary);
+      display: flex;
+      align-items: flex-start;
+      gap: 0.5rem;
+    }
+
+    .insights-list li::before {
+      content: "💡";
+      flex-shrink: 0;
+    }
+
+    @media (max-width: 968px) {
+      .simulator-grid {
+        grid-template-columns: 1fr;
+      }
+
+      h1 {
+        font-size: 2rem;
+      }
+
+      .metrics {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+  <!-- Navigation -->
+  <nav class="navbar">
+    <div class="navbar-content">
+      <div class="logo-section">
+        <img src="{% static 'img/majn.png' %}" alt="Emajinet Logo" class="logo">
+        <span class="logo-text">Emajinet</span>
+      </div>
+      <div style="display: flex; gap: 1rem; align-items: center;">
+        <a href="{% url 'staticpages:home' %}" class="btn btn-text">Home</a>
+        <a href="{% url 'accounts:login' %}" class="btn btn-primary">Get Started</a>
+      </div>
+    </div>
+  </nav>
+
+  <!-- Hero -->
+  <div class="container">
+    <div class="hero">
+      <h1>📊 Business Simulator</h1>
+      <p class="subtitle">
+        Adjust your stock, pricing, and turnover to see how your monthly revenue and profit change.
+      </p>
+    </div>
+
+    <!-- Simulator Grid -->
+    <div class="simulator-grid">
+      <!-- Controls Card -->
+      <div class="card">
+        <h2>⚙️ Controls</h2>
+
+        <div class="control-group">
+          <div class="control-label">
+            <span>Monthly units sold</span>
+            <span class="control-value" id="units-value">200</span>
+          </div>
+          <input type="range" min="0" max="2000" value="200" step="10" class="slider" id="units-slider">
+        </div>
+
+        <div class="control-group">
+          <div class="control-label">
+            <span>Average selling price (MWK)</span>
+            <span class="control-value" id="price-value">120,000</span>
+          </div>
+          <input type="range" min="0" max="500000" value="120000" step="1000" class="slider" id="price-slider">
+        </div>
+
+        <div class="control-group">
+          <div class="control-label">
+            <span>Average cost per unit (MWK)</span>
+            <span class="control-value" id="cost-value">90,000</span>
+          </div>
+          <input type="range" min="0" max="500000" value="90000" step="1000" class="slider" id="cost-slider">
+        </div>
+
+        <div class="control-group">
+          <div class="control-label">
+            <span>Stock on hand</span>
+            <span class="control-value" id="stock-value">500</span>
+          </div>
+          <input type="range" min="0" max="5000" value="500" step="10" class="slider" id="stock-slider">
+        </div>
+
+        <div class="control-group">
+          <div class="control-label">
+            <span>Period (months)</span>
+            <span class="control-value" id="months-value">6</span>
+          </div>
+          <input type="range" min="1" max="12" value="6" step="1" class="slider" id="months-slider">
+        </div>
+      </div>
+
+      <!-- Chart and Metrics Card -->
+      <div>
+        <!-- Metrics -->
+        <div class="metrics">
+          <div class="metric-card revenue">
+            <div class="metric-label">Total Revenue</div>
+            <div class="metric-value" id="total-revenue">MWK 144M</div>
+          </div>
+          <div class="metric-card cost">
+            <div class="metric-label">Total Cost</div>
+            <div class="metric-value" id="total-cost">MWK 108M</div>
+          </div>
+          <div class="metric-card profit">
+            <div class="metric-label">Total Profit</div>
+            <div class="metric-value" id="total-profit">MWK 36M</div>
+          </div>
+        </div>
+
+        <!-- Chart -->
+        <div class="card">
+          <h2>📈 Financial Projection</h2>
+          <div class="chart-container">
+            <canvas id="financeChart"></canvas>
+          </div>
+        </div>
+
+        <!-- Insights -->
+        <div class="insights-card">
+          <h3>🎯 Insights & Suggestions</h3>
+          <ul class="insights-list" id="insights-list">
+            <li>Your profit margin is healthy at 25%. Keep it up!</li>
+            <li>Stock levels are appropriate for your sales velocity.</li>
+            <li>Consider increasing prices slightly to maximize profit.</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Initialize values
+    let units = 200;
+    let price = 120000;
+    let cost = 90000;
+    let stock = 500;
+    let months = 6;
+
+    // Format number with commas
+    function formatNumber(num) {
+      return num.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+    }
+
+    // Format currency (MWK)
+    function formatCurrency(num) {
+      if (num >= 1000000) {
+        return 'MWK ' + (num / 1000000).toFixed(1) + 'M';
+      } else if (num >= 1000) {
+        return 'MWK ' + (num / 1000).toFixed(1) + 'K';
+      } else {
+        return 'MWK ' + formatNumber(num);
+      }
+    }
+
+    // Calculate metrics
+    function calculateMetrics() {
+      const monthlyRevenue = units * price;
+      const monthlyCost = units * cost;
+      const monthlyProfit = monthlyRevenue - monthlyCost;
+      
+      return {
+        totalRevenue: monthlyRevenue * months,
+        totalCost: monthlyCost * months,
+        totalProfit: monthlyProfit * months,
+        monthlyRevenue,
+        monthlyCost,
+        monthlyProfit,
+        profitMargin: monthlyRevenue > 0 ? (monthlyProfit / monthlyRevenue * 100) : 0,
+      };
+    }
+
+    // Generate insights
+    function generateInsights(metrics) {
+      const insights = [];
+      
+      // Profit margin insights
+      if (metrics.profitMargin < 10) {
+        insights.push("Your margin is low (<10%). Consider raising prices or lowering costs.");
+      } else if (metrics.profitMargin > 40) {
+        insights.push("Excellent profit margin (>" + metrics.profitMargin.toFixed(0) + "%)! Your business is very healthy.");
+      } else if (metrics.profitMargin > 20) {
+        insights.push("Your profit margin is healthy at " + metrics.profitMargin.toFixed(0) + "%. Keep it up!");
+      }
+
+      // Stock insights
+      const monthsOfStock = units > 0 ? stock / units : 0;
+      if (monthsOfStock > 6) {
+        insights.push("You're overstocked (" + monthsOfStock.toFixed(1) + " months of inventory). Consider reducing orders.");
+      } else if (monthsOfStock < 1 && stock > 0) {
+        insights.push("Stock is running low (less than 1 month). Consider restocking soon.");
+      } else if (monthsOfStock >= 2 && monthsOfStock <= 4) {
+        insights.push("Stock levels are appropriate for your sales velocity.");
+      }
+
+      // Revenue insights
+      if (metrics.totalRevenue >= 50000000) {
+        insights.push("Great revenue performance! Think about reinvesting in inventory or new locations.");
+      }
+
+      // Price optimization
+      if (metrics.profitMargin > 15 && metrics.profitMargin < 25) {
+        insights.push("Consider increasing prices slightly to maximize profit without hurting sales.");
+      }
+
+      // Cost insights
+      if (cost >= price * 0.8) {
+        insights.push("Your costs are very high relative to price. Look for ways to reduce supplier costs.");
+      }
+
+      return insights.length > 0 ? insights : ["Adjust the sliders to see personalized insights for your business."];
+    }
+
+    // Update all displays
+    function updateDisplay() {
+      // Update slider value displays
+      document.getElementById('units-value').textContent = formatNumber(units);
+      document.getElementById('price-value').textContent = formatNumber(price);
+      document.getElementById('cost-value').textContent = formatNumber(cost);
+      document.getElementById('stock-value').textContent = formatNumber(stock);
+      document.getElementById('months-value').textContent = months;
+
+      // Calculate and update metrics
+      const metrics = calculateMetrics();
+      document.getElementById('total-revenue').textContent = formatCurrency(metrics.totalRevenue);
+      document.getElementById('total-cost').textContent = formatCurrency(metrics.totalCost);
+      document.getElementById('total-profit').textContent = formatCurrency(metrics.totalProfit);
+
+      // Update insights
+      const insights = generateInsights(metrics);
+      const insightsList = document.getElementById('insights-list');
+      insightsList.innerHTML = insights.map(insight => `<li>${insight}</li>`).join('');
+
+      // Update chart
+      updateChart(metrics);
+    }
+
+    // Initialize Chart
+    const ctx = document.getElementById('financeChart').getContext('2d');
+    let financeChart = new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels: [],
+        datasets: [
+          {
+            label: 'Revenue',
+            data: [],
+            borderColor: '#4f46e5',
+            backgroundColor: 'rgba(79, 70, 229, 0.1)',
+            fill: true,
+            tension: 0.4,
+          },
+          {
+            label: 'Cost',
+            data: [],
+            borderColor: '#ef4444',
+            backgroundColor: 'rgba(239, 68, 68, 0.1)',
+            fill: true,
+            tension: 0.4,
+          },
+          {
+            label: 'Profit',
+            data: [],
+            borderColor: '#10b981',
+            backgroundColor: 'rgba(16, 185, 129, 0.1)',
+            fill: true,
+            tension: 0.4,
+          },
+        ],
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: {
+            position: 'top',
+          },
+          tooltip: {
+            callbacks: {
+              label: function(context) {
+                let label = context.dataset.label || '';
+                if (label) {
+                  label += ': ';
+                }
+                label += formatCurrency(context.parsed.y);
+                return label;
+              }
+            }
+          }
+        },
+        scales: {
+          y: {
+            beginAtZero: true,
+            ticks: {
+              callback: function(value) {
+                return formatCurrency(value);
+              }
+            }
+          }
+        }
+      }
+    });
+
+    // Update chart data
+    function updateChart(metrics) {
+      const labels = [];
+      const revenueData = [];
+      const costData = [];
+      const profitData = [];
+
+      for (let i = 1; i <= months; i++) {
+        labels.push('Month ' + i);
+        revenueData.push(metrics.monthlyRevenue * i);
+        costData.push(metrics.monthlyCost * i);
+        profitData.push(metrics.monthlyProfit * i);
+      }
+
+      financeChart.data.labels = labels;
+      financeChart.data.datasets[0].data = revenueData;
+      financeChart.data.datasets[1].data = costData;
+      financeChart.data.datasets[2].data = profitData;
+      financeChart.update();
+    }
+
+    // Event listeners for sliders
+    document.getElementById('units-slider').addEventListener('input', (e) => {
+      units = parseInt(e.target.value);
+      updateDisplay();
+    });
+
+    document.getElementById('price-slider').addEventListener('input', (e) => {
+      price = parseInt(e.target.value);
+      updateDisplay();
+    });
+
+    document.getElementById('cost-slider').addEventListener('input', (e) => {
+      cost = parseInt(e.target.value);
+      updateDisplay();
+    });
+
+    document.getElementById('stock-slider').addEventListener('input', (e) => {
+      stock = parseInt(e.target.value);
+      updateDisplay();
+    });
+
+    document.getElementById('months-slider').addEventListener('input', (e) => {
+      months = parseInt(e.target.value);
+      updateDisplay();
+    });
+
+    // Initialize display
+    updateDisplay();
+  </script>
+</body>
+</html>
+

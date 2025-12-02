@@ -1,0 +1,253 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Terms of Service - Emajinet</title>
+  <link rel="icon" href="{% static 'favicon.ico' %}">
+  <style>
+    :root {
+      --primary: #4f46e5;
+      --text-primary: #1f2937;
+      --text-secondary: #6b7280;
+      --bg-light: #f9fafb;
+      --white: #ffffff;
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, Roboto, Helvetica, Arial, sans-serif;
+      line-height: 1.6;
+      color: var(--text-primary);
+      background: var(--bg-light);
+    }
+
+    .navbar {
+      background: var(--white);
+      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+      padding: 1rem 2rem;
+    }
+
+    .navbar-content {
+      max-width: 1280px;
+      margin: 0 auto;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .logo-section {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+    }
+
+    .logo {
+      height: 40px;
+      width: auto;
+    }
+
+    .logo-text {
+      font-size: 1.5rem;
+      font-weight: 700;
+      color: var(--primary);
+    }
+
+    .btn-text {
+      background: transparent;
+      color: var(--text-secondary);
+      text-decoration: none;
+      padding: 0.5rem 1rem;
+      border-radius: 100px;
+      font-weight: 600;
+    }
+
+    .btn-text:hover {
+      color: var(--primary);
+    }
+
+    .container {
+      max-width: 900px;
+      margin: 0 auto;
+      padding: 4rem 2rem;
+    }
+
+    h1 {
+      font-size: 2.5rem;
+      font-weight: 800;
+      margin-bottom: 1rem;
+      color: var(--text-primary);
+    }
+
+    .last-updated {
+      color: var(--text-secondary);
+      font-size: 0.9rem;
+      margin-bottom: 2rem;
+    }
+
+    h2 {
+      font-size: 1.5rem;
+      font-weight: 700;
+      margin-top: 2rem;
+      margin-bottom: 1rem;
+      color: var(--text-primary);
+    }
+
+    p {
+      margin-bottom: 1rem;
+      color: var(--text-secondary);
+    }
+
+    ul {
+      margin-bottom: 1rem;
+      padding-left: 2rem;
+      color: var(--text-secondary);
+    }
+
+    li {
+      margin-bottom: 0.5rem;
+    }
+
+    a {
+      color: var(--primary);
+      text-decoration: none;
+    }
+
+    a:hover {
+      text-decoration: underline;
+    }
+
+    strong {
+      color: var(--text-primary);
+    }
+  </style>
+</head>
+<body>
+  <!-- Navigation -->
+  <nav class="navbar">
+    <div class="navbar-content">
+      <div class="logo-section">
+        <img src="{% static 'img/majn.png' %}" alt="Emajinet Logo" class="logo">
+        <span class="logo-text">Emajinet</span>
+      </div>
+      <div>
+        <a href="{% url 'staticpages:home' %}" class="btn-text">← Back to Home</a>
+      </div>
+    </div>
+  </nav>
+
+  <div class="container">
+    <h1>Terms of Service</h1>
+    <p class="last-updated">Last updated: December 2, 2025</p>
+
+    <p>
+      Welcome to Emajinet. These Terms of Service ("Terms") govern your access to and use of Emajinet's 
+      business management platform, including our website, mobile applications, and services 
+      (collectively, the "Service").
+    </p>
+
+    <h2>1. Acceptance of Terms</h2>
+    <p>
+      By accessing or using our Service, you agree to be bound by these Terms. If you do not agree to 
+      these Terms, do not use the Service.
+    </p>
+
+    <h2>2. Use of Service</h2>
+    <p>You agree to use the Service only for lawful purposes and in accordance with these Terms. You agree not to:</p>
+    <ul>
+      <li>Use the Service in any way that violates any applicable law or regulation</li>
+      <li>Impersonate or attempt to impersonate Emajinet, an Emajinet employee, another user, or any other person or entity</li>
+      <li>Engage in any conduct that restricts or inhibits anyone's use or enjoyment of the Service</li>
+      <li>Use any robot, spider, or other automatic device to access the Service for any purpose</li>
+      <li>Introduce any viruses, trojan horses, worms, or other material that is malicious or technologically harmful</li>
+    </ul>
+
+    <h2>3. Accounts and Registration</h2>
+    <p>
+      To use certain features of the Service, you must register for an account. You agree to:
+    </p>
+    <ul>
+      <li>Provide accurate, current, and complete information during registration</li>
+      <li>Maintain and promptly update your account information</li>
+      <li>Maintain the security of your password and accept all risks of unauthorized access</li>
+      <li>Notify us immediately of any unauthorized use of your account</li>
+    </ul>
+
+    <h2>4. Business Data and Intellectual Property</h2>
+    <p>
+      <strong>Your Data:</strong> You retain all rights to the business data you upload to the Service. 
+      You grant us a limited license to use, store, and process your data solely to provide the Service to you.
+    </p>
+    <p>
+      <strong>Our Platform:</strong> The Service and its entire contents, features, and functionality 
+      (including but not limited to all information, software, text, displays, images, video, and audio) 
+      are owned by Emajinet and are protected by copyright, trademark, and other intellectual property laws.
+    </p>
+
+    <h2>5. Subscription and Payment</h2>
+    <p>
+      Some aspects of the Service are provided on a subscription basis. You agree to pay all fees 
+      associated with your subscription plan. Fees are non-refundable except as required by law or 
+      as explicitly stated in these Terms.
+    </p>
+
+    <h2>6. Multi-Tenant Environment</h2>
+    <p>
+      Our Service operates in a multi-tenant environment. Your business data is logically separated 
+      from other businesses. You are responsible for managing access to your business data within your organization.
+    </p>
+
+    <h2>7. Termination</h2>
+    <p>
+      We may terminate or suspend your account and access to the Service at our sole discretion, 
+      without prior notice or liability, for any reason, including if you breach these Terms.
+    </p>
+    <p>
+      You may terminate your account at any time by contacting us. Upon termination, your right to 
+      use the Service will immediately cease.
+    </p>
+
+    <h2>8. Disclaimer of Warranties</h2>
+    <p>
+      THE SERVICE IS PROVIDED "AS IS" AND "AS AVAILABLE" WITHOUT WARRANTIES OF ANY KIND, EITHER 
+      EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO IMPLIED WARRANTIES OF MERCHANTABILITY, 
+      FITNESS FOR A PARTICULAR PURPOSE, AND NON-INFRINGEMENT.
+    </p>
+
+    <h2>9. Limitation of Liability</h2>
+    <p>
+      TO THE MAXIMUM EXTENT PERMITTED BY APPLICABLE LAW, EMAJINET SHALL NOT BE LIABLE FOR ANY 
+      INDIRECT, INCIDENTAL, SPECIAL, CONSEQUENTIAL, OR PUNITIVE DAMAGES, OR ANY LOSS OF PROFITS 
+      OR REVENUES, WHETHER INCURRED DIRECTLY OR INDIRECTLY, OR ANY LOSS OF DATA, USE, GOODWILL, 
+      OR OTHER INTANGIBLE LOSSES.
+    </p>
+
+    <h2>10. Governing Law</h2>
+    <p>
+      These Terms shall be governed by and construed in accordance with the laws of the jurisdiction 
+      in which Emajinet operates, without regard to its conflict of law provisions.
+    </p>
+
+    <h2>11. Changes to Terms</h2>
+    <p>
+      We reserve the right to modify these Terms at any time. We will notify you of any changes by 
+      posting the new Terms on this page and updating the "Last updated" date. Your continued use 
+      of the Service after such modifications constitutes your acceptance of the new Terms.
+    </p>
+
+    <h2>12. Contact Us</h2>
+    <p>
+      If you have any questions about these Terms, please contact us at:
+      <br><br>
+      Email: <a href="mailto:legal@emajinet.com">legal@emajinet.com</a>
+    </p>
+  </div>
+</body>
+</html>
+

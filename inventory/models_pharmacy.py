@@ -128,6 +128,36 @@ class PharmacyProductInfo(models.Model):
 
 
 # ==============================================================================
+# PHARMACY BATCH QUERYSET (defined before model to use .as_manager())
+# ==============================================================================
+
+class PharmacyBatchQuerySet(models.QuerySet):
+    """Custom queryset for common pharmacy batch queries."""
+    
+    def active(self):
+        """Non-archived batches."""
+        return self.filter(is_archived=False)
+    
+    def expired(self):
+        """Batches past expiry date."""
+        return self.filter(expiry_date__lt=timezone.now().date())
+    
+    def near_expiry(self, days: int = 30):
+        """Batches expiring within N days."""
+        today = timezone.now().date()
+        future = today + timedelta(days=days)
+        return self.filter(expiry_date__gte=today, expiry_date__lte=future)
+    
+    def low_stock(self):
+        """Batches at or below reorder level."""
+        return self.filter(quantity__lte=models.F("reorder_level"))
+    
+    def in_stock(self):
+        """Batches with quantity > 0."""
+        return self.filter(quantity__gt=0)
+
+
+# ==============================================================================
 # PHARMACY BATCH (expiry tracking, FIFO)
 # ==============================================================================
 
@@ -200,6 +230,9 @@ class PharmacyBatch(models.Model):
     
     # Archive (for depleted or expired batches)
     is_archived = models.BooleanField(default=False, db_index=True)
+    
+    # Custom manager using the QuerySet defined above
+    objects = PharmacyBatchQuerySet.as_manager()
     
     class Meta:
         ordering = ["expiry_date", "batch_number"]  # FIFO: oldest expiry first
@@ -378,38 +411,4 @@ class PharmacySale(models.Model):
         # Auto-calculate total_amount
         self.total_amount = self.unit_price * Decimal(self.quantity)
         super().save(*args, **kwargs)
-
-
-# ==============================================================================
-# HELPER QUERYSETS / MANAGERS
-# ==============================================================================
-
-class PharmacyBatchQuerySet(models.QuerySet):
-    """Custom queryset for common pharmacy batch queries."""
-    
-    def active(self):
-        """Non-archived batches."""
-        return self.filter(is_archived=False)
-    
-    def expired(self):
-        """Batches past expiry date."""
-        return self.filter(expiry_date__lt=timezone.now().date())
-    
-    def near_expiry(self, days: int = 30):
-        """Batches expiring within N days."""
-        today = timezone.now().date()
-        future = today + timedelta(days=days)
-        return self.filter(expiry_date__gte=today, expiry_date__lte=future)
-    
-    def low_stock(self):
-        """Batches at or below reorder level."""
-        return self.filter(quantity__lte=models.F("reorder_level"))
-    
-    def in_stock(self):
-        """Batches with quantity > 0."""
-        return self.filter(quantity__gt=0)
-
-
-# Attach custom manager
-PharmacyBatch.objects = PharmacyBatchQuerySet.as_manager()
 

@@ -12,6 +12,6 @@ def store_locations(request):
             defaults=dict(lat=request.POST["lat"], lng=request.POST["lng"], radius_m=request.POST.get("radius_m",60), created_by=request.user)
         )
         return redirect("hq:store_locations")
-    return render(request, "hq/locations.html", {"locations": Location.objects.filter(business=biz)})
+    return render(request, "hq/locations.html", {"locations": Location.objects.filter(business=biz), "active_tab": "locations"})
 
 

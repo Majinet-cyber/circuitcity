@@ -8,7 +8,8 @@ from django.contrib.auth import get_user_model
 from django.test import TestCase, Client
 from django.urls import reverse
 
-from tenants.models import Business, Location, Membership
+from tenants.models import Business, Membership
+from inventory.models import Location
 from inventory.business_kinds import BusinessKind
 
 User = get_user_model()

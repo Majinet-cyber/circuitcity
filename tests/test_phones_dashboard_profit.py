@@ -9,7 +9,8 @@ from django.test import TestCase, Client
 from django.urls import reverse
 from django.utils import timezone
 
-from tenants.models import Business, Location, Membership
+from tenants.models import Business, Membership
+from inventory.models import Location
 from inventory.models import MerchProduct, InventoryItem
 from sales.models import Sale, PaymentMethod
 from wallet.models import WalletTransaction, Ledger, TxnType

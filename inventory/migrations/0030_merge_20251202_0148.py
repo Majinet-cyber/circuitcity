@@ -6,7 +6,7 @@ from django.db import migrations
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('inventory', '0002_warranty_and_approval'),
+        ('inventory', '0002_inventoryaudit'),
         ('inventory', '0029_verticals_models'),
     ]
 

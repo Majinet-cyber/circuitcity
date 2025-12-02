@@ -553,6 +553,15 @@
     </div>
   </section>
 
+  <!-- Simulator CTA -->
+  <section style="padding: 3rem 2rem; background: var(--white); text-align: center;">
+    <h2 class="section-title">Try Our Business Simulator</h2>
+    <p class="section-subtitle">
+      Play with numbers and see how stock, turnover, and pricing affect your revenue and profit
+    </p>
+    <a href="{% url 'staticpages:simulator' %}" class="btn btn-secondary">Launch Simulator →</a>
+  </section>
+
   <!-- CTA Section -->
   <section class="cta-section">
     <h2 class="cta-title">Ready to Transform Your Business?</h2>
@@ -562,7 +571,11 @@
 
   <!-- Footer -->
   <footer class="footer">
-    <p class="footer-text">&copy; 2025 Emajinet / Circuit City. All rights reserved.</p>
+    <p class="footer-text">&copy; 2025 Emajinet. All rights reserved.</p>
+    <div style="margin-top: 1rem; display: flex; gap: 2rem; justify-content: center; flex-wrap: wrap;">
+      <a href="{% url 'staticpages:privacy' %}" style="color: rgba(255,255,255,0.7); text-decoration: none; font-size: 0.9rem;">Privacy Policy</a>
+      <a href="{% url 'staticpages:terms' %}" style="color: rgba(255,255,255,0.7); text-decoration: none; font-size: 0.9rem;">Terms of Service</a>
+    </div>
   </footer>
 
   <script>

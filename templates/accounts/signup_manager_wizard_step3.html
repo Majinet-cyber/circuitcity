@@ -1,0 +1,181 @@
+{% load static %}
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Create your store · Step 3 of 4 · Emajinet</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#0b1220" />
+  <style>
+    :root{
+      --ink:#0b1220;
+      --muted:#54627a;
+      --line:#d6dfed;
+      --bg1:#eef4ff; --bg2:#ffffff;
+      --blue:#3b82f6;
+      --green:#10b981;       /* signature green */
+      --rose:#ef4444;
+
+      --shadow: 0 14px 36px rgba(15,23,42,.14), 0 1px 0 rgba(255,255,255,.6) inset;
+      --glass: color-mix(in oklab, #ffffffaa 78%, transparent);
+      --pop: cubic-bezier(.17,.67,.25,1.35);
+      --fast:160ms; --slow:420ms;
+    }
+    *{box-sizing:border-box}
+    html,body{height:100%}
+    body{
+      margin:0; color:var(--ink);
+      font:500 16px/1.45 system-ui, Segoe UI, Inter, Roboto, Arial, "Noto Sans";
+      background:
+        radial-gradient(1200px 800px at -10% -10%, rgba(34,211,238,.12), transparent 45%),
+        radial-gradient(1400px 800px at 110% 110%, rgba(59,130,246,.12), transparent 46%),
+        linear-gradient(180deg, var(--bg1), var(--bg2));
+    }
+
+    .wrap{ min-height:100dvh; display:grid; place-items:start center; padding:clamp(14px, 2.8vw, 28px); }
+    .card{
+      width:min(720px, 96vw);
+      background:var(--glass); backdrop-filter: blur(18px) saturate(120%);
+      border:1px solid var(--line); border-radius:24px; box-shadow:var(--shadow);
+      padding:clamp(16px,3.4vw,32px); animation:popIn var(--slow) var(--pop) both;
+    }
+    @keyframes popIn{ from{opacity:0; transform:translateY(8px) scale(.985)} to{opacity:1; transform:none} }
+
+    .brand{ display:flex; align-items:center; gap:.6rem; font-weight:900; color:#0b2868; margin:6px 2px 20px; }
+    .brand img{ width:22px; height:22px }
+    .page-title{ font-size:clamp(26px,3.6vw,36px); line-height:1.1; margin:.1rem 0 .5rem; font-weight:900 }
+    .subtitle{ color:var(--muted); margin:0 0 20px; }
+    .step-indicator{ color:var(--blue); font-weight:800; font-size:.9rem; margin:0 0 10px; }
+
+    /* top banner messages */
+    .alert{ background:#fef2f2;border:1px solid #fecaca;color:#991b1b;
+            padding:.7rem 1rem;border-radius:12px;margin:0 0 12px;font-weight:700 }
+
+    form{ display:grid; gap:14px; }
+    .grid{ display:grid; grid-template-columns: 1fr; gap:14px; }
+
+    .field{ position:relative; }
+    .label{ font-weight:800; font-size:.92rem; margin:0 0 6px; color:#08224e; }
+    .hint{ font-size:.84rem; color:#6b7e99; margin-top:6px }
+
+    /* File drop */
+    .drop{ position:relative; border:2px dashed #cfe; border-radius:14px; padding:32px; background:#f8fbff; transition:border-color var(--fast), background var(--fast); text-align:center; cursor:pointer; }
+    .drop.drag{ border-color:var(--blue); background:#eef6ff }
+    .drop-icon{ font-size:3rem; margin-bottom:1rem; }
+    .drop-text{ color:var(--ink); font-weight:600; }
+    .file{ display:none; }
+
+    /* Buttons */
+    .actions{ display:flex; gap:12px; justify-content:flex-end; margin-top:8px; }
+    .btn, .btn:link, .btn:visited{ text-decoration:none; }      /* no underline */
+    .btn{
+      border:1px solid color-mix(in oklab, var(--blue) 35%, white);
+      background:linear-gradient(180deg, var(--blue), color-mix(in oklab, var(--blue) 82%, black));
+      color:#fff; padding:12px 18px; font-weight:900; border-radius:14px; min-width:180px;
+      box-shadow:0 16px 40px rgba(59,130,246,.26);
+      transition: transform var(--fast) var(--pop), box-shadow var(--fast) var(--pop);
+      cursor:pointer;
+    }
+    .btn:hover{ transform:translateY(-1px); box-shadow:0 22px 50px rgba(59,130,246,.32) }
+    .btn:active{ transform:translateY(0) scale(.98) }
+
+    .btn.secondary{
+      background:linear-gradient(180deg,#f9fbff,#eef2ff);
+      color:#0b1f46; border-color:#cdd9f1; box-shadow:0 10px 24px rgba(2,6,23,.08);
+      min-width:auto;
+    }
+    .btn.secondary:hover{ filter:brightness(0.98) }
+
+    .skip-link{ color:var(--muted); text-decoration:none; font-size:.9rem; margin-top:1rem; display:inline-block; }
+    .skip-link:hover{ color:var(--blue); text-decoration:underline; }
+
+    .footer-links{ margin-top:20px; padding-top:20px; border-top:1px solid var(--line); display:flex; gap:1rem; justify-content:center; flex-wrap:wrap; }
+    .footer-link{ color:var(--muted); text-decoration:none; font-size:.9rem; }
+    .footer-link:hover{ color:var(--blue); text-decoration:underline; }
+    .terms-text{ margin-top:10px; color:var(--muted); font-size:.85rem; text-align:center; }
+
+    /* Inline error visuals */
+    .is-error{ border-color:var(--rose)!important; box-shadow:0 0 0 3px rgba(239,68,68,.12)!important; }
+    .err{ color:var(--rose); font-size:.85rem; margin-top:6px; font-weight:700; text-align:center; }
+  </style>
+</head>
+<body>
+<div class="wrap">
+  <section class="card">
+    <div class="brand">
+      <img src="{% static 'brand/mjn-32.png' %}" alt="" />
+      <span>Emajinet</span>
+    </div>
+
+    <div class="step-indicator">Step 3 of 4</div>
+    <h1 class="page-title">Your brand</h1>
+    <p class="subtitle">Add a logo to make your store stand out (you can always add this later).</p>
+
+    {% if messages %}
+      {% for m in messages %}
+        <div class="alert">{{ m }}</div>
+      {% endfor %}
+    {% endif %}
+
+    <form method="post" action="{% url 'accounts:signup_manager' %}?step=3" enctype="multipart/form-data" novalidate>
+      {% csrf_token %}
+      <input type="hidden" name="step" value="3">
+
+      <div class="grid">
+        <!-- Logo -->
+        {% with has_err=form.errors.logo %}
+        <div class="field">
+          <div class="label">Logo <span style="color:#7c8aa3">(optional)</span></div>
+          <div id="drop" class="drop{% if has_err %} is-error{% endif %}">
+            <div class="drop-icon">🎨</div>
+            <div class="drop-text">Drag & drop a PNG/JPG here or click to browse</div>
+            <div class="hint" style="margin-top:.5rem">Maximum size: 2MB</div>
+            <input id="logo" class="file" type="file" name="logo" accept="image/*">
+          </div>
+          {% if has_err %}<div class="err">{{ form.errors.logo|striptags }}</div>{% endif %}
+        </div>
+        {% endwith %}
+      </div>
+
+      <div class="actions">
+        <button class="btn secondary" type="submit" name="action" value="back">← Back</button>
+        <button class="btn" type="submit" name="action" value="next">Next →</button>
+      </div>
+
+      <div style="text-align:center;">
+        <button class="skip-link btn secondary" type="submit" name="action" value="next">Skip for now</button>
+      </div>
+    </form>
+
+    <div class="footer-links">
+      <a href="{% url 'accounts:login' %}" class="footer-link">Login</a>
+      <a href="{% url 'staticpages:privacy' %}" class="footer-link">Privacy Policy</a>
+      <a href="{% url 'staticpages:terms' %}" class="footer-link">Terms & Legal</a>
+    </div>
+    <div class="terms-text">By creating an account, you agree to our Terms of Service and Privacy Policy.</div>
+  </section>
+</div>
+
+<script>
+  // Drop highlight
+  const drop=document.getElementById('drop'), file=document.getElementById('logo');
+  if(drop&&file){
+    drop.addEventListener('dragenter',()=>drop.classList.add('drag'));
+    drop.addEventListener('dragleave',()=>drop.classList.remove('drag'));
+    drop.addEventListener('drop',()=>drop.classList.remove('drag'));
+    drop.addEventListener('click',()=>file.click());
+    
+    file.addEventListener('change', (e) => {
+      const files = e.target.files;
+      if (files.length > 0) {
+        const fileName = files[0].name;
+        drop.querySelector('.drop-text').textContent = '✓ ' + fileName;
+        drop.style.borderColor = 'var(--green)';
+        drop.style.background = '#f0fdf4';
+      }
+    });
+  }
+</script>
+</body>
+</html>
+
