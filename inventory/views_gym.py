@@ -15,7 +15,8 @@ from django.shortcuts import render, redirect, get_object_or_404
 from django.utils import timezone
 from django.views.decorators.http import require_POST
 
-from inventory.authz import require_business_kind, manager_required
+from core.decorators import manager_required
+from inventory.authz import require_business_kind
 from inventory.business_kinds import BusinessKind
 from inventory.helpers import get_active_business
 from inventory.models_verticals import (

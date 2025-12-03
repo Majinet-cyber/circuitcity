@@ -154,6 +154,9 @@ def tenant_context(request) -> Dict[str, Any]:
     try:
         from inventory.utils_verticals import get_vertical_sidebar_items
         sidebar_items = get_vertical_sidebar_items(mode)
+        # Ensure all items have require_manager key with safe default
+        for item in sidebar_items:
+            item.setdefault("require_manager", False)
     except Exception:
         pass  # Fail gracefully if utils_verticals is not available
 

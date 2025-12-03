@@ -265,7 +265,7 @@ def _send_payslip_email(p: Payslip) -> bool:
         f"Gross:       MWK {p.gross:,.0f}\n"
         f"Net:         MWK {p.net:,.0f}\n\n"
         f"Ref: {p.reference}\n"
-        f"â€" {getattr(settings, 'APP_NAME', 'Emajinet')}"
+        f"-- {getattr(settings, 'APP_NAME', 'Emajinet')}"
     )
     sent = send_mail(subject, body, settings.DEFAULT_FROM_EMAIL, [p.email_to], fail_silently=True)
     return bool(sent)
@@ -1309,6 +1309,7 @@ admin_po_list = AdminPOListView.as_view()
 class AdminCostListView(LoginRequiredMixin, TemplateView):
     """
     List and manage admin costs (once-off and recurring) for the active business.
+    Business and location aware with cost KPI aggregations.
     """
     template_name = "wallet/admin_costs.html"
 
@@ -1319,8 +1320,12 @@ class AdminCostListView(LoginRequiredMixin, TemplateView):
         return super().dispatch(request, *args, **kwargs)
 
     def get_context_data(self, **kwargs):
+        from datetime import timedelta
         ctx = super().get_context_data(**kwargs)
+        
+        # Get business and location from request
         biz = get_active_business(self.request)
+        location = getattr(self.request, "active_location", None)
         
         # Get all cost transactions for this business
         costs_qs = WalletTransaction.objects.filter(
@@ -1329,13 +1334,44 @@ class AdminCostListView(LoginRequiredMixin, TemplateView):
         )
         costs_qs = _maybe_scope_to_business(costs_qs, biz)
         
-        # Separate once-off and recurring
+        # Note: WalletTransaction doesn't have location FK, so we only filter by business
+        # If location tracking is needed, it can be added to WalletTransaction model in future
+        
+        # Calculate cost aggregations for KPI cards
+        period_days = 30
+        period_start = timezone.now() - timedelta(days=period_days)
+        
+        # Fixed monthly costs (sum of all recurring costs)
+        fixed_monthly = costs_qs.filter(is_recurring=True).aggregate(
+            total=Sum("amount")
+        )["total"] or Decimal("0.00")
+        # Costs are stored as negative, so take absolute value
+        fixed_monthly = abs(fixed_monthly)
+        
+        # Once-off costs in last 30 days
+        once_off_30d = costs_qs.filter(
+            is_recurring=False,
+            created_at__gte=period_start,
+        ).aggregate(total=Sum("amount"))["total"] or Decimal("0.00")
+        once_off_30d = abs(once_off_30d)
+        
+        # Total costs (30 days)
+        total_costs_30d = fixed_monthly + once_off_30d
+        
+        # Separate once-off and recurring for table display
         once_off = costs_qs.filter(is_recurring=False).order_by("-effective_date")
         recurring = costs_qs.filter(is_recurring=True).order_by("-effective_from")
         
-        ctx["once_off_costs"] = once_off
-        ctx["recurring_costs"] = recurring
-        ctx["business"] = biz
+        ctx.update({
+            "once_off_costs": once_off,
+            "recurring_costs": recurring,
+            "business": biz,
+            "location": location,
+            "fixed_monthly": fixed_monthly,
+            "once_off_30d": once_off_30d,
+            "total_costs_30d": total_costs_30d,
+            "period_days": period_days,
+        })
         return ctx
 
 

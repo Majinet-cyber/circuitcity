@@ -17,6 +17,7 @@
   .metric-card{background:#fff;border-radius:18px;padding:18px;box-shadow:0 10px 30px rgba(15,23,42,.08)}
   .metric-card h3{margin:0;font-size:.9rem;text-transform:uppercase;color:#64748b}
   .metric-card p{margin:6px 0 0;font-size:1.8rem;font-weight:800;color:#0f172a}
+  .metric-card small{display:block;margin-top:4px;font-size:.85rem}
   .recent-block{background:#fff;border-radius:20px;padding:18px;box-shadow:0 10px 30px rgba(15,23,42,.08)}
   .recent-list{list-style:none;margin:0;padding:0;display:grid;gap:12px}
   .recent-item{display:flex;justify-content:space-between;gap:12px;border:1px solid #e2e8f0;border-radius:16px;padding:14px}
@@ -34,29 +35,188 @@
     </div>
     <div class="hero-actions">
       <a class="primary" href="{{ liquor_add_url|default:'/inventory/liquor/products/new/v2/' }}">Add liquor item</a>
-      <a class="ghost" href="{{ scan_in_url|default:'/inventory/scan-in/' }}">Scan bottles</a>
-      <a class="ghost" href="{{ scan_sold_url|default:'/inventory/scan-sold/' }}">Sell shots</a>
+      <a class="ghost" href="/liquor/inventory/">Liquor Hub</a>
+      <a class="ghost" href="/liquor/sell/">Sell</a>
     </div>
   </header>
 
-  <section class="metrics-grid">
+  <!-- Financial KPIs: Enhanced with cost breakdown -->
+  <section class="metrics-grid" style="grid-template-columns:repeat(auto-fit,minmax(200px,1fr))">
     <article class="metric-card">
-      <h3>Bottle SKUs</h3>
-      <p>{{ product_count }}</p>
+      <h3>Revenue ({{ period_days }} days)</h3>
+      <p style="color:#16a34a">MK {{ revenue|floatformat:2|default:"0.00" }}</p>
+      <small style="color:#64748b">Total sales revenue</small>
     </article>
     <article class="metric-card">
-      <h3>Active items</h3>
-      <p>{{ active_product_count }}</p>
+      <h3>Inventory Costs</h3>
+      <p>MK {{ inventory_costs|floatformat:2|default:"0.00" }}</p>
+      <small style="color:#64748b">Cost of goods sold</small>
     </article>
     <article class="metric-card">
-      <h3>Shot-enabled</h3>
-      <p>{{ shots_enabled_count }}</p>
+      <h3>Admin Costs ({{ period_days }} days)</h3>
+      <p>MK {{ admin_costs|floatformat:2|default:"0.00" }}</p>
+      <small style="color:#64748b">Operational expenses</small>
     </article>
     <article class="metric-card">
-      <h3>Tracked inventory</h3>
-      <p>{{ inventory_tracked_count }}</p>
+      <h3>Total Costs</h3>
+      <p style="color:#dc2626">MK {{ total_costs|floatformat:2|default:"0.00" }}</p>
+      <small style="color:#64748b">Inventory + Admin</small>
+    </article>
+    <article class="metric-card" style="grid-column:span 2">
+      <h3>{% if net_profit >= 0 %}Net Profit{% else %}Net Loss{% endif %} ({{ period_days }} days)</h3>
+      <p style="{% if net_profit < 0 %}color:#dc2626{% else %}color:#16a34a{% endif %};font-size:2.2rem">MK {{ net_profit|floatformat:2|default:"0.00" }}</p>
+      <small style="color:#64748b">Revenue minus all costs</small>
+      {% if net_profit < 0 %}
+        <div style="margin-top:10px;padding:8px;background:#fef2f2;border-left:3px solid #dc2626;border-radius:6px">
+          <small style="color:#991b1b;font-weight:600">⚠️ Loss period - review costs and pricing</small>
+        </div>
+      {% endif %}
     </article>
   </section>
+
+  <!-- Stock KPIs -->
+  <section class="metrics-grid">
+    <article class="metric-card">
+      <h3>Bottles in Stock</h3>
+      <p>{{ total_bottles_in_stock|default:"0" }}</p>
+    </article>
+    <article class="metric-card">
+      <h3>Bottle SKUs</h3>
+      <p>{{ total_bottle_skus|default:"0" }}</p>
+    </article>
+    <article class="metric-card">
+      <h3>Days of Cover</h3>
+      <p>{{ days_of_cover|default:"N/A" }}</p>
+      <small style="color:#64748b">Estimated days until restock</small>
+    </article>
+  </section>
+
+  <!-- Target vs Sales Panel (Goal 5) -->
+  <section class="recent-block">
+    <h2 style="margin:0 0 10px;font-size:1.1rem">
+      <i class="bi bi-bullseye"></i> Target vs Sales (This Month)
+    </h2>
+    
+    {% if target_units > 0 %}
+      <div style="margin-bottom: 16px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+          <div>
+            <span style="font-weight: 600; color: #0f172a;">Target: {{ target_units }} bottles</span>
+            <span style="margin-left: 16px; color: #64748b;">Sold: <strong style="color: #16a34a;">{{ actual_units_month }}</strong> bottles</span>
+          </div>
+          <span style="font-weight: 800; font-size: 1.25rem; color: #6366f1;">{{ progress_pct }}%</span>
+        </div>
+        
+        <!-- Progress bar -->
+        <div style="width: 100%; height: 28px; background: #f1f5f9; border-radius: 14px; overflow: hidden; position: relative;">
+          <div style="height: 100%; background: linear-gradient(90deg, #6366f1, #8b5cf6); width: {{ progress_pct }}%; transition: width 0.3s ease; display: flex; align-items: center; justify-content: flex-end; padding-right: 12px; color: white; font-weight: 700; font-size: 0.875rem;">
+            {% if progress_pct > 15 %}{{ progress_pct }}%{% endif %}
+          </div>
+        </div>
+        
+        <!-- Inspirational message -->
+        <div style="margin-top: 14px; padding: 10px 14px; background: {% if remaining_units == 0 %}#dcfce7{% elif remaining_units <= 5 %}#fef3c7{% else %}#e0e7ff{% endif %}; border-left: 4px solid {% if remaining_units == 0 %}#16a34a{% elif remaining_units <= 5 %}#f59e0b{% else %}#6366f1{% endif %}; border-radius: 8px;">
+          <p style="margin: 0; color: {% if remaining_units == 0 %}#065f46{% elif remaining_units <= 5 %}#92400e{% else %}#3730a3{% endif %}; font-weight: 600; font-size: 0.95rem;">
+            {{ target_message }}
+          </p>
+        </div>
+        
+        {% if stock_warning %}
+          <div style="margin-top: 12px; padding: 10px 14px; background: #fef2f2; border-left: 4px solid #dc2626; border-radius: 8px;">
+            <p style="margin: 0; color: #991b1b; font-size: 0.9rem;">
+              <strong>⚠️ Stock Alert:</strong> {{ stock_warning_message }}
+            </p>
+          </div>
+        {% endif %}
+      </div>
+    {% else %}
+      <!-- No target set -->
+      <div style="padding: 24px; background: #f8fafc; border-radius: 12px; border: 2px dashed #cbd5e1; text-align: center;">
+        <p style="margin: 0 0 12px; color: #64748b; font-size: 1rem;">
+          No monthly target set yet. Set a target to track your progress and stay motivated!
+        </p>
+        <a href="/liquor/stock/" class="btn btn-primary btn-sm">
+          <i class="bi bi-gear"></i> Set Target in Stock Page
+        </a>
+      </div>
+    {% endif %}
+  </section>
+
+  {% if payment_mix %}
+  <section class="recent-block">
+    <h2 style="margin:0 0 10px;font-size:1.1rem">Payment Mix ({{ period_days }} days)</h2>
+    
+    {% if credit_ratio %}
+    <div style="margin-bottom:16px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+        <span style="font-weight:600">Credit Sales</span>
+        <span style="font-weight:700;color:{% if credit_warning %}#dc2626{% else %}#059669{% endif %}">{{ credit_ratio }}%</span>
+      </div>
+      <div style="width:100%;height:24px;background:#f1f5f9;border-radius:12px;overflow:hidden">
+        <div style="height:100%;background:{% if credit_warning %}linear-gradient(90deg,#dc2626,#b91c1c){% else %}linear-gradient(90deg,#10b981,#059669){% endif %};width:{{ credit_ratio }}%;transition:width 0.3s"></div>
+      </div>
+      {% if credit_warning %}
+      <div style="margin-top:12px;padding:12px;background:#fef2f2;border-left:4px solid #dc2626;border-radius:8px">
+        <p style="margin:0;color:#991b1b;font-size:.9rem">
+          <strong>⚠️ High Credit Alert:</strong> Credit sales are above 10% of revenue. Review customer list and tighten approvals.
+        </p>
+      </div>
+      {% endif %}
+    </div>
+    {% endif %}
+    
+    <div class="metrics-grid">
+      {% for pm in payment_mix %}
+      <article class="metric-card">
+        <h3>{{ pm.method }}</h3>
+        <p>MK {{ pm.amount|floatformat:2 }}</p>
+        <small style="color:#64748b">{{ pm.count }} transaction{{ pm.count|pluralize }}{% if pm.percent %} · {{ pm.percent }}%{% endif %}</small>
+      </article>
+      {% endfor %}
+    </div>
+  </section>
+  {% endif %}
+  
+  {% if open_credits %}
+  <section class="recent-block">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+      <h2 style="margin:0;font-size:1.1rem">Open Credits</h2>
+      <a class="btn btn-sm btn-outline-primary" href="/liquor/credits/">View all</a>
+    </div>
+    
+    <div id="credit-ticker" style="min-height:60px">
+      {% for credit in open_credits %}
+        <div class="credit-ticker-item" style="{% if not forloop.first %}display:none{% endif %};padding:16px;border:1px solid #e2e8f0;border-radius:12px">
+          <div style="display:flex;justify-content:space-between;align-items:start">
+            <div>
+              <strong style="font-size:1.05rem">{{ credit.customer_name }}</strong>
+              {% if credit.customer_phone %}
+                <div style="color:#64748b;font-size:.85rem;margin-top:2px">{{ credit.customer_phone }}</div>
+              {% endif %}
+            </div>
+            <div style="text-align:right">
+              <div style="font-size:1.3rem;font-weight:800;color:#dc2626">MK {{ credit.amount|floatformat:0 }}</div>
+              <div style="font-size:.75rem;color:#64748b;text-transform:uppercase;margin-top:2px">{{ credit.status }}</div>
+            </div>
+          </div>
+        </div>
+      {% endfor %}
+    </div>
+    
+    <script>
+      (function () {
+        const items = Array.from(document.querySelectorAll("#credit-ticker .credit-ticker-item"));
+        if (items.length <= 1) return;
+        let idx = 0;
+        function showNext() {
+          items.forEach((el, i) => el.style.display = i === idx ? "block" : "none");
+          idx = (idx + 1) % items.length;
+        }
+        setInterval(showNext, 5000);
+      })();
+    </script>
+  </section>
+  {% endif %}
 
   <section class="recent-block">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
@@ -84,4 +244,3 @@
   </section>
 </div>
 {% endblock %}
-

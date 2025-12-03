@@ -101,18 +101,42 @@
     </div>
   </div>
 
-  <!-- Stock Summary by Location (Phones) -->
+  <!-- Stock Summary by Location (Vertical-aware) -->
   {% if stock_summary %}
   <div class="cc-card" style="margin-top: 1.5rem;">
-    <h3>📦 Stock Summary by Location (Phones)</h3>
-    <p class="cc-hint" style="margin-bottom: 1rem;">Track inventory and sales performance across your locations</p>
+    <h3>
+      {% if BUSINESS_VERTICAL == "phones" %}
+        📦 Stock Summary by Location (Phones)
+      {% elif BUSINESS_VERTICAL == "liquor" %}
+        🍺 Stock Summary by Location (Liquor)
+      {% elif BUSINESS_VERTICAL == "gym" %}
+        💪 Member Summary by Location (Gym)
+      {% elif BUSINESS_VERTICAL == "clothing" %}
+        👕 Stock Summary by Location (Clothing)
+      {% else %}
+        📦 Stock Summary by Location
+      {% endif %}
+    </h3>
+    <p class="cc-hint" style="margin-bottom: 1rem;">
+      {% if BUSINESS_VERTICAL == "gym" %}
+        Track membership and payment status across your locations
+      {% else %}
+        Track inventory and sales performance across your locations
+      {% endif %}
+    </p>
     <table class="cc-table">
       <thead>
         <tr>
           <th>Location</th>
-          <th style="text-align: center;">Sold</th>
-          <th style="text-align: center;">In Stock</th>
-          <th style="text-align: center;">Total</th>
+          {% if BUSINESS_VERTICAL == "gym" %}
+            <th style="text-align: center;">Active</th>
+            <th style="text-align: center;">In Arrears</th>
+            <th style="text-align: center;">Total</th>
+          {% else %}
+            <th style="text-align: center;">Sold</th>
+            <th style="text-align: center;">In Stock</th>
+            <th style="text-align: center;">Total</th>
+          {% endif %}
           <th style="text-align: right;">Actions</th>
         </tr>
       </thead>
@@ -123,27 +147,51 @@
             <strong>{{ r.name }}</strong>
             {% if r.city %}<span class="cc-muted" style="font-size: 0.9em;"> · {{ r.city }}</span>{% endif %}
           </td>
-          <td style="text-align: center;">
-            <span class="badge" style="background: #10b981; color: white; padding: 0.25rem 0.5rem; border-radius: 6px;">
-              {{ r.stock.sold|default:0 }}
-            </span>
-          </td>
-          <td style="text-align: center;">
-            <span class="badge" style="background: #3b82f6; color: white; padding: 0.25rem 0.5rem; border-radius: 6px;">
-              {{ r.stock.in_stock|default:0 }}
-            </span>
-          </td>
-          <td style="text-align: center;">
-            <span class="badge" style="background: #64748b; color: white; padding: 0.25rem 0.5rem; border-radius: 6px;">
-              {{ r.stock.total|default:0 }}
-            </span>
-          </td>
+          {% if BUSINESS_VERTICAL == "gym" %}
+            <td style="text-align: center;">
+              <span class="badge" style="background: #10b981; color: white; padding: 0.25rem 0.5rem; border-radius: 6px;">
+                {{ r.stock.active|default:0 }}
+              </span>
+            </td>
+            <td style="text-align: center;">
+              <span class="badge" style="background: #ef4444; color: white; padding: 0.25rem 0.5rem; border-radius: 6px;">
+                {{ r.stock.in_arrears|default:0 }}
+              </span>
+            </td>
+            <td style="text-align: center;">
+              <span class="badge" style="background: #64748b; color: white; padding: 0.25rem 0.5rem; border-radius: 6px;">
+                {{ r.stock.total|default:0 }}
+              </span>
+            </td>
+          {% else %}
+            <td style="text-align: center;">
+              <span class="badge" style="background: #10b981; color: white; padding: 0.25rem 0.5rem; border-radius: 6px;">
+                {{ r.stock.sold|default:0 }}
+              </span>
+            </td>
+            <td style="text-align: center;">
+              <span class="badge" style="background: #3b82f6; color: white; padding: 0.25rem 0.5rem; border-radius: 6px;">
+                {{ r.stock.in_stock|default:0 }}
+              </span>
+            </td>
+            <td style="text-align: center;">
+              <span class="badge" style="background: #64748b; color: white; padding: 0.25rem 0.5rem; border-radius: 6px;">
+                {{ r.stock.total|default:0 }}
+              </span>
+            </td>
+          {% endif %}
           <td style="text-align: right;">
             <a href="{% url 'tenants:location_detail' r.id %}" class="cc-btn cc-btn-xs cc-btn-glass">View Details</a>
           </td>
         </tr>
         {% empty %}
-        <tr><td colspan="5" class="cc-muted">No stock data available.</td></tr>
+        <tr><td colspan="5" class="cc-muted">
+          {% if BUSINESS_VERTICAL == "gym" %}
+            No member data available.
+          {% else %}
+            No stock data available.
+          {% endif %}
+        </td></tr>
         {% endfor %}
       </tbody>
     </table>

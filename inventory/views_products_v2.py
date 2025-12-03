@@ -410,7 +410,11 @@ def product_create_liquor_v2(request):
                 messages.success(request, "Liquor item saved.")
                 return redirect(URL_NAME_LIQUOR)
             except IntegrityError:
-                messages.error(request, "Could not save item due to a uniqueness constraint.")
+                messages.error(
+                    request, 
+                    "A liquor product with this name already exists for your business. "
+                    "Please use a different name or modify the existing product."
+                )
     else:
         form = LiquorProductForm()
 

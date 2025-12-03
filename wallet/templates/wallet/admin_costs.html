@@ -4,6 +4,42 @@
 {% block title %}Admin Costs - {{ business.name|default:"CircuitCity" }}{% endblock %}
 
 {% block content %}
+<style>
+  .cost-kpi-card {
+    background: rgba(255, 255, 255, 0.85);
+    border: 1px solid rgba(148, 163, 184, 0.3);
+    border-radius: 16px;
+    padding: 20px;
+    box-shadow: 0 10px 30px rgba(15, 23, 42, 0.08);
+    backdrop-filter: blur(10px);
+    transition: transform 0.2s, box-shadow 0.2s;
+  }
+  .cost-kpi-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 12px 35px rgba(15, 23, 42, 0.12);
+  }
+  .cost-kpi-card h6 {
+    margin: 0 0 8px;
+    font-size: 0.85rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: #64748b;
+    font-weight: 700;
+  }
+  .cost-kpi-card .kpi-value {
+    margin: 0;
+    font-size: 1.8rem;
+    font-weight: 800;
+    color: #0f172a;
+  }
+  .cost-kpi-card .kpi-label {
+    display: block;
+    margin-top: 6px;
+    font-size: 0.8rem;
+    color: #94a3b8;
+  }
+</style>
+
 <div class="container-fluid py-4">
     <div class="row mb-4">
         <div class="col-md-8">
@@ -25,6 +61,31 @@
             </div>
         {% endfor %}
     {% endif %}
+
+    <!-- KPI Cards -->
+    <div class="row mb-4">
+        <div class="col-md-4">
+            <div class="cost-kpi-card">
+                <h6><i class="bi bi-arrow-repeat"></i> Fixed Monthly Costs</h6>
+                <p class="kpi-value">MK {{ fixed_monthly|floatformat:0|intcomma|default:"0" }}</p>
+                <span class="kpi-label">Recurring expenses per month</span>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="cost-kpi-card">
+                <h6><i class="bi bi-cash-stack"></i> Once-Off Costs ({{ period_days }} days)</h6>
+                <p class="kpi-value">MK {{ once_off_30d|floatformat:0|intcomma|default:"0" }}</p>
+                <span class="kpi-label">One-time expenses in last {{ period_days }} days</span>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="cost-kpi-card">
+                <h6><i class="bi bi-calculator"></i> Total Costs ({{ period_days }} days)</h6>
+                <p class="kpi-value" style="color: #dc2626;">MK {{ total_costs_30d|floatformat:0|intcomma|default:"0" }}</p>
+                <span class="kpi-label">Combined expenses (monthly + once-off)</span>
+            </div>
+        </div>
+    </div>
 
     <!-- Once-Off Costs -->
     <div class="card mb-4">

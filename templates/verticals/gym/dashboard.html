@@ -3,12 +3,14 @@
 {% block title %}Gym · Emajinet{% endblock %}
 
 {% block content %}
-{% url 'tenants:manager_review_agents' as url_team %}
-{% url 'wallet:agent_wallet' as wallet_url %}
+{% url 'inventory:gym_members_list' as members_url %}
+{% url 'inventory:gym_add_payment' as add_payment_url %}
+{% url 'inventory:time_logs' as checkin_url %}
 <style>
   .vertical-page{display:flex;flex-direction:column;gap:18px;padding:18px}
   .vertical-hero{background:linear-gradient(135deg,#2563eb,#10b981);padding:24px;border-radius:20px;color:#fff;display:flex;flex-wrap:wrap;gap:18px;align-items:center;justify-content:space-between}
   .vertical-hero h1{margin:0;font-size:clamp(24px,3vw,32px)}
+  .vertical-hero p{margin:4px 0 0}
   .hero-actions{display:flex;gap:12px;flex-wrap:wrap}
   .hero-actions a{border-radius:999px;padding:10px 16px;font-weight:700;text-decoration:none}
   .hero-actions .primary{background:#fff;color:#0f172a}
@@ -17,6 +19,7 @@
   .metric-card{background:#fff;border-radius:18px;padding:18px;box-shadow:0 10px 30px rgba(15,23,42,.08);text-align:center}
   .metric-card h3{margin:0;font-size:.9rem;text-transform:uppercase;color:#64748b}
   .metric-card p{margin:6px 0 0;font-size:2rem;font-weight:800;color:#0f172a}
+  .metric-card small{display:block;margin-top:4px;font-size:.85rem;color:#64748b}
   .recent-block{background:#fff;border-radius:20px;padding:18px;box-shadow:0 10px 30px rgba(15,23,42,.08)}
   .recent-list{list-style:none;margin:0;padding:0;display:grid;gap:12px}
   .recent-item{display:flex;justify-content:space-between;gap:12px;border:1px solid #e2e8f0;border-radius:16px;padding:12px}
@@ -30,41 +33,109 @@
       <p>{{ hero_blurb }}</p>
     </div>
     <div class="hero-actions">
-      <a class="primary" href="{{ url_team|default:'/tenants/manager/agents/' }}">Manage members</a>
-      <a class="ghost" href="{{ scan_in_url|default:'/inventory/scan-in/' }}">Scan check-ins</a>
-      <a class="ghost" href="{{ wallet_url|default:'/wallet/' }}">Wallet</a>
+      <a class="primary" href="{{ members_url|default:'/gym/members/' }}">Manage members</a>
+      <a class="ghost" href="{{ checkin_url|default:'/inventory/time/logs/' }}">Scan check-ins</a>
+      <a class="ghost" href="{{ add_payment_url|default:'/gym/payment/add/' }}">Record payment</a>
     </div>
   </header>
 
+  <!-- Member Stats -->
   <section class="metrics-grid">
     <article class="metric-card">
-      <h3>Managers</h3>
-      <p>{{ manager_count }}</p>
+      <h3>Total Members</h3>
+      <p>{{ total_members|default:"0" }}</p>
     </article>
     <article class="metric-card">
-      <h3>Coaches / agents</h3>
-      <p>{{ agent_count }}</p>
+      <h3>Active Members</h3>
+      <p style="color:#16a34a">{{ members_active_count|default:"0" }}</p>
+    </article>
+    <article class="metric-card">
+      <h3>In Arrears</h3>
+      <p style="color:#dc2626">{{ members_in_arrears|default:"0" }}</p>
     </article>
   </section>
 
+  <!-- Financial KPIs -->
   <section class="recent-block">
-    <h2 style="margin:0 0 10px;font-size:1.05rem">Recent memberships</h2>
-    {% if recent_members %}
+    <h2 style="margin:0 0 10px;font-size:1.1rem">Financial Performance (This Month)</h2>
+    <div class="metrics-grid">
+      <article class="metric-card">
+        <h3>Monthly Revenue</h3>
+        <p>MK {{ revenue|floatformat:2|default:"0.00" }}</p>
+        <small>{{ payment_count|default:"0" }} payment{{ payment_count|pluralize }}</small>
+      </article>
+      <article class="metric-card">
+        <h3>Costs</h3>
+        <p>MK {{ costs|floatformat:2|default:"0.00" }}</p>
+        <small>From admin wallet</small>
+      </article>
+      <article class="metric-card">
+        <h3>Profit</h3>
+        <p style="{% if profit < 0 %}color:#dc2626{% else %}color:#16a34a{% endif %}">MK {{ profit|floatformat:2|default:"0.00" }}</p>
+        <small>Revenue - Costs</small>
+      </article>
+      <article class="metric-card">
+        <h3>MRR</h3>
+        <p>MK {{ mrr|floatformat:2|default:"0.00" }}</p>
+        <small>Monthly Recurring Revenue</small>
+      </article>
+    </div>
+  </section>
+
+  <!-- Payment Mix -->
+  {% if payment_mix %}
+  <section class="recent-block">
+    <h2 style="margin:0 0 10px;font-size:1.1rem">Payment Mix (This Month)</h2>
+    <div class="metrics-grid">
+      {% for pm in payment_mix %}
+      <article class="metric-card">
+        <h3>{{ pm.method }}</h3>
+        <p>MK {{ pm.amount|floatformat:2 }}</p>
+        <small>{{ pm.count }} payment{{ pm.count|pluralize }}</small>
+      </article>
+      {% endfor %}
+    </div>
+  </section>
+  {% endif %}
+
+  <!-- Session/Check-in Stats -->
+  <section class="recent-block">
+    <h2 style="margin:0 0 10px;font-size:1.1rem">Check-ins & Sessions</h2>
+    <div class="metrics-grid">
+      <article class="metric-card">
+        <h3>Today</h3>
+        <p>{{ sessions_today|default:"0" }}</p>
+        <small>check-ins</small>
+      </article>
+      <article class="metric-card">
+        <h3>This Week</h3>
+        <p>{{ sessions_this_week|default:"0" }}</p>
+        <small>check-ins</small>
+      </article>
+    </div>
+  </section>
+
+  <!-- Recent Payments/Members -->
+  <section class="recent-block">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+      <h2 style="margin:0;font-size:1.1rem">Recent Payments</h2>
+      <a class="btn btn-sm btn-outline-primary" href="{{ members_url|default:'/gym/members/' }}">View all members</a>
+    </div>
+    {% if recent_payments %}
       <ul class="recent-list">
-        {% for membership in recent_members %}
+        {% for payment in recent_payments %}
           <li class="recent-item">
             <div>
-              <strong>{{ membership.user.get_full_name|default:membership.user.username }}</strong>
-              <small style="color:#64748b">{{ membership.get_role_display|default:membership.role }}</small>
+              <strong>{{ payment.member.name }}</strong>
+              <small style="display:block;color:#64748b">MK {{ payment.amount|floatformat:2 }}</small>
             </div>
-            <small style="color:#94a3b8">{{ membership.created_at|date:"M j" }}</small>
+            <small style="color:#94a3b8">{{ payment.paid_at|date:"M j, Y" }}</small>
           </li>
         {% endfor %}
       </ul>
     {% else %}
-      <p style="margin:0;color:#64748b">Invite your first coach or member to populate this list.</p>
+      <p style="margin:0;color:#64748b">No recent payments. Record your first payment to get started.</p>
     {% endif %}
   </section>
 </div>
 {% endblock %}
-

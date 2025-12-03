@@ -78,6 +78,33 @@ class AdminCostForm(forms.ModelForm):
             cleaned['type'] = TxnType.COST_ONCE_OFF
         
         return cleaned
+    
+    def _post_clean(self):
+        """Override to set ledger before model validation."""
+        from .models import Ledger
+        
+        # Set ledger before calling parent's _post_clean (which calls model.full_clean())
+        self.instance.ledger = Ledger.COMPANY
+        
+        # Set business if provided
+        if self.business:
+            self.instance.business = self.business
+        
+        # Costs are stored as negative amounts (expenses)
+        # But only convert if amount is positive (user entered positive value)
+        if self.instance.amount and self.instance.amount > Decimal('0.00'):
+            self.instance.amount = -self.instance.amount
+        
+        # Now call parent's _post_clean which will run model validation
+        super()._post_clean()
+    
+    def save(self, commit=True):
+        """Save the cost transaction."""
+        instance = super().save(commit=False)
+        
+        if commit:
+            instance.save()
+        return instance
 
 
 class AgentWalletAdjustmentForm(forms.Form):

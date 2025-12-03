@@ -4,6 +4,7 @@ from decimal import Decimal, ROUND_HALF_UP
 from typing import Optional
 
 from django.conf import settings
+from django.core.validators import MinValueValidator
 from django.db import models
 from django.db.models import Sum
 from django.utils import timezone
@@ -49,6 +50,9 @@ class TxnType(models.TextChoices):
     PAYSLIP = "payslip", "Payslip Payment"
     ADJUSTMENT = "adjustment", "Manual Adjustment"
     BUDGET = "budget", "Budget Payout/Recovery"
+    COST_ONCE_OFF = "cost_once_off", "Cost (Once-off)"
+    COST_RECURRING = "cost_recurring", "Cost (Recurring)"
+    REVENUE = "revenue", "Revenue"
 
 
 class WalletTransactionQuerySet(models.QuerySet):
@@ -61,11 +65,17 @@ class WalletTransactionQuerySet(models.QuerySet):
         return q2(s or Decimal("0"))
 
 
+class RecurrenceType(models.TextChoices):
+    MONTHLY = "monthly", "Monthly"
+    # Future: WEEKLY, QUARTERLY, YEARLY
+
+
 class WalletTransaction(models.Model):
     """
     Signed amounts in MWK.
     - Agent ledger: positives increase agent balance; negatives reduce it.
     - Company ledger: mirror of company cash flow (optional to display).
+    - For cost transactions: use COMPANY ledger with negative amounts for expenses.
     """
     ledger = models.CharField(max_length=16, choices=Ledger.choices, default=Ledger.AGENT)
     agent = models.ForeignKey(User, null=True, blank=True, on_delete=models.SET_NULL, related_name="wallet_txns")
@@ -80,6 +90,31 @@ class WalletTransaction(models.Model):
         User, null=True, blank=True, on_delete=models.SET_NULL, related_name="created_wallet_txns"
     )
     meta = models.JSONField(default=dict, blank=True)
+    
+    # --- Cost/recurring fields (only used for admin cost transactions) ---
+    is_recurring = models.BooleanField(default=False, help_text="If True, this cost recurs monthly")
+    recurrence = models.CharField(
+        max_length=20,
+        choices=RecurrenceType.choices,
+        default=RecurrenceType.MONTHLY,
+        blank=True,
+        help_text="Recurrence pattern (only used if is_recurring=True)",
+    )
+    effective_from = models.DateField(
+        null=True,
+        blank=True,
+        help_text="When recurring costs start being applied (relevant for recurring costs)",
+    )
+    
+    # --- Business scoping (to support multi-tenant cost tracking) ---
+    business = models.ForeignKey(
+        "tenants.Business",
+        null=True,
+        blank=True,
+        on_delete=models.CASCADE,
+        related_name="wallet_transactions",
+        help_text="Business this transaction belongs to (for company costs/revenue)",
+    )
 
     objects = WalletTransactionQuerySet.as_manager()
 
@@ -87,16 +122,43 @@ class WalletTransaction(models.Model):
         indexes = [
             models.Index(fields=["ledger", "agent", "effective_date"]),
             models.Index(fields=["type"]),
+            models.Index(fields=["business", "type", "effective_date"]),
+            models.Index(fields=["business", "is_recurring", "effective_from"]),
         ]
         ordering = ["-created_at"]
 
     def __str__(self) -> str:
         who = self.agent_id or "company"
-        return f"{self.type} {self.amount} â†’ {who} {self.effective_date}"
+        return f"{self.type} {self.amount} â†' {who} {self.effective_date}"
+
+    def clean(self):
+        """Validate cost transaction rules."""
+        from django.core.exceptions import ValidationError
+        errors = {}
+        
+        # Cost transactions must use COMPANY ledger
+        if self.type in [TxnType.COST_ONCE_OFF, TxnType.COST_RECURRING]:
+            if self.ledger != Ledger.COMPANY:
+                errors["ledger"] = "Cost transactions must use COMPANY ledger."
+            # Costs should have negative amounts (expenses)
+            if self.amount and self.amount > 0:
+                errors["amount"] = "Cost amounts should be negative (expense)."
+        
+        # Recurring costs need effective_from
+        if self.is_recurring and not self.effective_from:
+            errors["effective_from"] = "Recurring costs must have an effective_from date."
+        
+        if errors:
+            raise ValidationError(errors)
 
     def save(self, *args, **kwargs):
         # Normalize amount to 2dp
         self.amount = q2(self.amount)
+        
+        # Auto-set effective_from for recurring costs if not provided
+        if self.is_recurring and not self.effective_from:
+            self.effective_from = self.effective_date
+        
         super().save(*args, **kwargs)
 
 

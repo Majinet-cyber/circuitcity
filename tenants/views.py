@@ -680,43 +680,26 @@ def manager_locations(request: HttpRequest) -> HttpResponse:
             return bool(getattr(loc, "is_default"))
         return True
 
-    # ---------- Stock Summary per Location (phones only) ----------
+    # ---------- Stock Summary per Location (vertical-aware) ----------
+    # Determine the business vertical
+    vertical = "phones"  # default
+    try:
+        from inventory.helpers import business_vertical
+        vertical = business_vertical(request)
+    except Exception:
+        # Fallback: try to get from business model
+        try:
+            vertical = getattr(b, "business_kind", "phones") or "phones"
+        except Exception:
+            pass
+    
+    # Get vertical-specific stock summary
     stock_summary = {}
     try:
-        from inventory.models import InventoryItem
-        from sales.models import Sale
-        from django.db.models import Count, Q
-        
-        # For each location, compute stock metrics
-        for loc in locations:
-            loc_id = getattr(loc, "id", None)
-            if not loc_id:
-                continue
-            
-            # In stock count
-            in_stock = InventoryItem.objects.filter(
-                business=b,
-                current_location_id=loc_id,
-                status="IN_STOCK",
-                is_active=True
-            ).count()
-            
-            # Sold count (via Sales)
-            sold = Sale.objects.filter(
-                location_id=loc_id,
-                location__business=b
-            ).count()
-            
-            # Total = in_stock + sold
-            total = in_stock + sold
-            
-            stock_summary[loc_id] = {
-                "sold": sold,
-                "in_stock": in_stock,
-                "total": total,
-            }
-    except Exception as e:
-        # If inventory app not available, skip stock summary
+        from tenants.helpers_location_summary import get_stock_summary_for_vertical
+        stock_summary = get_stock_summary_for_vertical(vertical, b, locations)
+    except Exception:
+        # If helper not available, skip stock summary
         pass
 
     rows = [

@@ -17,14 +17,15 @@ from django.shortcuts import render, redirect, get_object_or_404
 from django.utils import timezone
 from django.views.decorators.http import require_POST
 
-from inventory.authz import require_business_kind, manager_required
+from core.decorators import manager_required
+from inventory.authz import require_business_kind
 from inventory.business_kinds import BusinessKind
 from inventory.helpers import get_active_business
 from inventory.models import MerchProduct
 from inventory.models_verticals import (
     LiquorSale, LiquorCredit, LiquorCreditPayment, LiquorStockEditRequest,
     LiquorWalletEntry, LiquorUnitType, LiquorSaleType, LiquorCreditStatus,
-    LiquorCreditPaymentStatus, LiquorStockEditRequestStatus
+    LiquorCreditPaymentStatus, LiquorStockEditRequestStatus, MonthlySalesTarget
 )
 from tenants.utils import require_business
 
@@ -908,3 +909,137 @@ def shift_report(request, shift_id):
         "variance_data": variance_data,
         "top_products": top_products,
     })
+
+
+# ==============================================================================
+# STOCK OVERVIEW
+# ==============================================================================
+
+@login_required
+@require_business
+@require_business_kind(BusinessKind.LIQUOR)
+def stock_overview(request):
+    """
+    Stock overview with category batteries, editable thresholds, and monthly target adjustment.
+    """
+    from inventory.models_verticals import LiquorStockThreshold
+    from django.contrib import messages
+    
+    business = get_active_business(request)
+    location = getattr(request, "active_location", None)
+    
+    # Handle monthly target update (managers only)
+    is_manager = _is_manager(request.user)
+    if request.method == "POST" and is_manager and "update_target" in request.POST:
+        try:
+            new_target = int(request.POST.get("target_units", 0))
+            now = timezone.now()
+            year = now.year
+            month = now.month
+            
+            target_obj, created = MonthlySalesTarget.objects.get_or_create(
+                business=business,
+                location=location,
+                vertical="liquor",
+                year=year,
+                month=month,
+                defaults={"target_units": new_target, "target_revenue": Decimal("0.00")},
+            )
+            
+            if not created:
+                target_obj.target_units = new_target
+                target_obj.save(update_fields=["target_units", "updated_at"])
+            
+            messages.success(request, f"Monthly sales target updated to {new_target} bottles.")
+            return redirect("inventory_liquor:stock_overview")
+        except (ValueError, TypeError):
+            messages.error(request, "Invalid target value. Please enter a valid number.")
+    
+    # Get all active liquor products
+    products = MerchProduct.objects.filter(
+        business=business,
+        kind=BusinessKind.LIQUOR,
+        is_active=True
+    )
+    
+    # If location is set, filter by location
+    if location:
+        products = products.filter(location=location)
+    
+    # Group by category and count bottles
+    by_category = {}
+    for p in products:
+        cat = (p.category or "other").lower()
+        by_category.setdefault(cat, 0)
+        # Use quantity field for bottle count
+        qty = getattr(p, "quantity", 0) or 0
+        by_category[cat] += qty
+    
+    # Get thresholds
+    thresholds_qs = LiquorStockThreshold.objects.filter(business=business)
+    if location:
+        thresholds_qs = thresholds_qs.filter(location=location)
+    
+    thresholds = {
+        t.category: t.full_capacity
+        for t in thresholds_qs
+    }
+    
+    # Build category rows
+    category_rows = []
+    for cat, qty in by_category.items():
+        cap = thresholds.get(cat, 600)  # default 600 if not set
+        pct = int(qty * 100 / cap) if cap else 0
+        pct = min(pct, 100)  # cap at 100%
+        category_rows.append({
+            "category": cat,
+            "quantity": qty,
+            "capacity": cap,
+            "percent": pct,
+        })
+    
+    # Sort by category name
+    category_rows.sort(key=lambda x: x["category"])
+    
+    # Calculate totals
+    total_qty = sum(row["quantity"] for row in category_rows)
+    total_cap = sum(row["capacity"] for row in category_rows) or 1
+    total_pct = int(total_qty * 100 / total_cap)
+    
+    # Get current monthly target for this business/location
+    now = timezone.now()
+    year = now.year
+    month = now.month
+    
+    target_obj, _ = MonthlySalesTarget.objects.get_or_create(
+        business=business,
+        location=location,
+        vertical="liquor",
+        year=year,
+        month=month,
+        defaults={"target_units": 0, "target_revenue": Decimal("0.00")},
+    )
+    
+    # Stock awareness warning
+    stock_warning = False
+    if target_obj.target_units > 0 and target_obj.target_units > total_qty:
+        stock_warning = True
+    
+    # Suggested max target (e.g., 2x current stock)
+    suggested_max = max(total_qty * 2, 100)
+    
+    ctx = {
+        "business": business,
+        "location": location,
+        "categories": category_rows,
+        "total_qty": total_qty,
+        "total_cap": total_cap,
+        "total_pct": total_pct,
+        "sales_target": target_obj,
+        "stock_warning": stock_warning,
+        "suggested_max": suggested_max,
+        "is_manager": is_manager,
+        "current_year": year,
+        "current_month": month,
+    }
+    return render(request, "verticals/liquor/stock_overview.html", ctx)

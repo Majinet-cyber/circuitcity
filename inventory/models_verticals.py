@@ -496,6 +496,13 @@ class GymPayment(models.Model):
     
     # Payment details
     amount = models.DecimalField(max_digits=10, decimal_places=2, validators=[MinValueValidator(Decimal("0.01"))])
+    payment_method = models.CharField(
+        max_length=20,
+        choices=PaymentMethod.choices,
+        default=PaymentMethod.CASH,
+        db_index=True,
+        help_text="Payment method used for this membership payment"
+    )
     
     # 30-day period
     start_date = models.DateField()
@@ -752,3 +759,106 @@ class LiquorWalletEntry(models.Model):
     def __str__(self):
         return f"{self.entry_type}: {self.amount} - {self.description}"
 
+
+class LiquorStockThreshold(models.Model):
+    """
+    Stock capacity thresholds for liquor categories.
+    Used to calculate "battery" percentages in stock overview.
+    """
+    CATEGORY_CHOICES = [
+        ("beer", "Beer"),
+        ("cider", "Cider"),
+        ("spirits", "Spirits"),
+        ("wine", "Wine"),
+        ("other", "Other"),
+    ]
+    
+    business = models.ForeignKey(Business, on_delete=models.CASCADE, related_name="liquor_stock_thresholds")
+    location = models.ForeignKey("inventory.Location", null=True, blank=True, on_delete=models.CASCADE, related_name="liquor_stock_thresholds")
+    category = models.CharField(max_length=20, choices=CATEGORY_CHOICES)
+    full_capacity = models.PositiveIntegerField(default=600, help_text="Target capacity (bottles) when fully stocked")
+    
+    class Meta:
+        unique_together = ("business", "location", "category")
+        indexes = [
+            models.Index(fields=["business", "location", "category"]),
+        ]
+    
+    def __str__(self):
+        return f"{self.business.name} - {self.get_category_display()} - {self.full_capacity} bottles"
+
+
+# ==============================================================================
+# MONTHLY SALES TARGETS (Generic for all verticals)
+# ==============================================================================
+
+class MonthlySalesTarget(models.Model):
+    """
+    Monthly sales target for any business vertical.
+    Generic model that can be used across phones, liquor, gym, clothing, etc.
+    Stock-aware: warns if target is inconsistent with current inventory.
+    """
+    business = models.ForeignKey(
+        Business,
+        on_delete=models.CASCADE,
+        related_name="monthly_sales_targets",
+        db_index=True
+    )
+    location = models.ForeignKey(
+        "inventory.Location",
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name="monthly_sales_targets",
+    )
+    
+    # Vertical identifier (use same choices as business vertical/product kind)
+    vertical = models.CharField(
+        max_length=32,
+        db_index=True,
+        help_text="Business vertical: liquor, phones, gym, clothing, pharmacy, etc."
+    )
+    
+    # Time period
+    year = models.IntegerField(db_index=True)
+    month = models.IntegerField(db_index=True, help_text="1-12")
+    
+    # Targets
+    target_units = models.PositiveIntegerField(
+        default=0,
+        help_text="Target number of items/units to sell this month"
+    )
+    target_revenue = models.DecimalField(
+        max_digits=14,
+        decimal_places=2,
+        default=Decimal("0.00"),
+        help_text="Optional revenue target in local currency"
+    )
+    
+    # Metadata
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    created_by = models.ForeignKey(
+        User,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="monthly_sales_targets_created"
+    )
+    
+    class Meta:
+        unique_together = ("business", "location", "vertical", "year", "month")
+        indexes = [
+            models.Index(fields=["business", "vertical", "year", "month"]),
+            models.Index(fields=["business", "location", "vertical", "year", "month"]),
+        ]
+        ordering = ["-year", "-month"]
+    
+    def __str__(self):
+        location_str = f" @ {self.location.name}" if self.location else ""
+        return f"{self.business.name}{location_str} - {self.vertical} - {self.year}-{self.month:02d} - {self.target_units} units"
+    
+    def is_current_month(self) -> bool:
+        """Check if this target is for the current calendar month."""
+        now = timezone.now()
+        return self.year == now.year and self.month == now.month

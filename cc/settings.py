@@ -209,7 +209,7 @@ MIDDLEWARE = [
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
 ]
 print("[cc.settings] Final MIDDLEWARE:", MIDDLEWARE)
-print(f"[cc.settings] SSL flags → DEBUG={DEBUG} RUNSERVER={IS_RUNSERVER} "
+print(f"[cc.settings] SSL flags -> DEBUG={DEBUG} RUNSERVER={IS_RUNSERVER} "
       f"SECURE_SSL_REDIRECT={SECURE_SSL_REDIRECT} SESSION_COOKIE_SECURE={SESSION_COOKIE_SECURE} CSRF_COOKIE_SECURE={CSRF_COOKIE_SECURE}")
 
 ROOT_URLCONF = "cc.urls"

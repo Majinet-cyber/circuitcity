@@ -1,0 +1,138 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Add Liquor Product{% endblock %}
+
+{% block content %}
+<div class="container max-w-5xl mx-auto px-3 py-4">
+  <h2 class="h3 mb-2">Add Liquor Product</h2>
+  <p class="text-muted mb-4">
+    Add liquor items with bottle and shot pricing. Configure shot-enabled products to sell by bottle or by shot.
+  </p>
+
+  <div class="card shadow-sm border-0 mb-4">
+    <div class="card-body">
+      <form method="post" novalidate>
+        {% csrf_token %}
+        <div class="row g-3">
+          <div class="col-12 col-md-6">
+            <label class="form-label">Liquor Name</label>
+            {{ form.liquor_name }}
+            <small class="text-muted">e.g., Johnnie Walker Red Label, Savanna Cider</small>
+          </div>
+
+          <div class="col-12 col-md-6">
+            <label class="form-label">Category <span class="text-muted">(optional)</span></label>
+            {{ form.category }}
+            <small class="text-muted">e.g., whisky, beer, cider, wine, spirits</small>
+          </div>
+
+          <div class="col-12 col-md-6">
+            <label class="form-label">Price per Bottle</label>
+            {{ form.price_bottle }}
+            <small class="text-muted">Selling price for a full bottle</small>
+          </div>
+
+          <div class="col-12 col-md-6">
+            <label class="form-label">Cost per Bottle <span class="text-muted">(optional)</span></label>
+            {{ form.cost_bottle }}
+            <small class="text-muted">Purchase cost for profit tracking</small>
+          </div>
+
+          <div class="col-12 col-md-6">
+            <label class="form-label">Price per Shot <span class="text-muted">(optional)</span></label>
+            {{ form.price_shot }}
+            <small class="text-muted">Leave blank if not selling by shot</small>
+          </div>
+
+          <div class="col-12 col-md-6">
+            <label class="form-label">Shots per Bottle <span class="text-muted">(optional)</span></label>
+            {{ form.shots_per_bottle }}
+            <small class="text-muted">Number of sellable shots in one bottle</small>
+          </div>
+
+          <div class="col-12 col-md-6">
+            <label class="form-label">Initial Stock (Bottles) <span class="text-muted">(optional)</span></label>
+            {{ form.qty_bottles }}
+            <small class="text-muted">Starting inventory quantity</small>
+          </div>
+        </div>
+
+        <div class="mt-4 d-flex gap-2">
+          <button class="btn btn-primary px-4">Save Liquor Item</button>
+          <a href="{% url 'verticals:liquor_dashboard' %}" class="btn btn-outline-secondary">Cancel</a>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div class="card border-0 shadow-sm">
+    <div class="card-body">
+      <div class="d-flex justify-content-between align-items-center mb-2">
+        <h5 class="mb-0">Your Liquor Products</h5>
+        <small class="text-muted">Showing latest {{ products|length }} items</small>
+      </div>
+
+      {% if products %}
+      <div class="table-responsive">
+        <table class="table align-middle">
+          <thead class="small text-muted">
+            <tr>
+              <th>Name</th>
+              <th>Category</th>
+              <th>Bottle Price</th>
+              <th>Shot Price</th>
+              <th>Shots/Bottle</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for p in products %}
+            <tr>
+              <td>{{ p.name|default:p.liquor_name|default:"—" }}</td>
+              <td>{{ p.category|default:"—" }}</td>
+              <td>MK {{ p.price_per_bottle|default:p.price|floatformat:2|default:"—" }}</td>
+              <td>
+                {% if p.has_shots and p.price_per_shot %}
+                  MK {{ p.price_per_shot|floatformat:2 }}
+                {% else %}
+                  —
+                {% endif %}
+              </td>
+              <td>
+                {% if p.has_shots and p.sellable_shots_per_bottle %}
+                  {{ p.sellable_shots_per_bottle }}
+                {% else %}
+                  —
+                {% endif %}
+              </td>
+              <td class="text-end">
+                {% if p.pk %}
+                  <div class="d-inline-flex gap-1">
+                    <a class="btn btn-sm btn-outline-primary"
+                       href="{% url 'inventory:product_edit_v2' p.pk %}">Edit</a>
+                    <form method="post"
+                          action="{% url 'inventory:product_delete_v2' p.pk %}"
+                          onsubmit="return confirm('Delete this product? This cannot be undone.');"
+                          style="display:inline;">
+                      {% csrf_token %}
+                      <button type="submit" class="btn btn-sm btn-outline-danger">Delete</button>
+                    </form>
+                  </div>
+                {% else %}
+                  <span class="text-muted">—</span>
+                {% endif %}
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}
+        <p class="text-muted mb-0">No liquor products yet. Add your first one above.</p>
+      {% endif %}
+    </div>
+  </div>
+</div>
+{% endblock %}
+

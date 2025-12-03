@@ -4,10 +4,17 @@ URL patterns for liquor store operations.
 """
 from django.urls import path
 from . import views_liquor
+from . import views_liquor_inventory
 
 app_name = "liquor"
 
 urlpatterns = [
+    # Inventory Dashboard
+    path("inventory/", views_liquor_inventory.liquor_inventory_dashboard, name="inventory_dashboard"),
+    
+    # Stock Overview
+    path("stock/", views_liquor.stock_overview, name="stock_overview"),
+    
     # Shifts
     path("shifts/start/", views_liquor.start_shift, name="start_shift"),
     path("shifts/<int:shift_id>/close/", views_liquor.close_shift, name="close_shift"),

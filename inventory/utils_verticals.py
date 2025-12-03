@@ -235,18 +235,16 @@ def get_vertical_sidebar_items(business_kind: str) -> list[dict]:
     """
     if business_kind == "gym":
         return [
-            # MAIN section
-            {"section": "MAIN", "url": "dashboard:home", "label": "Dashboard", "icon": "bi-speedometer2", "active_pattern": "/dashboard/"},
-            {"section": "MAIN", "url": "verticals:gym_dashboard", "label": "Gym Hub", "icon": "bi-activity", "active_pattern": "/verticals/gym/"},
-            {"section": "MAIN", "url": "tenants:manager_review_agents", "label": "Members", "icon": "bi-people", "active_pattern": "/tenants/manager/agents/"},
-            {"section": "MAIN", "url": "inventory:time_logs", "label": "Check-ins", "icon": "bi-clipboard-check", "active_pattern": "/inventory/time"},
-            {"section": "MAIN", "url": "wallet:agent_wallet", "label": "Wallet", "icon": "bi-wallet2", "active_pattern": "/wallet/"},
+            # MAIN section - gym-specific operations
+            {"section": "MAIN", "url": "verticals:gym_dashboard", "label": "Dashboard", "icon": "bi-speedometer2", "active_pattern": "/verticals/gym/", "require_manager": False},
+            {"section": "MAIN", "url": "gym:members_list", "label": "Members", "icon": "bi-people", "active_pattern": "/gym/members/", "require_manager": False},
+            {"section": "MAIN", "url": "inventory:time_checkin", "label": "Scan Check-ins", "icon": "bi-clipboard-check", "active_pattern": "/inventory/time/check-in", "require_manager": False},
             
             # TIME section
-            {"section": "TIME", "url": "inventory:time_logs", "label": "Time Logs", "icon": "bi-journal-text", "active_pattern": "/inventory/time/logs"},
+            {"section": "TIME", "url": "inventory:time_logs", "label": "Time Logs", "icon": "bi-journal-text", "active_pattern": "/inventory/time/logs", "require_manager": False},
             
-            # MONEY section (for managers)
-            {"section": "MONEY", "url": "wallet:agent_wallet", "label": "My Wallet", "icon": "bi-wallet2", "active_pattern": "/wallet/"},
+            # MONEY section
+            {"section": "MONEY", "url": "wallet:agent_wallet", "label": "My Wallet", "icon": "bi-wallet2", "active_pattern": "/wallet/", "require_manager": False},
             {"section": "MONEY", "url": "wallet:admin_home", "label": "Admin Wallet", "icon": "bi-briefcase", "active_pattern": "/wallet/admin/", "require_manager": True},
             
             # BUSINESS section (for managers)
@@ -258,17 +256,17 @@ def get_vertical_sidebar_items(business_kind: str) -> list[dict]:
     elif business_kind == "clothing":
         return [
             # MAIN section
-            {"section": "MAIN", "url": "dashboard:home", "label": "Dashboard", "icon": "bi-speedometer2", "active_pattern": "/dashboard/"},
-            {"section": "MAIN", "url": "verticals:clothing_dashboard", "label": "Clothing Hub", "icon": "bi-person-bounding-box", "active_pattern": "/verticals/clothing/"},
-            {"section": "MAIN", "url": "inventory:clothing_product_new_v2", "label": "Add Product", "icon": "bi-plus-square", "active_pattern": "/clothing/products/new"},
-            {"section": "MAIN", "url": "inventory:scan_in", "label": "Stock In", "icon": "bi-upc-scan", "active_pattern": "/inventory/scan"},
-            {"section": "MAIN", "url": "inventory:scan_sold", "label": "Sell", "icon": "bi-bag-check", "active_pattern": "/sell/"},
+            {"section": "MAIN", "url": "dashboard:home", "label": "Dashboard", "icon": "bi-speedometer2", "active_pattern": "/dashboard/", "require_manager": False},
+            {"section": "MAIN", "url": "verticals:clothing_dashboard", "label": "Clothing Hub", "icon": "bi-person-bounding-box", "active_pattern": "/verticals/clothing/", "require_manager": False},
+            {"section": "MAIN", "url": "inventory:clothing_product_new_v2", "label": "Add Product", "icon": "bi-plus-square", "active_pattern": "/clothing/products/new", "require_manager": False},
+            {"section": "MAIN", "url": "inventory:scan_in", "label": "Stock In", "icon": "bi-upc-scan", "active_pattern": "/inventory/scan", "require_manager": False},
+            {"section": "MAIN", "url": "inventory:scan_sold", "label": "Sell", "icon": "bi-bag-check", "active_pattern": "/sell/", "require_manager": False},
             
             # TIME section
-            {"section": "TIME", "url": "inventory:time_logs", "label": "Time Logs", "icon": "bi-journal-text", "active_pattern": "/inventory/time/logs"},
+            {"section": "TIME", "url": "inventory:time_logs", "label": "Time Logs", "icon": "bi-journal-text", "active_pattern": "/inventory/time/logs", "require_manager": False},
             
             # MONEY section
-            {"section": "MONEY", "url": "wallet:agent_wallet", "label": "My Wallet", "icon": "bi-wallet2", "active_pattern": "/wallet/"},
+            {"section": "MONEY", "url": "wallet:agent_wallet", "label": "My Wallet", "icon": "bi-wallet2", "active_pattern": "/wallet/", "require_manager": False},
             {"section": "MONEY", "url": "wallet:admin_home", "label": "Admin Wallet", "icon": "bi-briefcase", "active_pattern": "/wallet/admin/", "require_manager": True},
             
             # BUSINESS section (for managers)
@@ -281,17 +279,18 @@ def get_vertical_sidebar_items(business_kind: str) -> list[dict]:
     elif business_kind == "liquor":
         return [
             # MAIN section
-            {"section": "MAIN", "url": "dashboard:home", "label": "Dashboard", "icon": "bi-speedometer2", "active_pattern": "/dashboard/"},
-            {"section": "MAIN", "url": "verticals:liquor_dashboard", "label": "Liquor Hub", "icon": "bi-cup-straw", "active_pattern": "/verticals/liquor/"},
-            {"section": "MAIN", "url": "inventory:liquor_product_new_v2", "label": "Add Product", "icon": "bi-droplet-half", "active_pattern": "/liquor/products/new"},
-            {"section": "MAIN", "url": "inventory:scan_in", "label": "Stock In", "icon": "bi-upc-scan", "active_pattern": "/inventory/scan"},
-            {"section": "MAIN", "url": "inventory:scan_sold", "label": "Sell", "icon": "bi-lightning-charge", "active_pattern": "/sell/"},
+            {"section": "MAIN", "url": "verticals:liquor_dashboard", "label": "Dashboard", "icon": "bi-speedometer2", "active_pattern": "/verticals/liquor/", "require_manager": False},
+            {"section": "MAIN", "url": "liquor:inventory_dashboard", "label": "Liquor Hub", "icon": "bi-cup-straw", "active_pattern": "/liquor/inventory/", "require_manager": False},
+            {"section": "MAIN", "url": "liquor:stock_overview", "label": "Stock", "icon": "bi-box-seam", "active_pattern": "/liquor/stock/", "require_manager": False},
+            {"section": "MAIN", "url": "inventory:liquor_product_new_v2", "label": "Add Product", "icon": "bi-droplet-half", "active_pattern": "/liquor/products/new", "require_manager": False},
+            {"section": "MAIN", "url": "liquor:sell", "label": "Sell", "icon": "bi-lightning-charge", "active_pattern": "/liquor/sell", "require_manager": False},
             
             # TIME section
-            {"section": "TIME", "url": "inventory:time_logs", "label": "Time Logs", "icon": "bi-journal-text", "active_pattern": "/inventory/time/logs"},
+            {"section": "TIME", "url": "inventory:time_logs", "label": "Time Logs", "icon": "bi-journal-text", "active_pattern": "/inventory/time/logs", "require_manager": False},
             
             # MONEY section
-            {"section": "MONEY", "url": "wallet:agent_wallet", "label": "My Wallet", "icon": "bi-wallet2", "active_pattern": "/wallet/"},
+            {"section": "MONEY", "url": "wallet:agent_wallet", "label": "My Wallet", "icon": "bi-wallet2", "active_pattern": "/wallet/", "require_manager": False},
+            {"section": "MONEY", "url": "liquor:credits_list", "label": "Credits", "icon": "bi-person-lines-fill", "active_pattern": "/liquor/credits/", "require_manager": False},
             {"section": "MONEY", "url": "wallet:admin_home", "label": "Admin Wallet", "icon": "bi-briefcase", "active_pattern": "/wallet/admin/", "require_manager": True},
             
             # BUSINESS section (for managers)
@@ -303,18 +302,18 @@ def get_vertical_sidebar_items(business_kind: str) -> list[dict]:
     elif business_kind == "pharmacy":
         return [
             # MAIN section
-            {"section": "MAIN", "url": "dashboard:home", "label": "Dashboard", "icon": "bi-speedometer2", "active_pattern": "/dashboard/"},
-            {"section": "MAIN", "url": "verticals:pharmacy_dashboard", "label": "Pharmacy Hub", "icon": "bi-prescription2", "active_pattern": "/verticals/pharmacy/"},
-            {"section": "MAIN", "url": "inventory:pharmacy_product_new", "label": "Add Medicine", "icon": "bi-capsule", "active_pattern": "/pharmacy/products/new"},
-            {"section": "MAIN", "url": "inventory:pharmacy_batches", "label": "Batches", "icon": "bi-boxes", "active_pattern": "/pharmacy/batches"},
-            {"section": "MAIN", "url": "inventory:scan_in", "label": "Stock In", "icon": "bi-upc-scan", "active_pattern": "/inventory/scan"},
-            {"section": "MAIN", "url": "inventory:scan_sold", "label": "Sell", "icon": "bi-bag-check", "active_pattern": "/sell/"},
+            {"section": "MAIN", "url": "dashboard:home", "label": "Dashboard", "icon": "bi-speedometer2", "active_pattern": "/dashboard/", "require_manager": False},
+            {"section": "MAIN", "url": "verticals:pharmacy_dashboard", "label": "Pharmacy Hub", "icon": "bi-prescription2", "active_pattern": "/verticals/pharmacy/", "require_manager": False},
+            {"section": "MAIN", "url": "inventory:pharmacy_product_new", "label": "Add Medicine", "icon": "bi-capsule", "active_pattern": "/pharmacy/products/new", "require_manager": False},
+            {"section": "MAIN", "url": "inventory:pharmacy_batches", "label": "Batches", "icon": "bi-boxes", "active_pattern": "/pharmacy/batches", "require_manager": False},
+            {"section": "MAIN", "url": "inventory:scan_in", "label": "Stock In", "icon": "bi-upc-scan", "active_pattern": "/inventory/scan", "require_manager": False},
+            {"section": "MAIN", "url": "inventory:scan_sold", "label": "Sell", "icon": "bi-bag-check", "active_pattern": "/sell/", "require_manager": False},
             
             # TIME section
-            {"section": "TIME", "url": "inventory:time_logs", "label": "Time Logs", "icon": "bi-journal-text", "active_pattern": "/inventory/time/logs"},
+            {"section": "TIME", "url": "inventory:time_logs", "label": "Time Logs", "icon": "bi-journal-text", "active_pattern": "/inventory/time/logs", "require_manager": False},
             
             # MONEY section
-            {"section": "MONEY", "url": "wallet:agent_wallet", "label": "My Wallet", "icon": "bi-wallet2", "active_pattern": "/wallet/"},
+            {"section": "MONEY", "url": "wallet:agent_wallet", "label": "My Wallet", "icon": "bi-wallet2", "active_pattern": "/wallet/", "require_manager": False},
             {"section": "MONEY", "url": "wallet:admin_home", "label": "Admin Wallet", "icon": "bi-briefcase", "active_pattern": "/wallet/admin/", "require_manager": True},
             
             # BUSINESS section (for managers)
@@ -326,17 +325,17 @@ def get_vertical_sidebar_items(business_kind: str) -> list[dict]:
     else:  # "phones" or default
         return [
             # MAIN section
-            {"section": "MAIN", "url": "dashboard:home", "label": "Dashboard", "icon": "bi-speedometer2", "active_pattern": "/dashboard/"},
-            {"section": "MAIN", "url": "inventory:inventory_dashboard", "label": "Inventory Dashboard", "icon": "bi-columns-gap", "active_pattern": "/inventory/dashboard"},
-            {"section": "MAIN", "url": "inventory:stock_list", "label": "Stock", "icon": "bi-box-seam", "active_pattern": "/inventory/list/"},
-            {"section": "MAIN", "url": "inventory:scan_in", "label": "Scan IN", "icon": "bi-upc-scan", "active_pattern": "/inventory/scan"},
-            {"section": "MAIN", "url": "sell:sell_index", "label": "Sell", "icon": "bi-bag-check", "active_pattern": "/sell/"},
+            {"section": "MAIN", "url": "dashboard:home", "label": "Dashboard", "icon": "bi-speedometer2", "active_pattern": "/dashboard/", "require_manager": False},
+            {"section": "MAIN", "url": "inventory:inventory_dashboard", "label": "Inventory Dashboard", "icon": "bi-columns-gap", "active_pattern": "/inventory/dashboard", "require_manager": False},
+            {"section": "MAIN", "url": "inventory:stock_list", "label": "Stock", "icon": "bi-box-seam", "active_pattern": "/inventory/list/", "require_manager": False},
+            {"section": "MAIN", "url": "inventory:scan_in", "label": "Scan IN", "icon": "bi-upc-scan", "active_pattern": "/inventory/scan", "require_manager": False},
+            {"section": "MAIN", "url": "sell:sell_index", "label": "Sell", "icon": "bi-bag-check", "active_pattern": "/sell/", "require_manager": False},
             
             # TIME section
-            {"section": "TIME", "url": "inventory:time_logs", "label": "Time Logs", "icon": "bi-journal-text", "active_pattern": "/inventory/time/logs"},
+            {"section": "TIME", "url": "inventory:time_logs", "label": "Time Logs", "icon": "bi-journal-text", "active_pattern": "/inventory/time/logs", "require_manager": False},
             
             # MONEY section
-            {"section": "MONEY", "url": "wallet:agent_wallet", "label": "My Wallet", "icon": "bi-wallet2", "active_pattern": "/wallet/"},
+            {"section": "MONEY", "url": "wallet:agent_wallet", "label": "My Wallet", "icon": "bi-wallet2", "active_pattern": "/wallet/", "require_manager": False},
             {"section": "MONEY", "url": "wallet:admin_home", "label": "Admin Wallet", "icon": "bi-briefcase", "active_pattern": "/wallet/admin/", "require_manager": True},
             
             # BUSINESS section (for managers)
@@ -347,7 +346,7 @@ def get_vertical_sidebar_items(business_kind: str) -> list[dict]:
             {"section": "BUSINESS", "url": "inventory:orders_list", "label": "Orders", "icon": "bi-clipboard-data", "active_pattern": "/inventory/orders/", "require_manager": True},
             
             # LAYBY section (phones specific)
-            {"section": "LAYBY", "url": "layby:dashboard", "label": "Layby", "icon": "bi-journal-check", "active_pattern": "/layby/"},
+            {"section": "LAYBY", "url": "layby:dashboard", "label": "Layby", "icon": "bi-journal-check", "active_pattern": "/layby/", "require_manager": False},
         ]
 
 
