@@ -3,7 +3,7 @@ Daily wisdom quotes - shows 1-2 quotes at the top of dashboard
 {% endcomment %}
 
 {% if DASHBOARD_QUOTES and DASHBOARD_QUOTES.quotes %}
-<section class="js-auto-hide" data-hide-after-ms="30000" style="margin-bottom:16px">
+<section id="welcome-quote-card" class="js-auto-hide" data-hide-after-ms="30000" data-quotes='{{ quotes_json|default:"[]" }}' style="margin-bottom:16px;transition:opacity 0.5s ease-out">
   <div style="
     background:linear-gradient(135deg,rgba(255,255,255,0.95),rgba(255,255,255,0.85));
     backdrop-filter:blur(10px);
@@ -20,7 +20,7 @@ Daily wisdom quotes - shows 1-2 quotes at the top of dashboard
     {% comment %}Show slot 1 (primary quote){% endcomment %}
     {% if DASHBOARD_QUOTES.slot_1 %}
     <div style="margin-bottom:12px">
-      <p style="margin:0 0 6px;font-size:0.95rem;line-height:1.5;color:#0f172a;font-style:italic">
+      <p data-quote-text style="margin:0 0 6px;font-size:0.95rem;line-height:1.5;color:#0f172a;font-style:italic">
         "{{ DASHBOARD_QUOTES.slot_1.text }}"
       </p>
       <p style="margin:0;font-size:0.8rem;font-weight:600;color:#6366f1;text-align:right">

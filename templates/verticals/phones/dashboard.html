@@ -1,0 +1,335 @@
+{% extends "base.html" %}
+
+{% block title %}Phones Dashboard · Emajinet{% endblock %}
+
+{% block extra_head %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+{% endblock %}
+
+{% block content %}
+
+{% comment %}Branded header with greeting{% endcomment %}
+{% include "partials/dashboard_brand_header.html" %}
+
+{% comment %}Daily wisdom quotes{% endcomment %}
+{% include "partials/dashboard_quotes.html" %}
+
+{% comment %}Yesterday summary (shows once per day){% endcomment %}
+{% include "partials/dashboard_yesterday_summary.html" %}
+
+<style>
+  .vertical-page{display:flex;flex-direction:column;gap:18px;padding:18px}
+  .vertical-hero{background:linear-gradient(120deg,#3b82f6,#8b5cf6);padding:24px;border-radius:20px;color:#fff;display:flex;flex-wrap:wrap;gap:18px;align-items:center;justify-content:space-between;box-shadow:0 20px 50px rgba(59,130,246,0.3)}
+  .vertical-hero h1{margin:0;font-size:clamp(28px,3.5vw,36px);font-weight:900}
+  .vertical-hero p{margin:4px 0 0;opacity:.95}
+  .hero-actions{display:flex;gap:12px;flex-wrap:wrap}
+  .hero-actions a{border-radius:999px;padding:12px 20px;font-weight:700;text-decoration:none;transition:all 0.2s}
+  .hero-actions .primary{background:#fff;color:#3b82f6}
+  .hero-actions .primary:hover{background:#f0f9ff;transform:translateY(-2px);box-shadow:0 8px 20px rgba(255,255,255,0.3)}
+  .hero-actions .ghost{border:2px solid rgba(255,255,255,.9);color:#fff}
+  .hero-actions .ghost:hover{background:rgba(255,255,255,.15)}
+  
+  .metrics-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:18px}
+  .metric-card{background:linear-gradient(135deg,#ffffff,#f8fafc);border-radius:20px;padding:20px;box-shadow:0 10px 30px rgba(15,23,42,.1);border:1px solid rgba(148,163,184,0.1);transition:all 0.3s}
+  .metric-card:hover{transform:translateY(-4px);box-shadow:0 20px 50px rgba(15,23,42,.15)}
+  .metric-card h3{margin:0;font-size:.95rem;text-transform:uppercase;color:#64748b;letter-spacing:0.05em;font-weight:600}
+  .metric-card p{margin:8px 0 0;font-size:2rem;font-weight:900;color:#0f172a}
+  .metric-card small{display:block;margin-top:6px;font-size:.9rem;color:#64748b}
+  
+  .section-title{font-size:1.3rem;font-weight:800;color:#0f172a;margin:0 0 16px;display:flex;align-items:center;gap:10px}
+  .section-title i{color:#3b82f6}
+  
+  .recent-block{background:linear-gradient(135deg,#ffffff,#f8fafc);border-radius:22px;padding:22px;box-shadow:0 10px 30px rgba(15,23,42,.1);border:1px solid rgba(148,163,184,0.1)}
+  
+  .badge{display:inline-flex;align-items:center;gap:6px;border-radius:20px;padding:5px 12px;font-size:.8rem;font-weight:700}
+  .badge.green{background:#dcfce7;color:#166534}
+  .badge.yellow{background:#fef9c3;color:#854d0e}
+  .badge.red{background:#fee2e2;color:#991b1b}
+  
+  .chart-container{position:relative;height:280px;margin-top:16px}
+  .leaderboard{display:grid;gap:12px}
+  .leaderboard-item{display:flex;justify-content:space-between;align-items:center;padding:14px;background:linear-gradient(135deg,#f1f5f9,#e2e8f0);border-radius:14px;transition:all 0.2s}
+  .leaderboard-item:hover{background:linear-gradient(135deg,#e2e8f0,#cbd5e1);transform:translateX(4px)}
+  .leaderboard-rank{font-weight:900;font-size:1.2rem;color:#3b82f6;min-width:40px}
+  .leaderboard-name{flex:1;font-weight:600;color:#0f172a}
+  .leaderboard-value{font-weight:700;color:#16a34a}
+</style>
+
+<div class="vertical-page">
+  <header class="vertical-hero">
+    <div>
+      <p style="margin:0;opacity:.9;text-transform:uppercase;letter-spacing:.08em;font-size:.85rem">{{ business.name }} · {{ location_label|default:"All Locations" }}</p>
+      <h1>{{ hero_title }}</h1>
+      <p>{{ hero_blurb }}</p>
+    </div>
+    <div class="hero-actions">
+      <a class="primary" href="{% url 'inventory:scan_in' %}"><i class="bi bi-box-arrow-in-down"></i> Scan IN</a>
+      <a class="primary" href="{% url 'inventory:scan_sold' %}"><i class="bi bi-phone"></i> Sell Phone</a>
+      <a class="ghost" href="{% url 'inventory:stock_list' %}"><i class="bi bi-list-ul"></i> Stock List</a>
+    </div>
+  </header>
+
+  <!-- PHONES BUSINESS PANEL - Fast-Moving KPIs -->
+  <section class="recent-block">
+    <h2 class="section-title"><i class="bi bi-speedometer2"></i> Phones Business Panel</h2>
+    
+    <div class="metrics-grid" style="grid-template-columns:repeat(auto-fit,minmax(220px,1fr))">
+      <!-- TODAY -->
+      <article class="metric-card">
+        <h3><i class="bi bi-calendar-day"></i> Today</h3>
+        <p style="color:#3b82f6">{{ phones_kpis.today.units }}</p>
+        <small>units sold</small>
+        <div style="margin-top:10px;padding-top:10px;border-top:1px solid #e2e8f0">
+          <small><strong>Revenue:</strong> MK {{ phones_kpis.today.revenue|floatformat:0 }}</small><br>
+          <small><strong>Profit:</strong> MK {{ phones_kpis.today.gross_profit|floatformat:0 }}</small>
+        </div>
+      </article>
+      
+      <!-- LAST 7 DAYS -->
+      <article class="metric-card">
+        <h3><i class="bi bi-calendar-week"></i> Last 7 Days</h3>
+        <p style="color:#8b5cf6">{{ phones_kpis.last_7_days.units }}</p>
+        <small>units sold</small>
+        <div style="margin-top:10px;padding-top:10px;border-top:1px solid #e2e8f0">
+          <small><strong>Revenue:</strong> MK {{ phones_kpis.last_7_days.revenue|floatformat:0 }}</small><br>
+          <small><strong>Profit:</strong> MK {{ phones_kpis.last_7_days.gross_profit|floatformat:0 }}</small>
+        </div>
+      </article>
+      
+      <!-- MONTH-TO-DATE -->
+      <article class="metric-card">
+        <h3><i class="bi bi-calendar-month"></i> This Month</h3>
+        <p style="color:#16a34a">{{ phones_kpis.mtd.units }}</p>
+        <small>units sold</small>
+        <div style="margin-top:10px;padding-top:10px;border-top:1px solid #e2e8f0">
+          <small><strong>Revenue:</strong> MK {{ phones_kpis.mtd.revenue|floatformat:0 }}</small><br>
+          <small><strong>Profit:</strong> MK {{ phones_kpis.mtd.gross_profit|floatformat:0 }}</small>
+        </div>
+      </article>
+      
+      <!-- STOCK ON HAND -->
+      <article class="metric-card">
+        <h3><i class="bi bi-box-seam"></i> Stock on Hand</h3>
+        <p style="color:#0f172a">{{ phones_kpis.stock.units }}</p>
+        <small>units available</small>
+        <div style="margin-top:10px;padding-top:10px;border-top:1px solid #e2e8f0">
+          <small><strong>Cost Value:</strong> MK {{ phones_kpis.stock.cost_value|floatformat:0 }}</small><br>
+          <small><strong>Selling Value:</strong> MK {{ phones_kpis.stock.selling_value|floatformat:0 }}</small><br>
+          <small style="color:#16a34a"><strong>Potential Profit:</strong> MK {{ phones_kpis.stock.potential_profit|floatformat:0 }}</small>
+        </div>
+      </article>
+    </div>
+  </section>
+
+  <!-- BUSINESS PERFORMANCE METRICS -->
+  <section class="recent-block">
+    <h2 class="section-title"><i class="bi bi-bar-chart-line"></i> Business Performance (This Month)</h2>
+    
+    <div class="metrics-grid">
+      <article class="metric-card">
+        <h3>Avg Selling Price</h3>
+        <p style="color:#3b82f6">MK {{ business_panel.avg_selling_price_mtd|floatformat:0 }}</p>
+        <small>per unit sold</small>
+      </article>
+      
+      <article class="metric-card">
+        <h3>Avg Gross Profit</h3>
+        <p style="color:#16a34a">MK {{ business_panel.avg_gross_profit_mtd|floatformat:0 }}</p>
+        <small>per unit sold</small>
+      </article>
+      
+      <article class="metric-card">
+        <h3>Profit Margin</h3>
+        <p style="color:#f59e0b">{{ business_panel.profit_margin_mtd }}%</p>
+        <small>gross margin</small>
+      </article>
+      
+      <article class="metric-card">
+        <h3>Sell-Through Rate</h3>
+        <p style="color:{% if business_panel.sell_through_color == 'green' %}#16a34a{% elif business_panel.sell_through_color == 'yellow' %}#f59e0b{% else %}#dc2626{% endif %}">{{ business_panel.sell_through_rate }}%</p>
+        <small>
+          <span class="badge {{ business_panel.sell_through_color }}">{{ business_panel.sell_through_hint }}</span>
+        </small>
+      </article>
+    </div>
+    
+    <div style="margin-top:16px;padding:14px;background:linear-gradient(135deg,#dbeafe,#e0e7ff);border-radius:12px;border-left:4px solid #3b82f6">
+      <p style="margin:0;color:#1e40af;font-size:.95rem">
+        <strong>💡 Tip:</strong> 
+        {% if business_panel.sell_through_rate < 40 %}
+          Your sell-through rate is low. Consider reviewing pricing or increasing marketing efforts.
+        {% elif business_panel.sell_through_rate < 70 %}
+          Good sell-through rate! Keep up the momentum and optimize stock levels.
+        {% else %}
+          Excellent sell-through! Your inventory is moving fast. Consider increasing stock.
+        {% endif %}
+      </p>
+    </div>
+  </section>
+
+  <!-- SALES TREND & FAST MOVERS -->
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:18px">
+    <!-- SALES TREND CHART -->
+    <section class="recent-block">
+      <h2 class="section-title"><i class="bi bi-graph-up"></i> Sales Trend (Last 30 Days)</h2>
+      <div class="chart-container">
+        <canvas id="salesTrendChart"></canvas>
+      </div>
+    </section>
+    
+    <!-- FAST MOVING MODELS -->
+    <section class="recent-block">
+      <h2 class="section-title"><i class="bi bi-fire"></i> Fast Moving Models</h2>
+      {% if fast_models_30d %}
+        <div class="leaderboard">
+          {% for model in fast_models_30d %}
+            <div class="leaderboard-item">
+              <div class="leaderboard-rank">{{ forloop.counter }}</div>
+              <div class="leaderboard-name">
+                <strong>{{ model.brand }} {{ model.model }}</strong>
+                <div style="font-size:.85rem;color:#64748b">{{ model.ram_rom }}</div>
+              </div>
+              <div class="leaderboard-value">
+                {{ model.units }} units · MK {{ model.revenue|floatformat:0 }}
+              </div>
+            </div>
+          {% endfor %}
+        </div>
+      {% else %}
+        <p style="color:#64748b;text-align:center;padding:40px 0">No sales data for the last 30 days</p>
+      {% endif %}
+    </section>
+  </div>
+
+  <!-- TOP AGENTS LEADERBOARD -->
+  <section class="recent-block">
+    <h2 class="section-title"><i class="bi bi-trophy"></i> Top Agents (Last 30 Days)</h2>
+    {% if fast_agents_30d %}
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:14px">
+        {% for agent in fast_agents_30d %}
+          <div class="leaderboard-item">
+            <div class="leaderboard-rank">
+              {% if forloop.counter == 1 %}🥇
+              {% elif forloop.counter == 2 %}🥈
+              {% elif forloop.counter == 3 %}🥉
+              {% else %}{{ forloop.counter }}{% endif %}
+            </div>
+            <div class="leaderboard-name">
+              <strong>{{ agent.agent_name }}</strong>
+              <div style="font-size:.85rem;color:#64748b">
+                {{ agent.units }} units · Best day: {% if agent.best_day %}{{ agent.best_day }}{% else %}N/A{% endif %}
+              </div>
+            </div>
+            <div class="leaderboard-value">MK {{ agent.revenue|floatformat:0 }}</div>
+          </div>
+        {% endfor %}
+      </div>
+    {% else %}
+      <p style="color:#64748b;text-align:center;padding:40px 0">No agent sales data for the last 30 days</p>
+    {% endif %}
+  </section>
+
+  <!-- BEST SALES DAY HIGHLIGHT -->
+  {% if best_sales_day_30d %}
+  <section class="recent-block" style="background:linear-gradient(135deg,#fef3c7,#fde68a);border:2px solid #fbbf24">
+    <h2 class="section-title" style="color:#92400e"><i class="bi bi-star-fill"></i> Best Sales Day (Last 30 Days)</h2>
+    <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:20px">
+      <div>
+        <p style="margin:0;font-size:2rem;font-weight:900;color:#92400e">{{ best_sales_day_30d.date }}</p>
+        <p style="margin:4px 0 0;color:#78350f;font-size:1.1rem">Your best day in the last month!</p>
+      </div>
+      <div style="text-align:right">
+        <p style="margin:0;font-size:1.8rem;font-weight:800;color:#16a34a">{{ best_sales_day_30d.units }} units</p>
+        <p style="margin:4px 0 0;font-size:1.2rem;color:#78350f">MK {{ best_sales_day_30d.revenue|floatformat:0 }}</p>
+      </div>
+    </div>
+  </section>
+  {% endif %}
+</div>
+
+<script>
+// Sales Trend Chart
+(function() {
+  const trendData = {{ sales_trend_json|safe }};
+  const ctx = document.getElementById('salesTrendChart');
+  
+  if (ctx && trendData && trendData.length > 0) {
+    new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels: trendData.map(d => d.date),
+        datasets: [{
+          label: 'Units Sold',
+          data: trendData.map(d => d.units),
+          borderColor: '#3b82f6',
+          backgroundColor: 'rgba(59, 130, 246, 0.1)',
+          fill: true,
+          tension: 0.4,
+          pointRadius: 4,
+          pointHoverRadius: 6,
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            callbacks: {
+              label: function(context) {
+                return 'Units: ' + context.parsed.y;
+              }
+            }
+          }
+        },
+        scales: {
+          y: {
+            beginAtZero: true,
+            ticks: { precision: 0 }
+          }
+        }
+      }
+    });
+  }
+})();
+
+// =============================================================================
+// Welcome + Quote Auto-Hide / Rotate Behavior
+// =============================================================================
+(function() {
+  const card = document.getElementById("welcome-quote-card");
+  if (!card) return;
+  
+  const quotes = {{ quotes_json|safe }};
+  let quoteIndex = 0;
+  
+  const hideCard = () => {
+    card.classList.add("opacity-0", "pointer-events-none");
+    card.style.transition = "opacity 0.5s ease-out";
+  };
+  
+  const showCardWithNextQuote = () => {
+    if (quotes && quotes.length) {
+      const textEl = card.querySelector("[data-quote-text]");
+      if (textEl) {
+        textEl.textContent = quotes[quoteIndex % quotes.length];
+        quoteIndex += 1;
+      }
+    }
+    card.classList.remove("opacity-0", "pointer-events-none");
+    card.style.transition = "opacity 0.3s ease-in";
+    
+    // Hide after 3 seconds
+    setTimeout(hideCard, 3000);
+  };
+  
+  // Initial hide after 30 seconds
+  setTimeout(hideCard, 30000);
+  
+  // Show new quote every hour (3600000 ms)
+  setInterval(showCardWithNextQuote, 60 * 60 * 1000);
+})();
+</script>
+
+{% endblock %}
+

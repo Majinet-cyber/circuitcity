@@ -389,6 +389,7 @@ def time_logs_page(request: HttpRequest) -> HttpResponse:
     expected = max(0, shift_h) * 3600
 
     data = _collect_manager_overview(bid, start, end, expected)
+    data["active_tab"] = "time_logs"  # ✅ For sidebar nav highlighting
     return render(request, "inventory/time_logs.html", data)
 
 # ---------------------------------------------------------------------

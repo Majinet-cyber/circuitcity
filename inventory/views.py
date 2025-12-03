@@ -402,11 +402,24 @@ def merch_add_router(request):
     return render(request, template, ctx)
 
 def _require_active_business(request):
-    """Attach/choose a business for this request, or show error + redirect."""
+    """
+    Attach/choose a business for this request, or show error + redirect.
+    
+    GUARD: To avoid redirect loops, redirect to choose-business page instead of dashboard:home
+    when no active business is found.
+    """
     biz = _get_active_business(request)
     if not biz:
         messages.error(request, "No active business selected. Switch business and try again.")
-        return redirect("dashboard:home")  # or your choose-business page
+        # Redirect to choose-business to avoid loops (dashboard:home also needs a business)
+        try:
+            from django.urls import reverse, NoReverseMatch
+            try:
+                return redirect(reverse("tenants:choose_business"))
+            except NoReverseMatch:
+                return redirect("/tenants/choose/")
+        except Exception:
+            return redirect("/tenants/choose/")
     return None  # OK
 
 def __active_business_id(request):
@@ -1452,6 +1465,7 @@ def stock_list(request: HttpRequest, *args, **kwargs) -> HttpResponse:
         "sold": sold_count,
         "sum_order": sum_order_amt,
         "sum_selling": sum_selling_amt,
+        "active_tab": "stock_list",  # ✅ For sidebar nav highlighting
         **badge_aliases,
     }
     return render(request, template, ctx)
@@ -1918,6 +1932,9 @@ def scan_sold(request, *args, **kwargs):
 
         # Optional form for templates that expect {{ form }}
         "form": form,
+        
+        # ✅ For sidebar nav highlighting
+        "active_tab": "scan_sold",
     }
 
     return render(request, "inventory/scan_sold.html", ctx)
@@ -3056,6 +3073,7 @@ def scan_in(request):
         "default_location": default_loc,
         "loc_is_required": loc_is_required,
         "today": today,
+        "active_tab": "scan_in",  # ✅ For sidebar nav highlighting
 
         # For custom selects:
         "locations": locations,
@@ -4166,6 +4184,7 @@ def _render_dashboard_safe(request, context, today=None, mtd_count=0, all_time_c
     context.setdefault("today_count", context.get("today_count", 0))
     context.setdefault("mtd_count", context.get("mtd_count", mtd_count))
     context.setdefault("all_time_count", context.get("all_time_count", all_time_count))
+    context.setdefault("active_tab", "inventory_dashboard")  # ✅ For sidebar nav highlighting
 
     try:
         return render(request, "inventory/dashboard.html", context)

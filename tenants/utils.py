@@ -799,7 +799,14 @@ def require_business(_fn: Optional[Callable] = None) -> Callable:
                 return redirect(target)
 
             # Normal users → activation flow with next=
-            target = _safe_reverse("tenants:activate_mine", "/tenants/activate/")
+            # GUARD: Never redirect back to inventory:dashboard to avoid loops
+            current_path = getattr(request, "path", "")
+            if current_path and current_path.rstrip("/") == "/inventory/dashboard":
+                # Instead of redirecting to activate_mine and back, go straight to choose business
+                target = _safe_reverse("tenants:choose_business", "/tenants/choose/")
+            else:
+                target = _safe_reverse("tenants:activate_mine", "/tenants/activate/")
+            
             next_q = quote_plus(getattr(request, "get_full_path", lambda: "/")())
 
             # If tenants app not mounted, nudge to unified settings

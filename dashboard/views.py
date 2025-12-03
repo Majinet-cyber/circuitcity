@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timedelta, time, date
+from decimal import Decimal
 from importlib import import_module
 
 from django.conf import settings
@@ -72,6 +73,34 @@ except Exception:  # pragma: no cover
 # ---------------------------
 def _is_staff(user) -> bool:
     return user.is_authenticated and user.is_staff
+
+
+def _namespace_exists(namespace: str) -> bool:
+    """
+    Check if a URL namespace is registered (safe for templates).
+    Returns True if the namespace exists, False otherwise.
+    """
+    try:
+        from django.urls import get_resolver
+        resolver = get_resolver()
+        # Check namespace_dict if available
+        if hasattr(resolver, 'namespace_dict') and namespace in resolver.namespace_dict:
+            return True
+        # Fallback: try to reverse a likely common pattern
+        try:
+            reverse(f'{namespace}:home')
+            return True
+        except NoReverseMatch:
+            pass
+        # Try index as fallback
+        try:
+            reverse(f'{namespace}:index')
+            return True
+        except NoReverseMatch:
+            pass
+        return False
+    except Exception:
+        return False
 
 
 def _start_of_day(d: date, tz):
@@ -300,6 +329,8 @@ def _products_count(biz) -> int:
 # ---------------------------
 @login_required
 @require_business
+@login_required
+@require_business
 def home(request):
     """
     Default dashboard for managers/agents within an active business.
@@ -307,6 +338,9 @@ def home(request):
     Staff users are redirected to the staff dashboard (per-tenant view if business is set).
     
     Routes to vertical-specific dashboards for gym, clothing, liquor, and pharmacy.
+    
+    NOTE: @require_business ensures request.business is set; if no active business,
+    user is redirected to choose-business page, preventing redirect loops.
     """
     if request.user.is_staff:
         return redirect("dashboard:admin_dashboard")
@@ -419,6 +453,170 @@ def home(request):
         # Gracefully degrade if helpers not available
         ctx_enhancements = {}
     
+    # ===== Enhanced Dashboard Data =====
+    # Determine if user is manager or agent
+    is_manager = (
+        request.user.is_staff 
+        or request.user.is_superuser 
+        or getattr(request.user, 'is_manager', False)
+        or getattr(getattr(request.user, 'profile', None), 'is_manager', False)
+    )
+    
+    # Today's sales
+    today_start = _start_of_day(today, tz)
+    today_end = _start_of_day(today + timedelta(days=1), tz)
+    today_sold = _scope_queryset(InventoryItem.objects.all(), biz).filter(
+        SOLD_Q(), sold_at__gte=today_start, sold_at__lt=today_end
+    )
+    today_sales_count = today_sold.count()
+    today_sales_amount = _inv_revenue_sum(today_sold)
+    
+    # Month's sales (already computed above for sold_mtd_count)
+    month_sold = _scope_queryset(InventoryItem.objects.all(), biz).filter(
+        SOLD_Q(), sold_at__gte=month_start, sold_at__lt=month_end
+    )
+    month_sales_count = sold_mtd_count
+    month_sales_amount = _inv_revenue_sum(month_sold)
+    
+    # Locations and agents count
+    try:
+        from inventory.models import Location
+        locations_count = Location.objects.filter(business=biz).count()
+    except Exception:
+        locations_count = 0
+    
+    User = get_user_model()
+    try:
+        # Count users who have agent_profile for this business
+        from inventory.models import AgentProfile
+        agents_count = AgentProfile.objects.filter(location__business=biz).count()
+    except Exception:
+        agents_count = 0
+    
+    # Location performance (manager only)
+    location_performance = []
+    agent_leaderboard = []
+    
+    if is_manager:
+        try:
+            from inventory.models import Location
+            locations = Location.objects.filter(business=biz)
+            for loc in locations:
+                loc_stock = _scope_queryset(InventoryItem.objects.all(), biz).filter(
+                    current_location=loc, status='IN_STOCK'
+                ).count()
+                loc_sales = _scope_queryset(InventoryItem.objects.all(), biz).filter(
+                    SOLD_Q(),
+                    current_location=loc,
+                    sold_at__gte=month_start, sold_at__lt=month_end
+                )
+                loc_amount = _inv_revenue_sum(loc_sales)
+                
+                location_performance.append({
+                    'name': loc.name,
+                    'stock_count': loc_stock,
+                    'sales_amount': loc_amount,
+                    'trend': 'up',  # TODO: Compare with last month
+                })
+        except Exception:
+            pass
+        
+        # Agent leaderboard (top agents by sales this month)
+        try:
+            from inventory.models import AgentProfile
+            agents = AgentProfile.objects.filter(location__business=biz).select_related('user', 'location')
+            agent_stats = []
+            for agent in agents:
+                agent_sales = _scope_queryset(InventoryItem.objects.all(), biz).filter(
+                    SOLD_Q(),
+                    assigned_agent=agent.user,
+                    sold_at__gte=month_start, sold_at__lt=month_end
+                )
+                agent_amount = _inv_revenue_sum(agent_sales)
+                agent_units = agent_sales.count()
+                
+                if agent_units > 0:  # Only include agents with sales
+                    agent_stats.append({
+                        'user': agent.user,
+                        'name': agent.user.get_full_name() or agent.user.username,
+                        'location': agent.location.name if agent.location else '',
+                        'amount': agent_amount,
+                        'units': agent_units,
+                    })
+            
+            # Sort by amount descending
+            agent_stats.sort(key=lambda x: x['amount'], reverse=True)
+            
+            # Add rank
+            for idx, stat in enumerate(agent_stats[:10], start=1):  # Top 10
+                stat['rank'] = idx
+                agent_leaderboard.append(stat)
+        except Exception as e:
+            pass
+    
+    # Agent-specific data
+    agent_today_amount = 0
+    agent_today_count = 0
+    agent_month_amount = 0
+    agent_month_count = 0
+    agent_rank = None
+    agent_gap = None
+    agent_commission = 0
+    
+    if not is_manager:
+        try:
+            # Agent's own sales today
+            agent_today_sales = _scope_queryset(InventoryItem.objects.all(), biz).filter(
+                SOLD_Q(),
+                assigned_agent=request.user,
+                sold_at__gte=today_start, sold_at__lt=today_end
+            )
+            agent_today_count = agent_today_sales.count()
+            agent_today_amount = _inv_revenue_sum(agent_today_sales)
+            
+            # Agent's sales this month
+            agent_month_sales = _scope_queryset(InventoryItem.objects.all(), biz).filter(
+                SOLD_Q(),
+                assigned_agent=request.user,
+                sold_at__gte=month_start, sold_at__lt=month_end
+            )
+            agent_month_count = agent_month_sales.count()
+            agent_month_amount = _inv_revenue_sum(agent_month_sales)
+            
+            # Calculate rank (simplified - compare with all agents)
+            from inventory.models import AgentProfile
+            all_agents = AgentProfile.objects.filter(location__business=biz).select_related('user')
+            agent_stats = []
+            for agent in all_agents:
+                a_sales = _scope_queryset(InventoryItem.objects.all(), biz).filter(
+                    SOLD_Q(),
+                    assigned_agent=agent.user,
+                    sold_at__gte=month_start, sold_at__lt=month_end
+                )
+                a_amount = _inv_revenue_sum(a_sales)
+                agent_stats.append({
+                    'user_id': agent.user_id,
+                    'amount': a_amount
+                })
+            
+            agent_stats.sort(key=lambda x: x['amount'], reverse=True)
+            for idx, stat in enumerate(agent_stats, start=1):
+                if stat['user_id'] == request.user.id:
+                    agent_rank = idx
+                    if idx > 1:
+                        # Calculate gap to next rank
+                        prev_amount = agent_stats[idx-2]['amount']
+                        agent_gap = f"{int(prev_amount - agent_month_amount):,} MK"
+                    break
+            
+            # Commission (simplified - assuming 5% of sales)
+            agent_commission = agent_month_amount * Decimal('0.05')
+        except Exception:
+            pass
+    
+    # Check for optional namespaces
+    has_reports_namespace = _namespace_exists("reports")
+    
     ctx = {
         "first_run": first_run,
         "products_count": products_count,
@@ -430,6 +628,26 @@ def home(request):
         "staff_view": False,
         "vertical_kind": vertical_kind,
         "onboarding_steps": onboarding_steps,
+        # Enhanced dashboard data
+        "IS_MANAGER": is_manager,
+        "today_sales_amount": today_sales_amount,
+        "today_sales_count": today_sales_count,
+        "month_sales_amount": month_sales_amount,
+        "month_sales_count": month_sales_count,
+        "locations_count": locations_count,
+        "agents_count": agents_count,
+        "location_performance": location_performance,
+        "agent_leaderboard": agent_leaderboard,
+        # Agent-specific
+        "agent_today_amount": agent_today_amount,
+        "agent_today_count": agent_today_count,
+        "agent_month_amount": agent_month_amount,
+        "agent_month_count": agent_month_count,
+        "agent_rank": agent_rank,
+        "agent_gap": agent_gap,
+        "agent_commission": agent_commission,
+        # Optional namespace flags
+        "HAS_REPORTS_NAMESPACE": has_reports_namespace,
         **ctx_enhancements,  # Merge enhancements
     }
     return render(request, "dashboard/home.html", ctx)

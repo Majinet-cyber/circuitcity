@@ -1,0 +1,130 @@
+{% extends "base.html" %}
+
+{% block title %}{% if product %}Edit{% else %}Add{% endif %} Phone Product · Emajinet{% endblock %}
+
+{% block content %}
+
+<style>
+  .form-page{max-width:700px;margin:40px auto;padding:20px}
+  .form-card{background:linear-gradient(135deg,#ffffff,#f8fafc);border-radius:22px;padding:32px;box-shadow:0 10px 30px rgba(15,23,42,.1)}
+  .form-title{font-size:1.8rem;font-weight:900;color:#0f172a;margin:0 0 8px}
+  .form-subtitle{color:#64748b;margin:0 0 28px}
+  .form-group{margin-bottom:20px}
+  .form-group label{display:block;font-weight:600;color:#0f172a;margin-bottom:8px}
+  .form-group input, .form-group select{width:100%;padding:12px 16px;border-radius:12px;border:2px solid #e2e8f0;font-size:1rem}
+  .form-group input:focus, .form-group select:focus{outline:none;border-color:#3b82f6}
+  .form-group small{display:block;margin-top:4px;color:#64748b;font-size:.9rem}
+  .form-actions{display:flex;gap:12px;margin-top:28px}
+  .btn{padding:12px 24px;border-radius:12px;font-weight:700;text-decoration:none;border:none;cursor:pointer;transition:all 0.2s}
+  .btn-primary{background:linear-gradient(135deg,#3b82f6,#8b5cf6);color:#fff}
+  .btn-primary:hover{transform:translateY(-2px);box-shadow:0 8px 20px rgba(59,130,246,0.3)}
+  .btn-secondary{background:#f1f5f9;color:#475569}
+  .btn-secondary:hover{background:#e2e8f0}
+  .form-row{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+</style>
+
+<div class="form-page">
+  <div class="form-card">
+    <h1 class="form-title">{% if product %}Edit Product{% else %}Add New Phone Product{% endif %}</h1>
+    <p class="form-subtitle">{% if product %}Update product details and pricing{% else %}Add a new phone model to your catalog{% endif %}</p>
+    
+    <form method="post">
+      {% csrf_token %}
+      
+      {% if not product %}
+      <!-- Brand and Model (immutable after creation) -->
+      <div class="form-row">
+        <div class="form-group">
+          <label for="brand">Brand *</label>
+          <select id="brand" name="brand" required>
+            <option value="">Select brand...</option>
+            <option value="TECNO">TECNO</option>
+            <option value="ITEL">ITEL</option>
+            <option value="SAMSUNG">SAMSUNG</option>
+            <option value="INFINIX">INFINIX</option>
+            <option value="XIAOMI">XIAOMI</option>
+            <option value="OPPO">OPPO</option>
+            <option value="VIVO">VIVO</option>
+            <option value="OTHER">OTHER</option>
+          </select>
+        </div>
+        
+        <div class="form-group">
+          <label for="model_name">Model Name *</label>
+          <input type="text" id="model_name" name="model_name" placeholder="e.g., Spark 40" required>
+        </div>
+      </div>
+      
+      <!-- RAM and ROM -->
+      <div class="form-row">
+        <div class="form-group">
+          <label for="ram_gb">RAM (GB) *</label>
+          <input type="number" id="ram_gb" name="ram_gb" min="1" max="32" placeholder="e.g., 4" required>
+          <small>RAM in gigabytes</small>
+        </div>
+        
+        <div class="form-group">
+          <label for="rom_gb">ROM/Storage (GB) *</label>
+          <input type="number" id="rom_gb" name="rom_gb" min="8" max="1024" placeholder="e.g., 128" required>
+          <small>Internal storage in gigabytes</small>
+        </div>
+      </div>
+      {% else %}
+      <!-- Display immutable fields -->
+      <div class="form-group">
+        <label>Product</label>
+        <div style="padding:12px 16px;background:#f1f5f9;border-radius:12px;color:#0f172a;font-weight:600">
+          {{ product.display_name }}
+        </div>
+        <small>Brand, model, and variant cannot be changed after creation</small>
+      </div>
+      {% endif %}
+      
+      <!-- Model Number (optional, editable) -->
+      <div class="form-group">
+        <label for="model_number">Internal Model Number (optional)</label>
+        <input type="text" id="model_number" name="model_number" placeholder="e.g., KJ7" value="{% if product %}{{ product.model_number }}{% endif %}">
+        <small>Your internal SKU or model code</small>
+      </div>
+      
+      <!-- Pricing (optional, editable) -->
+      <div class="form-row">
+        <div class="form-group">
+          <label for="default_cost_price">Default Cost Price (optional)</label>
+          <input type="number" id="default_cost_price" name="default_cost_price" min="0" step="0.01" placeholder="0.00" value="{% if product.default_cost_price %}{{ product.default_cost_price }}{% endif %}">
+          <small>MWK</small>
+        </div>
+        
+        <div class="form-group">
+          <label for="default_selling_price">Default Selling Price (optional)</label>
+          <input type="number" id="default_selling_price" name="default_selling_price" min="0" step="0.01" placeholder="0.00" value="{% if product.default_selling_price %}{{ product.default_selling_price }}{% endif %}">
+          <small>MWK</small>
+        </div>
+      </div>
+      
+      {% if product %}
+      <!-- Active toggle (only for editing) -->
+      <div class="form-group">
+        <label>
+          <input type="checkbox" name="is_active" {% if product.is_active %}checked{% endif %}>
+          Active in catalog
+        </label>
+        <small>Uncheck to hide this product from the catalog</small>
+      </div>
+      {% endif %}
+      
+      <!-- Actions -->
+      <div class="form-actions">
+        <button type="submit" class="btn btn-primary">
+          <i class="bi bi-check-circle"></i> {% if product %}Save Changes{% else %}Add Product{% endif %}
+        </button>
+        <a href="{% url 'inventory:phone_products' %}" class="btn btn-secondary">
+          <i class="bi bi-x-circle"></i> Cancel
+        </a>
+      </div>
+    </form>
+  </div>
+</div>
+
+{% endblock %}
+

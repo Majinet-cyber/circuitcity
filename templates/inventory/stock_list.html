@@ -2,7 +2,14 @@
 {% load humanize static %}
 
 {% block title %}Stock List · Emajinet{% endblock %}
-{% block header_title %}Inventory · Stock{% endblock %}
+{% block header_title %}
+  Inventory · Stock
+  {% if IS_MANAGER and trial_banner.show %}
+    <span style="margin-left:1rem;font-size:.9rem;font-weight:600;color:#f59e0b;background:rgba(251,191,36,.15);padding:.35rem .65rem;border-radius:.5rem;border:1px solid rgba(251,191,36,.3)">
+      Trial – ends {{ trial_banner.trial_end|date:"M j" }}
+    </span>
+  {% endif %}
+{% endblock %}
 
 {# --- Inventory page: narrow notifications & no search --- #}
 {% block notif_scope %}inventory{% endblock %}
@@ -224,10 +231,15 @@
   <!-- KPI quick line -->
   <div class="kpi-line">
     <a href="{{ dash_url|default:'/' }}" class="kpi-pill tap" onclick="window.buzz&&buzz(6)"><i class="bi bi-house-door"></i> Home</a>
-    <span class="kpi-pill">In stock: <b>{{ in_stock|default:0|intcomma }}</b></span>
-    <span class="kpi-pill">Sold: <b>{{ sold_count|default:0|intcomma }}</b></span>
-    <span class="kpi-pill">Sum order: <b>{{ sum_order|default:0|floatformat:0|intcomma }}</b></span>
-    <span class="kpi-pill">Sum selling: <b>{{ sum_selling|default:0|floatformat:0|intcomma }}</b></span>
+    <span class="kpi-pill" id="kpiInStock" title="Current stock on hand">In stock: <b data-target="{{ in_stock|default:0 }}" data-type="count">0</b></span>
+    <span class="kpi-pill" id="kpiSold" title="Total items sold">Sold: <b data-target="{{ sold_count|default:0 }}" data-type="count">0</b></span>
+    <span class="kpi-pill" id="kpiOrder" title="Total order/cost price">Sum order: <b data-target="{{ sum_order|default:0|floatformat:0 }}" data-type="money">0</b></span>
+    <span class="kpi-pill" id="kpiSelling" title="Total selling price">Sum selling: <b data-target="{{ sum_selling|default:0|floatformat:0 }}" data-type="money">0</b></span>
+    {% if IS_MANAGER and trial_banner.show %}
+      <a href="{% url 'billing:plans' %}" class="kpi-pill tap" style="background:linear-gradient(135deg,#fef3c7,#fde68a);border-color:#fbbf24;color:#92400e" onclick="window.buzz&&buzz(8)" title="Upgrade to unlock premium features">
+        <i class="bi bi-rocket-takeoff"></i> Upgrade
+      </a>
+    {% endif %}
   </div>
 
   <h2 id="stock" style="margin:.25rem 0 0;color:var(--cc-text)">Stock List</h2>
@@ -528,6 +540,7 @@
       <div>
         <div id="batteryLabel" class="battery-label"></div>
         <div class="battery-hint">100 = full, ≤20 = critical</div>
+        <div id="batteryGameHint" style="margin-top:.5rem;font-size:.85rem;color:var(--cc-muted);font-style:italic"></div>
       </div>
     </div>
   </div>
@@ -580,6 +593,41 @@
 {% block extra_js %}
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
 <script>
+// ===== Count-up animation for KPIs (enhanced with money formatting) =====
+(function animateKPIs(){
+  const kpis = document.querySelectorAll('.kpi-pill b[data-target]');
+  kpis.forEach(el => {
+    const targetStr = el.getAttribute('data-target') || '0';
+    const target = parseInt(targetStr.replace(/,/g, ''), 10);
+    const dataType = el.getAttribute('data-type') || 'count';
+    if (isNaN(target) || target === 0) { 
+      el.textContent = dataType === 'money' ? '0' : '0'; 
+      return; 
+    }
+    let current = 0;
+    const duration = 900; // ms
+    const step = Math.max(1, Math.ceil(target / 60));
+    const interval = duration / (target / step);
+    const timer = setInterval(() => {
+      current += step;
+      if (current >= target) {
+        if (dataType === 'money') {
+          el.textContent = 'MK ' + target.toLocaleString();
+        } else {
+          el.textContent = target.toLocaleString();
+        }
+        clearInterval(timer);
+      } else {
+        if (dataType === 'money') {
+          el.textContent = 'MK ' + current.toLocaleString();
+        } else {
+          el.textContent = current.toLocaleString();
+        }
+      }
+    }, interval);
+  });
+})();
+
 (function(){
   const params   = new URLSearchParams(location.search);
   const showAll  = params.get('view') === 'all';
@@ -659,9 +707,27 @@
     }
 
     fill.style.width = pct + '%';
-    if (pct <= 20){ fill.style.background = 'linear-gradient(90deg,#ef4444,#dc2626)'; label.textContent = `${on_hand} in stock • ${pct}% • Critical`; }
-    else if (pct <= 50){ fill.style.background = 'linear-gradient(90deg,#f59e0b,#d97706)'; label.textContent = `${on_hand} in stock • ${pct}% • Low`; }
-    else { fill.style.background = 'linear-gradient(90deg,#22c55e,#06b6d4)'; label.textContent = `${on_hand} in stock • ${pct}% • OK`; }
+    const hintEl = document.getElementById('batteryGameHint');
+    if (pct <= 20){ 
+      fill.style.background = 'linear-gradient(90deg,#ef4444,#dc2626)'; 
+      label.textContent = `${on_hand} in stock • ${pct}% • Critical`; 
+      if (hintEl) hintEl.textContent = '🚨 Stock critically low! Time to reorder.';
+    }
+    else if (pct <= 50){ 
+      fill.style.background = 'linear-gradient(90deg,#f59e0b,#d97706)'; 
+      label.textContent = `${on_hand} in stock • ${pct}% • Low`; 
+      if (hintEl) hintEl.textContent = '⚠️ Stock running low. Consider restocking soon.';
+    }
+    else if (pct <= 79){ 
+      fill.style.background = 'linear-gradient(90deg,#22c55e,#06b6d4)'; 
+      label.textContent = `${on_hand} in stock • ${pct}% • OK`; 
+      if (hintEl) hintEl.textContent = '✅ Stock levels are healthy.';
+    }
+    else { 
+      fill.style.background = 'linear-gradient(90deg,#22c55e,#06b6d4)'; 
+      label.textContent = `${on_hand} in stock • ${pct}% • Excellent`; 
+      if (hintEl) hintEl.textContent = '🎉 Stock is fully stocked! Great work!';
+    }
   }
   loadBattery();
 })();

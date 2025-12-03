@@ -102,17 +102,23 @@ def dashboard(request):
     today = now.replace(hour=0, minute=0, second=0, microsecond=0)
     week_start = today - timedelta(days=today.weekday())
     
-    sessions_today = TimeLog.objects.filter(
-        business=business,
-        kind="ARRIVAL",
-        timestamp__gte=today
-    ).count()
-    
-    sessions_this_week = TimeLog.objects.filter(
-        business=business,
-        kind="ARRIVAL",
-        timestamp__gte=week_start
-    ).count()
+    # Safely query TimeLog (may not exist in all environments)
+    try:
+        sessions_today = TimeLog.objects.filter(
+            business=business,
+            kind="ARRIVAL",
+            ts__gte=today
+        ).count()
+        
+        sessions_this_week = TimeLog.objects.filter(
+            business=business,
+            kind="ARRIVAL",
+            ts__gte=week_start
+        ).count()
+    except Exception:
+        # TimeLog table doesn't exist or is not configured
+        sessions_today = 0
+        sessions_this_week = 0
 
     ctx.update(
         {

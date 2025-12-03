@@ -39,6 +39,12 @@ try:
 except Exception:
     PhoneStockEditRequest = None  # safe fallback
 
+# Re-export PhoneProductCatalog for phone products catalog
+try:
+    from .models_phone_products import PhoneProductCatalog  # noqa: F401
+except Exception:
+    PhoneProductCatalog = None  # safe fallback
+
 # Re-export StockActivityLog for audit trail
 try:
     from .models_audit import StockActivityLog, StockAction  # noqa: F401
@@ -112,6 +118,17 @@ class Location(models.Model):
         if self.business_id:
             label = f"{label} · {getattr(self.business, 'name', self.business_id)}"
         return label
+    
+    @property
+    def display_name(self):
+        """
+        Returns 'BusinessName · LocationName' format for UI display.
+        Example: "Spears · Spears Mchinji branch"
+        """
+        if self.business_id:
+            biz_name = getattr(self.business, 'name', 'Business')
+            return f"{biz_name} · {self.name}"
+        return self.name
 
     def save(self, *args, **kwargs):
         """
@@ -580,6 +597,9 @@ class InventoryItem(models.Model):
     updated_at = models.DateTimeField(default=timezone.now)  # we’ll bump this in save()
 
     # ---------- Carlcare warranty/activation tracking ----------
+    # NOTE: If you see "no such column: inventory_inventoryitem.warranty_expiration",
+    #       run: python manage.py migrate inventory
+    #       Migration 0039 renames warranty_expires_at -> warranty_expiration.
     WARRANTY_CHOICES = [
         ("unknown", "Unknown"),
         ("no_warranty", "No warranty"),

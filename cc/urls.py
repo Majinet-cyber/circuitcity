@@ -549,6 +549,8 @@ urlpatterns += [
     path("dashboard/", include_or_raise("dashboard.urls", "dashboard")),
     # ADD: Layby app include (fixes /layby/ 404)
     path("layby/",     include_or_raise("layby.urls", "layby")),
+    # Reports (business intelligence, charts, exports)
+    path("reports/",   include_or_raise("reports.urls", "reports")),
     # Support & Audit
     path("support/",   include_or_raise("support.urls", "support")),
     path("audit/",     include_or_raise("audit.urls", "audit")),

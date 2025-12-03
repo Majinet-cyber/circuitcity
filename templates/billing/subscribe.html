@@ -78,16 +78,63 @@
 
 {% block content %}
 <div class="bill-wrap">
-  <div class="g">
+  {# Trial/Subscription Status Banner #}
+  <div class="g" style="background: linear-gradient(135deg, rgba(59, 130, 246, 0.1), rgba(147, 197, 253, 0.1)); border-color: rgba(59, 130, 246, 0.3);">
     <div class="row-top">
-      <p class="text-muted m-0">Your trial ends: <strong>{{ sub.trial_ends_at|date:"M j, Y H:i" }}</strong></p>
-      {% if sub.status == "trialing" %}
-        <span class="pill">Trial</span>
+      {% if sub.status == "trial" %}
+        <div style="display: flex; align-items: center; gap: 12px; width: 100%;">
+          <span style="font-size: 1.5rem;">🎯</span>
+          <div style="flex: 1;">
+            <p style="margin: 0; font-weight: 700; font-size: 1.1rem; color: var(--text);">
+              You're on a free trial
+            </p>
+            {% if sub.trial_end %}
+            <p style="margin: 4px 0 0; opacity: 0.9; font-size: 0.95rem;">
+              Trial ends on <strong>{{ sub.trial_end|date:"F j, Y" }}</strong>
+              {% with days_left=sub.days_left_in_trial %}
+                {% if days_left > 0 %}
+                  ({{ days_left }} day{{ days_left|pluralize }} left)
+                {% endif %}
+              {% endwith %}
+            </p>
+            {% endif %}
+          </div>
+        </div>
+      {% elif sub.status != "active" %}
+        <div style="display: flex; align-items: center; gap: 12px; width: 100%;">
+          <span style="font-size: 1.5rem;">💳</span>
+          <div style="flex: 1;">
+            <p style="margin: 0; font-weight: 700; font-size: 1.1rem; color: var(--text);">
+              No active subscription
+            </p>
+            <p style="margin: 4px 0 0; opacity: 0.9; font-size: 0.95rem;">
+              Pick a plan to continue using CircuitCity
+            </p>
+          </div>
+        </div>
+      {% else %}
+        <div style="display: flex; align-items: center; gap: 12px; width: 100%;">
+          <span style="font-size: 1.5rem;">✅</span>
+          <div style="flex: 1;">
+            <p style="margin: 0; font-weight: 700; font-size: 1.1rem; color: var(--text);">
+              Subscription Active
+            </p>
+            <p style="margin: 4px 0 0; opacity: 0.9; font-size: 0.95rem;">
+              {{ sub.plan.name }} plan
+              {% if sub.current_period_end %}
+                — renews on {{ sub.current_period_end|date:"F j, Y" }}
+              {% endif %}
+            </p>
+          </div>
+        </div>
       {% endif %}
     </div>
   </div>
 
   <div class="g">
+    <h2 style="margin: 0 0 8px; font-size: 1.4rem; font-weight: 800;">Choose your plan</h2>
+    <p class="text-muted" style="margin: 0 0 20px; font-size: 0.95rem;">Select the plan that best fits your business needs</p>
+    
     <div class="plans">
       {% for p in plans %}
         <div class="plan-card" data-plan="{{ p.id }}">
@@ -124,44 +171,20 @@
             {% endif %}
           </div>
 
-          {# Payment method buttons #}
-          <div style="display: flex; flex-direction: column; gap: 8px; margin-top: 12px;">
-            {# Pesapal button (always show for Malawi) #}
-            <form method="post" action="{% url 'billing:pesapal_checkout' %}" style="margin: 0;">
-              {% csrf_token %}
-              <input type="hidden" name="plan_code" value="{{ p.code }}">
-              <button class="plan-cta" type="submit" style="width: 100%; background: #2563eb; font-size: 0.9rem;">
-                💳 Pay with Card/Mobile (Pesapal)
-              </button>
-            </form>
-
-            {# Stripe button (only if configured) #}
-            {% if stripe_configured %}
-            <form method="post" action="{% url 'billing:stripe_checkout' %}" style="margin: 0;">
-              {% csrf_token %}
-              <input type="hidden" name="plan_code" value="{{ p.code }}">
-              <button class="plan-cta" type="submit" style="width: 100%; background: #6366f1; font-size: 0.9rem;">
-                💳 Pay with Card (Stripe)
-              </button>
-            </form>
-            {% endif %}
-
-            {# Manual/other payment methods (existing flow) #}
-            <form method="post" action="{% url 'billing:select_plan' %}" style="margin: 0;">
-              {% csrf_token %}
-              <input type="hidden" name="plan" value="{{ p.id }}">
-              <button class="plan-cta" type="submit" style="width: 100%; background: #64748b; font-size: 0.85rem; opacity: 0.9;">
-                Other Payment Methods
-              </button>
-            </form>
-          </div>
+          {# Single CTA button that goes to checkout with plan selection #}
+          <form method="post" action="{% url 'billing:select_plan' %}" style="margin: 12px 0 0;">
+            {% csrf_token %}
+            <input type="hidden" name="plan" value="{{ p.id }}">
+            <button class="plan-cta" type="submit" style="width: 100%;">
+              Choose {{ p.name }}
+            </button>
+          </form>
         </div>
       {% endfor %}
     </div>
 
     <div class="go">
-      <a href="{% url 'tenants:choose_business' %}" class="btn muted">Back</a>
-      {# No Continue button – one-click selection #}
+      <a href="{% url 'dashboard:home' %}" class="btn muted">Back to Dashboard</a>
     </div>
   </div>
 </div>

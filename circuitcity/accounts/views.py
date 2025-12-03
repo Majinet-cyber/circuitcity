@@ -1016,6 +1016,7 @@ def _seed_defaults_for_business(biz) -> None:
     """
     Create minimal per-tenant objects so new managers see a ready UI.
     Tries inventory.Store and inventory.Warehouse if present.
+    For phone businesses, also seeds default phone products.
     """
     try:
         Store = apps.get_model("inventory", "Store")
@@ -1038,6 +1039,15 @@ def _seed_defaults_for_business(biz) -> None:
         if hasattr(Warehouse, "is_default"):
             wh_kwargs["is_default"] = True
         Warehouse.objects.create(**wh_kwargs)
+
+    # Seed phone products for phone businesses
+    business_kind = getattr(biz, "business_kind", "").lower()
+    if business_kind in ("phones", "phone", "electronics", "mobile", "mobiles"):
+        try:
+            from django.core.management import call_command
+            call_command("seed_default_phone_products", business_id=biz.id, verbosity=0)
+        except Exception as e:
+            log.warning(f"Failed to seed phone products for {biz.name}: {e}")
 
 
 # =========================================
@@ -1293,7 +1303,7 @@ def _complete_manager_wizard_signup(request, wizard_data):
                 except Exception as e:
                     log.warning("Failed to save logo during manager wizard: %s", e)
 
-        # 4. Ensure Profile exists and mark as manager
+        # 4. Ensure Profile exists and mark as manager (NOT an agent)
         try:
             profile = getattr(user, "profile", None)
             if profile is None:
@@ -1303,8 +1313,16 @@ def _complete_manager_wizard_signup(request, wizard_data):
                 profile.save(update_fields=["is_manager"])
         except Exception:
             pass
+        
+        # 5. Explicitly ensure NO AgentProfile is created for managers
+        try:
+            from inventory.models import AgentProfile
+            # Delete any accidentally created AgentProfile
+            AgentProfile.objects.filter(user=user).delete()
+        except Exception:
+            pass
 
-        # 5. Auto-login + select business
+        # 6. Auto-login + select business
         login(request, user)
         if biz is not None:
             try:
@@ -1318,8 +1336,8 @@ def _complete_manager_wizard_signup(request, wizard_data):
         # Clear wizard data
         _clear_manager_wizard_data(request)
 
-        # Redirect to dashboard
-        return redirect(_safe_redirect("inventory:inventory_dashboard", default="/inventory/dashboard/"))
+        # Redirect to main dashboard (manager dashboard, not inventory dashboard)
+        return redirect(_safe_redirect("dashboard:home", default="/dashboard/"))
 
 
 # =========================================

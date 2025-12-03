@@ -15,7 +15,7 @@
                         Data Backup & Export
                     </h2>
                     <p class="text-muted mb-0">
-                        Download complete backups of your business data. All records are preserved and exportable.
+                        Download complete backups of your {{ PRODUCT_MODE|default:"business" }} data. All records are preserved and exportable as CSV files.
                     </p>
                 </div>
                 <form method="post" action="{% url 'backups:generate' %}">
@@ -107,27 +107,41 @@
                             <ul class="list-unstyled">
                                 <li class="mb-2"><i class="bi bi-check-circle text-success me-2"></i>Sales Records</li>
                                 <li class="mb-2"><i class="bi bi-check-circle text-success me-2"></i>Wallet Transactions</li>
-                                <li class="mb-2"><i class="bi bi-check-circle text-success me-2"></i>Timelogs</li>
+                                <li class="mb-2"><i class="bi bi-check-circle text-success me-2"></i>Time Logs</li>
                             </ul>
                         </div>
                         <div class="col-md-3">
                             <ul class="list-unstyled">
-                                <li class="mb-2"><i class="bi bi-check-circle text-success me-2"></i>Layby Contracts</li>
+                                {% if PRODUCT_MODE == 'phones' or BUSINESS_VERTICAL == 'phones' %}
+                                    <li class="mb-2"><i class="bi bi-check-circle text-success me-2"></i>IMEI Records</li>
+                                    <li class="mb-2"><i class="bi bi-check-circle text-success me-2"></i>Layby Contracts</li>
+                                {% elif PRODUCT_MODE == 'liquor' or BUSINESS_VERTICAL == 'liquor' %}
+                                    <li class="mb-2"><i class="bi bi-check-circle text-success me-2"></i>Liquor Data</li>
+                                    <li class="mb-2"><i class="bi bi-check-circle text-success me-2"></i>Shifts & Stock</li>
+                                {% elif PRODUCT_MODE == 'gym' or BUSINESS_VERTICAL == 'gym' %}
+                                    <li class="mb-2"><i class="bi bi-check-circle text-success me-2"></i>Gym Members</li>
+                                    <li class="mb-2"><i class="bi bi-check-circle text-success me-2"></i>Memberships</li>
+                                {% elif PRODUCT_MODE == 'clothing' or BUSINESS_VERTICAL == 'clothing' %}
+                                    <li class="mb-2"><i class="bi bi-check-circle text-success me-2"></i>Clothing Sales</li>
+                                    <li class="mb-2"><i class="bi bi-check-circle text-success me-2"></i>Size Records</li>
+                                {% else %}
+                                    <li class="mb-2"><i class="bi bi-check-circle text-success me-2"></i>Order History</li>
+                                    <li class="mb-2"><i class="bi bi-check-circle text-success me-2"></i>Customer Data</li>
+                                {% endif %}
                                 <li class="mb-2"><i class="bi bi-check-circle text-success me-2"></i>Team Members</li>
-                                <li class="mb-2"><i class="bi bi-check-circle text-success me-2"></i>Audit Logs</li>
                             </ul>
                         </div>
                         <div class="col-md-3">
                             <ul class="list-unstyled">
-                                <li class="mb-2"><i class="bi bi-check-circle text-success me-2"></i>Liquor Data</li>
-                                <li class="mb-2"><i class="bi bi-check-circle text-success me-2"></i>Gym Members</li>
-                                <li class="mb-2"><i class="bi bi-check-circle text-success me-2"></i>Clothing Sales</li>
+                                <li class="mb-2"><i class="bi bi-check-circle text-success me-2"></i>Business Settings</li>
+                                <li class="mb-2"><i class="bi bi-check-circle text-success me-2"></i>Agent Profiles</li>
+                                <li class="mb-2"><i class="bi bi-check-circle text-success me-2"></i>Commission Data</li>
                             </ul>
                         </div>
                     </div>
                     <div class="alert alert-info mt-3 mb-0">
                         <i class="bi bi-info-circle me-2"></i>
-                        <strong>Note:</strong> Backups are generated as ZIP files containing CSV exports of all your data. 
+                        <strong>Note:</strong> Backups are generated as ZIP files containing CSV exports of all your {% if PRODUCT_MODE == 'phones' %}phone shop{% elif PRODUCT_MODE == 'liquor' %}liquor store{% elif PRODUCT_MODE == 'gym' %}gym{% elif PRODUCT_MODE == 'clothing' %}clothing store{% else %}business{% endif %} data. 
                         You can open these files in Excel, import them into other systems, or keep them for your records.
                     </div>
                 </div>

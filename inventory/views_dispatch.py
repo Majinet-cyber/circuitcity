@@ -16,7 +16,6 @@ from .helpers import (
 )
 
 _VERTICAL_ROUTES = {
-    PHONES: "inventory:inventory_dashboard",  # Phones use core inventory dashboard
     CLOTHING: "verticals:clothing_dashboard",
     LIQUOR: "verticals:liquor_dashboard",
     PHARMACY: "verticals:pharmacy_dashboard",
@@ -36,10 +35,22 @@ def _safe_reverse(name: str, default: str) -> str:
 @require_business
 def vertical_dispatcher(request):
     """
-    Redirect users to the correct dashboard for their business vertical.
+    Route users to the correct dashboard for their business vertical.
+    
+    PHONES businesses render the PHONES premium dashboard directly (no redirect to avoid loops).
+    Other verticals redirect to their specialized dashboards.
     Falls back to a generic prompt if the vertical is unknown.
     """
     vertical = business_vertical(request)
+    
+    # PHONES: render the premium phones dashboard directly to prevent self-redirect loop
+    # (since this view IS mapped to inventory:inventory_dashboard)
+    if vertical == PHONES:
+        # Import here to avoid circular imports
+        from inventory.verticals.phones import dashboard as phones_dashboard
+        return phones_dashboard(request)
+    
+    # Other verticals: redirect to their specialized dashboards
     target = _VERTICAL_ROUTES.get(vertical, _DEFAULT_ROUTE)
     return redirect(target)
 

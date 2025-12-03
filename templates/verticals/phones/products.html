@@ -1,0 +1,170 @@
+{% extends "base.html" %}
+
+{% block title %}Phone Products · Emajinet{% endblock %}
+
+{% block content %}
+
+<style>
+  .products-page{display:flex;flex-direction:column;gap:20px;padding:20px}
+  .page-hero{background:linear-gradient(120deg,#3b82f6,#8b5cf6);padding:28px;border-radius:22px;color:#fff;box-shadow:0 20px 50px rgba(59,130,246,0.3)}
+  .page-hero h1{margin:0;font-size:clamp(28px,3.5vw,36px);font-weight:900}
+  .page-hero p{margin:6px 0 0;opacity:.95}
+  .page-actions{display:flex;gap:12px;margin-top:16px;flex-wrap:wrap}
+  .page-actions a, .page-actions button{border-radius:999px;padding:12px 20px;font-weight:700;text-decoration:none;border:none;cursor:pointer;transition:all 0.2s}
+  .btn-primary{background:#fff;color:#3b82f6}
+  .btn-primary:hover{background:#f0f9ff;transform:translateY(-2px)}
+  .btn-ghost{border:2px solid rgba(255,255,255,.9);color:#fff;background:transparent}
+  .btn-ghost:hover{background:rgba(255,255,255,.15)}
+  
+  .filter-bar{background:linear-gradient(135deg,#ffffff,#f8fafc);padding:18px;border-radius:18px;box-shadow:0 10px 30px rgba(15,23,42,.1);display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+  .filter-bar label{font-weight:600;color:#0f172a}
+  .filter-bar select{padding:10px 16px;border-radius:12px;border:2px solid #e2e8f0;font-size:1rem;min-width:180px}
+  
+  .brand-section{background:linear-gradient(135deg,#ffffff,#f8fafc);border-radius:20px;padding:22px;box-shadow:0 10px 30px rgba(15,23,42,.1);margin-bottom:20px}
+  .brand-header{display:flex;align-items:center;gap:14px;margin-bottom:18px;padding-bottom:14px;border-bottom:3px solid #e2e8f0}
+  .brand-logo{width:60px;height:60px;border-radius:50%;background:linear-gradient(135deg,#3b82f6,#8b5cf6);display:flex;align-items:center;justify-content:center;color:#fff;font-weight:900;font-size:1.5rem;box-shadow:0 8px 20px rgba(59,130,246,0.3)}
+  .brand-name{font-size:1.8rem;font-weight:900;color:#0f172a}
+  
+  .products-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:16px}
+  .product-card{background:linear-gradient(135deg,#f8fafc,#f1f5f9);border-radius:16px;padding:18px;border:2px solid #e2e8f0;transition:all 0.3s}
+  .product-card:hover{transform:translateY(-4px);box-shadow:0 12px 30px rgba(15,23,42,.15);border-color:#3b82f6}
+  .product-model{font-size:1.2rem;font-weight:800;color:#0f172a;margin:0 0 6px}
+  .product-variant{display:inline-block;background:linear-gradient(135deg,#dbeafe,#e0e7ff);color:#1e40af;padding:6px 12px;border-radius:20px;font-weight:700;font-size:.9rem;margin-bottom:10px}
+  .product-pricing{margin:12px 0;padding:12px 0;border-top:1px solid #cbd5e1;border-bottom:1px solid #cbd5e1}
+  .product-pricing div{display:flex;justify-content:space-between;margin:4px 0;font-size:.9rem}
+  .product-actions{display:flex;gap:8px;margin-top:12px}
+  .product-actions button, .product-actions a{padding:8px 14px;border-radius:10px;font-weight:600;font-size:.85rem;text-decoration:none;border:none;cursor:pointer;transition:all 0.2s}
+  .btn-use{background:linear-gradient(135deg,#10b981,#059669);color:#fff}
+  .btn-use:hover{background:linear-gradient(135deg,#059669,#047857);transform:scale(1.05)}
+  .btn-edit{background:#f1f5f9;color:#475569}
+  .btn-edit:hover{background:#e2e8f0}
+  .btn-delete{background:#fee2e2;color:#991b1b}
+  .btn-delete:hover{background:#fecaca}
+  
+  .empty-state{text-align:center;padding:60px 20px;color:#64748b}
+  .empty-state i{font-size:4rem;color:#cbd5e1;margin-bottom:16px}
+  .empty-state h3{font-size:1.4rem;color:#475569;margin:0 0 8px}
+</style>
+
+<div class="products-page">
+  <header class="page-hero">
+    <h1>{{ hero_title }}</h1>
+    <p>{{ hero_blurb }}</p>
+    <div class="page-actions">
+      <a href="{% url 'inventory:phone_product_create' %}" class="btn-primary">
+        <i class="bi bi-plus-circle"></i> Add New Product
+      </a>
+      <a href="{% url 'inventory:inventory_dashboard' %}" class="btn-ghost">
+        <i class="bi bi-arrow-left"></i> Back to Dashboard
+      </a>
+    </div>
+  </header>
+
+  <!-- Filter Bar -->
+  <div class="filter-bar">
+    <label for="brandFilter"><i class="bi bi-funnel"></i> Filter by Brand:</label>
+    <select id="brandFilter" onchange="filterByBrand(this.value)">
+      <option value="">All Brands</option>
+      {% for brand in all_brands %}
+        <option value="{{ brand }}" {% if brand == brand_filter %}selected{% endif %}>{{ brand }}</option>
+      {% endfor %}
+    </select>
+    <div style="margin-left:auto;color:#64748b;font-weight:600">
+      {{ total_products }} product{{ total_products|pluralize }} in catalog
+    </div>
+  </div>
+
+  <!-- Products by Brand -->
+  {% if products_by_brand %}
+    {% for brand, products in products_by_brand.items %}
+      <section class="brand-section">
+        <div class="brand-header">
+          <div class="brand-logo">{{ brand|slice:":2" }}</div>
+          <div>
+            <div class="brand-name">{{ brand }}</div>
+            <div style="color:#64748b;font-size:.95rem">{{ products|length }} model{{ products|length|pluralize }} available</div>
+          </div>
+        </div>
+        
+        <div class="products-grid">
+          {% for product in products %}
+            <article class="product-card">
+              <h3 class="product-model">{{ product.model_name }}</h3>
+              <span class="product-variant">
+                <i class="bi bi-memory"></i> {{ product.variant_label }}
+              </span>
+              
+              {% if product.has_pricing %}
+                <div class="product-pricing">
+                  <div>
+                    <span style="color:#64748b">Cost:</span>
+                    <strong style="color:#0f172a">MK {{ product.default_cost_price|floatformat:0 }}</strong>
+                  </div>
+                  <div>
+                    <span style="color:#64748b">Selling:</span>
+                    <strong style="color:#16a34a">MK {{ product.default_selling_price|floatformat:0 }}</strong>
+                  </div>
+                  <div>
+                    <span style="color:#64748b">Margin:</span>
+                    <strong style="color:#3b82f6">
+                      MK {{ product.default_selling_price|add:"-"|add:product.default_cost_price|floatformat:0 }}
+                    </strong>
+                  </div>
+                </div>
+              {% else %}
+                <div class="product-pricing">
+                  <div style="color:#94a3b8;font-style:italic">No pricing set</div>
+                </div>
+              {% endif %}
+              
+              {% if product.model_number %}
+                <div style="font-size:.85rem;color:#64748b;margin-bottom:8px">
+                  <i class="bi bi-tag"></i> {{ product.model_number }}
+                </div>
+              {% endif %}
+              
+              <div class="product-actions">
+                <a href="{% url 'inventory:phone_sale_wizard' %}?product_id={{ product.id }}" class="btn-use">
+                  <i class="bi bi-cart-plus"></i> Use in Sale
+                </a>
+                <a href="{% url 'inventory:phone_product_edit' product.id %}" class="btn-edit">
+                  <i class="bi bi-pencil"></i> Edit
+                </a>
+                <form method="post" action="{% url 'inventory:phone_product_delete' product.id %}" style="display:inline" onsubmit="return confirm('Remove this product from catalog?')">
+                  {% csrf_token %}
+                  <button type="submit" class="btn-delete">
+                    <i class="bi bi-trash"></i>
+                  </button>
+                </form>
+              </div>
+            </article>
+          {% endfor %}
+        </div>
+      </section>
+    {% endfor %}
+  {% else %}
+    <div class="empty-state">
+      <i class="bi bi-inbox"></i>
+      <h3>No products in catalog</h3>
+      <p>Add your first phone product to get started</p>
+      <a href="{% url 'inventory:phone_product_create' %}" class="btn-primary" style="display:inline-block;margin-top:16px">
+        <i class="bi bi-plus-circle"></i> Add Product
+      </a>
+    </div>
+  {% endif %}
+</div>
+
+<script>
+function filterByBrand(brand) {
+  const url = new URL(window.location);
+  if (brand) {
+    url.searchParams.set('brand', brand);
+  } else {
+    url.searchParams.delete('brand');
+  }
+  window.location = url;
+}
+</script>
+
+{% endblock %}
+

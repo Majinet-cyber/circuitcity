@@ -12,6 +12,7 @@ urlpatterns = [
     # ------------------------------------------------------------------
     # Public / customer endpoints
     # ------------------------------------------------------------------
+    path("plans/", v.subscribe, name="plans"),  # Alias for sidebar navigation
     path("subscribe/", v.subscribe, name="subscribe"),
     path("checkout/",  v.checkout,  name="checkout"),
     path("success/",   v.success,   name="success"),

@@ -1032,3 +1032,28 @@ urlpatterns += [
     path("alerts/", _need_biz(_alerts_page), name="alerts_feed"),
     path("capture-gps/", manager_required(_need_biz(_capture_gps)), name="capture_gps"),
 ]
+
+# ---------------------------------------------------------------------
+# PHONES Products Catalog (PHONES vertical only)
+# ---------------------------------------------------------------------
+try:
+    from . import views_phone_products as _phone_prods
+except Exception:
+    _phone_prods = SimpleNamespace()
+
+try:
+    from . import views_phone_sale_wizard as _phone_wizard
+except Exception:
+    _phone_wizard = SimpleNamespace()
+
+urlpatterns += [
+    path("phone-products/", _need_biz(getattr(_phone_prods, "phone_products_list", _stub("phone_products_list not found"))), name="phone_products"),
+    path("phone-products/new/", manager_required(_need_biz(getattr(_phone_prods, "phone_product_create", _stub("phone_product_create not found")))), name="phone_product_create"),
+    path("phone-products/<int:product_id>/edit/", manager_required(_need_biz(getattr(_phone_prods, "phone_product_edit", _stub("phone_product_edit not found")))), name="phone_product_edit"),
+    path("phone-products/<int:product_id>/delete/", manager_required(_need_biz(getattr(_phone_prods, "phone_product_delete", _stub("phone_product_delete not found")))), name="phone_product_delete"),
+    path("api/phone-products/models/", _need_biz(getattr(_phone_prods, "phone_products_api_models", _stub("phone_products_api_models not found"))), name="api_phone_products_models"),
+    
+    # Gamified phone sale wizard
+    path("phone-sale-wizard/", _need_biz(getattr(_phone_wizard, "phone_sale_wizard", _stub("phone_sale_wizard not found"))), name="phone_sale_wizard"),
+    path("phone-sale-wizard/reset/", _need_biz(getattr(_phone_wizard, "phone_sale_wizard_reset", _stub("phone_sale_wizard_reset not found"))), name="phone_sale_wizard_reset"),
+]

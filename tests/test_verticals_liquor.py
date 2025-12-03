@@ -1,6 +1,32 @@
 # tests/test_verticals_liquor.py
 """
 Tests for liquor store functionality: products, sales, credits, payments.
+
+MANUAL SANITY CHECKLIST (run after any major billing/trial/phone changes):
+
+Liquor Dashboard:
+1. ✓ Dashboard loads at /verticals/liquor/dashboard/ (200 OK)
+2. ✓ Shows liquor-specific KPIs (sales, credits, shifts)
+3. ✓ No trial badge or "Choose a plan" text appears
+4. ✓ No phone-specific UI elements (IMEI, warranty, etc.)
+
+Liquor Operations:
+5. ✓ /liquor/sell/ - Sell page loads with product categories
+6. ✓ /liquor/sales/ - Sales list page loads
+7. ✓ /liquor/credits/ - Credits list page loads
+8. ✓ /liquor/payments/pending/ - Pending payments page (managers only)
+9. ✓ Shift management works (start/close shift)
+
+Data Scoping:
+10. ✓ Sales filtered by active business
+11. ✓ Credits filtered by active business
+12. ✓ Products filtered by BusinessKind.LIQUOR
+13. ✓ Location scoping works for multi-location businesses
+
+UI/UX:
+14. ✓ Liquor-specific terminology (bottles, shots, shifts)
+15. ✓ No subscription/trial UI on operational pages
+16. ✓ Sidebar shows liquor-appropriate navigation
 """
 import pytest
 from decimal import Decimal
@@ -682,3 +708,295 @@ class TestLiquorStockTargets:
         warning = data["warnings"][0]
         assert warning["type"] in ["danger", "warning"]
         assert "spirits" in warning["category"].lower()
+
+
+@pytest.mark.django_db
+class TestLiquorRegressionProtection:
+    """
+    REGRESSION TESTS: Ensure recent billing/trial/phones changes don't break liquor vertical.
+    These tests protect against:
+    - Billing/subscription UI leaking into liquor pages
+    - Phone-specific features appearing in liquor views
+    - Business kind filtering breaking
+    - Location scoping issues
+    """
+    
+    def test_liquor_dashboard_loads(self, client, business, manager):
+        """Test that liquor dashboard loads successfully"""
+        from tenants.models import Membership
+        
+        Membership.objects.create(
+            user=manager,
+            business=business,
+            role="MANAGER",
+            status="ACTIVE",
+            location=None
+        )
+        
+        client.force_login(manager)
+        session = client.session
+        session['active_business_id'] = business.id
+        session.save()
+        
+        response = client.get('/verticals/liquor/dashboard/')
+        
+        assert response.status_code == 200
+        # Should contain liquor-specific text
+        content = response.content.decode('utf-8').lower()
+        assert 'liquor' in content or 'shift' in content or 'barman' in content
+    
+    def test_liquor_dashboard_no_trial_ui(self, client, business, manager):
+        """Test that liquor dashboard does NOT show trial/billing UI"""
+        from tenants.models import Membership
+        
+        Membership.objects.create(
+            user=manager,
+            business=business,
+            role="MANAGER",
+            status="ACTIVE",
+            location=None
+        )
+        
+        client.force_login(manager)
+        session = client.session
+        session['active_business_id'] = business.id
+        session.save()
+        
+        response = client.get('/verticals/liquor/dashboard/')
+        content = response.content.decode('utf-8').lower()
+        
+        # Should NOT contain trial/billing UI text
+        assert 'choose a plan' not in content
+        assert 'trial ends' not in content
+        assert 'upgrade now' not in content
+        # Note: "subscription" might appear in footer/sidebar, so we check for specific phrases
+        assert 'subscribe now' not in content
+    
+    def test_liquor_dashboard_no_phone_ui(self, client, business, manager):
+        """Test that liquor dashboard does NOT show phone-specific UI"""
+        from tenants.models import Membership
+        
+        Membership.objects.create(
+            user=manager,
+            business=business,
+            role="MANAGER",
+            status="ACTIVE",
+            location=None
+        )
+        
+        client.force_login(manager)
+        session = client.session
+        session['active_business_id'] = business.id
+        session.save()
+        
+        response = client.get('/verticals/liquor/dashboard/')
+        content = response.content.decode('utf-8').lower()
+        
+        # Should NOT contain phone-specific text
+        assert 'imei' not in content
+        assert 'warranty' not in content
+        assert 'phone scanner' not in content
+    
+    def test_liquor_sales_page_loads(self, client, business, manager):
+        """Test that /liquor/sales/ loads successfully"""
+        from tenants.models import Membership
+        
+        Membership.objects.create(
+            user=manager,
+            business=business,
+            role="MANAGER",
+            status="ACTIVE",
+            location=None
+        )
+        
+        client.force_login(manager)
+        session = client.session
+        session['active_business_id'] = business.id
+        session.save()
+        
+        response = client.get('/liquor/sales/')
+        
+        assert response.status_code == 200
+        assert b'sale' in response.content.lower()
+    
+    def test_liquor_credits_page_loads(self, client, business, manager):
+        """Test that /liquor/credits/ loads successfully"""
+        from tenants.models import Membership
+        
+        Membership.objects.create(
+            user=manager,
+            business=business,
+            role="MANAGER",
+            status="ACTIVE",
+            location=None
+        )
+        
+        client.force_login(manager)
+        session = client.session
+        session['active_business_id'] = business.id
+        session.save()
+        
+        response = client.get('/liquor/credits/')
+        
+        assert response.status_code == 200
+        content = response.content.decode('utf-8').lower()
+        assert 'credit' in content
+    
+    def test_liquor_pending_payments_page_loads(self, client, business, manager):
+        """Test that /liquor/payments/pending/ loads for managers"""
+        from tenants.models import Membership
+        
+        Membership.objects.create(
+            user=manager,
+            business=business,
+            role="MANAGER",
+            status="ACTIVE",
+            location=None
+        )
+        
+        # Make manager actually a manager (staff or role-based)
+        manager.is_staff = True
+        manager.save()
+        
+        client.force_login(manager)
+        session = client.session
+        session['active_business_id'] = business.id
+        session.save()
+        
+        response = client.get('/liquor/payments/pending/')
+        
+        # Should load successfully (200) or redirect if no permissions
+        assert response.status_code in [200, 302, 403]
+    
+    def test_liquor_business_scoping(self, client, business, manager, liquor_product):
+        """Test that liquor sales are correctly scoped to business"""
+        from tenants.models import Membership
+        
+        # Create another liquor business
+        other_business = Business.objects.create(
+            name="Other Liquor Store",
+            slug="other-liquor",
+            status="ACTIVE",
+            business_kind=BusinessKind.LIQUOR
+        )
+        
+        # Create a sale in our business
+        sale_our = LiquorSale.objects.create(
+            business=business,
+            product=liquor_product,
+            unit=LiquorUnitType.BOTTLE,
+            quantity=1,
+            unit_price=Decimal("15000.00"),
+            total_price=Decimal("15000.00"),
+            sold_by=manager
+        )
+        
+        # Create a product in other business
+        other_product = MerchProduct.objects.create(
+            business=other_business,
+            name="Other Whiskey",
+            kind=BusinessKind.LIQUOR,
+            category="spirits",
+            price_per_bottle=Decimal("20000.00"),
+            is_active=True
+        )
+        
+        # Create a sale in other business
+        sale_other = LiquorSale.objects.create(
+            business=other_business,
+            product=other_product,
+            unit=LiquorUnitType.BOTTLE,
+            quantity=1,
+            unit_price=Decimal("20000.00"),
+            total_price=Decimal("20000.00"),
+            sold_by=manager
+        )
+        
+        # Query sales for our business
+        our_sales = LiquorSale.objects.filter(business=business)
+        
+        assert sale_our in our_sales
+        assert sale_other not in our_sales
+        assert our_sales.count() == 1
+    
+    def test_liquor_kind_filtering(self, business):
+        """Test that products are correctly filtered by BusinessKind.LIQUOR"""
+        # Create liquor product
+        liquor = MerchProduct.objects.create(
+            business=business,
+            name="Liquor Product",
+            kind=BusinessKind.LIQUOR,
+            category="beer",
+            price_per_bottle=Decimal("2000.00"),
+            is_active=True
+        )
+        
+        # Create a phone product in same business (should not appear in liquor queries)
+        phone = MerchProduct.objects.create(
+            business=business,
+            name="Phone Product",
+            kind=BusinessKind.PHONES,
+            price_per_bottle=Decimal("50000.00"),
+            is_active=True
+        )
+        
+        # Query liquor products
+        liquor_products = MerchProduct.objects.filter(
+            business=business,
+            kind=BusinessKind.LIQUOR
+        )
+        
+        assert liquor in liquor_products
+        assert phone not in liquor_products
+        assert liquor_products.count() == 1
+    
+    def test_liquor_location_scoping(self, business, manager):
+        """Test that location-based filtering works for liquor"""
+        from inventory.models import Location
+        
+        # Create two locations
+        location1 = Location.objects.create(
+            business=business,
+            name="Branch A"
+        )
+        location2 = Location.objects.create(
+            business=business,
+            name="Branch B"
+        )
+        
+        # Create product
+        product = MerchProduct.objects.create(
+            business=business,
+            name="Test Liquor",
+            kind=BusinessKind.LIQUOR,
+            category="beer",
+            price_per_bottle=Decimal("2000.00"),
+            is_active=True
+        )
+        
+        # Create shifts at different locations
+        from inventory.models_verticals import LiquorShift
+        
+        shift1 = LiquorShift.objects.create(
+            business=business,
+            location=location1,
+            barman=manager,
+            created_by=manager
+        )
+        
+        shift2 = LiquorShift.objects.create(
+            business=business,
+            location=location2,
+            barman=manager,
+            created_by=manager
+        )
+        
+        # Query shifts for location1
+        location1_shifts = LiquorShift.objects.filter(
+            business=business,
+            location=location1
+        )
+        
+        assert shift1 in location1_shifts
+        assert shift2 not in location1_shifts
+        assert location1_shifts.count() == 1

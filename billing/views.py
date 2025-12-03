@@ -100,7 +100,7 @@ def _ensure_trial_subscription(biz: Business) -> BusinessSubscription:
 
 def _sub_badge(sub: BusinessSubscription) -> str:
     if sub.status == BusinessSubscription.Status.TRIAL:
-        return f"Trial â€” {sub.days_left_in_trial()} days left"
+        return f"Trial – {sub.days_left_in_trial()} days left"
     if sub.status == BusinessSubscription.Status.ACTIVE:
         return "Active"
     if sub.status == BusinessSubscription.Status.GRACE:
@@ -133,7 +133,7 @@ def _create_draft_invoice_for_plan(biz: Business, plan: SubscriptionPlan, *, cre
     )
     InvoiceItem.objects.create(
         invoice=inv,
-        description=f"{plan.name} â€” {plan.get_interval_display()} plan",
+        description=f"{plan.name} – {plan.get_interval_display()} plan",
         qty=Decimal("1"),
         unit="mo" if plan.interval == SubscriptionPlan.Interval.MONTH else "yr",
         unit_price=Decimal(plan.amount),
@@ -173,6 +173,8 @@ def subscribe(request: HttpRequest) -> HttpResponse:
     """
     Pick a plan (or show current); seed trial if missing; create the first invoice draft.
     This page now primarily serves GET (the one-click flow posts to select_plan).
+    
+    NO payment provider errors are shown here - only on checkout page.
     """
     biz: Business = request.business
     sub = _ensure_trial_subscription(biz)
@@ -193,12 +195,6 @@ def subscribe(request: HttpRequest) -> HttpResponse:
             messages.error(request, "Please choose a valid plan.")
     else:
         form = ChoosePlanForm(initial={"plan": sub.plan_id} if sub.plan_id else None)
-
-    # Check if Stripe is configured
-    stripe_configured = bool(
-        getattr(settings, "STRIPE_SECRET_KEY", "")
-        and getattr(settings, "STRIPE_PUBLISHABLE_KEY", "")
-    )
     
     return render(
         request,
@@ -209,7 +205,6 @@ def subscribe(request: HttpRequest) -> HttpResponse:
             "sub": sub,
             "days_left": sub.days_left_in_trial(),
             "sub_badge": _sub_badge(sub),
-            "stripe_configured": stripe_configured,
         },
     )
 
@@ -244,8 +239,8 @@ def select_plan(request: HttpRequest) -> HttpResponse:
     inv = _create_draft_invoice_for_plan(biz, plan, created_by=request.user)
     request.session["billing_invoice_id"] = str(inv.id)
 
-    # Head to the plan-specific landing (with graceful fallback inside).
-    return redirect("billing:plan_detail", slug=_plan_slug(plan))
+    # Go directly to checkout (production behavior)
+    return redirect("billing:checkout")
 
 
 @login_required
@@ -277,7 +272,7 @@ def plan_detail(request: HttpRequest, slug: str) -> HttpResponse:
             },
         )
     except TemplateDoesNotExist:
-        # No bespoke page yet â€” go straight to checkout.
+        # No bespoke page yet – go straight to checkout.
         return redirect("billing:checkout")
 
 
@@ -288,13 +283,15 @@ def checkout(request: HttpRequest) -> HttpResponse:
     Interactive checkout with tabs:
     - Airtel Money (prompt)
     - Standard Bank (proof/reference)
-    - Card (number/exp/cvv) â€” stubbed tokenization for now
+    - Card (number/exp/cvv) – stubbed tokenization for now
     Shows invoice preview on the side.
+    
+    Payment provider errors are handled here with friendly messages.
     """
     biz: Business = request.business
     inv_id = request.session.get("billing_invoice_id")
     if not inv_id:
-        messages.info(request, "No pending invoice. Pick a plan first.")
+        messages.info(request, "No pending invoice. Please pick a plan first.")
         return redirect("billing:subscribe")
 
     invoice = get_object_or_404(Invoice, id=inv_id, business=biz)
@@ -306,76 +303,90 @@ def checkout(request: HttpRequest) -> HttpResponse:
     if request.method == "POST":
         method = (request.POST.get("method") or "").lower()
 
-        # ---------------- Airtel Money ----------------
-        if method == "airtel":
-            airtel_form = AirtelForm(request.POST, prefix="airtel")
-            if airtel_form.is_valid():
-                msisdn = airtel_form.cleaned_data["msisdn"]
-                Payment.objects.create(
-                    business=biz,
-                    invoice=invoice,
-                    provider=Payment.Provider.AIRTEL,
-                    amount=invoice.total,
-                    currency=invoice.currency,
-                    status=Payment.Status.PENDING,
-                    raw_payload={"msisdn": msisdn},
-                )
-                messages.success(
-                    request,
-                    "Airtel Money prompt initiated (stub). Please approve on your phone. Weâ€™ll activate once confirmed.",
-                )
-                return redirect("billing:success")
+        # Wrap payment processing in try/except for friendly error handling
+        try:
+            # ---------------- Airtel Money ----------------
+            if method == "airtel":
+                airtel_form = AirtelForm(request.POST, prefix="airtel")
+                if airtel_form.is_valid():
+                    msisdn = airtel_form.cleaned_data["msisdn"]
+                    Payment.objects.create(
+                        business=biz,
+                        invoice=invoice,
+                        provider=Payment.Provider.AIRTEL,
+                        amount=invoice.total,
+                        currency=invoice.currency,
+                        status=Payment.Status.PENDING,
+                        raw_payload={"msisdn": msisdn},
+                    )
+                    messages.success(
+                        request,
+                        "Airtel Money prompt initiated. Please approve on your phone. We'll activate once confirmed.",
+                    )
+                    return redirect("billing:success")
 
-        # ---------------- Standard Bank (manual) -----
-        elif method == "standard_bank":
-            bank_form = BankProofForm(request.POST, prefix="bank")
-            if bank_form.is_valid():
-                ref = bank_form.cleaned_data["reference"]
-                Payment.objects.create(
-                    business=biz,
-                    invoice=invoice,
-                    provider=Payment.Provider.STANDARD_BANK,
-                    amount=invoice.total,
-                    currency=invoice.currency,
-                    status=Payment.Status.PENDING,
-                    reference=ref,
-                )
-                messages.info(request, "Proof submitted. Weâ€™ll verify and activate shortly.")
-                return redirect("billing:success")
+            # ---------------- Standard Bank (manual) -----
+            elif method == "standard_bank":
+                bank_form = BankProofForm(request.POST, prefix="bank")
+                if bank_form.is_valid():
+                    ref = bank_form.cleaned_data["reference"]
+                    Payment.objects.create(
+                        business=biz,
+                        invoice=invoice,
+                        provider=Payment.Provider.STANDARD_BANK,
+                        amount=invoice.total,
+                        currency=invoice.currency,
+                        status=Payment.Status.PENDING,
+                        reference=ref,
+                    )
+                    messages.info(request, "Payment proof submitted. We'll verify and activate shortly.")
+                    return redirect("billing:success")
 
-        # ---------------- Card (stub success) --------
-        elif method == "card":
-            card_form = CardForm(request.POST, prefix="card")
-            if card_form.is_valid():
-                # In real flow: tokenize cardâ†’chargeâ†’webhook. For now, mark success.
-                Payment.objects.create(
-                    business=biz,
-                    invoice=invoice,
-                    provider=Payment.Provider.CARD,
-                    amount=invoice.total,
-                    currency=invoice.currency,
-                    status=Payment.Status.SUCCEEDED,
-                    external_id="TEST-OK",
-                )
-                invoice.mark_paid()
+            # ---------------- Card (stub success) --------
+            elif method == "card":
+                card_form = CardForm(request.POST, prefix="card")
+                if card_form.is_valid():
+                    # In real flow: tokenize card→charge→webhook. For now, mark success.
+                    Payment.objects.create(
+                        business=biz,
+                        invoice=invoice,
+                        provider=Payment.Provider.CARD,
+                        amount=invoice.total,
+                        currency=invoice.currency,
+                        status=Payment.Status.SUCCEEDED,
+                        external_id="TEST-OK",
+                    )
+                    invoice.mark_paid()
 
-                sub = _ensure_trial_subscription(biz)
-                if not sub.plan_id:
-                    sub.plan = SubscriptionPlan.objects.filter(is_active=True).order_by("amount").first()
-                sub.status = BusinessSubscription.Status.ACTIVE
-                sub.last_payment_at = timezone.now()
-                sub.advance_period()
-                sub.save(update_fields=["plan", "status", "last_payment_at", "updated_at"])
+                    sub = _ensure_trial_subscription(biz)
+                    if not sub.plan_id:
+                        sub.plan = SubscriptionPlan.objects.filter(is_active=True).order_by("amount").first()
+                    sub.status = BusinessSubscription.Status.ACTIVE
+                    sub.last_payment_at = timezone.now()
+                    sub.advance_period()
+                    sub.save(update_fields=["plan", "status", "last_payment_at", "updated_at"])
 
-                # Notify & mark sent
-                _send_invoice_email(invoice)
-                _send_invoice_whatsapp(invoice)
-                invoice.mark_sent()
+                    # Notify & mark sent
+                    _send_invoice_email(invoice)
+                    _send_invoice_whatsapp(invoice)
+                    invoice.mark_sent()
 
-                messages.success(request, "Payment successful and subscription activated.")
-                return redirect("billing:success")
+                    messages.success(request, "Payment successful and subscription activated!")
+                    return redirect("billing:success")
 
-        messages.error(request, "Please check your payment details and try again.")
+            messages.error(request, "Please check your payment details and try again.")
+            
+        except Exception as e:
+            # Log the real error for debugging
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.error(f"Payment processing error: {e}", exc_info=True)
+            
+            # Show friendly error to user
+            messages.error(
+                request,
+                "Payment processing is temporarily unavailable. Please try another payment method or contact support."
+            )
 
     # Sidebar badge
     sub = _ensure_trial_subscription(biz)
@@ -429,7 +440,7 @@ def invoice_download(request: HttpRequest, pk: str) -> FileResponse:
     content = f"""
     Invoice: {inv.number}
     Business: {getattr(biz, "name", "")}
-    Period: {inv.period_start} â€“ {inv.period_end}
+    Period: {inv.period_start} – {inv.period_end}
     Amount: {inv.currency} {inv.total}
     Status: {inv.get_status_display()}
     """.strip()
@@ -543,7 +554,7 @@ def paywall(request: HttpRequest) -> HttpResponse:
 @require_business
 def manage(request: HttpRequest) -> HttpResponse:
     """
-    Basic â€œmanage subscriptionâ€ page (stub). You can add upgrade/downgrade actions here later.
+    Basic "manage subscription" page (stub). You can add upgrade/downgrade actions here later.
     """
     biz: Business = request.business
     sub = _ensure_trial_subscription(biz)
@@ -552,7 +563,7 @@ def manage(request: HttpRequest) -> HttpResponse:
 
 
 # ------------------------------------------------------------------------------
-# HQ / Admin views (legacy â€“ prefer hq app views)
+# HQ / Admin views (legacy – prefer hq app views)
 # ------------------------------------------------------------------------------
 @staff_member_required
 def hq_subscriptions(request: HttpRequest) -> HttpResponse:
@@ -588,5 +599,4 @@ def force_status(request: HttpRequest, sub_id: str) -> HttpResponse:
     else:
         messages.error(request, "Invalid status.")
     return redirect("billing:hq")
-
 

@@ -332,8 +332,9 @@ def get_vertical_sidebar_items(business_kind: str) -> list[dict]:
             {"section": "MAIN", "url": "dashboard:home", "label": "Dashboard", "icon": "bi-speedometer2", "active_pattern": "/dashboard/", "require_manager": False},
             {"section": "MAIN", "url": "inventory:inventory_dashboard", "label": "Inventory Dashboard", "icon": "bi-columns-gap", "active_pattern": "/inventory/dashboard", "require_manager": False},
             {"section": "MAIN", "url": "inventory:stock_list", "label": "Stock", "icon": "bi-box-seam", "active_pattern": "/inventory/list/", "require_manager": False},
+            {"section": "MAIN", "url": "inventory:phone_products", "label": "Products", "icon": "bi-grid-3x3-gap", "active_pattern": "/inventory/phone-products", "require_manager": False},
             {"section": "MAIN", "url": "inventory:scan_in", "label": "Scan IN", "icon": "bi-upc-scan", "active_pattern": "/inventory/scan", "require_manager": False},
-            {"section": "MAIN", "url": "sell:sell_index", "label": "Sell", "icon": "bi-bag-check", "active_pattern": "/sell/", "require_manager": False},
+            {"section": "MAIN", "url": "inventory:phone_sale_wizard", "label": "Scan & Sell", "icon": "bi-bag-check", "active_pattern": "/inventory/phone-sale-wizard/", "require_manager": False},
             
             # TIME section
             {"section": "TIME", "url": "inventory:time_logs", "label": "Time Logs", "icon": "bi-journal-text", "active_pattern": "/inventory/time/logs", "require_manager": False},
