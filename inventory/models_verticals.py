@@ -788,6 +788,35 @@ class LiquorStockThreshold(models.Model):
         return f"{self.business.name} - {self.get_category_display()} - {self.full_capacity} bottles"
 
 
+class LiquorStockSettings(models.Model):
+    """
+    Business-level stock settings for liquor store.
+    Provides default targets per category and default auto-adjust percentage.
+    """
+    business = models.OneToOneField(Business, on_delete=models.CASCADE, related_name="liquor_stock_settings")
+    
+    # Category-level default targets (fallback when no per-product targets exist)
+    beer_target = models.PositiveIntegerField(default=600, help_text="Default target for beer category")
+    cider_target = models.PositiveIntegerField(default=600, help_text="Default target for cider category")
+    spirits_target = models.PositiveIntegerField(default=600, help_text="Default target for spirits category")
+    whiskey_target = models.PositiveIntegerField(default=600, help_text="Default target for whiskey category")
+    wine_target = models.PositiveIntegerField(default=600, help_text="Default target for wine category")
+    other_target = models.PositiveIntegerField(default=600, help_text="Default target for other category")
+    
+    # Default auto-adjust percentage for all products
+    default_auto_adjust_pct = models.PositiveIntegerField(default=20, help_text="Default auto-adjust percentage for products (typically 20%)")
+    
+    # Auto-adjust settings
+    auto_adjust_lookback_days = models.PositiveIntegerField(default=30, help_text="Days to look back when calculating peak demand")
+    
+    class Meta:
+        verbose_name = "Liquor Stock Settings"
+        verbose_name_plural = "Liquor Stock Settings"
+    
+    def __str__(self):
+        return f"Stock Settings for {self.business.name}"
+
+
 # ==============================================================================
 # MONTHLY SALES TARGETS (Generic for all verticals)
 # ==============================================================================

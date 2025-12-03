@@ -106,8 +106,17 @@ class LiquorSellForm(forms.Form):
 @require_business
 @require_business_kind(BusinessKind.LIQUOR)
 def sell_liquor(request):
-    """Sell liquor (bottle or shot)"""
+    """Sell liquor (bottle or shot) - Gamified flow"""
     business = get_active_business(request)
+    
+    # Safely get membership and subscription
+    membership = getattr(request, "membership", None)
+    subscription = None
+    try:
+        subscription = getattr(business, "subscription", None)
+    except Exception:
+        # Business has no subscription yet (trial or free tier)
+        subscription = None
     
     # Get active shift (if any)
     active_shift = get_active_shift(request)
@@ -117,12 +126,30 @@ def sell_liquor(request):
         messages.warning(request, "You don't have an active shift. Start a shift first to track sales properly.")
     
     if request.method == "POST":
-        form = LiquorSellForm(business, request.POST)
-        if form.is_valid():
-            data = form.cleaned_data
-            product = data["product"]
-            unit = data["unit"]
-            quantity = data["quantity"]
+        # POST logic remains intact - handle sale recording
+        # Extract POST data directly (no form validation for speed)
+        try:
+            product_id = int(request.POST.get("product_id", 0))
+            quantity = int(request.POST.get("quantity", 1))
+            mode = request.POST.get("mode", "bottle")  # "bottle" or "shot"
+            
+            product = MerchProduct.objects.get(
+                pk=product_id,
+                business=business,
+                kind=BusinessKind.LIQUOR,
+                is_active=True
+            )
+            
+            # Map mode to unit
+            unit = LiquorUnitType.SHOT if mode == "shot" else LiquorUnitType.BOTTLE
+            
+            # Validate shot sales
+            if mode == "shot" and not product.has_shots:
+                messages.error(request, f"{product.name} does not support shot sales.")
+                return redirect("liquor:sell")
+            
+            # Get price
+            unit_price = product.price_per_shot if mode == "shot" else product.price_per_bottle
             
             with transaction.atomic():
                 # Calculate cost for profit tracking
@@ -130,60 +157,72 @@ def sell_liquor(request):
                 total_cost = Decimal(quantity) * unit_cost
                 
                 # Calculate total price
-                total = Decimal(quantity) * data["unit_price"]
+                total = Decimal(quantity) * unit_price
                 
-                # Create sale
+                # Create sale (always cash for quick flow; free/credit can use old form if needed)
                 sale = LiquorSale.objects.create(
                     business=business,
                     product=product,
-                    shift=active_shift,  # Attach to active shift
+                    shift=active_shift,
                     unit=unit,
                     quantity=quantity,
-                    unit_price=data["unit_price"],
+                    unit_price=unit_price,
                     total_price=total,
                     unit_cost=unit_cost,
                     total_cost=total_cost,
-                    sale_type=data["sale_type"],
+                    sale_type=LiquorSaleType.SALE,
                     sold_by=request.user,
-                    notes=data.get("notes", "")
+                    notes=""
                 )
                 
-                # If credit sale, create credit record
-                if data["sale_type"] == LiquorSaleType.CREDIT:
-                    credit = LiquorCredit.objects.create(
-                        business=business,
-                        customer_name=data["customer_name"],
-                        customer_phone=data.get("customer_phone", ""),
-                        amount=total,
-                        related_sale=sale,
-                        created_by=request.user
-                    )
-                    sale.linked_credit = credit
-                    sale.save(update_fields=["linked_credit"])
-                elif data["sale_type"] != LiquorSaleType.FREE:
-                    # Create wallet entry for cash sale (not for free sales)
-                    LiquorWalletEntry.objects.create(
-                        business=business,
-                        amount=total,
-                        description=f"Sale: {product.name} ({quantity} {unit})",
-                        entry_type="income",
-                        related_sale=sale,
-                        created_by=request.user
-                    )
+                # Create wallet entry for cash sale
+                LiquorWalletEntry.objects.create(
+                    business=business,
+                    amount=total,
+                    description=f"Sale: {product.name} ({quantity} {unit})",
+                    entry_type="income",
+                    related_sale=sale,
+                    created_by=request.user
+                )
             
-            sale_type_display = dict(LiquorSaleType.choices).get(data["sale_type"], data["sale_type"])
-            messages.success(request, f"{sale_type_display} recorded: {quantity} {unit} of {product.name}")
-            return redirect("inventory:liquor_sell")  # Stay on sell page for quick successive sales
-    else:
-        form = LiquorSellForm(business)
+            messages.success(request, f"Sold {quantity} × {product.name} ({mode})")
+            return redirect("liquor:sell")
+            
+        except (ValueError, MerchProduct.DoesNotExist, KeyError) as e:
+            messages.error(request, f"Sale failed: {e}")
+            return redirect("liquor:sell")
+    
+    # GET: Build category-grouped products
+    from collections import defaultdict
+    
+    products = MerchProduct.objects.filter(
+        business=business,
+        kind=BusinessKind.LIQUOR,
+        is_archived=False,
+        is_active=True
+    ).order_by("category", "name")
+    
+    products_by_category = defaultdict(list)
+    for p in products:
+        cat = (p.category or "").lower()
+        if cat:
+            products_by_category[cat].append(p)
+    
+    # Build categories list in order, but include only those that have products
+    category_order = ["beer", "cider", "wine", "spirits", "whiskey"]
+    categories = [cat for cat in category_order if cat in products_by_category]
     
     recent_sales = LiquorSale.objects.filter(business=business).select_related("product", "sold_by", "shift")[:10]
     
     return render(request, "inventory/liquor/sell.html", {
-        "form": form,
+        "categories": categories,
+        "products_by_category": dict(products_by_category),
         "recent_sales": recent_sales,
         "business": business,
+        "membership": membership,
+        "subscription": subscription,
         "active_shift": active_shift,
+        "active_tab": "sell",
     })
 
 
@@ -260,7 +299,7 @@ def convert_sale_to_credit(request, sale_id):
     
     if sale.is_credit:
         messages.warning(request, "This sale is already marked as credit.")
-        return redirect("inventory:liquor_sales_list")
+        return redirect("liquor:sales_list")
     
     if request.method == "POST":
         form = ConvertToCreditForm(request.POST)
@@ -301,7 +340,7 @@ def convert_sale_to_credit(request, sale_id):
                     )
                     messages.success(request, f"New credit created for {data['customer_name']}")
             
-            return redirect("inventory:liquor_credits_list")
+            return redirect("liquor:credits_list")
     else:
         form = ConvertToCreditForm()
     
@@ -391,7 +430,7 @@ def submit_credit_payment(request, credit_id):
     
     if credit.status == LiquorCreditStatus.SETTLED:
         messages.warning(request, "This credit is already settled.")
-        return redirect("inventory:liquor_credit_detail", credit_id=credit.id)
+        return redirect("liquor:credit_detail", credit_id=credit.id)
     
     if request.method == "POST":
         form = CreditPaymentForm(request.POST, request.FILES)
@@ -408,7 +447,7 @@ def submit_credit_payment(request, credit_id):
             )
             
             messages.success(request, "Payment submitted for approval.")
-            return redirect("inventory:liquor_credit_detail", credit_id=credit.id)
+            return redirect("liquor:credit_detail", credit_id=credit.id)
     else:
         form = CreditPaymentForm(initial={"amount": credit.balance})
     
@@ -470,7 +509,7 @@ def approve_payment(request, payment_id):
         )
     
     messages.success(request, f"Payment of {payment.amount} approved and credit updated.")
-    return redirect("inventory:liquor_pending_payments")
+    return redirect("liquor:pending_payments")
 
 
 @login_required
@@ -492,7 +531,7 @@ def reject_payment(request, payment_id):
     payment.reject(request.user, reason)
     
     messages.warning(request, f"Payment rejected. Reason: {reason}")
-    return redirect("inventory:liquor_pending_payments")
+    return redirect("liquor:pending_payments")
 
 
 # ==============================================================================
@@ -533,7 +572,7 @@ def request_stock_edit(request, product_id):
             )
             
             messages.success(request, "Stock edit request submitted for manager approval.")
-            return redirect("inventory:liquor_dashboard")
+            return redirect("verticals:liquor_dashboard")
     else:
         form = StockEditRequestForm()
     
@@ -559,6 +598,167 @@ def stock_edit_requests(request):
     return render(request, "inventory/liquor/stock_edit_requests.html", {
         "requests": requests_qs,
         "business": business,
+    })
+
+
+# ==============================================================================
+# STOCK SETTINGS (Managers)
+# ==============================================================================
+
+class LiquorStockSettingsForm(forms.Form):
+    """Form for editing business-level liquor stock settings"""
+    beer_target = forms.IntegerField(
+        min_value=0, initial=600,
+        widget=forms.NumberInput(attrs={"class": "form-control", "min": "0"})
+    )
+    cider_target = forms.IntegerField(
+        min_value=0, initial=600,
+        widget=forms.NumberInput(attrs={"class": "form-control", "min": "0"})
+    )
+    spirits_target = forms.IntegerField(
+        min_value=0, initial=600,
+        widget=forms.NumberInput(attrs={"class": "form-control", "min": "0"})
+    )
+    whiskey_target = forms.IntegerField(
+        min_value=0, initial=600,
+        widget=forms.NumberInput(attrs={"class": "form-control", "min": "0"})
+    )
+    wine_target = forms.IntegerField(
+        min_value=0, initial=600,
+        widget=forms.NumberInput(attrs={"class": "form-control", "min": "0"})
+    )
+    other_target = forms.IntegerField(
+        min_value=0, initial=600,
+        widget=forms.NumberInput(attrs={"class": "form-control", "min": "0"})
+    )
+    default_auto_adjust_pct = forms.IntegerField(
+        min_value=0, max_value=200, initial=20,
+        widget=forms.NumberInput(attrs={"class": "form-control", "min": "0", "max": "200"}),
+        label="Default Auto-Adjust Percentage",
+        help_text="Default percentage to increase targets over peak demand (typically 20%)"
+    )
+    auto_adjust_lookback_days = forms.IntegerField(
+        min_value=1, max_value=90, initial=30,
+        widget=forms.NumberInput(attrs={"class": "form-control", "min": "1", "max": "90"}),
+        label="Auto-Adjust Lookback Period (Days)",
+        help_text="Number of days to analyze when calculating peak demand (typically 30)"
+    )
+
+
+@login_required
+@require_business
+@require_business_kind(BusinessKind.LIQUOR)
+@manager_required
+def stock_settings(request):
+    """Edit business-level stock settings"""
+    from inventory.models_verticals import LiquorStockSettings
+    
+    business = get_active_business(request)
+    
+    # Get or create settings
+    settings, created = LiquorStockSettings.objects.get_or_create(
+        business=business,
+        defaults={
+            "beer_target": 600,
+            "cider_target": 600,
+            "spirits_target": 600,
+            "whiskey_target": 600,
+            "wine_target": 600,
+            "other_target": 600,
+            "default_auto_adjust_pct": 20,
+            "auto_adjust_lookback_days": 30,
+        }
+    )
+    
+    if request.method == "POST":
+        form = LiquorStockSettingsForm(request.POST)
+        if form.is_valid():
+            data = form.cleaned_data
+            
+            settings.beer_target = data["beer_target"]
+            settings.cider_target = data["cider_target"]
+            settings.spirits_target = data["spirits_target"]
+            settings.whiskey_target = data["whiskey_target"]
+            settings.wine_target = data["wine_target"]
+            settings.other_target = data["other_target"]
+            settings.default_auto_adjust_pct = data["default_auto_adjust_pct"]
+            settings.auto_adjust_lookback_days = data["auto_adjust_lookback_days"]
+            settings.save()
+            
+            messages.success(request, "Stock settings updated successfully.")
+            return redirect("liquor:stock_overview")
+    else:
+        initial = {
+            "beer_target": settings.beer_target,
+            "cider_target": settings.cider_target,
+            "spirits_target": settings.spirits_target,
+            "whiskey_target": settings.whiskey_target,
+            "wine_target": settings.wine_target,
+            "other_target": settings.other_target,
+            "default_auto_adjust_pct": settings.default_auto_adjust_pct,
+            "auto_adjust_lookback_days": settings.auto_adjust_lookback_days,
+        }
+        form = LiquorStockSettingsForm(initial=initial)
+    
+    return render(request, "inventory/liquor/stock_settings.html", {
+        "form": form,
+        "settings": settings,
+        "business": business,
+    })
+
+
+@login_required
+@require_business
+@require_business_kind(BusinessKind.LIQUOR)
+@manager_required
+@require_POST
+def update_category_target(request, category):
+    """Update target for a specific category (AJAX endpoint)"""
+    from inventory.models_verticals import LiquorStockSettings
+    from decimal import Decimal
+    
+    business = get_active_business(request)
+    
+    # Validate category
+    valid_categories = ["beer", "cider", "spirits", "whiskey", "wine", "other"]
+    if category not in valid_categories:
+        return JsonResponse({"success": False, "error": "Invalid category"}, status=400)
+    
+    # Get or create settings
+    settings, created = LiquorStockSettings.objects.get_or_create(
+        business=business,
+        defaults={
+            "beer_target": 600,
+            "cider_target": 600,
+            "spirits_target": 600,
+            "whiskey_target": 600,
+            "wine_target": 600,
+            "other_target": 600,
+            "default_auto_adjust_pct": 20,
+            "auto_adjust_lookback_days": 30,
+        }
+    )
+    
+    # Get new target from POST
+    try:
+        new_target = int(request.POST.get("target", 0))
+        if new_target < 0:
+            return JsonResponse({"success": False, "error": "Target must be non-negative"}, status=400)
+    except (ValueError, TypeError):
+        return JsonResponse({"success": False, "error": "Invalid target value"}, status=400)
+    
+    # Update the appropriate field
+    field_name = f"{category}_target"
+    setattr(settings, field_name, new_target)
+    settings.save(update_fields=[field_name])
+    
+    messages.success(request, f"Updated {category.title()} target to {new_target} bottles.")
+    
+    return JsonResponse({
+        "success": True,
+        "category": category,
+        "new_target": new_target,
+        "message": f"Updated {category.title()} target to {new_target} bottles."
     })
 
 
@@ -626,7 +826,7 @@ def start_shift(request):
     existing_shift = get_active_shift(request)
     if existing_shift:
         messages.warning(request, f"You already have an active shift (started {existing_shift.started_at.strftime('%H:%M %d/%m/%Y')}). Close it before starting a new one.")
-        return redirect("inventory:liquor_close_shift", shift_id=existing_shift.id)
+        return redirect("liquor:close_shift", shift_id=existing_shift.id)
     
     if request.method == "POST":
         form = StartShiftForm(business, request.POST)
@@ -669,7 +869,7 @@ def start_shift(request):
                     )
                 
                 messages.success(request, f"Shift started successfully! Record all sales during your shift.")
-                return redirect("inventory:liquor_sell")
+                return redirect("liquor:sell")
     else:
         form = StartShiftForm(business)
     
@@ -711,7 +911,7 @@ def close_shift(request, shift_id):
     # Only the barman or a manager can close the shift
     if not (shift.barman == request.user or _is_manager(request.user)):
         messages.error(request, "You can only close your own shifts.")
-        return redirect("inventory:liquor_dashboard")
+        return redirect("verticals:liquor_dashboard")
     
     if request.method == "POST":
         with transaction.atomic():
@@ -800,7 +1000,7 @@ def close_shift(request, shift_id):
             shift.save()
             
             messages.success(request, f"Shift closed successfully! Total sales: MK {total_sales:,.2f}, Profit: MK {shift.total_profit_amount:,.2f}")
-            return redirect("inventory:liquor_shift_report", shift_id=shift.id)
+            return redirect("liquor:shift_report", shift_id=shift.id)
     
     # Get opening stock to display
     opening_stock = shift.stock_snapshots.filter(snapshot_type="opening").select_related("product")
@@ -920,126 +1120,38 @@ def shift_report(request, shift_id):
 @require_business_kind(BusinessKind.LIQUOR)
 def stock_overview(request):
     """
-    Stock overview with category batteries, editable thresholds, and monthly target adjustment.
+    Stock overview with category batteries using configurable per-product and business-level targets.
     """
-    from inventory.models_verticals import LiquorStockThreshold
-    from django.contrib import messages
+    from inventory.liquor_utils import get_stock_overview_data, recalculate_liquor_targets_for_business
     
     business = get_active_business(request)
     location = getattr(request, "active_location", None)
-    
-    # Handle monthly target update (managers only)
     is_manager = _is_manager(request.user)
-    if request.method == "POST" and is_manager and "update_target" in request.POST:
+    
+    # Handle auto-adjust trigger (managers only)
+    if request.method == "POST" and is_manager and "trigger_auto_adjust" in request.POST:
         try:
-            new_target = int(request.POST.get("target_units", 0))
-            now = timezone.now()
-            year = now.year
-            month = now.month
-            
-            target_obj, created = MonthlySalesTarget.objects.get_or_create(
-                business=business,
-                location=location,
-                vertical="liquor",
-                year=year,
-                month=month,
-                defaults={"target_units": new_target, "target_revenue": Decimal("0.00")},
-            )
-            
-            if not created:
-                target_obj.target_units = new_target
-                target_obj.save(update_fields=["target_units", "updated_at"])
-            
-            messages.success(request, f"Monthly sales target updated to {new_target} bottles.")
-            return redirect("inventory_liquor:stock_overview")
-        except (ValueError, TypeError):
-            messages.error(request, "Invalid target value. Please enter a valid number.")
+            updated = recalculate_liquor_targets_for_business(business)
+            if updated:
+                count = len(updated)
+                messages.success(request, f"Auto-adjusted targets for {count} product(s) based on recent sales data.")
+            else:
+                messages.info(request, "No products required target adjustment at this time.")
+            return redirect("liquor:stock_overview")
+        except Exception as e:
+            messages.error(request, f"Error during auto-adjust: {str(e)}")
     
-    # Get all active liquor products
-    products = MerchProduct.objects.filter(
-        business=business,
-        kind=BusinessKind.LIQUOR,
-        is_active=True
-    )
-    
-    # If location is set, filter by location
-    if location:
-        products = products.filter(location=location)
-    
-    # Group by category and count bottles
-    by_category = {}
-    for p in products:
-        cat = (p.category or "other").lower()
-        by_category.setdefault(cat, 0)
-        # Use quantity field for bottle count
-        qty = getattr(p, "quantity", 0) or 0
-        by_category[cat] += qty
-    
-    # Get thresholds
-    thresholds_qs = LiquorStockThreshold.objects.filter(business=business)
-    if location:
-        thresholds_qs = thresholds_qs.filter(location=location)
-    
-    thresholds = {
-        t.category: t.full_capacity
-        for t in thresholds_qs
-    }
-    
-    # Build category rows
-    category_rows = []
-    for cat, qty in by_category.items():
-        cap = thresholds.get(cat, 600)  # default 600 if not set
-        pct = int(qty * 100 / cap) if cap else 0
-        pct = min(pct, 100)  # cap at 100%
-        category_rows.append({
-            "category": cat,
-            "quantity": qty,
-            "capacity": cap,
-            "percent": pct,
-        })
-    
-    # Sort by category name
-    category_rows.sort(key=lambda x: x["category"])
-    
-    # Calculate totals
-    total_qty = sum(row["quantity"] for row in category_rows)
-    total_cap = sum(row["capacity"] for row in category_rows) or 1
-    total_pct = int(total_qty * 100 / total_cap)
-    
-    # Get current monthly target for this business/location
-    now = timezone.now()
-    year = now.year
-    month = now.month
-    
-    target_obj, _ = MonthlySalesTarget.objects.get_or_create(
-        business=business,
-        location=location,
-        vertical="liquor",
-        year=year,
-        month=month,
-        defaults={"target_units": 0, "target_revenue": Decimal("0.00")},
-    )
-    
-    # Stock awareness warning
-    stock_warning = False
-    if target_obj.target_units > 0 and target_obj.target_units > total_qty:
-        stock_warning = True
-    
-    # Suggested max target (e.g., 2x current stock)
-    suggested_max = max(total_qty * 2, 100)
+    # Get stock overview data using the new utility function
+    data = get_stock_overview_data(business, location)
     
     ctx = {
         "business": business,
         "location": location,
-        "categories": category_rows,
-        "total_qty": total_qty,
-        "total_cap": total_cap,
-        "total_pct": total_pct,
-        "sales_target": target_obj,
-        "stock_warning": stock_warning,
-        "suggested_max": suggested_max,
+        "categories": data["categories"],
+        "totals": data["totals"],
+        "warnings": data["warnings"],
+        "settings": data["settings"],
         "is_manager": is_manager,
-        "current_year": year,
-        "current_month": month,
+        "active_tab": "stock_overview",
     }
     return render(request, "verticals/liquor/stock_overview.html", ctx)

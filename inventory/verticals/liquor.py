@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from datetime import timedelta
 from decimal import Decimal
 
@@ -16,6 +17,7 @@ from inventory.models_verticals import (
     LiquorSale, LiquorCredit, PaymentMethod, LiquorShiftStock, MonthlySalesTarget
 )
 from inventory.models import MerchProduct
+from inventory.liquor_seed import create_default_liquor_catalog, should_seed_liquor_products
 
 from . import base
 
@@ -44,6 +46,14 @@ def dashboard(request):
     
     if location is None:
         location = getattr(request, "location", None)
+    
+    # Auto-seed liquor products if this is a new liquor business with no products
+    if should_seed_liquor_products(business):
+        try:
+            create_default_liquor_catalog(business, location)
+        except Exception:
+            # Silently fail if seeding doesn't work - don't break the dashboard
+            pass
     
     # Basic product metrics
     metrics = base.merch_metrics(business, BusinessKind.LIQUOR)
@@ -318,6 +328,93 @@ def dashboard(request):
         # Gracefully degrade if helpers not available
         ctx_enhancements = {}
     
+    # ========== Rotating Dashboard Insights (Goal 3) ==========
+    # Compute fast-moving products, locations, agents, and payment mix for chart rotation
+    insights_window = timedelta(days=30)
+    insights_start = now - insights_window
+    
+    # Fast products (top 5 by quantity sold)
+    fast_products_data = (
+        LiquorSale.objects.filter(
+            business=business,
+            sold_at__gte=insights_start
+        )
+        .values("product__name")
+        .annotate(qty=Sum("quantity"))
+        .order_by("-qty")[:5]
+    )
+    fast_products_json = json.dumps([
+        {"label": item["product__name"] or "Unknown", "value": int(item["qty"])}
+        for item in fast_products_data
+    ])
+    
+    # Fast locations (top 5 by revenue)
+    fast_locations_data = []
+    if location:
+        # If we have location tracking, aggregate by location
+        try:
+            from inventory.models import Location
+            fast_locations_data = (
+                LiquorSale.objects.filter(
+                    business=business,
+                    sold_at__gte=insights_start,
+                    shift__location__isnull=False
+                )
+                .values("shift__location__name")
+                .annotate(revenue=Sum("total_price"))
+                .order_by("-revenue")[:5]
+            )
+            fast_locations_json = json.dumps([
+                {"label": item["shift__location__name"] or "Unknown", "value": float(item["revenue"])}
+                for item in fast_locations_data
+            ])
+        except Exception:
+            fast_locations_json = json.dumps([])
+    else:
+        fast_locations_json = json.dumps([])
+    
+    # Fast agents (top 5 by revenue)
+    fast_agents_data = (
+        LiquorSale.objects.filter(
+            business=business,
+            sold_at__gte=insights_start,
+            sold_by__isnull=False
+        )
+        .values("sold_by__username", "sold_by__first_name", "sold_by__last_name")
+        .annotate(revenue=Sum("total_price"))
+        .order_by("-revenue")[:5]
+    )
+    fast_agents_json = json.dumps([
+        {
+            "label": (
+                f"{item['sold_by__first_name']} {item['sold_by__last_name']}".strip() 
+                or item["sold_by__username"] 
+                or "Unknown"
+            ),
+            "value": float(item["revenue"])
+        }
+        for item in fast_agents_data
+    ])
+    
+    # Payment mix (aggregate by payment method)
+    payment_mix_data = (
+        LiquorSale.objects.filter(
+            business=business,
+            sold_at__gte=insights_start,
+            is_free=False
+        )
+        .values("payment_method")
+        .annotate(total=Sum("total_price"))
+        .order_by("-total")
+    )
+    payment_mix_json = json.dumps([
+        {
+            "label": dict(PaymentMethod.choices).get(item["payment_method"], item["payment_method"]),
+            "value": float(item["total"])
+        }
+        for item in payment_mix_data
+    ])
+    
     ctx.update(
         {
             "hero_title": "Liquor & Bar",
@@ -372,6 +469,12 @@ def dashboard(request):
             # UI flags
             "show_search": False,  # Liquor dashboard doesn't need search bar
             "active_tab": "home",  # For base.html mobile nav highlighting
+            
+            # Rotating insights data (Goal 3)
+            "fast_products_json": fast_products_json,
+            "fast_locations_json": fast_locations_json,
+            "fast_agents_json": fast_agents_json,
+            "payment_mix_json": payment_mix_json,
             
             **ctx_enhancements,  # Merge dashboard enhancements
         }

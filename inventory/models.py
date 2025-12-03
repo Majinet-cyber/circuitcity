@@ -223,6 +223,11 @@ class MerchProduct(models.Model):
     cost_per_bottle = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True, help_text="Cost price for a full bottle")
     cost_per_shot = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True, help_text="Cost price per shot")
 
+    # Smart stock targets (per-product) - for liquor "battery" and auto-adjust
+    target_bottles = models.PositiveIntegerField(default=0, help_text="Desired full stock for this product in bottles")
+    auto_adjust_enabled = models.BooleanField(default=True, help_text="Enable smart auto-adjust based on sales demand")
+    auto_adjust_pct = models.PositiveIntegerField(default=20, help_text="Increase target by this % over observed peak demand")
+
     # Archive helpers (for clothing and other verticals)
     is_archived = models.BooleanField(default=False, db_index=True)
     archived_at = models.DateTimeField(null=True, blank=True)

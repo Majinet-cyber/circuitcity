@@ -336,7 +336,7 @@ class LiquorProductForm(forms.Form):
         widget=forms.TextInput(attrs={"class": "form-control input", "placeholder": "e.g. Hunter's Gold"})
     )
     category = forms.ChoiceField(
-        choices=[("", "Select category")] + [("beer", "Beer"), ("cider", "Cider"), ("spirits", "Spirits"), ("wine", "Wine"), ("other", "Other")],
+        choices=[("", "Select category")] + [("beer", "Beer"), ("cider", "Cider"), ("spirits", "Spirits"), ("wine", "Wine"), ("whiskey", "Whiskey"), ("other", "Other")],
         required=False,
         widget=forms.Select(attrs={"class": "form-control"})
     )
@@ -346,54 +346,125 @@ class LiquorProductForm(forms.Form):
     )
     shots_per_bottle = forms.IntegerField(
         min_value=1, required=False,
-        widget=forms.NumberInput(attrs={"class": "form-control input", "placeholder": "e.g. 25"})
+        widget=forms.NumberInput(attrs={"class": "form-control input", "placeholder": "e.g. 25", "min": "1"})
     )
     barman_shots_reserved = forms.IntegerField(
         min_value=0, required=False, initial=2,
-        widget=forms.NumberInput(attrs={"class": "form-control input", "placeholder": "Typically 2"})
+        widget=forms.NumberInput(attrs={"class": "form-control input", "placeholder": "2", "min": "0"})
     )
     price_bottle = forms.DecimalField(
         max_digits=12, decimal_places=2,
-        widget=forms.NumberInput(attrs={"class": "form-control input", "step": "0.01", "min": "0"})
+        widget=forms.NumberInput(attrs={"class": "form-control input", "step": "0.01", "min": "0", "placeholder": "0.00"})
+    )
+    cost_per_bottle = forms.DecimalField(
+        max_digits=12, decimal_places=2, required=False,
+        widget=forms.NumberInput(attrs={"class": "form-control input", "step": "0.01", "min": "0", "placeholder": "0.00"})
     )
     price_shot = forms.DecimalField(
         max_digits=12, decimal_places=2, required=False,
-        widget=forms.NumberInput(attrs={"class": "form-control input", "step": "0.01", "min": "0"})
+        widget=forms.NumberInput(attrs={"class": "form-control input", "step": "0.01", "min": "0", "placeholder": "0.00"})
     )
     qty_bottles = forms.IntegerField(
         min_value=0, required=False,
-        widget=forms.NumberInput(attrs={"class": "form-control input"})
+        widget=forms.NumberInput(attrs={"class": "form-control input", "min": "0", "placeholder": "0"})
     )
+    
+    # Smart stock target fields
+    target_bottles = forms.IntegerField(
+        min_value=0, required=False, initial=0,
+        widget=forms.NumberInput(attrs={"class": "form-control input", "min": "0", "placeholder": "0", "title": "Target stock level"})
+    )
+    auto_adjust_enabled = forms.BooleanField(
+        required=False, initial=True,
+        widget=forms.CheckboxInput(attrs={"class": "form-check-input"}),
+        label="Enable smart auto-adjust"
+    )
+    auto_adjust_pct = forms.IntegerField(
+        min_value=0, max_value=200, required=False, initial=20,
+        widget=forms.NumberInput(attrs={"class": "form-control input", "min": "0", "max": "200", "placeholder": "20"})
+    )
+    
+    def clean(self):
+        cleaned_data = super().clean()
+        has_shots = cleaned_data.get("has_shots")
+        shots_per_bottle = cleaned_data.get("shots_per_bottle")
+        price_shot = cleaned_data.get("price_shot")
+        
+        # If has_shots is enabled, require shots_per_bottle and price_shot
+        if has_shots:
+            if not shots_per_bottle:
+                raise forms.ValidationError("Shots per bottle is required when shot sales are enabled.")
+            if not price_shot:
+                raise forms.ValidationError("Price per shot is required when shot sales are enabled.")
+        
+        return cleaned_data
 
 def _inflate_liquor(instance: Product, data: dict):
-    if hasattr(instance, "liquor_name"):
-        instance.liquor_name = data.get("liquor_name") or ""
-    elif hasattr(instance, "name"):
+    """Map form data to MerchProduct/LiquorProduct instance"""
+    # Map liquor_name to name field
+    if hasattr(instance, "name"):
         instance.name = data.get("liquor_name") or ""
+    elif hasattr(instance, "liquor_name"):
+        instance.liquor_name = data.get("liquor_name") or ""
     elif hasattr(instance, "title"):
         instance.title = data.get("liquor_name") or ""
     else:
         _assign_if_has(instance, "variant", data.get("liquor_name") or "")
 
-    # New liquor fields
+    # Category and shot configuration
     _assign_if_has(instance, "category", data.get("category") or "")
     _assign_if_has(instance, "has_shots", data.get("has_shots") or False)
     _assign_if_has(instance, "shots_per_bottle", data.get("shots_per_bottle"))
     _assign_if_has(instance, "barman_shots_reserved", data.get("barman_shots_reserved") or 2)
     
-    for field, value in (("price_bottle", data.get("price_bottle")),
-                         ("price_per_bottle", data.get("price_bottle")),
-                         ("price_shot", data.get("price_shot")),
-                         ("price_per_shot", data.get("price_shot"))):
-        if value is not None and hasattr(instance, field):
-            setattr(instance, field, value)
-
-    _assign_if_has(instance, "qty_bottles", data.get("qty_bottles"))
+    # Prices - map to both possible field names
+    price_bottle = data.get("price_bottle")
+    if price_bottle is not None:
+        _assign_if_has(instance, "price_per_bottle", price_bottle)
+        _assign_if_has(instance, "price_bottle", price_bottle)
+    
+    price_shot = data.get("price_shot")
+    if price_shot is not None:
+        _assign_if_has(instance, "price_per_shot", price_shot)
+        _assign_if_has(instance, "price_shot", price_shot)
+    
+    # Cost prices for profit tracking
+    cost_per_bottle = data.get("cost_per_bottle")
+    if cost_per_bottle is not None:
+        _assign_if_has(instance, "cost_per_bottle", cost_per_bottle)
+    
+    # Smart stock targets
+    target_bottles = data.get("target_bottles")
+    if target_bottles is not None:
+        _assign_if_has(instance, "target_bottles", target_bottles)
+    
+    auto_adjust_enabled = data.get("auto_adjust_enabled")
+    if auto_adjust_enabled is not None:
+        _assign_if_has(instance, "auto_adjust_enabled", auto_adjust_enabled)
+    
+    auto_adjust_pct = data.get("auto_adjust_pct")
+    if auto_adjust_pct is not None:
+        _assign_if_has(instance, "auto_adjust_pct", auto_adjust_pct)
+    
+    # Initial stock quantity (not a model field, handle separately if needed)
+    # qty_bottles is not saved to the model directly in this flow
 
 @login_required
 @manager_required
 @require_business_kind(BusinessKind.LIQUOR)
 def product_create_liquor_v2(request):
+    # Get active business
+    business = get_active_business(request)
+    
+    # Try to seed liquor products if business has none yet
+    try:
+        from inventory.liquor_seed import should_seed_liquor_products, create_default_liquor_catalog
+        if business and should_seed_liquor_products(business):
+            create_default_liquor_catalog(business)
+    except Exception:
+        # Fail silently – we never want seeding to break the page
+        pass
+    
     qs = _product_base_qs(request)
 
     if request.method == "POST":
@@ -418,15 +489,38 @@ def product_create_liquor_v2(request):
     else:
         form = LiquorProductForm()
 
-    products = qs.order_by("-id")[:50]
-    return render(request, "inventory/products/liquor_v2.html", {"form": form, "products": products, "vertical": "liquor"})
+    # Query all liquor products for the business (non-archived)
+    from inventory.models import LiquorProduct
+    products = LiquorProduct.objects.filter(
+        business=business,
+        is_archived=False,
+    ).order_by("category", "name")
+    
+    # Check if user is a manager
+    try:
+        from core.decorators import _is_manager
+        is_manager = _is_manager(request.user)
+    except (ImportError, AttributeError):
+        is_manager = request.user.is_staff or request.user.is_superuser
+    
+    return render(request, "inventory/products/liquor_v2.html", {
+        "form": form,
+        "products": products,
+        "vertical": "liquor",
+        "active_tab": "liquor_products",
+        "IS_MANAGER": is_manager,
+    })
 
 @login_required
 @manager_required
 @require_business_kind(BusinessKind.LIQUOR)
 def product_edit_liquor_v2(request, pk: int):
-    qs = _product_base_qs(request)
-    obj = get_object_or_404(qs, pk=pk)
+    """Edit an existing liquor product"""
+    business = get_active_business(request)
+    
+    # Get the product, ensuring it belongs to this business
+    from inventory.models import LiquorProduct
+    obj = get_object_or_404(LiquorProduct, pk=pk, business=business)
 
     if request.method == "POST":
         form = LiquorProductForm(request.POST)
@@ -434,12 +528,16 @@ def product_edit_liquor_v2(request, pk: int):
             _inflate_liquor(obj, form.cleaned_data)
             try:
                 obj.save()
-                messages.success(request, "Liquor item updated.")
+                messages.success(request, f"Updated {obj.name}.")
                 return redirect(URL_NAME_LIQUOR)
-            except IntegrityError:
-                messages.error(request, "Could not update item due to a uniqueness constraint.")
+            except IntegrityError as e:
+                if 'unique' in str(e).lower():
+                    messages.error(request, "A product with this name already exists for your business.")
+                else:
+                    messages.error(request, "Could not update product due to a database constraint.")
     else:
         def g(*names, default=None):
+            """Get first non-empty value from object attributes"""
             for n in names:
                 if hasattr(obj, n):
                     v = getattr(obj, n)
@@ -448,19 +546,42 @@ def product_edit_liquor_v2(request, pk: int):
             return default
 
         initial = {
-            "liquor_name": g("liquor_name", "name", "title", "variant", default=""),
+            "liquor_name": g("name", "liquor_name", "title", "variant", default=""),
             "category": g("category", default=""),
             "has_shots": g("has_shots", default=False),
             "shots_per_bottle": g("shots_per_bottle", default=None),
             "barman_shots_reserved": g("barman_shots_reserved", default=2),
-            "price_bottle": g("price_bottle", "price_per_bottle", default=None),
-            "price_shot": g("price_shot", "price_per_shot", default=None),
-            "qty_bottles": g("qty_bottles", default=None),
+            "price_bottle": g("price_per_bottle", "price_bottle", default=None),
+            "cost_per_bottle": g("cost_per_bottle", default=None),
+            "price_shot": g("price_per_shot", "price_shot", default=None),
+            "qty_bottles": None,  # Not stored in model, always blank for edits
+            "target_bottles": g("target_bottles", default=0),
+            "auto_adjust_enabled": g("auto_adjust_enabled", default=True),
+            "auto_adjust_pct": g("auto_adjust_pct", default=20),
         }
         form = LiquorProductForm(initial=initial)
 
-    products = qs.order_by("-id")[:50]
-    return render(request, "inventory/products/liquor_v2.html", {"form": form, "products": products, "vertical": "liquor"})
+    # Get all liquor products for display
+    products = LiquorProduct.objects.filter(
+        business=business,
+        is_archived=False,
+    ).order_by("category", "name")
+    
+    # Check if user is a manager
+    try:
+        from core.decorators import _is_manager
+        is_manager = _is_manager(request.user)
+    except (ImportError, AttributeError):
+        is_manager = request.user.is_staff or request.user.is_superuser
+    
+    return render(request, "inventory/products/liquor_v2.html", {
+        "form": form,
+        "products": products,
+        "vertical": "liquor",
+        "active_tab": "liquor_products",
+        "IS_MANAGER": is_manager,
+        "editing": obj,
+    })
 
 # ========================= CLOTHING v2 ===========================
 class ClothingProductForm(forms.Form):

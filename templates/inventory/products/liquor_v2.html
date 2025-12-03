@@ -3,136 +3,277 @@
 
 {% block title %}Add Liquor Product{% endblock %}
 
-{% block content %}
-<div class="container max-w-5xl mx-auto px-3 py-4">
-  <h2 class="h3 mb-2">Add Liquor Product</h2>
-  <p class="text-muted mb-4">
-    Add liquor items with bottle and shot pricing. Configure shot-enabled products to sell by bottle or by shot.
-  </p>
+{% block extra_head %}
+<style>
+/* Glassmorphic cards */
+.glass-card {
+    background: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(10px);
+    border-radius: 16px;
+    border: 1px solid rgba(220, 230, 255, 0.5);
+    box-shadow: 0 8px 32px rgba(100, 120, 180, 0.12);
+    transition: all 0.3s ease;
+}
 
-  <div class="card shadow-sm border-0 mb-4">
+.glass-card:hover {
+    box-shadow: 0 12px 48px rgba(100, 120, 180, 0.18);
+    transform: translateY(-2px);
+}
+
+.product-card {
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.98), rgba(245, 250, 255, 0.98));
+    backdrop-filter: blur(10px);
+    border-radius: 12px;
+    border: 1px solid rgba(200, 220, 255, 0.4);
+    padding: 1.25rem;
+    margin-bottom: 1rem;
+    transition: all 0.2s ease;
+}
+
+.product-card:hover {
+    box-shadow: 0 6px 20px rgba(100, 120, 180, 0.15);
+    border-color: rgba(100, 150, 255, 0.5);
+    transform: translateX(4px);
+}
+
+.badge-soft {
+    padding: 0.35rem 0.75rem;
+    border-radius: 8px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: capitalize;
+}
+
+.badge-beer { background: #fef3c7; color: #92400e; }
+.badge-cider { background: #fce7f3; color: #9f1239; }
+.badge-wine { background: #ede9fe; color: #5b21b6; }
+.badge-spirits { background: #dbeafe; color: #1e40af; }
+.badge-whiskey { background: #fed7aa; color: #9a3412; }
+.badge-other { background: #f3f4f6; color: #374151; }
+
+.stat-badge {
+    background: rgba(99, 102, 241, 0.1);
+    color: #4f46e5;
+    padding: 0.25rem 0.65rem;
+    border-radius: 6px;
+    font-size: 0.875rem;
+    font-weight: 600;
+}
+
+.has-shots-badge {
+    background: rgba(16, 185, 129, 0.1);
+    color: #059669;
+    padding: 0.2rem 0.6rem;
+    border-radius: 6px;
+    font-size: 0.75rem;
+    font-weight: 600;
+}
+
+.btn-ghost {
+    background: transparent;
+    border: 1px solid #e5e7eb;
+    color: #6b7280;
+    transition: all 0.2s ease;
+}
+
+.btn-ghost:hover {
+    background: #f9fafb;
+    border-color: #d1d5db;
+    color: #374151;
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container max-w-6xl mx-auto px-3 py-4">
+  <div class="mb-4">
+    <h2 class="h3 mb-2">Liquor Products</h2>
+    <p class="text-muted mb-0">
+      Manage your bar's liquor catalog with bottle and shot pricing.
+    </p>
+  </div>
+
+  <div class="glass-card mb-4">
     <div class="card-body">
+      <h5 class="mb-3">Add New Product</h5>
       <form method="post" novalidate>
         {% csrf_token %}
         <div class="row g-3">
           <div class="col-12 col-md-6">
-            <label class="form-label">Liquor Name</label>
+            <label class="form-label fw-semibold">Liquor Name</label>
             {{ form.liquor_name }}
-            <small class="text-muted">e.g., Johnnie Walker Red Label, Savanna Cider</small>
+            {% if form.liquor_name.errors %}
+              <div class="text-danger small mt-1">{{ form.liquor_name.errors.0 }}</div>
+            {% endif %}
           </div>
 
           <div class="col-12 col-md-6">
-            <label class="form-label">Category <span class="text-muted">(optional)</span></label>
+            <label class="form-label fw-semibold">Category</label>
             {{ form.category }}
-            <small class="text-muted">e.g., whisky, beer, cider, wine, spirits</small>
           </div>
 
-          <div class="col-12 col-md-6">
-            <label class="form-label">Price per Bottle</label>
+          <div class="col-12 col-md-4">
+            <label class="form-label fw-semibold">Price per Bottle</label>
             {{ form.price_bottle }}
-            <small class="text-muted">Selling price for a full bottle</small>
+            <small class="text-muted d-block mt-1">Selling price</small>
           </div>
 
-          <div class="col-12 col-md-6">
-            <label class="form-label">Cost per Bottle <span class="text-muted">(optional)</span></label>
-            {{ form.cost_bottle }}
-            <small class="text-muted">Purchase cost for profit tracking</small>
+          <div class="col-12 col-md-4">
+            <label class="form-label fw-semibold">Cost per Bottle <span class="text-muted">(optional)</span></label>
+            {{ form.cost_per_bottle }}
+            <small class="text-muted d-block mt-1">For profit tracking</small>
           </div>
 
-          <div class="col-12 col-md-6">
-            <label class="form-label">Price per Shot <span class="text-muted">(optional)</span></label>
-            {{ form.price_shot }}
-            <small class="text-muted">Leave blank if not selling by shot</small>
-          </div>
-
-          <div class="col-12 col-md-6">
-            <label class="form-label">Shots per Bottle <span class="text-muted">(optional)</span></label>
-            {{ form.shots_per_bottle }}
-            <small class="text-muted">Number of sellable shots in one bottle</small>
-          </div>
-
-          <div class="col-12 col-md-6">
-            <label class="form-label">Initial Stock (Bottles) <span class="text-muted">(optional)</span></label>
+          <div class="col-12 col-md-4">
+            <label class="form-label fw-semibold">Initial Stock <span class="text-muted">(optional)</span></label>
             {{ form.qty_bottles }}
-            <small class="text-muted">Starting inventory quantity</small>
+            <small class="text-muted d-block mt-1">Bottles on hand</small>
+          </div>
+
+          <div class="col-12">
+            <div class="form-check mb-3">
+              {{ form.has_shots }}
+              <label class="form-check-label fw-semibold" for="{{ form.has_shots.id_for_label }}">
+                Enable shot sales
+              </label>
+            </div>
+          </div>
+
+          <div class="col-12 col-md-4">
+            <label class="form-label fw-semibold">Price per Shot <span class="text-muted">(if shots enabled)</span></label>
+            {{ form.price_shot }}
+          </div>
+
+          <div class="col-12 col-md-4">
+            <label class="form-label fw-semibold">Shots per Bottle <span class="text-muted">(if shots enabled)</span></label>
+            {{ form.shots_per_bottle }}
+          </div>
+
+          <div class="col-12 col-md-4">
+            <label class="form-label fw-semibold">Barman Reserved <span class="text-muted">(typically 2)</span></label>
+            {{ form.barman_shots_reserved }}
           </div>
         </div>
 
+        <!-- Smart Stock Target Section -->
+        <div class="mt-4 p-3" style="background: rgba(99, 102, 241, 0.05); border-radius: 12px; border: 1px solid rgba(99, 102, 241, 0.1);">
+          <h6 class="mb-3 fw-bold text-primary">
+            <i class="bi bi-graph-up-arrow me-2"></i>Smart Stock Target
+          </h6>
+          <div class="row g-3">
+            <div class="col-12 col-md-4">
+              <label class="form-label fw-semibold">Target Bottles (Full Stock)</label>
+              {{ form.target_bottles }}
+              <small class="text-muted d-block mt-1">Desired stock level when fully stocked</small>
+            </div>
+            <div class="col-12 col-md-4">
+              <div class="form-check mt-4">
+                {{ form.auto_adjust_enabled }}
+                <label class="form-check-label fw-semibold" for="{{ form.auto_adjust_enabled.id_for_label }}">
+                  {{ form.auto_adjust_enabled.label }}
+                </label>
+              </div>
+              <small class="text-muted d-block mt-1">Automatically adjusts target based on sales demand</small>
+            </div>
+            <div class="col-12 col-md-4">
+              <label class="form-label fw-semibold">Auto-Adjust % <span class="text-muted">(default 20%)</span></label>
+              {{ form.auto_adjust_pct }}
+              <small class="text-muted d-block mt-1">Increase target by this % over peak demand</small>
+            </div>
+          </div>
+        </div>
+
+        {% if form.non_field_errors %}
+          <div class="alert alert-danger mt-3">
+            {{ form.non_field_errors.0 }}
+          </div>
+        {% endif %}
+
         <div class="mt-4 d-flex gap-2">
-          <button class="btn btn-primary px-4">Save Liquor Item</button>
+          <button type="submit" class="btn btn-primary px-4">
+            <i class="bi bi-plus-circle me-1"></i> {% if editing %}Update{% else %}Save{% endif %} Product
+          </button>
           <a href="{% url 'verticals:liquor_dashboard' %}" class="btn btn-outline-secondary">Cancel</a>
         </div>
       </form>
     </div>
   </div>
 
-  <div class="card border-0 shadow-sm">
+  {% if products %}
+  <div class="glass-card">
     <div class="card-body">
-      <div class="d-flex justify-content-between align-items-center mb-2">
-        <h5 class="mb-0">Your Liquor Products</h5>
-        <small class="text-muted">Showing latest {{ products|length }} items</small>
+      <div class="d-flex justify-content-between align-items-center mb-3">
+        <h5 class="mb-0">Your Catalog</h5>
+        <span class="stat-badge">{{ products|length }} product{{ products|length|pluralize }}</span>
       </div>
 
-      {% if products %}
-      <div class="table-responsive">
-        <table class="table align-middle">
-          <thead class="small text-muted">
-            <tr>
-              <th>Name</th>
-              <th>Category</th>
-              <th>Bottle Price</th>
-              <th>Shot Price</th>
-              <th>Shots/Bottle</th>
-              <th></th>
-            </tr>
-          </thead>
-          <tbody>
-            {% for p in products %}
-            <tr>
-              <td>{{ p.name|default:p.liquor_name|default:"—" }}</td>
-              <td>{{ p.category|default:"—" }}</td>
-              <td>MK {{ p.price_per_bottle|default:p.price|floatformat:2|default:"—" }}</td>
-              <td>
-                {% if p.has_shots and p.price_per_shot %}
-                  MK {{ p.price_per_shot|floatformat:2 }}
-                {% else %}
-                  —
-                {% endif %}
-              </td>
-              <td>
-                {% if p.has_shots and p.sellable_shots_per_bottle %}
-                  {{ p.sellable_shots_per_bottle }}
-                {% else %}
-                  —
-                {% endif %}
-              </td>
-              <td class="text-end">
-                {% if p.pk %}
-                  <div class="d-inline-flex gap-1">
-                    <a class="btn btn-sm btn-outline-primary"
-                       href="{% url 'inventory:product_edit_v2' p.pk %}">Edit</a>
-                    <form method="post"
-                          action="{% url 'inventory:product_delete_v2' p.pk %}"
-                          onsubmit="return confirm('Delete this product? This cannot be undone.');"
-                          style="display:inline;">
-                      {% csrf_token %}
-                      <button type="submit" class="btn btn-sm btn-outline-danger">Delete</button>
-                    </form>
-                  </div>
-                {% else %}
-                  <span class="text-muted">—</span>
-                {% endif %}
-              </td>
-            </tr>
-            {% endfor %}
-          </tbody>
-        </table>
+      {% if IS_MANAGER %}
+      <div class="alert alert-info py-2 mb-3 border-0" style="background: rgba(59, 130, 246, 0.08);">
+        <i class="bi bi-info-circle me-2"></i>
+        <small>These products are editable per your bar. Update prices, categories, or archive items anytime.</small>
       </div>
-      {% else %}
-        <p class="text-muted mb-0">No liquor products yet. Add your first one above.</p>
       {% endif %}
+
+      <div class="row g-3">
+        {% for p in products %}
+        <div class="col-12 col-md-6 col-lg-4">
+          <div class="product-card">
+            <div class="d-flex justify-content-between align-items-start mb-2">
+              <h6 class="mb-0 fw-bold">{{ p.name }}</h6>
+              <span class="badge-soft badge-{{ p.category|lower|default:'other' }}">
+                {{ p.category|default:"Other" }}
+              </span>
+            </div>
+
+            <div class="mb-2">
+              <div class="d-flex justify-content-between align-items-center mb-1">
+                <span class="text-muted small">Bottle:</span>
+                <strong class="text-primary">MK {{ p.price_per_bottle|floatformat:0 }}</strong>
+              </div>
+              {% if p.has_shots and p.price_per_shot %}
+                <div class="d-flex justify-content-between align-items-center mb-1">
+                  <span class="text-muted small">Shot:</span>
+                  <strong class="text-success">MK {{ p.price_per_shot|floatformat:0 }}</strong>
+                </div>
+              {% endif %}
+            </div>
+
+            {% if p.has_shots %}
+            <div class="mb-3">
+              <span class="has-shots-badge">
+                <i class="bi bi-stars me-1"></i>{{ p.sellable_shots_per_bottle }} shots/bottle
+              </span>
+            </div>
+            {% endif %}
+
+            <div class="d-flex gap-2">
+              <a class="btn btn-sm btn-primary flex-fill"
+                 href="{% url 'inventory:liquor_product_edit_v2' p.pk %}">
+                <i class="bi bi-pencil"></i> Edit
+              </a>
+              <form method="post"
+                    action="{% url 'inventory:product_delete_v2' p.pk %}"
+                    onsubmit="return confirm('Archive {{ p.name }}? You can restore it later.');"
+                    class="flex-fill">
+                {% csrf_token %}
+                <button type="submit" class="btn btn-sm btn-ghost w-100">
+                  <i class="bi bi-archive"></i> Archive
+                </button>
+              </form>
+            </div>
+          </div>
+        </div>
+        {% endfor %}
+      </div>
     </div>
   </div>
+  {% else %}
+  <div class="glass-card text-center py-5">
+    <i class="bi bi-inbox" style="font-size: 3rem; opacity: 0.2; color: #6b7280;"></i>
+    <p class="text-muted mt-3 mb-0">No products yet. Add your first liquor item above.</p>
+  </div>
+  {% endif %}
 </div>
 {% endblock %}
+
 

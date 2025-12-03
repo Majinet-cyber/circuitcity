@@ -393,3 +393,16 @@ body.has-bottom-nav .cc-fab{ display:block; }
 
 /* Give scan pages a little extra bottom room so controls don't clash with bottom nav */
 body.scan-page.has-bottom-nav .cc-main{ padding-bottom: calc(var(--cc-bottom-nav-h) + 50px); }
+
+/* ====== Auto-hide helper for greeting/quote cards ====== */
+.is-hidden-soft {
+  opacity: 0;
+  transform: translateY(-10px);
+  transition: opacity 0.5s ease-out, transform 0.5s ease-out;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .is-hidden-soft {
+    transition: none;
+  }
+}

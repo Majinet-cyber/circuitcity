@@ -325,6 +325,186 @@
   })();
 
   /* =========================
+     AUTO-HIDE ELEMENTS
+     - Finds .js-auto-hide elements with data-hide-after-ms attribute
+     - Hides them after the specified delay with fade animation
+  ========================== */
+  (function autoHide() {
+    const prefersReduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    d.querySelectorAll('.js-auto-hide').forEach(el => {
+      const delay = parseInt(el.getAttribute('data-hide-after-ms')) || 30000;
+      setTimeout(() => {
+        if (prefersReduced) {
+          el.style.display = 'none';
+        } else {
+          el.style.transition = 'opacity 0.5s ease-out, transform 0.5s ease-out';
+          el.style.opacity = '0';
+          el.style.transform = 'translateY(-10px)';
+          setTimeout(() => {
+            el.style.display = 'none';
+          }, 500);
+        }
+      }, delay);
+    });
+  })();
+
+  /* =========================
+     ROTATING DASHBOARD INSIGHTS
+     - Rotates between fast products, locations, agents, and payment mix
+     - Updates chart every 5 seconds
+     - Requires Chart.js to be loaded
+  ========================== */
+  (function rotatingInsights() {
+    const canvas = d.getElementById('rotating-insights-chart');
+    if (!canvas || typeof Chart === 'undefined') return;
+    
+    const data = window.EmajinetDashboardData;
+    if (!data) return;
+    
+    const titleEl = d.getElementById('rotating-insights-title');
+    const subtitleEl = d.getElementById('rotating-insights-subtitle');
+    const indicatorEl = d.getElementById('rotating-insights-indicator');
+    
+    // Define states for rotation
+    const states = [
+      {
+        key: 'fastProducts',
+        title: 'Fast Moving Stock',
+        subtitle: 'Top 5 products by quantity sold (last 30 days)',
+        data: data.fastProducts || [],
+        colors: ['#6366f1', '#8b5cf6', '#a855f7', '#c084fc', '#d8b4fe']
+      },
+      {
+        key: 'fastLocations',
+        title: 'Fast Moving Locations',
+        subtitle: 'Top 5 locations by revenue (last 30 days)',
+        data: data.fastLocations || [],
+        colors: ['#10b981', '#14b8a6', '#06b6d4', '#0ea5e9', '#3b82f6']
+      },
+      {
+        key: 'fastAgents',
+        title: 'Top Agents',
+        subtitle: 'Top 5 agents by revenue (last 30 days)',
+        data: data.fastAgents || [],
+        colors: ['#f59e0b', '#f97316', '#ef4444', '#ec4899', '#d946ef']
+      },
+      {
+        key: 'paymentMix',
+        title: 'Payment Mix',
+        subtitle: 'Revenue by payment method (last 30 days)',
+        data: data.paymentMix || [],
+        colors: ['#0ea5e9', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6']
+      }
+    ];
+    
+    // Filter out states with no data
+    const activeStates = states.filter(s => s.data.length > 0);
+    if (activeStates.length === 0) {
+      if (titleEl) titleEl.textContent = 'No Data Available';
+      if (subtitleEl) subtitleEl.textContent = 'Start making sales to see insights';
+      return;
+    }
+    
+    let currentIndex = 0;
+    
+    // Initialize chart
+    const ctx = canvas.getContext('2d');
+    const chart = new Chart(ctx, {
+      type: 'bar',
+      data: {
+        labels: [],
+        datasets: [{
+          label: 'Value',
+          data: [],
+          backgroundColor: [],
+          borderRadius: 8,
+          borderSkipped: false
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: {
+            display: false
+          },
+          tooltip: {
+            backgroundColor: 'rgba(15, 23, 42, 0.9)',
+            padding: 12,
+            borderRadius: 8,
+            titleFont: { size: 14, weight: 'bold' },
+            bodyFont: { size: 13 },
+            callbacks: {
+              label: function(context) {
+                const value = context.parsed.y;
+                // Format numbers with commas
+                return ' ' + value.toLocaleString();
+              }
+            }
+          }
+        },
+        scales: {
+          y: {
+            beginAtZero: true,
+            ticks: {
+              callback: function(value) {
+                // Format large numbers (e.g., 1000 -> 1K)
+                if (value >= 1000000) return (value / 1000000).toFixed(1) + 'M';
+                if (value >= 1000) return (value / 1000).toFixed(1) + 'K';
+                return value;
+              }
+            },
+            grid: {
+              color: 'rgba(0, 0, 0, 0.05)'
+            }
+          },
+          x: {
+            grid: {
+              display: false
+            }
+          }
+        },
+        animation: {
+          duration: 750,
+          easing: 'easeInOutQuart'
+        }
+      }
+    });
+    
+    // Update chart with current state
+    function updateChart() {
+      const state = activeStates[currentIndex];
+      
+      // Update title and subtitle
+      if (titleEl) titleEl.textContent = state.title;
+      if (subtitleEl) subtitleEl.textContent = state.subtitle;
+      
+      // Update indicator dots
+      if (indicatorEl) {
+        const dots = indicatorEl.querySelectorAll('.rotating-insights-dot');
+        dots.forEach((dot, i) => {
+          dot.classList.toggle('active', i === currentIndex);
+        });
+      }
+      
+      // Update chart data
+      chart.data.labels = state.data.map(item => item.label);
+      chart.data.datasets[0].data = state.data.map(item => item.value);
+      chart.data.datasets[0].backgroundColor = state.colors.slice(0, state.data.length);
+      chart.update();
+    }
+    
+    // Initial render
+    updateChart();
+    
+    // Rotate every 5 seconds
+    setInterval(() => {
+      currentIndex = (currentIndex + 1) % activeStates.length;
+      updateChart();
+    }, 5000);
+  })();
+
+  /* =========================
      SERVICE WORKER (optional)
   ========================== */
   (function sw() {

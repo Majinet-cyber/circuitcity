@@ -1,0 +1,103 @@
+{% comment %}
+Rotating Dashboard Insights Panel
+Shows fast-moving products, locations, agents, and payment mix in a rotating chart.
+Rotates every 5 seconds between different views.
+
+Context variables expected:
+  - fast_products_json: JSON array of {label, value} for top products
+  - fast_locations_json: JSON array of {label, value} for top locations
+  - fast_agents_json: JSON array of {label, value} for top agents
+  - payment_mix_json: JSON array of {label, value} for payment methods
+{% endcomment %}
+
+<style>
+  .rotating-insights-card {
+    background: #fff;
+    border-radius: 20px;
+    padding: 20px;
+    box-shadow: 0 10px 30px rgba(15,23,42,.08);
+    margin-bottom: 20px;
+  }
+  
+  .rotating-insights-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 16px;
+  }
+  
+  .rotating-insights-title {
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: #0f172a;
+    margin: 0;
+  }
+  
+  .rotating-insights-subtitle {
+    font-size: 0.85rem;
+    color: #64748b;
+    margin: 4px 0 0 0;
+  }
+  
+  .rotating-insights-indicator {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+  }
+  
+  .rotating-insights-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #cbd5e1;
+    transition: background 0.3s ease;
+  }
+  
+  .rotating-insights-dot.active {
+    background: #6366f1;
+    width: 24px;
+    border-radius: 4px;
+  }
+  
+  .rotating-insights-canvas-wrapper {
+    position: relative;
+    height: 280px;
+    width: 100%;
+  }
+  
+  @media (max-width: 768px) {
+    .rotating-insights-canvas-wrapper {
+      height: 240px;
+    }
+  }
+</style>
+
+<section class="rotating-insights-card">
+  <div class="rotating-insights-header">
+    <div>
+      <h2 class="rotating-insights-title" id="rotating-insights-title">Business Insights</h2>
+      <p class="rotating-insights-subtitle" id="rotating-insights-subtitle">Loading...</p>
+    </div>
+    <div class="rotating-insights-indicator" id="rotating-insights-indicator">
+      <span class="rotating-insights-dot active"></span>
+      <span class="rotating-insights-dot"></span>
+      <span class="rotating-insights-dot"></span>
+      <span class="rotating-insights-dot"></span>
+    </div>
+  </div>
+  
+  <div class="rotating-insights-canvas-wrapper">
+    <canvas id="rotating-insights-chart"></canvas>
+  </div>
+</section>
+
+<script>
+  // Inject data into window for the main app.js to consume
+  window.EmajinetDashboardData = {
+    fastProducts: {{ fast_products_json|safe }},
+    fastLocations: {{ fast_locations_json|safe }},
+    fastAgents: {{ fast_agents_json|safe }},
+    paymentMix: {{ payment_mix_json|safe }}
+  };
+</script>
+

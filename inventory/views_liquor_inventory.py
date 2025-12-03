@@ -155,7 +155,8 @@ def liquor_inventory_dashboard(request):
         "total_skus": total_skus,
         "total_stock": total_stock,
         "low_stock_items": low_stock_items,
-        "out_of_stock_count": out_of_stock_items,
+        "out_of_stock_count": out_of_stock_count,
+        "active_tab": "inventory",
     }
     
     return render(request, "verticals/liquor/inventory_dashboard.html", context)

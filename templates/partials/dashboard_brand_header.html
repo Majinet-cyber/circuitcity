@@ -125,7 +125,7 @@ Context variables expected:
 {% endif %}
 
 {% comment %}Branded header with logo or business name{% endcomment %}
-<div class="dashboard-brand-header">
+<div class="dashboard-brand-header js-auto-hide" data-hide-after-ms="30000">
   {% if DASHBOARD_BRAND_LOGO_URL %}
     <div class="dashboard-brand-logo">
       <img src="{{ DASHBOARD_BRAND_LOGO_URL }}" alt="{{ DASHBOARD_BRAND_TITLE }}" loading="lazy">

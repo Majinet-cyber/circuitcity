@@ -14,6 +14,8 @@ urlpatterns = [
     
     # Stock Overview
     path("stock/", views_liquor.stock_overview, name="stock_overview"),
+    path("stock/settings/", views_liquor.stock_settings, name="stock_settings"),
+    path("stock/category/<str:category>/update-target/", views_liquor.update_category_target, name="update_category_target"),
     
     # Shifts
     path("shifts/start/", views_liquor.start_shift, name="start_shift"),

@@ -3,17 +3,147 @@
 
 {% block title %}Sell Liquor - {{ business.name }}{% endblock %}
 
+{% block extra_head %}
+<style>
+/* Glassmorphic cards */
+.glass-card {
+    background: rgba(255, 255, 255, 0.9);
+    backdrop-filter: blur(10px);
+    border-radius: 12px;
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+/* Category tiles */
+.category-tile {
+    cursor: pointer;
+    transition: all 0.3s ease;
+    padding: 2rem 1.5rem;
+    text-align: center;
+    border-radius: 12px;
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.9), rgba(240, 240, 255, 0.9));
+    border: 2px solid rgba(100, 100, 255, 0.2);
+}
+
+.category-tile:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 8px 16px rgba(0, 0, 0, 0.15);
+    border-color: rgba(100, 100, 255, 0.5);
+}
+
+.category-tile .icon {
+    font-size: 3rem;
+    margin-bottom: 0.5rem;
+    color: #4a5568;
+}
+
+.category-tile .title {
+    font-size: 1.25rem;
+    font-weight: 600;
+    margin-bottom: 0.25rem;
+}
+
+.category-tile .subtitle {
+    font-size: 0.875rem;
+    color: #718096;
+}
+
+/* Product rows */
+.product-row {
+    cursor: pointer;
+    transition: all 0.2s ease;
+    padding: 1rem;
+    border-radius: 8px;
+    margin-bottom: 0.5rem;
+    background: white;
+    border: 1px solid #e2e8f0;
+}
+
+.product-row:hover {
+    background: #f7fafc;
+    border-color: #cbd5e0;
+    transform: translateX(5px);
+}
+
+.product-row.selected {
+    background: #ebf8ff;
+    border-color: #4299e1;
+}
+
+/* Confirmation card */
+.confirm-card {
+    position: sticky;
+    top: 20px;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    border-radius: 12px;
+    padding: 2rem;
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+}
+
+.confirm-card input[type="number"],
+.confirm-card select {
+    border: 2px solid rgba(255, 255, 255, 0.3);
+    background: rgba(255, 255, 255, 0.2);
+    color: white;
+    padding: 0.75rem;
+    border-radius: 8px;
+    font-size: 1rem;
+}
+
+.confirm-card input[type="number"]:focus,
+.confirm-card select:focus {
+    outline: none;
+    border-color: rgba(255, 255, 255, 0.8);
+    background: rgba(255, 255, 255, 0.3);
+}
+
+.confirm-card ::placeholder {
+    color: rgba(255, 255, 255, 0.7);
+}
+
+.badge-shots {
+    background: #f0fff4;
+    color: #22543d;
+    padding: 0.25rem 0.75rem;
+    border-radius: 12px;
+    font-size: 0.75rem;
+    font-weight: 600;
+}
+
+.hidden {
+    display: none !important;
+}
+
+/* Mobile responsive */
+@media (max-width: 768px) {
+    .category-tile {
+        padding: 1.5rem 1rem;
+    }
+    
+    .category-tile .icon {
+        font-size: 2rem;
+    }
+    
+    .confirm-card {
+        position: relative;
+        margin-top: 1rem;
+    }
+}
+</style>
+{% endblock %}
+
 {% block content %}
 <div class="container-fluid py-4">
     <div class="row mb-4">
         <div class="col">
             <div class="d-flex align-items-center justify-content-between">
                 <div>
-                    <h2>Sell Liquor</h2>
-                    <p class="text-muted mb-0">Record bottle and shot sales</p>
+                    <h2>Quick Sell</h2>
+                    <p class="text-muted mb-0">Fast liquor sales for bar staff</p>
                 </div>
                 {% if active_shift %}
-                    <div class="badge bg-success-subtle text-success">
+                    <div class="badge bg-success-subtle text-success py-2 px-3">
                         <i class="bi bi-clock"></i> Active Shift
                     </div>
                 {% endif %}
@@ -22,7 +152,7 @@
     </div>
 
     {% if not active_shift %}
-    <div class="alert alert-warning d-flex align-items-center" role="alert">
+    <div class="alert alert-warning d-flex align-items-center mb-4" role="alert">
         <i class="bi bi-exclamation-triangle-fill me-2"></i>
         <div>
             <strong>No active shift!</strong> Start a shift first to track sales properly.
@@ -32,126 +162,158 @@
     {% endif %}
 
     <div class="row">
-        <!-- Sale Form -->
-        <div class="col-lg-7">
-            <div class="glass-card p-3 p-md-4 mb-4">
-                <h5 class="mb-3">Record Sale</h5>
+        <!-- Main Sell Area -->
+        <div class="col-lg-8">
+            <!-- Step 1: Category Tiles -->
+            <div id="category-tiles-container" class="glass-card p-4 mb-4">
+                <h5 class="mb-4">Select Category</h5>
                 
-                <form method="post" id="liquor-sell-form">
-                    {% csrf_token %}
-                    
-                    {% if form.errors %}
-                    <div class="alert alert-danger">
-                        {% for field, errors in form.errors.items %}
-                            {% for error in errors %}
-                                <div>{{ field }}: {{ error }}</div>
-                            {% endfor %}
-                        {% endfor %}
-                    </div>
-                    {% endif %}
-
-                    <div class="row g-3">
-                        <!-- Product Selection -->
-                        <div class="col-12">
-                            <label class="form-label">Product <span class="text-danger">*</span></label>
-                            {{ form.product }}
-                            <div class="form-text">Select the bottle or drink being sold</div>
-                        </div>
-
-                        <!-- Unit Type (Bottle or Shot) -->
-                        <div class="col-6 col-md-4">
-                            <label class="form-label">Unit Type <span class="text-danger">*</span></label>
-                            {{ form.unit }}
-                        </div>
-
-                        <!-- Quantity -->
-                        <div class="col-6 col-md-4">
-                            <label class="form-label">Quantity <span class="text-danger">*</span></label>
-                            {{ form.quantity }}
-                        </div>
-
-                        <!-- Unit Price -->
-                        <div class="col-12 col-md-4">
-                            <label class="form-label">Unit Price (MWK) <span class="text-danger">*</span></label>
-                            {{ form.unit_price }}
-                            <div class="form-text small" id="price-helper">Will auto-fill from product</div>
-                        </div>
-
-                        <!-- Sale Type -->
-                        <div class="col-12 col-md-6">
-                            <label class="form-label">Sale Type <span class="text-danger">*</span></label>
-                            {{ form.sale_type }}
-                            <div class="form-text">Cash, credit, or complimentary</div>
-                        </div>
-
-                        <!-- Total Display -->
-                        <div class="col-12 col-md-6">
-                            <label class="form-label">Total Amount</label>
-                            <div class="input-group">
-                                <span class="input-group-text">MWK</span>
-                                <input type="text" id="total-display" class="form-control" readonly value="0.00">
+                {% if categories %}
+                <div class="row g-3">
+                    {% for cat in categories %}
+                    <div class="col-6 col-md-4">
+                        <div class="category-tile" data-category-tile data-category="{{ cat }}">
+                            <div class="icon">
+                                {% if cat == "beer" %}
+                                    <i class="bi bi-cup-straw"></i>
+                                {% elif cat == "cider" %}
+                                    <i class="bi bi-droplet"></i>
+                                {% elif cat == "wine" %}
+                                    <i class="bi bi-box-seam"></i>
+                                {% elif cat == "spirits" %}
+                                    <i class="bi bi-lightning"></i>
+                                {% elif cat == "whiskey" %}
+                                    <i class="bi bi-gem"></i>
+                                {% else %}
+                                    <i class="bi bi-circle"></i>
+                                {% endif %}
+                            </div>
+                            <div class="title text-capitalize">{{ cat }}</div>
+                            <div class="subtitle">
+                                {% if cat == "beer" %}No shots
+                                {% elif cat == "cider" %}No shots
+                                {% elif cat == "wine" %}Per glass or bottle
+                                {% elif cat == "spirits" %}Shots & bottles
+                                {% elif cat == "whiskey" %}Shots & bottles
+                                {% endif %}
                             </div>
                         </div>
-
-                        <!-- Customer Info (for credit sales) -->
-                        <div class="col-12" id="credit-fields" style="display: none;">
-                            <div class="alert alert-info mb-3">
-                                <i class="bi bi-info-circle me-2"></i>
-                                <strong>Credit Sale:</strong> Customer information required
-                            </div>
-                            
-                            <div class="row g-2">
-                                <div class="col-12 col-md-6">
-                                    <label class="form-label">Customer Name <span class="text-danger">*</span></label>
-                                    {{ form.customer_name }}
-                                </div>
-                                <div class="col-12 col-md-6">
-                                    <label class="form-label">Customer Phone</label>
-                                    {{ form.customer_phone }}
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- Notes -->
-                        <div class="col-12">
-                            <label class="form-label">Notes (optional)</label>
-                            {{ form.notes }}
-                        </div>
                     </div>
-
-                    <!-- Submit Buttons -->
-                    <div class="d-flex gap-2 mt-4">
-                        <button type="submit" class="btn btn-primary">
-                            <i class="bi bi-check-circle"></i> Record Sale
-                        </button>
-                        <button type="reset" class="btn btn-outline-secondary">
-                            <i class="bi bi-x-circle"></i> Clear
-                        </button>
-                    </div>
-                </form>
-            </div>
-        </div>
-
-        <!-- Recent Sales & Summary -->
-        <div class="col-lg-5">
-            <!-- Quick Stats -->
-            {% if active_shift %}
-            <div class="glass-card p-3 mb-4">
-                <h6 class="text-muted mb-2">Current Shift</h6>
-                <div class="d-flex align-items-center justify-content-between">
-                    <div>
-                        <div class="small text-muted">Started</div>
-                        <div class="fw-bold">{{ active_shift.started_at|date:"H:i, d M Y" }}</div>
-                    </div>
-                    <a href="{% url 'liquor:close_shift' shift_id=active_shift.id %}" class="btn btn-sm btn-outline-danger">
-                        Close Shift
+                    {% endfor %}
+                </div>
+                {% else %}
+                <div class="text-center text-muted py-5">
+                    <i class="bi bi-inbox" style="font-size: 3rem; opacity: 0.3;"></i>
+                    <div class="mt-3">No products available. Add some products first.</div>
+                    <a href="{% url 'inventory:liquor_product_new_v2' %}" class="btn btn-primary mt-3">
+                        <i class="bi bi-plus-circle"></i> Add Products
                     </a>
                 </div>
+                {% endif %}
             </div>
-            {% endif %}
+
+            <!-- Step 2: Product List (hidden by default) -->
+            {% for cat, products in products_by_category.items %}
+            <div id="products-list-{{ cat }}" class="glass-card p-4 mb-4 hidden" data-category-list="{{ cat }}">
+                <div class="d-flex align-items-center justify-content-between mb-4">
+                    <h5 class="mb-0 text-capitalize">{{ cat }}</h5>
+                    <button class="btn btn-sm btn-outline-secondary back-btn" data-back-to-tiles>
+                        <i class="bi bi-arrow-left"></i> Back
+                    </button>
+                </div>
+                
+                <div class="products-container">
+                    {% for p in products %}
+                    <div class="product-row" 
+                         data-product-row
+                         data-product-id="{{ p.id }}"
+                         data-product-name="{{ p.name }}"
+                         data-has-shots="{{ p.has_shots|yesno:'true,false' }}"
+                         data-bottle-price="{{ p.price_per_bottle }}"
+                         data-shot-price="{{ p.price_per_shot|default:'0' }}"
+                         data-category="{{ cat }}">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div class="flex-grow-1">
+                                <div class="fw-semibold">{{ p.name }}</div>
+                                <div class="small text-muted">
+                                    <span>Bottle: MK {{ p.price_per_bottle|floatformat:0 }}</span>
+                                    {% if p.has_shots and p.price_per_shot %}
+                                        <span class="ms-2">Shot: MK {{ p.price_per_shot|floatformat:0 }}</span>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            {% if p.has_shots %}
+                            <div>
+                                <span class="badge-shots">
+                                    <i class="bi bi-stars"></i> Shots available
+                                </span>
+                            </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+
+        <!-- Step 3: Confirmation Card (Sidebar) -->
+        <div class="col-lg-4">
+            <!-- Confirmation Card -->
+            <div id="confirm-card" class="confirm-card hidden">
+                <button class="btn btn-sm btn-light mb-3" id="undo-btn" style="opacity: 0.9;">
+                    <i class="bi bi-x-circle"></i> Undo
+                </button>
+                
+                <h5 class="mb-3" id="confirm-product-name">Product Name</h5>
+                <p class="small mb-3" style="opacity: 0.9;" id="confirm-category">Category</p>
+                
+                <form method="post" id="sell-form">
+                    {% csrf_token %}
+                    <input type="hidden" name="product_id" id="input-product-id">
+                    <input type="hidden" name="mode" id="input-mode" value="bottle">
+                    
+                    <!-- Shot/Bottle Toggle (for shot-enabled products) -->
+                    <div id="mode-toggle-container" class="mb-3 hidden">
+                        <label class="form-label">Sell as:</label>
+                        <div class="btn-group w-100" role="group">
+                            <input type="radio" class="btn-check" name="mode-radio" id="mode-bottle" value="bottle" checked>
+                            <label class="btn btn-outline-light" for="mode-bottle">Bottles</label>
+                            
+                            <input type="radio" class="btn-check" name="mode-radio" id="mode-shot" value="shot">
+                            <label class="btn btn-outline-light" for="mode-shot">Shots</label>
+                        </div>
+                    </div>
+                    
+                    <!-- Quantity -->
+                    <div class="mb-3">
+                        <label class="form-label" id="quantity-label">Bottles</label>
+                        <input type="number" 
+                               class="form-control" 
+                               name="quantity" 
+                               id="input-quantity" 
+                               min="1" 
+                               value="1" 
+                               required>
+                    </div>
+                    
+                    <!-- Estimated Total -->
+                    <div class="mb-4">
+                        <label class="form-label">Estimated Total</label>
+                        <div style="font-size: 2rem; font-weight: 700;">
+                            MK <span id="estimated-total">0</span>
+                        </div>
+                    </div>
+                    
+                    <!-- Action Buttons -->
+                    <button type="submit" class="btn btn-light btn-lg w-100 mb-2">
+                        <i class="bi bi-check-circle"></i> Mark as Sold
+                    </button>
+                </form>
+            </div>
 
             <!-- Recent Sales -->
-            <div class="glass-card p-3">
+            <div class="glass-card p-3 mt-4">
                 <h6 class="mb-3">Recent Sales</h6>
                 
                 {% if recent_sales %}
@@ -160,10 +322,10 @@
                         <div class="list-group-item px-0 py-2 border-bottom">
                             <div class="d-flex justify-content-between align-items-start">
                                 <div class="flex-grow-1">
-                                    <div class="fw-semibold">{{ sale.product.name }}</div>
+                                    <div class="fw-semibold small">{{ sale.product.name }}</div>
                                     <div class="small text-muted">
                                         {{ sale.quantity }} {{ sale.get_unit_display }}{% if sale.quantity > 1 %}s{% endif %}
-                                        · MWK {{ sale.total_price }}
+                                        · MK {{ sale.total_price|floatformat:0 }}
                                     </div>
                                 </div>
                                 <div class="text-end">
@@ -183,9 +345,9 @@
                         {% endfor %}
                     </div>
                 {% else %}
-                    <div class="text-center text-muted py-4">
-                        <i class="bi bi-inbox" style="font-size: 2rem; opacity: 0.3;"></i>
-                        <div class="mt-2">No sales recorded yet</div>
+                    <div class="text-center text-muted py-3">
+                        <i class="bi bi-inbox" style="font-size: 1.5rem; opacity: 0.3;"></i>
+                        <div class="mt-2 small">No sales yet</div>
                     </div>
                 {% endif %}
             </div>
@@ -195,110 +357,163 @@
 
 <script>
 (function() {
-    const productSelect = document.getElementById('id_product');
-    const unitSelect = document.getElementById('id_unit');
-    const quantityInput = document.getElementById('id_quantity');
-    const priceInput = document.getElementById('id_unit_price');
-    const totalDisplay = document.getElementById('total-display');
-    const saleTypeSelect = document.getElementById('id_sale_type');
-    const creditFields = document.getElementById('credit-fields');
-    const priceHelper = document.getElementById('price-helper');
-
-    // Fetch product pricing when product changes
-    productSelect.addEventListener('change', async function() {
-        const productId = this.value;
-        if (!productId) return;
-
-        try {
-            const response = await fetch(`/liquor/get-product-pricing/${productId}/`);
-            const data = await response.json();
-            
-            if (data.success) {
-                // Store product data for later use
-                productSelect.dataset.hasShots = data.has_shots;
-                productSelect.dataset.priceBottle = data.price_per_bottle;
-                productSelect.dataset.priceShot = data.price_per_shot;
-                
-                // Update price based on current unit selection
-                updatePrice();
-                
-                // Update helper text
-                if (data.has_shots) {
-                    priceHelper.textContent = `Bottle: MWK ${data.price_per_bottle} | Shot: MWK ${data.price_per_shot}`;
-                } else {
-                    priceHelper.textContent = `Bottle: MWK ${data.price_per_bottle}`;
-                }
-            }
-        } catch (error) {
-            console.error('Error fetching product pricing:', error);
-        }
+    // Elements
+    const categoryTilesContainer = document.getElementById('category-tiles-container');
+    const categoryTiles = document.querySelectorAll('[data-category-tile]');
+    const categoryLists = document.querySelectorAll('[data-category-list]');
+    const productRows = document.querySelectorAll('[data-product-row]');
+    const backButtons = document.querySelectorAll('[data-back-to-tiles]');
+    const confirmCard = document.getElementById('confirm-card');
+    const undoBtn = document.getElementById('undo-btn');
+    const sellForm = document.getElementById('sell-form');
+    
+    // Form inputs
+    const inputProductId = document.getElementById('input-product-id');
+    const inputMode = document.getElementById('input-mode');
+    const inputQuantity = document.getElementById('input-quantity');
+    
+    // Display elements
+    const confirmProductName = document.getElementById('confirm-product-name');
+    const confirmCategory = document.getElementById('confirm-category');
+    const modeToggleContainer = document.getElementById('mode-toggle-container');
+    const modeBottleRadio = document.getElementById('mode-bottle');
+    const modeShotRadio = document.getElementById('mode-shot');
+    const quantityLabel = document.getElementById('quantity-label');
+    const estimatedTotal = document.getElementById('estimated-total');
+    
+    // State
+    let currentProduct = null;
+    
+    // Step 1: Category tile click
+    categoryTiles.forEach(tile => {
+        tile.addEventListener('click', function() {
+            const category = this.dataset.category;
+            showProductList(category);
+        });
     });
-
-    // Update price when unit type changes
-    unitSelect.addEventListener('change', updatePrice);
-
-    function updatePrice() {
-        const unit = unitSelect.value;
-        const hasShots = productSelect.dataset.hasShots === 'true';
+    
+    // Back to category tiles
+    backButtons.forEach(btn => {
+        btn.addEventListener('click', function() {
+            showCategoryTiles();
+        });
+    });
+    
+    // Step 2: Product row click
+    productRows.forEach(row => {
+        row.addEventListener('click', function() {
+            // Remove previous selection
+            productRows.forEach(r => r.classList.remove('selected'));
+            this.classList.add('selected');
+            
+            // Get product data
+            currentProduct = {
+                id: this.dataset.productId,
+                name: this.dataset.productName,
+                category: this.dataset.category,
+                hasShots: this.dataset.hasShots === 'true',
+                bottlePrice: parseFloat(this.dataset.bottlePrice),
+                shotPrice: parseFloat(this.dataset.shotPrice || 0)
+            };
+            
+            showConfirmCard();
+        });
+    });
+    
+    // Undo button
+    undoBtn.addEventListener('click', function() {
+        hideConfirmCard();
+        showCategoryTiles();
+    });
+    
+    // Mode toggle
+    if (modeBottleRadio && modeShotRadio) {
+        modeBottleRadio.addEventListener('change', function() {
+            if (this.checked) {
+                inputMode.value = 'bottle';
+                quantityLabel.textContent = 'Bottles';
+                updateTotal();
+            }
+        });
         
-        if (unit === 'bottle') {
-            priceInput.value = productSelect.dataset.priceBottle || '';
-        } else if (unit === 'shot' && hasShots) {
-            priceInput.value = productSelect.dataset.priceShot || '';
+        modeShotRadio.addEventListener('change', function() {
+            if (this.checked) {
+                inputMode.value = 'shot';
+                quantityLabel.textContent = 'Shots';
+                updateTotal();
+            }
+        });
+    }
+    
+    // Quantity change
+    inputQuantity.addEventListener('input', updateTotal);
+    
+    // Functions
+    function showProductList(category) {
+        categoryTilesContainer.classList.add('hidden');
+        categoryLists.forEach(list => {
+            if (list.dataset.categoryList === category) {
+                list.classList.remove('hidden');
+            } else {
+                list.classList.add('hidden');
+            }
+        });
+    }
+    
+    function showCategoryTiles() {
+        categoryTilesContainer.classList.remove('hidden');
+        categoryLists.forEach(list => list.classList.add('hidden'));
+        productRows.forEach(r => r.classList.remove('selected'));
+        hideConfirmCard();
+    }
+    
+    function showConfirmCard() {
+        if (!currentProduct) return;
+        
+        // Fill in product details
+        confirmProductName.textContent = currentProduct.name;
+        confirmCategory.textContent = currentProduct.category.charAt(0).toUpperCase() + currentProduct.category.slice(1);
+        inputProductId.value = currentProduct.id;
+        
+        // Show/hide mode toggle
+        if (currentProduct.hasShots) {
+            modeToggleContainer.classList.remove('hidden');
+        } else {
+            modeToggleContainer.classList.add('hidden');
+            inputMode.value = 'bottle';
+            quantityLabel.textContent = 'Bottles';
         }
+        
+        // Reset form
+        inputQuantity.value = 1;
+        if (modeBottleRadio) modeBottleRadio.checked = true;
+        inputMode.value = 'bottle';
+        quantityLabel.textContent = 'Bottles';
         
         updateTotal();
+        confirmCard.classList.remove('hidden');
     }
-
-    // Update total when quantity or price changes
-    quantityInput.addEventListener('input', updateTotal);
-    priceInput.addEventListener('input', updateTotal);
-
+    
+    function hideConfirmCard() {
+        confirmCard.classList.add('hidden');
+        currentProduct = null;
+    }
+    
     function updateTotal() {
-        const quantity = parseFloat(quantityInput.value) || 0;
-        const price = parseFloat(priceInput.value) || 0;
-        const total = quantity * price;
-        totalDisplay.value = total.toFixed(2);
-    }
-
-    // Show/hide credit fields based on sale type
-    saleTypeSelect.addEventListener('change', function() {
-        if (this.value === 'credit') {
-            creditFields.style.display = 'block';
-            document.getElementById('id_customer_name').required = true;
-        } else {
-            creditFields.style.display = 'none';
-            document.getElementById('id_customer_name').required = false;
-        }
-    });
-
-    // Initialize
-    updateTotal();
-    if (saleTypeSelect.value === 'credit') {
-        creditFields.style.display = 'block';
-    }
-
-    // Form validation
-    document.getElementById('liquor-sell-form').addEventListener('submit', function(e) {
-        const saleType = saleTypeSelect.value;
-        const customerName = document.getElementById('id_customer_name').value.trim();
+        if (!currentProduct) return;
         
-        if (saleType === 'credit' && !customerName) {
-            e.preventDefault();
-            alert('Customer name is required for credit sales.');
-            return false;
-        }
-    });
-
-    // Reset form handler
-    document.querySelector('button[type="reset"]').addEventListener('click', function() {
-        setTimeout(() => {
-            creditFields.style.display = 'none';
-            priceHelper.textContent = 'Will auto-fill from product';
-            updateTotal();
-        }, 10);
+        const quantity = parseInt(inputQuantity.value) || 1;
+        const mode = inputMode.value;
+        const price = mode === 'shot' ? currentProduct.shotPrice : currentProduct.bottlePrice;
+        const total = quantity * price;
+        
+        estimatedTotal.textContent = total.toFixed(0);
+    }
+    
+    // Form submit (just ensure form submits normally)
+    sellForm.addEventListener('submit', function(e) {
+        // Let form submit naturally to POST endpoint
     });
 })();
 </script>
 {% endblock %}
-

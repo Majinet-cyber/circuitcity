@@ -1,0 +1,165 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Liquor Stock Settings · {{ business.name }}{% endblock %}
+
+{% block extra_head %}
+<style>
+.glass-card {
+    background: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(10px);
+    border-radius: 16px;
+    border: 1px solid rgba(220, 230, 255, 0.5);
+    box-shadow: 0 8px 32px rgba(100, 120, 180, 0.12);
+}
+
+.settings-section {
+    padding: 1.5rem;
+    margin-bottom: 1.5rem;
+}
+
+.settings-header {
+    margin-bottom: 1.5rem;
+    padding-bottom: 1rem;
+    border-bottom: 2px solid rgba(99, 102, 241, 0.1);
+}
+
+.form-group-inline {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    margin-bottom: 1rem;
+}
+
+.form-group-inline label {
+    min-width: 150px;
+    font-weight: 600;
+    color: #374151;
+}
+
+.form-group-inline input {
+    flex: 1;
+    max-width: 200px;
+}
+
+.info-box {
+    background: rgba(59, 130, 246, 0.05);
+    border-left: 4px solid #3b82f6;
+    padding: 1rem;
+    border-radius: 8px;
+    margin-bottom: 1.5rem;
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container max-w-4xl mx-auto px-3 py-4">
+  <div class="mb-4">
+    <div class="d-flex justify-content-between align-items-center">
+      <div>
+        <h2 class="h3 mb-2">Liquor Stock Settings</h2>
+        <p class="text-muted mb-0">
+          Configure default stock targets and auto-adjust behavior for {{ business.name }}
+        </p>
+      </div>
+      <a href="{% url 'liquor:stock_overview' %}" class="btn btn-outline-secondary">
+        <i class="bi bi-arrow-left me-1"></i> Back to Overview
+      </a>
+    </div>
+  </div>
+
+  <div class="info-box">
+    <p class="mb-2"><strong><i class="bi bi-info-circle me-2"></i>How Stock Targets Work:</strong></p>
+    <ul class="mb-0" style="font-size: 0.9rem;">
+      <li>Each product can have its own <strong>per-product target</strong> (set on the product edit page)</li>
+      <li>If no per-product targets are set for a category, the <strong>business default</strong> below is used</li>
+      <li>Auto-adjust automatically raises targets based on recent sales demand</li>
+    </ul>
+  </div>
+
+  <form method="post">
+    {% csrf_token %}
+    
+    <!-- Category Defaults -->
+    <div class="glass-card settings-section">
+      <div class="settings-header">
+        <h5 class="mb-0"><i class="bi bi-box-seam me-2"></i>Category Default Targets</h5>
+        <small class="text-muted">These are fallback targets when products don't have individual targets set</small>
+      </div>
+      
+      <div class="form-group-inline">
+        <label for="{{ form.beer_target.id_for_label }}">Beer</label>
+        {{ form.beer_target }}
+        <span class="text-muted">bottles</span>
+      </div>
+      
+      <div class="form-group-inline">
+        <label for="{{ form.cider_target.id_for_label }}">Cider</label>
+        {{ form.cider_target }}
+        <span class="text-muted">bottles</span>
+      </div>
+      
+      <div class="form-group-inline">
+        <label for="{{ form.spirits_target.id_for_label }}">Spirits</label>
+        {{ form.spirits_target }}
+        <span class="text-muted">bottles</span>
+      </div>
+      
+      <div class="form-group-inline">
+        <label for="{{ form.whiskey_target.id_for_label }}">Whiskey</label>
+        {{ form.whiskey_target }}
+        <span class="text-muted">bottles</span>
+      </div>
+      
+      <div class="form-group-inline">
+        <label for="{{ form.wine_target.id_for_label }}">Wine</label>
+        {{ form.wine_target }}
+        <span class="text-muted">bottles</span>
+      </div>
+      
+      <div class="form-group-inline">
+        <label for="{{ form.other_target.id_for_label }}">Other</label>
+        {{ form.other_target }}
+        <span class="text-muted">bottles</span>
+      </div>
+    </div>
+
+    <!-- Auto-Adjust Settings -->
+    <div class="glass-card settings-section">
+      <div class="settings-header">
+        <h5 class="mb-0"><i class="bi bi-graph-up-arrow me-2"></i>Smart Auto-Adjust Settings</h5>
+        <small class="text-muted">Controls how targets automatically adjust based on sales demand</small>
+      </div>
+      
+      <div class="mb-3">
+        <label for="{{ form.default_auto_adjust_pct.id_for_label }}" class="form-label fw-semibold">
+          {{ form.default_auto_adjust_pct.label }}
+        </label>
+        {{ form.default_auto_adjust_pct }}
+        <small class="text-muted d-block mt-1">
+          {{ form.default_auto_adjust_pct.help_text }}
+          <br>Example: If peak demand is 200 bottles/day and this is 20%, target becomes 240 bottles.
+        </small>
+      </div>
+      
+      <div class="mb-3">
+        <label for="{{ form.auto_adjust_lookback_days.id_for_label }}" class="form-label fw-semibold">
+          {{ form.auto_adjust_lookback_days.label }}
+        </label>
+        {{ form.auto_adjust_lookback_days }}
+        <small class="text-muted d-block mt-1">
+          {{ form.auto_adjust_lookback_days.help_text }}
+        </small>
+      </div>
+    </div>
+
+    <div class="d-flex gap-2">
+      <button type="submit" class="btn btn-primary px-4">
+        <i class="bi bi-check-circle me-1"></i> Save Settings
+      </button>
+      <a href="{% url 'liquor:stock_overview' %}" class="btn btn-outline-secondary">Cancel</a>
+    </div>
+  </form>
+</div>
+{% endblock %}
+

@@ -119,97 +119,58 @@
 
 <div class="stock-page">
   <div class="stock-header">
-    <h1>Liquor Stock Overview</h1>
-    <p>{{ business.name }}{% if location %} · {{ location.name }}{% endif %}</p>
+    <div style="display: flex; justify-content: space-between; align-items: center;">
+      <div>
+        <h1>Liquor Stock Overview</h1>
+        <p>{{ business.name }}{% if location %} · {{ location.name }}{% endif %}</p>
+      </div>
+      {% if is_manager %}
+      <div style="display: flex; gap: 12px;">
+        <form method="post" style="display: inline;">
+          {% csrf_token %}
+          <input type="hidden" name="trigger_auto_adjust" value="1">
+          <button type="submit" class="btn btn-outline-primary" title="Recalculate targets based on recent sales data">
+            <i class="bi bi-arrow-clockwise me-1"></i> Auto-Adjust Targets
+          </button>
+        </form>
+        <a href="{% url 'liquor:stock_settings' %}" class="btn btn-outline-secondary">
+          <i class="bi bi-gear me-1"></i> Stock Settings
+        </a>
+      </div>
+      {% endif %}
+    </div>
   </div>
+  
+  <!-- Warnings Section -->
+  {% if warnings %}
+  <div style="margin-bottom: 24px;">
+    {% for warning in warnings %}
+      <div style="padding: 12px 16px; margin-bottom: 12px; background: {% if warning.type == 'danger' %}#fee2e2{% elif warning.type == 'warning' %}#fef3c7{% else %}#dbeafe{% endif %}; border-left: 4px solid {% if warning.type == 'danger' %}#dc2626{% elif warning.type == 'warning' %}#f59e0b{% else %}#3b82f6{% endif %}; border-radius: 8px;">
+        <p style="margin: 0; color: {% if warning.type == 'danger' %}#7f1d1d{% elif warning.type == 'warning' %}#78350f{% else %}#1e3a8a{% endif %}; font-size: 0.9rem;">
+          <strong>{% if warning.type == 'danger' %}🚨{% elif warning.type == 'warning' %}⚠️{% else %}💡{% endif %} {{ warning.category }}:</strong> {{ warning.message }}
+        </p>
+      </div>
+    {% endfor %}
+  </div>
+  {% endif %}
   
   <div class="total-card glass">
     <h2>Total Liquor Stock</h2>
     <div class="battery">
-      <div class="battery-fill{% if total_pct < 30 %} critical{% elif total_pct < 60 %} low{% endif %}" 
-           style="width: {{ total_pct }}%;">
-        {{ total_pct }}%
+      <div class="battery-fill{% if totals.percent < 30 %} critical{% elif totals.percent < 60 %} low{% endif %}" 
+           style="width: {{ totals.percent }}%;">
+        {{ totals.percent }}%
       </div>
     </div>
     <p class="total-stats">
-      <strong>{{ total_qty }}</strong> bottles in stock · 
-      Target: <strong>{{ total_cap }}</strong> bottles
+      <strong>{{ totals.current }}</strong> bottles in stock · 
+      Target: <strong>{{ totals.target }}</strong> bottles
     </p>
-  </div>
-  
-  <!-- Monthly Sales Target Card -->
-  <div class="glass" style="padding: 24px; margin-bottom: 24px;">
-    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
-      <div>
-        <h2 style="margin: 0; font-size: 1.25rem; font-weight: 800;">Monthly Sales Target</h2>
-        <p style="margin: 4px 0 0; color: #64748b; font-size: 0.875rem;">
-          {{ current_year }}-{{ current_month|stringformat:"02d" }} · Current stock: {{ total_qty }} bottles
-        </p>
-      </div>
-    </div>
-    
     {% if is_manager %}
-      <form method="post" style="margin-bottom: 20px;">
-        {% csrf_token %}
-        <input type="hidden" name="update_target" value="1">
-        
-        <div style="margin-bottom: 16px;">
-          <label for="target_units" style="display: block; margin-bottom: 8px; font-weight: 600; color: #0f172a;">
-            Target: <span id="target_display" style="color: #6366f1; font-size: 1.25rem;">{{ sales_target.target_units }}</span> bottles this month
-          </label>
-          
-          <div style="display: flex; gap: 12px; align-items: center;">
-            <input type="range" 
-                   id="target_slider" 
-                   name="target_units" 
-                   min="0" 
-                   max="{{ suggested_max }}" 
-                   step="5" 
-                   value="{{ sales_target.target_units }}"
-                   class="form-range"
-                   style="flex: 1;"
-                   oninput="document.getElementById('target_display').textContent = this.value; document.getElementById('target_number').value = this.value;">
-            
-            <input type="number" 
-                   id="target_number" 
-                   name="target_units_number"
-                   min="0" 
-                   max="{{ suggested_max }}"
-                   step="5"
-                   value="{{ sales_target.target_units }}"
-                   class="form-control"
-                   style="width: 120px;"
-                   onchange="document.getElementById('target_slider').value = this.value; document.getElementById('target_display').textContent = this.value;">
-            
-            <button type="submit" class="btn btn-primary">
-              <i class="bi bi-check-circle"></i> Save Target
-            </button>
-          </div>
-          
-          <small style="display: block; margin-top: 8px; color: #64748b;">
-            Suggested max: {{ suggested_max }} bottles (2× current stock)
-          </small>
-        </div>
-        
-        {% if stock_warning %}
-          <div style="padding: 12px; background: #fef3c7; border-left: 4px solid #f59e0b; border-radius: 8px;">
-            <p style="margin: 0; color: #92400e; font-size: 0.9rem;">
-              <strong>⚠️ Stock Warning:</strong> Your target ({{ sales_target.target_units }} bottles) exceeds current stock ({{ total_qty }} bottles). 
-              Consider restocking or adjusting the target to be more realistic.
-            </p>
-          </div>
-        {% endif %}
-      </form>
-    {% else %}
-      <!-- Agents can only view the target -->
-      <div style="padding: 16px; background: #f8fafc; border-radius: 12px; border: 2px solid #e2e8f0;">
-        <p style="margin: 0; font-size: 1.5rem; font-weight: 800; color: #6366f1;">
-          Target: {{ sales_target.target_units }} bottles this month
-        </p>
-        <p style="margin: 8px 0 0; color: #64748b; font-size: 0.875rem;">
-          Only managers can adjust the monthly target
-        </p>
-      </div>
+    <p style="margin: 12px 0 0; font-size: 0.875rem; opacity: 0.9;">
+      <i class="bi bi-info-circle me-1"></i>
+      Targets are calculated from per-product targets when set, or fall back to category defaults.
+    </p>
     {% endif %}
   </div>
   
@@ -218,12 +179,18 @@
       {% for row in categories %}
         <div class="category-card glass">
           <div class="category-header">
-            <h3>{{ row.category|title }}</h3>
+            <h3>{{ row.category_display }}</h3>
             <div class="category-stats">
-              <strong>{{ row.quantity }}</strong> / {{ row.capacity }} bottles
+              <strong>{{ row.current }}</strong> / <span id="target-{{ row.category }}">{{ row.target }}</span> bottles
               <span style="color: {% if row.percent < 30 %}#dc2626{% elif row.percent < 60 %}#d97706{% else %}#059669{% endif %}">
                 ({{ row.percent }}%)
               </span>
+              {% if is_manager %}
+              <button class="btn-edit-target" onclick="editCategoryTarget('{{ row.category }}', {{ row.target }})" 
+                      style="margin-left: 8px; padding: 2px 8px; font-size: 0.75rem; background: #e0e7ff; color: #4338ca; border: none; border-radius: 6px; cursor: pointer;">
+                <i class="bi bi-pencil"></i> Edit
+              </button>
+              {% endif %}
             </div>
           </div>
           <div class="battery">
@@ -232,6 +199,15 @@
               {% if row.percent > 20 %}{{ row.percent }}%{% endif %}
             </div>
           </div>
+          {% if is_manager %}
+          <p style="margin: 8px 0 0; font-size: 0.75rem; color: #64748b;">
+            {% if row.using_per_product_targets %}
+              <i class="bi bi-check-circle-fill text-success"></i> Using per-product targets
+            {% else %}
+              <i class="bi bi-info-circle"></i> Using business default ({{ row.target }} bottles)
+            {% endif %}
+          </p>
+          {% endif %}
         </div>
       {% endfor %}
     </div>
@@ -246,5 +222,101 @@
     </div>
   {% endif %}
 </div>
+
+<!-- Modal for editing category target -->
+<div id="editTargetModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.5); z-index: 9999; align-items: center; justify-content: center;">
+  <div class="glass" style="max-width: 500px; width: 90%; padding: 32px; position: relative;">
+    <button onclick="closeEditModal()" style="position: absolute; top: 16px; right: 16px; background: none; border: none; font-size: 1.5rem; cursor: pointer; color: #64748b;">&times;</button>
+    
+    <h2 style="margin: 0 0 16px; font-size: 1.5rem; font-weight: 700;">Edit Category Target</h2>
+    
+    <form id="editTargetForm" onsubmit="submitTargetUpdate(event)">
+      {% csrf_token %}
+      <input type="hidden" id="edit_category" name="category">
+      
+      <div style="margin-bottom: 16px;">
+        <label style="display: block; margin-bottom: 8px; font-weight: 600; color: #0f172a;">
+          Target Bottles for <span id="category_label"></span>
+        </label>
+        <input type="number" id="edit_target" name="target" min="0" required
+               class="form-control" style="width: 100%; padding: 12px; border: 2px solid #e2e8f0; border-radius: 12px; font-size: 1rem;">
+        <p style="margin: 8px 0 0; font-size: 0.875rem; color: #64748b;">
+          Set the target capacity for this category. This is used to calculate stock percentage.
+        </p>
+      </div>
+      
+      <div style="display: flex; gap: 12px; justify-content: flex-end;">
+        <button type="button" onclick="closeEditModal()" class="btn btn-outline-secondary">
+          Cancel
+        </button>
+        <button type="submit" class="btn btn-primary">
+          <i class="bi bi-check-circle"></i> Update Target
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+function editCategoryTarget(category, currentTarget) {
+  document.getElementById('edit_category').value = category;
+  document.getElementById('edit_target').value = currentTarget;
+  document.getElementById('category_label').textContent = category.charAt(0).toUpperCase() + category.slice(1);
+  document.getElementById('editTargetModal').style.display = 'flex';
+}
+
+function closeEditModal() {
+  document.getElementById('editTargetModal').style.display = 'none';
+}
+
+function submitTargetUpdate(event) {
+  event.preventDefault();
+  
+  const category = document.getElementById('edit_category').value;
+  const target = document.getElementById('edit_target').value;
+  const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+  
+  // Disable submit button
+  const submitBtn = event.target.querySelector('button[type="submit"]');
+  submitBtn.disabled = true;
+  submitBtn.innerHTML = '<i class="bi bi-hourglass-split"></i> Updating...';
+  
+  fetch(`/liquor/stock/category/${category}/update-target/`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/x-www-form-urlencoded',
+      'X-CSRFToken': csrfToken
+    },
+    body: `target=${target}`
+  })
+  .then(response => response.json())
+  .then(data => {
+    if (data.success) {
+      // Update the displayed target
+      document.getElementById(`target-${category}`).textContent = target;
+      
+      // Close modal and reload page to update percentages
+      closeEditModal();
+      window.location.reload();
+    } else {
+      alert('Error: ' + (data.error || 'Failed to update target'));
+      submitBtn.disabled = false;
+      submitBtn.innerHTML = '<i class="bi bi-check-circle"></i> Update Target';
+    }
+  })
+  .catch(error => {
+    alert('Network error: ' + error);
+    submitBtn.disabled = false;
+    submitBtn.innerHTML = '<i class="bi bi-check-circle"></i> Update Target';
+  });
+}
+
+// Close modal when clicking outside
+document.getElementById('editTargetModal').addEventListener('click', function(e) {
+  if (e.target === this) {
+    closeEditModal();
+  }
+});
+</script>
 {% endblock %}
 

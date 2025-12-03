@@ -3,6 +3,10 @@
 {% block title %}Liquor Inventory · Emajinet{% endblock %}
 
 {% block content %}
+{# Safely handle active_tab with default #}
+{% with current_tab=active_tab|default:"inventory" %}
+{# Template body - current_tab can be used safely here if needed #}
+{% endwith %}
 <style>
   .inventory-page{display:flex;flex-direction:column;gap:18px;padding:18px}
   .page-header{background:linear-gradient(120deg,#7c3aed,#db2777);padding:24px;border-radius:20px;color:#fff}

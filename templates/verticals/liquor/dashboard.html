@@ -2,6 +2,10 @@
 
 {% block title %}Liquor · Emajinet{% endblock %}
 
+{% block extra_head %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+{% endblock %}
+
 {% block content %}
 {% url 'inventory:liquor_product_new_v2' as liquor_add_url %}
 
@@ -154,6 +158,9 @@
       </div>
     {% endif %}
   </section>
+
+  {% comment %}Rotating Insights Panel{% endcomment %}
+  {% include "partials/dashboard_rotating_insights.html" %}
 
   {% comment %}Payment Mix Card - fallback if PAYMENT_MIX not available{% endcomment %}
   {% if not PAYMENT_MIX and payment_mix %}

@@ -1023,7 +1023,7 @@ urlpatterns += [
 
     # liquor v2 (explicit)
     path("liquor/products/new/v2/", manager_required(_need_biz(prodv2.product_create_liquor_v2)), name="liquor_product_new_v2"),
-    path("liquor/products/<int:pk>/edit/", manager_required(_need_biz(prodv2.product_edit_liquor_v2)), name="liquor_product_edit_v2"),
+    path("liquor/products/<int:pk>/edit/v2/", manager_required(_need_biz(prodv2.product_edit_liquor_v2)), name="liquor_product_edit_v2"),
 ]
 
 # Manager Locations + Alerts pages
