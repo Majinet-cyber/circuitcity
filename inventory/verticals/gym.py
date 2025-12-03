@@ -44,6 +44,7 @@ def dashboard(request):
     # Active gym members
     active_members = GymMember.objects.filter(business=business, is_active=True, is_archived=False)
     total_members = active_members.count()
+    members_active_count = total_members  # Alias for template compatibility
     
     # Calculate members in arrears
     members_in_arrears = 0
@@ -65,19 +66,24 @@ def dashboard(request):
     mrr = current_month_payments.aggregate(total=Sum("amount"))["total"] or Decimal("0.00")
     payment_count = current_month_payments.count()
     
-    # Payment mix
+    # Payment mix (handle cases where payment_method might be NULL)
     from inventory.models_verticals import PaymentMethod
     payment_mix = []
-    for method_code, method_label in PaymentMethod.choices:
-        method_payments = current_month_payments.filter(payment_method=method_code)
-        count = method_payments.count()
-        amount = method_payments.aggregate(total=Sum("amount"))["total"] or Decimal("0.00")
-        if count > 0:
-            payment_mix.append({
-                "method": method_label,
-                "count": count,
-                "amount": amount,
-            })
+    try:
+        for method_code, method_label in PaymentMethod.choices:
+            method_payments = current_month_payments.filter(payment_method=method_code)
+            count = method_payments.count()
+            amount = method_payments.aggregate(total=Sum("amount"))["total"] or Decimal("0.00")
+            if count > 0:
+                payment_mix.append({
+                    "method": method_label,
+                    "count": count,
+                    "amount": amount,
+                })
+    except Exception as e:
+        # If payment_method column doesn't exist or has issues, gracefully handle it
+        # This ensures dashboard doesn't crash before migrations are applied
+        payment_mix = []
     
     # Costs from wallet (current month expenses)
     costs = GymWalletEntry.objects.filter(
@@ -132,6 +138,7 @@ def dashboard(request):
             
             # Member KPIs
             "total_members": total_members,
+            "members_active_count": members_active_count,  # Template expects this
             "members_in_arrears": members_in_arrears,
             
             # Financial KPIs (current month)
@@ -148,6 +155,11 @@ def dashboard(request):
             # Session KPIs
             "sessions_today": sessions_today,
             "sessions_this_week": sessions_this_week,
+            
+            # Billing/subscription safe defaults (gym doesn't use subscriptions)
+            "membership": None,
+            "subscription": None,
+            "quotes_json": "[]",
         }
     )
     

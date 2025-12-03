@@ -46,13 +46,6 @@ class LiquorSaleType(models.TextChoices):
     UNDECIDED = "undecided", "Undecided"
 
 
-class PaymentMethod(models.TextChoices):
-    """Payment method for sales (consistent across all verticals)"""
-    CASH = "CASH", "Cash"
-    BANK = "BANK", "Bank"
-    MOBILE_MONEY = "MOBILE_MONEY", "Mobile Money"
-
-
 class LiquorShiftStatus(models.TextChoices):
     """Status of a shift"""
     OPEN = "open", "Open"

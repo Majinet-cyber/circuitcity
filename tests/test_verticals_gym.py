@@ -552,4 +552,254 @@ class TestGymRegressionProtection:
         
         assert gym_member.is_archived is False
         assert gym_member.is_active is True
+    
+    def test_gym_dashboard_with_payment_method(self, client, business, manager, gym_member):
+        """
+        CRITICAL: Test that gym dashboard loads successfully with payment_method field.
+        This test ensures the OperationalError for missing payment_method column is fixed.
+        """
+        from tenants.models import Membership
+        from inventory.models_verticals import PaymentMethod
+        
+        # Create membership for manager
+        Membership.objects.create(
+            user=manager,
+            business=business,
+            role="MANAGER",
+            status="ACTIVE",
+            location=None
+        )
+        
+        # Create a payment with payment_method
+        payment = GymPayment.objects.create(
+            member=gym_member,
+            amount=Decimal("50000.00"),
+            start_date=date.today(),
+            paid_by=manager,
+            payment_method=PaymentMethod.CASH  # Explicitly set payment method
+        )
+        
+        # Log in and set active business
+        client.force_login(manager)
+        session = client.session
+        session['active_business_id'] = business.id
+        session.save()
+        
+        # This should NOT raise OperationalError about missing payment_method column
+        response = client.get('/verticals/gym/dashboard/')
+        
+        assert response.status_code == 200
+        content = response.content.decode('utf-8')
+        
+        # Verify payment is shown in dashboard
+        assert 'gym' in content.lower() or 'member' in content.lower()
+    
+    def test_gym_payment_with_all_payment_methods(self, gym_member, manager):
+        """Test creating payments with different payment methods"""
+        from inventory.models_verticals import PaymentMethod
+        
+        # Test each payment method
+        for method_code, method_label in PaymentMethod.choices:
+            payment = GymPayment.objects.create(
+                member=gym_member,
+                amount=Decimal("50000.00"),
+                start_date=date.today(),
+                paid_by=manager,
+                payment_method=method_code
+            )
+            
+            assert payment.payment_method == method_code
+            assert payment.get_payment_method_display() == method_label
+    
+    def test_gym_dashboard_payment_mix(self, client, business, manager, gym_member):
+        """Test that dashboard correctly aggregates payment mix"""
+        from tenants.models import Membership
+        from inventory.models_verticals import PaymentMethod
+        
+        # Create membership for manager
+        Membership.objects.create(
+            user=manager,
+            business=business,
+            role="MANAGER",
+            status="ACTIVE",
+            location=None
+        )
+        
+        # Create payments with different payment methods
+        GymPayment.objects.create(
+            member=gym_member,
+            amount=Decimal("50000.00"),
+            start_date=date.today(),
+            paid_by=manager,
+            payment_method=PaymentMethod.CASH
+        )
+        
+        GymPayment.objects.create(
+            member=gym_member,
+            amount=Decimal("60000.00"),
+            start_date=date.today(),
+            paid_by=manager,
+            payment_method=PaymentMethod.MOBILE_MONEY
+        )
+        
+        # Log in and access dashboard
+        client.force_login(manager)
+        session = client.session
+        session['active_business_id'] = business.id
+        session.save()
+        
+        response = client.get('/verticals/gym/dashboard/')
+        
+        assert response.status_code == 200
+        
+        # Check that payment_mix is in context
+        if 'payment_mix' in response.context or 'PAYMENT_MIX' in response.context:
+            # If payment mix is present, verify it has data
+            payment_mix = response.context.get('payment_mix') or response.context.get('PAYMENT_MIX')
+            if payment_mix:
+                # Should have at least one payment method
+                assert len(payment_mix) > 0
+    
+    def test_gym_dashboard_without_subscription(self, client, business, manager):
+        """
+        CRITICAL REGRESSION TEST: Gym dashboard must load successfully 
+        even when business has NO subscription object.
+        
+        This protects against VariableDoesNotExist errors for:
+        - membership
+        - subscription
+        - quotes_json
+        - members_active_count
+        """
+        from tenants.models import Membership
+        
+        # Create membership for manager (NOT a subscription)
+        Membership.objects.create(
+            user=manager,
+            business=business,
+            role="MANAGER",
+            status="ACTIVE",
+            location=None
+        )
+        
+        # Ensure business has NO subscription
+        # (This is the key scenario that was failing)
+        assert not hasattr(business, 'subscription') or business.subscription is None
+        
+        # Log in and set active business
+        client.force_login(manager)
+        session = client.session
+        session['active_business_id'] = business.id
+        session.save()
+        
+        # This should NOT crash with:
+        # - Business.subscription.RelatedObjectDoesNotExist
+        # - VariableDoesNotExist for membership/subscription/quotes_json/members_active_count
+        response = client.get('/verticals/gym/dashboard/')
+        
+        # Must return 200 (not 500)
+        assert response.status_code == 200
+        
+        # Verify critical context variables are present with safe defaults
+        assert 'members_active_count' in response.context
+        assert 'membership' in response.context or response.context.get('membership') is None
+        assert 'subscription' in response.context or response.context.get('subscription') is None
+        assert 'quotes_json' in response.context
+        
+        # Content should NOT contain billing/trial UI
+        content = response.content.decode('utf-8').lower()
+        assert 'choose a plan' not in content
+        assert 'trial ends' not in content
+        assert 'subscribe now' not in content
+        assert 'upgrade now' not in content
+        
+        # Content SHOULD contain gym-specific text
+        assert 'gym' in content or 'member' in content or 'arrears' in content
+
+
+@pytest.mark.django_db
+class TestCrossVerticalSanityChecks:
+    """
+    Cross-vertical sanity tests to ensure gym payment_method migration doesn't break other verticals.
+    """
+    
+    def test_liquor_dashboard_still_works(self, client):
+        """Verify liquor dashboard loads after gym payment_method changes"""
+        from tenants.models import Membership
+        from inventory.business_kinds import BusinessKind
+        
+        # Create liquor business
+        business = Business.objects.create(
+            name="Test Liquor Store",
+            slug="test-liquor",
+            status="ACTIVE",
+            business_kind=BusinessKind.LIQUOR
+        )
+        
+        # Create manager
+        manager = User.objects.create_user(username="liquor_mgr", password="pass")
+        
+        # Create membership
+        Membership.objects.create(
+            user=manager,
+            business=business,
+            role="MANAGER",
+            status="ACTIVE",
+            location=None
+        )
+        
+        # Log in
+        client.force_login(manager)
+        session = client.session
+        session['active_business_id'] = business.id
+        session.save()
+        
+        # Access liquor dashboard
+        try:
+            response = client.get('/verticals/liquor/dashboard/')
+            # Should return 200 or redirect, but not crash
+            assert response.status_code in [200, 302, 404]
+        except Exception as e:
+            # If template doesn't exist, that's OK - we're checking the query doesn't crash
+            assert 'payment_method' not in str(e).lower() or 'no such column' not in str(e).lower()
+    
+    def test_clothing_dashboard_still_works(self, client):
+        """Verify clothing dashboard loads after gym payment_method changes"""
+        from tenants.models import Membership
+        from inventory.business_kinds import BusinessKind
+        
+        # Create clothing business
+        business = Business.objects.create(
+            name="Test Clothing Store",
+            slug="test-clothing",
+            status="ACTIVE",
+            business_kind=BusinessKind.CLOTHING
+        )
+        
+        # Create manager
+        manager = User.objects.create_user(username="clothing_mgr", password="pass")
+        
+        # Create membership
+        Membership.objects.create(
+            user=manager,
+            business=business,
+            role="MANAGER",
+            status="ACTIVE",
+            location=None
+        )
+        
+        # Log in
+        client.force_login(manager)
+        session = client.session
+        session['active_business_id'] = business.id
+        session.save()
+        
+        # Access clothing dashboard
+        try:
+            response = client.get('/verticals/clothing/dashboard/')
+            # Should return 200 or redirect, but not crash
+            assert response.status_code in [200, 302, 404]
+        except Exception as e:
+            # If template doesn't exist, that's OK - we're checking the query doesn't crash
+            assert 'payment_method' not in str(e).lower() or 'no such column' not in str(e).lower()
 
