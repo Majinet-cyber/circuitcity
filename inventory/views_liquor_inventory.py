@@ -8,7 +8,7 @@ from decimal import Decimal
 from typing import Dict, List
 
 from django.contrib.auth.decorators import login_required
-from django.db.models import Sum, Count, Avg, F
+from django.db.models import Sum, Count, Avg, F, Subquery, OuterRef
 from django.shortcuts import render
 from django.utils import timezone
 
@@ -48,6 +48,9 @@ def _calculate_days_in_stock(products) -> int:
 
 def _get_category_data(business, category_key: str, config: dict) -> dict:
     """Get stock data for a specific category"""
+    from inventory.models_verticals import LiquorShiftStock
+    from django.db.models import Subquery, OuterRef
+    
     # Query products in this category
     products = MerchProduct.objects.filter(
         business=business,
@@ -56,10 +59,22 @@ def _get_category_data(business, category_key: str, config: dict) -> dict:
         category__iexact=category_key
     )
     
-    # Calculate metrics
-    total_stock = products.filter(track_inventory=True).aggregate(
-        total=Sum("quantity")
-    )["total"] or 0
+    # Get latest stock snapshots for these products
+    # Subquery to get the most recent snapshot for each product
+    latest_snapshots = LiquorShiftStock.objects.filter(
+        product=OuterRef('pk'),
+        shift__business=business
+    ).order_by('-recorded_at')
+    
+    # Calculate total stock from latest snapshots
+    total_stock = 0
+    products_with_stock = products.filter(track_inventory=True).annotate(
+        latest_bottles=Subquery(latest_snapshots.values('bottles_count')[:1])
+    )
+    
+    for product in products_with_stock:
+        if product.latest_bottles is not None:
+            total_stock += product.latest_bottles
     
     sku_count = products.count()
     capacity = config.get("capacity", 100)
@@ -96,6 +111,8 @@ def liquor_inventory_dashboard(request):
             category_batteries.append(data)
     
     # Overall stats
+    from inventory.models_verticals import LiquorShiftStock
+    
     all_liquor_products = MerchProduct.objects.filter(
         business=business,
         kind=BusinessKind.LIQUOR,
@@ -103,22 +120,34 @@ def liquor_inventory_dashboard(request):
     )
     
     total_skus = all_liquor_products.count()
-    total_stock = all_liquor_products.filter(track_inventory=True).aggregate(
-        total=Sum("quantity")
-    )["total"] or 0
     
-    # Low stock items (quantity < 10)
-    low_stock_items = all_liquor_products.filter(
-        track_inventory=True,
-        quantity__lt=10,
-        quantity__gt=0
-    ).order_by("quantity")[:10]
+    # Get latest stock snapshots
+    latest_snapshots = LiquorShiftStock.objects.filter(
+        product=OuterRef('pk'),
+        shift__business=business
+    ).order_by('-recorded_at')
     
-    # Out of stock items
-    out_of_stock_items = all_liquor_products.filter(
-        track_inventory=True,
-        quantity=0
-    ).count()
+    # Calculate total stock from latest snapshots
+    total_stock = 0
+    products_with_stock = all_liquor_products.filter(track_inventory=True).annotate(
+        latest_bottles=Subquery(latest_snapshots.values('bottles_count')[:1])
+    )
+    
+    low_stock_list = []
+    out_of_stock_count = 0
+    
+    for product in products_with_stock:
+        bottles = product.latest_bottles or 0
+        total_stock += bottles
+        
+        if bottles == 0:
+            out_of_stock_count += 1
+        elif bottles < 10:
+            low_stock_list.append((product, bottles))
+    
+    # Sort low stock items by quantity and take top 10
+    low_stock_list.sort(key=lambda x: x[1])
+    low_stock_items = [item[0] for item in low_stock_list[:10]]
     
     context = {
         "business": business,

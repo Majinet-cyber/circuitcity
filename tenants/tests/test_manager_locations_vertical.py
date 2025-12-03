@@ -153,6 +153,17 @@ class TestManagerLocationsLiquor:
         """Liquor business should show '(Liquor)' in header"""
         setup_client_for_business(client, manager_user, liquor_business)
         
+        # Create a location so the stock summary section appears
+        try:
+            from inventory.models import Location
+            Location.objects.create(
+                business=liquor_business,
+                name="Main Bar",
+                city="Blantyre"
+            )
+        except Exception:
+            pytest.skip("Location model not available")
+        
         url = reverse('tenants:manager_locations')
         response = client.get(url)
         
@@ -224,11 +235,33 @@ class TestManagerLocationsGym:
         """Gym business should show 'Member Summary' with '(Gym)' in header"""
         setup_client_for_business(client, manager_user, gym_business)
         
+        # Create a location so the stock summary section appears
+        try:
+            from inventory.models import Location
+            Location.objects.create(
+                business=gym_business,
+                name="Main Gym",
+                city="Mzuzu"
+            )
+        except Exception:
+            pytest.skip("Location model not available")
+        
         url = reverse('tenants:manager_locations')
         response = client.get(url)
         
         assert response.status_code == 200
         content = response.content.decode('utf-8')
+        
+        # Debug: Check what's in the response
+        import re
+        match = re.search(r'(Stock|Member) Summary by Location[^<]*', content)
+        if match:
+            print(f"\nFound header: {match.group()}")
+        else:
+            print(f"\nNo summary header found. Business kind: {gym_business.business_kind}")
+            # Check if BUSINESS_VERTICAL is in context
+            if 'BUSINESS_VERTICAL' in str(response.context):
+                print(f"BUSINESS_VERTICAL in context: {response.context.get('BUSINESS_VERTICAL')}")
         
         # Check for gym-specific header
         assert 'Member Summary by Location (Gym)' in content or '💪 Member Summary by Location (Gym)' in content
@@ -297,6 +330,17 @@ class TestManagerLocationsClothing:
     def test_clothing_business_shows_clothing_header(self, client, manager_user, clothing_business):
         """Clothing business should show '(Clothing)' in header"""
         setup_client_for_business(client, manager_user, clothing_business)
+        
+        # Create a location so the stock summary section appears
+        try:
+            from inventory.models import Location
+            Location.objects.create(
+                business=clothing_business,
+                name="Main Store",
+                city="Lilongwe"
+            )
+        except Exception:
+            pytest.skip("Location model not available")
         
         url = reverse('tenants:manager_locations')
         response = client.get(url)

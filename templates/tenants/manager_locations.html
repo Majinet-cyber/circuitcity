@@ -120,6 +120,12 @@
     <p class="cc-hint" style="margin-bottom: 1rem;">
       {% if BUSINESS_VERTICAL == "gym" %}
         Track membership and payment status across your locations
+      {% elif BUSINESS_VERTICAL == "liquor" %}
+        Track bottle sales and stock levels across your bars
+      {% elif BUSINESS_VERTICAL == "clothing" %}
+        Track sales and inventory across your stores
+      {% elif BUSINESS_VERTICAL == "pharmacy" %}
+        Track medicine sales and stock across your pharmacies
       {% else %}
         Track inventory and sales performance across your locations
       {% endif %}
@@ -131,6 +137,14 @@
           {% if BUSINESS_VERTICAL == "gym" %}
             <th style="text-align: center;">Active</th>
             <th style="text-align: center;">In Arrears</th>
+            <th style="text-align: center;">Total</th>
+          {% elif BUSINESS_VERTICAL == "liquor" %}
+            <th style="text-align: center;">Bottles Sold</th>
+            <th style="text-align: center;">Bottles in Stock</th>
+            <th style="text-align: center;">Total</th>
+          {% elif BUSINESS_VERTICAL == "clothing" %}
+            <th style="text-align: center;">Items Sold</th>
+            <th style="text-align: center;">Items in Stock</th>
             <th style="text-align: center;">Total</th>
           {% else %}
             <th style="text-align: center;">Sold</th>
@@ -187,9 +201,13 @@
         {% empty %}
         <tr><td colspan="5" class="cc-muted">
           {% if BUSINESS_VERTICAL == "gym" %}
-            No member data available.
+            No member data available. Add members to see statistics here.
+          {% elif BUSINESS_VERTICAL == "liquor" %}
+            No sales or stock data available. Start a shift and record sales.
+          {% elif BUSINESS_VERTICAL == "clothing" %}
+            No sales or stock data available. Add inventory and record sales.
           {% else %}
-            No stock data available.
+            No stock data available. Add inventory to see statistics here.
           {% endif %}
         </td></tr>
         {% endfor %}

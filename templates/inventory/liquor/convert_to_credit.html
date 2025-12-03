@@ -1,0 +1,121 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Convert to Credit - {{ business.name }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <!-- Header -->
+    <div class="row mb-4">
+        <div class="col">
+            <h2>Convert Sale to Credit</h2>
+            <p class="text-muted mb-0">Convert a cash sale into a credit sale</p>
+        </div>
+    </div>
+
+    <div class="row">
+        <!-- Sale Details -->
+        <div class="col-lg-4 mb-4">
+            <div class="glass-card p-4">
+                <h5 class="mb-3">Sale Details</h5>
+                
+                <div class="mb-3">
+                    <div class="small text-muted">Product</div>
+                    <div class="fw-bold">{{ sale.product.name }}</div>
+                </div>
+
+                <div class="mb-3">
+                    <div class="small text-muted">Quantity</div>
+                    <div>{{ sale.quantity }} {{ sale.get_unit_display }}{% if sale.quantity > 1 %}s{% endif %}</div>
+                </div>
+
+                <div class="mb-3">
+                    <div class="small text-muted">Total Amount</div>
+                    <div class="h4 mb-0">MWK {{ sale.total_price|floatformat:2 }}</div>
+                </div>
+
+                <div class="mb-3">
+                    <div class="small text-muted">Sale Date</div>
+                    <div>{{ sale.sold_at|date:"d M Y, H:i" }}</div>
+                </div>
+
+                <div class="mb-3">
+                    <div class="small text-muted">Sold By</div>
+                    <div>{{ sale.sold_by.get_full_name|default:sale.sold_by.username }}</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Conversion Form -->
+        <div class="col-lg-8">
+            <div class="glass-card p-4">
+                <h5 class="mb-3">Credit Information</h5>
+                
+                <form method="post">
+                    {% csrf_token %}
+                    
+                    {% if form.errors %}
+                    <div class="alert alert-danger">
+                        <strong>Please correct the errors below:</strong>
+                        <ul class="mb-0 mt-2">
+                            {% for field, errors in form.errors.items %}
+                                {% for error in errors %}
+                                    <li>{{ field }}: {{ error }}</li>
+                                {% endfor %}
+                            {% endfor %}
+                        </ul>
+                    </div>
+                    {% endif %}
+
+                    <div class="row g-3">
+                        <!-- Customer Name -->
+                        <div class="col-12 col-md-6">
+                            <label class="form-label">Customer Name <span class="text-danger">*</span></label>
+                            {{ form.customer_name }}
+                            <div class="form-text">Full name of the customer</div>
+                        </div>
+
+                        <!-- Customer Phone -->
+                        <div class="col-12 col-md-6">
+                            <label class="form-label">Customer Phone</label>
+                            {{ form.customer_phone }}
+                            <div class="form-text">Optional contact number</div>
+                        </div>
+
+                        <!-- Claim from sale checkbox -->
+                        <div class="col-12">
+                            <div class="form-check">
+                                {{ form.claim_from_sale }}
+                                <label class="form-check-label" for="{{ form.claim_from_sale.id_for_label }}">
+                                    {{ form.claim_from_sale.label }}
+                                </label>
+                            </div>
+                            <div class="form-text">{{ form.claim_from_sale.help_text }}</div>
+                        </div>
+
+                        <!-- Info Alert -->
+                        <div class="col-12">
+                            <div class="alert alert-info">
+                                <i class="bi bi-info-circle me-2"></i>
+                                <strong>Note:</strong> If you check "Convert existing cash sale", this sale will be marked as a credit sale. 
+                                If unchecked, a new credit record will be created without modifying the original sale.
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Submit Buttons -->
+                    <div class="d-flex gap-2 mt-4">
+                        <button type="submit" class="btn btn-primary">
+                            <i class="bi bi-check-circle"></i> Convert to Credit
+                        </button>
+                        <a href="{% url 'liquor:sales_list' %}" class="btn btn-outline-secondary">
+                            <i class="bi bi-x-circle"></i> Cancel
+                        </a>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+

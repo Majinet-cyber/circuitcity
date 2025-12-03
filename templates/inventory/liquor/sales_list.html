@@ -1,0 +1,125 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Sales History - {{ business.name }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <!-- Header -->
+    <div class="row mb-4">
+        <div class="col">
+            <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
+                <div>
+                    <h2>Sales History</h2>
+                    <p class="text-muted mb-0">View all liquor sales transactions</p>
+                </div>
+                <a href="{% url 'liquor:sell' %}" class="btn btn-primary">
+                    <i class="bi bi-plus-circle"></i> New Sale
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Filters -->
+    <div class="glass-card p-3 mb-4">
+        <form method="get" class="row g-3 align-items-end">
+            <div class="col-12 col-md-4">
+                <label class="form-label">Filter by Type</label>
+                <select name="type" class="form-select" onchange="this.form.submit()">
+                    <option value="">All Types</option>
+                    <option value="sale" {% if request.GET.type == "sale" %}selected{% endif %}>Cash Sale</option>
+                    <option value="credit" {% if request.GET.type == "credit" %}selected{% endif %}>Credit Sale</option>
+                    <option value="free" {% if request.GET.type == "free" %}selected{% endif %}>Free/Complimentary</option>
+                </select>
+            </div>
+            <div class="col-12 col-md-4">
+                <button type="submit" class="btn btn-outline-primary w-100">
+                    <i class="bi bi-search"></i> Filter
+                </button>
+                {% if request.GET.type %}
+                    <a href="{% url 'liquor:sales_list' %}" class="btn btn-outline-secondary w-100 mt-2">
+                        <i class="bi bi-x-circle"></i> Clear Filters
+                    </a>
+                {% endif %}
+            </div>
+        </form>
+    </div>
+
+    <!-- Sales Table -->
+    <div class="glass-card p-0">
+        {% if sales %}
+            <div class="table-responsive">
+                <table class="table table-hover mb-0">
+                    <thead>
+                        <tr>
+                            <th>Product</th>
+                            <th>Quantity</th>
+                            <th class="text-end">Unit Price</th>
+                            <th class="text-end">Total</th>
+                            <th>Type</th>
+                            <th>Sold By</th>
+                            <th>Date</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for sale in sales %}
+                        <tr>
+                            <td>
+                                <div class="fw-semibold">{{ sale.product.name }}</div>
+                                {% if sale.notes %}
+                                    <div class="small text-muted">{{ sale.notes|truncatewords:10 }}</div>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {{ sale.quantity }} {{ sale.get_unit_display }}{% if sale.quantity > 1 %}s{% endif %}
+                            </td>
+                            <td class="text-end">
+                                MWK {{ sale.unit_price|floatformat:2 }}
+                            </td>
+                            <td class="text-end">
+                                <span class="fw-semibold">MWK {{ sale.total_price|floatformat:2 }}</span>
+                            </td>
+                            <td>
+                                {% if sale.sale_type == "credit" %}
+                                    <span class="badge bg-warning-subtle text-warning">Credit</span>
+                                {% elif sale.sale_type == "free" %}
+                                    <span class="badge bg-secondary-subtle text-secondary">Free</span>
+                                {% else %}
+                                    <span class="badge bg-success-subtle text-success">Cash</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {{ sale.sold_by.get_full_name|default:sale.sold_by.username }}
+                            </td>
+                            <td>
+                                <div>{{ sale.sold_at|date:"d M Y" }}</div>
+                                <div class="small text-muted">{{ sale.sold_at|date:"H:i" }}</div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        {% else %}
+            <!-- Empty State -->
+            <div class="text-center py-5">
+                <div class="mb-3">
+                    <i class="bi bi-inbox" style="font-size: 3rem; opacity: 0.3;"></i>
+                </div>
+                <h5 class="text-muted mb-2">No Sales Found</h5>
+                <p class="text-muted mb-4">
+                    {% if request.GET.type %}
+                        No sales match your current filters. Try adjusting your search criteria.
+                    {% else %}
+                        Start recording sales from the POS to see them here.
+                    {% endif %}
+                </p>
+                <a href="{% url 'liquor:sell' %}" class="btn btn-primary">
+                    <i class="bi bi-plus-circle"></i> Record First Sale
+                </a>
+            </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
+

@@ -553,6 +553,8 @@ urlpatterns += [
     path("support/",   include_or_raise("support.urls", "support")),
     path("audit/",     include_or_raise("audit.urls", "audit")),
     path("notifications/", include_or_raise("notifications.urls", "notifications")),
+    # Backups & Data Export
+    path("backups/",   include_or_raise("backups.urls", "backups")),
     # Debug views (staff-only)
     path("debug/",     include_or_raise("core.urls_debug", "debug")),
 ]

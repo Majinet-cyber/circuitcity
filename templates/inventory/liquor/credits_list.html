@@ -1,0 +1,233 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Credit Sales - {{ business.name }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <!-- Header -->
+    <div class="row mb-4">
+        <div class="col">
+            <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
+                <div>
+                    <h2>Credit Sales</h2>
+                    <p class="text-muted mb-0">Track customer bar tabs and credit payments</p>
+                </div>
+                <a href="{% url 'liquor:sell' %}" class="btn btn-primary">
+                    <i class="bi bi-plus-circle"></i> New Sale
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Filters -->
+    <div class="glass-card p-3 mb-4">
+        <form method="get" class="row g-3 align-items-end">
+            <div class="col-12 col-md-4">
+                <label class="form-label">Filter by Status</label>
+                <select name="status" class="form-select" onchange="this.form.submit()">
+                    <option value="">All Statuses</option>
+                    <option value="pending" {% if request.GET.status == "pending" %}selected{% endif %}>Pending</option>
+                    <option value="partial" {% if request.GET.status == "partial" %}selected{% endif %}>Partially Paid</option>
+                    <option value="settled" {% if request.GET.status == "settled" %}selected{% endif %}>Settled</option>
+                    <option value="written_off" {% if request.GET.status == "written_off" %}selected{% endif %}>Written Off</option>
+                </select>
+            </div>
+            <div class="col-12 col-md-4">
+                <label class="form-label">Search Customer</label>
+                <input type="text" name="search" class="form-control" placeholder="Customer name or phone" value="{{ request.GET.search }}">
+            </div>
+            <div class="col-12 col-md-4">
+                <button type="submit" class="btn btn-outline-primary w-100">
+                    <i class="bi bi-search"></i> Filter
+                </button>
+                {% if request.GET.status or request.GET.search %}
+                    <a href="{% url 'liquor:credits_list' %}" class="btn btn-outline-secondary w-100 mt-2">
+                        <i class="bi bi-x-circle"></i> Clear Filters
+                    </a>
+                {% endif %}
+            </div>
+        </form>
+    </div>
+
+    <!-- Credits Summary Cards -->
+    {% if credits %}
+        {% with total_pending=credits|length %}
+        <div class="row g-3 mb-4">
+            <div class="col-6 col-md-3">
+                <div class="glass-card p-3">
+                    <div class="small text-muted mb-1">Total Credits</div>
+                    <div class="h4 mb-0 fw-bold">{{ credits|length }}</div>
+                </div>
+            </div>
+            <div class="col-6 col-md-3">
+                <div class="glass-card p-3">
+                    <div class="small text-muted mb-1">Total Outstanding</div>
+                    <div class="h4 mb-0 fw-bold">
+                        MWK {% widthratio credits.0.business.id 1 1 as dummy %}
+                        {{ credits|length|floatformat:0 }}
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endwith %}
+    {% endif %}
+
+    <!-- Credits Table -->
+    <div class="glass-card p-0">
+        {% if credits %}
+            <div class="table-responsive">
+                <table class="table table-hover mb-0">
+                    <thead>
+                        <tr>
+                            <th>Customer</th>
+                            <th>Product</th>
+                            <th class="text-end">Amount</th>
+                            <th class="text-end">Paid</th>
+                            <th class="text-end">Balance</th>
+                            <th>Status</th>
+                            <th>Date</th>
+                            <th class="text-end">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for credit in credits %}
+                        <tr>
+                            <td>
+                                <div class="fw-semibold">{{ credit.customer_name }}</div>
+                                {% if credit.customer_phone %}
+                                    <div class="small text-muted">{{ credit.customer_phone }}</div>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if credit.related_sale %}
+                                    <div>{{ credit.related_sale.product.name }}</div>
+                                    <div class="small text-muted">
+                                        {{ credit.related_sale.quantity }} {{ credit.related_sale.get_unit_display }}{% if credit.related_sale.quantity > 1 %}s{% endif %}
+                                    </div>
+                                {% else %}
+                                    <span class="text-muted">-</span>
+                                {% endif %}
+                            </td>
+                            <td class="text-end">
+                                <span class="fw-semibold">MWK {{ credit.amount|floatformat:2 }}</span>
+                            </td>
+                            <td class="text-end">
+                                <span class="text-success">MWK {{ credit.amount_paid|floatformat:2 }}</span>
+                            </td>
+                            <td class="text-end">
+                                {% if credit.balance > 0 %}
+                                    <span class="text-danger fw-semibold">MWK {{ credit.balance|floatformat:2 }}</span>
+                                {% else %}
+                                    <span class="text-muted">MWK 0.00</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if credit.status == "pending" %}
+                                    <span class="badge bg-warning-subtle text-warning">Pending</span>
+                                {% elif credit.status == "partial" %}
+                                    <span class="badge bg-info-subtle text-info">Partial</span>
+                                {% elif credit.status == "settled" %}
+                                    <span class="badge bg-success-subtle text-success">Settled</span>
+                                {% elif credit.status == "written_off" %}
+                                    <span class="badge bg-secondary-subtle text-secondary">Written Off</span>
+                                {% else %}
+                                    <span class="badge bg-light text-dark">{{ credit.get_status_display }}</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <div>{{ credit.created_at|date:"d M Y" }}</div>
+                                <div class="small text-muted">{{ credit.created_at|date:"H:i" }}</div>
+                            </td>
+                            <td class="text-end">
+                                <div class="btn-group btn-group-sm">
+                                    <a href="{% url 'liquor:credit_detail' credit_id=credit.id %}" 
+                                       class="btn btn-outline-primary btn-sm" 
+                                       title="View Details">
+                                        <i class="bi bi-eye"></i>
+                                    </a>
+                                    {% if credit.status != "settled" and credit.status != "written_off" %}
+                                        <a href="{% url 'liquor:submit_credit_payment' credit_id=credit.id %}" 
+                                           class="btn btn-outline-success btn-sm" 
+                                           title="Add Payment">
+                                            <i class="bi bi-cash"></i>
+                                        </a>
+                                    {% endif %}
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        {% else %}
+            <!-- Empty State -->
+            <div class="text-center py-5">
+                <div class="mb-3">
+                    <i class="bi bi-inbox" style="font-size: 3rem; opacity: 0.3;"></i>
+                </div>
+                <h5 class="text-muted mb-2">No Credit Sales Found</h5>
+                <p class="text-muted mb-4">
+                    {% if request.GET.status or request.GET.search %}
+                        No credits match your current filters. Try adjusting your search criteria.
+                    {% else %}
+                        Start recording credit sales from the POS to track customer bar tabs.
+                    {% endif %}
+                </p>
+                {% if not request.GET.status and not request.GET.search %}
+                    <a href="{% url 'liquor:sell' %}" class="btn btn-primary">
+                        <i class="bi bi-plus-circle"></i> Record First Credit Sale
+                    </a>
+                {% else %}
+                    <a href="{% url 'liquor:credits_list' %}" class="btn btn-outline-primary">
+                        <i class="bi bi-x-circle"></i> Clear Filters
+                    </a>
+                {% endif %}
+            </div>
+        {% endif %}
+    </div>
+
+    <!-- Tips Section -->
+    {% if not credits and not request.GET.status and not request.GET.search %}
+    <div class="glass-card p-3 mt-4">
+        <div class="d-flex align-items-start">
+            <i class="bi bi-lightbulb text-warning me-3" style="font-size: 1.5rem;"></i>
+            <div>
+                <h6 class="mb-2">About Credit Sales</h6>
+                <p class="small text-muted mb-0">
+                    Credit sales allow you to track customer bar tabs. When recording a sale, 
+                    select "Credit Sale" as the sale type and enter customer details. 
+                    Bartenders can submit payments with proof, and managers approve them. 
+                    All payments update the credit balance automatically.
+                </p>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+</div>
+
+<style>
+    .table > :not(caption) > * > * {
+        padding: 0.75rem 0.5rem;
+    }
+    
+    .table tbody tr {
+        transition: background-color 0.15s ease;
+    }
+    
+    .table tbody tr:hover {
+        background-color: rgba(var(--bs-primary-rgb), 0.03);
+    }
+    
+    @media (max-width: 768px) {
+        .table-responsive {
+            font-size: 0.875rem;
+        }
+        
+        .table th, .table td {
+            white-space: nowrap;
+        }
+    }
+</style>
+{% endblock %}
+

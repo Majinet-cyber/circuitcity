@@ -35,6 +35,20 @@ _VERTICAL_ALIASES = {
     "bottle-store": "liquor",
     "bottle store": "liquor",
 
+    # Gym / Fitness
+    "gym": "gym",
+    "fitness": "gym",
+    "fitness center": "gym",
+    "health club": "gym",
+    "sports club": "gym",
+
+    # Clothing / Fashion
+    "clothing": "clothing",
+    "fashion": "clothing",
+    "apparel": "clothing",
+    "boutique": "clothing",
+    "garments": "clothing",
+
     # Grocery / Supermarket / Retail
     "grocery": "grocery",
     "groceries": "grocery",

@@ -105,6 +105,14 @@ class Business(models.Model):
         on_delete=models.SET_NULL,
         related_name="businesses_created",
     )
+    
+    # Logo (optional branding)
+    logo = models.ImageField(
+        upload_to="business_logos/",
+        null=True,
+        blank=True,
+        help_text="Business logo. Best fit: square or 3:1 ratio (e.g., 300x300 or 600x200). PNG with transparent background recommended.",
+    )
 
     class Meta:
         ordering = ["name"]
@@ -298,6 +306,36 @@ class Membership(models.Model):
     def save(self, *args, **kwargs):
         self.full_clean()
         return super().save(*args, **kwargs)
+    
+    def transfer_location(self, new_location, changed_by):
+        """
+        Transfer this membership to a new location and create history record.
+        
+        Args:
+            new_location: New Location instance
+            changed_by: User performing the transfer
+        
+        Returns:
+            MembershipLocationHistory instance
+        """
+        if not new_location or new_location == self.location:
+            return None
+        
+        # Create history record
+        from django.db import transaction
+        with transaction.atomic():
+            history = MembershipLocationHistory.objects.create(
+                membership=self,
+                from_location=self.location,
+                to_location=new_location,
+                changed_by=changed_by,
+            )
+            
+            # Update membership
+            self.location = new_location
+            self.save(update_fields=["location"])
+            
+            return history
 
 
 # ===============================
@@ -652,3 +690,57 @@ class AgentInvite(BaseTenantModel):
         membership = self.attach_user_as_agent(user)
         self.mark_joined(user=user, save=True)
         return membership
+
+
+# ===============================
+# Membership Location History
+# ===============================
+
+class MembershipLocationHistory(models.Model):
+    """
+    Tracks agent location transfers with timestamp and responsible user.
+    Maintains an audit trail of all location changes.
+    """
+    membership = models.ForeignKey(
+        Membership,
+        on_delete=models.CASCADE,
+        related_name="location_history",
+    )
+    from_location = models.ForeignKey(
+        "inventory.Location",
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="membership_history_from",
+        help_text="Previous location (null if this is the first assignment)",
+    )
+    to_location = models.ForeignKey(
+        "inventory.Location",
+        on_delete=models.PROTECT,
+        related_name="membership_history_to",
+        help_text="New location",
+    )
+    changed_by = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="membership_transfers_made",
+    )
+    changed_at = models.DateTimeField(auto_now_add=True, db_index=True)
+    notes = models.TextField(blank=True, default="")
+
+    class Meta:
+        ordering = ["-changed_at"]
+        indexes = [
+            models.Index(fields=["membership", "-changed_at"]),
+            models.Index(fields=["from_location", "-changed_at"]),
+            models.Index(fields=["to_location", "-changed_at"]),
+        ]
+        verbose_name = "Membership Location History"
+        verbose_name_plural = "Membership Location Histories"
+
+    def __str__(self) -> str:
+        from_name = self.from_location.name if self.from_location else "New"
+        to_name = self.to_location.name if self.to_location else "Unknown"
+        return f"{self.membership.user} transferred from {from_name} to {to_name} on {self.changed_at:%Y-%m-%d}"

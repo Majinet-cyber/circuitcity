@@ -4,6 +4,19 @@
 {% block title %}Pharmacy · Emajinet{% endblock %}
 
 {% block content %}
+
+{% comment %}Branded header with greeting{% endcomment %}
+{% include "partials/dashboard_brand_header.html" %}
+
+{% comment %}Daily wisdom quotes{% endcomment %}
+{% include "partials/dashboard_quotes.html" %}
+
+{% comment %}Yesterday summary (shows once per day){% endcomment %}
+{% include "partials/dashboard_yesterday_summary.html" %}
+
+{% comment %}Payment Mix{% endcomment %}
+{% include "partials/dashboard_payment_mix.html" %}
+
 <style>
   .vertical-page{display:flex;flex-direction:column;gap:18px;padding:18px}
   .vertical-hero{background:linear-gradient(120deg,#06b6d4,#3b82f6);padding:24px;border-radius:20px;color:#fff;display:flex;flex-wrap:wrap;gap:18px;align-items:center;justify-content:space-between}

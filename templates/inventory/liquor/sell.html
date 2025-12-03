@@ -1,0 +1,304 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Sell Liquor - {{ business.name }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <div class="row mb-4">
+        <div class="col">
+            <div class="d-flex align-items-center justify-content-between">
+                <div>
+                    <h2>Sell Liquor</h2>
+                    <p class="text-muted mb-0">Record bottle and shot sales</p>
+                </div>
+                {% if active_shift %}
+                    <div class="badge bg-success-subtle text-success">
+                        <i class="bi bi-clock"></i> Active Shift
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    {% if not active_shift %}
+    <div class="alert alert-warning d-flex align-items-center" role="alert">
+        <i class="bi bi-exclamation-triangle-fill me-2"></i>
+        <div>
+            <strong>No active shift!</strong> Start a shift first to track sales properly.
+            <a href="{% url 'liquor:start_shift' %}" class="alert-link ms-2">Start Shift Now</a>
+        </div>
+    </div>
+    {% endif %}
+
+    <div class="row">
+        <!-- Sale Form -->
+        <div class="col-lg-7">
+            <div class="glass-card p-3 p-md-4 mb-4">
+                <h5 class="mb-3">Record Sale</h5>
+                
+                <form method="post" id="liquor-sell-form">
+                    {% csrf_token %}
+                    
+                    {% if form.errors %}
+                    <div class="alert alert-danger">
+                        {% for field, errors in form.errors.items %}
+                            {% for error in errors %}
+                                <div>{{ field }}: {{ error }}</div>
+                            {% endfor %}
+                        {% endfor %}
+                    </div>
+                    {% endif %}
+
+                    <div class="row g-3">
+                        <!-- Product Selection -->
+                        <div class="col-12">
+                            <label class="form-label">Product <span class="text-danger">*</span></label>
+                            {{ form.product }}
+                            <div class="form-text">Select the bottle or drink being sold</div>
+                        </div>
+
+                        <!-- Unit Type (Bottle or Shot) -->
+                        <div class="col-6 col-md-4">
+                            <label class="form-label">Unit Type <span class="text-danger">*</span></label>
+                            {{ form.unit }}
+                        </div>
+
+                        <!-- Quantity -->
+                        <div class="col-6 col-md-4">
+                            <label class="form-label">Quantity <span class="text-danger">*</span></label>
+                            {{ form.quantity }}
+                        </div>
+
+                        <!-- Unit Price -->
+                        <div class="col-12 col-md-4">
+                            <label class="form-label">Unit Price (MWK) <span class="text-danger">*</span></label>
+                            {{ form.unit_price }}
+                            <div class="form-text small" id="price-helper">Will auto-fill from product</div>
+                        </div>
+
+                        <!-- Sale Type -->
+                        <div class="col-12 col-md-6">
+                            <label class="form-label">Sale Type <span class="text-danger">*</span></label>
+                            {{ form.sale_type }}
+                            <div class="form-text">Cash, credit, or complimentary</div>
+                        </div>
+
+                        <!-- Total Display -->
+                        <div class="col-12 col-md-6">
+                            <label class="form-label">Total Amount</label>
+                            <div class="input-group">
+                                <span class="input-group-text">MWK</span>
+                                <input type="text" id="total-display" class="form-control" readonly value="0.00">
+                            </div>
+                        </div>
+
+                        <!-- Customer Info (for credit sales) -->
+                        <div class="col-12" id="credit-fields" style="display: none;">
+                            <div class="alert alert-info mb-3">
+                                <i class="bi bi-info-circle me-2"></i>
+                                <strong>Credit Sale:</strong> Customer information required
+                            </div>
+                            
+                            <div class="row g-2">
+                                <div class="col-12 col-md-6">
+                                    <label class="form-label">Customer Name <span class="text-danger">*</span></label>
+                                    {{ form.customer_name }}
+                                </div>
+                                <div class="col-12 col-md-6">
+                                    <label class="form-label">Customer Phone</label>
+                                    {{ form.customer_phone }}
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Notes -->
+                        <div class="col-12">
+                            <label class="form-label">Notes (optional)</label>
+                            {{ form.notes }}
+                        </div>
+                    </div>
+
+                    <!-- Submit Buttons -->
+                    <div class="d-flex gap-2 mt-4">
+                        <button type="submit" class="btn btn-primary">
+                            <i class="bi bi-check-circle"></i> Record Sale
+                        </button>
+                        <button type="reset" class="btn btn-outline-secondary">
+                            <i class="bi bi-x-circle"></i> Clear
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- Recent Sales & Summary -->
+        <div class="col-lg-5">
+            <!-- Quick Stats -->
+            {% if active_shift %}
+            <div class="glass-card p-3 mb-4">
+                <h6 class="text-muted mb-2">Current Shift</h6>
+                <div class="d-flex align-items-center justify-content-between">
+                    <div>
+                        <div class="small text-muted">Started</div>
+                        <div class="fw-bold">{{ active_shift.started_at|date:"H:i, d M Y" }}</div>
+                    </div>
+                    <a href="{% url 'liquor:close_shift' shift_id=active_shift.id %}" class="btn btn-sm btn-outline-danger">
+                        Close Shift
+                    </a>
+                </div>
+            </div>
+            {% endif %}
+
+            <!-- Recent Sales -->
+            <div class="glass-card p-3">
+                <h6 class="mb-3">Recent Sales</h6>
+                
+                {% if recent_sales %}
+                    <div class="list-group list-group-flush">
+                        {% for sale in recent_sales %}
+                        <div class="list-group-item px-0 py-2 border-bottom">
+                            <div class="d-flex justify-content-between align-items-start">
+                                <div class="flex-grow-1">
+                                    <div class="fw-semibold">{{ sale.product.name }}</div>
+                                    <div class="small text-muted">
+                                        {{ sale.quantity }} {{ sale.get_unit_display }}{% if sale.quantity > 1 %}s{% endif %}
+                                        · MWK {{ sale.total_price }}
+                                    </div>
+                                </div>
+                                <div class="text-end">
+                                    {% if sale.sale_type == "credit" %}
+                                        <span class="badge bg-warning-subtle text-warning">Credit</span>
+                                    {% elif sale.sale_type == "free" %}
+                                        <span class="badge bg-secondary-subtle text-secondary">Free</span>
+                                    {% else %}
+                                        <span class="badge bg-success-subtle text-success">Cash</span>
+                                    {% endif %}
+                                    <div class="small text-muted mt-1">
+                                        {{ sale.sold_at|date:"H:i" }}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                {% else %}
+                    <div class="text-center text-muted py-4">
+                        <i class="bi bi-inbox" style="font-size: 2rem; opacity: 0.3;"></i>
+                        <div class="mt-2">No sales recorded yet</div>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+(function() {
+    const productSelect = document.getElementById('id_product');
+    const unitSelect = document.getElementById('id_unit');
+    const quantityInput = document.getElementById('id_quantity');
+    const priceInput = document.getElementById('id_unit_price');
+    const totalDisplay = document.getElementById('total-display');
+    const saleTypeSelect = document.getElementById('id_sale_type');
+    const creditFields = document.getElementById('credit-fields');
+    const priceHelper = document.getElementById('price-helper');
+
+    // Fetch product pricing when product changes
+    productSelect.addEventListener('change', async function() {
+        const productId = this.value;
+        if (!productId) return;
+
+        try {
+            const response = await fetch(`/liquor/get-product-pricing/${productId}/`);
+            const data = await response.json();
+            
+            if (data.success) {
+                // Store product data for later use
+                productSelect.dataset.hasShots = data.has_shots;
+                productSelect.dataset.priceBottle = data.price_per_bottle;
+                productSelect.dataset.priceShot = data.price_per_shot;
+                
+                // Update price based on current unit selection
+                updatePrice();
+                
+                // Update helper text
+                if (data.has_shots) {
+                    priceHelper.textContent = `Bottle: MWK ${data.price_per_bottle} | Shot: MWK ${data.price_per_shot}`;
+                } else {
+                    priceHelper.textContent = `Bottle: MWK ${data.price_per_bottle}`;
+                }
+            }
+        } catch (error) {
+            console.error('Error fetching product pricing:', error);
+        }
+    });
+
+    // Update price when unit type changes
+    unitSelect.addEventListener('change', updatePrice);
+
+    function updatePrice() {
+        const unit = unitSelect.value;
+        const hasShots = productSelect.dataset.hasShots === 'true';
+        
+        if (unit === 'bottle') {
+            priceInput.value = productSelect.dataset.priceBottle || '';
+        } else if (unit === 'shot' && hasShots) {
+            priceInput.value = productSelect.dataset.priceShot || '';
+        }
+        
+        updateTotal();
+    }
+
+    // Update total when quantity or price changes
+    quantityInput.addEventListener('input', updateTotal);
+    priceInput.addEventListener('input', updateTotal);
+
+    function updateTotal() {
+        const quantity = parseFloat(quantityInput.value) || 0;
+        const price = parseFloat(priceInput.value) || 0;
+        const total = quantity * price;
+        totalDisplay.value = total.toFixed(2);
+    }
+
+    // Show/hide credit fields based on sale type
+    saleTypeSelect.addEventListener('change', function() {
+        if (this.value === 'credit') {
+            creditFields.style.display = 'block';
+            document.getElementById('id_customer_name').required = true;
+        } else {
+            creditFields.style.display = 'none';
+            document.getElementById('id_customer_name').required = false;
+        }
+    });
+
+    // Initialize
+    updateTotal();
+    if (saleTypeSelect.value === 'credit') {
+        creditFields.style.display = 'block';
+    }
+
+    // Form validation
+    document.getElementById('liquor-sell-form').addEventListener('submit', function(e) {
+        const saleType = saleTypeSelect.value;
+        const customerName = document.getElementById('id_customer_name').value.trim();
+        
+        if (saleType === 'credit' && !customerName) {
+            e.preventDefault();
+            alert('Customer name is required for credit sales.');
+            return false;
+        }
+    });
+
+    // Reset form handler
+    document.querySelector('button[type="reset"]').addEventListener('click', function() {
+        setTimeout(() => {
+            creditFields.style.display = 'none';
+            priceHelper.textContent = 'Will auto-fill from product';
+            updateTotal();
+        }, 10);
+    });
+})();
+</script>
+{% endblock %}
+

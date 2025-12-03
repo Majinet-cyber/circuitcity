@@ -1,0 +1,137 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Stock Edit Requests - {{ business.name }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <!-- Header -->
+    <div class="row mb-4">
+        <div class="col">
+            <h2>Stock Edit Requests</h2>
+            <p class="text-muted mb-0">Review and approve stock modification requests from bartenders</p>
+        </div>
+    </div>
+
+    <!-- Pending Requests -->
+    <div class="glass-card p-0">
+        {% if requests %}
+            <div class="table-responsive">
+                <table class="table table-hover mb-0">
+                    <thead>
+                        <tr>
+                            <th>Product</th>
+                            <th>Requested Changes</th>
+                            <th>Reason</th>
+                            <th>Requested By</th>
+                            <th>Date</th>
+                            <th class="text-end">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for req in requests %}
+                        <tr>
+                            <td>
+                                <div class="fw-semibold">{{ req.product.name }}</div>
+                                {% if req.product.category %}
+                                    <div class="small text-muted">{{ req.product.category|title }}</div>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <div class="small">{{ req.requested_changes.description|default:"No description" }}</div>
+                            </td>
+                            <td>
+                                <div class="small">{{ req.reason|truncatewords:15 }}</div>
+                            </td>
+                            <td>
+                                {{ req.requested_by.get_full_name|default:req.requested_by.username }}
+                            </td>
+                            <td>
+                                <div>{{ req.created_at|date:"d M Y" }}</div>
+                                <div class="small text-muted">{{ req.created_at|date:"H:i" }}</div>
+                            </td>
+                            <td class="text-end">
+                                <div class="btn-group btn-group-sm">
+                                    <button type="button" class="btn btn-success" data-bs-toggle="modal" data-bs-target="#approveModal{{ req.id }}">
+                                        <i class="bi bi-check-circle"></i> Approve
+                                    </button>
+                                    <button type="button" class="btn btn-danger" data-bs-toggle="modal" data-bs-target="#rejectModal{{ req.id }}">
+                                        <i class="bi bi-x-circle"></i> Reject
+                                    </button>
+                                </div>
+
+                                <!-- Approve Modal -->
+                                <div class="modal fade" id="approveModal{{ req.id }}" tabindex="-1">
+                                    <div class="modal-dialog">
+                                        <div class="modal-content">
+                                            <div class="modal-header">
+                                                <h5 class="modal-title">Approve Stock Edit</h5>
+                                                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                                            </div>
+                                            <div class="modal-body">
+                                                <p>Approve stock edit for <strong>{{ req.product.name }}</strong>?</p>
+                                                <div class="alert alert-info">
+                                                    <strong>Requested Changes:</strong><br>
+                                                    {{ req.requested_changes.description|default:"No description" }}
+                                                </div>
+                                                <div class="alert alert-warning">
+                                                    <strong>Reason:</strong><br>
+                                                    {{ req.reason }}
+                                                </div>
+                                            </div>
+                                            <div class="modal-footer">
+                                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                                                <form method="post" action="#" style="display: inline;">
+                                                    {% csrf_token %}
+                                                    <button type="submit" class="btn btn-success">Approve Request</button>
+                                                </form>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Reject Modal -->
+                                <div class="modal fade" id="rejectModal{{ req.id }}" tabindex="-1">
+                                    <div class="modal-dialog">
+                                        <div class="modal-content">
+                                            <form method="post" action="#">
+                                                {% csrf_token %}
+                                                <div class="modal-header">
+                                                    <h5 class="modal-title">Reject Stock Edit</h5>
+                                                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                                                </div>
+                                                <div class="modal-body">
+                                                    <p>Reject stock edit request for <strong>{{ req.product.name }}</strong>?</p>
+                                                    <label class="form-label">Reason for rejection <span class="text-danger">*</span></label>
+                                                    <textarea name="rejection_reason" class="form-control" rows="3" required placeholder="Explain why this request is being rejected..."></textarea>
+                                                </div>
+                                                <div class="modal-footer">
+                                                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                                                    <button type="submit" class="btn btn-danger">Reject Request</button>
+                                                </div>
+                                            </form>
+                                        </div>
+                                    </div>
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        {% else %}
+            <!-- Empty State -->
+            <div class="text-center py-5">
+                <div class="mb-3">
+                    <i class="bi bi-inbox" style="font-size: 3rem; opacity: 0.3;"></i>
+                </div>
+                <h5 class="text-muted mb-2">No Pending Requests</h5>
+                <p class="text-muted mb-4">
+                    All stock edit requests have been reviewed. New requests will appear here.
+                </p>
+            </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
+

@@ -3,6 +3,7 @@ from django.urls import path
 from django.views.generic import RedirectView
 from django.http import JsonResponse
 from . import views
+from . import views_export
 
 app_name = "wallet"
 
@@ -26,6 +27,7 @@ urlpatterns = [
     path("tx/<int:pk>/", views.entry_detail, name="entry_detail"),  # transaction drill-down
     path("payslip/<int:year>-<int:month>/download/", views.payslip_download, name="payslip_download"),
     path("budget/new/", views.budget_new, name="budget_new"),
+    path("export/activity/", views_export.agent_export_activity, name="agent_export_activity"),  # Agent data export
 
     # ------------------------------------------------------------------
     # Wallet Admin Pages (canonical: /wallet/admin/...)

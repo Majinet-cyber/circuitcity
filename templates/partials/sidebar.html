@@ -116,7 +116,7 @@
           {% for item in section.list %}
             {# Check if item requires manager role #}
             {% if item.require_manager|default:False %}
-              {% if request.user.is_superuser or request.user.is_staff or request.user.profile.is_manager %}
+              {% if request.user.is_superuser or request.user.is_staff or IS_MANAGER %}
                 {# Resolve URL (try named URL first, then use as-is if it starts with /) #}
                 {% url item.url as item_url %}
                 {% if not item_url and item.url|slice:':1' == '/' %}

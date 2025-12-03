@@ -250,6 +250,7 @@ def get_vertical_sidebar_items(business_kind: str) -> list[dict]:
             # BUSINESS section (for managers)
             {"section": "BUSINESS", "url": "tenants:manager_review_agents", "label": "Trainers", "icon": "bi-people", "active_pattern": "/tenants/manager/agents/", "require_manager": True},
             {"section": "BUSINESS", "url": "tenants:manager_locations", "label": "Locations", "icon": "bi-geo", "active_pattern": "/tenants/manager/locations/", "require_manager": True},
+            {"section": "BUSINESS", "url": "backups:manager_list", "label": "Data Backup", "icon": "bi-cloud-download", "active_pattern": "/backups/", "require_manager": True},
             {"section": "BUSINESS", "url": "billing:plans", "label": "Choose Plan", "icon": "bi-credit-card-2-front", "active_pattern": "/billing/plans", "require_manager": True},
         ]
     
@@ -272,6 +273,7 @@ def get_vertical_sidebar_items(business_kind: str) -> list[dict]:
             # BUSINESS section (for managers)
             {"section": "BUSINESS", "url": "tenants:manager_review_agents", "label": "Agents", "icon": "bi-people", "active_pattern": "/tenants/manager/agents/", "require_manager": True},
             {"section": "BUSINESS", "url": "tenants:manager_locations", "label": "Locations", "icon": "bi-geo", "active_pattern": "/tenants/manager/locations/", "require_manager": True},
+            {"section": "BUSINESS", "url": "backups:manager_list", "label": "Data Backup", "icon": "bi-cloud-download", "active_pattern": "/backups/", "require_manager": True},
             {"section": "BUSINESS", "url": "billing:plans", "label": "Choose Plan", "icon": "bi-credit-card-2-front", "active_pattern": "/billing/plans", "require_manager": True},
             {"section": "BUSINESS", "url": "inventory:orders_list", "label": "Orders", "icon": "bi-clipboard-data", "active_pattern": "/inventory/orders/", "require_manager": True},
         ]
@@ -296,6 +298,7 @@ def get_vertical_sidebar_items(business_kind: str) -> list[dict]:
             # BUSINESS section (for managers)
             {"section": "BUSINESS", "url": "tenants:manager_review_agents", "label": "Agents", "icon": "bi-people", "active_pattern": "/tenants/manager/agents/", "require_manager": True},
             {"section": "BUSINESS", "url": "tenants:manager_locations", "label": "Locations", "icon": "bi-geo", "active_pattern": "/tenants/manager/locations/", "require_manager": True},
+            {"section": "BUSINESS", "url": "backups:manager_list", "label": "Data Backup", "icon": "bi-cloud-download", "active_pattern": "/backups/", "require_manager": True},
             {"section": "BUSINESS", "url": "billing:plans", "label": "Choose Plan", "icon": "bi-credit-card-2-front", "active_pattern": "/billing/plans", "require_manager": True},
         ]
     
@@ -319,6 +322,7 @@ def get_vertical_sidebar_items(business_kind: str) -> list[dict]:
             # BUSINESS section (for managers)
             {"section": "BUSINESS", "url": "tenants:manager_review_agents", "label": "Agents", "icon": "bi-people", "active_pattern": "/tenants/manager/agents/", "require_manager": True},
             {"section": "BUSINESS", "url": "tenants:manager_locations", "label": "Locations", "icon": "bi-geo", "active_pattern": "/tenants/manager/locations/", "require_manager": True},
+            {"section": "BUSINESS", "url": "backups:manager_list", "label": "Data Backup", "icon": "bi-cloud-download", "active_pattern": "/backups/", "require_manager": True},
             {"section": "BUSINESS", "url": "billing:plans", "label": "Choose Plan", "icon": "bi-credit-card-2-front", "active_pattern": "/billing/plans", "require_manager": True},
         ]
     
@@ -342,6 +346,7 @@ def get_vertical_sidebar_items(business_kind: str) -> list[dict]:
             {"section": "BUSINESS", "url": "reports:home", "label": "Reports", "icon": "bi-graph-up", "active_pattern": "/reports/", "require_manager": True},
             {"section": "BUSINESS", "url": "tenants:manager_review_agents", "label": "Agents", "icon": "bi-people", "active_pattern": "/tenants/manager/agents/", "require_manager": True},
             {"section": "BUSINESS", "url": "tenants:manager_locations", "label": "Locations", "icon": "bi-geo", "active_pattern": "/tenants/manager/locations/", "require_manager": True},
+            {"section": "BUSINESS", "url": "backups:manager_list", "label": "Data Backup", "icon": "bi-cloud-download", "active_pattern": "/backups/", "require_manager": True},
             {"section": "BUSINESS", "url": "billing:plans", "label": "Choose Plan", "icon": "bi-credit-card-2-front", "active_pattern": "/billing/plans", "require_manager": True},
             {"section": "BUSINESS", "url": "inventory:orders_list", "label": "Orders", "icon": "bi-clipboard-data", "active_pattern": "/inventory/orders/", "require_manager": True},
             

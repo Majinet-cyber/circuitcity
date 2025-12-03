@@ -1,0 +1,216 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Credit Detail - {{ credit.customer_name }} - {{ business.name }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <!-- Header -->
+    <div class="row mb-4">
+        <div class="col">
+            <nav aria-label="breadcrumb">
+                <ol class="breadcrumb">
+                    <li class="breadcrumb-item"><a href="{% url 'liquor:credits_list' %}">Credits</a></li>
+                    <li class="breadcrumb-item active">{{ credit.customer_name }}</li>
+                </ol>
+            </nav>
+            <h2>Credit Detail</h2>
+        </div>
+    </div>
+
+    <div class="row">
+        <!-- Credit Summary -->
+        <div class="col-lg-4 mb-4">
+            <div class="glass-card p-4">
+                <h5 class="mb-3">Customer Information</h5>
+                
+                <div class="mb-3">
+                    <div class="small text-muted">Customer Name</div>
+                    <div class="fw-bold">{{ credit.customer_name }}</div>
+                </div>
+
+                {% if credit.customer_phone %}
+                <div class="mb-3">
+                    <div class="small text-muted">Phone</div>
+                    <div>{{ credit.customer_phone }}</div>
+                </div>
+                {% endif %}
+
+                <hr>
+
+                <div class="mb-3">
+                    <div class="small text-muted">Total Amount</div>
+                    <div class="h4 mb-0">MWK {{ credit.amount|floatformat:2 }}</div>
+                </div>
+
+                <div class="mb-3">
+                    <div class="small text-muted">Amount Paid</div>
+                    <div class="h5 mb-0 text-success">MWK {{ credit.amount_paid|floatformat:2 }}</div>
+                </div>
+
+                <div class="mb-3">
+                    <div class="small text-muted">Balance</div>
+                    <div class="h5 mb-0 {% if credit.balance > 0 %}text-danger{% else %}text-muted{% endif %}">
+                        MWK {{ credit.balance|floatformat:2 }}
+                    </div>
+                </div>
+
+                <hr>
+
+                <div class="mb-3">
+                    <div class="small text-muted">Status</div>
+                    <div>
+                        {% if credit.status == "pending" %}
+                            <span class="badge bg-warning-subtle text-warning">Pending</span>
+                        {% elif credit.status == "partial" %}
+                            <span class="badge bg-info-subtle text-info">Partially Paid</span>
+                        {% elif credit.status == "settled" %}
+                            <span class="badge bg-success-subtle text-success">Settled</span>
+                        {% elif credit.status == "written_off" %}
+                            <span class="badge bg-secondary-subtle text-secondary">Written Off</span>
+                        {% else %}
+                            <span class="badge bg-light text-dark">{{ credit.get_status_display }}</span>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <div class="mb-3">
+                    <div class="small text-muted">Created</div>
+                    <div>{{ credit.created_at|date:"d M Y, H:i" }}</div>
+                </div>
+
+                {% if credit.notes %}
+                <div class="mb-3">
+                    <div class="small text-muted">Notes</div>
+                    <div class="small">{{ credit.notes }}</div>
+                </div>
+                {% endif %}
+
+                {% if credit.status != "settled" and credit.status != "written_off" %}
+                <div class="d-grid gap-2 mt-4">
+                    <a href="{% url 'liquor:submit_credit_payment' credit_id=credit.id %}" class="btn btn-success">
+                        <i class="bi bi-cash"></i> Add Payment
+                    </a>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Related Sale & Payments -->
+        <div class="col-lg-8">
+            <!-- Related Sale -->
+            {% if credit.related_sale %}
+            <div class="glass-card p-4 mb-4">
+                <h5 class="mb-3">Related Sale</h5>
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="mb-2">
+                            <div class="small text-muted">Product</div>
+                            <div class="fw-semibold">{{ credit.related_sale.product.name }}</div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="mb-2">
+                            <div class="small text-muted">Quantity</div>
+                            <div>{{ credit.related_sale.quantity }} {{ credit.related_sale.get_unit_display }}{% if credit.related_sale.quantity > 1 %}s{% endif %}</div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="mb-2">
+                            <div class="small text-muted">Sold At</div>
+                            <div>{{ credit.related_sale.sold_at|date:"d M Y, H:i" }}</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+
+            <!-- Payments -->
+            <div class="glass-card p-4">
+                <div class="d-flex align-items-center justify-content-between mb-3">
+                    <h5 class="mb-0">Payment History</h5>
+                    {% if credit.status != "settled" and credit.status != "written_off" %}
+                        <a href="{% url 'liquor:submit_credit_payment' credit_id=credit.id %}" class="btn btn-sm btn-success">
+                            <i class="bi bi-plus-circle"></i> Add Payment
+                        </a>
+                    {% endif %}
+                </div>
+
+                {% if payments %}
+                    <div class="table-responsive">
+                        <table class="table table-hover mb-0">
+                            <thead>
+                                <tr>
+                                    <th>Amount</th>
+                                    <th>Transaction ID</th>
+                                    <th>Status</th>
+                                    <th>Paid By</th>
+                                    <th>Reviewed By</th>
+                                    <th>Date</th>
+                                    <th>Proof</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for payment in payments %}
+                                <tr>
+                                    <td>
+                                        <span class="fw-semibold">MWK {{ payment.amount|floatformat:2 }}</span>
+                                    </td>
+                                    <td>
+                                        {% if payment.transaction_id %}
+                                            <code class="small">{{ payment.transaction_id }}</code>
+                                        {% else %}
+                                            <span class="text-muted">-</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if payment.status == "pending" %}
+                                            <span class="badge bg-warning-subtle text-warning">Pending</span>
+                                        {% elif payment.status == "approved" %}
+                                            <span class="badge bg-success-subtle text-success">Approved</span>
+                                        {% elif payment.status == "rejected" %}
+                                            <span class="badge bg-danger-subtle text-danger">Rejected</span>
+                                        {% else %}
+                                            <span class="badge bg-light text-dark">{{ payment.get_status_display }}</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {{ payment.paid_by.get_full_name|default:payment.paid_by.username }}
+                                    </td>
+                                    <td>
+                                        {% if payment.reviewed_by %}
+                                            {{ payment.reviewed_by.get_full_name|default:payment.reviewed_by.username }}
+                                        {% else %}
+                                            <span class="text-muted">-</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        <div>{{ payment.created_at|date:"d M Y" }}</div>
+                                        <div class="small text-muted">{{ payment.created_at|date:"H:i" }}</div>
+                                    </td>
+                                    <td>
+                                        {% if payment.proof_file %}
+                                            <a href="{{ payment.proof_file.url }}" target="_blank" class="btn btn-sm btn-outline-primary">
+                                                <i class="bi bi-file-earmark"></i> View
+                                            </a>
+                                        {% else %}
+                                            <span class="text-muted">-</span>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                {% else %}
+                    <div class="text-center text-muted py-4">
+                        <i class="bi bi-inbox" style="font-size: 2rem; opacity: 0.3;"></i>
+                        <div class="mt-2">No payments recorded yet</div>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+

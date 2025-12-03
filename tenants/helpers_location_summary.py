@@ -59,43 +59,47 @@ def get_liquor_stock_summary(business, locations: List) -> Dict[int, Dict[str, i
     Returns: {location_id: {"sold": int, "in_stock": int, "total": int}}
     
     - Sold: Count of bottles sold via LiquorSale (where unit="bottle")
-    - In Stock: Count of bottles in MerchProduct.quantity (where kind=liquor, is_active=True)
+    - In Stock: Count of bottles from latest LiquorShiftStock snapshots
     - Total: sold + in_stock
     """
     stock_summary = {}
     
     try:
         from inventory.models import MerchProduct
-        from inventory.models_verticals import LiquorSale
+        from inventory.models_verticals import LiquorSale, LiquorShiftStock
         from inventory.business_kinds import BusinessKind
+        from django.db.models import Subquery, OuterRef
         
         for loc in locations:
             loc_id = getattr(loc, "id", None)
             if not loc_id:
                 continue
             
-            # In stock: sum of quantity field for liquor products at this location
-            # Note: MerchProduct doesn't have a direct location FK in all cases,
-            # so we'll compute business-wide for now and refine if location FK exists
-            in_stock_qs = MerchProduct.objects.filter(
+            # Get latest stock snapshots for products at this location
+            latest_snapshots = LiquorShiftStock.objects.filter(
+                product=OuterRef('pk'),
+                shift__business=business,
+                shift__location_id=loc_id
+            ).order_by('-recorded_at')
+            
+            # Get products with their latest stock counts
+            products_qs = MerchProduct.objects.filter(
                 business=business,
                 kind=BusinessKind.LIQUOR,
                 is_active=True,
                 is_archived=False,
+            ).annotate(
+                latest_bottles=Subquery(latest_snapshots.values('bottles_count')[:1])
             )
             
-            # Check if MerchProduct has location FK
-            if hasattr(MerchProduct, "location_id"):
-                in_stock_qs = in_stock_qs.filter(location_id=loc_id)
+            # Sum up bottles in stock
+            in_stock = sum(p.latest_bottles or 0 for p in products_qs)
             
-            # Sum quantities (bottles in stock)
-            in_stock = sum(getattr(p, "quantity", 0) or 0 for p in in_stock_qs)
-            
-            # Sold: count bottles sold via LiquorSale
-            # LiquorSale doesn't have direct location FK, but we can try via shift or product
+            # Sold: count bottles sold via LiquorSale at this location
             sold_qs = LiquorSale.objects.filter(
                 business=business,
                 unit="bottle",
+                shift__location_id=loc_id
             )
             
             # Try to filter by location via shift
@@ -130,6 +134,16 @@ def get_gym_member_summary(business, locations: List) -> Dict[int, Dict[str, int
     """
     stock_summary = {}
     
+    # Initialize with zeros for all locations
+    for loc in locations:
+        loc_id = getattr(loc, "id", None)
+        if loc_id:
+            stock_summary[loc_id] = {
+                "active": 0,
+                "in_arrears": 0,
+                "total": 0,
+            }
+    
     try:
         from inventory.models_verticals import GymMember
         
@@ -157,18 +171,14 @@ def get_gym_member_summary(business, locations: List) -> Dict[int, Dict[str, int
         
         # For now, show same data for all locations
         # (since GymMember doesn't have location FK)
-        for loc in locations:
-            loc_id = getattr(loc, "id", None)
-            if not loc_id:
-                continue
-            
+        for loc_id in stock_summary.keys():
             stock_summary[loc_id] = {
                 "active": members_active_count,
                 "in_arrears": members_in_arrears_count,
                 "total": total_members,
             }
     except Exception:
-        # If models not available, return empty
+        # If models not available, keep zeros
         pass
     
     return stock_summary
@@ -185,16 +195,22 @@ def get_clothing_stock_summary(business, locations: List) -> Dict[int, Dict[str,
     """
     stock_summary = {}
     
+    # Initialize with zeros for all locations
+    for loc in locations:
+        loc_id = getattr(loc, "id", None)
+        if loc_id:
+            stock_summary[loc_id] = {
+                "sold": 0,
+                "in_stock": 0,
+                "total": 0,
+            }
+    
     try:
         from inventory.models import MerchProduct
         from inventory.models_verticals import ClothingSale
         from inventory.business_kinds import BusinessKind
         
-        for loc in locations:
-            loc_id = getattr(loc, "id", None)
-            if not loc_id:
-                continue
-            
+        for loc_id in stock_summary.keys():
             # In stock: sum of quantity field for clothing products at this location
             in_stock_qs = MerchProduct.objects.filter(
                 business=business,
@@ -225,7 +241,7 @@ def get_clothing_stock_summary(business, locations: List) -> Dict[int, Dict[str,
                 "total": total,
             }
     except Exception:
-        # If models not available, return empty
+        # If models not available, keep zeros
         pass
     
     return stock_summary

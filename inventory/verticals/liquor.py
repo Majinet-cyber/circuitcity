@@ -274,6 +274,50 @@ def dashboard(request):
         sale_word = "sale" if remaining_units == 1 else "sales"
         target_message = f"Keep going – {remaining_units} {sale_word} left to reach your monthly target."
 
+    # ===== NEW: Personalized dashboard enhancements =====
+    try:
+        from dashboard.helpers_greetings import get_personalized_greeting
+        from dashboard.helpers_yesterday import get_yesterday_summary, should_show_yesterday_summary, mark_yesterday_summary_shown
+        from dashboard.helpers_payments import get_payment_mix_for_dashboard
+        from dashboard.helpers_quotes import get_todays_quotes
+        
+        # Personalized greeting
+        greeting_ctx = get_personalized_greeting(request.user, business)
+        
+        # Brand header context
+        brand_logo_url = None
+        if business and hasattr(business, 'logo') and business.logo:
+            brand_logo_url = business.logo.url
+        
+        # Yesterday summary (show once per day)
+        yesterday_summary = None
+        if should_show_yesterday_summary(request):
+            yesterday_summary = get_yesterday_summary(request.user, business)
+            if yesterday_summary:
+                mark_yesterday_summary_shown(request)
+        
+        # Payment mix (use existing logic, but also create standardized version)
+        payment_mix_standard = get_payment_mix_for_dashboard(business, period_days=days_back, user=None)
+        
+        # Daily quotes
+        daily_quotes = get_todays_quotes(request.user, count=10)
+        
+        ctx_enhancements = {
+            "DASHBOARD_GREETING": greeting_ctx.get("greeting"),
+            "DASHBOARD_USER_NAME": greeting_ctx.get("user_name"),
+            "DASHBOARD_SHOW_WELCOME": greeting_ctx.get("show_welcome"),
+            "DASHBOARD_MILESTONE_MESSAGE": greeting_ctx.get("milestone"),
+            "DASHBOARD_BRAND_LOGO_URL": brand_logo_url,
+            "DASHBOARD_BRAND_TITLE": business.name if business else "Liquor Dashboard",
+            "YESTERDAY_SUMMARY": yesterday_summary,
+            "PAYMENT_MIX": payment_mix_standard if payment_mix_standard else None,
+            "PAYMENT_MIX_PERIOD": f"Last {days_back} days",
+            "DASHBOARD_QUOTES": daily_quotes,
+        }
+    except Exception:
+        # Gracefully degrade if helpers not available
+        ctx_enhancements = {}
+    
     ctx.update(
         {
             "hero_title": "Liquor & Bar",
@@ -328,6 +372,8 @@ def dashboard(request):
             # UI flags
             "show_search": False,  # Liquor dashboard doesn't need search bar
             "active_tab": "home",  # For base.html mobile nav highlighting
+            
+            **ctx_enhancements,  # Merge dashboard enhancements
         }
     )
     return render(request, "verticals/liquor/dashboard.html", ctx)

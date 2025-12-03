@@ -6,6 +6,19 @@
 {% url 'inventory:gym_members_list' as members_url %}
 {% url 'inventory:gym_add_payment' as add_payment_url %}
 {% url 'inventory:time_logs' as checkin_url %}
+
+{% comment %}Branded header with greeting{% endcomment %}
+{% include "partials/dashboard_brand_header.html" %}
+
+{% comment %}Daily wisdom quotes{% endcomment %}
+{% include "partials/dashboard_quotes.html" %}
+
+{% comment %}Yesterday summary (shows once per day){% endcomment %}
+{% include "partials/dashboard_yesterday_summary.html" %}
+
+{% comment %}Payment Mix Card{% endcomment %}
+{% include "partials/dashboard_payment_mix.html" %}
+
 <style>
   .vertical-page{display:flex;flex-direction:column;gap:18px;padding:18px}
   .vertical-hero{background:linear-gradient(135deg,#2563eb,#10b981);padding:24px;border-radius:20px;color:#fff;display:flex;flex-wrap:wrap;gap:18px;align-items:center;justify-content:space-between}
@@ -82,8 +95,8 @@
     </div>
   </section>
 
-  <!-- Payment Mix -->
-  {% if payment_mix %}
+  <!-- Payment Mix - fallback if PAYMENT_MIX not available -->
+  {% if not PAYMENT_MIX and payment_mix %}
   <section class="recent-block">
     <h2 style="margin:0 0 10px;font-size:1.1rem">Payment Mix (This Month)</h2>
     <div class="metrics-grid">

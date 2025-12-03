@@ -373,6 +373,52 @@ def home(request):
     # Onboarding steps tailored to business vertical
     onboarding_steps = get_onboarding_steps(vertical_kind, request)
     
+    # ===== NEW: Personalized dashboard enhancements =====
+    # Import helpers
+    try:
+        from dashboard.helpers_greetings import get_personalized_greeting
+        from dashboard.helpers_yesterday import get_yesterday_summary, should_show_yesterday_summary, mark_yesterday_summary_shown
+        from dashboard.helpers_payments import get_payment_mix_for_dashboard
+        from dashboard.helpers_quotes import get_todays_quotes
+        
+        # Personalized greeting
+        greeting_ctx = get_personalized_greeting(request.user, biz)
+        
+        # Brand header context
+        brand_logo_url = None
+        if hasattr(biz, 'logo') and biz.logo:
+            brand_logo_url = biz.logo.url
+        
+        # Yesterday summary (show once per day)
+        yesterday_summary = None
+        if should_show_yesterday_summary(request):
+            yesterday_summary = get_yesterday_summary(request.user, biz)
+            if yesterday_summary:
+                mark_yesterday_summary_shown(request)
+        
+        # Payment mix (last 30 days)
+        payment_mix = get_payment_mix_for_dashboard(biz, period_days=30, user=None)
+        
+        # Daily quotes
+        daily_quotes = get_todays_quotes(request.user, count=10)
+        
+        # Add to context
+        ctx_enhancements = {
+            "DASHBOARD_GREETING": greeting_ctx.get("greeting"),
+            "DASHBOARD_USER_NAME": greeting_ctx.get("user_name"),
+            "DASHBOARD_SHOW_WELCOME": greeting_ctx.get("show_welcome"),
+            "DASHBOARD_MILESTONE_MESSAGE": greeting_ctx.get("milestone"),
+            "DASHBOARD_BRAND_LOGO_URL": brand_logo_url,
+            "DASHBOARD_BRAND_TITLE": biz.name if biz else "Dashboard",
+            "YESTERDAY_SUMMARY": yesterday_summary,
+            "PAYMENT_MIX": payment_mix,
+            "PAYMENT_MIX_PERIOD": "Last 30 days",
+            "DASHBOARD_QUOTES": daily_quotes,
+        }
+    except Exception:
+        # Gracefully degrade if helpers not available
+        ctx_enhancements = {}
+    
     ctx = {
         "first_run": first_run,
         "products_count": products_count,
@@ -384,6 +430,7 @@ def home(request):
         "staff_view": False,
         "vertical_kind": vertical_kind,
         "onboarding_steps": onboarding_steps,
+        **ctx_enhancements,  # Merge enhancements
     }
     return render(request, "dashboard/home.html", ctx)
 
@@ -509,6 +556,40 @@ def admin_dashboard(request):
             "url": detail_url,
         })
 
+    # ===== NEW: Personalized dashboard enhancements for staff =====
+    try:
+        from dashboard.helpers_greetings import get_personalized_greeting
+        from dashboard.helpers_payments import get_payment_mix_for_dashboard
+        from dashboard.helpers_quotes import get_todays_quotes
+        
+        # Personalized greeting
+        greeting_ctx = get_personalized_greeting(request.user, biz)
+        
+        # Brand header context
+        brand_logo_url = None
+        if biz and hasattr(biz, 'logo') and biz.logo:
+            brand_logo_url = biz.logo.url
+        
+        # Payment mix (business-wide, last 30 days)
+        payment_mix = get_payment_mix_for_dashboard(biz, period_days=30, user=None)
+        
+        # Daily quotes
+        daily_quotes = get_todays_quotes(request.user, count=10)
+        
+        ctx_enhancements = {
+            "DASHBOARD_GREETING": greeting_ctx.get("greeting"),
+            "DASHBOARD_USER_NAME": greeting_ctx.get("user_name"),
+            "DASHBOARD_SHOW_WELCOME": greeting_ctx.get("show_welcome"),
+            "DASHBOARD_MILESTONE_MESSAGE": greeting_ctx.get("milestone"),
+            "DASHBOARD_BRAND_LOGO_URL": brand_logo_url,
+            "DASHBOARD_BRAND_TITLE": biz.name if biz else "Admin Dashboard",
+            "PAYMENT_MIX": payment_mix,
+            "PAYMENT_MIX_PERIOD": "Last 30 days",
+            "DASHBOARD_QUOTES": daily_quotes,
+        }
+    except Exception:
+        ctx_enhancements = {}
+    
     ctx = {
         "kpis": kpis,
         "in_stock_total": in_stock_total,
@@ -519,6 +600,7 @@ def admin_dashboard(request):
         "agents": agent_cards,
         "staff_view": True,
         "scope": scope,
+        **ctx_enhancements,
     }
     return render(request, "dashboard.html", ctx)
 
@@ -632,12 +714,56 @@ def agent_dashboard(request):
         log = logging.getLogger(__name__)
         log.exception("Failed to calculate agent ranking/milestones: %s", e)
 
+    # ===== NEW: Personalized dashboard enhancements for agents =====
+    try:
+        from dashboard.helpers_greetings import get_personalized_greeting
+        from dashboard.helpers_yesterday import get_yesterday_summary, should_show_yesterday_summary, mark_yesterday_summary_shown
+        from dashboard.helpers_payments import get_payment_mix_for_dashboard
+        from dashboard.helpers_quotes import get_todays_quotes
+        
+        # Personalized greeting
+        greeting_ctx = get_personalized_greeting(request.user, biz)
+        
+        # Brand header context
+        brand_logo_url = None
+        if biz and hasattr(biz, 'logo') and biz.logo:
+            brand_logo_url = biz.logo.url
+        
+        # Yesterday summary (agent-scoped would be future enhancement)
+        yesterday_summary = None
+        if should_show_yesterday_summary(request):
+            yesterday_summary = get_yesterday_summary(request.user, biz)
+            if yesterday_summary:
+                mark_yesterday_summary_shown(request)
+        
+        # Payment mix (agent-scoped, last 30 days)
+        payment_mix = get_payment_mix_for_dashboard(biz, period_days=30, user=request.user)
+        
+        # Daily quotes
+        daily_quotes = get_todays_quotes(request.user, count=10)
+        
+        ctx_enhancements = {
+            "DASHBOARD_GREETING": greeting_ctx.get("greeting"),
+            "DASHBOARD_USER_NAME": greeting_ctx.get("user_name"),
+            "DASHBOARD_SHOW_WELCOME": greeting_ctx.get("show_welcome"),
+            "DASHBOARD_MILESTONE_MESSAGE": greeting_ctx.get("milestone"),
+            "DASHBOARD_BRAND_LOGO_URL": brand_logo_url,
+            "DASHBOARD_BRAND_TITLE": biz.name if biz else "Dashboard",
+            "YESTERDAY_SUMMARY": yesterday_summary,
+            "PAYMENT_MIX": payment_mix,
+            "PAYMENT_MIX_PERIOD": "Last 30 days (your sales)",
+            "DASHBOARD_QUOTES": daily_quotes,
+        }
+    except Exception:
+        ctx_enhancements = {}
+    
     ctx = {
         "kpis": kpis,
         "agent_battery": {"count": my_in_stock, "max": battery_max, "pct": pct, "label": label, "color": color},
         "wallet": wallet,
         "staff_view": False,
         "agent_ranking": agent_ranking,
+        **ctx_enhancements,
     }
     return render(request, "dashboard.html", ctx)
 

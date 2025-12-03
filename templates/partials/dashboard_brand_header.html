@@ -1,0 +1,154 @@
+{% comment %}
+Branded top panel for dashboard - shows business logo or name in glassmorphic style.
+
+Context variables expected:
+  - DASHBOARD_BRAND_LOGO_URL: URL to logo image (optional)
+  - DASHBOARD_BRAND_TITLE: Business name or fallback title
+  - DASHBOARD_GREETING: Personalized greeting (optional)
+  - DASHBOARD_USER_NAME: User's first name or username (optional)
+  - DASHBOARD_SHOW_WELCOME: Boolean for first-time welcome (optional)
+  - DASHBOARD_MILESTONE_MESSAGE: Milestone text (optional)
+{% endcomment %}
+
+<style>
+  .dashboard-brand-header {
+    background: linear-gradient(135deg, rgba(255,255,255,0.1), rgba(255,255,255,0.05));
+    backdrop-filter: blur(10px);
+    border-radius: 20px;
+    border: 1px solid rgba(255,255,255,0.18);
+    box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.12);
+    padding: 24px;
+    margin-bottom: 20px;
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    flex-wrap: wrap;
+  }
+  
+  .dashboard-brand-logo {
+    flex-shrink: 0;
+  }
+  
+  .dashboard-brand-logo img {
+    max-width: 120px;
+    max-height: 80px;
+    object-fit: contain;
+    border-radius: 12px;
+  }
+  
+  .dashboard-brand-text {
+    flex: 1;
+    min-width: 200px;
+  }
+  
+  .dashboard-brand-title {
+    font-size: clamp(1.5rem, 3vw, 2.2rem);
+    font-weight: 900;
+    margin: 0;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    letter-spacing: -0.02em;
+  }
+  
+  .dashboard-greeting {
+    font-size: clamp(1.1rem, 2vw, 1.3rem);
+    font-weight: 700;
+    color: #1e293b;
+    margin: 8px 0 0 0;
+  }
+  
+  .dashboard-welcome-banner {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    border-radius: 16px;
+    padding: 20px;
+    margin-bottom: 20px;
+    box-shadow: 0 10px 30px rgba(102, 126, 234, 0.3);
+  }
+  
+  .dashboard-welcome-banner h2 {
+    margin: 0 0 8px 0;
+    font-size: clamp(1.3rem, 2.5vw, 1.8rem);
+    font-weight: 800;
+  }
+  
+  .dashboard-welcome-banner p {
+    margin: 0;
+    opacity: 0.95;
+    font-size: 1rem;
+  }
+  
+  .dashboard-milestone {
+    background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+    color: white;
+    border-radius: 14px;
+    padding: 14px 18px;
+    margin-top: 12px;
+    font-weight: 600;
+    font-size: 0.95rem;
+    display: inline-block;
+    box-shadow: 0 6px 20px rgba(245, 87, 108, 0.25);
+  }
+  
+  .dashboard-milestone::before {
+    content: "🎉 ";
+  }
+  
+  .dashboard-logo-hint {
+    font-size: 0.75rem;
+    color: #64748b;
+    margin-top: 4px;
+    font-style: italic;
+  }
+  
+  /* Dark mode support */
+  @media (prefers-color-scheme: dark) {
+    .dashboard-brand-header {
+      background: linear-gradient(135deg, rgba(255,255,255,0.05), rgba(255,255,255,0.02));
+      border-color: rgba(255,255,255,0.1);
+    }
+    
+    .dashboard-greeting {
+      color: #e2e8f0;
+    }
+  }
+</style>
+
+{% comment %}First-time welcome banner{% endcomment %}
+{% if DASHBOARD_SHOW_WELCOME %}
+<div class="dashboard-welcome-banner">
+  <h2>Welcome{% if DASHBOARD_USER_NAME %}, {{ DASHBOARD_USER_NAME }}{% endif %}! 👋</h2>
+  <p>Your personalized dashboard is ready. Let's make today productive!</p>
+</div>
+{% endif %}
+
+{% comment %}Branded header with logo or business name{% endcomment %}
+<div class="dashboard-brand-header">
+  {% if DASHBOARD_BRAND_LOGO_URL %}
+    <div class="dashboard-brand-logo">
+      <img src="{{ DASHBOARD_BRAND_LOGO_URL }}" alt="{{ DASHBOARD_BRAND_TITLE }}" loading="lazy">
+      <div class="dashboard-logo-hint">Square or 3:1 logo works best</div>
+    </div>
+  {% endif %}
+  
+  <div class="dashboard-brand-text">
+    {% if not DASHBOARD_BRAND_LOGO_URL %}
+      <h1 class="dashboard-brand-title">{{ DASHBOARD_BRAND_TITLE|default:"Dashboard" }}</h1>
+    {% endif %}
+    
+    {% if DASHBOARD_GREETING and DASHBOARD_USER_NAME %}
+      <p class="dashboard-greeting">
+        {{ DASHBOARD_GREETING }}, {{ DASHBOARD_USER_NAME }}
+      </p>
+    {% endif %}
+    
+    {% if DASHBOARD_MILESTONE_MESSAGE and not DASHBOARD_SHOW_WELCOME %}
+      <div class="dashboard-milestone">
+        {{ DASHBOARD_MILESTONE_MESSAGE }}
+      </div>
+    {% endif %}
+  </div>
+</div>
+

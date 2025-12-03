@@ -88,24 +88,69 @@ def pharmacy_dashboard(request: HttpRequest) -> HttpResponse:
         is_active=True
     ).count()
     
-    return render(
-        request,
-        "verticals/pharmacy/dashboard.html",
-        {
-            "total_batches": total_batches,
-            "total_stock_value": total_stock_value,
-            "products_count": products_count,
-            "near_expiry_count": near_expiry_batches.count(),
-            "expired_count": expired_batches.count(),
-            "low_stock_count": low_stock_batches.count(),
-            "today_revenue": today_revenue,
-            "today_profit": today_profit,
-            "today_sales_count": today_sales_count,
-            "near_expiry_batches": near_expiry_batches,
-            "expired_batches": expired_batches,
-            "low_stock_batches": low_stock_batches,
-        },
-    )
+    # ===== NEW: Personalized dashboard enhancements =====
+    ctx_enhancements = {}
+    try:
+        from dashboard.helpers_greetings import get_personalized_greeting
+        from dashboard.helpers_yesterday import get_yesterday_summary, should_show_yesterday_summary, mark_yesterday_summary_shown
+        from dashboard.helpers_payments import get_payment_mix_for_dashboard
+        from dashboard.helpers_quotes import get_todays_quotes
+        
+        # Personalized greeting
+        greeting_ctx = get_personalized_greeting(request.user, business)
+        
+        # Brand header context
+        brand_logo_url = None
+        if business and hasattr(business, 'logo') and business.logo:
+            brand_logo_url = business.logo.url
+        
+        # Yesterday summary (show once per day)
+        yesterday_summary = None
+        if should_show_yesterday_summary(request):
+            yesterday_summary = get_yesterday_summary(request.user, business)
+            if yesterday_summary:
+                mark_yesterday_summary_shown(request)
+        
+        # Payment mix (last 30 days)
+        payment_mix = get_payment_mix_for_dashboard(business, period_days=30, user=None)
+        
+        # Daily quotes
+        daily_quotes = get_todays_quotes(request.user, count=10)
+        
+        ctx_enhancements = {
+            "DASHBOARD_GREETING": greeting_ctx.get("greeting"),
+            "DASHBOARD_USER_NAME": greeting_ctx.get("user_name"),
+            "DASHBOARD_SHOW_WELCOME": greeting_ctx.get("show_welcome"),
+            "DASHBOARD_MILESTONE_MESSAGE": greeting_ctx.get("milestone"),
+            "DASHBOARD_BRAND_LOGO_URL": brand_logo_url,
+            "DASHBOARD_BRAND_TITLE": business.name if business else "Pharmacy Dashboard",
+            "YESTERDAY_SUMMARY": yesterday_summary,
+            "PAYMENT_MIX": payment_mix,
+            "PAYMENT_MIX_PERIOD": "Last 30 days",
+            "DASHBOARD_QUOTES": daily_quotes,
+        }
+    except Exception:
+        pass  # Gracefully degrade if helpers not available
+    
+    ctx = {
+        "total_batches": total_batches,
+        "total_stock_value": total_stock_value,
+        "products_count": products_count,
+        "near_expiry_count": near_expiry_batches.count(),
+        "expired_count": expired_batches.count(),
+        "low_stock_count": low_stock_batches.count(),
+        "today_revenue": today_revenue,
+        "today_profit": today_profit,
+        "today_sales_count": today_sales_count,
+        "near_expiry_batches": near_expiry_batches,
+        "expired_batches": expired_batches,
+        "low_stock_batches": low_stock_batches,
+    }
+    
+    # Merge enhancements from above (includes quotes)
+    ctx.update(ctx_enhancements)
+    
+    return render(request, "verticals/pharmacy/dashboard.html", ctx)
 
 
 # ==============================================================================

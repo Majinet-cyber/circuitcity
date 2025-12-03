@@ -2,7 +2,7 @@
 {% load static %}
 {% load humanize %}
 
-{% block title %}Dashboard · Emajinet{% endblock %}
+{% block title %}Dashboard ï¿½ Emajinet{% endblock %}
 {% block header_title %}Dashboard{% endblock %}
 
 {% block extra_css %}
@@ -95,6 +95,18 @@
   {# Resolve URLs we need here #}
   {% url 'inventory:scan_in' as url_scan_in %}
 
+  {% comment %}Branded header with greeting{% endcomment %}
+  {% include "partials/dashboard_brand_header.html" %}
+
+  {% comment %}Daily wisdom quotes{% endcomment %}
+  {% include "partials/dashboard_quotes.html" %}
+
+  {% comment %}Yesterday summary (shows once per day){% endcomment %}
+  {% include "partials/dashboard_yesterday_summary.html" %}
+
+  {# Payment Mix Card #}
+  {% include "partials/dashboard_payment_mix.html" %}
+
   <!-- KPI band -->
   <section class="kpi-row">
     <div class="kpi panel">
@@ -121,7 +133,7 @@
     </div>
   </section>
 
-  {# ? Financial Overview (AI-CFO) — managers/admins only #}
+  {# ? Financial Overview (AI-CFO) ï¿½ managers/admins only #}
   {% if request.user.is_staff or request.user.is_superuser or request.user.profile.is_manager %}
   <section class="cfo-band">
     <div class="panel">
@@ -145,7 +157,7 @@
             <option value="7d">Last 7 days</option>
             <option value="month" selected>This month</option>
             <option value="all">All time</option>
-            <option value="date">Choose date…</option>
+            <option value="date">Choose dateï¿½</option>
           </select>
           <input type="date" id="trendDate" class="form-control" style="width:auto; display:none;">
           <label class="visually-hidden" for="trendMetric">Trend metric</label>
@@ -168,7 +180,7 @@
         <div>
           AI-Driven Insights
           {% if not request.user.is_staff and not request.user.is_superuser and not request.user.profile.is_manager %}
-            <span class="small text-muted">· for your stock &amp; sales</span>
+            <span class="small text-muted">ï¿½ for your stock &amp; sales</span>
           {% endif %}
         </div>
         <button id="ai-recs-refresh" type="button" class="btn icon tap" onclick="window.buzz&&buzz(8)"><i class="bi bi-arrow-clockwise"></i> Refresh</button>
@@ -199,7 +211,7 @@
             <option value="today">Today</option>
             <option value="7d" selected>Last 7 days</option>
             <option value="all">All time</option>
-            <option value="date">Choose date…</option>
+            <option value="date">Choose dateï¿½</option>
           </select>
           <input type="date" id="vtDate" class="form-control" style="width:auto; display:none;">
         </div>
@@ -223,7 +235,7 @@
             <select id="topPeriod" class="form-select" style="width:auto">
               <option value="today">Today</option>
               <option value="month" selected>This month</option>
-              <option value="date">Choose date…</option>
+              <option value="date">Choose dateï¿½</option>
             </select>
             <input type="date" id="topDate" class="form-control" style="width:auto; display:none;">
           </div>
@@ -240,13 +252,13 @@
       <div class="panel card h-100" id="alertCard">
         <h5 class="m-0 mb-2">Stock Alerts</h5>
         <ul id="alertsList" class="list-group list-group-flush">
-          <li class="list-group-item" style="color:var(--cc-muted)">Loading…</li>
+          <li class="list-group-item" style="color:var(--cc-muted)">Loadingï¿½</li>
         </ul>
       </div>
     </div>
   </section>
 
-  {# ? Simulation & Scenarios — managers/admins only (agents don’t see this) #}
+  {# ? Simulation & Scenarios ï¿½ managers/admins only (agents donï¿½t see this) #}
   {% if request.user.is_staff or request.user.is_superuser or request.user.profile.is_manager %}
   <section class="mb-3">
     <div class="panel card">
@@ -267,7 +279,7 @@
           </a>
         </div>
         <div class="small mt-2 muted-note">
-          Tip: Use “Compare” like <code>/simulator/compare/?id=12&amp;id=15</code> to overlay Net Profit curves across scenarios.
+          Tip: Use ï¿½Compareï¿½ like <code>/simulator/compare/?id=12&amp;id=15</code> to overlay Net Profit curves across scenarios.
         </div>
       </div>
     </div>
@@ -327,7 +339,7 @@
     catch(e){ for(const alt of legacy){ try{ return await tryOnce(alt); }catch(_){} } throw e; }
   }
 
-  // ---- date toggles (show input when "Choose date…" is picked) ----
+  // ---- date toggles (show input when "Choose dateï¿½" is picked) ----
   function bindDateToggle(selectId, inputId){
     const sel=$id(selectId), input=$id(inputId);
     if(!sel || !input) return;
@@ -466,7 +478,7 @@
 
   async function loadAI(){
     const viewport=$id('ai-viewport'); const overallEl=$id('ai-recs-overall'); if(!viewport) return;
-    hide('errAI'); viewport.innerHTML='<span class="text-muted">Loading…</span>'; if(overallEl) overallEl.textContent='';
+    hide('errAI'); viewport.innerHTML='<span class="text-muted">Loadingï¿½</span>'; if(overallEl) overallEl.textContent='';
     try{
       const data=await fetchJSON(`/inventory/api/predictions/?_=${Date.now()}${MODEL_QS}`,
         { legacy:[`/inventory/api/predictions?_=${Date.now()}${MODEL_QS}`, `/inventory/api-predictions/?_=${Date.now()}${MODEL_QS}`, `/inventory/api_predictions/?_=${Date.now()}${MODEL_QS}`] });
@@ -477,7 +489,7 @@
             <span class="badge text-bg-danger">Risk</span>
             <div><b>${x.product}</b> likely stockout by ${x.stockout_date}. On-hand ${x.on_hand}. Restock <b>${x.suggested_restock}</b>.</div>
           </div>`)
-        : [`<div class="ai-item"><span class="badge text-bg-success">OK</span><div>All good — no stockouts predicted.</div></div>`];
+        : [`<div class="ai-item"><span class="badge text-bg-success">OK</span><div>All good ï¿½ no stockouts predicted.</div></div>`];
 
       aiIdx=0; renderAISlide(aiIdx); startAIRotation();
 
@@ -485,7 +497,7 @@
         const total=(data.overall||[]).reduce((s,x)=>s+(x.predicted_units||0),0);
         const rev=(data.overall||[]).reduce((s,x)=>s+(+x.predicted_revenue||0),0);
         const sign=data?.currency?.sign||'MK';
-        overallEl.innerHTML = `Next 7 days: <b>${nf.format(total)}</b> units • <b>${sign} ${nf.format(Math.round(rev))}</b>`;
+        overallEl.innerHTML = `Next 7 days: <b>${nf.format(total)}</b> units ï¿½ <b>${sign} ${nf.format(Math.round(rev))}</b>`;
       }
     }catch(e){
       show('errAI'); $id('errAI').textContent=`Insights error: ${e.message}`;

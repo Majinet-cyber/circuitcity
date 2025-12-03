@@ -317,3 +317,121 @@ class TestLiquorWalletEntry:
         assert entry.entry_type == "income"
         assert entry.amount == Decimal("15000.00")
 
+
+@pytest.mark.django_db
+class TestLiquorViews:
+    """Test liquor view endpoints"""
+    
+    def test_sell_liquor_page_loads(self, client, business, manager, liquor_product):
+        """Test that /liquor/sell/ loads successfully"""
+        from tenants.models import Membership
+        
+        # Create membership for manager (managers can have null location)
+        Membership.objects.create(
+            user=manager,
+            business=business,
+            role="MANAGER",
+            status="ACTIVE",
+            location=None
+        )
+        
+        # Login
+        client.force_login(manager)
+        
+        # Set active business in session
+        session = client.session
+        session['active_business_id'] = business.id
+        session.save()
+        
+        # Access sell page
+        response = client.get('/liquor/sell/')
+        
+        assert response.status_code == 200
+        assert b'Sell Liquor' in response.content or b'sell' in response.content.lower()
+    
+    def test_credits_list_page_loads(self, client, business, manager):
+        """Test that /liquor/credits/ loads successfully"""
+        from tenants.models import Membership
+        
+        # Create membership for manager
+        Membership.objects.create(
+            user=manager,
+            business=business,
+            role="MANAGER",
+            status="ACTIVE",
+            location=None
+        )
+        
+        # Login
+        client.force_login(manager)
+        
+        # Set active business in session
+        session = client.session
+        session['active_business_id'] = business.id
+        session.save()
+        
+        # Access credits page
+        response = client.get('/liquor/credits/')
+        
+        assert response.status_code == 200
+        assert b'Credit' in response.content or b'credit' in response.content.lower()
+    
+    def test_sales_list_page_loads(self, client, business, manager):
+        """Test that /liquor/sales/ loads successfully"""
+        from tenants.models import Membership
+        
+        # Create membership for manager
+        Membership.objects.create(
+            user=manager,
+            business=business,
+            role="MANAGER",
+            status="ACTIVE",
+            location=None
+        )
+        
+        # Login
+        client.force_login(manager)
+        
+        # Set active business in session
+        session = client.session
+        session['active_business_id'] = business.id
+        session.save()
+        
+        # Access sales list page
+        response = client.get('/liquor/sales/')
+        
+        assert response.status_code == 200
+    
+    def test_liquor_routes_require_liquor_business(self, client, manager):
+        """Test that liquor routes require a liquor business"""
+        from tenants.models import Membership
+        
+        # Create a phones business instead
+        phones_business = Business.objects.create(
+            name="Test Phones Store",
+            slug="test-phones",
+            status="ACTIVE",
+            business_kind=BusinessKind.PHONES
+        )
+        
+        Membership.objects.create(
+            user=manager,
+            business=phones_business,
+            role="MANAGER",
+            status="ACTIVE",
+            location=None
+        )
+        
+        # Login
+        client.force_login(manager)
+        
+        # Set phones business as active
+        session = client.session
+        session['active_business_id'] = phones_business.id
+        session.save()
+        
+        # Try to access liquor route - should be forbidden or redirected
+        response = client.get('/liquor/sell/')
+        
+        # Should not be 200 (either 403 Forbidden or redirect)
+        assert response.status_code != 200

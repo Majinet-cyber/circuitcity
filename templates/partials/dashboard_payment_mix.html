@@ -1,0 +1,179 @@
+{% comment %}
+Payment mix card for dashboard and sales views.
+
+Context variables expected:
+  - PAYMENT_MIX: list of dicts with:
+      - method: str (display name)
+      - method_code: str
+      - amount: float
+      - count: int
+      - percentage: float
+  - PAYMENT_MIX_PERIOD: str (optional, e.g., "Today", "This Month")
+{% endcomment %}
+
+{% if PAYMENT_MIX %}
+<style>
+  .payment-mix-card {
+    background: white;
+    border-radius: 18px;
+    border: 1px solid #e2e8f0;
+    padding: 20px;
+    box-shadow: 0 4px 20px rgba(15, 23, 42, 0.08);
+  }
+  
+  .payment-mix-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 16px;
+  }
+  
+  .payment-mix-title {
+    font-size: 1.1rem;
+    font-weight: 800;
+    color: #0f172a;
+    margin: 0;
+  }
+  
+  .payment-mix-period {
+    font-size: 0.85rem;
+    color: #64748b;
+    font-weight: 600;
+  }
+  
+  .payment-mix-list {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+  
+  .payment-mix-item {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  
+  .payment-mix-item-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  
+  .payment-mix-method {
+    font-weight: 700;
+    color: #1e293b;
+    font-size: 0.95rem;
+  }
+  
+  .payment-mix-percentage {
+    font-weight: 800;
+    color: #6366f1;
+    font-size: 1.1rem;
+  }
+  
+  .payment-mix-bar-container {
+    width: 100%;
+    height: 28px;
+    background: #f1f5f9;
+    border-radius: 14px;
+    overflow: hidden;
+    position: relative;
+  }
+  
+  .payment-mix-bar {
+    height: 100%;
+    background: linear-gradient(90deg, #6366f1, #8b5cf6);
+    transition: width 0.5s ease;
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    padding-right: 12px;
+    color: white;
+    font-weight: 700;
+    font-size: 0.85rem;
+  }
+  
+  .payment-mix-bar.cash {
+    background: linear-gradient(90deg, #10b981, #059669);
+  }
+  
+  .payment-mix-bar.bank {
+    background: linear-gradient(90deg, #3b82f6, #2563eb);
+  }
+  
+  .payment-mix-bar.mobile-money {
+    background: linear-gradient(90deg, #f59e0b, #d97706);
+  }
+  
+  .payment-mix-bar.credit {
+    background: linear-gradient(90deg, #ef4444, #dc2626);
+  }
+  
+  .payment-mix-details {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.85rem;
+    color: #64748b;
+  }
+  
+  .payment-mix-amount {
+    font-weight: 700;
+    color: #059669;
+  }
+  
+  .payment-mix-count {
+    font-weight: 600;
+  }
+  
+  @media (prefers-color-scheme: dark) {
+    .payment-mix-card {
+      background: #1e293b;
+      border-color: #334155;
+    }
+    
+    .payment-mix-title {
+      color: #f1f5f9;
+    }
+    
+    .payment-mix-method {
+      color: #e2e8f0;
+    }
+    
+    .payment-mix-bar-container {
+      background: #0f172a;
+    }
+  }
+</style>
+
+<div class="payment-mix-card">
+  <div class="payment-mix-header">
+    <h3 class="payment-mix-title">💳 Payment Mix</h3>
+    {% if PAYMENT_MIX_PERIOD %}
+      <span class="payment-mix-period">{{ PAYMENT_MIX_PERIOD }}</span>
+    {% endif %}
+  </div>
+  
+  <div class="payment-mix-list">
+    {% for pm in PAYMENT_MIX %}
+      <div class="payment-mix-item">
+        <div class="payment-mix-item-header">
+          <span class="payment-mix-method">{{ pm.method }}</span>
+          <span class="payment-mix-percentage">{{ pm.percentage }}%</span>
+        </div>
+        
+        <div class="payment-mix-bar-container">
+          <div class="payment-mix-bar {{ pm.method_code|lower|slugify }}" style="width: {{ pm.percentage }}%;">
+            {% if pm.percentage > 15 %}{{ pm.percentage }}%{% endif %}
+          </div>
+        </div>
+        
+        <div class="payment-mix-details">
+          <span class="payment-mix-amount">MK {{ pm.amount|floatformat:0 }}</span>
+          <span class="payment-mix-count">{{ pm.count }} transaction{{ pm.count|pluralize }}</span>
+        </div>
+      </div>
+    {% endfor %}
+  </div>
+</div>
+{% endif %}
+

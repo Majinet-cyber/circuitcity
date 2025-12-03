@@ -176,6 +176,7 @@ INSTALLED_APPS = [
     "support",   # ticket system
     "audit",     # audit logs UI (if you see an audit app folder)
     "staticpages",  # Public home page with hero section
+    "backups",   # data backup & export system
 ]
 
 

@@ -626,6 +626,9 @@ class AdminWalletHome(LoginRequiredMixin, TemplateView):
 
         pending = scope_qs_to_user(BudgetRequest.objects.all(), self.request)
         ctx["budgets_pending"] = pending.filter(status=BudgetRequest.Status.PENDING).count()
+        
+        # Set active_tab to prevent template errors
+        ctx["active_tab"] = "overview"
         return ctx
 
 
