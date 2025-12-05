@@ -524,6 +524,16 @@ _api_stock_delete = _get_any(
     msg="api_stock_delete not implemented",
 )
 
+# NEW: Phone catalog API endpoints (from views_scan.py)
+try:
+    from .views_scan import api_phone_brands, api_phone_models
+    _phone_brands_api = api_phone_brands
+    _phone_models_api = api_phone_models
+except ImportError:
+    _phone_brands_api = _stub("api_phone_brands not available")
+    _phone_models_api = _stub("api_phone_models not available")
+
+
 # ---------------------------------------------------------------------
 # Product-create page (BUSINESS-SPECIFIC UI; model-agnostic)
 # ---------------------------------------------------------------------
@@ -888,6 +898,10 @@ urlpatterns += [
 
     path("api/stock-list/", _api_stock_list_view, name="api_stock_list"),
     path("api/stock_list/", _api_stock_list_view),
+
+    # Phone catalog API endpoints (Brand → Model filtering)
+    path("api/phone-brands/", _phone_brands_api, name="api_phone_brands"),
+    path("api/phone-models/", _phone_models_api, name="api_phone_models"),
 ]
 
 # --- NEW: Manager-only stock edit/delete (IN_STOCK only; JSON) ---

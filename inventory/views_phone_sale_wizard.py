@@ -17,8 +17,9 @@ from decimal import Decimal
 
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
-from django.http import JsonResponse
+from django.http import HttpResponse, JsonResponse
 from django.shortcuts import render, redirect
+from django.urls import reverse
 from django.utils import timezone
 from django.views.decorators.http import require_http_methods
 
@@ -29,6 +30,21 @@ from inventory.models import InventoryItem, Location
 from inventory.models_phone_products import PhoneProductCatalog
 from inventory.phone_catalog_seed import get_brands_for_business, get_models_for_brand
 from inventory.verticals import base
+
+
+def _redirect_to_step(step: int) -> HttpResponse:
+    """
+    Helper to redirect to a specific wizard step.
+    Properly constructs URL with query parameter to avoid NoReverseMatch.
+    
+    Args:
+        step: The wizard step number (1-5)
+    
+    Returns:
+        HttpResponse redirect to the wizard at the specified step
+    """
+    url = reverse("inventory:phone_sale_wizard")
+    return redirect(f"{url}?step={step}")
 
 
 @login_required
@@ -97,6 +113,7 @@ def _clear_wizard_session(request):
         "sale_wizard_variant",
         "sale_wizard_product_id",
         "sale_wizard_imei",
+        "sale_wizard_stock_item_id",  # Added for stock lookup flow
         "sale_wizard_selling_price",
     ]
     for key in keys_to_clear:
@@ -110,7 +127,7 @@ def _wizard_step_brand(request, ctx, business):
         if brand:
             request.session["sale_wizard_brand"] = brand
             request.session["sale_wizard_step"] = 2
-            return redirect("inventory:phone_sale_wizard?step=2")
+            return _redirect_to_step(2)
         else:
             messages.error(request, "Please select a brand")
     
@@ -132,7 +149,7 @@ def _wizard_step_model(request, ctx, business):
     """Step 2: Model selection"""
     brand = request.session.get("sale_wizard_brand")
     if not brand:
-        return redirect("inventory:phone_sale_wizard?step=1")
+        return _redirect_to_step(1)
     
     if request.method == "POST":
         model = request.POST.get("model", "").strip()
@@ -141,7 +158,7 @@ def _wizard_step_model(request, ctx, business):
             request.session["sale_wizard_model"] = model
             request.session["sale_wizard_product_id"] = product_id
             request.session["sale_wizard_step"] = 3
-            return redirect("inventory:phone_sale_wizard?step=3")
+            return _redirect_to_step(3)
         else:
             messages.error(request, "Please select a model")
     
@@ -173,7 +190,7 @@ def _wizard_step_variant(request, ctx, business):
     brand = request.session.get("sale_wizard_brand")
     model = request.session.get("sale_wizard_model")
     if not brand or not model:
-        return redirect("inventory:phone_sale_wizard?step=1")
+        return _redirect_to_step(1)
     
     if request.method == "POST":
         variant = request.POST.get("variant", "").strip()
@@ -182,7 +199,7 @@ def _wizard_step_variant(request, ctx, business):
             request.session["sale_wizard_variant"] = variant
             request.session["sale_wizard_product_id"] = product_id
             request.session["sale_wizard_step"] = 4
-            return redirect("inventory:phone_sale_wizard?step=4")
+            return _redirect_to_step(4)
         else:
             messages.error(request, "Please select a variant")
     
@@ -195,7 +212,7 @@ def _wizard_step_variant(request, ctx, business):
             models = get_models_for_brand(business, brand)
             variants = [m for m in models if m["model_name"] == model]
         except PhoneProductCatalog.DoesNotExist:
-            return redirect("inventory:phone_sale_wizard?step=1")
+            return _redirect_to_step(1)
     else:
         models = get_models_for_brand(business, brand)
         variants = [m for m in models if m["model_name"] == model]
@@ -221,40 +238,73 @@ def _wizard_step_imei(request, ctx, business):
     product_id = request.session.get("sale_wizard_product_id")
     
     if not all([brand, model, variant, product_id]):
-        return redirect("inventory:phone_sale_wizard?step=1")
+        return _redirect_to_step(1)
     
     if request.method == "POST":
         imei = request.POST.get("imei", "").strip()
         
-        # Validate IMEI
+        # Validate IMEI format
         if not imei:
             messages.error(request, "IMEI is required")
         elif len(imei) != 15 or not imei.isdigit():
             messages.error(request, "IMEI must be exactly 15 digits")
         else:
-            # Check for duplicates (active stock with same IMEI)
-            existing = InventoryItem.objects.filter(
+            # NEW BEHAVIOR: Check if an IN_STOCK unit matching brand+model+IMEI exists
+            # Get the phone product catalog entry to find the correct Product
+            try:
+                catalog_product = PhoneProductCatalog.objects.get(id=product_id, business=business)
+            except PhoneProductCatalog.DoesNotExist:
+                messages.error(request, "Product configuration error. Please start over.")
+                return _redirect_to_step(1)
+            
+            # Look for an in-stock inventory item matching:
+            # - business
+            # - brand (via product relationship)
+            # - model (via product relationship)
+            # - exact IMEI
+            # - status IN_STOCK
+            # - is_active True
+            
+            # First, find all IN_STOCK items with this IMEI
+            matching_items = InventoryItem.objects.filter(
                 business=business,
                 imei=imei,
                 status="IN_STOCK",
                 is_active=True
-            ).first()
+            )
             
-            if existing:
+            # Filter to those with matching brand and model (via Product if exists)
+            valid_match = None
+            for item in matching_items:
+                if item.product:
+                    # Check if product brand/model match our chosen phone
+                    item_brand = getattr(item.product, 'brand', '').strip().upper()
+                    item_model = getattr(item.product, 'model', '').strip().upper()
+                    
+                    if (item_brand == brand.upper() and 
+                        item_model.upper() == model.upper()):
+                        valid_match = item
+                        break
+            
+            if not valid_match:
+                # IMEI not in stock for this brand+model
                 messages.error(
                     request,
-                    f"IMEI {imei} already exists in stock (ID: {existing.id}). Cannot add duplicate."
+                    f"IMEI {imei} is not in stock for {brand} {model} at your location. "
+                    f"Please scan this phone into inventory first using Scan IN."
                 )
             else:
+                # Valid in-stock unit found! Store IMEI and proceed
                 request.session["sale_wizard_imei"] = imei
+                request.session["sale_wizard_stock_item_id"] = valid_match.id  # Store for confirmation
                 request.session["sale_wizard_step"] = 5
-                return redirect("inventory:phone_sale_wizard?step=5")
+                return _redirect_to_step(5)
     
     # Get product details for display
     try:
         product = PhoneProductCatalog.objects.get(id=product_id, business=business)
     except PhoneProductCatalog.DoesNotExist:
-        return redirect("inventory:phone_sale_wizard?step=1")
+        return _redirect_to_step(1)
     
     # Fun motivational messages
     motivational_messages = [
@@ -289,13 +339,13 @@ def _wizard_step_confirm(request, ctx, business):
     imei = request.session.get("sale_wizard_imei")
     
     if not all([brand, model, variant, product_id, imei]):
-        return redirect("inventory:phone_sale_wizard?step=1")
+        return _redirect_to_step(1)
     
     # Get product details
     try:
         catalog_product = PhoneProductCatalog.objects.get(id=product_id, business=business)
     except PhoneProductCatalog.DoesNotExist:
-        return redirect("inventory:phone_sale_wizard?step=1")
+        return _redirect_to_step(1)
     
     if request.method == "POST":
         selling_price = request.POST.get("selling_price", "").strip()
@@ -307,44 +357,47 @@ def _wizard_step_confirm(request, ctx, business):
             cost_price = Decimal(cost_price) if cost_price else Decimal("0.00")
         except Exception:
             messages.error(request, "Invalid price format")
-            return redirect("inventory:phone_sale_wizard?step=5")
+            return _redirect_to_step(5)
         
         if selling_price <= 0:
             messages.error(request, "Selling price must be greater than zero")
-            return redirect("inventory:phone_sale_wizard?step=5")
+            return _redirect_to_step(5)
         
-        # Create the inventory item (SOLD status)
-        location = ctx.get("location") or Location.default_for(business)
-        if not location:
-            messages.error(request, "No location found. Please set up a location first.")
-            return redirect("inventory:phone_sale_wizard?step=5")
+        # NEW BEHAVIOR: Look up the existing IN_STOCK item and mark it SOLD
+        # (Step 4 validated and stored the stock_item_id in session)
+        stock_item_id = request.session.get("sale_wizard_stock_item_id")
         
-        # Find or create Product (global SKU)
-        from inventory.models import Product
-        product, _ = Product.objects.get_or_create(
-            brand=brand,
-            model=model,
-            variant=variant,
-            defaults={
-                "code": f"{brand}_{model}_{variant}".replace(" ", "_").upper(),
-                "name": f"{brand} {model} {variant}",
-                "cost_price": cost_price,
-                "sale_price": selling_price,
-            }
-        )
+        if not stock_item_id:
+            messages.error(request, "Stock validation error. Please re-enter the IMEI.")
+            return _redirect_to_step(4)
         
-        # Create inventory item as SOLD
-        item = InventoryItem.objects.create(
-            business=business,
-            imei=imei,
-            product=product,
-            order_price=cost_price,
-            selling_price=selling_price,
-            status="SOLD",
-            current_location=location,
-            assigned_agent=request.user,
-            sold_at=timezone.now(),
-        )
+        # Fetch the stock item
+        try:
+            item = InventoryItem.objects.get(id=stock_item_id, business=business)
+        except InventoryItem.DoesNotExist:
+            messages.error(request, "Stock item not found. It may have been sold already.")
+            return _redirect_to_step(4)
+        
+        # Double-check it's still in stock (safeguard against race conditions)
+        if item.status != "IN_STOCK" or not item.is_active:
+            messages.error(
+                request,
+                f"This item (IMEI {item.imei}) is no longer in stock. "
+                f"It may have been sold by someone else."
+            )
+            return _redirect_to_step(4)
+        
+        # Update the existing item to SOLD status
+        item.status = "SOLD"
+        item.selling_price = selling_price
+        item.sold_at = timezone.now()
+        item.assigned_agent = request.user
+        
+        # Use existing order_price (cost) if present, otherwise use entered cost_price
+        if not item.order_price or item.order_price == 0:
+            item.order_price = cost_price
+        
+        item.save()
         
         # Clear wizard session
         _clear_wizard_session(request)

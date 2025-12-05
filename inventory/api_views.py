@@ -2073,6 +2073,17 @@ def api_sales_trend(request: HttpRequest) -> JsonResponse:
     except Exception:
         rows = []
 
+    # DEBUG: Log queryset info to help diagnose why sales aren't detected
+    import logging
+    log = logging.getLogger(__name__)
+    biz = get_active_business(request)
+    log.info(
+        f"[api_sales_trend] period={period_raw}, metric={metric}, "
+        f"business={getattr(biz, 'name', None)}, "
+        f"model={Model.__name__}, ts_field={ts_field}, price_field={price_field}, "
+        f"sold_q_filters={sold_q}, rows_found={len(rows)}"
+    )
+
     out = [0 for _ in bins]
 
     def _to_local(dt):
@@ -2105,24 +2116,15 @@ def api_sales_trend(request: HttpRequest) -> JsonResponse:
                         pass
                 break
 
-    if sum(out) == 0:
-        try:
-            summary = _inventory_summary(request)
-        except Exception:
-            summary = {"sum_selling": 0.0}
-        base_scale = float(summary.get("sum_selling") or 0.0)
-        if base_scale <= 0:
-            base_scale = 10000.0
-
-        if metric in {"count", "qty", "quantity"}:
-            out = [int(max(0, round(2 + 2 * math.sin(0.8 * i + 1.3)))) for i in range(len(bins))]
-        else:
-            per_bin = max(800.0, base_scale / max(6, len(bins)))
-            out = [round(max(0.0, (0.55 + 0.45 * math.sin(0.9 * i + 0.7)) * per_bin), 2) for i in range(len(bins))]
+    # REMOVED: Demo data fallback - let frontend handle empty states
+    # Previously lines 2108-2121 generated synthetic data when sum(out) == 0
+    # Now we return real data or zeros, allowing the frontend to show "No data yet"
 
     is_count = metric in {"count", "qty", "quantity"}
     values = [int(v) for v in out] if is_count else [float(v) for v in out]
     series_name = "Count" if is_count else "Amount"
+
+    log.info(f"[api_sales_trend] Returning {len(values)} data points, total={sum(values)}")
 
     return JsonResponse(
         {
@@ -2136,6 +2138,7 @@ def api_sales_trend(request: HttpRequest) -> JsonResponse:
         },
         status=200,
     )
+
 
 @login_required
 @require_http_methods(["GET"])
@@ -2249,6 +2252,16 @@ def api_top_models(request: HttpRequest) -> JsonResponse:
     except Exception:
         rows = []
 
+    # DEBUG: Log queryset info
+    import logging
+    log = logging.getLogger(__name__)
+    biz = get_active_business(request)
+    log.info(
+        f"[api_top_models] period={period_raw}, business={getattr(biz, 'name', None)}, "
+        f"model={Model.__name__}, time_field={time_field}, price_field={price_field}, "
+        f"rows_found={len(rows)}"
+    )
+
     agg = defaultdict(lambda: {"count": 0, "amount": Decimal("0")})
     for r in rows:
         model_name = r.get("product__name") or r.get("name") or "Unknown"
@@ -2267,58 +2280,13 @@ def api_top_models(request: HttpRequest) -> JsonResponse:
         reverse=True
     )[:5]
 
-    if not items:
-        try:
-            base_qs = scoped(_manager(Model).all(), request)
-            unsold_q = Q()
-            if _hasf("status"):     unsold_q &= ~Q(status__iexact="sold")
-            if _hasf("sold_at"):    unsold_q &= Q(sold_at__isnull=True)
-            if _hasf("is_sold"):    unsold_q &= Q(is_sold=False)
-            if _hasf("in_stock"):   unsold_q &= Q(in_stock=True)
-            if _hasf("quantity"):   unsold_q &= (Q(quantity__gt=0) | Q(quantity__isnull=True))
-            if _hasf("qty"):        unsold_q &= (Q(qty__gt=0) | Q(qty__isnull=True))
-            base_qs = base_qs.filter(unsold_q)
-
-            pick_fields = []
-            if _hasf("product"): pick_fields.append("product__name")
-            if _hasf("name"): pick_fields.append("name")
-            pf = None
-            for f in PRICE_FIELD_CANDIDATES:
-                if _hasf(f):
-                    pf = f
-                    pick_fields.append(f)
-                    break
-            if _hasf("product"):
-                try: base_qs = base_qs.select_related("product")
-                except Exception: pass
-
-            rows2 = list(base_qs.values(*pick_fields)[:8])
-            pool = []
-            for r in rows2:
-                nm = r.get("product__name") or r.get("name") or "Model"
-                price = 0.0
-                if pf:
-                    try: price = float(r.get(pf) or 0.0)
-                    except Exception: price = 0.0
-                pool.append((nm, price))
-
-            demo_counts = [5, 4, 3, 2, 1][:max(1, min(5, len(pool) or 5))]
-            out_items = []
-            for i in range(len(demo_counts)):
-                nm, price = (pool[i] if i < len(pool) else (f"Model {i+1}", 100.0 * (i+1)))
-                c = demo_counts[i]
-                amt = round(max(0.0, price) * c or (150.0 * (i+1)), 2)
-                out_items.append({"name": nm, "count": c, "amount": float(amt)})
-            items = out_items
-        except Exception:
-            items = [
-                {"name": "Model A", "count": 5, "amount": 750.0},
-                {"name": "Model B", "count": 3, "amount": 450.0},
-                {"name": "Model C", "count": 2, "amount": 220.0},
-            ]
+    # REMOVED: Demo data fallback (previously lines 2270-2318)
+    # Now return real data or empty arrays, let frontend handle empty state
 
     labels = [it["name"] for it in items]
     values = [int(it["count"]) for it in items]
+
+    log.info(f"[api_top_models] Returning {len(items)} models, total_sales={sum(values)}")
 
     return JsonResponse(
         {
@@ -2331,6 +2299,7 @@ def api_top_models(request: HttpRequest) -> JsonResponse:
         },
         status=200,
     )
+
 
 @login_required
 @require_http_methods(["GET"])

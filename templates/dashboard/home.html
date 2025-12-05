@@ -15,27 +15,50 @@
     --dash-border: #e2e8f0;
     --dash-accent: #2563eb;
     --dash-success: #16a34a;
-    --dash-shadow: 0 4px 14px rgba(2,6,23,.08);
+    --dash-shadow: 0 4px 14px rgba(2, 6, 23, .08);
   }
 
-  .dash-container { max-width: 1280px; margin: 0 auto; padding: 1.5rem; color: var(--dash-text); }
-  
+  .dash-container {
+    max-width: 1280px;
+    margin: 0 auto;
+    padding: 1.5rem;
+    color: var(--dash-text);
+  }
+
   /* Hero Section */
-  .hero-greeting { margin-bottom: 2rem; }
-  .hero-greeting h1 { font-size: 2rem; font-weight: 800; margin-bottom: .5rem; }
-  .hero-greeting p { color: var(--dash-muted); font-size: 1.1rem; }
-  
+  .hero-greeting {
+    margin-bottom: 2rem;
+  }
+
+  .hero-greeting h1 {
+    font-size: 2rem;
+    font-weight: 800;
+    margin-bottom: .5rem;
+  }
+
+  .hero-greeting p {
+    color: var(--dash-muted);
+    font-size: 1.1rem;
+  }
+
   /* Stats Cards */
-  .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 1rem; margin-bottom: 2rem; }
-  .stat-card { 
-    background: var(--dash-panel); 
-    border: 1px solid var(--dash-border); 
-    border-radius: 14px; 
-    padding: 1.5rem; 
+  .stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: 1rem;
+    margin-bottom: 2rem;
+  }
+
+  .stat-card {
+    background: var(--dash-panel);
+    border: 1px solid var(--dash-border);
+    border-radius: 14px;
+    padding: 1.5rem;
     box-shadow: var(--dash-shadow);
     position: relative;
     overflow: hidden;
   }
+
   .stat-card::before {
     content: '';
     position: absolute;
@@ -45,114 +68,215 @@
     height: 3px;
     background: linear-gradient(90deg, var(--dash-accent), #06b6d4);
   }
-  .stat-label { 
-    font-size: .85rem; 
-    color: var(--dash-muted); 
-    margin-bottom: .5rem; 
-    display: flex; 
-    align-items: center; 
-    gap: .5rem; 
+
+  .stat-label {
+    font-size: .85rem;
+    color: var(--dash-muted);
+    margin-bottom: .5rem;
+    display: flex;
+    align-items: center;
+    gap: .5rem;
   }
-  .stat-value { 
-    font-size: 2rem; 
-    font-weight: 800; 
-    color: var(--dash-text); 
+
+  .stat-value {
+    font-size: 2rem;
+    font-weight: 800;
+    color: var(--dash-text);
   }
-  .stat-change { 
-    font-size: .8rem; 
-    color: var(--dash-success); 
-    margin-top: .5rem; 
+
+  .stat-change {
+    font-size: .8rem;
+    color: var(--dash-success);
+    margin-top: .5rem;
   }
-  .stat-change.negative { color: #dc2626; }
-  
+
+  .stat-change.negative {
+    color: #dc2626;
+  }
+
   /* Charts Section */
-  .charts-section { margin-bottom: 2rem; }
-  .chart-grid { display: grid; grid-template-columns: 1.4fr 1fr; gap: 1.5rem; margin-bottom: 1.5rem; }
-  .chart-card { 
-    background: var(--dash-panel); 
-    border: 1px solid var(--dash-border); 
-    border-radius: 14px; 
-    padding: 1.5rem; 
-    box-shadow: var(--dash-shadow); 
+  .charts-section {
+    margin-bottom: 2rem;
   }
-  .chart-header { 
-    display: flex; 
-    justify-content: space-between; 
-    align-items: center; 
-    margin-bottom: 1rem; 
+
+  .chart-grid {
+    display: grid;
+    grid-template-columns: 1.4fr 1fr;
+    gap: 1.5rem;
+    margin-bottom: 1.5rem;
   }
-  .chart-title { font-size: 1.1rem; font-weight: 700; color: var(--dash-text); }
-  .chart-canvas { width: 100%!important; max-width: 100%; height: 280px!important; }
-  
+
+  .chart-card {
+    background: var(--dash-panel);
+    border: 1px solid var(--dash-border);
+    border-radius: 14px;
+    padding: 1.5rem;
+    box-shadow: var(--dash-shadow);
+  }
+
+  .chart-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1rem;
+  }
+
+  .chart-title {
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: var(--dash-text);
+  }
+
+  .chart-canvas {
+    width: 100% !important;
+    max-width: 100%;
+    height: 280px !important;
+  }
+
   /* Performance Tables */
-  .perf-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; margin-bottom: 2rem; }
-  .perf-card { 
-    background: var(--dash-panel); 
-    border: 1px solid var(--dash-border); 
-    border-radius: 14px; 
-    padding: 1.5rem; 
-    box-shadow: var(--dash-shadow); 
+  .perf-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1.5rem;
+    margin-bottom: 2rem;
   }
-  .perf-title { font-size: 1.1rem; font-weight: 700; margin-bottom: 1rem; }
-  .perf-table { width: 100%; border-collapse: collapse; }
-  .perf-table th { 
-    text-align: left; 
-    padding: .75rem .5rem; 
-    font-size: .85rem; 
-    color: var(--dash-muted); 
-    border-bottom: 2px solid var(--dash-border); 
+
+  .perf-card {
+    background: var(--dash-panel);
+    border: 1px solid var(--dash-border);
+    border-radius: 14px;
+    padding: 1.5rem;
+    box-shadow: var(--dash-shadow);
   }
-  .perf-table td { 
-    padding: .75rem .5rem; 
-    border-bottom: 1px solid var(--dash-border); 
+
+  .perf-title {
+    font-size: 1.1rem;
+    font-weight: 700;
+    margin-bottom: 1rem;
   }
-  .perf-table tr:hover td { background: var(--dash-panel-2); }
-  
+
+  .perf-table {
+    width: 100%;
+    border-collapse: collapse;
+  }
+
+  .perf-table th {
+    text-align: left;
+    padding: .75rem .5rem;
+    font-size: .85rem;
+    color: var(--dash-muted);
+    border-bottom: 2px solid var(--dash-border);
+  }
+
+  .perf-table td {
+    padding: .75rem .5rem;
+    border-bottom: 1px solid var(--dash-border);
+  }
+
+  .perf-table tr:hover td {
+    background: var(--dash-panel-2);
+  }
+
   /* Leaderboard */
-  .leaderboard-item { 
-    display: flex; 
-    align-items: center; 
-    padding: .75rem; 
-    border-radius: 8px; 
-    margin-bottom: .5rem; 
+  .leaderboard-item {
+    display: flex;
+    align-items: center;
+    padding: .75rem;
+    border-radius: 8px;
+    margin-bottom: .5rem;
   }
-  .leaderboard-item:hover { background: var(--dash-panel-2); }
-  .rank-badge { 
-    width: 36px; 
-    height: 36px; 
-    border-radius: 50%; 
-    display: flex; 
-    align-items: center; 
-    justify-content: center; 
-    font-weight: 800; 
-    margin-right: 1rem; 
+
+  .leaderboard-item:hover {
+    background: var(--dash-panel-2);
   }
-  .rank-1 { background: linear-gradient(135deg, #fbbf24, #f59e0b); color: #92400e; }
-  .rank-2 { background: linear-gradient(135deg, #d1d5db, #9ca3af); color: #1f2937; }
-  .rank-3 { background: linear-gradient(135deg, #f59e0b, #d97706); color: #92400e; }
-  .rank-other { background: var(--dash-panel-2); color: var(--dash-muted); }
-  .agent-info { flex: 1; }
-  .agent-name { font-weight: 700; color: var(--dash-text); }
-  .agent-location { font-size: .85rem; color: var(--dash-muted); }
-  .agent-stats { text-align: right; }
-  .agent-amount { font-weight: 800; color: var(--dash-accent); }
-  .agent-units { font-size: .85rem; color: var(--dash-muted); }
-  
+
+  .rank-badge {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 800;
+    margin-right: 1rem;
+  }
+
+  .rank-1 {
+    background: linear-gradient(135deg, #fbbf24, #f59e0b);
+    color: #92400e;
+  }
+
+  .rank-2 {
+    background: linear-gradient(135deg, #d1d5db, #9ca3af);
+    color: #1f2937;
+  }
+
+  .rank-3 {
+    background: linear-gradient(135deg, #f59e0b, #d97706);
+    color: #92400e;
+  }
+
+  .rank-other {
+    background: var(--dash-panel-2);
+    color: var(--dash-muted);
+  }
+
+  .agent-info {
+    flex: 1;
+  }
+
+  .agent-name {
+    font-weight: 700;
+    color: var(--dash-text);
+  }
+
+  .agent-location {
+    font-size: .85rem;
+    color: var(--dash-muted);
+  }
+
+  .agent-stats {
+    text-align: right;
+  }
+
+  .agent-amount {
+    font-weight: 800;
+    color: var(--dash-accent);
+  }
+
+  .agent-units {
+    font-size: .85rem;
+    color: var(--dash-muted);
+  }
+
   /* Responsive */
   @media (max-width: 992px) {
-    .chart-grid, .perf-grid { grid-template-columns: 1fr; }
+
+    .chart-grid,
+    .perf-grid {
+      grid-template-columns: 1fr;
+    }
   }
+
   @media (max-width: 768px) {
-    .stats-grid { grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); }
-    .hero-greeting h1 { font-size: 1.5rem; }
+    .stats-grid {
+      grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    }
+
+    .hero-greeting h1 {
+      font-size: 1.5rem;
+    }
   }
-  
+
   /* Agent View Specific */
-  .agent-rank-card { 
-    background: linear-gradient(135deg, #eff6ff, #dbeafe); 
-    border: 2px solid #3b82f6; 
+  .agent-rank-card {
+    background: linear-gradient(135deg, #eff6ff, #dbeafe);
+    border: 2px solid #3b82f6;
   }
-  .agent-rank-card .stat-value { color: var(--dash-accent); }
+
+  .agent-rank-card .stat-value {
+    color: var(--dash-accent);
+  }
 </style>
 {% endblock %}
 
@@ -161,220 +285,228 @@
   {# ========== Hero Greeting ========== #}
   <div class="hero-greeting">
     {% if IS_MANAGER %}
-      <h1>Good {% now "H" as hour %}{% if hour|add:"0" < 12 %}morning{% elif hour|add:"0" < 18 %}afternoon{% else %}evening{% endif %}, {{ request.user.first_name|default:request.user.username }}! 👋</h1>
-      <p>Here's how {{ request.business.name|default:"your business" }} is performing today.</p>
-      
-      {# Show welcome CTA for new managers (no sales yet) #}
-      {% if first_run %}
-      <div style="margin-top: 1.5rem; padding: 1.5rem; background: linear-gradient(135deg, rgba(37, 99, 235, 0.1), rgba(59, 130, 246, 0.05)); border: 1px solid rgba(37, 99, 235, 0.2); border-radius: 14px;">
-        <div style="display: flex; align-items: center; gap: 1rem; flex-wrap: wrap;">
-          <div style="flex: 1; min-width: 250px;">
-            <h3 style="margin: 0 0 0.5rem; font-size: 1.2rem; font-weight: 700; color: var(--dash-text);">🚀 Welcome to CircuitCity!</h3>
-            <p style="margin: 0; color: var(--dash-muted); font-size: 0.95rem;">Your store is set up and ready. Start by adding products or scanning in your first inventory.</p>
-          </div>
-          <div style="display: flex; gap: 0.75rem; flex-wrap: wrap;">
-            <a href="{% url 'inventory:phone_products' %}" class="btn btn-primary" style="white-space: nowrap; padding: 0.75rem 1.5rem; font-weight: 600;">
-              <i class="bi bi-grid-3x3-gap me-2"></i>View Products
-            </a>
-            <a href="{% url 'inventory:scan_in' %}" class="btn btn-outline-primary" style="white-space: nowrap; padding: 0.75rem 1.5rem; font-weight: 600;">
-              <i class="bi bi-upc-scan me-2"></i>Scan IN
-            </a>
-          </div>
+    <h1>{{ greeting_text }}, {{ request.user.first_name|default:"there" }}! 👋</h1>
+    <p>Here's how {{ request.business.name|default:"your business" }} is performing today.</p>
+
+    {# Show welcome CTA for new managers (no sales yet) #}
+    {% if first_run %}
+    <div
+      style="margin-top: 1.5rem; padding: 1.5rem; background: linear-gradient(135deg, rgba(37, 99, 235, 0.1), rgba(59, 130, 246, 0.05)); border: 1px solid rgba(37, 99, 235, 0.2); border-radius: 14px;">
+      <div style="display: flex; align-items: center; gap: 1rem; flex-wrap: wrap;">
+        <div style="flex: 1; min-width: 250px;">
+          <h3 style="margin: 0 0 0.5rem; font-size: 1.2rem; font-weight: 700; color: var(--dash-text);">🚀 Welcome
+            to CircuitCity!</h3>
+          <p style="margin: 0; color: var(--dash-muted); font-size: 0.95rem;">Your store is set up and ready. Start
+            by adding products or scanning in your first inventory.</p>
+        </div>
+        <div style="display: flex; gap: 0.75rem; flex-wrap: wrap;">
+          <a href="{% url 'inventory:phone_products' %}" class="btn btn-primary"
+            style="white-space: nowrap; padding: 0.75rem 1.5rem; font-weight: 600;">
+            <i class="bi bi-grid-3x3-gap me-2"></i>View Products
+          </a>
+          <a href="{% url 'inventory:scan_in' %}" class="btn btn-outline-primary"
+            style="white-space: nowrap; padding: 0.75rem 1.5rem; font-weight: 600;">
+            <i class="bi bi-upc-scan me-2"></i>Scan IN
+          </a>
         </div>
       </div>
-      {% endif %}
+    </div>
+    {% endif %}
     {% else %}
-      <h1>Welcome back, {{ request.user.first_name|default:request.user.username }}! 👋</h1>
-      <p>Your performance at {{ request.user.agent_profile.location.name|default:"your location" }}</p>
+    <h1>Welcome back, {{ request.user.first_name|default:request.user.username }}! 👋</h1>
+    <p>Your performance at {{ request.user.agent_profile.location.name|default:"your location" }}</p>
     {% endif %}
   </div>
 
   {% if IS_MANAGER %}
-    {# ========== Manager Dashboard ========== #}
-    
-    {# Stats Grid #}
-    <div class="stats-grid">
-      <div class="stat-card">
-        <div class="stat-label">
-          <i class="bi bi-cash-coin"></i> Today's Sales
-        </div>
-        <div class="stat-value" data-animate-value="{{ today_sales_amount|default:0 }}">MK 0</div>
-        <div class="stat-change">{{ today_sales_count|default:0 }} devices sold</div>
+  {# ========== Manager Dashboard ========== #}
+
+  {# Stats Grid #}
+  <div class="stats-grid">
+    <div class="stat-card">
+      <div class="stat-label">
+        <i class="bi bi-cash-coin"></i> Today's Sales
       </div>
-      
-      <div class="stat-card">
-        <div class="stat-label">
-          <i class="bi bi-calendar-check"></i> This Month
-        </div>
-        <div class="stat-value" data-animate-value="{{ month_sales_amount|default:0 }}">MK 0</div>
-        <div class="stat-change">{{ month_sales_count|default:0 }} devices</div>
-      </div>
-      
-      <div class="stat-card">
-        <div class="stat-label">
-          <i class="bi bi-box-seam"></i> Active Stock
-        </div>
-        <div class="stat-value" data-animate-value="{{ stock_count|default:0 }}">0</div>
-        <div class="stat-change">{{ products_count|default:0 }} product SKUs</div>
-      </div>
-      
-      <div class="stat-card">
-        <div class="stat-label">
-          <i class="bi bi-geo-alt"></i> Locations
-        </div>
-        <div class="stat-value">{{ locations_count|default:1 }}</div>
-        <div class="stat-change">{{ agents_count|default:0 }} agents total</div>
-      </div>
+      <div class="stat-value" data-animate-value="{{ today_sales_amount|default:0 }}">MK 0</div>
+      <div class="stat-change">{{ today_sales_count|default:0 }} devices sold</div>
     </div>
 
-    {# Charts #}
-    <div class="charts-section">
-      <div class="chart-grid">
-        <div class="chart-card">
-          <div class="chart-header">
-            <div class="chart-title">Sales Trend (Last 30 Days)</div>
-            <select id="trendMetric" class="form-select form-select-sm" style="width:auto">
-              <option value="amount" selected>Amount</option>
-              <option value="count">Count</option>
-            </select>
-          </div>
-          <canvas id="salesTrendChart" class="chart-canvas" aria-label="Sales trend"></canvas>
-        </div>
-        
-        <div class="chart-card">
-          <div class="chart-header">
-            <div class="chart-title">Top 5 Models</div>
-            <select id="topPeriod" class="form-select form-select-sm" style="width:auto">
-              <option value="month" selected>This Month</option>
-              <option value="today">Today</option>
-            </select>
-          </div>
-          <canvas id="topModelsChart" class="chart-canvas" aria-label="Top models"></canvas>
-        </div>
+    <div class="stat-card">
+      <div class="stat-label">
+        <i class="bi bi-calendar-check"></i> This Month
       </div>
+      <div class="stat-value" data-animate-value="{{ month_sales_amount|default:0 }}">MK 0</div>
+      <div class="stat-change">{{ month_sales_count|default:0 }} devices</div>
     </div>
 
-    {# Performance Tables #}
-    <div class="perf-grid">
-      <div class="perf-card">
-        <div class="perf-title"><i class="bi bi-geo-alt me-2"></i>Location Performance</div>
-        <table class="perf-table">
-          <thead>
-            <tr>
-              <th>Location</th>
-              <th class="text-end">Stock</th>
-              <th class="text-end">Sales (MTD)</th>
-              <th class="text-end">Trend</th>
-            </tr>
-          </thead>
-          <tbody id="locationPerf">
-            {% for loc in location_performance %}
-            <tr>
-              <td><strong>{{ loc.name }}</strong></td>
-              <td class="text-end">{{ loc.stock_count|default:0 }}</td>
-              <td class="text-end">MK {{ loc.sales_amount|default:0|floatformat:0|intcomma }}</td>
-              <td class="text-end">
-                {% if loc.trend == 'up' %}
-                  <span class="text-success"><i class="bi bi-arrow-up"></i></span>
-                {% elif loc.trend == 'down' %}
-                  <span class="text-danger"><i class="bi bi-arrow-down"></i></span>
-                {% else %}
-                  <span class="text-muted">—</span>
-                {% endif %}
-              </td>
-            </tr>
-            {% empty %}
-            <tr><td colspan="4" class="text-center text-muted">No location data yet</td></tr>
-            {% endfor %}
-          </tbody>
-        </table>
+    <div class="stat-card">
+      <div class="stat-label">
+        <i class="bi bi-box-seam"></i> Active Stock
+      </div>
+      <div class="stat-value" data-animate-value="{{ stock_count|default:0 }}">0</div>
+      <div class="stat-change">{{ products_count|default:0 }} product SKUs</div>
+    </div>
+
+    <div class="stat-card">
+      <div class="stat-label">
+        <i class="bi bi-geo-alt"></i> Locations
+      </div>
+      <div class="stat-value">{{ locations_count|default:1 }}</div>
+      <div class="stat-change">{{ agents_count|default:0 }} agents total</div>
+    </div>
+  </div>
+
+  {# Charts #}
+  <div class="charts-section">
+    <div class="chart-grid">
+      <div class="chart-card">
+        <div class="chart-header">
+          <div class="chart-title">Sales Trend (Last 30 Days)</div>
+          <select id="trendMetric" class="form-select form-select-sm" style="width:auto">
+            <option value="amount" selected>Amount</option>
+            <option value="count">Count</option>
+          </select>
+        </div>
+        <canvas id="salesTrendChart" class="chart-canvas" aria-label="Sales trend"></canvas>
       </div>
 
-      <div class="perf-card">
-        <div class="perf-title"><i class="bi bi-trophy me-2"></i>Agent Leaderboard</div>
-        <div id="agentLeaderboard">
-          {% for agent in agent_leaderboard %}
-          <div class="leaderboard-item">
-            <div class="rank-badge rank-{% if agent.rank <= 3 %}{{ agent.rank }}{% else %}other{% endif %}">
-              {% if agent.rank == 1 %}🥇{% elif agent.rank == 2 %}🥈{% elif agent.rank == 3 %}🥉{% else %}{{ agent.rank }}{% endif %}
-            </div>
-            <div class="agent-info">
-              <div class="agent-name">{{ agent.name }}</div>
-              <div class="agent-location">{{ agent.location }}</div>
-            </div>
-            <div class="agent-stats">
-              <div class="agent-amount">MK {{ agent.amount|default:0|floatformat:0|intcomma }}</div>
-              <div class="agent-units">{{ agent.units|default:0 }} devices</div>
-            </div>
-          </div>
+      <div class="chart-card">
+        <div class="chart-header">
+          <div class="chart-title">Top 5 Models</div>
+          <select id="topPeriod" class="form-select form-select-sm" style="width:auto">
+            <option value="month" selected>This Month</option>
+            <option value="today">Today</option>
+          </select>
+        </div>
+        <canvas id="topModelsChart" class="chart-canvas" aria-label="Top models"></canvas>
+      </div>
+    </div>
+  </div>
+
+  {# Performance Tables #}
+  <div class="perf-grid">
+    <div class="perf-card">
+      <div class="perf-title"><i class="bi bi-geo-alt me-2"></i>Location Performance</div>
+      <table class="perf-table">
+        <thead>
+          <tr>
+            <th>Location</th>
+            <th class="text-end">Stock</th>
+            <th class="text-end">Sales (MTD)</th>
+            <th class="text-end">Trend</th>
+          </tr>
+        </thead>
+        <tbody id="locationPerf">
+          {% for loc in location_performance %}
+          <tr>
+            <td><strong>{{ loc.name }}</strong></td>
+            <td class="text-end">{{ loc.stock_count|default:0 }}</td>
+            <td class="text-end">MK {{ loc.sales_amount|default:0|floatformat:0|intcomma }}</td>
+            <td class="text-end">
+              {% if loc.trend == 'up' %}
+              <span class="text-success"><i class="bi bi-arrow-up"></i></span>
+              {% elif loc.trend == 'down' %}
+              <span class="text-danger"><i class="bi bi-arrow-down"></i></span>
+              {% else %}
+              <span class="text-muted">—</span>
+              {% endif %}
+            </td>
+          </tr>
           {% empty %}
-          <p class="text-center text-muted">No sales data yet</p>
+          <tr>
+            <td colspan="4" class="text-center text-muted">No location data yet</td>
+          </tr>
           {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    <div class="perf-card">
+      <div class="perf-title"><i class="bi bi-trophy me-2"></i>Agent Leaderboard</div>
+      <div id="agentLeaderboard">
+        {% for agent in agent_leaderboard %}
+        <div class="leaderboard-item">
+          <div class="rank-badge rank-{% if agent.rank <= 3 %}{{ agent.rank }}{% else %}other{% endif %}">
+            {% if agent.rank == 1 %}🥇{% elif agent.rank == 2 %}🥈{% elif agent.rank == 3 %}🥉{% else %}{{ agent.rank
+            }}{% endif %}
+          </div>
+          <div class="agent-info">
+            <div class="agent-name">{{ agent.name }}</div>
+            <div class="agent-location">{{ agent.location }}</div>
+          </div>
+          <div class="agent-stats">
+            <div class="agent-amount">MK {{ agent.amount|default:0|floatformat:0|intcomma }}</div>
+            <div class="agent-units">{{ agent.units|default:0 }} devices</div>
+          </div>
         </div>
+        {% empty %}
+        <p class="text-center text-muted">📊 No sales yet this month</p>
+        {% endfor %}
       </div>
     </div>
+  </div>
 
   {% else %}
-    {# ========== Agent Dashboard ========== #}
-    
-    <div class="stats-grid">
-      <div class="stat-card">
-        <div class="stat-label">
-          <i class="bi bi-calendar-day"></i> Today's Sales
-        </div>
-        <div class="stat-value" data-animate-value="{{ agent_today_amount|default:0 }}">MK 0</div>
-        <div class="stat-change">{{ agent_today_count|default:0 }} devices</div>
+  {# ========== Agent Dashboard ========== #}
+
+  <div class="stats-grid">
+    <div class="stat-card">
+      <div class="stat-label">
+        <i class="bi bi-calendar-day"></i> Today's Sales
       </div>
-      
-      <div class="stat-card">
-        <div class="stat-label">
-          <i class="bi bi-calendar-month"></i> This Month
-        </div>
-        <div class="stat-value" data-animate-value="{{ agent_month_amount|default:0 }}">MK 0</div>
-        <div class="stat-change">{{ agent_month_count|default:0 }} devices</div>
+      <div class="stat-value" data-animate-value="{{ agent_today_amount|default:0 }}">MK 0</div>
+      <div class="stat-change">{{ agent_today_count|default:0 }} devices</div>
+    </div>
+
+    <div class="stat-card">
+      <div class="stat-label">
+        <i class="bi bi-calendar-month"></i> This Month
       </div>
-      
-      <div class="stat-card agent-rank-card">
-        <div class="stat-label">
-          <i class="bi bi-trophy-fill"></i> Your Rank
-        </div>
-        <div class="stat-value">#{{ agent_rank|default:"-" }}</div>
-        <div class="stat-change">
-          {% if agent_gap %}
-            {{ agent_gap }} behind #{{ agent_rank|add:"-1" }}
-          {% else %}
-            Keep up the great work!
-          {% endif %}
-        </div>
+      <div class="stat-value" data-animate-value="{{ agent_month_amount|default:0 }}">MK 0</div>
+      <div class="stat-change">{{ agent_month_count|default:0 }} devices</div>
+    </div>
+
+    <div class="stat-card agent-rank-card">
+      <div class="stat-label">
+        <i class="bi bi-trophy-fill"></i> Your Rank
       </div>
-      
-      <div class="stat-card">
-        <div class="stat-label">
-          <i class="bi bi-star-fill"></i> Commission Earned
-        </div>
-        <div class="stat-value" data-animate-value="{{ agent_commission|default:0 }}">MK 0</div>
-        <div class="stat-change">This month</div>
+      <div class="stat-value">#{{ agent_rank|default:"-" }}</div>
+      <div class="stat-change">
+        {% if agent_gap %}
+        {{ agent_gap }} behind #{{ agent_rank|add:"-1" }}
+        {% else %}
+        Keep up the great work!
+        {% endif %}
       </div>
     </div>
 
-    {# Quick Actions for Agents #}
-    <div class="chart-card" style="margin-bottom:2rem">
-      <div class="chart-title" style="margin-bottom:1rem">Quick Actions</div>
-      <div class="d-flex flex-wrap gap-2">
-        <a href="{% url 'inventory:scan_in' %}" class="btn btn-primary">
-          <i class="bi bi-upc-scan"></i> Scan IN
-        </a>
-        <a href="{% url 'inventory:phone_sale_wizard' %}" class="btn btn-success">
-          <i class="bi bi-bag-check"></i> Scan & Sell
-        </a>
-        <a href="{% url 'inventory:stock_list' %}" class="btn btn-outline-primary">
-          <i class="bi bi-box-seam"></i> View Stock
-        </a>
-        <a href="{% url 'wallet:agent_wallet' %}" class="btn btn-outline-primary">
-          <i class="bi bi-wallet2"></i> My Wallet
-        </a>
+    <div class="stat-card">
+      <div class="stat-label">
+        <i class="bi bi-star-fill"></i> Commission Earned
       </div>
+      <div class="stat-value" data-animate-value="{{ agent_commission|default:0 }}">MK 0</div>
+      <div class="stat-change">This month</div>
     </div>
+  </div>
+
+  {# Quick Actions for Agents #}
+  <div class="chart-card" style="margin-bottom:2rem">
+    <div class="chart-title" style="margin-bottom:1rem">Quick Actions</div>
+    <div class="d-flex flex-wrap gap-2">
+      <a href="{% url 'inventory:scan_in' %}" class="btn btn-primary">
+        <i class="bi bi-upc-scan"></i> Scan IN
+      </a>
+      <a href="{% url 'inventory:phone_sale_wizard' %}" class="btn btn-success">
+        <i class="bi bi-bag-check"></i> Scan & Sell
+      </a>
+      <a href="{% url 'inventory:stock_list' %}" class="btn btn-outline-primary">
+        <i class="bi bi-box-seam"></i> View Stock
+      </a>
+      <a href="{% url 'wallet:agent_wallet' %}" class="btn btn-outline-primary">
+        <i class="bi bi-wallet2"></i> My Wallet
+      </a>
+    </div>
+  </div>
   {% endif %}
 
   {# Quick Links #}
@@ -388,17 +520,17 @@
         <i class="bi bi-columns-gap"></i> Inventory Dashboard
       </a>
       {% if IS_MANAGER %}
-        {% if HAS_REPORTS_NAMESPACE %}
-        <a href="{% url 'reports:home' %}" class="btn btn-sm btn-outline-primary">
-          <i class="bi bi-graph-up"></i> Reports
-        </a>
-        {% endif %}
-        <a href="{% url 'tenants:manager_review_agents' %}" class="btn btn-sm btn-outline-primary">
-          <i class="bi bi-people"></i> Manage Agents
-        </a>
-        <a href="{% url 'billing:plans' %}" class="btn btn-sm btn-outline-warning">
-          <i class="bi bi-rocket-takeoff"></i> Upgrade Plan
-        </a>
+      {% if HAS_REPORTS_NAMESPACE %}
+      <a href="{% url 'reports:home' %}" class="btn btn-sm btn-outline-primary">
+        <i class="bi bi-graph-up"></i> Reports
+      </a>
+      {% endif %}
+      <a href="{% url 'tenants:manager_review_agents' %}" class="btn btn-sm btn-outline-primary">
+        <i class="bi bi-people"></i> Manage Agents
+      </a>
+      <a href="{% url 'billing:plans' %}" class="btn btn-sm btn-outline-warning">
+        <i class="bi bi-rocket-takeoff"></i> Upgrade Plan
+      </a>
       {% endif %}
     </div>
   </div>
@@ -409,124 +541,158 @@
 {% if IS_MANAGER %}
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
 <script>
-// Animate stat values on load
-(function animateStats() {
-  document.querySelectorAll('[data-animate-value]').forEach(el => {
-    const target = parseInt(el.getAttribute('data-animate-value') || '0', 10);
-    if (isNaN(target) || target === 0) { el.textContent = 'MK 0'; return; }
-    let current = 0;
-    const duration = 1000;
-    const step = Math.max(1, Math.ceil(target / 60));
-    const interval = duration / (target / step);
-    const timer = setInterval(() => {
-      current += step;
-      if (current >= target) {
-        el.textContent = 'MK ' + target.toLocaleString();
-        clearInterval(timer);
-      } else {
-        el.textContent = 'MK ' + current.toLocaleString();
-      }
-    }, interval);
-  });
-})();
-
-// Sales trend chart
-async function loadSalesTrend() {
-  const metric = document.getElementById('trendMetric').value;
-  try {
-    const resp = await fetch(`/dashboard/api/sales-trend/?period=30d&metric=${metric}`);
-    const data = await resp.json();
-    
-    const ctx = document.getElementById('salesTrendChart');
-    if (window.salesTrendChart) window.salesTrendChart.destroy();
-    
-    window.salesTrendChart = new Chart(ctx, {
-      type: 'line',
-      data: {
-        labels: data.labels || [],
-        datasets: [{
-          label: metric === 'amount' ? 'Sales (MK)' : 'Sales (Count)',
-          data: data.values || [],
-          borderColor: '#2563eb',
-          backgroundColor: 'rgba(37,99,235,0.1)',
-          fill: true,
-          tension: 0.4
-        }]
-      },
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        plugins: { legend: { display: false } }
-      }
-    });
-  } catch (e) {
-    console.error('Failed to load sales trend:', e);
-  }
-}
-
-// Top models chart
-async function loadTopModels() {
-  const period = document.getElementById('topPeriod').value;
-  try {
-    const resp = await fetch(`/dashboard/api/top-models/?period=${period}`);
-    const data = await resp.json();
-    
-    const ctx = document.getElementById('topModelsChart');
-    if (window.topModelsChart) window.topModelsChart.destroy();
-    
-    window.topModelsChart = new Chart(ctx, {
-      type: 'bar',
-      data: {
-        labels: data.labels || [],
-        datasets: [{
-          label: 'Units Sold',
-          data: data.values || [],
-          backgroundColor: '#2563eb'
-        }]
-      },
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        plugins: { legend: { display: false } },
-        scales: {
-          y: { beginAtZero: true }
+  // Animate stat values on load
+  (function animateStats() {
+    document.querySelectorAll('[data-animate-value]').forEach(el => {
+      const target = parseInt(el.getAttribute('data-animate-value') || '0', 10);
+      if (isNaN(target) || target === 0) { el.textContent = 'MK 0'; return; }
+      let current = 0;
+      const duration = 1000;
+      const step = Math.max(1, Math.ceil(target / 60));
+      const interval = duration / (target / step);
+      const timer = setInterval(() => {
+        current += step;
+        if (current >= target) {
+          el.textContent = 'MK ' + target.toLocaleString();
+          clearInterval(timer);
+        } else {
+          el.textContent = 'MK ' + current.toLocaleString();
         }
-      }
+      }, interval);
     });
-  } catch (e) {
-    console.error('Failed to load top models:', e);
+  })();
+
+  // Sales trend chart
+  async function loadSalesTrend() {
+    const metric = document.getElementById('trendMetric').value;
+    try {
+      const resp = await fetch(`/dashboard/api/sales-trend/?period=30d&metric=${metric}`);
+      const data = await resp.json();
+
+      const ctx = document.getElementById('salesTrendChart');
+      const chartContainer = ctx.parentElement;
+      if (window.salesTrendChart) window.salesTrendChart.destroy();
+
+      // Check if data is empty (all zeros or no values)
+      const hasData = data.values && data.values.length > 0 && data.values.some(v => v > 0);
+
+      if (!hasData) {
+        // Show "No data yet" message
+        chartContainer.innerHTML = '<canvas id="salesTrendChart" class="chart-canvas" aria-label="Sales trend"></canvas><p class="text-center text-muted mt-3" style="font-size: 0.9rem;">📊 No sales data yet for this period</p>';
+        return;
+      }
+
+      // Restore canvas if it was replaced
+      if (!document.getElementById('salesTrendChart')) {
+        chartContainer.innerHTML = '<canvas id="salesTrendChart" class="chart-canvas" aria-label="Sales trend"></canvas>';
+      }
+
+      window.salesTrendChart = new Chart(document.getElementById('salesTrendChart'), {
+        type: 'line',
+        data: {
+          labels: data.labels || [],
+          datasets: [{
+            label: metric === 'amount' ? 'Sales (MK)' : 'Sales (Count)',
+            data: data.values || [],
+            borderColor: '#2563eb',
+            backgroundColor: 'rgba(37,99,235,0.1)',
+            fill: true,
+            tension: 0.4
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: { legend: { display: false } }
+        }
+      });
+    } catch (e) {
+      console.error('Failed to load sales trend:', e);
+      document.getElementById('salesTrendChart').parentElement.innerHTML =
+        '<canvas id="salesTrendChart" class="chart-canvas"></canvas><p class="text-center text-danger mt-3">⚠️ Failed to load chart</p>';
+    }
   }
-}
 
-document.getElementById('trendMetric').addEventListener('change', loadSalesTrend);
-document.getElementById('topPeriod').addEventListener('change', loadTopModels);
+  // Top models chart
+  async function loadTopModels() {
+    const period = document.getElementById('topPeriod').value;
+    try {
+      const resp = await fetch(`/dashboard/api/top-models/?period=${period}`);
+      const data = await resp.json();
 
-// Load charts on page load
-loadSalesTrend();
-loadTopModels();
+      const ctx = document.getElementById('topModelsChart');
+      const chartContainer = ctx.parentElement;
+      if (window.topModelsChart) window.topModelsChart.destroy();
+
+      // Check if data is empty
+      const hasData = data.values && data.values.length > 0 && data.values.some(v => v > 0);
+
+      if (!hasData) {
+        // Show "No data yet" message
+        chartContainer.innerHTML = '<canvas id="topModelsChart" class="chart-canvas" aria-label="Top models"></canvas><p class="text-center text-muted mt-3" style="font-size: 0.9rem;">📱 No models sold yet for this period</p>';
+        return;
+      }
+
+      // Restore canvas if it was replaced
+      if (!document.getElementById('topModelsChart')) {
+        chartContainer.innerHTML = '<canvas id="topModelsChart" class="chart-canvas" aria-label="Top models"></canvas>';
+      }
+
+      window.topModelsChart = new Chart(document.getElementById('topModelsChart'), {
+        type: 'bar',
+        data: {
+          labels: data.labels || [],
+          datasets: [{
+            label: 'Units Sold',
+            data: data.values || [],
+            backgroundColor: '#2563eb'
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: { legend: { display: false } },
+          scales: {
+            y: { beginAtZero: true }
+          }
+        }
+      });
+    } catch (e) {
+      console.error('Failed to load top models:', e);
+      document.getElementById('topModelsChart').parentElement.innerHTML =
+        '<canvas id="topModelsChart" class="chart-canvas"></canvas><p class="text-center text-danger mt-3">⚠️ Failed to load chart</p>';
+    }
+  }
+
+  document.getElementById('trendMetric').addEventListener('change', loadSalesTrend);
+  document.getElementById('topPeriod').addEventListener('change', loadTopModels);
+
+  // Load charts on page load
+  loadSalesTrend();
+  loadTopModels();
 </script>
 {% else %}
 <script>
-// Agent view - simple animation
-(function animateStats() {
-  document.querySelectorAll('[data-animate-value]').forEach(el => {
-    const target = parseInt(el.getAttribute('data-animate-value') || '0', 10);
-    if (isNaN(target) || target === 0) { el.textContent = 'MK 0'; return; }
-    let current = 0;
-    const duration = 1000;
-    const step = Math.max(1, Math.ceil(target / 60));
-    const interval = duration / (target / step);
-    const timer = setInterval(() => {
-      current += step;
-      if (current >= target) {
-        el.textContent = 'MK ' + target.toLocaleString();
-        clearInterval(timer);
-      } else {
-        el.textContent = 'MK ' + current.toLocaleString();
-      }
-    }, interval);
-  });
-})();
+  // Agent view - simple animation
+  (function animateStats() {
+    document.querySelectorAll('[data-animate-value]').forEach(el => {
+      const target = parseInt(el.getAttribute('data-animate-value') || '0', 10);
+      if (isNaN(target) || target === 0) { el.textContent = 'MK 0'; return; }
+      let current = 0;
+      const duration = 1000;
+      const step = Math.max(1, Math.ceil(target / 60));
+      const interval = duration / (target / step);
+      const timer = setInterval(() => {
+        current += step;
+        if (current >= target) {
+          el.textContent = 'MK ' + target.toLocaleString();
+          clearInterval(timer);
+        } else {
+          el.textContent = 'MK ' + current.toLocaleString();
+        }
+      }, interval);
+    });
+  })();
 </script>
 {% endif %}
 {% endblock %}

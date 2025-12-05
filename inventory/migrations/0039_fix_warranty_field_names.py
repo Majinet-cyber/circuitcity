@@ -6,6 +6,49 @@
 from django.db import migrations
 
 
+def rename_warranty_columns_if_exist(apps, schema_editor):
+    """Rename warranty columns only if the old ones exist"""
+    with schema_editor.connection.cursor() as cursor:
+        # Check if old columns exist
+        cursor.execute("""
+            SELECT COUNT(*) FROM pragma_table_info('inventory_inventoryitem') 
+            WHERE name='warranty_expires_at'
+        """)
+        has_old_expiration = cursor.fetchone()[0] > 0
+        
+        cursor.execute("""
+            SELECT COUNT(*) FROM pragma_table_info('inventory_inventoryitem') 
+            WHERE name='warranty_last_checked_at'
+        """)
+        has_old_checked = cursor.fetchone()[0] > 0
+        
+        cursor.execute("""
+            SELECT COUNT(*) FROM pragma_table_info('inventory_inventoryitem') 
+            WHERE name='warranty_source'
+        """)
+        has_source = cursor.fetchone()[0] > 0
+        
+        # Rename if old columns exist
+        if has_old_expiration:
+            cursor.execute("""
+                ALTER TABLE inventory_inventoryitem 
+                RENAME COLUMN warranty_expires_at TO warranty_expiration
+            """)
+        
+        if has_old_checked:
+            cursor.execute("""
+                ALTER TABLE inventory_inventoryitem 
+                RENAME COLUMN warranty_last_checked_at TO warranty_checked_at
+            """)
+        
+        # Add warranty_source if it doesn't exist
+        if not has_source:
+            cursor.execute("""
+                ALTER TABLE inventory_inventoryitem 
+                ADD COLUMN warranty_source varchar(50) DEFAULT 'carlcare' NOT NULL
+            """)
+
+
 class Migration(migrations.Migration):
 
     dependencies = [
@@ -13,25 +56,6 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
-        # Rename warranty_expires_at -> warranty_expiration (if it exists in DB)
-        migrations.RunSQL(
-            sql="ALTER TABLE inventory_inventoryitem RENAME COLUMN warranty_expires_at TO warranty_expiration;",
-            reverse_sql="ALTER TABLE inventory_inventoryitem RENAME COLUMN warranty_expiration TO warranty_expires_at;",
-        ),
-        
-        # Rename warranty_last_checked_at -> warranty_checked_at (if it exists in DB)
-        migrations.RunSQL(
-            sql="ALTER TABLE inventory_inventoryitem RENAME COLUMN warranty_last_checked_at TO warranty_checked_at;",
-            reverse_sql="ALTER TABLE inventory_inventoryitem RENAME COLUMN warranty_checked_at TO warranty_last_checked_at;",
-        ),
-        
-        # Add warranty_source column if it doesn't exist (from migration 0034 that didn't apply)
-        migrations.RunSQL(
-            sql="""
-            ALTER TABLE inventory_inventoryitem 
-            ADD COLUMN warranty_source varchar(50) DEFAULT 'carlcare' NOT NULL;
-            """,
-            reverse_sql="ALTER TABLE inventory_inventoryitem DROP COLUMN warranty_source;",
-        ),
+        migrations.RunPython(rename_warranty_columns_if_exist, migrations.RunPython.noop),
     ]
 

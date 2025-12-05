@@ -123,6 +123,18 @@ def _initials(user):
     return (parts[0][0] + (parts[1][0] if len(parts) > 1 else "")).upper()
 
 
+def _get_greeting():
+    """Return time-of-day greeting based on current hour."""
+    now = timezone.localtime()
+    hour = now.hour
+    if hour < 12:
+        return "Good morning"
+    elif hour < 18:
+        return "Good afternoon"
+    else:
+        return "Good evening"
+
+
 def _reverse_agent_detail(user_id: int) -> str | None:
     """
     Try namespaced URL first, then legacy alias (for older templates).
@@ -526,6 +538,7 @@ def home(request):
             from inventory.models import AgentProfile
             agents = AgentProfile.objects.filter(location__business=biz).select_related('user', 'location')
             agent_stats = []
+            
             for agent in agents:
                 agent_sales = _scope_queryset(InventoryItem.objects.all(), biz).filter(
                     SOLD_Q(),
@@ -542,6 +555,26 @@ def home(request):
                         'location': agent.location.name if agent.location else '',
                         'amount': agent_amount,
                         'units': agent_units,
+                    })
+            
+            # IMPORTANT: If no agents have sales, check if the MANAGER has sold anything
+            # This handles the case where manager is the only seller
+            if len(agent_stats) == 0 and request.user.is_authenticated:
+                manager_sales = _scope_queryset(InventoryItem.objects.all(), biz).filter(
+                    SOLD_Q(),
+                    assigned_agent=request.user,
+                    sold_at__gte=month_start, sold_at__lt=month_end
+                )
+                manager_amount = _inv_revenue_sum(manager_sales)
+                manager_units = manager_sales.count()
+                
+                if manager_units > 0:
+                    agent_stats.append({
+                        'user': request.user,
+                        'name': request.user.get_full_name() or request.user.username,
+                        'location': '',  # Manager might not have a location
+                        'amount': manager_amount,
+                        'units': manager_units,
                     })
             
             # Sort by amount descending
@@ -630,6 +663,7 @@ def home(request):
         "onboarding_steps": onboarding_steps,
         # Enhanced dashboard data
         "IS_MANAGER": is_manager,
+        "greeting_text": _get_greeting(),
         "today_sales_amount": today_sales_amount,
         "today_sales_count": today_sales_count,
         "month_sales_amount": month_sales_amount,
@@ -1203,20 +1237,57 @@ def agent_dashboard_proxy(request):
 @login_required
 @require_GET
 def v2_sales_trend_data_proxy(request):
-    try:
-        return _call_inventory_view("api_sales_trend", request)
-    except Exception:
-        return JsonResponse({"labels": [], "values": []})
+    """Proxy to inventory sales trend API - formats data for main dashboard."""
+    # Import the working API function directly
+    from inventory.api_sales_metrics import api_sales_trend
+    response = api_sales_trend(request)
+    
+    # The inventory API returns {ok, data: {period, series:[{date, qty, amount}], ...}}
+    # Main dashboard JS expects {labels: [...], values: [...]}
+    if response.status_code == 200:
+        import json
+        data = json.loads(response.content)
+        if data.get("ok"):
+            payload = data.get("data", {})
+            series = payload.get("series", [])
+            
+            # Extract based on requested metric
+            metric = request.GET.get("metric", "amount")
+            if metric == "count" or metric == "qty":
+                return JsonResponse({
+                    "labels": [s.get("date") for s in series],
+                    "values": [s.get("qty", 0) for s in series],
+                })
+            else:  # amount
+                return JsonResponse({
+                    "labels": [s.get("date") for s in series],
+                    "values": [s.get("amount", 0) for s in series],
+                })
+    return JsonResponse({"labels": [], "values": []})
 
 
 @never_cache
 @login_required
 @require_GET
 def v2_top_models_data_proxy(request):
-    try:
-        return _call_inventory_view("api_top_models", request)
-    except Exception:
-        return JsonResponse({"labels": [], "values": []})
+    """Proxy to inventory top models API - formats data for main dashboard."""
+    from inventory.api_sales_metrics import api_top_models
+    response = api_top_models(request)
+    
+    # Inventory API returns {ok, data: {series: [{name, qty, amount}], ...}}
+    # Main dashboard JS expects {labels: [...], values: [...]}
+    if response.status_code == 200:
+        import json
+        data = json.loads(response.content)
+        if data.get("ok"):
+            payload = data.get("data", {})
+            series = payload.get("series", [])
+            
+            return JsonResponse({
+                "labels": [s.get("name", "Unknown") for s in series],
+                "values": [s.get("qty", 0) for s in series],
+            })
+    return JsonResponse({"labels": [], "values": []})
 
 
 @never_cache

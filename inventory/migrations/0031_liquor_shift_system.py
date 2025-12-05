@@ -338,16 +338,6 @@ class Migration(migrations.Migration):
             ),
         ),
         migrations.AlterField(
-            model_name="inventoryitem",
-            name="warranty_expiration",
-            field=models.DateField(
-                blank=True,
-                db_index=True,
-                help_text="Warranty expiration date if available",
-                null=True,
-            ),
-        ),
-        migrations.AlterField(
             model_name="liquorsale",
             name="sale_type",
             field=models.CharField(
@@ -373,13 +363,6 @@ class Migration(migrations.Migration):
         migrations.AlterUniqueTogether(
             name="gymmember",
             unique_together={("business", "phone")},
-        ),
-        migrations.AddIndex(
-            model_name="inventoryitem",
-            index=models.Index(
-                fields=["warranty_status", "warranty_expiration"],
-                name="inv_wty_stat_exp_idx",
-            ),
         ),
         migrations.AddField(
             model_name="liquorshift",
