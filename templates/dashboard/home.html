@@ -369,6 +369,69 @@
     </div>
   </div>
 
+  {# ========== Costs & Commissions Panel (Manager Only) ========== #}
+  {% if costs_commissions_panel %}
+  <div class="chart-card" style="margin-bottom: 2rem; background: linear-gradient(135deg, rgba(37, 99, 235, 0.05), rgba(59, 130, 246, 0.02)); border: 2px solid rgba(37, 99, 235, 0.2);">
+    <div class="chart-header">
+      <div>
+        <div class="chart-title" style="font-size: 1.25rem; margin-bottom: 0.25rem;">💰 Costs & Commissions (MTD)</div>
+        <div style="font-size: 0.875rem; color: var(--dash-muted);">
+          {{ costs_commissions_panel.period_start|date:"M j" }} - {{ costs_commissions_panel.period_end|date:"M j, Y" }}
+        </div>
+      </div>
+      <a href="{% url 'wallet:admin_cost_list' %}" class="btn btn-sm btn-outline-primary">
+        <i class="bi bi-sliders me-1"></i> Manage Costs
+      </a>
+    </div>
+
+    <div class="stats-grid" style="margin-top: 1rem;">
+      <div style="background: #fef3c7; border: 1px solid #fbbf24; border-radius: 12px; padding: 1rem;">
+        <div style="font-size: 0.8rem; color: #92400e; margin-bottom: 0.5rem; font-weight: 600;">Revenue</div>
+        <div style="font-size: 1.5rem; font-weight: 800; color: #92400e;">
+          MK {{ costs_commissions_panel.revenue_this_period|floatformat:0|intcomma }}
+        </div>
+      </div>
+
+      <div style="background: #fef2f2; border: 1px solid #fecaca; border-radius: 12px; padding: 1rem;">
+        <div style="font-size: 0.8rem; color: #991b1b; margin-bottom: 0.5rem; font-weight: 600;">Commissions</div>
+        <div style="font-size: 1.5rem; font-weight: 800; color: #991b1b;">
+          MK {{ costs_commissions_panel.commissions_this_period|floatformat:0|intcomma }}
+        </div>
+        <div style="font-size: 0.75rem; color: #7f1d1d; margin-top: 0.25rem;">Agents earned</div>
+      </div>
+
+      <div style="background: #fef2f2; border: 1px solid #fecaca; border-radius: 12px; padding: 1rem;">
+        <div style="font-size: 0.8rem; color: #991b1b; margin-bottom: 0.5rem; font-weight: 600;">Costs (Total)</div>
+        <div style="font-size: 1.5rem; font-weight: 800; color: #991b1b;">
+          MK {{ costs_commissions_panel.costs_this_period|floatformat:0|intcomma }}
+        </div>
+        <div style="font-size: 0.75rem; color: #7f1d1d; margin-top: 0.25rem;">
+          Fixed: MK {{ costs_commissions_panel.fixed_costs|floatformat:0|intcomma }} · 
+          Variable: MK {{ costs_commissions_panel.variable_costs|floatformat:0|intcomma }}
+        </div>
+      </div>
+
+      <div style="background: {% if costs_commissions_panel.net_profit_this_period >= 0 %}#dcfce7{% else %}#fee2e2{% endif %}; border: 1px solid {% if costs_commissions_panel.net_profit_this_period >= 0 %}#bbf7d0{% else %}#fecaca{% endif %}; border-radius: 12px; padding: 1rem;">
+        <div style="font-size: 0.8rem; color: {% if costs_commissions_panel.net_profit_this_period >= 0 %}#166534{% else %}#991b1b{% endif %}; margin-bottom: 0.5rem; font-weight: 600;">Net Profit</div>
+        <div style="font-size: 1.5rem; font-weight: 800; color: {% if costs_commissions_panel.net_profit_this_period >= 0 %}#166534{% else %}#991b1b{% endif %};">
+          MK {{ costs_commissions_panel.net_profit_this_period|floatformat:0|intcomma }}
+        </div>
+        <div style="font-size: 0.75rem; color: {% if costs_commissions_panel.net_profit_this_period >= 0 %}#14532d{% else %}#7f1d1b{% endif %}; margin-top: 0.25rem;">
+          {{ costs_commissions_panel.profit_margin }}% margin
+        </div>
+      </div>
+    </div>
+
+    <div style="margin-top: 1rem; padding: 1rem; background: rgba(255, 255, 255, 0.5); border-radius: 10px; font-size: 0.875rem; color: var(--dash-muted);">
+      <strong>Formula:</strong> Net Profit = Gross Profit - Commissions - Costs
+      <br>
+      <span style="font-size: 0.8rem;">
+        (Gross Profit: MK {{ costs_commissions_panel.gross_profit_this_period|floatformat:0|intcomma }})
+      </span>
+    </div>
+  </div>
+  {% endif %}
+
   {# Charts #}
   <div class="charts-section">
     <div class="chart-grid">

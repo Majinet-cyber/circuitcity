@@ -44,8 +44,11 @@ def record_sale_commission_to_wallet(
     if not business:
         return None
     
-    # Get commission percentage from config
-    commission_pct_fraction = get_phone_commission_pct(business)
+    # Determine if this is an agent sale (sale.agent is set)
+    is_agent_sale = bool(sale.agent)
+    
+    # Get commission percentage from config (12% for agent sales by default)
+    commission_pct_fraction = get_phone_commission_pct(business, is_agent_sale=is_agent_sale)
     
     # Calculate commission amount
     commission_amount = sale.price * commission_pct_fraction

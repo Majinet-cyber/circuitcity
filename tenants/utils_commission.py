@@ -10,25 +10,26 @@ from typing import Optional
 from django.apps import apps
 
 
-def get_phone_commission_pct(business) -> Decimal:
+def get_phone_commission_pct(business, is_agent_sale=True) -> Decimal:
     """
     Get the phone commission percentage for a business as a fraction (not percentage).
     
     Args:
         business: Business instance or business_id
+        is_agent_sale: If True and no custom config exists, defaults to 12% for agent sales
         
     Returns:
-        Decimal fraction (e.g., Decimal("0.10") for 10%)
+        Decimal fraction (e.g., Decimal("0.12") for 12%)
         
     Example:
-        >>> pct = get_phone_commission_pct(my_business)  # Returns Decimal("0.10")
+        >>> pct = get_phone_commission_pct(my_business)  # Returns Decimal("0.12")
         >>> commission = price * pct
     """
     try:
         CommissionConfig = apps.get_model("sales", "CommissionConfig")
     except LookupError:
         # Fallback if CommissionConfig doesn't exist yet
-        return Decimal("0.10")
+        return Decimal("0.12") if is_agent_sale else Decimal("0.10")
     
     business_id = business.id if hasattr(business, "id") else business
     config = CommissionConfig.objects.filter(
@@ -37,11 +38,11 @@ def get_phone_commission_pct(business) -> Decimal:
     ).first()
     
     if config:
-        # Convert percentage to fraction (e.g., 10.00 → 0.10)
+        # Convert percentage to fraction (e.g., 12.00 → 0.12)
         return config.base_commission_pct / Decimal("100")
     
-    # Default 10%
-    return Decimal("0.10")
+    # Default 12% for agent sales, 10% for others
+    return Decimal("0.12") if is_agent_sale else Decimal("0.10")
 
 
 def get_phone_commission_config(business):

@@ -646,6 +646,17 @@ def home(request):
         "show_payslip_banner": show_payslip_banner,
         **ctx_enhancements,  # Merge enhancements
     }
+    
+    # ===== MANAGER ONLY: Costs & Commissions Panel =====
+    if is_manager:
+        try:
+            from dashboard.helpers_costs_commissions import get_month_to_date_costs_commissions
+            costs_commissions_panel = get_month_to_date_costs_commissions(biz)
+            ctx['costs_commissions_panel'] = costs_commissions_panel
+        except Exception:
+            # Gracefully degrade if helper not available
+            pass
+    
     return render(request, "dashboard/home.html", ctx)
 
 

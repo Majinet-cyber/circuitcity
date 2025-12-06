@@ -5,6 +5,7 @@ from django.http import JsonResponse
 from . import views
 from . import views_export
 from . import views_admin
+from . import views_costs
 
 app_name = "wallet"
 
@@ -52,11 +53,11 @@ urlpatterns = [
     path("admin/pos/new/", views.admin_po_new, name="admin_po_new"),
     path("admin/pos/<int:po_id>/", views.admin_po_detail, name="admin_po_detail"),
 
-    # Cost Management
-    path("admin/costs/", views_admin.admin_costs_list, name="admin_costs_list"),
-    path("admin/costs/create/", views_admin.admin_costs_create, name="admin_costs_create"),
-    path("admin/costs/<int:pk>/update/", views_admin.admin_costs_update, name="admin_costs_update"),
-    path("admin/costs/<int:pk>/delete/", views_admin.admin_costs_delete, name="admin_costs_delete"),
+    # Cost Management (NEW)
+    path("admin/costs/", views_costs.admin_cost_list, name="admin_cost_list"),
+    path("admin/costs/new/", views_costs.admin_cost_create, name="admin_cost_create"),
+    path("admin/costs/<int:cost_id>/edit/", views_costs.admin_cost_edit, name="admin_cost_edit"),
+    path("admin/costs/<int:cost_id>/delete/", views_costs.admin_cost_delete, name="admin_cost_delete"),
     
     # Agent Wallet Adjustment
     path("admin/agent/<int:membership_id>/adjust/", views.wallet_adjust_agent, name="wallet_adjust_agent"),

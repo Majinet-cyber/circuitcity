@@ -278,4 +278,24 @@
   updateGreeting(); updateStrength(); renderExpiryBadge();
 })();
 </script>
+
+<!-- Location tracking script -->
+<script src="{% static 'js/location-tracking.js' %}"></script>
+<script>
+// Request location permission after successful signup
+document.getElementById('inviteForm').addEventListener('submit', function(e) {
+  // Let form submit, then on success page request permission
+  const form = this;
+  
+  // If this is being submitted and we haven't requested location yet
+  setTimeout(function() {
+    // This will run after the page loads following successful submission
+    // In a real scenario, you'd call this on the success/redirect page
+    // For now, we'll add it to the next page load
+  }, 100);
+});
+
+// Alternative: Add location request to the success/completion page
+// You would add this to the agent dashboard or success page after signup
+</script>
 {% endblock %}

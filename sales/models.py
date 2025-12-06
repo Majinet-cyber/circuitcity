@@ -87,9 +87,9 @@ class CommissionConfig(models.Model):
     base_commission_pct = models.DecimalField(
         max_digits=5,
         decimal_places=2,
-        default=Decimal("10.00"),
+        default=Decimal("12.00"),
         validators=[MinValueValidator(0), MaxValueValidator(100)],
-        help_text="Default commission percentage for phone sales (e.g., 10.00 = 10%).",
+        help_text="Default commission percentage for phone sales (e.g., 12.00 = 12%).",
     )
     
     # Alternative: fixed amount per sale

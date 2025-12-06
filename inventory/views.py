@@ -1264,6 +1264,44 @@ def stock_list(request: HttpRequest, *args, **kwargs) -> HttpResponse:
                     qs = qs.filter(**{fk: loc_id})
                     break
 
+    # ---------- AGENT VISIBILITY RULES (Part 1: Stock Ownership) ----------
+    # Agents can only see stock assigned to them; Managers see all stock
+    user_is_manager = False
+    try:
+        # Check if user is manager
+        user_is_manager = (
+            request.user.is_staff 
+            or request.user.is_superuser
+            or getattr(getattr(request.user, 'profile', None), 'is_manager', False)
+        )
+        
+        # Also check Membership role
+        if not user_is_manager and biz:
+            try:
+                from tenants.models import Membership
+                membership = Membership.objects.filter(
+                    user=request.user,
+                    business=biz,
+                    role='MANAGER',
+                    status='ACTIVE'
+                ).first()
+                if membership:
+                    user_is_manager = True
+            except Exception:
+                pass
+        
+        # If user is NOT a manager (i.e., they are an agent), filter stock to only what's assigned to them
+        if not user_is_manager and _hasf(Model, "assigned_agent"):
+            # Agents only see items where assigned_agent = them OR assigned_role = 'AGENT' and assigned_agent = them
+            qs = qs.filter(
+                Q(assigned_agent=request.user) 
+                | Q(assigned_role='AGENT', assigned_agent=request.user)
+            )
+    except Exception:
+        # On any error, default to safe behavior (show nothing for non-staff)
+        if not (request.user.is_staff or request.user.is_superuser):
+            qs = qs.none()
+
     # ---------- SOLD vs IN-STOCK predicates ----------
     def SOLD_Q() -> Q:
         q = Q()

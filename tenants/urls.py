@@ -7,6 +7,12 @@ from django.views.generic import RedirectView
 
 from . import views
 
+# Location tracking views
+try:
+    from . import views_location_tracking
+except ImportError:
+    views_location_tracking = None
+
 # --- Optional helpers (import if present; never crash in dev) ------------------
 try:
     from . import views_join  # type: ignore
@@ -208,4 +214,21 @@ urlpatterns = [
     # Accept invite (used in links shared with agents)
     # NOTE: <str:token> safely carries TimestampSigner tokens (no slashes).
     path("invites/accept/<str:token>/", invite_accept, name="invite_accept"),
+    
+    # Location tracking endpoints (for agents)
+    path(
+        "location-tracking/enable/",
+        views_location_tracking.enable_location_tracking if views_location_tracking else _fallback_redirect("tenants:choose_business"),
+        name="enable_location_tracking"
+    ),
+    path(
+        "location-tracking/disable/",
+        views_location_tracking.disable_location_tracking if views_location_tracking else _fallback_redirect("tenants:choose_business"),
+        name="disable_location_tracking"
+    ),
+    path(
+        "location-tracking/status/",
+        views_location_tracking.location_tracking_status if views_location_tracking else _fallback_redirect("tenants:choose_business"),
+        name="location_tracking_status"
+    ),
 ]

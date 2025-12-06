@@ -247,6 +247,31 @@ class Membership(models.Model):
         related_name="memberships",
         help_text="Default store/location for this member. Agents must have this set; managers may leave it blank.",
     )
+    
+    # Geolocation tracking for agents (for time-log bonuses/penalties)
+    location_tracking_enabled = models.BooleanField(
+        default=False,
+        help_text="True if the agent has granted location permission for automatic time logs.",
+    )
+    last_known_latitude = models.DecimalField(
+        max_digits=9,
+        decimal_places=6,
+        null=True,
+        blank=True,
+        help_text="Last known GPS latitude from agent.",
+    )
+    last_known_longitude = models.DecimalField(
+        max_digits=9,
+        decimal_places=6,
+        null=True,
+        blank=True,
+        help_text="Last known GPS longitude from agent.",
+    )
+    last_location_update = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text="Timestamp of last location ping.",
+    )
 
     class Meta:
         # Allow multiple rows per (user, business) as long as location differs.
