@@ -11,7 +11,7 @@ services:
     # Run via bash -lc to avoid the single-quote EOF issue.
     startCommand: bash -lc "exec gunicorn cc.wsgi:application --preload --workers=$WEB_CONCURRENCY --timeout 120 --bind 0.0.0.0:$PORT"
 
-    healthCheckPath: /inventory/healthz/
+    healthCheckPath: /healthz/
 
     envVars:
       - key: PYTHON_VERSION
