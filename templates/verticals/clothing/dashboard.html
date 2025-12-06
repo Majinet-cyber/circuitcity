@@ -40,6 +40,17 @@
   .badge{display:inline-flex;align-items:center;gap:6px;border-radius:999px;padding:4px 10px;font-size:.75rem;font-weight:700}
   .badge.scan{background:#ecfeff;color:#0891b2}
   .badge.track{background:#f0fdf4;color:#15803d}
+  
+  /* Date Filter Styles */
+  .date-filter-container{background:#fff;border-radius:18px;padding:18px;margin-bottom:18px;box-shadow:0 10px 30px rgba(15,23,42,.08)}
+  .date-filter-pills{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+  .date-pill{padding:8px 16px;border-radius:20px;border:2px solid #e2e8f0;background:#fff;color:#64748b;font-weight:600;text-decoration:none;transition:all 0.2s;font-size:0.9rem}
+  .date-pill:hover{border-color:#3b82f6;color:#3b82f6;background:#eff6ff}
+  .date-pill.active{border-color:#3b82f6;background:#3b82f6;color:#fff}
+  .date-input-group{display:flex;gap:8px;align-items:center}
+  .date-input-group input[type="date"]{padding:6px 12px;border:2px solid #e2e8f0;border-radius:12px;font-size:0.9rem;font-family:inherit}
+  .date-input-group button{padding:6px 12px;background:#3b82f6;color:#fff;border:none;border-radius:12px;font-weight:600;cursor:pointer;font-size:0.9rem}
+  .date-input-group button:hover{background:#2563eb}
 </style>
 
 <div class="vertical-page">
@@ -50,11 +61,134 @@
       <p>{{ hero_blurb }}</p>
     </div>
     <div class="hero-actions">
-      <a class="primary" href="{{ clothing_add_url|default:'/inventory/clothing/products/new/v2/' }}">Add clothing item</a>
-      <a class="ghost" href="{{ scan_in_url|default:'/inventory/scan-in/' }}">Scan IN</a>
-      <a class="ghost" href="{{ stock_url|default:'/inventory/list/' }}">Stock list</a>
+      <a class="primary" href="{% url 'verticals:clothing_scan_in' %}">Scan IN</a>
+      <a class="ghost" href="{% url 'verticals:clothing_hub' %}">Clothing Hub</a>
+      <a class="ghost" href="{% url 'verticals:clothing_sell' %}">Sell</a>
     </div>
   </header>
+
+  {% comment %}Date Filter Controls{% endcomment %}
+  <section class="date-filter-container">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+      <h3 style="margin:0;font-size:1rem;color:#64748b;text-transform:uppercase;letter-spacing:0.08em">📅 Date Range</h3>
+    </div>
+    <div class="date-filter-pills">
+      <a href="?range=today" class="date-pill {% if active_range == 'today' %}active{% endif %}">
+        Today
+      </a>
+      <a href="?range=7d" class="date-pill {% if active_range == '7d' %}active{% endif %}">
+        Last 7 Days
+      </a>
+      <a href="?range=mtd" class="date-pill {% if active_range == 'mtd' %}active{% endif %}">
+        Month to Date
+      </a>
+      
+      <form method="get" class="date-input-group" style="margin-left:auto">
+        <input type="hidden" name="range" value="date">
+        <input 
+          type="date" 
+          name="date" 
+          value="{{ date_param|default:'' }}"
+          required
+        >
+        <button type="submit">Pick Date</button>
+      </form>
+    </div>
+    {% if active_range == 'date' and selected_date %}
+    <div style="margin-top:12px;padding:8px 12px;background:#eff6ff;border-radius:12px;font-size:0.85rem;color:#1e40af">
+      📆 Showing data for: <strong>{{ selected_date|date:"F j, Y" }}</strong>
+    </div>
+    {% endif %}
+  </section>
+
+  <section class="metrics-grid">
+    <article class="metric-card" style="background:linear-gradient(135deg,#10b981,#059669);color:#fff">
+      <h3 style="color:rgba(255,255,255,.9)">Revenue{% if active_range == 'today' %} (Today){% elif active_range == '7d' %} (7D){% elif active_range == 'date' %} (Day){% else %} (MTD){% endif %}</h3>
+      <p style="color:#fff">K {{ revenue_mtd|floatformat:0|default:"0" }}</p>
+    </article>
+    <article class="metric-card" style="background:linear-gradient(135deg,#f59e0b,#d97706);color:#fff">
+      <h3 style="color:rgba(255,255,255,.9)">Cost of Goods{% if active_range == 'today' %} (Today){% elif active_range == '7d' %} (7D){% elif active_range == 'date' %} (Day){% else %} (MTD){% endif %}</h3>
+      <p style="color:#fff">K {{ cost_mtd|floatformat:0|default:"0" }}</p>
+    </article>
+    <article class="metric-card" style="background:linear-gradient(135deg,#ef4444,#dc2626);color:#fff">
+      <h3 style="color:rgba(255,255,255,.9)">Overhead{% if active_range == 'today' %} (Today){% elif active_range == '7d' %} (7D){% elif active_range == 'date' %} (Day){% else %} (MTD){% endif %}</h3>
+      <p style="color:#fff">K {{ overhead_costs|floatformat:0|default:"0" }}</p>
+    </article>
+    <article class="metric-card" style="background:linear-gradient(135deg,#3b82f6,#2563eb);color:#fff">
+      <h3 style="color:rgba(255,255,255,.9)">Profit{% if active_range == 'today' %} (Today){% elif active_range == '7d' %} (7D){% elif active_range == 'date' %} (Day){% else %} (MTD){% endif %}</h3>
+      <p style="color:#fff">K {{ profit_mtd|floatformat:0|default:"0" }}</p>
+    </article>
+    <article class="metric-card">
+      <h3>Sales{% if active_range == 'today' %} (Today){% elif active_range == '7d' %} (7D){% elif active_range == 'date' %} (Day){% else %} (MTD){% endif %}</h3>
+      <p>{{ total_sales_mtd }}</p>
+    </article>
+  </section>
+
+  {% comment %}Payment Mix Panel{% endcomment %}
+  {% if payment_mix_data %}
+  <section class="recent-block">
+    <h2 style="margin:0 0 16px;font-size:1.1rem">💳 Cash Mix{% if active_range == 'today' %} (Today){% elif active_range == '7d' %} (Last 7 Days){% elif active_range == 'date' %} (Selected Day){% else %} (This Month){% endif %}</h2>
+    <div style="display:flex;flex-direction:column;gap:12px">
+      {% for pm in payment_mix_data %}
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <div style="flex:1">
+          <strong style="font-size:1rem">{{ pm.method_display }}</strong>
+          <div style="margin-top:4px;height:8px;background:#e2e8f0;border-radius:4px;overflow:hidden">
+            <div style="height:100%;background:#10b981;width:{{ pm.percentage }}%"></div>
+          </div>
+        </div>
+        <div style="text-align:right;margin-left:16px">
+          <div style="font-size:1.2rem;font-weight:700">{{ pm.percentage }}%</div>
+          <div style="font-size:.85rem;color:#64748b">K {{ pm.total|floatformat:0 }}</div>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+  </section>
+  {% endif %}
+
+  {% comment %}Top Model & Sales Trends{% endcomment %}
+  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:16px">
+    {% if top_model %}
+    <section class="recent-block">
+      <h2 style="margin:0 0 12px;font-size:1.1rem">🏆 Top Model{% if active_range == 'today' %} (Today){% elif active_range == '7d' %} (Last 7 Days){% elif active_range == 'date' %} (Selected Day){% else %} (This Month){% endif %}</h2>
+      <div>
+        <strong style="font-size:1.2rem;display:block">{{ top_model.product__name }}</strong>
+        <div style="margin-top:12px;display:grid;grid-template-columns:1fr 1fr;gap:12px">
+          <div>
+            <div style="color:#64748b;font-size:.85rem">Units Sold</div>
+            <div style="font-size:1.5rem;font-weight:700">{{ top_model.units_sold }}</div>
+          </div>
+          <div>
+            <div style="color:#64748b;font-size:.85rem">Revenue</div>
+            <div style="font-size:1.5rem;font-weight:700">K {{ top_model.revenue|floatformat:0 }}</div>
+          </div>
+        </div>
+      </div>
+    </section>
+    {% endif %}
+
+    {% if sales_trend %}
+    <section class="recent-block">
+      <h2 style="margin:0 0 12px;font-size:1.1rem">📈 Sales Trend (Last 7 Days)</h2>
+      <div style="display:flex;flex-direction:column;gap:8px">
+        {% for day in sales_trend %}
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <span style="font-size:.9rem;color:#64748b">{{ day.date_short }}</span>
+          <div style="flex:1;margin:0 12px;height:6px;background:#e2e8f0;border-radius:3px;overflow:hidden">
+            {% if sales_trend|length > 0 %}
+            {% with max_rev=sales_trend.0.revenue %}
+            <div style="height:100%;background:#3b82f6;width:{% if max_rev > 0 %}{{ day.revenue|floatformat:0|add:"0"|default:"1" }}{% else %}0{% endif %}%"></div>
+            {% endwith %}
+            {% endif %}
+          </div>
+          <span style="font-size:.9rem;font-weight:600">{{ day.count }}</span>
+        </div>
+        {% endfor %}
+      </div>
+    </section>
+    {% endif %}
+  </div>
 
   <section class="metrics-grid">
     <article class="metric-card">

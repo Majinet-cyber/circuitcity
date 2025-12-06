@@ -1,12 +1,16 @@
 {
-  "name": "Circuit City",
-  "short_name": "CircuitCity",
+  "name": "Emajinet",
+  "short_name": "Emajinet",
+  "description": "A digital record and AI driven MBA manager for every ledger and common person",
   "start_url": "/",
   "display": "standalone",
+  "scope": "/",
   "background_color": "#0b1220",
-  "theme_color": "#0d1321",
+  "theme_color": "#0b1220",
   "icons": [
-    {"src": "/static/icons/icon-192.png","sizes":"192x192","type":"image/png"},
-    {"src": "/static/icons/icon-512.png","sizes":"512x512","type":"image/png"}
-  ]
+    {"src": "/static/icons/icon-192.png","sizes":"192x192","type":"image/png","purpose":"any maskable"},
+    {"src": "/static/brand/mjn-192.png","sizes":"192x192","type":"image/png","purpose":"any maskable"}
+  ],
+  "categories": ["business", "productivity", "finance"],
+  "orientation": "portrait-primary"
 }

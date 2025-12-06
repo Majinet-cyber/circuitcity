@@ -35,9 +35,9 @@ def test_landing_page_contains_mission_statement(client):
     assert "Our Mission" in content
     
     # Check for mission statement text
-    assert "Spotify of every small business" in content or "sportify of every small business" in content.lower()
-    assert "replacing hardcovers" in content.lower()
-    assert "AI MBA manager" in content
+    assert "digital record" in content.lower()
+    assert "AI driven MBA manager" in content or "AI-driven MBA manager" in content
+    assert "every ledger and common person" in content.lower()
 
 
 def test_landing_page_contains_ts_eliot_motto(client):
@@ -118,8 +118,7 @@ def test_landing_page_sections_are_present(client):
     assert "Our Mission" in content
     
     # Check for hero section content
-    assert "Doing business" in content
-    assert "shouldn't be a headache" in content or "shouldn't be a headache" in content.lower()
+    assert "digital MBA manager" in content or "MBA manager" in content
 
 
 def test_landing_page_has_navigation(client):

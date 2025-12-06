@@ -26,8 +26,11 @@ urlpatterns = [
     # Gym vertical
     path("gym/dashboard/", gym.dashboard, name="gym_dashboard"),
     
-    # Clothing vertical
+    # Clothing vertical - NEW ROUTES
     path("clothing/dashboard/", clothing.dashboard, name="clothing_dashboard"),
+    path("clothing/hub/", clothing.hub, name="clothing_hub"),
+    path("clothing/scan-in/", clothing.scan_in, name="clothing_scan_in"),
+    path("clothing/sell/", clothing.sell, name="clothing_sell"),
     
     # Liquor vertical
     path("liquor/dashboard/", liquor.dashboard, name="liquor_dashboard"),

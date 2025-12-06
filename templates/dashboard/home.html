@@ -295,7 +295,7 @@
       <div style="display: flex; align-items: center; gap: 1rem; flex-wrap: wrap;">
         <div style="flex: 1; min-width: 250px;">
           <h3 style="margin: 0 0 0.5rem; font-size: 1.2rem; font-weight: 700; color: var(--dash-text);">🚀 Welcome
-            to CircuitCity!</h3>
+            to Emajinet!</h3>
           <p style="margin: 0; color: var(--dash-muted); font-size: 0.95rem;">Your store is set up and ready. Start
             by adding products or scanning in your first inventory.</p>
         </div>
@@ -334,11 +334,61 @@
   {% if IS_MANAGER %}
   {# ========== Manager Dashboard ========== #}
 
+  {# ========== Date Filter Controls ========== #}
+  <div style="background: var(--dash-panel); border: 1px solid var(--dash-border); border-radius: 14px; padding: 1.25rem; margin-bottom: 1.5rem; box-shadow: var(--dash-shadow);">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px">
+      <h3 style="margin:0; font-size:1rem; color:var(--dash-muted); text-transform:uppercase; letter-spacing:0.08em; font-weight:700">
+        <i class="bi bi-calendar3"></i> Date Range
+      </h3>
+    </div>
+    <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:center">
+      <a href="?range=today" 
+         style="padding:8px 16px; border-radius:20px; border:2px solid #e2e8f0; background:{% if active_range == 'today' %}#3b82f6{% else %}#fff{% endif %}; color:{% if active_range == 'today' %}#fff{% else %}#64748b{% endif %}; font-weight:600; text-decoration:none; transition:all 0.2s; font-size:0.9rem">
+        Today
+      </a>
+      <a href="?range=7d" 
+         style="padding:8px 16px; border-radius:20px; border:2px solid #e2e8f0; background:{% if active_range == '7d' %}#3b82f6{% else %}#fff{% endif %}; color:{% if active_range == '7d' %}#fff{% else %}#64748b{% endif %}; font-weight:600; text-decoration:none; transition:all 0.2s; font-size:0.9rem">
+        Last 7 Days
+      </a>
+      <a href="?range=mtd" 
+         style="padding:8px 16px; border-radius:20px; border:2px solid #e2e8f0; background:{% if active_range == 'mtd' %}#3b82f6{% else %}#fff{% endif %}; color:{% if active_range == 'mtd' %}#fff{% else %}#64748b{% endif %}; font-weight:600; text-decoration:none; transition:all 0.2s; font-size:0.9rem">
+        Month to Date
+      </a>
+      
+      <form method="get" style="display:flex; gap:8px; align-items:center; margin-left:auto">
+        <input type="hidden" name="range" value="date">
+        <input 
+          type="date" 
+          name="date" 
+          value="{{ date_param|default:'' }}"
+          required
+          style="padding:6px 12px; border:2px solid #e2e8f0; border-radius:12px; font-size:0.9rem; font-family:inherit">
+        <button type="submit" style="padding:6px 12px; background:#3b82f6; color:#fff; border:none; border-radius:12px; font-weight:600; cursor:pointer; font-size:0.9rem">
+          Pick Date
+        </button>
+      </form>
+    </div>
+    {% if active_range == 'date' and selected_date %}
+    <div style="margin-top:12px; padding:8px 12px; background:#eff6ff; border-radius:12px; font-size:0.85rem; color:#1e40af">
+      <i class="bi bi-calendar-check"></i> Showing data for: <strong>{{ selected_date|date:"F j, Y" }}</strong>
+    </div>
+    {% endif %}
+  </div>
+
   {# Stats Grid #}
   <div class="stats-grid">
     <div class="stat-card">
       <div class="stat-label">
-        <i class="bi bi-cash-coin"></i> Today's Sales
+        <i class="bi bi-cash-coin"></i> 
+        {% if active_range == 'today' %}
+          Today's Sales
+        {% elif active_range == '7d' %}
+          Last 7 Days Sales
+        {% elif active_range == 'date' %}
+          Selected Day Sales
+        {% else %}
+          This Month Sales
+        {% endif %}
       </div>
       <div class="stat-value" data-animate-value="{{ today_sales_amount|default:0 }}" data-format="currency">MK 0</div>
       <div class="stat-change">{{ today_sales_count|default:0 }} devices sold</div>
@@ -346,7 +396,16 @@
 
     <div class="stat-card">
       <div class="stat-label">
-        <i class="bi bi-calendar-check"></i> This Month
+        <i class="bi bi-calendar-check"></i> 
+        {% if active_range == 'today' %}
+          Revenue (Today)
+        {% elif active_range == '7d' %}
+          Revenue (Last 7 Days)
+        {% elif active_range == 'date' %}
+          Revenue (Selected Day)
+        {% else %}
+          Revenue (Month to Date)
+        {% endif %}
       </div>
       <div class="stat-value" data-animate-value="{{ month_sales_amount|default:0 }}" data-format="currency">MK 0</div>
       <div class="stat-change">{{ month_sales_count|default:0 }} devices</div>
@@ -529,10 +588,60 @@
   {% else %}
   {# ========== Agent Dashboard ========== #}
 
+  {# ========== Date Filter Controls (Agent View) ========== #}
+  <div style="background: var(--dash-panel); border: 1px solid var(--dash-border); border-radius: 14px; padding: 1.25rem; margin-bottom: 1.5rem; box-shadow: var(--dash-shadow);">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px">
+      <h3 style="margin:0; font-size:1rem; color:var(--dash-muted); text-transform:uppercase; letter-spacing:0.08em; font-weight:700">
+        <i class="bi bi-calendar3"></i> Date Range
+      </h3>
+    </div>
+    <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:center">
+      <a href="?range=today" 
+         style="padding:8px 16px; border-radius:20px; border:2px solid #e2e8f0; background:{% if active_range == 'today' %}#3b82f6{% else %}#fff{% endif %}; color:{% if active_range == 'today' %}#fff{% else %}#64748b{% endif %}; font-weight:600; text-decoration:none; transition:all 0.2s; font-size:0.9rem">
+        Today
+      </a>
+      <a href="?range=7d" 
+         style="padding:8px 16px; border-radius:20px; border:2px solid #e2e8f0; background:{% if active_range == '7d' %}#3b82f6{% else %}#fff{% endif %}; color:{% if active_range == '7d' %}#fff{% else %}#64748b{% endif %}; font-weight:600; text-decoration:none; transition:all 0.2s; font-size:0.9rem">
+        Last 7 Days
+      </a>
+      <a href="?range=mtd" 
+         style="padding:8px 16px; border-radius:20px; border:2px solid #e2e8f0; background:{% if active_range == 'mtd' %}#3b82f6{% else %}#fff{% endif %}; color:{% if active_range == 'mtd' %}#fff{% else %}#64748b{% endif %}; font-weight:600; text-decoration:none; transition:all 0.2s; font-size:0.9rem">
+        Month to Date
+      </a>
+      
+      <form method="get" style="display:flex; gap:8px; align-items:center; margin-left:auto">
+        <input type="hidden" name="range" value="date">
+        <input 
+          type="date" 
+          name="date" 
+          value="{{ date_param|default:'' }}"
+          required
+          style="padding:6px 12px; border:2px solid #e2e8f0; border-radius:12px; font-size:0.9rem; font-family:inherit">
+        <button type="submit" style="padding:6px 12px; background:#3b82f6; color:#fff; border:none; border-radius:12px; font-weight:600; cursor:pointer; font-size:0.9rem">
+          Pick Date
+        </button>
+      </form>
+    </div>
+    {% if active_range == 'date' and selected_date %}
+    <div style="margin-top:12px; padding:8px 12px; background:#eff6ff; border-radius:12px; font-size:0.85rem; color:#1e40af">
+      <i class="bi bi-calendar-check"></i> Showing data for: <strong>{{ selected_date|date:"F j, Y" }}</strong>
+    </div>
+    {% endif %}
+  </div>
+
   <div class="stats-grid">
     <div class="stat-card">
       <div class="stat-label">
-        <i class="bi bi-calendar-day"></i> Today's Sales
+        <i class="bi bi-calendar-day"></i> 
+        {% if active_range == 'today' %}
+          Today's Sales
+        {% elif active_range == '7d' %}
+          Last 7 Days
+        {% elif active_range == 'date' %}
+          Selected Day
+        {% else %}
+          This Month
+        {% endif %}
       </div>
       <div class="stat-value" data-animate-value="{{ agent_today_amount|default:0 }}" data-format="currency">MK 0</div>
       <div class="stat-change">{{ agent_today_count|default:0 }} devices</div>
@@ -540,7 +649,16 @@
 
     <div class="stat-card">
       <div class="stat-label">
-        <i class="bi bi-calendar-month"></i> This Month
+        <i class="bi bi-calendar-month"></i> 
+        {% if active_range == 'today' %}
+          Revenue (Today)
+        {% elif active_range == '7d' %}
+          Revenue (Last 7 Days)
+        {% elif active_range == 'date' %}
+          Revenue (Selected)
+        {% else %}
+          Revenue (MTD)
+        {% endif %}
       </div>
       <div class="stat-value" data-animate-value="{{ agent_month_amount|default:0 }}" data-format="currency">MK 0</div>
       <div class="stat-change">{{ agent_month_count|default:0 }} devices</div>
@@ -549,6 +667,15 @@
     <div class="stat-card agent-rank-card">
       <div class="stat-label">
         <i class="bi bi-trophy-fill"></i> Your Rank
+        {% if active_range == 'today' %}
+          (Today)
+        {% elif active_range == '7d' %}
+          (Last 7 Days)
+        {% elif active_range == 'date' %}
+          (Selected Day)
+        {% else %}
+          (This Month)
+        {% endif %}
       </div>
       {% if agent_rank %}
       <div class="stat-value">#{{ agent_rank }}</div>
@@ -570,7 +697,17 @@
         <i class="bi bi-star-fill"></i> Commission Earned
       </div>
       <div class="stat-value" data-animate-value="{{ agent_commission|default:0 }}" data-format="currency">MK 0</div>
-      <div class="stat-change">This month</div>
+      <div class="stat-change">
+        {% if active_range == 'today' %}
+          Today
+        {% elif active_range == '7d' %}
+          Last 7 days
+        {% elif active_range == 'date' %}
+          Selected day
+        {% else %}
+          This month
+        {% endif %}
+      </div>
     </div>
   </div>
 

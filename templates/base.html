@@ -6,9 +6,22 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1, user-scalable=no">
   <meta name="format-detection" content="telephone=no">
   <title>{% block title %}Emajinet{% endblock %}</title>
+  <meta name="description" content="{% block meta_description %}A digital record and AI driven MBA manager for every ledger and common person{% endblock %}">
   <meta name="color-scheme" content="light dark" />
   <meta name="theme-color" content="#0b1220" />
   <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  
+  <!-- Open Graph / Social Media -->
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="{% block og_title %}Emajinet{% endblock %}">
+  <meta property="og:description" content="{% block og_description %}A digital record and AI driven MBA manager for every ledger and common person{% endblock %}">
+  <meta property="og:site_name" content="Emajinet">
+  
+  <!-- Twitter Card -->
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="{% block twitter_title %}Emajinet{% endblock %}">
+  <meta name="twitter:description" content="{% block twitter_description %}A digital record and AI driven MBA manager for every ledger and common person{% endblock %}">
 
   {# Provide CSRF to JS in a reliable way #}
   <meta name="csrf-token" content="{{ csrf_token }}">
@@ -1233,5 +1246,40 @@
 {% endif %}
 
   {% include "partials/loading_spinner.html" %}
+
+{# ===== PWA Service Worker Registration ===== #}
+<script>
+(function() {
+  // Only register service worker if supported and not in Django admin
+  if (!('serviceWorker' in navigator)) return;
+  if (window.location.pathname.startsWith('/admin/')) return;
+
+  window.addEventListener('load', function() {
+    navigator.serviceWorker.register('{% static "sw.js" %}', { scope: '/' })
+      .then(function(registration) {
+        console.log('ServiceWorker registered: ', registration.scope);
+        
+        // Check for updates periodically
+        registration.addEventListener('updatefound', function() {
+          const newWorker = registration.installing;
+          if (!newWorker) return;
+          
+          newWorker.addEventListener('statechange', function() {
+            if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+              // New service worker available, could show update notification
+              console.log('New content available; refresh to update.');
+            }
+          });
+        });
+      })
+      .catch(function(error) {
+        // Fail silently in production, log in dev
+        if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+          console.warn('ServiceWorker registration failed: ', error);
+        }
+      });
+  });
+})();
+</script>
 </body>
 </html>

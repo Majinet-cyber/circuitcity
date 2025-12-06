@@ -44,7 +44,7 @@ class Sale(models.Model):
         help_text="Payment method used for this sale"
     )
     # Phase 5: index for fast dashboards / recents
-    created_at      = models.DateTimeField(default=timezone.now, db_index=True, editable=False)
+    created_at      = models.DateTimeField(default=timezone.now, editable=False)
 
     class Meta:
         indexes = [

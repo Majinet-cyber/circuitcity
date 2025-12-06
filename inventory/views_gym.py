@@ -21,7 +21,7 @@ from inventory.business_kinds import BusinessKind
 from inventory.helpers import get_active_business
 from inventory.models_verticals import (
     GymMember, GymPayment, GymMemberLog, GymSettings, GymWalletEntry,
-    GymMemberAction
+    GymMemberAction, GymCheckIn, GymMemberStatus
 )
 from tenants.utils import require_business
 
@@ -32,14 +32,25 @@ from tenants.utils import require_business
 
 class GymMemberForm(forms.ModelForm):
     """Form for adding/editing gym members"""
+    mark_as_paid = forms.BooleanField(
+        required=False,
+        initial=False,
+        label="Mark as paid now",
+        help_text="Check to activate membership for 30 days"
+    )
+    
     class Meta:
         model = GymMember
-        fields = ["name", "phone", "email", "notes"]
+        fields = ["name", "phone", "email", "has_trainer", "notes"]
         widgets = {
             "name": forms.TextInput(attrs={"class": "form-control", "placeholder": "Member name"}),
             "phone": forms.TextInput(attrs={"class": "form-control", "placeholder": "Phone number"}),
             "email": forms.EmailInput(attrs={"class": "form-control", "placeholder": "Email (optional)"}),
+            "has_trainer": forms.CheckboxInput(attrs={"class": "form-check-input"}),
             "notes": forms.Textarea(attrs={"class": "form-control", "rows": 3, "placeholder": "Additional notes (optional)"}),
+        }
+        labels = {
+            "has_trainer": "With Trainer",
         }
 
 
@@ -76,30 +87,68 @@ def member_add(request):
     """Add a new gym member"""
     business = get_active_business(request)
     
+    # Get gym settings for default fees
+    try:
+        gym_settings = GymSettings.objects.get(business=business)
+    except GymSettings.DoesNotExist:
+        gym_settings = GymSettings.objects.create(business=business)
+    
     if request.method == "POST":
         form = GymMemberForm(request.POST)
         if form.is_valid():
             with transaction.atomic():
                 member = form.save(commit=False)
                 member.business = business
+                
+                # Set fees from settings
+                member.membership_fee = gym_settings.default_membership_price
+                if member.has_trainer:
+                    member.trainer_fee = gym_settings.default_trainer_fee
+                else:
+                    member.trainer_fee = Decimal("0.00")
+                
                 member.save()
+                
+                # If marked as paid, activate membership for 30 days
+                mark_as_paid = form.cleaned_data.get("mark_as_paid", False)
+                if mark_as_paid:
+                    member.set_paid(
+                        payment_date=None,  # Today
+                        membership_fee=member.membership_fee,
+                        trainer_fee=member.trainer_fee,
+                        paid_by=request.user
+                    )
+                    messages.success(
+                        request, 
+                        f"Member '{member.name}' added and activated. Membership valid until {member.membership_end.strftime('%Y-%m-%d')}."
+                    )
+                else:
+                    member.status = GymMemberStatus.PENDING_PAYMENT
+                    member.save(update_fields=["status"])
+                    messages.success(request, f"Member '{member.name}' added. Remember to mark as paid when payment is received.")
                 
                 # Log the creation
                 GymMemberLog.objects.create(
                     member=member,
                     action=GymMemberAction.CREATED,
-                    changes={"name": member.name, "phone": member.phone, "email": member.email},
+                    changes={
+                        "name": member.name, 
+                        "phone": member.phone, 
+                        "email": member.email,
+                        "has_trainer": member.has_trainer,
+                        "marked_as_paid": mark_as_paid
+                    },
                     performed_by=request.user
                 )
             
-            messages.success(request, f"Member '{member.name}' added successfully.")
-            return redirect("inventory:gym_member_detail", member_id=member.id)
+            return redirect("gym:member_detail", member_id=member.id)
     else:
         form = GymMemberForm()
     
     return render(request, "inventory/gym/member_form.html", {
         "form": form,
         "business": business,
+        "gym_settings": gym_settings,
         "title": "Add New Member",
     })
 
@@ -136,7 +185,7 @@ def member_edit(request, member_id):
                     )
             
             messages.success(request, f"Member '{member.name}' updated successfully.")
-            return redirect("inventory:gym_member_detail", member_id=member.id)
+            return redirect("gym:member_detail", member_id=member.id)
     else:
         form = GymMemberForm(instance=member)
     
@@ -205,7 +254,7 @@ def member_archive(request, member_id):
         )
     
     messages.success(request, f"Member '{member.name}' archived.")
-    return redirect("inventory:gym_members_list")
+    return redirect("gym:members_list")
 
 
 @login_required
@@ -234,7 +283,89 @@ def member_restore(request, member_id):
         )
     
     messages.success(request, f"Member '{member.name}' restored.")
-    return redirect("inventory:gym_member_detail", member_id=member.id)
+    return redirect("gym:member_detail", member_id=member.id)
+
+
+@login_required
+@require_business
+@require_business_kind(BusinessKind.GYM)
+@manager_required
+@require_POST
+def member_set_paid(request, member_id):
+    """Mark a member as paid / renew membership for 30 days"""
+    business = get_active_business(request)
+    member = get_object_or_404(GymMember, pk=member_id, business=business)
+    
+    # Get gym settings for fees
+    try:
+        gym_settings = GymSettings.objects.get(business=business)
+    except GymSettings.DoesNotExist:
+        gym_settings = GymSettings.objects.create(business=business)
+    
+    with transaction.atomic():
+        # Update fees based on current settings
+        member.membership_fee = gym_settings.default_membership_price
+        if member.has_trainer:
+            member.trainer_fee = gym_settings.default_trainer_fee
+        else:
+            member.trainer_fee = Decimal("0.00")
+        
+        # Set as paid (activates for 30 days)
+        member.set_paid(
+            payment_date=None,  # Today
+            membership_fee=member.membership_fee,
+            trainer_fee=member.trainer_fee,
+            paid_by=request.user
+        )
+        
+        # Log the renewal
+        GymMemberLog.objects.create(
+            member=member,
+            action=GymMemberAction.UPDATED,
+            changes={
+                "action": "renewed",
+                "membership_start": str(member.membership_start),
+                "membership_end": str(member.membership_end),
+                "amount": str((member.membership_fee or Decimal("0.00")) + (member.trainer_fee or Decimal("0.00")))
+            },
+            performed_by=request.user
+        )
+    
+    messages.success(
+        request, 
+        f"Member '{member.name}' renewed. Membership valid until {member.membership_end.strftime('%Y-%m-%d')}."
+    )
+    return redirect("gym:member_detail", member_id=member.id)
+
+
+# ==============================================================================
+# GYM CHECK-INS
+# ==============================================================================
+
+@login_required
+@require_business
+@require_business_kind(BusinessKind.GYM)
+@require_POST
+def member_checkin(request, member_id):
+    """Check in a gym member"""
+    business = get_active_business(request)
+    member = get_object_or_404(GymMember, pk=member_id, business=business)
+    
+    # Create check-in
+    checkin = GymCheckIn.objects.create(
+        business=business,
+        member=member,
+        checked_in_by=request.user,
+        notes=request.POST.get("notes", "")
+    )
+    
+    messages.success(request, f"Member '{member.name}' checked in successfully.")
+    
+    # Return to members list or member detail based on referrer
+    next_url = request.POST.get("next") or request.META.get("HTTP_REFERER") or "gym:members_list"
+    if "member_detail" in next_url or f"/member/{member_id}/" in next_url:
+        return redirect("gym:member_detail", member_id=member.id)
+    return redirect("gym:members_list")
 
 
 # ==============================================================================
@@ -327,7 +458,7 @@ def add_payment(request):
                 )
             
             messages.success(request, f"Payment recorded. Membership valid until {end_date.strftime('%Y-%m-%d')}.")
-            return redirect("inventory:gym_member_detail", member_id=member.id)
+            return redirect("gym:member_detail", member_id=member.id)
     else:
         form = GymPaymentForm(business, initial={"amount": default_price})
     
@@ -348,25 +479,68 @@ def add_payment(request):
 @require_business
 @require_business_kind(BusinessKind.GYM)
 def gym_dashboard(request):
-    """Gym business dashboard with member stats and arrears"""
+    """Gym business dashboard with member stats, payment buckets, and check-in metrics"""
     business = get_active_business(request)
     
-    # Get active members
-    active_members = GymMember.objects.filter(business=business, is_active=True, is_archived=False)
+    # Get all non-archived members
+    all_members = GymMember.objects.filter(business=business, is_archived=False)
     
-    # Calculate members in arrears
-    members_in_arrears = []
-    members_active_count = 0
+    # Payment status buckets
+    today = timezone.now().date()
     
-    for member in active_members:
-        days_left = member.days_left()
-        if days_left == 0:
-            members_in_arrears.append(member)
+    pending_members = all_members.filter(status=GymMemberStatus.PENDING_PAYMENT)
+    behind_schedule_members = all_members.filter(status=GymMemberStatus.BEHIND_SCHEDULE)
+    active_members = all_members.filter(status=GymMemberStatus.ACTIVE)
+    
+    # Also catch any members whose membership_end is past but status not updated
+    for member in all_members:
+        if member.membership_end and member.membership_end < today and member.status == GymMemberStatus.ACTIVE:
+            member.status = GymMemberStatus.BEHIND_SCHEDULE
+            member.save(update_fields=["status"])
+    
+    # Re-query after status updates
+    pending_members = all_members.filter(status=GymMemberStatus.PENDING_PAYMENT)
+    behind_schedule_members = all_members.filter(status=GymMemberStatus.BEHIND_SCHEDULE)
+    active_members = all_members.filter(status=GymMemberStatus.ACTIVE)
+    
+    pending_count = pending_members.count()
+    behind_schedule_count = behind_schedule_members.count()
+    active_count = active_members.count()
+    total_members = all_members.count()
+    
+    # Check-in metrics (today)
+    today_start = timezone.now().replace(hour=0, minute=0, second=0, microsecond=0)
+    today_checkins = GymCheckIn.objects.filter(
+        business=business,
+        timestamp__gte=today_start
+    ).select_related("member")
+    
+    total_checkins = today_checkins.count()
+    
+    # Calculate paid vs unpaid check-ins
+    paid_checkins = 0
+    unpaid_checkins = 0
+    for checkin in today_checkins:
+        if checkin.member.status == GymMemberStatus.ACTIVE:
+            paid_checkins += 1
         else:
-            members_active_count += 1
+            unpaid_checkins += 1
+    
+    # Conversion percentage
+    if total_checkins > 0:
+        conversion_percentage = (paid_checkins / total_checkins) * 100
+    else:
+        conversion_percentage = 0
     
     # Recent payments
-    recent_payments = GymPayment.objects.filter(member__business=business).select_related("member", "paid_by").order_by("-paid_at")[:10]
+    recent_payments = GymPayment.objects.filter(
+        member__business=business
+    ).select_related("member", "paid_by").order_by("-paid_at")[:10]
+    
+    # Recent check-ins
+    recent_checkins = GymCheckIn.objects.filter(
+        business=business
+    ).select_related("member", "checked_in_by").order_by("-timestamp")[:10]
     
     # Get gym settings
     try:
@@ -376,10 +550,29 @@ def gym_dashboard(request):
     
     return render(request, "inventory/gym/dashboard.html", {
         "business": business,
-        "total_members": active_members.count(),
-        "members_active_count": members_active_count,
-        "members_in_arrears_count": len(members_in_arrears),
-        "members_in_arrears": members_in_arrears,
+        
+        # Payment status buckets
+        "total_members": total_members,
+        "pending_count": pending_count,
+        "behind_schedule_count": behind_schedule_count,
+        "active_count": active_count,
+        
+        "pending_members": pending_members[:10],  # Show first 10
+        "behind_schedule_members": behind_schedule_members[:10],
+        "active_members": active_members[:10],
+        
+        # Check-in metrics
+        "total_checkins": total_checkins,
+        "paid_checkins": paid_checkins,
+        "unpaid_checkins": unpaid_checkins,
+        "conversion_percentage": round(conversion_percentage, 1),
+        "recent_checkins": recent_checkins,
+        
+        # Legacy fields (for backward compatibility)
+        "members_active_count": active_count,
+        "members_in_arrears_count": behind_schedule_count,
+        "members_in_arrears": behind_schedule_members[:10],
+        
         "recent_payments": recent_payments,
         "gym_settings": gym_settings,
     })
@@ -393,12 +586,17 @@ class GymSettingsForm(forms.ModelForm):
     """Form for gym business settings"""
     class Meta:
         model = GymSettings
-        fields = ["support_phone", "support_email", "default_membership_price", "arrears_message"]
+        fields = ["support_phone", "support_email", "default_membership_price", "default_trainer_fee", "arrears_message"]
         widgets = {
             "support_phone": forms.TextInput(attrs={"class": "form-control"}),
             "support_email": forms.EmailInput(attrs={"class": "form-control"}),
             "default_membership_price": forms.NumberInput(attrs={"class": "form-control", "step": "0.01"}),
+            "default_trainer_fee": forms.NumberInput(attrs={"class": "form-control", "step": "0.01"}),
             "arrears_message": forms.Textarea(attrs={"class": "form-control", "rows": 3}),
+        }
+        labels = {
+            "default_membership_price": "Default Membership Fee (30 days)",
+            "default_trainer_fee": "Default Trainer Fee (30 days)",
         }
 
 
@@ -418,7 +616,7 @@ def gym_settings_view(request):
         if form.is_valid():
             form.save()
             messages.success(request, "Gym settings updated.")
-            return redirect("inventory:gym_dashboard")
+            return redirect("gym:dashboard")
     else:
         form = GymSettingsForm(instance=gym_settings)
     

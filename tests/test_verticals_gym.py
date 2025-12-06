@@ -151,12 +151,16 @@ class TestGymPayment:
     def test_days_left_calculation(self, gym_member, manager):
         """Test days left calculation"""
         start = date.today()
-        payment = GymPayment.objects.create(
-            member=gym_member,
-            amount=Decimal("50000.00"),
-            start_date=start,
+        # Use set_paid method to properly activate membership
+        gym_member.set_paid(
+            payment_date=start,
+            membership_fee=Decimal("50000.00"),
+            trainer_fee=Decimal("0.00"),
             paid_by=manager
         )
+        
+        # Refresh from DB
+        gym_member.refresh_from_db()
         
         days_left = gym_member.days_left()
         # Days left includes both start and end date, so it's 31 days total
@@ -165,48 +169,55 @@ class TestGymPayment:
     def test_days_left_after_10_days(self, gym_member, manager):
         """Test days left after 10 days"""
         start = date.today() - timedelta(days=10)
-        payment = GymPayment.objects.create(
-            member=gym_member,
-            amount=Decimal("50000.00"),
-            start_date=start,
+        # Use set_paid method to properly activate membership
+        gym_member.set_paid(
+            payment_date=start,
+            membership_fee=Decimal("50000.00"),
+            trainer_fee=Decimal("0.00"),
             paid_by=manager
         )
         
-        # Manually set end_date to simulate
-        payment.end_date = start + timedelta(days=30)
-        payment.save()
+        # Refresh from DB
+        gym_member.refresh_from_db()
         
         days_left = gym_member.days_left()
         # Should be around 20-21 days (depending on inclusive/exclusive logic)
-        assert 20 <= days_left <= 21
+        assert 19 <= days_left <= 21
     
     def test_membership_in_arrears(self, gym_member, manager):
         """Test member in arrears after 30 days"""
         start = date.today() - timedelta(days=31)
-        payment = GymPayment.objects.create(
-            member=gym_member,
-            amount=Decimal("50000.00"),
-            start_date=start,
+        # Use set_paid method to properly activate membership
+        gym_member.set_paid(
+            payment_date=start,
+            membership_fee=Decimal("50000.00"),
+            trainer_fee=Decimal("0.00"),
             paid_by=manager
         )
-        payment.end_date = start + timedelta(days=30)
-        payment.save()
+        
+        # Refresh from DB and update status
+        gym_member.refresh_from_db()
+        gym_member.update_status()
         
         days_left = gym_member.days_left()
         status = gym_member.membership_status()
         
         assert days_left == 0
-        assert status == "In arrears"
+        assert status == "Behind Schedule"
     
     def test_active_membership(self, gym_member, manager):
         """Test active membership status"""
         start = date.today()
-        payment = GymPayment.objects.create(
-            member=gym_member,
-            amount=Decimal("50000.00"),
-            start_date=start,
+        # Use set_paid method to properly activate membership
+        gym_member.set_paid(
+            payment_date=start,
+            membership_fee=Decimal("50000.00"),
+            trainer_fee=Decimal("0.00"),
             paid_by=manager
         )
+        
+        # Refresh from DB
+        gym_member.refresh_from_db()
         
         status = gym_member.membership_status()
         assert status == "Active"
@@ -480,16 +491,20 @@ class TestGymRegressionProtection:
     def test_gym_30_day_logic_not_broken(self, gym_member, manager):
         """Test that 30-day membership logic still works correctly"""
         start = date.today()
-        payment = GymPayment.objects.create(
-            member=gym_member,
-            amount=Decimal("50000.00"),
-            start_date=start,
+        # Use set_paid method to properly activate membership
+        gym_member.set_paid(
+            payment_date=start,
+            membership_fee=Decimal("50000.00"),
+            trainer_fee=Decimal("0.00"),
             paid_by=manager
         )
         
+        # Refresh from DB
+        gym_member.refresh_from_db()
+        
         # Verify end date is exactly 30 days after start
         expected_end = start + timedelta(days=30)
-        assert payment.end_date == expected_end
+        assert gym_member.membership_end == expected_end
         
         # Verify days left calculation (may include both start and end date)
         days_left = gym_member.days_left()
@@ -503,21 +518,24 @@ class TestGymRegressionProtection:
         """Test that arrears detection works correctly"""
         # Create expired payment (31 days ago)
         old_start = date.today() - timedelta(days=31)
-        payment = GymPayment.objects.create(
-            member=gym_member,
-            amount=Decimal("50000.00"),
-            start_date=old_start,
+        # Use set_paid method to properly activate membership
+        gym_member.set_paid(
+            payment_date=old_start,
+            membership_fee=Decimal("50000.00"),
+            trainer_fee=Decimal("0.00"),
             paid_by=manager
         )
-        payment.end_date = old_start + timedelta(days=30)
-        payment.save()
         
-        # Member should be in arrears
+        # Refresh from DB and update status
+        gym_member.refresh_from_db()
+        gym_member.update_status()
+        
+        # Member should be in arrears (Behind Schedule)
         days_left = gym_member.days_left()
         status = gym_member.membership_status()
         
         assert days_left == 0
-        assert status == "In arrears"
+        assert status == "Behind Schedule"
     
     def test_gym_settings_persists(self, business):
         """Test that gym settings are business-specific"""

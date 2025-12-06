@@ -1,0 +1,346 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Gym Dashboard - {{ business.name }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <!-- Header -->
+    <div class="row mb-4">
+        <div class="col">
+            <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
+                <div>
+                    <h2>Gym Dashboard</h2>
+                    <p class="text-muted mb-0">{{ business.name }}</p>
+                </div>
+                <div class="d-flex gap-2">
+                    <a href="{% url 'gym:members_list' %}" class="btn btn-outline-primary">
+                        <i class="bi bi-people"></i> All Members
+                    </a>
+                    <a href="{% url 'gym:member_add' %}" class="btn btn-primary">
+                        <i class="bi bi-person-plus"></i> Add Member
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Payment Status Buckets -->
+    <div class="row g-3 mb-4">
+        <div class="col-12 col-md-3">
+            <div class="glass-card p-4">
+                <div class="d-flex justify-content-between align-items-start">
+                    <div>
+                        <p class="text-muted mb-1 small text-uppercase">Total Members</p>
+                        <h3 class="mb-0">{{ total_members|default:0 }}</h3>
+                    </div>
+                    <div class="text-primary" style="font-size: 2rem; opacity: 0.3;">
+                        <i class="bi bi-people"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-12 col-md-3">
+            <div class="glass-card p-4">
+                <div class="d-flex justify-content-between align-items-start">
+                    <div>
+                        <p class="text-muted mb-1 small text-uppercase">Pending Payments</p>
+                        <h3 class="mb-0 text-warning">{{ pending_count|default:0 }}</h3>
+                        <small class="text-muted">Not yet paid</small>
+                    </div>
+                    <div class="text-warning" style="font-size: 2rem; opacity: 0.3;">
+                        <i class="bi bi-clock-history"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-12 col-md-3">
+            <div class="glass-card p-4">
+                <div class="d-flex justify-content-between align-items-start">
+                    <div>
+                        <p class="text-muted mb-1 small text-uppercase">Active Members</p>
+                        <h3 class="mb-0 text-success">{{ active_count|default:0 }}</h3>
+                        <small class="text-muted">Membership valid</small>
+                    </div>
+                    <div class="text-success" style="font-size: 2rem; opacity: 0.3;">
+                        <i class="bi bi-check-circle"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-12 col-md-3">
+            <div class="glass-card p-4">
+                <div class="d-flex justify-content-between align-items-start">
+                    <div>
+                        <p class="text-muted mb-1 small text-uppercase">Behind Schedule</p>
+                        <h3 class="mb-0 text-danger">{{ behind_schedule_count|default:0 }}</h3>
+                        <small class="text-muted">Membership expired</small>
+                    </div>
+                    <div class="text-danger" style="font-size: 2rem; opacity: 0.3;">
+                        <i class="bi bi-exclamation-triangle"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Check-in Metrics -->
+    <div class="row g-3 mb-4">
+        <div class="col-12 col-md-4">
+            <div class="glass-card p-4">
+                <div class="d-flex justify-content-between align-items-start">
+                    <div>
+                        <p class="text-muted mb-1 small text-uppercase">Check-ins Today</p>
+                        <h3 class="mb-0">{{ total_checkins|default:0 }}</h3>
+                    </div>
+                    <div class="text-info" style="font-size: 2rem; opacity: 0.3;">
+                        <i class="bi bi-box-arrow-in-right"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-12 col-md-4">
+            <div class="glass-card p-4">
+                <div class="d-flex justify-content-between align-items-start">
+                    <div>
+                        <p class="text-muted mb-1 small text-uppercase">Paid Members Checked In</p>
+                        <h3 class="mb-0 text-success">{{ paid_checkins|default:0 }}</h3>
+                        <small class="text-muted">{{ conversion_percentage|default:0 }}% of total</small>
+                    </div>
+                    <div class="text-success" style="font-size: 2rem; opacity: 0.3;">
+                        <i class="bi bi-cash-coin"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-12 col-md-4">
+            <div class="glass-card p-4">
+                <div class="d-flex justify-content-between align-items-start">
+                    <div>
+                        <p class="text-muted mb-1 small text-uppercase">Unpaid Checked In</p>
+                        <h3 class="mb-0 text-warning">{{ unpaid_checkins|default:0 }}</h3>
+                        <small class="text-muted">Potential conversions</small>
+                    </div>
+                    <div class="text-warning" style="font-size: 2rem; opacity: 0.3;">
+                        <i class="bi bi-person-exclamation"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Quick Action Lists -->
+    <div class="row g-3 mb-4">
+        <!-- Pending Payments -->
+        {% if pending_members %}
+        <div class="col-12 col-lg-6">
+            <div class="glass-card p-4">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h5 class="mb-0">
+                        <i class="bi bi-clock-history text-warning"></i> Pending Payments
+                    </h5>
+                    <span class="badge bg-warning">{{ pending_count }}</span>
+                </div>
+                <div class="table-responsive">
+                    <table class="table table-hover table-sm mb-0">
+                        <thead>
+                            <tr>
+                                <th>Name</th>
+                                <th>Phone</th>
+                                <th>Action</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for member in pending_members %}
+                            <tr>
+                                <td>{{ member.name }}</td>
+                                <td>{{ member.phone|default:"-" }}</td>
+                                <td>
+                                    <a href="{% url 'gym:member_detail' member.id %}" class="btn btn-sm btn-outline-primary">
+                                        View
+                                    </a>
+                                    <form method="post" action="{% url 'gym:member_set_paid' member.id %}" style="display: inline;">
+                                        {% csrf_token %}
+                                        <button type="submit" class="btn btn-sm btn-success" title="Mark as Paid">
+                                            <i class="bi bi-cash-coin"></i>
+                                        </button>
+                                    </form>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Behind Schedule -->
+        {% if behind_schedule_members %}
+        <div class="col-12 col-lg-6">
+            <div class="glass-card p-4">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h5 class="mb-0">
+                        <i class="bi bi-exclamation-triangle text-danger"></i> Behind Schedule
+                    </h5>
+                    <span class="badge bg-danger">{{ behind_schedule_count }}</span>
+                </div>
+                <div class="table-responsive">
+                    <table class="table table-hover table-sm mb-0">
+                        <thead>
+                            <tr>
+                                <th>Name</th>
+                                <th>Phone</th>
+                                <th>Action</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for member in behind_schedule_members %}
+                            <tr>
+                                <td>{{ member.name }}</td>
+                                <td>{{ member.phone|default:"-" }}</td>
+                                <td>
+                                    <a href="{% url 'gym:member_detail' member.id %}" class="btn btn-sm btn-outline-primary">
+                                        View
+                                    </a>
+                                    <form method="post" action="{% url 'gym:member_set_paid' member.id %}" style="display: inline;">
+                                        {% csrf_token %}
+                                        <button type="submit" class="btn btn-sm btn-success" title="Renew">
+                                            <i class="bi bi-arrow-clockwise"></i>
+                                        </button>
+                                    </form>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Recent Check-ins -->
+    {% if recent_checkins %}
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="glass-card p-4">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h5 class="mb-0">
+                        <i class="bi bi-box-arrow-in-right text-info"></i> Recent Check-ins
+                    </h5>
+                </div>
+                <div class="table-responsive">
+                    <table class="table table-hover mb-0">
+                        <thead>
+                            <tr>
+                                <th>Member</th>
+                                <th>Status</th>
+                                <th>Time</th>
+                                <th>Checked In By</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for checkin in recent_checkins %}
+                            <tr>
+                                <td>
+                                    <a href="{% url 'gym:member_detail' checkin.member.id %}">
+                                        {{ checkin.member.name }}
+                                    </a>
+                                </td>
+                                <td>
+                                    {% if checkin.member.status == "ACTIVE" %}
+                                        <span class="badge bg-success-subtle text-success">Paid</span>
+                                    {% else %}
+                                        <span class="badge bg-warning-subtle text-warning">Unpaid</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <div>{{ checkin.timestamp|date:"d M Y" }}</div>
+                                    <div class="small text-muted">{{ checkin.timestamp|date:"H:i" }}</div>
+                                </td>
+                                <td>{{ checkin.checked_in_by.get_full_name|default:checkin.checked_in_by.username|default:"-" }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Recent Payments -->
+    <div class="row">
+        <div class="col-12">
+            <div class="glass-card p-4">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h5 class="mb-0">
+                        <i class="bi bi-wallet2 text-primary"></i> Recent Payments
+                    </h5>
+                    <a href="{% url 'gym:members_list' %}" class="btn btn-sm btn-outline-primary">
+                        View All Members
+                    </a>
+                </div>
+
+                {% if recent_payments %}
+                    <div class="table-responsive">
+                        <table class="table table-hover mb-0">
+                            <thead>
+                                <tr>
+                                    <th>Member</th>
+                                    <th>Amount</th>
+                                    <th>Valid Period</th>
+                                    <th>Paid By</th>
+                                    <th>Date</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for payment in recent_payments %}
+                                <tr>
+                                    <td>
+                                        <a href="{% url 'gym:member_detail' payment.member.id %}">
+                                            {{ payment.member.name }}
+                                        </a>
+                                    </td>
+                                    <td class="fw-semibold">MWK {{ payment.amount|floatformat:2 }}</td>
+                                    <td>
+                                        {{ payment.start_date|date:"d M" }} - {{ payment.end_date|date:"d M Y" }}
+                                        <span class="badge bg-info-subtle text-info ms-1">30 days</span>
+                                    </td>
+                                    <td>{{ payment.paid_by.get_full_name|default:payment.paid_by.username|default:"-" }}</td>
+                                    <td>
+                                        <div>{{ payment.paid_at|date:"d M Y" }}</div>
+                                        <div class="small text-muted">{{ payment.paid_at|date:"H:i" }}</div>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                {% else %}
+                    <div class="text-center py-5">
+                        <i class="bi bi-wallet2" style="font-size: 3rem; opacity: 0.3;"></i>
+                        <p class="text-muted mt-3 mb-0">No payments recorded yet. Start by adding members and recording payments.</p>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.glass-card {
+    background: rgba(255, 255, 255, 0.95);
+    border-radius: 18px;
+    border: 1px solid rgba(15, 23, 42, 0.08);
+    box-shadow: 0 10px 30px rgba(15, 23, 42, 0.08);
+    backdrop-filter: blur(10px);
+}
+</style>
+{% endblock %}

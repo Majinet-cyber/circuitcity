@@ -27,7 +27,7 @@ except Exception:  # pragma: no cover
     def manager_required(fn):
         return fn
 
-from .models import Product, InventoryItem
+from .models import Product, InventoryItem, MerchProduct
 
 # -------------------------- business helpers ------------------------
 try:
@@ -668,53 +668,132 @@ def _initial_from_clothing(p: Product) -> dict:
 @manager_required
 @require_business_kind(BusinessKind.CLOTHING)
 def product_create_clothing_v2(request):
-    qs = _product_base_qs(request)
+    business = get_active_business(request)
+    
+    # Build queryset for display
+    products = MerchProduct.objects.filter(
+        business=business,
+        kind=BusinessKind.CLOTHING,
+        is_archived=False
+    ).order_by("-id")[:50]
 
     if request.method == "POST":
         form = ClothingProductForm(request.POST)
         if form.is_valid():
-            obj = Product()
-            if hasattr(Product, "business_id"):
-                biz = get_active_business(request)
-                if biz is not None:
-                    setattr(obj, "business_id", getattr(biz, "id", biz))
-            _inflate_clothing(obj, form.cleaned_data)
-            try:
-                obj.save()
-                messages.success(request, "Clothing item saved.")
-                return redirect(URL_NAME_CLOTHING)
-            except IntegrityError:
-                messages.error(request, "Could not save item due to a uniqueness constraint.")
+            data = form.cleaned_data
+            
+            # Construct unique product name from product_name + size
+            # This ensures each size variant gets a unique name
+            base_name = data.get("product_name", "").strip()
+            size = data.get("size", "").strip()
+            
+            if size:
+                unique_name = f"{base_name} - {size}"
+            else:
+                unique_name = base_name
+            
+            # Use update_or_create for idempotent save
+            obj, created = MerchProduct.objects.update_or_create(
+                business=business,
+                name=unique_name,
+                defaults={
+                    "kind": BusinessKind.CLOTHING,
+                    "size": size,
+                    "selling_price": data.get("price"),
+                    "is_active": True,
+                    "track_inventory": True,
+                }
+            )
+            
+            if created:
+                messages.success(request, f"✅ Clothing product created: {unique_name}")
+            else:
+                messages.success(request, f"✅ Product already existed, details updated: {unique_name}")
+            
+            return redirect(URL_NAME_CLOTHING)
     else:
         form = ClothingProductForm()
 
-    products = qs.order_by("-id")[:50]
     return render(request, "inventory/add_product_clothing.html",
-                  {"form": form, "products": products, "vertical": "clothing"})
+                  {"form": form, "products": products, "vertical": "clothing", "active_tab": "clothing_add_product"})
 
 @login_required
 @manager_required
 @require_business_kind(BusinessKind.CLOTHING)
 def product_edit_clothing_v2(request, pk: int):
-    qs = _product_base_qs(request)
-    obj = get_object_or_404(qs, pk=pk)
+    business = get_active_business(request)
+    
+    # Get the specific product being edited
+    obj = get_object_or_404(
+        MerchProduct.objects.filter(business=business, kind=BusinessKind.CLOTHING),
+        pk=pk
+    )
+    
+    # Build queryset for display
+    products = MerchProduct.objects.filter(
+        business=business,
+        kind=BusinessKind.CLOTHING,
+        is_archived=False
+    ).order_by("-id")[:50]
 
     if request.method == "POST":
         form = ClothingProductForm(request.POST)
         if form.is_valid():
-            _inflate_clothing(obj, form.cleaned_data)
-            try:
+            data = form.cleaned_data
+            
+            # Update the existing product
+            obj.size = data.get("size", "").strip()
+            obj.selling_price = data.get("price")
+            
+            # Update name if product_name or size changed
+            base_name = data.get("product_name", "").strip()
+            size = obj.size
+            
+            if size:
+                new_name = f"{base_name} - {size}"
+            else:
+                new_name = base_name
+            
+            # Check if name change would conflict
+            if obj.name != new_name:
+                existing = MerchProduct.objects.filter(
+                    business=business,
+                    name=new_name
+                ).exclude(pk=obj.pk).first()
+                
+                if existing:
+                    messages.error(
+                        request,
+                        f"A product with name '{new_name}' already exists. "
+                        "Please use a different product name or size."
+                    )
+                else:
+                    obj.name = new_name
+                    obj.save()
+                    messages.success(request, f"✅ Clothing item updated: {new_name}")
+                    return redirect(URL_NAME_CLOTHING)
+            else:
                 obj.save()
-                messages.success(request, "Clothing item updated.")
+                messages.success(request, f"✅ Clothing item updated: {obj.name}")
                 return redirect(URL_NAME_CLOTHING)
-            except IntegrityError:
-                messages.error(request, "Could not update item due to a uniqueness constraint.")
     else:
-        form = ClothingProductForm(initial=_initial_from_clothing(obj))
+        # Extract base name (remove size suffix if present)
+        current_name = obj.name
+        size = obj.size or ""
+        
+        if size and current_name.endswith(f" - {size}"):
+            base_name = current_name[:-len(f" - {size}")]
+        else:
+            base_name = current_name
+        
+        form = ClothingProductForm(initial={
+            "product_name": base_name,
+            "size": size,
+            "price": obj.selling_price,
+        })
 
-    products = qs.order_by("-id")[:50]
     return render(request, "inventory/add_product_clothing.html",
-                  {"form": form, "products": products, "vertical": "clothing"})
+                  {"form": form, "products": products, "vertical": "clothing", "active_tab": "clothing_edit_product", "editing": True, "product_id": pk})
 
 # ========================= ROUTER ================================
 # DO NOT DECORATE THIS (keeps it pure and avoids redirect loops)

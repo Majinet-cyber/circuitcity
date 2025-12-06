@@ -22,7 +22,7 @@ class Migration(migrations.Migration):
                 ('sold_at', models.DateField()),
                 ('price', models.DecimalField(decimal_places=2, max_digits=12, validators=[MinValueValidator(0)])),
                 ('commission_pct', models.DecimalField(decimal_places=2, default=0, max_digits=5, validators=[MinValueValidator(0), MaxValueValidator(100)])),
-                ('created_at', models.DateTimeField(default=timezone.now, db_index=True, editable=False)),
+                ('created_at', models.DateTimeField(default=timezone.now, editable=False)),
                 ('agent', models.ForeignKey(on_delete=django.db.models.deletion.PROTECT, related_name='sales', to=settings.AUTH_USER_MODEL)),
                 ('location', models.ForeignKey(on_delete=django.db.models.deletion.PROTECT, to='inventory.location')),
                 ('item', models.OneToOneField(on_delete=django.db.models.deletion.PROTECT, related_name='sale', to='inventory.inventoryitem')),

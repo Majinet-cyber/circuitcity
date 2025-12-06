@@ -257,11 +257,11 @@ def get_vertical_sidebar_items(business_kind: str) -> list[dict]:
     elif business_kind == "clothing":
         return [
             # MAIN section
-            {"section": "MAIN", "url": "dashboard:home", "label": "Dashboard", "icon": "bi-speedometer2", "active_pattern": "/dashboard/", "require_manager": False},
-            {"section": "MAIN", "url": "verticals:clothing_dashboard", "label": "Clothing Hub", "icon": "bi-person-bounding-box", "active_pattern": "/verticals/clothing/", "require_manager": False},
+            {"section": "MAIN", "url": "verticals:clothing_dashboard", "label": "Dashboard", "icon": "bi-speedometer2", "active_pattern": "/verticals/clothing/dashboard", "require_manager": False},
+            {"section": "MAIN", "url": "verticals:clothing_hub", "label": "Clothing Hub", "icon": "bi-person-bounding-box", "active_pattern": "/verticals/clothing/hub", "require_manager": False},
             {"section": "MAIN", "url": "inventory:clothing_product_new_v2", "label": "Add Product", "icon": "bi-plus-square", "active_pattern": "/clothing/products/new", "require_manager": False},
-            {"section": "MAIN", "url": "inventory:scan_in", "label": "Stock In", "icon": "bi-upc-scan", "active_pattern": "/inventory/scan", "require_manager": False},
-            {"section": "MAIN", "url": "inventory:scan_sold", "label": "Sell", "icon": "bi-bag-check", "active_pattern": "/sell/", "require_manager": False},
+            {"section": "MAIN", "url": "verticals:clothing_scan_in", "label": "Scan IN", "icon": "bi-upc-scan", "active_pattern": "/verticals/clothing/scan-in", "require_manager": False},
+            {"section": "MAIN", "url": "verticals:clothing_sell", "label": "Sell", "icon": "bi-bag-check", "active_pattern": "/verticals/clothing/sell", "require_manager": False},
             
             # TIME section
             {"section": "TIME", "url": "inventory:time_logs", "label": "Time Logs", "icon": "bi-journal-text", "active_pattern": "/inventory/time/logs", "require_manager": False},

@@ -425,6 +425,14 @@ class LiquorStockEditRequest(models.Model):
 # GYM MODELS
 # ==============================================================================
 
+class GymMemberStatus(models.TextChoices):
+    """Membership payment status"""
+    PENDING_PAYMENT = "PENDING_PAYMENT", "Pending Payment"
+    ACTIVE = "ACTIVE", "Active"
+    BEHIND_SCHEDULE = "BEHIND_SCHEDULE", "Behind Schedule"
+    EXPIRED = "EXPIRED", "Expired"
+
+
 class GymMember(models.Model):
     """
     Gym member with 30-day rolling membership.
@@ -435,6 +443,40 @@ class GymMember(models.Model):
     name = models.CharField(max_length=120)
     phone = models.CharField(max_length=20, blank=True, default="")
     email = models.EmailField(blank=True, default="")
+    
+    # Trainer and fees (snapshot at signup/renewal)
+    has_trainer = models.BooleanField(default=False, help_text="Whether this member has a trainer")
+    membership_fee = models.DecimalField(
+        max_digits=10, 
+        decimal_places=2, 
+        null=True, 
+        blank=True, 
+        help_text="Snapshot of membership fee at signup/renewal"
+    )
+    trainer_fee = models.DecimalField(
+        max_digits=10, 
+        decimal_places=2, 
+        null=True, 
+        blank=True, 
+        help_text="Snapshot of trainer fee if has_trainer=True"
+    )
+    
+    # Membership period (current/active period)
+    last_payment_date = models.DateField(null=True, blank=True, help_text="Date of most recent payment")
+    membership_start = models.DateField(null=True, blank=True, help_text="Start date of current membership period")
+    membership_end = models.DateField(
+        null=True, 
+        blank=True, 
+        db_index=True, 
+        help_text="End date of current membership period (start + 30 days)"
+    )
+    status = models.CharField(
+        max_length=20,
+        choices=GymMemberStatus.choices,
+        default=GymMemberStatus.PENDING_PAYMENT,
+        db_index=True,
+        help_text="Current membership status"
+    )
     
     # Membership status
     is_active = models.BooleanField(default=True, db_index=True)
@@ -459,17 +501,81 @@ class GymMember(models.Model):
         return f"{self.name} ({self.phone})"
     
     def days_left(self) -> int:
-        """Calculate days left in membership based on latest payment"""
-        latest_payment = self.payments.filter(is_active=True).order_by("-end_date").first()
-        if not latest_payment:
+        """Calculate days left in membership based on membership_end date"""
+        if not self.membership_end:
             return 0
         
-        days = (latest_payment.end_date - timezone.now().date()).days
+        today = timezone.now().date()
+        days = (self.membership_end - today).days
         return max(0, days)
     
     def membership_status(self) -> str:
-        """Return 'Active' or 'In arrears'"""
-        return "Active" if self.days_left() > 0 else "In arrears"
+        """Return human-readable membership status"""
+        if self.status == GymMemberStatus.ACTIVE:
+            return "Active"
+        elif self.status == GymMemberStatus.PENDING_PAYMENT:
+            return "Pending Payment"
+        elif self.status == GymMemberStatus.BEHIND_SCHEDULE:
+            return "Behind Schedule"
+        elif self.status == GymMemberStatus.EXPIRED:
+            return "Expired"
+        return "Unknown"
+    
+    def update_status(self):
+        """Update status based on membership dates"""
+        if not self.membership_start or not self.membership_end:
+            self.status = GymMemberStatus.PENDING_PAYMENT
+        else:
+            today = timezone.now().date()
+            if today <= self.membership_end:
+                self.status = GymMemberStatus.ACTIVE
+            else:
+                # Membership has expired
+                self.status = GymMemberStatus.BEHIND_SCHEDULE
+        self.save(update_fields=["status"])
+    
+    def set_paid(self, payment_date=None, membership_fee=None, trainer_fee=None, paid_by=None):
+        """
+        Mark member as paid and set 30-day membership period.
+        This is the core business logic for membership activation/renewal.
+        """
+        from datetime import timedelta
+        
+        if payment_date is None:
+            payment_date = timezone.now().date()
+        
+        # Set membership period: 30 days from payment date
+        self.last_payment_date = payment_date
+        self.membership_start = payment_date
+        self.membership_end = payment_date + timedelta(days=30)
+        self.status = GymMemberStatus.ACTIVE
+        
+        # Update fees if provided
+        if membership_fee is not None:
+            self.membership_fee = membership_fee
+        if trainer_fee is not None:
+            self.trainer_fee = trainer_fee
+        
+        self.save(update_fields=[
+            "last_payment_date", 
+            "membership_start", 
+            "membership_end", 
+            "status",
+            "membership_fee",
+            "trainer_fee"
+        ])
+        
+        # Create a payment record
+        total_amount = (self.membership_fee or Decimal("0.00")) + (self.trainer_fee or Decimal("0.00"))
+        if total_amount > 0:
+            GymPayment.objects.create(
+                member=self,
+                amount=total_amount,
+                start_date=self.membership_start,
+                end_date=self.membership_end,
+                paid_by=paid_by,
+                notes=f"{'With trainer' if self.has_trainer else 'No trainer'}"
+            )
     
     def archive(self, by_user):
         """Archive this member"""
@@ -570,8 +676,19 @@ class GymSettings(models.Model):
     support_phone = models.CharField(max_length=20, blank=True, default="")
     support_email = models.EmailField(blank=True, default="")
     
-    # Default membership price
-    default_membership_price = models.DecimalField(max_digits=10, decimal_places=2, default=Decimal("50000.00"))
+    # Default membership prices
+    default_membership_price = models.DecimalField(
+        max_digits=10, 
+        decimal_places=2, 
+        default=Decimal("50000.00"),
+        help_text="Default monthly membership fee (30 days)"
+    )
+    default_trainer_fee = models.DecimalField(
+        max_digits=10, 
+        decimal_places=2, 
+        default=Decimal("30000.00"),
+        help_text="Default trainer fee per month"
+    )
     
     # Other settings
     arrears_message = models.TextField(default="Your membership is in arrears. Please contact us to renew.")
@@ -614,6 +731,31 @@ class GymWalletEntry(models.Model):
         return f"{self.entry_type}: {self.amount} - {self.description}"
 
 
+class GymCheckIn(models.Model):
+    """
+    Records when a gym member checks in (arrives at gym).
+    Used for attendance tracking and conversion metrics.
+    """
+    business = models.ForeignKey(Business, on_delete=models.CASCADE, related_name="gym_checkins", db_index=True)
+    location = models.ForeignKey("inventory.Location", null=True, blank=True, on_delete=models.SET_NULL, related_name="gym_checkins")
+    member = models.ForeignKey(GymMember, on_delete=models.CASCADE, related_name="checkins")
+    
+    # Check-in metadata
+    timestamp = models.DateTimeField(default=timezone.now, db_index=True)
+    checked_in_by = models.ForeignKey(User, null=True, blank=True, on_delete=models.SET_NULL, related_name="gym_checkins_performed")
+    notes = models.TextField(blank=True, default="")
+    
+    class Meta:
+        ordering = ["-timestamp"]
+        indexes = [
+            models.Index(fields=["business", "-timestamp"]),
+            models.Index(fields=["member", "-timestamp"]),
+        ]
+    
+    def __str__(self):
+        return f"{self.member.name} - {self.timestamp.strftime('%Y-%m-%d %H:%M')}"
+
+
 # ==============================================================================
 # CLOTHING MODELS
 # ==============================================================================
@@ -624,6 +766,8 @@ class ClothingProductAction(models.TextChoices):
     UPDATED = "updated", "Updated"
     ARCHIVED = "archived", "Archived"
     RESTORED = "restored", "Restored"
+    STOCK_IN = "stock_in", "Stock In"
+    SOLD = "sold", "Sold"
 
 
 class ClothingProductLog(models.Model):
@@ -663,6 +807,20 @@ class ClothingSale(models.Model):
     unit_price = models.DecimalField(max_digits=10, decimal_places=2, validators=[MinValueValidator(Decimal("0.01"))])
     total_price = models.DecimalField(max_digits=12, decimal_places=2)
     
+    # Cost tracking (for profit calculation)
+    unit_cost = models.DecimalField(
+        max_digits=10, 
+        decimal_places=2, 
+        default=Decimal("0.00"),
+        help_text="Cost per unit sold (for profit calculation)"
+    )
+    total_cost = models.DecimalField(
+        max_digits=12, 
+        decimal_places=2, 
+        default=Decimal("0.00"),
+        help_text="Total cost of goods sold"
+    )
+    
     # Payment method (for cash mix tracking)
     payment_method = models.CharField(
         max_length=20,
@@ -688,10 +846,17 @@ class ClothingSale(models.Model):
         return f"{self.product.name} x {self.quantity} - {self.total_price}"
     
     def save(self, *args, **kwargs):
-        # Auto-calculate total if not set
+        # Auto-calculate totals if not set
         if not self.total_price:
             self.total_price = Decimal(self.quantity) * self.unit_price
+        if not self.total_cost:
+            self.total_cost = Decimal(self.quantity) * self.unit_cost
         super().save(*args, **kwargs)
+    
+    @property
+    def profit(self):
+        """Calculate profit for this sale"""
+        return self.total_price - self.total_cost
 
 
 # ==============================================================================

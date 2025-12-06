@@ -1,0 +1,153 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Stock In · Clothing · Emajinet{% endblock %}
+
+{% block content %}
+
+<style>
+  .scan-in-page{padding:18px;max-width:900px;margin:0 auto}
+  .scan-header{background:linear-gradient(135deg,#10b981,#059669);padding:28px;border-radius:20px;color:#fff;margin-bottom:24px;text-align:center}
+  .scan-header h1{margin:0 0 8px;font-size:clamp(26px,4vw,36px);font-weight:800}
+  .scan-header p{margin:0;opacity:.9;font-size:1.1rem}
+  .form-panel{background:#fff;border-radius:20px;padding:28px;box-shadow:0 10px 40px rgba(15,23,42,.1);margin-bottom:24px}
+  .form-step{margin-bottom:24px}
+  .form-step label{display:block;font-size:1rem;font-weight:700;color:#0f172a;margin-bottom:8px}
+  .form-step .form-control,.form-step .form-select{width:100%;padding:12px 16px;border:2px solid #e2e8f0;border-radius:12px;font-size:1rem;transition:border-color .2s}
+  .form-step .form-control:focus,.form-step .form-select:focus{outline:none;border-color:#10b981}
+  .category-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:12px;margin-top:8px}
+  .category-card{display:flex;flex-direction:column;align-items:center;gap:8px;padding:16px;border:2px solid #e2e8f0;border-radius:16px;cursor:pointer;transition:all .2s;background:#fff}
+  .category-card:hover{border-color:#10b981;transform:translateY(-2px);box-shadow:0 8px 20px rgba(16,185,129,.15)}
+  .category-card.selected{border-color:#10b981;background:#f0fdf4}
+  .category-icon{font-size:2.5rem}
+  .category-name{font-size:.9rem;font-weight:600;color:#0f172a}
+  .btn-submit{width:100%;padding:16px;background:linear-gradient(135deg,#10b981,#059669);color:#fff;border:none;border-radius:999px;font-size:1.1rem;font-weight:700;cursor:pointer;transition:transform .2s,box-shadow .2s}
+  .btn-submit:hover{transform:translateY(-2px);box-shadow:0 12px 30px rgba(16,185,129,.3)}
+  .recent-section{background:#fff;border-radius:20px;padding:24px;box-shadow:0 10px 40px rgba(15,23,42,.1)}
+  .recent-section h2{margin:0 0 16px;font-size:1.2rem;color:#0f172a}
+  .recent-list{list-style:none;margin:0;padding:0}
+  .recent-item{padding:12px 0;border-bottom:1px solid #f1f5f9;display:flex;justify-content:space-between;gap:12px}
+  .recent-item:last-child{border-bottom:0}
+  .recent-item strong{display:block;font-size:.95rem;color:#0f172a}
+  .recent-item small{color:#64748b;font-size:.85rem}
+  .alert-success{background:#f0fdf4;border:1px solid #86efac;color:#15803d;padding:14px 18px;border-radius:12px;margin-bottom:20px}
+</style>
+
+<div class="scan-in-page">
+  <header class="scan-header">
+    <h1>📦 Stock In</h1>
+    <p>Add new clothing items to your inventory</p>
+  </header>
+
+  {% if messages %}
+    {% for message in messages %}
+      <div class="alert-success">{{ message }}</div>
+    {% endfor %}
+  {% endif %}
+
+  <div class="form-panel">
+    <form method="post" id="stockInForm">
+      {% csrf_token %}
+      
+      <div class="form-step">
+        <label for="id_category">1️⃣ Select Category</label>
+        <div class="category-grid">
+          {% for cat_value, cat_label, cat_icon in categories %}
+          <div class="category-card" data-category="{{ cat_value }}">
+            <div class="category-icon">{{ cat_icon }}</div>
+            <div class="category-name">{{ cat_label }}</div>
+          </div>
+          {% endfor %}
+        </div>
+        {{ form.category }}
+      </div>
+
+      <div class="form-step">
+        <label for="id_size">2️⃣ Select Size</label>
+        {{ form.size }}
+      </div>
+
+      <div class="form-step">
+        <label for="id_color">3️⃣ Select Color</label>
+        {{ form.color }}
+      </div>
+
+      <div class="form-step">
+        <label for="id_quantity">4️⃣ Quantity</label>
+        {{ form.quantity }}
+      </div>
+
+      <div class="form-step">
+        <label for="id_cost_price">5️⃣ Cost Price (per unit)</label>
+        {{ form.cost_price }}
+      </div>
+
+      <div class="form-step">
+        <label for="id_selling_price">6️⃣ Selling Price (optional)</label>
+        {{ form.selling_price }}
+      </div>
+
+      <button type="submit" class="btn-submit">✅ Add to Stock</button>
+    </form>
+  </div>
+
+  {% if recent_logs %}
+  <div class="recent-section">
+    <h2>📋 Recent Stock Additions</h2>
+    <ul class="recent-list">
+      {% for log in recent_logs %}
+      <li class="recent-item">
+        <div>
+          <strong>{{ log.product.name }}</strong>
+          <small>
+            +{{ log.changes.quantity_added }} units · 
+            K {{ log.changes.cost_price }} each · 
+            by {{ log.performed_by.get_full_name|default:log.performed_by.username }}
+          </small>
+        </div>
+        <div style="text-align:right">
+          <small style="color:#64748b">{{ log.created_at|timesince }} ago</small>
+        </div>
+      </li>
+      {% endfor %}
+    </ul>
+  </div>
+  {% endif %}
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  // Hide the actual select element for category
+  const categorySelect = document.getElementById('id_category');
+  if (categorySelect) {
+    categorySelect.style.display = 'none';
+  }
+
+  // Category card selection
+  const categoryCards = document.querySelectorAll('.category-card');
+  categoryCards.forEach(card => {
+    card.addEventListener('click', function() {
+      // Remove selected class from all
+      categoryCards.forEach(c => c.classList.remove('selected'));
+      // Add to clicked
+      this.classList.add('selected');
+      // Update hidden select
+      const categoryValue = this.dataset.category;
+      if (categorySelect) {
+        categorySelect.value = categoryValue;
+      }
+    });
+  });
+
+  // Pre-select if value exists
+  if (categorySelect && categorySelect.value) {
+    const selectedCard = document.querySelector(`.category-card[data-category="${categorySelect.value}"]`);
+    if (selectedCard) {
+      selectedCard.classList.add('selected');
+    }
+  }
+});
+</script>
+
+{% endblock %}
+

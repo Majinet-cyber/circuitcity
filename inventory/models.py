@@ -245,6 +245,13 @@ class MerchProduct(models.Model):
     auto_adjust_enabled = models.BooleanField(default=True, help_text="Enable smart auto-adjust based on sales demand")
     auto_adjust_pct = models.PositiveIntegerField(default=20, help_text="Increase target by this % over observed peak demand")
 
+    # Clothing and general merchandise fields
+    size = models.CharField(max_length=20, blank=True, default='', help_text="Size for clothing items (e.g., S, M, L, XL, or numeric)")
+    color = models.CharField(max_length=50, blank=True, default='', help_text="Color for clothing items")
+    quantity_in_stock = models.PositiveIntegerField(default=0, help_text="Current quantity in stock (for clothing and other inventory-tracked items)")
+    cost_price = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True, help_text="Cost price per unit (for non-liquor items)")
+    selling_price = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True, help_text="Selling price per unit (for non-liquor items)")
+
     # Archive helpers (for clothing and other verticals)
     is_archived = models.BooleanField(default=False, db_index=True)
     archived_at = models.DateTimeField(null=True, blank=True)

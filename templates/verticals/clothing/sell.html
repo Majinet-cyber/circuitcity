@@ -1,0 +1,294 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Sell Clothing · Emajinet{% endblock %}
+
+{% block content %}
+
+<style>
+  .sell-page{padding:18px;max-width:1100px;margin:0 auto}
+  .sell-header{background:linear-gradient(135deg,#10b981,#059669);padding:28px;border-radius:20px;color:#fff;margin-bottom:24px;text-align:center}
+  .sell-header h1{margin:0 0 8px;font-size:clamp(26px,4vw,36px);font-weight:800}
+  .sell-header p{margin:0;opacity:.9;font-size:1.1rem}
+  
+  /* Product Grid */
+  .product-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:16px;margin-bottom:24px}
+  .product-card{background:#fff;border:2px solid #e2e8f0;border-radius:16px;padding:16px;cursor:pointer;transition:all .2s}
+  .product-card:hover{border-color:#10b981;box-shadow:0 6px 20px rgba(16,185,129,.15)}
+  .product-card.selected{border-color:#10b981;background:#f0fdf4}
+  .product-card h4{margin:0 0 8px;font-size:1rem;color:#0f172a}
+  .product-card .stock{font-size:.85rem;color:#64748b}
+  .product-card .price{font-size:1.1rem;font-weight:700;color:#10b981;margin-top:8px}
+  
+  .form-panel{background:#fff;border-radius:20px;padding:28px;box-shadow:0 10px 40px rgba(15,23,42,.1);margin-bottom:24px}
+  .form-step{margin-bottom:24px}
+  .form-step label{display:block;font-size:1rem;font-weight:700;color:#0f172a;margin-bottom:8px}
+  .form-step .form-control,.form-step .form-select{width:100%;padding:12px 16px;border:2px solid #e2e8f0;border-radius:12px;font-size:1rem;transition:border-color .2s}
+  .form-step .form-control:focus,.form-step .form-select:focus{outline:none;border-color:#10b981}
+  .summary-card{background:linear-gradient(135deg,#f0fdf4,#dcfce7);padding:20px;border-radius:16px;margin:20px 0;border:2px solid #86efac}
+  .summary-card h3{margin:0 0 12px;font-size:1.1rem;color:#15803d}
+  .summary-row{display:flex;justify-content:space-between;margin-bottom:8px;font-size:.95rem}
+  .summary-row .label{color:#166534}
+  .summary-row .value{font-weight:700;color:#0f172a}
+  .summary-row.total{font-size:1.2rem;padding-top:12px;border-top:2px solid #86efac;margin-top:12px}
+  .summary-row.profit{color:#10b981}
+  .btn-submit{width:100%;padding:16px;background:linear-gradient(135deg,#10b981,#059669);color:#fff;border:none;border-radius:999px;font-size:1.1rem;font-weight:700;cursor:pointer;transition:transform .2s,box-shadow .2s}
+  .btn-submit:hover:not(:disabled){transform:translateY(-2px);box-shadow:0 12px 30px rgba(16,185,129,.3)}
+  .btn-submit:disabled{opacity:.5;cursor:not-allowed}
+  .btn-back{background:none;border:none;color:#10b981;font-weight:600;margin-bottom:16px;cursor:pointer;font-size:1rem}
+  .recent-section{background:#fff;border-radius:20px;padding:24px;box-shadow:0 10px 40px rgba(15,23,42,.1)}
+  .recent-section h2{margin:0 0 16px;font-size:1.2rem;color:#0f172a}
+  .recent-list{list-style:none;margin:0;padding:0}
+  .recent-item{padding:12px 0;border-bottom:1px solid #f1f5f9;display:flex;justify-content:space-between;gap:12px;align-items:center}
+  .recent-item:last-child{border-bottom:0}
+  .recent-item strong{display:block;font-size:.95rem;color:#0f172a}
+  .recent-item small{color:#64748b;font-size:.85rem}
+  .alert-success{background:#f0fdf4;border:1px solid #86efac;color:#15803d;padding:14px 18px;border-radius:12px;margin-bottom:20px}
+  .alert-danger{background:#fef2f2;border:1px solid #fca5a5;color:#dc2626;padding:14px 18px;border-radius:12px;margin-bottom:20px}
+  .profit-badge{display:inline-block;padding:4px 12px;border-radius:999px;font-size:.85rem;font-weight:700;background:#dcfce7;color:#15803d}
+  .step-indicator{text-align:center;margin-bottom:24px;font-size:.9rem;color:#64748b;font-weight:600}
+  .hidden{display:none!important}
+</style>
+
+<div class="sell-page">
+  <header class="sell-header">
+    <h1>💰 Sell Clothing</h1>
+    <p>Select item, set price, and complete the sale</p>
+  </header>
+  
+  <div class="step-indicator" id="stepIndicator">
+    <span id="stepText">Step 1 of 2: Choose Product</span>
+  </div>
+
+  {% if messages %}
+    {% for message in messages %}
+      {% if 'error' in message.tags or '❌' in message.message %}
+        <div class="alert-danger">{{ message }}</div>
+      {% else %}
+        <div class="alert-success">{{ message }}</div>
+      {% endif %}
+    {% endfor %}
+  {% endif %}
+
+  <!-- Step 1: Product Selection (Gamified Cards) -->
+  <div id="step1" class="form-panel">
+    <h2 style="margin:0 0 20px;font-size:1.3rem;color:#0f172a">🛍️ Choose an Item to Sell</h2>
+    
+    <div class="product-grid" id="productGrid">
+      {% for product in form.product.field.queryset %}
+      <div class="product-card" data-product-id="{{ product.id }}" 
+           data-product-name="{{ product.name }}"
+           data-product-stock="{{ product.quantity_in_stock }}"
+           data-product-price="{{ product.selling_price|default:0 }}"
+           data-product-cost="{{ product.cost_price|default:0 }}"
+           onclick="selectProduct(this)">
+        <h4>{{ product.name }}</h4>
+        <div class="stock">
+          📦 Stock: <strong>{{ product.quantity_in_stock }} units</strong>
+        </div>
+        {% if product.selling_price %}
+        <div class="price">K {{ product.selling_price|floatformat:0 }}</div>
+        {% endif %}
+      </div>
+      {% empty %}
+      <p style="grid-column:1/-1;text-align:center;color:#64748b;padding:40px">
+        No products available. <a href="{% url 'verticals:clothing_scan_in' %}">Add stock first</a>.
+      </p>
+      {% endfor %}
+    </div>
+    
+    <button type="button" class="btn-submit" id="btnNext" onclick="goToStep2()" disabled>
+      Continue to Details →
+    </button>
+  </div>
+  
+  <!-- Step 2: Sale Details Form -->
+  <form method="post" id="step2" class="form-panel hidden">
+    {% csrf_token %}
+    
+    <button type="button" class="btn-back" onclick="goToStep1()">
+      ← Back to product selection
+    </button>
+    
+    <h2 style="margin:0 0 20px;font-size:1.3rem;color:#0f172a">📝 Complete the Sale</h2>
+    
+    <!-- Hidden product field -->
+    <input type="hidden" name="product" id="selectedProductId">
+    
+    <div class="form-step">
+      <label for="id_quantity">Quantity</label>
+      {{ form.quantity }}
+      {% if form.quantity.errors %}
+        <small style="color:#dc2626">{{ form.quantity.errors.0 }}</small>
+      {% endif %}
+    </div>
+
+    <div class="form-step">
+      <label for="id_selling_price">Selling Price (per unit)</label>
+      {{ form.selling_price }}
+      {% if form.selling_price.errors %}
+        <small style="color:#dc2626">{{ form.selling_price.errors.0 }}</small>
+      {% endif %}
+    </div>
+
+    <div class="form-step">
+      <label for="id_payment_method">Payment Method</label>
+      {{ form.payment_method }}
+      {% if form.payment_method.errors %}
+        <small style="color:#dc2626">{{ form.payment_method.errors.0 }}</small>
+      {% endif %}
+    </div>
+
+    <div class="form-step">
+      <label for="id_notes">Notes (optional)</label>
+      {{ form.notes }}
+    </div>
+
+    <div class="summary-card" id="saleSummary" style="display:none">
+      <h3>📋 Sale Summary</h3>
+      <div class="summary-row">
+        <span class="label">Product:</span>
+        <span class="value" id="summaryProduct">-</span>
+      </div>
+      <div class="summary-row">
+        <span class="label">Quantity:</span>
+        <span class="value" id="summaryQuantity">-</span>
+      </div>
+      <div class="summary-row">
+        <span class="label">Unit Price:</span>
+        <span class="value" id="summaryUnitPrice">-</span>
+      </div>
+      <div class="summary-row">
+        <span class="label">Unit Cost:</span>
+        <span class="value" id="summaryUnitCost">-</span>
+      </div>
+      <div class="summary-row total">
+        <span class="label">Total Revenue:</span>
+        <span class="value" id="summaryRevenue">K 0</span>
+      </div>
+      <div class="summary-row profit">
+        <span class="label">Estimated Profit:</span>
+        <span class="value" id="summaryProfit">K 0</span>
+      </div>
+    </div>
+
+    <button type="submit" class="btn-submit">
+      💰 Complete Sale
+    </button>
+  </form>
+
+  <!-- Recent Sales -->
+  {% if recent_sales %}
+  <section class="recent-section">
+    <h2>📊 Recent Sales</h2>
+    <ul class="recent-list">
+      {% for sale in recent_sales %}
+      <li class="recent-item">
+        <div>
+          <strong>{{ sale.product.name }}</strong>
+          <small>{{ sale.sold_at|date:"M d, Y H:i" }} · Qty: {{ sale.quantity }} · {{ sale.sold_by.get_full_name|default:sale.sold_by.username }}</small>
+        </div>
+        <div style="text-align:right">
+          <strong style="color:#10b981">K {{ sale.total_price|floatformat:0 }}</strong>
+          <small class="profit-badge">+K {{ sale.profit|default:0|floatformat:0 }}</small>
+        </div>
+      </li>
+      {% endfor %}
+    </ul>
+  </section>
+  {% endif %}
+</div>
+
+<script>
+// Product selection state
+let selectedProductData = null;
+
+function selectProduct(card) {
+  // Remove previous selection
+  document.querySelectorAll('.product-card').forEach(c => c.classList.remove('selected'));
+  
+  // Mark this card as selected
+  card.classList.add('selected');
+  
+  // Store product data
+  selectedProductData = {
+    id: card.dataset.productId,
+    name: card.dataset.productName,
+    stock: parseInt(card.dataset.productStock),
+    price: parseFloat(card.dataset.productPrice),
+    cost: parseFloat(card.dataset.productCost)
+  };
+  
+  // Enable next button
+  document.getElementById('btnNext').disabled = false;
+}
+
+function goToStep2() {
+  if (!selectedProductData) return;
+  
+  // Hide step 1, show step 2
+  document.getElementById('step1').classList.add('hidden');
+  document.getElementById('step2').classList.remove('hidden');
+  document.getElementById('stepText').textContent = 'Step 2 of 2: Sale Details';
+  
+  // Set hidden product ID
+  document.getElementById('selectedProductId').value = selectedProductData.id;
+  
+  // Pre-fill selling price if available
+  const priceInput = document.getElementById('id_selling_price');
+  if (selectedProductData.price > 0 && priceInput) {
+    priceInput.value = selectedProductData.price.toFixed(2);
+  }
+  
+  // Update summary
+  updateSummary();
+}
+
+function goToStep1() {
+  // Show step 1, hide step 2
+  document.getElementById('step1').classList.remove('hidden');
+  document.getElementById('step2').classList.add('hidden');
+  document.getElementById('stepText').textContent = 'Step 1 of 2: Choose Product';
+}
+
+function updateSummary() {
+  const quantityInput = document.getElementById('id_quantity');
+  const priceInput = document.getElementById('id_selling_price');
+  const summaryCard = document.getElementById('saleSummary');
+  
+  if (!selectedProductData || !quantityInput || !priceInput) return;
+  
+  const quantity = parseInt(quantityInput.value) || 1;
+  const unitPrice = parseFloat(priceInput.value) || 0;
+  const unitCost = selectedProductData.cost || 0;
+  
+  if (quantity > 0 && unitPrice > 0) {
+    const revenue = quantity * unitPrice;
+    const totalCost = quantity * unitCost;
+    const profit = revenue - totalCost;
+    
+    // Update summary card
+    document.getElementById('summaryProduct').textContent = selectedProductData.name;
+    document.getElementById('summaryQuantity').textContent = quantity;
+    document.getElementById('summaryUnitPrice').textContent = 'K ' + unitPrice.toFixed(0);
+    document.getElementById('summaryUnitCost').textContent = 'K ' + unitCost.toFixed(0);
+    document.getElementById('summaryRevenue').textContent = 'K ' + revenue.toFixed(0);
+    document.getElementById('summaryProfit').textContent = 'K ' + profit.toFixed(0);
+    
+    summaryCard.style.display = 'block';
+  } else {
+    summaryCard.style.display = 'none';
+  }
+}
+
+// Auto-update summary when values change
+document.addEventListener('DOMContentLoaded', function() {
+  const quantityInput = document.getElementById('id_quantity');
+  const priceInput = document.getElementById('id_selling_price');
+  
+  if (quantityInput) quantityInput.addEventListener('input', updateSummary);
+  if (priceInput) priceInput.addEventListener('input', updateSummary);
+});
+</script>
+
+{% endblock %}

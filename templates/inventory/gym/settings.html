@@ -1,0 +1,126 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Gym Settings - {{ business.name }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <!-- Header -->
+    <div class="row mb-4">
+        <div class="col">
+            <div class="d-flex align-items-center gap-2">
+                <a href="{% url 'gym:dashboard' %}" class="btn btn-outline-secondary">
+                    <i class="bi bi-arrow-left"></i>
+                </a>
+                <div>
+                    <h2>Gym Settings</h2>
+                    <p class="text-muted mb-0">Configure your gym business settings</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-12 col-lg-8">
+            <div class="glass-card p-4">
+                <form method="post">
+                    {% csrf_token %}
+                    
+                    <h5 class="mb-3">Contact Information</h5>
+                    
+                    <div class="mb-3">
+                        <label for="{{ form.support_phone.id_for_label }}" class="form-label">
+                            Support Phone
+                        </label>
+                        {{ form.support_phone }}
+                        <small class="form-text text-muted">
+                            Phone number for member support and inquiries
+                        </small>
+                        {% if form.support_phone.errors %}
+                            <div class="text-danger small mt-1">{{ form.support_phone.errors }}</div>
+                        {% endif %}
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="{{ form.support_email.id_for_label }}" class="form-label">
+                            Support Email
+                        </label>
+                        {{ form.support_email }}
+                        <small class="form-text text-muted">
+                            Email address for member support
+                        </small>
+                        {% if form.support_email.errors %}
+                            <div class="text-danger small mt-1">{{ form.support_email.errors }}</div>
+                        {% endif %}
+                    </div>
+
+                    <hr class="my-4">
+
+                    <h5 class="mb-3">Membership Settings</h5>
+
+                    <div class="mb-3">
+                        <label for="{{ form.default_membership_price.id_for_label }}" class="form-label">
+                            Default Membership Price (MWK)
+                        </label>
+                        {{ form.default_membership_price }}
+                        <small class="form-text text-muted">
+                            Default price for 30-day membership
+                        </small>
+                        {% if form.default_membership_price.errors %}
+                            <div class="text-danger small mt-1">{{ form.default_membership_price.errors }}</div>
+                        {% endif %}
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="{{ form.arrears_message.id_for_label }}" class="form-label">
+                            Arrears Message
+                        </label>
+                        {{ form.arrears_message }}
+                        <small class="form-text text-muted">
+                            Message to display/send to members with expired memberships
+                        </small>
+                        {% if form.arrears_message.errors %}
+                            <div class="text-danger small mt-1">{{ form.arrears_message.errors }}</div>
+                        {% endif %}
+                    </div>
+
+                    <div class="d-flex gap-2">
+                        <button type="submit" class="btn btn-primary">
+                            <i class="bi bi-check-circle"></i> Save Settings
+                        </button>
+                        <a href="{% url 'gym:dashboard' %}" class="btn btn-outline-secondary">
+                            Cancel
+                        </a>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <div class="col-12 col-lg-4">
+            <div class="glass-card p-4">
+                <h5 class="mb-3">
+                    <i class="bi bi-info-circle"></i> Settings Guide
+                </h5>
+                <p class="text-muted small mb-3">
+                    Configure your gym business settings to streamline operations.
+                </p>
+                <hr>
+                <div class="mb-3">
+                    <strong class="small">Support Contact</strong>
+                    <p class="text-muted small mb-0">
+                        Provide contact information for members to reach out for support or inquiries.
+                    </p>
+                </div>
+                <hr>
+                <div>
+                    <strong class="small">Membership Pricing</strong>
+                    <p class="text-muted small mb-0">
+                        Set a default price for memberships to speed up payment processing.
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+

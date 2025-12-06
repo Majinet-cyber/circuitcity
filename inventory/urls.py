@@ -1112,3 +1112,10 @@ urlpatterns += [
     # Intelligent IMEI picker API
     path("phones/available-imeis/<int:product_id>/", login_required(getattr(_phones_views, "phone_available_imeis", _stub("phone_available_imeis not found"))), name="phones_available_imeis"),
 ]
+
+# ---------------------------------------------------------------------
+# Nested verticals namespace (for inventory:verticals:* URLs)
+# ---------------------------------------------------------------------
+urlpatterns += [
+    path("verticals/", include(("verticals.urls", "verticals"), namespace="verticals")),
+]

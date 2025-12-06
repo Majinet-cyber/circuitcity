@@ -1,0 +1,160 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}{{ member.name }} - {{ business.name }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <!-- Header -->
+    <div class="row mb-4">
+        <div class="col">
+            <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
+                <div class="d-flex align-items-center gap-2">
+                    <a href="{% url 'gym:members_list' %}" class="btn btn-outline-secondary">
+                        <i class="bi bi-arrow-left"></i>
+                    </a>
+                    <div>
+                        <h2>{{ member.name }}</h2>
+                        <p class="text-muted mb-0">Member Details</p>
+                    </div>
+                </div>
+                <div class="d-flex gap-2">
+                    <a href="{% url 'gym:member_edit' member.id %}" class="btn btn-outline-primary">
+                        <i class="bi bi-pencil"></i> Edit
+                    </a>
+                    {% if not member.is_archived %}
+                    <form method="post" action="{% url 'gym:member_archive' member.id %}" class="d-inline" 
+                          onsubmit="return confirm('Archive this member? They can be restored later.')">
+                        {% csrf_token %}
+                        <button type="submit" class="btn btn-outline-danger">
+                            <i class="bi bi-archive"></i> Archive
+                        </button>
+                    </form>
+                    {% else %}
+                    <form method="post" action="{% url 'gym:member_restore' member.id %}" class="d-inline">
+                        {% csrf_token %}
+                        <button type="submit" class="btn btn-outline-success">
+                            <i class="bi bi-arrow-counterclockwise"></i> Restore
+                        </button>
+                    </form>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <!-- Member Info -->
+        <div class="col-12 col-lg-4 mb-4">
+            <div class="glass-card p-4">
+                <h5 class="mb-3">Contact Information</h5>
+                <div class="mb-3">
+                    <label class="text-muted small">Phone</label>
+                    <div>{{ member.phone|default:"-" }}</div>
+                </div>
+                <div class="mb-3">
+                    <label class="text-muted small">Email</label>
+                    <div>{{ member.email|default:"-" }}</div>
+                </div>
+                <div class="mb-3">
+                    <label class="text-muted small">Joined</label>
+                    <div>{{ member.joined_at|date:"d M Y" }}</div>
+                </div>
+                <div class="mb-3">
+                    <label class="text-muted small">Status</label>
+                    <div>
+                        {% if member.is_archived %}
+                            <span class="badge bg-secondary-subtle text-secondary">Archived</span>
+                        {% elif days_left == 0 %}
+                            <span class="badge bg-danger-subtle text-danger">Expired</span>
+                        {% elif days_left <= 7 %}
+                            <span class="badge bg-warning-subtle text-warning">Expiring Soon ({{ days_left }} days)</span>
+                        {% else %}
+                            <span class="badge bg-success-subtle text-success">Active ({{ days_left }} days left)</span>
+                        {% endif %}
+                    </div>
+                </div>
+                {% if member.notes %}
+                <div>
+                    <label class="text-muted small">Notes</label>
+                    <div>{{ member.notes }}</div>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Payment History -->
+        <div class="col-12 col-lg-8 mb-4">
+            <div class="glass-card p-4">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h5 class="mb-0">Payment History</h5>
+                    <a href="{% url 'gym:add_payment' %}?member={{ member.id }}" class="btn btn-sm btn-primary">
+                        <i class="bi bi-plus-circle"></i> Add Payment
+                    </a>
+                </div>
+
+                {% if payments %}
+                    <div class="table-responsive">
+                        <table class="table table-hover mb-0">
+                            <thead>
+                                <tr>
+                                    <th>Amount</th>
+                                    <th>Period</th>
+                                    <th>Paid By</th>
+                                    <th>Date</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for payment in payments %}
+                                <tr>
+                                    <td class="fw-semibold">MWK {{ payment.amount|floatformat:2 }}</td>
+                                    <td>
+                                        {{ payment.start_date|date:"d M Y" }} - {{ payment.end_date|date:"d M Y" }}
+                                    </td>
+                                    <td>{{ payment.paid_by.get_full_name|default:payment.paid_by.username }}</td>
+                                    <td>
+                                        <div>{{ payment.paid_at|date:"d M Y" }}</div>
+                                        <div class="small text-muted">{{ payment.paid_at|date:"H:i" }}</div>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                {% else %}
+                    <div class="text-center py-4">
+                        <i class="bi bi-wallet2" style="font-size: 2rem; opacity: 0.3;"></i>
+                        <p class="text-muted mb-3">No payments recorded yet.</p>
+                        <a href="{% url 'gym:add_payment' %}?member={{ member.id }}" class="btn btn-sm btn-primary">
+                            <i class="bi bi-plus-circle"></i> Record First Payment
+                        </a>
+                    </div>
+                {% endif %}
+            </div>
+
+            <!-- Activity Log -->
+            {% if logs %}
+            <div class="glass-card p-4 mt-4">
+                <h5 class="mb-3">Activity Log</h5>
+                <div class="list-group">
+                    {% for log in logs %}
+                    <div class="list-group-item">
+                        <div class="d-flex justify-content-between">
+                            <div>
+                                <strong>{{ log.get_action_display }}</strong>
+                                <div class="small text-muted">
+                                    by {{ log.performed_by.get_full_name|default:log.performed_by.username }}
+                                </div>
+                            </div>
+                            <small class="text-muted">{{ log.created_at|date:"d M Y H:i" }}</small>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}
+

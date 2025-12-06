@@ -44,6 +44,13 @@ except ImportError:
 from inventory.constants import IN_STOCK_Q, SOLD_Q
 from inventory.queries import business_metrics, inventory_qs_for_user, inventory_qs_tenant
 
+# Date range parsing for dashboard filters
+try:
+    from inventory.verticals.base import parse_date_range_from_request
+    DATE_FILTER_AVAILABLE = True
+except ImportError:
+    DATE_FILTER_AVAILABLE = False
+
 # Cache optional inventory models module once (safer / faster)
 try:
     inv_models = import_module("inventory.models")
@@ -373,6 +380,27 @@ def home(request):
             # If the URL doesn't exist, fall through to default dashboard
             pass
 
+    # ===== DATE FILTER PARAMS =====
+    # Parse date range from request (default to MTD like clothing)
+    date_range_ctx = {}
+    active_range = 'mtd'
+    filter_start_date = None
+    filter_end_date = None
+    selected_date = None
+    date_param = None
+    
+    if DATE_FILTER_AVAILABLE:
+        try:
+            date_range_ctx = parse_date_range_from_request(request)
+            active_range = date_range_ctx.get('active_range', 'mtd')
+            filter_start_date = date_range_ctx.get('start_date')
+            filter_end_date = date_range_ctx.get('end_date')
+            selected_date = date_range_ctx.get('selected_date')
+            date_param = date_range_ctx.get('date_param')
+        except Exception:
+            # Fallback to MTD if parsing fails
+            pass
+    
     # Canonical KPI source (tenant-wide for the dashboard tiles)
     inv_kpis = business_metrics(request, include_agent_scope=False)
 
@@ -390,10 +418,23 @@ def home(request):
     # Simple per-tenant KPIs (safe)
     tz = timezone.get_current_timezone()
     today = timezone.localdate()
+    
+    # Use filter dates if available, otherwise use MTD
+    if filter_start_date and filter_end_date:
+        # Use the filtered date range
+        period_start = _start_of_day(filter_start_date, tz)
+        period_end = _start_of_day(filter_end_date, tz)
+    else:
+        # Default to MTD
+        period_start = _start_of_day(today.replace(day=1), tz)
+        period_end = _start_of_day(_first_of_next_month(today), tz)
+    
+    # Keep original month bounds for backwards compatibility
     month_start = _start_of_day(today.replace(day=1), tz)
     month_end = _start_of_day(_first_of_next_month(today), tz)
 
     # Try full KPIs when Sale rows exist, else fallback to InventoryItem SOLD rows
+    # Use filtered period for KPIs
     try:
         kpis = compute_sales_kpis(sales_qs, dt_field="sold_at", amount_field="price") or {}
     except Exception:
@@ -403,18 +444,21 @@ def home(request):
             _scope_queryset(InventoryItem.objects.all(), biz)
             .filter(SOLD_Q())
         )
-        mtd_qs = sold_items.filter(sold_at__gte=month_start, sold_at__lt=month_end)
-        revenue = _inv_revenue_sum(mtd_qs)
-        kpis = {"orders": mtd_qs.count(), "revenue": revenue, "scope": f"{biz.name}"}
+        period_qs = sold_items.filter(sold_at__gte=period_start, sold_at__lt=period_end)
+        revenue = _inv_revenue_sum(period_qs)
+        kpis = {"orders": period_qs.count(), "revenue": revenue, "scope": f"{biz.name}"}
     else:
         kpis["scope"] = f"{biz.name}"
 
-    # Sold (MTD) tile — from InventoryItem using SOLD_Q
-    sold_mtd_count = (
+    # Sold count for the selected period — from InventoryItem using SOLD_Q
+    sold_period_count = (
         _scope_queryset(InventoryItem.objects.all(), biz)
-        .filter(SOLD_Q(), sold_at__gte=month_start, sold_at__lt=month_end)
+        .filter(SOLD_Q(), sold_at__gte=period_start, sold_at__lt=period_end)
         .count()
     )
+    
+    # Keep MTD count for backwards compatibility (some parts may still use it)
+    sold_mtd_count = sold_period_count
 
     # Onboarding steps tailored to business vertical
     onboarding_steps = get_onboarding_steps(vertical_kind, request)
@@ -474,21 +518,26 @@ def home(request):
         or getattr(getattr(request.user, 'profile', None), 'is_manager', False)
     )
     
-    # Today's sales
-    today_start = _start_of_day(today, tz)
-    today_end = _start_of_day(today + timedelta(days=1), tz)
-    today_sold = _scope_queryset(InventoryItem.objects.all(), biz).filter(
-        SOLD_Q(), sold_at__gte=today_start, sold_at__lt=today_end
+    # Sales for the filtered period (respects date range selector)
+    period_sold = _scope_queryset(InventoryItem.objects.all(), biz).filter(
+        SOLD_Q(), sold_at__gte=period_start, sold_at__lt=period_end
     )
-    today_sales_count = today_sold.count()
-    today_sales_amount = _inv_revenue_sum(today_sold)
+    period_sales_count = period_sold.count()
+    period_sales_amount = _inv_revenue_sum(period_sold)
     
-    # Month's sales (already computed above for sold_mtd_count)
-    month_sold = _scope_queryset(InventoryItem.objects.all(), biz).filter(
-        SOLD_Q(), sold_at__gte=month_start, sold_at__lt=month_end
-    )
-    month_sales_count = sold_mtd_count
-    month_sales_amount = _inv_revenue_sum(month_sold)
+    # For display purposes, map to "today" or "month" variables based on active range
+    # This maintains backwards compatibility with templates
+    if active_range == 'today':
+        today_sales_count = period_sales_count
+        today_sales_amount = period_sales_amount
+        month_sales_count = period_sales_count
+        month_sales_amount = period_sales_amount
+    else:
+        # For other ranges, show in "month" metrics
+        today_sales_count = period_sales_count
+        today_sales_amount = period_sales_amount
+        month_sales_count = period_sales_count
+        month_sales_amount = period_sales_amount
     
     # Locations and agents count
     try:
@@ -520,7 +569,7 @@ def home(request):
                 loc_sales = _scope_queryset(InventoryItem.objects.all(), biz).filter(
                     SOLD_Q(),
                     current_location=loc,
-                    sold_at__gte=month_start, sold_at__lt=month_end
+                    sold_at__gte=period_start, sold_at__lt=period_end
                 )
                 loc_amount = _inv_revenue_sum(loc_sales)
                 
@@ -528,18 +577,18 @@ def home(request):
                     'name': loc.name,
                     'stock_count': loc_stock,
                     'sales_amount': loc_amount,
-                    'trend': 'up',  # TODO: Compare with last month
+                    'trend': 'up',  # TODO: Compare with last period
                 })
         except Exception:
             pass
         
-        # Agent leaderboard (using new service)
+        # Agent leaderboard (using new service with filtered period)
         try:
             from tenants.services.leaderboard import get_agent_leaderboard
             agent_leaderboard = get_agent_leaderboard(
                 business=biz,
-                start=month_start.date(),
-                end=month_end.date(),
+                start=period_start.date(),
+                end=period_end.date(),
                 limit=10
             )
             # Convert to match template expectations
@@ -560,31 +609,28 @@ def home(request):
     
     if not is_manager:
         try:
-            # Agent's own sales today
-            agent_today_sales = _scope_queryset(InventoryItem.objects.all(), biz).filter(
+            # Agent's own sales for the filtered period
+            agent_period_sales = _scope_queryset(InventoryItem.objects.all(), biz).filter(
                 SOLD_Q(),
                 assigned_agent=request.user,
-                sold_at__gte=today_start, sold_at__lt=today_end
+                sold_at__gte=period_start, sold_at__lt=period_end
             )
-            agent_today_count = agent_today_sales.count()
-            agent_today_amount = _inv_revenue_sum(agent_today_sales)
+            agent_period_count = agent_period_sales.count()
+            agent_period_amount = _inv_revenue_sum(agent_period_sales)
             
-            # Agent's sales this month
-            agent_month_sales = _scope_queryset(InventoryItem.objects.all(), biz).filter(
-                SOLD_Q(),
-                assigned_agent=request.user,
-                sold_at__gte=month_start, sold_at__lt=month_end
-            )
-            agent_month_count = agent_month_sales.count()
-            agent_month_amount = _inv_revenue_sum(agent_month_sales)
+            # Map to display variables
+            agent_today_count = agent_period_count
+            agent_today_amount = agent_period_amount
+            agent_month_count = agent_period_count
+            agent_month_amount = agent_period_amount
             
-            # Calculate rank using new service
+            # Calculate rank using new service with filtered period
             from tenants.services.leaderboard import get_current_agent_rank
             rank_data = get_current_agent_rank(
                 business=biz,
                 user=request.user,
-                start=month_start.date(),
-                end=month_end.date()
+                start=period_start.date(),
+                end=period_end.date()
             )
             agent_rank = rank_data.get('rank')
             agent_gap = rank_data.get('gap_formatted')
@@ -644,6 +690,10 @@ def home(request):
         # Optional namespace flags
         "HAS_REPORTS_NAMESPACE": has_reports_namespace,
         "show_payslip_banner": show_payslip_banner,
+        # Date filter context (NEW)
+        "active_range": active_range,
+        "selected_date": selected_date,
+        "date_param": date_param,
         **ctx_enhancements,  # Merge enhancements
     }
     

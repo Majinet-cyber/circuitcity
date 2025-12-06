@@ -1,0 +1,137 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Record Payment - {{ business.name }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <!-- Header -->
+    <div class="row mb-4">
+        <div class="col">
+            <div class="d-flex align-items-center gap-2">
+                <a href="{% url 'gym:members_list' %}" class="btn btn-outline-secondary">
+                    <i class="bi bi-arrow-left"></i>
+                </a>
+                <div>
+                    <h2>Record Membership Payment</h2>
+                    <p class="text-muted mb-0">{{ business.name }}</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <!-- Payment Form -->
+        <div class="col-12 col-lg-8 mb-4">
+            <div class="glass-card p-4">
+                <form method="post">
+                    {% csrf_token %}
+                    
+                    <div class="mb-3">
+                        <label for="{{ form.member.id_for_label }}" class="form-label">
+                            Member <span class="text-danger">*</span>
+                        </label>
+                        {{ form.member }}
+                        {% if form.member.errors %}
+                            <div class="text-danger small mt-1">{{ form.member.errors }}</div>
+                        {% endif %}
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="{{ form.amount.id_for_label }}" class="form-label">
+                            Amount (MWK) <span class="text-danger">*</span>
+                        </label>
+                        {{ form.amount }}
+                        {% if form.amount.errors %}
+                            <div class="text-danger small mt-1">{{ form.amount.errors }}</div>
+                        {% endif %}
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="{{ form.start_date.id_for_label }}" class="form-label">
+                            Start Date <span class="text-danger">*</span>
+                        </label>
+                        {{ form.start_date }}
+                        <small class="form-text text-muted">
+                            Membership will automatically extend by 30 days from this date
+                        </small>
+                        {% if form.start_date.errors %}
+                            <div class="text-danger small mt-1">{{ form.start_date.errors }}</div>
+                        {% endif %}
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="{{ form.notes.id_for_label }}" class="form-label">
+                            Notes (Optional)
+                        </label>
+                        {{ form.notes }}
+                        {% if form.notes.errors %}
+                            <div class="text-danger small mt-1">{{ form.notes.errors }}</div>
+                        {% endif %}
+                    </div>
+
+                    <div class="d-flex gap-2">
+                        <button type="submit" class="btn btn-primary">
+                            <i class="bi bi-check-circle"></i> Record Payment
+                        </button>
+                        <a href="{% url 'gym:members_list' %}" class="btn btn-outline-secondary">
+                            Cancel
+                        </a>
+                    </div>
+                </form>
+            </div>
+
+            <!-- Recent Payments -->
+            {% if recent_payments %}
+            <div class="glass-card p-4 mt-4">
+                <h5 class="mb-3">Recent Payments</h5>
+                <div class="table-responsive">
+                    <table class="table table-hover table-sm mb-0">
+                        <thead>
+                            <tr>
+                                <th>Member</th>
+                                <th>Amount</th>
+                                <th>Valid Until</th>
+                                <th>Date</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for payment in recent_payments %}
+                            <tr>
+                                <td>{{ payment.member.name }}</td>
+                                <td class="fw-semibold">MWK {{ payment.amount|floatformat:2 }}</td>
+                                <td>{{ payment.end_date|date:"d M Y" }}</td>
+                                <td class="small text-muted">{{ payment.paid_at|date:"d M Y" }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+
+        <!-- Info Sidebar -->
+        <div class="col-12 col-lg-4">
+            <div class="glass-card p-4">
+                <h5 class="mb-3">
+                    <i class="bi bi-info-circle"></i> Membership Information
+                </h5>
+                <p class="text-muted small mb-3">
+                    Each membership payment provides access for 30 days from the start date.
+                </p>
+                <hr>
+                <div class="mb-3">
+                    <label class="text-muted small">Standard Membership</label>
+                    <div class="fw-semibold">30 Days</div>
+                </div>
+                <hr>
+                <p class="text-muted small mb-0">
+                    <strong>Auto-Extension:</strong> If a member has an active membership, the new period will automatically start after their current membership expires.
+                </p>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+

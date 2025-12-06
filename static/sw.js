@@ -1,18 +1,25 @@
-// ---- Circuit City SW (network-first for pages, SWR for static) ----
+// ---- Emajinet Service Worker (PWA) ----
+// Network-first for HTML, Stale-While-Revalidate for static assets
 // Bump VERSION on every deploy to force a refresh for all users.
-const VERSION = 'cc-v3-2025-08-22';
+const VERSION = 'emajinet-v1-2025-12-06';
 const STATIC_CACHE = `${VERSION}-static`;
 const PAGE_CACHE   = `${VERSION}-pages`;
 const CDN_CACHE    = `${VERSION}-cdn`;
+const OFFLINE_PAGE = '/offline/';
 
 const PRECACHE_ASSETS = [
-  '/',                        // app shell
+  '/',                                          // app shell
+  '/home/',                                     // home/dashboard
+  '/inventory/dashboard/',                      // main dashboard
   '/static/css/tokens.css',
   '/static/css/app.css',
   '/static/css/polish.css',
+  '/static/css/mobile.css',
   '/static/js/app.js',
   '/static/manifest.webmanifest',
-  '/static/favicon.ico'
+  '/static/favicon.ico',
+  '/static/icons/icon-192.png',
+  '/static/img/majn.png'
 ];
 
 // Simple helpers
@@ -50,7 +57,7 @@ async function swr(cacheName, request) {
   return cached || (await fetchPromise) || cached || Response.error();
 }
 
-// Network-First (with cache fallback)
+// Network-First (with cache fallback and offline page)
 async function networkFirst(cacheName, request) {
   try {
     const res = await fetch(request);
@@ -59,14 +66,40 @@ async function networkFirst(cacheName, request) {
   } catch (_) {
     const cache = await caches.open(cacheName);
     const cached = await cache.match(request, { ignoreVary: true });
-    return cached || caches.match('/') || Response.error();
+    if (cached) return cached;
+    
+    // If no cached version, try to serve offline page for HTML requests
+    if (isDoc(request)) {
+      const offlinePage = await caches.match(OFFLINE_PAGE);
+      if (offlinePage) return offlinePage;
+    }
+    
+    // Last resort: try app shell
+    const appShell = await caches.match('/');
+    return appShell || Response.error();
   }
 }
 
-// Install: precache app shell
+// Install: precache app shell and key assets
 self.addEventListener('install', (event) => {
   event.waitUntil(
-    caches.open(STATIC_CACHE).then((cache) => cache.addAll(PRECACHE_ASSETS))
+    (async () => {
+      const cache = await caches.open(STATIC_CACHE);
+      // Try to cache all assets, but don't fail if some don't exist yet
+      try {
+        await cache.addAll(PRECACHE_ASSETS);
+      } catch (e) {
+        console.warn('Some precache assets failed to load:', e);
+        // Cache what we can individually
+        for (const asset of PRECACHE_ASSETS) {
+          try {
+            await cache.add(asset);
+          } catch (_) {
+            console.warn('Failed to cache:', asset);
+          }
+        }
+      }
+    })()
   );
   self.skipWaiting();
 });

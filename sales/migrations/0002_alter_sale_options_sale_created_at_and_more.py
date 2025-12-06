@@ -19,7 +19,7 @@ class Migration(migrations.Migration):
         migrations.AddField(
             model_name='sale',
             name='created_at',
-            field=models.DateTimeField(db_index=True, default=django.utils.timezone.now, editable=False),
+            field=models.DateTimeField(default=django.utils.timezone.now, editable=False),
         ),
         migrations.AlterField(
             model_name='sale',
@@ -31,22 +31,7 @@ class Migration(migrations.Migration):
             name='price',
             field=models.DecimalField(decimal_places=2, max_digits=12, validators=[django.core.validators.MinValueValidator(0)]),
         ),
-        migrations.AddIndex(
-            model_name='sale',
-            index=models.Index(fields=['created_at'], name='sale_created_at_idx'),
-        ),
-        migrations.AddIndex(
-            model_name='sale',
-            index=models.Index(fields=['sold_at'], name='sale_sold_at_idx'),
-        ),
-        migrations.AddIndex(
-            model_name='sale',
-            index=models.Index(fields=['location', 'created_at'], name='sale_loc_created_idx'),
-        ),
-        migrations.AddIndex(
-            model_name='sale',
-            index=models.Index(fields=['agent', 'created_at'], name='sale_agent_created_idx'),
-        ),
+        # Indexes already exist from 0001_initial - no need to add them again
         migrations.AddConstraint(
             model_name='sale',
             constraint=models.CheckConstraint(check=models.Q(('price__gte', 0)), name='sale_price_nonneg'),

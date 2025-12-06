@@ -3,8 +3,8 @@
 {% block title %}Gym · Emajinet{% endblock %}
 
 {% block content %}
-{% url 'inventory:gym_members_list' as members_url %}
-{% url 'inventory:gym_add_payment' as add_payment_url %}
+{% url 'gym:members_list' as members_url %}
+{% url 'gym:add_payment' as add_payment_url %}
 {% url 'inventory:time_logs' as checkin_url %}
 
 {% comment %}Branded header with greeting{% endcomment %}

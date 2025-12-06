@@ -18,6 +18,8 @@ urlpatterns = [
     path("member/<int:member_id>/edit/", views_gym.member_edit, name="member_edit"),
     path("member/<int:member_id>/archive/", views_gym.member_archive, name="member_archive"),
     path("member/<int:member_id>/restore/", views_gym.member_restore, name="member_restore"),
+    path("member/<int:member_id>/set-paid/", views_gym.member_set_paid, name="member_set_paid"),
+    path("member/<int:member_id>/checkin/", views_gym.member_checkin, name="member_checkin"),
     
     # Payments
     path("payment/add/", views_gym.add_payment, name="add_payment"),
