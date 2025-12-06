@@ -44,8 +44,14 @@ _sim_results_api = _get(_views, "sim_results_api", "results API missing")
 _api_run         = _get(_api,   "run_simulation",  "api_run missing")
 _api_forecast    = _get(_api,   "ai_forecast_api", "ai_forecast missing")
 _api_monte       = _get(_api,   "monte_carlo_api", "monte_carlo missing")
+_business_sim    = _get(_views, "business_simulator", "business_simulator view missing")
 
 urlpatterns = [
+    # ----------------------
+    # Business Simulator (Manager-only, uses real data)
+    # ----------------------
+    path("business/",        manager_required(_business_sim), name="business_home"),
+    
     # ----------------------
     # Core scenario pages  (ADMIN/MANAGER ONLY)
     # ----------------------

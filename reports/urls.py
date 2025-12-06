@@ -14,6 +14,10 @@ urlpatterns = [
     # Back-compat alias: /reports/index/ -> /reports/
     path("index/", RedirectView.as_view(pattern_name="reports:home", permanent=False), name="index"),
 
+    # Report pages (for templates that link to dedicated report views)
+    path("sales/", views.sales_report, name="sales"),
+    path("inventory/", views.inventory_report, name="inventory"),
+
     # -------------------------------
     # API (charts / tables)
     # -------------------------------
@@ -30,6 +34,10 @@ urlpatterns = [
     path("export/expenses.csv",          views_export.export_expenses_csv,          name="export_expenses_csv"),
     path("export/inventory.csv",         views_export.export_inventory_csv,         name="export_inventory_csv"),
     path("export/management-report.csv", views_export.export_management_report_csv, name="export_management_csv"),
+    # New exports for monthly business report
+    path("export/sales/",   views_export.export_monthly_sales,   name="export_monthly_sales"),
+    path("export/costs/",   views_export.export_monthly_costs,   name="export_monthly_costs"),
+    path("export/summary/", views_export.export_monthly_summary, name="export_monthly_summary"),
 ]
 
 # ðŸ”Ž DEBUG-only alias to easily see the headers from reports_home

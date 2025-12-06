@@ -152,13 +152,20 @@ def _wizard_step_model(request, ctx, business):
         return _redirect_to_step(1)
     
     if request.method == "POST":
-        model = request.POST.get("model", "").strip()
         product_id = request.POST.get("product_id", "").strip()
-        if model and product_id:
-            request.session["sale_wizard_model"] = model
-            request.session["sale_wizard_product_id"] = product_id
-            request.session["sale_wizard_step"] = 3
-            return _redirect_to_step(3)
+        if product_id:
+            # Get the product to extract the model name
+            try:
+                product = PhoneProductCatalog.objects.get(id=product_id, business=business)
+                model = product.model_name
+                
+                # Store both model name and product_id
+                request.session["sale_wizard_model"] = model
+                request.session["sale_wizard_product_id"] = product_id
+                request.session["sale_wizard_step"] = 3
+                return _redirect_to_step(3)
+            except PhoneProductCatalog.DoesNotExist:
+                messages.error(request, "Invalid model selected")
         else:
             messages.error(request, "Please select a model")
     
@@ -350,6 +357,7 @@ def _wizard_step_confirm(request, ctx, business):
     if request.method == "POST":
         selling_price = request.POST.get("selling_price", "").strip()
         cost_price = request.POST.get("cost_price", "").strip()
+        payment_method = request.POST.get("payment_method", "CASH").strip()
         
         # Validation
         try:
@@ -362,6 +370,11 @@ def _wizard_step_confirm(request, ctx, business):
         if selling_price <= 0:
             messages.error(request, "Selling price must be greater than zero")
             return _redirect_to_step(5)
+        
+        # Validate payment method
+        valid_payment_methods = ["CASH", "BANK", "MOBILE_MONEY"]
+        if payment_method not in valid_payment_methods:
+            payment_method = "CASH"  # Default to cash if invalid
         
         # NEW BEHAVIOR: Look up the existing IN_STOCK item and mark it SOLD
         # (Step 4 validated and stored the stock_item_id in session)
@@ -392,6 +405,7 @@ def _wizard_step_confirm(request, ctx, business):
         item.selling_price = selling_price
         item.sold_at = timezone.now()
         item.assigned_agent = request.user
+        item.payment_method = payment_method
         
         # Use existing order_price (cost) if present, otherwise use entered cost_price
         if not item.order_price or item.order_price == 0:

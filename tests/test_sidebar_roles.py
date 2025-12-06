@@ -211,10 +211,72 @@ class TestSidebarRoleVisibility:
         assert len(manager_items) > 0, \
             "Expected at least one item with require_manager=True"
         
-        # Check that Locations and Admin Wallet are in manager_items
+        # Check that Locations, Admin Wallet, and Costs are in manager_items
         manager_labels = [item.get("label") for item in manager_items]
         assert "Locations" in manager_labels, \
             f"Expected 'Locations' in manager items, got {manager_labels}"
         assert "Admin Wallet" in manager_labels, \
             f"Expected 'Admin Wallet' in manager items, got {manager_labels}"
+        assert "Costs" in manager_labels, \
+            f"Expected 'Costs' in manager items, got {manager_labels}"
+    
+    def test_manager_sees_costs_link_in_money_section(self, setup_business_with_roles, client: Client):
+        """Test that managers see the Costs link under the MONEY section."""
+        data = setup_business_with_roles
+        manager = data["manager"]
+        business = data["business"]
+        
+        # Log in as manager
+        client.force_login(manager)
+        
+        # Set active business in session
+        session = client.session
+        session["active_business_id"] = business.id
+        session.save()
+        
+        # GET a dashboard page that renders the sidebar
+        url = reverse("dashboard:home")
+        response = client.get(url)
+        
+        # Assert 200 OK
+        assert response.status_code == 200, f"Expected 200, got {response.status_code}"
+        
+        # Check that the response contains the Costs link
+        content = response.content.decode("utf-8")
+        
+        # Assert "Costs" appears in the sidebar
+        assert "Costs" in content, \
+            "Expected 'Costs' to appear in sidebar for manager"
+        
+        # Assert costs admin URL is present
+        assert "/wallet/admin/costs/" in content, \
+            "Expected costs admin URL to appear in sidebar for manager"
+    
+    def test_agent_does_not_see_costs_link(self, setup_business_with_roles, client: Client):
+        """Test that agents do NOT see the Costs link in the sidebar."""
+        data = setup_business_with_roles
+        agent = data["agent"]
+        business = data["business"]
+        
+        # Log in as agent
+        client.force_login(agent)
+        
+        # Set active business in session
+        session = client.session
+        session["active_business_id"] = business.id
+        session.save()
+        
+        # GET a dashboard page that renders the sidebar
+        url = reverse("dashboard:home")
+        response = client.get(url)
+        
+        # Assert 200 OK
+        assert response.status_code == 200, f"Expected 200, got {response.status_code}"
+        
+        # Check that the response does NOT contain the Costs link
+        content = response.content.decode("utf-8")
+        
+        # Assert costs admin URL is NOT present
+        assert "/wallet/admin/costs/" not in content, \
+            "Expected costs admin URL to NOT appear in sidebar for agent"
 

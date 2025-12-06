@@ -1,0 +1,409 @@
+{% extends "base.html" %}
+{% load humanize %}
+
+{% block title %}Business Simulator · {{ business.name }}{% endblock %}
+
+{% block extra_css %}
+<style>
+  :root {
+    --sim-bg: #f8fafc;
+    --sim-panel: #ffffff;
+    --sim-border: #e2e8f0;
+    --sim-text: #0f172a;
+    --sim-muted: #64748b;
+    --sim-accent: #2563eb;
+    --sim-shadow: 0 10px 30px rgba(15, 23, 42, 0.08);
+  }
+
+  .simulator-page {
+    max-width: 1200px;
+    margin: 2rem auto;
+    padding: 0 1rem;
+  }
+
+  .page-header {
+    text-align: center;
+    margin-bottom: 3rem;
+  }
+
+  .page-header h1 {
+    font-size: 2.5rem;
+    font-weight: 900;
+    color: var(--sim-text);
+    margin-bottom: 0.5rem;
+  }
+
+  .page-header p {
+    font-size: 1.1rem;
+    color: var(--sim-muted);
+  }
+
+  .section {
+    background: var(--sim-panel);
+    border: 1px solid var(--sim-border);
+    border-radius: 20px;
+    padding: 2rem;
+    margin-bottom: 2rem;
+    box-shadow: var(--sim-shadow);
+  }
+
+  .section-title {
+    font-size: 1.5rem;
+    font-weight: 800;
+    color: var(--sim-text);
+    margin-bottom: 1.5rem;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+  }
+
+  .snapshot-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 1.5rem;
+  }
+
+  .snapshot-card {
+    text-align: center;
+    padding: 1.5rem;
+    border-radius: 16px;
+    border: 2px solid var(--sim-border);
+    background: linear-gradient(135deg, #f8fafc, #f1f5f9);
+  }
+
+  .snapshot-card.revenue {
+    background: linear-gradient(135deg, #fef3c7, #fefce8);
+    border-color: #fbbf24;
+  }
+
+  .snapshot-card.costs {
+    background: linear-gradient(135deg, #fef2f2, #fee2e2);
+    border-color: #f87171;
+  }
+
+  .snapshot-card.profit {
+    background: linear-gradient(135deg, #dcfce7, #f0fdf4);
+    border-color: #86efac;
+  }
+
+  .snapshot-label {
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: var(--sim-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-bottom: 0.5rem;
+  }
+
+  .snapshot-value {
+    font-size: 2rem;
+    font-weight: 900;
+    color: var(--sim-text);
+  }
+
+  .snapshot-meta {
+    font-size: 0.875rem;
+    color: var(--sim-muted);
+    margin-top: 0.5rem;
+  }
+
+  .sim-controls {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 1.5rem;
+    margin-bottom: 2rem;
+  }
+
+  .control-group {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .control-label {
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: var(--sim-text);
+    margin-bottom: 0.5rem;
+  }
+
+  .control-input {
+    padding: 0.875rem 1rem;
+    border: 2px solid var(--sim-border);
+    border-radius: 12px;
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: var(--sim-accent);
+    transition: all 0.2s;
+  }
+
+  .control-input:focus {
+    outline: none;
+    border-color: var(--sim-accent);
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+  }
+
+  .control-hint {
+    font-size: 0.8rem;
+    color: var(--sim-muted);
+    margin-top: 0.25rem;
+  }
+
+  .results-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 1.25rem;
+  }
+
+  .result-card {
+    padding: 1.5rem;
+    border-radius: 14px;
+    border: 2px solid;
+    text-align: center;
+  }
+
+  .result-card.revenue {
+    background: linear-gradient(135deg, #dbeafe, #eff6ff);
+    border-color: #93c5fd;
+  }
+
+  .result-card.costs {
+    background: linear-gradient(135deg, #fee2e2, #fef2f2);
+    border-color: #fca5a5;
+  }
+
+  .result-card.profit {
+    background: linear-gradient(135deg, #dcfce7, #f0fdf4);
+    border-color: #86efac;
+  }
+
+  .result-label {
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: var(--sim-muted);
+    margin-bottom: 0.5rem;
+  }
+
+  .result-value {
+    font-size: 1.75rem;
+    font-weight: 900;
+    color: var(--sim-text);
+  }
+
+  @media (max-width: 768px) {
+    .snapshot-grid,
+    .sim-controls,
+    .results-grid {
+      grid-template-columns: 1fr;
+    }
+
+    .page-header h1 {
+      font-size: 2rem;
+    }
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="simulator-page">
+  <div class="page-header">
+    <h1>📊 Business Simulator</h1>
+    <p>For {{ business.name }} · Powered by real data</p>
+  </div>
+
+  <!-- Current Snapshot -->
+  <div class="section">
+    <h2 class="section-title">
+      <i class="bi bi-graph-up-arrow"></i>
+      Current Snapshot ({{ period_label }})
+    </h2>
+    <div class="snapshot-grid">
+      <div class="snapshot-card revenue">
+        <div class="snapshot-label">Revenue</div>
+        <div class="snapshot-value">MK {{ snapshot.revenue|floatformat:0|intcomma }}</div>
+        <div class="snapshot-meta">{{ snapshot.sales_count }} sales</div>
+      </div>
+
+      <div class="snapshot-card costs">
+        <div class="snapshot-label">Costs</div>
+        <div class="snapshot-value">MK {{ snapshot.costs|floatformat:0|intcomma }}</div>
+        <div class="snapshot-meta">Operating expenses</div>
+      </div>
+
+      <div class="snapshot-card profit">
+        <div class="snapshot-label">Profit</div>
+        <div class="snapshot-value">MK {{ snapshot.profit|floatformat:0|intcomma }}</div>
+        <div class="snapshot-meta">Net profit</div>
+      </div>
+
+      <div class="snapshot-card">
+        <div class="snapshot-label">Avg Sale</div>
+        <div class="snapshot-value">MK {{ snapshot.avg_sale|floatformat:0|intcomma }}</div>
+        <div class="snapshot-meta">Per transaction</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Scenario Playground -->
+  <div class="section">
+    <h2 class="section-title">
+      <i class="bi bi-calculator"></i>
+      Scenario Playground
+    </h2>
+    <p style="color: var(--sim-muted); margin-bottom: 1.5rem;">
+      Adjust the numbers below to see how changes affect your business
+    </p>
+
+    <div class="sim-controls">
+      <div class="control-group">
+        <label class="control-label" for="sim-customers">
+          <i class="bi bi-people"></i> Customers per month
+        </label>
+        <input
+          type="number"
+          id="sim-customers"
+          class="control-input"
+          value="{{ defaults.customers }}"
+          min="0"
+          step="1"
+        >
+        <small class="control-hint">Expected monthly customers</small>
+      </div>
+
+      <div class="control-group">
+        <label class="control-label" for="sim-average-sale">
+          <i class="bi bi-currency-exchange"></i> Average sale per customer (MWK)
+        </label>
+        <input
+          type="number"
+          id="sim-average-sale"
+          class="control-input"
+          value="{{ defaults.average_sale }}"
+          min="0"
+          step="100"
+        >
+        <small class="control-hint">Average transaction value</small>
+      </div>
+
+      <div class="control-group">
+        <label class="control-label" for="sim-cost-pct">
+          <i class="bi bi-percent"></i> Costs as % of revenue
+        </label>
+        <input
+          type="number"
+          id="sim-cost-pct"
+          class="control-input"
+          value="{{ defaults.cost_pct }}"
+          min="0"
+          max="100"
+          step="1"
+        >
+        <small class="control-hint">Operating costs percentage (0-100%)</small>
+      </div>
+
+      <div class="control-group">
+        <label class="control-label" for="sim-growth">
+          <i class="bi bi-graph-up"></i> Customer growth (%)
+        </label>
+        <input
+          type="number"
+          id="sim-growth"
+          class="control-input"
+          value="{{ defaults.growth_pct }}"
+          min="-50"
+          max="200"
+          step="1"
+        >
+        <small class="control-hint">Monthly growth rate</small>
+      </div>
+    </div>
+
+    <!-- Results -->
+    <h3 style="font-size: 1.2rem; font-weight: 700; margin-bottom: 1rem; color: var(--sim-text);">
+      <i class="bi bi-lightbulb"></i> Simulated Results
+    </h3>
+    <div class="results-grid">
+      <div class="result-card revenue">
+        <div class="result-label">Projected Revenue</div>
+        <div class="result-value" id="sim-revenue">MK 0</div>
+      </div>
+
+      <div class="result-card costs">
+        <div class="result-label">Projected Costs</div>
+        <div class="result-value" id="sim-costs">MK 0</div>
+      </div>
+
+      <div class="result-card profit">
+        <div class="result-label">Projected Profit</div>
+        <div class="result-value" id="sim-profit">MK 0</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Hint -->
+  <div style="text-align: center; color: var(--sim-muted); font-size: 0.9rem; margin-top: 2rem;">
+    <i class="bi bi-info-circle"></i>
+    This simulator uses your actual business data from the last 30 days as a baseline.
+    Adjust the controls above to explore different scenarios.
+  </div>
+</div>
+
+<script>
+  // Business Simulator Logic
+  (function initBusinessSimulator() {
+    const customersInput = document.getElementById('sim-customers');
+    const avgSaleInput = document.getElementById('sim-average-sale');
+    const costPctInput = document.getElementById('sim-cost-pct');
+    const growthInput = document.getElementById('sim-growth');
+
+    const revenueDisplay = document.getElementById('sim-revenue');
+    const costsDisplay = document.getElementById('sim-costs');
+    const profitDisplay = document.getElementById('sim-profit');
+
+    function formatMoney(value) {
+      try {
+        return 'MK ' + new Intl.NumberFormat('en-MW', {
+          maximumFractionDigits: 0,
+        }).format(value);
+      } catch (e) {
+        return 'MK ' + Math.round(value).toLocaleString();
+      }
+    }
+
+    function recalc() {
+      let customers = parseFloat(customersInput.value) || 0;
+      let avgSale = parseFloat(avgSaleInput.value) || 0;
+      let costPct = parseFloat(costPctInput.value) || 0;
+      let growthPct = parseFloat(growthInput.value) || 0;
+
+      // Clamp values
+      if (customers < 0) customers = 0;
+      if (avgSale < 0) avgSale = 0;
+      if (costPct < 0) costPct = 0;
+      if (costPct > 100) costPct = 100;
+
+      // Apply growth
+      const adjustedCustomers = customers * (1 + growthPct / 100);
+
+      // Calculate
+      const revenue = adjustedCustomers * avgSale;
+      const costs = revenue * (costPct / 100);
+      const profit = revenue - costs;
+
+      // Update displays
+      revenueDisplay.textContent = formatMoney(revenue);
+      costsDisplay.textContent = formatMoney(costs);
+      profitDisplay.textContent = formatMoney(profit);
+    }
+
+    // Attach listeners
+    [customersInput, avgSaleInput, costPctInput, growthInput].forEach(input => {
+      input.addEventListener('input', recalc);
+      input.addEventListener('change', recalc);
+    });
+
+    // Initial calculation
+    recalc();
+  })();
+</script>
+{% endblock %}
+

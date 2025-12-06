@@ -55,7 +55,7 @@ urlpatterns = [
 
     # Cost Management (NEW)
     path("admin/costs/", views_costs.admin_cost_list, name="admin_cost_list"),
-    path("admin/costs/new/", views_costs.admin_cost_create, name="admin_cost_create"),
+    path("admin/costs/new/", views_costs.admin_cost_create, name="admin_costs_create"),
     path("admin/costs/<int:cost_id>/edit/", views_costs.admin_cost_edit, name="admin_cost_edit"),
     path("admin/costs/<int:cost_id>/delete/", views_costs.admin_cost_delete, name="admin_cost_delete"),
     

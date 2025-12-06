@@ -144,21 +144,12 @@
             <h5 class="mb-0">
               {% if request.user.is_superuser %}Company Spend Trend (recent){% else %}Business Spend Trend (recent){% endif %}
             </h5>
-            <span class="badge text-bg-light">Last {{ recent|length }} entries</span>
+            <span class="badge text-bg-light">Last 14 days</span>
           </div>
-          <div class="chart-wrap">
-            <canvas id="spendChart" role="img" aria-label="Company spend trend"></canvas>
+          <div class="chart-wrap" id="spendChartContainer">
+            <canvas id="spendChart" role="img" aria-label="Business spend trend"></canvas>
           </div>
-          <small class="text-muted d-block mt-2">Positive bars = payouts; negatives = recoveries/offsets.</small>
-
-          {# Embed a simple data payload for chart.js #}
-          <template id="spend-data">
-            [
-            {% for t in recent reversed %}
-              {"d":"{{ t.created_at|date:'Y-m-d H:i' }}","v":{{ t.amount|default:0|floatformat:2 }}}{% if not forloop.last %},{% endif %}
-            {% endfor %}
-            ]
-          </template>
+          <small class="text-muted d-block mt-2">Shows daily costs (fixed + variable) and agent commissions paid out.</small>
         </div>
       </div>
     </div>
@@ -228,32 +219,82 @@
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
 <script>
 (function(){
-  const el = document.getElementById('spendChart');
-  const tpl = document.getElementById('spend-data');
-  const rows = (() => {
-    try { return JSON.parse((tpl?.textContent||'[]').trim() || '[]'); }
-    catch(e){ return []; }
-  })();
+  const spendTrendData = JSON.parse('{{ business_spend_trend|default:"[]"|escapejs }}');
+  const ctx = document.getElementById('spendChart');
+  const container = document.getElementById('spendChartContainer');
 
-  const labels = rows.map(r => r.d);
-  const vals = rows.map(r => Number(r.v||0));
+  if (!spendTrendData || spendTrendData.length === 0) {
+    // If no data, show a friendly message
+    if (container) {
+      container.innerHTML = '<p class="text-muted px-3 py-4 text-center">No spend data yet. Add costs or pay commissions to see trends here.</p>';
+    }
+  } else {
+    // Extract labels and datasets
+    const labels = spendTrendData.map(row => row.date);
+    const costSeries = spendTrendData.map(row => Number(row.costs || 0));
+    const commissionSeries = spendTrendData.map(row => Number(row.commissions || 0));
 
-  if(el){
-    new Chart(el, {
-      type: 'bar',
-      data: { labels, datasets: [{ label: 'MWK', data: vals }] },
-      options: {
-        responsive:true, maintainAspectRatio:false,
-        scales:{
-          y:{ beginAtZero:true, grid:{ drawBorder:false }, ticks:{ callback:v => (Number(v)||0).toLocaleString() } },
-          x:{ grid:{ display:false } }
+    if (ctx) {
+      new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels: labels,
+          datasets: [
+            {
+              label: 'Costs',
+              data: costSeries,
+              borderColor: 'rgba(220, 53, 69, 0.8)',
+              backgroundColor: 'rgba(220, 53, 69, 0.1)',
+              tension: 0.4,
+              fill: true,
+            },
+            {
+              label: 'Commissions',
+              data: commissionSeries,
+              borderColor: 'rgba(13, 110, 253, 0.8)',
+              backgroundColor: 'rgba(13, 110, 253, 0.1)',
+              tension: 0.4,
+              fill: true,
+            },
+          ],
         },
-        plugins:{
-          legend:{ display:false },
-          tooltip:{ callbacks:{ label:(ctx)=> " MWK " + (ctx.parsed.y||0).toLocaleString() } }
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          interaction: {
+            mode: 'index',
+            intersect: false,
+          },
+          scales: {
+            y: {
+              beginAtZero: true,
+              grid: { drawBorder: false },
+              ticks: {
+                callback: function(value) {
+                  return 'MWK ' + value.toLocaleString();
+                }
+              }
+            },
+            x: {
+              grid: { display: false }
+            }
+          },
+          plugins: {
+            legend: {
+              display: true,
+              position: 'top',
+            },
+            tooltip: {
+              callbacks: {
+                label: function(context) {
+                  return context.dataset.label + ': MWK ' + context.parsed.y.toLocaleString();
+                }
+              }
+            }
+          }
         }
-      }
-    });
+      });
+    }
   }
 })();
 </script>

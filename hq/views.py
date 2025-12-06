@@ -251,6 +251,10 @@ def _dashboard_inline(ctx: dict) -> str:
 
 @hq_admin_required
 def dashboard(request):
+    # Log HQ dashboard access
+    from audit.utils import log_hq_action
+    log_hq_action(request, action="VIEW_PAGE", entity_type="HQ_DASHBOARD", message="Accessed HQ dashboard")
+    
     now = timezone.now()
     seven = now - timedelta(days=7)
     thirty = now - timedelta(days=30)
@@ -529,6 +533,10 @@ def monthly_drill_down_api(request):
 # -------------------------------------------------------------------
 @hq_admin_required
 def businesses(request):
+    # Log HQ access to businesses list
+    from audit.utils import log_hq_action
+    log_hq_action(request, action="VIEW_PAGE", entity_type="BUSINESS_LIST", message="Accessed businesses list")
+    
     start, end, rng = _date_range_from_request(request)
     q = (request.GET.get("q") or "").strip()
 
@@ -546,6 +554,12 @@ def businesses(request):
 @hq_admin_required
 def business_detail(request, pk: int):
     biz = get_object_or_404(Business, pk=pk)
+    
+    # Log HQ access to business detail
+    from audit.utils import log_hq_action
+    log_hq_action(request, action="VIEW_PAGE", entity_type="Business", entity_id=pk, 
+                  message=f"Viewed business detail: {biz.name}", business=biz)
+    
     start, end, rng = _date_range_from_request(request)
 
     inv = Invoice.objects.filter(business=biz)
@@ -585,13 +599,19 @@ def business_detail(request, pk: int):
 
     agents_qs = Membership.objects.filter(role="AGENT", business=biz).select_related("user")
     limits = _limits_for_business(biz)
+    
+    # Get subscription for membership controls
+    subscription = getattr(biz, 'subscription', None)
+    total_invoices = inv.count()
 
     ctx = {
         "biz": biz,
         "range": rng, "start": start, "end": end,
         "paid_total": paid_total, "open_total": open_total,
+        "total_invoices": total_invoices,
         "active_subs": active_subs, "mrr": mrr,
         "agents_qs": agents_qs,
+        "subscription": subscription,
         "series_paid": [{"label": (r["m"].strftime("%Y-%m") if r["m"] else ""), "amount": float(r["amount"] or 0)} for r in paid_series_qs],
         "limits": limits,
         "active_tab": "businesses",
@@ -604,6 +624,10 @@ def business_detail(request, pk: int):
 # -------------------------------------------------------------------
 @hq_admin_required
 def subscriptions(request):
+    # Log HQ access to subscriptions list
+    from audit.utils import log_hq_action
+    log_hq_action(request, action="VIEW_PAGE", entity_type="SUBSCRIPTION_LIST", message="Accessed subscriptions list")
+    
     start, end, rng = _date_range_from_request(request)
     q = (request.GET.get("q") or "").strip()
     status = (request.GET.get("status") or "").strip()
@@ -654,6 +678,10 @@ def subscriptions(request):
 # -------------------------------------------------------------------
 @hq_admin_required
 def invoices(request):
+    # Log HQ access to invoices list
+    from audit.utils import log_hq_action
+    log_hq_action(request, action="VIEW_PAGE", entity_type="INVOICE_LIST", message="Accessed invoices list")
+    
     qs = Invoice.objects.select_related('business', 'created_by')
 
     status = (request.GET.get('status') or '').strip()
@@ -676,6 +704,10 @@ def invoices(request):
 # -------------------------------------------------------------------
 @hq_admin_required
 def agents(request):
+    # Log HQ access to agents list
+    from audit.utils import log_hq_action
+    log_hq_action(request, action="VIEW_PAGE", entity_type="AGENT_LIST", message="Accessed agents list")
+    
     q = (request.GET.get("q") or "").strip()
     rows = Membership.objects.filter(role="AGENT").select_related("business", "user")
     if q:
@@ -707,6 +739,10 @@ def stock_trends(request):
     """
     HQ Stock Trends (SQLite-safe)
     """
+    # Log HQ access to stock trends
+    from audit.utils import log_hq_action
+    log_hq_action(request, action="VIEW_PAGE", entity_type="STOCK_TRENDS", message="Accessed stock trends")
+    
     # dates
     def _parse(dtxt, fallback):
         try:

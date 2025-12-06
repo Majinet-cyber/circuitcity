@@ -1,48 +1,175 @@
 {% load static %}
 <!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>{{ biz.name }} · Profile</title>
+<title>{{ biz.name }} · Business Detail · HQ</title>
 <style>
   body{font:500 15px/1.45 system-ui;background:#f7fbff;margin:0;color:#0b1b3a}
-  .shell{max-width:1100px;margin:20px auto;padding:0 14px}
+  .shell{max-width:1200px;margin:20px auto;padding:0 14px}
   h1{margin:0 0 8px}
+  h2{margin:20px 0 10px;font-size:18px}
   .muted{color:#476aa0}
   .grid{display:grid;gap:12px;grid-template-columns:1fr}
   @media(min-width:900px){.grid{grid-template-columns:1fr 1fr}}
-  .card{padding:16px;border:1px solid #d8e4ff;border-radius:16px;background:#fff;box-shadow:0 10px 30px rgba(12,36,97,.06)}
-  .num{font-weight:900}
-  ul{margin:8px 0 0}
+  .card{padding:18px;border:1px solid #d8e4ff;border-radius:16px;background:#fff;box-shadow:0 10px 30px rgba(12,36,97,.06)}
+  .num{font-weight:900;color:#1e40af}
+  ul{margin:8px 0 0;padding-left:20px}
   canvas{width:100%;height:160px}
   .list{margin-top:10px}
   .pill{padding:6px 10px;border-radius:999px;border:1px solid #d8e4ff;background:#eef5ff;color:#2757d8;font-weight:800}
+  .badge{display:inline-block;padding:4px 10px;border-radius:999px;font-size:13px;font-weight:700}
+  .badge-success{background:#10b981;color:#fff}
+  .badge-info{background:#06b6d4;color:#fff}
+  .badge-warning{background:#f59e0b;color:#fff}
+  .badge-danger{background:#ef4444;color:#fff}
+  .badge-secondary{background:#6b7280;color:#fff}
+  .btn{padding:8px 16px;border-radius:10px;border:none;font-weight:600;cursor:pointer;text-decoration:none;display:inline-block;font-size:14px;transition:all .15s}
+  .btn-primary{background:#2563eb;color:#fff}
+  .btn-primary:hover{background:#1e40af}
+  .btn-success{background:#10b981;color:#fff}
+  .btn-success:hover{background:#059669}
+  .btn-danger{background:#ef4444;color:#fff}
+  .btn-danger:hover{background:#dc2626}
+  .btn-sm{padding:6px 12px;font-size:13px}
+  .form-group{margin-bottom:12px}
+  .form-label{display:block;font-weight:600;margin-bottom:4px;font-size:14px}
+  .form-control{width:100%;padding:8px 12px;border:1px solid #d1d5db;border-radius:8px;font-size:14px}
+  .modal{display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.5);z-index:100;align-items:center;justify-content:center}
+  .modal.show{display:flex}
+  .modal-content{background:#fff;border-radius:16px;padding:24px;max-width:500px;width:90%}
+  .modal-header{margin-bottom:16px;font-size:20px;font-weight:700}
+  .modal-footer{margin-top:20px;display:flex;gap:8px;justify-content:flex-end}
+  .back-link{display:inline-block;margin-bottom:12px;color:#2563eb;text-decoration:none;font-size:14px}
+  .back-link:hover{text-decoration:underline}
+  .status-row{display:flex;gap:8px;align-items:center;margin-bottom:8px}
 </style>
 </head><body>
 <div class="shell">
+  <a href="{% url 'hq:businesses' %}" class="back-link">← Back to Businesses</a>
   <h1>{{ biz.name }}</h1>
-  <div class="muted">Public business overview (no private data).</div>
+  <div class="muted">Business detail · HQ control panel</div>
 
   <div class="grid">
+    <!-- Subscription & Membership Card -->
     <div class="card">
-      <div><span class="num">{{ active_subs }}</span> active subscriptions · MRR <span class="num">{{ mrr }}</span></div>
-      <div><span class="num">{{ total_invoices }}</span> invoices · Paid <span class="num">{{ paid_total }}</span> · Open <span class="num">{{ open_total }}</span></div>
-      <div class="list">
-        <span class="pill">{{ agents_qs|length }} agents</span>
-        <span class="pill">{{ locs_qs|length }} locations</span>
-      </div>
+      <h2>💳 Membership & Subscription</h2>
+      {% if biz.subscription %}
+        {% with sub=biz.subscription %}
+        <div class="status-row">
+          <strong>Status:</strong>
+          {% if sub.status == 'active' or sub.status == 'ACTIVE' %}
+            <span class="badge badge-success">Active</span>
+          {% elif sub.status == 'trial' or sub.status == 'TRIAL' %}
+            <span class="badge badge-info">Trial</span>
+          {% elif sub.status == 'canceled' or sub.status == 'CANCELED' %}
+            <span class="badge badge-danger">Canceled</span>
+          {% elif sub.status == 'expired' or sub.status == 'EXPIRED' %}
+            <span class="badge badge-secondary">Expired</span>
+          {% else %}
+            <span class="badge badge-warning">{{ sub.status }}</span>
+          {% endif %}
+        </div>
+        <div class="status-row">
+          <strong>Plan:</strong> {{ sub.plan.name|default:"None" }}
+          {% if sub.plan.amount %}(MWK {{ sub.plan.amount|floatformat:0 }}/month){% endif %}
+        </div>
+        {% if sub.trial_end %}
+        <div class="status-row">
+          <strong>Trial ends:</strong> {{ sub.trial_end|date:"Y-m-d" }}
+          {% if sub.days_left_in_trial %}
+            ({{ sub.days_left_in_trial }} day{{ sub.days_left_in_trial|pluralize }} left)
+          {% endif %}
+        </div>
+        {% endif %}
+        {% if sub.current_period_end %}
+        <div class="status-row">
+          <strong>Current period ends:</strong> {{ sub.current_period_end|date:"Y-m-d" }}
+        </div>
+        {% endif %}
+        <div style="margin-top:16px;display:flex;gap:8px;flex-wrap:wrap">
+          <button class="btn btn-success btn-sm" onclick="showExtendModal()">➕ Add Days</button>
+          {% if sub.status == 'canceled' or sub.status == 'CANCELED' or sub.status == 'expired' or sub.status == 'EXPIRED' %}
+            <button class="btn btn-primary btn-sm" onclick="activateSubscription('{{ sub.pk }}')">✅ Re-activate</button>
+          {% else %}
+            <button class="btn btn-danger btn-sm" onclick="revokeSubscription('{{ sub.pk }}')">🚫 Revoke/Disable</button>
+          {% endif %}
+        </div>
+        {% endwith %}
+      {% else %}
+        <p>No subscription found for this business.</p>
+      {% endif %}
     </div>
+
+    <!-- Financial Overview Card -->
     <div class="card">
-      <strong>Trajectory (paid invoices)</strong>
+      <h2>💰 Financial Overview</h2>
+      <div><span class="num">{{ active_subs }}</span> active subscriptions</div>
+      <div>MRR: <span class="num">MWK {{ mrr|floatformat:0 }}</span></div>
+      <div style="margin-top:12px">Paid invoices: <span class="num">MWK {{ paid_total|floatformat:0 }}</span></div>
+      <div>Open invoices: <span class="num">MWK {{ open_total|floatformat:0 }}</span></div>
+    </div>
+  </div>
+
+  <div class="grid" style="margin-top:12px">
+    <!-- Team Info Card -->
+    <div class="card">
+      <h2>👥 Team & Resources</h2>
+      <div class="list">
+        <span class="pill">{{ agents_qs|length }} agent{{ agents_qs|length|pluralize }}</span>
+        {% if limits.max_agents and limits.max_agents != -1 %}
+          <small class="muted">(limit: {{ limits.max_agents }})</small>
+        {% else %}
+          <small class="muted">(unlimited)</small>
+        {% endif %}
+      </div>
+      {% if agents_qs %}
+      <ul style="font-size:13px;margin-top:8px">
+        {% for a in agents_qs|slice:":5" %}
+        <li>{{ a.user.get_full_name|default:a.user.username }}</li>
+        {% endfor %}
+        {% if agents_qs|length > 5 %}<li>+ {{ agents_qs|length|add:"-5" }} more...</li>{% endif %}
+      </ul>
+      {% endif %}
+    </div>
+
+    <!-- Trajectory Chart Card -->
+    <div class="card">
+      <h2>📈 Revenue Trajectory</h2>
+      <small class="muted">Paid invoices over time</small>
       <canvas id="spark"></canvas>
     </div>
   </div>
 </div>
+
+<!-- Extend Membership Modal -->
+<div id="extendModal" class="modal">
+  <div class="modal-content">
+    <div class="modal-header">Extend Membership</div>
+    <form id="extendForm">
+      <div class="form-group">
+        <label class="form-label">Number of days to add:</label>
+        <input type="number" class="form-control" id="daysInput" placeholder="e.g., 30" required>
+        <small class="muted">Positive number adds days, negative removes days.</small>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn" onclick="hideExtendModal()">Cancel</button>
+        <button type="submit" class="btn btn-success">Extend</button>
+      </div>
+    </form>
+  </div>
+</div>
+
 <script>
+// Chart rendering
 (function(){
   const data = {{ series_paid|default:"[]"|safe }};
   const c = document.getElementById('spark'), ctx=c.getContext('2d');
   function draw(){
     const w=c.width=c.clientWidth*devicePixelRatio, h=c.height=c.clientHeight*devicePixelRatio;
     ctx.clearRect(0,0,w,h);
-    if(!data.length) return;
+    if(!data.length){
+      ctx.fillStyle='#94a3b8';ctx.font='14px system-ui';ctx.textAlign='center';
+      ctx.fillText('No data',w/2,h/2);
+      return;
+    }
     const pad=10, xw=w-2*pad, yh=h-2*pad;
     const ys=data.map(d=>d.amount); const max=Math.max(10, Math.max(...ys));
     data.forEach((d,i)=>{
@@ -52,7 +179,48 @@
     });
     ctx.strokeStyle="#2563eb"; ctx.lineWidth=2*devicePixelRatio; ctx.stroke();
   }
-  draw(); new ResizeObserver(draw).observe(document.getElementById('spark'));
+  draw(); new ResizeObserver(draw).observe(c);
 })();
+
+// Modal controls
+function showExtendModal(){ document.getElementById('extendModal').classList.add('show'); }
+function hideExtendModal(){ document.getElementById('extendModal').classList.remove('show'); }
+
+// Extend subscription
+document.getElementById('extendForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const days = document.getElementById('daysInput').value;
+  if (!days) return;
+  {% if biz.subscription %}
+  const url = '{% url "hq:sub_extend" biz.subscription.pk %}?days=' + days;
+  try {
+    window.location.href = url; // GET request with redirect
+  } catch(err) {
+    alert('Error extending subscription: ' + err.message);
+  }
+  {% endif %}
+});
+
+// Revoke subscription
+async function revokeSubscription(pk) {
+  if (!confirm('Are you sure you want to revoke/disable this subscription? The business will lose access.')) return;
+  const url = '/hq/subscriptions/' + pk + '/revoke/';
+  try {
+    window.location.href = url; // GET request with redirect
+  } catch(err) {
+    alert('Error revoking subscription: ' + err.message);
+  }
+}
+
+// Activate subscription
+async function activateSubscription(pk) {
+  if (!confirm('Activate this subscription for 30 days?')) return;
+  const url = '/hq/subscriptions/' + pk + '/activate/';
+  try {
+    window.location.href = url; // GET request with redirect
+  } catch(err) {
+    alert('Error activating subscription: ' + err.message);
+  }
+}
 </script>
 </body></html>

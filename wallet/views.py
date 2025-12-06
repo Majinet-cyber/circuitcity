@@ -5,7 +5,7 @@ import csv
 import io
 import json
 from calendar import monthrange
-from datetime import date
+from datetime import date, timedelta
 from decimal import Decimal, InvalidOperation
 from typing import Tuple, Any
 
@@ -15,6 +15,7 @@ from django.contrib.auth import get_user_model
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.core.mail import send_mail
+from django.core.serializers.json import DjangoJSONEncoder
 from django.db.models import Sum, QuerySet
 from django.http import HttpRequest, JsonResponse, HttpResponseBadRequest, HttpResponse, Http404
 from django.shortcuts import get_object_or_404, redirect, render
@@ -653,9 +654,75 @@ class AdminWalletHome(LoginRequiredMixin, TemplateView):
             ctx["total_costs_this_month"] = Decimal("0.00")
             ctx["recurring_monthly_costs"] = Decimal("0.00")
         
+        # Compute Business Spend Trend (costs + commissions) for recent days
+        ctx["business_spend_trend"] = self._compute_spend_trend(business)
+        
         # Set active_tab to prevent template errors
         ctx["active_tab"] = "overview"
         return ctx
+    
+    def _compute_spend_trend(self, business):
+        """
+        Compute spend trend data (costs + commissions) for the last 14 days.
+        Returns JSON string with daily aggregates.
+        """
+        today = timezone.localdate()
+        days_back = 14
+        start_date = today - timedelta(days=days_back)
+        
+        # Get costs (WalletTransaction with type in COST_ONCE_OFF, COST_RECURRING)
+        cost_qs = WalletTransaction.objects.filter(
+            ledger=Ledger.COMPANY,
+            type__in=[TxnType.COST_ONCE_OFF, TxnType.COST_RECURRING],
+            effective_date__gte=start_date,
+            effective_date__lte=today,
+        )
+        if business:
+            cost_qs = cost_qs.filter(business=business)
+        
+        cost_by_date = cost_qs.values('effective_date').annotate(total=Sum('amount'))
+        
+        # Get commissions (SaleCommission)
+        try:
+            from sales.models import SaleCommission
+            commission_qs = SaleCommission.objects.filter(
+                created_at__date__gte=start_date,
+                created_at__date__lte=today,
+            )
+            if business:
+                commission_qs = commission_qs.filter(business=business)
+            
+            commission_by_date = commission_qs.extra(
+                select={'date': 'DATE(created_at)'}
+            ).values('date').annotate(total=Sum('net_amount'))
+        except Exception:
+            # If SaleCommission model is not available or error occurs
+            commission_by_date = []
+        
+        # Build a dictionary keyed by date
+        trend_map = {}
+        
+        for row in cost_by_date:
+            d = row['effective_date']
+            if d not in trend_map:
+                trend_map[d] = {'date': d, 'costs': 0, 'commissions': 0}
+            # Costs are stored as negative, convert to positive for display
+            trend_map[d]['costs'] += abs(float(row['total'] or 0))
+        
+        for row in commission_by_date:
+            # Handle both dict key formats
+            d = row.get('date') or row.get('created_at__date')
+            if isinstance(d, str):
+                d = date.fromisoformat(d)
+            if d not in trend_map:
+                trend_map[d] = {'date': d, 'costs': 0, 'commissions': 0}
+            trend_map[d]['commissions'] += float(row['total'] or 0)
+        
+        # Convert to sorted list
+        trend_data = sorted(trend_map.values(), key=lambda x: x['date'])
+        
+        # Convert to JSON
+        return json.dumps(trend_data, cls=DjangoJSONEncoder)
 
 
 @method_decorator([otp_required, ensure_csrf_cookie], name="dispatch")

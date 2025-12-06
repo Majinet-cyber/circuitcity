@@ -488,3 +488,429 @@ class TestProfitCalculationWithOverheadCosts:
         )
         
         assert recurring_total == Decimal('200000.00')
+
+
+@pytest.mark.django_db
+class TestAdminCostsPageAccess:
+    """Test admin costs page URL resolution and access."""
+    
+    def test_admin_costs_urls_resolve(self):
+        """Test that admin costs URLs can be reversed."""
+        from django.urls import reverse
+        
+        url_list = reverse("wallet:admin_cost_list")
+        url_create = reverse("wallet:admin_costs_create")
+        
+        assert url_list == "/wallet/admin/costs/"
+        assert url_create == "/wallet/admin/costs/new/"
+    
+    def test_admin_costs_page_loads_for_manager(self, client):
+        """Test that admin costs page loads successfully for a manager."""
+        from django.contrib.auth import get_user_model
+        from django.urls import reverse
+        from tenants.models import Membership
+        
+        User = get_user_model()
+        
+        # Create business
+        business = Business.objects.create(
+            name="Test Business",
+            slug="test-biz",
+            status="ACTIVE",
+        )
+        
+        # Create manager user
+        manager = User.objects.create_user(
+            username='manager@example.com',
+            email='manager@example.com',
+            password='testpass123',
+            is_staff=True
+        )
+        
+        # Create membership
+        Membership.objects.create(
+            user=manager,
+            business=business,
+            role='MANAGER',
+            status='ACTIVE'
+        )
+        
+        # Login as manager
+        client.force_login(manager)
+        
+        # Make request to admin costs list page
+        resp = client.get(reverse("wallet:admin_cost_list"))
+        
+        # Should return 200 (not 500)
+        assert resp.status_code == 200
+        assert b'Business Costs' in resp.content or b'business costs' in resp.content.lower()
+    
+    def test_admin_costs_page_loads_without_notifications_context(self, client):
+        """Test that admin costs page loads even without notifications context processor."""
+        from django.contrib.auth import get_user_model
+        from django.urls import reverse
+        from django.test import RequestFactory
+        from wallet.views_costs import admin_cost_list
+        from tenants.models import Membership
+        
+        User = get_user_model()
+        factory = RequestFactory()
+        
+        # Create business
+        business = Business.objects.create(
+            name="Test Business",
+            slug="test-biz",
+            status="ACTIVE",
+        )
+        
+        # Create manager user
+        manager = User.objects.create_user(
+            username='manager2@example.com',
+            email='manager2@example.com',
+            password='testpass123',
+            is_staff=True
+        )
+        
+        # Create membership
+        Membership.objects.create(
+            user=manager,
+            business=business,
+            role='MANAGER',
+            status='ACTIVE'
+        )
+        
+        # Create a request with minimal context (no notifications context processor)
+        request = factory.get(reverse("wallet:admin_cost_list"))
+        request.user = manager
+        request.business = business
+        
+        # Call the view directly
+        response = admin_cost_list(request)
+        
+        # Should return 200, not raise VariableDoesNotExist
+        assert response.status_code == 200
+    
+    def test_admin_cost_create_url_accessible(self, client):
+        """Test that the create cost URL is accessible."""
+        from django.contrib.auth import get_user_model
+        from django.urls import reverse
+        from tenants.models import Membership
+        
+        User = get_user_model()
+        
+        # Create business
+        business = Business.objects.create(
+            name="Test Business",
+            slug="test-biz",
+            status="ACTIVE",
+        )
+        
+        # Create manager user
+        manager = User.objects.create_user(
+            username='manager3@example.com',
+            email='manager3@example.com',
+            password='testpass123',
+            is_staff=True
+        )
+        
+        # Create membership
+        Membership.objects.create(
+            user=manager,
+            business=business,
+            role='MANAGER',
+            status='ACTIVE'
+        )
+        
+        # Login
+        client.force_login(manager)
+        
+        # Access create form
+        resp = client.get(reverse("wallet:admin_costs_create"))
+        
+        # Should show the form
+        assert resp.status_code == 200
+        assert b'Add New Cost' in resp.content or b'Add Cost' in resp.content
+
+
+@pytest.mark.django_db
+class TestBusinessSpendTrend:
+    """Test business spend trend chart data generation."""
+    
+    def test_spend_trend_includes_costs_and_commissions(self, client):
+        """Test that spend trend includes both costs and commissions."""
+        from django.contrib.auth import get_user_model
+        from django.urls import reverse
+        import json
+        
+        User = get_user_model()
+        
+        # Create business
+        business = Business.objects.create(
+            name="Test Business",
+            slug="test-biz",
+            status="ACTIVE",
+        )
+        
+        # Create manager user
+        manager = User.objects.create_user(
+            username="manager",
+            email="manager@test.com",
+            password="password123",
+            is_staff=True,
+        )
+        
+        # Create membership
+        from tenants.models import BusinessUserMembership
+        BusinessUserMembership.objects.create(
+            user=manager,
+            business=business,
+            role='MANAGER',
+            status='ACTIVE'
+        )
+        
+        # Create a cost transaction
+        today = timezone.localdate()
+        cost = WalletTransaction.objects.create(
+            ledger=Ledger.COMPANY,
+            type=TxnType.COST_ONCE_OFF,
+            amount=Decimal("-1000.00"),
+            note="Test Cost",
+            business=business,
+            effective_date=today,
+        )
+        
+        # Create a commission
+        try:
+            from sales.models import SaleCommission, Sale
+            from inventory.models import InventoryItem, Location
+            
+            # Create location
+            location = Location.objects.create(
+                name="Test Location",
+                business=business,
+                status="ACTIVE",
+            )
+            
+            # Create inventory item
+            item = InventoryItem.objects.create(
+                imei="123456789012345",
+                model="Test Phone",
+                location=location,
+                status="SOLD",
+            )
+            
+            # Create sale
+            sale = Sale.objects.create(
+                item=item,
+                agent=manager,
+                location=location,
+                sold_at=today,
+                price=Decimal("10000.00"),
+            )
+            
+            # Create commission
+            commission = SaleCommission.objects.create(
+                sale=sale,
+                agent=manager,
+                business=business,
+                base_commission=Decimal("500.00"),
+                net_amount=Decimal("500.00"),
+            )
+        except Exception:
+            # If models not available, skip commission part
+            commission = None
+        
+        # Login as manager
+        client.force_login(manager)
+        
+        # Set active business in session
+        session = client.session
+        session['active_business_id'] = business.id
+        session.save()
+        
+        # Access admin home
+        resp = client.get(reverse("wallet:admin_home"))
+        
+        # Should return 200
+        assert resp.status_code == 200
+        
+        # Check that business_spend_trend is in context
+        assert "business_spend_trend" in resp.context
+        
+        # Parse the JSON data
+        trend_data = json.loads(resp.context["business_spend_trend"])
+        
+        # Should have at least one entry
+        assert len(trend_data) >= 1
+        
+        # Find today's entry
+        today_str = str(today)
+        today_entry = None
+        for entry in trend_data:
+            if entry['date'] == today_str:
+                today_entry = entry
+                break
+        
+        # Should have today's data
+        assert today_entry is not None
+        
+        # Should have cost of 1000 (stored as -1000, converted to positive)
+        assert float(today_entry['costs']) == 1000.0
+        
+        # If commission was created, should have commission of 500
+        if commission:
+            assert float(today_entry['commissions']) == 500.0
+    
+    def test_spend_trend_empty_data(self, client):
+        """Test that spend trend handles empty data gracefully."""
+        from django.contrib.auth import get_user_model
+        from django.urls import reverse
+        import json
+        
+        User = get_user_model()
+        
+        # Create business with no costs or commissions
+        business = Business.objects.create(
+            name="Empty Business",
+            slug="empty-biz",
+            status="ACTIVE",
+        )
+        
+        # Create manager user
+        manager = User.objects.create_user(
+            username="empty_manager",
+            email="empty@test.com",
+            password="password123",
+            is_staff=True,
+        )
+        
+        # Create membership
+        from tenants.models import BusinessUserMembership
+        BusinessUserMembership.objects.create(
+            user=manager,
+            business=business,
+            role='MANAGER',
+            status='ACTIVE'
+        )
+        
+        # Login as manager
+        client.force_login(manager)
+        
+        # Set active business in session
+        session = client.session
+        session['active_business_id'] = business.id
+        session.save()
+        
+        # Access admin home
+        resp = client.get(reverse("wallet:admin_home"))
+        
+        # Should return 200
+        assert resp.status_code == 200
+        
+        # Check that business_spend_trend is in context
+        assert "business_spend_trend" in resp.context
+        
+        # Parse the JSON data
+        trend_data = json.loads(resp.context["business_spend_trend"])
+        
+        # Should be an empty list or have all zeros
+        if len(trend_data) > 0:
+            # All entries should have zero costs and commissions
+            for entry in trend_data:
+                assert entry['costs'] == 0 or entry['costs'] == 0.0
+                assert entry['commissions'] == 0 or entry['commissions'] == 0.0
+        else:
+            # Empty list is also acceptable
+            assert trend_data == []
+    
+    def test_spend_trend_multiple_days(self, client):
+        """Test spend trend with data across multiple days."""
+        from django.contrib.auth import get_user_model
+        from django.urls import reverse
+        import json
+        
+        User = get_user_model()
+        
+        # Create business
+        business = Business.objects.create(
+            name="Multi Day Business",
+            slug="multi-day-biz",
+            status="ACTIVE",
+        )
+        
+        # Create manager user
+        manager = User.objects.create_user(
+            username="multi_manager",
+            email="multi@test.com",
+            password="password123",
+            is_staff=True,
+        )
+        
+        # Create membership
+        from tenants.models import BusinessUserMembership
+        BusinessUserMembership.objects.create(
+            user=manager,
+            business=business,
+            role='MANAGER',
+            status='ACTIVE'
+        )
+        
+        # Create costs for different days
+        today = timezone.localdate()
+        yesterday = today - timedelta(days=1)
+        two_days_ago = today - timedelta(days=2)
+        
+        WalletTransaction.objects.create(
+            ledger=Ledger.COMPANY,
+            type=TxnType.COST_ONCE_OFF,
+            amount=Decimal("-1000.00"),
+            note="Cost Today",
+            business=business,
+            effective_date=today,
+        )
+        
+        WalletTransaction.objects.create(
+            ledger=Ledger.COMPANY,
+            type=TxnType.COST_ONCE_OFF,
+            amount=Decimal("-2000.00"),
+            note="Cost Yesterday",
+            business=business,
+            effective_date=yesterday,
+        )
+        
+        WalletTransaction.objects.create(
+            ledger=Ledger.COMPANY,
+            type=TxnType.COST_RECURRING,
+            amount=Decimal("-5000.00"),
+            note="Recurring Cost",
+            business=business,
+            effective_date=two_days_ago,
+            is_recurring=True,
+        )
+        
+        # Login as manager
+        client.force_login(manager)
+        
+        # Set active business in session
+        session = client.session
+        session['active_business_id'] = business.id
+        session.save()
+        
+        # Access admin home
+        resp = client.get(reverse("wallet:admin_home"))
+        
+        # Should return 200
+        assert resp.status_code == 200
+        
+        # Check that business_spend_trend is in context
+        assert "business_spend_trend" in resp.context
+        
+        # Parse the JSON data
+        trend_data = json.loads(resp.context["business_spend_trend"])
+        
+        # Should have at least 3 entries (one for each day with costs)
+        assert len(trend_data) >= 3
+        
+        # Data should be sorted by date
+        dates = [entry['date'] for entry in trend_data]
+        assert dates == sorted(dates)

@@ -35,6 +35,10 @@
     .container{max-width:1100px;margin:28px auto;padding:0 16px}
     h1{margin:0 0 8px 0;font-weight:800;letter-spacing:.2px}
     p.muted{color:var(--muted);margin:.25rem 0 1rem}
+    @media (max-width:640px){
+      h1{font-size:1.5rem}
+      p.muted{font-size:13px}
+    }
     .bar{display:flex;gap:10px;align-items:center;margin:16px 0 12px}
     .btn{background:#fff;border:1px solid var(--border);padding:10px 14px;border-radius:10px;color:var(--txt);cursor:pointer;text-decoration:none}
     .btn:hover{background:#fafafa}
@@ -47,6 +51,10 @@
     th,td{padding:12px 14px;border-bottom:1px solid var(--border);text-align:left;vertical-align:middle}
     th{color:#334155;font-weight:700;background:#fbfbfd}
     tr:last-child td{border-bottom:none}
+    @media (max-width:640px){
+      table{display:block;overflow-x:auto;white-space:nowrap}
+      th,td{padding:10px 8px;font-size:13px}
+    }
     .status{display:inline-flex;align-items:center;gap:6px;padding:4px 10px;border-radius:999px;border:1px solid var(--border);background:var(--chip)}
     .s-draft{background:#f8fafc}
     .s-pending{background:#fff7ed;border-color:#fed7aa;color:#9a3412}
@@ -55,8 +63,18 @@
     .muted{color:var(--muted)}
     .right{display:flex;gap:8px;align-items:center;margin-left:auto}
     .side{background:var(--panel);border:1px solid var(--border);border-radius:14px;padding:14px}
+    @media (max-width:640px){
+      .side{padding:12px}
+      .tip{padding:10px}
+      .tip ul{padding-left:20px;font-size:13px}
+    }
     .split{display:grid;grid-template-columns:1fr 300px;gap:16px}
     @media (max-width:900px){.split{grid-template-columns:1fr}}
+    @media (max-width:768px){
+      .bar{flex-wrap:wrap}
+      .bar .btn{flex:1 1 auto;min-width:120px}
+      .bar .right{width:100%;justify-content:flex-end;margin-top:8px}
+    }
     .tip{background:#fff;border:1px solid var(--border);padding:12px;border-radius:12px}
     code{background:#f8fafc;border:1px solid var(--border);padding:2px 6px;border-radius:6px}
     .empty{padding:28px;text-align:center;color:var(--muted);background:#fff}

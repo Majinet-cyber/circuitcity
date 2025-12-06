@@ -422,6 +422,17 @@
       }
     }
 
+    /* Business Simulator Input Styles */
+    input[type="number"]:focus {
+      outline: none;
+      border-color: var(--primary);
+      box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.1);
+    }
+
+    input[type="number"]:hover {
+      border-color: #cbd5e1;
+    }
+
     /* Responsive */
     @media (max-width: 768px) {
       .hero-content {
@@ -480,10 +491,10 @@
     <div class="hero-content">
       <div class="hero-text">
         <h1 class="hero-title">
-          Your <span class="highlight">digital MBA manager</span>
+          Doing business <span class="highlight">shouldn't be a headache</span>
         </h1>
         <p class="hero-subtitle">
-          A digital record and AI driven MBA manager for every ledger and common person.
+          Run your phone shop, liquor store, gym, or pharmacy with ease. Track inventory, manage agents, and grow your business—all in one powerful platform.
         </p>
         <div class="hero-buttons">
           <a href="{% url 'login' %}" class="btn btn-primary">Get Started</a>
@@ -501,7 +512,7 @@
     <div style="max-width: 800px; margin: 0 auto;">
       <h2 class="section-title" style="margin-bottom: 1.5rem;">Our Mission</h2>
       <p style="font-size: 1.25rem; line-height: 1.8; color: var(--text-secondary); margin-bottom: 0;">
-        A digital record and AI driven MBA manager for every ledger and common person.
+        The <strong>Spotify of every small business</strong>. A digital record and AI-driven MBA manager for every ledger and common person in Malawi and beyond.
       </p>
     </div>
   </section>
@@ -618,20 +629,135 @@
     </div>
   </section>
 
-  <!-- Simulator CTA -->
-  <section style="padding: 3rem 2rem; background: var(--white); text-align: center;">
-    <h2 class="section-title">Try Our Business Simulator</h2>
-    <p class="section-subtitle">
-      Play with numbers and see how stock, turnover, and pricing affect your revenue and profit
-    </p>
-    <a href="{% url 'staticpages:simulator' %}" class="btn btn-primary">Launch Simulator →</a>
+  <!-- Business Simulator Section -->
+  <section id="business-simulator" style="padding: 5rem 2rem; background: linear-gradient(135deg, #f9fafb 0%, #e0e7ff 100%);">
+    <div style="max-width: 1100px; margin: 0 auto;">
+      <h2 class="section-title">📊 Business Simulator</h2>
+      <p class="section-subtitle" style="margin-bottom: 3rem;">
+        Play with the numbers and see how customers, pricing, and costs affect your revenue and profit
+      </p>
+
+      <!-- Simulator Container -->
+      <div style="background: rgba(255, 255, 255, 0.9); backdrop-filter: blur(10px); border-radius: 24px; padding: 2.5rem; box-shadow: 0 20px 60px rgba(79, 70, 229, 0.15); border: 1px solid rgba(79, 70, 229, 0.1);">
+        
+        <!-- Input Controls -->
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 2rem; margin-bottom: 3rem;">
+          
+          <!-- Customers Input -->
+          <div>
+            <label for="sim-customers" style="display: block; font-weight: 600; color: var(--text-primary); margin-bottom: 0.5rem;">
+              Number of customers per month
+            </label>
+            <input 
+              type="number" 
+              id="sim-customers" 
+              value="100" 
+              min="0" 
+              step="1"
+              style="width: 100%; padding: 0.75rem 1rem; border: 2px solid #e5e7eb; border-radius: 12px; font-size: 1rem; font-weight: 600; color: var(--primary); transition: all 0.3s ease;"
+            >
+            <small style="display: block; margin-top: 0.5rem; color: var(--text-secondary); font-size: 0.875rem;">
+              How many customers you expect monthly
+            </small>
+          </div>
+
+          <!-- Average Sale Input -->
+          <div>
+            <label for="sim-average-sale" style="display: block; font-weight: 600; color: var(--text-primary); margin-bottom: 0.5rem;">
+              Average spend per customer (MWK)
+            </label>
+            <input 
+              type="number" 
+              id="sim-average-sale" 
+              value="10000" 
+              min="0" 
+              step="100"
+              style="width: 100%; padding: 0.75rem 1rem; border: 2px solid #e5e7eb; border-radius: 12px; font-size: 1rem; font-weight: 600; color: var(--primary); transition: all 0.3s ease;"
+            >
+            <small style="display: block; margin-top: 0.5rem; color: var(--text-secondary); font-size: 0.875rem;">
+              Average ticket size per transaction
+            </small>
+          </div>
+
+          <!-- Cost Percentage Input -->
+          <div>
+            <label for="sim-cost-percent" style="display: block; font-weight: 600; color: var(--text-primary); margin-bottom: 0.5rem;">
+              Costs as % of revenue
+            </label>
+            <input 
+              type="number" 
+              id="sim-cost-percent" 
+              value="40" 
+              min="0" 
+              max="100" 
+              step="1"
+              style="width: 100%; padding: 0.75rem 1rem; border: 2px solid #e5e7eb; border-radius: 12px; font-size: 1rem; font-weight: 600; color: var(--primary); transition: all 0.3s ease;"
+            >
+            <small style="display: block; margin-top: 0.5rem; color: var(--text-secondary); font-size: 0.875rem;">
+              Operating costs, COGS, overhead (0-100%)
+            </small>
+          </div>
+        </div>
+
+        <!-- Results Cards -->
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 1.5rem; margin-bottom: 2rem;">
+          
+          <!-- Revenue Card -->
+          <div style="background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%); border-radius: 20px; padding: 2rem; text-align: center; color: var(--white); box-shadow: 0 10px 30px rgba(79, 70, 229, 0.3);">
+            <div style="font-size: 0.9rem; opacity: 0.9; margin-bottom: 0.5rem; font-weight: 500;">
+              Estimated monthly revenue
+            </div>
+            <div id="sim-revenue" style="font-size: 2.25rem; font-weight: 800; letter-spacing: -0.02em;">
+              MWK 1,000,000
+            </div>
+          </div>
+
+          <!-- Costs Card -->
+          <div style="background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%); border-radius: 20px; padding: 2rem; text-align: center; color: var(--white); box-shadow: 0 10px 30px rgba(239, 68, 68, 0.3);">
+            <div style="font-size: 0.9rem; opacity: 0.9; margin-bottom: 0.5rem; font-weight: 500;">
+              Estimated monthly costs
+            </div>
+            <div id="sim-costs" style="font-size: 2.25rem; font-weight: 800; letter-spacing: -0.02em;">
+              MWK 400,000
+            </div>
+          </div>
+
+          <!-- Profit Card -->
+          <div style="background: linear-gradient(135deg, #10b981 0%, #059669 100%); border-radius: 20px; padding: 2rem; text-align: center; color: var(--white); box-shadow: 0 10px 30px rgba(16, 185, 129, 0.3);">
+            <div style="font-size: 0.9rem; opacity: 0.9; margin-bottom: 0.5rem; font-weight: 500;">
+              Estimated monthly profit
+            </div>
+            <div id="sim-profit" style="font-size: 2.25rem; font-weight: 800; letter-spacing: -0.02em;">
+              MWK 600,000
+            </div>
+          </div>
+        </div>
+
+        <!-- Hint Text -->
+        <div style="text-align: center; padding-top: 1.5rem; border-top: 1px solid rgba(79, 70, 229, 0.1);">
+          <p style="color: var(--text-secondary); font-size: 0.875rem; margin-bottom: 0.5rem;">
+            💡 <em>This is a quick simulator, not your actual data.</em>
+          </p>
+          <p style="color: var(--text-secondary); font-size: 0.875rem;">
+            <strong>Install Emajinet to track real numbers live.</strong>
+          </p>
+        </div>
+      </div>
+
+      <!-- Link to Advanced Simulator -->
+      <div style="text-align: center; margin-top: 2rem;">
+        <a href="{% url 'staticpages:simulator' %}" class="btn btn-outline" style="font-size: 0.9rem;">
+          Try Advanced Simulator with Charts →
+        </a>
+      </div>
+    </div>
   </section>
 
   <!-- CTA Section -->
   <section class="cta-section">
     <h2 class="cta-title">Ready to Transform Your Business?</h2>
     <p class="cta-subtitle">Join thousands of merchants already using Emajinet</p>
-    <a href="{% url 'login' %}" class="btn btn-light">Get Started Today</a>
+    <a href="{% url 'login' %}" class="btn btn-primary">Get Started Today</a>
   </section>
 
   <!-- Footer -->
@@ -667,6 +793,105 @@
         navbar.style.boxShadow = '0 2px 10px rgba(0, 0, 0, 0.05)';
       }
     });
+
+    // ============================================
+    // BUSINESS SIMULATOR - Pure front-end logic
+    // ============================================
+    function initBusinessSimulator() {
+      // Get input elements
+      const customersInput = document.getElementById('sim-customers');
+      const averageSaleInput = document.getElementById('sim-average-sale');
+      const costPercentInput = document.getElementById('sim-cost-percent');
+
+      // Get display elements
+      const revenueDisplay = document.getElementById('sim-revenue');
+      const costsDisplay = document.getElementById('sim-costs');
+      const profitDisplay = document.getElementById('sim-profit');
+
+      // Check if simulator exists on this page
+      if (!customersInput || !averageSaleInput || !costPercentInput) {
+        return; // Simulator not on this page
+      }
+
+      /**
+       * Format money with MWK currency and thousands separators
+       */
+      function formatMoney(amount) {
+        // Use Intl.NumberFormat if available
+        if (typeof Intl !== 'undefined' && Intl.NumberFormat) {
+          try {
+            const formatter = new Intl.NumberFormat('en-MW', {
+              style: 'decimal',
+              minimumFractionDigits: 0,
+              maximumFractionDigits: 0,
+            });
+            return 'MWK ' + formatter.format(Math.round(amount));
+          } catch (e) {
+            // Fallback if locale not supported
+          }
+        }
+        
+        // Fallback: manual thousands separator
+        const rounded = Math.round(amount);
+        const parts = rounded.toString().split('.');
+        parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+        return 'MWK ' + parts.join('.');
+      }
+
+      /**
+       * Recalculate and update all displays
+       */
+      function recalc() {
+        // Parse inputs, default to 0 if invalid
+        let customers = parseFloat(customersInput.value);
+        let avgSale = parseFloat(averageSaleInput.value);
+        let costPct = parseFloat(costPercentInput.value);
+
+        // Sanitize/clamp values
+        if (isNaN(customers) || customers < 0) customers = 0;
+        if (isNaN(avgSale) || avgSale < 0) avgSale = 0;
+        if (isNaN(costPct) || costPct < 0) costPct = 0;
+        if (costPct > 100) {
+          costPct = 100;
+          costPercentInput.value = 100; // Update the input to show clamped value
+        }
+
+        // Formula:
+        // revenue = customers * average_sale
+        // costs = revenue * (cost_percentage / 100)
+        // profit = revenue - costs
+        const revenue = customers * avgSale;
+        const costs = revenue * (costPct / 100);
+        const profit = revenue - costs;
+
+        // Update displays
+        revenueDisplay.textContent = formatMoney(revenue);
+        costsDisplay.textContent = formatMoney(costs);
+        profitDisplay.textContent = formatMoney(profit);
+      }
+
+      // Attach event listeners to all inputs
+      const inputs = [customersInput, averageSaleInput, costPercentInput];
+      inputs.forEach(input => {
+        // 'input' fires as user types
+        input.addEventListener('input', recalc);
+        // 'change' fires when input loses focus
+        input.addEventListener('change', recalc);
+        // Also listen for 'keyup' for better responsiveness
+        input.addEventListener('keyup', recalc);
+      });
+
+      // Run initial calculation on page load
+      recalc();
+    }
+
+    // Initialize simulator when DOM is ready
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', initBusinessSimulator);
+    } else {
+      // DOM already loaded
+      initBusinessSimulator();
+    }
   </script>
 </body>
 </html>

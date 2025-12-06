@@ -136,7 +136,7 @@
       </p>
     </div>
     <div>
-      <a href="{% url 'wallet:admin_cost_create' %}" class="btn btn-primary">
+      <a href="{% url 'wallet:admin_costs_create' %}" class="btn btn-primary">
         <i class="bi bi-plus-circle me-1"></i> Add Cost
       </a>
       <a href="{% url 'wallet:admin_home' %}" class="btn btn-outline-secondary ms-2">
@@ -269,7 +269,7 @@
   {% if not fixed_costs and not variable_costs %}
   <div class="alert alert-info">
     <i class="bi bi-info-circle me-2"></i>
-    No costs recorded yet. <a href="{% url 'wallet:admin_cost_create' %}">Add your first cost</a> to start tracking.
+    No costs recorded yet. <a href="{% url 'wallet:admin_costs_create' %}">Add your first cost</a> to start tracking.
   </div>
   {% endif %}
 </div>

@@ -474,38 +474,44 @@
                      style="min-width:320px;max-height:400px;overflow-y:auto">
                   <div class="p-2 border-bottom d-flex align-items-center justify-content-between">
                     <strong>Notifications</strong>
-                    {% if latest_notifications %}
-                      <a href="{% url 'notifications:mark_all_read' %}" class="btn btn-sm btn-light" title="Mark all as read">
-                        <i class="bi bi-check-all"></i>
-                      </a>
-                    {% endif %}
+                    {% with latest_notifications|default:None as notif_list %}
+                      {% if notif_list %}
+                        <a href="{% url 'notifications:mark_all_read' %}" class="btn btn-sm btn-light" title="Mark all as read">
+                          <i class="bi bi-check-all"></i>
+                        </a>
+                      {% endif %}
+                    {% endwith %}
                   </div>
                   <div id="ccNotifList">
-                    {% if latest_notifications %}
-                      {% for n in latest_notifications %}
-                        <a class="dropdown-item small {% if not n.is_read %}fw-semibold bg-light{% endif %}" 
-                           href="{% url 'notifications:mark_read_and_redirect' n.id %}"
-                           style="padding:.75rem 1rem;border-bottom:1px solid #e9ecef;white-space:normal">
-                          <div class="d-flex align-items-start">
-                            <div class="flex-grow-1">
-                              <div {% if not n.is_read %}class="text-primary"{% endif %}>{{ n.message }}</div>
-                              <small class="text-muted d-block mt-1">{{ n.created_at|date:"M j, H:i" }}</small>
+                    {% with latest_notifications|default:None as notif_list %}
+                      {% if notif_list %}
+                        {% for n in notif_list %}
+                          <a class="dropdown-item small {% if not n.is_read %}fw-semibold bg-light{% endif %}" 
+                             href="{% url 'notifications:mark_read_and_redirect' n.id %}"
+                             style="padding:.75rem 1rem;border-bottom:1px solid #e9ecef;white-space:normal">
+                            <div class="d-flex align-items-start">
+                              <div class="flex-grow-1">
+                                <div {% if not n.is_read %}class="text-primary"{% endif %}>{{ n.message }}</div>
+                                <small class="text-muted d-block mt-1">{{ n.created_at|date:"M j, H:i" }}</small>
+                              </div>
+                              {% if not n.is_read %}
+                                <span class="badge bg-primary rounded-pill ms-2">New</span>
+                              {% endif %}
                             </div>
-                            {% if not n.is_read %}
-                              <span class="badge bg-primary rounded-pill ms-2">New</span>
-                            {% endif %}
-                          </div>
-                        </a>
-                      {% endfor %}
-                    {% else %}
-                      <div class="notif-empty p-3 text-muted text-center">No notifications yet.</div>
-                    {% endif %}
+                          </a>
+                        {% endfor %}
+                      {% else %}
+                        <div class="notif-empty p-3 text-muted text-center">No notifications yet.</div>
+                      {% endif %}
+                    {% endwith %}
                   </div>
-                  {% if latest_notifications %}
-                    <div class="p-2 text-center border-top">
-                      <a class="text-decoration-underline small" href="{% url 'notifications:list' %}">View all notifications</a>
-                    </div>
-                  {% endif %}
+                  {% with latest_notifications|default:None as notif_list %}
+                    {% if notif_list %}
+                      <div class="p-2 text-center border-top">
+                        <a class="text-decoration-underline small" href="{% url 'notifications:list' %}">View all notifications</a>
+                      </div>
+                    {% endif %}
+                  {% endwith %}
                 </div>
               </div>
               {# /Notifications #}

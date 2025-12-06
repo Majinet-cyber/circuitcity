@@ -657,6 +657,35 @@ def home(request):
     except Exception:
         pass
     
+    # ===== COMPUTE COSTS & PROFIT (Manager view) =====
+    total_costs_period = Decimal("0.00")
+    net_profit = period_sales_amount  # Default: profit = revenue (no costs)
+    profit_margin = Decimal("100.00") if period_sales_amount > 0 else Decimal("0.00")
+    costs_breakdown = {}
+    
+    if is_manager:
+        try:
+            from wallet.utils import compute_revenue_costs_profit
+            
+            # Compute costs and profit for the selected period
+            period_start_date = period_start.date() if hasattr(period_start, 'date') else period_start
+            period_end_date = period_end.date() if hasattr(period_end, 'date') else period_end
+            
+            metrics = compute_revenue_costs_profit(
+                biz,
+                period_sales_amount,
+                period_start_date,
+                period_end_date
+            )
+            
+            total_costs_period = metrics.get('costs', Decimal("0.00"))
+            net_profit = metrics.get('profit', period_sales_amount)
+            profit_margin = metrics.get('profit_margin', Decimal("100.00"))
+            costs_breakdown = metrics.get('costs_breakdown', {})
+        except Exception:
+            # Gracefully degrade if wallet app not available
+            pass
+    
     ctx = {
         "first_run": first_run,
         "products_count": products_count,
@@ -694,6 +723,11 @@ def home(request):
         "active_range": active_range,
         "selected_date": selected_date,
         "date_param": date_param,
+        # Costs & Profit (NEW)
+        "total_costs_period": total_costs_period,
+        "net_profit": net_profit,
+        "profit_margin": profit_margin,
+        "costs_breakdown": costs_breakdown,
         **ctx_enhancements,  # Merge enhancements
     }
     

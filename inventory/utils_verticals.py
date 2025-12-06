@@ -246,8 +246,10 @@ def get_vertical_sidebar_items(business_kind: str) -> list[dict]:
             # MONEY section
             {"section": "MONEY", "url": "wallet:agent_wallet", "label": "My Wallet", "icon": "bi-wallet2", "active_pattern": "/wallet/", "require_manager": False},
             {"section": "MONEY", "url": "wallet:admin_home", "label": "Admin Wallet", "icon": "bi-briefcase", "active_pattern": "/wallet/admin/", "require_manager": True},
+            {"section": "MONEY", "url": "wallet:admin_cost_list", "label": "Costs", "icon": "bi-cash-stack", "active_pattern": "/wallet/admin/costs/", "require_manager": True},
             
             # BUSINESS section (for managers)
+            {"section": "BUSINESS", "url": "simulator:business_home", "label": "Simulator", "icon": "bi-cpu", "active_pattern": "/simulator/business/", "require_manager": True},
             {"section": "BUSINESS", "url": "tenants:manager_review_agents", "label": "Trainers", "icon": "bi-people", "active_pattern": "/tenants/manager/agents/", "require_manager": True},
             {"section": "BUSINESS", "url": "tenants:manager_locations", "label": "Locations", "icon": "bi-geo", "active_pattern": "/tenants/manager/locations/", "require_manager": True},
             {"section": "BUSINESS", "url": "backups:manager_list", "label": "Data Backup", "icon": "bi-cloud-download", "active_pattern": "/backups/", "require_manager": True},
@@ -269,8 +271,10 @@ def get_vertical_sidebar_items(business_kind: str) -> list[dict]:
             # MONEY section
             {"section": "MONEY", "url": "wallet:agent_wallet", "label": "My Wallet", "icon": "bi-wallet2", "active_pattern": "/wallet/", "require_manager": False},
             {"section": "MONEY", "url": "wallet:admin_home", "label": "Admin Wallet", "icon": "bi-briefcase", "active_pattern": "/wallet/admin/", "require_manager": True},
+            {"section": "MONEY", "url": "wallet:admin_cost_list", "label": "Costs", "icon": "bi-cash-stack", "active_pattern": "/wallet/admin/costs/", "require_manager": True},
             
             # BUSINESS section (for managers)
+            {"section": "BUSINESS", "url": "simulator:business_home", "label": "Simulator", "icon": "bi-cpu", "active_pattern": "/simulator/business/", "require_manager": True},
             {"section": "BUSINESS", "url": "tenants:manager_review_agents", "label": "Agents", "icon": "bi-people", "active_pattern": "/tenants/manager/agents/", "require_manager": True},
             {"section": "BUSINESS", "url": "tenants:manager_locations", "label": "Locations", "icon": "bi-geo", "active_pattern": "/tenants/manager/locations/", "require_manager": True},
             {"section": "BUSINESS", "url": "backups:manager_list", "label": "Data Backup", "icon": "bi-cloud-download", "active_pattern": "/backups/", "require_manager": True},
@@ -294,6 +298,7 @@ def get_vertical_sidebar_items(business_kind: str) -> list[dict]:
             {"section": "MONEY", "url": "wallet:agent_wallet", "label": "My Wallet", "icon": "bi-wallet2", "active_pattern": "/wallet/", "require_manager": False},
             {"section": "MONEY", "url": "liquor:credits_list", "label": "Credits", "icon": "bi-person-lines-fill", "active_pattern": "/liquor/credits/", "require_manager": False},
             {"section": "MONEY", "url": "wallet:admin_home", "label": "Admin Wallet", "icon": "bi-briefcase", "active_pattern": "/wallet/admin/", "require_manager": True},
+            {"section": "MONEY", "url": "wallet:admin_cost_list", "label": "Costs", "icon": "bi-cash-stack", "active_pattern": "/wallet/admin/costs/", "require_manager": True},
             
             # BUSINESS section (for managers)
             {"section": "BUSINESS", "url": "tenants:manager_review_agents", "label": "Agents", "icon": "bi-people", "active_pattern": "/tenants/manager/agents/", "require_manager": True},
@@ -318,6 +323,7 @@ def get_vertical_sidebar_items(business_kind: str) -> list[dict]:
             # MONEY section
             {"section": "MONEY", "url": "wallet:agent_wallet", "label": "My Wallet", "icon": "bi-wallet2", "active_pattern": "/wallet/", "require_manager": False},
             {"section": "MONEY", "url": "wallet:admin_home", "label": "Admin Wallet", "icon": "bi-briefcase", "active_pattern": "/wallet/admin/", "require_manager": True},
+            {"section": "MONEY", "url": "wallet:admin_cost_list", "label": "Costs", "icon": "bi-cash-stack", "active_pattern": "/wallet/admin/costs/", "require_manager": True},
             
             # BUSINESS section (for managers)
             {"section": "BUSINESS", "url": "tenants:manager_review_agents", "label": "Agents", "icon": "bi-people", "active_pattern": "/tenants/manager/agents/", "require_manager": True},
@@ -342,8 +348,10 @@ def get_vertical_sidebar_items(business_kind: str) -> list[dict]:
             # MONEY section
             {"section": "MONEY", "url": "wallet:agent_wallet", "label": "My Wallet", "icon": "bi-wallet2", "active_pattern": "/wallet/", "require_manager": False},
             {"section": "MONEY", "url": "wallet:admin_home", "label": "Admin Wallet", "icon": "bi-briefcase", "active_pattern": "/wallet/admin/", "require_manager": True},
+            {"section": "MONEY", "url": "wallet:admin_cost_list", "label": "Costs", "icon": "bi-cash-stack", "active_pattern": "/wallet/admin/costs/", "require_manager": True},
             
             # BUSINESS section (for managers)
+            {"section": "BUSINESS", "url": "simulator:business_home", "label": "Simulator", "icon": "bi-cpu", "active_pattern": "/simulator/business/", "require_manager": True},
             {"section": "BUSINESS", "url": "reports:home", "label": "Reports", "icon": "bi-graph-up", "active_pattern": "/reports/", "require_manager": True},
             {"section": "BUSINESS", "url": "tenants:manager_review_agents", "label": "Agents", "icon": "bi-people", "active_pattern": "/tenants/manager/agents/", "require_manager": True},
             {"section": "BUSINESS", "url": "tenants:manager_locations", "label": "Locations", "icon": "bi-geo", "active_pattern": "/tenants/manager/locations/", "require_manager": True},
