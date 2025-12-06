@@ -58,6 +58,15 @@ def terms(request):
     })
 
 
+def data_deletion(request):
+    """
+    Data Deletion Policy page (for Meta/WhatsApp compliance).
+    """
+    return render(request, 'staticpages/data_deletion.html', {
+        'hide_nav': True,
+    })
+
+
 def get_cfo_mood(total_profit, profit_margin):
     """
     Determine CFO mood based on profit and margin.

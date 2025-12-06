@@ -29,6 +29,14 @@ class TestStaticPages:
         response = client.get(reverse("staticpages:terms"))
         assert response.status_code == 200
 
+    def test_data_deletion_page_loads(self):
+        """Test that data deletion page loads successfully."""
+        client = Client()
+        response = client.get(reverse("staticpages:data_deletion"))
+        assert response.status_code == 200
+        content = response.content.decode("utf-8")
+        assert "Data Deletion Policy" in content
+
     def test_simulator_page_loads(self):
         """Test that simulator page loads successfully."""
         client = Client()

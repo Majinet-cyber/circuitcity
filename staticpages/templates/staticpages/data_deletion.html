@@ -1,0 +1,260 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Data Deletion Policy - Emajinet</title>
+  <link rel="icon" href="{% static 'favicon.ico' %}">
+  <style>
+    :root {
+      --primary: #4f46e5;
+      --text-primary: #1f2937;
+      --text-secondary: #6b7280;
+      --bg-light: #f9fafb;
+      --white: #ffffff;
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, Roboto, Helvetica, Arial, sans-serif;
+      line-height: 1.6;
+      color: var(--text-primary);
+      background: var(--bg-light);
+    }
+
+    .navbar {
+      background: var(--white);
+      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+      padding: 1rem 2rem;
+    }
+
+    .navbar-content {
+      max-width: 1280px;
+      margin: 0 auto;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .logo-section {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+    }
+
+    .logo {
+      height: 40px;
+      width: auto;
+    }
+
+    .logo-text {
+      font-size: 1.5rem;
+      font-weight: 700;
+      color: var(--primary);
+    }
+
+    .btn-text {
+      background: transparent;
+      color: var(--text-secondary);
+      text-decoration: none;
+      padding: 0.5rem 1rem;
+      border-radius: 100px;
+      font-weight: 600;
+    }
+
+    .btn-text:hover {
+      color: var(--primary);
+    }
+
+    .container {
+      max-width: 900px;
+      margin: 0 auto;
+      padding: 4rem 2rem;
+    }
+
+    h1 {
+      font-size: 2.5rem;
+      font-weight: 800;
+      margin-bottom: 1rem;
+      color: var(--text-primary);
+    }
+
+    .last-updated {
+      color: var(--text-secondary);
+      font-size: 0.9rem;
+      margin-bottom: 2rem;
+    }
+
+    h2 {
+      font-size: 1.5rem;
+      font-weight: 700;
+      margin-top: 2rem;
+      margin-bottom: 1rem;
+      color: var(--text-primary);
+    }
+
+    p {
+      margin-bottom: 1rem;
+      color: var(--text-secondary);
+    }
+
+    ul {
+      margin-bottom: 1rem;
+      padding-left: 2rem;
+      color: var(--text-secondary);
+    }
+
+    li {
+      margin-bottom: 0.5rem;
+    }
+
+    a {
+      color: var(--primary);
+      text-decoration: none;
+    }
+
+    a:hover {
+      text-decoration: underline;
+    }
+
+    strong {
+      color: var(--text-primary);
+    }
+
+    .contact-box {
+      background: rgba(79, 70, 229, 0.05);
+      border-left: 4px solid var(--primary);
+      padding: 1rem 1.5rem;
+      margin: 1.5rem 0;
+      border-radius: 8px;
+    }
+  </style>
+</head>
+<body>
+  <!-- Navigation -->
+  <nav class="navbar">
+    <div class="navbar-content">
+      <div class="logo-section">
+        <img src="{% static 'img/majn.png' %}" alt="Emajinet Logo" class="logo">
+        <span class="logo-text">Emajinet</span>
+      </div>
+      <div>
+        <a href="{% url 'staticpages:home' %}" class="btn-text">← Back to Home</a>
+      </div>
+    </div>
+  </nav>
+
+  <div class="container">
+    <h1>Data Deletion Policy</h1>
+    <p class="last-updated">Last updated: December 6, 2025</p>
+
+    <p>
+      At Emajinet, we respect the privacy and rights of our users and customers. This page explains 
+      how you can request deletion of your personal data from our systems in compliance with Meta / 
+      WhatsApp and general data protection expectations.
+    </p>
+
+    <h2>1. Who this policy applies to</h2>
+    <p>This Data Deletion Policy applies to:</p>
+    <ul>
+      <li>Merchants and businesses who use the Emajinet platform.</li>
+      <li>Agents and staff who log into Emajinet.</li>
+      <li>End customers whose data (for example, phone numbers, sales history, or WhatsApp contact 
+        details) may be processed by Emajinet on behalf of a merchant.</li>
+    </ul>
+
+    <h2>2. What data we can delete</h2>
+    <p>
+      Depending on our legal, tax, and accounting obligations, we may be able to delete or anonymize 
+      the following categories of data:
+    </p>
+    <ul>
+      <li>Account information (name, email address, phone number, business profile).</li>
+      <li>Transactional data linked to a specific customer or user (for example, sales records, 
+        invoices, and payment history) after any legally required retention period has passed.</li>
+      <li>WhatsApp and notification contact details stored for messaging.</li>
+      <li>Other profile or usage data stored in our system that can be safely removed without 
+        breaking critical accounting, audit, or legal obligations.</li>
+    </ul>
+    <p>
+      Some data may need to be retained for a specific period where we have a legitimate business 
+      or legal reason (for example, to comply with financial regulations, combat fraud, or maintain 
+      accurate accounting records). In such cases, we will restrict the data and keep it only for 
+      as long as required.
+    </p>
+
+    <h2>3. How to request data deletion</h2>
+    <p>To request deletion of your data, please send an email to:</p>
+    
+    <div class="contact-box">
+      <strong>Email:</strong> <a href="mailto:support@emajinet.africa">support@emajinet.africa</a>
+    </div>
+
+    <p>Please include:</p>
+    <ul>
+      <li>Your full name</li>
+      <li>Your business name (if applicable)</li>
+      <li>The email address and/or phone number associated with your Emajinet account</li>
+      <li>A clear description of what data you want deleted (for example: account deletion, specific 
+        customer records, WhatsApp contact details, etc.)</li>
+    </ul>
+    <p>We may ask for additional information to verify your identity before processing your request.</p>
+
+    <h2>4. Processing your request</h2>
+    <p>Once we receive a valid and verifiable request:</p>
+    <ul>
+      <li>We will acknowledge your request by email.</li>
+      <li>We will review what data we hold about you or your account.</li>
+      <li>Where deletion is possible, we will delete or irreversibly anonymize the requested data 
+        from our active systems.</li>
+      <li>In some cases, we may retain certain minimal information where required by law, to prevent 
+        fraud or abuse, or to maintain bookkeeping records.</li>
+    </ul>
+    <p>
+      We aim to process most deletion requests within <strong>30 days</strong>, subject to the 
+      complexity of the request and applicable legal requirements.
+    </p>
+
+    <h2>5. Data in backups and logs</h2>
+    <p>
+      In some cases, certain data may continue to exist temporarily in encrypted backups or system 
+      logs after deletion from our active systems. These backups and logs are retained only for 
+      disaster recovery, security, and audit purposes and are automatically removed after their 
+      retention period expires. We do not use backup or log data for any other purpose.
+    </p>
+
+    <h2>6. Deletion requests via Meta / WhatsApp</h2>
+    <p>
+      If you have connected with us or one of our merchants via WhatsApp (using the Emajinet 
+      integration) and you submit a data deletion request through Meta / WhatsApp, we will:
+    </p>
+    <ul>
+      <li>Treat the request as a standard data deletion request under this policy.</li>
+      <li>Identify your records based on the phone number or identifiers provided by Meta / WhatsApp.</li>
+      <li>Delete or anonymize any associated data from Emajinet's systems where possible and lawful.</li>
+    </ul>
+
+    <h2>7. Changes to this policy</h2>
+    <p>
+      We may update this Data Deletion Policy from time to time to reflect changes in our services 
+      or applicable laws. When we make changes, we will update the "Last updated" date at the top 
+      of this page. Your continued use of Emajinet after those changes become effective means you 
+      accept the updated policy.
+    </p>
+
+    <h2>8. Contact Us</h2>
+    <p>
+      If you have any questions about how we handle data deletion, please contact us at:
+      <br><br>
+      Email: <a href="mailto:support@emajinet.africa">support@emajinet.africa</a>
+    </p>
+  </div>
+</body>
+</html>
+
