@@ -29,7 +29,7 @@ try:
     
     # Try to access inventory/list/
     print("\nAttempting to access /inventory/list/...")
-    response = client.get('/inventory/list/')
+    response = client.get('/inventory/list/', HTTP_HOST='localhost')
     
     print(f"\nResponse status: {response.status_code}")
     
