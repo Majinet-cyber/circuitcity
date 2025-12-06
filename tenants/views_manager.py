@@ -113,19 +113,19 @@ def _force_pick_any_membership(request: HttpRequest) -> Optional[Business]:
 
 
 def _active_agents_for_business(biz: Business) -> List[Membership]:
-    qs = Membership.objects.filter(business=biz).select_related("user", "business", "location")
+    """Return all agent memberships (active and suspended) for this business."""
+    qs = Membership.objects.filter(business=biz, role="AGENT").select_related("user", "business", "location")
     try:
+        # Include both ACTIVE and SUSPENDED, exclude only REJECTED
         field_names = {f.name for f in Membership._meta.fields}
         if "status" in field_names:
-            qs_active = qs.filter(status="ACTIVE")
-            if qs_active.exists():
-                qs = qs_active
+            qs = qs.exclude(status="REJECTED")
     except Exception:
         pass
     try:
-        return list(qs.order_by("role", "-created_at"))
+        return list(qs.order_by("-created_at"))
     except Exception:
-        return list(qs.order_by("role", "-id"))
+        return list(qs.order_by("-id"))
 
 
 def _render_agents_template(request: HttpRequest, ctx: dict) -> HttpResponse:
@@ -275,17 +275,18 @@ def _safe_service_create_invite(
     ttl_days: int,
     message: str,
     location_id: Optional[int] = None,
-) -> Any:
+) -> tuple:
     """
     Call tenants.services.invites.create_agent_invite if compatible.
     If its signature is 0-arg or mismatched, fall back to a local creator.
+    Returns: (invite, temp_password_plaintext or None)
     """
     fn: Callable[..., Any] = create_agent_invite_service
 
     try:
         sig = inspect.signature(fn)
         if len(sig.parameters) == 0:
-            return _local_fallback_create_invite(
+            result = _local_fallback_create_invite(
                 business=business,
                 requested_by=requested_by,
                 invited_name=invited_name,
@@ -295,6 +296,8 @@ def _safe_service_create_invite(
                 message=message,
                 location_id=location_id,
             )
+            # Ensure it's a tuple
+            return (result, None) if not isinstance(result, tuple) else result
     except Exception:
         pass
 
@@ -309,10 +312,19 @@ def _safe_service_create_invite(
             ttl_days=ttl_days,
             message=message,
             mark_sent=True,
+            generate_temp_password=True,  # ✅ Enable password generation
         )
         if location_id is not None:
-            kwargs["location_id"] = location_id
-        return fn(**kwargs)
+            # Location model needs to be loaded
+            try:
+                from inventory.models import Location
+                location = Location.objects.get(pk=location_id, business=business)
+                kwargs["location"] = location
+            except Exception:
+                pass
+        result = fn(**kwargs)
+        # Service returns (invite, temp_password)
+        return result if isinstance(result, tuple) else (result, None)
     except TypeError as te:
         msg = str(te)
         if (
@@ -320,7 +332,7 @@ def _safe_service_create_invite(
             or "unexpected keyword" in msg
             or "takes 0 positional arguments" in msg
         ):
-            return _local_fallback_create_invite(
+            result = _local_fallback_create_invite(
                 business=business,
                 requested_by=requested_by,
                 invited_name=invited_name,
@@ -330,6 +342,7 @@ def _safe_service_create_invite(
                 message=message,
                 location_id=location_id,
             )
+            return (result, None) if not isinstance(result, tuple) else result
         raise
 
 
@@ -370,7 +383,7 @@ def manager_agents(request: HttpRequest) -> HttpResponse:
             location_id = None
 
         try:
-            inv = _safe_service_create_invite(
+            inv, temp_password = _safe_service_create_invite(
                 business=biz,
                 requested_by=getattr(request, "user", None),
                 invited_name=invited_name,
@@ -383,8 +396,11 @@ def manager_agents(request: HttpRequest) -> HttpResponse:
             latest_link = _invite_accept_absolute_url(request, inv)
             messages.success(request, "Invitation created.")
             url = reverse("tenants:manager_review_agents")
+            # Pass both link and password via URL params (one-time display)
             if latest_link:
                 url = f"{url}?latest_link={quote(latest_link)}"
+            if temp_password:
+                url = f"{url}&temp_password={quote(temp_password)}"
             return redirect(url)  # PRG
         except Exception as e:
             messages.error(request, f"Could not create invite: {e}")
@@ -439,6 +455,7 @@ def manager_agents(request: HttpRequest) -> HttpResponse:
         locations = []
 
     latest_link = (request.GET.get("latest_link") or "").strip()
+    temp_password = (request.GET.get("temp_password") or "").strip()  # ✅ One-time password display
     latest_share = _latest_share_text(latest_link, getattr(biz, "name", "") or "your shop") if latest_link else ""
 
     ctx = {
@@ -454,9 +471,125 @@ def manager_agents(request: HttpRequest) -> HttpResponse:
         "has_any_invites": bool(invites_all),
         "locations": locations,          # for optional location dropdown
         "latest_link": latest_link,      # makes share box show the latest link
+        "temp_password": temp_password,  # ✅ Temporary password (one-time display)
         "latest_share": latest_share,    # small helper text shown under share box
     }
     return _render_agents_template(request, ctx)
+
+
+@never_cache
+@login_required
+@require_http_methods(["POST"])
+@transaction.atomic
+def suspend_agent(request: HttpRequest, membership_id: int) -> HttpResponse:
+    """
+    Suspend an agent (set their membership and user to inactive).
+    Manager can only suspend agents in their own business.
+    """
+    biz = _active_business_from_request(request) or _force_pick_any_membership(request)
+    if not biz:
+        messages.error(request, "Please select a business first.")
+        return redirect("tenants:manager_review_agents")
+    
+    try:
+        membership = Membership.objects.get(pk=membership_id, business=biz, role="AGENT")
+        user = membership.user
+        
+        # Set membership inactive
+        membership.status = "SUSPENDED"
+        membership.save(update_fields=["status"])
+        
+        # Also set user inactive so they can't log in
+        if user and user.is_active:
+            user.is_active = False
+            user.save(update_fields=["is_active"])
+        
+        messages.success(request, f"Agent {user.get_full_name() or user.username} has been suspended.")
+    except Membership.DoesNotExist:
+        messages.error(request, "Agent not found or not in your business.")
+    except Exception as e:
+        messages.error(request, f"Error suspending agent: {e}")
+    
+    return redirect("tenants:manager_review_agents")
+
+
+@never_cache
+@login_required
+@require_http_methods(["POST"])
+@transaction.atomic
+def restore_agent(request: HttpRequest, membership_id: int) -> HttpResponse:
+    """
+    Restore a suspended agent (set their membership and user back to active).
+    Manager can only restore agents in their own business.
+    """
+    biz = _active_business_from_request(request) or _force_pick_any_membership(request)
+    if not biz:
+        messages.error(request, "Please select a business first.")
+        return redirect("tenants:manager_review_agents")
+    
+    try:
+        membership = Membership.objects.get(pk=membership_id, business=biz, role="AGENT")
+        user = membership.user
+        
+        # Set membership active
+        membership.status = "ACTIVE"
+        membership.save(update_fields=["status"])
+        
+        # Also set user active so they can log in
+        if user and not user.is_active:
+            user.is_active = True
+            user.save(update_fields=["is_active"])
+        
+        messages.success(request, f"Agent {user.get_full_name() or user.username} has been restored.")
+    except Membership.DoesNotExist:
+        messages.error(request, "Agent not found or not in your business.")
+    except Exception as e:
+        messages.error(request, f"Error restoring agent: {e}")
+    
+    return redirect("tenants:manager_review_agents")
+
+
+@never_cache
+@login_required
+@require_http_methods(["GET", "POST"])
+@transaction.atomic
+def edit_agent_location(request: HttpRequest, membership_id: int) -> HttpResponse:
+    """
+    Edit an agent's location assignment.
+    """
+    biz = _active_business_from_request(request) or _force_pick_any_membership(request)
+    if not biz:
+        messages.error(request, "Please select a business first.")
+        return redirect("tenants:manager_review_agents")
+    
+    try:
+        membership = Membership.objects.get(pk=membership_id, business=biz, role="AGENT")
+        
+        if request.method == "POST":
+            location_id = request.POST.get("location_id")
+            if location_id:
+                try:
+                    from inventory.models import Location
+                    location = Location.objects.get(pk=int(location_id), business=biz)
+                    membership.location = location
+                    membership.save(update_fields=["location"])
+                    messages.success(request, f"Updated location for {membership.user.get_full_name() or membership.user.username}.")
+                except Exception as e:
+                    messages.error(request, f"Invalid location: {e}")
+            else:
+                # Clear location
+                membership.location = None
+                membership.save(update_fields=["location"])
+                messages.success(request, f"Cleared location for {membership.user.get_full_name() or membership.user.username}.")
+            
+            return redirect("tenants:manager_review_agents")
+        
+        # GET: show form (or redirect if we want inline editing)
+        return redirect("tenants:manager_review_agents")
+        
+    except Membership.DoesNotExist:
+        messages.error(request, "Agent not found.")
+        return redirect("tenants:manager_review_agents")
 
 
 @never_cache
@@ -490,7 +623,7 @@ def create_agent_invite(request: HttpRequest) -> HttpResponse:
         location_id = None
 
     try:
-        inv = _safe_service_create_invite(
+        inv, temp_password = _safe_service_create_invite(
             business=biz,
             requested_by=getattr(request, "user", None),
             invited_name=invited_name,
@@ -503,8 +636,11 @@ def create_agent_invite(request: HttpRequest) -> HttpResponse:
         latest_link = _invite_accept_absolute_url(request, inv)
         messages.success(request, "Invitation created.")
         url = reverse("tenants:manager_review_agents")
+        # Pass both link and password via URL params (one-time display)
         if latest_link:
             url = f"{url}?latest_link={quote(latest_link)}"
+        if temp_password:
+            url = f"{url}&temp_password={quote(temp_password)}"
         return redirect(url)
     except Exception as e:
         messages.error(request, f"Could not create invite: {e}")

@@ -1,6 +1,7 @@
 ﻿# tenants/views_invites.py
 from __future__ import annotations
 
+import logging
 from typing import Optional, Any
 
 from django.conf import settings
@@ -12,7 +13,10 @@ from django.shortcuts import redirect, render
 from django.urls import reverse, NoReverseMatch
 from django.utils import timezone
 from django.views.decorators.cache import never_cache
+from django.views.decorators.csrf import ensure_csrf_cookie
 from django.views.decorators.http import require_http_methods
+
+logger = logging.getLogger(__name__)
 
 from tenants.models import AgentInvite
 from tenants.services.invites import accept_invite_by_token
@@ -243,6 +247,7 @@ def _post_val(request: HttpRequest, *keys: str) -> str:
 # ---------------------------------------------------------------------------
 
 @never_cache
+@ensure_csrf_cookie
 @require_http_methods(["GET", "POST"])
 def accept_invite(request: HttpRequest, token: str) -> HttpResponse:
     """
@@ -260,6 +265,9 @@ def accept_invite(request: HttpRequest, token: str) -> HttpResponse:
             "message": "This invitation link is not valid. Please request a new invite from the manager.",
             "invite": None,
             "compact": True,
+            "active_tab": "",
+            "show_search": False,
+            "error": None,
         }
         return _render_safe(request, "tenants/invites/invalid.html", ctx, status=404)
 
@@ -283,19 +291,19 @@ def accept_invite(request: HttpRequest, token: str) -> HttpResponse:
             "greeting": _greeting(invite),
             "expires_at": getattr(invite, "expires_at", None),
             "compact": True,
+            "active_tab": "",
+            "show_search": False,
+            "error": None,
         }
         return _render_safe(request, "tenants/invites/expired.html", ctx, status=410)
 
     # If already authenticated: ACCEPT IMMEDIATELY (no email match check)
     if getattr(request, "user", None) and request.user.is_authenticated:
         try:
-            kw: dict[str, Any] = {"token": token, "user": request.user, "role": "AGENT"}
-            location = getattr(invite, "location", None)
-            location_id = getattr(invite, "location_id", None)
-            if location or location_id:
-                kw["location"] = location or location_id
-            accept_invite_by_token(**kw)  # type: ignore[arg-type]
+            # accept_invite_by_token gets location from the invite automatically
+            accept_invite_by_token(token=token, user=request.user, role="AGENT")
         except ValueError as e:
+            logger.warning(f"Invite accept ValueError for token {token}: {e}", exc_info=True)
             ctx = {
                 "title": "Invite problem",
                 "message": str(e) or "This invitation cannot be used. Please ask for a new one.",
@@ -303,9 +311,13 @@ def accept_invite(request: HttpRequest, token: str) -> HttpResponse:
                 "biz_name": _biz_name(invite),
                 "greeting": _greeting(invite),
                 "compact": True,
+                "active_tab": "",
+                "show_search": False,
+                "error": str(e) if e else None,
             }
             return _render_safe(request, "tenants/invites/invalid.html", ctx, status=400)
         except Exception:
+            logger.exception(f"Unexpected error accepting invite for authenticated user, token {token}")
             ctx = {
                 "title": "Something went wrong",
                 "message": "We couldn't complete your invitation right now. Please try again.",
@@ -313,6 +325,9 @@ def accept_invite(request: HttpRequest, token: str) -> HttpResponse:
                 "biz_name": _biz_name(invite),
                 "greeting": _greeting(invite),
                 "compact": True,
+                "active_tab": "",
+                "show_search": False,
+                "error": "An unexpected error occurred",
             }
             return _render_safe(request, "tenants/invites/error.html", ctx, status=500)
 
@@ -352,14 +367,32 @@ def accept_invite(request: HttpRequest, token: str) -> HttpResponse:
             "greeting": _greeting(invite),
             "expires_at": getattr(invite, "expires_at", None),
             "compact": True,  # template can hide app bottom nav for perfect mobile fit
+            "active_tab": "",  # suppress base template warning
+            "show_search": False,
+            "error": None,
         }
         return _render_safe(request, "tenants/invite_accept.html", ctx, status=200)
 
     # POST: tolerant extraction
-    form = AgentInviteAcceptForm(request.POST, initial_email=getattr(invite, "email", None) or None)
-    if not getattr(invite, "email", None):
-        form.fields["email"].disabled = False
-        form.fields["email"].required = True
+    try:
+        form = AgentInviteAcceptForm(request.POST, initial_email=getattr(invite, "email", None) or None)
+        if not getattr(invite, "email", None):
+            form.fields["email"].disabled = False
+            form.fields["email"].required = True
+    except Exception as e:
+        logger.exception(f"Error creating form for invite {token}: {e}")
+        ctx = {
+            "title": "Something went wrong",
+            "message": "We couldn't process your form. Please try again or contact support.",
+            "invite": invite,
+            "biz_name": _biz_name(invite),
+            "greeting": _greeting(invite),
+            "compact": True,
+            "active_tab": "",
+            "show_search": False,
+            "error": "Form processing error",
+        }
+        return _render_safe(request, "tenants/invites/error.html", ctx, status=500)
 
     # If the form isn't valid, re-render with errors (never a blank page)
     if not form.is_valid():
@@ -371,6 +404,9 @@ def accept_invite(request: HttpRequest, token: str) -> HttpResponse:
             "greeting": _greeting(invite),
             "expires_at": getattr(invite, "expires_at", None),
             "compact": True,
+            "active_tab": "",
+            "show_search": False,
+            "error": "Please correct the errors below",
         }
         return _render_safe(request, "tenants/invite_accept.html", ctx, status=400)
 
@@ -378,11 +414,28 @@ def accept_invite(request: HttpRequest, token: str) -> HttpResponse:
 
     # Accept ANY email:
     # prefer invite.email; else get from form; else try common POST aliases as last resort
-    email = (
-        (getattr(invite, "email", None) or "") or
-        (form.cleaned_data.get("email") or "") or
-        _post_val(request, "email", "user_email", "username", "login")
-    ).lower().strip()
+    try:
+        email = (
+            (getattr(invite, "email", None) or "") or
+            (form.cleaned_data.get("email") or "") or
+            _post_val(request, "email", "user_email", "username", "login")
+        ).lower().strip()
+    except Exception as e:
+        logger.exception(f"Error extracting email for invite {token}: {e}")
+        ctx = {
+            "form": form,
+            "invite": invite,
+            "title": f"Join {_biz_name(invite)}",
+            "biz_name": _biz_name(invite),
+            "greeting": _greeting(invite),
+            "expires_at": getattr(invite, "expires_at", None),
+            "message": "Could not process your email. Please try again.",
+            "compact": True,
+            "active_tab": "",
+            "show_search": False,
+            "error": "Could not process your email",
+        }
+        return _render_safe(request, "tenants/invite_accept.html", ctx, status=400)
 
     if not email:
         # Inline error instead of a bare "Email required" page
@@ -398,6 +451,9 @@ def accept_invite(request: HttpRequest, token: str) -> HttpResponse:
             "greeting": _greeting(invite),
             "expires_at": getattr(invite, "expires_at", None),
             "compact": True,
+            "active_tab": "",
+            "show_search": False,
+            "error": "Email is required",
         }
         return _render_safe(request, "tenants/invite_accept.html", ctx, status=400)
 
@@ -407,14 +463,48 @@ def accept_invite(request: HttpRequest, token: str) -> HttpResponse:
     )
 
     # Create user if not exists; otherwise require correct password
-    user = User.objects.filter(email__iexact=email).first()
+    try:
+        user = User.objects.filter(email__iexact=email).first()
+    except Exception as e:
+        logger.exception(f"Error querying user for invite {token}: {e}")
+        ctx = {
+            "title": "Something went wrong",
+            "message": "We couldn't complete your invitation right now. Please try again.",
+            "invite": invite,
+            "biz_name": _biz_name(invite),
+            "greeting": _greeting(invite),
+            "compact": True,
+            "active_tab": "",
+            "show_search": False,
+            "error": "Database error",
+        }
+        return _render_safe(request, "tenants/invites/error.html", ctx, status=500)
+
     if user is None:
-        username = _unique_username_from_email(email)
-        user = User.objects.create_user(username=username, email=email, password=password or "changeme-now")
-        if not password:
-            # ensure the account is usable even if password missing
-            user.set_password("changeme-now")
-            user.save(update_fields=["password"])
+        try:
+            username = _unique_username_from_email(email)
+            user = User.objects.create_user(username=username, email=email, password=password or "changeme-now")
+            if not password:
+                # ensure the account is usable even if password missing
+                user.set_password("changeme-now")
+                user.save(update_fields=["password"])
+            logger.info(f"Created new user {user.username} ({email}) for invite {token}")
+        except Exception as e:
+            logger.exception(f"Error creating user for invite {token}: {e}")
+            ctx = {
+                "form": form,
+                "invite": invite,
+                "title": f"Join {_biz_name(invite)}",
+                "biz_name": _biz_name(invite),
+                "greeting": _greeting(invite),
+                "expires_at": getattr(invite, "expires_at", None),
+                "message": "Could not create your account. This email may already be in use.",
+                "compact": True,
+                "active_tab": "",
+                "show_search": False,
+                "error": "Account creation failed",
+            }
+            return _render_safe(request, "tenants/invite_accept.html", ctx, status=400)
     else:
         # If account exists and has a usable password, authenticate
         if user.has_usable_password():
@@ -431,6 +521,9 @@ def accept_invite(request: HttpRequest, token: str) -> HttpResponse:
                     "greeting": _greeting(invite),
                     "message": "An account with this email already exists. Please enter its correct password.",
                     "compact": True,
+                    "active_tab": "",
+                    "show_search": False,
+                    "error": "Password required for existing account",
                 }
                 return _render_safe(request, "tenants/invite_accept.html", ctx, status=400)
             auth_ok = authenticate(request, username=user.username, password=password)
@@ -447,6 +540,9 @@ def accept_invite(request: HttpRequest, token: str) -> HttpResponse:
                     "greeting": _greeting(invite),
                     "message": "Incorrect password for existing account.",
                     "compact": True,
+                    "active_tab": "",
+                    "show_search": False,
+                    "error": "Incorrect password",
                 }
                 return _render_safe(request, "tenants/invite_accept.html", ctx, status=400)
         else:
@@ -456,23 +552,36 @@ def accept_invite(request: HttpRequest, token: str) -> HttpResponse:
                 user.save(update_fields=["password"])
 
     # Log in (authenticate if possible; otherwise force login)
-    auth_user = None
-    if password:
-        auth_user = authenticate(request, username=user.username, password=password)
-    if auth_user is None:
-        login(request, user, backend="django.contrib.auth.backends.ModelBackend")
-    else:
-        login(request, auth_user)
+    try:
+        auth_user = None
+        if password:
+            auth_user = authenticate(request, username=user.username, password=password)
+        if auth_user is None:
+            login(request, user, backend="django.contrib.auth.backends.ModelBackend")
+        else:
+            login(request, auth_user)
+        logger.info(f"User {user.username} logged in via invite {token}")
+    except Exception as e:
+        logger.exception(f"Error logging in user for invite {token}: {e}")
+        ctx = {
+            "title": "Something went wrong",
+            "message": "We couldn't log you in. Please try signing in manually.",
+            "invite": invite,
+            "biz_name": _biz_name(invite),
+            "greeting": _greeting(invite),
+            "compact": True,
+            "active_tab": "",
+            "show_search": False,
+            "error": "Login failed",
+        }
+        return _render_safe(request, "tenants/invites/error.html", ctx, status=500)
 
     # Accept the invite
     try:
-        kw: dict[str, Any] = {"token": token, "user": request.user, "role": "AGENT"}
-        location = getattr(invite, "location", None)
-        location_id = getattr(invite, "location_id", None)
-        if location or location_id:
-            kw["location"] = location or location_id
-        accept_invite_by_token(**kw)  # type: ignore[arg-type]
+        # accept_invite_by_token gets location from the invite automatically
+        accept_invite_by_token(token=token, user=request.user, role="AGENT")
     except ValueError as e:
+        logger.warning(f"Invite accept ValueError for token {token} after user creation: {e}", exc_info=True)
         ctx = {
             "title": "Invite problem",
             "message": str(e) or "This invitation cannot be used. Please ask for a new one.",
@@ -480,9 +589,13 @@ def accept_invite(request: HttpRequest, token: str) -> HttpResponse:
             "biz_name": _biz_name(invite),
             "greeting": _greeting(invite),
             "compact": True,
+            "active_tab": "",
+            "show_search": False,
+            "error": str(e) if e else "Invite cannot be used",
         }
         return _render_safe(request, "tenants/invites/invalid.html", ctx, status=400)
     except Exception:
+        logger.exception(f"Unexpected error accepting invite after user creation, token {token}")
         ctx = {
             "title": "Something went wrong",
             "message": "We couldn't complete your invitation right now. Please try again.",
@@ -490,6 +603,9 @@ def accept_invite(request: HttpRequest, token: str) -> HttpResponse:
             "biz_name": _biz_name(invite),
             "greeting": _greeting(invite),
             "compact": True,
+            "active_tab": "",
+            "show_search": False,
+            "error": "Unexpected error",
         }
         return _render_safe(request, "tenants/invites/error.html", ctx, status=500)
 

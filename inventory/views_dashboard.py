@@ -134,6 +134,67 @@ def inventory_dashboard(request: HttpRequest) -> HttpResponse:
             except Exception as e:
                 log.exception("Agent ranking failed: %s", e)
         
+        # ------------ Compute additional metrics for dashboard cards ------------
+        # Get sales data to compute total_units and stock_value
+        try:
+            from inventory.models import InventoryItem
+            from inventory.queries import inventory_qs_tenant, SOLD_Q
+            from decimal import Decimal
+            from django.utils import timezone
+            from datetime import timedelta
+            from django.db.models import Sum, Q, Count
+            from django.db.models.functions import Coalesce
+            
+            business = getattr(request, "business", None)
+            
+            # Month-to-date sales count
+            now = timezone.now()
+            month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+            
+            base_inv = inventory_qs_tenant(request) if business else InventoryItem.objects.all()
+            
+            # Total units sold (MTD)
+            sold_items_mtd = base_inv.filter(SOLD_Q(), sold_at__gte=month_start)
+            total_units = sold_items_mtd.count()
+            
+            # Total revenue (MTD) - use sales_mtd which is already computed
+            total_revenue = sales_mtd
+            
+            # Stock value (cost value of items in stock)
+            stock_items = base_inv.filter(status="IN_STOCK", is_active=True)
+            stock_value = stock_items.aggregate(
+                total=Coalesce(Sum("order_price"), Decimal("0.00"))
+            )["total"] or Decimal("0.00")
+            
+            # Active stock count (for "Active Stock" card) - this is items_in_stock
+            active_stock_count = items_in_stock
+            
+            # Low/out items (items with low or zero stock)
+            # This depends on your business logic - using a simple heuristic here
+            try:
+                from inventory.models import Product
+                # Count products that are low or out of stock
+                low_items = Product.objects.filter(
+                    business=business
+                ).annotate(
+                    stock_count=Count("inventoryitem", filter=Q(
+                        inventoryitem__status="IN_STOCK", 
+                        inventoryitem__is_active=True
+                    ))
+                ).filter(
+                    Q(stock_count=0) | Q(stock_count__lte=2)  # Out of stock or low stock (2 or fewer)
+                ).count() if business else 0
+            except Exception:
+                low_items = 0
+            
+        except Exception as e:
+            log.exception("Failed to compute dashboard metrics: %s", e)
+            total_units = 0
+            total_revenue = sales_mtd
+            stock_value = Decimal("0.00")
+            active_stock_count = items_in_stock
+            low_items = 0
+        
         # ------------ Profit & Payment Mix (MTD) ------------
         # Import helpers locally to avoid circular imports
         try:
@@ -159,18 +220,25 @@ def inventory_dashboard(request: HttpRequest) -> HttpResponse:
                 )
             
             # Revenue is already calculated as sales_mtd
-            revenue_total = Decimal(str(sales_mtd))
+            revenue_total = Decimal(str(total_revenue))
             
-            # Create initial context
+            # Create initial context with all dashboard card variables
             ctx: Dict[str, Any] = {
                 "products": products,
                 "items_in_stock": items_in_stock,
+                "active_stock_count": active_stock_count,  # For "Active Stock" card
                 "sales_mtd": sales_mtd,
                 "sales_last": sales_last,
                 "last_days": last_days,
                 "products_in_stock_only": products_in_stock_only,
                 "agent_ranking": ranking_data,
                 "is_agent": is_agent,
+                # Dashboard card variables (for KPI band in template)
+                "total_revenue": total_revenue,
+                "total_units": total_units,
+                "stock_value": float(stock_value),
+                "low_items": low_items,
+                "period": "month",  # Default period for display
             }
             
             # Add profit context
@@ -197,12 +265,18 @@ def inventory_dashboard(request: HttpRequest) -> HttpResponse:
             ctx: Dict[str, Any] = {
                 "products": products,
                 "items_in_stock": items_in_stock,
+                "active_stock_count": active_stock_count,
                 "sales_mtd": sales_mtd,
                 "sales_last": sales_last,
                 "last_days": last_days,
                 "products_in_stock_only": products_in_stock_only,
                 "agent_ranking": ranking_data,
                 "is_agent": is_agent,
+                "total_revenue": total_revenue,
+                "total_units": total_units,
+                "stock_value": float(stock_value),
+                "low_items": low_items,
+                "period": "month",
             }
 
         # ------------ HTML ------------

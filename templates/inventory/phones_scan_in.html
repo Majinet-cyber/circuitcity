@@ -1,0 +1,472 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Scan In Phones · Inventory{% endblock %}
+{% block header_title %}📱 Scan In Phones{% endblock %}
+
+{% block extra_css %}
+<style>
+  /* ===== Layout ===== */
+  .page{margin:0 auto;max-width:1120px;padding:clamp(12px,4vw,24px)}
+  .vstack{display:flex;flex-direction:column;gap:.75rem}
+  .hstack{display:flex;align-items:center;gap:.75rem;flex-wrap:wrap}
+
+  /* ===== Theme ===== */
+  :root{
+    --cc-bg:#ffffff;
+    --cc-text:#0f172a;
+    --cc-muted:#64748b;
+    --cc-border:#e2e8f0;
+    --cc-panel:#ffffff;
+    --cc-panel-2:#f8fafc;
+    --cc-accent:#1f6feb;
+    --cc-accent-600:#1a5fd4;
+    --cc-shadow:0 6px 18px rgba(2,6,23,.08);
+    --brand-itel:#f59e0b;
+    --brand-tecno:#3b82f6;
+    --brand-samsung:#1e3a8a;
+  }
+  body{background:var(--cc-bg);color:var(--cc-text)}
+
+  /* ===== Gamification Bar ===== */
+  .gamification-bar{
+    background:linear-gradient(135deg,#f8fafc,#ffffff);
+    border:1px solid var(--cc-border);
+    border-radius:16px;
+    padding:20px;
+    box-shadow:var(--cc-shadow);
+    margin-bottom:24px;
+  }
+  .progress-container{
+    position:relative;
+    background:#e2e8f0;
+    height:28px;
+    border-radius:999px;
+    overflow:hidden;
+    margin-top:12px;
+  }
+  .progress-bar{
+    height:100%;
+    background:linear-gradient(90deg,#10b981,#059669);
+    transition:width 0.6s ease;
+    display:flex;
+    align-items:center;
+    justify-content:flex-end;
+    padding-right:12px;
+    color:#fff;
+    font-weight:700;
+    font-size:14px;
+  }
+  .stats-row{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    font-size:15px;
+  }
+
+  /* ===== Brand Cards ===== */
+  .brand-cards{
+    display:grid;
+    grid-template-columns:repeat(auto-fit,minmax(280px,1fr));
+    gap:16px;
+    margin:24px 0;
+  }
+  .brand-card{
+    background:var(--cc-panel);
+    border:2px solid var(--cc-border);
+    border-radius:16px;
+    padding:24px;
+    cursor:pointer;
+    transition:all 0.25s ease;
+    box-shadow:var(--cc-shadow);
+    text-align:center;
+  }
+  .brand-card:hover{
+    transform:translateY(-4px);
+    box-shadow:0 12px 28px rgba(2,6,23,.14);
+  }
+  .brand-card.selected{
+    border-color:var(--cc-accent);
+    background:linear-gradient(135deg,rgba(31,111,235,0.05),rgba(31,111,235,0.02));
+    box-shadow:0 0 0 4px rgba(31,111,235,.15),var(--cc-shadow);
+  }
+  .brand-card img{
+    max-height:48px;
+    width:auto;
+    margin:0 auto 12px;
+    display:block;
+  }
+  .brand-card h3{
+    font-size:20px;
+    font-weight:700;
+    margin:8px 0 6px;
+  }
+  .brand-card .tagline{
+    font-size:13px;
+    color:var(--cc-muted);
+    margin-bottom:0;
+  }
+  .brand-card .tap-hint{
+    font-size:11px;
+    color:var(--cc-accent);
+    font-weight:600;
+    margin-top:8px;
+    opacity:0;
+    transition:opacity 0.2s;
+  }
+  .brand-card:hover .tap-hint,.brand-card.selected .tap-hint{
+    opacity:1;
+  }
+
+  /* ===== Form Styling ===== */
+  .form-section{
+    background:var(--cc-panel);
+    border:1px solid var(--cc-border);
+    border-radius:16px;
+    padding:24px;
+    box-shadow:var(--cc-shadow);
+    margin-bottom:24px;
+  }
+  .form-with-sidebar{
+    display:grid;
+    grid-template-columns:1fr 320px;
+    gap:24px;
+    align-items:start;
+  }
+  @media (max-width:900px){
+    .form-with-sidebar{
+      grid-template-columns:1fr;
+    }
+  }
+  .field{
+    position:relative;
+    background:var(--cc-panel-2);
+    border:1px solid var(--cc-border);
+    border-radius:12px;
+    display:flex;
+    align-items:center;
+    box-shadow:0 2px 8px rgba(2,6,23,.04);
+    margin-bottom:16px;
+  }
+  .field > label{
+    position:absolute;
+    top:-8px;
+    left:12px;
+    background:var(--cc-panel);
+    padding:0 6px;
+    font-size:12px;
+    font-weight:700;
+    color:var(--cc-muted);
+  }
+  .field > input,.field > select{
+    flex:1;
+    background:transparent;
+    color:var(--cc-text);
+    border:0;
+    padding:14px 14px;
+    outline:none;
+    font-size:16px;
+    width:100%;
+    min-height:48px;
+  }
+  input:focus,select:focus{
+    outline:none;
+  }
+  .field:focus-within{
+    border-color:var(--cc-accent);
+    box-shadow:0 0 0 3px rgba(31,111,235,.18);
+  }
+
+  /* ===== Buttons ===== */
+  .btn{
+    appearance:none;
+    border:1px solid var(--cc-border);
+    color:var(--cc-text);
+    background:var(--cc-panel);
+    border-radius:12px;
+    padding:14px 20px;
+    cursor:pointer;
+    font-weight:700;
+    font-size:15px;
+    min-height:52px;
+    transition:all 0.2s ease;
+  }
+  .btn:hover{
+    transform:translateY(-2px);
+    box-shadow:var(--cc-shadow);
+  }
+  .btn[disabled]{
+    opacity:.5;
+    cursor:not-allowed;
+    transform:none;
+  }
+  .btn-primary{
+    background:linear-gradient(135deg,var(--cc-accent),var(--cc-accent-600));
+    color:#fff;
+    border-color:var(--cc-accent);
+  }
+  .btn-primary:hover{
+    background:linear-gradient(135deg,var(--cc-accent-600),#164fb1);
+  }
+
+  /* ===== IMEI Picker Panel ===== */
+  .imei-picker{
+    background:var(--cc-panel-2);
+    border:1px solid var(--cc-border);
+    border-radius:12px;
+    padding:16px;
+    max-height:400px;
+    overflow-y:auto;
+  }
+  .imei-picker h4{
+    font-size:14px;
+    font-weight:700;
+    color:var(--cc-muted);
+    margin:0 0 12px;
+    text-transform:uppercase;
+    letter-spacing:0.5px;
+  }
+  .imei-list{
+    display:flex;
+    flex-direction:column;
+    gap:8px;
+  }
+  .imei-item{
+    background:var(--cc-panel);
+    border:1px solid var(--cc-border);
+    border-radius:8px;
+    padding:10px 12px;
+    cursor:pointer;
+    transition:all 0.2s ease;
+    font-family:monospace;
+    font-size:13px;
+    color:var(--cc-text);
+  }
+  .imei-item:hover{
+    border-color:var(--cc-accent);
+    background:rgba(31,111,235,0.05);
+    transform:translateX(4px);
+  }
+  .imei-empty{
+    color:var(--cc-muted);
+    font-size:13px;
+    font-style:italic;
+    text-align:center;
+    padding:20px;
+  }
+  .imei-loading{
+    color:var(--cc-muted);
+    font-size:13px;
+    text-align:center;
+    padding:20px;
+  }
+
+  /* ===== Mobile Responsive ===== */
+  @media (max-width:640px){
+    .brand-cards{
+      grid-template-columns:1fr;
+    }
+    .stats-row{
+      flex-direction:column;
+      gap:8px;
+      text-align:center;
+    }
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page">
+  <!-- Gamification Bar -->
+  <div class="gamification-bar">
+    <div class="stats-row">
+      <div>
+        <strong style="font-size:18px;">🎯 Today's Target: {{ daily_target }} phones</strong>
+      </div>
+      <div>
+        <span style="color:var(--cc-muted);">Scanned today:</span>
+        <strong style="color:#10b981;font-size:18px;">{{ scanned_today }}</strong>
+      </div>
+    </div>
+    <div class="progress-container">
+      <div class="progress-bar" style="width:{{ progress_pct }}%">
+        {% if progress_pct > 0 %}{{ progress_pct }}%{% endif %}
+      </div>
+    </div>
+  </div>
+
+  <!-- Brand Selection Cards -->
+  <div class="brand-cards">
+    {% for brand in brands %}
+    <div class="brand-card" data-brand="{{ brand.key }}" onclick="selectBrand('{{ brand.key }}', '{{ brand.name }}')">
+      <img src="{% static brand.logo %}" alt="{{ brand.name }}" onerror="this.style.display='none'">
+      <h3>{{ brand.name }}</h3>
+      <p class="tagline">{{ brand.tagline }}</p>
+      <p class="tap-hint">👆 Tap to select</p>
+    </div>
+    {% endfor %}
+  </div>
+
+  <!-- Scan Form with IMEI Picker Sidebar -->
+  <div id="scan-form-wrapper" style="display:none;">
+    <div class="form-with-sidebar">
+      <!-- Main Form -->
+      <form method="post" id="scan-form" class="form-section" style="margin-bottom:0;">
+        {% csrf_token %}
+        <input type="hidden" name="brand" id="brand-input">
+        
+        <h3 style="margin-top:0;margin-bottom:20px;color:var(--cc-accent);">
+          <span id="selected-brand-name"></span> Models
+        </h3>
+
+        <div class="field">
+          <label>Model & Variant</label>
+          <select name="catalog_product_id" id="model-select" required>
+            <option value="">Loading models...</option>
+          </select>
+        </div>
+
+        <div class="field">
+          <label>IMEI (15 digits)</label>
+          <input type="text" name="imei" id="imei-input" maxlength="15" pattern="\d{15}" placeholder="Enter 15-digit IMEI" required>
+        </div>
+
+        <button type="submit" class="btn btn-primary" style="width:100%;">
+          ✅ Scan In Phone
+        </button>
+      </form>
+
+      <!-- IMEI Picker Sidebar -->
+      <div class="imei-picker" id="imei-picker">
+        <h4>📱 Available IMEIs</h4>
+        <div id="imei-list-container">
+          <div class="imei-empty">Select a model to see available IMEIs</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  let selectedBrand = null;
+
+  function selectBrand(brandKey, brandName) {
+    selectedBrand = brandKey;
+    
+    // Update UI
+    document.querySelectorAll('.brand-card').forEach(card => {
+      card.classList.remove('selected');
+    });
+    document.querySelector(`.brand-card[data-brand="${brandKey}"]`).classList.add('selected');
+    
+    // Set hidden input
+    document.getElementById('brand-input').value = brandKey;
+    document.getElementById('selected-brand-name').textContent = brandName;
+    
+    // Show form wrapper (includes form + IMEI picker)
+    document.getElementById('scan-form-wrapper').style.display = 'block';
+    
+    // Fetch models for this brand
+    fetchModels(brandKey);
+    
+    // Clear IMEI picker
+    document.getElementById('imei-list-container').innerHTML = '<div class="imei-empty">Select a model to see available IMEIs</div>';
+    
+    // Scroll to form
+    document.getElementById('scan-form-wrapper').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+
+  async function fetchModels(brandKey) {
+    const select = document.getElementById('model-select');
+    select.innerHTML = '<option value="">Loading...</option>';
+    
+    try {
+      const response = await fetch(`/inventory/api/phone-models/?brand=${encodeURIComponent(brandKey.toUpperCase())}`);
+      const data = await response.json();
+      
+      if (data.models && data.models.length > 0) {
+        select.innerHTML = '<option value="">-- Select a model --</option>';
+        data.models.forEach(model => {
+          const option = document.createElement('option');
+          option.value = model.id;
+          option.textContent = model.display_name;
+          
+          // Store cost price as data attribute for potential auto-fill
+          if (model.default_cost_price) {
+            option.dataset.cost = model.default_cost_price;
+          }
+          
+          select.appendChild(option);
+        });
+      } else {
+        select.innerHTML = '<option value="">No models found for this brand</option>';
+      }
+    } catch (error) {
+      console.error('Failed to fetch models:', error);
+      select.innerHTML = '<option value="">Error loading models</option>';
+    }
+  }
+
+  // IMEI input: auto-format as digits only
+  const imeiInput = document.getElementById('imei-input');
+  imeiInput.addEventListener('input', function(e) {
+    let value = e.target.value.replace(/\D/g, '');  // digits only
+    if (value.length > 15) {
+      value = value.slice(-15);  // last 15 digits
+    }
+    e.target.value = value;
+  });
+
+  // Model select: fetch available IMEIs when model changes
+  const modelSelect = document.getElementById('model-select');
+  modelSelect.addEventListener('change', function() {
+    const productId = this.value;
+    if (!productId) {
+      document.getElementById('imei-list-container').innerHTML = '<div class="imei-empty">Select a model to see available IMEIs</div>';
+      return;
+    }
+    fetchAvailableImeis(productId);
+  });
+
+  async function fetchAvailableImeis(productId) {
+    const container = document.getElementById('imei-list-container');
+    container.innerHTML = '<div class="imei-loading">Loading IMEIs...</div>';
+    
+    try {
+      const response = await fetch(`/inventory/phones/available-imeis/${productId}/`);
+      const data = await response.json();
+      
+      if (data.ok && data.imeis && data.imeis.length > 0) {
+        let html = '<div class="imei-list">';
+        data.imeis.forEach(imei => {
+          html += `<div class="imei-item" onclick="selectImei('${imei}')">${imei}</div>`;
+        });
+        html += '</div>';
+        container.innerHTML = html;
+      } else {
+        container.innerHTML = '<div class="imei-empty">No existing IMEIs for this model.<br>You are adding a new one.</div>';
+      }
+    } catch (error) {
+      console.error('Failed to fetch IMEIs:', error);
+      container.innerHTML = '<div class="imei-empty">Error loading IMEIs</div>';
+    }
+  }
+
+  function selectImei(imei) {
+    document.getElementById('imei-input').value = imei;
+    document.getElementById('imei-input').focus();
+    
+    // Visual feedback
+    document.querySelectorAll('.imei-item').forEach(item => {
+      if (item.textContent === imei) {
+        item.style.background = 'rgba(31,111,235,0.15)';
+        item.style.borderColor = 'var(--cc-accent)';
+      } else {
+        item.style.background = '';
+        item.style.borderColor = '';
+      }
+    });
+  }
+</script>
+{% endblock %}
+

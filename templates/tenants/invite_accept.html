@@ -25,41 +25,53 @@
 
   /* Full-screen stage */
   .invite-screen{
-    position:fixed; inset:0; display:grid; place-items:center; padding:12px;
+    position:fixed; inset:0; display:flex; align-items:center; justify-content:center; 
+    padding:1rem;
     background:
       radial-gradient(1200px 600px at 30% -10%, #ffffff 0%, rgba(255,255,255,0) 60%),
       radial-gradient(1200px 600px at 90% 120%, #ffffff 0%, rgba(255,255,255,0) 60%),
       #eef2f7;
   }
 
-  /* Card = header (auto) • body (1fr, scrolls) • footer (auto) */
+  /* Card = header (auto) • body (scrolls) • footer (auto) - fits nicely on 768px height */
   .invite-card{
-    width:100%; max-width:560px; max-height:100svh;
-    background:#fff; border-radius:16px; box-shadow:0 10px 30px rgba(2,6,23,.10);
+    width:100%; max-width:520px; max-height:min(95vh, 720px);
+    background:#fff; border-radius:20px; box-shadow:0 18px 45px rgba(15,23,42,.15);
     display:grid; grid-template-rows:auto 1fr auto;
+    overflow:hidden;
   }
-  .invite-head{ padding:18px 20px 6px; }
-  .invite-body{ padding:6px 20px 12px; overflow:auto; -webkit-overflow-scrolling:touch; }
-  .invite-foot{ padding:12px 20px 18px; border-top:1px solid #eef2f7; }
+  .invite-head{ padding:16px 20px 8px; }
+  .invite-body{ padding:4px 20px 8px; overflow:auto; -webkit-overflow-scrolling:touch; }
+  .invite-foot{ padding:12px 20px 16px; border-top:1px solid #eef2f7; background:#fafbfc; }
 
-  .invite-title{ font-weight:800; margin:0 0 4px 0; letter-spacing:.2px; }
-  .badge-soft{ background:#eef2ff; color:#273a8a; border:1px solid #e5e7eb; border-radius:999px; padding:2px 10px; font-size:12px; }
-  .hello{ background:#f8fafc; border-radius:12px; padding:10px 12px; }
-  .form-label{ font-weight:600; }
-  .form-control{ height:46px; border-radius:12px; }
-  .input-group .btn{ border-radius:12px; }
+  .invite-title{ font-weight:800; margin:0 0 4px 0; letter-spacing:.2px; font-size:1.5rem; }
+  .badge-soft{ background:#eef2ff; color:#273a8a; border:1px solid #e5e7eb; border-radius:999px; padding:2px 10px; font-size:11px; }
+  .hello{ background:#f8fafc; border-radius:10px; padding:8px 10px; margin-bottom:0.75rem !important; }
+  
+  /* Compact form styling */
+  .form-label{ font-weight:600; margin-bottom:0.35rem; font-size:0.9rem; }
+  .form-control{ height:42px; border-radius:10px; font-size:0.95rem; }
+  .input-group .btn{ border-radius:10px; font-size:0.85rem; }
+  .form-text{ font-size:0.8rem; margin-top:0.25rem; }
+  
+  /* Reduce spacing between fields */
+  .mb-3{ margin-bottom:0.75rem !important; }
+  .mb-2{ margin-bottom:0.5rem !important; }
 
   .btn-accept{
     background:#16a34a; border-color:#16a34a; color:#fff;
-    height:48px; border-radius:12px; font-weight:700; width:100%;
+    height:46px; border-radius:10px; font-weight:700; width:100%;
+    font-size:1rem; border:none;
   }
+  .btn-accept:hover{ background:#15803d; }
   .btn-accept:disabled{ opacity:.7; }
 
   /* Mobile compaction */
   @media (max-width:420px){
-    .invite-head{ padding:14px 14px 4px; }
-    .invite-body{ padding:4px 14px 10px; }
-    .invite-foot{ padding:10px 14px 14px; }
+    .invite-head{ padding:12px 16px 6px; }
+    .invite-body{ padding:4px 16px 8px; }
+    .invite-foot{ padding:10px 16px 12px; }
+    .invite-title{ font-size:1.3rem; }
   }
 </style>
 {% endblock %}
@@ -71,9 +83,7 @@
     <!-- Header -->
     <div class="invite-head">
       <div class="d-flex align-items-center gap-2 mb-2">
-        <div class="fw-bold text-uppercase small text-secondary">Agent Invite</div>
-        <div class="vr"></div>
-        <div class="small text-muted">Secure sign-up</div>
+        <div class="fw-bold text-uppercase small text-secondary" style="font-size:0.7rem;">Agent Invite</div>
         {% if invite.expires_at %}
           <div class="ms-auto">
             <span class="badge-soft" id="expiryBadge" title="{{ invite.expires_at|date:'c' }}">checking expiry…</span>
@@ -81,7 +91,7 @@
         {% endif %}
       </div>
       <h2 class="invite-title">Join {{ invite.business.name }}</h2>
-      <p class="text-muted mb-0">Create your account to start working in this shop.</p>
+      <p class="text-muted mb-0" style="font-size:0.9rem;">Create your account to start working.</p>
     </div>
 
     <!-- Body (scrolls on small phones) -->
@@ -89,9 +99,8 @@
       {% if error %}<div class="alert alert-danger" role="alert">{{ error }}</div>{% endif %}
       {% if form.non_field_errors %}<div class="alert alert-danger" role="alert">{{ form.non_field_errors|join:", " }}</div>{% endif %}
 
-      <div class="hello mb-3">
-        <div class="small text-muted mb-1">Personalized greeting</div>
-        <div id="greeting" style="font-weight:600;">
+      <div class="hello">
+        <div id="greeting" style="font-weight:600; font-size:0.95rem;">
           Hi {{ invite.invited_name|default:"there" }}, welcome to {{ invite.business.name }}.
         </div>
       </div>
@@ -105,12 +114,11 @@
                  placeholder="e.g. Chris Mwale"
                  value="{{ invite.invited_name|default_if_none:'' }}"
                  autocomplete="name">
-          <div class="form-text">Use the name teammates will recognize.</div>
         </div>
 
         <div class="mb-3">
           <label class="form-label">
-            Email {% if invite.email %}(from invite){% endif %}
+            Email {% if invite.email %}<span class="text-muted" style="font-weight:400; font-size:0.85rem;">(from invite)</span>{% endif %}
           </label>
 
           {# If invite has an email, lock it: show disabled field + hidden real field #}
@@ -126,12 +134,10 @@
               <input type="email" class="form-control" name="email" required autocomplete="email" value="">
             {% endif %}
           {% endif %}
-
-          <div class="form-text">Used for notifications and password reset.</div>
         </div>
 
-        <div class="mb-3">
-          <label for="{{ form.password1.id_for_label|default:'id_password1' }}" class="form-label">Create password</label>
+        <div class="mb-2">
+          <label for="{{ form.password1.id_for_label|default:'id_password1' }}" class="form-label">Password</label>
           <div class="input-group">
             {% if form.password1 %}
               {{ form.password1 }}
@@ -141,12 +147,11 @@
             <button class="btn btn-outline-secondary" type="button" data-toggle="reveal" data-target="[name='password1']">Show</button>
           </div>
           {% if form.password1 and form.password1.errors %}<div class="text-danger small mt-1">{{ form.password1.errors|join:", " }}</div>{% endif %}
-          <div class="form-text">Tip: at least 8 characters.</div>
           <div id="strengthHint" class="small mt-1"></div>
         </div>
 
         <div class="mb-2">
-          <label for="{{ form.password2.id_for_label|default:'id_password2' }}" class="form-label">Confirm password</label>
+          <label for="{{ form.password2.id_for_label|default:'id_password2' }}" class="form-label">Confirm</label>
           <div class="input-group">
             {% if form.password2 %}
               {{ form.password2 }}
@@ -159,8 +164,8 @@
           <div class="form-text" id="matchHint" style="display:none;">Passwords match ✔</div>
         </div>
 
-        <div class="text-center mt-3">
-          <a href="{% url 'login' %}" class="small">Already have an account? Sign in</a>
+        <div class="text-center mt-2">
+          <a href="{% url 'login' %}" class="small" style="font-size:0.85rem;">Already have an account? Sign in</a>
         </div>
       </form>
     </div>

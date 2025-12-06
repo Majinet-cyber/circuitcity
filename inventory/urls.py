@@ -70,6 +70,18 @@ try:
 except Exception:
     _docs = SimpleNamespace()
 
+# Optional Phones views (for gamified scan-in)
+try:
+    from . import views_phones as _phones_views
+except Exception:
+    _phones_views = SimpleNamespace()
+
+# Stock assignment views (manager-only)
+try:
+    from . import views_stock_assign as _stock_assign
+except Exception:
+    _stock_assign = SimpleNamespace()
+
 from .views_dispatch import product_new_entry as product_new_entry_view, vertical_dispatcher
 
 # ---------------------------------------------------------------------
@@ -868,8 +880,14 @@ urlpatterns = [
     path("dashboard", _redirect_to("inventory:inventory_dashboard"), name="dashboard"),
     path("dash/", _redirect_to("inventory:inventory_dashboard")),
 
+    # Stock assignment (manager-only)
+    path("stock/assign/", _need_biz(getattr(_stock_assign, "assign_stock_owner", lambda r: JsonResponse({"error": "Not implemented"}, status=501))), name="assign_stock_owner"),
+    path("stock/bulk-assign/", _need_biz(getattr(_stock_assign, "bulk_assign_stock", lambda r: JsonResponse({"error": "Not implemented"}, status=501))), name="bulk_assign_stock"),
+    path("api/business-agents/", _need_biz(getattr(_stock_assign, "get_business_agents", lambda r: JsonResponse({"error": "Not implemented"}, status=501))), name="api_business_agents"),
+
     # Scanning — pages
-    path("scan-in/", _need_biz(_scan_in_page_view), name="scan_in"),
+    # Main scan-in now uses gamified phone view (with fallback to legacy for non-phone businesses)
+    path("scan-in/", _need_biz(getattr(_phones_views, "phone_scan_in", _scan_in_page_view)), name="scan_in"),
     path("scan-sold/", _need_biz(_scan_sold_page_view), name="scan_sold"),
 
     # NEW — Quick Sell page (no post-sale probe)
@@ -1060,6 +1078,11 @@ try:
 except Exception:
     _phone_wizard = SimpleNamespace()
 
+try:
+    from . import views_phone_sale_wizard_v2 as _phone_wizard_v2
+except Exception:
+    _phone_wizard_v2 = SimpleNamespace()
+
 urlpatterns += [
     path("phone-products/", _need_biz(getattr(_phone_prods, "phone_products_list", _stub("phone_products_list not found"))), name="phone_products"),
     path("phone-products/new/", manager_required(_need_biz(getattr(_phone_prods, "phone_product_create", _stub("phone_product_create not found")))), name="phone_product_create"),
@@ -1067,7 +1090,25 @@ urlpatterns += [
     path("phone-products/<int:product_id>/delete/", manager_required(_need_biz(getattr(_phone_prods, "phone_product_delete", _stub("phone_product_delete not found")))), name="phone_product_delete"),
     path("api/phone-products/models/", _need_biz(getattr(_phone_prods, "phone_products_api_models", _stub("phone_products_api_models not found"))), name="api_phone_products_models"),
     
-    # Gamified phone sale wizard
+    # Gamified phone sale wizard (original 5-step)
     path("phone-sale-wizard/", _need_biz(getattr(_phone_wizard, "phone_sale_wizard", _stub("phone_sale_wizard not found"))), name="phone_sale_wizard"),
     path("phone-sale-wizard/reset/", _need_biz(getattr(_phone_wizard, "phone_sale_wizard_reset", _stub("phone_sale_wizard_reset not found"))), name="phone_sale_wizard_reset"),
+    
+    # NEW: Simplified 3-step wizard (IMEI → Price → Payment)
+    path("sell-phone/", _need_biz(getattr(_phone_wizard_v2, "phone_sale_wizard_v2", _stub("phone_sale_wizard_v2 not found"))), name="phone_sale_wizard_v2"),
+    path("sell-phone/reset/", _need_biz(getattr(_phone_wizard_v2, "phone_sale_wizard_v2_reset", _stub("phone_sale_wizard_v2_reset not found"))), name="phone_sale_wizard_v2_reset"),
+]
+
+# ---------------------------------------------------------------------
+# PHONES Gamified Scan-In/Sell (brand card UI)
+# (_phones_views already imported at top)
+# ---------------------------------------------------------------------
+
+urlpatterns += [
+    # Gamified scan-in/sell pages
+    path("phones/scan-in/", _need_biz(getattr(_phones_views, "phone_scan_in", _stub("phone_scan_in not found"))), name="phone_scan_in"),
+    path("phones/scan-sell/", _need_biz(getattr(_phones_views, "phone_scan_sell", _stub("phone_scan_sell not found"))), name="phone_scan_sell"),
+    
+    # Intelligent IMEI picker API
+    path("phones/available-imeis/<int:product_id>/", login_required(getattr(_phones_views, "phone_available_imeis", _stub("phone_available_imeis not found"))), name="phones_available_imeis"),
 ]

@@ -4,6 +4,7 @@ from django.views.generic import RedirectView
 from django.http import JsonResponse
 from . import views
 from . import views_export
+from . import views_admin
 
 app_name = "wallet"
 
@@ -59,6 +60,9 @@ urlpatterns = [
     
     # Agent Wallet Adjustment
     path("admin/agent/<int:membership_id>/adjust/", views.wallet_adjust_agent, name="wallet_adjust_agent"),
+    
+    # Commission Management
+    path("admin/commission/update/", views_admin.update_commission_config, name="update_commission_config"),
 
     # Admin extras (additive, non-breaking)
     path("admin/requests/", views.admin_budget_list, name="admin_budget_list"),

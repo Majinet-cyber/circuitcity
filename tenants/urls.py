@@ -25,6 +25,11 @@ try:
 except Exception:
     _vm = None
 
+# Agent management actions (suspend, restore, edit location)
+suspend_agent_view = getattr(_vm, "suspend_agent", None) if _vm else None
+restore_agent_view = getattr(_vm, "restore_agent", None) if _vm else None
+edit_agent_location_view = getattr(_vm, "edit_agent_location", None) if _vm else None
+
 # Prefer dedicated invite-accept views module if present
 _vinv = None
 try:
@@ -194,6 +199,11 @@ urlpatterns = [
     path("manager/agents/invite/",                 create_agent_invite, name="create_agent_invite"),
     path("manager/agents/invite/<int:pk>/resend/", resend_agent_invite, name="resend_agent_invite"),
     path("manager/agents/invite/<int:pk>/revoke/", revoke_agent_invite, name="revoke_agent_invite"),
+
+    # ----- Agent management actions (suspend, restore, location) -----
+    path("manager/agents/<int:membership_id>/suspend/", suspend_agent_view or _fallback_redirect("tenants:manager_review_agents"), name="suspend_agent"),
+    path("manager/agents/<int:membership_id>/restore/", restore_agent_view or _fallback_redirect("tenants:manager_review_agents"), name="restore_agent"),
+    path("manager/agents/<int:membership_id>/location/", edit_agent_location_view or _fallback_redirect("tenants:manager_review_agents"), name="edit_agent_location"),
 
     # Accept invite (used in links shared with agents)
     # NOTE: <str:token> safely carries TimestampSigner tokens (no slashes).

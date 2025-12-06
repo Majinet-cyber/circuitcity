@@ -653,31 +653,42 @@ class AgentInvite(BaseTenantModel):
         """
         Idempotently attach `user` to this invite's business as an ACTIVE AGENT,
         scoped to the invite's location (required for agents).
+        
+        Always ensures the agent has a valid location by using the business's
+        default location if the invite doesn't specify one.
         """
         MembershipModel = apps.get_model("tenants", "Membership")
-        if not self.location_id:
-            # ensure we always have a location for agents
-            loc = self.business.default_location()
-            if loc:
-                self.location = loc
-                self.save(update_fields=["location"])
+        
+        # Ensure we have a location for agents - use default if not set
+        location_for_membership = self.location
+        if not location_for_membership:
+            # Import the helper from services to avoid duplication
+            from tenants.services.invites import get_default_location_for_business
+            location_for_membership = get_default_location_for_business(self.business)
+            # Update the invite's location for consistency
+            self.location = location_for_membership
+            self.save(update_fields=["location"])
 
-        membership, _ = MembershipModel.objects.get_or_create(
+        membership, created = MembershipModel.objects.get_or_create(
             user=user,
             business=self.business,
-            location=self.location,
+            location=location_for_membership,
             defaults={"role": "AGENT", "status": "ACTIVE"},
         )
-        # Ensure the role/status in case it existed differently
-        changed = False
+        
+        # Ensure the role/status/location are correct in case it existed differently
+        updates = []
         if membership.role != "AGENT":
             membership.role = "AGENT"
-            changed = True
+            updates.append("role")
         if membership.status != "ACTIVE":
             membership.status = "ACTIVE"
-            changed = True
-        if changed:
-            membership.save(update_fields=["role", "status"])
+            updates.append("status")
+        if not membership.location:
+            membership.location = location_for_membership
+            updates.append("location")
+        if updates:
+            membership.save(update_fields=updates)
         return membership
 
     @transaction.atomic

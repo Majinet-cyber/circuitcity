@@ -573,7 +573,19 @@ class InventoryItem(models.Model):
     status = models.CharField(max_length=10, choices=STATUS, default="IN_STOCK", db_index=True)
     current_location = models.ForeignKey("Location", on_delete=models.PROTECT, db_index=True)
     assigned_agent = models.ForeignKey(
-        User, null=True, blank=True, on_delete=models.SET_NULL, related_name="assigned_items"
+        User, null=True, blank=True, on_delete=models.SET_NULL, related_name="assigned_items",
+        help_text="If set, this stock item belongs to a specific agent; otherwise to the manager/global pool."
+    )
+    # Stock ownership role categorization
+    ASSIGNMENT_ROLE_CHOICES = [
+        ("MANAGER", "Manager"),
+        ("AGENT", "Agent"),
+    ]
+    assigned_role = models.CharField(
+        max_length=20,
+        choices=ASSIGNMENT_ROLE_CHOICES,
+        default="MANAGER",
+        help_text="For reporting and filters. Indicates whether stock is manager-owned or agent-owned."
     )
     # Soft-delete flag (archive instead of hard delete when needed)
     is_active = models.BooleanField(default=True, db_index=True)

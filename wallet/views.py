@@ -627,6 +627,18 @@ class AdminWalletHome(LoginRequiredMixin, TemplateView):
         pending = scope_qs_to_user(BudgetRequest.objects.all(), self.request)
         ctx["budgets_pending"] = pending.filter(status=BudgetRequest.Status.PENDING).count()
         
+        # Get commission configuration
+        business = get_active_business(self.request)
+        if business:
+            try:
+                from tenants.utils_commission import get_phone_commission_pct
+                commission_fraction = get_phone_commission_pct(business)
+                ctx["commission_pct"] = commission_fraction * 100  # Convert to percentage for display
+            except Exception:
+                ctx["commission_pct"] = Decimal("10.00")  # Default
+        else:
+            ctx["commission_pct"] = Decimal("10.00")
+        
         # Set active_tab to prevent template errors
         ctx["active_tab"] = "overview"
         return ctx

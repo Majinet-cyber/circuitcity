@@ -58,7 +58,24 @@
 
         <!-- Share-this-link (only when latest_link exists) -->
         <div id="share-box" class="glass-ghost p-3 mt-3" style="{% if not latest_link|default:'' %}display:none{% endif %}">
-          <div class="section-title mb-2">Share this link</div>
+          <div class="section-title mb-2">✅ Invite Created!</div>
+          
+          <!-- Temporary Password Display -->
+          {% if temp_password %}
+          <div class="alert alert-success mb-3" role="alert">
+            <strong>🔑 Temporary Password:</strong>
+            <code class="fs-5 text-dark bg-white px-2 py-1 rounded" style="user-select: all;">{{ temp_password }}</code>
+            <button type="button" class="btn btn-sm btn-outline-success ms-2" onclick="navigator.clipboard.writeText('{{ temp_password }}'); this.innerHTML='✓ Copied';" title="Copy password">
+              <i class="bi bi-clipboard"></i> Copy
+            </button>
+            <div class="small mt-2 text-muted">
+              ⚠️ <strong>Important:</strong> Share this password with your agent. They can use it to log in directly, or use the invite link below to set their own password.
+            </div>
+          </div>
+          {% endif %}
+          
+          <!-- Invite Link -->
+          <div class="mb-2"><strong>Invite Link:</strong></div>
           <div class="input-group">
             <input id="latest-invite-link" type="text" class="form-control mono-link" readonly value="{{ latest_link|default:'' }}" aria-label="Latest invite link">
             <button id="copy-link" class="btn btn-copy" type="button" aria-label="Copy link"><i class="bi bi-clipboard"></i>Copy</button>
@@ -135,14 +152,95 @@
       <div class="glass p-3 p-md-4">
         <div class="section-title mb-2">Active agents</div>
         {% if active_members %}
-          <ul class="mb-0 list-unstyled">
-            {% for m in active_members %}
-              <li class="d-flex justify-content-between align-items-center py-1">
-                <span class="ellipsis">{{ m.user }}</span>
-                <span class="muted small">{{ m.created_at|date:"M j, Y H:i" }}</span>
-              </li>
-            {% endfor %}
-          </ul>
+          <div class="table-responsive">
+            <table class="table">
+              <thead>
+                <tr>
+                  <th>Agent</th>
+                  <th>Location</th>
+                  <th>Status</th>
+                  <th>Joined</th>
+                  <th style="width:200px">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for m in active_members %}
+                <tr>
+                  <td class="ellipsis">
+                    <strong>{{ m.user.get_full_name|default:m.user.username }}</strong>
+                    <br><small class="text-muted">{{ m.user.email }}</small>
+                  </td>
+                  <td>
+                    {% if m.location %}
+                      <span class="badge bg-info">{{ m.location.name }}</span>
+                    {% else %}
+                      <span class="text-muted">—</span>
+                    {% endif %}
+                  </td>
+                  <td>
+                    {% if m.status == "ACTIVE" and m.user.is_active %}
+                      <span class="chip status--accepted">Active</span>
+                    {% elif m.status == "SUSPENDED" or not m.user.is_active %}
+                      <span class="chip status--revoked">Suspended</span>
+                    {% else %}
+                      <span class="chip">{{ m.status|title }}</span>
+                    {% endif %}
+                  </td>
+                  <td class="small muted">{{ m.created_at|date:"M j, Y" }}</td>
+                  <td>
+                    <div class="d-flex flex-wrap gap-1">
+                      <!-- Location assignment -->
+                      <div class="dropdown">
+                        <button class="btn btn-sm dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+                          <i class="bi bi-geo-alt"></i>
+                        </button>
+                        <ul class="dropdown-menu">
+                          {% if locations %}
+                            {% for loc in locations %}
+                            <li>
+                              <form method="post" action="{% url 'tenants:edit_agent_location' m.id %}" class="d-inline">
+                                {% csrf_token %}
+                                <input type="hidden" name="location_id" value="{{ loc.id }}">
+                                <button type="submit" class="dropdown-item">{{ loc.name }}</button>
+                              </form>
+                            </li>
+                            {% endfor %}
+                            <li><hr class="dropdown-divider"></li>
+                            <li>
+                              <form method="post" action="{% url 'tenants:edit_agent_location' m.id %}" class="d-inline">
+                                {% csrf_token %}
+                                <button type="submit" class="dropdown-item text-muted">Clear location</button>
+                              </form>
+                            </li>
+                          {% else %}
+                            <li><span class="dropdown-item text-muted">No locations</span></li>
+                          {% endif %}
+                        </ul>
+                      </div>
+                      
+                      <!-- Suspend/Restore -->
+                      {% if m.status == "ACTIVE" and m.user.is_active %}
+                        <form method="post" action="{% url 'tenants:suspend_agent' m.id %}" class="d-inline" onsubmit="return confirm('Suspend this agent? They will not be able to log in.');">
+                          {% csrf_token %}
+                          <button type="submit" class="btn btn-sm btn-outline-warning" title="Suspend agent">
+                            <i class="bi bi-pause-circle"></i>
+                          </button>
+                        </form>
+                      {% else %}
+                        <form method="post" action="{% url 'tenants:restore_agent' m.id %}" class="d-inline">
+                          {% csrf_token %}
+                          <button type="submit" class="btn btn-sm btn-outline-success" title="Restore agent">
+                            <i class="bi bi-play-circle"></i>
+                          </button>
+                        </form>
+                      {% endif %}
+                    </div>
+                  </td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
         {% else %}
           <div class="glass-ghost p-3 text-center muted">No active agents yet.</div>
         {% endif %}

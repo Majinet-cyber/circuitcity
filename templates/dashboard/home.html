@@ -327,7 +327,7 @@
       <div class="stat-label">
         <i class="bi bi-cash-coin"></i> Today's Sales
       </div>
-      <div class="stat-value" data-animate-value="{{ today_sales_amount|default:0 }}">MK 0</div>
+      <div class="stat-value" data-animate-value="{{ today_sales_amount|default:0 }}" data-format="currency">MK 0</div>
       <div class="stat-change">{{ today_sales_count|default:0 }} devices sold</div>
     </div>
 
@@ -335,7 +335,7 @@
       <div class="stat-label">
         <i class="bi bi-calendar-check"></i> This Month
       </div>
-      <div class="stat-value" data-animate-value="{{ month_sales_amount|default:0 }}">MK 0</div>
+      <div class="stat-value" data-animate-value="{{ month_sales_amount|default:0 }}" data-format="currency">MK 0</div>
       <div class="stat-change">{{ month_sales_count|default:0 }} devices</div>
     </div>
 
@@ -343,7 +343,7 @@
       <div class="stat-label">
         <i class="bi bi-box-seam"></i> Active Stock
       </div>
-      <div class="stat-value" data-animate-value="{{ stock_count|default:0 }}">0</div>
+      <div class="stat-value" data-animate-value="{{ stock_count|default:0 }}" data-format="number">0</div>
       <div class="stat-change">{{ products_count|default:0 }} product SKUs</div>
     </div>
 
@@ -454,7 +454,7 @@
       <div class="stat-label">
         <i class="bi bi-calendar-day"></i> Today's Sales
       </div>
-      <div class="stat-value" data-animate-value="{{ agent_today_amount|default:0 }}">MK 0</div>
+      <div class="stat-value" data-animate-value="{{ agent_today_amount|default:0 }}" data-format="currency">MK 0</div>
       <div class="stat-change">{{ agent_today_count|default:0 }} devices</div>
     </div>
 
@@ -462,7 +462,7 @@
       <div class="stat-label">
         <i class="bi bi-calendar-month"></i> This Month
       </div>
-      <div class="stat-value" data-animate-value="{{ agent_month_amount|default:0 }}">MK 0</div>
+      <div class="stat-value" data-animate-value="{{ agent_month_amount|default:0 }}" data-format="currency">MK 0</div>
       <div class="stat-change">{{ agent_month_count|default:0 }} devices</div>
     </div>
 
@@ -484,7 +484,7 @@
       <div class="stat-label">
         <i class="bi bi-star-fill"></i> Commission Earned
       </div>
-      <div class="stat-value" data-animate-value="{{ agent_commission|default:0 }}">MK 0</div>
+      <div class="stat-value" data-animate-value="{{ agent_commission|default:0 }}" data-format="currency">MK 0</div>
       <div class="stat-change">This month</div>
     </div>
   </div>
@@ -545,7 +545,14 @@
   (function animateStats() {
     document.querySelectorAll('[data-animate-value]').forEach(el => {
       const target = parseInt(el.getAttribute('data-animate-value') || '0', 10);
-      if (isNaN(target) || target === 0) { el.textContent = 'MK 0'; return; }
+      const format = el.getAttribute('data-format') || 'currency';
+      const isCurrency = format === 'currency';
+      
+      if (isNaN(target) || target === 0) {
+        el.textContent = isCurrency ? 'MK 0' : '0';
+        return;
+      }
+      
       let current = 0;
       const duration = 1000;
       const step = Math.max(1, Math.ceil(target / 60));
@@ -553,10 +560,10 @@
       const timer = setInterval(() => {
         current += step;
         if (current >= target) {
-          el.textContent = 'MK ' + target.toLocaleString();
+          el.textContent = isCurrency ? ('MK ' + target.toLocaleString()) : target.toLocaleString();
           clearInterval(timer);
         } else {
-          el.textContent = 'MK ' + current.toLocaleString();
+          el.textContent = isCurrency ? ('MK ' + current.toLocaleString()) : current.toLocaleString();
         }
       }, interval);
     });
@@ -567,6 +574,9 @@
     const metric = document.getElementById('trendMetric').value;
     try {
       const resp = await fetch(`/dashboard/api/sales-trend/?period=30d&metric=${metric}`);
+      if (!resp.ok) {
+        throw new Error(`HTTP ${resp.status}`);
+      }
       const data = await resp.json();
 
       const ctx = document.getElementById('salesTrendChart');
@@ -608,8 +618,10 @@
       });
     } catch (e) {
       console.error('Failed to load sales trend:', e);
-      document.getElementById('salesTrendChart').parentElement.innerHTML =
-        '<canvas id="salesTrendChart" class="chart-canvas"></canvas><p class="text-center text-danger mt-3">⚠️ Failed to load chart</p>';
+      const container = document.getElementById('salesTrendChart')?.parentElement;
+      if (container) {
+        container.innerHTML = '<canvas id="salesTrendChart" class="chart-canvas"></canvas><p class="text-center text-danger mt-3">⚠️ Failed to load chart</p>';
+      }
     }
   }
 
@@ -618,6 +630,9 @@
     const period = document.getElementById('topPeriod').value;
     try {
       const resp = await fetch(`/dashboard/api/top-models/?period=${period}`);
+      if (!resp.ok) {
+        throw new Error(`HTTP ${resp.status}`);
+      }
       const data = await resp.json();
 
       const ctx = document.getElementById('topModelsChart');
@@ -659,8 +674,10 @@
       });
     } catch (e) {
       console.error('Failed to load top models:', e);
-      document.getElementById('topModelsChart').parentElement.innerHTML =
-        '<canvas id="topModelsChart" class="chart-canvas"></canvas><p class="text-center text-danger mt-3">⚠️ Failed to load chart</p>';
+      const container = document.getElementById('topModelsChart')?.parentElement;
+      if (container) {
+        container.innerHTML = '<canvas id="topModelsChart" class="chart-canvas"></canvas><p class="text-center text-danger mt-3">⚠️ Failed to load chart</p>';
+      }
     }
   }
 

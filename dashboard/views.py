@@ -9,7 +9,7 @@ from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.contrib.auth.decorators import login_required, user_passes_test
 from django.db.models import (
-    Sum, F, DecimalField, ExpressionWrapper, Count, Case, When, QuerySet, Q, Value
+    Sum, F, DecimalField, CharField, ExpressionWrapper, Count, Case, When, QuerySet, Q, Value
 )
 from django.db.models.functions import TruncMonth
 from django.http import JsonResponse, HttpResponseRedirect
@@ -1235,59 +1235,160 @@ def agent_dashboard_proxy(request):
 
 @never_cache
 @login_required
+@require_business
 @require_GET
 def v2_sales_trend_data_proxy(request):
-    """Proxy to inventory sales trend API - formats data for main dashboard."""
-    # Import the working API function directly
-    from inventory.api_sales_metrics import api_sales_trend
-    response = api_sales_trend(request)
-    
-    # The inventory API returns {ok, data: {period, series:[{date, qty, amount}], ...}}
-    # Main dashboard JS expects {labels: [...], values: [...]}
-    if response.status_code == 200:
-        import json
-        data = json.loads(response.content)
-        if data.get("ok"):
-            payload = data.get("data", {})
-            series = payload.get("series", [])
+    """
+    Sales trend API for main dashboard - uses InventoryItem (same as KPIs).
+    Returns {labels: [...], values: [...]} for Chart.js.
+    """
+    try:
+        # Get business from request (set by @require_business decorator)
+        business = getattr(request, "business", None)
+        if not business:
+            return JsonResponse({"labels": [], "values": []})
+        
+        # Parse period parameter (default 30d for "month")
+        period_param = request.GET.get("period", "30d").lower()
+        if period_param in ("month", "30d"):
+            days = 30
+        elif period_param in ("week", "7d"):
+            days = 7
+        elif period_param == "today":
+            days = 1
+        else:
+            days = 30
+        
+        # Calculate date range
+        tz = timezone.get_current_timezone()
+        today = timezone.localdate()
+        end_date = _start_of_day(today + timedelta(days=1), tz)
+        start_date = _start_of_day(today - timedelta(days=days - 1), tz)
+        
+        # Query sold items using InventoryItem (same as KPIs)
+        sold_items = (
+            _scope_queryset(InventoryItem.objects.all(), business)
+            .filter(SOLD_Q(), sold_at__gte=start_date, sold_at__lt=end_date)
+        )
+        
+        # Group by date
+        from django.db.models.functions import TruncDate
+        daily_sales = (
+            sold_items
+            .annotate(sale_date=TruncDate('sold_at'))
+            .values('sale_date')
+            .annotate(
+                qty=Count('id'),
+                amount=Sum(F(_inv_price_field() or 'selling_price'), output_field=DecimalField(max_digits=14, decimal_places=2))
+            )
+            .order_by('sale_date')
+        )
+        
+        # Build dict for quick lookup
+        sales_by_date = {
+            item['sale_date'].isoformat(): item
+            for item in daily_sales
+        }
+        
+        # Fill all dates in range (including zeros)
+        labels = []
+        values = []
+        current = today - timedelta(days=days - 1)
+        
+        metric = request.GET.get("metric", "amount")
+        
+        for i in range(days):
+            date_str = current.isoformat()
+            labels.append(date_str)
             
-            # Extract based on requested metric
-            metric = request.GET.get("metric", "amount")
-            if metric == "count" or metric == "qty":
-                return JsonResponse({
-                    "labels": [s.get("date") for s in series],
-                    "values": [s.get("qty", 0) for s in series],
-                })
-            else:  # amount
-                return JsonResponse({
-                    "labels": [s.get("date") for s in series],
-                    "values": [s.get("amount", 0) for s in series],
-                })
-    return JsonResponse({"labels": [], "values": []})
+            if date_str in sales_by_date:
+                row = sales_by_date[date_str]
+                if metric in ("count", "qty"):
+                    values.append(int(row['qty'] or 0))
+                else:  # amount
+                    values.append(float(row['amount'] or 0))
+            else:
+                values.append(0)
+            
+            current += timedelta(days=1)
+        
+        return JsonResponse({"labels": labels, "values": values})
+        
+    except Exception as e:
+        import logging
+        logging.exception("Error in v2_sales_trend_data_proxy")
+        return JsonResponse({"labels": [], "values": []})
 
 
 @never_cache
 @login_required
+@require_business
 @require_GET
 def v2_top_models_data_proxy(request):
-    """Proxy to inventory top models API - formats data for main dashboard."""
-    from inventory.api_sales_metrics import api_top_models
-    response = api_top_models(request)
-    
-    # Inventory API returns {ok, data: {series: [{name, qty, amount}], ...}}
-    # Main dashboard JS expects {labels: [...], values: [...]}
-    if response.status_code == 200:
-        import json
-        data = json.loads(response.content)
-        if data.get("ok"):
-            payload = data.get("data", {})
-            series = payload.get("series", [])
-            
-            return JsonResponse({
-                "labels": [s.get("name", "Unknown") for s in series],
-                "values": [s.get("qty", 0) for s in series],
-            })
-    return JsonResponse({"labels": [], "values": []})
+    """
+    Top models API for main dashboard - uses InventoryItem (same as KPIs).
+    Returns {labels: [...], values: [...]} for Chart.js.
+    """
+    try:
+        # Get business from request (set by @require_business decorator)
+        business = getattr(request, "business", None)
+        if not business:
+            return JsonResponse({"labels": [], "values": []})
+        
+        # Parse period parameter
+        period_param = request.GET.get("period", "month").lower()
+        if period_param == "today":
+            days = 1
+        elif period_param in ("week", "7d"):
+            days = 7
+        else:  # month/30d
+            days = 30
+        
+        # Calculate date range
+        tz = timezone.get_current_timezone()
+        today = timezone.localdate()
+        end_date = _start_of_day(today + timedelta(days=1), tz)
+        start_date = _start_of_day(today - timedelta(days=days - 1), tz)
+        
+        # Query sold items by product/model
+        sold_items = (
+            _scope_queryset(InventoryItem.objects.select_related('product'), business)
+            .filter(SOLD_Q(), sold_at__gte=start_date, sold_at__lt=end_date)
+        )
+        
+        # Group by product name
+        from django.db.models.functions import Coalesce
+        top_models = (
+            sold_items
+            .annotate(
+                model_name=Coalesce(
+                    F('product__name'),
+                    F('product__model'),
+                    Value('Unknown'),
+                    output_field=CharField()
+                )
+            )
+            .values('model_name')
+            .annotate(
+                qty=Count('id'),
+                amount=Sum(F(_inv_price_field() or 'selling_price'), output_field=DecimalField(max_digits=14, decimal_places=2))
+            )
+            .order_by('-qty')[:5]  # Top 5
+        )
+        
+        labels = []
+        values = []
+        
+        for item in top_models:
+            labels.append(str(item['model_name'] or 'Unknown'))
+            values.append(int(item['qty'] or 0))
+        
+        return JsonResponse({"labels": labels, "values": values})
+        
+    except Exception as e:
+        import logging
+        logging.exception("Error in v2_top_models_data_proxy")
+        return JsonResponse({"labels": [], "values": []})
 
 
 @never_cache

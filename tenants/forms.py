@@ -223,7 +223,14 @@ class AgentInviteAcceptForm(forms.Form):
             raise ValidationError("Passwords do not match.")
 
         # Ensure email survives (disabled fields are not posted)
-        email_val = (self.fields.get("email").initial  # type: ignore[assignment]
-                     if self.fields.get("email") else None)
+        # Safely extract email from initial value or fallback to saved initial_email
+        email_val = None
+        try:
+            email_field = self.fields.get("email")
+            if email_field:
+                email_val = getattr(email_field, "initial", None)
+        except (AttributeError, KeyError):
+            pass
+        
         cleaned["email"] = email_val or self._initial_email or ""
         return cleaned

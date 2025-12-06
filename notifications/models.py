@@ -17,6 +17,14 @@ class Notification(models.Model):
         ("ADMIN", "Admin"),
         ("AGENT", "Agent"),
     )
+    CATEGORIES = (
+        ("general", "General"),
+        ("payslip_reminder", "Payslip Reminder"),
+        ("commission", "Commission"),
+        ("stock", "Stock"),
+        ("sale", "Sale"),
+        ("system", "System"),
+    )
 
     audience = models.CharField(max_length=10, choices=AUDIENCE)
     # For agent notifications, target user (nullable for admin-wide notices)
@@ -26,8 +34,16 @@ class Notification(models.Model):
         on_delete=models.CASCADE,
         related_name="notifications",
     )
+    business = models.ForeignKey(
+        "tenants.Business",
+        null=True, blank=True,
+        on_delete=models.CASCADE,
+        related_name="notifications",
+        help_text="Business this notification belongs to (for multi-tenant support)"
+    )
 
     message = models.TextField()
+    category = models.CharField(max_length=50, choices=CATEGORIES, default="general")
     level = models.CharField(max_length=10, choices=LEVELS, default="info")
     created_at = models.DateTimeField(auto_now_add=True)
     read_at = models.DateTimeField(null=True, blank=True)
@@ -38,6 +54,8 @@ class Notification(models.Model):
             models.Index(fields=["audience", "created_at"]),
             models.Index(fields=["user", "created_at"]),
             models.Index(fields=["read_at"]),
+            models.Index(fields=["business", "category", "created_at"]),
+            models.Index(fields=["user", "category", "read_at"]),
         ]
         ordering = ["-created_at"]
 

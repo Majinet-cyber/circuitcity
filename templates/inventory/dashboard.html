@@ -90,8 +90,9 @@
       {% endif %}
     </div>
     <div class="kpi">
-      <div class="label">Stock Value</div>
-      <div class="value">MK {{ stock_value|default:0|floatformat:0|intcomma }}</div>
+      <div class="label">Active Stock</div>
+      <div class="value">{{ active_stock_count|default:items_in_stock|default:0|intcomma }}</div>
+      <small style="color:var(--cc-muted);font-size:0.75rem;margin-top:4px">items available</small>
     </div>
     <div class="kpi">
       <div class="label">Low / Out Items</div>

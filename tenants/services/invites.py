@@ -4,14 +4,74 @@ from __future__ import annotations
 from typing import Iterable, List, Optional, Tuple, Dict
 from datetime import timedelta
 import uuid
+import logging
 
+from django.apps import apps
 from django.contrib.auth import get_user_model
 from django.db import transaction
 from django.utils import timezone
 
 from tenants.models import AgentInvite, Business, Membership
 
+logger = logging.getLogger(__name__)
 User = get_user_model()
+
+
+# ---------------------------------------------------------------------------
+# Default location helper
+# ---------------------------------------------------------------------------
+
+def get_default_location_for_business(business: Business):
+    """
+    Return a Location instance to use as the default for new AGENT memberships.
+    
+    Rules:
+    1) If there is a location with name equal (case-insensitive) to business.name,
+       return that.
+    2) Else, if the business has at least one location, return the first one (stable order).
+    3) Else, auto-create a new location tied to this business with a sensible default name
+       (business.name) and any required fields set.
+    
+    This function must never return None.
+    
+    Args:
+        business: Business instance
+        
+    Returns:
+        Location instance (guaranteed non-None)
+    """
+    try:
+        Location = apps.get_model("inventory", "Location")
+    except Exception as e:
+        logger.error(f"Could not import Location model: {e}")
+        raise RuntimeError("Location model is required for agent memberships but could not be imported")
+    
+    # Rule 1: Try to find a location with name matching business name (case-insensitive)
+    location = Location.objects.filter(
+        business=business,
+        name__iexact=business.name
+    ).first()
+    
+    if location:
+        logger.info(f"Found location '{location.name}' matching business name for {business.name}")
+        return location
+    
+    # Rule 2: Try to find any existing location for this business
+    location = Location.objects.filter(business=business).order_by("id").first()
+    
+    if location:
+        logger.info(f"Using existing location '{location.name}' as default for {business.name}")
+        return location
+    
+    # Rule 3: Create a new location with sensible defaults
+    location = Location.objects.create(
+        business=business,
+        name=business.name,
+        city="",  # Optional field, blank is fine
+        is_default=True,  # Mark as default since it's the first/only one
+    )
+    logger.info(f"Created new default location '{location.name}' for {business.name}")
+    return location
 
 
 # ---------------------------------------------------------------------------
@@ -209,6 +269,7 @@ def accept_invite_by_token(
       - Invite must exist and not be expired.
       - If already JOINED, we still ensure membership is ACTIVE and return it.
       - Idempotent on repeat calls for the same user/invite.
+      - For AGENT role, ensures location is always set (using default if needed).
       - If force_password_change=True, sets user's profile.force_password_change=True.
 
     Returns (invite, membership).
@@ -225,13 +286,20 @@ def accept_invite_by_token(
         inv.save(update_fields=["status"])
         raise ValueError("Invite has expired")
 
+    # For AGENT role, ensure we have a location (use default if invite doesn't specify one)
+    location_for_membership = inv.location
+    if role == "AGENT" and not location_for_membership:
+        location_for_membership = get_default_location_for_business(inv.business)
+        logger.info(f"Using default location '{location_for_membership.name}' for agent membership")
+
     # Ensure membership exists / is active
     mem, _created = Membership.objects.get_or_create(
         user=user,
         business=inv.business,
-        location=inv.location,
+        location=location_for_membership,
         defaults={"role": role, "status": "ACTIVE"},
     )
+    
     # If it existed but was not active/role differs, gently fix it (do no harm)
     updates = []
     if mem.status != "ACTIVE":
@@ -240,9 +308,11 @@ def accept_invite_by_token(
     if role and mem.role != role:
         mem.role = role
         updates.append("role")
-    if inv.location and not mem.location:
-        mem.location = inv.location
+    # For AGENT role, ensure location is set
+    if role == "AGENT" and not mem.location:
+        mem.location = location_for_membership
         updates.append("location")
+        logger.info(f"Updated existing membership to have location '{location_for_membership.name}'")
     if updates:
         mem.save(update_fields=updates)
 

@@ -106,12 +106,24 @@
     }
 
     .btn-secondary {
-      background: rgba(79, 70, 229, 0.1);
+      background: var(--white);
       color: var(--primary);
       border: 2px solid var(--primary);
     }
 
     .btn-secondary:hover {
+      background: var(--primary);
+      color: var(--white);
+      transform: translateY(-2px);
+    }
+    
+    .btn-outline {
+      background: transparent;
+      color: var(--primary);
+      border: 2px solid var(--primary);
+    }
+    
+    .btn-outline:hover {
       background: var(--primary);
       color: var(--white);
       transform: translateY(-2px);
@@ -462,12 +474,22 @@
         </p>
         <div class="hero-buttons">
           <a href="{% url 'login' %}" class="btn btn-primary">Get Started</a>
-          <a href="#how-it-works" class="btn btn-secondary">See How It Works</a>
+          <a href="#how-it-works" class="btn btn-outline">See How It Works</a>
         </div>
       </div>
       <div class="hero-image">
         <img src="{% static 'img/majn.png' %}" alt="Emajinet" class="hero-logo">
       </div>
+    </div>
+  </section>
+
+  <!-- Mission Statement Section -->
+  <section style="padding: 4rem 2rem; background: var(--white); text-align: center;">
+    <div style="max-width: 800px; margin: 0 auto;">
+      <h2 class="section-title" style="margin-bottom: 1.5rem;">Our Mission</h2>
+      <p style="font-size: 1.25rem; line-height: 1.8; color: var(--text-secondary); margin-bottom: 0;">
+        The Spotify of every small business, replacing hardcovers with an AI MBA manager, with ease.
+      </p>
     </div>
   </section>
 
@@ -561,13 +583,35 @@
     </div>
   </section>
 
+  <!-- Motto Section (T.S. Eliot) -->
+  <section style="padding: 5rem 2rem; background: linear-gradient(135deg, #f9fafb 0%, #e0e7ff 100%); position: relative; overflow: hidden;">
+    <div style="max-width: 900px; margin: 0 auto; position: relative; z-index: 1;">
+      <div style="background: rgba(255, 255, 255, 0.9); backdrop-filter: blur(10px); border-radius: 24px; padding: 3rem 2.5rem; box-shadow: 0 20px 60px rgba(79, 70, 229, 0.15); border: 1px solid rgba(79, 70, 229, 0.1);">
+        <div style="text-align: center; margin-bottom: 2rem;">
+          <span style="font-size: 3rem; opacity: 0.3;">❝</span>
+        </div>
+        <blockquote style="margin: 0; padding: 0; border: none;">
+          <p style="font-size: 1.5rem; line-height: 1.8; font-style: italic; color: var(--text-primary); margin-bottom: 2rem; text-align: center; font-weight: 300;">
+            We shall not cease from exploration<br>
+            And the end of all our exploring<br>
+            Will be to arrive where we started<br>
+            And know the place for the first time.
+          </p>
+          <footer style="text-align: center; font-size: 0.95rem; color: var(--text-secondary); font-style: normal;">
+            — T.S. Eliot, <em>Four Quartets</em>
+          </footer>
+        </blockquote>
+      </div>
+    </div>
+  </section>
+
   <!-- Simulator CTA -->
   <section style="padding: 3rem 2rem; background: var(--white); text-align: center;">
     <h2 class="section-title">Try Our Business Simulator</h2>
     <p class="section-subtitle">
       Play with numbers and see how stock, turnover, and pricing affect your revenue and profit
     </p>
-    <a href="{% url 'staticpages:simulator' %}" class="btn btn-secondary">Launch Simulator →</a>
+    <a href="{% url 'staticpages:simulator' %}" class="btn btn-primary">Launch Simulator →</a>
   </section>
 
   <!-- CTA Section -->

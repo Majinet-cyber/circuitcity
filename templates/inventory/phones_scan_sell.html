@@ -1,0 +1,335 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Scan Sell Phones · Inventory{% endblock %}
+{% block header_title %}💸 Scan Sell Phones{% endblock %}
+
+{% block extra_css %}
+<style>
+  /* ===== Layout ===== */
+  .page{margin:0 auto;max-width:1120px;padding:clamp(12px,4vw,24px)}
+  .vstack{display:flex;flex-direction:column;gap:.75rem}
+  .hstack{display:flex;align-items:center;gap:.75rem;flex-wrap:wrap}
+
+  /* ===== Theme ===== */
+  :root{
+    --cc-bg:#ffffff;
+    --cc-text:#0f172a;
+    --cc-muted:#64748b;
+    --cc-border:#e2e8f0;
+    --cc-panel:#ffffff;
+    --cc-panel-2:#f8fafc;
+    --cc-accent:#10b981;
+    --cc-accent-600:#059669;
+    --cc-shadow:0 6px 18px rgba(2,6,23,.08);
+    --brand-itel:#f59e0b;
+    --brand-tecno:#3b82f6;
+    --brand-samsung:#1e3a8a;
+  }
+  body{background:var(--cc-bg);color:var(--cc-text)}
+
+  /* ===== Gamification Bar (Green for sales) ===== */
+  .gamification-bar{
+    background:linear-gradient(135deg,#f0fdf4,#ffffff);
+    border:1px solid var(--cc-border);
+    border-radius:16px;
+    padding:20px;
+    box-shadow:var(--cc-shadow);
+    margin-bottom:24px;
+  }
+  .progress-container{
+    position:relative;
+    background:#e2e8f0;
+    height:28px;
+    border-radius:999px;
+    overflow:hidden;
+    margin-top:12px;
+  }
+  .progress-bar{
+    height:100%;
+    background:linear-gradient(90deg,#10b981,#059669);
+    transition:width 0.6s ease;
+    display:flex;
+    align-items:center;
+    justify-content:flex-end;
+    padding-right:12px;
+    color:#fff;
+    font-weight:700;
+    font-size:14px;
+  }
+  .stats-row{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    font-size:15px;
+  }
+
+  /* ===== Brand Cards ===== */
+  .brand-cards{
+    display:grid;
+    grid-template-columns:repeat(auto-fit,minmax(280px,1fr));
+    gap:16px;
+    margin:24px 0;
+  }
+  .brand-card{
+    background:var(--cc-panel);
+    border:2px solid var(--cc-border);
+    border-radius:16px;
+    padding:24px;
+    cursor:pointer;
+    transition:all 0.25s ease;
+    box-shadow:var(--cc-shadow);
+    text-align:center;
+  }
+  .brand-card:hover{
+    transform:translateY(-4px);
+    box-shadow:0 12px 28px rgba(2,6,23,.14);
+  }
+  .brand-card.selected{
+    border-color:var(--cc-accent);
+    background:linear-gradient(135deg,rgba(16,185,129,0.05),rgba(16,185,129,0.02));
+    box-shadow:0 0 0 4px rgba(16,185,129,.15),var(--cc-shadow);
+  }
+  .brand-card img{
+    max-height:48px;
+    width:auto;
+    margin:0 auto 12px;
+    display:block;
+  }
+  .brand-card h3{
+    font-size:20px;
+    font-weight:700;
+    margin:8px 0 6px;
+  }
+  .brand-card .tagline{
+    font-size:13px;
+    color:var(--cc-muted);
+    margin-bottom:0;
+  }
+  .brand-card .tap-hint{
+    font-size:11px;
+    color:var(--cc-accent);
+    font-weight:600;
+    margin-top:8px;
+    opacity:0;
+    transition:opacity 0.2s;
+  }
+  .brand-card:hover .tap-hint,.brand-card.selected .tap-hint{
+    opacity:1;
+  }
+
+  /* ===== Form Styling ===== */
+  .form-section{
+    background:var(--cc-panel);
+    border:1px solid var(--cc-border);
+    border-radius:16px;
+    padding:24px;
+    box-shadow:var(--cc-shadow);
+    margin-bottom:24px;
+  }
+  .field{
+    position:relative;
+    background:var(--cc-panel-2);
+    border:1px solid var(--cc-border);
+    border-radius:12px;
+    display:flex;
+    align-items:center;
+    box-shadow:0 2px 8px rgba(2,6,23,.04);
+    margin-bottom:16px;
+  }
+  .field > label{
+    position:absolute;
+    top:-8px;
+    left:12px;
+    background:var(--cc-panel);
+    padding:0 6px;
+    font-size:12px;
+    font-weight:700;
+    color:var(--cc-muted);
+  }
+  .field > input,.field > select{
+    flex:1;
+    background:transparent;
+    color:var(--cc-text);
+    border:0;
+    padding:14px 14px;
+    outline:none;
+    font-size:16px;
+    width:100%;
+    min-height:48px;
+  }
+  input:focus,select:focus{
+    outline:none;
+  }
+  .field:focus-within{
+    border-color:var(--cc-accent);
+    box-shadow:0 0 0 3px rgba(16,185,129,.18);
+  }
+
+  .row{
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:16px;
+  }
+  @media (max-width:640px){
+    .row{grid-template-columns:1fr;}
+  }
+
+  /* ===== Buttons ===== */
+  .btn{
+    appearance:none;
+    border:1px solid var(--cc-border);
+    color:var(--cc-text);
+    background:var(--cc-panel);
+    border-radius:12px;
+    padding:14px 20px;
+    cursor:pointer;
+    font-weight:700;
+    font-size:15px;
+    min-height:52px;
+    transition:all 0.2s ease;
+  }
+  .btn:hover{
+    transform:translateY(-2px);
+    box-shadow:var(--cc-shadow);
+  }
+  .btn[disabled]{
+    opacity:.5;
+    cursor:not-allowed;
+    transform:none;
+  }
+  .btn-primary{
+    background:linear-gradient(135deg,var(--cc-accent),var(--cc-accent-600));
+    color:#fff;
+    border-color:var(--cc-accent);
+  }
+  .btn-primary:hover{
+    background:linear-gradient(135deg,var(--cc-accent-600),#047857);
+  }
+
+  /* ===== Mobile Responsive ===== */
+  @media (max-width:640px){
+    .brand-cards{
+      grid-template-columns:1fr;
+    }
+    .stats-row{
+      flex-direction:column;
+      gap:8px;
+      text-align:center;
+    }
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page">
+  <!-- Gamification Bar (Sales Target) -->
+  <div class="gamification-bar">
+    <div class="stats-row">
+      <div>
+        <strong style="font-size:18px;">🎯 Today's Sales Target: {{ daily_sales_target }} phones</strong>
+      </div>
+      <div>
+        <span style="color:var(--cc-muted);">Sold today:</span>
+        <strong style="color:#10b981;font-size:18px;">{{ sold_today }}</strong>
+      </div>
+    </div>
+    <div class="progress-container">
+      <div class="progress-bar" style="width:{{ sales_progress_pct }}%">
+        {% if sales_progress_pct > 0 %}{{ sales_progress_pct }}%{% endif %}
+      </div>
+    </div>
+  </div>
+
+  <!-- Brand Selection Cards -->
+  <div class="brand-cards">
+    {% for brand in brands %}
+    <div class="brand-card" data-brand="{{ brand.key }}" onclick="selectBrand('{{ brand.key }}', '{{ brand.name }}')">
+      <img src="{% static brand.logo %}" alt="{{ brand.name }}" onerror="this.style.display='none'">
+      <h3>{{ brand.name }}</h3>
+      <p class="tagline">{{ brand.tagline }}</p>
+      <p class="tap-hint">👆 Tap to select</p>
+    </div>
+    {% endfor %}
+  </div>
+
+  <!-- Sell Form -->
+  <form method="post" id="sell-form" class="form-section" style="display:none;">
+    {% csrf_token %}
+    <input type="hidden" name="brand" id="brand-input">
+    
+    <h3 style="margin-top:0;margin-bottom:20px;color:var(--cc-accent);">
+      💸 Sell <span id="selected-brand-name"></span> Phone
+    </h3>
+
+    <div class="field">
+      <label>IMEI (15 digits)</label>
+      <input type="text" name="imei" id="imei-input" maxlength="15" pattern="\d{15}" placeholder="Enter 15-digit IMEI" required>
+    </div>
+
+    <div class="row">
+      <div class="field">
+        <label>Selling Price (MWK)</label>
+        <input type="number" name="selling_price" id="selling-price-input" step="0.01" min="0" placeholder="0.00" required>
+      </div>
+
+      <div class="field">
+        <label>Payment Method</label>
+        <select name="payment_method" id="payment-method-select">
+          <option value="CASH">Cash</option>
+          <option value="BANK">Bank</option>
+          <option value="MOBILE_MONEY">Mobile Money</option>
+        </select>
+      </div>
+    </div>
+
+    <button type="submit" class="btn btn-primary" style="width:100%;">
+      💰 Complete Sale
+    </button>
+  </form>
+</div>
+
+<script>
+  let selectedBrand = null;
+
+  function selectBrand(brandKey, brandName) {
+    selectedBrand = brandKey;
+    
+    // Update UI
+    document.querySelectorAll('.brand-card').forEach(card => {
+      card.classList.remove('selected');
+    });
+    document.querySelector(`.brand-card[data-brand="${brandKey}"]`).classList.add('selected');
+    
+    // Set hidden input
+    document.getElementById('brand-input').value = brandKey;
+    document.getElementById('selected-brand-name').textContent = brandName;
+    
+    // Show form
+    document.getElementById('sell-form').style.display = 'block';
+    
+    // Scroll to form
+    document.getElementById('sell-form').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+
+  // IMEI input: auto-format as digits only
+  const imeiInput = document.getElementById('imei-input');
+  imeiInput.addEventListener('input', function(e) {
+    let value = e.target.value.replace(/\D/g, '');  // digits only
+    if (value.length > 15) {
+      value = value.slice(-15);  // last 15 digits
+    }
+    e.target.value = value;
+  });
+
+  // Selling price: format with commas on blur
+  const priceInput = document.getElementById('selling-price-input');
+  priceInput.addEventListener('blur', function(e) {
+    const value = parseFloat(e.target.value);
+    if (!isNaN(value)) {
+      e.target.value = value.toFixed(2);
+    }
+  });
+</script>
+{% endblock %}
+

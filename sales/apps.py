@@ -8,8 +8,7 @@ class SalesConfig(AppConfig):
     verbose_name = "Sales"
 
     def ready(self):
-        # Import signals here if you add any later, e.g.:
-        # from . import signals  # noqa: F401
-        pass
+        # Import signals to register handlers
+        from . import signals  # noqa: F401
 
 
