@@ -639,6 +639,20 @@ class AdminWalletHome(LoginRequiredMixin, TemplateView):
         else:
             ctx["commission_pct"] = Decimal("10.00")
         
+        # Get cost summary for current month
+        if business:
+            try:
+                from .services_costs import get_business_costs_for_period
+                cost_summary = get_business_costs_for_period(business, period='month')
+                ctx["total_costs_this_month"] = cost_summary['overall_costs_total']
+                ctx["recurring_monthly_costs"] = cost_summary['recurring_costs']
+            except Exception:
+                ctx["total_costs_this_month"] = Decimal("0.00")
+                ctx["recurring_monthly_costs"] = Decimal("0.00")
+        else:
+            ctx["total_costs_this_month"] = Decimal("0.00")
+            ctx["recurring_monthly_costs"] = Decimal("0.00")
+        
         # Set active_tab to prevent template errors
         ctx["active_tab"] = "overview"
         return ctx

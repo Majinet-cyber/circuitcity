@@ -76,9 +76,21 @@
     <div class="col-6 col-xl-3">
       <div class="card shadow-sm border-0 h-100 kpi-card">
         <div class="card-body">
-          <div class="label mb-1">Quick Health</div>
-          <div class="value">OK</div>
-          <div class="sub small">Wallet admin is online</div>
+          <div class="label mb-1">Total Costs (This Month)</div>
+          <div class="value">MWK {{ total_costs_this_month|default:0|floatformat:0|intcomma }}</div>
+          <div class="sub small">
+            {% url 'wallet:admin_cost_list' as url_costs %}
+            {% if url_costs %}<a href="{{ url_costs }}" class="text-decoration-none">View details</a>{% endif %}
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="col-6 col-xl-3">
+      <div class="card shadow-sm border-0 h-100 kpi-card">
+        <div class="card-body">
+          <div class="label mb-1">Recurring Costs (Monthly)</div>
+          <div class="value">MWK {{ recurring_monthly_costs|default:0|floatformat:0|intcomma }}</div>
+          <div class="sub small">Expected monthly fixed costs</div>
         </div>
       </div>
     </div>
@@ -109,6 +121,12 @@
             {% if url_schedules %}
               <a class="btn btn-outline-secondary" href="{{ url_schedules }}">
                 <i class="bi bi-calendar2-check me-1"></i> Payout Schedules
+              </a>
+            {% endif %}
+            {% url 'wallet:admin_cost_list' as url_costs %}
+            {% if url_costs %}
+              <a class="btn btn-outline-secondary" href="{{ url_costs }}">
+                <i class="bi bi-receipt me-1"></i> View Costs
               </a>
             {% endif %}
           </div>
