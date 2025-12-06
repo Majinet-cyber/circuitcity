@@ -4,6 +4,7 @@ Pharmacy vertical views: batch management, sales, expiry tracking, and dashboard
 """
 from __future__ import annotations
 
+import logging
 from decimal import Decimal
 from datetime import timedelta
 from typing import Optional
@@ -29,6 +30,8 @@ from .models_pharmacy import (
     PharmacyProductForm,
     PharmacyCategory,
 )
+
+logger = logging.getLogger(__name__)
 
 
 # ==============================================================================
@@ -89,8 +92,14 @@ def pharmacy_dashboard(request: HttpRequest) -> HttpResponse:
     ).count()
     
     # ===== NEW: Personalized dashboard enhancements =====
-    ctx_enhancements = {}
+    # Initialize with safe defaults
+    ctx_enhancements = {
+        "DASHBOARD_QUOTES": {"quotes": []},
+        "quotes_json": "[]",  # Safe default for template
+    }
+    
     try:
+        import json
         from dashboard.helpers_greetings import get_personalized_greeting
         from dashboard.helpers_yesterday import get_yesterday_summary, should_show_yesterday_summary, mark_yesterday_summary_shown
         from dashboard.helpers_payments import get_payment_mix_for_dashboard
@@ -117,7 +126,12 @@ def pharmacy_dashboard(request: HttpRequest) -> HttpResponse:
         # Daily quotes
         daily_quotes = get_todays_quotes(request.user, count=10)
         
-        ctx_enhancements = {
+        # Extract quote texts for JavaScript rotation
+        # get_todays_quotes returns {"quotes": [{"text": "...", "author": "..."}, ...], "slot_1": {...}, ...}
+        quote_texts = [q.get("text", "") for q in daily_quotes.get("quotes", []) if q.get("text")]
+        quotes_json = json.dumps(quote_texts)
+        
+        ctx_enhancements.update({
             "DASHBOARD_GREETING": greeting_ctx.get("greeting"),
             "DASHBOARD_USER_NAME": greeting_ctx.get("user_name"),
             "DASHBOARD_SHOW_WELCOME": greeting_ctx.get("show_welcome"),
@@ -128,9 +142,10 @@ def pharmacy_dashboard(request: HttpRequest) -> HttpResponse:
             "PAYMENT_MIX": payment_mix,
             "PAYMENT_MIX_PERIOD": "Last 30 days",
             "DASHBOARD_QUOTES": daily_quotes,
-        }
+            "quotes_json": quotes_json,  # For JS rotation in quotes widget
+        })
     except Exception:
-        pass  # Gracefully degrade if helpers not available
+        pass  # Gracefully degrade if helpers not available, defaults already set
     
     ctx = {
         "total_batches": total_batches,

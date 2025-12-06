@@ -544,6 +544,7 @@ urlpatterns += [
     # Vertical-specific operation URLs (members, sales, shifts, etc.)
     path("gym/", include_or_raise("inventory.urls_gym", "gym")),
     path("liquor/", include_or_raise("inventory.urls_liquor", "liquor")),
+    path("pharmacy/", include_or_raise("inventory.urls_pharmacy", "pharmacy")),
     
     path("tenants/",   include_or_raise("tenants.urls", "tenants")),
     path("dashboard/", include_or_raise("dashboard.urls", "dashboard")),
