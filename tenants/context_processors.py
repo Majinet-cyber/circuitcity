@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from typing import Dict, Any
+from django.db import models
 
 # Defensive/lazy imports so templates never crash if utilities are missing
 try:
@@ -189,4 +190,44 @@ def tenant_context(request) -> Dict[str, Any]:
     }
 
 
-__all__ = ["active_business", "tenant_context"]
+def notifications_context(request) -> Dict[str, Any]:
+    """
+    Adds notification data to every template:
+      - unread_notifications_count: count of unread notifications for current user
+      - latest_notifications: last 10 notifications for current user
+    """
+    if not request.user.is_authenticated:
+        return {
+            "unread_notifications_count": 0,
+            "latest_notifications": [],
+        }
+    
+    try:
+        from notifications.models import Notification
+        
+        # Get user's notifications (including business-scoped ones if applicable)
+        user_notifications = Notification.objects.filter(user=request.user)
+        
+        # Optionally filter by active business if needed
+        biz = _resolve_business(request)
+        if biz:
+            user_notifications = user_notifications.filter(
+                models.Q(business=biz) | models.Q(business__isnull=True)
+            )
+        
+        unread_count = user_notifications.filter(read_at__isnull=True).count()
+        latest = list(user_notifications.order_by('-created_at')[:10])
+        
+        return {
+            "unread_notifications_count": unread_count,
+            "latest_notifications": latest,
+        }
+    except Exception:
+        # Fail gracefully if notifications app is not available
+        return {
+            "unread_notifications_count": 0,
+            "latest_notifications": [],
+        }
+
+
+__all__ = ["active_business", "tenant_context", "notifications_context"]

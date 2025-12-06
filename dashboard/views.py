@@ -533,57 +533,19 @@ def home(request):
         except Exception:
             pass
         
-        # Agent leaderboard (top agents by sales this month)
+        # Agent leaderboard (using new service)
         try:
-            from inventory.models import AgentProfile
-            agents = AgentProfile.objects.filter(location__business=biz).select_related('user', 'location')
-            agent_stats = []
-            
-            for agent in agents:
-                agent_sales = _scope_queryset(InventoryItem.objects.all(), biz).filter(
-                    SOLD_Q(),
-                    assigned_agent=agent.user,
-                    sold_at__gte=month_start, sold_at__lt=month_end
-                )
-                agent_amount = _inv_revenue_sum(agent_sales)
-                agent_units = agent_sales.count()
-                
-                if agent_units > 0:  # Only include agents with sales
-                    agent_stats.append({
-                        'user': agent.user,
-                        'name': agent.user.get_full_name() or agent.user.username,
-                        'location': agent.location.name if agent.location else '',
-                        'amount': agent_amount,
-                        'units': agent_units,
-                    })
-            
-            # IMPORTANT: If no agents have sales, check if the MANAGER has sold anything
-            # This handles the case where manager is the only seller
-            if len(agent_stats) == 0 and request.user.is_authenticated:
-                manager_sales = _scope_queryset(InventoryItem.objects.all(), biz).filter(
-                    SOLD_Q(),
-                    assigned_agent=request.user,
-                    sold_at__gte=month_start, sold_at__lt=month_end
-                )
-                manager_amount = _inv_revenue_sum(manager_sales)
-                manager_units = manager_sales.count()
-                
-                if manager_units > 0:
-                    agent_stats.append({
-                        'user': request.user,
-                        'name': request.user.get_full_name() or request.user.username,
-                        'location': '',  # Manager might not have a location
-                        'amount': manager_amount,
-                        'units': manager_units,
-                    })
-            
-            # Sort by amount descending
-            agent_stats.sort(key=lambda x: x['amount'], reverse=True)
-            
-            # Add rank
-            for idx, stat in enumerate(agent_stats[:10], start=1):  # Top 10
-                stat['rank'] = idx
-                agent_leaderboard.append(stat)
+            from tenants.services.leaderboard import get_agent_leaderboard
+            agent_leaderboard = get_agent_leaderboard(
+                business=biz,
+                start=month_start.date(),
+                end=month_end.date(),
+                limit=10
+            )
+            # Convert to match template expectations
+            for agent in agent_leaderboard:
+                agent['amount'] = agent['total_sales_amount']
+                agent['units'] = agent['devices_sold']
         except Exception as e:
             pass
     
@@ -616,31 +578,16 @@ def home(request):
             agent_month_count = agent_month_sales.count()
             agent_month_amount = _inv_revenue_sum(agent_month_sales)
             
-            # Calculate rank (simplified - compare with all agents)
-            from inventory.models import AgentProfile
-            all_agents = AgentProfile.objects.filter(location__business=biz).select_related('user')
-            agent_stats = []
-            for agent in all_agents:
-                a_sales = _scope_queryset(InventoryItem.objects.all(), biz).filter(
-                    SOLD_Q(),
-                    assigned_agent=agent.user,
-                    sold_at__gte=month_start, sold_at__lt=month_end
-                )
-                a_amount = _inv_revenue_sum(a_sales)
-                agent_stats.append({
-                    'user_id': agent.user_id,
-                    'amount': a_amount
-                })
-            
-            agent_stats.sort(key=lambda x: x['amount'], reverse=True)
-            for idx, stat in enumerate(agent_stats, start=1):
-                if stat['user_id'] == request.user.id:
-                    agent_rank = idx
-                    if idx > 1:
-                        # Calculate gap to next rank
-                        prev_amount = agent_stats[idx-2]['amount']
-                        agent_gap = f"{int(prev_amount - agent_month_amount):,} MK"
-                    break
+            # Calculate rank using new service
+            from tenants.services.leaderboard import get_current_agent_rank
+            rank_data = get_current_agent_rank(
+                business=biz,
+                user=request.user,
+                start=month_start.date(),
+                end=month_end.date()
+            )
+            agent_rank = rank_data.get('rank')
+            agent_gap = rank_data.get('gap_formatted')
             
             # Commission (simplified - assuming 5% of sales)
             agent_commission = agent_month_amount * Decimal('0.05')
@@ -649,6 +596,20 @@ def home(request):
     
     # Check for optional namespaces
     has_reports_namespace = _namespace_exists("reports")
+    
+    # Check for payslip reminder banner (show if there's an unread payslip notification in last 10 days)
+    show_payslip_banner = False
+    try:
+        from notifications.models import Notification
+        ten_days_ago = timezone.now() - timedelta(days=10)
+        show_payslip_banner = Notification.objects.filter(
+            user=request.user,
+            category='payslip_reminder',
+            read_at__isnull=True,
+            created_at__gte=ten_days_ago
+        ).exists()
+    except Exception:
+        pass
     
     ctx = {
         "first_run": first_run,
@@ -682,6 +643,7 @@ def home(request):
         "agent_commission": agent_commission,
         # Optional namespace flags
         "HAS_REPORTS_NAMESPACE": has_reports_namespace,
+        "show_payslip_banner": show_payslip_banner,
         **ctx_enhancements,  # Merge enhancements
     }
     return render(request, "dashboard/home.html", ctx)

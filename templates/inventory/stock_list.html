@@ -316,7 +316,7 @@
       <table id="stockTable" data-kb-table>
         <thead>
           <tr>
-            <th>IMEI</th><th>Product</th><th>Status</th><th>Order Price</th><th>Selling Price</th><th>Location</th><th>Agent</th>
+            <th>IMEI</th><th>Product</th><th>Status</th><th>Order Price</th><th>Selling Price</th><th>Location</th><th>Agent</th><th>Owner</th>
             {% if IS_MANAGER|default:False or request.user.is_staff or request.user.is_superuser or request.user.profile.is_manager %}
               <th style="width:220px">Actions</th>
             {% endif %}
@@ -339,9 +339,36 @@
                 <td class="num">{% if it.selling_price is not None %}{{ it.selling_price|floatformat:0|intcomma }}{% else %}—{% endif %}</td>
                 <td>{% if it.current_location_id %}{{ it.current_location.name }}{% else %}—{% endif %}</td>
                 <td>{% if it.assigned_agent_id %}{{ it.assigned_agent.username }}{% else %}—{% endif %}</td>
+                <td>
+                  {% if it.assigned_agent %}
+                    <span class="badge rounded-pill bg-light text-dark">
+                      {{ it.assigned_agent.get_full_name|default:it.assigned_agent.username }}
+                    </span>
+                  {% else %}
+                    <span class="badge rounded-pill bg-secondary-subtle text-dark">
+                      Manager
+                    </span>
+                  {% endif %}
+                </td>
                 {% if IS_MANAGER|default:False or request.user.is_staff or request.user.is_superuser or request.user.profile.is_manager %}
                   <td>
                     <div class="act-wrap">
+                      {# Assign Stock (managers only) #}
+                      {% if it.status|lower != 'sold' %}
+                        <button
+                          class="act-chip tap"
+                          style="background:#eef2ff;color:#1e40af;border:1px solid #c7d2fe;cursor:pointer"
+                          data-bs-toggle="modal"
+                          data-bs-target="#assignStockModal"
+                          data-item-id="{{ it.id }}"
+                          data-item-label="{{ it.imei|default:'' }} · {{ it.product }}"
+                          title="Assign stock"
+                          type="button"
+                        >
+                          <i class="bi bi-person-plus"></i> Assign
+                        </button>
+                      {% endif %}
+
                       {# Edit (full edit screen) #}
                       <a class="act-chip act-edit tap" href="/inventory/stock/{{ it.id }}/edit/" title="Edit">
                         <i class="bi bi-pencil-square"></i> Edit
@@ -366,7 +393,7 @@
                 {% endif %}
               </tr>
             {% empty %}
-              <tr><td colspan="{% if IS_MANAGER|default:False or request.user.is_staff or request.user.is_superuser or request.user.profile.is_manager %}8{% else %}7{% endif %}" style="text-align:center;color:var(--cc-muted)">
+              <tr><td colspan="{% if IS_MANAGER|default:False or request.user.is_staff or request.user.is_superuser or request.user.profile.is_manager %}9{% else %}8{% endif %}" style="text-align:center;color:var(--cc-muted)">
                 No stock yet. <a href="{{ scan_in_url|default:'#' }}" class="ms-1">Scan IN your first item →</a>
               </td></tr>
             {% endfor %}
@@ -386,6 +413,7 @@
               <td class="num">{{ row.selling_price|default:"—" }}</td>
               <td>{{ row.location }}</td>
               <td>{{ row.agent }}</td>
+              <td>—</td>
               {# Fallback rows have no guaranteed id → omit actions to avoid 500s #}
               {% if IS_MANAGER|default:False or request.user.is_staff or request.user.is_superuser or request.user.profile.is_manager %}
                 <td>
@@ -395,7 +423,7 @@
             </tr>
             {% empty %}
             <tr>
-              <td colspan="{% if IS_MANAGER|default:False or request.user.is_staff or request.user.is_superuser or request.user.profile.is_manager %}8{% else %}7{% endif %}" style="text-align:center;color:var(--cc-muted)">
+              <td colspan="{% if IS_MANAGER|default:False or request.user.is_staff or request.user.is_superuser or request.user.profile.is_manager %}9{% else %}8{% endif %}" style="text-align:center;color:var(--cc-muted)">
                 No stock yet. <a href="{{ scan_in_url|default:'#' }}" class="ms-1">Scan IN your first item →</a>
               </td>
             </tr>
@@ -425,9 +453,34 @@
               <td data-label="Selling Price" class="num">{% if it.selling_price is not None %}{{ it.selling_price|floatformat:0|intcomma }}{% else %}—{% endif %}</td>
               <td data-label="Location">{% if it.current_location_id %}{{ it.current_location.name }}{% else %}—{% endif %}</td>
               <td data-label="Agent">{% if it.assigned_agent_id %}{{ it.assigned_agent.username }}{% else %}—{% endif %}</td>
+              <td data-label="Owner">
+                {% if it.assigned_agent %}
+                  <span class="badge rounded-pill bg-light text-dark">
+                    {{ it.assigned_agent.get_full_name|default:it.assigned_agent.username }}
+                  </span>
+                {% else %}
+                  <span class="badge rounded-pill bg-secondary-subtle text-dark">
+                    Manager
+                  </span>
+                {% endif %}
+              </td>
               {% if IS_MANAGER|default:False or request.user.is_staff or request.user.is_superuser or request.user.profile.is_manager %}
                 <td data-label="Actions">
                   <div class="act-wrap">
+                    {% if it.status|lower != 'sold' %}
+                      <button
+                        class="act-chip tap"
+                        style="background:#eef2ff;color:#1e40af;border:1px solid #c7d2fe;cursor:pointer"
+                        data-bs-toggle="modal"
+                        data-bs-target="#assignStockModal"
+                        data-item-id="{{ it.id }}"
+                        data-item-label="{{ it.imei|default:'' }} · {{ it.product }}"
+                        title="Assign stock"
+                        type="button"
+                      >
+                        <i class="bi bi-person-plus"></i> Assign
+                      </button>
+                    {% endif %}
                     <a class="act-chip act-edit tap" href="/inventory/stock/{{ it.id }}/edit/" title="Edit">
                       <i class="bi bi-pencil-square"></i> Edit
                     </a>
@@ -463,6 +516,7 @@
               <td data-label="Selling Price" class="num">{{ row.selling_price|default:"—" }}</td>
               <td data-label="Location">{{ row.location }}</td>
               <td data-label="Agent">{{ row.agent }}</td>
+              <td data-label="Owner">—</td>
               {% if IS_MANAGER|default:False or request.user.is_staff or request.user.is_superuser or request.user.profile.is_manager %}
                 <td data-label="Actions"><div class="text-muted">—</div></td>
               {% endif %}
@@ -545,6 +599,50 @@
     </div>
   </div>
 </section>
+
+<!-- Assign Stock Modal -->
+{% if IS_MANAGER|default:False or request.user.is_staff or request.user.is_superuser or request.user.profile.is_manager %}
+<div class="modal fade" id="assignStockModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content" style="background:var(--cc-panel);border:1px solid var(--cc-border);border-radius:14px;box-shadow:var(--cc-shadow)">
+      <form method="post" action="{% url 'inventory:assign_stock_owner' %}">
+        {% csrf_token %}
+        <div class="modal-header" style="border-bottom:1px solid var(--cc-border)">
+          <h5 class="modal-title">Assign stock</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+          <input type="hidden" name="stock_id" id="assign-item-id">
+
+          <p class="mb-2 small text-muted">
+            IMEI / Item: <span id="assign-item-label" class="fw-semibold"></span>
+          </p>
+
+          <div class="mb-3">
+            <label class="form-label">Assign to</label>
+            <select name="owner_id" class="form-select" style="padding:.5rem .6rem;border-radius:.55rem;border:1px solid var(--cc-border);background:var(--cc-panel);color:var(--cc-text);min-height:44px">
+              <option value="">Manager (global)</option>
+              {% for membership in manager_agents %}
+                <option value="{{ membership.user_id }}">
+                  {{ membership.user.get_full_name|default:membership.user.username }}
+                  {% if membership.location %} – {{ membership.location.name }}{% endif %}
+                </option>
+              {% endfor %}
+            </select>
+            <div class="form-text">
+              Leave blank to keep with Manager (visible to any manager).
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer" style="border-top:1px solid var(--cc-border)">
+          <button class="btn btn-outline-secondary" type="button" data-bs-dismiss="modal">Cancel</button>
+          <button class="btn btn-primary" type="submit">Save</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+{% endif %}
 
 <!-- Offcanvas Menu -->
 <div class="offcanvas offcanvas-start" tabindex="-1" id="ccMenu" aria-labelledby="ccMenuLabel">
@@ -943,4 +1041,28 @@ $id('invTopPeriod')?.addEventListener('change', loadInvTopModels);
   {% endif %}
 })();
 </script>
+
+{# Assign Stock Modal JS #}
+{% if IS_MANAGER|default:False or request.user.is_staff or request.user.is_superuser or request.user.profile.is_manager %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  const assignModal = document.getElementById('assignStockModal');
+  if (assignModal) {
+    assignModal.addEventListener('show.bs.modal', function(event) {
+      const button = event.relatedTarget;
+      if (!button) return;
+      
+      const itemId = button.getAttribute('data-item-id');
+      const itemLabel = button.getAttribute('data-item-label') || '';
+      
+      const modalItemId = assignModal.querySelector('#assign-item-id');
+      const modalItemLabel = assignModal.querySelector('#assign-item-label');
+      
+      if (modalItemId) modalItemId.value = itemId || '';
+      if (modalItemLabel) modalItemLabel.textContent = itemLabel;
+    });
+  }
+});
+</script>
+{% endif %}
 {% endblock %}

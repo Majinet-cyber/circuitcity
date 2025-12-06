@@ -1,0 +1,230 @@
+{% extends "base.html" %}
+{% load humanize static %}
+
+{% block title %}Manage Costs · {{ business.name }}{% endblock %}
+{% block header_title %}Admin Wallet · Costs{% endblock %}
+
+{% block extra_css %}
+<style>
+  :root {
+    --cost-bg: #0b1220;
+    --cost-text: #0f172a;
+    --cost-muted: #64748b;
+    --cost-panel: #ffffff;
+    --cost-border: #e2e8f0;
+    --cost-accent: #2563eb;
+    --cost-shadow: 0 4px 14px rgba(2, 6, 23, .08);
+  }
+
+  .cost-container {
+    max-width: 1000px;
+    margin: 2rem auto;
+    padding: 1.5rem;
+  }
+
+  .glass-card {
+    background: var(--cost-panel);
+    border: 1px solid var(--cost-border);
+    border-radius: 14px;
+    padding: 2rem;
+    box-shadow: var(--cost-shadow);
+  }
+
+  .badge-recurring {
+    background: linear-gradient(135deg, #3b82f6, #2563eb);
+    color: white;
+  }
+
+  .badge-once-off {
+    background: linear-gradient(135deg, #64748b, #475569);
+    color: white;
+  }
+
+  .cost-amount {
+    font-variant-numeric: tabular-nums;
+    font-weight: 600;
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="cost-container">
+  <div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+      <h1 class="h3 mb-0">Manage Costs</h1>
+      <p class="text-muted mb-0">Track fixed and variable business costs</p>
+    </div>
+    <a href="{% url 'wallet:admin_home' %}" class="btn btn-outline-secondary">
+      <i class="bi bi-arrow-left me-1"></i> Back to Wallet
+    </a>
+  </div>
+
+  {# Add New Cost Card #}
+  <div class="glass-card mb-4">
+    <h5 class="mb-3">
+      <i class="bi bi-plus-circle me-2"></i>Add New Cost
+    </h5>
+    <form method="post" action="{% url 'wallet:admin_costs_create' %}">
+      {% csrf_token %}
+      <div class="row g-3">
+        <div class="col-md-5">
+          <label class="form-label">Cost Name</label>
+          <input 
+            type="text" 
+            name="name" 
+            class="form-control" 
+            placeholder="e.g. Rent, Electricity, Salaries"
+            required
+          >
+        </div>
+        <div class="col-md-3">
+          <label class="form-label">Amount (MK)</label>
+          <input 
+            type="number" 
+            name="amount" 
+            class="form-control" 
+            step="0.01" 
+            min="0.01"
+            placeholder="0.00"
+            required
+          >
+        </div>
+        <div class="col-md-2">
+          <label class="form-label">Type</label>
+          <select name="is_recurring" class="form-select" required>
+            <option value="0">Once-off</option>
+            <option value="1">Recurring</option>
+          </select>
+        </div>
+        <div class="col-md-2 d-flex align-items-end">
+          <button type="submit" class="btn btn-primary w-100">
+            <i class="bi bi-plus me-1"></i> Add
+          </button>
+        </div>
+      </div>
+    </form>
+  </div>
+
+  {# Costs List #}
+  <div class="glass-card">
+    <h5 class="mb-3">
+      <i class="bi bi-list-ul me-2"></i>All Costs
+    </h5>
+    
+    {% if costs %}
+    <div class="table-responsive">
+      <table class="table table-hover">
+        <thead>
+          <tr>
+            <th>Name</th>
+            <th>Type</th>
+            <th class="text-end">Amount</th>
+            <th>Recurring</th>
+            <th>Created</th>
+            <th class="text-end">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for cost in costs %}
+          <tr>
+            <td class="fw-semibold">{{ cost.note }}</td>
+            <td>
+              {% if cost.is_recurring %}
+                <span class="badge badge-recurring">Recurring</span>
+              {% else %}
+                <span class="badge badge-once-off">Once-off</span>
+              {% endif %}
+            </td>
+            <td class="text-end cost-amount">
+              MK {{ cost.amount|abs|floatformat:0|intcomma }}
+            </td>
+            <td>
+              {% if cost.is_recurring %}
+                <i class="bi bi-check-circle-fill text-success"></i> Yes
+              {% else %}
+                <i class="bi bi-dash-circle text-muted"></i> No
+              {% endif %}
+            </td>
+            <td>
+              <small class="text-muted">{{ cost.created_at|date:"M j, Y" }}</small>
+            </td>
+            <td class="text-end">
+              <button 
+                class="btn btn-sm btn-outline-primary me-1"
+                data-bs-toggle="modal"
+                data-bs-target="#editCostModal{{ cost.id }}"
+              >
+                <i class="bi bi-pencil"></i>
+              </button>
+              <form method="post" action="{% url 'wallet:admin_costs_delete' cost.id %}" style="display:inline" onsubmit="return confirm('Delete this cost permanently?');">
+                {% csrf_token %}
+                <button type="submit" class="btn btn-sm btn-outline-danger">
+                  <i class="bi bi-trash"></i>
+                </button>
+              </form>
+            </td>
+          </tr>
+
+          {# Edit Modal for this cost #}
+          <div class="modal fade" id="editCostModal{{ cost.id }}" tabindex="-1" aria-hidden="true">
+            <div class="modal-dialog modal-dialog-centered">
+              <div class="modal-content">
+                <form method="post" action="{% url 'wallet:admin_costs_update' cost.id %}">
+                  {% csrf_token %}
+                  <div class="modal-header">
+                    <h5 class="modal-title">Edit Cost</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                  </div>
+                  <div class="modal-body">
+                    <div class="mb-3">
+                      <label class="form-label">Cost Name</label>
+                      <input 
+                        type="text" 
+                        name="name" 
+                        class="form-control" 
+                        value="{{ cost.note }}"
+                        required
+                      >
+                    </div>
+                    <div class="mb-3">
+                      <label class="form-label">Amount (MK)</label>
+                      <input 
+                        type="number" 
+                        name="amount" 
+                        class="form-control" 
+                        step="0.01" 
+                        min="0.01"
+                        value="{{ cost.amount|abs }}"
+                        required
+                      >
+                    </div>
+                    <div class="mb-3">
+                      <label class="form-label">Type</label>
+                      <select name="is_recurring" class="form-select" required>
+                        <option value="0" {% if not cost.is_recurring %}selected{% endif %}>Once-off</option>
+                        <option value="1" {% if cost.is_recurring %}selected{% endif %}>Recurring</option>
+                      </select>
+                    </div>
+                  </div>
+                  <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Save Changes</button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          </div>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <div class="text-center text-muted py-5">
+      <i class="bi bi-inbox" style="font-size:3rem;opacity:0.3"></i>
+      <p class="mt-3">No costs added yet. Add your first cost above.</p>
+    </div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}
+

@@ -1,0 +1,246 @@
+{% extends "base.html" %}
+{% load humanize static %}
+
+{% block title %}Sell Phone - Step 1: IMEI · {{ business.name }}{% endblock %}
+{% block header_title %}Sell Phone{% endblock %}
+
+{% block extra_css %}
+<style>
+  :root {
+    --wizard-bg: #0b1220;
+    --wizard-text: #0f172a;
+    --wizard-muted: #64748b;
+    --wizard-panel: #ffffff;
+    --wizard-border: #e2e8f0;
+    --wizard-accent: #2563eb;
+    --wizard-success: #16a34a;
+    --wizard-shadow: 0 4px 14px rgba(2, 6, 23, .08);
+  }
+
+  .wizard-container {
+    max-width: 600px;
+    margin: 2rem auto;
+    padding: 1.5rem;
+  }
+
+  .wizard-progress {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 2rem;
+    position: relative;
+  }
+
+  .wizard-progress::before {
+    content: '';
+    position: absolute;
+    top: 20px;
+    left: 0;
+    right: 0;
+    height: 2px;
+    background: var(--wizard-border);
+    z-index: 0;
+  }
+
+  .wizard-step {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    position: relative;
+    z-index: 1;
+    flex: 1;
+  }
+
+  .wizard-step-circle {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background: var(--wizard-panel);
+    border: 2px solid var(--wizard-border);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    margin-bottom: 0.5rem;
+  }
+
+  .wizard-step.active .wizard-step-circle {
+    background: var(--wizard-accent);
+    color: white;
+    border-color: var(--wizard-accent);
+  }
+
+  .wizard-step.completed .wizard-step-circle {
+    background: var(--wizard-success);
+    color: white;
+    border-color: var(--wizard-success);
+  }
+
+  .wizard-step-label {
+    font-size: 0.85rem;
+    color: var(--wizard-muted);
+    text-align: center;
+  }
+
+  .wizard-step.active .wizard-step-label {
+    color: var(--wizard-accent);
+    font-weight: 600;
+  }
+
+  .glass-card {
+    background: var(--wizard-panel);
+    border: 1px solid var(--wizard-border);
+    border-radius: 14px;
+    padding: 2rem;
+    box-shadow: var(--wizard-shadow);
+  }
+
+  .wizard-title {
+    font-size: 1.75rem;
+    font-weight: 800;
+    margin-bottom: 0.5rem;
+    color: var(--wizard-text);
+  }
+
+  .wizard-subtitle {
+    color: var(--wizard-muted);
+    margin-bottom: 2rem;
+  }
+
+  .form-control {
+    padding: 0.75rem 1rem;
+    border-radius: 8px;
+    border: 1px solid var(--wizard-border);
+    font-size: 1rem;
+  }
+
+  .form-control:focus {
+    border-color: var(--wizard-accent);
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+    outline: none;
+  }
+
+  .btn {
+    padding: 0.75rem 1.5rem;
+    border-radius: 8px;
+    font-weight: 600;
+    transition: all 0.2s;
+  }
+
+  .btn-primary {
+    background: var(--wizard-accent);
+    border: none;
+    color: white;
+  }
+
+  .btn-primary:hover {
+    background: #1d4ed8;
+    transform: translateY(-1px);
+  }
+
+  .btn-outline-secondary {
+    border: 1px solid var(--wizard-border);
+    color: var(--wizard-text);
+    background: white;
+  }
+
+  .btn-outline-secondary:hover {
+    background: var(--wizard-border);
+  }
+
+  .scanner-btn {
+    margin-top: 1rem;
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="wizard-container">
+  {# Progress Bar #}
+  <div class="wizard-progress">
+    <div class="wizard-step active">
+      <div class="wizard-step-circle">1</div>
+      <div class="wizard-step-label">IMEI</div>
+    </div>
+    <div class="wizard-step">
+      <div class="wizard-step-circle">2</div>
+      <div class="wizard-step-label">Price</div>
+    </div>
+    <div class="wizard-step">
+      <div class="wizard-step-circle">3</div>
+      <div class="wizard-step-label">Payment</div>
+    </div>
+  </div>
+
+  {# Step 1 Form #}
+  <div class="glass-card">
+    <h2 class="wizard-title text-center">Step 1: Scan or enter IMEI</h2>
+    <p class="wizard-subtitle text-center">We'll check if this device is in stock at your location.</p>
+
+    <form method="post">
+      {% csrf_token %}
+      
+      <div class="mb-4">
+        <label class="form-label fw-semibold">IMEI</label>
+        <div class="input-group">
+          <input 
+            type="text" 
+            name="imei" 
+            id="imei-input"
+            class="form-control" 
+            required 
+            autofocus 
+            placeholder="Scan or type 15-digit IMEI..."
+            pattern="[0-9]{15}"
+            maxlength="15"
+            autocomplete="off"
+          >
+          <button type="submit" class="btn btn-primary">
+            <i class="bi bi-search me-1"></i> Search
+          </button>
+        </div>
+        <div class="form-text">Use the scanner button below to auto-fill this field.</div>
+      </div>
+
+      <button 
+        type="button" 
+        class="btn btn-outline-secondary scanner-btn w-100" 
+        id="launchScanner"
+      >
+        <i class="bi bi-upc-scan me-2"></i> Open Scanner
+      </button>
+    </form>
+  </div>
+
+  {# Back button #}
+  <div class="text-center mt-3">
+    <a href="{% url 'inventory:inventory_dashboard' %}" class="btn btn-sm btn-outline-secondary">
+      <i class="bi bi-arrow-left me-1"></i> Back to Dashboard
+    </a>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  const scannerBtn = document.getElementById('launchScanner');
+  const imeiInput = document.getElementById('imei-input');
+  
+  if (scannerBtn && imeiInput) {
+    scannerBtn.addEventListener('click', function() {
+      // Check if there's an existing scanner integration
+      if (window.openBarcodeScanner) {
+        window.openBarcodeScanner(function(barcode) {
+          imeiInput.value = barcode;
+        });
+      } else {
+        // Fallback: prompt for manual entry
+        alert('Scanner integration not available. Please type the IMEI manually.');
+        imeiInput.focus();
+      }
+    });
+  }
+});
+</script>
+{% endblock %}
+

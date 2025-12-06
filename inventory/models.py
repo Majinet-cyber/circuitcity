@@ -585,6 +585,7 @@ class InventoryItem(models.Model):
         max_length=20,
         choices=ASSIGNMENT_ROLE_CHOICES,
         default="MANAGER",
+        db_index=True,
         help_text="For reporting and filters. Indicates whether stock is manager-owned or agent-owned."
     )
     # Soft-delete flag (archive instead of hard delete when needed)

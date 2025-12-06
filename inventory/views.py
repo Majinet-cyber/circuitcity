@@ -1455,6 +1455,20 @@ def stock_list(request: HttpRequest, *args, **kwargs) -> HttpResponse:
         default="inventory/list.html",
     )
 
+    # Add manager agents for stock assignment (if manager)
+    manager_agents = []
+    try:
+        from tenants.models import Membership
+        if request.user.is_staff or getattr(request.user, 'is_manager', False) or hasattr(request, 'membership'):
+            # Get active agent memberships for current business
+            manager_agents = Membership.objects.filter(
+                business=biz,
+                role='AGENT',
+                status='ACTIVE'
+            ).select_related('user', 'location').order_by('user__first_name', 'user__last_name')
+    except Exception:
+        pass
+
     ctx = {
         "items": items,
         "rows": items,
@@ -1466,6 +1480,7 @@ def stock_list(request: HttpRequest, *args, **kwargs) -> HttpResponse:
         "sum_order": sum_order_amt,
         "sum_selling": sum_selling_amt,
         "active_tab": "stock_list",  # ✅ For sidebar nav highlighting
+        "manager_agents": manager_agents,  # For stock assignment UI
         **badge_aliases,
     }
     return render(request, template, ctx)

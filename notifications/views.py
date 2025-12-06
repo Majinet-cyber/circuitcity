@@ -70,6 +70,7 @@ def mark_as_read(request, pk):
 @login_required
 def mark_all_as_read(request):
     """Mark all user's notifications as read."""
+    from django.utils import timezone
     Notification.objects.filter(user=request.user, read_at__isnull=True).update(
         read_at=timezone.now()
     )
@@ -80,4 +81,26 @@ def mark_all_as_read(request):
     return redirect('notifications:list')
 
 
-from django.utils import timezone
+@login_required
+def mark_read_and_redirect(request, pk):
+    """
+    Mark a notification as read and redirect to its deep link or dashboard.
+    Used for notification bell dropdown clicks.
+    """
+    try:
+        notification = Notification.objects.get(pk=pk, user=request.user)
+        notification.mark_read()
+        
+        # Check if notification has a deep link in meta
+        deep_link = notification.meta.get('link') if notification.meta else None
+        if deep_link:
+            return redirect(deep_link)
+    except Notification.DoesNotExist:
+        pass
+    
+    # Default: redirect to dashboard
+    try:
+        from django.urls import reverse
+        return redirect(reverse('dashboard:home'))
+    except Exception:
+        return redirect('/')

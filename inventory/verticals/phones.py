@@ -133,10 +133,14 @@ def dashboard(request):
     stock_cost_value = stock_items.aggregate(
         total=Coalesce(Sum('order_price'), Decimal('0.00'), output_field=DecimalField())
     )['total'] or Decimal('0.00')
-    stock_selling_value = stock_items.aggregate(
-        total=Coalesce(Sum('selling_price'), Decimal('0.00'), output_field=DecimalField())
-    )['total'] or Decimal('0.00')
-    potential_profit_on_hand = stock_selling_value - stock_cost_value
+    
+    # Compute estimated selling value and potential profit using margin-based estimation
+    # This replaces the old (selling_value - cost_value) which could go negative
+    from inventory.utils_metrics import estimate_margin_for_business_and_sku
+    
+    margin_pct = estimate_margin_for_business_and_sku(business)
+    stock_selling_value = stock_cost_value * (Decimal('1') + margin_pct)
+    potential_profit_on_hand = max(Decimal('0'), stock_cost_value * margin_pct)
     
     # Group into organized dict
     phones_kpis = {

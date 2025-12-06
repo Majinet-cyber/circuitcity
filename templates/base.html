@@ -43,6 +43,8 @@
   <link rel="stylesheet" href="{% static 'css/polish.css' %}?v={{ ASSET_V }}">
   <link rel="stylesheet" href="{% static 'css/mobile.css' %}?v={{ ASSET_V }}">
   <link rel="stylesheet" href="{% static 'css/mobile-fixes.css' %}?v={{ ASSET_V }}">
+  <link rel="stylesheet" href="{% static 'css/mobile-tables-responsive.css' %}?v={{ ASSET_V }}">
+  <link rel="stylesheet" href="{% static 'css/glassmorphic-enhancement.css' %}?v={{ ASSET_V }}">
 
   <!-- FINAL: versioned overrides must load LAST to win the cascade -->
   <link rel="stylesheet" href="{% static 'css/v2-overrides.2025-09-25.css' %}?v={{ ASSET_V }}">
@@ -444,25 +446,53 @@
                         aria-controls="ccNotifMenu"
                         title="Notifications">
                   <i class="bi bi-bell"></i>
-                  <span class="notif-dot" id="ccNotifDot" aria-hidden="true"></span>
+                  {% if unread_notifications_count %}
+                    <span class="notif-dot" id="ccNotifDot" aria-hidden="true"></span>
+                    <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger" style="font-size:10px">
+                      {{ unread_notifications_count }}
+                      <span class="visually-hidden">unread notifications</span>
+                    </span>
+                  {% endif %}
                 </button>
 
                 <div class="dropdown-menu dropdown-menu-end p-0 shadow notif-menu"
                      id="ccNotifMenu"
                      aria-labelledby="ccNotifBtn"
-                     style="min-width:320px">
+                     style="min-width:320px;max-height:400px;overflow-y:auto">
                   <div class="p-2 border-bottom d-flex align-items-center justify-content-between">
                     <strong>Notifications</strong>
-                    <button class="btn btn-sm btn-light" id="ccNotifRefresh" type="button">
-                      <i class="bi bi-arrow-clockwise"></i> Refresh
-                    </button>
+                    {% if latest_notifications %}
+                      <a href="{% url 'notifications:mark_all_read' %}" class="btn btn-sm btn-light" title="Mark all as read">
+                        <i class="bi bi-check-all"></i>
+                      </a>
+                    {% endif %}
                   </div>
                   <div id="ccNotifList">
-                    <div class="notif-empty p-3 text-muted">No notifications.</div>
+                    {% if latest_notifications %}
+                      {% for n in latest_notifications %}
+                        <a class="dropdown-item small {% if not n.is_read %}fw-semibold bg-light{% endif %}" 
+                           href="{% url 'notifications:mark_read_and_redirect' n.id %}"
+                           style="padding:.75rem 1rem;border-bottom:1px solid #e9ecef;white-space:normal">
+                          <div class="d-flex align-items-start">
+                            <div class="flex-grow-1">
+                              <div {% if not n.is_read %}class="text-primary"{% endif %}>{{ n.message }}</div>
+                              <small class="text-muted d-block mt-1">{{ n.created_at|date:"M j, H:i" }}</small>
+                            </div>
+                            {% if not n.is_read %}
+                              <span class="badge bg-primary rounded-pill ms-2">New</span>
+                            {% endif %}
+                          </div>
+                        </a>
+                      {% endfor %}
+                    {% else %}
+                      <div class="notif-empty p-3 text-muted text-center">No notifications yet.</div>
+                    {% endif %}
                   </div>
-                  <div class="p-2 text-end border-top">
-                    <a class="text-decoration-underline" href="#" id="ccNotifOpen">Open inbox</a>
-                  </div>
+                  {% if latest_notifications %}
+                    <div class="p-2 text-center border-top">
+                      <a class="text-decoration-underline small" href="{% url 'notifications:list' %}">View all notifications</a>
+                    </div>
+                  {% endif %}
                 </div>
               </div>
               {# /Notifications #}

@@ -318,6 +318,19 @@
     {% endif %}
   </div>
 
+  {# ========== Payslip Reminder Banner ========== #}
+  {% if show_payslip_banner %}
+  <div class="alert alert-info mb-3" style="background:linear-gradient(135deg, rgba(59, 130, 246, 0.1), rgba(96, 165, 250, 0.05));border:1px solid rgba(59, 130, 246, 0.2);border-radius:14px;padding:1.25rem">
+    <div style="display:flex;align-items:center;gap:1rem">
+      <i class="bi bi-info-circle-fill" style="font-size:1.5rem;color:#3b82f6"></i>
+      <div>
+        <strong style="color:var(--dash-text)">Payslip day is coming.</strong>
+        <span style="color:var(--dash-muted)">Salaries close soon – check your sales and wallet.</span>
+      </div>
+    </div>
+  </div>
+  {% endif %}
+
   {% if IS_MANAGER %}
   {# ========== Manager Dashboard ========== #}
 
@@ -424,24 +437,28 @@
     <div class="perf-card">
       <div class="perf-title"><i class="bi bi-trophy me-2"></i>Agent Leaderboard</div>
       <div id="agentLeaderboard">
-        {% for agent in agent_leaderboard %}
-        <div class="leaderboard-item">
-          <div class="rank-badge rank-{% if agent.rank <= 3 %}{{ agent.rank }}{% else %}other{% endif %}">
-            {% if agent.rank == 1 %}🥇{% elif agent.rank == 2 %}🥈{% elif agent.rank == 3 %}🥉{% else %}{{ agent.rank
-            }}{% endif %}
-          </div>
-          <div class="agent-info">
-            <div class="agent-name">{{ agent.name }}</div>
-            <div class="agent-location">{{ agent.location }}</div>
-          </div>
-          <div class="agent-stats">
-            <div class="agent-amount">MK {{ agent.amount|default:0|floatformat:0|intcomma }}</div>
-            <div class="agent-units">{{ agent.units|default:0 }} devices</div>
-          </div>
-        </div>
-        {% empty %}
-        <p class="text-center text-muted">📊 No sales yet this month</p>
-        {% endfor %}
+        {% if agent_leaderboard %}
+          <ol class="list-group list-group-numbered" style="list-style:none;padding:0">
+            {% for agent in agent_leaderboard %}
+            <li class="list-group-item d-flex justify-content-between align-items-center {% if agent.user_id == request.user.id %}list-group-item-success{% endif %}" style="border:none;border-bottom:1px solid var(--dash-border);padding:.75rem 0">
+              <div style="flex:1">
+                <div class="fw-semibold">
+                  {% if agent.rank == 1 %}🥇{% elif agent.rank == 2 %}🥈{% elif agent.rank == 3 %}🥉{% else %}{{ agent.rank }}.{% endif %}
+                  {{ agent.name }}
+                </div>
+                <small class="text-muted">
+                  {{ agent.devices_sold|default:0 }} devices · MK {{ agent.total_sales_amount|default:0|floatformat:0|intcomma }}
+                </small>
+              </div>
+              <span class="badge rounded-pill bg-primary">
+                MK {{ agent.total_commission_amount|default:0|floatformat:0|intcomma }}
+              </span>
+            </li>
+            {% endfor %}
+          </ol>
+        {% else %}
+          <p class="text-center text-muted py-3">📊 No sales yet this period. Be the first on the board!</p>
+        {% endif %}
       </div>
     </div>
   </div>
@@ -470,14 +487,19 @@
       <div class="stat-label">
         <i class="bi bi-trophy-fill"></i> Your Rank
       </div>
-      <div class="stat-value">#{{ agent_rank|default:"-" }}</div>
+      {% if agent_rank %}
+      <div class="stat-value">#{{ agent_rank }}</div>
       <div class="stat-change">
         {% if agent_gap %}
-        {{ agent_gap }} behind #{{ agent_rank|add:"-1" }}
+        {{ agent_gap }}
         {% else %}
-        Keep up the great work!
+        You're #1! 🎉
         {% endif %}
       </div>
+      {% else %}
+      <div class="stat-value">#–</div>
+      <div class="stat-change">Make your first sale to join the leaderboard.</div>
+      {% endif %}
     </div>
 
     <div class="stat-card">

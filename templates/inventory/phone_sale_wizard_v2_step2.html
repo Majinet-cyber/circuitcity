@@ -1,0 +1,237 @@
+{% extends "base.html" %}
+{% load humanize static %}
+
+{% block title %}Sell Phone - Step 2: Price · {{ business.name }}{% endblock %}
+{% block header_title %}Sell Phone{% endblock %}
+
+{% block extra_css %}
+<style>
+  :root {
+    --wizard-bg: #0b1220;
+    --wizard-text: #0f172a;
+    --wizard-muted: #64748b;
+    --wizard-panel: #ffffff;
+    --wizard-border: #e2e8f0;
+    --wizard-accent: #2563eb;
+    --wizard-success: #16a34a;
+    --wizard-shadow: 0 4px 14px rgba(2, 6, 23, .08);
+  }
+
+  .wizard-container {
+    max-width: 600px;
+    margin: 2rem auto;
+    padding: 1.5rem;
+  }
+
+  .wizard-progress {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 2rem;
+    position: relative;
+  }
+
+  .wizard-progress::before {
+    content: '';
+    position: absolute;
+    top: 20px;
+    left: 0;
+    right: 0;
+    height: 2px;
+    background: var(--wizard-border);
+    z-index: 0;
+  }
+
+  .wizard-step {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    position: relative;
+    z-index: 1;
+    flex: 1;
+  }
+
+  .wizard-step-circle {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background: var(--wizard-panel);
+    border: 2px solid var(--wizard-border);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    margin-bottom: 0.5rem;
+  }
+
+  .wizard-step.active .wizard-step-circle {
+    background: var(--wizard-accent);
+    color: white;
+    border-color: var(--wizard-accent);
+  }
+
+  .wizard-step.completed .wizard-step-circle {
+    background: var(--wizard-success);
+    color: white;
+    border-color: var(--wizard-success);
+  }
+
+  .wizard-step-label {
+    font-size: 0.85rem;
+    color: var(--wizard-muted);
+    text-align: center;
+  }
+
+  .wizard-step.active .wizard-step-label {
+    color: var(--wizard-accent);
+    font-weight: 600;
+  }
+
+  .glass-card {
+    background: var(--wizard-panel);
+    border: 1px solid var(--wizard-border);
+    border-radius: 14px;
+    padding: 2rem;
+    box-shadow: var(--wizard-shadow);
+  }
+
+  .wizard-title {
+    font-size: 1.75rem;
+    font-weight: 800;
+    margin-bottom: 0.5rem;
+    color: var(--wizard-text);
+  }
+
+  .wizard-subtitle {
+    color: var(--wizard-muted);
+    margin-bottom: 2rem;
+  }
+
+  .product-summary {
+    background: linear-gradient(135deg, rgba(22, 163, 74, 0.1), rgba(34, 197, 94, 0.05));
+    border: 1px solid rgba(22, 163, 74, 0.2);
+    border-radius: 12px;
+    padding: 1.25rem;
+    margin-bottom: 2rem;
+  }
+
+  .product-summary .title {
+    font-weight: 700;
+    color: var(--wizard-text);
+    margin-bottom: 0.25rem;
+  }
+
+  .product-summary .details {
+    font-size: 0.9rem;
+    color: var(--wizard-muted);
+  }
+
+  .form-control {
+    padding: 0.75rem 1rem;
+    border-radius: 8px;
+    border: 1px solid var(--wizard-border);
+    font-size: 1rem;
+  }
+
+  .form-control:focus {
+    border-color: var(--wizard-accent);
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+    outline: none;
+  }
+
+  .btn {
+    padding: 0.75rem 1.5rem;
+    border-radius: 8px;
+    font-weight: 600;
+    transition: all 0.2s;
+  }
+
+  .btn-primary {
+    background: var(--wizard-accent);
+    border: none;
+    color: white;
+  }
+
+  .btn-primary:hover {
+    background: #1d4ed8;
+    transform: translateY(-1px);
+  }
+
+  .btn-outline-secondary {
+    border: 1px solid var(--wizard-border);
+    color: var(--wizard-text);
+    background: white;
+  }
+
+  .btn-outline-secondary:hover {
+    background: var(--wizard-border);
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="wizard-container">
+  {# Progress Bar #}
+  <div class="wizard-progress">
+    <div class="wizard-step completed">
+      <div class="wizard-step-circle"><i class="bi bi-check"></i></div>
+      <div class="wizard-step-label">IMEI</div>
+    </div>
+    <div class="wizard-step active">
+      <div class="wizard-step-circle">2</div>
+      <div class="wizard-step-label">Price</div>
+    </div>
+    <div class="wizard-step">
+      <div class="wizard-step-circle">3</div>
+      <div class="wizard-step-label">Payment</div>
+    </div>
+  </div>
+
+  {# Product Summary #}
+  <div class="product-summary">
+    <div class="title">{{ wizard_data.product_name }}</div>
+    <small class="details">
+      IMEI: {{ wizard_data.imei }}
+      {% if wizard_data.variant %} · {{ wizard_data.variant }}{% endif %}
+      {% if wizard_data.location %} · {{ wizard_data.location }}{% endif %}
+    </small>
+  </div>
+
+  {# Step 2 Form #}
+  <div class="glass-card">
+    <h2 class="wizard-title text-center">Step 2: Set selling price</h2>
+    <p class="wizard-subtitle text-center">Enter the price you're selling this phone for.</p>
+
+    <form method="post">
+      {% csrf_token %}
+      
+      <div class="mb-4">
+        <label class="form-label fw-semibold">Selling price (MK)</label>
+        <input 
+          type="number" 
+          name="selling_price" 
+          class="form-control" 
+          step="1" 
+          min="1" 
+          value="{{ wizard_data.suggested_price|default:'' }}" 
+          required
+          autofocus
+          placeholder="Enter selling price..."
+        >
+        {% if wizard_data.suggested_price %}
+        <div class="form-text">Suggested price: MK {{ wizard_data.suggested_price|floatformat:0|intcomma }}</div>
+        {% endif %}
+      </div>
+
+      <div class="d-flex justify-content-between gap-2">
+        <a href="{% url 'inventory:phone_sale_wizard_v2' %}?step=1" class="btn btn-outline-secondary">
+          <i class="bi bi-arrow-left me-1"></i> Back
+        </a>
+        <button type="submit" class="btn btn-primary">
+          Next <i class="bi bi-arrow-right ms-1"></i>
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}
+

@@ -1,0 +1,327 @@
+/* =========================================================================
+   GLASSMORPHIC ENHANCEMENT LAYER - Premium Mobile-First
+   Adds glassmorphic effects without changing existing layouts/colors
+   ========================================================================= */
+
+/* ==================== PREMIUM GLASSMORPHIC UTILITIES ==================== */
+
+/* Add subtle glassmorphic effect to existing cards */
+.card,
+.glass-card,
+.kpi,
+.stat-card,
+.panel,
+.glass-panel {
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1),
+              0 1px 0 rgba(255, 255, 255, 0.1) inset;
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.card:hover,
+.glass-card:hover,
+.kpi:hover,
+.stat-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.15),
+              0 1px 0 rgba(255, 255, 255, 0.2) inset;
+}
+
+/* ==================== PREMIUM BUTTONS ==================== */
+
+/* Enhance existing buttons with glassmorphic effects */
+.btn,
+.glass-button,
+button:not(.btn-close):not(.navbar-toggler) {
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border-radius: 12px;
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+  position: relative;
+  overflow: hidden;
+}
+
+.btn::before,
+.glass-button::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+  transition: left 0.5s;
+}
+
+.btn:hover::before,
+.glass-button:hover::before {
+  left: 100%;
+}
+
+.btn:hover,
+.glass-button:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+}
+
+.btn:active,
+.glass-button:active {
+  transform: translateY(0);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+/* Primary button enhancement */
+.btn-primary,
+.glass-button-primary {
+  box-shadow: 0 6px 20px rgba(37, 99, 235, 0.35);
+}
+
+.btn-primary:hover {
+  box-shadow: 0 10px 30px rgba(37, 99, 235, 0.45);
+}
+
+/* Success/Green button enhancement */
+.btn-success,
+.btn-green,
+.glass-button-success {
+  box-shadow: 0 6px 20px rgba(16, 185, 129, 0.35);
+}
+
+.btn-success:hover,
+.btn-green:hover {
+  box-shadow: 0 10px 30px rgba(16, 185, 129, 0.45);
+}
+
+/* ==================== FORM INPUTS - PREMIUM GLASSMORPHIC ==================== */
+
+.form-control,
+.form-select,
+.input,
+input[type="text"],
+input[type="email"],
+input[type="password"],
+input[type="number"],
+input[type="search"],
+textarea,
+select {
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  transition: all 0.25s ease;
+  border-radius: 10px;
+}
+
+.form-control:focus,
+.form-select:focus,
+.input:focus,
+input:focus,
+textarea:focus,
+select:focus {
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15),
+              0 4px 12px rgba(0, 0, 0, 0.1);
+  transform: translateY(-1px);
+}
+
+/* ==================== NAVIGATION - GLASSMORPHIC ==================== */
+
+.navbar,
+.cc-header,
+.topbar {
+  backdrop-filter: blur(16px) saturate(180%);
+  -webkit-backdrop-filter: blur(16px) saturate(180%);
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.08),
+              0 1px 0 rgba(255, 255, 255, 0.1) inset;
+}
+
+/* ==================== SIDEBAR - PREMIUM GLASSMORPHIC ==================== */
+
+.cc-sidebar,
+.sidebar {
+  backdrop-filter: blur(20px) saturate(150%);
+  -webkit-backdrop-filter: blur(20px) saturate(150%);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.15),
+              1px 0 0 rgba(255, 255, 255, 0.05) inset;
+}
+
+/* ==================== MODALS & DROPDOWNS ==================== */
+
+.modal-content,
+.dropdown-menu {
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.2),
+              0 1px 0 rgba(255, 255, 255, 0.1) inset;
+}
+
+/* ==================== TABLES - GLASSMORPHIC ENHANCEMENT ==================== */
+
+.table,
+.table-responsive {
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+
+.table thead th {
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+/* ==================== BADGES & CHIPS ==================== */
+
+.badge,
+.chip,
+.glass-badge {
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+/* ==================== MOBILE-FIRST ENHANCEMENTS ==================== */
+
+/* Ensure minimum tap targets on mobile */
+@media (max-width: 768px) {
+  .btn,
+  button,
+  a.btn,
+  .glass-button {
+    min-height: 44px;
+    min-width: 44px;
+    padding: 0.625rem 1rem;
+  }
+  
+  /* Prevent iOS zoom on inputs */
+  input,
+  select,
+  textarea {
+    font-size: 16px !important;
+  }
+  
+  /* Enhanced touch feedback */
+  .btn:active,
+  button:active,
+  .card:active {
+    transform: scale(0.98);
+  }
+}
+
+/* ==================== LOADING & SKELETON STATES ==================== */
+
+.skeleton,
+.loading {
+  background: linear-gradient(90deg, 
+    rgba(255, 255, 255, 0.05) 25%, 
+    rgba(255, 255, 255, 0.15) 50%, 
+    rgba(255, 255, 255, 0.05) 75%);
+  background-size: 200% 100%;
+  animation: shimmer 2s infinite;
+}
+
+@keyframes shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+/* ==================== SCROLL ENHANCEMENT ==================== */
+
+/* Premium scrollbar */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.05);
+  border-radius: 10px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 10px;
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 0, 0, 0.3);
+}
+
+/* ==================== ANIMATIONS ==================== */
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.fade-in {
+  animation: fadeIn 0.4s ease-out;
+}
+
+/* ==================== ACCESSIBILITY ==================== */
+
+/* Better focus indicators */
+*:focus-visible {
+  outline: 3px solid rgba(59, 130, 246, 0.5);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* Reduced motion support */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* ==================== TOUCH ENHANCEMENTS ==================== */
+
+@media (hover: none) and (pointer: coarse) {
+  /* Remove hover effects on touch devices */
+  .btn:hover,
+  .card:hover {
+    transform: none;
+  }
+  
+  /* Enhanced active states for touch */
+  .btn:active,
+  .card:active,
+  a:active {
+    transform: scale(0.97);
+    opacity: 0.9;
+  }
+}
+
+/* ==================== RESPONSIVE IMAGES ==================== */
+
+img,
+svg,
+video,
+canvas {
+  max-width: 100%;
+  height: auto;
+}
+
+/* ==================== MOBILE BOTTOM NAVIGATION ==================== */
+
+@media (max-width: 767.98px) {
+  .mobile-tabbar,
+  .cc-bottom-nav {
+    backdrop-filter: blur(20px) saturate(180%);
+    -webkit-backdrop-filter: blur(20px) saturate(180%);
+    box-shadow: 0 -4px 24px rgba(0, 0, 0, 0.1),
+                0 -1px 0 rgba(255, 255, 255, 0.1) inset;
+  }
+}
+
