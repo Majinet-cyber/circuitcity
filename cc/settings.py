@@ -14,15 +14,18 @@ def env_bool(key: str, default: bool = False) -> bool:
         return default
     return v.strip().lower() in ("1", "true", "yes", "on")
 
+
 def env_csv(key: str, default: str = "") -> list[str]:
     raw = os.environ.get(key, default)
     return [x.strip() for x in raw.split(",") if x.strip()]
+
 
 def env_int(key: str, default: int) -> int:
     try:
         return int(os.environ.get(key, "").strip())
     except Exception:
         return default
+
 
 def _optional_app(app_label: str):
     """
@@ -35,6 +38,7 @@ def _optional_app(app_label: str):
     except Exception:
         return None
 
+
 def _csrf_from_hosts(hosts: list[str]) -> list[str]:
     """
     Turn hostnames into CSRF trusted origins (https://host).
@@ -46,15 +50,18 @@ def _csrf_from_hosts(hosts: list[str]) -> list[str]:
         if not h or h in {"localhost", "127.0.0.1", "0.0.0.0"}:
             continue
         if h.startswith("."):
-            out.append(f"https://*{h}")  # wildcard subdomains like .onrender.com
+            # wildcard subdomains like .onrender.com
+            out.append(f"https://*{h}")
         else:
             out.append(f"https://{h}")
     return out
+
 
 # --------------------------- base & .env ---------------------------
 BASE_DIR = Path(__file__).resolve().parent.parent
 try:
     from dotenv import load_dotenv  # type: ignore
+
     load_dotenv(BASE_DIR / ".env")
 except Exception:
     pass
@@ -72,10 +79,15 @@ TESTING = any(token in _argv for token in (" test", "pytest", "py.test")) or os.
 ON_RENDER = env_bool("RENDER", False) or ("RENDER" in os.environ)
 
 # Allow from env first, else sane defaults (Render host, localhost, etc.)
+# NOTE: include staging host by default.
 ALLOWED_HOSTS = env_csv(
     "ALLOWED_HOSTS",
-    "emajinet.africa,www.emajinet.africa,localhost,127.0.0.1,0.0.0.0,.onrender.com",
+    "emajinet.africa,"
+    "www.emajinet.africa,"
+    "emajinet-staging.onrender.com,"
+    "localhost,127.0.0.1,0.0.0.0,.onrender.com",
 )
+
 if ON_RENDER and ".onrender.com" not in ALLOWED_HOSTS and "*.onrender.com" not in ALLOWED_HOSTS:
     ALLOWED_HOSTS = list({*ALLOWED_HOSTS, ".onrender.com"})
 if IS_RUNSERVER and "*" not in ALLOWED_HOSTS:
@@ -91,6 +103,7 @@ _default_csrf_fixed = [
     "https://*.trycloudflare.com",
     "https://emajinet.africa",
     "https://www.emajinet.africa",
+    "https://emajinet-staging.onrender.com",
 ]
 _default_csrf = list({*_default_csrf_fixed, *_csrf_from_hosts(ALLOWED_HOSTS)})
 CSRF_TRUSTED_ORIGINS = env_csv("CSRF_TRUSTED_ORIGINS", ",".join(_default_csrf))
@@ -154,7 +167,6 @@ INSTALLED_APPS = [
     "django.contrib.messages",
     "django.contrib.staticfiles",
     "django.contrib.humanize",
-
     # Local apps
     "circuitcity.accounts.apps.AccountsConfig",
     "tenants.apps.TenantsConfig",
@@ -166,52 +178,57 @@ INSTALLED_APPS = [
     "billing",
     "wallet.apps.WalletConfig",
     # Layby (TOP-LEVEL import, not circuitcity.layby)
-        "layby.apps.LaybyConfig",
+    "layby.apps.LaybyConfig",
     "timelogs",
     "notifications",
     "hq",
     "reports",
-
     # NEW APPS
-    "support",   # ticket system
-    "audit",     # audit logs UI (if you see an audit app folder)
+    "support",  # ticket system
+    "audit",  # audit logs UI
     "staticpages",  # Public home page with hero section
-    "backups",   # data backup & export system
+    "backups",  # data backup & export system
 ]
 
-
 # Optional dev/helper apps
-INSTALLED_APPS += [a for a in (
-    _optional_app("sslserver"),
-    _optional_app("django_extensions"),
-) if a]
+INSTALLED_APPS += [
+    a
+    for a in (
+        _optional_app("sslserver"),
+        _optional_app("django_extensions"),
+    )
+    if a
+]
 
 print("[cc.settings] Final INSTALLED_APPS:", INSTALLED_APPS)
 
 # --------------------------- middleware ---------------------------
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
-    "whitenoise.middleware.WhiteNoiseMiddleware",   # must be right after SecurityMiddleware
+    "whitenoise.middleware.WhiteNoiseMiddleware",  # must be right after SecurityMiddleware
     "django.contrib.sessions.middleware.SessionMiddleware",
     "cc.middleware.RequestIDMiddleware",
     "cc.middleware.AccessLogMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
-
     # HQ admins stay in HQ
     "cc.middleware.PreventHQFromClientUI",
-
     # Tenant resolution + compat alias
     "tenants.middleware.TenantResolutionMiddleware",
     "tenants.middleware.ActiveBusinessMiddleware",
-
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
 ]
+
 print("[cc.settings] Final MIDDLEWARE:", MIDDLEWARE)
-print(f"[cc.settings] SSL flags -> DEBUG={DEBUG} RUNSERVER={IS_RUNSERVER} "
-      f"SECURE_SSL_REDIRECT={SECURE_SSL_REDIRECT} SESSION_COOKIE_SECURE={SESSION_COOKIE_SECURE} CSRF_COOKIE_SECURE={CSRF_COOKIE_SECURE}")
+print(
+    f"[cc.settings] SSL flags -> DEBUG={DEBUG} RUNSERVER={IS_RUNSERVER} "
+    f"SECURE_SSL_REDIRECT={SECURE_SSL_REDIRECT} "
+    f"SESSION_COOKIE_SECURE={SESSION_COOKIE_SECURE} CSRF_COOKIE_SECURE={CSRF_COOKIE_SECURE}"
+)
+print("[cc.settings] ALLOWED_HOSTS ->", ALLOWED_HOSTS)
+print("[cc.settings] CSRF_TRUSTED_ORIGINS ->", CSRF_TRUSTED_ORIGINS)
 
 ROOT_URLCONF = "cc.urls"
 
@@ -220,7 +237,14 @@ TEMPLATES = [
     {
         "BACKEND": "django.template.backends.django.DjangoTemplates",
         "DIRS": [
-            *(p for p in [BASE_DIR / "templates", BASE_DIR / "circuitcity" / "templates"] if p.exists())
+            *(
+                p
+                for p in [
+                    BASE_DIR / "templates",
+                    BASE_DIR / "circuitcity" / "templates",
+                ]
+                if p.exists()
+            )
         ],
         "APP_DIRS": True,
         "OPTIONS": {
@@ -279,7 +303,10 @@ elif DATABASE_URL:
     DATABASES["default"] = cfg
 elif USE_LOCAL_SQLITE:
     sqlite_path = str(BASE_DIR / "db.sqlite3")
-    DATABASES["default"] = {"ENGINE": "django.db.backends.sqlite3", "NAME": sqlite_path}
+    DATABASES["default"] = {
+        "ENGINE": "django.db.backends.sqlite3",
+        "NAME": sqlite_path,
+    }
 else:
     NAME = os.environ.get("POSTGRES_DB") or os.environ.get("DB_NAME", "circuitcity")
     USER = os.environ.get("POSTGRES_USER") or os.environ.get("DB_USER", "ccuser")
@@ -326,7 +353,10 @@ else:
 AUTH_PASSWORD_VALIDATORS = [
     {"NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator"},
     # Minimum 8 characters for better UX (as per requirements)
-    {"NAME": "django.contrib.auth.password_validation.MinimumLengthValidator", "OPTIONS": {"min_length": 8}},
+    {
+        "NAME": "django.contrib.auth.password_validation.MinimumLengthValidator",
+        "OPTIONS": {"min_length": 8},
+    },
     {"NAME": "django.contrib.auth.password_validation.CommonPasswordValidator"},
     {"NAME": "django.contrib.auth.password_validation.NumericPasswordValidator"},
 ]
@@ -338,14 +368,17 @@ USE_I18N = True
 USE_TZ = True
 
 # --------------------------- static / media ---------------------------
-# IMPORTANT:
-# - STATIC_URL stays "/static/".
-# - STATIC_ROOT is where collectstatic writes (served by WhiteNoise in prod).
-# - STATICFILES_DIRS only includes existing local asset folders.
 STATIC_URL = "/static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"
 STATICFILES_DIRS = [
-    *(p for p in [BASE_DIR / "static", BASE_DIR / "circuitcity" / "static"] if p.exists())
+    *(
+        p
+        for p in [
+            BASE_DIR / "static",
+            BASE_DIR / "circuitcity" / "static",
+        ]
+        if p.exists()
+    )
 ]
 MEDIA_URL = "/media/"
 MEDIA_ROOT = BASE_DIR / "media"
@@ -367,7 +400,6 @@ WHITENOISE_AUTOREFRESH = DEBUG
 WHITENOISE_MAX_AGE = 60 * 60 * 24 * 365
 WHITENOISE_INDEX_FILE = False
 # DO NOT hard-fail on manifest mismatches during rolling deploys.
-# (Still, always run: python manage.py collectstatic --clear --noinput)
 WHITENOISE_MANIFEST_STRICT = False
 
 # --------------------------- auth redirects ---------------------------
@@ -383,13 +415,17 @@ if DEBUG and not USE_SMTP_IN_DEBUG:
     EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"
     DEFAULT_FROM_EMAIL = os.environ.get("DEFAULT_FROM_EMAIL", "noreply@example.com")
 else:
-    EMAIL_BACKEND = os.environ.get("EMAIL_BACKEND", "django.core.mail.backends.smtp.EmailBackend")
+    EMAIL_BACKEND = os.environ.get(
+        "EMAIL_BACKEND", "django.core.mail.backends.smtp.EmailBackend"
+    )
     EMAIL_HOST = os.environ.get("EMAIL_HOST", "smtp.gmail.com")
     EMAIL_PORT = env_int("EMAIL_PORT", 587)
     EMAIL_USE_TLS = env_bool("EMAIL_USE_TLS", True)
     EMAIL_HOST_USER = os.environ.get("EMAIL_HOST_USER", "")
     EMAIL_HOST_PASSWORD = os.environ.get("EMAIL_HOST_PASSWORD", "")
-    DEFAULT_FROM_EMAIL = os.environ.get("DEFAULT_FROM_EMAIL", EMAIL_HOST_USER or "noreply@example.com")
+    DEFAULT_FROM_EMAIL = os.environ.get(
+        "DEFAULT_FROM_EMAIL", EMAIL_HOST_USER or "noreply@example.com"
+    )
     EMAIL_TIMEOUT = env_int("EMAIL_TIMEOUT", 10)
 
 # --------------------------- billing ---------------------------
@@ -398,12 +434,36 @@ BILLING = {
     "DEFAULT_CURRENCY": os.environ.get("BILLING_CURRENCY", "MWK"),
     "TRIAL_DAYS": env_int("BILLING_TRIAL_DAYS", 30),
     "GRACE_DAYS": env_int("BILLING_GRACE_DAYS", 30),
-    "INVOICE_FROM": os.environ.get("BILLING_INVOICE_FROM", os.environ.get("DEFAULT_FROM_EMAIL", "noreply@example.com")),
+    "INVOICE_FROM": os.environ.get(
+        "BILLING_INVOICE_FROM",
+        os.environ.get("DEFAULT_FROM_EMAIL", "noreply@example.com"),
+    ),
 }
 BILLING_PLANS = {
-    "starter": {"code": "starter", "name": "Starter", "amount": 20000, "currency": "MWK", "max_agents": 0, "max_stores": 1},
-    "growth": {"code": "growth", "name": "Growth", "amount": 60000, "currency": "MWK", "max_agents": 5, "max_stores": 5},
-    "pro": {"code": "pro", "name": "Pro", "amount": 120000, "currency": "MWK", "max_agents": None, "max_stores": None},
+    "starter": {
+        "code": "starter",
+        "name": "Starter",
+        "amount": 20000,
+        "currency": "MWK",
+        "max_agents": 0,
+        "max_stores": 1,
+    },
+    "growth": {
+        "code": "growth",
+        "name": "Growth",
+        "amount": 60000,
+        "currency": "MWK",
+        "max_agents": 5,
+        "max_stores": 5,
+    },
+    "pro": {
+        "code": "pro",
+        "name": "Pro",
+        "amount": 120000,
+        "currency": "MWK",
+        "max_agents": None,
+        "max_stores": None,
+    },
 }
 
 REPORTS_DEFAULT_CURRENCY = BILLING["DEFAULT_CURRENCY"]
@@ -416,26 +476,31 @@ STRIPE_SECRET_KEY = os.environ.get("STRIPE_SECRET_KEY", "")
 STRIPE_PUBLISHABLE_KEY = os.environ.get("STRIPE_PUBLISHABLE_KEY", "")
 STRIPE_WEBHOOK_SECRET = os.environ.get("STRIPE_WEBHOOK_SECRET", "")
 
-# Configure Stripe if keys are present
 if STRIPE_SECRET_KEY:
     try:
         import stripe  # type: ignore
+
         stripe.api_key = STRIPE_SECRET_KEY
     except ImportError:
-        pass  # Stripe not installed; skip config
+        pass
 
 # Pesapal (mobile money + cards for Africa)
 PESAPAL_CONSUMER_KEY = os.environ.get("PESAPAL_CONSUMER_KEY", "")
 PESAPAL_CONSUMER_SECRET = os.environ.get("PESAPAL_CONSUMER_SECRET", "")
-PESAPAL_BASE_URL = os.environ.get("PESAPAL_BASE_URL", "https://cybqa.pesapal.com/pesapalv3/api/")  # sandbox default
+PESAPAL_BASE_URL = os.environ.get(
+    "PESAPAL_BASE_URL", "https://cybqa.pesapal.com/pesapalv3/api/"
+)  # sandbox default
 PESAPAL_IPN_ID = os.environ.get("PESAPAL_IPN_ID", "")
 
 # --------------------------- whatsapp notifications ---------------------------
-# Using WhatsApp Cloud API (Meta)
-WHATSAPP_API_BASE_URL = os.environ.get("WHATSAPP_API_BASE_URL", "https://graph.facebook.com/v21.0/")
+WHATSAPP_API_BASE_URL = os.environ.get(
+    "WHATSAPP_API_BASE_URL", "https://graph.facebook.com/v21.0/"
+)
 WHATSAPP_PHONE_NUMBER_ID = os.environ.get("WHATSAPP_PHONE_NUMBER_ID", "")
 WHATSAPP_ACCESS_TOKEN = os.environ.get("WHATSAPP_ACCESS_TOKEN", "")
-WHATSAPP_DEFAULT_COUNTRY_CODE = os.environ.get("WHATSAPP_DEFAULT_COUNTRY_CODE", "+265")  # Malawi
+WHATSAPP_DEFAULT_COUNTRY_CODE = os.environ.get(
+    "WHATSAPP_DEFAULT_COUNTRY_CODE", "+265"
+)  # Malawi
 
 # --------------------------- global UI ---------------------------
 UI = {
@@ -459,14 +524,18 @@ WARRANTY_REQUEST_TIMEOUT = env_int("WARRANTY_REQUEST_TIMEOUT", 12)
 
 APP_NAME = os.environ.get("APP_NAME", "Emajinet")
 APP_ENV = os.environ.get("APP_ENV", "dev" if DEBUG else "beta")
-BETA_FEEDBACK_MAILTO = os.environ.get("BETA_FEEDBACK_MAILTO", "beta@emajinet.africa")
+BETA_FEEDBACK_MAILTO = os.environ.get(
+    "BETA_FEEDBACK_MAILTO", "beta@emajinet.africa"
+)
 
 # --------------------------- safety toggles ---------------------------
 DISABLE_SALES_AUTOCREATE = env_bool("DISABLE_SALES_AUTOCREATE", True)
 
 # Make template exceptions bubble loudly in dev
 DEBUG_PROPAGATE_EXCEPTIONS = DEBUG
-DEFAULT_EXCEPTION_REPORTER_FILTER = "django.views.debug.SafeExceptionReporterFilter"
+DEFAULT_EXCEPTION_REPORTER_FILTER = (
+    "django.views.debug.SafeExceptionReporterFilter"
+)
 
 # Minimal logging so template errors are obvious in console
 LOGGING = {
@@ -475,7 +544,11 @@ LOGGING = {
     "handlers": {"console": {"class": "logging.StreamHandler"}},
     "root": {"handlers": ["console"], "level": "INFO"},
     "loggers": {
-        "django.template": {"handlers": ["console"], "level": "DEBUG" if DEBUG else "INFO", "propagate": True},
+        "django.template": {
+            "handlers": ["console"],
+            "level": "DEBUG" if DEBUG else "INFO",
+            "propagate": True,
+        },
     },
 }
 
