@@ -551,7 +551,8 @@ urlpatterns += [
     # ADD: Layby app include (fixes /layby/ 404)
     path("layby/",     include_or_raise("layby.urls", "layby")),
     # Reports (business intelligence, charts, exports)
-    path("reports/",   include_or_raise("reports.urls", "reports")),
+    # NOTE: reports is now optional; added conditionally below to avoid crashes
+    # path("reports/",   include_or_raise("reports.urls", "reports")),
     # Support & Audit
     path("support/",   include_or_raise("support.urls", "support")),
     path("audit/",     include_or_raise("audit.urls", "audit")),
@@ -845,6 +846,19 @@ except Exception:
 if settings.DEBUG:
     urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
     urlpatterns += static(settings.STATIC_URL, document_root=settings.STATIC_ROOT)
+
+# ======================================================================================
+# Optional: Reports app (gracefully skip if unavailable)
+# ======================================================================================
+try:
+    import_module("reports.urls")
+except ModuleNotFoundError:
+    # reports app is not available in this environment; skip mounting it
+    pass
+else:
+    urlpatterns.append(
+        path("reports/", include("reports.urls"))
+    )
 
 # ======================================================================================
 # Error handlers
