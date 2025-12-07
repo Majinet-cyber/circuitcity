@@ -56,21 +56,20 @@
         </div>
 
         <div class="d-grid gap-3 my-4">
-          <a href="{% static 'pdfs/merchant_contract_template.pdf' %}" 
-             class="btn btn-lg btn-primary" 
-             download
-             title="Download contract template">
+          <!-- PDF download temporarily disabled -->
+          <button type="button" 
+                  class="btn btn-lg btn-outline-secondary" 
+                  disabled
+                  title="Contract template PDF coming soon">
             <i class="bi bi-download me-2"></i>
-            Download Contract Template (PDF)
-          </a>
+            Download Contract Template (Coming Soon)
+          </button>
           
-          <a href="{% static 'pdfs/merchant_contract_template.pdf' %}" 
-             class="btn btn-lg btn-outline-primary" 
-             target="_blank"
-             title="Preview in new tab">
-            <i class="bi bi-eye me-2"></i>
-            Preview Template
-          </a>
+          <div class="alert alert-info">
+            <i class="bi bi-info-circle me-2"></i>
+            <strong>Note:</strong> The contract template PDF is being finalized. 
+            For now, please contact HQ for contract templates via email or support tickets.
+          </div>
         </div>
 
         <hr class="my-4">
