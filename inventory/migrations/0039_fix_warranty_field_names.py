@@ -7,7 +7,12 @@ from django.db import migrations
 
 
 def rename_warranty_columns_if_exist(apps, schema_editor):
-    """Rename warranty columns only if the old ones exist"""
+    """Rename warranty columns only if the old ones exist (SQLite only)"""
+    # Skip this migration on non-SQLite databases (e.g., PostgreSQL on Render)
+    # The pragma_table_info function is SQLite-specific
+    if schema_editor.connection.vendor != 'sqlite':
+        return
+    
     with schema_editor.connection.cursor() as cursor:
         # Check if old columns exist
         cursor.execute("""
