@@ -106,11 +106,11 @@
   </ul>
   {% endif %}
 
-  {# ================= PHARMACY ================= #}
+  {# ================= PHARMACY & COSMETICS ================= #}
   {% if business_kind == "pharmacy" %}
-  <div class="menu-group">PHARMACY</div>
+  <div class="menu-group">PHARMACY & COSMETICS</div>
   <ul class="navlist">
-    <li><a class="navlink" href="{{ url_pharmacy_dash|default:'/inventory/verticals/pharmacy/' }}"><i class="bi bi-capsule"></i> Pharmacy Dashboard</a></li>
+    <li><a class="navlink" href="{{ url_pharmacy_dash|default:'/inventory/verticals/pharmacy/' }}"><i class="bi bi-capsule"></i> Pharmacy & Cosmetics Hub</a></li>
     <li><a class="navlink" href="{{ url_stock|default:'/inventory/list/' }}"><i class="bi bi-box-seam"></i> Inventory</a></li>
     <li><a class="navlink" href="{{ url_scan_sold|default:'/inventory/scan-sold/' }}"><i class="bi bi-cart-check"></i> Dispense</a></li>
     {% if url_sales %}<li><a class="navlink" href="{{ url_sales }}"><i class="bi bi-receipt"></i> Sales</a></li>{% endif %}

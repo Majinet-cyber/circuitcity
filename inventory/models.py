@@ -223,12 +223,12 @@ class MerchProduct(models.Model):
     base_unit = models.CharField(max_length=10, choices=BaseUnit.choices, default=BaseUnit.UNIT)
     track_inventory = models.BooleanField(default=True)
 
-    # Liquor helpers
+    # Category field (used by liquor, pharmacy, and other verticals)
     category = models.CharField(
-        max_length=20, 
+        max_length=30, 
         blank=True, 
         default="", 
-        help_text="Liquor category: beer, cider, spirits, wine, other"
+        help_text="Product category (e.g., liquor: beer/cider/spirits; pharmacy: medicine/cosmetics)"
     )
     has_shots = models.BooleanField(default=False)
     shots_per_bottle = models.PositiveIntegerField(null=True, blank=True)
@@ -270,6 +270,21 @@ class MerchProduct(models.Model):
 
     def __str__(self):
         return self.name
+    
+    def get_category_display(self):
+        """Get human-readable category name based on product kind."""
+        if not self.category:
+            return ""
+        
+        # Import here to avoid circular dependencies
+        if self.kind == "pharmacy":
+            from .models_pharmacy import PharmacyCategory
+            return dict(PharmacyCategory.choices).get(self.category, self.category)
+        elif self.kind == "liquor":
+            from .models_verticals import LiquorCategory
+            return dict(LiquorCategory.choices).get(self.category, self.category)
+        else:
+            return self.category
 
     @property
     def sellable_shots_per_bottle(self):

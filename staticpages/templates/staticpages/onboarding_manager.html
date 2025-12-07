@@ -1,0 +1,355 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Manager Onboarding - Emajinet{% endblock %}
+
+{% block content %}
+<div class="container-fluid px-3 px-md-4 py-4">
+  <!-- Header -->
+  <div class="row mb-4">
+    <div class="col-12">
+      <div class="glass-card p-4">
+        <div class="d-flex justify-content-between align-items-center flex-wrap gap-3">
+          <div>
+            <h1 class="h3 mb-1">
+              <i class="bi bi-book text-primary me-2"></i>
+              Manager Onboarding Guide
+            </h1>
+            <p class="text-muted mb-0">
+              Welcome to Emajinet! Learn how to manage your business like a pro.
+            </p>
+          </div>
+          <div>
+            <a href="{% static 'pdfs/onboarding_manager.pdf' %}" 
+               class="btn btn-primary" 
+               download
+               title="Download PDF version">
+              <i class="bi bi-download me-2"></i>
+              Download PDF
+            </a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Content -->
+  <div class="row">
+    <div class="col-12">
+      <div class="glass-card p-4">
+        <div class="onboarding-content">
+          <!-- Quick Navigation -->
+          <div class="alert alert-info mb-4">
+            <h4 class="alert-heading">
+              <i class="bi bi-compass me-2"></i>
+              Quick Navigation
+            </h4>
+            <div class="row">
+              <div class="col-md-6">
+                <ul class="mb-0">
+                  <li><a href="#getting-started">Getting Started</a></li>
+                  <li><a href="#core-modules">Core Modules</a></li>
+                  <li><a href="#best-practices">Best Practices</a></li>
+                </ul>
+              </div>
+              <div class="col-md-6">
+                <ul class="mb-0">
+                  <li><a href="#vertical-features">Vertical-Specific Features</a></li>
+                  <li><a href="#support">Getting Help</a></li>
+                  <li><a href="#next-steps">Next Steps</a></li>
+                </ul>
+              </div>
+            </div>
+          </div>
+
+          <!-- Main Content Sections -->
+          <div id="content-sections">
+            
+            <!-- What is Emajinet -->
+            <section class="mb-5">
+              <h2 class="border-bottom pb-2 mb-3">
+                <i class="bi bi-info-circle text-primary me-2"></i>
+                What is Emajinet?
+              </h2>
+              <p class="lead">
+                Emajinet is a powerful multi-tenant platform designed to help you manage your business efficiently. 
+                Whether you run a phone shop, pharmacy, liquor store, clothing boutique, or gym, Emajinet provides 
+                tailored tools to track inventory, sales, costs, and profits in real-time.
+              </p>
+            </section>
+
+            <!-- Getting Started -->
+            <section class="mb-5" id="getting-started">
+              <h2 class="border-bottom pb-2 mb-3">
+                <i class="bi bi-rocket-takeoff text-success me-2"></i>
+                Getting Started
+              </h2>
+              
+              <div class="card border-0 shadow-sm mb-3">
+                <div class="card-body">
+                  <h3 class="h5">1. Logging In</h3>
+                  <ol>
+                    <li>Visit your Emajinet portal</li>
+                    <li>Enter your username and password</li>
+                    <li>After login, you'll be prompted to select your <strong>Business</strong> and <strong>Location</strong></li>
+                  </ol>
+                  <div class="alert alert-warning">
+                    <i class="bi bi-exclamation-triangle me-2"></i>
+                    <strong>Important:</strong> Always ensure you've selected the correct business and location before performing any operations.
+                  </div>
+                </div>
+              </div>
+
+              <div class="card border-0 shadow-sm">
+                <div class="card-body">
+                  <h3 class="h5">2. Understanding the Dashboard</h3>
+                  <p>Your dashboard is the heart of Emajinet. Here you'll see:</p>
+                  <ul>
+                    <li><strong>Today's Revenue & Profit:</strong> Real-time financial metrics</li>
+                    <li><strong>Sales Count:</strong> Number of transactions today</li>
+                    <li><strong>Top Products:</strong> Your best-selling items</li>
+                    <li><strong>Payment Mix:</strong> Cash vs Bank vs Mobile Money breakdown</li>
+                    <li><strong>Alerts:</strong> Low stock, expiring items, warranty expirations</li>
+                  </ul>
+                  <div class="alert alert-success">
+                    <i class="bi bi-lightbulb me-2"></i>
+                    <strong>Pro Tip:</strong> Use the date range filters to analyze performance over different time periods 
+                    (Today, Last 7 Days, This Month, Custom).
+                  </div>
+                </div>
+              </div>
+            </section>
+
+            <!-- Core Modules -->
+            <section class="mb-5" id="core-modules">
+              <h2 class="border-bottom pb-2 mb-3">
+                <i class="bi bi-grid text-info me-2"></i>
+                Core Modules
+              </h2>
+              
+              <div class="row g-3">
+                <!-- Inventory -->
+                <div class="col-md-6">
+                  <div class="card h-100 border-0 shadow-sm">
+                    <div class="card-body">
+                      <h3 class="h5">
+                        <i class="bi bi-box-seam text-primary me-2"></i>
+                        Inventory Management
+                      </h3>
+                      <p class="text-muted">Track all your products and stock levels.</p>
+                      <p><strong>Key Actions:</strong></p>
+                      <ul class="mb-0">
+                        <li>Stock In: Add new products</li>
+                        <li>View Inventory: See all products</li>
+                        <li>Batch Management (Pharmacy)</li>
+                        <li>Serial Numbers (Phones)</li>
+                      </ul>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Scan & Sell -->
+                <div class="col-md-6">
+                  <div class="card h-100 border-0 shadow-sm">
+                    <div class="card-body">
+                      <h3 class="h5">
+                        <i class="bi bi-upc-scan text-success me-2"></i>
+                        Scan & Sell
+                      </h3>
+                      <p class="text-muted">Quick sales interface for agents and cashiers.</p>
+                      <p><strong>Features:</strong></p>
+                      <ul class="mb-0">
+                        <li>Barcode/QR code scanning</li>
+                        <li>Quick product search</li>
+                        <li>Multiple payment methods</li>
+                        <li>Instant commission calculation</li>
+                      </ul>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Wallet -->
+                <div class="col-md-6">
+                  <div class="card h-100 border-0 shadow-sm">
+                    <div class="card-body">
+                      <h3 class="h5">
+                        <i class="bi bi-wallet2 text-warning me-2"></i>
+                        Wallet & Transactions
+                      </h3>
+                      <p class="text-muted">Track all financial transactions in one place.</p>
+                      <p><strong>What's Tracked:</strong></p>
+                      <ul class="mb-0">
+                        <li>Sales revenue</li>
+                        <li>Agent commissions</li>
+                        <li>Business costs</li>
+                        <li>Withdrawals and deposits</li>
+                      </ul>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Reports -->
+                <div class="col-md-6">
+                  <div class="card h-100 border-0 shadow-sm">
+                    <div class="card-body">
+                      <h3 class="h5">
+                        <i class="bi bi-bar-chart text-danger me-2"></i>
+                        Reports
+                      </h3>
+                      <p class="text-muted">Generate detailed business insights.</p>
+                      <p><strong>Available Reports:</strong></p>
+                      <ul class="mb-0">
+                        <li>Sales by product/agent</li>
+                        <li>Profit & Loss statements</li>
+                        <li>Stock valuation</li>
+                        <li>Trend analysis</li>
+                      </ul>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </section>
+
+            <!-- Best Practices -->
+            <section class="mb-5" id="best-practices">
+              <h2 class="border-bottom pb-2 mb-3">
+                <i class="bi bi-award text-warning me-2"></i>
+                Best Practices
+              </h2>
+              
+              <div class="accordion" id="bestPracticesAccordion">
+                <div class="accordion-item">
+                  <h2 class="accordion-header">
+                    <button class="accordion-button" type="button" data-bs-toggle="collapse" data-bs-target="#dailyChecklist">
+                      <i class="bi bi-calendar-check me-2"></i>
+                      Daily Checklist
+                    </button>
+                  </h2>
+                  <div id="dailyChecklist" class="accordion-collapse collapse show" data-bs-parent="#bestPracticesAccordion">
+                    <div class="accordion-body">
+                      <div class="row">
+                        <div class="col-md-4">
+                          <h4 class="h6">Morning</h4>
+                          <ul>
+                            <li>Clock in</li>
+                            <li>Review yesterday's summary</li>
+                            <li>Check low stock alerts</li>
+                          </ul>
+                        </div>
+                        <div class="col-md-4">
+                          <h4 class="h6">During Day</h4>
+                          <ul>
+                            <li>Record all sales immediately</li>
+                            <li>Add stock as it arrives</li>
+                            <li>Record any costs incurred</li>
+                          </ul>
+                        </div>
+                        <div class="col-md-4">
+                          <h4 class="h6">Evening</h4>
+                          <ul>
+                            <li>Review today's metrics</li>
+                            <li>Check agent performance</li>
+                            <li>Clock out</li>
+                          </ul>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </section>
+
+            <!-- Support -->
+            <section class="mb-5" id="support">
+              <h2 class="border-bottom pb-2 mb-3">
+                <i class="bi bi-headset text-info me-2"></i>
+                Getting Help
+              </h2>
+              <div class="row">
+                <div class="col-md-4">
+                  <div class="card border-0 shadow-sm text-center p-3">
+                    <i class="bi bi-chat-dots fs-1 text-primary mb-2"></i>
+                    <h3 class="h5">In-App Support</h3>
+                    <p class="text-muted small mb-0">Submit tickets directly from the app</p>
+                  </div>
+                </div>
+                <div class="col-md-4">
+                  <div class="card border-0 shadow-sm text-center p-3">
+                    <i class="bi bi-whatsapp fs-1 text-success mb-2"></i>
+                    <h3 class="h5">WhatsApp</h3>
+                    <p class="text-muted small mb-0">Receive alerts and notifications</p>
+                  </div>
+                </div>
+                <div class="col-md-4">
+                  <div class="card border-0 shadow-sm text-center p-3">
+                    <i class="bi bi-book fs-1 text-info mb-2"></i>
+                    <h3 class="h5">Documentation</h3>
+                    <p class="text-muted small mb-0">FAQs and video tutorials</p>
+                  </div>
+                </div>
+              </div>
+            </section>
+
+            <!-- Next Steps -->
+            <section class="mb-5" id="next-steps">
+              <h2 class="border-bottom pb-2 mb-3">
+                <i class="bi bi-arrow-right-circle text-success me-2"></i>
+                Next Steps
+              </h2>
+              <div class="card border-0 shadow-sm">
+                <div class="card-body">
+                  <ol class="mb-0">
+                    <li><strong>Explore the Dashboard:</strong> Familiarize yourself with the layout</li>
+                    <li><strong>Add Your First Product:</strong> Go to Inventory → Stock In</li>
+                    <li><strong>Make Your First Sale:</strong> Go to Scan & Sell</li>
+                    <li><strong>Record Your First Cost:</strong> Go to Wallet → Add Cost</li>
+                    <li><strong>Review Your Reports:</strong> Go to Reports → Sales Summary</li>
+                  </ol>
+                  <div class="alert alert-primary mt-3 mb-0">
+                    <i class="bi bi-person-video3 me-2"></i>
+                    <strong>Need personalized training?</strong> Contact HQ to schedule a one-on-one session!
+                  </div>
+                </div>
+              </div>
+            </section>
+          </div>
+
+          <!-- Footer -->
+          <div class="text-center text-muted mt-5 pt-4 border-top">
+            <p class="small mb-0">
+              <i class="bi bi-file-earmark-text me-2"></i>
+              Version 1.0 – December 2025 | Emajinet / Circuit City Team
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<style>
+.onboarding-content {
+  font-size: 1rem;
+  line-height: 1.7;
+}
+.onboarding-content h2 {
+  font-size: 1.75rem;
+  font-weight: 600;
+  margin-top: 2rem;
+}
+.onboarding-content h3 {
+  font-size: 1.25rem;
+  font-weight: 600;
+}
+.onboarding-content ul, .onboarding-content ol {
+  margin-bottom: 1rem;
+}
+.onboarding-content .card {
+  transition: transform 0.2s ease;
+}
+.onboarding-content .card:hover {
+  transform: translateY(-2px);
+}
+</style>
+{% endblock %}
+

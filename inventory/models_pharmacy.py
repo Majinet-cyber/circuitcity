@@ -39,7 +39,11 @@ class PharmacyProductForm(models.TextChoices):
 
 
 class PharmacyCategory(models.TextChoices):
-    """Drug categories"""
+    """
+    Product categories for Pharmacy & Cosmetics vertical.
+    Includes both medicine and cosmetics categories.
+    """
+    # === MEDICINE CATEGORIES ===
     ANALGESIC = "analgesic", "Analgesic (Pain Relief)"
     ANTIBIOTIC = "antibiotic", "Antibiotic"
     ANTIFUNGAL = "antifungal", "Antifungal"
@@ -52,8 +56,18 @@ class PharmacyCategory(models.TextChoices):
     ANTIPARASITIC = "antiparasitic", "Antiparasitic"
     RESPIRATORY = "respiratory", "Respiratory"
     GASTROINTESTINAL = "gastrointestinal", "Gastrointestinal"
-    DERMATOLOGICAL = "dermatological", "Dermatological"
     CONTRACEPTIVE = "contraceptive", "Contraceptive"
+    
+    # === COSMETICS & PERSONAL CARE CATEGORIES ===
+    SKIN_CARE = "skin_care", "Skin Care"
+    HAIR_CARE = "hair_care", "Hair Care"
+    PERSONAL_CARE = "personal_care", "Personal Care"
+    BEAUTY_MAKEUP = "beauty_makeup", "Beauty & Makeup"
+    BABY_CARE = "baby_care", "Baby Care"
+    ORAL_CARE = "oral_care", "Oral Care"
+    
+    # === GENERAL ===
+    GENERAL = "general", "General Products"
     OTHER = "other", "Other"
 
 
@@ -387,12 +401,42 @@ class PharmacySale(models.Model):
     # Notes
     notes = models.TextField(blank=True, default="")
     
+    # Soft delete and undo support
+    is_deleted = models.BooleanField(
+        default=False,
+        db_index=True,
+        help_text="Soft delete flag - deleted sales excluded from reports"
+    )
+    is_reversed = models.BooleanField(
+        default=False,
+        db_index=True,
+        help_text="True if this sale was reversed/undone"
+    )
+    reversal_of = models.ForeignKey(
+        "self",
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="reversals",
+        help_text="Original sale this reverses (if undo)"
+    )
+    deleted_at = models.DateTimeField(null=True, blank=True)
+    deleted_by = models.ForeignKey(
+        User,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="pharmacy_sales_deleted"
+    )
+    
     class Meta:
         ordering = ["-sold_at"]
         indexes = [
             models.Index(fields=["business", "-sold_at"]),
             models.Index(fields=["batch", "-sold_at"]),
             models.Index(fields=["sold_by", "-sold_at"]),
+            models.Index(fields=["is_deleted"]),
+            models.Index(fields=["is_reversed"]),
         ]
         verbose_name = "Pharmacy Sale"
         verbose_name_plural = "Pharmacy Sales"

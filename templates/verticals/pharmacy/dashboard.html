@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% load humanize %}
 
-{% block title %}Pharmacy · Emajinet{% endblock %}
+{% block title %}Pharmacy & Cosmetics · Emajinet{% endblock %}
 
 {% block content %}
 
@@ -26,10 +26,33 @@
   .hero-actions a{border-radius:999px;padding:10px 16px;font-weight:700;text-decoration:none}
   .hero-actions .primary{background:#fff;color:#111827}
   .hero-actions .ghost{border:1px solid rgba(255,255,255,.8);color:#fff}
+  
+  /* Date filter bar */
+  .date-filter-bar{background:#fff;border-radius:18px;padding:16px;box-shadow:0 10px 30px rgba(15,23,42,.08);display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+  .date-filter-bar h3{margin:0;font-size:1rem;color:#64748b}
+  .filter-buttons{display:flex;gap:8px;flex-wrap:wrap}
+  .filter-btn{border-radius:12px;padding:8px 16px;font-weight:600;text-decoration:none;border:2px solid #e2e8f0;color:#475569;transition:all .2s}
+  .filter-btn:hover{background:#f1f5f9;border-color:#cbd5e1}
+  .filter-btn.active{background:#3b82f6;color:#fff;border-color:#3b82f6}
+  .custom-date-inputs{display:flex;gap:8px;align-items:center}
+  .custom-date-inputs input{border-radius:8px;border:2px solid #e2e8f0;padding:6px 10px;font-size:.9rem}
+  .custom-date-inputs button{border-radius:8px;padding:6px 12px;background:#3b82f6;color:#fff;border:none;font-weight:600;cursor:pointer}
+  
   .metrics-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:16px}
   .metric-card{background:#fff;border-radius:18px;padding:18px;box-shadow:0 10px 30px rgba(15,23,42,.08)}
   .metric-card h3{margin:0;font-size:.9rem;text-transform:uppercase;color:#64748b}
   .metric-card p{margin:6px 0 0;font-size:1.8rem;font-weight:800;color:#0f172a}
+  .metric-card small{font-size:.8rem;color:#64748b;font-weight:normal}
+  
+  /* Payment mix card */
+  .payment-mix-card{background:#fff;border-radius:18px;padding:18px;box-shadow:0 10px 30px rgba(15,23,42,.08)}
+  .payment-method-item{display:flex;justify-content:space-between;align-items:center;padding:12px;border-bottom:1px solid #f1f5f9}
+  .payment-method-item:last-child{border-bottom:none}
+  .payment-method-icon{width:40px;height:40px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:1.2rem}
+  .pm-cash{background:#dcfce7;color:#16a34a}
+  .pm-bank{background:#dbeafe;color:#2563eb}
+  .pm-mobile{background:#fef3c7;color:#f59e0b}
+  
   .recent-block{background:#fff;border-radius:20px;padding:18px;box-shadow:0 10px 30px rgba(15,23,42,.08)}
   .recent-list{list-style:none;margin:0;padding:0;display:grid;gap:12px}
   .recent-item{display:flex;justify-content:space-between;gap:12px;border:1px solid #e2e8f0;border-radius:16px;padding:14px;align-items:center}
@@ -37,48 +60,201 @@
   .badge.warning{background:#fef9c3;color:#b45309}
   .badge.danger{background:#fee2e2;color:#dc2626}
   .badge.info{background:#dbeafe;color:#2563eb}
+  .badge.success{background:#dcfce7;color:#16a34a}
 </style>
 
 <div class="vertical-page">
   <header class="vertical-hero">
     <div>
-      <h1>💊 Pharmacy Dashboard</h1>
-      <p>Batch tracking, expiry management & sales</p>
+      <h1>💊 Pharmacy & Cosmetics Dashboard</h1>
+      <p>Medicine, cosmetics, batch tracking & expiry management</p>
     </div>
     <div class="hero-actions">
-      <a class="primary" href="{% url 'pharmacy:batch_create' %}">Add Batch</a>
-      <a class="ghost" href="{% url 'pharmacy:sale_create' %}">Record Sale</a>
+      <a class="primary" href="{% url 'pharmacy:stock_in' %}">📦 Stock In</a>
+      <a class="primary" href="{% url 'pharmacy:sell' %}">💰 Sell</a>
       <a class="ghost" href="{% url 'pharmacy:batch_list' %}">View Batches</a>
     </div>
   </header>
+
+  {# Date Filter Bar #}
+  <section class="date-filter-bar">
+    <h3>📅 Period:</h3>
+    <div class="filter-buttons">
+      <a href="?range=today" class="filter-btn {% if range_param == 'today' %}active{% endif %}">Today</a>
+      <a href="?range=7d" class="filter-btn {% if range_param == '7d' %}active{% endif %}">Last 7 Days</a>
+      <a href="?range=month" class="filter-btn {% if range_param == 'month' %}active{% endif %}">This Month</a>
+    </div>
+    <div class="custom-date-inputs" id="customDatePicker" style="{% if range_param != 'custom' %}display:none{% endif %}">
+      <input type="date" id="startDate" value="{{ start_date|date:'Y-m-d' }}">
+      <span>to</span>
+      <input type="date" id="endDate" value="{{ end_date|date:'Y-m-d' }}">
+      <button onclick="applyCustomRange()">Apply</button>
+    </div>
+    <a href="#" onclick="toggleCustomPicker(); return false;" class="filter-btn {% if range_param == 'custom' %}active{% endif %}">Custom</a>
+    <div style="margin-left:auto;color:#64748b;font-weight:600">{{ period_label }}</div>
+  </section>
 
   {# Key Metrics #}
   <section class="metrics-grid">
     <article class="metric-card">
       <h3>📦 Total Batches</h3>
       <p>{{ total_batches|intcomma }}</p>
+      <small>Current stock status</small>
     </article>
     <article class="metric-card">
       <h3>💰 Stock Value</h3>
       <p>MWK {{ total_stock_value|floatformat:0|intcomma }}</p>
+      <small>At selling price</small>
     </article>
     <article class="metric-card">
-      <h3>💵 Today's Revenue</h3>
-      <p>MWK {{ today_revenue|floatformat:0|intcomma }}</p>
+      <h3>💵 Revenue ({{ period_label }})</h3>
+      <p>MWK {{ period_revenue|floatformat:0|intcomma }}</p>
+      <small>{{ period_sales_count }} sale{{ period_sales_count|pluralize }}</small>
     </article>
     <article class="metric-card">
-      <h3>📈 Today's Profit</h3>
-      <p>MWK {{ today_profit|floatformat:0|intcomma }}</p>
+      <h3>📈 Profit ({{ period_label }})</h3>
+      <p>MWK {{ period_profit|floatformat:0|intcomma }}</p>
+      <small>{% if period_revenue > 0 %}{% widthratio period_profit period_revenue 100 %}% margin{% endif %}</small>
     </article>
     <article class="metric-card">
-      <h3>🛒 Today's Sales</h3>
-      <p>{{ today_sales_count|intcomma }}</p>
+      <h3>💸 Costs ({{ period_label }})</h3>
+      <p>MWK {{ period_costs|floatformat:0|intcomma }}</p>
+      <small>Operating expenses</small>
     </article>
     <article class="metric-card">
-      <h3>💊 Products</h3>
+      <h3>🛒 Sales Count</h3>
+      <p>{{ period_sales_count|intcomma }}</p>
+      <small>Avg: MWK {{ avg_sale_value|floatformat:0|intcomma }}</small>
+    </article>
+    <article class="metric-card">
+      <h3>📦 Products</h3>
       <p>{{ products_count|intcomma }}</p>
+      <small>In stock</small>
     </article>
   </section>
+
+  {# Payment Mix Card #}
+  {% if period_sales_count > 0 %}
+  <section class="payment-mix-card">
+    <h2 style="margin:0 0 16px;font-size:1.1rem">💳 Payment Mix ({{ period_label }})</h2>
+    <div>
+      <div class="payment-method-item">
+        <div style="display:flex;align-items:center;gap:12px">
+          <div class="payment-method-icon pm-cash">💵</div>
+          <div>
+            <div style="font-weight:700">Cash</div>
+            <small style="color:#64748b">{{ payment_mix.CASH.count }} transaction{{ payment_mix.CASH.count|pluralize }}</small>
+          </div>
+        </div>
+        <div style="text-align:right">
+          <div style="font-weight:700;font-size:1.1rem">MWK {{ payment_mix.CASH.amount|floatformat:0|intcomma }}</div>
+          <small style="color:#64748b">{% if period_revenue > 0 %}{% widthratio payment_mix.CASH.amount period_revenue 100 %}%{% endif %}</small>
+        </div>
+      </div>
+      <div class="payment-method-item">
+        <div style="display:flex;align-items:center;gap:12px">
+          <div class="payment-method-icon pm-bank">🏦</div>
+          <div>
+            <div style="font-weight:700">Bank</div>
+            <small style="color:#64748b">{{ payment_mix.BANK.count }} transaction{{ payment_mix.BANK.count|pluralize }}</small>
+          </div>
+        </div>
+        <div style="text-align:right">
+          <div style="font-weight:700;font-size:1.1rem">MWK {{ payment_mix.BANK.amount|floatformat:0|intcomma }}</div>
+          <small style="color:#64748b">{% if period_revenue > 0 %}{% widthratio payment_mix.BANK.amount period_revenue 100 %}%{% endif %}</small>
+        </div>
+      </div>
+      <div class="payment-method-item">
+        <div style="display:flex;align-items:center;gap:12px">
+          <div class="payment-method-icon pm-mobile">📱</div>
+          <div>
+            <div style="font-weight:700">Mobile Money</div>
+            <small style="color:#64748b">{{ payment_mix.MOBILE_MONEY.count }} transaction{{ payment_mix.MOBILE_MONEY.count|pluralize }}</small>
+          </div>
+        </div>
+        <div style="text-align:right">
+          <div style="font-weight:700;font-size:1.1rem">MWK {{ payment_mix.MOBILE_MONEY.amount|floatformat:0|intcomma }}</div>
+          <small style="color:#64748b">{% if period_revenue > 0 %}{% widthratio payment_mix.MOBILE_MONEY.amount period_revenue 100 %}%{% endif %}</small>
+        </div>
+      </div>
+    </div>
+  </section>
+  {% endif %}
+
+  {# Top Products & Categories Section #}
+  {% if top_products or top_categories %}
+  <div style="display: grid; gap: 16px; grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));">
+    
+    {# Top Products #}
+    {% if top_products %}
+    <section class="recent-block">
+      <h2 style="margin:0 0 16px;font-size:1.1rem">🏆 Top Products ({{ period_label }})</h2>
+      <div style="overflow-x:auto">
+        <table style="width:100%;border-collapse:collapse">
+          <thead>
+            <tr style="border-bottom:2px solid #e2e8f0;text-align:left">
+              <th style="padding:8px;font-size:.85rem;color:#64748b">Product</th>
+              <th style="padding:8px;font-size:.85rem;color:#64748b">Category</th>
+              <th style="padding:8px;font-size:.85rem;color:#64748b;text-align:right">Qty</th>
+              <th style="padding:8px;font-size:.85rem;color:#64748b;text-align:right">Revenue</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for product in top_products|slice:":8" %}
+            <tr style="border-bottom:1px solid #f1f5f9">
+              <td style="padding:10px;font-weight:600">{{ product.name }}</td>
+              <td style="padding:10px">
+                <span class="badge info">{{ product.category }}</span>
+              </td>
+              <td style="padding:10px;text-align:right;color:#64748b">{{ product.quantity|intcomma }}</td>
+              <td style="padding:10px;text-align:right;font-weight:700">MWK {{ product.revenue|floatformat:0|intcomma }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </section>
+    {% endif %}
+
+    {# Top Categories #}
+    {% if top_categories %}
+    <section class="recent-block">
+      <h2 style="margin:0 0 16px;font-size:1.1rem">📊 Top Categories ({{ period_label }})</h2>
+      <div style="overflow-x:auto">
+        <table style="width:100%;border-collapse:collapse">
+          <thead>
+            <tr style="border-bottom:2px solid #e2e8f0;text-align:left">
+              <th style="padding:8px;font-size:.85rem;color:#64748b">Category</th>
+              <th style="padding:8px;font-size:.85rem;color:#64748b;text-align:right">Revenue</th>
+              <th style="padding:8px;font-size:.85rem;color:#64748b;text-align:right">Share</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for cat in top_categories %}
+            <tr style="border-bottom:1px solid #f1f5f9">
+              <td style="padding:10px">
+                <div style="font-weight:600">{{ cat.category }}</div>
+                <small style="color:#64748b">{{ cat.quantity|intcomma }} items sold</small>
+              </td>
+              <td style="padding:10px;text-align:right;font-weight:700">MWK {{ cat.revenue|floatformat:0|intcomma }}</td>
+              <td style="padding:10px;text-align:right">
+                <div style="display:flex;align-items:center;justify-content:flex-end;gap:8px">
+                  <div style="flex:0 0 60px;background:#e2e8f0;height:6px;border-radius:3px;overflow:hidden">
+                    <div style="width:{{ cat.revenue_pct|floatformat:0 }}%;background:#3b82f6;height:100%"></div>
+                  </div>
+                  <span style="font-size:.85rem;color:#64748b;min-width:40px">{{ cat.revenue_pct|floatformat:1 }}%</span>
+                </div>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </section>
+    {% endif %}
+    
+  </div>
+  {% endif %}
 
   {# Alerts Section #}
   <div style="display: grid; gap: 16px; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));">
@@ -169,4 +345,22 @@
   </div>
 
 </div>
+
+<script>
+function toggleCustomPicker() {
+  const picker = document.getElementById('customDatePicker');
+  const isVisible = picker.style.display !== 'none';
+  picker.style.display = isVisible ? 'none' : 'flex';
+}
+
+function applyCustomRange() {
+  const start = document.getElementById('startDate').value;
+  const end = document.getElementById('endDate').value;
+  if (start && end) {
+    window.location.href = `?range=custom&start=${start}&end=${end}`;
+  } else {
+    alert('Please select both start and end dates');
+  }
+}
+</script>
 {% endblock %}

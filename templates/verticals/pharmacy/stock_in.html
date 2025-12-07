@@ -1,0 +1,210 @@
+{% extends "base.html" %}
+{% load humanize %}
+
+{% block title %}Stock In · Pharmacy & Cosmetics · Emajinet{% endblock %}
+
+{% block content %}
+
+<style>
+  .stock-in-page{max-width:800px;margin:24px auto;padding:24px}
+  .wizard-header{background:linear-gradient(120deg,#10b981,#3b82f6);padding:32px;border-radius:24px;color:#fff;text-align:center;margin-bottom:24px}
+  .wizard-header h1{margin:0;font-size:clamp(24px,4vw,36px);font-weight:800}
+  .wizard-header p{margin:8px 0 0;opacity:.9}
+  
+  .form-card{background:#fff;border-radius:24px;padding:32px;box-shadow:0 10px 40px rgba(15,23,42,.1)}
+  .form-section{margin-bottom:32px}
+  .form-section h2{font-size:1.2rem;margin:0 0 16px;color:#1e293b;display:flex;align-items:center;gap:8px}
+  .form-section h2 .icon{font-size:1.4rem}
+  
+  .form-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:16px}
+  .form-field{display:flex;flex-direction:column;gap:6px}
+  .form-field label{font-weight:600;font-size:.95rem;color:#475569}
+  .form-field label .required{color:#dc2626}
+  .form-field input,.form-field select,.form-field textarea{border-radius:12px;border:2px solid #e2e8f0;padding:12px 16px;font-size:1rem;transition:border-color .2s}
+  .form-field input:focus,.form-field select:focus,.form-field textarea:focus{outline:none;border-color:#3b82f6}
+  .form-field textarea{resize:vertical;min-height:80px}
+  .form-field small{color:#64748b;font-size:.85rem}
+  
+  .submit-section{display:flex;gap:12px;justify-content:flex-end;padding-top:16px;border-top:2px solid #f1f5f9}
+  .btn-submit{background:linear-gradient(120deg,#10b981,#059669);color:#fff;border:none;border-radius:999px;padding:14px 32px;font-weight:700;font-size:1.1rem;cursor:pointer;transition:transform .2s,box-shadow .2s}
+  .btn-submit:hover{transform:translateY(-2px);box-shadow:0 8px 20px rgba(16,185,129,.3)}
+  .btn-cancel{background:#f1f5f9;color:#475569;border:none;border-radius:999px;padding:14px 32px;font-weight:600;cursor:pointer}
+  
+  /* Success celebration */
+  .success-celebration{background:linear-gradient(120deg,#dcfce7,#d1fae5);border:3px solid #10b981;border-radius:24px;padding:32px;text-align:center;margin-bottom:24px;animation:slideDown .5s ease}
+  .success-celebration .icon{font-size:4rem;margin-bottom:16px}
+  .success-celebration h2{color:#065f46;margin:0 0 8px;font-size:1.8rem}
+  .success-celebration p{color:#047857;margin:0 0 20px;font-size:1.1rem}
+  .success-actions{display:flex;gap:12px;justify-content:center;flex-wrap:wrap}
+  .success-actions a{border-radius:999px;padding:12px 24px;font-weight:700;text-decoration:none;transition:transform .2s}
+  .success-actions .primary{background:#10b981;color:#fff}
+  .success-actions .secondary{background:#fff;color:#10b981;border:2px solid #10b981}
+  .success-actions a:hover{transform:translateY(-2px)}
+  
+  @keyframes slideDown{from{opacity:0;transform:translateY(-20px)}to{opacity:1;transform:translateY(0)}}
+  
+  .product-type-toggle{display:flex;gap:12px;margin-top:8px}
+  .product-type-option{flex:1;padding:12px;border:2px solid #e2e8f0;border-radius:12px;cursor:pointer;text-align:center;font-weight:600;transition:all .2s}
+  .product-type-option:hover{border-color:#cbd5e1;background:#f8fafc}
+  .product-type-option.selected{border-color:#3b82f6;background:#dbeafe;color:#1e40af}
+  .product-type-option input[type="radio"]{display:none}
+</style>
+
+<div class="stock-in-page">
+  
+  {% if success_data %}
+  <div class="success-celebration">
+    <div class="icon">🎉</div>
+    <h2>Stock Updated Successfully!</h2>
+    <p>You added <strong>{{ success_data.quantity }}</strong> units of <strong>{{ success_data.product_name }}</strong></p>
+    <div class="success-actions">
+      <a href="{% url 'pharmacy:stock_in' %}" class="primary">Add Another Product</a>
+      <a href="{% url 'pharmacy:sell' %}" class="secondary">Go to Sell</a>
+      <a href="{% url 'pharmacy:dashboard' %}" class="secondary">View Dashboard</a>
+    </div>
+  </div>
+  {% endif %}
+  
+  <header class="wizard-header">
+    <h1>📦 Pharmacy & Cosmetics Stock In</h1>
+    <p>Add medicine, cosmetics, and personal care products</p>
+  </header>
+
+  <form method="post" class="form-card">
+    {% csrf_token %}
+    
+    <div class="form-section">
+      <h2><span class="icon">🏷️</span> Product Information</h2>
+      <div class="form-grid">
+        <div class="form-field">
+          <label>Product Name <span class="required">*</span></label>
+          <input type="text" name="product_name" required placeholder="e.g., Paracetamol 500mg">
+          <small>Generic or brand name</small>
+        </div>
+        <div class="form-field">
+          <label>SKU / Barcode</label>
+          <input type="text" name="sku" placeholder="Optional">
+        </div>
+      </div>
+      
+      <div class="form-field">
+        <label>Category <span class="required">*</span></label>
+        <select name="category" required>
+          <option value="">-- Select Category --</option>
+          <optgroup label="Medicine">
+            <option value="analgesic">Analgesic (Pain Relief)</option>
+            <option value="antibiotic">Antibiotic</option>
+            <option value="antifungal">Antifungal</option>
+            <option value="antiviral">Antiviral</option>
+            <option value="antihistamine">Antihistamine</option>
+            <option value="antipyretic">Antipyretic (Fever)</option>
+            <option value="antihypertensive">Antihypertensive (Blood Pressure)</option>
+            <option value="antidiabetic">Antidiabetic</option>
+            <option value="vitamin">Vitamin/Supplement</option>
+            <option value="antiparasitic">Antiparasitic</option>
+            <option value="respiratory">Respiratory</option>
+            <option value="gastrointestinal">Gastrointestinal</option>
+            <option value="contraceptive">Contraceptive</option>
+          </optgroup>
+          <optgroup label="Cosmetics & Personal Care">
+            <option value="skin_care">Skin Care</option>
+            <option value="hair_care">Hair Care</option>
+            <option value="personal_care">Personal Care</option>
+            <option value="beauty_makeup">Beauty & Makeup</option>
+            <option value="baby_care">Baby Care</option>
+            <option value="oral_care">Oral Care</option>
+          </optgroup>
+          <optgroup label="General">
+            <option value="general">General Products</option>
+            <option value="other">Other</option>
+          </optgroup>
+        </select>
+        <small>Select the product category</small>
+      </div>
+    </div>
+
+    <div class="form-section">
+      <h2><span class="icon">📊</span> Quantity & Pricing</h2>
+      <div class="form-grid">
+        <div class="form-field">
+          <label>Quantity <span class="required">*</span></label>
+          <input type="number" name="quantity" required min="1" placeholder="0">
+          <small>Units in stock</small>
+        </div>
+        <div class="form-field">
+          <label>Reorder Level</label>
+          <input type="number" name="reorder_level" value="10" min="0">
+          <small>Alert when stock is low</small>
+        </div>
+      </div>
+      
+      <div class="form-grid">
+        <div class="form-field">
+          <label>Cost Price (per unit) <span class="required">*</span></label>
+          <input type="number" name="cost_price" required step="0.01" min="0" placeholder="0.00">
+          <small>Your purchase price</small>
+        </div>
+        <div class="form-field">
+          <label>Selling Price (per unit) <span class="required">*</span></label>
+          <input type="number" name="selling_price" required step="0.01" min="0" placeholder="0.00">
+          <small>Customer price</small>
+        </div>
+      </div>
+    </div>
+
+    <div class="form-section">
+      <h2><span class="icon">📅</span> Batch & Dates</h2>
+      <div class="form-grid">
+        <div class="form-field">
+          <label>Batch Number <span class="required">*</span></label>
+          <input type="text" name="batch_number" required placeholder="e.g., BT-2025-001">
+        </div>
+        <div class="form-field">
+          <label>Manufacture Date</label>
+          <input type="date" name="manufacture_date">
+        </div>
+      </div>
+      
+      <div class="form-field">
+        <label>Expiry Date <span class="required">*</span></label>
+        <input type="date" name="expiry_date" required>
+        <small>Must be after manufacture date</small>
+      </div>
+    </div>
+
+    <div class="form-section">
+      <h2><span class="icon">🏢</span> Supplier & Notes</h2>
+      <div class="form-field">
+        <label>Supplier</label>
+        <input type="text" name="supplier" placeholder="Supplier name">
+      </div>
+      
+      <div class="form-field">
+        <label>Description / Notes</label>
+        <textarea name="description" placeholder="Additional notes about this product..."></textarea>
+      </div>
+    </div>
+
+    <div class="submit-section">
+      <a href="{% url 'pharmacy:dashboard' %}" class="btn-cancel">Cancel</a>
+      <button type="submit" class="btn-submit">💾 Add to Stock</button>
+    </div>
+  </form>
+
+</div>
+
+<script>
+function selectProductType(element, value) {
+  // Remove selected class from all options
+  document.querySelectorAll('.product-type-option').forEach(opt => {
+    opt.classList.remove('selected');
+  });
+  // Add selected class to clicked option
+  element.classList.add('selected');
+  // Check the radio button
+  element.querySelector('input[type="radio"]').checked = true;
+}
+</script>
+
+{% endblock %}
+

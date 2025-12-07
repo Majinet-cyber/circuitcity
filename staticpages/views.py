@@ -116,3 +116,85 @@ def about(request):
     return render(request, 'staticpages/about.html', {
         'hide_nav': True,
     })
+
+
+def onboarding_manager(request):
+    """
+    Onboarding guide for store managers and business owners.
+    Shows structured content with sections and a PDF download link.
+    """
+    from django.contrib.auth.decorators import login_required
+    
+    # Read the markdown content
+    import os
+    from django.conf import settings
+    
+    content_path = os.path.join(settings.BASE_DIR, 'staticpages', 'content', 'onboarding_manager.md')
+    content_html = ""
+    
+    try:
+        with open(content_path, 'r', encoding='utf-8') as f:
+            content_md = f.read()
+            # Simple markdown to HTML conversion (basic)
+            # For production, use a proper markdown library
+            import re
+            content_html = content_md
+            # Convert headers
+            content_html = re.sub(r'^# (.+)$', r'<h1>\1</h1>', content_html, flags=re.MULTILINE)
+            content_html = re.sub(r'^## (.+)$', r'<h2>\1</h2>', content_html, flags=re.MULTILINE)
+            content_html = re.sub(r'^### (.+)$', r'<h3>\1</h3>', content_html, flags=re.MULTILINE)
+            # Convert lists
+            content_html = re.sub(r'^- (.+)$', r'<li>\1</li>', content_html, flags=re.MULTILINE)
+            # Convert paragraphs
+            content_html = content_html.replace('\n\n', '</p><p>')
+            content_html = '<p>' + content_html + '</p>'
+    except Exception as e:
+        content_html = f"<p>Error loading content: {str(e)}</p>"
+    
+    return render(request, 'staticpages/onboarding_manager.html', {
+        'content_html': content_html,
+    })
+
+
+def onboarding_hq(request):
+    """
+    Onboarding guide for HQ staff and platform administrators.
+    Shows structured content with sections and a PDF download link.
+    """
+    from django.contrib.auth.decorators import login_required
+    
+    # Check if user is HQ staff
+    if not request.user.is_authenticated or not (request.user.is_staff or request.user.is_superuser):
+        from django.contrib import messages
+        from django.shortcuts import redirect
+        messages.error(request, "Only HQ staff can access this page.")
+        return redirect('staticpages:home')
+    
+    # Read the markdown content
+    import os
+    from django.conf import settings
+    
+    content_path = os.path.join(settings.BASE_DIR, 'staticpages', 'content', 'onboarding_hq.md')
+    content_html = ""
+    
+    try:
+        with open(content_path, 'r', encoding='utf-8') as f:
+            content_md = f.read()
+            # Simple markdown to HTML conversion (basic)
+            import re
+            content_html = content_md
+            # Convert headers
+            content_html = re.sub(r'^# (.+)$', r'<h1>\1</h1>', content_html, flags=re.MULTILINE)
+            content_html = re.sub(r'^## (.+)$', r'<h2>\1</h2>', content_html, flags=re.MULTILINE)
+            content_html = re.sub(r'^### (.+)$', r'<h3>\1</h3>', content_html, flags=re.MULTILINE)
+            # Convert lists
+            content_html = re.sub(r'^- (.+)$', r'<li>\1</li>', content_html, flags=re.MULTILINE)
+            # Convert paragraphs
+            content_html = content_html.replace('\n\n', '</p><p>')
+            content_html = '<p>' + content_html + '</p>'
+    except Exception as e:
+        content_html = f"<p>Error loading content: {str(e)}</p>"
+    
+    return render(request, 'staticpages/onboarding_hq.html', {
+        'content_html': content_html,
+    })

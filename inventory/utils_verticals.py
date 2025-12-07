@@ -161,20 +161,20 @@ def get_onboarding_steps(vertical_kind: str, request=None) -> List[Dict[str, str
         return [
             {
                 "number": "1",
-                "label": "Create products & batches",
-                "url": safe_url("inventory:pharmacy_product_new", "/inventory/pharmacy/products/new/"),
+                "label": "Add products with categories",
+                "url": safe_url("pharmacy:stock_in", "/pharmacy/stock-in/"),
                 "icon": "bi-capsule"
             },
             {
                 "number": "2",
-                "label": "Set expiry & reorder levels",
-                "url": safe_url("inventory:pharmacy_batches", "/inventory/pharmacy/batches/"),
-                "icon": "bi-calendar-event"
+                "label": "Start selling products",
+                "url": safe_url("pharmacy:sell", "/pharmacy/sell/"),
+                "icon": "bi-bag-check"
             },
             {
                 "number": "3",
-                "label": "Track sales & alerts",
-                "url": safe_url("inventory:pharmacy_dashboard", "/inventory/pharmacy/dashboard/"),
+                "label": "Track sales & analytics",
+                "url": safe_url("verticals:pharmacy_dashboard", "/verticals/pharmacy/"),
                 "icon": "bi-graph-up"
             },
         ]
@@ -209,7 +209,7 @@ def get_vertical_display_name(vertical_kind: str) -> str:
         "gym": "Gym & Fitness",
         "clothing": "Clothing Store",
         "liquor": "Liquor Store",
-        "pharmacy": "Pharmacy",
+        "pharmacy": "Pharmacy & Cosmetics",
         "grocery": "Grocery Store",
         "generic": "Business",
     }
@@ -309,13 +309,12 @@ def get_vertical_sidebar_items(business_kind: str) -> list[dict]:
     
     elif business_kind == "pharmacy":
         return [
-            # MAIN section
+            # MAIN section - pharmacy & cosmetics vertical-aware flows
             {"section": "MAIN", "url": "dashboard:home", "label": "Dashboard", "icon": "bi-speedometer2", "active_pattern": "/dashboard/", "require_manager": False},
-            {"section": "MAIN", "url": "verticals:pharmacy_dashboard", "label": "Pharmacy Hub", "icon": "bi-prescription2", "active_pattern": "/verticals/pharmacy/", "require_manager": False},
-            {"section": "MAIN", "url": "inventory:pharmacy_product_new", "label": "Add Medicine", "icon": "bi-capsule", "active_pattern": "/pharmacy/products/new", "require_manager": False},
-            {"section": "MAIN", "url": "inventory:pharmacy_batches", "label": "Batches", "icon": "bi-boxes", "active_pattern": "/pharmacy/batches", "require_manager": False},
-            {"section": "MAIN", "url": "inventory:scan_in", "label": "Stock In", "icon": "bi-upc-scan", "active_pattern": "/inventory/scan", "require_manager": False},
-            {"section": "MAIN", "url": "inventory:scan_sold", "label": "Sell", "icon": "bi-bag-check", "active_pattern": "/sell/", "require_manager": False},
+            {"section": "MAIN", "url": "verticals:pharmacy_dashboard", "label": "Pharmacy & Cosmetics Hub", "icon": "bi-prescription2", "active_pattern": "/verticals/pharmacy/", "require_manager": False},
+            {"section": "MAIN", "url": "pharmacy:stock_in", "label": "Stock In", "icon": "bi-box-arrow-in-down", "active_pattern": "/pharmacy/stock-in", "require_manager": False},
+            {"section": "MAIN", "url": "pharmacy:sell", "label": "Sell", "icon": "bi-bag-check", "active_pattern": "/pharmacy/sell", "require_manager": False},
+            {"section": "MAIN", "url": "pharmacy:batch_list", "label": "Batches", "icon": "bi-boxes", "active_pattern": "/pharmacy/batches", "require_manager": False},
             
             # TIME section
             {"section": "TIME", "url": "inventory:time_logs", "label": "Time Logs", "icon": "bi-journal-text", "active_pattern": "/inventory/time/logs", "require_manager": False},

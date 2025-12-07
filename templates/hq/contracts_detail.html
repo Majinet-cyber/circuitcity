@@ -1,0 +1,203 @@
+{% extends "hq/base_hq.html" %}
+{% load static %}
+
+{% block title %}Contract for {{ business.name }} - HQ{% endblock %}
+
+{% block content %}
+<div class="container-fluid px-3 px-md-4 py-4">
+  <!-- Header -->
+  <div class="row mb-4">
+    <div class="col-12">
+      <div class="glass-card p-4">
+        <div class="d-flex justify-content-between align-items-center flex-wrap gap-3">
+          <div>
+            <h1 class="h3 mb-1">
+              <i class="bi bi-file-earmark-text text-primary me-2"></i>
+              Contract for {{ business.name }}
+            </h1>
+            <p class="text-muted mb-0">
+              {% if contract %}
+                View or replace the signed contract
+              {% else %}
+                Upload a signed contract for this business
+              {% endif %}
+            </p>
+          </div>
+          <div>
+            <a href="{% url 'hq:contracts_list' %}" class="btn btn-outline-secondary">
+              <i class="bi bi-arrow-left me-2"></i>
+              Back to List
+            </a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="row">
+    <!-- Business Info -->
+    <div class="col-lg-4 mb-4">
+      <div class="glass-card p-4">
+        <h2 class="h5 mb-3">
+          <i class="bi bi-building me-2"></i>
+          Business Information
+        </h2>
+        <dl class="mb-0">
+          <dt class="text-muted small">Business Name</dt>
+          <dd><strong>{{ business.name }}</strong></dd>
+          
+          <dt class="text-muted small">Slug</dt>
+          <dd><code>{{ business.slug }}</code></dd>
+          
+          <dt class="text-muted small">Vertical</dt>
+          <dd>
+            <span class="badge bg-info">
+              {{ business.get_business_kind_display|default:"N/A" }}
+            </span>
+          </dd>
+          
+          <dt class="text-muted small">Status</dt>
+          <dd>
+            <span class="badge bg-{{ business.status|lower }}">
+              {{ business.get_status_display }}
+            </span>
+          </dd>
+          
+          <dt class="text-muted small">Created</dt>
+          <dd>{{ business.created_at|date:"M d, Y" }}</dd>
+        </dl>
+      </div>
+    </div>
+
+    <!-- Contract Management -->
+    <div class="col-lg-8">
+      {% if contract %}
+      <!-- Existing Contract -->
+      <div class="glass-card p-4 mb-4">
+        <h2 class="h5 mb-3">
+          <i class="bi bi-check-circle text-success me-2"></i>
+          Current Contract
+        </h2>
+        <div class="card border-success">
+          <div class="card-body">
+            <div class="row">
+              <div class="col-md-6">
+                <dl class="mb-0">
+                  <dt class="text-muted small">File Name</dt>
+                  <dd>
+                    <i class="bi bi-file-pdf text-danger me-2"></i>
+                    {{ contract.file.name|default:"contract.pdf" }}
+                  </dd>
+                  
+                  <dt class="text-muted small">Uploaded By</dt>
+                  <dd>{{ contract.uploaded_by.get_full_name|default:contract.uploaded_by.username }}</dd>
+                </dl>
+              </div>
+              <div class="col-md-6">
+                <dl class="mb-0">
+                  <dt class="text-muted small">Uploaded At</dt>
+                  <dd>{{ contract.uploaded_at|date:"M d, Y H:i" }}</dd>
+                  
+                  <dt class="text-muted small">Last Updated</dt>
+                  <dd>{{ contract.updated_at|date:"M d, Y H:i" }}</dd>
+                </dl>
+              </div>
+            </div>
+            
+            {% if contract.notes %}
+            <div class="mt-3">
+              <dt class="text-muted small">Notes</dt>
+              <dd class="mb-0">{{ contract.notes }}</dd>
+            </div>
+            {% endif %}
+            
+            <div class="mt-4">
+              <a href="{% url 'hq:contract_download' contract.id %}" 
+                 class="btn btn-primary me-2">
+                <i class="bi bi-download me-2"></i>
+                Download Contract
+              </a>
+              <form method="post" 
+                    action="{% url 'hq:contract_delete' contract.id %}" 
+                    class="d-inline"
+                    onsubmit="return confirm('Are you sure you want to delete this contract? This action cannot be undone.');">
+                {% csrf_token %}
+                <button type="submit" class="btn btn-outline-danger">
+                  <i class="bi bi-trash me-2"></i>
+                  Delete
+                </button>
+              </form>
+            </div>
+          </div>
+        </div>
+      </div>
+      {% endif %}
+
+      <!-- Upload/Replace Form -->
+      <div class="glass-card p-4">
+        <h2 class="h5 mb-3">
+          <i class="bi bi-upload me-2"></i>
+          {% if contract %}Replace{% else %}Upload{% endif %} Contract
+        </h2>
+        
+        <form method="post" enctype="multipart/form-data">
+          {% csrf_token %}
+          
+          <div class="mb-3">
+            <label for="contract_file" class="form-label">
+              Contract File (PDF) <span class="text-danger">*</span>
+            </label>
+            <input type="file" 
+                   class="form-control" 
+                   id="contract_file" 
+                   name="contract_file" 
+                   accept=".pdf"
+                   required>
+            <small class="form-text text-muted">
+              Maximum file size: 10MB. Only PDF files are accepted.
+            </small>
+          </div>
+          
+          <div class="mb-3">
+            <label for="notes" class="form-label">Notes (Optional)</label>
+            <textarea class="form-control" 
+                      id="notes" 
+                      name="notes" 
+                      rows="4"
+                      placeholder="Add any relevant notes (e.g., signature method, date signed, special terms...)">{% if contract %}{{ contract.notes }}{% endif %}</textarea>
+            <small class="form-text text-muted">
+              Internal notes for reference (not visible to merchant).
+            </small>
+          </div>
+          
+          <div class="alert alert-info">
+            <h6 class="alert-heading">
+              <i class="bi bi-info-circle me-2"></i>
+              Before Uploading
+            </h6>
+            <ul class="mb-0 small">
+              <li>Verify the contract is signed by the business owner</li>
+              <li>Ensure all required fields are filled in</li>
+              <li>Check that the business details match this account</li>
+              {% if contract %}
+              <li><strong>Warning:</strong> Uploading a new file will replace the existing contract</li>
+              {% endif %}
+            </ul>
+          </div>
+          
+          <div class="d-flex gap-2">
+            <button type="submit" class="btn btn-primary">
+              <i class="bi bi-upload me-2"></i>
+              {% if contract %}Replace{% else %}Upload{% endif %} Contract
+            </button>
+            <a href="{% url 'hq:contracts_list' %}" class="btn btn-outline-secondary">
+              Cancel
+            </a>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+

@@ -2,6 +2,7 @@
 from django.urls import path
 from django.views.generic import RedirectView
 from . import views
+from . import views_contracts
 
 # All URLs are namespaced as 'hq:<name>'
 app_name = "hq"
@@ -39,6 +40,15 @@ urlpatterns = [
     # Wallet (HQ shell)
     # =========================
     path("wallet/", views.wallet_home, name="wallet"),
+
+    # =========================
+    # Merchant Contracts
+    # =========================
+    path("contracts/", views_contracts.contracts_list, name="contracts_list"),
+    path("contracts/template/", views_contracts.contract_template, name="contract_template"),
+    path("contracts/<int:business_id>/", views_contracts.contracts_detail, name="contracts_detail"),
+    path("contracts/<int:contract_id>/download/", views_contracts.contract_download, name="contract_download"),
+    path("contracts/<int:contract_id>/delete/", views_contracts.contract_delete, name="contract_delete"),
 
     # ==================================================================
     # Subscription Admin Actions (used by HQ Subscriptions table buttons)

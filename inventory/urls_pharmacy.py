@@ -11,14 +11,23 @@ urlpatterns = [
     # Dashboard
     path("", views_pharmacy.pharmacy_dashboard, name="dashboard"),
     
-    # Batch management
+    # Gamified vertical-aware flows
+    path("stock-in/", views_pharmacy.pharmacy_stock_in, name="stock_in"),
+    path("sell/", views_pharmacy.pharmacy_sell, name="sell"),
+    
+    # Batch management (legacy/admin)
     path("batches/", views_pharmacy.batch_list, name="batch_list"),
     path("batches/create/", views_pharmacy.batch_create, name="batch_create"),
     path("batches/<int:batch_id>/edit/", views_pharmacy.batch_edit, name="batch_edit"),
     
-    # Sales
+    # Sales (legacy)
     path("sales/", views_pharmacy.sale_list, name="sale_list"),
     path("sales/create/", views_pharmacy.sale_create, name="sale_create"),
+    
+    # Manager tools: edit, delete, undo
+    path("sales/<int:sale_id>/edit/", views_pharmacy.sale_edit, name="sale_edit"),
+    path("sales/<int:sale_id>/delete/", views_pharmacy.sale_delete, name="sale_delete"),
+    path("sales/<int:sale_id>/undo/", views_pharmacy.sale_undo, name="sale_undo"),
     
     # Alerts & Reports
     path("near-expiry/", views_pharmacy.near_expiry_list, name="near_expiry"),

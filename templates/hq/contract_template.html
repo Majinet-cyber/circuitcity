@@ -1,0 +1,138 @@
+{% extends "hq/base_hq.html" %}
+{% load static %}
+
+{% block title %}Merchant Contract Template - HQ{% endblock %}
+
+{% block content %}
+<div class="container-fluid px-3 px-md-4 py-4">
+  <!-- Header -->
+  <div class="row mb-4">
+    <div class="col-12">
+      <div class="glass-card p-4">
+        <div class="d-flex justify-content-between align-items-center flex-wrap gap-3">
+          <div>
+            <h1 class="h3 mb-1">
+              <i class="bi bi-file-earmark-text text-primary me-2"></i>
+              Merchant Contract Template
+            </h1>
+            <p class="text-muted mb-0">
+              Download the standard contract template to send to merchants.
+            </p>
+          </div>
+          <div>
+            <a href="{% url 'hq:contracts_list' %}" class="btn btn-outline-secondary">
+              <i class="bi bi-arrow-left me-2"></i>
+              Back to Contracts
+            </a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Content -->
+  <div class="row">
+    <div class="col-lg-8 mx-auto">
+      <div class="glass-card p-4">
+        <div class="text-center mb-4">
+          <i class="bi bi-file-pdf text-danger" style="font-size: 4rem;"></i>
+          <h2 class="h4 mt-3">Standard Merchant Services Agreement</h2>
+          <p class="text-muted">
+            This is the standard contract used for all Emajinet merchants.
+          </p>
+        </div>
+
+        <div class="alert alert-info">
+          <h4 class="alert-heading">
+            <i class="bi bi-info-circle me-2"></i>
+            How to Use This Template
+          </h4>
+          <ol class="mb-0">
+            <li>Download the PDF template below</li>
+            <li>Fill in the merchant's business details (highlighted sections)</li>
+            <li>Send to the merchant via email for signature</li>
+            <li>Once signed, upload it to the merchant's profile in the Contracts section</li>
+          </ol>
+        </div>
+
+        <div class="d-grid gap-3 my-4">
+          <a href="{% static 'pdfs/merchant_contract_template.pdf' %}" 
+             class="btn btn-lg btn-primary" 
+             download
+             title="Download contract template">
+            <i class="bi bi-download me-2"></i>
+            Download Contract Template (PDF)
+          </a>
+          
+          <a href="{% static 'pdfs/merchant_contract_template.pdf' %}" 
+             class="btn btn-lg btn-outline-primary" 
+             target="_blank"
+             title="Preview in new tab">
+            <i class="bi bi-eye me-2"></i>
+            Preview Template
+          </a>
+        </div>
+
+        <hr class="my-4">
+
+        <div class="card border-0 bg-light">
+          <div class="card-body">
+            <h3 class="h5">
+              <i class="bi bi-list-check me-2"></i>
+              Template Contents
+            </h3>
+            <p class="text-muted small mb-3">
+              The standard contract includes the following sections:
+            </p>
+            <div class="row">
+              <div class="col-md-6">
+                <ul class="small">
+                  <li>Agreement Purpose</li>
+                  <li>Services Provided</li>
+                  <li>Subscription & Payment Terms</li>
+                  <li>Data Ownership & Privacy</li>
+                  <li>Merchant Responsibilities</li>
+                  <li>Intellectual Property</li>
+                  <li>Service Level & Uptime</li>
+                </ul>
+              </div>
+              <div class="col-md-6">
+                <ul class="small">
+                  <li>Limitation of Liability</li>
+                  <li>Indemnification</li>
+                  <li>Termination</li>
+                  <li>Confidentiality</li>
+                  <li>Dispute Resolution</li>
+                  <li>General Provisions</li>
+                  <li>Signature Section</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="alert alert-warning mt-4">
+          <h4 class="alert-heading">
+            <i class="bi bi-exclamation-triangle me-2"></i>
+            Important Notes
+          </h4>
+          <ul class="mb-0 small">
+            <li><strong>Legal Review:</strong> Have contracts reviewed by legal counsel before use</li>
+            <li><strong>Customization:</strong> Some businesses may require customized terms (Enterprise tier)</li>
+            <li><strong>Signatures:</strong> Digital signatures (DocuSign, HelloSign) or physical signatures are acceptable</li>
+            <li><strong>Record Keeping:</strong> Always upload the signed contract to the merchant's profile</li>
+          </ul>
+        </div>
+
+        <div class="text-center mt-4">
+          <a href="{% url 'hq:contracts_list' %}" class="btn btn-secondary">
+            <i class="bi bi-arrow-left me-2"></i>
+            Return to Contracts List
+          </a>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+

@@ -1,0 +1,412 @@
+{% extends "hq/base_hq.html" %}
+{% load static %}
+
+{% block title %}HQ Staff Onboarding - Emajinet{% endblock %}
+
+{% block content %}
+<div class="container-fluid px-3 px-md-4 py-4">
+  <!-- Header -->
+  <div class="row mb-4">
+    <div class="col-12">
+      <div class="glass-card p-4">
+        <div class="d-flex justify-content-between align-items-center flex-wrap gap-3">
+          <div>
+            <h1 class="h3 mb-1">
+              <i class="bi bi-shield-check text-danger me-2"></i>
+              HQ Staff Onboarding Guide
+            </h1>
+            <p class="text-muted mb-0">
+              Welcome to the HQ Admin Portal! Learn how to manage the Emajinet platform.
+            </p>
+          </div>
+          <div>
+            <a href="{% static 'pdfs/onboarding_hq.pdf' %}" 
+               class="btn btn-primary" 
+               download
+               title="Download PDF version">
+              <i class="bi bi-download me-2"></i>
+              Download PDF
+            </a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Content -->
+  <div class="row">
+    <div class="col-12">
+      <div class="glass-card p-4">
+        <div class="onboarding-content">
+          <!-- Quick Navigation -->
+          <div class="alert alert-danger mb-4">
+            <h4 class="alert-heading">
+              <i class="bi bi-shield-exclamation me-2"></i>
+              HQ Staff Access
+            </h4>
+            <p class="mb-0">
+              This guide is for HQ staff and platform administrators only. 
+              You have access to sensitive business data and system controls. 
+              Always handle this access with care and professionalism.
+            </p>
+          </div>
+
+          <div class="alert alert-info mb-4">
+            <h4 class="alert-heading">
+              <i class="bi bi-compass me-2"></i>
+              Quick Navigation
+            </h4>
+            <div class="row">
+              <div class="col-md-6">
+                <ul class="mb-0">
+                  <li><a href="#hq-portal">HQ Portal Overview</a></li>
+                  <li><a href="#business-management">Business Management</a></li>
+                  <li><a href="#contracts">Merchant Contracts</a></li>
+                </ul>
+              </div>
+              <div class="col-md-6">
+                <ul class="mb-0">
+                  <li><a href="#subscriptions">Subscription Management</a></li>
+                  <li><a href="#analytics">Analytics & Reporting</a></li>
+                  <li><a href="#workflows">Workflows & Processes</a></li>
+                </ul>
+              </div>
+            </div>
+          </div>
+
+          <!-- HQ Portal Overview -->
+          <section class="mb-5" id="hq-portal">
+            <h2 class="border-bottom pb-2 mb-3">
+              <i class="bi bi-building text-danger me-2"></i>
+              What is the HQ Portal?
+            </h2>
+            <p class="lead">
+              The HQ portal provides superuser capabilities to manage the entire Emajinet platform. 
+              As HQ staff, you have visibility across all businesses, subscriptions, agents, and system-wide analytics.
+            </p>
+            <div class="card border-danger mb-3">
+              <div class="card-body">
+                <h3 class="h5 text-danger">
+                  <i class="bi bi-shield-lock me-2"></i>
+                  Security Note
+                </h3>
+                <p class="mb-0">
+                  HQ access is restricted. Never share HQ credentials. All actions are logged in audit trails.
+                </p>
+              </div>
+            </div>
+          </section>
+
+          <!-- Business Management -->
+          <section class="mb-5" id="business-management">
+            <h2 class="border-bottom pb-2 mb-3">
+              <i class="bi bi-shop text-primary me-2"></i>
+              Business Management
+            </h2>
+            
+            <div class="card border-0 shadow-sm mb-3">
+              <div class="card-body">
+                <h3 class="h5">Oversee All Merchants</h3>
+                <p><strong>View:</strong> <code>/hq/businesses/</code></p>
+                <p><strong>Key Information:</strong></p>
+                <ul>
+                  <li>Business name, contact, and vertical</li>
+                  <li>Status (Pending, Active, Suspended)</li>
+                  <li>Subscription tier</li>
+                  <li>Contract status (signed/not signed)</li>
+                  <li>Activity metrics</li>
+                </ul>
+                <p><strong>Actions:</strong></p>
+                <ol>
+                  <li><strong>Approve New Businesses:</strong> Review and activate pending applications</li>
+                  <li><strong>View Business Details:</strong> Access full business profiles</li>
+                  <li><strong>Suspend Businesses:</strong> Disable access for non-payment or violations</li>
+                  <li><strong>Manage Contracts:</strong> Upload signed merchant agreements</li>
+                </ol>
+                <div class="alert alert-success mt-3 mb-0">
+                  <i class="bi bi-lightbulb me-2"></i>
+                  <strong>Best Practice:</strong> Review new business applications within 24 hours.
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <!-- Merchant Contracts -->
+          <section class="mb-5" id="contracts">
+            <h2 class="border-bottom pb-2 mb-3">
+              <i class="bi bi-file-earmark-text text-success me-2"></i>
+              Merchant Contracts
+            </h2>
+            
+            <div class="card border-0 shadow-sm">
+              <div class="card-body">
+                <h3 class="h5">Contract Management Workflow</h3>
+                <div class="row">
+                  <div class="col-md-6">
+                    <h4 class="h6">1. Download Template</h4>
+                    <ul>
+                      <li>Go to Contracts → Template</li>
+                      <li>Download standard contract PDF</li>
+                      <li>Customize if needed</li>
+                    </ul>
+                    
+                    <h4 class="h6">2. Send to Merchant</h4>
+                    <ul>
+                      <li>Email contract to business owner</li>
+                      <li>Request signature (digital or physical)</li>
+                    </ul>
+                  </div>
+                  <div class="col-md-6">
+                    <h4 class="h6">3. Upload Signed Contract</h4>
+                    <ul>
+                      <li>Click business in Contracts list</li>
+                      <li>Upload signed PDF</li>
+                      <li>Add notes (e.g., date, method)</li>
+                    </ul>
+                    
+                    <h4 class="h6">4. Track Status</h4>
+                    <ul>
+                      <li><span class="badge bg-success">Signed</span> - Contract on file</li>
+                      <li><span class="badge bg-danger">Not Signed</span> - Pending action</li>
+                    </ul>
+                  </div>
+                </div>
+                <div class="alert alert-warning mt-3 mb-0">
+                  <i class="bi bi-exclamation-triangle me-2"></i>
+                  <strong>Legal Note:</strong> Ensure all active paying customers have signed contracts on file.
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <!-- Subscriptions -->
+          <section class="mb-5" id="subscriptions">
+            <h2 class="border-bottom pb-2 mb-3">
+              <i class="bi bi-credit-card text-info me-2"></i>
+              Subscription Management
+            </h2>
+            
+            <div class="row g-3">
+              <div class="col-md-6">
+                <div class="card border-0 shadow-sm h-100">
+                  <div class="card-body">
+                    <h3 class="h5">Subscription Tiers</h3>
+                    <ul>
+                      <li><strong>Trial:</strong> 14-day free (new businesses)</li>
+                      <li><strong>Basic:</strong> Limited features</li>
+                      <li><strong>Pro:</strong> Full features</li>
+                      <li><strong>Enterprise:</strong> Custom pricing</li>
+                    </ul>
+                  </div>
+                </div>
+              </div>
+              <div class="col-md-6">
+                <div class="card border-0 shadow-sm h-100">
+                  <div class="card-body">
+                    <h3 class="h5">Common Actions</h3>
+                    <ul>
+                      <li>Extend trial periods</li>
+                      <li>Activate subscriptions</li>
+                      <li>Revoke/suspend access</li>
+                      <li>Change subscription tiers</li>
+                    </ul>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <!-- Analytics -->
+          <section class="mb-5" id="analytics">
+            <h2 class="border-bottom pb-2 mb-3">
+              <i class="bi bi-graph-up text-warning me-2"></i>
+              Analytics & Reporting
+            </h2>
+            
+            <div class="card border-0 shadow-sm">
+              <div class="card-body">
+                <h3 class="h5">Platform Insights</h3>
+                <p>Gain insights into platform usage and performance:</p>
+                <div class="row">
+                  <div class="col-md-4">
+                    <h4 class="h6">Stock Trends</h4>
+                    <ul>
+                      <li>Top products across businesses</li>
+                      <li>Trending categories</li>
+                      <li>Inventory patterns</li>
+                    </ul>
+                  </div>
+                  <div class="col-md-4">
+                    <h4 class="h6">Agent Performance</h4>
+                    <ul>
+                      <li>All agents platform-wide</li>
+                      <li>Sales & commission metrics</li>
+                      <li>Top performers</li>
+                    </ul>
+                  </div>
+                  <div class="col-md-4">
+                    <h4 class="h6">Revenue Analytics</h4>
+                    <ul>
+                      <li>Monthly subscription revenue</li>
+                      <li>Churn rate</li>
+                      <li>Customer lifetime value</li>
+                    </ul>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <!-- Best Practices -->
+          <section class="mb-5" id="workflows">
+            <h2 class="border-bottom pb-2 mb-3">
+              <i class="bi bi-diagram-3 text-primary me-2"></i>
+              Workflows & Processes
+            </h2>
+            
+            <div class="accordion" id="workflowsAccordion">
+              <div class="accordion-item">
+                <h2 class="accordion-header">
+                  <button class="accordion-button" type="button" data-bs-toggle="collapse" data-bs-target="#onboardingWorkflow">
+                    <i class="bi bi-person-plus-fill me-2"></i>
+                    New Business Onboarding
+                  </button>
+                </h2>
+                <div id="onboardingWorkflow" class="accordion-collapse collapse show" data-bs-parent="#workflowsAccordion">
+                  <div class="accordion-body">
+                    <ol>
+                      <li><strong>Application Received:</strong> Review in /hq/businesses/</li>
+                      <li><strong>Verification:</strong> Confirm business registration and contact info</li>
+                      <li><strong>Contract:</strong> Send contract template for signature</li>
+                      <li><strong>Approval:</strong> Activate business and assign trial subscription</li>
+                      <li><strong>Onboarding Call:</strong> Schedule setup assistance</li>
+                      <li><strong>Follow-Up:</strong> Check-in after 7 days</li>
+                    </ol>
+                    <div class="alert alert-info mb-0">
+                      <strong>SLA:</strong> Complete onboarding within 48 hours of application.
+                    </div>
+                  </div>
+                </div>
+              </div>
+              
+              <div class="accordion-item">
+                <h2 class="accordion-header">
+                  <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#renewalWorkflow">
+                    <i class="bi bi-arrow-repeat me-2"></i>
+                    Subscription Renewal
+                  </button>
+                </h2>
+                <div id="renewalWorkflow" class="accordion-collapse collapse" data-bs-parent="#workflowsAccordion">
+                  <div class="accordion-body">
+                    <ul>
+                      <li><strong>7 Days Before:</strong> Send renewal reminder email</li>
+                      <li><strong>3 Days Before:</strong> Second reminder via email and WhatsApp</li>
+                      <li><strong>On Expiry:</strong> Grace period (3 days read-only)</li>
+                      <li><strong>After Grace:</strong> Suspend access, preserve data for 30 days</li>
+                    </ul>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <!-- Important Reminders -->
+          <section class="mb-5">
+            <h2 class="border-bottom pb-2 mb-3">
+              <i class="bi bi-exclamation-octagon text-danger me-2"></i>
+              Important Reminders
+            </h2>
+            
+            <div class="row g-3">
+              <div class="col-md-6">
+                <div class="card border-danger">
+                  <div class="card-body">
+                    <h3 class="h6 text-danger">
+                      <i class="bi bi-shield-lock me-2"></i>
+                      Data Security
+                    </h3>
+                    <ul class="small mb-0">
+                      <li>Never share HQ credentials</li>
+                      <li>All access is logged in audit trails</li>
+                      <li>Report security incidents immediately</li>
+                    </ul>
+                  </div>
+                </div>
+              </div>
+              <div class="col-md-6">
+                <div class="card border-warning">
+                  <div class="card-body">
+                    <h3 class="h6 text-warning">
+                      <i class="bi bi-shield-exclamation me-2"></i>
+                      Confidentiality
+                    </h3>
+                    <ul class="small mb-0">
+                      <li>All merchant data is confidential</li>
+                      <li>Do not share analytics externally</li>
+                      <li>Follow NDA agreements</li>
+                    </ul>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <!-- Next Steps -->
+          <section class="mb-5">
+            <h2 class="border-bottom pb-2 mb-3">
+              <i class="bi bi-arrow-right-circle text-success me-2"></i>
+              Next Steps
+            </h2>
+            <div class="card border-0 shadow-sm">
+              <div class="card-body">
+                <ol class="mb-0">
+                  <li><strong>Tour the HQ Dashboard:</strong> Familiarize yourself with all sections</li>
+                  <li><strong>Review Pending Businesses:</strong> Practice approval workflow</li>
+                  <li><strong>Browse Contracts:</strong> Understand the contract process</li>
+                  <li><strong>Explore Analytics:</strong> Generate a sample report</li>
+                  <li><strong>Shadow a Senior Staff Member:</strong> Learn best practices</li>
+                </ol>
+                <div class="alert alert-primary mt-3 mb-0">
+                  <i class="bi bi-people me-2"></i>
+                  <strong>Questions?</strong> Reach out to your team lead or refer to the internal wiki!
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <!-- Footer -->
+          <div class="text-center text-muted mt-5 pt-4 border-top">
+            <p class="small mb-0">
+              <i class="bi bi-file-earmark-text me-2"></i>
+              Version 1.0 – December 2025 | Emajinet / Circuit City HQ Team
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<style>
+.onboarding-content {
+  font-size: 1rem;
+  line-height: 1.7;
+}
+.onboarding-content h2 {
+  font-size: 1.75rem;
+  font-weight: 600;
+  margin-top: 2rem;
+}
+.onboarding-content h3 {
+  font-size: 1.25rem;
+  font-weight: 600;
+}
+.onboarding-content code {
+  background: rgba(0,0,0,0.05);
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 0.9em;
+}
+</style>
+{% endblock %}
+

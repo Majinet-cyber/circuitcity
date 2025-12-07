@@ -1,0 +1,367 @@
+{% extends "base.html" %}
+{% load humanize %}
+
+{% block title %}Sell · Pharmacy & Cosmetics · Emajinet{% endblock %}
+
+{% block content %}
+
+<style>
+  .sell-page{max-width:1000px;margin:24px auto;padding:24px}
+  .wizard-header{background:linear-gradient(120deg,#8b5cf6,#6366f1);padding:32px;border-radius:24px;color:#fff;text-align:center;margin-bottom:24px}
+  .wizard-header h1{margin:0;font-size:clamp(24px,4vw,36px);font-weight:800}
+  .wizard-header p{margin:8px 0 0;opacity:.9}
+  
+  .progress-steps{display:flex;justify-content:center;gap:16px;margin-bottom:32px;flex-wrap:wrap}
+  .step{display:flex;align-items:center;gap:8px;padding:12px 20px;border-radius:999px;background:#f1f5f9;color:#64748b;font-weight:600}
+  .step.active{background:#8b5cf6;color:#fff}
+  .step.complete{background:#10b981;color:#fff}
+  .step-number{width:28px;height:28px;border-radius:50%;background:rgba(255,255,255,.3);display:flex;align-items:center;justify-content:center;font-weight:700}
+  
+  .sell-grid{display:grid;grid-template-columns:2fr 1fr;gap:24px}
+  
+  .form-card{background:#fff;border-radius:24px;padding:32px;box-shadow:0 10px 40px rgba(15,23,42,.1)}
+  .form-section{margin-bottom:24px}
+  .form-section h2{font-size:1.2rem;margin:0 0 16px;color:#1e293b}
+  
+  .product-search{position:relative;margin-bottom:20px}
+  .product-search input{width:100%;border-radius:12px;border:2px solid #e2e8f0;padding:14px 16px;font-size:1rem}
+  .product-search input:focus{outline:none;border-color:#8b5cf6}
+  
+  .product-list{max-height:400px;overflow-y:auto;display:grid;gap:12px}
+  .product-item{border:2px solid #e2e8f0;border-radius:16px;padding:16px;cursor:pointer;transition:all .2s}
+  .product-item:hover{border-color:#8b5cf6;background:#f5f3ff}
+  .product-item.selected{border-color:#8b5cf6;background:#ede9fe}
+  .product-header{display:flex;justify-content:space-between;align-items:start;margin-bottom:8px}
+  .product-name{font-weight:700;font-size:1.1rem;color:#1e293b}
+  .product-price{font-weight:800;font-size:1.2rem;color:#8b5cf6}
+  .product-meta{display:flex;gap:16px;flex-wrap:wrap;font-size:.9rem;color:#64748b}
+  .meta-badge{display:inline-flex;align-items:center;gap:4px}
+  
+  .quantity-input{margin-top:16px;padding:16px;background:#f8fafc;border-radius:12px}
+  .quantity-input label{display:block;font-weight:600;margin-bottom:8px}
+  .quantity-controls{display:flex;gap:8px;align-items:center}
+  .quantity-controls button{width:40px;height:40px;border-radius:50%;border:2px solid #e2e8f0;background:#fff;font-size:1.2rem;cursor:pointer;font-weight:700}
+  .quantity-controls input{width:80px;text-align:center;border-radius:12px;border:2px solid #e2e8f0;padding:8px;font-size:1.1rem;font-weight:700}
+  .stock-warning{color:#dc2626;font-size:.9rem;margin-top:8px}
+  
+  .payment-methods{display:grid;gap:12px}
+  .payment-option{border:2px solid #e2e8f0;border-radius:16px;padding:16px;cursor:pointer;display:flex;align-items:center;gap:12px;transition:all .2s}
+  .payment-option:hover{border-color:#cbd5e1;background:#f8fafc}
+  .payment-option.selected{border-color:#8b5cf6;background:#ede9fe}
+  .payment-option input[type="radio"]{display:none}
+  .payment-icon{width:48px;height:48px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:1.5rem}
+  .pm-cash .payment-icon{background:#dcfce7;color:#16a34a}
+  .pm-bank .payment-icon{background:#dbeafe;color:#2563eb}
+  .pm-mobile .payment-icon{background:#fef3c7;color:#f59e0b}
+  .payment-details{flex:1}
+  .payment-title{font-weight:700;color:#1e293b}
+  
+  .summary-card{background:#fff;border-radius:24px;padding:24px;box-shadow:0 10px 40px rgba(15,23,42,.1);position:sticky;top:24px}
+  .summary-card h2{font-size:1.2rem;margin:0 0 20px;color:#1e293b}
+  .summary-empty{text-align:center;color:#94a3b8;padding:40px 20px}
+  .summary-item{display:flex;justify-content:space-between;padding:12px 0;border-bottom:1px solid #f1f5f9}
+  .summary-item:last-child{border-bottom:none}
+  .summary-label{color:#64748b}
+  .summary-value{font-weight:700;color:#1e293b}
+  .summary-total{background:#f8fafc;border-radius:12px;padding:16px;margin:16px 0}
+  .summary-total .summary-label{font-size:1.1rem;color:#1e293b}
+  .summary-total .summary-value{font-size:1.5rem;color:#8b5cf6}
+  .summary-profit{color:#10b981;font-size:.9rem;margin-top:8px}
+  
+  .btn-complete{width:100%;background:linear-gradient(120deg,#8b5cf6,#6366f1);color:#fff;border:none;border-radius:999px;padding:16px;font-weight:700;font-size:1.1rem;cursor:pointer;transition:transform .2s,box-shadow .2s;margin-top:16px}
+  .btn-complete:hover:not(:disabled){transform:translateY(-2px);box-shadow:0 8px 20px rgba(139,92,246,.3)}
+  .btn-complete:disabled{opacity:.5;cursor:not-allowed}
+  
+  .success-celebration{background:linear-gradient(120deg,#dcfce7,#d1fae5);border:3px solid #10b981;border-radius:24px;padding:32px;text-align:center;margin-bottom:24px;animation:slideDown .5s ease}
+  .success-celebration .icon{font-size:4rem;margin-bottom:16px}
+  .success-celebration h2{color:#065f46;margin:0 0 8px;font-size:1.8rem}
+  .success-celebration p{color:#047857;margin:0 0 20px;font-size:1.1rem}
+  .success-actions{display:flex;gap:12px;justify-content:center;flex-wrap:wrap}
+  .success-actions a{border-radius:999px;padding:12px 24px;font-weight:700;text-decoration:none}
+  .success-actions .primary{background:#10b981;color:#fff}
+  .success-actions .secondary{background:#fff;color:#10b981;border:2px solid #10b981}
+  
+  @keyframes slideDown{from{opacity:0;transform:translateY(-20px)}to{opacity:1;transform:translateY(0)}}
+  
+  @media (max-width: 768px) {
+    .sell-grid{grid-template-columns:1fr}
+    .summary-card{position:static}
+  }
+</style>
+
+<div class="sell-page">
+  
+  {% if success_data %}
+  <div class="success-celebration">
+    <div class="icon">✅</div>
+    <h2>Sale Completed!</h2>
+    <p>
+      Sold <strong>{{ success_data.quantity }}</strong> x <strong>{{ success_data.product_name }}</strong><br>
+      Total: <strong>MWK {{ success_data.amount|floatformat:0|intcomma }}</strong><br>
+      Profit: <strong>MWK {{ success_data.profit|floatformat:0|intcomma }}</strong>
+    </p>
+    <div class="success-actions">
+      <a href="{% url 'pharmacy:sell' %}" class="primary">New Sale</a>
+      <a href="{% url 'pharmacy:dashboard' %}" class="secondary">Dashboard</a>
+    </div>
+  </div>
+  {% endif %}
+  
+  <header class="wizard-header">
+    <h1>💰 Pharmacy & Cosmetics Sell</h1>
+    <p>Quick sales with automatic stock tracking</p>
+  </header>
+
+  <div class="progress-steps">
+    <div class="step active" id="step1">
+      <span class="step-number">1</span>
+      <span>Select Product</span>
+    </div>
+    <div class="step" id="step2">
+      <span class="step-number">2</span>
+      <span>Payment</span>
+    </div>
+    <div class="step" id="step3">
+      <span class="step-number">3</span>
+      <span>Confirm</span>
+    </div>
+  </div>
+
+  <form method="post" id="sellForm">
+    {% csrf_token %}
+    <input type="hidden" name="batch_id" id="selectedBatchId">
+    <input type="hidden" name="quantity" id="selectedQuantity" value="1">
+    <input type="hidden" name="payment_method" id="selectedPaymentMethod" value="CASH">
+    
+    <div class="sell-grid">
+      
+      <div class="form-card">
+        <div class="form-section">
+          <h2>🛍️ Select Product</h2>
+          <div class="product-search">
+            <input type="text" id="productSearch" placeholder="🔍 Search products..." onkeyup="filterProducts()">
+          </div>
+          
+          <div class="product-list" id="productList">
+            {% if batches %}
+              {% for batch in batches %}
+              <div class="product-item" 
+                   data-id="{{ batch.id }}"
+                   data-name="{{ batch.product_name }}"
+                   data-price="{{ batch.price }}"
+                   data-cost="{{ batch.cost }}"
+                   data-stock="{{ batch.quantity }}"
+                   data-category="{{ batch.category|default:'General' }}"
+                   onclick="selectProduct(this)">
+                <div class="product-header">
+                  <div class="product-name">{{ batch.product_name }}</div>
+                  <div class="product-price">MWK {{ batch.price|floatformat:0|intcomma }}</div>
+                </div>
+                <div class="product-meta">
+                  {% if batch.category %}
+                  <span class="meta-badge" style="background:#ede9fe;color:#6366f1;padding:4px 8px;border-radius:6px">{{ batch.category }}</span>
+                  {% endif %}
+                  <span class="meta-badge">📦 Stock: {{ batch.quantity }}</span>
+                  <span class="meta-badge">🏷️ Batch: {{ batch.batch_number }}</span>
+                  <span class="meta-badge">📅 Exp: {{ batch.expiry_date }}</span>
+                  {% if batch.days_to_expiry <= 30 %}
+                  <span class="meta-badge" style="color:#dc2626">⚠️ {{ batch.days_to_expiry }} days</span>
+                  {% endif %}
+                </div>
+              </div>
+              {% endfor %}
+            {% else %}
+              <p style="text-align:center;color:#94a3b8;padding:40px">No products available for sale</p>
+            {% endif %}
+          </div>
+        </div>
+        
+        <div class="form-section" id="paymentSection" style="display:none">
+          <h2>💳 Payment Method</h2>
+          <div class="payment-methods">
+            <label class="payment-option pm-cash selected" onclick="selectPayment(this, 'CASH')">
+              <input type="radio" name="payment_method_radio" value="CASH" checked>
+              <div class="payment-icon">💵</div>
+              <div class="payment-details">
+                <div class="payment-title">Cash</div>
+                <small style="color:#64748b">Immediate payment</small>
+              </div>
+            </label>
+            <label class="payment-option pm-bank" onclick="selectPayment(this, 'BANK')">
+              <input type="radio" name="payment_method_radio" value="BANK">
+              <div class="payment-icon">🏦</div>
+              <div class="payment-details">
+                <div class="payment-title">Bank Transfer</div>
+                <small style="color:#64748b">Electronic transfer</small>
+              </div>
+            </label>
+            <label class="payment-option pm-mobile" onclick="selectPayment(this, 'MOBILE_MONEY')">
+              <input type="radio" name="payment_method_radio" value="MOBILE_MONEY">
+              <div class="payment-icon">📱</div>
+              <div class="payment-details">
+                <div class="payment-title">Mobile Money</div>
+                <small style="color:#64748b">Airtel/TNM Money</small>
+              </div>
+            </label>
+          </div>
+        </div>
+      </div>
+
+      <div class="summary-card">
+        <h2>📋 Sale Summary</h2>
+        <div id="summaryEmpty" class="summary-empty">
+          <div style="font-size:3rem;margin-bottom:12px">🛒</div>
+          <p>Select a product to begin</p>
+        </div>
+        <div id="summaryContent" style="display:none">
+          <div class="summary-item">
+            <span class="summary-label">Product:</span>
+            <span class="summary-value" id="summaryProduct">—</span>
+          </div>
+          <div class="quantity-input">
+            <label>Quantity:</label>
+            <div class="quantity-controls">
+              <button type="button" onclick="adjustQuantity(-1)">−</button>
+              <input type="number" id="quantityDisplay" value="1" min="1" onchange="updateQuantity(this.value)" readonly>
+              <button type="button" onclick="adjustQuantity(1)">+</button>
+            </div>
+            <div class="stock-warning" id="stockWarning" style="display:none"></div>
+          </div>
+          <div class="summary-item">
+            <span class="summary-label">Unit Price:</span>
+            <span class="summary-value" id="summaryUnitPrice">—</span>
+          </div>
+          <div class="summary-total">
+            <div class="summary-item" style="border:none;padding:0">
+              <span class="summary-label">Total:</span>
+              <span class="summary-value" id="summaryTotal">MWK 0</span>
+            </div>
+            <div class="summary-profit" id="summaryProfit"></div>
+          </div>
+          <div class="summary-item">
+            <span class="summary-label">Payment:</span>
+            <span class="summary-value" id="summaryPayment">Cash</span>
+          </div>
+          <button type="submit" class="btn-complete" id="completeBtn" disabled>
+            ✅ Complete Sale
+          </button>
+        </div>
+      </div>
+      
+    </div>
+  </form>
+
+</div>
+
+<script>
+let selectedBatch = null;
+let quantity = 1;
+let maxStock = 0;
+
+function filterProducts() {
+  const search = document.getElementById('productSearch').value.toLowerCase();
+  const items = document.querySelectorAll('.product-item');
+  items.forEach(item => {
+    const name = item.dataset.name.toLowerCase();
+    item.style.display = name.includes(search) ? 'block' : 'none';
+  });
+}
+
+function selectProduct(element) {
+  // Remove previous selection
+  document.querySelectorAll('.product-item').forEach(item => {
+    item.classList.remove('selected');
+  });
+  element.classList.add('selected');
+  
+  // Store product data
+  selectedBatch = {
+    id: element.dataset.id,
+    name: element.dataset.name,
+    price: parseFloat(element.dataset.price),
+    cost: parseFloat(element.dataset.cost),
+    stock: parseInt(element.dataset.stock)
+  };
+  maxStock = selectedBatch.stock;
+  quantity = 1;
+  
+  // Update form
+  document.getElementById('selectedBatchId').value = selectedBatch.id;
+  document.getElementById('selectedQuantity').value = quantity;
+  
+  // Update summary
+  document.getElementById('summaryEmpty').style.display = 'none';
+  document.getElementById('summaryContent').style.display = 'block';
+  document.getElementById('summaryProduct').textContent = selectedBatch.name;
+  document.getElementById('quantityDisplay').value = quantity;
+  updateSummary();
+  
+  // Show payment section
+  document.getElementById('paymentSection').style.display = 'block';
+  
+  // Update steps
+  document.getElementById('step1').classList.add('complete');
+  document.getElementById('step2').classList.add('active');
+  
+  // Enable complete button
+  document.getElementById('completeBtn').disabled = false;
+}
+
+function adjustQuantity(delta) {
+  if (!selectedBatch) return;
+  quantity = Math.max(1, Math.min(maxStock, quantity + delta));
+  document.getElementById('quantityDisplay').value = quantity;
+  document.getElementById('selectedQuantity').value = quantity;
+  updateSummary();
+}
+
+function updateQuantity(value) {
+  if (!selectedBatch) return;
+  quantity = Math.max(1, Math.min(maxStock, parseInt(value) || 1));
+  document.getElementById('quantityDisplay').value = quantity;
+  document.getElementById('selectedQuantity').value = quantity;
+  updateSummary();
+}
+
+function updateSummary() {
+  if (!selectedBatch) return;
+  
+  const total = selectedBatch.price * quantity;
+  const profit = (selectedBatch.price - selectedBatch.cost) * quantity;
+  
+  document.getElementById('summaryUnitPrice').textContent = 'MWK ' + selectedBatch.price.toLocaleString();
+  document.getElementById('summaryTotal').textContent = 'MWK ' + total.toLocaleString();
+  document.getElementById('summaryProfit').textContent = '💰 Profit: MWK ' + profit.toLocaleString();
+  
+  // Stock warning
+  const warning = document.getElementById('stockWarning');
+  if (quantity >= maxStock) {
+    warning.textContent = `⚠️ Maximum stock: ${maxStock} units`;
+    warning.style.display = 'block';
+  } else {
+    warning.style.display = 'none';
+  }
+  
+  // Update step 3
+  document.getElementById('step2').classList.add('complete');
+  document.getElementById('step3').classList.add('active');
+}
+
+function selectPayment(element, method) {
+  document.querySelectorAll('.payment-option').forEach(opt => {
+    opt.classList.remove('selected');
+  });
+  element.classList.add('selected');
+  document.getElementById('selectedPaymentMethod').value = method;
+  
+  const labels = {
+    'CASH': 'Cash',
+    'BANK': 'Bank Transfer',
+    'MOBILE_MONEY': 'Mobile Money'
+  };
+  document.getElementById('summaryPayment').textContent = labels[method];
+}
+</script>
+
+{% endblock %}
+

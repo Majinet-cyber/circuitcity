@@ -10,5 +10,9 @@ urlpatterns = [
     path('data-deletion/', views.data_deletion, name='data_deletion'),
     path('about/', views.about, name='about'),
     path('simulator/', views.simulator, name='simulator'),
+    
+    # Onboarding guides
+    path('onboarding/manager/', views.onboarding_manager, name='onboarding_manager'),
+    path('onboarding/hq/', views.onboarding_hq, name='onboarding_hq'),
 ]
 

@@ -1,0 +1,165 @@
+{% extends "base.html" %}
+{% load humanize %}
+
+{% block title %}Sales History · Pharmacy & Cosmetics · Emajinet{% endblock %}
+
+{% block content %}
+
+<style>
+  .sales-page{max-width:1200px;margin:24px auto;padding:24px}
+  .page-header{background:linear-gradient(120deg,#8b5cf6,#6366f1);padding:24px;border-radius:20px;color:#fff;margin-bottom:24px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:16px}
+  .page-header h1{margin:0;font-size:1.8rem}
+  .page-header .actions{display:flex;gap:12px;flex-wrap:wrap}
+  .btn{border-radius:999px;padding:10px 20px;font-weight:700;text-decoration:none;cursor:pointer;border:none;display:inline-flex;align-items:center;gap:6px}
+  .btn-primary{background:#fff;color:#6366f1}
+  .btn-secondary{background:rgba(255,255,255,.2);color:#fff;border:1px solid rgba(255,255,255,.3)}
+  
+  .sales-table{background:#fff;border-radius:20px;padding:24px;box-shadow:0 10px 30px rgba(15,23,42,.08);overflow-x:auto}
+  table{width:100%;border-collapse:collapse}
+  thead{background:#f8fafc;border-bottom:2px solid #e2e8f0}
+  th{padding:12px;text-align:left;font-weight:700;font-size:.85rem;color:#64748b;text-transform:uppercase}
+  td{padding:12px;border-bottom:1px solid #f1f5f9}
+  tbody tr:hover{background:#f8fafc}
+  tbody tr:last-child td{border-bottom:none}
+  
+  .badge{display:inline-flex;align-items:center;gap:4px;border-radius:12px;padding:4px 10px;font-size:.75rem;font-weight:700}
+  .badge-success{background:#dcfce7;color:#16a34a}
+  .badge-warning{background:#fef9c3;color:#b45309}
+  .badge-danger{background:#fee2e2;color:#dc2626}
+  .badge-info{background:#dbeafe;color:#2563eb}
+  .badge-secondary{background:#f1f5f9;color:#64748b}
+  
+  .action-buttons{display:flex;gap:8px;flex-wrap:wrap}
+  .btn-sm{border-radius:8px;padding:6px 12px;font-size:.85rem;font-weight:600}
+  .btn-edit{background:#3b82f6;color:#fff}
+  .btn-delete{background:#dc2626;color:#fff}
+  .btn-undo{background:#10b981;color:#fff}
+  .btn-sm:hover{opacity:.9;transform:translateY(-1px)}
+  
+  .text-right{text-align:right}
+  .text-muted{color:#64748b;font-size:.9rem}
+  .deleted-row{opacity:.6;background:#fee2e2}
+  .reversed-row{opacity:.7;background:#fef3c7}
+</style>
+
+<div class="sales-page">
+  <header class="page-header">
+    <div>
+      <h1>📋 Pharmacy & Cosmetics Sales History</h1>
+      <p style="margin:8px 0 0;opacity:.9">View and manage all sales</p>
+    </div>
+    <div class="actions">
+      <a href="{% url 'pharmacy:sell' %}" class="btn btn-primary">💰 New Sale</a>
+      <a href="{% url 'pharmacy:dashboard' %}" class="btn btn-secondary">📊 Dashboard</a>
+    </div>
+  </header>
+
+  <div class="sales-table">
+    {% if sales %}
+    <table>
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th>Product</th>
+          <th>Category</th>
+          <th>Batch</th>
+          <th>Qty</th>
+          <th class="text-right">Unit Price</th>
+          <th class="text-right">Total</th>
+          <th class="text-right">Profit</th>
+          <th>Payment</th>
+          <th>Sold By</th>
+          <th>Date</th>
+          <th>Status</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for sale in sales %}
+        <tr class="{% if sale.is_deleted %}deleted-row{% elif sale.is_reversed %}reversed-row{% endif %}">
+          <td>#{{ sale.id }}</td>
+          <td>
+            <strong>{{ sale.batch.merch_product.name }}</strong>
+            {% if sale.customer_name %}
+            <br><small class="text-muted">Customer: {{ sale.customer_name }}</small>
+            {% endif %}
+          </td>
+          <td>
+            {% if sale.batch.merch_product.category %}
+            <span class="badge badge-info">{{ sale.batch.merch_product.get_category_display }}</span>
+            {% else %}
+            <span class="badge badge-secondary">—</span>
+            {% endif %}
+          </td>
+          <td><small class="text-muted">{{ sale.batch.batch_number }}</small></td>
+          <td>{{ sale.quantity|intcomma }}</td>
+          <td class="text-right">MWK {{ sale.unit_price|floatformat:0|intcomma }}</td>
+          <td class="text-right"><strong>MWK {{ sale.total_amount|floatformat:0|intcomma }}</strong></td>
+          <td class="text-right">
+            <span style="color:#10b981">MWK {{ sale.profit|floatformat:0|intcomma }}</span>
+          </td>
+          <td>
+            {% if sale.payment_method == "CASH" %}
+            <span class="badge badge-success">💵 Cash</span>
+            {% elif sale.payment_method == "BANK" %}
+            <span class="badge badge-info">🏦 Bank</span>
+            {% elif sale.payment_method == "MOBILE_MONEY" %}
+            <span class="badge badge-warning">📱 Mobile</span>
+            {% else %}
+            <span class="badge badge-secondary">{{ sale.payment_method }}</span>
+            {% endif %}
+          </td>
+          <td>
+            <small>{{ sale.sold_by.get_full_name|default:sale.sold_by.username }}</small>
+          </td>
+          <td>
+            <small>{{ sale.sold_at|date:"Y-m-d" }}</small>
+            <br><small class="text-muted">{{ sale.sold_at|date:"H:i" }}</small>
+          </td>
+          <td>
+            {% if sale.is_deleted %}
+            <span class="badge badge-danger">🗑️ Deleted</span>
+            {% elif sale.is_reversed %}
+            <span class="badge badge-warning">↩️ Reversed</span>
+            {% else %}
+            <span class="badge badge-success">✅ Active</span>
+            {% endif %}
+          </td>
+          <td>
+            <div class="action-buttons">
+              {% if not sale.is_deleted and not sale.is_reversed %}
+                {% if user.is_staff or user.is_superuser or perms.inventory.change_pharmacysale %}
+                <a href="{% url 'pharmacy:sale_edit' sale.id %}" class="btn btn-sm btn-edit">✏️ Edit</a>
+                {% endif %}
+                {% if user.is_staff or user.is_superuser or perms.inventory.delete_pharmacysale %}
+                <form method="post" action="{% url 'pharmacy:sale_undo' sale.id %}" style="display:inline" onsubmit="return confirm('Undo this sale? Stock will be restored.')">
+                  {% csrf_token %}
+                  <button type="submit" class="btn btn-sm btn-undo">↩️ Undo</button>
+                </form>
+                <form method="post" action="{% url 'pharmacy:sale_delete' sale.id %}" style="display:inline" onsubmit="return confirm('Delete this sale? Stock will be restored.')">
+                  {% csrf_token %}
+                  <button type="submit" class="btn btn-sm btn-delete">🗑️ Delete</button>
+                </form>
+                {% endif %}
+              {% else %}
+                <span class="text-muted">—</span>
+              {% endif %}
+            </div>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <div style="text-align:center;padding:60px 20px;color:#64748b">
+      <div style="font-size:4rem;margin-bottom:16px">📋</div>
+      <h2 style="margin:0 0 8px;color:#1e293b">No sales yet</h2>
+      <p style="margin:0 0 24px">Start selling products to see them here</p>
+      <a href="{% url 'pharmacy:sell' %}" class="btn btn-primary">💰 Make First Sale</a>
+    </div>
+    {% endif %}
+  </div>
+</div>
+
+{% endblock %}
+

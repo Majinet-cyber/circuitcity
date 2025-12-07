@@ -1,0 +1,194 @@
+{% extends "hq/base_hq.html" %}
+{% load static %}
+
+{% block title %}Merchant Contracts - HQ{% endblock %}
+
+{% block content %}
+<div class="container-fluid px-3 px-md-4 py-4">
+  <!-- Header -->
+  <div class="row mb-4">
+    <div class="col-12">
+      <div class="glass-card p-4">
+        <div class="d-flex justify-content-between align-items-center flex-wrap gap-3">
+          <div>
+            <h1 class="h3 mb-1">
+              <i class="bi bi-file-earmark-text text-primary me-2"></i>
+              Merchant Contracts
+            </h1>
+            <p class="text-muted mb-0">
+              Manage signed contracts for all businesses.
+            </p>
+          </div>
+          <div class="d-flex gap-2">
+            <a href="{% url 'hq:contract_template' %}" class="btn btn-outline-primary">
+              <i class="bi bi-download me-2"></i>
+              Download Template
+            </a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Filters -->
+  <div class="row mb-3">
+    <div class="col-12">
+      <div class="glass-card p-3">
+        <form method="get" class="row g-3 align-items-end">
+          <div class="col-md-4">
+            <label for="search" class="form-label small">Search Business</label>
+            <input type="text" 
+                   id="search" 
+                   name="q" 
+                   class="form-control" 
+                   placeholder="Business name or slug..."
+                   value="{{ search_query }}">
+          </div>
+          <div class="col-md-3">
+            <label for="status" class="form-label small">Contract Status</label>
+            <select name="status" id="status" class="form-select">
+              <option value="all" {% if status_filter == 'all' %}selected{% endif %}>All</option>
+              <option value="signed" {% if status_filter == 'signed' %}selected{% endif %}>Signed</option>
+              <option value="unsigned" {% if status_filter == 'unsigned' %}selected{% endif %}>Not Signed</option>
+            </select>
+          </div>
+          <div class="col-md-auto">
+            <button type="submit" class="btn btn-primary">
+              <i class="bi bi-funnel me-2"></i>Filter
+            </button>
+            <a href="{% url 'hq:contracts_list' %}" class="btn btn-outline-secondary">Clear</a>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- Contracts Table -->
+  <div class="row">
+    <div class="col-12">
+      <div class="glass-card p-4">
+        <div class="table-responsive">
+          <table class="table table-hover">
+            <thead>
+              <tr>
+                <th>Business</th>
+                <th>Vertical</th>
+                <th>Status</th>
+                <th>Contract</th>
+                <th>Uploaded</th>
+                <th>Uploaded By</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for item in businesses_with_status %}
+              <tr>
+                <td>
+                  <div>
+                    <strong>{{ item.business.name }}</strong>
+                    <br>
+                    <small class="text-muted">{{ item.business.slug }}</small>
+                  </div>
+                </td>
+                <td>
+                  <span class="badge bg-info">
+                    {{ item.business.get_business_kind_display|default:"N/A" }}
+                  </span>
+                </td>
+                <td>
+                  <span class="badge bg-{{ item.business.status|lower }}">
+                    {{ item.business.get_status_display }}
+                  </span>
+                </td>
+                <td>
+                  {% if item.has_contract %}
+                    <span class="badge bg-success">
+                      <i class="bi bi-check-circle me-1"></i>Signed
+                    </span>
+                  {% else %}
+                    <span class="badge bg-danger">
+                      <i class="bi bi-x-circle me-1"></i>Not Signed
+                    </span>
+                  {% endif %}
+                </td>
+                <td>
+                  {% if item.has_contract %}
+                    <small class="text-muted">
+                      {{ item.contract.uploaded_at|date:"M d, Y" }}
+                      <br>
+                      {{ item.contract.uploaded_at|time:"H:i" }}
+                    </small>
+                  {% else %}
+                    <small class="text-muted">—</small>
+                  {% endif %}
+                </td>
+                <td>
+                  {% if item.has_contract and item.contract.uploaded_by %}
+                    <small>{{ item.contract.uploaded_by.get_full_name|default:item.contract.uploaded_by.username }}</small>
+                  {% else %}
+                    <small class="text-muted">—</small>
+                  {% endif %}
+                </td>
+                <td>
+                  <div class="btn-group btn-group-sm" role="group">
+                    {% if item.has_contract %}
+                      <a href="{% url 'hq:contract_download' item.contract.id %}" 
+                         class="btn btn-sm btn-outline-primary"
+                         title="Download contract">
+                        <i class="bi bi-download"></i>
+                      </a>
+                    {% endif %}
+                    <a href="{% url 'hq:contracts_detail' item.business.id %}" 
+                       class="btn btn-sm btn-outline-secondary"
+                       title="{% if item.has_contract %}View/Replace{% else %}Upload{% endif %}">
+                      <i class="bi bi-{% if item.has_contract %}pencil{% else %}upload{% endif %}"></i>
+                    </a>
+                  </div>
+                </td>
+              </tr>
+              {% empty %}
+              <tr>
+                <td colspan="7" class="text-center text-muted py-5">
+                  <i class="bi bi-inbox fs-1 d-block mb-3"></i>
+                  No businesses found matching your criteria.
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+
+        <!-- Pagination -->
+        {% if page_obj.has_other_pages %}
+        <nav aria-label="Page navigation" class="mt-4">
+          <ul class="pagination justify-content-center">
+            {% if page_obj.has_previous %}
+            <li class="page-item">
+              <a class="page-link" href="?page={{ page_obj.previous_page_number }}&status={{ status_filter }}&q={{ search_query }}">
+                <i class="bi bi-chevron-left"></i> Previous
+              </a>
+            </li>
+            {% endif %}
+            
+            <li class="page-item active">
+              <span class="page-link">
+                Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}
+              </span>
+            </li>
+            
+            {% if page_obj.has_next %}
+            <li class="page-item">
+              <a class="page-link" href="?page={{ page_obj.next_page_number }}&status={{ status_filter }}&q={{ search_query }}">
+                Next <i class="bi bi-chevron-right"></i>
+              </a>
+            </li>
+            {% endif %}
+          </ul>
+        </nav>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
