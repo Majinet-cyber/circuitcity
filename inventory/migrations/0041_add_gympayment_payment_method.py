@@ -2,6 +2,45 @@
 from django.db import migrations, models
 
 
+def add_payment_method_column(apps, schema_editor):
+    connection = schema_editor.connection
+
+    # If NOT Postgres: add the field normally using schema_editor
+    if connection.vendor != "postgresql":
+        GymPayment = apps.get_model("inventory", "GymPayment")
+
+        field = models.CharField(
+            max_length=20,
+            choices=[
+                ('cash', 'Cash'),
+                ('bank', 'Bank'),
+                ('mobile_money', 'Mobile Money')
+            ],
+            default='cash',
+            db_index=True,
+            help_text='Payment method used for this membership payment'
+        )
+        field.set_attributes_from_name("payment_method")
+        schema_editor.add_field(GymPayment, field)
+        return
+
+    # Postgres: use IF NOT EXISTS so it never errors if column already there
+    schema_editor.execute(
+        """
+        ALTER TABLE inventory_gympayment
+        ADD COLUMN IF NOT EXISTS payment_method varchar(20) NOT NULL DEFAULT 'cash';
+        """
+    )
+    
+    # Create index if it doesn't exist
+    schema_editor.execute(
+        """
+        CREATE INDEX IF NOT EXISTS inventory_gympayment_payment_method_idx
+        ON inventory_gympayment (payment_method);
+        """
+    )
+
+
 class Migration(migrations.Migration):
 
     dependencies = [
@@ -9,20 +48,27 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
-        migrations.AddField(
-            model_name='gympayment',
-            name='payment_method',
-            field=models.CharField(
-                choices=[
-                    ('cash', 'Cash'),
-                    ('bank', 'Bank'),
-                    ('mobile_money', 'Mobile Money')
-                ],
-                default='cash',
-                max_length=20,
-                db_index=True,
-                help_text='Payment method used for this membership payment'
-            ),
+        migrations.SeparateDatabaseAndState(
+            state_operations=[
+                migrations.AddField(
+                    model_name='gympayment',
+                    name='payment_method',
+                    field=models.CharField(
+                        choices=[
+                            ('cash', 'Cash'),
+                            ('bank', 'Bank'),
+                            ('mobile_money', 'Mobile Money')
+                        ],
+                        default='cash',
+                        max_length=20,
+                        db_index=True,
+                        help_text='Payment method used for this membership payment'
+                    ),
+                ),
+            ],
+            database_operations=[
+                migrations.RunPython(add_payment_method_column, migrations.RunPython.noop),
+            ],
         ),
     ]
 
