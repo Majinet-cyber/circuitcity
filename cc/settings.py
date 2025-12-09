@@ -184,10 +184,10 @@ INSTALLED_APPS = [
     "hq",
     "reports",
     # NEW APPS
-    "support",  # ticket system
-    "audit",  # audit logs UI
+    "support",      # ticket system
+    "audit",        # audit logs UI
     "staticpages",  # Public home page with hero section
-    "backups",  # data backup & export system
+    "backups",      # data backup & export system
 ]
 
 # Optional dev/helper apps
@@ -404,7 +404,8 @@ WHITENOISE_MANIFEST_STRICT = False
 
 # --------------------------- auth redirects ---------------------------
 LOGIN_URL = "/accounts/login/"
-LOGIN_REDIRECT_URL = "/"
+# Send users directly to inventory dashboard after login
+LOGIN_REDIRECT_URL = "/inventory/dashboard/"
 LOGOUT_REDIRECT_URL = "/accounts/login/"
 
 # --------------------------- email ---------------------------

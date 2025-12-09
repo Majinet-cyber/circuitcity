@@ -17,7 +17,7 @@ from django.db import transaction
 from tenants.models import Business
 
 
-# Flagship phone definitions
+# Flagship phone definitions - 5 BRANDS
 FLAGSHIP_PHONES = [
     # TECNO
     {"brand": "TECNO", "model": "Spark 40", "ram": 4, "rom": 128},
@@ -42,6 +42,21 @@ FLAGSHIP_PHONES = [
     {"brand": "SAMSUNG", "model": "Galaxy A25", "ram": 8, "rom": 256},
     {"brand": "SAMSUNG", "model": "Galaxy A05s", "ram": 4, "rom": 64},
     {"brand": "SAMSUNG", "model": "Galaxy A05s", "ram": 4, "rom": 128},
+    
+    # GOOGLE PIXEL
+    {"brand": "GOOGLE PIXEL", "model": "Pixel 8", "ram": 8, "rom": 128},
+    {"brand": "GOOGLE PIXEL", "model": "Pixel 8", "ram": 8, "rom": 256},
+    {"brand": "GOOGLE PIXEL", "model": "Pixel 7a", "ram": 8, "rom": 128},
+    {"brand": "GOOGLE PIXEL", "model": "Pixel 8a", "ram": 8, "rom": 128},
+    {"brand": "GOOGLE PIXEL", "model": "Pixel 8 Pro", "ram": 12, "rom": 256},
+    
+    # REDMI
+    {"brand": "REDMI", "model": "Note 13", "ram": 6, "rom": 128},
+    {"brand": "REDMI", "model": "Note 13", "ram": 8, "rom": 256},
+    {"brand": "REDMI", "model": "Note 13 Pro", "ram": 8, "rom": 256},
+    {"brand": "REDMI", "model": "13C", "ram": 4, "rom": 128},
+    {"brand": "REDMI", "model": "13C", "ram": 6, "rom": 128},
+    {"brand": "REDMI", "model": "12", "ram": 8, "rom": 256},
 ]
 
 

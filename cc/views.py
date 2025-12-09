@@ -31,7 +31,12 @@ SUNDAY_BONUS = Decimal("15000")         # any time on Sunday
 # ==============================================================================
 # Single Source of Truth: error rendering helper
 # ==============================================================================
-def _render_error(request: HttpRequest, template: str, status: int, context: Dict[str, Any] | None = None) -> HttpResponse:
+def _render_error(
+    request: HttpRequest,
+    template: str,
+    status: int,
+    context: Dict[str, Any] | None = None,
+) -> HttpResponse:
     """
     Centralized renderer for error pages so all errors:
       - Share the same template look/feel
@@ -85,23 +90,29 @@ def is_admin(user: User) -> bool:
     return user.is_staff or user_in_group(user, "Admin")
 
 
+# ==============================================================================
+# Global HOME alias
+# ==============================================================================
 @login_required
 @ensure_csrf_cookie  # ensure csrftoken cookie is set on first GET
 def home(request: HttpRequest) -> HttpResponse:
     """
-    Route users to the correct dashboard using the NEW (namespaced) routes.
-    Staff/Admin  -> dashboard:dashboard
-    Manager      -> manager_dashboard
-    Agent        -> dashboard:agent_dashboard
+    Global 'home' alias view.
+
+    Many templates / old code use `{% url 'home' %}`.
+    We now treat 'home' as "go to the main inventory dashboard".
+
+    - If user is authenticated -> redirect to inventory:inventory_dashboard
+    - Else -> redirect to login page
     """
-    u = request.user
-    if is_admin(u):
-        return redirect("dashboard:dashboard")
-    if user_in_group(u, "Manager"):
-        return redirect("manager_dashboard")
-    return redirect("dashboard:agent_dashboard")
+    if request.user.is_authenticated:
+        return redirect("inventory:inventory_dashboard")
+    return redirect("login")
 
 
+# ==============================================================================
+# Logout helper
+# ==============================================================================
 @require_http_methods(["GET", "POST"])
 def logout_now(request: HttpRequest) -> HttpResponse:
     """
@@ -148,12 +159,12 @@ def _totals_for_user(user: User, scope: str = "all") -> Dict[str, Any]:
 @login_required
 @user_passes_test(is_admin)
 def admin_dashboard(_request: HttpRequest) -> HttpResponse:
-    """Old route name â†’ redirect to the new namespaced admin dashboard."""
+    """Old route name → redirect to the new namespaced admin dashboard."""
     return redirect("dashboard:dashboard")
 
 
 # ==============================================================================
-# Admin â†’ per-agent detail + record advance
+# Admin → per-agent detail + record advance
 # ==============================================================================
 @login_required
 @user_passes_test(is_admin)
@@ -182,7 +193,10 @@ def admin_agent_detail(request: HttpRequest, user_id: int) -> HttpResponse:
                 reason="ADVANCE",
                 memo=memo or "Advance payment",
             )
-            messages.success(request, f"Advance of MK{amount:,} recorded for {agent.get_username()}.")
+            messages.success(
+                request,
+                f"Advance of MK{amount:,} recorded for {agent.get_username()}.",
+            )
         else:
             messages.error(request, "Enter a non-zero amount.")
         return redirect("admin_agent_detail", user_id=agent.id)
@@ -268,7 +282,11 @@ def agent_dashboard(request: HttpRequest) -> HttpResponse:
             except Exception:
                 when = now
 
-        TimeLog.objects.create(user=user, logged_at=when, note=request.POST.get("note", "")[:200])
+        TimeLog.objects.create(
+            user=user,
+            logged_at=when,
+            note=request.POST.get("note", "")[:200],
+        )
 
         # Rewards/penalties using LOCAL time
         local_when = timezone.localtime(when)
@@ -280,9 +298,14 @@ def agent_dashboard(request: HttpRequest) -> HttpResponse:
                 reason="SUNDAY_BONUS",
                 memo="Sunday work bonus",
             )
-            messages.success(request, "ðŸŽ‰ Sunday bonus MK15,000 added to your wallet!")
+            messages.success(
+                request,
+                "🎉 Sunday bonus MK15,000 added to your wallet!",
+            )
         else:
-            eight_am = local_when.replace(hour=8, minute=0, second=0, microsecond=0)
+            eight_am = local_when.replace(
+                hour=8, minute=0, second=0, microsecond=0
+            )
             if local_when <= eight_am:
                 WalletTxn.objects.create(
                     user=user,
@@ -290,7 +313,10 @@ def agent_dashboard(request: HttpRequest) -> HttpResponse:
                     reason="EARLY_BIRD",
                     memo="Early-bird before 8am",
                 )
-                messages.success(request, "ðŸ˜Š Early-bird bonus MK5,000 added to your wallet!")
+                messages.success(
+                    request,
+                    "🙂 Early-bird bonus MK5,000 added to your wallet!",
+                )
             else:
                 secs_after = (local_when - eight_am).total_seconds()
                 blocks = int((secs_after + 1799) // 1800)  # 30-min blocks, rounded up
@@ -302,7 +328,10 @@ def agent_dashboard(request: HttpRequest) -> HttpResponse:
                         reason="LATE_PENALTY",
                         memo=f"Late by ~{blocks*30} minutes",
                     )
-                    messages.error(request, f"ðŸ˜¢ Late penalty âˆ’MK{penalty:,} applied.")
+                    messages.error(
+                        request,
+                        f"😢 Late penalty −MK{penalty:,} applied.",
+                    )
 
         # Stay on this (cc) agent dashboard
         return redirect("agent_dashboard")
@@ -312,7 +341,11 @@ def agent_dashboard(request: HttpRequest) -> HttpResponse:
         assigned_agent=user, status="IN_STOCK"
     ).count()
     battery_max = 20
-    battery_pct = min(100, int(round((agent_in_stock / battery_max) * 100))) if agent_in_stock > 0 else 0
+    battery_pct = (
+        min(100, int(round((agent_in_stock / battery_max) * 100)))
+        if agent_in_stock > 0
+        else 0
+    )
     if agent_in_stock < 10:
         battery_color = "red"
         battery_label = "Critical"
@@ -389,22 +422,36 @@ def api_recommendations(request: HttpRequest) -> JsonResponse:
     items: list[dict[str, Any]] = []
 
     # Stock-based nudge
-    in_stock = InventoryItem.objects.filter(assigned_agent=user, status="IN_STOCK").count()
+    in_stock = InventoryItem.objects.filter(
+        assigned_agent=user, status="IN_STOCK"
+    ).count()
     if in_stock < 10:
-        items.append({
-            "type": "restock",
-            "message": f"Low stock: only {in_stock} items available. Consider restocking to at least 12.",
-            "confidence": 0.82,
-        })
+        items.append(
+            {
+                "type": "restock",
+                "message": (
+                    f"Low stock: only {in_stock} items available. "
+                    "Consider restocking to at least 12."
+                ),
+                "confidence": 0.82,
+            }
+        )
 
     # Recent sales nudge
-    recent_sales = Sale.objects.filter(agent=user, sold_at__gte=now - timedelta(days=14)).count()
+    recent_sales = Sale.objects.filter(
+        agent=user, sold_at__gte=now - timedelta(days=14)
+    ).count()
     if recent_sales == 0:
-        items.append({
-            "type": "marketing",
-            "message": "No sales in the last 14 days. Try a small discount or a WhatsApp broadcast.",
-            "confidence": 0.61,
-        })
+        items.append(
+            {
+                "type": "marketing",
+                "message": (
+                    "No sales in the last 14 days. "
+                    "Try a small discount or a WhatsApp broadcast."
+                ),
+                "confidence": 0.61,
+            }
+        )
 
     return JsonResponse({"success": True, "items": items})
 
@@ -426,8 +473,8 @@ def page_not_found(request: HttpRequest, exception, *args, **kwargs) -> HttpResp
 
 def server_error(request: HttpRequest, *args, **kwargs) -> HttpResponse:
     """
-    Global 500 renderer. Django calls this when DEBUG=False, or our FriendlyErrorsMiddleware
-    decides to render a user-safe page.
+    Global 500 renderer. Django calls this when DEBUG=False, or our
+    FriendlyErrorsMiddleware decides to render a user-safe page.
     """
     return _render_error(request, template="errors/500.html", status=500)
 
@@ -438,8 +485,3 @@ def feature_unavailable(request: HttpRequest, *args, **kwargs) -> HttpResponse:
     before the real implementation lands.
     """
     return _render_error(request, template="errors/501.html", status=501)
-
-
-
-
-

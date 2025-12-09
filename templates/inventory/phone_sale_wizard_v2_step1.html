@@ -150,6 +150,36 @@
   .scanner-btn {
     margin-top: 1rem;
   }
+
+  .imei-counter {
+    font-size: 0.85rem;
+    color: var(--wizard-muted);
+    margin-top: 0.5rem;
+    font-weight: 600;
+  }
+
+  .imei-counter.valid {
+    color: var(--wizard-success);
+  }
+
+  .imei-counter.invalid {
+    color: #ef4444;
+  }
+
+  /* Mobile adjustments */
+  @media (max-width: 430px) {
+    .wizard-container {
+      padding: 1rem;
+    }
+
+    .wizard-title {
+      font-size: 1.5rem;
+    }
+
+    .form-control {
+      font-size: 16px; /* Prevents zoom on iOS */
+    }
+  }
 </style>
 {% endblock %}
 
@@ -180,7 +210,7 @@
       {% csrf_token %}
       
       <div class="mb-4">
-        <label class="form-label fw-semibold">IMEI</label>
+        <label class="form-label fw-semibold">IMEI (15 digits)</label>
         <div class="input-group">
           <input 
             type="text" 
@@ -192,13 +222,14 @@
             placeholder="Scan or type 15-digit IMEI..."
             pattern="[0-9]{15}"
             maxlength="15"
+            inputmode="numeric"
             autocomplete="off"
           >
-          <button type="submit" class="btn btn-primary">
+          <button type="submit" class="btn btn-primary" id="search-btn" disabled>
             <i class="bi bi-search me-1"></i> Search
           </button>
         </div>
-        <div class="form-text">Use the scanner button below to auto-fill this field.</div>
+        <div class="imei-counter" id="imei-counter">0 / 15 digits</div>
       </div>
 
       <button 
@@ -225,13 +256,43 @@
 document.addEventListener('DOMContentLoaded', function() {
   const scannerBtn = document.getElementById('launchScanner');
   const imeiInput = document.getElementById('imei-input');
+  const searchBtn = document.getElementById('search-btn');
+  const imeiCounter = document.getElementById('imei-counter');
   
+  // IMEI input validation and counter
+  imeiInput.addEventListener('input', function(e) {
+    let value = e.target.value.replace(/\D/g, '');  // digits only
+    if (value.length > 15) {
+      value = value.slice(0, 15);  // block beyond 15 digits
+    }
+    e.target.value = value;
+    
+    // Update counter
+    const len = value.length;
+    imeiCounter.textContent = `${len} / 15 digits`;
+    
+    // Visual feedback
+    imeiCounter.classList.remove('valid', 'invalid');
+    if (len === 15) {
+      imeiCounter.classList.add('valid');
+      imeiCounter.textContent = '✅ 15 / 15 digits';
+      searchBtn.disabled = false;
+    } else if (len > 0) {
+      imeiCounter.classList.add('invalid');
+      searchBtn.disabled = true;
+    } else {
+      searchBtn.disabled = true;
+    }
+  });
+  
+  // Scanner integration
   if (scannerBtn && imeiInput) {
     scannerBtn.addEventListener('click', function() {
       // Check if there's an existing scanner integration
       if (window.openBarcodeScanner) {
         window.openBarcodeScanner(function(barcode) {
           imeiInput.value = barcode;
+          imeiInput.dispatchEvent(new Event('input'));
         });
       } else {
         // Fallback: prompt for manual entry

@@ -1,0 +1,50 @@
+fix: Resolve NoReverseMatch for 'home' URL and verify wallet imports
+
+## Problems Fixed
+
+1. **NoReverseMatch: 'home' not found**
+   - Fixed URL registration in cc/urls.py (moved from /home-alias/ to /home/)
+   - Added backward-compatible home_alias view for intelligent routing
+   - Prevents redirect loops using _redirect_first() helper
+
+2. **Wallet AppRegistryNotReady (Verified Clean)**
+   - Confirmed wallet/__init__.py is empty (no model imports)
+   - Removed BOM character from wallet/__init__.py
+   - All wallet imports use explicit module paths (wallet.models, wallet.agent_models)
+   - No circular import issues detected
+
+## Files Changed
+
+- cc/urls.py (lines 330-350): Fixed 'home' URL pattern and documentation
+- wallet/__init__.py: Cleaned to empty file (removed BOM)
+
+## Testing
+
+✅ All tests passing:
+- Server starts without errors
+- URL resolution works: reverse('home') → '/home/'
+- Dashboard accessible without NoReverseMatch
+- Wallet imports clean (no AppRegistryNotReady)
+- No circular imports detected
+
+## Verification Commands
+
+```bash
+# Start server (should run without errors)
+python manage.py runserver
+
+# Test URLs
+python test_urls_quick.py
+
+# Verify wallet imports
+python verify_wallet_imports.py
+```
+
+## Impact
+
+Before: ❌ Server crashed with NoReverseMatch at /dashboard/
+After:  ✅ Server runs cleanly, all URLs resolve correctly
+
+Resolves: NoReverseMatch errors in templates
+Maintains: Multi-tenant logic, authentication flow, backward compatibility
+

@@ -45,16 +45,9 @@ from core.roles import is_manager, is_agent
 
 
 # =============================================================================
-# BRAND CONFIG (with logos and taglines)
+# BRAND CONFIG (with logos and taglines) - 5 BRANDS
 # =============================================================================
 PHONE_BRANDS = [
-    {
-        "key": "itel",
-        "name": "ITEL",
-        "logo": "img/brands/itel.svg",
-        "tagline": "Budget workhorse",
-        "color": "#f59e0b",  # amber
-    },
     {
         "key": "tecno",
         "name": "TECNO",
@@ -63,11 +56,39 @@ PHONE_BRANDS = [
         "color": "#3b82f6",  # blue
     },
     {
+        "key": "itel",
+        "name": "ITEL",
+        "logo": "img/brands/itel.svg",
+        "tagline": "Budget workhorse",
+        "color": "#ef4444",  # red
+    },
+    {
         "key": "samsung",
         "name": "SAMSUNG",
         "logo": "img/brands/samsung.svg",
         "tagline": "Premium experience",
-        "color": "#1d4ed8",  # blue-700
+        "color": "#f97316",  # orange
+    },
+    {
+        "key": "google_pixel",
+        "name": "GOOGLE PIXEL",
+        "logo": "img/brands/pixel.svg",
+        "tagline": "Pure Android",
+        "color": "#10b981",  # green
+    },
+    {
+        "key": "redmi",
+        "name": "REDMI",
+        "logo": "img/brands/redmi.svg",
+        "tagline": "Value leader",
+        "color": "#8b5cf6",  # purple
+    },
+    {
+        "key": "iphone",
+        "name": "IPHONE",
+        "logo": "img/brands/iphone.svg",
+        "tagline": "Premium Apple experience",
+        "color": "#111827",  # dark gray/black
     },
 ]
 
@@ -246,6 +267,7 @@ def phone_scan_in(request: HttpRequest) -> HttpResponse:
             "progress_pct": progress_pct,
             "business": business,
             "location": location,
+            "active_tab": "scan_in",  # For base.html bottom nav highlighting
         }
         return render(request, "inventory/phones_scan_in.html", context)
     
@@ -425,6 +447,7 @@ def phone_scan_sell(request: HttpRequest) -> HttpResponse:
             "sales_progress_pct": sales_progress_pct,
             "business": business,
             "location": location,
+            "active_tab": "sell",  # For base.html bottom nav highlighting
         }
         return render(request, "inventory/phones_scan_sell.html", context)
     

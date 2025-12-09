@@ -22,9 +22,12 @@
     --cc-accent:#1f6feb;
     --cc-accent-600:#1a5fd4;
     --cc-shadow:0 6px 18px rgba(2,6,23,.08);
-    --brand-itel:#f59e0b;
     --brand-tecno:#3b82f6;
-    --brand-samsung:#1e3a8a;
+    --brand-itel:#ef4444;
+    --brand-samsung:#f97316;
+    --brand-pixel:#10b981;
+    --brand-redmi:#8b5cf6;
+    --brand-iphone:#111827;
   }
   body{background:var(--cc-bg);color:var(--cc-text)}
 
@@ -261,15 +264,50 @@
     padding:20px;
   }
 
+  /* ===== Counter Badge ===== */
+  .imei-counter{
+    font-size:11px;
+    color:var(--cc-muted);
+    margin-top:8px;
+    font-weight:600;
+  }
+  .imei-counter.valid{
+    color:#10b981;
+  }
+  .imei-counter.invalid{
+    color:#ef4444;
+  }
+
   /* ===== Mobile Responsive ===== */
-  @media (max-width:640px){
+  @media (max-width:430px){
+    .page{
+      padding:12px;
+    }
     .brand-cards{
       grid-template-columns:1fr;
+      gap:12px;
+    }
+    .brand-card{
+      padding:16px;
+    }
+    .brand-card h3{
+      font-size:18px;
     }
     .stats-row{
       flex-direction:column;
       gap:8px;
       text-align:center;
+    }
+    .form-with-sidebar{
+      grid-template-columns:1fr;
+    }
+    .field > input, .field > select{
+      font-size:16px; /* Prevents zoom on iOS */
+    }
+  }
+  @media (max-width:640px){
+    .brand-cards{
+      grid-template-columns:repeat(auto-fit,minmax(160px,1fr));
     }
   }
 </style>
@@ -299,7 +337,9 @@
   <div class="brand-cards">
     {% for brand in brands %}
     <div class="brand-card" data-brand="{{ brand.key }}" onclick="selectBrand('{{ brand.key }}', '{{ brand.name }}')">
+      {% if brand.logo %}
       <img src="{% static brand.logo %}" alt="{{ brand.name }}" onerror="this.style.display='none'">
+      {% endif %}
       <h3>{{ brand.name }}</h3>
       <p class="tagline">{{ brand.tagline }}</p>
       <p class="tap-hint">👆 Tap to select</p>
@@ -328,10 +368,11 @@
 
         <div class="field">
           <label>IMEI (15 digits)</label>
-          <input type="text" name="imei" id="imei-input" maxlength="15" pattern="\d{15}" placeholder="Enter 15-digit IMEI" required>
+          <input type="text" name="imei" id="imei-input" maxlength="15" pattern="[0-9]{15}" placeholder="Enter 15-digit IMEI" inputmode="numeric" required>
         </div>
+        <div class="imei-counter" id="imei-counter">0 / 15 digits</div>
 
-        <button type="submit" class="btn btn-primary" style="width:100%;">
+        <button type="submit" class="btn btn-primary" id="submit-button" style="width:100%;" disabled>
           ✅ Scan In Phone
         </button>
       </form>
@@ -407,14 +448,34 @@
     }
   }
 
-  // IMEI input: auto-format as digits only
+  // IMEI input: auto-format as digits only + live counter
   const imeiInput = document.getElementById('imei-input');
+  const imeiCounter = document.getElementById('imei-counter');
+  const submitButton = document.querySelector('#scan-form button[type="submit"]');
+  
   imeiInput.addEventListener('input', function(e) {
     let value = e.target.value.replace(/\D/g, '');  // digits only
     if (value.length > 15) {
-      value = value.slice(-15);  // last 15 digits
+      value = value.slice(0, 15);  // block beyond 15 digits
     }
     e.target.value = value;
+    
+    // Update counter
+    const len = value.length;
+    imeiCounter.textContent = `${len} / 15 digits`;
+    
+    // Visual feedback
+    imeiCounter.classList.remove('valid', 'invalid');
+    if (len === 15) {
+      imeiCounter.classList.add('valid');
+      imeiCounter.textContent = '✅ 15 / 15 digits';
+      submitButton.disabled = false;
+    } else if (len > 0) {
+      imeiCounter.classList.add('invalid');
+      submitButton.disabled = true;
+    } else {
+      submitButton.disabled = true;
+    }
   });
 
   // Model select: fetch available IMEIs when model changes

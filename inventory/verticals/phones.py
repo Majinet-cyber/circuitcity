@@ -3,7 +3,7 @@
 Premium PHONES dashboard - the crown jewel of CircuitCity verticals.
 
 Mirrors the premium Liquor dashboard patterns:
-- Comprehensive KPIs (today, 7-day, MTD, stock on hand)
+- Comprehensive KPIs with custom date range filtering
 - Fast-moving models and top agents tracking  
 - Sales trend visualization over 30 days
 - Business panel with average metrics and sell-through rate
@@ -11,11 +11,15 @@ Mirrors the premium Liquor dashboard patterns:
 
 PHONES uses the InventoryItem model where each phone is tracked with IMEI.
 Sales are recorded by setting status="SOLD" and sold_at timestamp.
+
+NEW in this version:
+- Date range filtering: Today, Last 7 Days, This Month (MTD), Custom
+- All KPIs respect the selected range
 """
 from __future__ import annotations
 
 import json
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, date
 from decimal import Decimal
 
 from django.contrib.auth.decorators import login_required
@@ -31,20 +35,71 @@ from inventory.models import InventoryItem, Product, Location
 from . import base
 
 
+def _parse_date_range(request):
+    """
+    Parse date range from query parameters.
+    
+    Supports:
+    - ?range=today
+    - ?range=7d (last 7 days)
+    - ?range=mtd (month to date, DEFAULT)
+    - ?range=custom&start=YYYY-MM-DD&end=YYYY-MM-DD
+    
+    Returns:
+        tuple: (range_key, start_datetime, end_datetime, display_label)
+    """
+    now = timezone.now()
+    today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+    today_end = today_start + timedelta(days=1)
+    
+    range_param = request.GET.get('range', 'mtd').lower()
+    
+    if range_param == 'today':
+        return ('today', today_start, today_end, 'Today')
+    
+    elif range_param == '7d':
+        start = today_start - timedelta(days=7)
+        return ('7d', start, today_end, 'Last 7 Days')
+    
+    elif range_param == 'custom':
+        # Parse custom dates from query params
+        start_str = request.GET.get('start', '')
+        end_str = request.GET.get('end', '')
+        
+        try:
+            start_date = datetime.strptime(start_str, '%Y-%m-%d').date()
+            end_date = datetime.strptime(end_str, '%Y-%m-%d').date()
+            
+            # Convert to timezone-aware datetimes
+            start_dt = timezone.make_aware(datetime.combine(start_date, datetime.min.time()))
+            end_dt = timezone.make_aware(datetime.combine(end_date, datetime.max.time()))
+            
+            label = f"{start_date.strftime('%b %d')} – {end_date.strftime('%b %d, %Y')}"
+            return ('custom', start_dt, end_dt, label)
+        except (ValueError, TypeError):
+            # Fall back to MTD if custom dates are invalid
+            pass
+    
+    # Default: month-to-date
+    month_start = today_start.replace(day=1)
+    return ('mtd', month_start, today_end, 'This Month')
+
+
 @login_required
 @require_business
 @require_business_kind(BusinessKind.PHONES)
 def dashboard(request):
     """
-    Premium PHONES Dashboard - Crown Jewel Edition
+    Premium PHONES Dashboard - Crown Jewel Edition (with Date Filtering)
     
     Provides comprehensive business metrics for phone retailers:
-    - Today, Last 7 Days, Month-to-Date KPIs
+    - Custom date range filtering (Today / Last 7 Days / MTD / Custom)
+    - KPIs: Units Sold, Revenue, Costs, Profit, Profit Margin
     - Stock on hand with cost/selling value and potential profit
     - 30-day sales trend for visualization
     - Fast-moving models (top 5 by units sold)
     - Top agents leaderboard (top 5 by revenue)
-    - Best sales day in last 30 days
+    - Best sales day in selected period
     - Business panel with average metrics and sell-through rate
     
     Follows the Liquor dashboard pattern for consistency and premium feel.
@@ -56,16 +111,15 @@ def dashboard(request):
     if location is None:
         location = getattr(request, "location", None)
     
-    # Current datetime for date range calculations
+    # ==========================================================================
+    # DATE RANGE PARSING
+    # ==========================================================================
+    range_key, start_date, end_date, range_label = _parse_date_range(request)
+    
+    # Current datetime for other calculations
     now = timezone.now()
     today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
     today_end = today_start + timedelta(days=1)
-    
-    # Last 7 days range
-    last_7_days_start = today_start - timedelta(days=7)
-    
-    # Month-to-date range
-    month_start = today_start.replace(day=1)
     
     # Last 30 days range (for trends and fast-moving analysis)
     last_30_days_start = today_start - timedelta(days=30)
@@ -83,43 +137,57 @@ def dashboard(request):
         sold_items = sold_items.filter(current_location=location)
     
     # ==========================================================================
-    # A) FAST-MOVING KPIs (BUSINESS PANEL FOR PHONES)
+    # A) PREMIUM KPIs FOR SELECTED RANGE
     # ==========================================================================
     
-    # --- TODAY ---
-    today_sales = sold_items.filter(sold_at__gte=today_start, sold_at__lt=today_end)
-    phones_sold_today = today_sales.count()
-    revenue_today = today_sales.aggregate(
+    # Filter sales to the selected date range
+    range_sales = sold_items.filter(sold_at__gte=start_date, sold_at__lt=end_date)
+    
+    # Units sold in selected range
+    units_sold = range_sales.count()
+    
+    # Revenue (sum of selling prices)
+    revenue = range_sales.aggregate(
         total=Coalesce(Sum('selling_price'), Decimal('0.00'), output_field=DecimalField())
     )['total'] or Decimal('0.00')
-    cost_today = today_sales.aggregate(
+    
+    # ==========================================================================
+    # ENHANCED COST TRACKING (Cost of Goods + Business Costs)
+    # ==========================================================================
+    
+    # A) Cost of Goods: Inventory value of current stock (snapshot, not date-filtered)
+    # This is the value of phones currently on hand, based on order_price
+    cost_of_goods = stock_items.aggregate(
         total=Coalesce(Sum('order_price'), Decimal('0.00'), output_field=DecimalField())
     )['total'] or Decimal('0.00')
-    gross_profit_today = revenue_today - cost_today
     
-    # --- LAST 7 DAYS ---
-    last_7_days_sales = sold_items.filter(sold_at__gte=last_7_days_start)
-    phones_sold_7d = last_7_days_sales.count()
-    revenue_7d = last_7_days_sales.aggregate(
-        total=Coalesce(Sum('selling_price'), Decimal('0.00'), output_field=DecimalField())
-    )['total'] or Decimal('0.00')
-    cost_7d = last_7_days_sales.aggregate(
-        total=Coalesce(Sum('order_price'), Decimal('0.00'), output_field=DecimalField())
-    )['total'] or Decimal('0.00')
-    gross_profit_7d = revenue_7d - cost_7d
+    # B) Business Costs: Operating expenses from Admin Wallet > Costs
+    # Import WalletTransaction model
+    from wallet.models import WalletTransaction, Ledger, TxnType
     
-    # --- MONTH-TO-DATE ---
-    mtd_sales = sold_items.filter(sold_at__gte=month_start)
-    phones_sold_mtd = mtd_sales.count()
-    revenue_mtd = mtd_sales.aggregate(
-        total=Coalesce(Sum('selling_price'), Decimal('0.00'), output_field=DecimalField())
-    )['total'] or Decimal('0.00')
-    cost_mtd = mtd_sales.aggregate(
-        total=Coalesce(Sum('order_price'), Decimal('0.00'), output_field=DecimalField())
-    )['total'] or Decimal('0.00')
-    gross_profit_mtd = revenue_mtd - cost_mtd
+    # Query business costs for the selected date range
+    business_costs_query = WalletTransaction.objects.filter(
+        business=business,
+        ledger=Ledger.COMPANY,
+        type__in=[TxnType.COST_ONCE_OFF, TxnType.COST_RECURRING],
+        effective_date__gte=start_date.date() if hasattr(start_date, 'date') else start_date,
+        effective_date__lt=end_date.date() if hasattr(end_date, 'date') else end_date,
+    )
     
-    # --- STOCK ON HAND ---
+    # Sum the absolute values (costs are stored as negative amounts)
+    business_costs_sum = business_costs_query.aggregate(
+        total=Coalesce(Sum('amount'), Decimal('0.00'), output_field=DecimalField())
+    )['total'] or Decimal('0.00')
+    business_costs = abs(business_costs_sum)  # Convert to positive for display
+    
+    # C) Total Costs: Cost of Goods + Business Costs
+    total_costs = cost_of_goods + business_costs
+    
+    # D) Profit and Profit Margin (based on total costs)
+    profit = revenue - total_costs
+    profit_margin = (profit / revenue * 100) if revenue > 0 else Decimal('0.00')
+    
+    # --- STOCK ON HAND (current, not date-filtered) ---
     stock_items = InventoryItem.objects.filter(
         business=business,
         status="IN_STOCK",
@@ -129,50 +197,30 @@ def dashboard(request):
     if location:
         stock_items = stock_items.filter(current_location=location)
     
-    stock_units_on_hand = stock_items.count()
-    stock_cost_value = stock_items.aggregate(
-        total=Coalesce(Sum('order_price'), Decimal('0.00'), output_field=DecimalField())
-    )['total'] or Decimal('0.00')
+    stock_on_hand = stock_items.count()
     
-    # Compute estimated selling value and potential profit using margin-based estimation
-    # This replaces the old (selling_value - cost_value) which could go negative
-    from inventory.utils_metrics import estimate_margin_for_business_and_sku
-    
-    margin_pct = estimate_margin_for_business_and_sku(business)
-    stock_selling_value = stock_cost_value * (Decimal('1') + margin_pct)
-    potential_profit_on_hand = max(Decimal('0'), stock_cost_value * margin_pct)
-    
-    # Group into organized dict
-    phones_kpis = {
-        "today": {
-            "units": phones_sold_today,
-            "revenue": revenue_today,
-            "gross_profit": gross_profit_today,
-        },
-        "last_7_days": {
-            "units": phones_sold_7d,
-            "revenue": revenue_7d,
-            "gross_profit": gross_profit_7d,
-        },
-        "mtd": {
-            "units": phones_sold_mtd,
-            "revenue": revenue_mtd,
-            "gross_profit": gross_profit_mtd,
-        },
-        "stock": {
-            "units": stock_units_on_hand,
-            "cost_value": stock_cost_value,
-            "selling_value": stock_selling_value,
-            "potential_profit": potential_profit_on_hand,
-        },
+    # Package the main dashboard KPIs for the selected range
+    dashboard_kpis = {
+        "range_key": range_key,
+        "range_label": range_label,
+        "start_date": start_date.date() if hasattr(start_date, 'date') else start_date,
+        "end_date": end_date.date() if hasattr(end_date, 'date') else end_date,
+        "units_sold": units_sold,
+        "revenue": revenue,
+        # Enhanced cost breakdown
+        "cost_of_goods": cost_of_goods,
+        "business_costs": business_costs,
+        "total_costs": total_costs,
+        "profit": profit,
+        "profit_margin": profit_margin,
+        "stock_on_hand": stock_on_hand,
     }
     
     # ==========================================================================
-    # B) FAST MOVING GRAPHS + HIGHLIGHTS
+    # B) ADDITIONAL INSIGHTS (still using 30-day window for trends/highlights)
     # ==========================================================================
     
-    # --- SALES TREND - LAST 30 DAYS ---
-    # Group sales by date for the last 30 days
+    # --- SALES TREND - LAST 30 DAYS (unchanged for visualization) ---
     sales_trend_data = []
     for i in range(30):
         day_start = today_start - timedelta(days=29-i)
@@ -191,9 +239,9 @@ def dashboard(request):
     
     sales_trend_30d = sales_trend_data
     
-    # --- FAST MOVING MODELS - TOP 5 BY UNITS SOLD (LAST 30 DAYS) ---
+    # --- FAST MOVING MODELS - TOP 5 BY UNITS SOLD (SELECTED RANGE) ---
     fast_models_query = (
-        sold_items.filter(sold_at__gte=last_30_days_start)
+        range_sales
         .values('product__brand', 'product__model', 'product__variant')
         .annotate(
             units=Count('id'),
@@ -202,14 +250,14 @@ def dashboard(request):
         .order_by('-units')[:5]
     )
     
-    fast_models_30d = []
+    fast_models = []
     for item in fast_models_query:
         brand = item['product__brand'] or "Unknown"
         model = item['product__model'] or "Unknown"
         variant = item['product__variant'] or ""
         ram_rom = variant if variant else "N/A"
         
-        fast_models_30d.append({
+        fast_models.append({
             "brand": brand,
             "model": model,
             "ram_rom": ram_rom,
@@ -217,12 +265,9 @@ def dashboard(request):
             "revenue": item['revenue'],
         })
     
-    # --- FAST AGENTS - TOP 5 BY REVENUE (LAST 30 DAYS) ---
-    fast_agents_query = (
-        sold_items.filter(
-            sold_at__gte=last_30_days_start,
-            assigned_agent__isnull=False
-        )
+    # --- TOP AGENTS - TOP 5 BY REVENUE (SELECTED RANGE) ---
+    top_agents_query = (
+        range_sales.filter(assigned_agent__isnull=False)
         .values('assigned_agent__id', 'assigned_agent__first_name', 'assigned_agent__last_name', 'assigned_agent__username')
         .annotate(
             units=Count('id'),
@@ -231,45 +276,22 @@ def dashboard(request):
         .order_by('-revenue')[:5]
     )
     
-    fast_agents_30d = []
-    for item in fast_agents_query:
+    top_agents = []
+    for item in top_agents_query:
         first_name = item['assigned_agent__first_name'] or ""
         last_name = item['assigned_agent__last_name'] or ""
         username = item['assigned_agent__username'] or "Unknown"
         agent_name = f"{first_name} {last_name}".strip() or username
         
-        # Find best day for this agent (day with highest revenue in last 30 days)
-        agent_id = item['assigned_agent__id']
-        best_day = None
-        if agent_id:
-            # Group by day and find the day with max revenue
-            agent_daily_sales = (
-                sold_items.filter(
-                    assigned_agent__id=agent_id,
-                    sold_at__gte=last_30_days_start
-                )
-                .extra(select={'day': 'DATE(sold_at)'})
-                .values('day')
-                .annotate(
-                    day_revenue=Coalesce(Sum('selling_price'), Decimal('0.00'), output_field=DecimalField())
-                )
-                .order_by('-day_revenue')
-                .first()
-            )
-            if agent_daily_sales:
-                best_day = agent_daily_sales['day']
-        
-        fast_agents_30d.append({
+        top_agents.append({
             "agent_name": agent_name,
             "units": item['units'],
             "revenue": item['revenue'],
-            "best_day": best_day,
         })
     
-    # --- BEST SALES DAY - LAST 30 DAYS ---
-    # Find the single day with the highest revenue
+    # --- BEST SALES DAY IN SELECTED RANGE ---
     best_day_query = (
-        sold_items.filter(sold_at__gte=last_30_days_start)
+        range_sales
         .extra(select={'day': 'DATE(sold_at)'})
         .values('day')
         .annotate(
@@ -280,73 +302,47 @@ def dashboard(request):
         .first()
     )
     
-    best_sales_day_30d = None
+    best_sales_day = None
     if best_day_query:
-        best_sales_day_30d = {
+        best_sales_day = {
             "date": best_day_query['day'],
             "units": best_day_query['day_units'],
             "revenue": best_day_query['day_revenue'],
         }
     
-    # ==========================================================================
-    # C) BUSINESS PANEL METRICS (PHONES-SPECIFIC)
-    # ==========================================================================
+    # --- SALES BY PHONE MODEL - TOP 10 BY REVENUE (SELECTED RANGE) ---
+    # Group sales by phone brand + model to show which models are selling
+    sales_by_model_query = (
+        range_sales
+        .values('product__brand', 'product__model')
+        .annotate(
+            units_sold=Count('id'),
+            revenue=Coalesce(Sum('selling_price'), Decimal('0.00'), output_field=DecimalField())
+        )
+        .order_by('-revenue')[:10]  # Top 10 models by revenue
+    )
     
-    # Average selling price per unit this month
-    avg_selling_price_mtd = Decimal('0.00')
-    if phones_sold_mtd > 0:
-        avg_selling_price_mtd = revenue_mtd / phones_sold_mtd
-    
-    # Average gross profit per unit this month
-    avg_gross_profit_mtd = Decimal('0.00')
-    if phones_sold_mtd > 0:
-        avg_gross_profit_mtd = gross_profit_mtd / phones_sold_mtd
-    
-    # Sell-through rate: units_sold_mtd / (units_on_hand + units_sold_mtd)
-    sell_through_rate = 0
-    total_inventory = stock_units_on_hand + phones_sold_mtd
-    if total_inventory > 0:
-        sell_through_rate = int((phones_sold_mtd / total_inventory) * 100)
-    
-    # Traffic light hints
-    sell_through_hint = "Needs attention"
-    sell_through_color = "red"
-    if sell_through_rate >= 70:
-        sell_through_hint = "Great"
-        sell_through_color = "green"
-    elif sell_through_rate >= 40:
-        sell_through_hint = "Okay"
-        sell_through_color = "yellow"
-    
-    profit_margin_mtd = 0
-    if revenue_mtd > 0:
-        profit_margin_mtd = int((gross_profit_mtd / revenue_mtd) * 100)
-    
-    business_panel = {
-        "avg_selling_price_mtd": avg_selling_price_mtd,
-        "avg_gross_profit_mtd": avg_gross_profit_mtd,
-        "sell_through_rate": sell_through_rate,
-        "sell_through_hint": sell_through_hint,
-        "sell_through_color": sell_through_color,
-        "profit_margin_mtd": profit_margin_mtd,
-    }
+    sales_by_model = []
+    for item in sales_by_model_query:
+        brand = item['product__brand'] or "Unknown"
+        model = item['product__model'] or "Unknown"
+        # Combine brand and model for display (e.g., "Tecno Pova 5", "Itel A58")
+        model_name = f"{brand} {model}".strip()
+        
+        sales_by_model.append({
+            "model_name": model_name,
+            "units_sold": item['units_sold'],
+            "revenue": item['revenue'],
+        })
     
     # ==========================================================================
-    # D) CONTEXT ASSEMBLY
+    # C) CONTEXT ASSEMBLY
     # ==========================================================================
     
-    # Serialize data for JavaScript charts (following Liquor pattern)
+    # Serialize data for JavaScript charts
     sales_trend_json = json.dumps(sales_trend_30d)
-    fast_models_json = json.dumps([
-        {"label": f"{m['brand']} {m['model']} {m['ram_rom']}", "value": m['units']}
-        for m in fast_models_30d
-    ])
-    fast_agents_json = json.dumps([
-        {"label": a['agent_name'], "value": float(a['revenue'])}
-        for a in fast_agents_30d
-    ])
     
-    # Dashboard enhancements (greeting, quotes, etc.) - same as Liquor
+    # Dashboard enhancements (greeting, quotes, etc.)
     try:
         from dashboard.helpers_greetings import get_personalized_greeting
         from dashboard.helpers_yesterday import get_yesterday_summary, should_show_yesterday_summary, mark_yesterday_summary_shown
@@ -387,20 +383,20 @@ def dashboard(request):
     # Update context
     ctx.update({
         "hero_title": "Phones & Electronics",
-        "hero_blurb": "Track your phone sales, stock, and agents in one premium dashboard.",
+        "hero_blurb": "Track your phone sales, stock, and agents with premium KPIs and custom date filtering.",
         
-        # KPIs
-        "phones_kpis": phones_kpis,
-        "business_panel": business_panel,
+        # NEW: Premium dashboard KPIs with date filtering
+        "dashboard_kpis": dashboard_kpis,
         
-        # Charts and trends
+        # Charts and trends (30-day window for visualization)
         "sales_trend_30d": sales_trend_30d,
         "sales_trend_json": sales_trend_json,
-        "fast_models_30d": fast_models_30d,
-        "fast_models_json": fast_models_json,
-        "fast_agents_30d": fast_agents_30d,
-        "fast_agents_json": fast_agents_json,
-        "best_sales_day_30d": best_sales_day_30d,
+        "fast_models": fast_models,
+        "top_agents": top_agents,
+        "best_sales_day": best_sales_day,
+        
+        # NEW: Sales by phone model (respects date range filter)
+        "sales_by_model": sales_by_model,
         
         # UI flags
         "show_search": False,

@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% load humanize %}
 
 {% block title %}Phones Dashboard · Emajinet{% endblock %}
 
@@ -69,103 +70,118 @@
     </div>
   </header>
 
-  <!-- PHONES BUSINESS PANEL - Fast-Moving KPIs -->
-  <section class="recent-block">
-    <h2 class="section-title"><i class="bi bi-speedometer2"></i> Phones Business Panel</h2>
+  <!-- DATE RANGE FILTER BAR -->
+  <section class="recent-block" style="padding:16px 22px">
+    <div style="display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:space-between">
+      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+        <span style="font-weight:700;color:#64748b;margin-right:8px">Date Range:</span>
+        <a href="?range=today" class="btn {% if dashboard_kpis.range_key == 'today' %}btn-primary{% else %}btn-outline-secondary{% endif %}" style="border-radius:20px;padding:8px 16px;font-size:.9rem">
+          <i class="bi bi-calendar-day"></i> Today
+        </a>
+        <a href="?range=7d" class="btn {% if dashboard_kpis.range_key == '7d' %}btn-primary{% else %}btn-outline-secondary{% endif %}" style="border-radius:20px;padding:8px 16px;font-size:.9rem">
+          <i class="bi bi-calendar-week"></i> Last 7 Days
+        </a>
+        <a href="?range=mtd" class="btn {% if dashboard_kpis.range_key == 'mtd' %}btn-primary{% else %}btn-outline-secondary{% endif %}" style="border-radius:20px;padding:8px 16px;font-size:.9rem">
+          <i class="bi bi-calendar-month"></i> This Month
+        </a>
+        <button type="button" class="btn {% if dashboard_kpis.range_key == 'custom' %}btn-primary{% else %}btn-outline-secondary{% endif %}" style="border-radius:20px;padding:8px 16px;font-size:.9rem" onclick="toggleCustomRange()">
+          <i class="bi bi-calendar-range"></i> Custom
+        </button>
+      </div>
+      <div style="font-size:.9rem;color:#64748b">
+        <strong>Showing:</strong> {{ dashboard_kpis.range_label }}
+      </div>
+    </div>
     
-    <div class="metrics-grid" style="grid-template-columns:repeat(auto-fit,minmax(220px,1fr))">
-      <!-- TODAY -->
-      <article class="metric-card">
-        <h3><i class="bi bi-calendar-day"></i> Today</h3>
-        <p style="color:#3b82f6">{{ phones_kpis.today.units }}</p>
-        <small>units sold</small>
-        <div style="margin-top:10px;padding-top:10px;border-top:1px solid #e2e8f0">
-          <small><strong>Revenue:</strong> MK {{ phones_kpis.today.revenue|floatformat:0 }}</small><br>
-          <small><strong>Profit:</strong> MK {{ phones_kpis.today.gross_profit|floatformat:0 }}</small>
-        </div>
-      </article>
-      
-      <!-- LAST 7 DAYS -->
-      <article class="metric-card">
-        <h3><i class="bi bi-calendar-week"></i> Last 7 Days</h3>
-        <p style="color:#8b5cf6">{{ phones_kpis.last_7_days.units }}</p>
-        <small>units sold</small>
-        <div style="margin-top:10px;padding-top:10px;border-top:1px solid #e2e8f0">
-          <small><strong>Revenue:</strong> MK {{ phones_kpis.last_7_days.revenue|floatformat:0 }}</small><br>
-          <small><strong>Profit:</strong> MK {{ phones_kpis.last_7_days.gross_profit|floatformat:0 }}</small>
-        </div>
-      </article>
-      
-      <!-- MONTH-TO-DATE -->
-      <article class="metric-card">
-        <h3><i class="bi bi-calendar-month"></i> This Month</h3>
-        <p style="color:#16a34a">{{ phones_kpis.mtd.units }}</p>
-        <small>units sold</small>
-        <div style="margin-top:10px;padding-top:10px;border-top:1px solid #e2e8f0">
-          <small><strong>Revenue:</strong> MK {{ phones_kpis.mtd.revenue|floatformat:0 }}</small><br>
-          <small><strong>Profit:</strong> MK {{ phones_kpis.mtd.gross_profit|floatformat:0 }}</small>
-        </div>
-      </article>
-      
+    <!-- CUSTOM DATE RANGE FORM (hidden by default) -->
+    <form method="get" id="customRangeForm" style="display:{% if dashboard_kpis.range_key == 'custom' %}flex{% else %}none{% endif %};gap:12px;margin-top:16px;padding-top:16px;border-top:1px solid #e2e8f0;flex-wrap:wrap;align-items:end">
+      <input type="hidden" name="range" value="custom">
+      <div>
+        <label for="startDate" style="display:block;font-size:.85rem;font-weight:600;color:#64748b;margin-bottom:4px">Start Date</label>
+        <input type="date" id="startDate" name="start" value="{% if dashboard_kpis.range_key == 'custom' %}{{ dashboard_kpis.start_date|date:'Y-m-d' }}{% endif %}" class="form-control" required style="border-radius:10px">
+      </div>
+      <div>
+        <label for="endDate" style="display:block;font-size:.85rem;font-weight:600;color:#64748b;margin-bottom:4px">End Date</label>
+        <input type="date" id="endDate" name="end" value="{% if dashboard_kpis.range_key == 'custom' %}{{ dashboard_kpis.end_date|date:'Y-m-d' }}{% endif %}" class="form-control" required style="border-radius:10px">
+      </div>
+      <button type="submit" class="btn btn-primary" style="border-radius:10px">
+        <i class="bi bi-check-circle"></i> Apply
+      </button>
+      <button type="button" class="btn btn-outline-secondary" style="border-radius:10px" onclick="toggleCustomRange()">
+        Cancel
+      </button>
+    </form>
+  </section>
+
+  <!-- PREMIUM KPI CARDS (with date range filtering) -->
+  <section class="recent-block">
+    <h2 class="section-title">
+      <i class="bi bi-graph-up-arrow"></i> Business KPIs
+      <span style="font-size:.85rem;font-weight:600;color:#64748b;margin-left:12px">{{ dashboard_kpis.range_label }}</span>
+    </h2>
+    
+    <div class="metrics-grid">
       <!-- STOCK ON HAND -->
       <article class="metric-card">
         <h3><i class="bi bi-box-seam"></i> Stock on Hand</h3>
-        <p style="color:#0f172a">{{ phones_kpis.stock.units }}</p>
-        <small>units available</small>
-        <div style="margin-top:10px;padding-top:10px;border-top:1px solid #e2e8f0">
-          <small><strong>Cost Value:</strong> MK {{ phones_kpis.stock.cost_value|floatformat:0 }}</small><br>
-          <small><strong>Selling Value:</strong> MK {{ phones_kpis.stock.selling_value|floatformat:0 }}</small><br>
-          <small style="color:#16a34a"><strong>Potential Profit:</strong> MK {{ phones_kpis.stock.potential_profit|floatformat:0 }}</small>
-        </div>
-      </article>
-    </div>
-  </section>
-
-  <!-- BUSINESS PERFORMANCE METRICS -->
-  <section class="recent-block">
-    <h2 class="section-title"><i class="bi bi-bar-chart-line"></i> Business Performance (This Month)</h2>
-    
-    <div class="metrics-grid">
-      <article class="metric-card">
-        <h3>Avg Selling Price</h3>
-        <p style="color:#3b82f6">MK {{ business_panel.avg_selling_price_mtd|floatformat:0 }}</p>
-        <small>per unit sold</small>
+        <p style="color:#0f172a">{{ dashboard_kpis.stock_on_hand|intcomma }}</p>
+        <small>units in stock</small>
       </article>
       
+      <!-- UNITS SOLD -->
       <article class="metric-card">
-        <h3>Avg Gross Profit</h3>
-        <p style="color:#16a34a">MK {{ business_panel.avg_gross_profit_mtd|floatformat:0 }}</p>
-        <small>per unit sold</small>
+        <h3><i class="bi bi-cart-check"></i> Units Sold</h3>
+        <p style="color:#3b82f6">{{ dashboard_kpis.units_sold|intcomma }}</p>
+        <small>in selected period</small>
       </article>
       
+      <!-- REVENUE -->
       <article class="metric-card">
-        <h3>Profit Margin</h3>
-        <p style="color:#f59e0b">{{ business_panel.profit_margin_mtd }}%</p>
-        <small>gross margin</small>
+        <h3><i class="bi bi-cash-stack"></i> Revenue</h3>
+        <p style="color:#16a34a">MK {{ dashboard_kpis.revenue|floatformat:0|intcomma }}</p>
+        <small>total sales amount</small>
       </article>
       
+      <!-- COSTS (Enhanced with breakdown) -->
       <article class="metric-card">
-        <h3>Sell-Through Rate</h3>
-        <p style="color:{% if business_panel.sell_through_color == 'green' %}#16a34a{% elif business_panel.sell_through_color == 'yellow' %}#f59e0b{% else %}#dc2626{% endif %}">{{ business_panel.sell_through_rate }}%</p>
+        <h3><i class="bi bi-receipt"></i> Costs</h3>
+        <p style="color:#f59e0b">MK {{ dashboard_kpis.total_costs|floatformat:0|intcomma }}</p>
+        <small style="display:block;margin-top:4px;line-height:1.5">
+          Cost of goods: MK {{ dashboard_kpis.cost_of_goods|floatformat:0|intcomma }}<br>
+          Business costs: MK {{ dashboard_kpis.business_costs|floatformat:0|intcomma }}
+        </small>
+      </article>
+      
+      <!-- PROFIT (with enhanced margin display) -->
+      <article class="metric-card" style="border:2px solid {% if dashboard_kpis.profit >= 0 %}#16a34a{% else %}#dc2626{% endif %}">
+        <h3><i class="bi bi-trophy"></i> Profit</h3>
+        <p style="color:{% if dashboard_kpis.profit >= 0 %}#16a34a{% else %}#dc2626{% endif %}">
+          {% if dashboard_kpis.profit < 0 %}-{% endif %}MK {{ dashboard_kpis.profit|abs|floatformat:0|intcomma }}
+        </p>
         <small>
-          <span class="badge {{ business_panel.sell_through_color }}">{{ business_panel.sell_through_hint }}</span>
+          <span class="badge {% if dashboard_kpis.profit_margin >= 20 %}green{% elif dashboard_kpis.profit_margin >= 10 %}yellow{% else %}red{% endif %}">
+            {% if dashboard_kpis.profit_margin < 0 %}-{% endif %}{{ dashboard_kpis.profit_margin|abs|floatformat:1 }}% margin
+          </span>
         </small>
       </article>
     </div>
     
     <div style="margin-top:16px;padding:14px;background:linear-gradient(135deg,#dbeafe,#e0e7ff);border-radius:12px;border-left:4px solid #3b82f6">
       <p style="margin:0;color:#1e40af;font-size:.95rem">
-        <strong>💡 Tip:</strong> 
-        {% if business_panel.sell_through_rate < 40 %}
-          Your sell-through rate is low. Consider reviewing pricing or increasing marketing efforts.
-        {% elif business_panel.sell_through_rate < 70 %}
-          Good sell-through rate! Keep up the momentum and optimize stock levels.
+        <strong>💡 Insight:</strong> 
+        {% if dashboard_kpis.units_sold == 0 %}
+          No sales recorded in this period. Check your date range or start selling!
+        {% elif dashboard_kpis.profit_margin < 10 %}
+          Your profit margin is low ({{ dashboard_kpis.profit_margin|floatformat:1 }}%). Consider reviewing pricing or reducing costs.
+        {% elif dashboard_kpis.profit_margin < 20 %}
+          Good profit margin of {{ dashboard_kpis.profit_margin|floatformat:1 }}%. Keep optimizing to reach 20%+.
         {% else %}
-          Excellent sell-through! Your inventory is moving fast. Consider increasing stock.
+          Excellent profit margin of {{ dashboard_kpis.profit_margin|floatformat:1 }}%! Your business is performing great.
         {% endif %}
       </p>
     </div>
   </section>
+
 
   <!-- SALES TREND & FAST MOVERS -->
   <div style="display:grid;grid-template-columns:1fr 1fr;gap:18px">
@@ -179,10 +195,13 @@
     
     <!-- FAST MOVING MODELS -->
     <section class="recent-block">
-      <h2 class="section-title"><i class="bi bi-fire"></i> Fast Moving Models</h2>
-      {% if fast_models_30d %}
+      <h2 class="section-title">
+        <i class="bi bi-fire"></i> Fast Moving Models
+        <span style="font-size:.85rem;font-weight:600;color:#64748b;margin-left:8px">({{ dashboard_kpis.range_label }})</span>
+      </h2>
+      {% if fast_models %}
         <div class="leaderboard">
-          {% for model in fast_models_30d %}
+          {% for model in fast_models %}
             <div class="leaderboard-item">
               <div class="leaderboard-rank">{{ forloop.counter }}</div>
               <div class="leaderboard-name">
@@ -190,23 +209,72 @@
                 <div style="font-size:.85rem;color:#64748b">{{ model.ram_rom }}</div>
               </div>
               <div class="leaderboard-value">
-                {{ model.units }} units · MK {{ model.revenue|floatformat:0 }}
+                {{ model.units }} units · MK {{ model.revenue|floatformat:0|intcomma }}
               </div>
             </div>
           {% endfor %}
         </div>
       {% else %}
-        <p style="color:#64748b;text-align:center;padding:40px 0">No sales data for the last 30 days</p>
+        <p style="color:#64748b;text-align:center;padding:40px 0">No sales data for {{ dashboard_kpis.range_label|lower }}</p>
       {% endif %}
     </section>
   </div>
 
+  <!-- SALES BY PHONE MODEL (NEW) -->
+  <section class="recent-block">
+    <h2 class="section-title">
+      <i class="bi bi-phone"></i> Sales by Phone Model
+      <span style="font-size:.85rem;font-weight:600;color:#64748b;margin-left:8px">({{ dashboard_kpis.range_label }})</span>
+    </h2>
+    {% if sales_by_model %}
+      <div style="display:grid;gap:12px">
+        {% for model in sales_by_model %}
+          <div style="display:flex;align-items:center;gap:12px">
+            <!-- Model name -->
+            <div style="min-width:150px;font-weight:600;color:#0f172a;font-size:.95rem">
+              {{ model.model_name }}
+            </div>
+            
+            <!-- Visual bar (units) -->
+            <div style="flex:1;position:relative;height:36px;background:linear-gradient(135deg,#e0e7ff,#dbeafe);border-radius:10px;overflow:hidden">
+              {% with max_units=sales_by_model.0.units_sold %}
+                {% with bar_width=model.units_sold|floatformat:0|add:"0"|floatformat:0 %}
+                  {% widthratio model.units_sold max_units 100 as width_pct %}
+                  <div style="position:absolute;left:0;top:0;bottom:0;width:{{ width_pct }}%;background:linear-gradient(90deg,#3b82f6,#8b5cf6);border-radius:10px;transition:width 0.3s ease"></div>
+                {% endwith %}
+              {% endwith %}
+              
+              <!-- Units label overlay -->
+              <div style="position:absolute;left:12px;top:50%;transform:translateY(-50%);color:#fff;font-weight:700;font-size:.9rem;text-shadow:0 1px 2px rgba(0,0,0,0.3)">
+                {{ model.units_sold }} unit{{ model.units_sold|pluralize }}
+              </div>
+            </div>
+            
+            <!-- Revenue -->
+            <div style="min-width:140px;text-align:right;font-weight:700;color:#16a34a;font-size:.95rem">
+              MK {{ model.revenue|floatformat:0|intcomma }}
+            </div>
+          </div>
+        {% endfor %}
+      </div>
+    {% else %}
+      <div style="text-align:center;padding:60px 20px;color:#64748b">
+        <i class="bi bi-phone" style="font-size:3rem;opacity:0.3;display:block;margin-bottom:16px"></i>
+        <p style="margin:0;font-size:1.1rem;font-weight:600">No phone sales in this period yet</p>
+        <p style="margin:8px 0 0;font-size:.95rem">Sales data will appear here once you start selling phones during {{ dashboard_kpis.range_label|lower }}</p>
+      </div>
+    {% endif %}
+  </section>
+
   <!-- TOP AGENTS LEADERBOARD -->
   <section class="recent-block">
-    <h2 class="section-title"><i class="bi bi-trophy"></i> Top Agents (Last 30 Days)</h2>
-    {% if fast_agents_30d %}
+    <h2 class="section-title">
+      <i class="bi bi-trophy"></i> Top Agents
+      <span style="font-size:.85rem;font-weight:600;color:#64748b;margin-left:8px">({{ dashboard_kpis.range_label }})</span>
+    </h2>
+    {% if top_agents %}
       <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:14px">
-        {% for agent in fast_agents_30d %}
+        {% for agent in top_agents %}
           <div class="leaderboard-item">
             <div class="leaderboard-rank">
               {% if forloop.counter == 1 %}🥇
@@ -217,30 +285,32 @@
             <div class="leaderboard-name">
               <strong>{{ agent.agent_name }}</strong>
               <div style="font-size:.85rem;color:#64748b">
-                {{ agent.units }} units · Best day: {% if agent.best_day %}{{ agent.best_day }}{% else %}N/A{% endif %}
+                {{ agent.units }} units sold
               </div>
             </div>
-            <div class="leaderboard-value">MK {{ agent.revenue|floatformat:0 }}</div>
+            <div class="leaderboard-value">MK {{ agent.revenue|floatformat:0|intcomma }}</div>
           </div>
         {% endfor %}
       </div>
     {% else %}
-      <p style="color:#64748b;text-align:center;padding:40px 0">No agent sales data for the last 30 days</p>
+      <p style="color:#64748b;text-align:center;padding:40px 0">No agent sales data for {{ dashboard_kpis.range_label|lower }}</p>
     {% endif %}
   </section>
 
   <!-- BEST SALES DAY HIGHLIGHT -->
-  {% if best_sales_day_30d %}
+  {% if best_sales_day %}
   <section class="recent-block" style="background:linear-gradient(135deg,#fef3c7,#fde68a);border:2px solid #fbbf24">
-    <h2 class="section-title" style="color:#92400e"><i class="bi bi-star-fill"></i> Best Sales Day (Last 30 Days)</h2>
+    <h2 class="section-title" style="color:#92400e">
+      <i class="bi bi-star-fill"></i> Best Sales Day ({{ dashboard_kpis.range_label }})
+    </h2>
     <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:20px">
       <div>
-        <p style="margin:0;font-size:2rem;font-weight:900;color:#92400e">{{ best_sales_day_30d.date }}</p>
-        <p style="margin:4px 0 0;color:#78350f;font-size:1.1rem">Your best day in the last month!</p>
+        <p style="margin:0;font-size:2rem;font-weight:900;color:#92400e">{{ best_sales_day.date }}</p>
+        <p style="margin:4px 0 0;color:#78350f;font-size:1.1rem">Your best day in the selected period!</p>
       </div>
       <div style="text-align:right">
-        <p style="margin:0;font-size:1.8rem;font-weight:800;color:#16a34a">{{ best_sales_day_30d.units }} units</p>
-        <p style="margin:4px 0 0;font-size:1.2rem;color:#78350f">MK {{ best_sales_day_30d.revenue|floatformat:0 }}</p>
+        <p style="margin:0;font-size:1.8rem;font-weight:800;color:#16a34a">{{ best_sales_day.units }} units</p>
+        <p style="margin:4px 0 0;font-size:1.2rem;color:#78350f">MK {{ best_sales_day.revenue|floatformat:0|intcomma }}</p>
       </div>
     </div>
   </section>
@@ -248,6 +318,14 @@
 </div>
 
 <script>
+// Toggle custom date range form
+function toggleCustomRange() {
+  const form = document.getElementById('customRangeForm');
+  if (form) {
+    form.style.display = form.style.display === 'none' ? 'flex' : 'none';
+  }
+}
+
 // Sales Trend Chart
 (function() {
   const trendData = {{ sales_trend_json|safe }};

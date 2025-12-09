@@ -245,7 +245,9 @@
   <div class="brand-cards">
     {% for brand in brands %}
     <div class="brand-card" data-brand="{{ brand.key }}" onclick="selectBrand('{{ brand.key }}', '{{ brand.name }}')">
+      {% if brand.logo %}
       <img src="{% static brand.logo %}" alt="{{ brand.name }}" onerror="this.style.display='none'">
+      {% endif %}
       <h3>{{ brand.name }}</h3>
       <p class="tagline">{{ brand.tagline }}</p>
       <p class="tap-hint">👆 Tap to select</p>
@@ -264,8 +266,9 @@
 
     <div class="field">
       <label>IMEI (15 digits)</label>
-      <input type="text" name="imei" id="imei-input" maxlength="15" pattern="\d{15}" placeholder="Enter 15-digit IMEI" required>
+      <input type="text" name="imei" id="imei-input" maxlength="15" pattern="\d{15}" placeholder="Enter 15-digit IMEI" inputmode="numeric" required>
     </div>
+    <div class="imei-counter" id="imei-counter" style="font-size:11px;color:#64748b;margin-top:-8px;margin-bottom:16px;font-weight:600;">0 / 15 digits</div>
 
     <div class="row">
       <div class="field">
@@ -275,7 +278,7 @@
 
       <div class="field">
         <label>Payment Method</label>
-        <select name="payment_method" id="payment-method-select">
+        <select name="payment_method" id="payment-method-select" required>
           <option value="CASH">Cash</option>
           <option value="BANK">Bank</option>
           <option value="MOBILE_MONEY">Mobile Money</option>
@@ -283,7 +286,7 @@
       </div>
     </div>
 
-    <button type="submit" class="btn btn-primary" style="width:100%;">
+    <button type="submit" class="btn btn-primary" id="submit-button" style="width:100%;" disabled>
       💰 Complete Sale
     </button>
   </form>
@@ -312,14 +315,37 @@
     document.getElementById('sell-form').scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
 
-  // IMEI input: auto-format as digits only
+  // IMEI input: auto-format as digits only + live counter
   const imeiInput = document.getElementById('imei-input');
+  const imeiCounter = document.getElementById('imei-counter');
+  const submitButton = document.getElementById('submit-button');
+  
   imeiInput.addEventListener('input', function(e) {
     let value = e.target.value.replace(/\D/g, '');  // digits only
     if (value.length > 15) {
-      value = value.slice(-15);  // last 15 digits
+      value = value.slice(0, 15);  // block beyond 15 digits
     }
     e.target.value = value;
+    
+    // Update counter
+    const len = value.length;
+    imeiCounter.textContent = `${len} / 15 digits`;
+    
+    // Visual feedback & validation
+    imeiCounter.classList.remove('valid', 'invalid');
+    if (len === 15) {
+      imeiCounter.classList.add('valid');
+      imeiCounter.textContent = '✅ 15 / 15 digits';
+      imeiCounter.style.color = '#10b981';
+      submitButton.disabled = false;
+    } else if (len > 0) {
+      imeiCounter.classList.add('invalid');
+      imeiCounter.style.color = '#ef4444';
+      submitButton.disabled = true;
+    } else {
+      imeiCounter.style.color = '#64748b';
+      submitButton.disabled = true;
+    }
   });
 
   // Selling price: format with commas on blur

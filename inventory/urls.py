@@ -76,6 +76,12 @@ try:
 except Exception:
     _phones_views = SimpleNamespace()
 
+# Import phone products view (brand-first Add Products)
+try:
+    from . import views_phone_products as _phone_products_views
+except Exception:
+    _phone_products_views = SimpleNamespace()
+
 # Stock assignment views (manager-only)
 try:
     from . import views_stock_assign as _stock_assign
@@ -1035,7 +1041,7 @@ urlpatterns += [
     path("products/new/generic/", _redirect_to("inventory:product_new_entry"), name="product_create"),
     path("product/new/", _redirect_to("inventory:product_new_entry"), name="product_create_short"),
 
-    path("phones/products/new/",   manager_required(_need_biz(_product_create_for_mode_factory("phones"))),   name="product_create_phones"),
+    path("phones/products/new/",   manager_required(_need_biz(getattr(_phone_products_views, "add_phone_products", _product_create_for_mode_factory("phones")))),   name="product_create_phones"),
     path("pharmacy/products/new/", manager_required(_need_biz(_product_create_for_mode_factory("pharmacy"))), name="product_create_pharmacy"),
     path("liquor/products/new/",   manager_required(_need_biz(_product_create_for_mode_factory("liquor"))),   name="product_create_liquor"),
     path("grocery/products/new/",  manager_required(_need_biz(_product_create_for_mode_factory("grocery"))),  name="product_create_grocery"),
@@ -1084,8 +1090,8 @@ except Exception:
     _phone_wizard_v2 = SimpleNamespace()
 
 urlpatterns += [
-    path("phone-products/", _need_biz(getattr(_phone_prods, "phone_products_list", _stub("phone_products_list not found"))), name="phone_products"),
-    path("phone-products/new/", manager_required(_need_biz(getattr(_phone_prods, "phone_product_create", _stub("phone_product_create not found")))), name="phone_product_create"),
+    path("phone-products/", _need_biz(getattr(_phone_products_views, "add_phone_products", _stub("add_phone_products not found"))), name="phone_products"),
+    path("phone-products/new/", manager_required(_need_biz(getattr(_phone_products_views, "add_phone_products", _stub("add_phone_products not found")))), name="phone_product_create"),
     path("phone-products/<int:product_id>/edit/", manager_required(_need_biz(getattr(_phone_prods, "phone_product_edit", _stub("phone_product_edit not found")))), name="phone_product_edit"),
     path("phone-products/<int:product_id>/delete/", manager_required(_need_biz(getattr(_phone_prods, "phone_product_delete", _stub("phone_product_delete not found")))), name="phone_product_delete"),
     path("api/phone-products/models/", _need_biz(getattr(_phone_prods, "phone_products_api_models", _stub("phone_products_api_models not found"))), name="api_phone_products_models"),

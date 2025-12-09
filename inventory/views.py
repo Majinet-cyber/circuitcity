@@ -4239,6 +4239,23 @@ def _render_dashboard_safe(request, context, today=None, mtd_count=0, all_time_c
     context.setdefault("all_time_count", context.get("all_time_count", all_time_count))
     context.setdefault("active_tab", "inventory_dashboard")  # ✅ For sidebar nav highlighting
 
+    # ✅ PHONES DASHBOARD FIX: Provide safe defaults for template variables
+    # Map from existing metrics where possible, otherwise default to 0
+    context.setdefault("items_in_stock", context.get("jug_count", 0))
+    context.setdefault("active_stock_count", context.get("jug_count", 0))
+    context.setdefault("units_sold", context.get("window_count", 0) or context.get("today_count", 0))
+    context.setdefault("total_units", context.get("window_count", 0) or context.get("today_count", 0))
+    context.setdefault("revenue_total", context.get("window_revenue", 0.0) or context.get("today_total", 0.0))
+    context.setdefault("total_revenue", context.get("window_revenue", 0.0) or context.get("today_total", 0.0))
+    context.setdefault("costs_total", 0)   # for now, business costs; we'll wire it from Costs later
+    context.setdefault("profit_total", 0)  # for now, can later be revenue_total - costs_total
+    context.setdefault("low_items", 0)     # low/out of stock items count
+    
+    # Profit panel variables (used by partials/profit_panel.html)
+    context.setdefault("revenue", context.get("window_revenue", 0.0) or context.get("today_total", 0.0))
+    context.setdefault("costs", 0)
+    context.setdefault("profit", 0)
+
     try:
         return render(request, "inventory/dashboard.html", context)
     except TemplateDoesNotExist:
