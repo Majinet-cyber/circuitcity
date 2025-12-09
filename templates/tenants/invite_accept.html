@@ -142,11 +142,20 @@
             {% if form.password1 %}
               {{ form.password1 }}
             {% else %}
-              <input type="password" name="password1" id="id_password1" class="form-control" minlength="8" required autocomplete="new-password" autofocus>
+              <input type="password" name="password1" id="id_password1" class="form-control" minlength="12" required autocomplete="new-password" autofocus>
             {% endif %}
             <button class="btn btn-outline-secondary" type="button" data-toggle="reveal" data-target="[name='password1']">Show</button>
           </div>
-          {% if form.password1 and form.password1.errors %}<div class="text-danger small mt-1">{{ form.password1.errors|join:", " }}</div>{% endif %}
+          {% if form.password1 and form.password1.errors %}
+            <div class="text-danger small mt-1">
+              {% for error in form.password1.errors %}
+                <div>{{ error }}</div>
+              {% endfor %}
+            </div>
+          {% endif %}
+          <div class="form-text small" style="font-size:0.8rem;">
+            Must be at least 12 characters with uppercase, lowercase, digit, and symbol (e.g. @, #, $, !, etc.)
+          </div>
           <div id="strengthHint" class="small mt-1"></div>
         </div>
 
@@ -156,11 +165,17 @@
             {% if form.password2 %}
               {{ form.password2 }}
             {% else %}
-              <input type="password" name="password2" id="id_password2" class="form-control" minlength="8" required autocomplete="new-password">
+              <input type="password" name="password2" id="id_password2" class="form-control" minlength="12" required autocomplete="new-password">
             {% endif %}
             <button class="btn btn-outline-secondary" type="button" data-toggle="reveal" data-target="[name='password2']">Show</button>
           </div>
-          {% if form.password2 and form.password2.errors %}<div class="text-danger small mt-1">{{ form.password2.errors|join:", " }}</div>{% endif %}
+          {% if form.password2 and form.password2.errors %}
+            <div class="text-danger small mt-1">
+              {% for error in form.password2.errors %}
+                <div>{{ error }}</div>
+              {% endfor %}
+            </div>
+          {% endif %}
           <div class="form-text" id="matchHint" style="display:none;">Passwords match ✔</div>
         </div>
 
@@ -201,35 +216,35 @@
     greeting.textContent=`Hi ${name}, welcome to ${shopName}.`;
   }
 
-  function strength(s){let n=0; if(s.length>=8)n++; if(/[a-z]/.test(s)&&/[A-Z]/.test(s))n++; if(/\d/.test(s))n++; if(/[^A-Za-z0-9]/.test(s))n++; return n;}
+  function strength(s){let n=0; if(s.length>=12)n++; if(/[a-z]/.test(s)&&/[A-Z]/.test(s))n++; if(/\d/.test(s))n++; if(/[^A-Za-z0-9]/.test(s))n++; return n;}
   function updateStrength(){
     if(!p1||!strengthHint)return;
     const sc=strength(p1.value||"");
     let msg="";
     if(!p1.value) msg="";
-    else if(sc<=1) msg="Strength: weak";
-    else if(sc===2) msg="Strength: fair";
-    else if(sc===3) msg="Strength: good";
-    else msg="Strength: strong";
+    else if(sc<=1) msg="⚠️ Too weak - needs 12+ chars, upper, lower, digit, symbol";
+    else if(sc===2) msg="⚠️ Weak - missing some requirements";
+    else if(sc===3) msg="✓ Good password";
+    else msg="✓ Strong password";
     strengthHint.textContent=msg;
-    strengthHint.className="small mt-1 "+(sc<=1?"text-danger":sc===2?"text-warning":"text-success");
+    strengthHint.className="small mt-1 "+(sc<=2?"text-danger":sc===3?"text-warning":"text-success");
   }
 
   function updateMatch(){
     if(!p1||!p2||!matchHint)return;
     if(!p1.value||!p2.value){ matchHint.style.display='none'; return; }
-    const ok=p1.value===p2.value && p1.value.length>=8;
+    const ok=p1.value===p2.value && p1.value.length>=12;
     matchHint.style.display='block';
     matchHint.className="form-text "+(ok?"text-success":"text-danger");
-    matchHint.textContent= ok ? "Passwords match ✔" : "Passwords don't match";
+    matchHint.textContent= ok ? "✓ Passwords match" : "⚠️ Passwords don't match";
   }
 
   if(form){
     form.addEventListener('submit', e=>{
-      const ok=p1&&p2&&p1.value===p2.value&&p1.value.length>=8;
+      const ok=p1&&p2&&p1.value===p2.value&&p1.value.length>=12;
       if(!ok){
         e.preventDefault(); updateMatch();
-        if(p1&&p1.value.length<8) p1.focus(); else if(p2) p2.focus();
+        if(p1&&p1.value.length<12) p1.focus(); else if(p2) p2.focus();
         return;
       }
       if(submitBtn){ submitBtn.disabled=true; submitBtn.innerText="Creating account…"; }

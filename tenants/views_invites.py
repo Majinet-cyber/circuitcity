@@ -7,11 +7,14 @@ from typing import Optional, Any
 from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth import get_user_model, login, authenticate
+from django.contrib.auth.password_validation import validate_password
+from django.core.exceptions import ValidationError
 from django.db.models import Q
 from django.http import HttpRequest, HttpResponse
 from django.shortcuts import redirect, render
 from django.urls import reverse, NoReverseMatch
 from django.utils import timezone
+from django.utils.http import url_has_allowed_host_and_scheme
 from django.views.decorators.cache import never_cache
 from django.views.decorators.csrf import ensure_csrf_cookie
 from django.views.decorators.http import require_http_methods
@@ -42,14 +45,26 @@ def _best_post_accept_redirect(request: HttpRequest) -> str:
     After successfully joining, send the user somewhere agent-friendly.
     These views should pick up the ACTIVE BUSINESS from session/thread-local,
     which we set via set_active_business().
+    
+    Security: Also checks for a safe 'next' parameter, but only allows internal URLs.
     """
+    # Check for a safe 'next' parameter (must be internal URL)
+    next_url = request.GET.get("next") or request.POST.get("next")
+    if next_url:
+        allowed_hosts = {request.get_host()}
+        if url_has_allowed_host_and_scheme(
+            url=next_url,
+            allowed_hosts=allowed_hosts,
+            require_https=request.is_secure()
+        ):
+            return next_url
+    
+    # Default agent-friendly landing pages
     for name in [
         "inventory:scan_sold",           # most agent-centric
         "inventory:inventory_dashboard",  # inventory hub
         "dashboard:home",
         "dashboard:dashboard",
-        "tenants:activate_mine",
-        "tenants:choose_business",
         "home",
     ]:
         try:
@@ -481,6 +496,33 @@ def accept_invite(request: HttpRequest, token: str) -> HttpResponse:
         return _render_safe(request, "tenants/invites/error.html", ctx, status=500)
 
     if user is None:
+        # Validate password before creating user (additional safeguard)
+        if password:
+            try:
+                temp_user = User(username=email.split("@")[0], email=email)
+                validate_password(password, user=temp_user)
+            except ValidationError as e:
+                logger.warning(f"Password validation failed for invite {token}: {e}")
+                try:
+                    for error in e.messages:
+                        form.add_error("password1", error)
+                except Exception:
+                    form.add_error("password1", "Password does not meet security requirements.")
+                ctx = {
+                    "form": form,
+                    "invite": invite,
+                    "title": f"Join {_biz_name(invite)}",
+                    "biz_name": _biz_name(invite),
+                    "greeting": _greeting(invite),
+                    "expires_at": getattr(invite, "expires_at", None),
+                    "message": "Password does not meet security requirements.",
+                    "compact": True,
+                    "active_tab": "",
+                    "show_search": False,
+                    "error": "Weak password",
+                }
+                return _render_safe(request, "tenants/invite_accept.html", ctx, status=400)
+        
         try:
             username = _unique_username_from_email(email)
             user = User.objects.create_user(username=username, email=email, password=password or "changeme-now")

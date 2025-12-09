@@ -278,3 +278,67 @@ class UniqueCaseInsensitive:
 
     def __repr__(self) -> str:
         return f"{self.__class__.__name__}(model={self.model.__name__}, field_name={self.field_name!r})"
+
+
+# ---------------------------------------------------------------------------
+# Strong Password Validator (for agent invites and user registration)
+# ---------------------------------------------------------------------------
+
+@deconstructible
+class StrongPasswordValidator:
+    """
+    Enforce a strong password policy:
+    - At least 12 characters
+    - At least 1 uppercase letter
+    - At least 1 lowercase letter
+    - At least 1 digit
+    - At least 1 symbol (non-alphanumeric)
+    
+    This validator is designed to be used in Django's AUTH_PASSWORD_VALIDATORS setting.
+    """
+    
+    def validate(self, password, user=None):
+        """
+        Validate that the password meets all strength requirements.
+        
+        Args:
+            password: The password string to validate
+            user: The user object (optional, for compatibility with Django's password validation)
+            
+        Raises:
+            ValidationError: If the password doesn't meet requirements
+        """
+        if not password:
+            raise ValidationError(
+                "Password is required.",
+                code="password_required"
+            )
+        
+        errors = []
+        
+        if len(password) < 12:
+            errors.append("Password must be at least 12 characters long.")
+        
+        if not re.search(r"[A-Z]", password):
+            errors.append("Password must contain at least one uppercase letter (A-Z).")
+        
+        if not re.search(r"[a-z]", password):
+            errors.append("Password must contain at least one lowercase letter (a-z).")
+        
+        if not re.search(r"\d", password):
+            errors.append("Password must contain at least one digit (0-9).")
+        
+        if not re.search(r"[^A-Za-z0-9]", password):
+            errors.append("Password must contain at least one symbol (e.g. @, #, $, %, &, !, etc.).")
+        
+        if errors:
+            raise ValidationError(errors, code="password_too_weak")
+    
+    def get_help_text(self):
+        """
+        Return help text to be displayed to the user.
+        """
+        return (
+            "Your password must be at least 12 characters long and include "
+            "at least one uppercase letter, one lowercase letter, one digit, and one symbol."
+        )

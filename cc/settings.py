@@ -352,11 +352,9 @@ else:
 # --------------------------- auth / i18n ---------------------------
 AUTH_PASSWORD_VALIDATORS = [
     {"NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator"},
-    # Minimum 8 characters for better UX (as per requirements)
-    {
-        "NAME": "django.contrib.auth.password_validation.MinimumLengthValidator",
-        "OPTIONS": {"min_length": 8},
-    },
+    # Strong password policy: 12+ chars, upper, lower, digit, symbol
+    # This applies to all password creation/change flows (agent invites, user registration, password reset)
+    {"NAME": "tenants.validators.StrongPasswordValidator"},
     {"NAME": "django.contrib.auth.password_validation.CommonPasswordValidator"},
     {"NAME": "django.contrib.auth.password_validation.NumericPasswordValidator"},
 ]
