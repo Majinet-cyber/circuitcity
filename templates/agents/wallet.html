@@ -72,4 +72,8 @@
   {% endif %}
 
 </div>
+
+{# Include mobile bottom nav (hidden on desktop) #}
+{% include 'partials/bottomnav.html' with active_tab='wallet' %}
+
 {% endblock %}

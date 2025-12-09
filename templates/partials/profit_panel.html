@@ -1,82 +1,263 @@
 {% load humanize %}
 
-<!-- Revenue / Costs / Profit Panel -->
-<div class="row g-3 mb-4">
-    <div class="col-md-4">
-        <div class="card h-100 border-success">
-            <div class="card-body">
-                <div class="d-flex justify-content-between align-items-center mb-2">
-                    <h6 class="card-title text-success mb-0">
-                        <i class="bi bi-graph-up-arrow"></i> Revenue
-                    </h6>
-                    <span class="badge bg-success-subtle text-success">{{ period|default:"MTD" }}</span>
-                </div>
-                <h3 class="mb-0 text-success">
-                    MK {{ revenue|default:0|floatformat:0|intcomma }}
-                </h3>
-                {% if revenue_prev %}
-                <small class="text-muted">
-                    Previous: MK {{ revenue_prev|floatformat:0|intcomma }}
-                    {% if revenue_delta %}
-                        <span class="badge {% if revenue_delta > 0 %}bg-success{% else %}bg-danger{% endif %} ms-1">
-                            {{ revenue_delta|floatformat:1 }}%
-                        </span>
-                    {% endif %}
-                </small>
-                {% endif %}
-            </div>
+<!-- Revenue / Costs / Profit Summary Cards -->
+<section class="kpi-row" style="margin-bottom: 1rem;">
+    <div class="kpi" style="background: linear-gradient(135deg, color-mix(in oklab, #10b981 15%, var(--cc-panel)) 0%, var(--cc-panel) 100%); border: 1px solid color-mix(in oklab, #10b981 30%, transparent); border-radius: var(--radius, 12px); padding: 1rem;">
+        <div class="label" style="color: #10b981; font-weight: 800;">
+            <i class="bi bi-graph-up-arrow"></i> Revenue ({{ period|default:"This month"|title }})
         </div>
+        <div class="value" style="color: #10b981;">
+            MK {{ total_revenue|default:0|floatformat:0|intcomma }}
+        </div>
+        <small style="color: var(--cc-muted); font-size: 0.75rem; font-weight: 600;">
+            {{ total_units|default:0|intcomma }} unit{{ total_units|pluralize }} sold
+        </small>
     </div>
     
-    <div class="col-md-4">
-        <div class="card h-100 border-warning">
-            <div class="card-body">
-                <div class="d-flex justify-content-between align-items-center mb-2">
-                    <h6 class="card-title text-warning mb-0">
-                        <i class="bi bi-cash-stack"></i> Costs
-                    </h6>
-                    <span class="badge bg-warning-subtle text-warning">{{ period|default:"MTD" }}</span>
-                </div>
-                <h3 class="mb-0 text-warning">
-                    MK {{ costs|default:0|floatformat:0|intcomma }}
-                </h3>
-                {% if costs_breakdown %}
-                <small class="text-muted">
-                    Once-off: MK {{ costs_breakdown.once_off_total|floatformat:0|intcomma }}
-                    <br>
-                    Recurring: MK {{ costs_breakdown.recurring_total|floatformat:0|intcomma }}
-                </small>
-                {% endif %}
-            </div>
+    <div class="kpi" style="background: linear-gradient(135deg, color-mix(in oklab, #f59e0b 15%, var(--cc-panel)) 0%, var(--cc-panel) 100%); border: 1px solid color-mix(in oklab, #f59e0b 30%, transparent); border-radius: var(--radius, 12px); padding: 1rem;">
+        <div class="label" style="color: #f59e0b; font-weight: 800;">
+            <i class="bi bi-cash-stack"></i> Costs ({{ period|default:"This month"|title }})
         </div>
+        <div class="value" style="color: #f59e0b;">
+            MK {{ costs_total|default:0|floatformat:0|intcomma }}
+        </div>
+        <small style="color: var(--cc-muted); font-size: 0.75rem; font-weight: 600;">
+            COGS + Admin costs
+        </small>
     </div>
     
-    <div class="col-md-4">
-        <div class="card h-100 {% if profit >= 0 %}border-primary{% else %}border-danger{% endif %}">
-            <div class="card-body">
-                <div class="d-flex justify-content-between align-items-center mb-2">
-                    <h6 class="card-title {% if profit >= 0 %}text-primary{% else %}text-danger{% endif %} mb-0">
-                        <i class="bi bi-piggy-bank"></i> Profit
-                    </h6>
-                    <span class="badge {% if profit >= 0 %}bg-primary-subtle text-primary{% else %}bg-danger-subtle text-danger{% endif %}">
-                        {{ period|default:"MTD" }}
-                    </span>
-                </div>
-                <h3 class="mb-0 {% if profit >= 0 %}text-primary{% else %}text-danger{% endif %}">
-                    MK {{ profit|default:0|floatformat:0|intcomma }}
-                </h3>
-                {% if profit_margin is not None %}
-                <small class="text-muted">
-                    Margin: {{ profit_margin|floatformat:1 }}%
-                    {% if revenue > 0 %}
-                        <span class="badge {% if profit_margin >= 20 %}bg-success{% elif profit_margin >= 10 %}bg-warning{% else %}bg-danger{% endif %} ms-1">
-                            {% if profit_margin >= 20 %}Excellent{% elif profit_margin >= 10 %}Good{% else %}Low{% endif %}
-                        </span>
-                    {% endif %}
-                </small>
-                {% endif %}
-            </div>
+    <div class="kpi" style="background: linear-gradient(135deg, color-mix(in oklab, #3b82f6 15%, var(--cc-panel)) 0%, var(--cc-panel) 100%); border: 1px solid color-mix(in oklab, #3b82f6 30%, transparent); border-radius: var(--radius, 12px); padding: 1rem;">
+        <div class="label" style="color: #3b82f6; font-weight: 800;">
+            <i class="bi bi-piggy-bank"></i> Profit ({{ period|default:"This month"|title }})
         </div>
+        <div class="value" style="color: #3b82f6;">
+            MK {{ profit_total|default:0|floatformat:0|intcomma }}
+        </div>
+        <small style="color: var(--cc-muted); font-size: 0.75rem; font-weight: 600;">
+            {% if total_revenue > 0 %}
+                {{ profit_margin|default:0 }}% margin
+            {% else %}
+                No sales yet
+            {% endif %}
+        </small>
     </div>
-</div>
+</section>
 
+<!-- Battery Cards Row -->
+<section class="row g-3 mb-3">
+    <!-- Revenue vs Costs Battery -->
+    {% if rev_cost_mix %}
+    <div class="col-md-4">
+        <div class="panel" style="height: 100%;">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h6 class="m-0 fw-bold" style="font-size: 0.9rem;">
+                    <i class="bi bi-pie-chart"></i> Revenue vs Costs
+                </h6>
+                <span class="badge" style="background: var(--cc-accent); color: white; font-size: 0.7rem; padding: 0.25rem 0.5rem;">
+                    {{ period|default:"Month"|title }}
+                </span>
+            </div>
+            
+            <!-- Battery visualization -->
+            <div style="margin-bottom: 1rem;">
+                <div style="display: flex; height: 28px; border-radius: 6px; overflow: hidden; border: 2px solid var(--cc-border);">
+                    {% if rev_cost_mix.revenue.pct > 0 %}
+                    <div style="background: #10b981; width: {{ rev_cost_mix.revenue.pct }}%; display: flex; align-items: center; justify-content: center; color: white; font-weight: 700; font-size: 0.7rem; transition: width 0.3s ease;">
+                        {% if rev_cost_mix.revenue.pct >= 20 %}{{ rev_cost_mix.revenue.pct }}%{% endif %}
+                    </div>
+                    {% endif %}
+                    {% if rev_cost_mix.costs.pct > 0 %}
+                    <div style="background: #f59e0b; width: {{ rev_cost_mix.costs.pct }}%; display: flex; align-items: center; justify-content: center; color: white; font-weight: 700; font-size: 0.7rem; transition: width 0.3s ease;">
+                        {% if rev_cost_mix.costs.pct >= 20 %}{{ rev_cost_mix.costs.pct }}%{% endif %}
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+            
+            <!-- Breakdown -->
+            <div class="row g-2">
+                <div class="col-6">
+                    <div style="text-align: center; padding: 0.4rem; border-radius: 6px; background: color-mix(in oklab, #10b981 10%, var(--cc-panel));">
+                        <div style="color: #10b981; font-size: 0.65rem; font-weight: 800; text-transform: uppercase; margin-bottom: 0.2rem;">
+                            Revenue
+                        </div>
+                        <div style="font-weight: 900; font-size: 1.3rem; color: var(--cc-ink);">
+                            {{ rev_cost_mix.revenue.pct }}%
+                        </div>
+                        <div style="font-size: 0.65rem; color: var(--cc-muted); font-weight: 600;">
+                            MK {{ rev_cost_mix.revenue.amount|floatformat:0|intcomma }}
+                        </div>
+                    </div>
+                </div>
+                <div class="col-6">
+                    <div style="text-align: center; padding: 0.4rem; border-radius: 6px; background: color-mix(in oklab, #f59e0b 10%, var(--cc-panel));">
+                        <div style="color: #f59e0b; font-size: 0.65rem; font-weight: 800; text-transform: uppercase; margin-bottom: 0.2rem;">
+                            Costs
+                        </div>
+                        <div style="font-weight: 900; font-size: 1.3rem; color: var(--cc-ink);">
+                            {{ rev_cost_mix.costs.pct }}%
+                        </div>
+                        <div style="font-size: 0.65rem; color: var(--cc-muted); font-weight: 600;">
+                            MK {{ rev_cost_mix.costs.amount|floatformat:0|intcomma }}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+    
+    <!-- Profit vs Costs Battery -->
+    {% if profit_cost_mix %}
+    <div class="col-md-4">
+        <div class="panel" style="height: 100%; {% if profit_cost_mix.low_margin_warning %}border: 2px solid #ef4444; background: linear-gradient(135deg, color-mix(in oklab, #ef4444 8%, var(--cc-panel)) 0%, var(--cc-panel) 100%);{% endif %}">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h6 class="m-0 fw-bold" style="font-size: 0.9rem;">
+                    <i class="bi bi-exclamation-triangle{% if profit_cost_mix.low_margin_warning %}-fill text-danger{% endif %}"></i> Profit vs Costs
+                </h6>
+                <span class="badge" style="background: {% if profit_cost_mix.low_margin_warning %}#ef4444{% else %}var(--cc-accent){% endif %}; color: white; font-size: 0.7rem; padding: 0.25rem 0.5rem;">
+                    {{ period|default:"Month"|title }}
+                </span>
+            </div>
+            
+            {% if profit_cost_mix.low_margin_warning %}
+            <div style="background: #fee2e2; border-left: 4px solid #ef4444; padding: 0.5rem 0.75rem; margin-bottom: 0.75rem; border-radius: 4px;">
+                <div style="display: flex; align-items: center; gap: 0.5rem;">
+                    <i class="bi bi-exclamation-circle-fill text-danger"></i>
+                    <div>
+                        <div style="font-weight: 800; font-size: 0.75rem; color: #991b1b;">⚠ Low Margin</div>
+                        <div style="font-size: 0.7rem; color: #7f1d1d; font-weight: 600;">Costs are more than 90% of revenue</div>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+            
+            <!-- Battery visualization -->
+            <div style="margin-bottom: 1rem;">
+                <div style="display: flex; height: 28px; border-radius: 6px; overflow: hidden; border: 2px solid {% if profit_cost_mix.low_margin_warning %}#ef4444{% else %}var(--cc-border){% endif %};">
+                    {% if profit_cost_mix.profit.pct > 0 %}
+                    <div style="background: #3b82f6; width: {{ profit_cost_mix.profit.pct }}%; display: flex; align-items: center; justify-content: center; color: white; font-weight: 700; font-size: 0.7rem; transition: width 0.3s ease;">
+                        {% if profit_cost_mix.profit.pct >= 20 %}{{ profit_cost_mix.profit.pct }}%{% endif %}
+                    </div>
+                    {% endif %}
+                    {% if profit_cost_mix.costs.pct > 0 %}
+                    <div style="background: {% if profit_cost_mix.low_margin_warning %}#ef4444{% else %}#f59e0b{% endif %}; width: {{ profit_cost_mix.costs.pct }}%; display: flex; align-items: center; justify-content: center; color: white; font-weight: 700; font-size: 0.7rem; transition: width 0.3s ease;">
+                        {% if profit_cost_mix.costs.pct >= 20 %}{{ profit_cost_mix.costs.pct }}%{% endif %}
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+            
+            <!-- Breakdown -->
+            <div class="row g-2">
+                <div class="col-6">
+                    <div style="text-align: center; padding: 0.4rem; border-radius: 6px; background: color-mix(in oklab, #3b82f6 10%, var(--cc-panel));">
+                        <div style="color: #3b82f6; font-size: 0.65rem; font-weight: 800; text-transform: uppercase; margin-bottom: 0.2rem;">
+                            Profit
+                        </div>
+                        <div style="font-weight: 900; font-size: 1.3rem; color: var(--cc-ink);">
+                            {{ profit_cost_mix.profit.pct }}%
+                        </div>
+                        <div style="font-size: 0.65rem; color: var(--cc-muted); font-weight: 600;">
+                            MK {{ profit_cost_mix.profit.amount|floatformat:0|intcomma }}
+                        </div>
+                    </div>
+                </div>
+                <div class="col-6">
+                    <div style="text-align: center; padding: 0.4rem; border-radius: 6px; background: color-mix(in oklab, {% if profit_cost_mix.low_margin_warning %}#ef4444{% else %}#f59e0b{% endif %} 10%, var(--cc-panel));">
+                        <div style="color: {% if profit_cost_mix.low_margin_warning %}#ef4444{% else %}#f59e0b{% endif %}; font-size: 0.65rem; font-weight: 800; text-transform: uppercase; margin-bottom: 0.2rem;">
+                            Costs
+                        </div>
+                        <div style="font-weight: 900; font-size: 1.3rem; color: var(--cc-ink);">
+                            {{ profit_cost_mix.costs.pct }}%
+                        </div>
+                        <div style="font-size: 0.65rem; color: var(--cc-muted); font-weight: 600;">
+                            MK {{ profit_cost_mix.costs.amount|floatformat:0|intcomma }}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+    
+    <!-- Payment Mix Battery (compact version for this row) -->
+    {% if payment_mix %}
+    <div class="col-md-4">
+        <div class="panel" style="height: 100%;">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h6 class="m-0 fw-bold" style="font-size: 0.9rem;">
+                    <i class="bi bi-wallet2"></i> Payment Mix
+                </h6>
+                <span class="badge" style="background: var(--cc-accent); color: white; font-size: 0.7rem; padding: 0.25rem 0.5rem;">
+                    {{ period|default:"Month"|title }}
+                </span>
+            </div>
+            
+            <!-- Battery visualization -->
+            <div style="margin-bottom: 1rem;">
+                <div style="display: flex; height: 28px; border-radius: 6px; overflow: hidden; border: 2px solid var(--cc-border);">
+                    {% if payment_mix.cash.pct > 0 %}
+                    <div style="background: #10b981; width: {{ payment_mix.cash.pct }}%; display: flex; align-items: center; justify-content: center; color: white; font-weight: 700; font-size: 0.7rem; transition: width 0.3s ease;">
+                        {% if payment_mix.cash.pct >= 15 %}{{ payment_mix.cash.pct }}%{% endif %}
+                    </div>
+                    {% endif %}
+                    {% if payment_mix.bank.pct > 0 %}
+                    <div style="background: #3b82f6; width: {{ payment_mix.bank.pct }}%; display: flex; align-items: center; justify-content: center; color: white; font-weight: 700; font-size: 0.7rem; transition: width 0.3s ease;">
+                        {% if payment_mix.bank.pct >= 15 %}{{ payment_mix.bank.pct }}%{% endif %}
+                    </div>
+                    {% endif %}
+                    {% if payment_mix.mobile.pct > 0 %}
+                    <div style="background: #f59e0b; width: {{ payment_mix.mobile.pct }}%; display: flex; align-items: center; justify-content: center; color: white; font-weight: 700; font-size: 0.75rem; transition: width 0.3s ease;">
+                        {% if payment_mix.mobile.pct >= 15 %}{{ payment_mix.mobile.pct }}%{% endif %}
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+            
+            <!-- Compact Breakdown -->
+            <div class="row g-2">
+                <div class="col-4">
+                    <div style="text-align: center; padding: 0.35rem; border-radius: 6px; background: color-mix(in oklab, #10b981 10%, var(--cc-panel));">
+                        <div style="color: #10b981; font-size: 0.6rem; font-weight: 800; text-transform: uppercase; margin-bottom: 0.15rem;">
+                            <i class="bi bi-cash-coin"></i>
+                        </div>
+                        <div style="font-weight: 900; font-size: 1.2rem; color: var(--cc-ink);">
+                            {{ payment_mix.cash.pct }}%
+                        </div>
+                        <div style="font-size: 0.6rem; color: var(--cc-muted); font-weight: 600;">
+                            Cash
+                        </div>
+                    </div>
+                </div>
+                <div class="col-4">
+                    <div style="text-align: center; padding: 0.35rem; border-radius: 6px; background: color-mix(in oklab, #3b82f6 10%, var(--cc-panel));">
+                        <div style="color: #3b82f6; font-size: 0.6rem; font-weight: 800; text-transform: uppercase; margin-bottom: 0.15rem;">
+                            <i class="bi bi-bank"></i>
+                        </div>
+                        <div style="font-weight: 900; font-size: 1.2rem; color: var(--cc-ink);">
+                            {{ payment_mix.bank.pct }}%
+                        </div>
+                        <div style="font-size: 0.6rem; color: var(--cc-muted); font-weight: 600;">
+                            Bank
+                        </div>
+                    </div>
+                </div>
+                <div class="col-4">
+                    <div style="text-align: center; padding: 0.35rem; border-radius: 6px; background: color-mix(in oklab, #f59e0b 10%, var(--cc-panel));">
+                        <div style="color: #f59e0b; font-size: 0.6rem; font-weight: 800; text-transform: uppercase; margin-bottom: 0.15rem;">
+                            <i class="bi bi-phone"></i>
+                        </div>
+                        <div style="font-weight: 900; font-size: 1.2rem; color: var(--cc-ink);">
+                            {{ payment_mix.mobile.pct }}%
+                        </div>
+                        <div style="font-size: 0.6rem; color: var(--cc-muted); font-weight: 600;">
+                            Mobile
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+</section>

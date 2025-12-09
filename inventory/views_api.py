@@ -197,3 +197,124 @@ def scan_sold(request: HttpRequest) -> JsonResponse:
         return _err(f"scan_sold failed: {e}", status=500)
 
 
+# ──────────────────────────────────────────────────────────────────────────────
+# IMEI Lookup Endpoint (smart scanner)
+# ──────────────────────────────────────────────────────────────────────────────
+@login_required
+@require_GET
+def imei_lookup(request: HttpRequest) -> JsonResponse:
+    """
+    Smart IMEI scanner lookup endpoint.
+    
+    Query params:
+        - imei: The 15-digit IMEI to check
+        - mode: "scan_in" or "scan_sell"
+        
+    Scan IN mode:
+        - Returns error if IMEI already exists (globally)
+        - Returns ok if IMEI is available for scan in
+        
+    Scan & Sell mode:
+        - Returns error if IMEI not in stock
+        - Returns product info if IMEI is in stock for current business
+    """
+    from .models import normalize_imei
+    
+    try:
+        # Get parameters
+        imei_raw = request.GET.get("imei", "").strip()
+        mode = request.GET.get("mode", "scan_in").lower()
+        
+        # Validate IMEI format
+        if not imei_raw:
+            return _err("IMEI is required")
+        
+        # Normalize IMEI (strips spaces, keeps last 15 digits)
+        imei = normalize_imei(imei_raw)
+        
+        # Validate it's exactly 15 digits
+        if len(imei) != 15 or not imei.isdigit():
+            return _err("IMEI must be exactly 15 digits (numbers only)")
+        
+        # Get current business
+        business = getattr(request, "business", None)
+        if not business:
+            return _err("No active business", status=403)
+        
+        business_id = business.id if hasattr(business, "id") else business
+        
+        # Mode: Scan IN
+        if mode == "scan_in":
+            # Check if IMEI already exists ANYWHERE (global uniqueness)
+            if InventoryItem is not None:
+                existing = InventoryItem.objects.filter(imei=imei).first()
+                if existing:
+                    # Get business name if possible
+                    biz_name = getattr(existing.business, "name", "Unknown") if hasattr(existing, "business") else "Unknown"
+                    product_name = getattr(existing.product, "model", "Unknown") if hasattr(existing, "product") else "Unknown"
+                    
+                    return _err(
+                        f"This IMEI is already in the system (Business: {biz_name}, Product: {product_name})",
+                        status=400,
+                        error_code="IMEI_EXISTS",
+                        existing_id=existing.id if hasattr(existing, "id") else None
+                    )
+            
+            # IMEI is available
+            return _ok({"status": "available", "imei": imei})
+        
+        # Mode: Scan & Sell
+        elif mode == "scan_sell":
+            # Check if IMEI exists in current business and is IN_STOCK
+            if InventoryItem is None:
+                return _err("Inventory model not available", status=501)
+            
+            # Find item in stock for this business
+            item = (
+                InventoryItem.objects
+                .filter(
+                    business_id=business_id,
+                    imei=imei,
+                    status="IN_STOCK",
+                    is_active=True,
+                    sold_at__isnull=True
+                )
+                .select_related("product", "current_location")
+                .first()
+            )
+            
+            if not item:
+                return _err(
+                    "This IMEI is not available in your current stock",
+                    status=400,
+                    error_code="NOT_IN_STOCK"
+                )
+            
+            # Return product details for pre-filling
+            product_data = {}
+            if hasattr(item, "product") and item.product:
+                product_data = {
+                    "product_id": item.product.id,
+                    "brand": getattr(item.product, "brand", ""),
+                    "model": getattr(item.product, "model", ""),
+                    "variant": getattr(item.product, "variant", ""),
+                    "product_name": f"{getattr(item.product, 'brand', '')} {getattr(item.product, 'model', '')}".strip(),
+                }
+            
+            return _ok({
+                "status": "in_stock",
+                "imei": imei,
+                "item_id": item.id,
+                "selling_price": float(item.selling_price) if hasattr(item, "selling_price") and item.selling_price else None,
+                "order_price": float(item.order_price) if hasattr(item, "order_price") and item.order_price else None,
+                "location": getattr(item.current_location, "name", "") if hasattr(item, "current_location") else "",
+                **product_data
+            })
+        
+        else:
+            return _err(f"Invalid mode: {mode}. Use 'scan_in' or 'scan_sell'")
+    
+    except Exception as e:
+        return _err(f"IMEI lookup failed: {e}", status=500)
+
+

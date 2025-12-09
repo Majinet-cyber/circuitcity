@@ -22,6 +22,7 @@ __all__ = [
     "validate_email_soft",
     "normalize_msisdn",
     "validate_msisdn",
+    "StrongPasswordValidator",
 ]
 
 

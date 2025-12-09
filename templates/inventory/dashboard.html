@@ -12,6 +12,7 @@
   .panel h5,.card-head>div{ font-weight:900; letter-spacing:.01em }
   .kpi-row{ display:grid; gap:12px; grid-template-columns:repeat(4,1fr); margin-bottom:12px; }
   @media (max-width:992px){ .kpi-row{ grid-template-columns:repeat(2,1fr); } }
+  @media (max-width:576px){ .kpi-row{ grid-template-columns:1fr; } }
   .kpi .label{ color:var(--cc-muted); font-weight:800 }
   .kpi .value{ font-size:1.6rem; font-weight:900 }
   .chart-canvas{ width:100% !important; height:var(--chart-h) !important }
@@ -19,7 +20,12 @@
   .dash-grid{ display:grid; gap:12px; grid-template-columns:2fr 1fr; grid-template-rows:minmax(0,1fr) minmax(0,1fr); height:clamp(540px,62vh,760px); }
   .dash-grid .left{ grid-row:1 / span 2; }
   .equal-grid{ display:grid; gap:12px; grid-template-columns:7fr 5fr; align-items:stretch; }
-  @media (max-width:992px){ .dash-grid,.equal-grid{ display:block; height:auto; } .chart-canvas{ height:220px !important } }
+  @media (max-width:992px){ 
+    .dash-grid,.equal-grid{ display:block; height:auto; } 
+    .dash-grid .left{ grid-row: auto; }
+    .chart-canvas{ height:220px !important } 
+    .panel{ margin-bottom: 12px; }
+  }
   .ai-item{ display:flex; gap:.5rem; align-items:flex-start; }
   .ai-item .badge{ margin-top:.15rem }
   .empty-hint{ color:var(--cc-muted); font-weight:700; padding:.5rem 0 .2rem }
@@ -28,6 +34,10 @@
   /* CFO band layout */
   .cfo-band{ display:grid; gap:12px; grid-template-columns: 2fr 1fr; margin-bottom:12px; }
   @media (max-width:992px){ .cfo-band{ grid-template-columns:1fr; } }
+  @media (max-width:767px){ 
+    .cfo-band{ grid-template-columns:1fr; }
+    .cfo-band .panel{ width: 100%; }
+  }
 
   /* Simulation quick actions */
   .sim-actions .btn{ min-width: 160px; }
@@ -51,6 +61,9 @@
 {% endblock %}
 
 {% block content %}
+
+<!-- FULL DASHBOARD (responsive for both desktop and mobile) -->
+<div class="cc-dashboard-content">
 
   <!-- ?? Always-visible dashboard actions -->
   <div class="actionbar d-flex align-items-center justify-content-between">
@@ -100,9 +113,8 @@
     </div>
   </section>
 
-  <!-- Profit & Payment Mix Panels -->
+  <!-- Profit & Battery Panels (includes all three batteries: Payment Mix, Revenue vs Costs, Profit vs Costs) -->
   {% include "partials/profit_panel.html" %}
-  {% include "partials/payment_mix_panel.html" %}
 
   <!-- Agent Ranking Widget (for agents only) -->
   {% if is_agent and agent_ranking %}
@@ -351,6 +363,9 @@
       </div>
     </div>
   </section>
+
+</div>
+<!-- END DASHBOARD CONTENT -->
 
 {% endblock %}
 

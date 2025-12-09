@@ -13,7 +13,7 @@ try:
         LiquorSale, LiquorCredit, LiquorCreditPayment, LiquorStockEditRequest,
         LiquorExpense, LiquorWalletEntry, LiquorShift, LiquorShiftStock,
         # Gym
-        GymMember, GymPayment, GymMemberLog, GymSettings, GymWalletEntry,
+        GymMember, GymPayment, GymMemberLog, GymSettings, GymWalletEntry, GymTrainer, GymCheckIn,
         # Clothing
         ClothingSale, ClothingProductLog,
     )
@@ -21,7 +21,7 @@ except ImportError:
     # Models not yet migrated
     LiquorSale = LiquorCredit = LiquorCreditPayment = LiquorStockEditRequest = None
     LiquorExpense = LiquorWalletEntry = LiquorShift = LiquorShiftStock = None
-    GymMember = GymPayment = GymMemberLog = GymSettings = GymWalletEntry = None
+    GymMember = GymPayment = GymMemberLog = GymSettings = GymWalletEntry = GymTrainer = GymCheckIn = None
     ClothingSale = ClothingProductLog = None
 
 
@@ -228,6 +228,35 @@ if GymWalletEntry:
         ordering = ("-created_at",)
         list_select_related = ("business", "created_by")
         list_per_page = 50
+
+
+if GymTrainer:
+    @admin.register(GymTrainer)
+    class GymTrainerAdmin(admin.ModelAdmin):
+        list_display = ("name", "phone", "email", "business", "is_active", "joined_at")
+        list_filter = ("is_active", "joined_at", "business")
+        search_fields = ("name", "phone", "email")
+        date_hierarchy = "joined_at"
+        ordering = ("name",)
+        list_select_related = ("business",)
+        list_per_page = 50
+
+
+if GymCheckIn:
+    @admin.register(GymCheckIn)
+    class GymCheckInAdmin(admin.ModelAdmin):
+        list_display = ("member", "timestamp", "checked_in_by", "business")
+        list_filter = ("timestamp", "business")
+        search_fields = ("member__name", "member__phone")
+        date_hierarchy = "timestamp"
+        ordering = ("-timestamp",)
+        list_select_related = ("member", "checked_in_by", "business")
+        autocomplete_fields = ("member", "checked_in_by")
+        list_per_page = 50
+        
+        def has_add_permission(self, request):
+            # Check-ins are created through the app, not manually
+            return False
 
 
 # ==============================================================================

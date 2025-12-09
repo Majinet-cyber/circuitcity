@@ -186,27 +186,44 @@
       <!-- IMEI -->
       <div>
         <label for="id_imei">IMEI</label>
-        <div class="field" id="imeiField">
-          <!-- never more than 15 -->
-          <input type="text"
-                 id="id_imei"
-                 name="imei"
-                 inputmode="numeric"
-                 autocomplete="off"
-                 placeholder="Scan or paste IMEI (15 digits)"
-                 aria-required="true"
-                 aria-invalid="false"
-                 maxlength="15"
-                 style="width:100%;background:transparent;border:0;padding:12px 14px;">
-          <!-- live counter badge -->
-          <span id="imeiLen"
-                class="badge rounded-pill"
-                style="position:absolute;right:12px;top:50%;transform:translateY(-50%);background:#e2e8f0;color:#0f172a;padding:.15rem .5rem;">
-            0/15
-          </span>
+        
+        <!-- 
+        INTELLIGENT SCANNER - SCAN IN MODE (IMPLEMENTED)
+        ================================================
+        ✅ IMEI validation: Exactly 15 digits enforced
+        ✅ Global uniqueness: DB constraint + model validation
+        ✅ API endpoint: /inventory/api/imei-lookup/?imei=...&mode=scan_in
+        ✅ Real-time validation with clear error messages
+        ✅ Accepts: keyboard, paste, barcode scanner, camera
+        -->
+        
+        <!-- Smart IMEI Scanner Integration -->
+        <div class="cc-imei-scanner" data-cc-imei-mode="scan_in" style="margin-bottom: 8px;">
+          <div class="field" id="imeiField">
+            <!-- never more than 15 -->
+            <input type="text"
+                   id="id_imei"
+                   name="imei"
+                   inputmode="numeric"
+                   autocomplete="off"
+                   placeholder="Scan or paste IMEI (15 digits)"
+                   aria-required="true"
+                   aria-invalid="false"
+                   maxlength="15"
+                   data-cc-imei-input
+                   style="width:100%;background:transparent;border:0;padding:12px 14px;">
+            <!-- live counter badge -->
+            <span id="imeiLen"
+                  class="badge rounded-pill"
+                  style="position:absolute;right:12px;top:50%;transform:translateY(-50%);background:#e2e8f0;color:#0f172a;padding:.15rem .5rem;">
+              0/15
+            </span>
+          </div>
+          <div id="imeiHelp" class="help-error" hidden>Enter a valid IMEI (exactly 15 digits).</div>
+          <div data-cc-imei-message class="cc-imei-message"></div>
         </div>
-        <div id="imeiHelp" class="help-error" hidden>Enter a valid IMEI (exactly 15 digits).</div>
         <div class="hstack" style="margin-top:6px">
+          <button type="button" data-cc-imei-scan class="btn btn-primary">🔍 Check IMEI</button>
           <button type="button" id="pasteBtn" class="btn btn-secondary">Paste from Clipboard</button>
           <button type="button" id="camToggle" class="btn btn-sky">Start Camera</button>
           <button type="button" id="torchBtn" class="btn">Toggle Torch</button>
@@ -1104,9 +1121,48 @@
 })();
 </script>
 
+<!-- Smart IMEI Scanner Integration -->
+<script src="{% static 'js/imei_scanner.js' %}"></script>
+<script>
+(function() {
+  // Initialize smart IMEI scanner
+  ImeiScanner.init({
+    autoValidate: false, // Manual validation via button
+    onSuccess: function(data) {
+      // IMEI is valid and available for scan in
+      console.log('IMEI check passed:', data);
+      
+      // Focus on product selection
+      const prodEl = document.getElementById('id_product');
+      if (prodEl) {
+        prodEl.focus();
+        prodEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+    },
+    onError: function(message, data) {
+      // IMEI validation failed or already exists
+      console.error('IMEI check failed:', message, data);
+      
+      // Clear the IMEI input if it already exists
+      if (data && data.error_code === 'IMEI_EXISTS') {
+        const imeiInput = document.getElementById('id_imei');
+        if (imeiInput && confirm('This IMEI already exists in the system. Clear and try another?')) {
+          imeiInput.value = '';
+          imeiInput.focus();
+        }
+      }
+    }
+  });
+})();
+</script>
+
 <noscript>
   <div class="warn" style="display:block" role="alert">
     JavaScript is required to use the camera scanner and live validation. You can still type the IMEI and submit.
   </div>
 </noscript>
+
+{# Include mobile bottom nav (hidden on desktop) #}
+{% include 'partials/bottomnav.html' with active_tab='scan' %}
+
 {% endblock %}

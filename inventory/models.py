@@ -573,7 +573,7 @@ class InventoryItem(models.Model):
         null=True,
         blank=True,
         validators=[RegexValidator(r"^\d{15}$", "IMEI must be exactly 15 digits.")],
-        help_text="15-digit IMEI. Unique per business when provided.",
+        help_text="15-digit IMEI. GLOBALLY UNIQUE across all tenants when provided.",
     )
     product = models.ForeignKey("Product", on_delete=models.PROTECT)
 
@@ -700,6 +700,7 @@ class InventoryItem(models.Model):
 
     class Meta:
         indexes = [
+            models.Index(fields=["imei"], name="inv_imei_global_idx"),  # Global IMEI index
             models.Index(fields=["business", "imei"], name="inv_biz_imei_idx"),
             # Composite for inventory lists — name <= 30 chars
             models.Index(
@@ -714,11 +715,11 @@ class InventoryItem(models.Model):
             models.Index(fields=["received_at"], name="inv_received_idx"),
         ]
         constraints = [
-            # Per-tenant IMEI uniqueness (only when IMEI present and non-empty)
+            # GLOBAL IMEI uniqueness (across ALL tenants) - enforced when IMEI present
             models.UniqueConstraint(
-                fields=["business", "imei"],
+                fields=["imei"],
                 condition=Q(imei__isnull=False) & ~Q(imei=""),
-                name="uniq_imei_per_business",
+                name="uniq_imei_globally",
             ),
             models.CheckConstraint(check=Q(order_price__gte=0), name="inv_order_price_nonneg"),
             models.CheckConstraint(
@@ -807,6 +808,11 @@ class InventoryItem(models.Model):
             s = str(self.imei).strip()
             if not s.isdigit() or len(s) != 15:
                 errors["imei"] = "IMEI must be exactly 15 numeric digits."
+            else:
+                # Check for GLOBAL IMEI uniqueness (across all tenants)
+                existing = InventoryItem.objects.filter(imei=s).exclude(pk=self.pk)
+                if existing.exists():
+                    errors["imei"] = "This IMEI already exists in the system and cannot be used again."
 
         if self.assigned_agent_id:
             if getattr(self.assigned_agent, "is_staff", False) or getattr(self.assigned_agent, "is_superuser", False):

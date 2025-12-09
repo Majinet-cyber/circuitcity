@@ -43,10 +43,10 @@
                         <tr>
                             <th>Name</th>
                             <th>Phone</th>
-                            <th>Email</th>
+                            <th>Trainer</th>
                             <th>Status</th>
                             <th>Days Left</th>
-                            <th>Joined</th>
+                            <th>Next Payment</th>
                             <th>Actions</th>
                         </tr>
                     </thead>
@@ -57,7 +57,13 @@
                                 <div class="fw-semibold">{{ member.name }}</div>
                             </td>
                             <td>{{ member.phone|default:"-" }}</td>
-                            <td>{{ member.email|default:"-" }}</td>
+                            <td>
+                                {% if member.trainer %}
+                                    <span class="badge bg-info-subtle text-info">{{ member.trainer.name }}</span>
+                                {% else %}
+                                    <span class="text-muted">-</span>
+                                {% endif %}
+                            </td>
                             <td>
                                 {% if member.is_archived %}
                                     <span class="badge bg-secondary-subtle text-secondary">Archived</span>
@@ -83,8 +89,15 @@
                                 {% endif %}
                             </td>
                             <td>
-                                <div>{{ member.joined_at|date:"d M Y" }}</div>
-                                <div class="small text-muted">{{ member.joined_at|date:"H:i" }}</div>
+                                {% if member.membership_end %}
+                                    <div>{{ member.membership_end|date:"d M Y" }}</div>
+                                    <div class="small text-muted">
+                                        <i class="bi bi-calendar-event"></i> 
+                                        {% if member.membership_start %}{{ member.days_attended }} days attended{% endif %}
+                                    </div>
+                                {% else %}
+                                    <span class="text-muted">Not set</span>
+                                {% endif %}
                             </td>
                             <td>
                                 <div class="btn-group" role="group">

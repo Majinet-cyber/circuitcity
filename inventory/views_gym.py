@@ -21,7 +21,7 @@ from inventory.business_kinds import BusinessKind
 from inventory.helpers import get_active_business
 from inventory.models_verticals import (
     GymMember, GymPayment, GymMemberLog, GymSettings, GymWalletEntry,
-    GymMemberAction, GymCheckIn, GymMemberStatus
+    GymMemberAction, GymCheckIn, GymMemberStatus, GymTrainer
 )
 from tenants.utils import require_business
 
@@ -41,17 +41,26 @@ class GymMemberForm(forms.ModelForm):
     
     class Meta:
         model = GymMember
-        fields = ["name", "phone", "email", "has_trainer", "notes"]
+        fields = ["name", "phone", "email", "trainer", "notes"]
         widgets = {
             "name": forms.TextInput(attrs={"class": "form-control", "placeholder": "Member name"}),
             "phone": forms.TextInput(attrs={"class": "form-control", "placeholder": "Phone number"}),
             "email": forms.EmailInput(attrs={"class": "form-control", "placeholder": "Email (optional)"}),
-            "has_trainer": forms.CheckboxInput(attrs={"class": "form-check-input"}),
+            "trainer": forms.Select(attrs={"class": "form-control"}),
             "notes": forms.Textarea(attrs={"class": "form-control", "rows": 3, "placeholder": "Additional notes (optional)"}),
         }
         labels = {
-            "has_trainer": "With Trainer",
+            "trainer": "Assign Trainer (optional)",
         }
+    
+    def __init__(self, business=None, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        if business:
+            self.fields["trainer"].queryset = GymTrainer.objects.filter(
+                business=business,
+                is_active=True
+            ).order_by("name")
+        self.fields["trainer"].required = False
 
 
 @login_required
@@ -94,7 +103,7 @@ def member_add(request):
         gym_settings = GymSettings.objects.create(business=business)
     
     if request.method == "POST":
-        form = GymMemberForm(request.POST)
+        form = GymMemberForm(business, request.POST)
         if form.is_valid():
             with transaction.atomic():
                 member = form.save(commit=False)
@@ -102,9 +111,12 @@ def member_add(request):
                 
                 # Set fees from settings
                 member.membership_fee = gym_settings.default_membership_price
-                if member.has_trainer:
+                # Set has_trainer based on whether a trainer is assigned
+                if member.trainer:
+                    member.has_trainer = True
                     member.trainer_fee = gym_settings.default_trainer_fee
                 else:
+                    member.has_trainer = False
                     member.trainer_fee = Decimal("0.00")
                 
                 member.save()
@@ -135,7 +147,7 @@ def member_add(request):
                         "name": member.name, 
                         "phone": member.phone, 
                         "email": member.email,
-                        "has_trainer": member.has_trainer,
+                        "trainer": member.trainer.name if member.trainer else None,
                         "marked_as_paid": mark_as_paid
                     },
                     performed_by=request.user
@@ -143,7 +155,7 @@ def member_add(request):
             
             return redirect("gym:member_detail", member_id=member.id)
     else:
-        form = GymMemberForm()
+        form = GymMemberForm(business)
     
     return render(request, "inventory/gym/member_form.html", {
         "form": form,
@@ -162,7 +174,7 @@ def member_edit(request, member_id):
     member = get_object_or_404(GymMember, pk=member_id, business=business)
     
     if request.method == "POST":
-        form = GymMemberForm(request.POST, instance=member)
+        form = GymMemberForm(business, request.POST, instance=member)
         if form.is_valid():
             # Track what changed
             changes = {}
@@ -187,7 +199,7 @@ def member_edit(request, member_id):
             messages.success(request, f"Member '{member.name}' updated successfully.")
             return redirect("gym:member_detail", member_id=member.id)
     else:
-        form = GymMemberForm(instance=member)
+        form = GymMemberForm(business, instance=member)
     
     return render(request, "inventory/gym/member_form.html", {
         "form": form,
@@ -345,25 +357,68 @@ def member_set_paid(request, member_id):
 @login_required
 @require_business
 @require_business_kind(BusinessKind.GYM)
+def checkin_page(request):
+    """Dedicated check-in page showing all members with attendance tracking"""
+    business = get_active_business(request)
+    
+    # Get all active members
+    members = GymMember.objects.filter(
+        business=business,
+        is_active=True,
+        is_archived=False
+    ).select_related("trainer").order_by("name")
+    
+    # Build member data with attendance
+    member_data = []
+    for member in members:
+        member_data.append({
+            "member": member,
+            "days_left": member.days_left(),
+            "days_attended": member.days_attended(),
+            "next_payment": member.next_payment_date(),
+            "status": member.status,
+        })
+    
+    return render(request, "inventory/gym/checkin_page.html", {
+        "member_data": member_data,
+        "business": business,
+    })
+
+
+@login_required
+@require_business
+@require_business_kind(BusinessKind.GYM)
 @require_POST
 def member_checkin(request, member_id):
     """Check in a gym member"""
     business = get_active_business(request)
     member = get_object_or_404(GymMember, pk=member_id, business=business)
     
-    # Create check-in
-    checkin = GymCheckIn.objects.create(
+    # Check if already checked in today
+    today_start = timezone.now().replace(hour=0, minute=0, second=0, microsecond=0)
+    existing = GymCheckIn.objects.filter(
         business=business,
         member=member,
-        checked_in_by=request.user,
-        notes=request.POST.get("notes", "")
-    )
+        timestamp__gte=today_start
+    ).exists()
     
-    messages.success(request, f"Member '{member.name}' checked in successfully.")
+    if existing:
+        messages.info(request, f"Member '{member.name}' already checked in today.")
+    else:
+        # Create check-in
+        checkin = GymCheckIn.objects.create(
+            business=business,
+            member=member,
+            checked_in_by=request.user,
+            notes=request.POST.get("notes", "")
+        )
+        messages.success(request, f"Member '{member.name}' checked in successfully.")
     
-    # Return to members list or member detail based on referrer
-    next_url = request.POST.get("next") or request.META.get("HTTP_REFERER") or "gym:members_list"
-    if "member_detail" in next_url or f"/member/{member_id}/" in next_url:
+    # Return to checkin page or member detail based on referrer
+    next_url = request.POST.get("next") or request.META.get("HTTP_REFERER") or "gym:checkin_page"
+    if "checkin" in next_url:
+        return redirect("gym:checkin_page")
+    elif "member_detail" in next_url or f"/member/{member_id}/" in next_url:
         return redirect("gym:member_detail", member_id=member.id)
     return redirect("gym:members_list")
 
@@ -548,6 +603,31 @@ def gym_dashboard(request):
     except GymSettings.DoesNotExist:
         gym_settings = None
     
+    # Trainer earnings
+    from django.db.models import Sum, Count
+    trainers = GymTrainer.objects.filter(business=business, is_active=True).order_by("name")
+    trainer_stats = []
+    for trainer in trainers:
+        # Active members with this trainer
+        active_members = trainer.members.filter(
+            is_active=True,
+            is_archived=False,
+            status=GymMemberStatus.ACTIVE
+        ).count()
+        
+        # Revenue from all payments where member has this trainer
+        revenue = GymPayment.objects.filter(
+            member__trainer=trainer,
+            member__business=business,
+            is_active=True
+        ).aggregate(total=Sum("amount"))["total"] or Decimal("0.00")
+        
+        trainer_stats.append({
+            "trainer": trainer,
+            "active_members": active_members,
+            "revenue": revenue,
+        })
+    
     return render(request, "inventory/gym/dashboard.html", {
         "business": business,
         
@@ -567,6 +647,9 @@ def gym_dashboard(request):
         "unpaid_checkins": unpaid_checkins,
         "conversion_percentage": round(conversion_percentage, 1),
         "recent_checkins": recent_checkins,
+        
+        # Trainer stats
+        "trainer_stats": trainer_stats,
         
         # Legacy fields (for backward compatibility)
         "members_active_count": active_count,
@@ -625,4 +708,130 @@ def gym_settings_view(request):
         "gym_settings": gym_settings,
         "business": business,
     })
+
+
+# ==============================================================================
+# GYM TRAINERS
+# ==============================================================================
+
+class GymTrainerForm(forms.ModelForm):
+    """Form for adding/editing gym trainers"""
+    class Meta:
+        model = GymTrainer
+        fields = ["name", "phone", "email", "notes"]
+        widgets = {
+            "name": forms.TextInput(attrs={"class": "form-control", "placeholder": "Trainer name"}),
+            "phone": forms.TextInput(attrs={"class": "form-control", "placeholder": "Phone number"}),
+            "email": forms.EmailInput(attrs={"class": "form-control", "placeholder": "Email (optional)"}),
+            "notes": forms.Textarea(attrs={"class": "form-control", "rows": 3, "placeholder": "Additional notes (optional)"}),
+        }
+
+
+@login_required
+@require_business
+@require_business_kind(BusinessKind.GYM)
+@manager_required
+def trainers_list(request):
+    """List all gym trainers"""
+    business = get_active_business(request)
+    
+    trainers = GymTrainer.objects.filter(business=business, is_active=True).order_by("name")
+    
+    # For each trainer, compute stats
+    trainer_stats = []
+    for trainer in trainers:
+        # Active members assigned to this trainer
+        active_members = trainer.members.filter(
+            is_active=True,
+            is_archived=False,
+            status=GymMemberStatus.ACTIVE
+        ).count()
+        
+        # Total members (including pending/behind)
+        total_members = trainer.members.filter(
+            is_active=True,
+            is_archived=False
+        ).count()
+        
+        trainer_stats.append({
+            "trainer": trainer,
+            "active_members": active_members,
+            "total_members": total_members,
+        })
+    
+    return render(request, "inventory/gym/trainers_list.html", {
+        "trainer_stats": trainer_stats,
+        "business": business,
+    })
+
+
+@login_required
+@require_business
+@require_business_kind(BusinessKind.GYM)
+@manager_required
+def trainer_add(request):
+    """Add a new gym trainer"""
+    business = get_active_business(request)
+    
+    if request.method == "POST":
+        form = GymTrainerForm(request.POST)
+        if form.is_valid():
+            with transaction.atomic():
+                trainer = form.save(commit=False)
+                trainer.business = business
+                trainer.save()
+            
+            messages.success(request, f"Trainer '{trainer.name}' added successfully.")
+            return redirect("gym:trainers_list")
+    else:
+        form = GymTrainerForm()
+    
+    return render(request, "inventory/gym/trainer_form.html", {
+        "form": form,
+        "business": business,
+        "title": "Add Trainer",
+    })
+
+
+@login_required
+@require_business
+@require_business_kind(BusinessKind.GYM)
+@manager_required
+def trainer_edit(request, trainer_id):
+    """Edit an existing gym trainer"""
+    business = get_active_business(request)
+    trainer = get_object_or_404(GymTrainer, pk=trainer_id, business=business)
+    
+    if request.method == "POST":
+        form = GymTrainerForm(request.POST, instance=trainer)
+        if form.is_valid():
+            trainer = form.save()
+            messages.success(request, f"Trainer '{trainer.name}' updated successfully.")
+            return redirect("gym:trainers_list")
+    else:
+        form = GymTrainerForm(instance=trainer)
+    
+    return render(request, "inventory/gym/trainer_form.html", {
+        "form": form,
+        "trainer": trainer,
+        "business": business,
+        "title": "Edit Trainer",
+    })
+
+
+@login_required
+@require_business
+@require_business_kind(BusinessKind.GYM)
+@manager_required
+@require_POST
+def trainer_deactivate(request, trainer_id):
+    """Deactivate a gym trainer"""
+    business = get_active_business(request)
+    trainer = get_object_or_404(GymTrainer, pk=trainer_id, business=business)
+    
+    trainer.is_active = False
+    trainer.save(update_fields=["is_active"])
+    
+    messages.success(request, f"Trainer '{trainer.name}' deactivated.")
+    return redirect("gym:trainers_list")
 

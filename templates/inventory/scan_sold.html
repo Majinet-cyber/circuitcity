@@ -105,34 +105,54 @@
       <!-- IMEI -->
       <div>
         <label for="id_imei">IMEI / Barcode</label>
-        <div class="field">
-          <input
-            type="text"
-            id="id_imei"
-            name="imei"
-            maxlength="15"
-            pattern="\d{15}"
-            inputmode="numeric"
-            autocomplete="off"
-            placeholder="Enter 15-digit IMEI"
-            aria-required="true"
-            aria-invalid="false">
-        </div>
+        
+        <!-- 
+        INTELLIGENT SCANNER - SCAN & SELL MODE (IMPLEMENTED)
+        ====================================================
+        ✅ IMEI validation: Exactly 15 digits enforced
+        ✅ Stock check: Validates IMEI is in current business stock
+        ✅ API endpoint: /inventory/api/imei-lookup/?imei=...&mode=scan_sell
+        ✅ Pre-fills product info and selling price when found
+        ✅ Real-time validation with clear status badges
+        ✅ Prevents double-selling (checks status IN_STOCK)
+        -->
+        
+        <!-- Smart IMEI Scanner Integration -->
+        <div class="cc-imei-scanner" data-cc-imei-mode="scan_sell">
+          <div class="field">
+            <input
+              type="text"
+              id="id_imei"
+              name="imei"
+              maxlength="15"
+              pattern="\d{15}"
+              inputmode="numeric"
+              autocomplete="off"
+              placeholder="Enter 15-digit IMEI"
+              aria-required="true"
+              aria-invalid="false"
+              data-cc-imei-input>
+          </div>
 
-        <div class="hstack" style="margin-top:.5rem">
-          <button class="btn" type="button" id="btnPaste">📋 Paste</button>
-          <button class="btn" type="button" id="camToggle">📷 Start Camera</button>
-          <button class="btn btn-muted" type="button" id="btnStopCam" style="display:none">■ Stop</button>
-          <button class="btn" type="button" id="torchBtn">🔦 Toggle Torch</button>
-          <button class="btn btn-muted" type="button" id="btnClear">✖ Clear</button>
+          <div class="hstack" style="margin-top:.5rem">
+            <button class="btn btn-primary" type="button" data-cc-imei-scan>🔍 Check IMEI</button>
+            <button class="btn" type="button" id="btnPaste">📋 Paste</button>
+            <button class="btn" type="button" id="camToggle">📷 Start Camera</button>
+            <button class="btn btn-muted" type="button" id="btnStopCam" style="display:none">■ Stop</button>
+            <button class="btn" type="button" id="torchBtn">🔦 Toggle Torch</button>
+            <button class="btn btn-muted" type="button" id="btnClear">✖ Clear</button>
 
-          <span id="stockBadge" class="badge badge-warn" aria-live="polite">Enter 15 digits</span>
-          <span id="lenChip" aria-hidden="true">0/15</span>
+            <span id="stockBadge" class="badge badge-warn" aria-live="polite">Enter 15 digits</span>
+            <span id="lenChip" aria-hidden="true">0/15</span>
 
           <label class="hstack" style="margin-left:auto;font-weight:600;color:var(--cc-muted)">
             <input type="checkbox" id="autoSubmit"> Auto-submit after scan
           </label>
         </div>
+        
+        <div data-cc-imei-message class="cc-imei-message"></div>
+        </div>
+        <!-- End Smart IMEI Scanner -->
 
         <!-- Camera shell -->
         <div id="cameraBox">
@@ -784,4 +804,63 @@
   });
 })();
 </script>
+
+<!-- Smart IMEI Scanner Integration -->
+{% load static %}
+<script src="{% static 'js/imei_scanner.js' %}"></script>
+<script>
+(function() {
+  // Initialize smart IMEI scanner for Scan & Sell
+  ImeiScanner.init({
+    autoValidate: false, // Manual validation via button
+    onSuccess: function(data) {
+      // IMEI is in stock and ready to sell
+      console.log('IMEI check passed:', data);
+      
+      // Pre-fill product information if available
+      if (data.product_name) {
+        // Show a toast or update UI to indicate product found
+        const toastEl = document.getElementById('toast');
+        if (toastEl && window.toast) {
+          window.toast(`Found: ${data.product_name}`, 'ok', 2000);
+        }
+      }
+      
+      // Pre-fill selling price if available
+      if (data.selling_price && document.getElementById('id_price')) {
+        const priceEl = document.getElementById('id_price');
+        if (!priceEl.value || priceEl.value === '0') {
+          priceEl.value = data.selling_price;
+        }
+      }
+      
+      // Focus on price field
+      const priceEl = document.getElementById('id_price');
+      if (priceEl) {
+        priceEl.focus();
+        priceEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+    },
+    onError: function(message, data) {
+      // IMEI not in stock or validation failed
+      console.error('IMEI check failed:', message, data);
+      
+      // Update the stock badge to show error
+      const stockBadge = document.getElementById('stockBadge');
+      if (stockBadge) {
+        stockBadge.className = 'badge badge-warn';
+        if (data && data.error_code === 'NOT_IN_STOCK') {
+          stockBadge.textContent = 'Not in stock';
+        } else {
+          stockBadge.textContent = 'Invalid IMEI';
+        }
+      }
+    }
+  });
+})();
+</script>
+
+{# Include mobile bottom nav (hidden on desktop) #}
+{% include 'partials/bottomnav.html' with active_tab='sell' %}
+
 {% endblock %}

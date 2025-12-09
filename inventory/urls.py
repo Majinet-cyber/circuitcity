@@ -426,6 +426,11 @@ _mark_sold_view = (
     or _get_any(("api_mark_sold",), _api_v2, _api_legacy, msg="api_mark_sold not implemented")
 )
 
+_api_imei_lookup = (
+    getattr(_api_v2_primary, "imei_lookup", None)
+    or _get_any(("imei_lookup", "api_imei_lookup"), _api_v2, _api_legacy, msg="imei_lookup not implemented")
+)
+
 _api_stock_list_view = (
     getattr(_api_v2_primary, "stock_list", None)
     or _get_any(("stock_list",), _api_v2, _api_legacy, msg="stock_list API not implemented")
@@ -926,6 +931,9 @@ urlpatterns += [
     # Phone catalog API endpoints (Brand → Model filtering)
     path("api/phone-brands/", _phone_brands_api, name="api_phone_brands"),
     path("api/phone-models/", _phone_models_api, name="api_phone_models"),
+    
+    # IMEI lookup endpoint for smart scanner
+    path("api/imei-lookup/", _api_imei_lookup, name="api_imei_lookup"),
 ]
 
 # --- NEW: Manager-only stock edit/delete (IN_STOCK only; JSON) ---

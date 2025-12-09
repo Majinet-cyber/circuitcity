@@ -1,0 +1,59 @@
+{% comment %}
+  Reusable bottom navigation for mobile-first design
+  Usage: {% include 'partials/bottomnav.html' with active_tab='home' %}
+{% endcomment %}
+
+{% load static %}
+
+{# Safely resolve URLs with fallbacks #}
+{% url 'inventory:inventory_dashboard' as url_dashboard %}
+{% url 'dashboard:home' as url_dash_home %}
+{% url 'inventory:scan_in' as url_scan %}
+{% url 'inventory:scan_sold' as url_sell %}
+{% url 'inventory:phone_sale_wizard' as url_sell_wizard %}
+{% url 'inventory:stock_list' as url_stock %}
+{% url 'wallet:agent_wallet' as url_wallet %}
+{% url 'wallet:admin_home' as url_wallet_admin %}
+
+<nav class="cc-bottomnav" role="navigation" aria-label="Main navigation">
+  <a href="{{ url_dash_home|default:url_dashboard|default:'/' }}" 
+     class="cc-bottomnav__item {% if active_tab == 'home' %}cc-bottomnav__item--active{% endif %}"
+     aria-label="Home"
+     aria-current="{% if active_tab == 'home' %}page{% endif %}">
+    <i class="bi bi-house-door{% if active_tab == 'home' %}-fill{% endif %}"></i>
+    <span>Home</span>
+  </a>
+  
+  <a href="{{ url_scan|default:'/inventory/scan-in/' }}" 
+     class="cc-bottomnav__item {% if active_tab == 'scan' %}cc-bottomnav__item--active{% endif %}"
+     aria-label="Scan In"
+     aria-current="{% if active_tab == 'scan' %}page{% endif %}">
+    <i class="bi bi-upc-scan"></i>
+    <span>Scan</span>
+  </a>
+  
+  <a href="{{ url_sell_wizard|default:url_sell|default:'/inventory/scan-sold/' }}" 
+     class="cc-bottomnav__item {% if active_tab == 'sell' %}cc-bottomnav__item--active{% endif %}"
+     aria-label="Sell"
+     aria-current="{% if active_tab == 'sell' %}page{% endif %}">
+    <i class="bi bi-cart-check{% if active_tab == 'sell' %}-fill{% endif %}"></i>
+    <span>Sell</span>
+  </a>
+  
+  <a href="{{ url_stock|default:'/inventory/list/' }}" 
+     class="cc-bottomnav__item {% if active_tab == 'stock' %}cc-bottomnav__item--active{% endif %}"
+     aria-label="Stock"
+     aria-current="{% if active_tab == 'stock' %}page{% endif %}">
+    <i class="bi bi-box-seam{% if active_tab == 'stock' %}-fill{% endif %}"></i>
+    <span>Stock</span>
+  </a>
+  
+  <a href="{% if IS_MANAGER %}{{ url_wallet_admin|default:url_wallet|default:'/wallet/' }}{% else %}{{ url_wallet|default:'/wallet/' }}{% endif %}" 
+     class="cc-bottomnav__item {% if active_tab == 'wallet' %}cc-bottomnav__item--active{% endif %}"
+     aria-label="Wallet"
+     aria-current="{% if active_tab == 'wallet' %}page{% endif %}">
+    <i class="bi bi-wallet2{% if active_tab == 'wallet' %}-fill{% endif %}"></i>
+    <span>Wallet</span>
+  </a>
+</nav>
+

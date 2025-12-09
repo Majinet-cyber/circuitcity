@@ -821,6 +821,10 @@
     </div>
   </div>
 </div>
+
+{# Include mobile bottom nav (hidden on desktop) #}
+{% include 'partials/bottomnav.html' with active_tab='home' %}
+
 {% endblock %}
 
 {% block extra_js %}

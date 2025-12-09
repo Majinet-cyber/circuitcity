@@ -21,10 +21,19 @@ urlpatterns = [
     path("member/<int:member_id>/set-paid/", views_gym.member_set_paid, name="member_set_paid"),
     path("member/<int:member_id>/checkin/", views_gym.member_checkin, name="member_checkin"),
     
+    # Check-in
+    path("checkin/", views_gym.checkin_page, name="checkin_page"),
+    
     # Payments
     path("payment/add/", views_gym.add_payment, name="add_payment"),
     
     # Settings
     path("settings/", views_gym.gym_settings_view, name="settings"),
+    
+    # Trainers
+    path("trainers/", views_gym.trainers_list, name="trainers_list"),
+    path("trainer/add/", views_gym.trainer_add, name="trainer_add"),
+    path("trainer/<int:trainer_id>/edit/", views_gym.trainer_edit, name="trainer_edit"),
+    path("trainer/<int:trainer_id>/deactivate/", views_gym.trainer_deactivate, name="trainer_deactivate"),
 ]
 

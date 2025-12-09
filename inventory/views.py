@@ -13,6 +13,9 @@ import csv
 import json
 import logging
 import math
+
+logger = logging.getLogger(__name__)
+
 # ------------------------------
 # Helpers (keep above all views)
 # ------------------------------
@@ -6960,15 +6963,54 @@ def inventory_dashboard(request):
         for row in total_assigned
     ]
 
-    # ===== Cost vs Revenue vs Profit (period/model filtered, decimal-safe) =====
-    totals = sales_qs_period.aggregate(
-        revenue=Coalesce(Sum("price"), Value(0), output_field=dec2),
-        cost=Coalesce(Sum(Coalesce(F("item__order_price"), Value(0), output_field=dec2)), Value(0), output_field=dec2),
-        profit=Coalesce(Sum(profit_expr_month), Value(0), output_field=dec2),
+    # ===== NEW: Use centralized KPI service (includes COGS + Admin Costs) =====
+    from inventory.services.dashboard_metrics import get_inventory_kpis
+    
+    # Determine period start/end for admin costs
+    if start_dt and end_dt:
+        period_start = start_dt
+        period_end = end_dt
+    elif period == "month":
+        period_start = month_start
+        period_end = tomorrow
+    elif period == "7d":
+        period_start = (timezone.now() - timedelta(days=7)).date()
+        period_end = tomorrow
+    else:
+        # "all" or unknown
+        period_start = None
+        period_end = None
+    
+    # Get unified KPIs (revenue, costs including admin, profit, ratios, payment mix)
+    kpis = get_inventory_kpis(
+        business=biz,
+        location=user_loc,
+        sales_qs=sales_qs_period,
+        start_date=period_start,
+        end_date=period_end,
+        model_filter=model_id,
     )
-    pie_revenue = float(totals.get("revenue") or 0)
-    pie_cost = float(totals.get("cost") or 0)
-    pie_profit = float(totals.get("profit") or 0)
+    
+    # Extract values for backward compatibility with existing template variables
+    pie_revenue = float(kpis["total_revenue"])
+    pie_cost = float(kpis["total_costs"])  # Now includes COGS + admin costs!
+    pie_profit = float(kpis["total_profit"])
+    
+    cash_total = float(kpis["payment_mix_cash_amount"])
+    bank_total = float(kpis["payment_mix_bank_amount"])
+    mobile_total = float(kpis["payment_mix_mobile_amount"])
+    total_payment_revenue = float(kpis["payment_mix_total"])
+    
+    cash_pct = kpis["payment_mix_cash_pct"]
+    bank_pct = kpis["payment_mix_bank_pct"]
+    mobile_pct = kpis["payment_mix_mobile_pct"]
+    
+    revenue_pct = kpis["rev_vs_costs_pct_revenue"]
+    costs_pct_of_total = kpis["rev_vs_costs_pct_costs"]
+    
+    profit_pct = kpis["profit_vs_costs_pct_profit"]
+    costs_pct_of_profit = kpis["profit_vs_costs_pct_costs"]
+    low_margin_warning = kpis["profit_vs_costs_warning"]
 
     # ===== Battery / Stock health =====
     in_stock_qs = items_scope.filter(status="IN_STOCK")
@@ -7024,6 +7066,43 @@ def inventory_dashboard(request):
     # NEW for UI: Profit Margin (% of selected period)
     profit_margin = int(round((pie_profit / pie_revenue) * 100)) if pie_revenue > 0 else 0
 
+    # ===== Low / Out of Stock Items (by product, aggregated across all items) =====
+    # Group by product and count items in stock
+    from django.db.models import OuterRef, Subquery
+    
+    stock_by_product = (
+        in_stock_qs
+        .values('product_id')
+        .annotate(stock_count=Count('id'))
+    )
+    
+    # Convert to dict for easy lookup
+    stock_counts = {item['product_id']: item['stock_count'] for item in stock_by_product}
+    
+    # Get all products and check their stock levels against thresholds
+    if Product is not None:
+        all_products = _scoped(Product.objects.all(), request).values('id', 'low_stock_threshold')
+        low_items_list = []
+        out_of_stock_list = []
+        
+        for prod in all_products:
+            prod_id = prod['id']
+            threshold = prod.get('low_stock_threshold', 5) or 5
+            current_stock = stock_counts.get(prod_id, 0)
+            
+            if current_stock == 0:
+                out_of_stock_list.append(prod_id)
+            elif current_stock <= threshold:
+                low_items_list.append(prod_id)
+        
+        low_items_count = len(low_items_list)
+        out_of_stock_count = len(out_of_stock_list)
+        total_low_out = low_items_count + out_of_stock_count
+    else:
+        low_items_count = 0
+        out_of_stock_count = 0
+        total_low_out = 0
+
     context = {
         "range": range_preset,
         "filter_day": day_str or "",
@@ -7051,6 +7130,39 @@ def inventory_dashboard(request):
         "profit_margin": profit_margin,
         "window_count": window_count,
         "window_revenue": window_revenue,
+        # Stock alerts (low/out of stock)
+        "low_items": total_low_out,
+        "low_items_count": low_items_count,
+        "out_of_stock_count": out_of_stock_count,
+        # Active stock count (for dashboard KPIs)
+        "active_stock_count": jug_count,
+        "items_in_stock": jug_count,
+        # Revenue, costs, profit for dashboard (from sales in selected period)
+        # NOW INCLUDES ADMIN COSTS from wallet!
+        "total_revenue": pie_revenue,
+        "total_units": window_count,
+        "costs_total": pie_cost,
+        "profit_total": pie_profit,
+        # Payment Mix Battery
+        "payment_mix": {
+            "total": total_payment_revenue,
+            "cash": {"amount": cash_total, "pct": cash_pct},
+            "bank": {"amount": bank_total, "pct": bank_pct},
+            "mobile": {"amount": mobile_total, "pct": mobile_pct},
+        },
+        # Revenue vs Costs Battery
+        "rev_cost_mix": {
+            "revenue": {"amount": pie_revenue, "pct": revenue_pct},
+            "costs": {"amount": pie_cost, "pct": costs_pct_of_total},
+        },
+        # Profit vs Costs Battery
+        "profit_cost_mix": {
+            "profit": {"amount": pie_profit, "pct": profit_pct},
+            "costs": {"amount": pie_cost, "pct": costs_pct_of_profit},
+            "low_margin_warning": low_margin_warning,
+        },
+        # NEW: Full KPIs dict (for templates that want more detail)
+        "kpis_detail": kpis,
         "kpis": {"scope": scope_label, "today_count": today_count, "month_count": mtd_count, "all_count": all_time_count},
         "wallet": {
             "balance": float(my_balance or 0),

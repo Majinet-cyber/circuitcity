@@ -433,6 +433,31 @@ class GymMemberStatus(models.TextChoices):
     EXPIRED = "EXPIRED", "Expired"
 
 
+class GymTrainer(models.Model):
+    """
+    Gym trainer who can be assigned to members.
+    """
+    business = models.ForeignKey(Business, on_delete=models.CASCADE, related_name="gym_trainers", db_index=True)
+    name = models.CharField(max_length=120)
+    phone = models.CharField(max_length=20, blank=True, default="")
+    email = models.EmailField(blank=True, default="")
+    is_active = models.BooleanField(default=True, db_index=True)
+    
+    # Metadata
+    joined_at = models.DateTimeField(default=timezone.now)
+    notes = models.TextField(blank=True, default="")
+    
+    class Meta:
+        unique_together = [("business", "name")]
+        ordering = ["name"]
+        indexes = [
+            models.Index(fields=["business", "is_active"]),
+        ]
+    
+    def __str__(self):
+        return f"{self.name} ({self.business.name})"
+
+
 class GymMember(models.Model):
     """
     Gym member with 30-day rolling membership.
@@ -443,6 +468,16 @@ class GymMember(models.Model):
     name = models.CharField(max_length=120)
     phone = models.CharField(max_length=20, blank=True, default="")
     email = models.EmailField(blank=True, default="")
+    
+    # Trainer assignment
+    trainer = models.ForeignKey(
+        GymTrainer, 
+        null=True, 
+        blank=True, 
+        on_delete=models.SET_NULL, 
+        related_name="members",
+        help_text="Assigned trainer for this member"
+    )
     
     # Trainer and fees (snapshot at signup/renewal)
     has_trainer = models.BooleanField(default=False, help_text="Whether this member has a trainer")
@@ -508,6 +543,23 @@ class GymMember(models.Model):
         today = timezone.now().date()
         days = (self.membership_end - today).days
         return max(0, days)
+    
+    def days_attended(self) -> int:
+        """Calculate days attended in current membership window"""
+        if not self.membership_start or not self.membership_end:
+            return 0
+        
+        # Count unique dates member checked in during current membership period
+        return self.checkins.filter(
+            timestamp__date__gte=self.membership_start,
+            timestamp__date__lte=self.membership_end
+        ).dates('timestamp', 'day').count()
+    
+    def next_payment_date(self):
+        """Return the next payment date (membership_end + 1 day)"""
+        if not self.membership_end:
+            return None
+        return self.membership_end
     
     def membership_status(self) -> str:
         """Return human-readable membership status"""

@@ -74,6 +74,28 @@
                         {% endif %}
                     </div>
                 </div>
+                {% if member.trainer %}
+                <div class="mb-3">
+                    <label class="text-muted small">Trainer</label>
+                    <div>{{ member.trainer.name }}</div>
+                </div>
+                {% endif %}
+                {% if member.membership_end %}
+                <div class="mb-3">
+                    <label class="text-muted small">Next Payment Date</label>
+                    <div>{{ member.membership_end|date:"d M Y" }}</div>
+                </div>
+                {% endif %}
+                {% if member.membership_start %}
+                <div class="mb-3">
+                    <label class="text-muted small">Days Attended (Current Period)</label>
+                    <div>
+                        <span class="badge bg-primary-subtle text-primary">
+                            {{ member.days_attended }} / 30 days
+                        </span>
+                    </div>
+                </div>
+                {% endif %}
                 {% if member.notes %}
                 <div>
                     <label class="text-muted small">Notes</label>

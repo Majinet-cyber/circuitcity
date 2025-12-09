@@ -14,6 +14,12 @@
                     <p class="text-muted mb-0">{{ business.name }}</p>
                 </div>
                 <div class="d-flex gap-2">
+                    <a href="{% url 'gym:checkin_page' %}" class="btn btn-outline-success">
+                        <i class="bi bi-box-arrow-in-right"></i> Check-In
+                    </a>
+                    <a href="{% url 'gym:trainers_list' %}" class="btn btn-outline-info">
+                        <i class="bi bi-person-badge"></i> Trainers
+                    </a>
                     <a href="{% url 'gym:members_list' %}" class="btn btn-outline-primary">
                         <i class="bi bi-people"></i> All Members
                     </a>
@@ -225,6 +231,46 @@
         {% endif %}
     </div>
 
+    <!-- Trainer Earnings -->
+    {% if trainer_stats %}
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="glass-card p-4">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h5 class="mb-0">
+                        <i class="bi bi-person-badge text-info"></i> Trainer Performance
+                    </h5>
+                    <a href="{% url 'gym:trainers_list' %}" class="btn btn-sm btn-outline-primary">
+                        Manage Trainers
+                    </a>
+                </div>
+                <div class="table-responsive">
+                    <table class="table table-hover mb-0">
+                        <thead>
+                            <tr>
+                                <th>Trainer</th>
+                                <th>Active Members</th>
+                                <th>Total Revenue</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for stat in trainer_stats %}
+                            <tr>
+                                <td class="fw-semibold">{{ stat.trainer.name }}</td>
+                                <td>
+                                    <span class="badge bg-success-subtle text-success">{{ stat.active_members }}</span>
+                                </td>
+                                <td class="fw-semibold">MWK {{ stat.revenue|floatformat:2 }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
     <!-- Recent Check-ins -->
     {% if recent_checkins %}
     <div class="row mb-4">
@@ -234,6 +280,9 @@
                     <h5 class="mb-0">
                         <i class="bi bi-box-arrow-in-right text-info"></i> Recent Check-ins
                     </h5>
+                    <a href="{% url 'gym:checkin_page' %}" class="btn btn-sm btn-outline-success">
+                        View All / Check In
+                    </a>
                 </div>
                 <div class="table-responsive">
                     <table class="table table-hover mb-0">

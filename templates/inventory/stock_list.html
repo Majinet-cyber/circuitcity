@@ -203,24 +203,16 @@
   {% url 'settings' as settings_url %}
   {% url 'inventory:settings' as settings_url2 %}
 
-  <!-- Top: brand + quick actions -->
+  <!-- Top: simplified header with scanner -->
   <div class="hero-row">
     <button class="glass-btn tap is-primary btn-sm" type="button" data-bs-toggle="offcanvas" data-bs-target="#ccMenu" aria-label="Menu" onclick="window.buzz&&buzz(8)">
       <span class="glass-icon">≡</span>
     </button>
-    <a href="{{ dash_url|default:'/' }}" class="brand-chip tap" onclick="window.buzz&&buzz(6)"><span class="glass-icon">📊</span> Emajinet</a>
 
-    <a class="glass-btn is-green tap" href="{{ scan_in_url|default:'#' }}" onclick="window.buzz&&buzz(10)"><span class="glass-icon">➕</span> Stock IN</a>
-    <a class="glass-btn is-amber tap" href="{{ scan_sold_url|default:'#' }}" onclick="window.buzz&&buzz(10)"><span class="glass-icon">✅</span> Scan SOLD</a>
-    <a class="glass-btn is-primary tap" href="{{ scan_web_url|default:'#' }}" onclick="window.buzz&&buzz(10)"><span class="glass-icon">🌐</span> Scan (Web)</a>
-
-    {% if place_order_url %}
-      {% if IS_MANAGER|default:False or request.user.is_staff or request.user.is_superuser or request.user.profile.is_manager %}
-        <a class="glass-btn tap is-amber" href="{{ place_order_url }}" onclick="window.buzz&&buzz(8)"><span class="glass-icon">🧾</span> Place Order</a>
-      {% endif %}
-    {% endif %}
-
-    <a class="glass-btn tap is-primary" href="{{ feedback_url|default:'/feedback/' }}" onclick="window.buzz&&buzz(6)"><span class="glass-icon">💬</span> Feedback</a>
+    <!-- Single Scanner Entry Point -->
+    <a class="glass-btn is-green tap" href="{{ scan_in_url|default:'#' }}" onclick="window.buzz&&buzz(10)" title="Scan IMEI for Stock IN or Sell">
+      <span class="glass-icon">📱</span> Scan IMEI
+    </a>
 
     <span class="ms-auto d-none d-md-inline text-muted fw-bold">
       {% if request.user.is_authenticated %}<i class="bi bi-person-circle me-1"></i>{{ request.user.username }}{% endif %}
@@ -682,10 +674,14 @@
   </div>
 </div>
 
-<!-- Mobile FAB -->
-<a href="{{ scan_web_url|default:scan_sold_url|default:'/inventory/scan-sold/' }}" class="cc-fab" onclick="window.buzz&&buzz(10)" aria-label="Scan">
+<!-- Mobile FAB - Single Scanner Entry -->
+<a href="{{ scan_in_url|default:'/inventory/scan-in/' }}" class="cc-fab" onclick="window.buzz&&buzz(10)" aria-label="Scan IMEI" title="Scan IMEI for Stock IN or Sell">
   <i class="bi bi-upc-scan fs-4"></i>
 </a>
+
+{# Include mobile bottom nav (hidden on desktop) #}
+{% include 'partials/bottomnav.html' with active_tab='stock' %}
+
 {% endblock %}
 
 {% block extra_js %}
