@@ -85,7 +85,7 @@ def test_payment_based_counts():
     print("Testing Payment-Based Queries")
     print("=" * 60)
     
-    gym_businesses = Business.objects.filter(kind="GYM")
+    gym_businesses = Business.objects.filter(business_kind="GYM")
     if not gym_businesses.exists():
         print("❌ No gym businesses found.")
         return False
@@ -204,4 +204,5 @@ if __name__ == "__main__":
         print(f"\n❌ Error running tests: {e}")
         import traceback
         traceback.print_exc()
-        ex
+        exit(1)
+
