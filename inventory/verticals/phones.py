@@ -102,7 +102,7 @@ def dashboard(request):
     - Best sales day in selected period
     - Business panel with average metrics and sell-through rate
     
-    Follows the Liquor dashboard pattern for consistency and premium feel.
+    Uses centralized metrics service for accurate cost/profit calculations.
     """
     ctx = base.base_context(request)
     business = ctx.get("business")
@@ -137,7 +137,7 @@ def dashboard(request):
         sold_items = sold_items.filter(current_location=location)
     
     # ==========================================================================
-    # A) PREMIUM KPIs FOR SELECTED RANGE
+    # A) PREMIUM KPIs FOR SELECTED RANGE (using centralized metrics service)
     # ==========================================================================
     
     # Filter sales to the selected date range
@@ -152,7 +152,7 @@ def dashboard(request):
     )['total'] or Decimal('0.00')
     
     # ==========================================================================
-    # STOCK ON HAND (current, not date-filtered) - Define first for cost calculation
+    # STOCK ON HAND (current, not date-filtered)
     # ==========================================================================
     stock_items = InventoryItem.objects.filter(
         business=business,
@@ -166,40 +166,69 @@ def dashboard(request):
     stock_on_hand = stock_items.count()
     
     # ==========================================================================
-    # ENHANCED COST TRACKING (Cost of Goods + Business Costs)
+    # COSTS AND PROFIT (using centralized metrics service)
     # ==========================================================================
+    # Import the centralized metrics service
+    from inventory.services.dashboard_metrics import get_inventory_kpis
+    from sales.models import Sale
     
-    # A) Cost of Goods: Sum of order_price for items sold in the selected period
-    # This represents the actual cost of phones that were sold (COGS)
-    cost_of_goods = range_sales.aggregate(
-        total=Coalesce(Sum('order_price'), Decimal('0.00'), output_field=DecimalField())
-    )['total'] or Decimal('0.00')
-    
-    # B) Business Costs: Operating expenses from Admin Wallet > Costs
-    # Import WalletTransaction model
-    from wallet.models import WalletTransaction, Ledger, TxnType
-    
-    # Query business costs for the selected date range
-    business_costs_query = WalletTransaction.objects.filter(
-        business=business,
-        ledger=Ledger.COMPANY,
-        type__in=[TxnType.COST_ONCE_OFF, TxnType.COST_RECURRING],
-        effective_date__gte=start_date.date() if hasattr(start_date, 'date') else start_date,
-        effective_date__lt=end_date.date() if hasattr(end_date, 'date') else end_date,
-    )
-    
-    # Sum the absolute values (costs are stored as negative amounts)
-    business_costs_sum = business_costs_query.aggregate(
-        total=Coalesce(Sum('amount'), Decimal('0.00'), output_field=DecimalField())
-    )['total'] or Decimal('0.00')
-    business_costs = abs(business_costs_sum)  # Convert to positive for display
-    
-    # C) Total Costs: Cost of Goods + Business Costs
-    total_costs = cost_of_goods + business_costs
-    
-    # D) Profit and Profit Margin (based on total costs)
-    profit = revenue - total_costs
-    profit_margin = (profit / revenue * 100) if revenue > 0 else Decimal('0.00')
+    # Build a Sale queryset for the metrics service
+    # Phones use InventoryItem but we need Sale objects for the metrics service
+    try:
+        sales_qs = Sale.objects.filter(
+            item__business=business,
+            created_at__gte=start_date,
+            created_at__lt=end_date,
+        ).select_related('item', 'agent')
+        
+        # Optional location filter
+        if location:
+            sales_qs = sales_qs.filter(location=location)
+        
+        # Get KPIs from centralized service
+        kpis = get_inventory_kpis(
+            business=business,
+            location=location,
+            sales_qs=sales_qs,
+            start_date=start_date,
+            end_date=end_date,
+        )
+        
+        # Extract metrics from service
+        cost_of_goods = kpis.get('total_cogs', Decimal('0.00'))
+        business_costs = kpis.get('total_admin_costs', Decimal('0.00'))
+        total_costs = kpis.get('total_costs', Decimal('0.00'))
+        profit = kpis.get('total_profit', Decimal('0.00'))
+        profit_margin = Decimal(str(kpis.get('profit_margin', 0.0)))
+        
+    except Exception as e:
+        # Fallback to direct calculation if Sale model isn't available or service fails
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.warning(f"Failed to use centralized metrics service, falling back: {e}")
+        
+        # Fallback: Calculate directly from InventoryItem
+        cost_of_goods = range_sales.aggregate(
+            total=Coalesce(Sum('order_price'), Decimal('0.00'), output_field=DecimalField())
+        )['total'] or Decimal('0.00')
+        
+        # Business Costs from Admin Wallet
+        from wallet.models import WalletTransaction, Ledger, TxnType
+        business_costs_query = WalletTransaction.objects.filter(
+            business=business,
+            ledger=Ledger.COMPANY,
+            type__in=[TxnType.COST_ONCE_OFF, TxnType.COST_RECURRING],
+            effective_date__gte=start_date.date() if hasattr(start_date, 'date') else start_date,
+            effective_date__lt=end_date.date() if hasattr(end_date, 'date') else end_date,
+        )
+        business_costs_sum = business_costs_query.aggregate(
+            total=Coalesce(Sum('amount'), Decimal('0.00'), output_field=DecimalField())
+        )['total'] or Decimal('0.00')
+        business_costs = abs(business_costs_sum)
+        
+        total_costs = cost_of_goods + business_costs
+        profit = revenue - total_costs
+        profit_margin = (profit / revenue * 100) if revenue > 0 else Decimal('0.00')
     
     # Compute absolute values for template display (Django doesn't have |abs filter)
     profit_abs = abs(profit)
@@ -208,6 +237,7 @@ def dashboard(request):
     # ==========================================================================
     # PAYMENT MIX - Breakdown by payment method for selected period
     # ==========================================================================
+    # Payment mix from InventoryItem (phones track payment_method on the item)
     payment_totals = range_sales.aggregate(
         cash=Coalesce(Sum('selling_price', filter=Q(payment_method='CASH')), Decimal('0.00'), output_field=DecimalField()),
         bank=Coalesce(Sum('selling_price', filter=Q(payment_method='BANK')), Decimal('0.00'), output_field=DecimalField()),
@@ -247,6 +277,9 @@ def dashboard(request):
         "total_costs": total_costs,
         "profit": profit,
         "profit_margin": profit_margin,
+        # Pre-computed absolute values for template (Django lacks |abs filter)
+        "profit_abs": profit_abs,
+        "profit_margin_abs": profit_margin_abs,
         "stock_on_hand": stock_on_hand,
         # Payment mix
         "payment_mix": payment_mix_data,

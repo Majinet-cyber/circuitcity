@@ -1,306 +1,303 @@
 // cypress/e2e/phones_full_journey.cy.js
 /**
- * End-to-end test for Phones vertical full journey
- * 
- * Tests:
- * - Login and navigate to phones dashboard
- * - Add phone product/stock
- * - Perform cash sale
- * - Perform credit sale
- * - Record credit repayment
- * - Verify dashboard metrics
+ * End-to-end tests for Phones vertical
+ *
+ * Main flow:
+ * - Login as manager
+ * - Ensure a phone product exists (IPHONE 15 Pro Max as example)
+ * - Ensure at least one stock item exists for that product (scan in if needed)
+ * - Run sale wizard: choose brand + model, enter IMEI from stock
+ * - Set selling price with ≥20% margin over cost
+ * - Choose any payment method (Cash / Bank / Mobile Money) and complete sale
+ * - Simple extra checks: dashboard + low stock alerts
  */
 
-describe('Phones Full Journey', () => {
+const TEST_BRAND = "IPHONE";
+const TEST_MODEL = "Iphone 15 Pro Max 8+256";  // adjust to your real model name
+const TEST_IMEI = "359999999999999";           // dummy IMEI used when we create stock
+
+describe("Phones Full Journey", () => {
   beforeEach(() => {
     cy.clearCookies();
     cy.clearLocalStorage();
   });
 
-  it('completes full phones workflow: add stock → cash sale → credit sale → repayment', () => {
-    // 1. Login
-    cy.loginAsOwner();
-    cy.wait(1000);
+  /**
+   * Ensure a phone product exists for the given brand/model.
+   * Uses /inventory/phone-products/ UI.
+   */
+  function ensurePhoneProductExists() {
+    cy.visit("/inventory/phone-products/");
 
-    // 2. Navigate to Phones dashboard
-    cy.visitDashboard('phones');
-    cy.url().should('include', 'phone');
-
-    // Verify dashboard loaded
-    cy.get('body').should('be.visible');
-    cy.get('body').should('not.contain', '500 Internal Server Error');
-
-    // 3. Check initial stock count
-    cy.get('body').then(($body) => {
-      if ($body.find('[data-cy="stock-count"]').length > 0) {
-        cy.get('[data-cy="stock-count"]').invoke('text').as('initialStock');
+    cy.get("body").then(($body) => {
+      // If our model name already exists anywhere on the page, we’re done.
+      if ($body.text().includes(TEST_MODEL)) {
+        cy.log("✅ Phone model already exists:", TEST_MODEL);
+        return;
       }
-    });
 
-    // 4. Add new stock (if form available)
-    cy.get('body').then(($body) => {
-      // Look for "Add Stock" or similar button
-      const addStockSelectors = [
-        '[data-cy="add-stock-btn"]',
-        'a:contains("Add Stock")',
-        'button:contains("Add Stock")',
-        'a:contains("Add Inventory")',
-      ];
+      cy.log("ℹ️ Creating phone model:", TEST_MODEL);
 
-      let found = false;
-      addStockSelectors.forEach((selector) => {
-        if ($body.find(selector).length > 0 && !found) {
-          cy.get(selector).first().click();
-          found = true;
-          cy.wait(500);
+      // Find the brand card (IPHONE) – adjust selector to your brand cards
+      cy.contains(".brand-card, .card", TEST_BRAND)
+        .as("brandCard");
 
-          // Fill in stock form if it appears
-          cy.url().then((url) => {
-            if (url.includes('add') || url.includes('create')) {
-              // Fill IMEI
-              cy.get('input[name="imei"], [data-cy="imei-input"]').then(($input) => {
-                if ($input.length > 0) {
-                  cy.wrap($input).clear().type('123456789012345');
-                }
-              });
-
-              // Submit form
-              cy.get('button[type="submit"], [data-cy="submit-btn"]').first().click();
-              cy.wait(1000);
-            }
-          });
-        }
+      cy.get("@brandCard").within(() => {
+        // Click the "Add model" control for that brand
+        cy.get(
+          "[data-cy='add-model-btn'], a:contains('Add model'), button:contains('Add model')"
+        )
+          .first()
+          .click();
       });
 
-      if (found) {
-        cy.log('✓ Added stock item');
-      } else {
-        cy.log('⚠ Add stock form not found - skipping');
-      }
+      // Now we should be on the "Add model" form / modal.
+      // Adjust input names/selectors as needed.
+      cy.get("input[name='name'], input[name='model_name']")
+        .clear()
+        .type(TEST_MODEL);
+
+      // Cost / order price – example: 2,800,000
+      cy.get("input[name='cost_price'], input[name='order_price']")
+        .first()
+        .clear()
+        .type("2800000");
+
+      // Submit model form
+      cy.get("button[type='submit'], [data-cy='submit-btn']")
+        .contains(/save|create|add/i)
+        .first()
+        .click();
+
+      // Confirm model appears on the products page
+      cy.contains(TEST_MODEL).should("exist");
+      cy.log("✅ Phone model created:", TEST_MODEL);
     });
+  }
 
-    // 5. Perform cash sale
-    cy.visitDashboard('phones');
-    cy.get('body').then(($body) => {
-      const saleSelectors = [
-        '[data-cy="record-sale-btn"]',
-        'a:contains("Record Sale")',
-        'button:contains("Sell")',
-        'a:contains("New Sale")',
-      ];
+  /**
+   * Ensure that there is at least ONE stock item for TEST_MODEL with TEST_IMEI.
+   * Checks /inventory/list/ and if not found, uses /inventory/scan-in/.
+   */
+  function ensureStockExistsForTestPhone() {
+    cy.visit("/inventory/list/");
 
-      let found = false;
-      saleSelectors.forEach((selector) => {
-        if ($body.find(selector).length > 0 && !found) {
-          cy.get(selector).first().click();
-          found = true;
-          cy.wait(500);
+    cy.get("body").then(($body) => {
+      if ($body.text().includes(TEST_IMEI)) {
+        cy.log("✅ Stock already present for IMEI:", TEST_IMEI);
+        return;
+      }
 
-          // Fill sale form if it appears
-          cy.url().then((url) => {
-            if (url.includes('sale') || url.includes('sell')) {
-              // Look for IMEI or product selection
-              cy.get('input[name="imei"], select[name="product"], [data-cy="imei-input"]').then(($field) => {
-                if ($field.length > 0) {
-                  if ($field.is('select')) {
-                    // Select first product
-                    cy.wrap($field).select(1);
-                  } else {
-                    // Enter IMEI
-                    cy.wrap($field).clear().type('123456789012345');
-                  }
+      cy.log("ℹ️ No stock for IMEI yet, scanning phone in");
+
+      // Go to Scan IN page
+      cy.visit("/inventory/scan-in/");
+
+      // Select brand (IPHONE) – adjust selector to your brand tiles/cards
+      cy.contains(
+        "[data-cy='scan-brand-card'], .phone-brand-card, .card",
+        TEST_BRAND
+      ).click();
+
+      // Select the specific model
+      cy.get("select[name='model'], [data-cy='scan-model-select']")
+        .should("be.visible")
+        .select(TEST_MODEL);
+
+      // Click the button that reveals the IMEI form
+      cy.contains(
+        "button, a",
+        /scan in phone|scan phone|add stock/i
+      )
+        .first()
+        .click();
+
+      // Now the IMEI field in the scan form should be visible.
+      // Important: use :visible so we never hit hidden #imei-input.
+      cy.get("input[name='imei']:visible, [data-cy='imei-input']:visible")
+        .should("be.visible")
+        .clear()
+        .type(TEST_IMEI);
+
+      // Submit / save
+      cy.contains("button, a", /save|add phone|create/i)
+        .first()
+        .click();
+
+      // Confirm stock shows up in list
+      cy.visit("/inventory/list/");
+      cy.contains(TEST_IMEI).should("exist");
+      cy.log("✅ Stock created for IMEI:", TEST_IMEI);
+    });
+  }
+
+  /**
+   * Completes a phone sale using the sale wizard.
+   * Requires TEST_BRAND, TEST_MODEL, TEST_IMEI to be valid.
+   * Sets selling price with ≥20% margin over cost.
+   */
+  function completeSaleWithMargin() {
+    cy.log("ℹ️ Starting phone sale wizard");
+
+    cy.visit("/inventory/phone-sale-wizard/");
+
+    // STEP 1: Choose brand
+    cy.contains(
+      "[data-cy='sale-brand-option'], .brand-option, .card",
+      TEST_BRAND
+    )
+      .first()
+      .click();
+
+    cy.contains("button", /continue|next/i)
+      .first()
+      .click();
+
+    // STEP 2: Choose model
+    cy.contains(
+      "[data-cy='sale-model-option'], .model-option, .card",
+      TEST_MODEL
+    )
+      .first()
+      .click();
+
+    cy.contains("button", /continue|next/i)
+      .first()
+      .click();
+
+    // STEP 3: IMEI entry (wizard version – visible field only!)
+    cy.get("input[name='imei']:visible, [data-cy='sale-imei-input']:visible")
+      .should("be.visible")
+      .clear()
+      .type(TEST_IMEI);
+
+    cy.contains("button", /continue|next/i)
+      .first()
+      .click();
+
+    // STEP 4: pricing / payment
+    // Read cost price from input, then set selling price = cost * 1.2 (20% margin)
+    cy.get(
+      "[data-cy='cost-price'], input[name='cost_price'], input[data-field='cost_price']"
+    )
+      .invoke("val")
+      .then((rawCost) => {
+        const numeric = String(rawCost).replace(/,/g, "");
+        const cost = Number(numeric || 0) || 0;
+
+        const sellingPrice = Math.round(cost * 1.2); // 20% margin
+
+        cy.get(
+          "[data-cy='selling-price'], input[name='selling_price'], input[data-field='selling_price']"
+        )
+          .clear()
+          .type(String(sellingPrice));
+
+        // Payment method: click any of Cash / Bank / Mobile Money that exists
+        cy.get("body").then(($body) => {
+          const methods = ["Cash", "Bank", "Mobile Money"];
+          let clicked = false;
+
+          methods.forEach((label) => {
+            if (!clicked && $body.find(`button:contains("${label}")`).length) {
+              cy.contains("button", label).click();
+              clicked = true;
+            }
+          });
+
+          if (!clicked) {
+            // Fallback: maybe a <select>
+            cy.get(
+              "select[name='payment_method'], [data-cy='payment-method']"
+            ).then(($select) => {
+              if ($select.length) {
+                // prefer cash if available
+                if ($select.find("option[value='cash']").length) {
+                  cy.wrap($select).select("cash");
+                } else {
+                  cy.wrap($select).select(1);
                 }
-              });
-
-              // Select payment method (cash)
-              cy.get('select[name="payment_method"], [data-cy="payment-method"]').then(($select) => {
-                if ($select.length > 0) {
-                  cy.wrap($select).select('cash');
-                }
-              });
-
-              // Submit
-              cy.get('button[type="submit"], [data-cy="submit-sale-btn"]').first().click();
-              cy.wait(1000);
-
-              // Verify success
-              cy.verifySuccess();
-            }
-          });
-        }
-      });
-
-      if (found) {
-        cy.log('✓ Recorded cash sale');
-      } else {
-        cy.log('⚠ Sale form not found - skipping');
-      }
-    });
-
-    // 6. Perform credit sale
-    cy.visitDashboard('phones');
-    cy.get('body').then(($body) => {
-      const creditSelectors = [
-        '[data-cy="credit-sale-btn"]',
-        'a:contains("Credit Sale")',
-        'a:contains("Sell on Credit")',
-      ];
-
-      let found = false;
-      creditSelectors.forEach((selector) => {
-        if ($body.find(selector).length > 0 && !found) {
-          cy.get(selector).first().click();
-          found = true;
-          cy.wait(500);
-
-          // Fill credit sale form
-          cy.get('input[name="customer_name"], [data-cy="customer-name"]').then(($input) => {
-            if ($input.length > 0) {
-              cy.wrap($input).clear().type('Test Customer');
-            }
-          });
-
-          cy.get('input[name="customer_phone"], [data-cy="customer-phone"]').then(($input) => {
-            if ($input.length > 0) {
-              cy.wrap($input).clear().type('0999123456');
-            }
-          });
-
-          cy.get('input[name="amount"], [data-cy="credit-amount"]').then(($input) => {
-            if ($input.length > 0) {
-              cy.wrap($input).clear().type('500000');
-            }
-          });
-
-          cy.get('button[type="submit"]').first().click();
-          cy.wait(1000);
-
-          cy.verifySuccess();
-        }
-      });
-
-      if (found) {
-        cy.log('✓ Created credit sale');
-      } else {
-        cy.log('⚠ Credit sale form not found - skipping');
-      }
-    });
-
-    // 7. Record credit repayment
-    cy.visitDashboard('phones');
-    cy.get('body').then(($body) => {
-      const creditListSelectors = [
-        '[data-cy="credits-link"]',
-        'a:contains("Credits")',
-        'a:contains("Outstanding")',
-      ];
-
-      let found = false;
-      creditListSelectors.forEach((selector) => {
-        if ($body.find(selector).length > 0 && !found) {
-          cy.get(selector).first().click();
-          found = true;
-          cy.wait(500);
-
-          // Look for a credit entry
-          cy.get('body').then(($creditBody) => {
-            const paymentSelectors = [
-              '[data-cy="record-payment-btn"]',
-              'button:contains("Pay")',
-              'a:contains("Record Payment")',
-            ];
-
-            paymentSelectors.forEach((paySelector) => {
-              if ($creditBody.find(paySelector).length > 0) {
-                cy.get(paySelector).first().click();
-                cy.wait(500);
-
-                // Fill payment form
-                cy.get('input[name="amount"], [data-cy="payment-amount"]').then(($input) => {
-                  if ($input.length > 0) {
-                    cy.wrap($input).clear().type('200000');
-                  }
-                });
-
-                cy.get('button[type="submit"]').first().click();
-                cy.wait(1000);
-
-                cy.verifySuccess();
               }
             });
-          });
-        }
+          }
+        });
+
+        // Complete the sale
+        cy.contains(
+          "button",
+          /complete sale|confirm sale|submit|finish/i
+        )
+          .first()
+          .click();
       });
 
-      if (found) {
-        cy.log('✓ Recorded credit payment');
-      } else {
-        cy.log('⚠ Credit list not found - skipping payment');
-      }
+    // Confirm success – tweak text to match your toast / alert
+    cy.get("body").should(($body) => {
+      expect($body.text().toLowerCase()).to.satisfy((txt) =>
+        txt.includes("sale completed") ||
+        txt.includes("success") ||
+        txt.includes("sale recorded")
+      );
     });
 
-    // 8. Verify dashboard reflects changes
-    cy.visitDashboard('phones');
+    cy.log("✅ Sale completed with ≥20% profit margin");
+  }
 
-    cy.get('body').then(($body) => {
-      // Check for financial metrics
-      if ($body.text().includes('MK') || $body.text().includes('$')) {
-        cy.log('✓ Dashboard shows financial data');
-      }
+  it("completes phones cash sale with ≥20% profit from existing or created stock", () => {
+    // 1. Login + open phones dashboard (custom helper)
+    cy.loginAsOwner();
+    cy.visitDashboard("phones");
 
-      // Check for stock count
-      if ($body.find('[data-cy="stock-count"]').length > 0) {
-        cy.get('[data-cy="stock-count"]').should('be.visible');
-        cy.log('✓ Stock count visible');
-      }
+    // 2. Ensure the product exists
+    ensurePhoneProductExists();
 
-      // Check for sales metrics
-      const metricsSelectors = [
-        '[data-cy="total-sales"]',
-        '[data-cy="revenue"]',
-        '[data-cy="profit"]',
-      ];
+    // 3. Ensure stock exists for that model (scan in if required)
+    ensureStockExistsForTestPhone();
 
-      metricsSelectors.forEach((selector) => {
-        if ($body.find(selector).length > 0) {
-          cy.get(selector).should('be.visible');
-        }
+    // 4. Run sale wizard using that stock
+    completeSaleWithMargin();
+
+    // 5. Optional: verify that IMEI appears as sold in inventory list
+    cy.visit("/inventory/list/");
+    cy.contains(TEST_IMEI)
+      .parents("tr")
+      .within(() => {
+        // adjust selector/text to how you mark sold items
+        cy.contains(/sold|out/i).should("exist");
       });
-    });
   });
 
-  it('handles stock out of stock scenario gracefully', () => {
+  it("handles stock low / out-of-stock alerts gracefully", () => {
     cy.loginAsOwner();
-    cy.visitDashboard('phones');
+    cy.visitDashboard("phones");
 
-    cy.get('body').then(($body) => {
+    cy.get("body").then(($body) => {
       // Check for low stock or out of stock alerts
       const alertSelectors = [
         '[data-cy="low-stock-alert"]',
-        '.alert:contains("low stock")',
-        '.badge:contains("Out of Stock")',
+        ".alert:contains('low stock')",
+        ".badge:contains('Out of Stock')",
       ];
 
       alertSelectors.forEach((selector) => {
         if ($body.find(selector).length > 0) {
-          cy.get(selector).should('be.visible');
-          cy.log('✓ Low stock alert displayed');
+          cy.get(selector).should("be.visible");
+          cy.log("✅ Low stock/out-of-stock alert displayed");
         }
       });
     });
   });
 
-  it('displays dashboard without errors', () => {
+  it("displays phones dashboard without server errors", () => {
     cy.loginAsOwner();
-    cy.visitDashboard('phones');
+    cy.visitDashboard("phones");
 
     // Verify no server errors
-    cy.get('body').should('not.contain', '500 Internal Server Error');
-    cy.get('body').should('not.contain', '404 Not Found');
-    cy.get('body').should('not.contain', 'Application error');
+    cy.get("body").should("not.contain", "500 Internal Server Error");
+    cy.get("body").should("not.contain", "404 Not Found");
+    cy.get("body").should("not.contain", "Application error");
 
     // Verify page loaded
-    cy.get('body').should('be.visible');
+    cy.get("body").should("be.visible");
   });
 });
-

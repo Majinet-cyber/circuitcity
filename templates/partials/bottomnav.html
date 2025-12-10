@@ -9,8 +9,8 @@
 {% url 'inventory:inventory_dashboard' as url_dashboard %}
 {% url 'dashboard:home' as url_dash_home %}
 {% url 'inventory:scan_in' as url_scan %}
-{% url 'inventory:scan_sold' as url_sell %}
 {% url 'inventory:phone_sale_wizard' as url_sell_wizard %}
+{% url 'inventory:phone_sale_wizard' as url_sell %}
 {% url 'inventory:stock_list' as url_stock %}
 {% url 'wallet:agent_wallet' as url_wallet %}
 {% url 'wallet:admin_home' as url_wallet_admin %}
@@ -32,7 +32,7 @@
     <span>Scan</span>
   </a>
   
-  <a href="{{ url_sell_wizard|default:url_sell|default:'/inventory/scan-sold/' }}" 
+  <a href="{{ url_sell_wizard|default:url_sell|default:'/inventory/phone-sale-wizard/' }}" 
      class="cc-bottomnav__item {% if active_tab == 'sell' %}cc-bottomnav__item--active{% endif %}"
      aria-label="Sell"
      aria-current="{% if active_tab == 'sell' %}page{% endif %}">

@@ -887,7 +887,8 @@ urlpatterns = [
     path("list/all/", _need_biz(_stock_list_wrapper(_list_all_redirect)), name="stock_list_all"),
     path("stocks/", _redirect_to("inventory:stock_list")),
 
-    path("dashboard/", vertical_dispatcher, name="inventory_dashboard"),
+    # Legacy inventory dashboard (not vertical-specific)
+    path("dashboard/", _need_biz(_inventory_dashboard), name="inventory_dashboard"),
     path("dashboard", _redirect_to("inventory:inventory_dashboard"), name="dashboard"),
     path("dash/", _redirect_to("inventory:inventory_dashboard")),
 

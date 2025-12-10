@@ -398,7 +398,7 @@
     {# ------- URLs for routing/helpers ------- #}
     {% url 'inventory:inventory_dashboard' as url_home %}
     {% url 'inventory:scan_in'           as url_scan_in %}
-    {% url 'inventory:scan_sold'         as url_sell %}
+    {% url 'inventory:phone_sale_wizard' as url_sell %}
     {% url 'inventory:stock_list'        as url_stock %}
     {% url 'wallet:agent_wallet'         as url_wallet %}
     {% url 'reports:home'                as url_reports %}
@@ -690,7 +690,7 @@
       <a class="tab {% if active_tab == 'scan_in' %}active{% endif %}" href="{{ url_scan_in|default:'/inventory/scan-in/' }}">
         <i class="bi bi-upc-scan d-block"></i>Scan
       </a>
-      <a class="tab {% if active_tab == 'sell' %}active{% endif %}" href="{{ url_sell|default:'/inventory/scan-sold/' }}">
+      <a class="tab {% if active_tab == 'sell' %}active{% endif %}" href="{{ url_sell|default:'/inventory/phone-sale-wizard/' }}">
         <i class="bi bi-cart-check d-block"></i>Sell
       </a>
       <a class="tab {% if active_tab == 'stock' %}active{% endif %}" href="{{ url_stock|default:'/inventory/list/' }}">
@@ -855,7 +855,7 @@
       URLS: Object.assign({
         home: "{{ url_home|default:'/inventory/dashboard/' }}",
         scan_in: "{{ url_scan_in|default:'/inventory/scan-in/' }}",
-        scan_sold: "{{ url_sell|default:'/inventory/scan-sold/' }}",
+        scan_sold: "{{ url_sell|default:'/inventory/phone-sale-wizard/' }}",
         stock_list: "{{ url_stock|default:'/inventory/list/' }}",
         wallet: "{{ url_wallet|default:'/wallet/' }}",
         reports: "{{ url_reports|default:'/reports/' }}",

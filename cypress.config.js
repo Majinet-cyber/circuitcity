@@ -14,7 +14,7 @@ module.exports = defineConfig({
     responseTimeout: 10000,
     env: {
       // Test user credentials
-      TEST_EMAIL: 'cindymahon@gmail.com',
+      TEST_EMAIL: 'empire@gmai.com',
       TEST_PASSWORD: '@Lincoln1863?',
     },
     setupNodeEvents(on, config) {

@@ -93,6 +93,10 @@ def get_inventory_kpis(
         from wallet.models import WalletTransaction, Ledger, TxnType
         
         if business and start_date and end_date:
+            # Convert datetime to date for comparison with DateField
+            start_d = start_date.date() if hasattr(start_date, 'date') else start_date
+            end_d = end_date.date() if hasattr(end_date, 'date') else end_date
+            
             # Query admin costs for this business and period
             admin_costs_qs = WalletTransaction.objects.filter(
                 business=business,
@@ -105,8 +109,8 @@ def get_inventory_kpis(
             once_off_q = Q(
                 type=TxnType.COST_ONCE_OFF,
                 is_recurring=False,
-                effective_date__gte=start_date,
-                effective_date__lte=end_date,
+                effective_date__gte=start_d,
+                effective_date__lte=end_d,
             )
             
             # For recurring costs: include if effective_from <= end_date
@@ -114,7 +118,7 @@ def get_inventory_kpis(
             recurring_q = Q(
                 type=TxnType.COST_RECURRING,
                 is_recurring=True,
-                effective_from__lte=end_date,
+                effective_from__lte=end_d,
             )
             
             period_costs_qs = admin_costs_qs.filter(once_off_q | recurring_q)
