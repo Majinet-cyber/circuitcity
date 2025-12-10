@@ -393,8 +393,12 @@ def checkin_page(request):
     # Build member data with attendance
     member_data = []
     for member in members:
-        # Get accurate membership status
-        membership_status = get_membership_status(member, today)
+        # Use centralized properties for membership status
+        is_active = member.is_active_membership
+        days_left = member.days_left
+        total_days = member.duration_days
+        status_label = member.status_label
+        next_payment = member.next_payment_date_property
         
         # Check if member checked in today
         checked_in_today = GymCheckIn.objects.filter(
@@ -410,7 +414,7 @@ def checkin_page(request):
         if checked_in_today:
             today_status = "present"
             today_label = "Present"
-        elif membership_status["status_code"] == "active":
+        elif is_active:
             today_status = "absent"
             today_label = "Absent"
         else:
@@ -419,11 +423,12 @@ def checkin_page(request):
         
         member_data.append({
             "member": member,
-            "membership_status": membership_status,
-            "days_left": membership_status["days_remaining"],
-            "total_days": membership_status["total_days"] or GYM_MEMBERSHIP_DAYS,
+            "status_label": status_label,
+            "is_active": is_active,
+            "days_left": days_left,
+            "total_days": total_days,
             "days_attended": days_attended,
-            "next_payment": membership_status["end_date"],
+            "next_payment": next_payment,
             "checked_in_today": checked_in_today,
             "today_status": today_status,
             "today_label": today_label,

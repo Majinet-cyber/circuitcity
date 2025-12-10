@@ -289,10 +289,16 @@ PGCONNECT_TIMEOUT = env_int("PGCONNECT_TIMEOUT", 5)
 DB_CONN_MAX_AGE = env_int("DB_CONN_MAX_AGE", 120)  # seconds
 DB_CONN_HEALTH_CHECKS = env_bool("DB_CONN_HEALTH_CHECKS", True)
 
+# SQLite timeout (seconds) to reduce "database is locked" during dev/Cypress
+SQLITE_TIMEOUT = env_int("SQLITE_TIMEOUT", 20)
+
 if TESTING:
     DATABASES["default"] = {
         "ENGINE": "django.db.backends.sqlite3",
         "NAME": BASE_DIR / "db.sqlite3",
+        "OPTIONS": {
+            "timeout": SQLITE_TIMEOUT,
+        },
     }
 elif DATABASE_URL:
     try:
@@ -316,6 +322,9 @@ elif USE_LOCAL_SQLITE:
     DATABASES["default"] = {
         "ENGINE": "django.db.backends.sqlite3",
         "NAME": sqlite_path,
+        "OPTIONS": {
+            "timeout": SQLITE_TIMEOUT,
+        },
     }
 else:
     NAME = os.environ.get("POSTGRES_DB") or os.environ.get("DB_NAME", "circuitcity")

@@ -65,7 +65,7 @@
                     <div>
                         {% if member.is_archived %}
                             <span class="badge bg-secondary-subtle text-secondary">Archived</span>
-                        {% elif member.is_active_today %}
+                        {% elif member.is_active_membership %}
                             <span class="badge bg-success-subtle text-success">Active</span>
                         {% else %}
                             <span class="badge bg-danger-subtle text-danger">In Arrears</span>
@@ -75,10 +75,10 @@
                 <div class="mb-3">
                     <label class="text-muted small">Days Left</label>
                     <div>
-                        {% if member.days_left_current > 0 %}
-                            <span class="fw-semibold">{{ member.days_left_current }} of 30 days</span>
+                        {% if member.days_left > 0 %}
+                            <span class="fw-semibold">{{ member.days_left_display }}</span>
                         {% else %}
-                            <span class="text-danger">0 days</span>
+                            <span class="text-danger">{{ member.days_left_display }}</span>
                         {% endif %}
                     </div>
                 </div>
@@ -95,23 +95,24 @@
                     </div>
                 </div>
                 {% endif %}
-                {% if member.current_payment %}
                 <div class="mb-3">
                     <label class="text-muted small">Next Payment</label>
-                    <div>{{ member.current_payment.end_date|date:"d M Y" }}</div>
+                    <div>
+                        {% if member.next_payment_date_property %}
+                            {{ member.next_payment_date_property|date:"d M Y" }}
+                        {% else %}
+                            <span class="text-muted">Not set</span>
+                        {% endif %}
+                    </div>
                 </div>
+                {% if member.is_active_membership %}
                 <div class="mb-3">
                     <label class="text-muted small">Days Attended (Current Period)</label>
                     <div>
                         <span class="badge bg-primary-subtle text-primary">
-                            {{ member.days_attended }} / 30 days
+                            {{ member.days_attended }} / {{ member.duration_days }} days
                         </span>
                     </div>
-                </div>
-                {% else %}
-                <div class="mb-3">
-                    <label class="text-muted small">Next Payment</label>
-                    <div class="text-muted">Not set</div>
                 </div>
                 {% endif %}
                 {% if member.notes %}

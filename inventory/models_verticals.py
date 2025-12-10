@@ -535,6 +535,128 @@ class GymMember(models.Model):
     def __str__(self):
         return f"{self.name} ({self.phone})"
     
+    # ==============================================================================
+    # CENTRALIZED MEMBERSHIP CALCULATION PROPERTIES
+    # ==============================================================================
+    
+    @property
+    def duration_days(self) -> int:
+        """
+        Get the duration of the membership in days.
+        Currently always 30 days, but this property allows for future flexibility.
+        """
+        from inventory.utils_gym import GYM_MEMBERSHIP_DAYS
+        return GYM_MEMBERSHIP_DAYS
+    
+    @property
+    def days_used(self) -> int:
+        """
+        Calculate how many days have been used in the current membership period.
+        
+        Returns 0 if:
+        - No membership exists (no last_payment_date)
+        - Today is before the membership start date (negative days clamped to 0)
+        
+        Returns duration_days if:
+        - Today is after the membership has expired (capped at duration_days)
+        
+        Otherwise returns the number of days elapsed since membership_start.
+        """
+        if not self.last_payment_date:
+            return 0
+        
+        today = timezone.now().date()
+        used = (today - self.last_payment_date).days
+        
+        # Clamp to valid range [0, duration_days]
+        if used < 0:
+            used = 0
+        if used > self.duration_days:
+            used = self.duration_days
+        
+        return used
+    
+    @property
+    def days_left(self) -> int:
+        """
+        Calculate remaining days in the current membership period.
+        
+        Returns:
+        - duration_days (e.g., 30) on the day of payment
+        - duration_days - 1 (e.g., 29) the day after payment
+        - 0 when membership has expired or never existed
+        
+        This ensures the display shows "30 / 30 days" on payment day.
+        """
+        if not self.last_payment_date:
+            return 0
+        return max(self.duration_days - self.days_used, 0)
+    
+    @property
+    def days_left_display(self) -> str:
+        """
+        Get a formatted string for displaying days left.
+        
+        Returns:
+        - "30 / 30 days" on payment day
+        - "29 / 30 days" the day after
+        - "0 / 30 days" when expired
+        """
+        return f"{self.days_left} / {self.duration_days} days"
+    
+    @property
+    def next_payment_date_property(self):
+        """
+        Get the next payment due date.
+        
+        Business rule: Next payment is due exactly duration_days after the last payment.
+        
+        Returns:
+        - Date when next payment is due (last_payment_date + duration_days)
+        - None if member has never paid
+        
+        Example:
+        - Last payment: Jan 1
+        - Duration: 30 days
+        - Membership period: Jan 1 - Jan 30
+        - Next payment due: Jan 31
+        """
+        if not self.last_payment_date:
+            return None
+        return self.last_payment_date + timedelta(days=self.duration_days)
+    
+    @property
+    def is_active_membership(self) -> bool:
+        """
+        Check if the member has an active membership.
+        
+        Active means:
+        - Has made a payment (last_payment_date exists)
+        - AND has days remaining (days_left > 0)
+        
+        Returns:
+        - True if membership is active
+        - False if expired or never existed
+        """
+        return bool(self.last_payment_date and self.days_left > 0)
+    
+    @property
+    def status_label(self) -> str:
+        """
+        Get a human-readable status label for display.
+        
+        Returns:
+        - "Active" if membership is active
+        - "No membership" if never paid or expired
+        """
+        if self.is_active_membership:
+            return "Active"
+        return "No membership"
+    
+    # ==============================================================================
+    # LEGACY PROPERTIES (kept for backward compatibility)
+    # ==============================================================================
+    
     @property
     def current_payment(self):
         """
@@ -566,22 +688,32 @@ class GymMember(models.Model):
         
         This is the correct way to calculate days left based on GymPayment records.
         Use this instead of days_left() for accurate results.
+        
+        FIXED: Now caps at duration_days to prevent "31 / 30 days" bug.
+        
+        DEPRECATED: Use days_left property instead for the new centralized logic.
         """
+        from inventory.utils_gym import compute_membership_days, GYM_MEMBERSHIP_DAYS
+        
         payment = self.current_payment
         if not payment:
             return 0
+        
         today = timezone.localdate()
-        days = (payment.end_date - today).days + 1
-        return max(days, 0)
+        # Use the centralized helper function that caps days_left at duration
+        days_left, _ = compute_membership_days(payment.start_date, GYM_MEMBERSHIP_DAYS, today)
+        return days_left
     
-    def days_left(self) -> int:
+    def days_left_legacy(self) -> int:
         """
+        DEPRECATED: Old days_left calculation based on membership_end.
+        Use the days_left property instead for accurate results.
+        
         Calculate days left in membership based on membership_end date (inclusive).
         
         For a new member with membership ending in 29 days, this returns 30
         (today + 29 future days = 30 days total).
         
-        DEPRECATED: Use get_membership_status() from utils_gym for accurate status.
         This method is kept for backward compatibility.
         """
         if not self.membership_end:
@@ -604,10 +736,21 @@ class GymMember(models.Model):
         ).dates('timestamp', 'day').count()
     
     def next_payment_date(self):
-        """Return the next payment date (membership_end + 1 day)"""
-        if not self.membership_end:
+        """
+        Return the next payment due date.
+        
+        Business rule: Next payment is due exactly 30 days after the last payment.
+        For a membership starting Jan 1, ending Jan 30, next payment is due Jan 31.
+        
+        Returns:
+            Date when next payment is due, or None if member has never paid
+        """
+        from inventory.utils_gym import compute_next_payment_date, GYM_MEMBERSHIP_DAYS
+        
+        if not self.last_payment_date:
             return None
-        return self.membership_end
+        
+        return compute_next_payment_date(self.last_payment_date, GYM_MEMBERSHIP_DAYS)
     
     def membership_status(self) -> str:
         """

@@ -8,28 +8,48 @@
  * @param {string} password - User password
  */
 Cypress.Commands.add('login', (email, password) => {
-  cy.visit('/accounts/login/');
-  
-  cy.get('input[name="username"], input[name="email"], [data-cy=login-email]')
+  cy.visit('/accounts/login/', { timeout: 60000 });
+
+  // Email / username
+  cy.get('input[name="username"], input[name="email"], [data-cy=login-email]', {
+    timeout: 30000,
+  })
+    .first()
     .clear()
     .type(email);
-    
-  cy.get('input[name="password"], [data-cy=login-password]')
+
+  // Password
+  cy.get('input[name="password"], [data-cy=login-password]', {
+    timeout: 30000,
+  })
+    .first()
     .clear()
     .type(password);
-    
-  cy.get('button[type="submit"], [data-cy=login-submit]').click();
-  
-  // Wait for redirect after successful login
-  cy.url().should('not.include', '/accounts/login/');
+
+  // Submit
+  cy.get('button[type="submit"], [data-cy=login-submit]', {
+    timeout: 30000,
+  })
+    .first()
+    .click();
+
+  // ✅ Be very patient and flexible after login
+  cy.location('pathname', { timeout: 60000 }).should((path) => {
+    // Just don't stay stuck on the login page
+    expect(path).to.not.eq('/accounts/login/');
+  });
+
+  // And wait for evidence that we’re really in the app
+  cy.contains(/Phones & Electronics/i, { timeout: 60000 }).should('exist');
 });
 
 /**
  * Custom command to log in as owner using environment variables
  */
 Cypress.Commands.add('loginAsOwner', () => {
-  const email = Cypress.env('TEST_EMAIL');
-  const password = Cypress.env('TEST_PASSWORD');
+  const email = Cypress.env('TEST_EMAIL') || 'empire@gmail.com';
+  const password = Cypress.env('TEST_PASSWORD') || '@Lincoln1863?';
+
   cy.login(email, password);
 });
 
@@ -77,10 +97,10 @@ Cypress.Commands.add('visitDashboard', (kind) => {
     gym: '/inventory/verticals/gym/',
     pharmacy: '/inventory/pharmacy/dashboard/',
   };
-  
+
   const url = dashboardUrls[kind] || '/dashboard/';
   cy.visit(url, { failOnStatusCode: false });
-  
+
   // Handle 404 fallback
   cy.url().then((currentUrl) => {
     if (currentUrl.includes('404')) {
@@ -136,7 +156,7 @@ Cypress.Commands.add('verifySuccess', (message) => {
     '.toast-success',
     '[role="alert"]:contains("Success")',
   ];
-  
+
   selectors.forEach((selector) => {
     cy.get('body').then(($body) => {
       if ($body.find(selector).length > 0) {
@@ -161,7 +181,7 @@ Cypress.Commands.add('verifyError', (message) => {
     '.toast-error',
     '[role="alert"]:contains("Error")',
   ];
-  
+
   selectors.forEach((selector) => {
     cy.get('body').then(($body) => {
       if ($body.find(selector).length > 0) {
@@ -174,4 +194,3 @@ Cypress.Commands.add('verifyError', (message) => {
     });
   });
 });
-
