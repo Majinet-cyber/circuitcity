@@ -67,25 +67,21 @@
                             <td>
                                 {% if member.is_archived %}
                                     <span class="badge bg-secondary-subtle text-secondary">Archived</span>
-                                {% elif member.status == "PENDING_PAYMENT" %}
-                                    <span class="badge bg-warning-subtle text-warning">Pending Payment</span>
-                                {% elif member.status == "BEHIND_SCHEDULE" %}
-                                    <span class="badge bg-danger-subtle text-danger">Behind Schedule</span>
-                                {% elif member.status == "ACTIVE" %}
-                                    {% if member.days_left <= 7 %}
+                                {% elif member.is_active_today %}
+                                    {% if member.days_left_current <= 7 %}
                                         <span class="badge bg-info-subtle text-info">Expiring Soon</span>
                                     {% else %}
                                         <span class="badge bg-success-subtle text-success">Active</span>
                                     {% endif %}
                                 {% else %}
-                                    <span class="badge bg-secondary-subtle text-secondary">{{ member.membership_status }}</span>
+                                    <span class="badge bg-danger-subtle text-danger">In Arrears</span>
                                 {% endif %}
                             </td>
                             <td>
                                 {% if member.is_archived %}
                                     -
                                 {% else %}
-                                    {{ member.days_left }} day{{ member.days_left|pluralize }}
+                                    {{ member.days_left_current }} day{{ member.days_left_current|pluralize }}
                                 {% endif %}
                             </td>
                             <td>
@@ -104,7 +100,7 @@
                                     <a href="{% url 'gym:member_detail' member.id %}" class="btn btn-sm btn-outline-primary">
                                         <i class="bi bi-eye"></i> View
                                     </a>
-                                    {% if not member.is_archived and member.status != "ACTIVE" %}
+                                    {% if not member.is_archived and not member.is_active_today %}
                                         <form method="post" action="{% url 'gym:member_set_paid' member.id %}" style="display: inline;">
                                             {% csrf_token %}
                                             <button type="submit" class="btn btn-sm btn-outline-success" title="Mark as Paid / Renew">

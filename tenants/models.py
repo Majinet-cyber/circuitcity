@@ -148,6 +148,7 @@ class Business(models.Model):
         Creates:
           - a default Location if none exists
           - optionally a default Warehouse if your inventory app defines one
+          - for gym businesses: default trainers (Steve, Lesta, Philip)
         """
         try:
             Location = apps.get_model("inventory", "Location")
@@ -188,6 +189,30 @@ class Business(models.Model):
                 if hasattr(Warehouse, "is_default"):
                     wkwargs["is_default"] = True
                 getattr(Warehouse, "all_objects", Warehouse.objects).create(**wkwargs)
+        
+        # Gym-specific: seed default trainers
+        vertical = getattr(self, "business_kind", None) or getattr(self, "vertical", None) or ""
+        if vertical.lower() == "gym":
+            try:
+                GymTrainer = apps.get_model("inventory", "GymTrainer")
+                GymSettings = apps.get_model("inventory", "GymSettings")
+                
+                # Create default trainers if none exist
+                existing_count = GymTrainer.objects.filter(business=self).count()
+                if existing_count == 0:
+                    default_trainers = ["Steve", "Lesta", "Philip"]
+                    for trainer_name in default_trainers:
+                        GymTrainer.objects.get_or_create(
+                            business=self,
+                            name=trainer_name,
+                            defaults={"is_active": True}
+                        )
+                
+                # Create gym settings if not exists
+                GymSettings.objects.get_or_create(business=self)
+            except Exception:
+                # If gym models aren't available, skip silently
+                pass
 
     # Convenience: fetch the default/first location
     def default_location(self):

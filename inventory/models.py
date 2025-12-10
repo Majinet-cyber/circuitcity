@@ -1276,7 +1276,7 @@ try:
         LiquorSale, LiquorCredit, LiquorCreditPayment, LiquorStockEditRequest,
         LiquorExpense, LiquorWalletEntry,
         # Gym
-        GymMember, GymPayment, GymMemberLog, GymSettings, GymWalletEntry,
+        GymMember, GymPayment, GymMemberLog, GymSettings, GymWalletEntry, TrainerFee,
         # Clothing
         ClothingSale, ClothingProductLog,
     )
@@ -1285,7 +1285,7 @@ try:
         "LiquorSale", "LiquorCredit", "LiquorCreditPayment", "LiquorStockEditRequest",
         "LiquorExpense", "LiquorWalletEntry",
         # Gym
-        "GymMember", "GymPayment", "GymMemberLog", "GymSettings", "GymWalletEntry",
+        "GymMember", "GymPayment", "GymMemberLog", "GymSettings", "GymWalletEntry", "TrainerFee",
         # Clothing
         "ClothingSale", "ClothingProductLog",
     ]

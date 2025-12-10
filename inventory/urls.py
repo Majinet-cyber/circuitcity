@@ -1026,9 +1026,9 @@ urlpatterns += [
 # Time pages — execute once if a factory leaks; render template fallback
 # ---------------------------------------------------------------------
 urlpatterns += [
-    path("time/check-in/", _need_biz(_page_exec(_time_checkin_page, "inventory/time_checkin.html")), name="time_checkin"),
-    path("time/logs/",     _need_biz(_page_exec(_time_logs_page, "inventory/time_logs.html")),      name="time_logs"),
-    path("time/my/",       _need_biz(_page_exec(_my_time_logs_page, "inventory/time_logs.html")),   name="my_time_logs"),
+    path("time/check-in/", _need_biz(_ensure_response(_time_checkin_page)), name="time_checkin"),
+    path("time/logs/",     _need_biz(_ensure_response(_time_logs_page)),      name="time_logs"),
+    path("time/my/",       _need_biz(_ensure_response(_my_time_logs_page)),   name="my_time_logs"),
     path("timelogs/", _redirect_to("inventory:time_logs"), name="timelogs_short"),
     path("time/log/", _redirect_to("inventory:time_logs")),
 ]

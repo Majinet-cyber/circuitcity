@@ -23,8 +23,8 @@ from tenants.models import Business
 from tenants.utils import require_business
 
 from .models import MerchProduct
-from .models_pharmacy import PharmacyBatch, PharmacySale
-from .pharmacy_constants import PharmacyCategory, calculate_pharmacy_badges
+from .models_pharmacy import PharmacyBatch, PharmacySale, PharmacyCategory
+from .pharmacy_constants import calculate_pharmacy_badges
 
 logger = logging.getLogger(__name__)
 

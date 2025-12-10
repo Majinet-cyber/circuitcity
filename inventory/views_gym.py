@@ -83,6 +83,7 @@ def members_list(request):
     members = members.order_by("-joined_at")
     
     return render(request, "inventory/gym/members_list.html", {
+        "active_tab": "members",  # For navigation highlighting
         "members": members,
         "business": business,
         "filter_type": filter_type,
@@ -214,8 +215,13 @@ def member_edit(request, member_id):
 @require_business_kind(BusinessKind.GYM)
 def member_detail(request, member_id):
     """View member details with payment history and logs"""
+    from inventory.utils_gym import get_membership_status, GYM_MEMBERSHIP_DAYS
+    
     business = get_active_business(request)
     member = get_object_or_404(GymMember, pk=member_id, business=business)
+    
+    # Get accurate membership status
+    membership_status = get_membership_status(member)
     
     # Get payment history
     payments = member.payments.select_related("paid_by").order_by("-paid_at")
@@ -229,18 +235,30 @@ def member_detail(request, member_id):
     except GymSettings.DoesNotExist:
         gym_settings = None
     
-    # Calculate membership status
-    days_left = member.days_left()
-    status = member.membership_status()
+    # Check for missing trainer fee
+    from inventory.models_verticals import TrainerFee
+    trainer_fee_missing = False
+    if member.trainer and membership_status["status_code"] == "active":
+        # Check if there's a trainer fee for current period
+        try:
+            trainer_fee_missing = not TrainerFee.objects.filter(
+                member=member,
+                period_start=membership_status["start_date"],
+                period_end=membership_status["end_date"]
+            ).exists()
+        except Exception:
+            # TrainerFee table may not exist yet
+            trainer_fee_missing = False
     
     return render(request, "inventory/gym/member_detail.html", {
         "member": member,
+        "membership_status": membership_status,
         "payments": payments,
         "logs": logs,
-        "days_left": days_left,
-        "status": status,
         "gym_settings": gym_settings,
         "business": business,
+        "trainer_fee_missing": trainer_fee_missing,
+        "total_days": GYM_MEMBERSHIP_DAYS,
     })
 
 
@@ -359,7 +377,11 @@ def member_set_paid(request, member_id):
 @require_business_kind(BusinessKind.GYM)
 def checkin_page(request):
     """Dedicated check-in page showing all members with attendance tracking"""
+    from inventory.utils_gym import get_membership_status, GYM_MEMBERSHIP_DAYS
+    
     business = get_active_business(request)
+    today = timezone.now().date()
+    today_start = timezone.now().replace(hour=0, minute=0, second=0, microsecond=0)
     
     # Get all active members
     members = GymMember.objects.filter(
@@ -371,15 +393,44 @@ def checkin_page(request):
     # Build member data with attendance
     member_data = []
     for member in members:
+        # Get accurate membership status
+        membership_status = get_membership_status(member, today)
+        
+        # Check if member checked in today
+        checked_in_today = GymCheckIn.objects.filter(
+            business=business,
+            member=member,
+            timestamp__gte=today_start
+        ).exists()
+        
+        # Calculate days attended in current period
+        days_attended = member.days_attended()
+        
+        # Determine "Today" column value
+        if checked_in_today:
+            today_status = "present"
+            today_label = "Present"
+        elif membership_status["status_code"] == "active":
+            today_status = "absent"
+            today_label = "Absent"
+        else:
+            today_status = "inactive"
+            today_label = "Inactive"
+        
         member_data.append({
             "member": member,
-            "days_left": member.days_left(),
-            "days_attended": member.days_attended(),
-            "next_payment": member.next_payment_date(),
-            "status": member.status,
+            "membership_status": membership_status,
+            "days_left": membership_status["days_remaining"],
+            "total_days": membership_status["total_days"] or GYM_MEMBERSHIP_DAYS,
+            "days_attended": days_attended,
+            "next_payment": membership_status["end_date"],
+            "checked_in_today": checked_in_today,
+            "today_status": today_status,
+            "today_label": today_label,
         })
     
     return render(request, "inventory/gym/checkin_page.html", {
+        "active_tab": "checkins",  # For navigation highlighting
         "member_data": member_data,
         "business": business,
     })
@@ -520,6 +571,7 @@ def add_payment(request):
     recent_payments = GymPayment.objects.filter(member__business=business).select_related("member", "paid_by").order_by("-paid_at")[:10]
     
     return render(request, "inventory/gym/payment_form.html", {
+        "active_tab": "payment",  # For navigation highlighting
         "form": form,
         "recent_payments": recent_payments,
         "business": business,
@@ -534,36 +586,80 @@ def add_payment(request):
 @require_business
 @require_business_kind(BusinessKind.GYM)
 def gym_dashboard(request):
-    """Gym business dashboard with member stats, payment buckets, and check-in metrics"""
+    """Gym business dashboard with member stats, payment buckets, check-in metrics, and payment mix"""
     business = get_active_business(request)
+    
+    # Date range filtering
+    from datetime import datetime
+    range_param = request.GET.get("range", "today")
+    today = timezone.now().date()
+    
+    if range_param == "today":
+        start_date = end_date = today
+        period_label = "Today"
+    elif range_param == "7d":
+        start_date = today - timedelta(days=6)
+        end_date = today
+        period_label = "Last 7 Days"
+    elif range_param == "month":
+        start_date = today.replace(day=1)
+        end_date = today
+        period_label = "This Month"
+    elif range_param == "custom":
+        start_str = request.GET.get("start", "")
+        end_str = request.GET.get("end", "")
+        try:
+            start_date = datetime.strptime(start_str, "%Y-%m-%d").date()
+            end_date = datetime.strptime(end_str, "%Y-%m-%d").date()
+            period_label = f"{start_date} to {end_date}"
+        except (ValueError, TypeError):
+            start_date = end_date = today
+            period_label = "Today"
+            range_param = "today"
+    else:
+        start_date = end_date = today
+        period_label = "Today"
+        range_param = "today"
     
     # Get all non-archived members
     all_members = GymMember.objects.filter(business=business, is_archived=False)
     
-    # Payment status buckets
-    today = timezone.now().date()
+    # Categorize members by accurate membership status
+    from inventory.utils_gym import get_membership_status
     
-    pending_members = all_members.filter(status=GymMemberStatus.PENDING_PAYMENT)
-    behind_schedule_members = all_members.filter(status=GymMemberStatus.BEHIND_SCHEDULE)
-    active_members = all_members.filter(status=GymMemberStatus.ACTIVE)
+    pending_members = []
+    behind_schedule_members = []
+    active_members = []
     
-    # Also catch any members whose membership_end is past but status not updated
     for member in all_members:
-        if member.membership_end and member.membership_end < today and member.status == GymMemberStatus.ACTIVE:
-            member.status = GymMemberStatus.BEHIND_SCHEDULE
-            member.save(update_fields=["status"])
+        status = get_membership_status(member, today)
+        if status["status_code"] == "none":
+            # No membership = pending payment
+            pending_members.append(member)
+        elif status["status_code"] == "expired":
+            # Expired membership = in arrears / behind schedule
+            behind_schedule_members.append(member)
+        elif status["status_code"] == "active":
+            # Active membership
+            active_members.append(member)
     
-    # Re-query after status updates
-    pending_members = all_members.filter(status=GymMemberStatus.PENDING_PAYMENT)
-    behind_schedule_members = all_members.filter(status=GymMemberStatus.BEHIND_SCHEDULE)
-    active_members = all_members.filter(status=GymMemberStatus.ACTIVE)
-    
-    pending_count = pending_members.count()
-    behind_schedule_count = behind_schedule_members.count()
-    active_count = active_members.count()
+    pending_count = len(pending_members)
+    behind_schedule_count = len(behind_schedule_members)
+    active_count = len(active_members)
     total_members = all_members.count()
     
-    # Check-in metrics (today)
+    # Membership expiry metrics
+    expiring_soon = all_members.filter(
+        status=GymMemberStatus.ACTIVE,
+        membership_end__gte=today,
+        membership_end__lte=today + timedelta(days=7)
+    ).count()
+    
+    expired = all_members.filter(
+        status__in=[GymMemberStatus.BEHIND_SCHEDULE, GymMemberStatus.EXPIRED]
+    ).count()
+    
+    # Check-in metrics (today for active session, range for payment-filtered check-ins)
     today_start = timezone.now().replace(hour=0, minute=0, second=0, microsecond=0)
     today_checkins = GymCheckIn.objects.filter(
         business=business,
@@ -572,11 +668,15 @@ def gym_dashboard(request):
     
     total_checkins = today_checkins.count()
     
-    # Calculate paid vs unpaid check-ins
+    # Active session members (checked in today and not explicitly checked out)
+    active_session_members = today_checkins.values("member").distinct().count()
+    
+    # Calculate paid vs unpaid check-ins using accurate status
     paid_checkins = 0
     unpaid_checkins = 0
     for checkin in today_checkins:
-        if checkin.member.status == GymMemberStatus.ACTIVE:
+        member_status = get_membership_status(checkin.member, today)
+        if member_status["status_code"] == "active":
             paid_checkins += 1
         else:
             unpaid_checkins += 1
@@ -586,6 +686,33 @@ def gym_dashboard(request):
         conversion_percentage = (paid_checkins / total_checkins) * 100
     else:
         conversion_percentage = 0
+    
+    # Payment mix (filtered by date range)
+    from django.db.models import Sum, Count
+    start_dt = timezone.make_aware(datetime.combine(start_date, datetime.min.time()))
+    end_dt = timezone.make_aware(datetime.combine(end_date, datetime.max.time()))
+    
+    payments_in_range = GymPayment.objects.filter(
+        member__business=business,
+        paid_at__gte=start_dt,
+        paid_at__lte=end_dt
+    )
+    
+    payment_mix = payments_in_range.values("payment_method").annotate(
+        count=Count("id"),
+        total=Sum("amount")
+    ).order_by("-total")
+    
+    payment_mix_list = []
+    for item in payment_mix:
+        payment_mix_list.append({
+            "method": item["payment_method"],
+            "method_display": dict(GymPayment._meta.get_field("payment_method").choices).get(item["payment_method"], item["payment_method"]),
+            "count": item["count"],
+            "total": item["total"] or Decimal("0.00"),
+        })
+    
+    total_revenue = sum(item["total"] for item in payment_mix_list)
     
     # Recent payments
     recent_payments = GymPayment.objects.filter(
@@ -603,33 +730,40 @@ def gym_dashboard(request):
     except GymSettings.DoesNotExist:
         gym_settings = None
     
-    # Trainer earnings
-    from django.db.models import Sum, Count
+    # Trainer earnings (filtered by date range)
     trainers = GymTrainer.objects.filter(business=business, is_active=True).order_by("name")
     trainer_stats = []
     for trainer in trainers:
         # Active members with this trainer
-        active_members = trainer.members.filter(
+        active_trainer_members = trainer.members.filter(
             is_active=True,
             is_archived=False,
             status=GymMemberStatus.ACTIVE
         ).count()
         
-        # Revenue from all payments where member has this trainer
+        # Revenue from payments in date range where member has this trainer
         revenue = GymPayment.objects.filter(
             member__trainer=trainer,
             member__business=business,
-            is_active=True
+            is_active=True,
+            paid_at__gte=start_dt,
+            paid_at__lte=end_dt
         ).aggregate(total=Sum("amount"))["total"] or Decimal("0.00")
         
         trainer_stats.append({
             "trainer": trainer,
-            "active_members": active_members,
+            "active_members": active_trainer_members,
             "revenue": revenue,
         })
     
     return render(request, "inventory/gym/dashboard.html", {
         "business": business,
+        
+        # Date filtering
+        "range_param": range_param,
+        "period_label": period_label,
+        "start_date": start_date,
+        "end_date": end_date,
         
         # Payment status buckets
         "total_members": total_members,
@@ -641,12 +775,21 @@ def gym_dashboard(request):
         "behind_schedule_members": behind_schedule_members[:10],
         "active_members": active_members[:10],
         
+        # Membership expiry metrics
+        "expiring_soon": expiring_soon,
+        "expired": expired,
+        
         # Check-in metrics
         "total_checkins": total_checkins,
         "paid_checkins": paid_checkins,
         "unpaid_checkins": unpaid_checkins,
         "conversion_percentage": round(conversion_percentage, 1),
+        "active_session_members": active_session_members,
         "recent_checkins": recent_checkins,
+        
+        # Payment mix
+        "payment_mix": payment_mix_list,
+        "total_revenue": total_revenue,
         
         # Trainer stats
         "trainer_stats": trainer_stats,

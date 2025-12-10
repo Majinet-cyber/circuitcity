@@ -34,10 +34,11 @@
                         <tr>
                             <th>Name</th>
                             <th>Trainer</th>
-                            <th>Status</th>
+                            <th>Membership Status</th>
                             <th>Days Left</th>
                             <th>Days Attended</th>
                             <th>Next Payment</th>
+                            <th>Today</th>
                             <th>Actions</th>
                         </tr>
                     </thead>
@@ -56,30 +57,22 @@
                                 {% endif %}
                             </td>
                             <td>
-                                {% if data.status == "PENDING_PAYMENT" %}
-                                    <span class="badge bg-warning-subtle text-warning">Pending</span>
-                                {% elif data.status == "BEHIND_SCHEDULE" %}
-                                    <span class="badge bg-danger-subtle text-danger">Expired</span>
-                                {% elif data.status == "ACTIVE" %}
-                                    {% if data.days_left <= 7 %}
-                                        <span class="badge bg-warning-subtle text-warning">Expiring Soon</span>
-                                    {% else %}
-                                        <span class="badge bg-success-subtle text-success">Active</span>
-                                    {% endif %}
+                                {% if data.member.is_active_today %}
+                                    <span class="badge bg-success-subtle text-success">Active</span>
                                 {% else %}
-                                    <span class="badge bg-secondary-subtle text-secondary">{{ data.status }}</span>
+                                    <span class="badge bg-danger-subtle text-danger">In Arrears</span>
                                 {% endif %}
                             </td>
                             <td>
-                                {% if data.days_left > 0 %}
-                                    <span class="text-success fw-semibold">{{ data.days_left }} day{{ data.days_left|pluralize }}</span>
+                                {% if data.member.days_left_current > 0 %}
+                                    <span class="fw-semibold">{{ data.member.days_left_current }} / 30 days</span>
                                 {% else %}
-                                    <span class="text-danger">Expired</span>
+                                    <span class="text-danger">0 days</span>
                                 {% endif %}
                             </td>
                             <td>
                                 <span class="badge bg-primary-subtle text-primary">
-                                    {{ data.days_attended }} / 30 days
+                                    {{ data.days_attended }} / 30
                                 </span>
                             </td>
                             <td>
@@ -90,13 +83,34 @@
                                 {% endif %}
                             </td>
                             <td>
-                                <form method="post" action="{% url 'gym:member_checkin' data.member.id %}" style="display: inline;">
-                                    {% csrf_token %}
-                                    <input type="hidden" name="next" value="{% url 'gym:checkin_page' %}">
-                                    <button type="submit" class="btn btn-sm btn-success">
-                                        <i class="bi bi-box-arrow-in-right"></i> Check In
+                                {% if data.today_status == "present" %}
+                                    <span class="badge bg-success text-white fw-semibold px-3 py-2">✓ {{ data.today_label }}</span>
+                                {% elif data.today_status == "absent" %}
+                                    <span class="badge bg-secondary-subtle text-secondary">{{ data.today_label }}</span>
+                                {% else %}
+                                    <span class="badge bg-danger-subtle text-danger">{{ data.today_label }}</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if data.member.is_active_today %}
+                                    {% if data.checked_in_today %}
+                                        <button class="btn btn-sm btn-outline-success" disabled>
+                                            <i class="bi bi-check-circle"></i> Checked In
+                                        </button>
+                                    {% else %}
+                                        <form method="post" action="{% url 'gym:member_checkin' data.member.id %}" style="display: inline;">
+                                            {% csrf_token %}
+                                            <input type="hidden" name="next" value="{% url 'gym:checkin_page' %}">
+                                            <button type="submit" class="btn btn-sm btn-success">
+                                                <i class="bi bi-box-arrow-in-right"></i> Check In
+                                            </button>
+                                        </form>
+                                    {% endif %}
+                                {% else %}
+                                    <button class="btn btn-sm btn-outline-secondary" disabled title="Membership inactive. Record payment first.">
+                                        <i class="bi bi-lock"></i> Inactive
                                     </button>
-                                </form>
+                                {% endif %}
                             </td>
                         </tr>
                         {% endfor %}

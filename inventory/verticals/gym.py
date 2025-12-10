@@ -41,16 +41,25 @@ def dashboard(request):
     # Staff membership stats
     stats = _membership_stats(business)
     
-    # Active gym members
-    active_members = GymMember.objects.filter(business=business, is_active=True, is_archived=False)
-    total_members = active_members.count()
-    members_active_count = total_members  # Alias for template compatibility
+    # Get all gym members
+    all_members = GymMember.objects.filter(business=business, is_active=True, is_archived=False)
+    total_members = all_members.count()
     
-    # Calculate members in arrears
-    members_in_arrears = 0
-    for member in active_members:
-        if member.days_left() == 0:
-            members_in_arrears += 1
+    # Calculate membership status based on GymPayment coverage
+    # A member is ACTIVE if they have at least one payment whose period covers today
+    today = timezone.localdate()
+    
+    active_members = all_members.filter(
+        payments__start_date__lte=today,
+        payments__end_date__gte=today,
+        payments__is_active=True,
+    ).distinct().count()
+    
+    # In arrears = total members - active members
+    in_arrears = total_members - active_members
+    
+    members_active_count = active_members  # Alias for template compatibility
+    members_in_arrears = in_arrears
     
     # Monthly Recurring Revenue (current month)
     now = timezone.now()
@@ -104,6 +113,18 @@ def dashboard(request):
     # Profit
     profit = revenue - costs
     
+    # Trainer earnings (this month)
+    from inventory.models_verticals import TrainerFee
+    try:
+        trainer_earnings = TrainerFee.objects.filter(
+            business=business,
+            created_at__gte=month_start,
+            created_at__lte=month_end
+        ).aggregate(total=Sum("amount"))["total"] or Decimal("0.00")
+    except Exception:
+        # TrainerFee table may not exist yet
+        trainer_earnings = Decimal("0.00")
+    
     # Check-ins / sessions
     today = now.replace(hour=0, minute=0, second=0, microsecond=0)
     week_start = today - timedelta(days=today.weekday())
@@ -128,6 +149,7 @@ def dashboard(request):
 
     ctx.update(
         {
+            "active_tab": "dashboard",  # For navigation highlighting
             "hero_title": "Gym & Fitness",
             "hero_blurb": "Monitor member pipelines, session scans, and wallet activity for your gym.",
             
@@ -148,6 +170,7 @@ def dashboard(request):
             "costs": costs,
             "profit": profit,
             "payment_mix": payment_mix,
+            "trainer_earnings": trainer_earnings,
             
             # Recent payments
             "recent_payments": GymPayment.objects.filter(member__business=business).select_related("member", "paid_by").order_by("-paid_at")[:10],

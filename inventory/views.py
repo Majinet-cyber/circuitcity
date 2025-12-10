@@ -4922,6 +4922,7 @@ def time_logs(request):
     page_obj = _paginate_qs(request, qs, per_page=50)
 
     ctx = {
+        "active_tab": "time_logs",  # For navigation highlighting
         "logs": list(page_obj.object_list),
         "page_obj": page_obj,
     }

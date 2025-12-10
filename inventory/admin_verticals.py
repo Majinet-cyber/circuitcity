@@ -248,15 +248,26 @@ if GymCheckIn:
         list_display = ("member", "timestamp", "checked_in_by", "business")
         list_filter = ("timestamp", "business")
         search_fields = ("member__name", "member__phone")
-        date_hierarchy = "timestamp"
-        ordering = ("-timestamp",)
-        list_select_related = ("member", "checked_in_by", "business")
-        autocomplete_fields = ("member", "checked_in_by")
+
+
+# Import TrainerFee
+try:
+    from inventory.models_verticals import TrainerFee
+except ImportError:
+    TrainerFee = None
+
+if TrainerFee:
+    @admin.register(TrainerFee)
+    class TrainerFeeAdmin(admin.ModelAdmin):
+        list_display = ("trainer", "member", "amount", "period_start", "period_end", "created_at", "business")
+        list_filter = ("created_at", "business", "trainer")
+        search_fields = ("trainer__name", "member__name", "member__phone")
+        date_hierarchy = "created_at"
+        ordering = ("-created_at",)
+        list_select_related = ("trainer", "member", "business", "recorded_by")
+        autocomplete_fields = ("business", "trainer", "member")
+        readonly_fields = ("created_at",)
         list_per_page = 50
-        
-        def has_add_permission(self, request):
-            # Check-ins are created through the app, not manually
-            return False
 
 
 # ==============================================================================

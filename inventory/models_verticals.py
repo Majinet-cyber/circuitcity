@@ -535,13 +535,61 @@ class GymMember(models.Model):
     def __str__(self):
         return f"{self.name} ({self.phone})"
     
+    @property
+    def current_payment(self):
+        """
+        Get the current active payment that covers today's date.
+        Returns the most recent GymPayment whose period includes today.
+        """
+        today = timezone.localdate()
+        return (
+            self.payments
+            .filter(start_date__lte=today, end_date__gte=today, is_active=True)
+            .order_by('-end_date')
+            .first()
+        )
+    
+    @property
+    def is_active_today(self):
+        """
+        Check if member has an active payment covering today.
+        A member is ACTIVE if they have at least one GymPayment whose period covers today.
+        """
+        return self.current_payment is not None
+    
+    @property
+    def days_left_current(self) -> int:
+        """
+        Calculate days left based on current_payment.
+        Returns the number of days remaining (inclusive) in the current payment period.
+        If no current payment exists, returns 0.
+        
+        This is the correct way to calculate days left based on GymPayment records.
+        Use this instead of days_left() for accurate results.
+        """
+        payment = self.current_payment
+        if not payment:
+            return 0
+        today = timezone.localdate()
+        days = (payment.end_date - today).days + 1
+        return max(days, 0)
+    
     def days_left(self) -> int:
-        """Calculate days left in membership based on membership_end date"""
+        """
+        Calculate days left in membership based on membership_end date (inclusive).
+        
+        For a new member with membership ending in 29 days, this returns 30
+        (today + 29 future days = 30 days total).
+        
+        DEPRECATED: Use get_membership_status() from utils_gym for accurate status.
+        This method is kept for backward compatibility.
+        """
         if not self.membership_end:
             return 0
         
         today = timezone.now().date()
-        days = (self.membership_end - today).days
+        # Inclusive counting: if membership_end is today, return 1 (not 0)
+        days = (self.membership_end - today).days + 1
         return max(0, days)
     
     def days_attended(self) -> int:
@@ -562,7 +610,12 @@ class GymMember(models.Model):
         return self.membership_end
     
     def membership_status(self) -> str:
-        """Return human-readable membership status"""
+        """
+        Return human-readable membership status.
+        
+        DEPRECATED: Use get_membership_status() from utils_gym for accurate status.
+        This method is kept for backward compatibility.
+        """
         if self.status == GymMemberStatus.ACTIVE:
             return "Active"
         elif self.status == GymMemberStatus.PENDING_PAYMENT:
@@ -572,6 +625,16 @@ class GymMember(models.Model):
         elif self.status == GymMemberStatus.EXPIRED:
             return "Expired"
         return "Unknown"
+    
+    def get_status(self):
+        """
+        Get accurate membership status using the single source of truth.
+        
+        Returns MembershipStatus dict from utils_gym.get_membership_status().
+        Use this instead of days_left() or membership_status() for accurate results.
+        """
+        from inventory.utils_gym import get_membership_status
+        return get_membership_status(self)
     
     def update_status(self):
         """Update status based on membership dates"""
@@ -592,14 +655,16 @@ class GymMember(models.Model):
         This is the core business logic for membership activation/renewal.
         """
         from datetime import timedelta
+        from inventory.utils_gym import GYM_MEMBERSHIP_DAYS
         
         if payment_date is None:
             payment_date = timezone.now().date()
         
-        # Set membership period: 30 days from payment date
+        # Set membership period: exactly 30 days (inclusive)
+        # If payment_date = Jan 1, membership_end = Jan 30 (30 days: Jan 1-30)
         self.last_payment_date = payment_date
         self.membership_start = payment_date
-        self.membership_end = payment_date + timedelta(days=30)
+        self.membership_end = payment_date + timedelta(days=GYM_MEMBERSHIP_DAYS - 1)
         self.status = GymMemberStatus.ACTIVE
         
         # Update fees if provided
@@ -806,6 +871,52 @@ class GymCheckIn(models.Model):
     
     def __str__(self):
         return f"{self.member.name} - {self.timestamp.strftime('%Y-%m-%d %H:%M')}"
+
+
+class TrainerFee(models.Model):
+    """
+    Records trainer fees for gym members.
+    Tracks earnings for trainers per membership period.
+    """
+    business = models.ForeignKey(Business, on_delete=models.CASCADE, related_name="trainer_fees", db_index=True)
+    trainer = models.ForeignKey(GymTrainer, on_delete=models.CASCADE, related_name="fees")
+    member = models.ForeignKey(GymMember, on_delete=models.CASCADE, related_name="trainer_fees")
+    
+    # Fee details
+    amount = models.DecimalField(
+        max_digits=10, 
+        decimal_places=2, 
+        validators=[MinValueValidator(Decimal("0.01"))],
+        help_text="Trainer fee amount for this period"
+    )
+    
+    # Period covered by this fee
+    period_start = models.DateField(help_text="Start date of membership period")
+    period_end = models.DateField(help_text="End date of membership period")
+    
+    # Metadata
+    recorded_by = models.ForeignKey(
+        User, 
+        null=True, 
+        blank=True, 
+        on_delete=models.SET_NULL, 
+        related_name="trainer_fees_recorded"
+    )
+    created_at = models.DateTimeField(default=timezone.now, db_index=True)
+    notes = models.TextField(blank=True, default="")
+    
+    class Meta:
+        ordering = ["-created_at"]
+        indexes = [
+            models.Index(fields=["business", "-created_at"]),
+            models.Index(fields=["trainer", "-created_at"]),
+            models.Index(fields=["member", "period_start", "period_end"]),
+        ]
+        # Prevent duplicate fees for same member/period
+        unique_together = [("member", "period_start", "period_end")]
+    
+    def __str__(self):
+        return f"{self.trainer.name} - {self.member.name} ({self.period_start} to {self.period_end})"
 
 
 # ==============================================================================

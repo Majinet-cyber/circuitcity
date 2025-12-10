@@ -37,6 +37,7 @@ urlpatterns = [
     
     # Pharmacy vertical
     path("pharmacy/dashboard/", pharmacy.dashboard, name="pharmacy_dashboard"),
+    path("pharmacy/hub/", pharmacy.hub, name="pharmacy_hub"),
     
     # Fallback for businesses without a kind
     path("none/", fallback.no_business, name="no_business"),

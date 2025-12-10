@@ -1,23 +1,16 @@
 # inventory/pharmacy_constants.py
 """
 Pharmacy and Cosmetics constants, categories, and brand presets.
+
+NOTE: PharmacyCategory enum is defined in models_pharmacy.py (source of truth).
+Import from there, not here. This file contains only helper constants and functions.
 """
 
 from django.db import models
 
 
-class PharmacyCategory(models.TextChoices):
-    """Product categories for Pharmacy & Cosmetics vertical."""
-    MEDICINE = "medicine", "💊 Medicine"
-    SKIN_CARE = "skin_care", "🧴 Skin Care"
-    BODY_CARE = "body_care", "🧼 Body Care"
-    HAIR_CARE = "hair_care", "💇 Hair Care"
-    PERFUME = "perfume", "🌸 Perfume"
-    PERSONAL_CARE = "personal_care", "🧽 Personal Care"
-    OTHER = "other", "📦 Other"
-
-
 # Premium cosmetics brands for quick selection
+# Keys match the category values from PharmacyCategory in models_pharmacy.py
 COSMETICS_BRANDS = {
     "skin_care": [
         "Nivea",
@@ -29,7 +22,7 @@ COSMETICS_BRANDS = {
         "Neutrogena",
         "L'Oréal",
     ],
-    "body_care": [
+    "personal_care": [  # Personal care includes body care products
         "Dove",
         "Nivea",
         "Vaseline",
@@ -45,7 +38,7 @@ COSMETICS_BRANDS = {
         "Tresemmé",
         "Sunsilk",
     ],
-    "perfume": [
+    "beauty_makeup": [  # Perfumes fall under beauty & makeup
         "Pure Black",
         "Chris Adams",
         "Lattafa",
@@ -53,6 +46,18 @@ COSMETICS_BRANDS = {
         "Ard Al Zaafaran",
         "Arabic Collection",
         "Designer Inspired",
+    ],
+    "baby_care": [
+        "Johnson's Baby",
+        "Pampers",
+        "Huggies",
+        "Cetaphil Baby",
+    ],
+    "oral_care": [
+        "Colgate",
+        "Oral-B",
+        "Sensodyne",
+        "Close Up",
     ],
 }
 

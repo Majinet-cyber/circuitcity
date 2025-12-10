@@ -61,32 +61,45 @@
                     <div>{{ member.joined_at|date:"d M Y" }}</div>
                 </div>
                 <div class="mb-3">
-                    <label class="text-muted small">Status</label>
+                    <label class="text-muted small">Membership Status</label>
                     <div>
                         {% if member.is_archived %}
                             <span class="badge bg-secondary-subtle text-secondary">Archived</span>
-                        {% elif days_left == 0 %}
-                            <span class="badge bg-danger-subtle text-danger">Expired</span>
-                        {% elif days_left <= 7 %}
-                            <span class="badge bg-warning-subtle text-warning">Expiring Soon ({{ days_left }} days)</span>
+                        {% elif member.is_active_today %}
+                            <span class="badge bg-success-subtle text-success">Active</span>
                         {% else %}
-                            <span class="badge bg-success-subtle text-success">Active ({{ days_left }} days left)</span>
+                            <span class="badge bg-danger-subtle text-danger">In Arrears</span>
+                        {% endif %}
+                    </div>
+                </div>
+                <div class="mb-3">
+                    <label class="text-muted small">Days Left</label>
+                    <div>
+                        {% if member.days_left_current > 0 %}
+                            <span class="fw-semibold">{{ member.days_left_current }} of 30 days</span>
+                        {% else %}
+                            <span class="text-danger">0 days</span>
                         {% endif %}
                     </div>
                 </div>
                 {% if member.trainer %}
                 <div class="mb-3">
                     <label class="text-muted small">Trainer</label>
-                    <div>{{ member.trainer.name }}</div>
+                    <div>
+                        {{ member.trainer.name }}
+                        {% if trainer_fee_missing %}
+                            <span class="badge bg-warning-subtle text-warning ms-2" title="Trainer fee not recorded for current period">
+                                <i class="bi bi-exclamation-triangle"></i> Fee not recorded
+                            </span>
+                        {% endif %}
+                    </div>
                 </div>
                 {% endif %}
-                {% if member.membership_end %}
+                {% if member.current_payment %}
                 <div class="mb-3">
-                    <label class="text-muted small">Next Payment Date</label>
-                    <div>{{ member.membership_end|date:"d M Y" }}</div>
+                    <label class="text-muted small">Next Payment</label>
+                    <div>{{ member.current_payment.end_date|date:"d M Y" }}</div>
                 </div>
-                {% endif %}
-                {% if member.membership_start %}
                 <div class="mb-3">
                     <label class="text-muted small">Days Attended (Current Period)</label>
                     <div>
@@ -94,6 +107,11 @@
                             {{ member.days_attended }} / 30 days
                         </span>
                     </div>
+                </div>
+                {% else %}
+                <div class="mb-3">
+                    <label class="text-muted small">Next Payment</label>
+                    <div class="text-muted">Not set</div>
                 </div>
                 {% endif %}
                 {% if member.notes %}

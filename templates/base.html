@@ -684,24 +684,24 @@
 
     <!-- Mobile bottom dock -->
     <nav class="mobile-tabbar d-flex d-md-none cc-bottom-nav">
-      <a class="tab {% if active_tab == 'home' %}active{% endif %}" href="{{ url_home|default:'/inventory/dashboard/' }}">
+      <a class="tab {% if active_tab|default:'' == 'home' %}active{% endif %}" href="{{ url_home|default:'/inventory/dashboard/' }}">
         <i class="bi bi-speedometer2 d-block"></i>Home
       </a>
-      <a class="tab {% if active_tab == 'scan_in' %}active{% endif %}" href="{{ url_scan_in|default:'/inventory/scan-in/' }}">
+      <a class="tab {% if active_tab|default:'' == 'scan_in' %}active{% endif %}" href="{{ url_scan_in|default:'/inventory/scan-in/' }}">
         <i class="bi bi-upc-scan d-block"></i>Scan
       </a>
-      <a class="tab {% if active_tab == 'sell' %}active{% endif %}" href="{{ url_sell|default:'/inventory/phone-sale-wizard/' }}">
+      <a class="tab {% if active_tab|default:'' == 'sell' %}active{% endif %}" href="{{ url_sell|default:'/inventory/phone-sale-wizard/' }}">
         <i class="bi bi-cart-check d-block"></i>Sell
       </a>
-      <a class="tab {% if active_tab == 'stock' %}active{% endif %}" href="{{ url_stock|default:'/inventory/list/' }}">
+      <a class="tab {% if active_tab|default:'' == 'stock' %}active{% endif %}" href="{{ url_stock|default:'/inventory/list/' }}">
         <i class="bi bi-box-seam d-block"></i>Stock
       </a>
-      <a class="tab {% if active_tab == 'wallet' %}active{% endif %}" href="{{ url_wallet|default:'/wallet/' }}">
+      <a class="tab {% if active_tab|default:'' == 'wallet' %}active{% endif %}" href="{{ url_wallet|default:'/wallet/' }}">
         <i class="bi bi-wallet2 d-block"></i>Wallet
       </a>
       {% if request.user.is_authenticated %}
         {% if IS_MANAGER or request.user.is_staff or request.user.profile.is_manager %}
-          <a class="tab {% if active_tab == 'sim' %}active{% endif %}" href="{{ url_simulator|default:'/simulator/' }}">
+          <a class="tab {% if active_tab|default:'' == 'sim' %}active{% endif %}" href="{{ url_simulator|default:'/simulator/' }}">
             <i class="bi bi-graph-up d-block"></i>Sim
           </a>
         {% endif %}

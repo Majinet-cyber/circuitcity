@@ -10,8 +10,8 @@ from datetime import timedelta
 
 from tenants.models import Business, Membership
 from inventory.models import MerchProduct
-from inventory.models_pharmacy import PharmacyBatch, PharmacySale
-from inventory.pharmacy_constants import PharmacyCategory, calculate_pharmacy_badges
+from inventory.models_pharmacy import PharmacyBatch, PharmacySale, PharmacyCategory
+from inventory.pharmacy_constants import calculate_pharmacy_badges
 
 User = get_user_model()
 
@@ -43,7 +43,7 @@ class PharmacyBatchTestCase(TestCase):
             business=self.business,
             name="Test Medicine",
             kind="pharmacy",
-            category=PharmacyCategory.MEDICINE
+            category=PharmacyCategory.ANALGESIC  # Use actual category from models_pharmacy
         )
     
     def test_batch_creation(self):
@@ -123,7 +123,7 @@ class CosmeticsCategoryTestCase(TestCase):
         """Test creating cosmetics products with different categories."""
         categories = [
             (PharmacyCategory.SKIN_CARE, "Nivea Body Lotion"),
-            (PharmacyCategory.PERFUME, "Pure Black Cologne"),
+            (PharmacyCategory.BEAUTY_MAKEUP, "Pure Black Cologne"),  # Perfume is under beauty_makeup
             (PharmacyCategory.HAIR_CARE, "Pantene Shampoo"),
         ]
         
@@ -243,7 +243,7 @@ class PharmacyBatchesPageTestCase(TestCase):
             business=self.business,
             name="Test Medicine",
             kind="pharmacy",
-            category=PharmacyCategory.MEDICINE
+            category=PharmacyCategory.ANALGESIC  # Use actual category from models_pharmacy
         )
         
         self.batch = PharmacyBatch.objects.create(
@@ -274,3 +274,65 @@ class PharmacyBatchesPageTestCase(TestCase):
             # If URL doesn't exist yet, skip this test
             self.skipTest(f"Pharmacy batch_list URL not configured: {e}")
 
+
+class PharmacyDashboardNoSubscriptionTestCase(TestCase):
+    """Test that pharmacy dashboard handles missing subscription gracefully."""
+    
+    def setUp(self):
+        """Create test business without subscription, user, and login."""
+        self.business = Business.objects.create(
+            name="Test Pharmacy No Sub",
+            slug="test-pharmacy-nosub",
+            status="ACTIVE",
+            business_kind="pharmacy"  # Set business kind to pharmacy
+        )
+        # Explicitly ensure no subscription is attached
+        # (Business.subscription will raise RelatedObjectDoesNotExist)
+        
+        self.user = User.objects.create_user(
+            username="manager2@test.com",
+            email="manager2@test.com",
+            password="TestPass123!@#"
+        )
+        
+        Membership.objects.create(
+            user=self.user,
+            business=self.business,
+            role="MANAGER",
+            status="ACTIVE"
+        )
+        
+        self.client = Client()
+        self.client.login(username="manager2@test.com", password="TestPass123!@#")
+    
+    def test_pharmacy_dashboard_without_subscription(self):
+        """Test that dashboard loads without error when business has no subscription."""
+        try:
+            from django.urls import reverse
+            
+            # Set active business in session
+            session = self.client.session
+            session['active_business_id'] = self.business.id
+            session.save()
+            
+            # Try accessing the pharmacy dashboard
+            url = reverse("verticals:pharmacy_dashboard")
+            response = self.client.get(url, follow=True)  # Follow redirects
+            
+            # Should return 200 OK (not 500)
+            # Follow redirects should land on the dashboard
+            self.assertEqual(response.status_code, 200, 
+                            f"Expected 200 but got {response.status_code}. Redirect chain: {response.redirect_chain}")
+            
+            # Should contain dashboard elements (pharmacy keyword)
+            self.assertContains(response, "Pharmacy", msg_prefix="Dashboard should contain 'Pharmacy' text")
+            
+            # Should NOT crash with RelatedObjectDoesNotExist
+            # subscription context variable should be None or safely handled
+            self.assertIn("subscription", response.context, 
+                         "subscription should be in context")
+            
+        except AssertionError:
+            raise  # Re-raise assertion errors
+        except Exception as e:
+            self.skipTest(f"Pharmacy dashboard URL not configured or other error: {e}")

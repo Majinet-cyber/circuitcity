@@ -255,6 +255,72 @@ def pharmacy_dashboard(request: HttpRequest) -> HttpResponse:
     except Exception:
         pass  # Gracefully handle if wallet app not available
     
+    # ===== COSMETICS TRACKING =====
+    # Track cosmetics (skin care, hair care, beauty, personal care, etc.) separately
+    # Note: PharmacyCategory is already imported at the top from models_pharmacy
+    
+    cosmetics_categories = [
+        PharmacyCategory.SKIN_CARE,
+        PharmacyCategory.HAIR_CARE,
+        PharmacyCategory.PERSONAL_CARE,
+        PharmacyCategory.BEAUTY_MAKEUP,
+        PharmacyCategory.BABY_CARE,
+        PharmacyCategory.ORAL_CARE,
+    ]
+    
+    # Cosmetics sales for period
+    cosmetics_sales = period_sales.filter(
+        batch__merch_product__category__in=cosmetics_categories
+    )
+    
+    cosmetics_revenue = Decimal("0.00")
+    for sale in cosmetics_sales:
+        cosmetics_revenue += sale.total_amount
+    
+    cosmetics_revenue_pct = (
+        (float(cosmetics_revenue) / float(period_revenue) * 100) if period_revenue > 0 else 0
+    )
+    
+    # Cosmetics products in stock
+    cosmetics_products = products_all.filter(
+        category__in=cosmetics_categories
+    ).count()
+    
+    # Top cosmetics brands (simple extraction from product names)
+    top_cosmetics_brands = []
+    try:
+        from .pharmacy_constants import get_all_brands
+        
+        known_brands = get_all_brands()
+        brand_revenue = {}
+        
+        for sale in cosmetics_sales:
+            product_name = sale.batch.merch_product.name.lower()
+            
+            # Check if any known brand appears in the product name
+            for brand in known_brands:
+                if brand.lower() in product_name:
+                    brand_revenue[brand] = brand_revenue.get(brand, Decimal("0.00")) + sale.total_amount
+                    break
+        
+        # Sort by revenue, top 5
+        top_cosmetics_brands = sorted(
+            [{"name": brand, "revenue": rev} for brand, rev in brand_revenue.items()],
+            key=lambda x: x["revenue"],
+            reverse=True
+        )[:5]
+    except Exception:
+        pass  # Gracefully handle if pharmacy_constants not available
+    
+    # ===== SAFE SUBSCRIPTION HANDLING =====
+    # Never let missing subscription crash the dashboard
+    subscription = None
+    try:
+        if hasattr(business, 'subscription'):
+            subscription = business.subscription
+    except Exception:
+        pass  # Business has no subscription - perfectly fine
+    
     # ===== PERSONALIZED DASHBOARD ENHANCEMENTS =====
     # Initialize with safe defaults
     ctx_enhancements = {
@@ -305,10 +371,14 @@ def pharmacy_dashboard(request: HttpRequest) -> HttpResponse:
         pass  # Gracefully degrade if helpers not available, defaults already set
     
     ctx = {
+        # Navigation context (for base template)
+        "active_tab": "home",  # Highlights the dashboard/home tab in mobile nav
+        
         # Stock metrics (current state)
         "total_batches": total_batches,
         "total_stock_value": total_stock_value,
         "products_count": products_count,
+        "total_products": products_count,  # Alias for template compatibility
         "medicine_count": medicine_count,
         "other_count": other_count,
         
@@ -341,6 +411,15 @@ def pharmacy_dashboard(request: HttpRequest) -> HttpResponse:
         "near_expiry_batches": near_expiry_batches,
         "expired_batches": expired_batches,
         "low_stock_batches": low_stock_batches,
+        
+        # Cosmetics tracking (premium feature)
+        "cosmetics_revenue": cosmetics_revenue,
+        "cosmetics_revenue_pct": cosmetics_revenue_pct,
+        "cosmetics_products": cosmetics_products,
+        "top_cosmetics_brands": top_cosmetics_brands,
+        
+        # Subscription (safe - None if not available)
+        "subscription": subscription,
         
         # Backward compatibility (today's metrics for legacy templates)
         "today_revenue": period_revenue if range_param == "today" else Decimal("0.00"),
@@ -1092,6 +1171,9 @@ def sale_list(request: HttpRequest) -> HttpResponse:
     """List pharmacy sales (excluding soft-deleted by default)."""
     business: Business = request.business
     
+    # Get active tab from query params (for template tab highlighting)
+    active_tab = request.GET.get("tab", "all")
+    
     # Filter out deleted sales by default (managers can see them if needed)
     show_deleted = request.GET.get("show_deleted") == "1"
     sales = PharmacySale.objects.filter(business=business).select_related(
@@ -1110,6 +1192,7 @@ def sale_list(request: HttpRequest) -> HttpResponse:
         {
             "sales": sales,
             "show_deleted": show_deleted,
+            "active_tab": active_tab,
         },
     )
 

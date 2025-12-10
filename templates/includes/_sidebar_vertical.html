@@ -110,7 +110,10 @@
   {% if business_kind == "pharmacy" %}
   <div class="menu-group">PHARMACY & COSMETICS</div>
   <ul class="navlist">
-    <li><a class="navlink" href="{{ url_pharmacy_dash|default:'/inventory/verticals/pharmacy/' }}"><i class="bi bi-capsule"></i> Pharmacy & Cosmetics Hub</a></li>
+    {% url 'verticals:pharmacy_hub' as url_pharmacy_hub %}
+    {% url 'verticals:pharmacy_dashboard' as url_pharmacy_dashboard %}
+    <li><a class="navlink" href="{{ url_pharmacy_hub|default:'/verticals/pharmacy/hub/' }}"><i class="bi bi-grid-3x3-gap"></i> Pharmacy & Cosmetics Hub</a></li>
+    <li><a class="navlink" href="{{ url_pharmacy_dashboard|default:'/verticals/pharmacy/dashboard/' }}"><i class="bi bi-graph-up"></i> Dashboard</a></li>
     <li><a class="navlink" href="{{ url_stock|default:'/inventory/list/' }}"><i class="bi bi-box-seam"></i> Inventory</a></li>
     <li><a class="navlink" href="{{ url_scan_sold|default:'/inventory/scan-sold/' }}"><i class="bi bi-cart-check"></i> Dispense</a></li>
     {% if url_sales %}<li><a class="navlink" href="{{ url_sales }}"><i class="bi bi-receipt"></i> Sales</a></li>{% endif %}

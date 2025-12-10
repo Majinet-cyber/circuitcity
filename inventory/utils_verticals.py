@@ -61,7 +61,7 @@ def get_vertical_dashboard_url(vertical_kind: str) -> Optional[str]:
     """
     vertical_dashboard_map = {
         "gym": "verticals:gym_dashboard",
-        "pharmacy": "verticals:pharmacy_dashboard",
+        "pharmacy": "verticals:pharmacy_hub",
         "clothing": "verticals:clothing_dashboard",
         "liquor": "verticals:liquor_dashboard",
         # "phones" uses the default dashboard at /inventory/dashboard/
@@ -238,10 +238,10 @@ def get_vertical_sidebar_items(business_kind: str) -> list[dict]:
             # MAIN section - gym-specific operations
             {"section": "MAIN", "url": "verticals:gym_dashboard", "label": "Dashboard", "icon": "bi-speedometer2", "active_pattern": "/verticals/gym/", "require_manager": False},
             {"section": "MAIN", "url": "gym:members_list", "label": "Members", "icon": "bi-people", "active_pattern": "/gym/members/", "require_manager": False},
-            {"section": "MAIN", "url": "inventory:time_checkin", "label": "Scan Check-ins", "icon": "bi-clipboard-check", "active_pattern": "/inventory/time/check-in", "require_manager": False},
+            {"section": "MAIN", "url": "gym:checkin_page", "label": "Member Check-ins", "icon": "bi-clipboard-check", "active_pattern": "/gym/checkin", "require_manager": False},
             
             # TIME section
-            {"section": "TIME", "url": "inventory:time_logs", "label": "Time Logs", "icon": "bi-journal-text", "active_pattern": "/inventory/time/logs", "require_manager": False},
+            {"section": "TIME", "url": "inventory:time_logs", "label": "Staff Time Logs", "icon": "bi-journal-text", "active_pattern": "/inventory/time/logs", "require_manager": False},
             
             # MONEY section
             {"section": "MONEY", "url": "wallet:agent_wallet", "label": "My Wallet", "icon": "bi-wallet2", "active_pattern": "/wallet/", "require_manager": False},
@@ -311,7 +311,8 @@ def get_vertical_sidebar_items(business_kind: str) -> list[dict]:
         return [
             # MAIN section - pharmacy & cosmetics vertical-aware flows
             {"section": "MAIN", "url": "dashboard:home", "label": "Dashboard", "icon": "bi-speedometer2", "active_pattern": "/dashboard/", "require_manager": False},
-            {"section": "MAIN", "url": "verticals:pharmacy_dashboard", "label": "Pharmacy & Cosmetics Hub", "icon": "bi-prescription2", "active_pattern": "/verticals/pharmacy/", "require_manager": False},
+            {"section": "MAIN", "url": "verticals:pharmacy_hub", "label": "Pharmacy & Cosmetics Hub", "icon": "bi-grid-3x3-gap", "active_pattern": "/verticals/pharmacy/hub", "require_manager": False},
+            {"section": "MAIN", "url": "verticals:pharmacy_dashboard", "label": "Pharmacy Dashboard", "icon": "bi-graph-up", "active_pattern": "/verticals/pharmacy/dashboard", "require_manager": False},
             {"section": "MAIN", "url": "pharmacy:stock_in", "label": "Stock In", "icon": "bi-box-arrow-in-down", "active_pattern": "/pharmacy/stock-in", "require_manager": False},
             {"section": "MAIN", "url": "pharmacy:sell", "label": "Sell", "icon": "bi-bag-check", "active_pattern": "/pharmacy/sell", "require_manager": False},
             {"section": "MAIN", "url": "pharmacy:batch_list", "label": "Batches", "icon": "bi-boxes", "active_pattern": "/pharmacy/batches", "require_manager": False},
