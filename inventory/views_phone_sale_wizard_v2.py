@@ -118,12 +118,20 @@ def _step1_imei(request, business, wizard_data):
             else:
                 # Stock found! Save to wizard and move to price step
                 product = stock_item.product
+                variant = getattr(product, 'variant', '')
+                
+                # Build full display name consistent with Scan In
+                # Format: BRAND MODEL (RAM+ROM) e.g. "ITEL A90 (3+128)"
+                full_product_name = f"{product.brand} {product.model}"
+                if variant:
+                    full_product_name += f" ({variant})"
+                
                 wizard_data.update({
                     'step': 2,
                     'imei': imei,
                     'stock_id': stock_item.id,
-                    'product_name': f"{product.brand} {product.model}",
-                    'variant': getattr(product, 'variant', ''),
+                    'product_name': full_product_name,
+                    'variant': variant,
                     'location': str(stock_item.current_location),
                     'suggested_price': float(stock_item.selling_price or product.sale_price or 0),
                 })

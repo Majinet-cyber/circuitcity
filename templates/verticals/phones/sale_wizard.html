@@ -557,7 +557,7 @@
       {% if step == 1 %}
       <div class="brand-grid">
         {% for brand in brands %}
-        <div class="brand-card" onclick="this.querySelector('input').checked=true; this.closest('form').submit();">
+        <div class="brand-card" data-cy="sale-brand-option" onclick="this.querySelector('input').checked=true; this.closest('form').submit();">
           <input type="radio" name="brand" value="{{ brand }}" id="brand_{{ forloop.counter }}">
           <div class="brand-logo">{{ brand|slice:":2" }}</div>
           <div class="brand-name">{{ brand }}</div>
@@ -571,11 +571,11 @@
       <div class="model-list">
         {% for model_name, variants in models_grouped.items %}
         {% for variant in variants %}
-        <div class="model-item" onclick="this.querySelector('input').checked=true;">
-          <input type="radio" name="product_id" value="{{ variant.id }}" id="model_{{ variant.id }}" required>
+        <div class="model-item" data-cy="sale-model-option" data-model-id="{{ variant.id }}" onclick="this.querySelector('input').checked=true;">
+          <input type="radio" name="product_id" value="{{ variant.id }}" id="model_{{ variant.id }}" data-model-id="{{ variant.id }}" required>
           <input type="hidden" name="model" value="{{ model_name }}">
           <div class="model-info">
-            <div class="model-name">{{ model_name }}</div>
+            <div class="model-name">{{ variant.display_name }}</div>
             <div class="model-variant">
               <i class="bi bi-memory"></i> {{ variant.variant_label }}
               {% if variant.model_number %} · {{ variant.model_number }}{% endif %}
@@ -606,11 +606,11 @@
       {% if step == 3 %}
       <div class="model-list">
         {% for variant in variants %}
-        <div class="model-item" onclick="this.querySelector('input').checked=true;">
-          <input type="radio" name="product_id" value="{{ variant.id }}" id="variant_{{ variant.id }}" required>
+        <div class="model-item" data-cy="sale-spec-option" data-model-id="{{ variant.id }}" onclick="this.querySelector('input').checked=true;">
+          <input type="radio" name="product_id" value="{{ variant.id }}" id="variant_{{ variant.id }}" data-model-id="{{ variant.id }}" required>
           <input type="hidden" name="variant" value="{{ variant.variant_label }}">
           <div class="model-info">
-            <div class="model-name">{{ variant.variant_label }}</div>
+            <div class="model-name">{{ variant.display_name }}</div>
             <div class="model-variant">
               RAM: {{ variant.ram_gb }}GB · Storage: {{ variant.rom_gb }}GB
             </div>
@@ -652,7 +652,7 @@
       <div class="imei-input-group">
         <label for="imei" style="font-weight:600;margin-bottom:10px;display:block">IMEI Number</label>
         <div class="imei-field" id="imeiField">
-          <input type="text" name="imei" id="imei" class="imei-input" placeholder="Enter 15-digit IMEI" maxlength="15"
+          <input type="text" name="imei" id="imei" class="imei-input" data-cy="sale-imei-input" placeholder="Enter 15-digit IMEI" maxlength="15"
             pattern="\d{15}" required autofocus inputmode="numeric" autocomplete="off">
           <!-- Live counter badge -->
           <span id="imeiLen" class="imei-badge">0/15</span>
@@ -729,7 +729,7 @@
         </div>
         <div class="price-group">
           <label for="selling_price">Selling Price (MWK) *</label>
-          <input type="number" name="selling_price" id="selling_price" min="0" step="0.01"
+          <input type="number" name="selling_price" id="selling_price" data-cy="selling-price-input" min="0" step="0.01"
             value="{{ default_selling_price }}" placeholder="0.00" required>
         </div>
       </div>
@@ -740,19 +740,19 @@
           💳 Payment Method
         </h3>
         <div class="btn-group d-flex" role="group" style="gap: 0.75rem;">
-          <input type="radio" class="btn-check" name="payment_method" id="pay-cash" value="CASH" checked>
+          <input type="radio" class="btn-check" name="payment_method" id="pay-cash" value="CASH" data-cy="payment-cash" checked>
           <label class="btn btn-outline-primary flex-fill" for="pay-cash" style="border-radius: 12px; padding: 1rem; font-weight: 600;">
             <i class="bi bi-cash-stack d-block" style="font-size: 1.5rem; margin-bottom: 0.5rem;"></i>
             Cash
           </label>
 
-          <input type="radio" class="btn-check" name="payment_method" id="pay-bank" value="BANK">
+          <input type="radio" class="btn-check" name="payment_method" id="pay-bank" value="BANK" data-cy="payment-bank">
           <label class="btn btn-outline-primary flex-fill" for="pay-bank" style="border-radius: 12px; padding: 1rem; font-weight: 600;">
             <i class="bi bi-bank d-block" style="font-size: 1.5rem; margin-bottom: 0.5rem;"></i>
             Bank
           </label>
 
-          <input type="radio" class="btn-check" name="payment_method" id="pay-mobile" value="MOBILE_MONEY">
+          <input type="radio" class="btn-check" name="payment_method" id="pay-mobile" value="MOBILE_MONEY" data-cy="payment-mobile">
           <label class="btn btn-outline-primary flex-fill" for="pay-mobile" style="border-radius: 12px; padding: 1rem; font-weight: 600;">
             <i class="bi bi-phone d-block" style="font-size: 1.5rem; margin-bottom: 0.5rem;"></i>
             Mobile Money
@@ -761,7 +761,7 @@
       </div>
 
       <div class="wizard-actions">
-        <button type="submit" class="btn btn-primary">
+        <button type="submit" class="btn btn-primary" data-cy="confirm-sale-btn">
           <i class="bi bi-check-circle"></i> Confirm & Save Sale
         </button>
         <a href="?step=4" class="btn btn-secondary">

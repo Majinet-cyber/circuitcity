@@ -347,6 +347,14 @@ else:
         },
     }
 
+# Ensure SQLite always has a sensible timeout, even if config changes later
+default_db = DATABASES.get("default", {})
+if default_db.get("ENGINE") == "django.db.backends.sqlite3":
+    opts = dict(default_db.get("OPTIONS") or {})
+    opts.setdefault("timeout", SQLITE_TIMEOUT)
+    default_db["OPTIONS"] = opts
+    DATABASES["default"] = default_db
+
 # --------------------------- cache ---------------------------
 CACHE_TTL_DEFAULT = env_int("CACHE_TTL_DEFAULT", 60)
 REDIS_URL = os.environ.get("REDIS_URL", "")

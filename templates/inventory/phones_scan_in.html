@@ -361,18 +361,18 @@
 
         <div class="field">
           <label>Model & Variant</label>
-          <select name="catalog_product_id" id="model-select" required>
+          <select name="catalog_product_id" id="model-select" data-cy="scan-model-select" required>
             <option value="">Loading models...</option>
           </select>
         </div>
 
         <div class="field">
           <label>IMEI (15 digits)</label>
-          <input type="text" name="imei" id="imei-input" maxlength="15" pattern="[0-9]{15}" placeholder="Enter 15-digit IMEI" inputmode="numeric" required>
+          <input type="text" name="imei" id="imei-input" data-cy="scan-imei-input" maxlength="15" pattern="[0-9]{15}" placeholder="Enter 15-digit IMEI" inputmode="numeric" required>
         </div>
         <div class="imei-counter" id="imei-counter">0 / 15 digits</div>
 
-        <button type="submit" class="btn btn-primary" id="submit-button" style="width:100%;" disabled>
+        <button type="submit" class="btn btn-primary" id="submit-button" data-cy="scan-phone-btn" style="width:100%;" disabled>
           ✅ Scan In Phone
         </button>
       </form>
@@ -431,6 +431,9 @@
           const option = document.createElement('option');
           option.value = model.id;
           option.textContent = model.display_name;
+          
+          // Add data-model-id for stable selection in tests
+          option.setAttribute('data-model-id', model.id);
           
           // Store cost price as data attribute for potential auto-fill
           if (model.default_cost_price) {
