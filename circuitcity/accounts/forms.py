@@ -581,6 +581,30 @@ class WizardStep2Form(forms.Form):
         name = (self.cleaned_data.get("business_name") or "").strip()
         if not name:
             raise forms.ValidationError("Enter your business name.")
+        
+        # Import validators
+        from tenants.validators import validate_business_name_not_numeric, validate_business_name
+        from tenants.models import Business
+        
+        # Check not numeric-only
+        try:
+            validate_business_name_not_numeric(name)
+        except forms.ValidationError as e:
+            raise forms.ValidationError(e.messages)
+        
+        # Check uniqueness (case-insensitive)
+        if Business.objects.filter(name__iexact=name).exists():
+            raise forms.ValidationError(
+                "That store name is already in use. Please pick another name or "
+                "contact support if you believe this is an error."
+            )
+        
+        # Apply basic business name validation
+        try:
+            validate_business_name(name)
+        except forms.ValidationError as e:
+            raise forms.ValidationError(e.messages)
+        
         return name
 
 
@@ -728,6 +752,30 @@ class ManagerWizardStep2Form(forms.Form):
         name = (self.cleaned_data.get("business_name") or "").strip()
         if not name:
             raise forms.ValidationError("Enter your store name.")
+        
+        # Import validators
+        from tenants.validators import validate_business_name_not_numeric, validate_business_name
+        from tenants.models import Business
+        
+        # Check not numeric-only
+        try:
+            validate_business_name_not_numeric(name)
+        except forms.ValidationError as e:
+            raise forms.ValidationError(e.messages)
+        
+        # Check uniqueness (case-insensitive)
+        if Business.objects.filter(name__iexact=name).exists():
+            raise forms.ValidationError(
+                "That store name is already in use. Please pick another name or "
+                "contact support if you believe this is an error."
+            )
+        
+        # Apply basic business name validation
+        try:
+            validate_business_name(name)
+        except forms.ValidationError as e:
+            raise forms.ValidationError(e.messages)
+        
         return name
 
 

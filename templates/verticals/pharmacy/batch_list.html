@@ -1,0 +1,182 @@
+{% extends "base.html" %}
+{% load humanize %}
+
+{% block title %}Pharmacy Batches · Emajinet{% endblock %}
+
+{% block content %}
+
+<style>
+  .batch-page{display:flex;flex-direction:column;gap:18px;padding:18px}
+  .page-header{background:linear-gradient(120deg,#06b6d4,#3b82f6);padding:24px;border-radius:20px;color:#fff;display:flex;flex-wrap:wrap;gap:18px;align-items:center;justify-content:space-between}
+  .page-header h1{margin:0;font-size:clamp(24px,3vw,32px)}
+  .header-actions{display:flex;gap:12px;flex-wrap:wrap}
+  .header-actions a{border-radius:999px;padding:10px 16px;font-weight:700;text-decoration:none}
+  .header-actions .primary{background:#fff;color:#111827}
+  .header-actions .ghost{border:1px solid rgba(255,255,255,.8);color:#fff}
+  
+  /* Filters */
+  .filters-card{background:#fff;border-radius:18px;padding:18px;box-shadow:0 10px 30px rgba(15,23,42,.08)}
+  .filter-row{display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+  .filter-row label{font-weight:600;color:#475569}
+  .filter-row select{border-radius:8px;border:2px solid #e2e8f0;padding:8px 12px}
+  .filter-row .btn{border-radius:8px;padding:8px 16px;background:#3b82f6;color:#fff;border:none;font-weight:600;cursor:pointer;text-decoration:none}
+  
+  /* Batch table */
+  .batch-table-card{background:#fff;border-radius:18px;padding:18px;box-shadow:0 10px 30px rgba(15,23,42,.08)}
+  .batch-table{width:100%;border-collapse:collapse}
+  .batch-table thead{background:#f8fafc}
+  .batch-table th{padding:12px;text-align:left;font-weight:700;color:#475569;border-bottom:2px solid #e2e8f0}
+  .batch-table td{padding:12px;border-bottom:1px solid #f1f5f9}
+  .batch-table tr:hover{background:#f8fafc}
+  
+  /* Status badges */
+  .badge{display:inline-block;padding:4px 10px;border-radius:12px;font-size:.85rem;font-weight:600}
+  .badge-success{background:#dcfce7;color:#166534}
+  .badge-warning{background:#fef3c7;color:#92400e}
+  .badge-danger{background:#fee2e2;color:#991b1b}
+  .badge-info{background:#dbeafe;color:#1e40af}
+  
+  /* Product type filter badges */
+  .type-filters{display:flex;gap:8px;margin-top:12px}
+  .type-filter{padding:8px 16px;border-radius:12px;border:2px solid #e2e8f0;color:#475569;text-decoration:none;font-weight:600;transition:all .2s}
+  .type-filter:hover{background:#f1f5f9;border-color:#cbd5e1}
+  .type-filter.active{background:#3b82f6;color:#fff;border-color:#3b82f6}
+  
+  @media (max-width: 768px) {
+    .batch-table-card{overflow-x:auto}
+    .batch-table{min-width:800px}
+  }
+</style>
+
+<div class="batch-page">
+  <!-- Header -->
+  <div class="page-header">
+    <div>
+      <h1>📦 Pharmacy Batches</h1>
+      <p>Track batches, expiry dates, and stock levels</p>
+    </div>
+    <div class="header-actions">
+      <a href="{% url 'pharmacy:dashboard' %}" class="ghost">← Dashboard</a>
+      <a href="{% url 'pharmacy:stock_in' %}" class="primary">+ Add Stock</a>
+    </div>
+  </div>
+  
+  <!-- Filters -->
+  <div class="filters-card">
+    <form method="get" class="filter-row">
+      <label>Filter by Product:</label>
+      <select name="product" onchange="this.form.submit()">
+        <option value="">All Products</option>
+        {% for product in products %}
+          <option value="{{ product.id }}" {% if selected_product == product.id|stringformat:"s" %}selected{% endif %}>
+            {{ product.name }}
+          </option>
+        {% endfor %}
+      </select>
+      
+      <label style="margin-left:16px">
+        <input type="checkbox" name="archived" value="1" {% if show_archived %}checked{% endif %} onchange="this.form.submit()">
+        Show archived batches
+      </label>
+      
+      <a href="?" class="btn" style="margin-left:auto">Clear Filters</a>
+    </form>
+    
+    <!-- Product Type Quick Filters -->
+    <div class="type-filters">
+      <span style="color:#64748b;font-weight:600">Quick filters:</span>
+      <a href="?category=medicine" class="type-filter">💊 Medicines</a>
+      <a href="?category=skin_care" class="type-filter">🧴 Skin Care</a>
+      <a href="?category=hair_care" class="type-filter">💇 Hair Care</a>
+      <a href="?category=personal_care" class="type-filter">🧼 Personal Care</a>
+    </div>
+  </div>
+  
+  <!-- Batch Table -->
+  <div class="batch-table-card">
+    <h2 style="margin:0 0 16px;color:#0f172a">Batches ({{ batches|length }})</h2>
+    
+    {% if batches %}
+      <table class="batch-table">
+        <thead>
+          <tr>
+            <th>Product</th>
+            <th>Category</th>
+            <th>Batch #</th>
+            <th>Quantity</th>
+            <th>Cost Price</th>
+            <th>Selling Price</th>
+            <th>Stock Value</th>
+            <th>Expiry Date</th>
+            <th>Status</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for batch in batches %}
+            <tr>
+              <td style="font-weight:600">{{ batch.merch_product.name }}</td>
+              <td>
+                {% if batch.merch_product.category %}
+                  <span class="badge badge-info">
+                    {{ batch.merch_product.get_category_display|default:batch.merch_product.category }}
+                  </span>
+                {% else %}
+                  <span style="color:#94a3b8">—</span>
+                {% endif %}
+              </td>
+              <td><code>{{ batch.batch_number }}</code></td>
+              <td>
+                <strong>{{ batch.quantity }}</strong>
+                {% if batch.is_low_stock %}
+                  <span class="badge badge-warning" style="margin-left:6px">Low</span>
+                {% endif %}
+              </td>
+              <td>MWK {{ batch.cost_price|floatformat:2|intcomma }}</td>
+              <td>MWK {{ batch.selling_price|floatformat:2|intcomma }}</td>
+              <td>MWK {{ batch.stock_value_selling|floatformat:2|intcomma }}</td>
+              <td>
+                {{ batch.expiry_date|date:"Y-m-d" }}
+                <br>
+                <small style="color:#64748b">({{ batch.days_to_expiry }} days)</small>
+              </td>
+              <td>
+                {% if batch.is_expired %}
+                  <span class="badge badge-danger">Expired</span>
+                {% elif batch.days_to_expiry <= 30 %}
+                  <span class="badge badge-warning">Near Expiry</span>
+                {% else %}
+                  <span class="badge badge-success">Good</span>
+                {% endif %}
+              </td>
+              <td>
+                <a href="{% url 'pharmacy:batch_edit' batch.id %}" style="color:#3b82f6;text-decoration:none;font-weight:600">Edit</a>
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    {% else %}
+      <div style="text-align:center;padding:48px;color:#94a3b8">
+        <p style="font-size:3rem;margin:0">📦</p>
+        <p style="font-size:1.2rem;margin:8px 0">No batches found</p>
+        <p>Add stock to see batches here</p>
+        <a href="{% url 'pharmacy:stock_in' %}" class="btn" style="margin-top:16px;display:inline-block">+ Add Stock</a>
+      </div>
+    {% endif %}
+  </div>
+  
+  <!-- Legend -->
+  <div style="background:#fff;border-radius:18px;padding:18px;box-shadow:0 10px 30px rgba(15,23,42,.08)">
+    <h3 style="margin:0 0 12px;color:#475569">Status Legend</h3>
+    <div style="display:flex;gap:16px;flex-wrap:wrap">
+      <div><span class="badge badge-success">Good</span> — More than 30 days to expiry</div>
+      <div><span class="badge badge-warning">Near Expiry</span> — Expires within 30 days</div>
+      <div><span class="badge badge-danger">Expired</span> — Past expiry date</div>
+      <div><span class="badge badge-warning">Low</span> — Stock at or below reorder level</div>
+    </div>
+  </div>
+</div>
+
+{% endblock %}
+

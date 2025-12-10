@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+{% load humanize %}
+
+{% block title %}Expired Batches · Pharmacy · Emajinet{% endblock %}
+
+{% block content %}
+
+<style>
+  .alert-page{display:flex;flex-direction:column;gap:18px;padding:18px}
+  .page-header{background:linear-gradient(120deg,#ef4444,#dc2626);padding:24px;border-radius:20px;color:#fff}
+  .page-header h1{margin:0;font-size:clamp(24px,3vw,32px)}
+  .page-header p{margin:8px 0 0;opacity:0.9}
+  
+  .batches-card{background:#fff;border-radius:18px;padding:18px;box-shadow:0 10px 30px rgba(15,23,42,.08)}
+  .batch-item{display:flex;justify-content:space-between;align-items:center;padding:16px;border-bottom:1px solid #f1f5f9;border-left:4px solid #ef4444}
+  .batch-item:last-child{border-bottom:none}
+  .batch-info h3{margin:0;color:#0f172a}
+  .batch-info p{margin:4px 0 0;color:#64748b;font-size:0.9rem}
+  .batch-meta{text-align:right}
+  .batch-meta .expiry{font-weight:700;color:#ef4444;font-size:1.1rem}
+  .batch-meta .stock{color:#64748b;font-size:0.9rem;margin-top:4px}
+</style>
+
+<div class="alert-page">
+  <div class="page-header">
+    <h1>🚫 Expired Batches</h1>
+    <p>Batches past their expiry date</p>
+  </div>
+  
+  <div class="batches-card">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+      <h2 style="margin:0;color:#0f172a">Found {{ batches|length }} expired batch{{ batches|length|pluralize:"es" }}</h2>
+      <a href="{% url 'pharmacy:dashboard' %}" style="color:#3b82f6;text-decoration:none;font-weight:600">← Dashboard</a>
+    </div>
+    
+    {% if batches %}
+      <div style="background:#fef3c7;border:1px solid #fbbf24;padding:12px;border-radius:12px;margin-bottom:16px">
+        ⚠️ <strong>Warning:</strong> These products should not be sold. Please archive or dispose of expired batches properly.
+      </div>
+      
+      {% for batch in batches %}
+        <div class="batch-item">
+          <div class="batch-info">
+            <h3>{{ batch.merch_product.name }}</h3>
+            <p>Batch: {{ batch.batch_number }} | Expiry: {{ batch.expiry_date|date:"Y-m-d" }}</p>
+          </div>
+          <div class="batch-meta">
+            <div class="expiry">Expired {{ batch.days_to_expiry|add:"-1" }} days ago</div>
+            <div class="stock">Stock: {{ batch.quantity }} units | MWK {{ batch.stock_value_selling|floatformat:2|intcomma }}</div>
+            <div style="margin-top:8px">
+              <a href="{% url 'pharmacy:batch_edit' batch.id %}" style="color:#3b82f6;text-decoration:none;font-weight:600">Manage</a>
+            </div>
+          </div>
+        </div>
+      {% endfor %}
+    {% else %}
+      <div style="text-align:center;padding:48px;color:#94a3b8">
+        <p style="font-size:3rem;margin:0">✅</p>
+        <p style="font-size:1.2rem;margin:8px 0">All good!</p>
+        <p>No expired batches</p>
+      </div>
+    {% endif %}
+  </div>
+</div>
+
+{% endblock %}
+

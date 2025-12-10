@@ -8,7 +8,12 @@ from django.contrib.auth.password_validation import validate_password
 from django.contrib.auth import get_user_model
 
 from .models import Business
-from .validators import validate_email_soft, validate_msisdn
+from .validators import (
+    validate_email_soft,
+    validate_msisdn,
+    validate_business_name,
+    validate_business_name_not_numeric,
+)
 
 User = get_user_model()
 
@@ -49,19 +54,50 @@ class CreateBusinessForm(forms.ModelForm):
             slug = f"{base}-{i+1}"
         return slug  # fallback (DB should still reject duplicates)
 
+    def clean_name(self):
+        """
+        Validate business/store name:
+        - Not numeric-only
+        - Must be unique (case-insensitive)
+        - Must pass basic business name validation
+        """
+        name = (self.cleaned_data.get("name") or "").strip()
+        
+        if not name:
+            raise ValidationError("Please provide a business/store name.")
+        
+        # Check not numeric-only
+        try:
+            validate_business_name_not_numeric(name)
+        except ValidationError as e:
+            raise ValidationError(e.messages)
+        
+        # Check uniqueness (case-insensitive)
+        if Business.objects.filter(name__iexact=name).exists():
+            raise ValidationError(
+                "That store name is already in use. Please pick another name or "
+                "contact support if you believe this is an error."
+            )
+        
+        # Apply basic business name validation
+        try:
+            validate_business_name(name)
+        except ValidationError as e:
+            raise ValidationError(e.messages)
+        
+        return name
+
     def clean(self):
         cleaned = super().clean()
         name = (cleaned.get("name") or "").strip()
-        if not name:
-            raise forms.ValidationError("Please provide a business/store name.")
-
+        
         # Provide a unique slug for views to use (only if model has slug)
         try:
             field_names = {f.name for f in Business._meta.fields}
         except Exception:
             field_names = set()
 
-        if "slug" in field_names:
+        if "slug" in field_names and name:
             base = slugify(name) or "shop"
             cleaned_slug = self._unique_slug(base)
             cleaned["slug"] = cleaned_slug

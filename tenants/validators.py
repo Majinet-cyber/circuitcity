@@ -15,6 +15,7 @@ __all__ = [
     "clean_whitespace",
     "digits",
     "validate_business_name",
+    "validate_business_name_not_numeric",
     "validate_subdomain",
     "validate_slug_simple",
     "unique_ci_validator",
@@ -53,11 +54,31 @@ BUSINESS_NAME_MIN = 2
 BUSINESS_NAME_ALLOWED_RE = re.compile(r"^[\w\s&/.,'’()\-+|#]*$", re.UNICODE)
 
 
+def validate_business_name_not_numeric(value: str) -> None:
+    """
+    Reject numeric-only business/store names.
+    Names like "444444" or "123 456" are not allowed.
+    Names with letters are OK (e.g. "Mo Touch 2", "Store 123").
+    """
+    v = clean_whitespace(value)
+    # Strip spaces and check if what remains is only digits
+    if v.replace(" ", "").isdigit():
+        raise ValidationError(
+            "Store name cannot be only numbers. Please enter a proper business name."
+        )
+    # Also ensure at least one letter is present
+    if not re.search(r"[a-zA-Z]", v):
+        raise ValidationError(
+            "Store name must contain at least one letter."
+        )
+
+
 def validate_business_name(value: str) -> None:
     """
     Basic sanity checks for a business/store name.
     - Length 2..80
     - Restrict to a conservative safe set of characters
+    - Not numeric-only
     """
     v = clean_whitespace(value)
     if not (BUSINESS_NAME_MIN <= len(v) <= BUSINESS_NAME_MAX):
@@ -69,6 +90,8 @@ def validate_business_name(value: str) -> None:
             "Business name contains invalid characters. "
             "Use letters, numbers, spaces, and simple punctuation like & / . , ' ( ) - + | #"
         )
+    # Also check not numeric-only
+    validate_business_name_not_numeric(v)
 
 
 # ---------------------------------------------------------------------------
