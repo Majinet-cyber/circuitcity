@@ -152,12 +152,26 @@ def dashboard(request):
     )['total'] or Decimal('0.00')
     
     # ==========================================================================
+    # STOCK ON HAND (current, not date-filtered) - Define first for cost calculation
+    # ==========================================================================
+    stock_items = InventoryItem.objects.filter(
+        business=business,
+        status="IN_STOCK",
+        is_active=True
+    ).select_related('product')
+    
+    if location:
+        stock_items = stock_items.filter(current_location=location)
+    
+    stock_on_hand = stock_items.count()
+    
+    # ==========================================================================
     # ENHANCED COST TRACKING (Cost of Goods + Business Costs)
     # ==========================================================================
     
-    # A) Cost of Goods: Inventory value of current stock (snapshot, not date-filtered)
-    # This is the value of phones currently on hand, based on order_price
-    cost_of_goods = stock_items.aggregate(
+    # A) Cost of Goods: Sum of order_price for items sold in the selected period
+    # This represents the actual cost of phones that were sold (COGS)
+    cost_of_goods = range_sales.aggregate(
         total=Coalesce(Sum('order_price'), Decimal('0.00'), output_field=DecimalField())
     )['total'] or Decimal('0.00')
     
@@ -187,17 +201,37 @@ def dashboard(request):
     profit = revenue - total_costs
     profit_margin = (profit / revenue * 100) if revenue > 0 else Decimal('0.00')
     
-    # --- STOCK ON HAND (current, not date-filtered) ---
-    stock_items = InventoryItem.objects.filter(
-        business=business,
-        status="IN_STOCK",
-        is_active=True
-    ).select_related('product')
+    # Compute absolute values for template display (Django doesn't have |abs filter)
+    profit_abs = abs(profit)
+    profit_margin_abs = abs(profit_margin)
     
-    if location:
-        stock_items = stock_items.filter(current_location=location)
+    # ==========================================================================
+    # PAYMENT MIX - Breakdown by payment method for selected period
+    # ==========================================================================
+    payment_totals = range_sales.aggregate(
+        cash=Coalesce(Sum('selling_price', filter=Q(payment_method='CASH')), Decimal('0.00'), output_field=DecimalField()),
+        bank=Coalesce(Sum('selling_price', filter=Q(payment_method='BANK')), Decimal('0.00'), output_field=DecimalField()),
+        mobile=Coalesce(Sum('selling_price', filter=Q(payment_method='MOBILE_MONEY')), Decimal('0.00'), output_field=DecimalField()),
+    )
     
-    stock_on_hand = stock_items.count()
+    cash_amount = payment_totals['cash'] or Decimal('0.00')
+    bank_amount = payment_totals['bank'] or Decimal('0.00')
+    mobile_amount = payment_totals['mobile'] or Decimal('0.00')
+    
+    # Calculate percentages (ensure they sum to exactly 100%)
+    if revenue > 0:
+        cash_pct = int(round((cash_amount / revenue) * 100))
+        bank_pct = int(round((bank_amount / revenue) * 100))
+        # Mobile gets the remainder to ensure exact 100%
+        mobile_pct = 100 - cash_pct - bank_pct
+    else:
+        cash_pct = bank_pct = mobile_pct = 0
+    
+    payment_mix_data = [
+        {'method': 'Cash', 'amount': cash_amount, 'percentage': cash_pct},
+        {'method': 'Bank', 'amount': bank_amount, 'percentage': bank_pct},
+        {'method': 'Mobile Money', 'amount': mobile_amount, 'percentage': mobile_pct},
+    ]
     
     # Package the main dashboard KPIs for the selected range
     dashboard_kpis = {
@@ -214,6 +248,8 @@ def dashboard(request):
         "profit": profit,
         "profit_margin": profit_margin,
         "stock_on_hand": stock_on_hand,
+        # Payment mix
+        "payment_mix": payment_mix_data,
     }
     
     # ==========================================================================

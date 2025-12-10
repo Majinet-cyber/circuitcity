@@ -88,6 +88,11 @@ ALLOWED_HOSTS = env_csv(
     "localhost,127.0.0.1,0.0.0.0,.onrender.com",
 )
 
+# Render deployment support: add RENDER_EXTERNAL_HOSTNAME if present
+RENDER_EXTERNAL_HOSTNAME = os.environ.get("RENDER_EXTERNAL_HOSTNAME", "").strip()
+if RENDER_EXTERNAL_HOSTNAME and RENDER_EXTERNAL_HOSTNAME not in ALLOWED_HOSTS:
+    ALLOWED_HOSTS = list({*ALLOWED_HOSTS, RENDER_EXTERNAL_HOSTNAME})
+
 if ON_RENDER and ".onrender.com" not in ALLOWED_HOSTS and "*.onrender.com" not in ALLOWED_HOSTS:
     ALLOWED_HOSTS = list({*ALLOWED_HOSTS, ".onrender.com"})
 if IS_RUNSERVER and "*" not in ALLOWED_HOSTS:
@@ -105,6 +110,11 @@ _default_csrf_fixed = [
     "https://www.emajinet.africa",
     "https://emajinet-staging.onrender.com",
 ]
+
+# Add RENDER_EXTERNAL_HOSTNAME to CSRF trusted origins
+if RENDER_EXTERNAL_HOSTNAME:
+    _default_csrf_fixed.append(f"https://{RENDER_EXTERNAL_HOSTNAME}")
+
 _default_csrf = list({*_default_csrf_fixed, *_csrf_from_hosts(ALLOWED_HOSTS)})
 CSRF_TRUSTED_ORIGINS = env_csv("CSRF_TRUSTED_ORIGINS", ",".join(_default_csrf))
 

@@ -333,9 +333,9 @@ def get_vertical_sidebar_items(business_kind: str) -> list[dict]:
     
     else:  # "phones" or default
         return [
-            # MAIN section - removed old "Dashboard" (dashboard:home) for phones vertical
-            # Now "Inventory Dashboard" is the first and primary entry point
-            {"section": "MAIN", "url": "inventory:inventory_dashboard", "label": "Inventory Dashboard", "icon": "bi-columns-gap", "active_pattern": "/inventory/dashboard", "require_manager": False},
+            # MAIN section - Phones Dashboard is the primary entry point
+            {"section": "MAIN", "url": "inventory_verticals:phones_dashboard", "label": "Phone Dashboard", "icon": "bi-speedometer2", "active_pattern": "/inventory/verticals/phones", "require_manager": False},
+            {"section": "MAIN", "url": "inventory:inventory_dashboard", "label": "Inventory Dashboard", "icon": "bi-bar-chart", "active_pattern": "/inventory/dashboard", "require_manager": False},
             {"section": "MAIN", "url": "inventory:stock_list", "label": "Stock", "icon": "bi-box-seam", "active_pattern": "/inventory/list/", "require_manager": False},
             {"section": "MAIN", "url": "inventory:phone_products", "label": "Products", "icon": "bi-grid-3x3-gap", "active_pattern": "/inventory/phone-products", "require_manager": False},
             {"section": "MAIN", "url": "inventory:scan_in", "label": "Scan IN", "icon": "bi-upc-scan", "active_pattern": "/inventory/scan", "require_manager": False},

@@ -8,8 +8,7 @@ from tenants.utils import require_business
 
 from inventory.authz import require_business_kind
 from inventory.business_kinds import BusinessKind
-from inventory.verticals import clothing, fallback, gym, liquor, pharmacy
-from inventory.views_dashboard import inventory_dashboard as phones_dashboard
+from inventory.verticals import clothing, fallback, gym, liquor, pharmacy, phones
 
 app_name = "inventory_verticals"
 
@@ -24,11 +23,11 @@ def _redirect_to_new_vertical(vertical_slug: str):
     return _view
 
 urlpatterns = [
-    # Phones dashboard stays at /inventory/dashboard/ (it's NOT a vertical)
+    # Phones dashboard at /inventory/verticals/phones/
     path(
         "phones/",
         require_business_kind(BusinessKind.PHONES)(
-            require_business(login_required(phones_dashboard))
+            require_business(login_required(phones.dashboard))
         ),
         name="phones_dashboard",
     ),

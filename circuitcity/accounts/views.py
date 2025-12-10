@@ -311,11 +311,40 @@ def _no_store(resp: HttpResponse) -> HttpResponse:
     return resp
 
 
-def _post_login_url() -> str:
+def _post_login_url(request=None) -> str:
     """
     Best-effort landing page after successful login.
-    Prefers dashboard; falls back to inventory dashboard/list.
+    
+    For phone businesses: redirect to phones dashboard.
+    Otherwise: prefer general dashboard; fall back to inventory dashboard/list.
     """
+    # If we have a request with an active business, check if it's phones
+    if request:
+        business = getattr(request, 'business', None)
+        if not business:
+            # Try to get from session
+            try:
+                from tenants.models import Business
+                business_id = request.session.get('active_business_id')
+                if business_id:
+                    business = Business.objects.filter(id=business_id).first()
+            except Exception:
+                pass
+        
+        # Redirect phones businesses to their dedicated dashboard
+        if business:
+            try:
+                from inventory.business_kinds import BusinessKind
+                business_kind = getattr(business, 'business_kind', None)
+                if business_kind == BusinessKind.PHONES or business_kind == 'phones':
+                    try:
+                        return reverse("inventory_verticals:phones_dashboard")
+                    except NoReverseMatch:
+                        pass
+            except Exception:
+                pass
+    
+    # Default landing pages (general dashboard, inventory, etc.)
     for name in (
         "dashboard:home",
         "dashboard:dashboard_home",
@@ -394,7 +423,7 @@ def login_view(request):
     next_url = request.POST.get("next") or request.GET.get("next") or ""
 
     if request.user.is_authenticated:
-        return redirect(next_url or _post_login_url())
+        return redirect(next_url or _post_login_url(request))
 
     origin_path = _debug_template_origin(LOGIN_TEMPLATE)
 
@@ -432,7 +461,7 @@ def login_view(request):
                 # Pick an active business for the session if possible
                 _select_active_business_for_user(request, auth_user)
 
-                return redirect(next_url or _post_login_url())
+                return redirect(next_url or _post_login_url(request))
 
             if user:
                 sec, _ = LoginSecurity.objects.get_or_create(user=user)
