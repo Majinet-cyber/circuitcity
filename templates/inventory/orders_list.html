@@ -1,270 +1,235 @@
-{% load static %}
-<!doctype html>
-<html lang="en">
-<head>
-  <meta charset="utf-8" />
-  <title>Purchase Orders</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <link rel="icon" href="{% static 'favicon.ico' %}" />
+{% extends "base.html" %}
+{% load humanize static %}
 
-  <style>
-    /* =========================
-       LIGHT THEME (no dark mode)
-       ========================= */
-    :root{
-      --bg:#ffffff;
-      --panel:#f8fafc;
-      --panel2:#f1f5f9;
-      --border:#e5e7eb;
-      --muted:#475569;
-      --txt:#0f172a;
-      --chip:#eef2ff;
-      --primary:#2563eb;
-      --primary-600:#1d4ed8;
-      --danger:#b91c1c;
-    }
-    @media (prefers-color-scheme: dark) {
-      /* neutralize OS dark mode; keep light */
-      :root { color-scheme: light; }
-    }
-    *{box-sizing:border-box}
-    body{margin:0;background:var(--bg);color:var(--txt);
-         font:14px/1.45 system-ui,Segoe UI,Inter,Roboto,Arial,sans-serif}
-    a{color:var(--primary);text-decoration:none}
-    a:hover{text-decoration:underline}
-    .container{max-width:1100px;margin:28px auto;padding:0 16px}
-    h1{margin:0 0 8px 0;font-weight:800;letter-spacing:.2px}
-    p.muted{color:var(--muted);margin:.25rem 0 1rem}
-    @media (max-width:640px){
-      h1{font-size:1.5rem}
-      p.muted{font-size:13px}
-    }
-    .bar{display:flex;gap:10px;align-items:center;margin:16px 0 12px}
-    .btn{background:#fff;border:1px solid var(--border);padding:10px 14px;border-radius:10px;color:var(--txt);cursor:pointer;text-decoration:none}
-    .btn:hover{background:#fafafa}
-    .btn.primary{background:var(--primary);border-color:var(--primary-600);color:#fff}
-    .btn.ghost{background:#fff}
-    .pill{padding:3px 10px;border-radius:999px;font-size:12px;border:1px solid var(--border);background:#fff;color:var(--muted)}
-    .grid{background:var(--panel);border:1px solid var(--border);border-radius:14px;overflow:hidden}
-    .grid header{display:flex;justify-content:space-between;align-items:center;padding:12px 14px;border-bottom:1px solid var(--border);background:var(--panel2)}
-    table{width:100%;border-collapse:collapse;background:#fff}
-    th,td{padding:12px 14px;border-bottom:1px solid var(--border);text-align:left;vertical-align:middle}
-    th{color:#334155;font-weight:700;background:#fbfbfd}
-    tr:last-child td{border-bottom:none}
-    @media (max-width:640px){
-      table{display:block;overflow-x:auto;white-space:nowrap}
-      th,td{padding:10px 8px;font-size:13px}
-    }
-    .status{display:inline-flex;align-items:center;gap:6px;padding:4px 10px;border-radius:999px;border:1px solid var(--border);background:var(--chip)}
-    .s-draft{background:#f8fafc}
-    .s-pending{background:#fff7ed;border-color:#fed7aa;color:#9a3412}
-    .s-approved{background:#ecfdf5;border-color:#a7f3d0;color:#065f46}
-    .s-received{background:#eff6ff;border-color:#bfdbfe;color:#1e40af}
-    .muted{color:var(--muted)}
-    .right{display:flex;gap:8px;align-items:center;margin-left:auto}
-    .side{background:var(--panel);border:1px solid var(--border);border-radius:14px;padding:14px}
-    @media (max-width:640px){
-      .side{padding:12px}
-      .tip{padding:10px}
-      .tip ul{padding-left:20px;font-size:13px}
-    }
-    .split{display:grid;grid-template-columns:1fr 300px;gap:16px}
-    @media (max-width:900px){.split{grid-template-columns:1fr}}
-    @media (max-width:768px){
-      .bar{flex-wrap:wrap}
-      .bar .btn{flex:1 1 auto;min-width:120px}
-      .bar .right{width:100%;justify-content:flex-end;margin-top:8px}
-    }
-    .tip{background:#fff;border:1px solid var(--border);padding:12px;border-radius:12px}
-    code{background:#f8fafc;border:1px solid var(--border);padding:2px 6px;border-radius:6px}
-    .empty{padding:28px;text-align:center;color:var(--muted);background:#fff}
-    .error{padding:16px;text-align:center;color:#7f1d1d;background:#fee2e2;border-top:1px solid #fecaca}
+{% block title %}Purchase Orders · Emajinet{% endblock %}
 
-    /* =========================================================
-       SIDEBAR LOCK (never collapse on web / large screens)
-       These are safe overrides; they won’t break mobile.
-       Adjust selectors to your layout if different.
-       ========================================================= */
-    @media (min-width: 900px){
-      .sidebar, .app-sidebar, [data-sidebar]{
-        width: 260px !important;
-        transform: none !important;
-        position: sticky; top: 0;
-      }
-      .sidebar.collapsed, .app-sidebar.collapsed, .nav-collapsed{
-        width: 260px !important;
-      }
-      .layout, .has-sidebar {
-        --sidebar-w: 260px;
-      }
-      .layout .main, .content-with-sidebar {
-        margin-left: var(--sidebar-w,260px) !important;
-      }
-      .sidebar-toggle, .hamburger, [data-action="toggle-sidebar"]{
-        display: none !important; /* hide collapse control on web */
-      }
-    }
-  </style>
-</head>
-<body>
-  <div class="container">
-    <h1>Purchase Orders</h1>
-    <p class="muted">Review, import, and track your purchase orders. Press <code>N</code> to start a new one.</p>
+{% block extra_head %}
+<style>
+  /* =========================
+     LIGHT THEME (consistent with app)
+     ========================= */
+  .orders-page{display:flex;flex-direction:column;gap:18px;padding:18px}
+  .orders-hero{background:linear-gradient(120deg,#3b82f6,#2563eb);padding:24px;border-radius:20px;color:#fff;display:flex;flex-wrap:wrap;gap:18px;align-items:center;justify-content:space-between;box-shadow:0 20px 50px rgba(59,130,246,0.3)}
+  .orders-hero h1{margin:0;font-size:clamp(28px,3.5vw,36px);font-weight:900}
+  .orders-hero p{margin:4px 0 0;opacity:.95}
+  .hero-actions{display:flex;gap:12px;flex-wrap:wrap}
+  .hero-actions a,.hero-actions button{border-radius:999px;padding:12px 20px;font-weight:700;text-decoration:none;transition:all 0.2s;border:none;cursor:pointer;display:inline-flex;align-items:center;gap:8px}
+  .hero-actions .primary{background:#fff;color:#3b82f6}
+  .hero-actions .primary:hover{background:#eff6ff;transform:translateY(-2px);box-shadow:0 8px 20px rgba(255,255,255,0.3)}
+  .hero-actions .ghost{border:2px solid rgba(255,255,255,.9);color:#fff;background:transparent}
+  .hero-actions .ghost:hover{background:rgba(255,255,255,.15)}
+  
+  .orders-container{background:#fff;border-radius:20px;padding:24px;box-shadow:0 10px 30px rgba(15,23,42,.1)}
+  .orders-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;flex-wrap:wrap;gap:12px}
+  .orders-header h2{margin:0;font-size:1.4rem;font-weight:800;color:#0f172a}
+  .count-badge{background:#eff6ff;color:#1e40af;padding:6px 14px;border-radius:999px;font-size:.9rem;font-weight:700}
+  
+  .orders-table{width:100%;overflow-x:auto}
+  .orders-table table{width:100%;min-width:900px;display:table}
+  .orders-table thead tr{border-bottom:2px solid #e2e8f0}
+  .orders-table th{padding:12px 16px;text-align:left;font-weight:700;color:#64748b;text-transform:uppercase;font-size:.85rem;letter-spacing:.05em}
+  .orders-table td{padding:14px 16px;border-bottom:1px solid #f1f5f9}
+  .orders-table tbody tr:hover{background:#f8fafc}
+  
+  .status{display:inline-flex;align-items:center;gap:6px;padding:4px 12px;border-radius:999px;font-size:.85rem;font-weight:700}
+  .s-draft{background:#f1f5f9;color:#475569}
+  .s-pending{background:#fff7ed;color:#9a3412}
+  .s-approved{background:#d1fae5;color:#065f46}
+  .s-received{background:#dbeafe;color:#1e40af}
+  .s-sent{background:#fef3c7;color:#92400e}
+  .s-cancelled{background:#fee2e2;color:#991b1b}
+  
+  .empty-state{text-align:center;padding:60px 20px;color:#64748b}
+  .empty-state i{font-size:4rem;opacity:.3}
+  .empty-state p{margin:16px 0 0;font-size:1.1rem;font-weight:600}
+  .empty-state .sub{margin:8px 0 20px;font-size:.95rem}
+  
+  .tip-box{background:#f8fafc;border:1px solid #e2e8f0;border-radius:16px;padding:20px;margin-top:20px}
+  .tip-box h3{margin:0 0 12px;font-size:1.1rem;font-weight:700;color:#0f172a}
+  .tip-box ul{margin:8px 0;padding-left:24px}
+  .tip-box li{margin:6px 0;color:#475569}
+  .tip-box code{background:#fff;border:1px solid #e2e8f0;padding:2px 8px;border-radius:6px;color:#3b82f6;font-size:.9rem}
+  
+  @media (max-width:640px){
+    .orders-hero h1{font-size:1.5rem}
+    .orders-hero p{font-size:.9rem}
+    .hero-actions{width:100%}
+    .hero-actions a,.hero-actions button{flex:1;justify-content:center}
+  }
+</style>
+{% endblock %}
 
-    <div class="bar">
-      <a class="btn primary" id="newBtn" href="{% url 'inventory:place_order' %}">+ New Order</a>
-      <button class="btn" id="demoBtn" title="Seed sample data on screen only">🧪 Demo Mode (D)</button>
-      <a class="btn ghost" id="openApi" href="{% url 'inventory:orders_list_api' %}" target="_blank" rel="noreferrer">📕 Open API</a>
-      <div class="right">
-        <button class="btn" id="refreshBtn">↻ Refresh (R)</button>
+{% block content %}
+<div class="orders-page">
+  <header class="orders-hero">
+    <div>
+      <p style="margin:0;opacity:.9;text-transform:uppercase;letter-spacing:.08em;font-size:.85rem">Purchase Management</p>
+      <h1><i class="bi bi-clipboard-data"></i> Orders</h1>
+      <p>Create and track purchase orders to your suppliers.</p>
+    </div>
+    <div class="hero-actions">
+      <a class="primary" href="{% url 'inventory:place_order' %}">
+        <i class="bi bi-plus-circle"></i> New Order
+      </a>
+      <button class="ghost" id="demoBtn" title="Seed sample data on screen only">
+        <i class="bi bi-flask"></i> Demo Mode
+      </button>
+    </div>
+  </header>
+
+  <div class="orders-container">
+    <div class="orders-header">
+      <h2><i class="bi bi-list-ul"></i> Recent Orders</h2>
+      <span class="count-badge" id="countBadge">Loading...</span>
+    </div>
+    
+    <div class="orders-table" id="tableWrap">
+      <div style="text-align:center;padding:40px;color:#64748b">
+        <i class="bi bi-hourglass-split" style="font-size:3rem;opacity:.3"></i>
+        <p style="margin:12px 0 0">Loading orders...</p>
       </div>
     </div>
 
-    <div class="split">
-      <section class="grid" id="ordersBox">
-        <header>
-          <div><span id="count" class="pill">0 orders</span></div>
-          <div class="muted">Showing latest</div>
-        </header>
-        <div id="tableWrap">
-          <div class="empty">Loading…</div>
-        </div>
-      </section>
-
-      <aside class="side">
-        <div class="tip" style="margin-bottom:14px">
-          <strong>Quick tips</strong>
-          <ul>
-            <li>Paste a supplier reference into “New Order”.</li>
-            <li>Use the API to seed from another system.</li>
-            <li>Shortcuts: <code>N</code> new, <code>R</code> refresh, <code>D</code> demo.</li>
-          </ul>
-        </div>
-
-        <div class="tip">
-          <strong>CSV Import</strong>
-          <p class="muted">Prepare a CSV with columns: <code>reference,status,total,created_at</code>.</p>
-          <button class="btn ghost" disabled>⤿ Import CSV</button>
-          <p class="muted" style="margin-top:8px">Import endpoint is not wired yet. (UI only)</p>
-        </div>
-      </aside>
+    <div class="tip-box">
+      <h3><i class="bi bi-lightbulb"></i> Quick Tips</h3>
+      <ul>
+        <li>Paste a supplier reference into "New Order" to track shipments</li>
+        <li>Use the API at <code>{% url 'inventory:orders_list_api' %}</code> to sync from another system</li>
+        <li>Press <code>N</code> for new order, <code>R</code> to refresh, <code>D</code> for demo data</li>
+      </ul>
     </div>
   </div>
+</div>
 
-  <script>
-    /* ====== keep sidebar open even if app JS tries to collapse ====== */
-    (function lockSidebarOpen(){
-      const unlock = () => {};
-      const forceOpen = () => {
-        const s = document.querySelector('.sidebar, .app-sidebar, [data-sidebar]');
-        if (s) { s.classList.remove('collapsed'); s.style.width='260px'; }
-        document.documentElement.classList.remove('nav-collapsed');
-      };
-      window.addEventListener('resize', forceOpen);
-      document.addEventListener('click', e=>{
-        const t = e.target.closest('.sidebar-toggle,[data-action="toggle-sidebar"]');
-        if (t) { e.preventDefault(); forceOpen(); }
-      });
-      forceOpen();
-      return unlock;
-    })();
+<script>
+/* ========== API + rendering ========== */
+const API_URL = "{% url 'inventory:orders_list_api' %}?limit=100";
 
-    /* ========== API + rendering ========== */
-    const API_URL = "{% url 'inventory:orders_list_api' %}?limit=100";
+const fmtMoney = v => {
+  if (v === null || v === undefined || isNaN(v)) return "—";
+  try { return 'K' + Number(v).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2}); }
+  catch { return v; }
+};
 
-    const fmtMoney = v => {
-      if (v === null || v === undefined || isNaN(v)) return "—";
-      try { return Number(v).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2}); }
-      catch { return v; }
-    };
-    const fmtDate = iso => {
-      if (!iso) return "—";
-      try { return new Date(iso).toLocaleString(); } catch { return iso; }
-    };
-    const statusClass = s => {
-      s = String(s || "").toLowerCase();
-      if (s === "approved") return "s-approved";
-      if (s === "received") return "s-received";
-      if (s === "pending") return "s-pending";
-      return "s-draft";
-    };
+const fmtDate = iso => {
+  if (!iso) return "—";
+  try { return new Date(iso).toLocaleDateString(); } catch { return iso; }
+};
 
-    function setCount(n){ document.getElementById('count').textContent = `${n} order${n===1?"":"s"}`; }
+const statusClass = s => {
+  s = String(s || "").toLowerCase();
+  if (s === "approved") return "s-approved";
+  if (s === "received") return "s-received";
+  if (s === "pending") return "s-pending";
+  if (s === "sent") return "s-sent";
+  if (s === "cancelled") return "s-cancelled";
+  return "s-draft";
+};
 
-    function renderTable(rows){
-      const wrap = document.getElementById('tableWrap');
-      if (!rows || !rows.length){
-        wrap.innerHTML = `<div class="empty">
-          No orders yet.<br/>
-          <button class="btn" style="margin-top:10px" onclick="seedDemo()">Fill demo data</button>
-        </div>`;
-        setCount(0);
-        return;
-      }
-      wrap.innerHTML = `
-        <table>
-          <thead><tr><th>ID</th><th>REFERENCE</th><th>STATUS</th><th>TOTAL</th><th>CREATED</th></tr></thead>
-          <tbody>
-            ${rows.map(o => `
-              <tr>
-                <td>#${o.id ?? "—"}</td>
-                <td>${o.reference ?? "—"}</td>
-                <td><span class="status ${statusClass(o.status)}">${o.status ?? "Draft"}</span></td>
-                <td>${fmtMoney(o.total)}</td>
-                <td>${fmtDate(o.created_at)}</td>
-              </tr>`).join("")}
-          </tbody>
-        </table>`;
-      setCount(rows.length);
+function setCount(n){ 
+  document.getElementById('countBadge').textContent = `${n} order${n===1?"":"s"}`; 
+}
+
+function renderTable(rows){
+  const wrap = document.getElementById('tableWrap');
+  if (!rows || !rows.length){
+    wrap.innerHTML = `<div class="empty-state">
+      <i class="bi bi-inbox"></i>
+      <p>No orders yet</p>
+      <p class="sub">Create your first purchase order to get started</p>
+      <button class="hero-actions primary" style="margin-top:16px" onclick="seedDemo()">
+        <i class="bi bi-flask"></i> Fill Demo Data
+      </button>
+    </div>`;
+    setCount(0);
+    return;
+  }
+  
+  wrap.innerHTML = `
+    <table>
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th>Reference</th>
+          <th>Supplier</th>
+          <th>Status</th>
+          <th>Total</th>
+          <th>Created</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${rows.map(o => `
+          <tr>
+            <td><strong>#${o.id ?? "—"}</strong></td>
+            <td>${o.reference ?? "—"}</td>
+            <td>${o.supplier_name ?? o.customer_name ?? "—"}</td>
+            <td><span class="status ${statusClass(o.status)}">${o.status ?? "Draft"}</span></td>
+            <td><strong>${fmtMoney(o.total)}</strong></td>
+            <td>${fmtDate(o.created_at)}</td>
+            <td>
+              ${o.id ? `<a href="/inventory/orders/${o.id}/invoice/" style="color:#3b82f6;text-decoration:none;font-weight:600"><i class="bi bi-eye"></i> View</a>` : '—'}
+            </td>
+          </tr>`).join("")}
+      </tbody>
+    </table>`;
+  setCount(rows.length);
+}
+
+function renderError(msg){
+  document.getElementById('tableWrap').innerHTML = `
+    <div style="background:#fee2e2;border:1px solid#fecaca;border-radius:12px;padding:20px;color:#991b1b">
+      <i class="bi bi-exclamation-triangle"></i> ${msg}
+    </div>`;
+}
+
+async function loadOrders(){
+  try{
+    const res = await fetch(API_URL, {headers: {'Accept':'application/json'}});
+    if (!res.ok){ 
+      renderError(`API error (${res.status}). Check the console for details.`); 
+      return; 
     }
+    const data = await res.json();
+    // Accept either {"ok":true,"data":[...]} or {"orders":[...]}
+    const rows = (Array.isArray(data?.data) && data.data)
+              || (Array.isArray(data?.orders) && data.orders)
+              || [];
+    renderTable(rows);
+  }catch(e){
+    console.error(e);
+    renderError("Could not load orders. Check console/network.");
+  }
+}
 
-    function renderError(msg){
-      document.getElementById('tableWrap').innerHTML = `<div class="error">${msg}</div>`;
-    }
+// Demo data (UI only)
+function seedDemo(){
+  const now = Date.now();
+  const sample = Array.from({length:8}).map((_,i)=>({
+    id: 1000+i,
+    reference: `PO-25-${String(1+i).padStart(4,"0")}`,
+    supplier_name: ["Acme Corp","Tech Supplies","Global Traders","Local Vendor"][i%4],
+    status: ["Draft","Pending","Approved","Received"][i%4],
+    total: 480 + Math.random()*1400,
+    created_at: new Date(now - i*86400000).toISOString()
+  }));
+  renderTable(sample);
+}
+window.seedDemo = seedDemo;
 
-    async function loadOrders(){
-      try{
-        const res = await fetch(API_URL, {headers: {'Accept':'application/json'}});
-        if (!res.ok){ renderError(`API error (${res.status}). Click “Open API” to inspect.`); return; }
-        const data = await res.json();
-        // Accept either {"ok":true,"data":[...]} or {"orders":[...]}
-        const rows = (Array.isArray(data?.data) && data.data)
-                  || (Array.isArray(data?.orders) && data.orders)
-                  || [];
-        renderTable(rows);
-      }catch(e){
-        console.error(e);
-        renderError("Could not load orders. Check console/network.");
-      }
-    }
+// UX shortcuts
+const demoBtn = document.getElementById('demoBtn');
+if (demoBtn) demoBtn.addEventListener('click', seedDemo);
 
-    // Demo data (UI only)
-    function seedDemo(){
-      const now = Date.now();
-      const sample = Array.from({length:8}).map((_,i)=>({
-        id: 1000+i,
-        reference: `PO-25-${String(1+i).padStart(4,"0")}`,
-        status: ["Draft","Pending","Approved","Received"][i%4],
-        total: 480 + Math.random()*1400,
-        created_at: new Date(now - i*86400000).toISOString()
-      }));
-      renderTable(sample);
-    }
-    window.seedDemo = seedDemo;
+document.addEventListener('keydown', (e)=>{
+  const tag = (e.target.tagName||"").toLowerCase();
+  if (tag === "input" || tag === "textarea") return;
+  const k = e.key.toLowerCase();
+  if (k === "r"){ e.preventDefault(); loadOrders(); }
+  if (k === "d"){ e.preventDefault(); seedDemo(); }
+  if (k === "n"){ e.preventDefault(); location.href = "{% url 'inventory:place_order' %}"; }
+});
 
-    // UX shortcuts
-    document.getElementById('refreshBtn').addEventListener('click', loadOrders);
-    document.getElementById('demoBtn').addEventListener('click', seedDemo);
-    document.addEventListener('keydown', (e)=>{
-      const tag = (e.target.tagName||"").toLowerCase();
-      if (tag === "input" || tag === "textarea") return;
-      const k = e.key.toLowerCase();
-      if (k === "r"){ e.preventDefault(); loadOrders(); }
-      if (k === "d"){ e.preventDefault(); seedDemo(); }
-      if (k === "n"){ e.preventDefault(); location.href = "{% url 'inventory:place_order' %}"; }
-    });
-
-    loadOrders();
-  </script>
-</body>
-</html>
+loadOrders();
+</script>
+{% endblock %}

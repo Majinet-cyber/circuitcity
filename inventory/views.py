@@ -3373,19 +3373,22 @@ from django.http import HttpRequest, HttpResponse
 from django.shortcuts import render
 from django.views.decorators.http import require_GET
 
-# ---- optional Sales model (Order) ----
+# ---- optional Purchase Order model (from wallet app) ----
 try:
-    from sales.models import Order  # type: ignore
+    from wallet.models import AdminPurchaseOrder as Order  # type: ignore
 except Exception:
-    Order = None  # type: ignore[assignment]
+    try:
+        from sales.models import Order  # type: ignore
+    except Exception:
+        Order = None  # type: ignore[assignment]
 
 
 @login_required
 @require_GET
 def orders_list(request: HttpRequest) -> HttpResponse:
     """
-    Orders table page. If Order exists, paginate it; otherwise
-    show a friendly empty state. Never 501.
+    Orders table page for purchase orders from suppliers.
+    If Order exists, paginate it; otherwise show a friendly empty state.
     """
     if Order is None:
         return render(
@@ -3425,6 +3428,39 @@ def orders_list(request: HttpRequest) -> HttpResponse:
         "inventory/orders_list.html",
         {"page_obj": page_obj, "orders": page_obj.object_list},
     )
+
+
+@login_required
+@require_GET
+def po_invoice(request: HttpRequest, po_id: int) -> HttpResponse:
+    """
+    Display a single purchase order in an invoice-style format.
+    Can be printed or downloaded as PDF.
+    """
+    if Order is None:
+        return HttpResponse("Order model not available", status=501)
+    
+    try:
+        order = Order.objects.get(pk=po_id)
+    except Order.DoesNotExist:
+        return HttpResponse("Purchase order not found", status=404)
+    
+    # Get order items if they exist
+    items = []
+    if hasattr(order, 'items'):
+        items = list(order.items.all())
+    
+    return render(
+        request,
+        "inventory/order_invoice.html",
+        {
+            "order": order,
+            "items": items,
+            "header_title": f"Purchase Order #{order.id}",
+            "active_nav": "orders",
+        },
+    )
+
 
 from django.contrib import messages
 from django.shortcuts import redirect, render

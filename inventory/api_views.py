@@ -42,7 +42,8 @@ def _try_import(modpath: str, attr: str | None = None):
         return None
 
 Sale  = _try_import("sales.models", "Sale")
-Order = _try_import("sales.models", "Order")
+# Try wallet.AdminPurchaseOrder first (purchase orders to suppliers), then sales.Order
+Order = _try_import("wallet.models", "AdminPurchaseOrder") or _try_import("sales.models", "Order")
 
 scoped = (
     _try_import("circuitcity.tenants.utils", "scoped")
@@ -1184,11 +1185,15 @@ def _serialize_order(o) -> Dict[str, Any]:
     except Exception:
         total = None
 
+    # For AdminPurchaseOrder (wallet.models), use supplier_name field
+    supplier = _get("supplier_name") or getattr(getattr(o, "supplier", None), "name", None)
+
     return {
         "id": getattr(o, "id", None),
-        "reference": _get("reference", "number", "code"),
+        "reference": _get("reference", "number", "code", default=f"PO-{getattr(o, 'id', '')}"),
         "status": _get("status"),
-        "supplier": getattr(getattr(o, "supplier", None), "name", None),
+        "supplier_name": supplier,
+        "supplier": supplier,  # backwards compat
         "total": total,
         "created_at": getattr(o, "created_at", None).isoformat() if getattr(o, "created_at", None) else None,
         "updated_at": getattr(o, "updated_at", None).isoformat() if getattr(o, "updated_at", None) else None,

@@ -127,6 +127,9 @@ urlpatterns = [
     # App (namespaced include so {% url 'inventory:...' %} works)
     path("inventory/", include(("inventory.urls", "inventory"), namespace="inventory")),
 
+    # Layby app
+    path("layby/", include(("layby.urls", "layby"), namespace="layby")),
+
     # Accounts app (login, password reset, avatars, etc.)
     path("accounts/", include("accounts.urls")),
 

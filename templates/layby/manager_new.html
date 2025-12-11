@@ -1,0 +1,197 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}New Layby Sale · Emajinet{% endblock %}
+
+{% block content %}
+<style>
+  .new-sale-page{max-width:900px;margin:0 auto;padding:20px}
+  .back-link{display:inline-flex;align-items:center;gap:8px;color:#8b5cf6;text-decoration:none;font-weight:600;margin-bottom:20px}
+  .back-link:hover{text-decoration:underline}
+  
+  .form-header{background:linear-gradient(120deg,#8b5cf6,#7c3aed);padding:30px;border-radius:20px;color:#fff;margin-bottom:24px;box-shadow:0 20px 50px rgba(139,92,246,0.3)}
+  .form-header h1{margin:0 0 8px;font-size:2rem;font-weight:900}
+  .form-header p{margin:0;opacity:.95}
+  
+  .form-container{background:#fff;border-radius:16px;padding:30px;box-shadow:0 10px 30px rgba(15,23,42,.1)}
+  .form-section{margin-bottom:32px}
+  .form-section:last-child{margin-bottom:0}
+  .form-section h2{margin:0 0 16px;font-size:1.2rem;font-weight:800;color:#0f172a;padding-bottom:8px;border-bottom:2px solid #e5e7eb}
+  
+  .form-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:16px}
+  .form-group{display:flex;flex-direction:column;gap:6px}
+  .form-group label{font-size:.9rem;font-weight:600;color:#475569}
+  .form-group input,.form-group select,.form-group textarea{padding:12px;border-radius:8px;border:1px solid #cbd5e1;font-size:1rem;font-family:inherit}
+  .form-group input:focus,.form-group select:focus,.form-group textarea:focus{outline:none;border-color:#8b5cf6;box-shadow:0 0 0 3px rgba(139,92,246,0.1)}
+  .form-group textarea{min-height:100px;resize:vertical}
+  .form-group .help-text{font-size:.85rem;color:#64748b;margin-top:4px}
+  .form-group .errorlist{list-style:none;padding:0;margin:4px 0 0;color:#ef4444;font-size:.85rem}
+  
+  .form-actions{display:flex;gap:12px;margin-top:24px;padding-top:24px;border-top:2px solid #e5e7eb}
+  .btn{padding:12px 24px;border-radius:12px;font-weight:700;border:none;cursor:pointer;transition:all 0.2s;text-decoration:none;display:inline-flex;align-items:center;gap:8px}
+  .btn-primary{background:#8b5cf6;color:#fff}
+  .btn-primary:hover{background:#7c3aed;transform:translateY(-2px);box-shadow:0 10px 20px rgba(139,92,246,0.3)}
+  .btn-secondary{background:#f1f5f9;color:#0f172a}
+  .btn-secondary:hover{background:#e2e8f0}
+</style>
+
+<div class="new-sale-page">
+  <a href="{% url 'layby:dashboard' %}" class="back-link">
+    <i class="bi bi-arrow-left"></i> Back to Layby Dashboard
+  </a>
+
+  <div class="form-header">
+    <h1><i class="bi bi-plus-circle"></i> New Layby Sale</h1>
+    <p>Create a new layby agreement for a customer</p>
+  </div>
+
+  <form method="post" enctype="multipart/form-data" class="form-container">
+    {% csrf_token %}
+    
+    {% if form.errors %}
+    <div style="background:#fee2e2;border:1px solid #fecaca;border-radius:12px;padding:16px;margin-bottom:24px">
+      <strong style="color:#991b1b">Please correct the errors below:</strong>
+      {{ form.errors }}
+    </div>
+    {% endif %}
+
+    <div class="form-section">
+      <h2><i class="bi bi-person"></i> Customer Information</h2>
+      <div class="form-grid">
+        <div class="form-group">
+          <label for="{{ form.customer_name.id_for_label }}">Customer Name *</label>
+          {{ form.customer_name }}
+          {% if form.customer_name.help_text %}
+            <span class="help-text">{{ form.customer_name.help_text }}</span>
+          {% endif %}
+          {{ form.customer_name.errors }}
+        </div>
+        <div class="form-group">
+          <label for="{{ form.customer_phone.id_for_label }}">Phone Number</label>
+          {{ form.customer_phone }}
+          {% if form.customer_phone.help_text %}
+            <span class="help-text">{{ form.customer_phone.help_text }}</span>
+          {% endif %}
+          {{ form.customer_phone.errors }}
+        </div>
+        <div class="form-group">
+          <label for="{{ form.id_number.id_for_label }}">National ID Number *</label>
+          {{ form.id_number }}
+          {% if form.id_number.help_text %}
+            <span class="help-text">{{ form.id_number.help_text }}</span>
+          {% endif %}
+          {{ form.id_number.errors }}
+        </div>
+        <div class="form-group">
+          <label for="{{ form.id_photo.id_for_label }}">ID Photo (optional)</label>
+          {{ form.id_photo }}
+          {{ form.id_photo.errors }}
+        </div>
+      </div>
+      
+      <h3 style="margin:24px 0 12px;font-size:1rem;font-weight:700;color:#64748b">Next of Kin (optional)</h3>
+      <div class="form-grid">
+        <div class="form-group">
+          <label for="{{ form.kin1_name.id_for_label }}">Kin 1 Name</label>
+          {{ form.kin1_name }}
+          {{ form.kin1_name.errors }}
+        </div>
+        <div class="form-group">
+          <label for="{{ form.kin1_phone.id_for_label }}">Kin 1 Phone</label>
+          {{ form.kin1_phone }}
+          {{ form.kin1_phone.errors }}
+        </div>
+        <div class="form-group">
+          <label for="{{ form.kin2_name.id_for_label }}">Kin 2 Name</label>
+          {{ form.kin2_name }}
+          {{ form.kin2_name.errors }}
+        </div>
+        <div class="form-group">
+          <label for="{{ form.kin2_phone.id_for_label }}">Kin 2 Phone</label>
+          {{ form.kin2_phone }}
+          {{ form.kin2_phone.errors }}
+        </div>
+      </div>
+    </div>
+
+    <div class="form-section">
+      <h2><i class="bi bi-box"></i> Product Information</h2>
+      <div class="form-grid">
+        <div class="form-group">
+          <label for="{{ form.item_name.id_for_label }}">Item Name *</label>
+          {{ form.item_name }}
+          {{ form.item_name.errors }}
+        </div>
+        <div class="form-group">
+          <label for="{{ form.sku.id_for_label }}">SKU / IMEI *</label>
+          {{ form.sku }}
+          {{ form.sku.errors }}
+        </div>
+      </div>
+    </div>
+
+    <div class="form-section">
+      <h2><i class="bi bi-cash-stack"></i> Payment Terms</h2>
+      <div class="form-grid">
+        <div class="form-group">
+          <label for="{{ form.total_price.id_for_label }}">Total Price (K) *</label>
+          {{ form.total_price }}
+          {{ form.total_price.errors }}
+        </div>
+        <div class="form-group">
+          <label for="{{ form.deposit_amount.id_for_label }}">Deposit Amount (K) *</label>
+          {{ form.deposit_amount }}
+          <span class="help-text">Initial payment from customer</span>
+          {{ form.deposit_amount.errors }}
+        </div>
+        <div class="form-group">
+          <label for="{{ form.term_months.id_for_label }}">Term (Months) *</label>
+          {{ form.term_months }}
+          <span class="help-text">Payment period (1-12 months)</span>
+          {{ form.term_months.errors }}
+        </div>
+      </div>
+    </div>
+
+    <div class="form-actions">
+      <button type="submit" class="btn btn-primary">
+        <i class="bi bi-check-circle"></i> Create Layby Sale
+      </button>
+      <a href="{% url 'layby:dashboard' %}" class="btn btn-secondary">
+        <i class="bi bi-x-circle"></i> Cancel
+      </a>
+    </div>
+  </form>
+</div>
+
+<script>
+// Add form enhancement: calculate balance automatically
+document.addEventListener('DOMContentLoaded', function() {
+  const totalInput = document.querySelector('input[name="total_price"]');
+  const depositInput = document.querySelector('input[name="deposit_amount"]');
+  
+  if (totalInput && depositInput) {
+    const showBalance = () => {
+      const total = parseFloat(totalInput.value) || 0;
+      const deposit = parseFloat(depositInput.value) || 0;
+      const balance = total - deposit;
+      
+      if (balance >= 0 && deposit > 0) {
+        let msg = document.getElementById('balance-preview');
+        if (!msg) {
+          msg = document.createElement('div');
+          msg.id = 'balance-preview';
+          msg.style.cssText = 'margin-top:12px;padding:12px;background:#f0fdf4;border:1px solid #86efac;border-radius:8px;color:#166534;font-weight:600';
+          depositInput.closest('.form-group').appendChild(msg);
+        }
+        msg.innerHTML = `<i class="bi bi-info-circle"></i> Balance to pay: K${balance.toFixed(2)}`;
+      }
+    };
+    
+    totalInput.addEventListener('input', showBalance);
+    depositInput.addEventListener('input', showBalance);
+  }
+});
+</script>
+{% endblock %}
+

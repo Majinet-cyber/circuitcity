@@ -1,0 +1,215 @@
+{% extends "base.html" %}
+{% load humanize static %}
+
+{% block title %}Purchase Order #{{ order.id }} · Emajinet{% endblock %}
+
+{% block extra_head %}
+<style>
+  /* Screen styles */
+  .invoice-page{max-width:900px;margin:0 auto;padding:20px}
+  .back-link{display:inline-flex;align-items:center;gap:8px;color:#3b82f6;text-decoration:none;font-weight:600;margin-bottom:20px}
+  .back-link:hover{text-decoration:underline}
+  
+  .invoice-actions{display:flex;gap:12px;margin-bottom:20px;flex-wrap:wrap}
+  .btn{display:inline-flex;align-items:center;gap:8px;padding:10px 20px;border-radius:12px;font-weight:700;text-decoration:none;transition:all 0.2s;border:none;cursor:pointer}
+  .btn-print{background:#3b82f6;color:#fff}
+  .btn-print:hover{background:#2563eb;transform:translateY(-2px);box-shadow:0 10px 20px rgba(59,130,246,0.3)}
+  .btn-back{background:#f1f5f9;color:#0f172a}
+  .btn-back:hover{background:#e2e8f0}
+  
+  .invoice-container{background:#fff;border-radius:16px;padding:40px;box-shadow:0 10px 30px rgba(15,23,42,.1)}
+  
+  .invoice-header{display:flex;justify-content:space-between;align-items:start;margin-bottom:40px;padding-bottom:20px;border-bottom:2px solid #e5e7eb}
+  .invoice-logo{font-size:2rem;font-weight:900;color:#3b82f6}
+  .invoice-info{text-align:right}
+  .invoice-info h1{margin:0 0 8px;font-size:1.8rem;font-weight:900;color:#0f172a}
+  .invoice-info p{margin:0;color:#64748b}
+  
+  .invoice-parties{display:grid;grid-template-columns:1fr 1fr;gap:30px;margin-bottom:40px}
+  .party h3{margin:0 0 12px;font-size:1rem;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.05em}
+  .party p{margin:4px 0;color:#0f172a}
+  .party strong{font-weight:700}
+  
+  .invoice-table{margin-bottom:40px}
+  .invoice-table table{width:100%;border-collapse:collapse}
+  .invoice-table thead{background:#f8fafc;border-top:2px solid #e5e7eb;border-bottom:2px solid #e5e7eb}
+  .invoice-table th{padding:12px 16px;text-align:left;font-weight:700;color:#64748b;text-transform:uppercase;font-size:.85rem}
+  .invoice-table th.right{text-align:right}
+  .invoice-table td{padding:14px 16px;border-bottom:1px solid #f1f5f9}
+  .invoice-table td.right{text-align:right}
+  .invoice-table tbody tr:hover{background:#f8fafc}
+  
+  .invoice-totals{display:flex;justify-content:flex-end;margin-bottom:40px}
+  .totals-box{min-width:300px;background:#f8fafc;border-radius:12px;padding:20px}
+  .total-row{display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid #e5e7eb}
+  .total-row:last-child{border-bottom:none;padding-top:12px;border-top:2px solid #e5e7eb;margin-top:8px}
+  .total-row.grand{font-size:1.3rem;font-weight:900}
+  
+  .invoice-notes{background:#fef9c3;border:1px solid #fde047;border-radius:12px;padding:16px;margin-bottom:20px}
+  .invoice-notes h4{margin:0 0 8px;font-size:.95rem;font-weight:700;color:#854d0e}
+  .invoice-notes p{margin:0;color:#713f12;font-size:.9rem}
+  
+  .invoice-footer{text-align:center;padding-top:20px;border-top:2px solid #e5e7eb;color:#64748b;font-size:.9rem}
+  
+  .status-badge{display:inline-flex;align-items:center;padding:6px 14px;border-radius:999px;font-size:.9rem;font-weight:700}
+  .status-draft{background:#f1f5f9;color:#475569}
+  .status-sent{background:#fef3c7;color:#92400e}
+  .status-completed{background:#d1fae5;color:#065f46}
+  .status-cancelled{background:#fee2e2;color:#991b1b}
+  
+  /* Print styles */
+  @media print {
+    body{background:#fff}
+    .invoice-page{max-width:none;margin:0;padding:0}
+    .invoice-actions,.back-link{display:none !important}
+    .invoice-container{box-shadow:none;border-radius:0;padding:20px}
+    .cc-sidebar,.cc-main > *:not(.invoice-page){display:none !important}
+    a{color:#000;text-decoration:none}
+    .invoice-header{page-break-after:avoid}
+    .invoice-table{page-break-inside:avoid}
+    .invoice-totals{page-break-inside:avoid}
+  }
+  
+  @media (max-width:640px){
+    .invoice-container{padding:20px}
+    .invoice-header{flex-direction:column;gap:20px}
+    .invoice-info{text-align:left}
+    .invoice-parties{grid-template-columns:1fr}
+    .invoice-table table{display:block;overflow-x:auto;white-space:nowrap}
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="invoice-page">
+  <a href="{% url 'inventory:orders_list' %}" class="back-link">
+    <i class="bi bi-arrow-left"></i> Back to Orders
+  </a>
+
+  <div class="invoice-actions">
+    <button class="btn btn-print" onclick="window.print()">
+      <i class="bi bi-printer"></i> Print / Download PDF
+    </button>
+    <a href="{% url 'inventory:orders_list' %}" class="btn btn-back">
+      <i class="bi bi-list-ul"></i> View All Orders
+    </a>
+  </div>
+
+  <div class="invoice-container">
+    <div class="invoice-header">
+      <div>
+        <div class="invoice-logo"><i class="bi bi-lightning-charge"></i> Emajinet</div>
+        <p style="margin:4px 0 0;color:#64748b">Purchase Order Management</p>
+      </div>
+      <div class="invoice-info">
+        <h1>Purchase Order</h1>
+        <p><strong>PO #{{ order.id }}</strong></p>
+        <p>Date: {{ order.created_at|date:"d M Y" }}</p>
+        <p>
+          {% if order.status == "draft" %}
+            <span class="status-badge status-draft">Draft</span>
+          {% elif order.status == "sent" %}
+            <span class="status-badge status-sent">Sent</span>
+          {% elif order.status == "completed" %}
+            <span class="status-badge status-completed">Completed</span>
+          {% elif order.status == "cancelled" %}
+            <span class="status-badge status-cancelled">Cancelled</span>
+          {% else %}
+            <span class="status-badge status-draft">{{ order.status|title }}</span>
+          {% endif %}
+        </p>
+      </div>
+    </div>
+
+    <div class="invoice-parties">
+      <div class="party">
+        <h3>From:</h3>
+        <p><strong>{{ ACTIVE_BUSINESS.name|default:"Your Business" }}</strong></p>
+        {% if order.agent_name %}
+        <p>Agent: {{ order.agent_name }}</p>
+        {% endif %}
+        {% if order.created_by %}
+        <p>Created by: {{ order.created_by.get_full_name|default:order.created_by.username }}</p>
+        {% endif %}
+      </div>
+      
+      <div class="party">
+        <h3>To (Supplier):</h3>
+        <p><strong>{{ order.supplier_name|default:"—" }}</strong></p>
+        {% if order.supplier_email %}
+        <p>Email: {{ order.supplier_email }}</p>
+        {% endif %}
+        {% if order.supplier_phone %}
+        <p>Phone: {{ order.supplier_phone }}</p>
+        {% endif %}
+      </div>
+    </div>
+
+    <div class="invoice-table">
+      <table>
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>Product</th>
+            <th class="right">Quantity</th>
+            <th class="right">Unit Price</th>
+            <th class="right">Line Total</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% if items %}
+            {% for item in items %}
+            <tr>
+              <td>{{ forloop.counter }}</td>
+              <td>{{ item.product.name|default:"Product" }}</td>
+              <td class="right">{{ item.quantity|intcomma }}</td>
+              <td class="right">{{ order.currency|default:"K" }} {{ item.unit_price|floatformat:2|intcomma }}</td>
+              <td class="right">{{ order.currency|default:"K" }} {{ item.line_total|floatformat:2|intcomma }}</td>
+            </tr>
+            {% endfor %}
+          {% else %}
+            <tr>
+              <td colspan="5" style="text-align:center;padding:40px;color:#64748b">
+                <i class="bi bi-inbox" style="font-size:2rem;opacity:.3"></i>
+                <p style="margin:12px 0 0">No items in this order yet</p>
+              </td>
+            </tr>
+          {% endif %}
+        </tbody>
+      </table>
+    </div>
+
+    <div class="invoice-totals">
+      <div class="totals-box">
+        <div class="total-row">
+          <span>Subtotal:</span>
+          <strong>{{ order.currency|default:"K" }} {{ order.subtotal|floatformat:2|intcomma }}</strong>
+        </div>
+        {% if order.tax %}
+        <div class="total-row">
+          <span>Tax:</span>
+          <strong>{{ order.currency|default:"K" }} {{ order.tax|floatformat:2|intcomma }}</strong>
+        </div>
+        {% endif %}
+        <div class="total-row grand">
+          <span>Grand Total:</span>
+          <strong>{{ order.currency|default:"K" }} {{ order.total|floatformat:2|intcomma }}</strong>
+        </div>
+      </div>
+    </div>
+
+    {% if order.notes %}
+    <div class="invoice-notes">
+      <h4><i class="bi bi-sticky"></i> Notes</h4>
+      <p>{{ order.notes }}</p>
+    </div>
+    {% endif %}
+
+    <div class="invoice-footer">
+      <p>Thank you for your business!</p>
+      <p style="margin-top:8px;font-size:.85rem">This purchase order was generated by Emajinet on {{ order.created_at|date:"d M Y" }}</p>
+    </div>
+  </div>
+</div>
+{% endblock %}
+

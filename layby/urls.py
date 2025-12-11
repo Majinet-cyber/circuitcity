@@ -4,11 +4,13 @@ from . import views
 app_name = "layby"
 
 urlpatterns = [
-    # Default: /layby/ â†’ Agent dashboard (list / overview)
-    path("", views.agent_dashboard, name="home"),
+    # Default: /layby/ → Manager dashboard (main entry point from sidebar)
+    path("", views.manager_dashboard, name="dashboard"),
+    path("", views.manager_dashboard, name="home"),  # backwards compat
 
     # Canonical "create" endpoint used by sidebar/templates
-    path("new/", views.agent_new, name="new"),
+    path("new/", views.manager_new_sale, name="new"),
+    path("<int:pk>/", views.manager_detail, name="detail"),
 
     # Agent area (explicit)
     path("agent/", views.agent_dashboard, name="agent_dashboard"),

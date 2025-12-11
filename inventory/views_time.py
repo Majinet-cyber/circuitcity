@@ -32,8 +32,9 @@ User = get_user_model()
 # ---------------------------------------------------------------------
 
 def _active_biz_id(request: HttpRequest) -> Optional[int]:
-    _, biz_id = get_active_business(request)
-    return biz_id
+    """Get the active business ID from request."""
+    biz = get_active_business(request)
+    return biz.id if biz else None
 
 def _wants_json(request: HttpRequest) -> bool:
     h = request.headers
@@ -378,17 +379,33 @@ def _collect_manager_overview(biz_id: int, start: timezone.datetime, end: timezo
 def time_logs_page(request: HttpRequest) -> HttpResponse:
     """
     Managers see ALL agent rows + batteries. Page renders even when empty.
+    Note: @require_business is applied in urls.py, so no need to call it here.
     """
-    gate = require_business(request)
-    if gate:
-        return gate
-
     bid = _active_biz_id(request)
+    if not bid:
+        # Fallback: render empty page if no business context
+        return render(request, "inventory/time_logs.html", {
+            "active_tab": "time_logs",
+            "logs": [],
+            "agents": [],
+            "batteries": []
+        })
+    
     start, end = _range_bounds(request)
     shift_h = int(request.GET.get("shift_hours", "8") or 8)
     expected = max(0, shift_h) * 3600
 
-    data = _collect_manager_overview(bid, start, end, expected)
+    try:
+        data = _collect_manager_overview(bid, start, end, expected)
+    except Exception:
+        # If TimeLog table doesn't exist or any other error, render empty page
+        data = {
+            "window_start": start.isoformat(),
+            "window_end": end.isoformat(),
+            "expected_shift_seconds": expected,
+            "agents": []
+        }
+    
     data["active_tab"] = "time_logs"  # ✅ For sidebar nav highlighting
     return render(request, "inventory/time_logs.html", data)
 
@@ -402,12 +419,12 @@ def time_logs_api(request: HttpRequest) -> JsonResponse:
     """
     Optional drill-down: ?user_id=123 returns last 30 logs for that user in the window.
     Otherwise returns the same overview payload as the page (agents + batteries).
+    Note: @require_business is applied in urls.py, so no need to call it here.
     """
-    gate = require_business(request)
-    if gate:
-        return JsonResponse({"ok": False, "error": "no_active_business"}, status=400)
-
     bid = _active_biz_id(request)
+    if not bid:
+        return JsonResponse({"ok": False, "error": "no_active_business"}, status=400)
+    
     start, end = _range_bounds(request)
 
     user_id = request.GET.get("user_id")
@@ -428,11 +445,9 @@ def time_logs_api(request: HttpRequest) -> JsonResponse:
 @login_required
 @require_http_methods(["GET"])
 def manager_time_overview_page(request: HttpRequest) -> HttpResponse:
-    gate = require_business(request)
-    if gate:
-        return gate
-
     biz_id = _active_biz_id(request)
+    if not biz_id:
+        return render(request, "inventory/time_overview.html", {"agents": []})
     start, end = _range_bounds(request)
     shift_h = int(request.GET.get("shift_hours", "8") or 8)
     expected = max(0, shift_h) * 3600
@@ -442,11 +457,9 @@ def manager_time_overview_page(request: HttpRequest) -> HttpResponse:
 @login_required
 @require_http_methods(["GET"])
 def manager_time_overview_api(request: HttpRequest) -> JsonResponse:
-    gate = require_business(request)
-    if gate:
-        return JsonResponse({"ok": False, "error": "no-business"}, status=403)
-
     biz_id = _active_biz_id(request)
+    if not biz_id:
+        return JsonResponse({"ok": False, "error": "no-business"}, status=403)
     start, end = _range_bounds(request)
     shift_h = int(request.GET.get("shift_hours", "8") or 8)
     expected = max(0, shift_h) * 3600
@@ -463,11 +476,9 @@ def time_logs_export_csv(request: HttpRequest) -> HttpResponse:
     Export logs in the selected window as CSV. GET only.
     Query: day=YYYY-MM-DD  or from=...&to=...
     """
-    gate = require_business(request)
-    if gate:
-        return gate  # let auth redirect happen
-
     bid = _active_biz_id(request)
+    if not bid:
+        return HttpResponse("No active business", status=400)
     start, end = _range_bounds(request)
 
     rows = (

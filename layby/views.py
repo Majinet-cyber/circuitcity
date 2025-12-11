@@ -750,3 +750,149 @@ def agent_add_payment(request: HttpRequest, order_id: int) -> HttpResponse:
     )
 
 
+# ---------------- Manager views (primary sidebar entry point) ----------------
+
+@login_required
+def manager_dashboard(request: HttpRequest) -> HttpResponse:
+    """
+    Manager-facing Layby dashboard - main entry point from sidebar.
+    Shows all layby orders for the business with payment status and progress.
+    """
+    from inventory.helpers import get_active_business, business_vertical
+    
+    # Get business context
+    try:
+        business = get_active_business(request)
+    except Exception:
+        business = None
+    
+    # Filter laybys by business if we can determine it
+    qs = LaybyOrder.objects.all()
+    field = _agent_field_name()
+    
+    # If there's a business field on LaybyOrder, filter by it
+    try:
+        if hasattr(LaybyOrder, 'business') and business:
+            qs = qs.filter(business=business)
+        elif hasattr(LaybyOrder, 'location') and hasattr(request.user, 'location'):
+            if request.user.location:
+                qs = qs.filter(location=request.user.location)
+    except Exception:
+        pass
+    
+    qs = qs.order_by("-id")[:500]
+    
+    # Serialize with computed fields
+    orders = []
+    for o in qs:
+        ser = _serialize_order(o)
+        # Calculate percentage paid
+        try:
+            total = ser.get('total') or Decimal("0.00")
+            paid = ser.get('amount_paid') or Decimal("0.00")
+            if total > 0:
+                pct = (paid / total) * 100
+            else:
+                pct = 0
+            ser['percentage_paid'] = min(pct, 100)
+        except Exception:
+            ser['percentage_paid'] = 0
+        orders.append(ser)
+    
+    # Aggregates
+    total_balance = sum((o.get("balance", Decimal("0.00")) for o in orders), Decimal("0"))
+    count_active = sum(1 for o in orders if (o.get("status") or "").lower() == "active")
+    total_value = sum((o.get("total", Decimal("0.00")) for o in orders), Decimal("0"))
+    total_paid = sum((o.get("amount_paid", Decimal("0.00")) for o in orders), Decimal("0"))
+    
+    return render(
+        request,
+        "layby/manager_dashboard.html",
+        {
+            "orders": orders,
+            "total_balance": total_balance,
+            "count_active": count_active,
+            "total_value": total_value,
+            "total_paid": total_paid,
+            "header_title": "Layby",
+            "active_nav": "layby",
+        },
+    )
+
+
+@login_required
+def manager_detail(request: HttpRequest, pk: int) -> HttpResponse:
+    """
+    Manager view for a single layby order with payment history.
+    """
+    order = get_object_or_404(LaybyOrder, pk=pk)
+    ser = _serialize_order(order)
+    
+    # Calculate percentage
+    try:
+        total = ser.get('total') or Decimal("0.00")
+        paid = ser.get('amount_paid') or Decimal("0.00")
+        if total > 0:
+            pct = (paid / total) * 100
+        else:
+            pct = 0
+        ser['percentage_paid'] = min(pct, 100)
+    except Exception:
+        ser['percentage_paid'] = 0
+    
+    # Get payment history
+    payments = _collect_payments(order)
+    
+    # Handle payment submission
+    if request.method == "POST" and "add_payment" in request.POST:
+        form = LaybyPaymentForm(request.POST)
+        if form.is_valid():
+            pay = form.save(commit=False)
+            pay.order = order
+            if hasattr(pay, "received_by") and request.user.is_authenticated:
+                pay.received_by = request.user
+            pay.save()
+            messages.success(request, "Payment recorded successfully.")
+            return redirect("layby:detail", pk=order.pk)
+    else:
+        form = LaybyPaymentForm()
+    
+    return render(
+        request,
+        "layby/manager_detail.html",
+        {
+            "order": order,
+            "ser": ser,
+            "payments": payments,
+            "form": form,
+            "header_title": "Layby Detail",
+            "active_nav": "layby",
+        },
+    )
+
+
+@login_required
+def manager_new_sale(request: HttpRequest) -> HttpResponse:
+    """
+    Manager view to create a new layby sale.
+    """
+    if request.method == "POST":
+        form = LaybyOrderForm(request.POST, request.FILES)
+        if form.is_valid():
+            order = form.save(user=request.user, commit=True)
+            messages.success(request, f"Layby {escape(getattr(order, 'ref', '') or order.pk)} created successfully.")
+            return redirect("layby:detail", pk=order.pk)
+    else:
+        form = LaybyOrderForm()
+    
+    return render(
+        request,
+        "layby/manager_new.html",
+        {
+            "form": form,
+            "header_title": "New Layby Sale",
+            "active_nav": "layby",
+        },
+    )
+
+

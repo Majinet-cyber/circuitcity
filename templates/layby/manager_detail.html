@@ -1,0 +1,168 @@
+{% extends "base.html" %}
+{% load humanize static %}
+
+{% block title %}Layby #{{ order.ref }} · Emajinet{% endblock %}
+
+{% block content %}
+<style>
+  .detail-page{max-width:1000px;margin:0 auto;padding:20px}
+  .back-link{display:inline-flex;align-items:center;gap:8px;color:#8b5cf6;text-decoration:none;font-weight:600;margin-bottom:20px}
+  .back-link:hover{text-decoration:underline}
+  
+  .detail-header{background:linear-gradient(120deg,#8b5cf6,#7c3aed);padding:30px;border-radius:20px;color:#fff;margin-bottom:24px;box-shadow:0 20px 50px rgba(139,92,246,0.3)}
+  .detail-header h1{margin:0 0 8px;font-size:2rem;font-weight:900}
+  .detail-header p{margin:0;opacity:.95}
+  
+  .info-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:20px;margin-bottom:24px}
+  .info-card{background:#fff;border-radius:16px;padding:20px;box-shadow:0 10px 30px rgba(15,23,42,.1)}
+  .info-card h3{margin:0 0 12px;font-size:.95rem;text-transform:uppercase;color:#64748b;letter-spacing:.05em;font-weight:600}
+  .info-card p{margin:4px 0;color:#0f172a}
+  .info-card strong{font-weight:700}
+  
+  .progress-section{background:#fff;border-radius:16px;padding:24px;box-shadow:0 10px 30px rgba(15,23,42,.1);margin-bottom:24px}
+  .progress-big{width:100%;height:24px;background:#e5e7eb;border-radius:999px;overflow:hidden;margin:16px 0}
+  .progress-big-fill{height:100%;background:linear-gradient(90deg,#8b5cf6,#a78bfa);transition:width 0.5s}
+  .progress-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-top:16px}
+  .progress-stat{text-align:center}
+  .progress-stat .label{font-size:.85rem;color:#64748b;text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px}
+  .progress-stat .value{font-size:1.4rem;font-weight:900;color:#0f172a}
+  
+  .payment-section{background:#fff;border-radius:16px;padding:24px;box-shadow:0 10px 30px rgba(15,23,42,.1);margin-bottom:24px}
+  .payment-section h2{margin:0 0 16px;font-size:1.3rem;font-weight:800;color:#0f172a}
+  
+  .payment-form{background:#f8fafc;border-radius:12px;padding:20px;margin-bottom:20px;border:2px dashed #cbd5e1}
+  .payment-form h3{margin:0 0 16px;font-size:1.1rem;font-weight:700;color:#0f172a}
+  .form-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;margin-bottom:12px}
+  .form-group{display:flex;flex-direction:column;gap:6px}
+  .form-group label{font-size:.9rem;font-weight:600;color:#475569}
+  .form-group input,.form-group select{padding:10px 12px;border-radius:8px;border:1px solid #cbd5e1;font-size:1rem}
+  .btn-submit{background:#8b5cf6;color:#fff;padding:12px 24px;border-radius:12px;font-weight:700;border:none;cursor:pointer;transition:all 0.2s}
+  .btn-submit:hover{background:#7c3aed;transform:translateY(-2px);box-shadow:0 10px 20px rgba(139,92,246,0.3)}
+  
+  .payment-history{display:flex;flex-direction:column;gap:12px}
+  .payment-item{display:flex;justify-content:space-between;align-items:center;padding:16px;background:#f8fafc;border-radius:12px;border-left:4px solid #8b5cf6}
+  .payment-item .date{font-size:.85rem;color:#64748b}
+  .payment-item .amount{font-size:1.2rem;font-weight:900;color:#10b981}
+  .payment-item .method{font-size:.85rem;color:#64748b;margin-top:4px}
+</style>
+
+<div class="detail-page">
+  <a href="{% url 'layby:dashboard' %}" class="back-link">
+    <i class="bi bi-arrow-left"></i> Back to Layby Dashboard
+  </a>
+
+  <div class="detail-header">
+    <h1><i class="bi bi-journal-check"></i> Layby #{{ order.ref|default:order.id }}</h1>
+    <p>{{ order.customer_name }} · {{ order.item_name }}</p>
+  </div>
+
+  <div class="info-grid">
+    <div class="info-card">
+      <h3><i class="bi bi-person"></i> Customer Details</h3>
+      <p><strong>Name:</strong> {{ order.customer_name }}</p>
+      <p><strong>Phone:</strong> {{ order.customer_phone|default:"—" }}</p>
+      <p><strong>ID Number:</strong> {{ order.id_number|default:"—" }}</p>
+      {% if order.kin1_name %}
+      <p style="margin-top:12px"><strong>Next of Kin:</strong> {{ order.kin1_name }}<br>
+      <small style="color:#64748b">{{ order.kin1_phone }}</small></p>
+      {% endif %}
+    </div>
+
+    <div class="info-card">
+      <h3><i class="bi bi-box"></i> Product Details</h3>
+      <p><strong>Item:</strong> {{ order.item_name }}</p>
+      <p><strong>SKU:</strong> {{ order.sku|default:"—" }}</p>
+      <p><strong>Term:</strong> {{ order.term_months }} months</p>
+      <p><strong>Status:</strong> 
+        {% if order.status == "active" %}
+          <span style="color:#10b981;font-weight:700">Active</span>
+        {% elif order.status == "completed" %}
+          <span style="color:#3b82f6;font-weight:700">Completed</span>
+        {% else %}
+          <span style="color:#ef4444;font-weight:700">{{ order.status|title }}</span>
+        {% endif %}
+      </p>
+    </div>
+
+    <div class="info-card">
+      <h3><i class="bi bi-calendar"></i> Timeline</h3>
+      <p><strong>Created:</strong> {{ order.created_at|date:"d M Y" }}</p>
+      <p><strong>Updated:</strong> {{ order.updated_at|date:"d M Y" }}</p>
+    </div>
+  </div>
+
+  <div class="progress-section">
+    <h2><i class="bi bi-graph-up"></i> Payment Progress</h2>
+    <div class="progress-big">
+      <div class="progress-big-fill" style="width:{{ ser.percentage_paid|floatformat:0 }}%"></div>
+    </div>
+    <div class="progress-stats">
+      <div class="progress-stat">
+        <div class="label">Total Price</div>
+        <div class="value">K{{ ser.total|floatformat:2|intcomma }}</div>
+      </div>
+      <div class="progress-stat">
+        <div class="label">Amount Paid</div>
+        <div class="value" style="color:#10b981">K{{ ser.amount_paid|floatformat:2|intcomma }}</div>
+      </div>
+      <div class="progress-stat">
+        <div class="label">Balance</div>
+        <div class="value" style="color:#ef4444">K{{ ser.balance|floatformat:2|intcomma }}</div>
+      </div>
+    </div>
+    <div style="text-align:center;margin-top:16px;font-size:2rem;font-weight:900;color:#8b5cf6">
+      {{ ser.percentage_paid|floatformat:1 }}% Paid
+    </div>
+  </div>
+
+  <div class="payment-section">
+    <h2><i class="bi bi-cash-stack"></i> Record New Payment</h2>
+    
+    <form method="post" class="payment-form">
+      {% csrf_token %}
+      <input type="hidden" name="add_payment" value="1">
+      <h3>Add Payment</h3>
+      
+      <div class="form-row">
+        <div class="form-group">
+          <label for="id_amount">Amount (K)</label>
+          {{ form.amount }}
+        </div>
+        <div class="form-group">
+          <label for="id_method">Payment Method</label>
+          {{ form.method }}
+        </div>
+        <div class="form-group">
+          <label for="id_tx_ref">Transaction Reference (optional)</label>
+          {{ form.tx_ref }}
+        </div>
+      </div>
+      
+      <button type="submit" class="btn-submit">
+        <i class="bi bi-plus-circle"></i> Record Payment
+      </button>
+    </form>
+
+    <h3 style="margin:0 0 16px;font-size:1.1rem;font-weight:700;color:#0f172a">Payment History</h3>
+    {% if payments %}
+    <div class="payment-history">
+      {% for payment in payments %}
+      <div class="payment-item">
+        <div>
+          <div class="amount">K{{ payment.amount|floatformat:2|intcomma }}</div>
+          <div class="method">{{ payment.method|default:"Cash" }} {% if payment.tx_ref %}· {{ payment.tx_ref }}{% endif %}</div>
+        </div>
+        <div class="date">{{ payment.when }}</div>
+      </div>
+      {% endfor %}
+    </div>
+    {% else %}
+    <div style="text-align:center;padding:40px;color:#64748b">
+      <i class="bi bi-inbox" style="font-size:3rem;opacity:.3"></i>
+      <p style="margin:12px 0 0">No payments recorded yet beyond the deposit.</p>
+    </div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}
+
