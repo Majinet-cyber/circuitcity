@@ -268,6 +268,7 @@ TEMPLATES = [
                 "cc.context_processors.role_flags",
                 "cc.context_processors.brand",
                 "tenants.context_processors.tenant_context",
+                "tenants.context_processors.notifications_context",
                 "billing.context_processors.trial_banner",
             ],
         },

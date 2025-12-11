@@ -1367,13 +1367,15 @@ def api_product_create(request: HttpRequest) -> JsonResponse:
 @login_required
 @csrf_exempt
 @require_http_methods(["POST"])
-def api_product_update_price(request: HttpRequest) -> JsonResponse:
+def api_product_update_price(request: HttpRequest, product_id: int = None) -> JsonResponse:
     data = _parse_json_body(request) | request.POST.dict()
     price = _to_decimal_price(data.get("price"))
     if price is None:
         return _err("Invalid or missing 'price'.")
 
-    product_id = data.get("product_id")
+    # Use URL parameter if provided, otherwise fall back to POST data
+    if product_id is None:
+        product_id = data.get("product_id")
     sku = (data.get("sku") or data.get("code") or "").strip()
 
     if Product is not None:

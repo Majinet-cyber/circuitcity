@@ -962,12 +962,8 @@ urlpatterns += [
     path("api/place-order/", manager_required(_need_biz(_api_place_order)), name="api_place_order"),
     path("api/order-price/<int:product_id>/", manager_required(_need_biz(_api_order_price)), name="api_order_price"),
 
-    path("api/product/update-price/", manager_required(_need_biz(_api_product_update_price)), name="api_product_update_price"),
-    path("api/product/update-price/<int:product_id>/",
-         RedirectView.as_view(pattern_name="inventory:api_product_update_price", permanent=False)),
+    path("api/product/update-price/<int:product_id>/", manager_required(_need_biz(_api_product_update_price)), name="api_product_update_price"),
     path("api/product/update_price/<int:product_id>/",
-         RedirectView.as_view(pattern_name="inventory:api_product_update_price", permanent=False)),
-    path("api/product/update_price/",
          RedirectView.as_view(pattern_name="inventory:api_product_update_price", permanent=False)),
 
     path("api/stock-models/", manager_required(_need_biz(_api_stock_models)), name="api_stock_models"),

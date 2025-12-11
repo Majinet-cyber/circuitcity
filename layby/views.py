@@ -23,7 +23,7 @@ from django.http import (
     Http404,
 )
 from django.middleware.csrf import get_token
-from django.shortcuts import get_object_or_404, redirect
+from django.shortcuts import get_object_or_404, redirect, render
 from django.template import TemplateDoesNotExist
 from django.template.loader import get_template
 from django.urls import NoReverseMatch, reverse

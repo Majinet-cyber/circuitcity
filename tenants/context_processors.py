@@ -175,6 +175,11 @@ def tenant_context(request) -> Dict[str, Any]:
     except Exception:
         pass  # Fail gracefully if utils_verticals is not available
 
+    # Resolve currency from business or default to MWK
+    currency = "MWK"
+    if biz and hasattr(biz, "currency") and getattr(biz, "currency", None):
+        currency = biz.currency
+
     # Expose both new and legacy keys so no template breaks
     return {
         # New names
@@ -183,6 +188,7 @@ def tenant_context(request) -> Dict[str, Any]:
         "PRODUCT_MODE": mode,
         "BUSINESS_VERTICAL": mode,  # Alias for sidebar compatibility
         "sidebar_items": sidebar_items,  # Vertical-aware navigation config
+        "currency": currency,  # Currency for templates
 
         # Legacy-friendly mirrors
         "active_business": biz,

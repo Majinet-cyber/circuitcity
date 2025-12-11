@@ -3423,10 +3423,18 @@ def orders_list(request: HttpRequest) -> HttpResponse:
 
     paginator = Paginator(qs, per_page)
     page_obj = paginator.get_page(request.GET.get("page"))
+    
+    # Build context with safe defaults
+    ctx = {
+        "page_obj": page_obj,
+        "orders": page_obj.object_list,
+        "active_tab": request.GET.get("tab", "all"),  # Default to "all" if not specified
+    }
+    
     return render(
         request,
         "inventory/orders_list.html",
-        {"page_obj": page_obj, "orders": page_obj.object_list},
+        ctx,
     )
 
 
@@ -3576,131 +3584,6 @@ def place_order_page(request):
         return render(request, "inventory/place_order.html", ctx)
     except TemplateDoesNotExist:
         return render(request, "inventory/place_order_fallback.html", ctx)
-    # --- Agent detail + assignment ----------------------------------------------
-    from django.shortcuts import get_object_or_404, render, redirect
-    from django.contrib import messages
-    from django.core.paginator import Paginator
-    from django.db.models import Sum
-    from django.db import transaction
-    from django.utils import timezone
-    from django.contrib.auth import get_user_model
-
-    from .models import Location, AgentProfile, WalletTxn
-
-    User = get_user_model()
-
-    def _active_business(request):
-        """Best-effort way to discover the tenant/business on the request."""
-        return (
-                getattr(request, "business", None)
-                or getattr(request, "active_business", None)
-                or getattr(getattr(request, "tenant", None), "business", None)
-        )
-
-    def _url_for_page(request, page_num: int) -> str:
-        q = request.GET.copy()
-        q["page"] = page_num
-        sep = "&" if "?" in request.get_full_path() else "?"
-        return f"{request.path}{sep}{q.urlencode()}"
-
-    def agent_detail(request, agent_id: int):
-        """
-        Shows agent info + wallet + simple location assignment UI.
-        Template: inventory/agent_detail.html
-        """
-        target = get_object_or_404(User, pk=agent_id)
-
-        # Limit locations to the active business (if we can detect one)
-        biz = _active_business(request)
-        loc_qs = Location.objects.all().order_by("name")
-        if biz:
-            loc_qs = loc_qs.filter(business=biz)
-
-        # Wallet numbers
-        month_start = timezone.now().replace(day=1, hour=0, minute=0, second=0, microsecond=0)
-        lifetime_total = (WalletTxn.objects.filter(user=target)
-                          .aggregate(s=Sum("amount"))["s"] or 0)
-        monthly_total = (WalletTxn.objects.filter(user=target, created_at__gte=month_start)
-                         .aggregate(s=Sum("amount"))["s"] or 0)
-        monthly_adv = (WalletTxn.objects.filter(
-            user=target, created_at__gte=month_start, reason="ADVANCE"
-        ).aggregate(s=Sum("amount"))["s"] or 0)
-        balance = lifetime_total  # credits minus debits
-
-        # Paginated transactions
-        txns = WalletTxn.objects.filter(user=target).order_by("-created_at")
-        page_obj = Paginator(txns, 25).get_page(request.GET.get("page") or 1)
-
-        ctx = {
-            "target": target,
-            "locations": list(loc_qs),
-            "txns": page_obj.object_list,
-            "page_obj": page_obj,
-            "url_for": lambda p: _url_for_page(request, p),
-            "balance": balance,
-            "monthly_total": monthly_total,
-            "monthly_adv": monthly_adv,
-            "lifetime_total": lifetime_total,
-        }
-        return render(request, "inventory/agent_detail.html", ctx)
-
-    @transaction.atomic
-    def agent_assign_location(request, agent_id: int):
-        """
-        POST handler for the small assignment form in agent_detail.html.
-        Redirects back to the detail page with a flash message.
-        """
-        if request.method != "POST":
-            return redirect("inventory:agent_detail", agent_id=agent_id)
-
-        target = get_object_or_404(User, pk=agent_id)
-        loc_id = request.POST.get("location_id")
-        if not loc_id:
-            messages.error(request, "Choose a location.")
-            return redirect("inventory:agent_detail", agent_id=agent_id)
-
-        loc = get_object_or_404(Location, pk=loc_id)
-
-        # Optional tenant safety: block cross-tenant assignment if we can detect biz
-        biz = _active_business(request)
-        if biz and loc.business_id and loc.business_id != getattr(biz, "id", None):
-            messages.error(request, "That location does not belong to your business.")
-            return redirect("inventory:agent_detail", agent_id=agent_id)
-
-        # Ensure the agent has a profile, then update location
-        profile, _created = AgentProfile.objects.get_or_create(
-            user=target, defaults={"location": loc}
-        )
-        profile.location = loc
-        profile.save()
-
-        messages.success(request, f"Assigned {target.get_username()} to {loc.name}.")
-        return redirect("inventory:agent_detail", agent_id=agent_id)
-
-    # ------------------------------
-    # PAGE: Add Product (manager/admin)
-    # ------------------------------
-    @login_required
-    @require_business
-    def product_create(request):
-        """
-        Form for managers to add new products.
-        Supports both IMEI-based products (phones)
-        and quantity-based items (liquor, groceries, pharmacy).
-        """
-        from .forms import ProductForm  # make sure you add this in forms.py
-
-        if request.method == "POST":
-            form = ProductForm(request.POST)
-            if form.is_valid():
-                product = form.save(commit=False)
-                product.business = request.business  # tenant scope
-                product.save()
-                return redirect("inventory:stock_list")
-        else:
-            form = ProductForm()
-
-        return render(request, "inventory/product_create.html", {"form": form})
 
 
 # ---------------------------------------------------------------------------
