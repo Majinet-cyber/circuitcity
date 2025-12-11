@@ -490,10 +490,71 @@ class AgentWalletView(LoginRequiredMixin, TemplateView):
         u = self.request.user
         biz = get_active_business(self.request)
 
+        # Parse date range from query params for filtered earnings view
+        from datetime import datetime, timedelta
+        
+        now = timezone.now()
+        today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+        
+        range_param = self.request.GET.get('range', 'month').lower()
+        
+        if range_param == 'today':
+            filter_start = today_start
+            filter_end = now
+            range_label = 'Today'
+        elif range_param == '7d':
+            filter_start = today_start - timedelta(days=7)
+            filter_end = now
+            range_label = 'Last 7 Days'
+        elif range_param == 'custom':
+            start_str = self.request.GET.get('start', '')
+            end_str = self.request.GET.get('end', '')
+            try:
+                start_d = datetime.strptime(start_str, '%Y-%m-%d').date()
+                end_d = datetime.strptime(end_str, '%Y-%m-%d').date()
+                filter_start = timezone.make_aware(datetime.combine(start_d, datetime.min.time()))
+                filter_end = timezone.make_aware(datetime.combine(end_d, datetime.max.time()))
+                range_label = f"{start_d.strftime('%b %d')} – {end_d.strftime('%b %d, %Y')}"
+            except (ValueError, TypeError):
+                # Fallback to this month
+                month_start = today_start.replace(day=1)
+                filter_start = month_start
+                filter_end = now
+                range_label = 'This Month'
+        else:
+            # Default: this month
+            month_start = today_start.replace(day=1)
+            filter_start = month_start
+            filter_end = now
+            range_label = 'This Month'
+        
+        # Get agent's earnings for the filtered period
+        try:
+            from inventory.services.agent_earnings import get_agent_earnings
+            
+            earnings_data = get_agent_earnings(
+                business=biz,
+                start_date=filter_start.date() if hasattr(filter_start, 'date') else filter_start,
+                end_date=filter_end.date() if hasattr(filter_end, 'date') else filter_end,
+                agent_id=u.id,
+            )
+            
+            # Extract this agent's data
+            my_earnings = earnings_data[0] if earnings_data else None
+        except Exception:
+            my_earnings = None
+
         # Summary is already per-user; txns also per-user
         txns = WalletTransaction.objects.filter(ledger=Ledger.AGENT, agent=u)
         ctx["agent_summary"] = agent_wallet_summary(u)
         ctx["txns"] = txns.order_by("-effective_date", "-id")[:50]
+        
+        # Add filtered earnings data
+        ctx["my_earnings"] = my_earnings
+        ctx["range_key"] = range_param
+        ctx["range_label"] = range_label
+        ctx["filter_start"] = filter_start.date() if hasattr(filter_start, 'date') else filter_start
+        ctx["filter_end"] = filter_end.date() if hasattr(filter_end, 'date') else filter_end
 
         # Scope tenant-aware lists where possible
         bqs = BudgetRequest.objects.filter(agent=u).order_by("-created_at")

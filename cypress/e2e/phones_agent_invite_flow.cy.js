@@ -1,7 +1,7 @@
 // cypress/e2e/phones_agent_invite_flow.cy.js
 
 /**
- * Generate a random 15-digit IMEI-style string
+ * Helper: generate a random 15-digit IMEI-style string
  */
 function generateRandomImei() {
   return Array.from({ length: 15 }, () =>
@@ -18,53 +18,113 @@ function getSaleImeiInput() {
       "input[data-cy='sale-imei-input']",
       "input[name='imei']",
       "input[placeholder*='IMEI Number' i]",
-      "input[placeholder*='Enter 15-digit IMEI' i]"
+      "input[placeholder*='Enter 15-digit IMEI' i]",
     ].join(", "),
     { timeout: 20000 }
   );
 }
 
 /**
- * Phones: Agent invite + signup + sale flow
+ * Helper: as the logged in agent, walk all sidebar links
+ * and make sure none of them throw a 500 error.
  *
- * Flow:
- * - Manager logs in and goes to Phones dashboard
- * - Opens Agents page from sidebar
- * - Creates an invite for a random agent name
- * - Copies invite link from share text
- * - Logs out
- * - Opens invite link, signs up as new agent (strong password)
- * - Lands inside the business as that agent
- * - Agent scans an ITEL phone into stock
- * - Agent sells that exact IMEI via the phone sale wizard
+ * We avoid "detached DOM" by:
+ *  - collecting all sidebar hrefs once on dashboard
+ *  - then using cy.visit(href, { failOnStatusCode: false }) for each one
  */
+function walkSidebarLinksAsAgent() {
+  const CLICK_WAIT_MS = 10000; // 10 seconds between pages
 
-describe("Phones agent invite + sale flow", () => {
+  cy.log("🧭 Sidebar smoke as AGENT – visit each sidebar href, assert no 500s");
+
+  // Start from dashboard for a clean baseline
+  cy.visit("/inventory/dashboard/");
+
+  cy.get("body").then(($body) => {
+    // Try to find a sidebar/nav wrapper
+    const $sidebarCandidate = $body.find(
+      "aside, .sidebar, nav[aria-label*='Sidebar'], .cc-sidebar"
+    );
+    const $sidebar = $sidebarCandidate.length ? $sidebarCandidate.first() : $body;
+
+    const hrefSet = new Set();
+
+    $sidebar.find("a[href]").each((_, el) => {
+      const href = el.getAttribute("href") || "";
+
+      // Skip invalid / junk / auth links
+      if (
+        !href ||
+        href === "#" ||
+        href.startsWith("javascript:") ||
+        href.includes("/logout")
+      ) {
+        return;
+      }
+
+      hrefSet.add(href);
+    });
+
+    const hrefs = Array.from(hrefSet);
+
+    cy.log(`🧾 Agent sidebar hrefs collected: ${hrefs.join(", ") || "(none found)"}`);
+
+    // Now iterate over the hrefs with Cypress
+    cy.wrap(hrefs).each((rawHref) => {
+      const href = String(rawHref);
+
+      cy.log(`➡️ [Agent sidebar] visiting href: ${href}`);
+
+      // ⭐ Allow 403 / 401 / etc – we only care about avoiding 500s
+      cy.visit(href, { failOnStatusCode: false });
+
+      // Let page render
+      cy.wait(CLICK_WAIT_MS);
+
+      // Assert no 500 error in the rendered HTML
+      cy.get("body").should("not.contain", "Server Error (500)");
+
+      // Log where we landed
+      cy.url().then((url) => {
+        cy.log(`✅ Sidebar href ${href} → ${url}`);
+      });
+
+      // Return to dashboard for the next cycle
+      cy.visit("/inventory/dashboard/");
+    });
+  });
+
+  // Final sanity check: dashboard is healthy
+  cy.get("body").should("not.contain", "Server Error (500)");
+  cy.url().should("include", "/inventory/dashboard/");
+}
+
+describe("Phones agent invite + sale + sidebar smoke", () => {
   const BRAND = "ITEL";
 
-  it("invites a new agent, completes signup, then agent scans & sells a phone", () => {
-    const IMEI = generateRandomImei();
-    cy.log(`🔢 Generated IMEI for agent: ${IMEI}`);
+  beforeEach(() => {
+    cy.clearCookies();
+    cy.clearLocalStorage();
+  });
 
-    // -------------------------------------------------------------------
-    // 1. Login as owner/manager and ensure we are in inventory
-    // -------------------------------------------------------------------
+  it("invites a new agent, completes signup, then agent scans & sells a phone and walks sidebar (no 500s)", () => {
+    const IMEI = generateRandomImei();
+    cy.log(`🔢 Generated IMEI: ${IMEI}`);
+
+    // =========================================================================
+    // 1. Manager logs in and creates an AGENT invite
+    // =========================================================================
+    cy.log("🔐 Step 1: Log in as EMPIRE manager and open Agents page");
     cy.loginAsOwner();
     cy.visitDashboard("phones");
-    cy.url().should("include", "/inventory");
+    cy.url({ timeout: 60000 }).should("include", "/inventory");
 
-    // -------------------------------------------------------------------
-    // 2. Go to Agents page via sidebar
-    // -------------------------------------------------------------------
     cy.contains("a, button", "Agents")
       .scrollIntoView()
       .click();
 
     cy.url().should("include", "/tenants/manager/agents/");
 
-    // -------------------------------------------------------------------
-    // 3. Create an invite
-    // -------------------------------------------------------------------
     const agentName = `CypressAgent-${Date.now()}`;
 
     cy.get('input[name="invited_name"], input[placeholder*="e.g. Alice"]')
@@ -76,9 +136,7 @@ describe("Phones agent invite + sale flow", () => {
     cy.contains("Pending invites");
     cy.contains(agentName).should("exist");
 
-    // -------------------------------------------------------------------
-    // 4. Grab invite link from share text
-    // -------------------------------------------------------------------
+    // Grab invite URL from share text
     cy.get("textarea, input[name='invite_link'], input[readonly]")
       .first()
       .invoke("val")
@@ -87,44 +145,51 @@ describe("Phones agent invite + sale flow", () => {
         const match = text.match(/https?:\/\/\S+/);
 
         expect(match, "found invite URL in share text").to.not.be.null;
-
         const inviteUrl = match[0];
 
-        // -----------------------------------------------------------------
-        // 5. Log out manager, visit invite URL as "incognito" agent
-        // -----------------------------------------------------------------
+        // Log out manager to simulate incognito agent signup
         cy.visit("/logout/");
+
+        // =========================================================================
+        // 2. Agent accepts invite, creates account with strong password
+        // =========================================================================
+        cy.log("🧾 Step 2: Agent visits invite link and signs up");
         cy.visit(inviteUrl);
 
         const email = `cypress.agent+${Date.now()}@example.com`;
-        const password = "@Lincoln1863?"; // strong password as requested
+        // Strong password: at least 12 chars, uppercase, lowercase, digit, symbol
+        const password = "@Lincoln1863?";
 
-        cy.get("input[type='email'], input[name='email']").type(email);
+        // Name/username is pre-filled from invite name; we only set email + password
+        cy.get('input[type="email"], input[name="email"]')
+          .clear()
+          .type(email);
 
-        cy.get(
-          "input[type='password'][name='password1'], input[name='password']"
-        )
+        cy.get('input[type="password"][name="password1"], input[name="password"]')
           .first()
+          .clear()
           .type(password);
 
-        cy.get("input[type='password'][name='password2']").type(password);
+        cy.get('input[type="password"][name="password2"]')
+          .clear()
+          .type(password);
 
-        cy.contains("button, input[type='submit']", "Create account").click();
+        cy.contains("button, input[type='submit']", /create account/i).click();
 
-        // -----------------------------------------------------------------
-        // 6. Assert agent lands inside the business (redirect into inventory)
-        // -----------------------------------------------------------------
-        cy.url({ timeout: 60000 }).should("include", "/inventory");
-        cy.contains("Empire").should("exist"); // brand/business name visible
+        // After signup, user should be inside inventory (choose business / dashboard)
+        cy.url({ timeout: 60000 }).should((href) => {
+          expect(
+            href.includes("/inventory"),
+            `expected redirect into inventory, got ${href}`
+          ).to.be.true;
+        });
 
-        // =================================================================
-        // AGENT FLOW: scan an ITEL phone into stock, then sell it
-        // =================================================================
+        cy.contains("Empire").should("exist"); // business name somewhere on page
 
-        // --------------------------------------------------------------
-        // 7. Agent → Scan In Phones and pick ITEL brand
-        // --------------------------------------------------------------
-        cy.log("📲 Agent: go to Scan IN Phones and pick ITEL");
+        // =========================================================================
+        // 3. As AGENT: scan an ITEL phone into stock
+        // =========================================================================
+        cy.log("📲 Step 3: Agent scans an ITEL phone into stock");
         cy.visit("/inventory/phones/scan-in/");
 
         cy.contains(
@@ -136,10 +201,6 @@ describe("Phones agent invite + sale flow", () => {
 
         cy.contains(/ITEL Models/i, { timeout: 20000 }).should("exist");
 
-        // --------------------------------------------------------------
-        // 8. Agent → Choose first ITEL model (dropdown)
-        // --------------------------------------------------------------
-        cy.log("📦 Agent: choose first ITEL model in dropdown");
         cy.get("select", { timeout: 20000 })
           .first()
           .as("modelSelect")
@@ -152,12 +213,8 @@ describe("Phones agent invite + sale flow", () => {
             cy.log(`ℹ️ Agent scan-in model selected: ${text.trim()}`);
           });
 
-        // --------------------------------------------------------------
-        // 9. Agent → Enter IMEI and submit scan
-        // --------------------------------------------------------------
-        cy.log("📡 Agent: enter IMEI and submit scan");
         cy.get("input[name='imei'], #imei-input, [data-cy='imei-input']", {
-          timeout: 20000
+          timeout: 20000,
         })
           .first()
           .clear()
@@ -169,39 +226,10 @@ describe("Phones agent invite + sale flow", () => {
 
         cy.contains(/added to stock/i, { timeout: 15000 }).should("exist");
 
-        // --------------------------------------------------------------
-        // 10. (Optional) Soft check IMEI in Stock List
-        // --------------------------------------------------------------
-        cy.log("📋 Agent: soft check IMEI in Stock List");
-        cy.visit("/inventory/list/");
-
-        cy.get(
-          "input[placeholder*='Search IMEI' i], input[placeholder*='Search IMEI/brand/model' i]",
-          { timeout: 20000 }
-        )
-          .first()
-          .clear()
-          .type(IMEI);
-
-        cy.wait(1000);
-
-        cy.get("body", { timeout: 20000 }).then(($body) => {
-          const found = $body
-            .find("td")
-            .toArray()
-            .some((el) => el.innerText.includes(IMEI));
-
-          if (found) {
-            cy.log("✅ Agent: IMEI found in stock list");
-          } else {
-            cy.log("⚠️ Agent: IMEI NOT found in stock list – continuing anyway");
-          }
-        });
-
-        // --------------------------------------------------------------
-        // 11. Agent → Open Phone Sale Wizard and choose ITEL brand
-        // --------------------------------------------------------------
-        cy.log("🧭 Agent: open Phone Sale Wizard and choose ITEL");
+        // =========================================================================
+        // 4. Agent opens Sale Wizard and sells same IMEI
+        // =========================================================================
+        cy.log("🧭 Step 4: Agent opens Phone Sale Wizard and chooses ITEL brand");
         cy.visit("/inventory/phone-sale-wizard/");
 
         cy.contains(
@@ -215,10 +243,7 @@ describe("Phones agent invite + sale flow", () => {
           .first()
           .click();
 
-        // --------------------------------------------------------------
-        // 12. Wizard Step 2 – choose first visible model radio
-        // --------------------------------------------------------------
-        cy.log("📦 Agent: choose first model in wizard (Step 2)");
+        cy.log("📦 Step 5: Choose first model in wizard (Step 2)");
         cy.get("input[type='radio']", { timeout: 10000 })
           .filter(":visible")
           .first()
@@ -228,14 +253,11 @@ describe("Phones agent invite + sale flow", () => {
           .first()
           .click();
 
-        // --------------------------------------------------------------
-        // 13. Wizard Step 3 – click first visible variant card (if step exists)
-        // --------------------------------------------------------------
-        cy.log("⚙️ Agent: choose variant/spec (Step 3, if present)");
+        cy.log("⚙️ Step 6: Choose variant/spec (Step 3, if present)");
         cy.get("body").then(($body) => {
           const isVariantStep = /variant/i.test($body.text());
           if (!isVariantStep) {
-            cy.log("ℹ️ Agent: no variant step detected – skipping to IMEI");
+            cy.log("ℹ️ No variant step detected – skipping to IMEI");
             return;
           }
 
@@ -254,10 +276,7 @@ describe("Phones agent invite + sale flow", () => {
             });
         });
 
-        // --------------------------------------------------------------
-        // 14. Wizard IMEI step – enter same IMEI
-        // --------------------------------------------------------------
-        cy.log("🧾 Agent: enter same IMEI in wizard");
+        cy.log("🧾 Step 7: Enter same IMEI in wizard");
         getSaleImeiInput()
           .should("be.visible")
           .clear()
@@ -267,10 +286,7 @@ describe("Phones agent invite + sale flow", () => {
           .first()
           .click();
 
-        // --------------------------------------------------------------
-        // 15. Set selling price & pick any payment method
-        // --------------------------------------------------------------
-        cy.log("💰 Agent: set price and payment");
+        cy.log("💰 Step 8: Set price and payment");
         cy.get(
           "input[data-cy='selling-price-input'], input[name='selling_price'], input[name='price']",
           { timeout: 20000 }
@@ -285,7 +301,7 @@ describe("Phones agent invite + sale flow", () => {
             "Bank",
             "Mobile Money",
             "Airtel Money",
-            "TNM Mpamba"
+            "TNM Mpamba",
           ];
           let clicked = false;
 
@@ -308,10 +324,7 @@ describe("Phones agent invite + sale flow", () => {
           .first()
           .click();
 
-        // --------------------------------------------------------------
-        // 16. Verify sale success
-        // --------------------------------------------------------------
-        cy.log("🎉 Agent: verify sale success");
+        cy.log("🎉 Step 9: Verify sale success banner and dashboard");
         cy.get("body", { timeout: 20000 }).should(($body) => {
           const text = $body.text().toLowerCase();
           expect(text).to.satisfy(
@@ -322,6 +335,13 @@ describe("Phones agent invite + sale flow", () => {
                 t.includes("recorded"))
           );
         });
+
+        cy.url().should("include", "/inventory/dashboard/");
+
+        // =========================================================================
+        // 5. AFTER SALE: Agent walks every sidebar link (no 500s, 10s between)
+        // =========================================================================
+        walkSidebarLinksAsAgent();
       });
   });
 });

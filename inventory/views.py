@@ -6916,6 +6916,10 @@ def inventory_dashboard(request):
     pie_cost = float(kpis["total_costs"])  # Now includes COGS + admin costs!
     pie_profit = float(kpis["total_profit"])
     
+    # Profit = revenue - total costs (cost of goods + business costs)
+    # Defensive check: Ensure profit is ALWAYS revenue - costs, never just -costs
+    pie_profit = pie_revenue - pie_cost
+    
     cash_total = float(kpis["payment_mix_cash_amount"])
     bank_total = float(kpis["payment_mix_bank_amount"])
     mobile_total = float(kpis["payment_mix_mobile_amount"])
@@ -7063,6 +7067,9 @@ def inventory_dashboard(request):
         "total_units": window_count,
         "costs_total": pie_cost,
         "profit_total": pie_profit,
+        # Split costs for detailed display
+        "cost_of_goods": float(kpis["total_cogs"]),
+        "business_costs": float(kpis["total_admin_costs"]),
         # Payment Mix Battery
         "payment_mix": {
             "total": total_payment_revenue,

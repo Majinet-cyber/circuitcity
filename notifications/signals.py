@@ -20,39 +20,61 @@ def notify_new_sale(sender, instance, created, **kwargs):
         return
     
     try:
-        # Notify the agent who made the sale
-        if instance.sold_by:
-            Notification.objects.create(
-                audience='AGENT',
-                user=instance.sold_by,
-                message=f"New sale recorded: {instance.total_selling_price or 0:.2f} - Commission pending",
-                level='success',
-                meta={
-                    'type': 'new_sale',
-                    'sale_id': instance.id,
-                    'amount': float(instance.total_selling_price or 0)
-                }
-            )
+        # Get business from location (Sale model doesn't have direct business field)
+        business = getattr(instance.location, 'business', None) if hasattr(instance, 'location') else None
         
-        # Notify managers about significant sales (> 5000)
-        if hasattr(instance, 'business') and instance.total_selling_price and instance.total_selling_price > 5000:
+        # Get product info from the item
+        product_name = "Unknown Product"
+        imei = ""
+        if hasattr(instance, 'item') and instance.item:
+            item = instance.item
+            # Try to get product name from various possible fields
+            if hasattr(item, 'product') and item.product:
+                product = item.product
+                product_name = f"{getattr(product, 'brand', '')} {getattr(product, 'model', '')}".strip() or str(product)
+            elif hasattr(item, 'name'):
+                product_name = item.name
+            elif hasattr(item, 'sku'):
+                product_name = f"SKU: {item.sku}"
+            
+            # Try to get IMEI/serial
+            imei = getattr(item, 'imei', '') or getattr(item, 'serial', '') or getattr(item, 'code', '')
+        
+        # Format price safely
+        sale_price = float(instance.price) if instance.price else 0
+        
+        # Create a notification for this sale so managers see it in the bell dropdown.
+        # Notify all managers of the business
+        if business:
             from tenants.models import Membership
             managers = Membership.objects.filter(
-                business=instance.business,
-                role='MANAGER',
+                business=business,
+                role__in=['MANAGER', 'ADMIN'],
                 status='ACTIVE'
             ).values_list('user_id', flat=True)
+            
+            # Format the notification message
+            agent_name = instance.agent.username if instance.agent else 'Unknown'
+            msg_parts = [f"Sale recorded: {product_name}"]
+            if imei:
+                msg_parts.append(f"(IMEI: {imei})")
+            msg_parts.append(f"sold for MK {sale_price:,.0f}")
+            message = " ".join(msg_parts)
             
             for manager_id in managers:
                 Notification.objects.create(
                     audience='ADMIN',
                     user_id=manager_id,
-                    message=f"High-value sale: {instance.total_selling_price:.2f} by {instance.sold_by.username if instance.sold_by else 'Unknown'}",
-                    level='info',
+                    message=message,
+                    level='success',
                     meta={
-                        'type': 'high_value_sale',
+                        'type': 'new_sale',
                         'sale_id': instance.id,
-                        'amount': float(instance.total_selling_price)
+                        'amount': sale_price,
+                        'agent_id': instance.agent.id if instance.agent else None,
+                        'agent_name': agent_name,
+                        'product': product_name,
+                        'imei': imei,
                     }
                 )
     except Exception as e:

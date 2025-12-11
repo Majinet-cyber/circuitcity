@@ -645,3 +645,110 @@ def create_agent_invite(request: HttpRequest) -> HttpResponse:
     except Exception as e:
         messages.error(request, f"Could not create invite: {e}")
         return redirect("tenants:manager_review_agents")
+
+
+@never_cache
+@login_required
+@require_http_methods(["GET"])
+def manager_agents_earnings(request: HttpRequest) -> HttpResponse:
+    """
+    Manager Agent Earnings view: show agent performance rankings.
+    
+    Filters:
+    - ?range=today
+    - ?range=7d (last 7 days)
+    - ?range=month (this month, default)
+    - ?range=custom&start=YYYY-MM-DD&end=YYYY-MM-DD
+    """
+    biz = _active_business_from_request(request) or _force_pick_any_membership(request)
+    if not biz:
+        messages.warning(request, "Please choose a business first.")
+        return redirect_manager_safe_choose(request)
+    
+    # Parse date range from query params
+    from datetime import datetime, date
+    
+    now = timezone.now()
+    today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+    
+    range_param = request.GET.get('range', 'month').lower()
+    
+    if range_param == 'today':
+        start_date = today_start
+        end_date = now
+        range_label = 'Today'
+    elif range_param == '7d':
+        start_date = today_start - timedelta(days=7)
+        end_date = now
+        range_label = 'Last 7 Days'
+    elif range_param == 'custom':
+        start_str = request.GET.get('start', '')
+        end_str = request.GET.get('end', '')
+        try:
+            start_d = datetime.strptime(start_str, '%Y-%m-%d').date()
+            end_d = datetime.strptime(end_str, '%Y-%m-%d').date()
+            start_date = timezone.make_aware(datetime.combine(start_d, datetime.min.time()))
+            end_date = timezone.make_aware(datetime.combine(end_d, datetime.max.time()))
+            range_label = f"{start_d.strftime('%b %d')} – {end_d.strftime('%b %d, %Y')}"
+        except (ValueError, TypeError):
+            # Fallback to this month
+            month_start = today_start.replace(day=1)
+            start_date = month_start
+            end_date = now
+            range_label = 'This Month'
+    else:
+        # Default: this month
+        month_start = today_start.replace(day=1)
+        start_date = month_start
+        end_date = now
+        range_label = 'This Month'
+    
+    # Get agent earnings data
+    try:
+        from inventory.services.agent_earnings import get_agent_earnings
+        
+        location = getattr(request, 'active_location', None) or getattr(request, 'location', None)
+        
+        earnings_data = get_agent_earnings(
+            business=biz,
+            start_date=start_date.date() if hasattr(start_date, 'date') else start_date,
+            end_date=end_date.date() if hasattr(end_date, 'date') else end_date,
+            location=location,
+        )
+        
+    except Exception as e:
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.exception("Failed to fetch agent earnings: %s", e)
+        earnings_data = []
+        messages.error(request, f"Error loading earnings data: {e}")
+    
+    # Calculate totals
+    from decimal import Decimal
+    total_revenue = sum((row.total_revenue for row in earnings_data), Decimal('0.00'))
+    total_commission = sum((row.total_commission for row in earnings_data), Decimal('0.00'))
+    total_units = sum((row.units_sold for row in earnings_data), 0)
+    
+    ctx = {
+        "tenant": biz,
+        "business": biz,
+        "earnings_data": earnings_data,
+        "range_key": range_param,
+        "range_label": range_label,
+        "start_date": start_date.date() if hasattr(start_date, 'date') else start_date,
+        "end_date": end_date.date() if hasattr(end_date, 'date') else end_date,
+        "total_revenue": total_revenue,
+        "total_commission": total_commission,
+        "total_units": total_units,
+        "agent_count": len(earnings_data),
+    }
+    
+    # Render template
+    from django.template.loader import select_template
+    from django.http import HttpResponse
+    
+    tpl = select_template([
+        "tenants/manager_agents_earnings.html",
+        "tenants/manager/agents_earnings.html",
+    ])
+    return HttpResponse(tpl.render(ctx, request))

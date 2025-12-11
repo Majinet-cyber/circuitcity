@@ -86,8 +86,9 @@ def get_inventory_kpis(
     )
     total_cogs = Decimal(str(cogs_agg.get("cogs") or 0))
     
-    # 2b. ADMIN COSTS (from WalletTransaction)
+    # 2b. BUSINESS COSTS (from WalletTransaction: admin costs + commissions)
     total_admin_costs = Decimal("0.00")
+    total_commissions = Decimal("0.00")
     
     try:
         from wallet.models import WalletTransaction, Ledger, TxnType
@@ -138,18 +139,48 @@ def get_inventory_kpis(
                 total_admin_costs,
                 period_costs_qs.count(),
             )
+            
+            # Query agent commissions for this business and period
+            # Commissions are stored in AGENT ledger with positive amounts
+            commissions_qs = WalletTransaction.objects.filter(
+                business=business,
+                ledger=Ledger.AGENT,
+                type=TxnType.COMMISSION,
+                effective_date__gte=start_d,
+                effective_date__lte=end_d,
+            )
+            
+            # Sum commissions (they're stored as positive)
+            commissions_agg = commissions_qs.aggregate(
+                total=Coalesce(Sum("amount"), Value(0), output_field=dec2)
+            )
+            total_commissions = Decimal(str(commissions_agg.get("total") or 0))
+            
+            logger.debug(
+                "Commissions for business=%s, period=%s to %s: %s (from %d transactions)",
+                business.id if business else None,
+                start_date,
+                end_date,
+                total_commissions,
+                commissions_qs.count(),
+            )
     
     except ImportError:
-        logger.warning("WalletTransaction not available, admin costs will be 0")
+        logger.warning("WalletTransaction not available, admin costs and commissions will be 0")
     except Exception as e:
-        logger.exception("Error computing admin costs: %s", e)
+        logger.exception("Error computing admin costs and commissions: %s", e)
     
-    # Total costs = COGS + Admin Costs
-    total_costs = total_cogs + total_admin_costs
+    # Total business costs = admin costs + commissions
+    total_business_costs = total_admin_costs + total_commissions
+    
+    # Total costs = COGS + Business Costs (admin costs + commissions)
+    total_costs = total_cogs + total_business_costs
     
     # ================================================================
     # 3. PROFIT = Revenue - Total Costs
     # ================================================================
+    # Profit = revenue - total costs (cost of goods + business costs)
+    # IMPORTANT: Profit MUST be revenue minus costs, not negative costs!
     total_profit = total_revenue - total_costs
     
     # Profit margin percentage
@@ -218,13 +249,14 @@ def get_inventory_kpis(
     # ================================================================
     logger.info(
         "Dashboard KPIs [business=%s, period=%s to %s]: revenue=%s, cogs=%s, admin_costs=%s, "
-        "total_costs=%s, profit=%s, margin=%.1f%%",
+        "commissions=%s, total_costs=%s, profit=%s, margin=%.1f%%",
         business.id if business else None,
         start_date,
         end_date,
         total_revenue,
         total_cogs,
         total_admin_costs,
+        total_commissions,
         total_costs,
         total_profit,
         profit_margin,
@@ -252,6 +284,8 @@ def get_inventory_kpis(
         "total_costs": total_costs,
         "total_cogs": total_cogs,
         "total_admin_costs": total_admin_costs,
+        "total_commissions": total_commissions,
+        "total_business_costs": total_business_costs,
         "total_profit": total_profit,
         "profit_margin": profit_margin,
         

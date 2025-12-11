@@ -31,6 +31,12 @@ from inventory.models_phone_products import PhoneProductCatalog
 from inventory.phone_catalog_seed import get_brands_for_business, get_models_for_brand
 from inventory.verticals import base
 
+# Import Sale model for commission recording
+try:
+    from sales.models import Sale
+except ImportError:
+    Sale = None
+
 
 def _redirect_to_step(step: int) -> HttpResponse:
     """
@@ -412,6 +418,33 @@ def _wizard_step_confirm(request, ctx, business):
             item.order_price = cost_price
         
         item.save()
+        
+        # Create Sale record for commission tracking
+        # This triggers the signal that creates a WalletTransaction for the agent
+        if Sale is not None:
+            try:
+                # Get commission percentage from business config
+                from tenants.utils_commission import get_phone_commission_pct
+                commission_fraction = get_phone_commission_pct(business, is_agent_sale=True)
+                commission_pct = commission_fraction * 100  # Convert to percentage
+                
+                # Determine location (from item or user's active location)
+                location = item.current_location
+                
+                Sale.objects.create(
+                    item=item,
+                    agent=request.user,
+                    location=location,
+                    sold_at=timezone.localdate(),
+                    price=selling_price,
+                    commission_pct=commission_pct,
+                    payment_method=payment_method,
+                )
+            except Exception as e:
+                # Log but don't fail the sale
+                import logging
+                logger = logging.getLogger(__name__)
+                logger.error(f"Failed to create Sale record for IMEI {imei}: {e}")
         
         # Clear wizard session
         _clear_wizard_session(request)

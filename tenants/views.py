@@ -29,6 +29,7 @@ from .utils import (
     user_highest_role,
     user_has_membership,
     redirect_manager_safe_choose,
+    get_business_home_url,
 )
 
 import logging
@@ -280,7 +281,13 @@ def set_active(request: HttpRequest, biz_id) -> HttpResponse:
 
 @login_required
 def choose_business(request: HttpRequest) -> HttpResponse:
-    """Chooser page for users with multiple businesses."""
+    """
+    Chooser page for users with multiple businesses.
+    
+    UPDATED: If user has exactly ONE membership, automatically activate it
+    and redirect to their business home instead of showing the switch UI.
+    Only users with 2+ memberships see the switch UI.
+    """
     user = request.user
 
     if not user.is_superuser:
@@ -296,6 +303,21 @@ def choose_business(request: HttpRequest) -> HttpResponse:
         .select_related("business")
         .order_by("-created_at")
     )
+    
+    # Filter to only ACTIVE businesses
+    memberships_list = [
+        m for m in memberships_qs
+        if getattr(m.business, "status", "ACTIVE") == "ACTIVE"
+    ]
+
+    # AUTO-REDIRECT: If user has exactly ONE membership, set it as active and go to their dashboard
+    if len(memberships_list) == 1 and not user.is_superuser:
+        single_biz = memberships_list[0].business
+        _ensure_seed_on_switch(single_biz)
+        set_active_business(request, single_biz)
+        # Redirect to appropriate business home (phones dashboard for agents)
+        home_url = get_business_home_url(user=user, business=single_biz)
+        return redirect(home_url)
 
     all_active_businesses = None
     if user.is_superuser:
@@ -916,12 +938,14 @@ def accept_invite(request: HttpRequest, token: str) -> HttpResponse:
     except Exception:
         pass
 
+    # Set active business and seed defaults if needed
+    _ensure_seed_on_switch(biz)
     set_active_business(request, biz)
-    messages.success(request, f"Welcome to {biz.name}! Your agent access is active.")
-    try:
-        return redirect("dashboard:home")
-    except Exception:
-        return redirect("/")
+    
+    # Redirect to appropriate business home (phones dashboard preferred for agents)
+    home_url = get_business_home_url(user=request.user, business=biz)
+    messages.success(request, f"You're now part of {biz.name}. Welcome!")
+    return redirect(home_url)
 
 
 # ---------- Inline pages for invite signup / invalid ----------

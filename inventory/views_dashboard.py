@@ -170,6 +170,11 @@ def inventory_dashboard(request: HttpRequest) -> HttpResponse:
         profit_total = kpis.get('total_profit', Decimal('0.00'))
         profit_margin = kpis.get('profit_margin', 0.0)
         
+        # Profit = revenue - total costs (cost of goods + business costs)
+        # Defensive check: Ensure profit is ALWAYS revenue - costs, never just -costs
+        profit_total = total_revenue - costs_total
+        profit_margin = float((profit_total / total_revenue) * 100) if total_revenue > 0 else 0.0
+        
         # Units sold
         total_units = sales_qs.count()
         

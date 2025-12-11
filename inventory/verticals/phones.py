@@ -201,6 +201,11 @@ def dashboard(request):
         profit = kpis.get('total_profit', Decimal('0.00'))
         profit_margin = Decimal(str(kpis.get('profit_margin', 0.0)))
         
+        # Profit = revenue - total costs (cost of goods + business costs)
+        # Defensive check: Ensure profit is ALWAYS revenue - costs, never just -costs
+        profit = revenue - total_costs
+        profit_margin = (profit / revenue * 100) if revenue > 0 else Decimal('0.00')
+        
     except Exception as e:
         # Fallback to direct calculation if Sale model isn't available or service fails
         import logging
@@ -227,6 +232,7 @@ def dashboard(request):
         business_costs = abs(business_costs_sum)
         
         total_costs = cost_of_goods + business_costs
+        # Profit = revenue - total costs (cost of goods + business costs)
         profit = revenue - total_costs
         profit_margin = (profit / revenue * 100) if revenue > 0 else Decimal('0.00')
     
@@ -334,29 +340,56 @@ def dashboard(request):
             "revenue": item['revenue'],
         })
     
-    # --- TOP AGENTS - TOP 5 BY REVENUE (SELECTED RANGE) ---
-    top_agents_query = (
-        range_sales.filter(assigned_agent__isnull=False)
-        .values('assigned_agent__id', 'assigned_agent__first_name', 'assigned_agent__last_name', 'assigned_agent__username')
-        .annotate(
-            units=Count('id'),
-            revenue=Coalesce(Sum('selling_price'), Decimal('0.00'), output_field=DecimalField())
-        )
-        .order_by('-revenue')[:5]
-    )
-    
-    top_agents = []
-    for item in top_agents_query:
-        first_name = item['assigned_agent__first_name'] or ""
-        last_name = item['assigned_agent__last_name'] or ""
-        username = item['assigned_agent__username'] or "Unknown"
-        agent_name = f"{first_name} {last_name}".strip() or username
+    # --- TOP AGENTS - TOP 5 BY COMMISSION (SELECTED RANGE) ---
+    # Use the centralized agent_earnings service for consistency
+    try:
+        from inventory.services.agent_earnings import get_top_agents
         
-        top_agents.append({
-            "agent_name": agent_name,
-            "units": item['units'],
-            "revenue": item['revenue'],
-        })
+        top_agents_data = get_top_agents(
+            business=business,
+            start_date=start_date.date() if hasattr(start_date, 'date') else start_date,
+            end_date=end_date.date() if hasattr(end_date, 'date') else end_date,
+            location=location,
+            limit=5,
+        )
+        
+        top_agents = []
+        for row in top_agents_data:
+            top_agents.append({
+                "agent_name": row.agent_name,
+                "units": row.units_sold,
+                "revenue": row.total_revenue,
+                "commission": row.total_commission,
+            })
+    except Exception as e:
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.warning(f"Failed to use agent_earnings service, falling back to direct query: {e}")
+        
+        # Fallback to direct query if service fails
+        top_agents_query = (
+            range_sales.filter(assigned_agent__isnull=False)
+            .values('assigned_agent__id', 'assigned_agent__first_name', 'assigned_agent__last_name', 'assigned_agent__username')
+            .annotate(
+                units=Count('id'),
+                revenue=Coalesce(Sum('selling_price'), Decimal('0.00'), output_field=DecimalField())
+            )
+            .order_by('-revenue')[:5]
+        )
+        
+        top_agents = []
+        for item in top_agents_query:
+            first_name = item['assigned_agent__first_name'] or ""
+            last_name = item['assigned_agent__last_name'] or ""
+            username = item['assigned_agent__username'] or "Unknown"
+            agent_name = f"{first_name} {last_name}".strip() or username
+            
+            top_agents.append({
+                "agent_name": agent_name,
+                "units": item['units'],
+                "revenue": item['revenue'],
+                "commission": Decimal('0.00'),  # No commission data in fallback
+            })
     
     # --- BEST SALES DAY IN SELECTED RANGE ---
     best_day_query = (

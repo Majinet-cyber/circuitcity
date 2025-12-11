@@ -17,14 +17,61 @@
 {% block body %}
 <div class="container-xxl px-0">
 
+  {# ========== Date Range Filter ========== #}
+  <div class="card shadow-sm border-0 mb-3">
+    <div class="card-body">
+      <div class="d-flex flex-wrap gap-2 align-items-center justify-content-between">
+        <div class="d-flex gap-2 flex-wrap align-items-center">
+          <span class="fw-bold text-muted small">PERIOD:</span>
+          <a href="?range=today" class="btn btn-sm {% if range_key == 'today' %}btn-primary{% else %}btn-outline-secondary{% endif %}" style="border-radius:20px">
+            Today
+          </a>
+          <a href="?range=7d" class="btn btn-sm {% if range_key == '7d' %}btn-primary{% else %}btn-outline-secondary{% endif %}" style="border-radius:20px">
+            Last 7 Days
+          </a>
+          <a href="?range=month" class="btn btn-sm {% if range_key == 'month' %}btn-primary{% else %}btn-outline-secondary{% endif %}" style="border-radius:20px">
+            This Month
+          </a>
+          <button type="button" class="btn btn-sm {% if range_key == 'custom' %}btn-primary{% else %}btn-outline-secondary{% endif %}" style="border-radius:20px" onclick="toggleCustomRange()">
+            Custom
+          </button>
+        </div>
+        <div class="small text-muted">
+          <strong>Showing:</strong> {{ range_label }}
+        </div>
+      </div>
+      
+      {# Custom Date Range Form #}
+      <form method="get" id="customRangeForm" class="mt-3 pt-3 border-top" style="display:{% if range_key == 'custom' %}flex{% else %}none{% endif %};gap:12px;flex-wrap:wrap;align-items:end">
+        <div>
+          <label class="form-label small mb-1">Start Date</label>
+          <input type="date" name="start" value="{{ filter_start|date:'Y-m-d' }}" class="form-control form-control-sm" required>
+        </div>
+        <div>
+          <label class="form-label small mb-1">End Date</label>
+          <input type="date" name="end" value="{{ filter_end|date:'Y-m-d' }}" class="form-control form-control-sm" required>
+        </div>
+        <button type="submit" class="btn btn-primary btn-sm" style="border-radius:20px">
+          <i class="bi bi-check-circle"></i> Apply
+        </button>
+        <input type="hidden" name="range" value="custom">
+      </form>
+    </div>
+  </div>
+
   {# ========== KPIs ========== #}
   <div class="row g-3 mb-3">
     <div class="col-6 col-lg-3">
       <div class="card shadow-sm border-0 h-100 kpi-card">
         <div class="card-body">
-          <div class="label mb-1">Today Earnings</div>
-          <div class="value">MWK {{ agent_summary.today_earnings|default:0|floatformat:0|intcomma }}</div>
-          <div class="sub small">Deductions: MWK {{ agent_summary.today_deductions|default:0|floatformat:0|intcomma }}</div>
+          <div class="label mb-1">{{ range_label }} Earnings</div>
+          {% if my_earnings %}
+            <div class="value" data-cy="wallet-period-earnings">MWK {{ my_earnings.total_commission|default:0|floatformat:0|intcomma }}</div>
+            <div class="sub small">{{ my_earnings.units_sold }} units sold</div>
+          {% else %}
+            <div class="value" data-cy="wallet-period-earnings">MWK 0</div>
+            <div class="sub small">0 units sold</div>
+          {% endif %}
         </div>
       </div>
     </div>
@@ -33,7 +80,7 @@
       <div class="card shadow-sm border-0 h-100 kpi-card">
         <div class="card-body">
           <div class="label mb-1">Month to Date</div>
-          <div class="value">MWK {{ agent_summary.month_total|default:0|floatformat:0|intcomma }}</div>
+          <div class="value" data-cy="wallet-month-to-date">MWK {{ agent_summary.month_total|default:0|floatformat:0|intcomma }}</div>
           <div class="sub small">Deductions: MWK {{ agent_summary.month_deductions|default:0|floatformat:0|intcomma }}</div>
         </div>
       </div>
@@ -43,7 +90,7 @@
       <div class="card shadow-sm border-0 h-100 kpi-card">
         <div class="card-body">
           <div class="label mb-1">All-Time Earnings</div>
-          <div class="value">MWK {{ agent_summary.all_time_total|default:0|floatformat:0|intcomma }}</div>
+          <div class="value" data-cy="wallet-all-time">MWK {{ agent_summary.all_time_total|default:0|floatformat:0|intcomma }}</div>
           <div class="sub small">All-Time Deductions: MWK {{ agent_summary.all_time_deductions|default:0|floatformat:0|intcomma }}</div>
         </div>
       </div>
@@ -53,7 +100,7 @@
       <div class="card shadow-sm border-0 h-100 kpi-card">
         <div class="card-body">
           <div class="label mb-1">Current Balance</div>
-          <div class="value {% if agent_summary.balance|default:0 < 0 %}text-danger{% endif %}">
+          <div class="value {% if agent_summary.balance|default:0 < 0 %}text-danger{% endif %}" data-cy="wallet-current-balance">
             MWK {{ agent_summary.balance|default:0|floatformat:0|intcomma }}
           </div>
           <div class="sub small">Updated {% now "M j, Y" %}</div>
@@ -61,6 +108,21 @@
       </div>
     </div>
   </div>
+  
+  {# ========== My Rank This Period ========== #}
+  {% if my_earnings and my_earnings.rank %}
+  <div class="alert alert-info d-flex align-items-center gap-2 mb-3" role="alert">
+    <i class="bi bi-trophy-fill fs-4"></i>
+    <div>
+      <strong>Your Rank:</strong> 
+      {% if my_earnings.rank == 1 %}🥇 1st
+      {% elif my_earnings.rank == 2 %}🥈 2nd
+      {% elif my_earnings.rank == 3 %}🥉 3rd
+      {% else %}#{{ my_earnings.rank }}{% endif %}
+      for {{ range_label|lower }} with MK {{ my_earnings.total_commission|floatformat:0|intcomma }} in commissions
+    </div>
+  </div>
+  {% endif %}
 
   {# ========== Ranking + Quick Panels ========== #}
   <div class="row g-3 mb-3">
@@ -233,6 +295,16 @@
 {% block extra_js %}
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
 <script>
+// Toggle custom date range form
+function toggleCustomRange() {
+  const form = document.getElementById('customRangeForm');
+  const isHidden = form.style.display === 'none';
+  form.style.display = isHidden ? 'flex' : 'none';
+  if (isHidden) {
+    form.querySelector('input[type="date"]').focus();
+  }
+}
+
 (function(){
   const el = document.getElementById('rankChart');
 

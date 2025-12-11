@@ -1016,6 +1016,56 @@ def agents_home_url(business: Optional["Business"] = None) -> str:
     )
 
 
+def get_business_home_url(user=None, business: Optional["Business"] = None) -> str:
+    """
+    Compute the appropriate business home/dashboard URL for a user.
+    
+    Priority:
+      1) Phones vertical dashboard (if available)
+      2) Inventory dashboard
+      3) Generic dashboard:home
+      4) Root (/)
+    
+    Args:
+        user: Optional user instance (for future role-based routing)
+        business: Optional Business instance (for future vertical detection)
+    
+    Returns:
+        str: The URL path to redirect to
+    """
+    # Try phones vertical dashboard first (most common for agents)
+    url = safe_reverse_many(
+        (
+            "inventory:phones_dashboard",
+            "inventory:verticals_phones",
+            "inventory:dashboard",
+            "dashboard:home",
+        ),
+        default="/",
+    )
+    
+    # If we got a valid URL that's not just root, use it
+    if url and url != "/":
+        return url
+    
+    # Fallback: try to construct the phones vertical URL manually
+    # (in case the URL name doesn't match what we expect)
+    try:
+        from django.urls import reverse
+        # Try common patterns
+        for pattern in [
+            "inventory/verticals/phones/",
+            "inventory/dashboard/",
+            "dashboard/",
+        ]:
+            if pattern:
+                return f"/{pattern.lstrip('/')}"
+    except Exception:
+        pass
+    
+    return "/"
+
+
 __all__ = [
     # session/context
     "set_active_business", "get_active_business", "get_active_business_id",
@@ -1036,5 +1086,5 @@ __all__ = [
     # bootstrap
     "bootstrap_manager_tenant",
     # urls
-    "safe_reverse_many", "agents_home_url",
+    "safe_reverse_many", "agents_home_url", "get_business_home_url",
 ]
