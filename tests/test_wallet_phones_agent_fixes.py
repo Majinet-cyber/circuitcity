@@ -6,6 +6,7 @@ Tests for Phones Agent Wallet 4 Critical Fixes:
 3. No duplicate commission transactions
 4. Ranking works in wallet (not "unavailable")
 5. Payslip updates immediately after sales
+6. Base salary MWK 50,000 per month for Phones agents
 """
 from decimal import Decimal
 from datetime import date, timedelta
@@ -16,7 +17,26 @@ from django.test import TestCase, Client
 from django.urls import reverse
 from django.utils import timezone
 
+from wallet.models import Ledger, TxnType
+
 User = get_user_model()
+
+
+def set_active_business_session(client, business_id, location_id=None):
+    """
+    Set session business/location context to match middleware expectations.
+    
+    This ensures views that depend on session['active_business_id'] work correctly.
+    Uses 'biz_id' (legacy key) that get_active_business() actually reads from.
+    """
+    session = client.session
+    # Match middleware expectations (keys seen in template context)
+    session["active_business_id"] = business_id
+    session["biz_id"] = business_id  # Legacy key that get_active_business() reads
+    if location_id is not None:
+        session["active_location_id"] = location_id
+        session["location_id"] = location_id
+    session.save()
 
 
 @pytest.mark.django_db
@@ -26,10 +46,12 @@ class TestPhonesAgentWalletFixes(TestCase):
     def setUp(self):
         """Set up test data."""
         # Create business
-        from tenants.models import Business, Location, Membership
+        from tenants.models import Business, Membership
+        from inventory.models import Location
         self.business = Business.objects.create(
             name="Test Phones Shop",
             business_kind="phones",
+            status="ACTIVE",  # Required for middleware to auto-select this business
         )
         
         self.location = Location.objects.create(
@@ -52,6 +74,7 @@ class TestPhonesAgentWalletFixes(TestCase):
         self.membership = Membership.objects.create(
             user=self.agent,
             business=self.business,
+            location=self.location,
             role="AGENT",
             status="ACTIVE",
         )
@@ -66,22 +89,38 @@ class TestPhonesAgentWalletFixes(TestCase):
         
         self.client = Client()
     
-    def _create_phone_sale(self, price=Decimal("500000.00"), agent=None):
+    def _create_phone_sale(self, price=Decimal("500000.00"), agent=None, imei=None, product=None):
         """Helper to create a phone sale."""
-        from inventory.models import InventoryItem
+        from inventory.models import InventoryItem, Product
         from sales.models import Sale
+        from uuid import uuid4
         
         if agent is None:
             agent = self.agent
         
-        # Create inventory item
+        # Generate unique identifiers
+        if imei is None:
+            # Generate a unique 15-digit IMEI-like string
+            imei = str(int(uuid4().int % 10**15)).zfill(15)
+        
+        # Create product if not provided (brand, model, variant live on Product, not InventoryItem)
+        if product is None:
+            product = Product.objects.create(
+                code=f"SAM-S21-{uuid4().hex[:8]}",  # Unique code required
+                name="Samsung Galaxy S21",
+                brand="Samsung",
+                model="Galaxy S21",
+                variant="128GB Black",
+                cost_price=Decimal("400000.00"),
+                sale_price=price,
+            )
+        
+        # Create inventory item with product FK
         item = InventoryItem.objects.create(
             business=self.business,
             current_location=self.location,
-            imei="123456789012345",
-            brand="Samsung",
-            model="Galaxy S21",
-            variant="128GB Black",
+            product=product,
+            imei=imei,
             status="SOLD",
             selling_price=price,
             order_price=Decimal("400000.00"),
@@ -264,6 +303,10 @@ class TestPhonesAgentWalletFixes(TestCase):
         sale1, _ = self._create_phone_sale(price=Decimal("500000.00"))
         
         # Create another agent
+        from tenants.models import Membership
+        from inventory.models import Product
+        from uuid import uuid4
+        
         agent2 = User.objects.create_user(
             username="agent2",
             email="agent2@test.com",
@@ -275,14 +318,27 @@ class TestPhonesAgentWalletFixes(TestCase):
         membership2 = Membership.objects.create(
             user=agent2,
             business=self.business,
+            location=self.location,
             role="AGENT",
             status="ACTIVE",
         )
         
-        sale2, _ = self._create_phone_sale(price=Decimal("800000.00"), agent=agent2)
+        # Create unique product for agent2's sale
+        product2 = Product.objects.create(
+            code=f"PHONE-AGENT2-{uuid4().hex[:8]}",
+            name="Test Phone Agent2",
+            brand="Apple",
+            model="iPhone 14",
+            variant="256GB",
+            cost_price=Decimal("700000.00"),
+            sale_price=Decimal("800000.00"),
+        )
+        
+        sale2, _ = self._create_phone_sale(price=Decimal("800000.00"), agent=agent2, product=product2)
         
         # Test API endpoint
-        self.client.login(username="testagent", password="testpass123")
+        self.client.force_login(self.agent)
+        set_active_business_session(self.client, self.business.id, self.location.id)
         
         # Call ranking API
         response = self.client.get(
@@ -324,7 +380,8 @@ class TestPhonesAgentWalletFixes(TestCase):
         sale, item = self._create_phone_sale(price=Decimal("500000.00"))
         
         # Login as agent
-        self.client.login(username="testagent", password="testpass123")
+        self.client.force_login(self.agent)
+        set_active_business_session(self.client, self.business.id, self.location.id)
         
         # Access wallet page
         response = self.client.get(reverse('wallet:agent_wallet'))
@@ -356,23 +413,38 @@ class TestPhonesAgentWalletFixes(TestCase):
             "Current month should appear in payslips"
         )
         
-        # Verify gross amount matches commission
+        # Verify gross amount includes commission + base salary
         expected_commission = Decimal("500000.00") * Decimal("0.03")
+        expected_base_salary = Decimal("50000.00")
+        expected_total = expected_commission + expected_base_salary
         self.assertEqual(
             current_month_payslip.gross,
-            expected_commission,
-            f"Payslip gross should be {expected_commission}"
+            expected_total,
+            f"Payslip gross should be {expected_total} (commission {expected_commission} + base salary {expected_base_salary})"
         )
     
     def test_integration_multiple_sales_correct_totals(self):
         """
         Integration test: Multiple sales should show correct totals.
         """
-        # Create 3 sales
+        from inventory.models import Product
+        from uuid import uuid4
+        
+        # Create 3 sales - create a shared product to avoid unique constraint violations
         prices = [Decimal("500000.00"), Decimal("750000.00"), Decimal("600000.00")]
         
-        for price in prices:
-            self._create_phone_sale(price=price)
+        for i, price in enumerate(prices):
+            # Create unique product for each sale
+            product = Product.objects.create(
+                code=f"PHONE-{uuid4().hex[:8]}",
+                name=f"Test Phone {i}",
+                brand="Samsung",
+                model=f"Model {i}",
+                variant="Test",
+                cost_price=Decimal("400000.00"),
+                sale_price=price,
+            )
+            self._create_phone_sale(price=price, product=product)
         
         # Get earnings
         from inventory.services.agent_earnings import get_agent_earnings
@@ -414,10 +486,15 @@ class TestPhonesAgentWalletFixes(TestCase):
         Test that wallet queries are properly scoped to business (no leakage).
         """
         # Create another business
-        from tenants.models import Business, Location, Membership
+        from tenants.models import Business, Membership
+        from inventory.models import Location
+        from uuid import uuid4
         
+        # Use timestamp or uuid to ensure unique business names/slugs
+        unique_suffix = uuid4().hex[:8]
         business2 = Business.objects.create(
-            name="Another Shop",
+            name=f"Another Shop {unique_suffix}",
+            slug=f"another-shop-{unique_suffix}",
             business_kind="phones",
         )
         
@@ -438,6 +515,7 @@ class TestPhonesAgentWalletFixes(TestCase):
         membership2 = Membership.objects.create(
             user=agent2,
             business=business2,
+            location=location2,
             role="AGENT",
             status="ACTIVE",
         )
@@ -446,16 +524,26 @@ class TestPhonesAgentWalletFixes(TestCase):
         self._create_phone_sale(price=Decimal("500000.00"))
         
         # Create sale in business2
-        from inventory.models import InventoryItem
+        from inventory.models import InventoryItem, Product
         from sales.models import Sale
+        from uuid import uuid4
+        
+        # Create product for business2
+        product2 = Product.objects.create(
+            code=f"IPHONE-14-{uuid4().hex[:8]}",
+            name="iPhone 14 Pro",
+            brand="iPhone",
+            model="14 Pro",
+            variant="256GB",
+            cost_price=Decimal("800000.00"),
+            sale_price=Decimal("1000000.00"),
+        )
         
         item2 = InventoryItem.objects.create(
             business=business2,
             current_location=location2,
+            product=product2,
             imei="999888777666555",
-            brand="iPhone",
-            model="14 Pro",
-            variant="256GB",
             status="SOLD",
             selling_price=Decimal("1000000.00"),
             order_price=Decimal("800000.00"),
@@ -543,3 +631,442 @@ class TestCommissionRateConfiguration(TestCase):
             # CommissionConfig not available, skip
             self.skipTest("CommissionConfig model not available")
 
+
+@pytest.mark.django_db
+class TestPhonesBaseSalary(TestCase):
+    """Test base salary feature for Phones agents."""
+    
+    def setUp(self):
+        """Set up test data."""
+        from tenants.models import Business, Membership
+        from inventory.models import Location
+        import time
+        
+        # Use timestamp for unique business names
+        ts = str(int(time.time() * 1000))[-8:]  # Last 8 digits of timestamp
+        
+        # Create Phones business
+        self.phones_business = Business.objects.create(
+            name=f"Phones Shop {ts}",
+            slug=f"phones-shop-{ts}",
+            business_kind="phones",
+            status="ACTIVE",  # Required for middleware to auto-select this business
+        )
+        
+        self.phones_location = Location.objects.create(
+            name=f"Phones Store {ts}",
+            business=self.phones_business,
+            latitude=Decimal("-15.123"),
+            longitude=Decimal("35.123"),
+        )
+        
+        # Create agent user
+        self.agent = User.objects.create_user(
+            username=f"phoneagent{ts}",
+            email=f"phoneagent{ts}@test.com",
+            password="testpass123",
+            first_name="Phone",
+            last_name="Agent",
+        )
+        
+        # Create agent membership
+        self.membership = Membership.objects.create(
+            user=self.agent,
+            business=self.phones_business,
+            location=self.phones_location,
+            role="AGENT",
+            status="ACTIVE",
+        )
+        
+        # Create non-phones business for comparison
+        self.other_business = Business.objects.create(
+            name=f"Laptop Shop {ts}",
+            slug=f"laptop-shop-{ts}",
+            business_kind="laptops",
+        )
+        
+        self.other_location = Location.objects.create(
+            name=f"Laptop Store {ts}",
+            business=self.other_business,
+            latitude=Decimal("-15.456"),
+            longitude=Decimal("35.456"),
+        )
+        
+        self.client = Client()
+    
+    def test_phone_agent_base_salary_created_once_per_month(self):
+        """
+        Base salary should be created exactly once per month, even with multiple wallet visits.
+        """
+        from wallet.utils_salary import ensure_monthly_base_salary_for_agent
+        from wallet.models import WalletTransaction, TxnType, Ledger
+        
+        today = timezone.localdate()
+        month_key = today.strftime("%Y-%m")
+        
+        # First call - should create base salary
+        txn1 = ensure_monthly_base_salary_for_agent(self.phones_business, self.agent, today)
+        
+        self.assertIsNotNone(txn1, "First call should create base salary transaction")
+        self.assertEqual(txn1.amount, Decimal("50000.00"), "Base salary should be MWK 50,000")
+        self.assertEqual(txn1.type, TxnType.BONUS)
+        self.assertEqual(txn1.meta.get("kind"), "phones_base_salary")
+        self.assertEqual(txn1.meta.get("month"), month_key)
+        
+        # Second call - should return None (idempotent)
+        txn2 = ensure_monthly_base_salary_for_agent(self.phones_business, self.agent, today)
+        
+        self.assertIsNone(txn2, "Second call should return None (idempotent)")
+        
+        # Verify only one base salary transaction exists
+        base_salary_txns = WalletTransaction.objects.filter(
+            ledger=Ledger.AGENT,
+            agent=self.agent,
+            business=self.phones_business,
+            type=TxnType.BONUS,
+            meta__kind="phones_base_salary",
+            meta__month=month_key,
+        )
+        
+        self.assertEqual(
+            base_salary_txns.count(),
+            1,
+            "Should have exactly one base salary transaction per month"
+        )
+    
+    def test_phone_agent_base_salary_not_created_for_non_phone_vertical(self):
+        """
+        Base salary should NOT be created for non-Phones businesses.
+        """
+        from wallet.utils_salary import ensure_monthly_base_salary_for_agent
+        from wallet.models import WalletTransaction
+        
+        # Create agent for non-phones business
+        import time
+        ts_agent = str(int(time.time() * 1000))[-8:]
+        
+        other_agent = User.objects.create_user(
+            username=f"laptopagent{ts_agent}",
+            email=f"laptopagent{ts_agent}@test.com",
+            password="test",
+        )
+        
+        from tenants.models import Membership
+        Membership.objects.create(
+            user=other_agent,
+            business=self.other_business,
+            location=self.other_location,
+            role="AGENT",
+            status="ACTIVE",
+        )
+        
+        # Try to create base salary
+        txn = ensure_monthly_base_salary_for_agent(self.other_business, other_agent)
+        
+        self.assertIsNone(txn, "Should not create base salary for non-Phones business")
+        
+        # Verify no base salary transactions exist
+        base_salary_txns = WalletTransaction.objects.filter(
+            agent=other_agent,
+            meta__kind="phones_base_salary",
+        )
+        
+        self.assertEqual(base_salary_txns.count(), 0)
+    
+    def test_phone_agent_new_month_creates_new_salary_txn(self):
+        """
+        A new month should create a new base salary transaction.
+        """
+        from wallet.utils_salary import ensure_monthly_base_salary_for_agent
+        from wallet.models import WalletTransaction
+        from datetime import timedelta
+        
+        # Current month
+        today = timezone.localdate()
+        txn1 = ensure_monthly_base_salary_for_agent(self.phones_business, self.agent, today)
+        
+        self.assertIsNotNone(txn1, "Should create base salary for current month")
+        
+        # Simulate next month (force "today" to be next month)
+        if today.month == 12:
+            next_month_date = date(today.year + 1, 1, 15)
+        else:
+            next_month_date = date(today.year, today.month + 1, 15)
+        
+        txn2 = ensure_monthly_base_salary_for_agent(self.phones_business, self.agent, next_month_date)
+        
+        self.assertIsNotNone(txn2, "Should create base salary for next month")
+        self.assertNotEqual(txn1.id, txn2.id, "Should be different transactions")
+        
+        # Verify two different month keys
+        self.assertNotEqual(txn1.meta.get("month"), txn2.meta.get("month"))
+        
+        # Verify total count is 2
+        base_salary_txns = WalletTransaction.objects.filter(
+            agent=self.agent,
+            business=self.phones_business,
+            meta__kind="phones_base_salary",
+        )
+        
+        self.assertEqual(base_salary_txns.count(), 2, "Should have 2 base salary txns (one per month)")
+    
+    def test_phone_agent_payslip_includes_base_even_without_sales(self):
+        """
+        Payslip should show MWK 50,000 even if agent has made no sales.
+        """
+        from wallet.utils_salary import ensure_monthly_base_salary_for_agent
+        
+        # Ensure base salary exists
+        ensure_monthly_base_salary_for_agent(self.phones_business, self.agent)
+        
+        # Login as agent
+        self.client.force_login(self.agent)
+        set_active_business_session(self.client, self.phones_business.id, self.phones_location.id)
+        
+        # Access wallet page
+        response = self.client.get(reverse('wallet:agent_wallet'))
+        
+        self.assertEqual(response.status_code, 200)
+        
+        # Check context for payslips
+        payslips = response.context.get('payslips', [])
+        
+        # Should have at least 1 payslip entry
+        self.assertGreater(len(payslips), 0, "Should have at least one payslip")
+        
+        # Check current month payslip
+        current_year = timezone.now().year
+        current_month = timezone.now().month
+        
+        current_month_payslip = None
+        for p in payslips:
+            if p.year == current_year and p.month == current_month:
+                current_month_payslip = p
+                break
+        
+        self.assertIsNotNone(current_month_payslip, "Current month should appear in payslips")
+        
+        # Verify gross includes base salary (MWK 50,000)
+        self.assertGreaterEqual(
+            current_month_payslip.gross,
+            Decimal("50000.00"),
+            "Payslip gross should include base salary of MWK 50,000"
+        )
+    
+    def test_commission_does_not_duplicate_salary(self):
+        """
+        Creating multiple sales should NOT duplicate base salary.
+        Should have 2 commission txns + 1 salary txn (total 3).
+        """
+        from wallet.utils_salary import ensure_monthly_base_salary_for_agent
+        from wallet.models import WalletTransaction, TxnType
+        from inventory.models import InventoryItem
+        from sales.models import Sale
+        
+        # Ensure base salary exists
+        ensure_monthly_base_salary_for_agent(self.phones_business, self.agent)
+        
+        # Create product first
+        from inventory.models import Product
+        
+        product = Product.objects.create(
+            code="SAM-S21-128",
+            name="Samsung Galaxy S21",
+            brand="Samsung",
+            model="Galaxy S21",
+            variant="128GB Black",
+        )
+        
+        # Create 2 sales
+        for i in range(2):
+            item = InventoryItem.objects.create(
+                business=self.phones_business,
+                current_location=self.phones_location,
+                product=product,
+                imei=f"12345678901234{i}",
+                status="SOLD",
+                selling_price=Decimal("500000.00"),
+                order_price=Decimal("400000.00"),
+                assigned_agent=self.agent,
+                sold_at=timezone.now(),
+            )
+            
+            Sale.objects.create(
+                item=item,
+                agent=self.agent,
+                location=self.phones_location,
+                sold_at=timezone.localdate(),
+                price=Decimal("500000.00"),
+                commission_pct=Decimal("3.00"),
+                payment_method="CASH",
+            )
+        
+        # Count commission transactions
+        commission_txns = WalletTransaction.objects.filter(
+            agent=self.agent,
+            business=self.phones_business,
+            type=TxnType.COMMISSION,
+        )
+        
+        self.assertEqual(commission_txns.count(), 2, "Should have 2 commission transactions")
+        
+        # Count base salary transactions
+        base_salary_txns = WalletTransaction.objects.filter(
+            agent=self.agent,
+            business=self.phones_business,
+            type=TxnType.BONUS,
+            meta__kind="phones_base_salary",
+        )
+        
+        self.assertEqual(base_salary_txns.count(), 1, "Should still have only 1 base salary transaction")
+        
+        # Total positive transactions should be 3 (2 commissions + 1 salary)
+        all_positive_txns = WalletTransaction.objects.filter(
+            ledger=Ledger.AGENT,
+            agent=self.agent,
+            business=self.phones_business,
+            amount__gt=0,
+        )
+        
+        self.assertEqual(all_positive_txns.count(), 3, "Should have 3 positive transactions total")
+    
+    def test_agent_wallet_view_calls_ensure_salary(self):
+        """
+        Accessing the agent wallet view should automatically ensure base salary exists.
+        """
+        from unittest.mock import patch
+        from wallet.models import WalletTransaction
+        
+        # Verify no base salary exists yet
+        base_salary_txns = WalletTransaction.objects.filter(
+            agent=self.agent,
+            meta__kind="phones_base_salary",
+        )
+        
+        self.assertEqual(base_salary_txns.count(), 0, "No base salary should exist initially")
+        
+        # Login and access wallet - patch at source (local import in method, not module-level)
+        with patch("wallet.utils_salary.ensure_monthly_base_salary_for_agent") as mocked:
+            # Configure mock to return None (default idempotent behavior)
+            mocked.return_value = None
+            
+            self.client.force_login(self.agent)
+            set_active_business_session(self.client, self.phones_business.id, self.phones_location.id)
+            response = self.client.get(reverse('wallet:agent_wallet'))
+            
+            self.assertEqual(response.status_code, 200)
+            
+            # Verify the function was called (it's imported and called inside the view)
+            mocked.assert_called()
+        
+        # Now call the real view without mocking to verify actual behavior
+        self.client.force_login(self.agent)
+        set_active_business_session(self.client, self.phones_business.id, self.phones_location.id)
+        response = self.client.get(reverse('wallet:agent_wallet'))
+        
+        self.assertEqual(response.status_code, 200)
+        
+        # Now base salary should exist
+        base_salary_txns = WalletTransaction.objects.filter(
+            agent=self.agent,
+            meta__kind="phones_base_salary",
+        )
+        
+        self.assertEqual(
+            base_salary_txns.count(),
+            1,
+            "Base salary should be created automatically on wallet visit"
+        )
+    
+    def test_base_salary_transaction_fields(self):
+        """
+        Verify base salary transaction has correct fields.
+        """
+        from wallet.utils_salary import ensure_monthly_base_salary_for_agent
+        
+        today = timezone.localdate()
+        month_key = today.strftime("%Y-%m")
+        month_start = today.replace(day=1)
+        
+        txn = ensure_monthly_base_salary_for_agent(self.phones_business, self.agent, today)
+        
+        # Check all required fields
+        self.assertEqual(txn.ledger, Ledger.AGENT)
+        self.assertEqual(txn.agent, self.agent)
+        self.assertEqual(txn.business, self.phones_business)
+        self.assertEqual(txn.type, TxnType.BONUS)
+        self.assertEqual(txn.amount, Decimal("50000.00"))
+        self.assertEqual(txn.effective_date, month_start, "Should use month start as effective date")
+        self.assertIn("Base salary", txn.note)
+        self.assertIn("SALARY", txn.reference)
+        
+        # Check meta fields
+        self.assertEqual(txn.meta.get("kind"), "phones_base_salary")
+        self.assertEqual(txn.meta.get("month"), month_key)
+        self.assertEqual(txn.meta.get("amount"), "50000.00")
+    
+    def test_business_isolation_for_base_salary(self):
+        """
+        Base salary should be properly scoped to business (no cross-business leakage).
+        """
+        from wallet.utils_salary import ensure_monthly_base_salary_for_agent
+        from wallet.models import WalletTransaction
+        
+        # Create base salary for phones business
+        txn1 = ensure_monthly_base_salary_for_agent(self.phones_business, self.agent)
+        
+        self.assertIsNotNone(txn1)
+        self.assertEqual(txn1.business, self.phones_business)
+        
+        # Create another phones business
+        from tenants.models import Business, Membership
+        from inventory.models import Location
+        import time
+        
+        ts2 = str(int(time.time() * 1000))[-8:]
+        
+        phones_business2 = Business.objects.create(
+            name=f"Phones Shop 2 {ts2}",
+            slug=f"phones-shop-2-{ts2}",
+            business_kind="phones",
+        )
+        
+        # Create location for second business
+        phones_location2 = Location.objects.create(
+            name="Phones Store 2",
+            business=phones_business2,
+            latitude=Decimal("-15.789"),
+            longitude=Decimal("35.789"),
+        )
+        
+        # Create membership for agent in second business
+        Membership.objects.create(
+            user=self.agent,
+            business=phones_business2,
+            location=phones_location2,
+            role="AGENT",
+            status="ACTIVE",
+        )
+        
+        # Create base salary for second business
+        txn2 = ensure_monthly_base_salary_for_agent(phones_business2, self.agent)
+        
+        self.assertIsNotNone(txn2)
+        self.assertEqual(txn2.business, phones_business2)
+        self.assertNotEqual(txn1.id, txn2.id)
+        
+        # Verify each business has exactly one base salary transaction
+        biz1_txns = WalletTransaction.objects.filter(
+            agent=self.agent,
+            business=self.phones_business,
+            meta__kind="phones_base_salary",
+        )
+        
+        biz2_txns = WalletTransaction.objects.filter(
+            agent=self.agent,
+            business=phones_business2,
+            meta__kind="phones_base_salary",
+        )
+        
+        self.assertEqual(biz1_txns.count(), 1)
+        self.assertEqual(biz2_txns.count(), 1)

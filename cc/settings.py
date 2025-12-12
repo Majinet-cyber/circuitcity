@@ -97,6 +97,8 @@ if ON_RENDER and ".onrender.com" not in ALLOWED_HOSTS and "*.onrender.com" not i
     ALLOWED_HOSTS = list({*ALLOWED_HOSTS, ".onrender.com"})
 if IS_RUNSERVER and "*" not in ALLOWED_HOSTS:
     ALLOWED_HOSTS = list({*ALLOWED_HOSTS, "localhost", "127.0.0.1", "0.0.0.0"})
+if TESTING and "testserver" not in ALLOWED_HOSTS:
+    ALLOWED_HOSTS = list({*ALLOWED_HOSTS, "testserver"})
 
 # CSRF trusted origins
 _default_csrf_fixed = [

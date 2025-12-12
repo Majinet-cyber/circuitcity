@@ -381,8 +381,30 @@ def _create_or_update_payslip_and_txn(
     first, last = _month_bounds(year, month)
     breakdown = _compute_breakdown(agent, first, last)
 
-    # Components â€” base salary default can be configured via settings
-    base_salary = Decimal(getattr(settings, "WALLET_BASE_SALARY", "40000") or "0")
+    # Components â€" base salary is computed from wallet transactions
+    # For Phones agents, this will include the MWK 50,000 base salary transaction
+    # For others, falls back to settings default
+    from .utils_salary import get_base_salary_for_month
+    from tenants.utils import get_active_business
+    
+    # Try to get business from agent's profile/membership
+    try:
+        from tenants.models import Membership
+        membership = Membership.objects.filter(
+            user=agent,
+            role="AGENT",
+            status="ACTIVE"
+        ).first()
+        biz = membership.business if membership else None
+    except Exception:
+        biz = None
+    
+    base_salary = get_base_salary_for_month(biz, agent, year, month) if biz else Decimal("0")
+    
+    # Fallback to settings default if no base salary transaction exists
+    if base_salary == Decimal("0"):
+        base_salary = Decimal(getattr(settings, "WALLET_BASE_SALARY", "40000") or "0")
+    
     commission = breakdown["commission"]
     bonuses_fees = breakdown["bonus"]
     deductions = -(breakdown["neg_total"])  # convert to positive
@@ -490,6 +512,10 @@ class AgentWalletView(LoginRequiredMixin, TemplateView):
         u = self.request.user
         biz = get_active_business(self.request)
 
+        # Ensure base salary for Phones agents (idempotent)
+        from .utils_salary import ensure_monthly_base_salary_for_agent
+        ensure_monthly_base_salary_for_agent(biz, u)
+
         # Parse date range from query params for filtered earnings view
         from datetime import datetime, timedelta
         
@@ -565,21 +591,32 @@ class AgentWalletView(LoginRequiredMixin, TemplateView):
         from datetime import datetime
         from collections import defaultdict
         
-        # Get all commission transactions grouped by month
-        commission_txns = WalletTransaction.objects.filter(
+        # Get all positive transactions (commissions + bonuses including base salary) grouped by month
+        earning_txns = WalletTransaction.objects.filter(
             ledger=Ledger.AGENT,
             agent=u,
-            type=TxnType.COMMISSION,
+            type__in=[TxnType.COMMISSION, TxnType.BONUS],
             amount__gt=0
-        ).order_by('-effective_date')[:100]  # Last 100 commissions
+        ).order_by('-effective_date')[:200]  # Last 200 transactions
+        
+        # Get all deductions
+        deduction_txns = WalletTransaction.objects.filter(
+            ledger=Ledger.AGENT,
+            agent=u,
+            amount__lt=0
+        ).order_by('-effective_date')[:100]  # Last 100 deductions
         
         # Group by year-month
         monthly_earnings = defaultdict(lambda: {'gross': Decimal('0'), 'deductions': Decimal('0'), 'count': 0})
         
-        for txn in commission_txns:
+        for txn in earning_txns:
             year_month = (txn.effective_date.year, txn.effective_date.month)
             monthly_earnings[year_month]['gross'] += txn.amount
             monthly_earnings[year_month]['count'] += 1
+        
+        for txn in deduction_txns:
+            year_month = (txn.effective_date.year, txn.effective_date.month)
+            monthly_earnings[year_month]['deductions'] += abs(txn.amount)
         
         # Also check for formal Payslip records (manager-issued)
         formal_payslips = Payslip.objects.filter(agent=u).order_by("-year", "-month")[:5]

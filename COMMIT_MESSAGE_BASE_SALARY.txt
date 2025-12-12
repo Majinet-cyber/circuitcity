@@ -1,0 +1,85 @@
+feat(wallet): Add MWK 50,000 monthly base salary for Phones agents
+
+Implement automatic base salary feature for Phones vertical agents:
+- MWK 50,000 credited at the start of each month
+- Exactly 1 base salary transaction per agent per business per month
+- Idempotent (no duplicates on wallet refresh or multiple sales)
+- Timezone-aware month boundaries
+- No database migrations required
+
+## Implementation Details
+
+### New Module: wallet/utils_salary.py
+- ensure_monthly_base_salary_for_agent(): Creates base salary txn if needed
+- get_base_salary_for_month(): Retrieves base salary for payslip generation
+- Only runs for Phones vertical (business_kind="phones")
+- Only runs for active AGENT memberships
+- Uses TxnType.BONUS with meta.kind="phones_base_salary"
+
+### Modified: wallet/views.py
+1. AgentWalletView: Call ensure_monthly_base_salary_for_agent() on page load
+2. Dynamic payslips: Include bonus transactions (base salary) in gross calculation
+3. Formal payslips: Use get_base_salary_for_month() instead of hardcoded setting
+
+### Tests: tests/test_wallet_phones_agent_fixes.py
+Added TestPhonesBaseSalary with 8 comprehensive tests:
+- test_phone_agent_base_salary_created_once_per_month
+- test_phone_agent_base_salary_not_created_for_non_phone_vertical
+- test_phone_agent_new_month_creates_new_salary_txn
+- test_phone_agent_payslip_includes_base_even_without_sales
+- test_commission_does_not_duplicate_salary
+- test_agent_wallet_view_calls_ensure_salary
+- test_base_salary_transaction_fields
+- test_business_isolation_for_base_salary
+
+### Cypress: cypress/e2e/phones_agent_invite_flow.cy.js
+Updated earnings assertion to expect MWK 65,000 (50k base + 15k commission)
+instead of MWK 15,000 (commission only)
+
+## Payslip Formula
+
+**Phones agents (new):**
+```
+monthly_gross = 50,000 (base salary txn) + commissions + other bonuses
+monthly_net = monthly_gross - deductions
+```
+
+**Other agents (unchanged):**
+```
+monthly_gross = 40,000 (setting) + commissions
+monthly_net = monthly_gross - deductions
+```
+
+## Key Features
+
+✅ Idempotent: Multiple calls don't create duplicates
+✅ Month boundaries: New transaction each month (uses "YYYY-MM" key)
+✅ Business scoped: Proper multi-tenant isolation
+✅ No migrations: Uses existing WalletTransaction + meta JSON
+✅ Vertical-specific: Only Phones, not laptops/electronics
+✅ Real-time updates: Payslip shows immediately
+✅ Ranking unaffected: Base salary is bonus, not commission
+
+## Technical Implementation
+
+- Transaction type: TxnType.BONUS (avoids new enum)
+- Identification: meta.kind="phones_base_salary"
+- Month tracking: meta.month="YYYY-MM"
+- Effective date: First day of month (consistent grouping)
+- Amount: Decimal("50000.00")
+- Business check: business.business_kind == "phones"
+- Role check: Membership with role="AGENT", status="ACTIVE"
+
+## Rollback
+
+No database migration needed. To disable:
+1. Comment out ensure_monthly_base_salary_for_agent() call in AgentWalletView
+2. Existing transactions remain in DB (filterable via meta.kind)
+
+## Documentation
+
+- WALLET_BASE_SALARY_IMPLEMENTATION.md: Full technical documentation
+- WALLET_BASE_SALARY_SUMMARY.md: Implementation summary with diffs
+
+Closes: [TICKET_NUMBER]
+
