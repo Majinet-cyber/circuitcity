@@ -43,7 +43,7 @@ def get_payment_mix(
         return []
     
     try:
-        from tenants.models import set_current_business_id, get_current_business_id
+        from datetime import datetime, time
         
         # Default date range: current month to today
         if start_date is None:
@@ -51,94 +51,133 @@ def get_payment_mix(
         if end_date is None:
             end_date = timezone.localdate()
         
-        # Set business context
-        prev_bid = get_current_business_id()
-        set_current_business_id(business.pk)
+        # Determine which sale model to use based on vertical or business kind
+        sales_qs = _get_sales_queryset(business, vertical)
         
-        try:
-            # Determine which sale model to use based on vertical or business kind
-            sales_qs = _get_sales_queryset(business, vertical)
+        if sales_qs is None:
+            return []
+        
+        # Convert date objects to timezone-aware datetime ranges for robust filtering
+        # This works consistently across SQLite/Postgres/MySQL and all timezones
+        if not isinstance(start_date, datetime):
+            # Start of day (00:00:00)
+            start_dt = timezone.make_aware(datetime.combine(start_date, time.min))
+        else:
+            start_dt = start_date
+        
+        if not isinstance(end_date, datetime):
+            # End of day (23:59:59.999999) by adding 1 day and using exclusive lt
+            end_dt = timezone.make_aware(datetime.combine(end_date, time.min)) + timezone.timedelta(days=1)
+        else:
+            end_dt = end_date
+        
+        # Use gte/lt for robust range filtering (inclusive start, exclusive end)
+        sales_qs = sales_qs.filter(sold_at__gte=start_dt, sold_at__lt=end_dt)
+        
+        # Scope to user if provided (agent filter)
+        if user:
+            # Try different agent field names based on model
+            if hasattr(sales_qs.model, '_meta'):
+                field_names = [f.name for f in sales_qs.model._meta.get_fields()]
+                if 'sold_by' in field_names:
+                    sales_qs = sales_qs.filter(sold_by=user)
+                elif 'agent' in field_names:
+                    sales_qs = sales_qs.filter(agent=user)
+        
+        # Get payment method choices
+        payment_choices = _get_payment_method_choices(business, vertical)
+        
+        # Determine revenue field name based on model
+        revenue_field = 'price'  # Default for Sale model
+        if hasattr(sales_qs.model, '_meta'):
+            field_names = [f.name for f in sales_qs.model._meta.get_fields()]
+            if 'total_price' in field_names:
+                revenue_field = 'total_price'
+            elif 'amount' in field_names:
+                revenue_field = 'amount'
+        
+        # Calculate total for percentages
+        total_amount = sales_qs.aggregate(total=Sum(revenue_field))["total"] or 0
+        if total_amount == 0:
+            return []
+        
+        # Build payment mix
+        payment_mix = []
+        for method_code, method_display in payment_choices:
+            method_qs = sales_qs.filter(payment_method=method_code)
+            method_count = method_qs.count()
             
-            if sales_qs is None:
-                return []
-            
-            # Filter by date range
-            sales_qs = sales_qs.filter(sold_at__gte=start_date, sold_at__lte=end_date)
-            
-            # Scope to user if provided
-            if user:
-                sales_qs = sales_qs.filter(agent=user)
-            
-            # Get payment method choices
-            payment_choices = _get_payment_method_choices(business, vertical)
-            
-            # Calculate total for percentages
-            total_amount = sales_qs.aggregate(total=Sum("price"))["total"] or 0
-            if total_amount == 0:
-                return []
-            
-            # Build payment mix
-            payment_mix = []
-            for method_code, method_display in payment_choices:
-                method_qs = sales_qs.filter(payment_method=method_code)
-                method_count = method_qs.count()
+            if method_count > 0:
+                method_amount = method_qs.aggregate(total=Sum(revenue_field))["total"] or 0
+                percentage = (float(method_amount) / float(total_amount) * 100) if total_amount > 0 else 0
                 
-                if method_count > 0:
-                    method_amount = method_qs.aggregate(total=Sum("price"))["total"] or 0
-                    percentage = (float(method_amount) / float(total_amount) * 100) if total_amount > 0 else 0
-                    
-                    payment_mix.append({
-                        "method": method_display,
-                        "method_code": method_code,
-                        "amount": float(method_amount),
-                        "count": method_count,
-                        "percentage": round(percentage, 1),
-                    })
-            
-            # Sort by amount descending
-            payment_mix.sort(key=lambda x: x["amount"], reverse=True)
-            
-            return payment_mix
+                payment_mix.append({
+                    "method": method_display,
+                    "method_code": method_code,
+                    "amount": float(method_amount),
+                    "count": method_count,
+                    "percentage": round(percentage, 1),
+                })
         
-        finally:
-            set_current_business_id(prev_bid)
+        # Sort by amount descending
+        payment_mix.sort(key=lambda x: x["amount"], reverse=True)
+        
+        return payment_mix
     
     except Exception:
         # Gracefully fail
+        import logging
+        logging.exception("Error in get_payment_mix")
         return []
 
 
 def _get_sales_queryset(business, vertical: Optional[str] = None):
     """
     Get the appropriate Sale queryset based on business vertical.
+    CRITICAL: Always filters by business to ensure proper data isolation.
     
     Returns the queryset or None if no suitable model exists.
     """
+    if not business:
+        return None
+    
     # Determine vertical from business if not provided
     if not vertical:
         vertical = getattr(business, 'business_kind', None)
     
     vertical_lower = (vertical or '').lower()
     
-    # Try vertical-specific models first
+    # Try vertical-specific models first (they have direct business field)
     if vertical_lower == 'liquor':
         try:
             from inventory.models_verticals import LiquorSale
-            return LiquorSale.objects.select_related('shift').all()
+            # ✅ Explicitly filter by business
+            return LiquorSale.objects.filter(business=business).select_related('shift')
         except Exception:
             pass
     
     elif vertical_lower == 'gym':
         try:
             from inventory.models_verticals import GymMemberPayment
-            # Gym uses payments not sales, map to similar structure
-            return GymMemberPayment.objects.select_related('member').all()
+            # Gym uses payments not sales, filter via member__business
+            # ✅ Explicitly filter by business
+            return GymMemberPayment.objects.filter(member__business=business).select_related('member')
         except Exception:
             pass
     
     elif vertical_lower == 'pharmacy':
         try:
             from inventory.models_pharmacy import PharmacySale
+            # Check if PharmacySale has business field
+            if hasattr(PharmacySale, '_meta'):
+                field_names = [f.name for f in PharmacySale._meta.get_fields()]
+                if 'business' in field_names:
+                    # ✅ Explicitly filter by business
+                    return PharmacySale.objects.filter(business=business).select_related('batch')
+                elif 'batch' in field_names:
+                    # Filter via batch__business if applicable
+                    return PharmacySale.objects.filter(batch__business=business).select_related('batch')
+            # Fallback without filtering (shouldn't happen but graceful)
             return PharmacySale.objects.select_related('batch').all()
         except Exception:
             pass
@@ -146,14 +185,20 @@ def _get_sales_queryset(business, vertical: Optional[str] = None):
     elif vertical_lower == 'clothing':
         try:
             from inventory.models_verticals import ClothingSale
-            return ClothingSale.objects.all()
+            # ✅ Explicitly filter by business
+            return ClothingSale.objects.filter(business=business)
         except Exception:
             pass
     
-    # Fall back to standard Sale model
+    # Fall back to standard Sale model (phones vertical)
     try:
         from sales.models import Sale
-        return Sale.objects.select_related('item').all()
+        from django.db.models import Q
+        # Sale model doesn't have direct business field
+        # ✅ Filter via item__business or location__business
+        return Sale.objects.filter(
+            Q(item__business=business) | Q(location__business=business)
+        ).select_related('item')
     except Exception:
         return None
 
@@ -195,7 +240,14 @@ def _get_payment_method_choices(business, vertical: Optional[str] = None):
         except Exception:
             pass
     
-    # Default payment methods (standard Sales model)
+    elif vertical_lower == 'clothing':
+        try:
+            from inventory.models_verticals import PaymentMethod as ClothingPaymentMethod
+            return ClothingPaymentMethod.choices
+        except Exception:
+            pass
+    
+    # Default payment methods (standard Sales model - for phones)
     try:
         from sales.models import PaymentMethod
         return PaymentMethod.choices

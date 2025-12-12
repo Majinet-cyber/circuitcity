@@ -96,23 +96,60 @@ def admin_cost_list(request: HttpRequest) -> HttpResponse:
     # Get cost summary for the period
     cost_summary = get_business_costs_for_period(business, period=period)
     
-    # Get detailed breakdown
+    # Get detailed breakdown with defensive handling
     breakdown = get_cost_breakdown_by_category(
         business,
         cost_summary['period_start'],
         cost_summary['period_end']
     )
+    # Defensive: ensure breakdown has expected keys
+    breakdown = breakdown or {}
+    
+    # Get all costs as WalletTransaction objects for templates that expect direct model access
+    # Defensive: use .none() if no business (though we already checked above)
+    if business:
+        all_costs_qs = WalletTransaction.objects.filter(
+            business=business,
+            ledger=Ledger.COMPANY,
+            type__in=[TxnType.COST_ONCE_OFF, TxnType.COST_RECURRING]
+        ).order_by('-created_at')
+    else:
+        all_costs_qs = WalletTransaction.objects.none()
+    
+    # Get subscription safely (may not exist)
+    subscription = None
+    try:
+        subscription = business.subscription
+    except Exception:
+        subscription = None
+    
+    # Get membership safely (may not exist)
+    membership = None
+    try:
+        from tenants.models import Membership
+        membership = Membership.objects.filter(
+            user=request.user,
+            business=business,
+            status='ACTIVE'
+        ).first()
+    except Exception:
+        membership = None
     
     context = {
         'business': business,
         'period': period,
         'cost_summary': cost_summary,
-        'fixed_costs': breakdown['fixed'],
-        'variable_costs': breakdown['variable'],
-        'fixed_total': breakdown['fixed_total'],
-        'variable_total': breakdown['variable_total'],
+        'fixed_costs': breakdown.get('fixed') or [],
+        'variable_costs': breakdown.get('variable') or [],
+        'fixed_total': breakdown.get('fixed_total') or Decimal('0'),
+        'variable_total': breakdown.get('variable_total') or Decimal('0'),
+        'costs': all_costs_qs,  # For templates that expect a 'costs' variable
+        'show_search': False,  # Don't show global search bar on this page
+        'subscription': subscription,  # Safe default for base template
+        'membership': membership,  # Safe default for base template
     }
     
+    # Explicitly render the app-specific template to avoid ambiguity
     return render(request, 'wallet/admin_costs.html', context)
 
 
