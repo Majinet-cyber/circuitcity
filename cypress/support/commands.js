@@ -1,7 +1,7 @@
 // ***********************************************
 // Custom Cypress commands for CircuitCity / Emajinet
 // - Managers have fixed creds per vertical
-// - Agents are CREATED in tests and MUST be passed explicitly
+// - Agents are CREATED in tests and MUST be passed explicitly (or stored via setAgentCreds)
 // ***********************************************
 
 const DEFAULT_MANAGER_PASSWORD = "@Lincoln1863?";
@@ -20,20 +20,21 @@ const DEFAULT_MANAGER_EMAILS = {
  * {
  *   "MANAGER_CREDS": {
  *     "clothing": { "email": "motouch@gmail.com", "password": "@Lincoln1863?" },
- *     "phones":   { "email": "empire@gmai.com",  "password": "@Lincoln1863?" }
+ *     "phones":   { "email": "empire@gmail.com",  "password": "@Lincoln1863?" }
  *   }
  * }
  */
 function getManagerCreds(kind = "phones") {
   const env = Cypress.env("MANAGER_CREDS") || {};
+  const k = String(kind || "phones").toLowerCase();
 
   const email =
-    env?.[kind]?.email ||
-    DEFAULT_MANAGER_EMAILS[kind] ||
+    env?.[k]?.email ||
+    DEFAULT_MANAGER_EMAILS[k] ||
     DEFAULT_MANAGER_EMAILS.phones;
 
   const password =
-    env?.[kind]?.password ||
+    env?.[k]?.password ||
     Cypress.env("MANAGER_PASSWORD") ||
     Cypress.env("TEST_PASSWORD") ||
     DEFAULT_MANAGER_PASSWORD;
@@ -48,17 +49,19 @@ function getManagerCreds(kind = "phones") {
  *   cy.getAgentCreds("clothing").then(({email,password}) => cy.loginAsAgent(email,password))
  */
 Cypress.Commands.add("setAgentCreds", (kind, creds) => {
-  const key = `AGENT_CREDS_${kind}`;
+  const k = String(kind || "").toLowerCase();
+  const key = `AGENT_CREDS_${k}`;
   Cypress.env(key, creds);
 });
 
 Cypress.Commands.add("getAgentCreds", (kind) => {
-  const key = `AGENT_CREDS_${kind}`;
+  const k = String(kind || "").toLowerCase();
+  const key = `AGENT_CREDS_${k}`;
   const creds = Cypress.env(key);
 
   if (!creds?.email || !creds?.password) {
     throw new Error(
-      `No agent creds stored for "${kind}". Create an agent in the test, then call cy.setAgentCreds("${kind}", {email, password}).`
+      `No agent creds stored for "${k}". Create an agent in the test, then call cy.setAgentCreds("${k}", {email, password}).`
     );
   }
 
@@ -118,7 +121,7 @@ Cypress.Commands.add("login", (email, password) => {
   })
     .first()
     .clear()
-    .type(password);
+    .type(password, { log: false });
 
   // Submit
   cy.get('button[type="submit"], [data-cy=login-submit]', { timeout: 30000 })
@@ -171,6 +174,36 @@ Cypress.Commands.add("loginAsAgent", (email, password) => {
 });
 
 /**
+ * ✅ NEW: Unified login helper used by your clothing sidebar test
+ * Usage:
+ *   cy.loginAs("clothing", "manager")
+ *   cy.loginAs("phones", "owner")
+ *   cy.loginAs("clothing", "agent") // uses stored agent creds via setAgentCreds()
+ *   cy.loginAs("clothing", "agent", "email", "pass") // explicit
+ */
+Cypress.Commands.add("loginAs", (kind = "phones", role = "owner", email, password) => {
+  const k = String(kind || "phones").toLowerCase();
+  const r = String(role || "owner").toLowerCase();
+
+  if (r === "owner") {
+    return cy.loginAsOwner();
+  }
+
+  if (r === "manager") {
+    return cy.loginAsManager(k);
+  }
+
+  if (r === "agent") {
+    if (email && password) {
+      return cy.loginAsAgent(email, password);
+    }
+    return cy.getAgentCreds(k).then((creds) => cy.loginAsAgent(creds.email, creds.password));
+  }
+
+  throw new Error(`Unknown role "${role}". Use "owner" | "manager" | "agent".`);
+});
+
+/**
  * Select business if on chooser page.
  */
 Cypress.Commands.add("selectBusiness", (businessName) => {
@@ -185,14 +218,16 @@ Cypress.Commands.add("selectBusiness", (businessName) => {
  * Select a business by vertical kind if on chooser.
  */
 Cypress.Commands.add("selectBusinessByKind", (kind) => {
+  const k = String(kind || "").toLowerCase();
+
   cy.url().then((url) => {
     if (url.includes("/choose") || url.includes("/select") || url.includes("/business")) {
       cy.get("body").then(($body) => {
-        const cySel = `[data-cy="business-${kind}"]`;
+        const cySel = `[data-cy="business-${k}"]`;
         if ($body.find(cySel).length) {
           cy.get(cySel).first().click();
         } else {
-          cy.contains(new RegExp(kind, "i")).first().click();
+          cy.contains(new RegExp(k, "i")).first().click();
         }
       });
     }
@@ -203,6 +238,8 @@ Cypress.Commands.add("selectBusinessByKind", (kind) => {
  * Visit a vertical dashboard (tries common routes safely).
  */
 Cypress.Commands.add("visitDashboard", (kind) => {
+  const k = String(kind || "").toLowerCase();
+
   const candidates = {
     clothing: ["/verticals/clothing/dashboard/", "/inventory/verticals/clothing/"],
     phones: ["/inventory/dashboard/", "/verticals/phones/dashboard/", "/inventory/verticals/phones/"],
@@ -211,7 +248,7 @@ Cypress.Commands.add("visitDashboard", (kind) => {
     pharmacy: ["/inventory/pharmacy/dashboard/", "/verticals/pharmacy/dashboard/"],
   };
 
-  const urls = candidates[kind] || ["/dashboard/"];
+  const urls = candidates[k] || ["/dashboard/"];
 
   const tryNext = (idx) => {
     const url = urls[idx];
@@ -285,21 +322,21 @@ Cypress.Commands.add("fillField", (labelOrCy, value) => {
 
   cy.get("body").then(($body) => {
     if ($body.find(cySel).length) {
-      cy.get(cySel).first().clear().type(value);
+      cy.get(cySel).first().clear().type(String(value ?? ""));
       return;
     }
 
     cy.contains("label", labelOrCy).then(($label) => {
       const inputId = $label.attr("for");
       if (inputId) {
-        cy.get(`#${inputId}`).clear().type(value);
+        cy.get(`#${inputId}`).clear().type(String(value ?? ""));
       } else {
         cy.wrap($label)
           .parent()
           .find("input, textarea, select")
           .first()
           .clear()
-          .type(value);
+          .type(String(value ?? ""));
       }
     });
   });
