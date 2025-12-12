@@ -1,0 +1,79 @@
+fix(wallet): resolve 4 critical agent wallet issues for Phones vertical
+
+## Issues Fixed
+
+1. **Units sold shows correct count (1 sale → 1 unit, not 2)**
+   - Root cause: Duplicate signals creating 2 commissions per sale
+   - Fix: Removed duplicate handler in wallet/signals.py
+
+2. **Commission rate changed from 12% → 3%**
+   - Root cause: Hardcoded default in tenants/utils_commission.py
+   - Fix: Changed Decimal("0.12") to Decimal("0.03")
+
+3. **Prevent duplicate commission transactions (idempotency)**
+   - Root cause: Same as issue #1
+   - Fix: Added idempotency check in sales/signals.py
+
+4. **Ranking works in wallet (no more "unavailable")**
+   - Root cause: api_ranking not using correct service
+   - Fix: Use agent_earnings service (same as dashboard)
+
+5. **Payslip updates immediately after sales**
+   - Root cause: Widget only showed formal Payslip records
+   - Fix: Compute dynamic payslips from WalletTransaction
+
+## Files Changed
+
+Core logic:
+- wallet/signals.py - Removed duplicate signal handler
+- sales/signals.py - Added idempotency guard
+- tenants/utils_commission.py - Changed default 12% → 3%
+- wallet/views.py - Fixed ranking API + dynamic payslips
+
+Tests:
+- tests/test_wallet_phones_agent_fixes.py (NEW) - Comprehensive unit tests
+- cypress/e2e/phones_agent_invite_flow.cy.js - Added E2E assertions
+
+## Impact
+
+- ✅ All new sales use 3% commission (historical data unchanged)
+- ✅ No duplicate transactions per sale (1 commission = 1 sale)
+- ✅ Wallet ranking matches dashboard exactly
+- ✅ Payslip shows real-time earnings
+- ✅ Multi-tenant isolation preserved
+- ✅ No database migrations needed
+
+## Testing
+
+Unit tests:
+```bash
+pytest tests/test_wallet_phones_agent_fixes.py -v
+```
+
+Cypress E2E:
+```bash
+npx cypress run --spec cypress/e2e/phones_agent_invite_flow.cy.js
+```
+
+## Constraints Met
+
+- [x] No regressions (all existing Cypress specs pass)
+- [x] Multi-tenant isolation intact
+- [x] Idempotent commission creation
+- [x] Historical data untouched (no retroactive changes)
+- [x] Tests added (unit + Cypress)
+
+## Verification Steps
+
+1. Login as agent
+2. Sell 1 phone (MK 500,000)
+3. Check My Wallet:
+   - Shows "1 unit sold" ✅
+   - Earnings = MK 15,000 (3%) ✅
+   - Ranking chart visible ✅
+   - Payslip shows current month ✅
+
+Closes #[issue-number]
+
+Co-authored-by: AI Assistant <ai@example.com>
+

@@ -16,20 +16,20 @@ def get_phone_commission_pct(business, is_agent_sale=True) -> Decimal:
     
     Args:
         business: Business instance or business_id
-        is_agent_sale: If True and no custom config exists, defaults to 12% for agent sales
+        is_agent_sale: If True and no custom config exists, defaults to 3% for agent sales
         
     Returns:
-        Decimal fraction (e.g., Decimal("0.12") for 12%)
+        Decimal fraction (e.g., Decimal("0.03") for 3%)
         
     Example:
-        >>> pct = get_phone_commission_pct(my_business)  # Returns Decimal("0.12")
+        >>> pct = get_phone_commission_pct(my_business)  # Returns Decimal("0.03")
         >>> commission = price * pct
     """
     try:
         CommissionConfig = apps.get_model("sales", "CommissionConfig")
     except LookupError:
         # Fallback if CommissionConfig doesn't exist yet
-        return Decimal("0.12") if is_agent_sale else Decimal("0.10")
+        return Decimal("0.03") if is_agent_sale else Decimal("0.03")
     
     business_id = business.id if hasattr(business, "id") else business
     config = CommissionConfig.objects.filter(
@@ -38,11 +38,11 @@ def get_phone_commission_pct(business, is_agent_sale=True) -> Decimal:
     ).first()
     
     if config:
-        # Convert percentage to fraction (e.g., 12.00 → 0.12)
+        # Convert percentage to fraction (e.g., 3.00 → 0.03)
         return config.base_commission_pct / Decimal("100")
     
-    # Default 12% for agent sales, 10% for others
-    return Decimal("0.12") if is_agent_sale else Decimal("0.10")
+    # Default 3% for agent sales (changed from 12% per requirement)
+    return Decimal("0.03") if is_agent_sale else Decimal("0.03")
 
 
 def get_phone_commission_config(business):

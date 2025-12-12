@@ -558,9 +558,61 @@ class AgentWalletView(LoginRequiredMixin, TemplateView):
 
         # Scope tenant-aware lists where possible
         bqs = BudgetRequest.objects.filter(agent=u).order_by("-created_at")
-        pqs = Payslip.objects.filter(agent=u).order_by("-year", "-month")
         ctx["budgets"] = bqs[:5]
-        ctx["payslips"] = pqs[:5]
+        
+        # Compute dynamic payslips from wallet transactions (so they update immediately)
+        # This provides real-time visibility into earnings without waiting for manager to issue payslip
+        from datetime import datetime
+        from collections import defaultdict
+        
+        # Get all commission transactions grouped by month
+        commission_txns = WalletTransaction.objects.filter(
+            ledger=Ledger.AGENT,
+            agent=u,
+            type=TxnType.COMMISSION,
+            amount__gt=0
+        ).order_by('-effective_date')[:100]  # Last 100 commissions
+        
+        # Group by year-month
+        monthly_earnings = defaultdict(lambda: {'gross': Decimal('0'), 'deductions': Decimal('0'), 'count': 0})
+        
+        for txn in commission_txns:
+            year_month = (txn.effective_date.year, txn.effective_date.month)
+            monthly_earnings[year_month]['gross'] += txn.amount
+            monthly_earnings[year_month]['count'] += 1
+        
+        # Also check for formal Payslip records (manager-issued)
+        formal_payslips = Payslip.objects.filter(agent=u).order_by("-year", "-month")[:5]
+        
+        # Build unified payslip list
+        payslip_list = []
+        
+        # Add formal payslips first
+        formal_months = set()
+        for p in formal_payslips:
+            payslip_list.append(p)
+            formal_months.add((p.year, p.month))
+        
+        # Add dynamic computed payslips for months without formal payslips
+        for (year, month), data in sorted(monthly_earnings.items(), reverse=True)[:5]:
+            if (year, month) not in formal_months:
+                # Create a temporary payslip-like object
+                class DynamicPayslip:
+                    def __init__(self, year, month, gross, deductions, count):
+                        self.year = year
+                        self.month = month
+                        self.gross = gross
+                        self.deductions = deductions
+                        self.net = gross - deductions
+                        self.pdf = None
+                        self.is_dynamic = True
+                        self.txn_count = count
+                
+                payslip_list.append(DynamicPayslip(year, month, data['gross'], data['deductions'], data['count']))
+        
+        # Sort by year/month descending and limit to 5
+        payslip_list.sort(key=lambda p: (p.year, p.month), reverse=True)
+        ctx["payslips"] = payslip_list[:5]
 
         # For ranking chart on the wallet page, prefer tenant scope if supported by service
         try:
@@ -586,13 +638,61 @@ class AgentTxnListView(LoginRequiredMixin, ListView):
 
 @login_required
 def api_ranking(request: HttpRequest):
+    """
+    API endpoint for agent earnings rankings.
+    Returns top agents by commission for the specified period.
+    """
     period = request.GET.get("period", "month")
     biz = get_active_business(request)
+    
+    if not biz:
+        return JsonResponse({"period": period, "rows": []})
+    
+    # Use the agent_earnings service for consistent ranking
     try:
-        rows = ranking(period, business=biz)  # type: ignore[arg-type]
-    except TypeError:
-        rows = ranking(period)
-    return JsonResponse({"rows": rows})
+        from inventory.services.agent_earnings import get_agent_earnings
+        from datetime import date, timedelta
+        from django.utils import timezone
+        
+        today = timezone.localdate()
+        
+        if period == "all":
+            start_date = None
+            end_date = today
+        else:  # month
+            start_date = today.replace(day=1)
+            end_date = today
+        
+        # Get earnings data
+        earnings_data = get_agent_earnings(
+            business=biz,
+            start_date=start_date,
+            end_date=end_date,
+        )
+        
+        # Convert to format expected by frontend
+        rows = []
+        for earning in earnings_data[:20]:  # Top 20
+            rows.append({
+                "agent__id": earning.agent_id,
+                "agent__first_name": earning.agent_name.split()[0] if " " in earning.agent_name else earning.agent_name,
+                "agent__last_name": " ".join(earning.agent_name.split()[1:]) if " " in earning.agent_name else "",
+                "total": float(earning.total_commission),
+            })
+        
+        return JsonResponse({"period": period, "rows": rows})
+        
+    except Exception as e:
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.error(f"Error in api_ranking: {e}")
+        
+        # Fallback to old ranking function
+        try:
+            rows = ranking(period, business=biz)  # type: ignore[arg-type]
+        except TypeError:
+            rows = ranking(period)
+        return JsonResponse({"rows": rows})
 
 
 # ---------------------------------------------------------------------
