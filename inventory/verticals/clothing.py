@@ -524,3 +524,264 @@ def sell(request):
     
     return render(request, "verticals/clothing/sell.html", ctx)
 
+
+@login_required
+@require_business
+@require_business_kind(BusinessKind.CLOTHING)
+def sales_history(request):
+    """
+    Sales History page with filters, pagination, and export.
+    Shows all clothing sales with date range filtering and search.
+    """
+    from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
+    from django.db.models import Q
+    
+    ctx = base.base_context(request)
+    business = ctx.get("business")
+    location = ctx.get("location")
+    
+    # Build base queryset
+    sales_qs = ClothingSale.objects.filter(business=business).select_related('product', 'sold_by')
+    
+    if location:
+        # If ClothingSale has location field, filter by it
+        if hasattr(ClothingSale, 'location'):
+            sales_qs = sales_qs.filter(location=location)
+    
+    # Parse filter parameters
+    start_date = request.GET.get('start', '')
+    end_date = request.GET.get('end', '')
+    search_query = request.GET.get('q', '')
+    sale_id = request.GET.get('sale_id', '')
+    
+    # Apply date filters
+    if start_date:
+        try:
+            from datetime import datetime
+            start_dt = datetime.strptime(start_date, '%Y-%m-%d').date()
+            sales_qs = sales_qs.filter(sold_at__date__gte=start_dt)
+        except ValueError:
+            pass
+    
+    if end_date:
+        try:
+            from datetime import datetime
+            end_dt = datetime.strptime(end_date, '%Y-%m-%d').date()
+            sales_qs = sales_qs.filter(sold_at__date__lte=end_dt)
+        except ValueError:
+            pass
+    
+    # Apply search filter (search across product name, notes, payment method)
+    if search_query:
+        sales_qs = sales_qs.filter(
+            Q(product__name__icontains=search_query) |
+            Q(product__category__icontains=search_query) |
+            Q(notes__icontains=search_query) |
+            Q(sold_by__username__icontains=search_query)
+        )
+    
+    # Highlight specific sale if sale_id provided
+    highlighted_sale_id = None
+    if sale_id:
+        try:
+            highlighted_sale_id = int(sale_id)
+            # Ensure the sale exists in the filtered queryset
+            if not sales_qs.filter(id=highlighted_sale_id).exists():
+                highlighted_sale_id = None
+        except ValueError:
+            pass
+    
+    # Order by most recent first
+    sales_qs = sales_qs.order_by('-sold_at')
+    
+    # Pagination
+    page = request.GET.get('page', 1)
+    paginator = Paginator(sales_qs, 50)  # 50 sales per page
+    
+    try:
+        sales_page = paginator.page(page)
+    except PageNotAnInteger:
+        sales_page = paginator.page(1)
+    except EmptyPage:
+        sales_page = paginator.page(paginator.num_pages)
+    
+    # Summary stats for filtered results
+    summary = sales_qs.aggregate(
+        total_revenue=Sum('total_price'),
+        total_cost=Sum('total_cost'),
+        total_sales=Count('id'),
+        total_items=Sum('quantity')
+    )
+    
+    ctx.update({
+        'sales': sales_page,
+        'start_date': start_date,
+        'end_date': end_date,
+        'search_query': search_query,
+        'highlighted_sale_id': highlighted_sale_id,
+        'summary': summary,
+        'page_title': 'Sales History',
+    })
+    
+    return render(request, "verticals/clothing/sales_history.html", ctx)
+
+
+@login_required
+@require_business
+@require_business_kind(BusinessKind.CLOTHING)
+def sales_export_csv(request):
+    """
+    Export filtered sales to CSV.
+    Respects all the same filters as sales_history view.
+    """
+    import csv
+    from django.http import HttpResponse
+    from django.db.models import Q
+    
+    business = base.base_context(request).get("business")
+    location = base.base_context(request).get("location")
+    
+    # Build queryset with same filters as sales_history
+    sales_qs = ClothingSale.objects.filter(business=business).select_related('product', 'sold_by')
+    
+    if location:
+        if hasattr(ClothingSale, 'location'):
+            sales_qs = sales_qs.filter(location=location)
+    
+    # Apply filters
+    start_date = request.GET.get('start', '')
+    end_date = request.GET.get('end', '')
+    search_query = request.GET.get('q', '')
+    
+    if start_date:
+        try:
+            from datetime import datetime
+            start_dt = datetime.strptime(start_date, '%Y-%m-%d').date()
+            sales_qs = sales_qs.filter(sold_at__date__gte=start_dt)
+        except ValueError:
+            pass
+    
+    if end_date:
+        try:
+            from datetime import datetime
+            end_dt = datetime.strptime(end_date, '%Y-%m-%d').date()
+            sales_qs = sales_qs.filter(sold_at__date__lte=end_dt)
+        except ValueError:
+            pass
+    
+    if search_query:
+        sales_qs = sales_qs.filter(
+            Q(product__name__icontains=search_query) |
+            Q(product__category__icontains=search_query) |
+            Q(notes__icontains=search_query) |
+            Q(sold_by__username__icontains=search_query)
+        )
+    
+    sales_qs = sales_qs.order_by('-sold_at')
+    
+    # Create CSV response
+    response = HttpResponse(content_type='text/csv')
+    response['Content-Disposition'] = f'attachment; filename="clothing_sales_{timezone.now().strftime("%Y%m%d_%H%M%S")}.csv"'
+    
+    writer = csv.writer(response)
+    
+    # Write header
+    writer.writerow([
+        'Timestamp',
+        'Date',
+        'Time',
+        'Item',
+        'Category',
+        'Size',
+        'Color',
+        'Qty',
+        'Unit Price',
+        'Total',
+        'Payment Method',
+        'Cashier',
+        'Notes'
+    ])
+    
+    # Write data rows
+    for sale in sales_qs:
+        product = sale.product
+        timestamp = timezone.localtime(sale.sold_at)
+        
+        writer.writerow([
+            timestamp.strftime('%Y-%m-%d %H:%M:%S'),
+            timestamp.strftime('%Y-%m-%d'),
+            timestamp.strftime('%H:%M:%S'),
+            product.name or '',
+            getattr(product, 'category', '') or '',
+            getattr(product, 'size', '') or '',
+            getattr(product, 'color', '') or '',
+            sale.quantity,
+            f'{sale.unit_price:.2f}',
+            f'{sale.total_price:.2f}',
+            sale.get_payment_method_display() if hasattr(sale, 'get_payment_method_display') else sale.payment_method,
+            sale.sold_by.username if sale.sold_by else 'System',
+            sale.notes or ''
+        ])
+    
+    return response
+
+
+@login_required
+@require_business
+@require_business_kind(BusinessKind.CLOTHING)
+def sales_trend_json(request):
+    """
+    JSON endpoint for sales trend data (last 7 days by default).
+    Respects dashboard date filters if provided.
+    Returns data suitable for Chart.js or similar libraries.
+    """
+    from django.http import JsonResponse
+    from datetime import datetime, date as date_type
+    
+    business = base.base_context(request).get("business")
+    location = base.base_context(request).get("location")
+    
+    # Parse date range from request
+    range_param = request.GET.get('range', '7d')
+    date_param = request.GET.get('date', '')
+    
+    # Use base helper to compute date range
+    date_range_ctx = base.parse_date_range_from_request(request)
+    start_date = date_range_ctx['start_date']
+    end_date = date_range_ctx['end_date']
+    
+    # Build sales queryset
+    sales_qs = ClothingSale.objects.filter(business=business)
+    
+    if location:
+        if hasattr(ClothingSale, 'location'):
+            sales_qs = sales_qs.filter(location=location)
+    
+    # Generate daily data for the date range
+    labels = []
+    revenue_values = []
+    count_values = []
+    
+    current_date = start_date
+    while current_date < end_date:
+        # Get sales for this day
+        day_sales = sales_qs.filter(sold_at__date=current_date)
+        day_revenue = day_sales.aggregate(total=Sum('total_price'))['total'] or Decimal('0.00')
+        day_count = day_sales.count()
+        
+        labels.append(current_date.strftime('%b %d'))
+        revenue_values.append(float(day_revenue))
+        count_values.append(day_count)
+        
+        current_date += timedelta(days=1)
+    
+    # Add cache-busting metadata
+    return JsonResponse({
+        'labels': labels,
+        'revenue': revenue_values,
+        'count': count_values,
+        'period': range_param,
+        'start_date': start_date.isoformat(),
+        'end_date': (end_date - timedelta(days=1)).isoformat(),
+        'timestamp': timezone.now().isoformat(),
+    })

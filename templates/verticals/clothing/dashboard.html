@@ -29,9 +29,11 @@
   .hero-actions .primary{background:#fff;color:#0f172a}
   .hero-actions .ghost{border:1px solid rgba(255,255,255,.8);color:#fff}
   .metrics-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:16px}
-  .metric-card{background:#fff;border-radius:18px;padding:18px;box-shadow:0 10px 30px rgba(15,23,42,.08)}
+  .metric-card{background:#fff;border-radius:18px;padding:18px;box-shadow:0 10px 30px rgba(15,23,42,.08);transition:all 0.2s}
   .metric-card h3{margin:0;font-size:.9rem;text-transform:uppercase;color:#64748b;letter-spacing:.08em}
   .metric-card p{margin:6px 0 0;font-size:1.9rem;font-weight:800;color:#0f172a}
+  .metric-card-clickable{cursor:pointer;text-decoration:none;display:block;color:inherit}
+  .metric-card-clickable:hover{transform:translateY(-4px);box-shadow:0 15px 40px rgba(15,23,42,.15)}
   .recent-block{background:#fff;border-radius:20px;padding:18px;box-shadow:0 10px 30px rgba(15,23,42,.08)}
   .recent-list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:12px}
   .recent-item{display:flex;justify-content:space-between;gap:12px;border-bottom:1px solid #e2e8f0;padding-bottom:12px}
@@ -118,10 +120,11 @@
       <h3 style="color:rgba(255,255,255,.9)">Profit{% if active_range == 'today' %} (Today){% elif active_range == '7d' %} (7D){% elif active_range == 'date' %} (Day){% else %} (MTD){% endif %}</h3>
       <p style="color:#fff">K {{ profit_mtd|floatformat:0|default:"0" }}</p>
     </article>
-    <article class="metric-card">
+    <a href="{% url 'verticals:clothing_sales_history' %}?{% if start_date %}start={{ start_date }}&{% endif %}{% if end_date %}end={{ end_date }}{% endif %}" class="metric-card metric-card-clickable" style="text-decoration:none;color:inherit">
       <h3>Sales{% if active_range == 'today' %} (Today){% elif active_range == '7d' %} (7D){% elif active_range == 'date' %} (Day){% else %} (MTD){% endif %}</h3>
       <p>{{ total_sales_mtd }}</p>
-    </article>
+      <div style="margin-top:8px;font-size:0.75rem;color:#3b82f6;font-weight:600">Click to view →</div>
+    </a>
   </section>
 
   {% comment %}Payment Mix Panel{% endcomment %}
@@ -168,26 +171,29 @@
     </section>
     {% endif %}
 
-    {% if sales_trend %}
     <section class="recent-block">
       <h2 style="margin:0 0 12px;font-size:1.1rem">📈 Sales Trend (Last 7 Days)</h2>
-      <div style="display:flex;flex-direction:column;gap:8px">
-        {% for day in sales_trend %}
-        <div style="display:flex;justify-content:space-between;align-items:center">
-          <span style="font-size:.9rem;color:#64748b">{{ day.date_short }}</span>
-          <div style="flex:1;margin:0 12px;height:6px;background:#e2e8f0;border-radius:3px;overflow:hidden">
-            {% if sales_trend|length > 0 %}
-            {% with max_rev=sales_trend.0.revenue %}
-            <div style="height:100%;background:#3b82f6;width:{% if max_rev > 0 %}{{ day.revenue|floatformat:0|add:"0"|default:"1" }}{% else %}0{% endif %}%"></div>
-            {% endwith %}
-            {% endif %}
+      <div id="sales-trend-container" style="display:flex;flex-direction:column;gap:8px">
+        {% comment %}Server-side rendered fallback{% endcomment %}
+        {% if sales_trend %}
+          {% for day in sales_trend %}
+          <div class="trend-day-row" style="display:flex;justify-content:space-between;align-items:center">
+            <span style="font-size:.9rem;color:#64748b">{{ day.date_short }}</span>
+            <div style="flex:1;margin:0 12px;height:6px;background:#e2e8f0;border-radius:3px;overflow:hidden">
+              {% if sales_trend|length > 0 %}
+              {% with max_rev=sales_trend.0.revenue %}
+              <div style="height:100%;background:#3b82f6;width:{% if max_rev > 0 %}{{ day.revenue|floatformat:0|add:"0"|default:"1" }}{% else %}0{% endif %}%"></div>
+              {% endwith %}
+              {% endif %}
+            </div>
+            <span style="font-size:.9rem;font-weight:600">{{ day.count }}</span>
           </div>
-          <span style="font-size:.9rem;font-weight:600">{{ day.count }}</span>
-        </div>
-        {% endfor %}
+          {% endfor %}
+        {% else %}
+          <p style="margin:0;color:#64748b">No trend data available.</p>
+        {% endif %}
       </div>
     </section>
-    {% endif %}
   </div>
 
   <section class="metrics-grid">
@@ -207,6 +213,34 @@
       <h3>Tracking inventory</h3>
       <p>{{ inventory_tracked_count }}</p>
     </article>
+  </section>
+
+  {% comment %}Recent Sales Section{% endcomment %}
+  <section class="recent-block">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+      <h2 style="margin:0;font-size:1.1rem">💰 Recent Sales</h2>
+      <a class="btn btn-sm btn-primary" href="{% url 'verticals:clothing_sales_history' %}" style="border-radius:20px;padding:6px 14px;font-weight:600">View All →</a>
+    </div>
+    {% if sales_trend %}
+      <div style="display:flex;flex-direction:column;gap:10px">
+        {% for day in sales_trend|slice:":5" %}
+        <a href="{% url 'verticals:clothing_sales_history' %}?start={{ day.date }}&end={{ day.date }}" 
+           style="display:flex;justify-content:space-between;align-items:center;padding:12px;background:#f8fafc;border-radius:12px;text-decoration:none;color:inherit;transition:all 0.2s"
+           onmouseover="this.style.background='#eff6ff';this.style.transform='translateX(4px)'" 
+           onmouseout="this.style.background='#f8fafc';this.style.transform='translateX(0)'">
+          <div>
+            <strong style="font-size:1rem;color:#0f172a">{{ day.date_short }}</strong>
+            <div style="font-size:0.85rem;color:#64748b;margin-top:2px">{{ day.count }} sale{{ day.count|pluralize }}</div>
+          </div>
+          <div style="text-align:right">
+            <div style="font-size:1.2rem;font-weight:700;color:#10b981">K {{ day.revenue|floatformat:0 }}</div>
+          </div>
+        </a>
+        {% endfor %}
+      </div>
+    {% else %}
+      <p style="margin:0;color:#64748b">No recent sales to display.</p>
+    {% endif %}
   </section>
 
   <section class="recent-block">
@@ -238,5 +272,71 @@
     {% endif %}
   </section>
 </div>
+
+{% comment %}Dynamic Sales Trend Update{% endcomment %}
+<script>
+(function() {
+  // Function to fetch and update sales trend
+  function updateSalesTrend() {
+    // Get current filter params from URL
+    const urlParams = new URLSearchParams(window.location.search);
+    const range = urlParams.get('range') || 'mtd';
+    const date = urlParams.get('date') || '';
+    
+    // Build API URL with cache busting
+    let apiUrl = '{% url "verticals:clothing_sales_trend_json" %}?ts=' + Date.now();
+    if (range) apiUrl += '&range=' + range;
+    if (date) apiUrl += '&date=' + date;
+    
+    // Fetch trend data
+    fetch(apiUrl)
+      .then(response => response.json())
+      .then(data => {
+        if (!data.labels || !data.count || data.labels.length === 0) {
+          return; // Keep fallback if no data
+        }
+        
+        // Find max revenue for scaling
+        const maxRevenue = Math.max(...data.revenue);
+        
+        // Build HTML
+        let html = '';
+        for (let i = 0; i < data.labels.length; i++) {
+          const widthPct = maxRevenue > 0 ? Math.round((data.revenue[i] / maxRevenue) * 100) : 0;
+          html += `
+            <div class="trend-day-row" style="display:flex;justify-content:space-between;align-items:center">
+              <span style="font-size:.9rem;color:#64748b">${data.labels[i]}</span>
+              <div style="flex:1;margin:0 12px;height:6px;background:#e2e8f0;border-radius:3px;overflow:hidden">
+                <div style="height:100%;background:#3b82f6;width:${widthPct}%;transition:width 0.3s"></div>
+              </div>
+              <span style="font-size:.9rem;font-weight:600">${data.count[i]}</span>
+            </div>
+          `;
+        }
+        
+        // Update container
+        const container = document.getElementById('sales-trend-container');
+        if (container) {
+          container.innerHTML = html;
+        }
+      })
+      .catch(error => {
+        console.error('Failed to fetch sales trend:', error);
+        // Keep fallback on error
+      });
+  }
+  
+  // Update on page load
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', updateSalesTrend);
+  } else {
+    updateSalesTrend();
+  }
+  
+  // Update every 60 seconds (optional - for real-time updates)
+  setInterval(updateSalesTrend, 60000);
+})();
+</script>
+
 {% endblock %}
 
