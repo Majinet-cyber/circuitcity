@@ -65,7 +65,7 @@ def transfer_stock(request: HttpRequest, pk: int) -> HttpResponse:
     if not agent_id:
         return JsonResponse({"ok": False, "error": "agent_id required."}, status=400)
     
-    if agent_id == "none" or agent_id == "":
+    if agent_id in ("none", "unassign", ""):
         # Transfer to manager pool (unassign)
         item.assigned_agent = None
         item.assigned_role = "MANAGER"
@@ -78,24 +78,25 @@ def transfer_stock(request: HttpRequest, pk: int) -> HttpResponse:
     except (TypeError, ValueError):
         return JsonResponse({"ok": False, "error": "Invalid agent_id."}, status=400)
     
-    # Verify agent is active for this business
+    # Verify user is active agent or manager for this business
     try:
         membership = Membership.objects.filter(
             user_id=agent_id,
             business=biz,
-            role='AGENT',
+            role__in=['AGENT', 'MANAGER'],
             status='ACTIVE'
         ).first()
         if not membership:
-            return JsonResponse({"ok": False, "error": "Agent not found or inactive."}, status=400)
+            return JsonResponse({"ok": False, "error": "User not found or inactive."}, status=400)
         
         agent = membership.user
+        assigned_role = membership.role
     except Exception as e:
-        return JsonResponse({"ok": False, "error": f"Error finding agent: {e}"}, status=400)
+        return JsonResponse({"ok": False, "error": f"Error finding user: {e}"}, status=400)
     
     # Transfer
     item.assigned_agent = agent
-    item.assigned_role = "AGENT"
+    item.assigned_role = assigned_role
     item.save(update_fields=["assigned_agent", "assigned_role", "updated_at"])
     
     messages.success(request, f"Stock {item.imei or item.pk} transferred to {agent.get_full_name() or agent.username}.")

@@ -1,8 +1,8 @@
 {% extends "base.html" %}
 {% load humanize %}
 
-{% block title %}Agent Earnings · {{ business.name }}{% endblock %}
-{% block header_title %}<i class="bi bi-trophy me-2"></i>Agent Earnings{% endblock %}
+{% block title %}{% if BUSINESS_VERTICAL == "gym" %}Trainer{% else %}Agent{% endif %} Earnings · {{ business.name }}{% endblock %}
+{% block header_title %}<i class="bi bi-trophy me-2"></i>{% if BUSINESS_VERTICAL == "gym" %}Trainer{% else %}Agent{% endif %} Earnings{% endblock %}
 
 {% block extra_css %}
 <style>
@@ -56,14 +56,14 @@
   <!-- BREADCRUMB / BACK NAV -->
   <div style="margin-bottom:20px">
     <a href="{% url 'tenants:manager_review_agents' %}" class="btn btn-outline-secondary btn-sm">
-      <i class="bi bi-arrow-left"></i> Back to Agents
+      <i class="bi bi-arrow-left"></i> Back to {% if BUSINESS_VERTICAL == "gym" %}Trainers{% else %}Agents{% endif %}
     </a>
   </div>
   
   <!-- PAGE HEADER -->
   <div style="margin-bottom:24px">
     <h1 style="font-size:2rem;font-weight:900;color:#0f172a;margin:0 0 8px">
-      <i class="bi bi-trophy" style="color:#3b82f6"></i> Agent Earnings
+      <i class="bi bi-trophy" style="color:#3b82f6"></i> {% if BUSINESS_VERTICAL == "gym" %}Trainer{% else %}Agent{% endif %} Earnings
     </h1>
     <p style="color:#64748b;margin:0">Performance rankings by commission for {{ range_label|lower }}</p>
   </div>

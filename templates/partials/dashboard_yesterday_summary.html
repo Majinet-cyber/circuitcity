@@ -144,7 +144,7 @@ Context variables expected:
   {% if YESTERDAY_SUMMARY.sales_count > 0 %}
     <div class="yesterday-summary-stats">
       <div class="yesterday-stat">
-        <div class="yesterday-stat-label">Sales</div>
+        <div class="yesterday-stat-label">{% if BUSINESS_VERTICAL == "gym" %}Payments{% else %}Sales{% endif %}</div>
         <div class="yesterday-stat-value">{{ YESTERDAY_SUMMARY.sales_count }}</div>
       </div>
       
@@ -167,7 +167,11 @@ Context variables expected:
     {% endif %}
   {% else %}
     <div class="yesterday-empty">
-      No sales recorded yesterday – fresh start today! 🚀
+      {% if BUSINESS_VERTICAL == "gym" %}
+        No new payments yesterday – fresh start today! 🚀
+      {% else %}
+        No sales recorded yesterday – fresh start today! 🚀
+      {% endif %}
     </div>
   {% endif %}
 </div>

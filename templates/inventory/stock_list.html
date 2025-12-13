@@ -161,10 +161,11 @@
 
   .battery-card{ background:var(--cc-panel-2); border:1px solid var(--cc-border); border-radius:14px; padding:12px; margin-top:14px }
   .battery-wrap{ display:flex; align-items:center; gap:1rem; flex-wrap:wrap }
-  .battery{ position:relative; width:220px; height:68px; border-radius:14px;
-            border:4px solid #cbd5e1; padding:6px; background:linear-gradient(180deg,#ffffff,#f8fafc); }
-  .battery:after{ content:""; position:absolute; right:-16px; top:18px; width:14px; height:32px; background:#cbd5e1; border-radius:3px }
-  .battery-fill{ height:100%; width:0%; border-radius:10px; transition:width .45s ease; background:linear-gradient(90deg,#22c55e,#06b6d4) }
+  .battery{ position:relative; width:180px; height:64px; border-radius:14px;
+            border:4px solid #cbd5e1; padding:4px; background:linear-gradient(180deg,#fff,#f8fafc);
+            box-shadow:inset 0 1px 0 rgba(255,255,255,.9); }
+  .battery:after{ content:""; position:absolute; right:-14px; top:16px; width:14px; height:30px; background:#cbd5e1; border-radius:3px }
+  .battery-fill{ height:100%; width:0%; border-radius:10px; transition:width .5s ease; background:linear-gradient(90deg,#22c55e,#06b6d4) }
   .battery-label{ font-weight:800 }
   .battery-hint{ color:var(--cc-muted); font-size:.85rem }
 
@@ -204,6 +205,18 @@
   .kebab-menu a, .kebab-menu button{ display:block; width:100%; text-align:left; padding:.5rem .85rem; background:transparent; border:none; color:var(--cc-text); text-decoration:none; font-size:.9rem; cursor:pointer; transition:background .12s }
   .kebab-menu a:hover, .kebab-menu button:hover{ background:rgba(37,99,235,.08) }
   .kebab-menu a i, .kebab-menu button i{ margin-right:.5rem; width:1rem; display:inline-block }
+
+  /* Ensure Actions buttons and dropdown items have proper cursor */
+  .stock-actions .btn,
+  .stock-actions .dropdown-item,
+  .dropdown .btn,
+  .dropdown-item,
+  .kebab-btn {
+    cursor: pointer;
+  }
+
+  /* Prevent dropdowns getting clipped inside responsive tables */
+  .table-responsive { overflow-y: visible; }
 </style>
 {% endblock %}
 
@@ -303,7 +316,7 @@
   <!-- ========== Ticker / Preview ========== -->
   <div id="ticker" class="ticker" role="region" aria-live="polite" aria-label="Rotating stock">
     <div class="ticker-row" id="tickerRow">
-      <div>IMEI</div><div>Product</div><div>Status</div><div>Order Price</div><div>Selling Price</div><div>Location</div><div>Agent</div>
+      <div>IMEI</div><div>Product</div><div>Status</div><div>Order Price</div><div>Selling Price</div><div>Location</div><div>{% if BUSINESS_VERTICAL == "gym" %}Trainer{% else %}Agent{% endif %}</div>
     </div>
     <div class="ticker-controls">
       <button class="btn-deep tap is-primary btn-sm" id="prevRow" type="button" aria-label="Previous" onclick="window.buzz&&buzz(6)">◀ Prev</button>
@@ -327,7 +340,7 @@
       <table id="stockTable" data-kb-table>
         <thead>
           <tr>
-            <th>IMEI</th><th>Product</th><th>Status</th><th class="d-none d-lg-table-cell">Order Price</th><th class="d-none d-lg-table-cell">Selling Price</th><th class="d-none d-lg-table-cell">Location</th><th>Agent</th>
+            <th>IMEI</th><th>Product</th><th>Status</th><th class="d-none d-lg-table-cell">Order Price</th><th class="d-none d-lg-table-cell">Selling Price</th><th class="d-none d-lg-table-cell">Location</th><th>{% if BUSINESS_VERTICAL == "gym" %}Trainer{% else %}Agent{% endif %}</th>
             {% if IS_MANAGER|default:False or request.user.is_staff or request.user.is_superuser or request.user.profile.is_manager %}
               <th class="text-end">Actions</th>
             {% endif %}
@@ -416,7 +429,7 @@
                   <span class="badge-chip green">In stock</span>
                 {% endif %}
               </td>
-              <td data-label="Agent">
+              <td data-label="{% if BUSINESS_VERTICAL == 'gym' %}Trainer{% else %}Agent{% endif %}">
                 {% if it.assigned_agent_id %}
                   <span class="badge rounded-pill bg-light text-dark border">
                     {{ it.assigned_agent.get_full_name|default:it.assigned_agent.username|default:it.assigned_agent.email }}
@@ -442,7 +455,7 @@
                   <span class="badge-chip green">In stock</span>
                 {% endif %}
               </td>
-              <td data-label="Agent">{{ row.agent }}</td>
+              <td data-label="{% if BUSINESS_VERTICAL == 'gym' %}Trainer{% else %}Agent{% endif %}">{{ row.agent }}</td>
               <td data-label="Actions">
                 <span class="text-muted">—</span>
               </td>
@@ -588,9 +601,16 @@
         <div class="modal-body">
           <p class="mb-2">Transfer stock <strong id="transferImei"></strong> to:</p>
           <select name="agent_id" class="form-select" style="padding:.5rem .6rem;border-radius:.55rem;border:1px solid var(--cc-border);background:var(--cc-panel);color:var(--cc-text);min-height:44px">
-            <option value="none">Manager Pool (Unassign)</option>
-            {% for membership in manager_agents %}
-              <option value="{{ membership.user.id }}">{{ membership.user.get_full_name|default:membership.user.username }} {% if membership.location %}({{ membership.location.name }}){% endif %}</option>
+            <option value="unassign">Manager Pool (Unassign)</option>
+            {% for location_name, memberships in transfer_agents_by_location %}
+              <optgroup label="{{ location_name }}">
+                {% for membership in memberships %}
+                  <option value="{{ membership.user.id }}">
+                    {{ membership.user.get_full_name|default:membership.user.username }}
+                    {% if membership.role == 'MANAGER' %} (Manager){% endif %}
+                  </option>
+                {% endfor %}
+              </optgroup>
             {% endfor %}
           </select>
         </div>
@@ -1036,6 +1056,31 @@ $id('invTopPeriod')?.addEventListener('change', loadInvTopModels);
 {# Stock Controls Modal JS (Transfer, Edit IMEI) #}
 {% if IS_MANAGER|default:False or request.user.is_staff or request.user.is_superuser or request.user.profile.is_manager %}
 <script>
+// ===== MOVE MODALS TO BODY (Fixes z-index/stacking-context issues) =====
+document.addEventListener('DOMContentLoaded', function() {
+  // Move all Bootstrap modals to document.body so they're not trapped
+  // inside transformed/glassmorphic containers
+  const modals = document.querySelectorAll('.modal');
+  modals.forEach(function(modal) {
+    if (modal.parentElement !== document.body) {
+      document.body.appendChild(modal);
+    }
+  });
+  
+  // Verify z-index values in console (for debugging)
+  if (window.console && console.log) {
+    modals.forEach(function(modal) {
+      const computedStyle = window.getComputedStyle(modal);
+      console.log('Modal z-index:', modal.id, '=', computedStyle.zIndex);
+    });
+    const backdrops = document.querySelectorAll('.modal-backdrop');
+    backdrops.forEach(function(backdrop) {
+      const computedStyle = window.getComputedStyle(backdrop);
+      console.log('Backdrop z-index:', computedStyle.zIndex);
+    });
+  }
+});
+
 // Transfer Modal
 function showTransferModal(itemId, imei) {
   const modal = new bootstrap.Modal(document.getElementById('transferModal'));
@@ -1053,6 +1098,30 @@ function showEditImeiModal(itemId, imei) {
   form.action = '/inventory/stock/' + itemId + '/edit-imei/';
   modal.show();
 }
+
+// ===== GLOBAL MODAL CLEANUP (Fixes blur/lock issue) =====
+(function () {
+  function cleanupBootstrapBackdrops() {
+    // Only cleanup if there is no modal currently shown
+    if (document.querySelectorAll(".modal.show").length === 0) {
+      document.querySelectorAll(".modal-backdrop").forEach(b => b.remove());
+      document.body.classList.remove("modal-open");
+      document.body.style.removeProperty("overflow");
+      document.body.style.removeProperty("padding-right");
+    }
+  }
+
+  // Cleanup on load (fixes already-stuck pages)
+  document.addEventListener("DOMContentLoaded", cleanupBootstrapBackdrops);
+
+  // Cleanup whenever any modal finishes hiding
+  document.addEventListener("hidden.bs.modal", cleanupBootstrapBackdrops);
+
+  // Extra safety: if something cancels show/hide mid-way
+  window.addEventListener("keydown", function (e) {
+    if (e.key === "Escape") setTimeout(cleanupBootstrapBackdrops, 0);
+  });
+})();
 </script>
 
 {# Assign Stock Modal JS #}

@@ -456,7 +456,7 @@
         <div style="font-size: 1.5rem; font-weight: 800; color: #991b1b;">
           MK {{ costs_commissions_panel.commissions_this_period|floatformat:0|intcomma }}
         </div>
-        <div style="font-size: 0.75rem; color: #7f1d1d; margin-top: 0.25rem;">Agents earned</div>
+        <div style="font-size: 0.75rem; color: #7f1d1d; margin-top: 0.25rem;">{% if BUSINESS_VERTICAL == "gym" %}Trainers{% else %}Agents{% endif %} earned</div>
       </div>
 
       <div style="background: #fef2f2; border: 1px solid #fecaca; border-radius: 12px; padding: 1rem;">
@@ -621,7 +621,7 @@
     </div>
 
     <div class="perf-card">
-      <div class="perf-title"><i class="bi bi-trophy me-2"></i>Agent Leaderboard</div>
+      <div class="perf-title"><i class="bi bi-trophy me-2"></i>{% if BUSINESS_VERTICAL == "gym" %}Trainer{% else %}Agent{% endif %} Leaderboard</div>
       <div id="agentLeaderboard">
         {% if agent_leaderboard %}
           <ol class="list-group list-group-numbered" style="list-style:none;padding:0">
@@ -650,9 +650,9 @@
   </div>
 
   {% else %}
-  {# ========== Agent Dashboard ========== #}
+  {# ========== {% if BUSINESS_VERTICAL == "gym" %}Trainer{% else %}Agent{% endif %} Dashboard ========== #}
 
-  {# ========== Date Filter Controls (Agent View) ========== #}
+  {# ========== Date Filter Controls ({% if BUSINESS_VERTICAL == "gym" %}Trainer{% else %}Agent{% endif %} View) ========== #}
   <div style="background: var(--dash-panel); border: 1px solid var(--dash-border); border-radius: 14px; padding: 1.25rem; margin-bottom: 1.5rem; box-shadow: var(--dash-shadow);">
     <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px">
       <h3 style="margin:0; font-size:1rem; color:var(--dash-muted); text-transform:uppercase; letter-spacing:0.08em; font-weight:700">
@@ -812,7 +812,7 @@
       </a>
       {% endif %}
       <a href="{% url 'tenants:manager_review_agents' %}" class="btn btn-sm btn-outline-primary">
-        <i class="bi bi-people"></i> Manage Agents
+        <i class="bi bi-people"></i> Manage {% if BUSINESS_VERTICAL == "gym" %}Trainers{% else %}Agents{% endif %}
       </a>
       <a href="{% url 'billing:plans' %}" class="btn btn-sm btn-outline-warning">
         <i class="bi bi-rocket-takeoff"></i> Upgrade Plan

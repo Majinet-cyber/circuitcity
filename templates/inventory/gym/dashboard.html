@@ -231,14 +231,15 @@
         {% endif %}
     </div>
 
-    <!-- Trainer Earnings -->
-    {% if trainer_stats %}
+    <!-- Trainers Ranking -->
+    {% if trainer_ranking %}
     <div class="row mb-4">
         <div class="col-12">
             <div class="glass-card p-4">
                 <div class="d-flex justify-content-between align-items-center mb-3">
                     <h5 class="mb-0">
-                        <i class="bi bi-person-badge text-info"></i> Trainer Performance
+                        <i class="bi bi-trophy text-warning"></i> Trainers Ranking
+                        <small class="text-muted ms-2">({{ period_label }})</small>
                     </h5>
                     <a href="{% url 'gym:trainers_list' %}" class="btn btn-sm btn-outline-primary">
                         Manage Trainers
@@ -248,24 +249,46 @@
                     <table class="table table-hover mb-0">
                         <thead>
                             <tr>
+                                <th width="50">#</th>
                                 <th>Trainer</th>
+                                <th>Fees Earned</th>
+                                <th>Sessions/Payments</th>
                                 <th>Active Members</th>
-                                <th>Total Revenue</th>
                             </tr>
                         </thead>
                         <tbody>
-                            {% for stat in trainer_stats %}
+                            {% for stat in trainer_ranking %}
                             <tr>
-                                <td class="fw-semibold">{{ stat.trainer.name }}</td>
                                 <td>
-                                    <span class="badge bg-success-subtle text-success">{{ stat.active_members }}</span>
+                                    {% if forloop.counter == 1 %}
+                                        <span class="badge bg-warning text-dark">🥇 1st</span>
+                                    {% elif forloop.counter == 2 %}
+                                        <span class="badge bg-secondary">🥈 2nd</span>
+                                    {% elif forloop.counter == 3 %}
+                                        <span class="badge bg-light text-dark">🥉 3rd</span>
+                                    {% else %}
+                                        <span class="text-muted">{{ forloop.counter }}</span>
+                                    {% endif %}
                                 </td>
-                                <td class="fw-semibold">MWK {{ stat.revenue|floatformat:2 }}</td>
+                                <td class="fw-semibold">{{ stat.trainer.name }}</td>
+                                <td class="fw-semibold text-success">MWK {{ stat.trainer_fees|floatformat:2 }}</td>
+                                <td>
+                                    <span class="badge bg-primary-subtle text-primary">{{ stat.payment_count }} session{{ stat.payment_count|pluralize }}</span>
+                                </td>
+                                <td>
+                                    <span class="badge bg-success-subtle text-success">{{ stat.active_members }} active</span>
+                                </td>
                             </tr>
                             {% endfor %}
                         </tbody>
                     </table>
                 </div>
+                {% if trainer_ranking|length == 0 %}
+                <div class="text-center py-4">
+                    <i class="bi bi-person-badge" style="font-size: 2rem; opacity: 0.3;"></i>
+                    <p class="text-muted mb-0">No trainer fees recorded in this period.</p>
+                </div>
+                {% endif %}
             </div>
         </div>
     </div>
@@ -390,6 +413,28 @@
     border: 1px solid rgba(15, 23, 42, 0.08);
     box-shadow: 0 10px 30px rgba(15, 23, 42, 0.08);
     backdrop-filter: blur(10px);
+    height: auto !important;
+    min-height: 90px;
+    overflow: visible !important;
+    min-width: 0;
+}
+
+/* Ensure KPI card labels wrap and don't clip */
+.glass-card .text-uppercase {
+    white-space: normal !important;
+    line-height: 1.2;
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+}
+
+.glass-card p, .glass-card h3, .glass-card small {
+    min-width: 0;
+    overflow: visible;
+}
+
+/* Ensure grid containers don't clip */
+.row.g-3 {
+    overflow: visible;
 }
 </style>
 {% endblock %}

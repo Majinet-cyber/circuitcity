@@ -180,7 +180,7 @@
   <div class="menu-group">TEAM</div>
   <ul class="navlist">
     {% if url_team_agents %}
-    <li><a class="navlink" href="{{ url_team_agents }}"><i class="bi bi-person-badge"></i> Agents</a></li>
+    <li><a class="navlink" href="{{ url_team_agents }}"><i class="bi bi-person-badge"></i> {% if business_kind == "gym" %}Trainers{% else %}Agents{% endif %}</a></li>
     {% endif %}
     {% if url_team_locations %}
     <li><a class="navlink" href="{{ url_team_locations }}"><i class="bi bi-geo-alt"></i> Locations</a></li>

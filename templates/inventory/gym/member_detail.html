@@ -65,20 +65,29 @@
                     <div>
                         {% if member.is_archived %}
                             <span class="badge bg-secondary-subtle text-secondary">Archived</span>
-                        {% elif member.is_active_membership %}
-                            <span class="badge bg-success-subtle text-success">Active</span>
+                        {% elif member.membership_end %}
+                            {% now "Y-m-d" as today_str %}
+                            {% if member.membership_end|date:"Y-m-d" >= today_str %}
+                                <span class="badge bg-success-subtle text-success">Active</span>
+                            {% else %}
+                                <span class="badge bg-danger-subtle text-danger">In Arrears</span>
+                            {% endif %}
                         {% else %}
-                            <span class="badge bg-danger-subtle text-danger">In Arrears</span>
+                            <span class="badge bg-warning-subtle text-warning">Pending Payment</span>
                         {% endif %}
                     </div>
                 </div>
                 <div class="mb-3">
                     <label class="text-muted small">Days Left</label>
                     <div>
-                        {% if member.days_left > 0 %}
-                            <span class="fw-semibold">{{ member.days_left_display }}</span>
+                        {% if member.membership_end %}
+                            {% if member.days_left > 0 %}
+                                <span class="fw-semibold">{{ member.days_left }} / {{ member.duration_days }} days</span>
+                            {% else %}
+                                <span class="text-danger">{{ member.days_left }} / {{ member.duration_days }} days</span>
+                            {% endif %}
                         {% else %}
-                            <span class="text-danger">{{ member.days_left_display }}</span>
+                            <span class="text-muted">No active membership</span>
                         {% endif %}
                     </div>
                 </div>

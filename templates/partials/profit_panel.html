@@ -37,7 +37,7 @@
             {% if total_revenue > 0 %}
                 {{ profit_margin|default:0 }}% margin
             {% else %}
-                No sales yet
+                {% if BUSINESS_VERTICAL == "gym" %}No payments yet{% else %}No sales yet{% endif %}
             {% endif %}
         </small>
     </div>

@@ -24,11 +24,11 @@
       <form method="post" action="{% url 'wallet:admin_issue' %}" class="row g-3">
         {% csrf_token %}
 
-        <!-- Select Agent -->
+        <!-- Select {% if BUSINESS_VERTICAL == "gym" %}Trainer{% else %}Agent{% endif %} -->
         <div class="col-12 col-md-6">
-          <label for="agent" class="form-label">Select Agent</label>
+          <label for="agent" class="form-label">Select {% if BUSINESS_VERTICAL == "gym" %}Trainer{% else %}Agent{% endif %}</label>
           <select class="form-select" id="agent" name="agent_id" required>
-            <option value="">-- Choose Agent --</option>
+            <option value="">-- Choose {% if BUSINESS_VERTICAL == "gym" %}Trainer{% else %}Agent{% endif %} --</option>
             {% for a in users %}
               <option value="{{ a.id }}">{{ a.first_name }} {{ a.last_name }} ({{ a.email }})</option>
             {% endfor %}

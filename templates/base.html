@@ -473,7 +473,7 @@
                   <div class="tenant-menu" id="tenantMenu" role="menu" aria-label="Business menu">
                     <a class="tenant-item" href="{{ url_choose_business|default:'/tenants/choose/' }}"><i class="bi bi-arrow-left-right"></i> Switch business</a>
                     {% if request.membership and request.membership.role == "MANAGER" or IS_MANAGER or request.user.is_authenticated and request.user.profile.is_manager %}
-                      <a class="tenant-item" href="{{ url_manager_agents|default:'/tenants/manager/agents/' }}"><i class="bi bi-people"></i> Agents</a>
+                      <a class="tenant-item" href="{{ url_manager_agents|default:'/tenants/manager/agents/' }}"><i class="bi bi-people"></i> {% if BUSINESS_VERTICAL == "gym" %}Trainers{% else %}Agents{% endif %}</a>
                     {% endif %}
                     {% if request.user.is_staff %}
                       <div class="tenant-divider"></div>

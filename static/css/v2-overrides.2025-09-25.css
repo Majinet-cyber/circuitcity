@@ -744,3 +744,13 @@ a[href*="/locations/switch"],
 .tenant-pill,.tenant-chip,.business-chip,.location-chip { display:none !important; }
 
 /* Keep hamburger/mobile toggles visible on phones (already reinforced above) */
+
+/* --------------------------------------------------------------------------
+   Bootstrap Modal z-index fix – prevents modal from appearing under backdrop
+   -------------------------------------------------------------------------- */
+.modal {
+  z-index: 20050 !important;
+}
+.modal-backdrop {
+  z-index: 20040 !important;
+}

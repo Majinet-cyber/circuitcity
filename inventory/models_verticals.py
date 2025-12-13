@@ -436,12 +436,23 @@ class GymMemberStatus(models.TextChoices):
 class GymTrainer(models.Model):
     """
     Gym trainer who can be assigned to members.
+    Can optionally be linked to a user account for wallet access.
     """
     business = models.ForeignKey(Business, on_delete=models.CASCADE, related_name="gym_trainers", db_index=True)
     name = models.CharField(max_length=120)
     phone = models.CharField(max_length=20, blank=True, default="")
     email = models.EmailField(blank=True, default="")
     is_active = models.BooleanField(default=True, db_index=True)
+    
+    # Optional linked user for wallet/login access
+    user = models.ForeignKey(
+        User,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="gym_trainer_profile",
+        help_text="Linked user account for trainer (enables wallet access)"
+    )
     
     # Metadata
     joined_at = models.DateTimeField(default=timezone.now)
@@ -456,6 +467,22 @@ class GymTrainer(models.Model):
     
     def __str__(self):
         return f"{self.name} ({self.business.name})"
+    
+    def total_fees_earned(self) -> Decimal:
+        """Calculate total trainer fees earned from all payments"""
+        from django.db.models import Sum
+        total = GymPayment.objects.filter(
+            trainer=self,
+            is_active=True
+        ).aggregate(total=Sum("trainer_fee"))["total"]
+        return total or Decimal("0.00")
+    
+    def payment_count(self) -> int:
+        """Count number of payments with this trainer"""
+        return GymPayment.objects.filter(
+            trainer=self,
+            is_active=True
+        ).count()
 
 
 class GymMember(models.Model):
@@ -543,8 +570,13 @@ class GymMember(models.Model):
     def duration_days(self) -> int:
         """
         Get the duration of the membership in days.
-        Currently always 30 days, but this property allows for future flexibility.
+        Returns the actual granted days based on the current membership period.
         """
+        if self.membership_start and self.membership_end:
+            # Calculate actual days in the current period (inclusive)
+            return (self.membership_end - self.membership_start).days + 1
+        
+        # Fallback to 30 if no membership exists
         from inventory.utils_gym import GYM_MEMBERSHIP_DAYS
         return GYM_MEMBERSHIP_DAYS
     
@@ -554,7 +586,7 @@ class GymMember(models.Model):
         Calculate how many days have been used in the current membership period.
         
         Returns 0 if:
-        - No membership exists (no last_payment_date)
+        - No membership exists (no membership_start)
         - Today is before the membership start date (negative days clamped to 0)
         
         Returns duration_days if:
@@ -562,11 +594,11 @@ class GymMember(models.Model):
         
         Otherwise returns the number of days elapsed since membership_start.
         """
-        if not self.last_payment_date:
+        if not self.membership_start:
             return 0
         
         today = timezone.now().date()
-        used = (today - self.last_payment_date).days
+        used = (today - self.membership_start).days
         
         # Clamp to valid range [0, duration_days]
         if used < 0:
@@ -579,18 +611,29 @@ class GymMember(models.Model):
     @property
     def days_left(self) -> int:
         """
-        Calculate remaining days in the current membership period.
+        Calculate remaining days in the current membership period (inclusive).
+        
+        Uses membership_end date to calculate remaining days accurately.
         
         Returns:
-        - duration_days (e.g., 30) on the day of payment
-        - duration_days - 1 (e.g., 29) the day after payment
+        - N when membership_end is (today + N - 1) days away
+        - 1 when membership_end is today (last day is inclusive)
         - 0 when membership has expired or never existed
         
-        This ensures the display shows "30 / 30 days" on payment day.
+        Examples:
+        - Today = Jan 1, membership_end = Jan 30: returns 30 days
+        - Today = Jan 30, membership_end = Jan 30: returns 1 day
+        - Today = Jan 31, membership_end = Jan 30: returns 0 days
         """
-        if not self.last_payment_date:
+        if not self.membership_end:
             return 0
-        return max(self.duration_days - self.days_used, 0)
+        
+        today = timezone.now().date()
+        if self.membership_end < today:
+            return 0
+        
+        # Inclusive calculation: (end - today).days + 1
+        return (self.membership_end - today).days + 1
     
     @property
     def days_left_display(self) -> str:
@@ -792,22 +835,43 @@ class GymMember(models.Model):
                 self.status = GymMemberStatus.BEHIND_SCHEDULE
         self.save(update_fields=["status"])
     
-    def set_paid(self, payment_date=None, membership_fee=None, trainer_fee=None, paid_by=None):
+    def set_paid(self, payment_date=None, membership_fee=None, trainer_fee=None, paid_by=None, amount=None):
         """
-        Mark member as paid and set 30-day membership period.
+        Mark member as paid and set prorated membership period based on amount.
         This is the core business logic for membership activation/renewal.
+        
+        Args:
+            payment_date: Date of payment (defaults to today)
+            membership_fee: Membership fee to snapshot (optional)
+            trainer_fee: Trainer fee to snapshot (optional)
+            paid_by: User who processed the payment
+            amount: Total payment amount for proration calculation (if None, uses membership_fee + trainer_fee)
         """
         from datetime import timedelta
-        from inventory.utils_gym import GYM_MEMBERSHIP_DAYS
+        from inventory.utils_gym import calculate_membership_period
         
         if payment_date is None:
             payment_date = timezone.now().date()
         
-        # Set membership period: exactly 30 days (inclusive)
-        # If payment_date = Jan 1, membership_end = Jan 30 (30 days: Jan 1-30)
+        # Calculate total amount
+        if amount is None:
+            total_amount = (membership_fee or self.membership_fee or Decimal("0.00")) + \
+                          (trainer_fee or self.trainer_fee or Decimal("0.00"))
+        else:
+            total_amount = amount
+        
+        # Calculate prorated membership period with auto-extension
+        new_start, new_end, days_granted = calculate_membership_period(
+            amount=total_amount,
+            member=self,
+            start_date=payment_date,
+            today=payment_date
+        )
+        
+        # Update member fields
         self.last_payment_date = payment_date
-        self.membership_start = payment_date
-        self.membership_end = payment_date + timedelta(days=GYM_MEMBERSHIP_DAYS - 1)
+        self.membership_start = new_start
+        self.membership_end = new_end
         self.status = GymMemberStatus.ACTIVE
         
         # Update fees if provided
@@ -826,15 +890,14 @@ class GymMember(models.Model):
         ])
         
         # Create a payment record
-        total_amount = (self.membership_fee or Decimal("0.00")) + (self.trainer_fee or Decimal("0.00"))
         if total_amount > 0:
             GymPayment.objects.create(
                 member=self,
                 amount=total_amount,
-                start_date=self.membership_start,
-                end_date=self.membership_end,
+                start_date=new_start,
+                end_date=new_end,
                 paid_by=paid_by,
-                notes=f"{'With trainer' if self.has_trainer else 'No trainer'}"
+                notes=f"{'With trainer' if self.has_trainer else 'No trainer'} - {days_granted} days"
             )
     
     def archive(self, by_user):
@@ -848,13 +911,44 @@ class GymMember(models.Model):
 
 class GymPayment(models.Model):
     """
-    Records a 30-day membership payment.
-    Each payment grants exactly 30 days.
+    Records a membership payment with optional trainer fee.
+    Membership days are calculated from membership_amount only.
     """
     member = models.ForeignKey(GymMember, on_delete=models.CASCADE, related_name="payments")
     
-    # Payment details
-    amount = models.DecimalField(max_digits=10, decimal_places=2, validators=[MinValueValidator(Decimal("0.01"))])
+    # Payment breakdown
+    membership_amount = models.DecimalField(
+        max_digits=10, 
+        decimal_places=2, 
+        default=Decimal("55000.00"),
+        validators=[MinValueValidator(Decimal("0.01"))],
+        help_text="Base membership fee (used for days calculation)"
+    )
+    trainer_fee = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        default=Decimal("0.00"),
+        validators=[MinValueValidator(Decimal("0.00"))],
+        help_text="Additional trainer fee (does not grant extra days)"
+    )
+    trainer = models.ForeignKey(
+        GymTrainer,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="payments",
+        help_text="Trainer assigned for this payment period"
+    )
+    
+    # Legacy amount field (for backward compatibility)
+    # Total amount = membership_amount + trainer_fee
+    amount = models.DecimalField(
+        max_digits=10, 
+        decimal_places=2, 
+        validators=[MinValueValidator(Decimal("0.01"))],
+        help_text="Total amount paid (membership + trainer fee)"
+    )
+    
     payment_method = models.CharField(
         max_length=20,
         choices=PaymentMethod.choices,
@@ -863,9 +957,9 @@ class GymPayment(models.Model):
         help_text="Payment method used for this membership payment"
     )
     
-    # 30-day period
+    # Membership period (calculated from membership_amount only)
     start_date = models.DateField()
-    end_date = models.DateField()  # Always start_date + 30 days
+    end_date = models.DateField()
     
     # Status
     is_active = models.BooleanField(default=True, db_index=True)
@@ -880,15 +974,28 @@ class GymPayment(models.Model):
         indexes = [
             models.Index(fields=["member", "-paid_at"]),
             models.Index(fields=["start_date", "end_date"]),
+            models.Index(fields=["trainer", "-paid_at"]),
         ]
     
     def __str__(self):
         return f"{self.member.name} - {self.start_date} to {self.end_date}"
     
+    @property
+    def total_amount(self) -> Decimal:
+        """Calculate total amount (membership + trainer fee)"""
+        return self.membership_amount + self.trainer_fee
+    
     def save(self, *args, **kwargs):
-        # Always set end_date to start_date + 30 days
-        if not self.end_date:
-            self.end_date = self.start_date + timedelta(days=30)
+        # Auto-calculate total amount if not set
+        if not self.amount:
+            self.amount = self.membership_amount + self.trainer_fee
+        
+        # End date should be set by the caller based on prorated calculation
+        # Only set default if not provided (for backward compatibility)
+        if not self.end_date and self.start_date:
+            from inventory.utils_gym import GYM_MEMBERSHIP_DAYS
+            self.end_date = self.start_date + timedelta(days=GYM_MEMBERSHIP_DAYS - 1)
+        
         super().save(*args, **kwargs)
 
 

@@ -322,7 +322,7 @@ def member_restore(request, member_id):
 @manager_required
 @require_POST
 def member_set_paid(request, member_id):
-    """Mark a member as paid / renew membership for 30 days"""
+    """Mark a member as paid / renew membership with prorated days based on default fee"""
     business = get_active_business(request)
     member = get_object_or_404(GymMember, pk=member_id, business=business)
     
@@ -340,13 +340,21 @@ def member_set_paid(request, member_id):
         else:
             member.trainer_fee = Decimal("0.00")
         
-        # Set as paid (activates for 30 days)
+        # Calculate total amount
+        total_amount = member.membership_fee + member.trainer_fee
+        
+        # Set as paid (activates with prorated days based on amount)
         member.set_paid(
             payment_date=None,  # Today
             membership_fee=member.membership_fee,
             trainer_fee=member.trainer_fee,
-            paid_by=request.user
+            paid_by=request.user,
+            amount=total_amount
         )
+        
+        # Calculate days granted for message
+        from inventory.utils_gym import calculate_prorated_days
+        days_granted = calculate_prorated_days(total_amount)
         
         # Log the renewal
         GymMemberLog.objects.create(
@@ -356,14 +364,15 @@ def member_set_paid(request, member_id):
                 "action": "renewed",
                 "membership_start": str(member.membership_start),
                 "membership_end": str(member.membership_end),
-                "amount": str((member.membership_fee or Decimal("0.00")) + (member.trainer_fee or Decimal("0.00")))
+                "amount": str(total_amount),
+                "days_granted": days_granted
             },
             performed_by=request.user
         )
     
     messages.success(
         request, 
-        f"Member '{member.name}' renewed. Membership valid until {member.membership_end.strftime('%Y-%m-%d')}."
+        f"Member '{member.name}' renewed. {days_granted} days granted. Membership valid until {member.membership_end.strftime('%Y-%m-%d')}."
     )
     return redirect("gym:member_detail", member_id=member.id)
 
@@ -484,16 +493,43 @@ def member_checkin(request, member_id):
 # ==============================================================================
 
 class GymPaymentForm(forms.Form):
-    """Form for recording a gym membership payment"""
+    """Form for recording a gym membership payment with optional trainer fee"""
     member = forms.ModelChoiceField(
         queryset=GymMember.objects.none(),
-        widget=forms.Select(attrs={"class": "form-control"})
+        widget=forms.Select(attrs={"class": "form-control", "data-cy": "gym-payment-member"})
     )
-    amount = forms.DecimalField(
+    membership_amount = forms.DecimalField(
         max_digits=10,
         decimal_places=2,
         min_value=Decimal("0.01"),
-        widget=forms.NumberInput(attrs={"class": "form-control", "step": "0.01"})
+        initial=Decimal("55000.00"),
+        label="Membership Amount (MWK)",
+        help_text="Base membership fee (days calculated from this only)",
+        widget=forms.NumberInput(attrs={
+            "class": "form-control", 
+            "step": "0.01",
+            "data-cy": "gym-payment-membership-amount"
+        })
+    )
+    trainer = forms.ModelChoiceField(
+        queryset=GymTrainer.objects.none(),
+        required=False,
+        label="Trainer (Optional)",
+        widget=forms.Select(attrs={"class": "form-control", "data-cy": "gym-payment-trainer"})
+    )
+    trainer_fee = forms.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        min_value=Decimal("0.00"),
+        initial=Decimal("0.00"),
+        required=False,
+        label="Trainer Fee (MWK)",
+        help_text="Additional trainer fee (does not add membership days)",
+        widget=forms.NumberInput(attrs={
+            "class": "form-control", 
+            "step": "0.01",
+            "data-cy": "gym-payment-trainer-fee"
+        })
     )
     start_date = forms.DateField(
         initial=date.today,
@@ -512,21 +548,46 @@ class GymPaymentForm(forms.Form):
                 is_active=True,
                 is_archived=False
             ).order_by("name")
+            self.fields["trainer"].queryset = GymTrainer.objects.filter(
+                business=business,
+                is_active=True
+            ).order_by("name")
+    
+    def clean(self):
+        cleaned_data = super().clean()
+        trainer = cleaned_data.get("trainer")
+        trainer_fee = cleaned_data.get("trainer_fee") or Decimal("0.00")
+        
+        # If trainer is selected, trainer_fee should be > 0
+        if trainer and trainer_fee <= 0:
+            self.add_error("trainer_fee", "Trainer fee is required when a trainer is selected.")
+        
+        # If trainer_fee > 0, trainer must be selected
+        if trainer_fee > 0 and not trainer:
+            self.add_error("trainer", "Please select a trainer when specifying a trainer fee.")
+        
+        return cleaned_data
 
 
 @login_required
 @require_business
 @require_business_kind(BusinessKind.GYM)
 def add_payment(request):
-    """Record a new gym membership payment (30 days)"""
+    """Record a new gym membership payment with optional trainer fee"""
     business = get_active_business(request)
     
     # Get default price from settings
     try:
         gym_settings = GymSettings.objects.get(business=business)
-        default_price = gym_settings.default_membership_price
+        default_membership_price = gym_settings.default_membership_price
     except GymSettings.DoesNotExist:
-        default_price = Decimal("50000.00")
+        default_membership_price = Decimal("55000.00")
+    
+    # Pre-select member if passed in query params
+    preselected_member_id = request.GET.get('member')
+    initial_data = {"membership_amount": default_membership_price}
+    if preselected_member_id:
+        initial_data["member"] = preselected_member_id
     
     if request.method == "POST":
         form = GymPaymentForm(business, request.POST)
@@ -534,46 +595,101 @@ def add_payment(request):
             data = form.cleaned_data
             
             with transaction.atomic():
-                # Determine start date: either today or end of previous membership
+                from inventory.utils_gym import calculate_membership_period
+                
                 member = data["member"]
-                latest_payment = member.payments.filter(is_active=True).order_by("-end_date").first()
+                membership_amount = data["membership_amount"]
+                trainer = data.get("trainer")
+                trainer_fee = data.get("trainer_fee") or Decimal("0.00")
+                start_date = data["start_date"]
                 
-                if latest_payment and latest_payment.end_date >= data["start_date"]:
-                    # Extend from previous end date
-                    start_date = latest_payment.end_date + timedelta(days=1)
-                else:
-                    # Start from specified date
-                    start_date = data["start_date"]
+                # IMPORTANT: Calculate days granted from membership_amount ONLY
+                # Trainer fee does NOT grant extra days
+                new_start, new_end, days_granted = calculate_membership_period(
+                    amount=membership_amount,  # Only membership amount, not trainer fee
+                    member=member,
+                    start_date=start_date,
+                    today=timezone.now().date()
+                )
                 
-                # Always 30 days
-                end_date = start_date + timedelta(days=30)
+                # Calculate total amount
+                total_amount = membership_amount + trainer_fee
                 
                 # Create payment
                 payment = GymPayment.objects.create(
                     member=member,
-                    amount=data["amount"],
-                    start_date=start_date,
-                    end_date=end_date,
+                    membership_amount=membership_amount,
+                    trainer=trainer,
+                    trainer_fee=trainer_fee,
+                    amount=total_amount,
+                    start_date=new_start,
+                    end_date=new_end,
                     paid_by=request.user,
-                    notes=data.get("notes", "")
+                    notes=data.get("notes", "") or f"{days_granted} days granted" + (f", trainer: {trainer.name}" if trainer else "")
                 )
                 
-                # Create wallet entry
+                # Update member's membership dates
+                member.last_payment_date = timezone.now().date()
+                member.membership_start = new_start
+                member.membership_end = new_end
+                member.status = GymMemberStatus.ACTIVE
+                
+                # Update member's trainer if provided
+                if trainer:
+                    member.trainer = trainer
+                
+                member.save(update_fields=["last_payment_date", "membership_start", "membership_end", "status", "trainer"])
+                
+                # Create wallet entry for membership
                 GymWalletEntry.objects.create(
                     business=business,
-                    amount=data["amount"],
-                    description=f"Membership payment from {member.name}",
+                    amount=total_amount,
+                    description=f"Membership payment from {member.name} ({days_granted} days)" + (f" + trainer fee" if trainer_fee > 0 else ""),
                     entry_type="income",
                     related_payment=payment,
                     created_by=request.user
                 )
+                
+                # Credit trainer's wallet if trainer_fee > 0 and trainer has linked user
+                if trainer and trainer_fee > 0:
+                    if trainer.user:
+                        try:
+                            # Use the wallet transaction system to credit trainer
+                            from wallet.models import WalletTransaction, TxnType, Ledger
+                            
+                            WalletTransaction.objects.create(
+                                ledger=Ledger.AGENT,
+                                agent=trainer.user,
+                                type=TxnType.BONUS,
+                                amount=trainer_fee,
+                                note=f"Trainer fee from {member.name} (gym)",
+                                reference=f"gym_payment_{payment.id}",
+                                effective_date=timezone.now().date(),
+                                created_by=request.user,
+                                business=business,
+                                meta={
+                                    "kind": "gym_trainer_fee",
+                                    "member_id": member.id,
+                                    "payment_id": payment.id,
+                                    "member_name": member.name,
+                                }
+                            )
+                        except Exception as e:
+                            # Log error but don't fail the payment
+                            import logging
+                            logger = logging.getLogger(__name__)
+                            logger.error(f"Failed to credit trainer wallet: {e}")
             
-            messages.success(request, f"Payment recorded. Membership valid until {end_date.strftime('%Y-%m-%d')}.")
+            success_msg = f"Payment recorded. {days_granted} days granted. Membership valid until {new_end.strftime('%Y-%m-%d')}."
+            if trainer and trainer_fee > 0:
+                success_msg += f" Trainer {trainer.name} credited with MWK {trainer_fee:,.2f}."
+            
+            messages.success(request, success_msg)
             return redirect("gym:member_detail", member_id=member.id)
     else:
-        form = GymPaymentForm(business, initial={"amount": default_price})
+        form = GymPaymentForm(business, initial=initial_data)
     
-    recent_payments = GymPayment.objects.filter(member__business=business).select_related("member", "paid_by").order_by("-paid_at")[:10]
+    recent_payments = GymPayment.objects.filter(member__business=business).select_related("member", "paid_by", "trainer").order_by("-paid_at")[:10]
     
     return render(request, "inventory/gym/payment_form.html", {
         "active_tab": "payment",  # For navigation highlighting
@@ -735,7 +851,7 @@ def gym_dashboard(request):
     except GymSettings.DoesNotExist:
         gym_settings = None
     
-    # Trainer earnings (filtered by date range)
+    # Trainer earnings/ranking (filtered by date range)
     trainers = GymTrainer.objects.filter(business=business, is_active=True).order_by("name")
     trainer_stats = []
     for trainer in trainers:
@@ -744,6 +860,22 @@ def gym_dashboard(request):
             is_active=True,
             is_archived=False,
             status=GymMemberStatus.ACTIVE
+        ).count()
+        
+        # Total trainer fees earned in date range
+        trainer_fees = GymPayment.objects.filter(
+            trainer=trainer,
+            is_active=True,
+            paid_at__gte=start_dt,
+            paid_at__lte=end_dt
+        ).aggregate(total=Sum("trainer_fee"))["total"] or Decimal("0.00")
+        
+        # Number of payments with this trainer in date range
+        payment_count = GymPayment.objects.filter(
+            trainer=trainer,
+            is_active=True,
+            paid_at__gte=start_dt,
+            paid_at__lte=end_dt
         ).count()
         
         # Revenue from payments in date range where member has this trainer
@@ -758,8 +890,13 @@ def gym_dashboard(request):
         trainer_stats.append({
             "trainer": trainer,
             "active_members": active_trainer_members,
+            "trainer_fees": trainer_fees,
+            "payment_count": payment_count,
             "revenue": revenue,
         })
+    
+    # Sort by trainer fees (descending) for rankings
+    trainer_ranking = sorted(trainer_stats, key=lambda x: x["trainer_fees"], reverse=True)
     
     return render(request, "inventory/gym/dashboard.html", {
         "business": business,
@@ -798,6 +935,7 @@ def gym_dashboard(request):
         
         # Trainer stats
         "trainer_stats": trainer_stats,
+        "trainer_ranking": trainer_ranking,  # Sorted by fees earned
         
         # Legacy fields (for backward compatibility)
         "members_active_count": active_count,

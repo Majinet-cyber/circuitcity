@@ -4,6 +4,7 @@ Gym-specific utility functions for membership status and business logic.
 from __future__ import annotations
 
 from datetime import date, timedelta
+from decimal import Decimal, ROUND_HALF_UP
 from typing import TYPE_CHECKING, Optional, TypedDict
 from django.utils import timezone
 
@@ -13,6 +14,10 @@ if TYPE_CHECKING:
 
 # Constant: 30-day membership period
 GYM_MEMBERSHIP_DAYS = 30
+
+# Gym pricing: MWK 55,000 for 30 days
+GYM_MONTHLY_FEE = Decimal("55000.00")
+GYM_DAILY_RATE = GYM_MONTHLY_FEE / Decimal("30")
 
 
 class MembershipStatus(TypedDict):
@@ -207,3 +212,94 @@ def compute_next_payment_date(last_payment_date: Optional[date], duration_days: 
         return None
     
     return last_payment_date + timedelta(days=duration_days)
+
+
+def calculate_prorated_days(amount: Decimal) -> int:
+    """
+    Calculate the number of days granted for a payment amount.
+    
+    Gym pricing: MWK 55,000 for 30 days
+    Daily rate: 55,000 / 30 = 1,833.33...
+    
+    Formula: days = ROUND_HALF_UP(amount / daily_rate), minimum 1 day
+    
+    Examples:
+        - 55,000 MWK => 30 days
+        - 110,000 MWK => 60 days
+        - 100,000 MWK => 55 days (100,000 / 1,833.33 = 54.545... => 55)
+        - 1,000 MWK => 1 day (minimum)
+    
+    Args:
+        amount: Payment amount in MWK
+    
+    Returns:
+        Number of days to grant (minimum 1)
+    """
+    if amount <= 0:
+        return 1
+    
+    # Calculate days with ROUND_HALF_UP
+    days_decimal = (amount / GYM_DAILY_RATE).quantize(Decimal("1"), rounding=ROUND_HALF_UP)
+    days = int(days_decimal)
+    
+    # Ensure minimum 1 day
+    return max(1, days)
+
+
+def calculate_membership_period(
+    amount: Decimal,
+    member: "GymMember",
+    start_date: Optional[date] = None,
+    today: Optional[date] = None
+) -> tuple[date, date, int]:
+    """
+    Calculate the membership start and end dates based on payment amount.
+    
+    Implements auto-extension logic:
+    - If member has active membership (valid_until >= today), extend from current end date
+    - Otherwise, start from specified start_date (or today)
+    
+    Args:
+        amount: Payment amount in MWK
+        member: GymMember instance
+        start_date: Desired start date (defaults to today if member inactive)
+        today: Current date for testing (defaults to timezone.now().date())
+    
+    Returns:
+        Tuple of (new_start, new_end, days_granted)
+    
+    Examples:
+        Member inactive, paying 55,000 on Jan 1:
+        - new_start = Jan 1
+        - new_end = Jan 30 (30 days inclusive)
+        - days_granted = 30
+        
+        Member active until Jan 30, paying 55,000 on Jan 15:
+        - new_start = Jan 31 (current_end + 1)
+        - new_end = Feb 29 (Jan 31 + 29 days)
+        - days_granted = 30
+        
+        Member inactive, paying 100,000 on Jan 1:
+        - new_start = Jan 1
+        - new_end = Feb 24 (55 days inclusive)
+        - days_granted = 55
+    """
+    if today is None:
+        today = timezone.now().date()
+    
+    # Calculate days to grant based on amount
+    days_granted = calculate_prorated_days(amount)
+    
+    # Determine start date based on auto-extension logic
+    if member.membership_end and member.membership_end >= today:
+        # Active member: extend from current end date
+        new_start = member.membership_end + timedelta(days=1)
+    else:
+        # Inactive member: start from specified date or today
+        new_start = start_date if start_date else today
+    
+    # Calculate end date (inclusive)
+    # For N days inclusive: end = start + (N - 1) days
+    new_end = new_start + timedelta(days=days_granted - 1)
+    
+    return new_start, new_end, days_granted

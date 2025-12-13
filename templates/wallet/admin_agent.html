@@ -1,13 +1,13 @@
 {% extends "base.html" %}
 {% load humanize %}
 
-{% block title %}Agent Wallet · Emajinet{% endblock %}
-{% block header_title %}<i class="bi bi-person-badge me-2"></i>Agent Wallet · {{ agent.first_name }} {{ agent.last_name }}{% endblock %}
+{% block title %}{% if BUSINESS_VERTICAL == "gym" %}Trainer{% else %}Agent{% endif %} Wallet · Emajinet{% endblock %}
+{% block header_title %}<i class="bi bi-person-badge me-2"></i>{% if BUSINESS_VERTICAL == "gym" %}Trainer{% else %}Agent{% endif %} Wallet · {{ agent.first_name }} {{ agent.last_name }}{% endblock %}
 
 {% block content %}
 <div class="container-xxl px-0">
 
-  <!-- ===== Agent Summary KPIs ===== -->
+  <!-- ===== {% if BUSINESS_VERTICAL == "gym" %}Trainer{% else %}Agent{% endif %} Summary KPIs ===== -->
   <div class="row g-3 mb-3">
     <div class="col-6 col-lg-3">
       <div class="card shadow-sm border-0 h-100">

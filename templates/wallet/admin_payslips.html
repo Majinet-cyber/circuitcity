@@ -26,7 +26,7 @@
             {% csrf_token %}
             <input type="hidden" name="form_kind" value="single">
             <div class="mb-3">
-              <label class="form-label">Agent</label>
+              <label class="form-label">{% if BUSINESS_VERTICAL == "gym" %}Trainer{% else %}Agent{% endif %}</label>
               <select class="form-select" name="agent_ids">
                 {% for a in agents %}
                   <option value="{{ a.id }}">{{ a.first_name }} {{ a.last_name }} ({{ a.username }})</option>

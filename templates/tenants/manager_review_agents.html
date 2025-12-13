@@ -2,8 +2,8 @@
 {% load static %}
 {% load humanize %}
 
-{% block title %}Agents · {{ tenant.name|default:"Business" }} · Emajinet{% endblock %}
-{% block header_title %}Agents{% endblock %}
+{% block title %}{% if BUSINESS_VERTICAL == "gym" %}Trainers{% else %}Agents{% endif %} · {{ tenant.name|default:"Business" }} · Emajinet{% endblock %}
+{% block header_title %}{% if BUSINESS_VERTICAL == "gym" %}Trainers{% else %}Agents{% endif %}{% endblock %}
 {% block notif_scope %}tenants{% endblock %}
 
 {% block content %}
@@ -33,7 +33,7 @@
 </style>
 
 <div class="container py-4" style="max-width:1100px;">
-  <h1 class="h5 fw-bold mb-3">Agents <span class="muted">· {{ tenant.name|default:"—" }}</span></h1>
+  <h1 class="h5 fw-bold mb-3">{% if BUSINESS_VERTICAL == "gym" %}Trainers{% else %}Agents{% endif %} <span class="muted">· {{ tenant.name|default:"—" }}</span></h1>
 
   <div class="row g-4">
     <!-- Create Invite -->

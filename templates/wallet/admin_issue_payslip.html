@@ -22,7 +22,7 @@
 
         <div class="row g-3">
           <div class="col-12">
-            <label class="form-label fw-semibold">Agent</label>
+            <label class="form-label fw-semibold">{% if BUSINESS_VERTICAL == "gym" %}Trainer{% else %}Agent{% endif %}</label>
             <select name="agent_id" class="form-select" required>
               {% for a in agents %}
                 <option value="{{ a.id }}">{{ a.get_full_name|default:a.username }}</option>

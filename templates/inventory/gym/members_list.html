@@ -67,21 +67,28 @@
                             <td>
                                 {% if member.is_archived %}
                                     <span class="badge bg-secondary-subtle text-secondary">Archived</span>
-                                {% elif member.is_active_today %}
-                                    {% if member.days_left_current <= 7 %}
-                                        <span class="badge bg-info-subtle text-info">Expiring Soon</span>
+                                {% elif member.membership_end %}
+                                    {% now "Y-m-d" as today_str %}
+                                    {% if member.membership_end|date:"Y-m-d" >= today_str %}
+                                        {% if member.days_left <= 7 %}
+                                            <span class="badge bg-info-subtle text-info">Expiring Soon</span>
+                                        {% else %}
+                                            <span class="badge bg-success-subtle text-success">Active</span>
+                                        {% endif %}
                                     {% else %}
-                                        <span class="badge bg-success-subtle text-success">Active</span>
+                                        <span class="badge bg-danger-subtle text-danger">In Arrears</span>
                                     {% endif %}
                                 {% else %}
-                                    <span class="badge bg-danger-subtle text-danger">In Arrears</span>
+                                    <span class="badge bg-warning-subtle text-warning">Pending Payment</span>
                                 {% endif %}
                             </td>
                             <td>
                                 {% if member.is_archived %}
                                     -
+                                {% elif member.membership_end %}
+                                    {{ member.days_left }} / {{ member.duration_days }} day{{ member.days_left|pluralize }}
                                 {% else %}
-                                    {{ member.days_left_current }} day{{ member.days_left_current|pluralize }}
+                                    <span class="text-muted">-</span>
                                 {% endif %}
                             </td>
                             <td>
@@ -100,15 +107,16 @@
                                     <a href="{% url 'gym:member_detail' member.id %}" class="btn btn-sm btn-outline-primary">
                                         <i class="bi bi-eye"></i> View
                                     </a>
-                                    {% if not member.is_archived and not member.is_active_today %}
-                                        <form method="post" action="{% url 'gym:member_set_paid' member.id %}" style="display: inline;">
-                                            {% csrf_token %}
-                                            <button type="submit" class="btn btn-sm btn-outline-success" title="Mark as Paid / Renew">
-                                                <i class="bi bi-cash-coin"></i> Pay
-                                            </button>
-                                        </form>
-                                    {% endif %}
                                     {% if not member.is_archived %}
+                                        {% now "Y-m-d" as today_str %}
+                                        {% if not member.membership_end or member.membership_end|date:"Y-m-d" < today_str %}
+                                            <form method="post" action="{% url 'gym:member_set_paid' member.id %}" style="display: inline;">
+                                                {% csrf_token %}
+                                                <button type="submit" class="btn btn-sm btn-outline-success" title="Mark as Paid / Renew">
+                                                    <i class="bi bi-cash-coin"></i> Pay
+                                                </button>
+                                            </form>
+                                        {% endif %}
                                         <form method="post" action="{% url 'gym:member_checkin' member.id %}" style="display: inline;">
                                             {% csrf_token %}
                                             <button type="submit" class="btn btn-sm btn-outline-info" title="Check In">

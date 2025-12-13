@@ -368,20 +368,20 @@
         <div id="recoStatusAdmin" class="muted" style="font-size:.9rem; margin-top:.4rem">Loading…</div>
       </div>
 
-      <!-- Agent performance -->
+      <!-- {% if BUSINESS_VERTICAL == "gym" %}Trainer{% else %}Agent{% endif %} performance -->
       <div class="row" style="justify-content:space-between; align-items:center; padding:1rem 1rem 0">
-        <h3 class="brand" style="margin:0">Agent Performance</h3>
+        <h3 class="brand" style="margin:0">{% if BUSINESS_VERTICAL == "gym" %}Trainer{% else %}Agent{% endif %} Performance</h3>
         <div class="row">
-          <input id="agentSearch" class="input" placeholder="Search agent… ( / )" aria-label="Search agents">
+          <input id="agentSearch" class="input" placeholder="Search {% if BUSINESS_VERTICAL == "gym" %}trainer{% else %}agent{% endif %}… ( / )" aria-label="Search {% if BUSINESS_VERTICAL == "gym" %}trainers{% else %}agents{% endif %}">
           <button id="clearSearch" class="btn ghost" type="button">Clear</button>
         </div>
       </div>
 
       <div class="table-wrap" style="margin:.75rem 1rem 1.25rem;">
-        <table id="agentTable" class="data" role="table" aria-label="Agent performance">
+        <table id="agentTable" class="data" role="table" aria-label="{% if BUSINESS_VERTICAL == "gym" %}Trainer{% else %}Agent{% endif %} performance">
           <thead>
             <tr>
-              <th data-sort="text">Agent</th>
+              <th data-sort="text">{% if BUSINESS_VERTICAL == "gym" %}Trainer{% else %}Agent{% endif %}</th>
               <th data-sort="num">Total Sales</th>
               <th data-sort="num">Current Stock</th>
               <th data-sort="text">Last Arrival Log</th>

@@ -1516,15 +1516,29 @@ def stock_list(request: HttpRequest, *args, **kwargs) -> HttpResponse:
 
     # Add manager agents for stock assignment (if manager)
     manager_agents = []
+    transfer_agents_by_location = []
     try:
         from tenants.models import Membership
+        from collections import defaultdict
         if request.user.is_staff or getattr(request.user, 'is_manager', False) or hasattr(request, 'membership'):
-            # Get active agent memberships for current business
-            manager_agents = Membership.objects.filter(
+            # Get active agent AND manager memberships for current business
+            memberships = Membership.objects.filter(
                 business=biz,
-                role='AGENT',
+                role__in=['AGENT', 'MANAGER'],
                 status='ACTIVE'
-            ).select_related('user', 'location').order_by('user__first_name', 'user__last_name')
+            ).select_related('user', 'location').order_by('location__name', 'user__first_name', 'user__last_name')
+            
+            # Keep manager_agents for backwards compatibility
+            manager_agents = [m for m in memberships if m.role == 'AGENT']
+            
+            # Group by location for transfer modal
+            by_location = defaultdict(list)
+            for m in memberships:
+                location_name = m.location.name if m.location else 'No Location'
+                by_location[location_name].append(m)
+            
+            # Convert to sorted list of tuples: [(location_name, [memberships...]), ...]
+            transfer_agents_by_location = sorted(by_location.items(), key=lambda x: (x[0] == 'No Location', x[0]))
     except Exception:
         pass
 
@@ -1567,6 +1581,7 @@ def stock_list(request: HttpRequest, *args, **kwargs) -> HttpResponse:
         "sum_selling": sum_selling_amt,
         "active_tab": "stock_list",  # ✅ For sidebar nav highlighting
         "manager_agents": manager_agents,  # For stock assignment UI
+        "transfer_agents_by_location": transfer_agents_by_location,  # Grouped agents for transfer modal
         "show_archived": show_archived,
         "include_archived": show_archived,  # Alias for template compatibility
         "is_manager": user_is_manager,

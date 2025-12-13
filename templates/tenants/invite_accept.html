@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 {% load static %}
-{% block title %}Join as Agent · {{ invite.business.name }}{% endblock %}
+{% block title %}Join as {% if invite.business.business_kind == "gym" %}Trainer{% else %}Agent{% endif %} · {{ invite.business.name }}{% endblock %}
 
 {# Hide app chrome for this page #}
 {% block sidebar %}{% endblock %}
@@ -83,7 +83,7 @@
     <!-- Header -->
     <div class="invite-head">
       <div class="d-flex align-items-center gap-2 mb-2">
-        <div class="fw-bold text-uppercase small text-secondary" style="font-size:0.7rem;">Agent Invite</div>
+        <div class="fw-bold text-uppercase small text-secondary" style="font-size:0.7rem;">{% if invite.business.business_kind == "gym" %}Trainer{% else %}Agent{% endif %} Invite</div>
         {% if invite.expires_at %}
           <div class="ms-auto">
             <span class="badge-soft" id="expiryBadge" title="{{ invite.expires_at|date:'c' }}">checking expiry…</span>

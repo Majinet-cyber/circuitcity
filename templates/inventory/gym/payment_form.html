@@ -38,12 +38,38 @@
                     </div>
 
                     <div class="mb-3">
-                        <label for="{{ form.amount.id_for_label }}" class="form-label">
-                            Amount (MWK) <span class="text-danger">*</span>
+                        <label for="{{ form.membership_amount.id_for_label }}" class="form-label">
+                            Membership Amount (MWK) <span class="text-danger">*</span>
                         </label>
-                        {{ form.amount }}
-                        {% if form.amount.errors %}
-                            <div class="text-danger small mt-1">{{ form.amount.errors }}</div>
+                        {{ form.membership_amount }}
+                        <small class="form-text text-muted d-block mt-1">
+                            Base membership fee (MWK 55,000 = 30 days). Days are calculated from this amount only.
+                        </small>
+                        {% if form.membership_amount.errors %}
+                            <div class="text-danger small mt-1">{{ form.membership_amount.errors }}</div>
+                        {% endif %}
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="{{ form.trainer.id_for_label }}" class="form-label">
+                            Trainer (Optional)
+                        </label>
+                        {{ form.trainer }}
+                        {% if form.trainer.errors %}
+                            <div class="text-danger small mt-1">{{ form.trainer.errors }}</div>
+                        {% endif %}
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="{{ form.trainer_fee.id_for_label }}" class="form-label">
+                            Trainer Fee (MWK)
+                        </label>
+                        {{ form.trainer_fee }}
+                        <small class="form-text text-muted d-block mt-1">
+                            Additional fee for trainer service (does not add extra membership days).
+                        </small>
+                        {% if form.trainer_fee.errors %}
+                            <div class="text-danger small mt-1">{{ form.trainer_fee.errors }}</div>
                         {% endif %}
                     </div>
 
@@ -53,7 +79,7 @@
                         </label>
                         {{ form.start_date }}
                         <small class="form-text text-muted">
-                            Membership will automatically extend by 30 days from this date
+                            Auto-extends from current end date if member is active.
                         </small>
                         {% if form.start_date.errors %}
                             <div class="text-danger small mt-1">{{ form.start_date.errors }}</div>
@@ -71,8 +97,8 @@
                     </div>
 
                     <div class="d-flex gap-2">
-                        <button type="submit" class="btn btn-primary">
-                            <i class="bi bi-check-circle"></i> Record Payment
+                        <button type="submit" class="btn btn-primary" data-cy="gym-payment-submit">
+                            <i class="bi bi-check-circle"></i> Mark as Paid
                         </button>
                         <a href="{% url 'gym:members_list' %}" class="btn btn-outline-secondary">
                             Cancel
@@ -118,12 +144,32 @@
                     <i class="bi bi-info-circle"></i> Membership Information
                 </h5>
                 <p class="text-muted small mb-3">
-                    Each membership payment provides access for 30 days from the start date.
+                    Membership days are prorated based on the payment amount.
                 </p>
                 <hr>
                 <div class="mb-3">
-                    <label class="text-muted small">Standard Membership</label>
-                    <div class="fw-semibold">30 Days</div>
+                    <label class="text-muted small">Pricing</label>
+                    <div class="fw-semibold">MWK 55,000 = 30 Days</div>
+                    <div class="small text-muted">Daily rate: MWK 1,833.33</div>
+                </div>
+                <div class="mb-3">
+                    <label class="text-muted small">Membership Examples</label>
+                    <ul class="small text-muted mb-0">
+                        <li>MWK 55,000 → 30 days</li>
+                        <li>MWK 100,000 → 55 days</li>
+                        <li>MWK 110,000 → 60 days</li>
+                    </ul>
+                </div>
+                <hr>
+                <div class="mb-3">
+                    <label class="text-muted small">Trainer Fee</label>
+                    <p class="small text-muted mb-0">
+                        <strong>Optional:</strong> If member has a trainer, add the trainer fee (e.g., MWK 15,000).
+                        The trainer fee does NOT add membership days.
+                    </p>
+                    <p class="small text-muted mb-0 mt-2">
+                        <strong>Total paid</strong> = Membership amount + Trainer fee
+                    </p>
                 </div>
                 <hr>
                 <p class="text-muted small mb-0">
