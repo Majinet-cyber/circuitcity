@@ -754,3 +754,90 @@ a[href*="/locations/switch"],
 .modal-backdrop {
   z-index: 20040 !important;
 }
+
+/* ==========================================================================
+   GYM-SPECIFIC FIXES – Table clipping & badge truncation
+   ========================================================================== */
+
+/* A) Fix table clipping – wrap tables with horizontal scroll */
+.gym-table-responsive {
+  width: 100%;
+  overflow-x: auto;
+  overflow-y: visible;
+  -webkit-overflow-scrolling: touch;
+  border: 1px solid var(--cc-border);
+  border-radius: var(--cc-radius);
+}
+
+/* Prevent flex shrinking that causes layout issues */
+.gym-table-responsive * {
+  min-width: 0;
+}
+
+/* B) Fix pill/badge text truncation – status pills in gym tables must show full text */
+.gym-table-responsive .status-pill,
+.gym-table-responsive .badge,
+.gym-table-responsive .chip,
+.gym-table-responsive .pill,
+.gym-table-responsive .status-badge {
+  width: auto !important;
+  max-width: none !important;
+  overflow: visible !important;
+  text-overflow: unset !important;
+  white-space: nowrap !important;
+  display: inline-flex !important;
+  align-items: center;
+  justify-content: center;
+  padding: 6px 10px;
+  line-height: 1.1;
+}
+
+/* C) Ensure key columns don't collapse too aggressively */
+.gym-table-responsive td.col-today,
+.gym-table-responsive th.col-today,
+.gym-table-responsive td.col-actions,
+.gym-table-responsive th.col-actions,
+.gym-table-responsive table td:nth-last-child(1),
+.gym-table-responsive table th:nth-last-child(1),
+.gym-table-responsive table td:nth-last-child(2),
+.gym-table-responsive table th:nth-last-child(2) {
+  min-width: 110px;
+  white-space: nowrap;
+}
+
+/* Ensure table cells in gym tables don't wrap prematurely */
+.gym-table-responsive table th,
+.gym-table-responsive table td {
+  white-space: nowrap;
+  padding: 10px 12px;
+}
+
+/* Allow text-wrap class to override when needed */
+.gym-table-responsive table td.text-wrap,
+.gym-table-responsive table th.text-wrap {
+  white-space: normal;
+}
+
+/* D) Responsive adjustments for mobile */
+@media (max-width: 991.98px) {
+  .gym-table-responsive {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+  
+  /* Ensure proper spacing on mobile */
+  .gym-table-responsive table {
+    min-width: 800px; /* Force horizontal scroll on narrow screens */
+  }
+}
+
+/* E) Fix button groups in gym tables from wrapping */
+.gym-table-responsive .btn-group {
+  white-space: nowrap;
+  display: inline-flex;
+  flex-wrap: nowrap;
+}
+
+.gym-table-responsive .btn-group .btn {
+  flex-shrink: 0;
+}

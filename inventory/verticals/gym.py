@@ -63,8 +63,16 @@ def dashboard(request):
     
     # Monthly Recurring Revenue (current month)
     now = timezone.now()
+    today = now.date()
+    yesterday = today - timedelta(days=1)
     month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
     month_end = (month_start + timedelta(days=32)).replace(day=1) - timedelta(seconds=1)
+    
+    # Date ranges for metrics
+    today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+    today_end = now.replace(hour=23, minute=59, second=59, microsecond=999999)
+    yesterday_start = (now - timedelta(days=1)).replace(hour=0, minute=0, second=0, microsecond=0)
+    yesterday_end = (now - timedelta(days=1)).replace(hour=23, minute=59, second=59, microsecond=999999)
     
     current_month_payments = GymPayment.objects.filter(
         member__business=business,
@@ -94,24 +102,51 @@ def dashboard(request):
         # This ensures dashboard doesn't crash before migrations are applied
         payment_mix = []
     
-    # Costs from wallet (current month expenses)
-    costs = GymWalletEntry.objects.filter(
-        business=business,
-        entry_type="expense",
-        created_at__gte=month_start,
-        created_at__lte=month_end
+    # ============================================================================
+    # COSTS: Use admin wallet costs (same source as /wallet/admin/costs/)
+    # This fixes the bug where costs added in admin wallet didn't show on dashboard
+    # ============================================================================
+    from inventory.utils_gym import get_business_costs_for_period
+    
+    costs_today = get_business_costs_for_period(business, today, today)
+    costs_yesterday = get_business_costs_for_period(business, yesterday, yesterday)
+    costs_this_month = get_business_costs_for_period(business, month_start.date(), today)
+    
+    # ============================================================================
+    # REVENUE: Calculate from GymPayment for today, yesterday, this month
+    # ============================================================================
+    revenue_today = GymPayment.objects.filter(
+        member__business=business,
+        is_active=True,
+        paid_at__gte=today_start,
+        paid_at__lte=today_end
     ).aggregate(total=Sum("amount"))["total"] or Decimal("0.00")
     
-    # Total revenue (current month income from wallet)
-    revenue = GymWalletEntry.objects.filter(
-        business=business,
-        entry_type="income",
-        created_at__gte=month_start,
-        created_at__lte=month_end
+    revenue_yesterday = GymPayment.objects.filter(
+        member__business=business,
+        is_active=True,
+        paid_at__gte=yesterday_start,
+        paid_at__lte=yesterday_end
     ).aggregate(total=Sum("amount"))["total"] or Decimal("0.00")
     
-    # Profit
-    profit = revenue - costs
+    revenue_this_month = GymPayment.objects.filter(
+        member__business=business,
+        is_active=True,
+        paid_at__gte=month_start,
+        paid_at__lte=month_end
+    ).aggregate(total=Sum("amount"))["total"] or Decimal("0.00")
+    
+    # ============================================================================
+    # PROFIT: Calculate profit = revenue - costs for each period
+    # ============================================================================
+    profit_today = revenue_today - costs_today
+    profit_yesterday = revenue_yesterday - costs_yesterday
+    profit_this_month = revenue_this_month - costs_this_month
+    
+    # Legacy context variables (for backward compatibility)
+    costs = costs_this_month
+    revenue = revenue_this_month
+    profit = profit_this_month
     
     # Trainer earnings (this month)
     from inventory.models_verticals import TrainerFee
@@ -163,12 +198,23 @@ def dashboard(request):
             "members_active_count": members_active_count,  # Template expects this
             "members_in_arrears": members_in_arrears,
             
-            # Financial KPIs (current month)
+            # Financial KPIs - Daily metrics (today, yesterday, this month)
+            "costs_today": costs_today,
+            "costs_yesterday": costs_yesterday,
+            "costs_this_month": costs_this_month,
+            "revenue_today": revenue_today,
+            "revenue_yesterday": revenue_yesterday,
+            "revenue_this_month": revenue_this_month,
+            "profit_today": profit_today,
+            "profit_yesterday": profit_yesterday,
+            "profit_this_month": profit_this_month,
+            
+            # Financial KPIs (legacy/default values for backward compatibility)
             "mrr": mrr,
             "payment_count": payment_count,
-            "revenue": revenue,
-            "costs": costs,
-            "profit": profit,
+            "revenue": revenue,  # Defaults to this month
+            "costs": costs,  # Defaults to this month
+            "profit": profit,  # Defaults to this month
             "payment_mix": payment_mix,
             "trainer_earnings": trainer_earnings,
             
