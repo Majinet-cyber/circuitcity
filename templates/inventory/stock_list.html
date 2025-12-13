@@ -33,7 +33,8 @@
     --chart-grid:   rgba(148,163,184,.28);
   }
 
-  section{max-width:1200px;margin-inline:auto;color:var(--cc-text)}
+  section{max-width:1200px;margin-inline:auto;color:var(--cc-text);padding:0 1rem}
+  @media (max-width: 768px){ section{ padding:0 0.5rem; } }
 
   /* ===== Glassmorphic buttons ===== */
   .glass-btn,
@@ -127,11 +128,14 @@
   }
   #stockTable thead th{
     position:sticky; top:0; z-index:1; font-weight:700; color:#fff;
-    background:var(--cc-accent); letter-spacing:.02em;
+    background:var(--cc-accent); letter-spacing:.02em; padding:.8rem .75rem;
   }
   #stockTable th,#stockTable td{ padding:.7rem .75rem; border-bottom:1px solid var(--cc-border); vertical-align:middle }
-  #stockTable tbody tr:hover td{ background: color-mix(in oklab, var(--cc-accent) 12%, transparent); color:#0b1220 }
+  #stockTable tbody tr:hover td{ background: color-mix(in oklab, var(--cc-accent) 8%, transparent); transition:background .15s ease }
   #stockTable td.num{ text-align:right; font-variant-numeric:tabular-nums }
+  @media (max-width: 991px){
+    #stockTable th,#stockTable td{ padding:.5rem .4rem; font-size:.9rem }
+  }
 
   .table-mobile{ width:100%; border:1px solid var(--cc-border); border-radius:12px; overflow:hidden; background:var(--cc-panel); box-shadow:var(--cc-shadow) }
   .table-mobile tr{ border-bottom:1px solid var(--cc-border) }
@@ -140,9 +144,10 @@
     content: attr(data-label) " · "; color:var(--cc-muted); font-weight:700; margin-right:.25rem;
   }
 
-  .badge-chip{ display:inline-block; padding:.22rem .55rem; border-radius:999px; border:1px solid var(--cc-border); font-weight:700 }
+  .badge-chip{ display:inline-block; padding:.22rem .55rem; border-radius:999px; border:1px solid var(--cc-border); font-weight:700; white-space:nowrap }
   .badge-chip.green{ background:#ecfdf5; color:#065f46; border-color:#a7f3d0 }
   .badge-chip.red{ background:#fef2f2; color:#991b1b; border-color:#fecaca }
+  .badge.rounded-pill{ white-space:nowrap; font-weight:600; padding:.25rem .65rem }
 
   .charts{ display:grid; grid-template-columns:1.4fr 1fr; gap:14px; margin-top:14px }
   .chart-card{ background:var(--cc-panel-2); border:1px solid var(--cc-border); border-radius:14px; padding:12px; position:relative; overflow:hidden; color:var(--cc-text) }
@@ -180,11 +185,25 @@
   }
 
   /* small action chips */
-  .act-chip{ display:inline-flex; align-items:center; gap:.4rem; padding:.35rem .6rem; border-radius:10px; font-weight:700; text-decoration:none; }
+  .act-chip{ display:inline-flex; align-items:center; gap:.4rem; padding:.35rem .6rem; border-radius:10px; font-weight:700; text-decoration:none; white-space:nowrap; font-size:.85rem }
   .act-edit{ background:#eef2ff; color:#1e40af; border:1px solid #c7d2fe; }
   .act-price{ background:#f0fdf4; color:#166534; border:1px solid #bbf7d0; }
   .act-del{ background:#fef2f2; color:#991b1b; border:1px solid #fecaca; }
   .act-wrap{ display:flex; gap:.4rem; flex-wrap:wrap; }
+  @media (max-width: 991px){
+    .act-wrap{ flex-direction:column; align-items:stretch }
+    .act-chip{ justify-content:center; padding:.45rem .7rem }
+  }
+  
+  /* Kebab dropdown for mobile actions */
+  .actions-kebab{ position:relative; display:inline-block }
+  .kebab-btn{ background:transparent; border:none; padding:.4rem .6rem; cursor:pointer; color:var(--cc-text); font-size:1.2rem; line-height:1; transition:background .15s }
+  .kebab-btn:hover{ background:rgba(37,99,235,.1); border-radius:.5rem }
+  .kebab-menu{ display:none; position:absolute; right:0; top:100%; min-width:180px; background:var(--cc-panel); border:1px solid var(--cc-border); border-radius:.75rem; box-shadow:0 8px 24px rgba(0,0,0,.15); z-index:100; margin-top:.25rem; padding:.35rem 0 }
+  .kebab-menu.show{ display:block }
+  .kebab-menu a, .kebab-menu button{ display:block; width:100%; text-align:left; padding:.5rem .85rem; background:transparent; border:none; color:var(--cc-text); text-decoration:none; font-size:.9rem; cursor:pointer; transition:background .12s }
+  .kebab-menu a:hover, .kebab-menu button:hover{ background:rgba(37,99,235,.08) }
+  .kebab-menu a i, .kebab-menu button i{ margin-right:.5rem; width:1rem; display:inline-block }
 </style>
 {% endblock %}
 
@@ -308,9 +327,9 @@
       <table id="stockTable" data-kb-table>
         <thead>
           <tr>
-            <th>IMEI</th><th>Product</th><th>Status</th><th>Order Price</th><th>Selling Price</th><th>Location</th><th>Agent</th><th>Owner</th>
+            <th>IMEI</th><th>Product</th><th>Status</th><th class="d-none d-lg-table-cell">Order Price</th><th class="d-none d-lg-table-cell">Selling Price</th><th class="d-none d-lg-table-cell">Location</th><th>Agent</th>
             {% if IS_MANAGER|default:False or request.user.is_staff or request.user.is_superuser or request.user.profile.is_manager %}
-              <th style="width:220px">Actions</th>
+              <th class="text-end">Actions</th>
             {% endif %}
           </tr>
         </thead>
@@ -327,65 +346,24 @@
                     <span class="badge-chip green">In stock</span>
                   {% endif %}
                 </td>
-                <td class="num">{% if it.order_price is not None %}{{ it.order_price|floatformat:0|intcomma }}{% else %}—{% endif %}</td>
-                <td class="num">{% if it.selling_price is not None %}{{ it.selling_price|floatformat:0|intcomma }}{% else %}—{% endif %}</td>
-                <td>{% if it.current_location_id %}{{ it.current_location.name }}{% else %}—{% endif %}</td>
-                <td>{% if it.assigned_agent_id %}{{ it.assigned_agent.username }}{% else %}—{% endif %}</td>
+                <td class="num d-none d-lg-table-cell">{% if it.order_price is not None %}{{ it.order_price|floatformat:0|intcomma }}{% else %}—{% endif %}</td>
+                <td class="num d-none d-lg-table-cell">{% if it.selling_price is not None %}{{ it.selling_price|floatformat:0|intcomma }}{% else %}—{% endif %}</td>
+                <td class="d-none d-lg-table-cell">{% if it.current_location_id %}{{ it.current_location.name }}{% else %}—{% endif %}</td>
                 <td>
-                  {% if it.assigned_agent %}
-                    <span class="badge rounded-pill bg-light text-dark">
-                      {{ it.assigned_agent.get_full_name|default:it.assigned_agent.username }}
+                  {% if it.assigned_agent_id %}
+                    <span class="badge rounded-pill bg-light text-dark border">
+                      {{ it.assigned_agent.get_full_name|default:it.assigned_agent.username|default:it.assigned_agent.email }}
                     </span>
                   {% else %}
-                    <span class="badge rounded-pill bg-secondary-subtle text-dark">
-                      Manager
-                    </span>
+                    <span class="text-muted">—</span>
                   {% endif %}
                 </td>
-                {% if IS_MANAGER|default:False or request.user.is_staff or request.user.is_superuser or request.user.profile.is_manager %}
-                  <td>
-                    <div class="act-wrap">
-                      {# Assign Stock (managers only) #}
-                      {% if it.status|lower != 'sold' %}
-                        <button
-                          class="act-chip tap"
-                          style="background:#eef2ff;color:#1e40af;border:1px solid #c7d2fe;cursor:pointer"
-                          data-bs-toggle="modal"
-                          data-bs-target="#assignStockModal"
-                          data-item-id="{{ it.id }}"
-                          data-item-label="{{ it.imei|default:'' }} · {{ it.product }}"
-                          title="Assign stock"
-                          type="button"
-                        >
-                          <i class="bi bi-person-plus"></i> Assign
-                        </button>
-                      {% endif %}
-
-                      {# Edit (full edit screen) #}
-                      <a class="act-chip act-edit tap" href="/inventory/stock/{{ it.id }}/edit/" title="Edit">
-                        <i class="bi bi-pencil-square"></i> Edit
-                      </a>
-
-                      {# Edit Price (same edit page, hint tab=price) #}
-                      <a class="act-chip act-price tap" href="/inventory/stock/{{ it.id }}/edit/?tab=price" title="Edit Price">
-                        <i class="bi bi-currency-exchange"></i> Edit Price
-                      </a>
-
-                      {# Delete only when NOT sold #}
-                      {% if it.status|lower != 'sold' %}
-                        <form method="post" action="/inventory/stock/{{ it.id }}/delete/" onsubmit="return confirm('Delete this in-stock item permanently?');" style="display:inline">
-                          {% csrf_token %}
-                          <button type="submit" class="act-chip act-del tap">
-                            <i class="bi bi-trash"></i> Delete
-                          </button>
-                        </form>
-                      {% endif %}
-                    </div>
-                  </td>
-                {% endif %}
+                <td class="text-end">
+                  {% include "inventory/partials/_stock_row_actions.html" with item=it is_manager=IS_MANAGER show_archived=show_archived %}
+                </td>
               </tr>
             {% empty %}
-              <tr><td colspan="{% if IS_MANAGER|default:False or request.user.is_staff or request.user.is_superuser or request.user.profile.is_manager %}9{% else %}8{% endif %}" style="text-align:center;color:var(--cc-muted)">
+              <tr><td colspan="8" style="text-align:center;color:var(--cc-muted)">
                 No stock yet. <a href="{{ scan_in_url|default:'#' }}" class="ms-1">Scan IN your first item →</a>
               </td></tr>
             {% endfor %}
@@ -401,21 +379,18 @@
                   <span class="badge-chip green">In stock</span>
                 {% endif %}
               </td>
-              <td class="num">{{ row.order_price }}</td>
-              <td class="num">{{ row.selling_price|default:"—" }}</td>
-              <td>{{ row.location }}</td>
+              <td class="num d-none d-lg-table-cell">{{ row.order_price }}</td>
+              <td class="num d-none d-lg-table-cell">{{ row.selling_price|default:"—" }}</td>
+              <td class="d-none d-lg-table-cell">{{ row.location }}</td>
               <td>{{ row.agent }}</td>
-              <td>—</td>
               {# Fallback rows have no guaranteed id → omit actions to avoid 500s #}
-              {% if IS_MANAGER|default:False or request.user.is_staff or request.user.is_superuser or request.user.profile.is_manager %}
-                <td>
-                  <div class="text-muted">—</div>
-                </td>
-              {% endif %}
+              <td class="text-end">
+                <span class="text-muted">—</span>
+              </td>
             </tr>
             {% empty %}
             <tr>
-              <td colspan="{% if IS_MANAGER|default:False or request.user.is_staff or request.user.is_superuser or request.user.profile.is_manager %}9{% else %}8{% endif %}" style="text-align:center;color:var(--cc-muted)">
+              <td colspan="8" style="text-align:center;color:var(--cc-muted)">
                 No stock yet. <a href="{{ scan_in_url|default:'#' }}" class="ms-1">Scan IN your first item →</a>
               </td>
             </tr>
@@ -441,55 +416,18 @@
                   <span class="badge-chip green">In stock</span>
                 {% endif %}
               </td>
-              <td data-label="Order Price" class="num">{% if it.order_price is not None %}{{ it.order_price|floatformat:0|intcomma }}{% else %}—{% endif %}</td>
-              <td data-label="Selling Price" class="num">{% if it.selling_price is not None %}{{ it.selling_price|floatformat:0|intcomma }}{% else %}—{% endif %}</td>
-              <td data-label="Location">{% if it.current_location_id %}{{ it.current_location.name }}{% else %}—{% endif %}</td>
-              <td data-label="Agent">{% if it.assigned_agent_id %}{{ it.assigned_agent.username }}{% else %}—{% endif %}</td>
-              <td data-label="Owner">
-                {% if it.assigned_agent %}
-                  <span class="badge rounded-pill bg-light text-dark">
-                    {{ it.assigned_agent.get_full_name|default:it.assigned_agent.username }}
+              <td data-label="Agent">
+                {% if it.assigned_agent_id %}
+                  <span class="badge rounded-pill bg-light text-dark border">
+                    {{ it.assigned_agent.get_full_name|default:it.assigned_agent.username|default:it.assigned_agent.email }}
                   </span>
                 {% else %}
-                  <span class="badge rounded-pill bg-secondary-subtle text-dark">
-                    Manager
-                  </span>
+                  <span class="text-muted">—</span>
                 {% endif %}
               </td>
-              {% if IS_MANAGER|default:False or request.user.is_staff or request.user.is_superuser or request.user.profile.is_manager %}
-                <td data-label="Actions">
-                  <div class="act-wrap">
-                    {% if it.status|lower != 'sold' %}
-                      <button
-                        class="act-chip tap"
-                        style="background:#eef2ff;color:#1e40af;border:1px solid #c7d2fe;cursor:pointer"
-                        data-bs-toggle="modal"
-                        data-bs-target="#assignStockModal"
-                        data-item-id="{{ it.id }}"
-                        data-item-label="{{ it.imei|default:'' }} · {{ it.product }}"
-                        title="Assign stock"
-                        type="button"
-                      >
-                        <i class="bi bi-person-plus"></i> Assign
-                      </button>
-                    {% endif %}
-                    <a class="act-chip act-edit tap" href="/inventory/stock/{{ it.id }}/edit/" title="Edit">
-                      <i class="bi bi-pencil-square"></i> Edit
-                    </a>
-                    <a class="act-chip act-price tap" href="/inventory/stock/{{ it.id }}/edit/?tab=price" title="Edit Price">
-                      <i class="bi bi-currency-exchange"></i> Edit Price
-                    </a>
-                    {% if it.status|lower != 'sold' %}
-                      <form method="post" action="/inventory/stock/{{ it.id }}/delete/" onsubmit="return confirm('Delete this in-stock item permanently?');" style="display:inline">
-                        {% csrf_token %}
-                        <button type="submit" class="act-chip act-del tap">
-                          <i class="bi bi-trash"></i> Delete
-                        </button>
-                      </form>
-                    {% endif %}
-                  </div>
-                </td>
-              {% endif %}
+              <td data-label="Actions">
+                {% include "inventory/partials/_stock_row_actions.html" with item=it is_manager=IS_MANAGER show_archived=show_archived %}
+              </td>
             </tr>
             {% endfor %}
           {% else %}
@@ -504,14 +442,10 @@
                   <span class="badge-chip green">In stock</span>
                 {% endif %}
               </td>
-              <td data-label="Order Price" class="num">{{ row.order_price }}</td>
-              <td data-label="Selling Price" class="num">{{ row.selling_price|default:"—" }}</td>
-              <td data-label="Location">{{ row.location }}</td>
               <td data-label="Agent">{{ row.agent }}</td>
-              <td data-label="Owner">—</td>
-              {% if IS_MANAGER|default:False or request.user.is_staff or request.user.is_superuser or request.user.profile.is_manager %}
-                <td data-label="Actions"><div class="text-muted">—</div></td>
-              {% endif %}
+              <td data-label="Actions">
+                <span class="text-muted">—</span>
+              </td>
             </tr>
             {% endfor %}
           {% endif %}
@@ -592,6 +526,12 @@
   </div>
 </section>
 
+{# ============================================================ #}
+{# MODALS: Defined ONCE at page level (outside responsive tables)
+   This prevents duplicate modal IDs from desktop/mobile tables.
+   Each modal is dynamically populated via JS when action button is clicked. #}
+{# ============================================================ #}
+
 <!-- Assign Stock Modal -->
 {% if IS_MANAGER|default:False or request.user.is_staff or request.user.is_superuser or request.user.profile.is_manager %}
 <div class="modal fade" id="assignStockModal" tabindex="-1" aria-hidden="true">
@@ -629,6 +569,61 @@
         <div class="modal-footer" style="border-top:1px solid var(--cc-border)">
           <button class="btn btn-outline-secondary" type="button" data-bs-dismiss="modal">Cancel</button>
           <button class="btn btn-primary" type="submit">Save</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- Transfer Stock Modal -->
+<div class="modal fade" id="transferModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content" style="background:var(--cc-panel);border:1px solid var(--cc-border);border-radius:14px;box-shadow:var(--cc-shadow)">
+      <form method="post" id="transferForm">
+        {% csrf_token %}
+        <div class="modal-header" style="border-bottom:1px solid var(--cc-border)">
+          <h5 class="modal-title">Transfer Stock</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+          <p class="mb-2">Transfer stock <strong id="transferImei"></strong> to:</p>
+          <select name="agent_id" class="form-select" style="padding:.5rem .6rem;border-radius:.55rem;border:1px solid var(--cc-border);background:var(--cc-panel);color:var(--cc-text);min-height:44px">
+            <option value="none">Manager Pool (Unassign)</option>
+            {% for membership in manager_agents %}
+              <option value="{{ membership.user.id }}">{{ membership.user.get_full_name|default:membership.user.username }} {% if membership.location %}({{ membership.location.name }}){% endif %}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="modal-footer" style="border-top:1px solid var(--cc-border)">
+          <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-primary">Transfer</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- Edit IMEI Modal -->
+<div class="modal fade" id="editImeiModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content" style="background:var(--cc-panel);border:1px solid var(--cc-border);border-radius:14px;box-shadow:var(--cc-shadow)">
+      <form method="post" id="editImeiForm">
+        {% csrf_token %}
+        <div class="modal-header" style="border-bottom:1px solid var(--cc-border)">
+          <h5 class="modal-title">Edit IMEI</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+          <p class="mb-2">Current IMEI: <strong id="currentImei"></strong></p>
+          <label class="form-label">
+            New IMEI (15 digits):
+            <input type="text" name="imei" pattern="\d{15}" maxlength="15" required 
+                   class="form-control" style="width:100%;padding:.5rem .6rem;margin-top:4px;border-radius:.55rem;border:1px solid var(--cc-border);background:var(--cc-panel);color:var(--cc-text)">
+          </label>
+        </div>
+        <div class="modal-footer" style="border-top:1px solid var(--cc-border)">
+          <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-primary">Update IMEI</button>
         </div>
       </form>
     </div>
@@ -1038,8 +1033,29 @@ $id('invTopPeriod')?.addEventListener('change', loadInvTopModels);
 })();
 </script>
 
-{# Assign Stock Modal JS #}
+{# Stock Controls Modal JS (Transfer, Edit IMEI) #}
 {% if IS_MANAGER|default:False or request.user.is_staff or request.user.is_superuser or request.user.profile.is_manager %}
+<script>
+// Transfer Modal
+function showTransferModal(itemId, imei) {
+  const modal = new bootstrap.Modal(document.getElementById('transferModal'));
+  const form = document.getElementById('transferForm');
+  document.getElementById('transferImei').textContent = imei || '#' + itemId;
+  form.action = '/inventory/stock/' + itemId + '/transfer/';
+  modal.show();
+}
+
+// Edit IMEI Modal
+function showEditImeiModal(itemId, imei) {
+  const modal = new bootstrap.Modal(document.getElementById('editImeiModal'));
+  const form = document.getElementById('editImeiForm');
+  document.getElementById('currentImei').textContent = imei || '(none)';
+  form.action = '/inventory/stock/' + itemId + '/edit-imei/';
+  modal.show();
+}
+</script>
+
+{# Assign Stock Modal JS #}
 <script>
 document.addEventListener('DOMContentLoaded', function() {
   const assignModal = document.getElementById('assignStockModal');
@@ -1058,6 +1074,24 @@ document.addEventListener('DOMContentLoaded', function() {
       if (modalItemLabel) modalItemLabel.textContent = itemLabel;
     });
   }
+  
+  // Kebab dropdown menu handler
+  document.addEventListener('click', function(e) {
+    if (e.target.closest('.kebab-btn')) {
+      e.stopPropagation();
+      const menu = e.target.closest('.actions-kebab').querySelector('.kebab-menu');
+      const wasShown = menu.classList.contains('show');
+      
+      // Close all other menus
+      document.querySelectorAll('.kebab-menu.show').forEach(m => m.classList.remove('show'));
+      
+      // Toggle current menu
+      if (!wasShown) menu.classList.add('show');
+    } else {
+      // Close all menus when clicking outside
+      document.querySelectorAll('.kebab-menu.show').forEach(m => m.classList.remove('show'));
+    }
+  });
 });
 </script>
 {% endif %}

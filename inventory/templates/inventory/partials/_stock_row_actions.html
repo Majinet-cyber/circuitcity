@@ -1,0 +1,66 @@
+{% comment %}
+Shared partial for stock row actions dropdown: Transfer, Edit IMEI, Archive, Restore
+Context required:
+- item: the inventory item (or 'it' for backwards compatibility)
+- show_archived: boolean indicating if we're showing archived items
+- is_manager: boolean indicating if user is a manager
+
+Usage: {% include 'inventory/partials/_stock_row_actions.html' with item=item show_archived=show_archived is_manager=is_manager %}
+{% endcomment %}
+
+{% with item=item|default:it %}
+{% if is_manager %}
+  <div class="dropdown">
+    <button class="btn btn-sm btn-outline-secondary dropdown-toggle"
+            type="button"
+            data-bs-toggle="dropdown"
+            aria-expanded="false"
+            data-cy="stock-actions-btn">
+      Actions
+    </button>
+
+    <ul class="dropdown-menu dropdown-menu-end">
+      {% if not show_archived %}
+        <li>
+          <button class="dropdown-item"
+                  type="button"
+                  onclick="showTransferModal({{ item.pk }}, '{{ item.imei|default:"" }}')"
+                  data-cy="stock-transfer-btn">
+            <i class="bi bi-arrow-left-right"></i> Transfer
+          </button>
+        </li>
+        <li>
+          <button class="dropdown-item"
+                  type="button"
+                  onclick="showEditImeiModal({{ item.pk }}, '{{ item.imei|default:"" }}')"
+                  data-cy="stock-edit-imei-btn">
+            <i class="bi bi-hash"></i> Edit IMEI
+          </button>
+        </li>
+        <li><hr class="dropdown-divider"></li>
+        <li>
+          <form method="post" action="{% url 'inventory:archive_stock' item.pk %}" style="display:inline-block; width:100%;">
+            {% csrf_token %}
+            <button class="dropdown-item text-danger" type="submit" data-cy="stock-archive-btn"
+                    onclick="return confirm('Archive this item?');">
+              <i class="bi bi-archive"></i> Archive
+            </button>
+          </form>
+        </li>
+      {% else %}
+        <li>
+          <form method="post" action="{% url 'inventory:restore_stock' item.pk %}" style="display:inline-block; width:100%;">
+            {% csrf_token %}
+            <button class="dropdown-item text-success" type="submit" data-cy="stock-restore-btn">
+              <i class="bi bi-arrow-counterclockwise"></i> Restore
+            </button>
+          </form>
+        </li>
+      {% endif %}
+    </ul>
+  </div>
+{% else %}
+  <span class="text-muted">—</span>
+{% endif %}
+{% endwith %}
+

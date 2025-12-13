@@ -613,6 +613,22 @@ class InventoryItem(models.Model):
     # Soft-delete flag (archive instead of hard delete when needed)
     is_active = models.BooleanField(default=True, db_index=True)
     
+    # Archive tracking (enhanced soft-delete)
+    archived_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        db_index=True,
+        help_text="When this item was archived (soft-deleted). NULL means not archived."
+    )
+    archived_by = models.ForeignKey(
+        User,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="archived_stock_items",
+        help_text="Manager/admin who archived this item."
+    )
+    
     # Payment method (for phones sold)
     PAYMENT_METHOD_CHOICES = [
         ("CASH", "Cash"),
@@ -743,6 +759,11 @@ class InventoryItem(models.Model):
     @property
     def is_sold(self) -> bool:
         return self.status == "SOLD"
+
+    @property
+    def is_archived(self) -> bool:
+        """Check if item is archived (soft-deleted)."""
+        return self.archived_at is not None
 
     # --- Compatibility helpers for templates / legacy code ---
     @property

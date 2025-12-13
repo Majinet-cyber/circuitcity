@@ -2,7 +2,8 @@
 """
 URL patterns for gym operations.
 """
-from django.urls import path
+from django.urls import path, reverse_lazy
+from django.views.generic import RedirectView
 from . import views_gym
 
 app_name = "gym"
@@ -10,6 +11,13 @@ app_name = "gym"
 urlpatterns = [
     # Dashboard
     path("", views_gym.gym_dashboard, name="dashboard"),
+    
+    # Alias for compatibility: /gym/dashboard/ -> /gym/
+    path(
+        "dashboard/",
+        RedirectView.as_view(url=reverse_lazy("gym:dashboard"), permanent=False),
+        name="dashboard_alias",
+    ),
     
     # Members
     path("members/", views_gym.members_list, name="members_list"),

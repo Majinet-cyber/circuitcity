@@ -606,8 +606,8 @@
       {% if step == 3 %}
       <div class="model-list">
         {% for variant in variants %}
-        <div class="model-item" data-cy="sale-spec-option" data-model-id="{{ variant.id }}" onclick="this.querySelector('input').checked=true;">
-          <input type="radio" name="product_id" value="{{ variant.id }}" id="variant_{{ variant.id }}" data-model-id="{{ variant.id }}" required>
+        <div class="model-item variant-card" data-cy="sale-variant-option" data-model-id="{{ variant.id }}" onclick="this.querySelector('input').checked=true;">
+          <input type="radio" name="product_id" value="{{ variant.id }}" id="variant_{{ variant.id }}" data-model-id="{{ variant.id }}" data-cy="sale-variant-radio" required>
           <input type="hidden" name="variant" value="{{ variant.variant_label }}">
           <div class="model-info">
             <div class="model-name">{{ variant.display_name }}</div>

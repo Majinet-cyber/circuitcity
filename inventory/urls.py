@@ -88,6 +88,12 @@ try:
 except Exception:
     _stock_assign = SimpleNamespace()
 
+# Stock control views (transfer, edit IMEI, archive, restore)
+try:
+    from . import views_stock_controls as _stock_controls
+except Exception:
+    _stock_controls = SimpleNamespace()
+
 from .views_dispatch import product_new_entry as product_new_entry_view, vertical_dispatcher
 
 # ---------------------------------------------------------------------
@@ -896,6 +902,12 @@ urlpatterns = [
     path("stock/assign/", _need_biz(getattr(_stock_assign, "assign_stock_owner", lambda r: JsonResponse({"error": "Not implemented"}, status=501))), name="assign_stock_owner"),
     path("stock/bulk-assign/", _need_biz(getattr(_stock_assign, "bulk_assign_stock", lambda r: JsonResponse({"error": "Not implemented"}, status=501))), name="bulk_assign_stock"),
     path("api/business-agents/", _need_biz(getattr(_stock_assign, "get_business_agents", lambda r: JsonResponse({"error": "Not implemented"}, status=501))), name="api_business_agents"),
+    
+    # Stock controls (manager-only: transfer, edit IMEI, archive, restore)
+    path("stock/<int:pk>/transfer/", _need_biz(getattr(_stock_controls, "transfer_stock", lambda r, pk: JsonResponse({"error": "Not implemented"}, status=501))), name="transfer_stock"),
+    path("stock/<int:pk>/edit-imei/", _need_biz(getattr(_stock_controls, "edit_imei", lambda r, pk: JsonResponse({"error": "Not implemented"}, status=501))), name="edit_imei"),
+    path("stock/<int:pk>/archive/", _need_biz(getattr(_stock_controls, "archive_stock", lambda r, pk: JsonResponse({"error": "Not implemented"}, status=501))), name="archive_stock"),
+    path("stock/<int:pk>/restore/", _need_biz(getattr(_stock_controls, "restore_stock", lambda r, pk: JsonResponse({"error": "Not implemented"}, status=501))), name="restore_stock"),
 
     # Scanning — pages
     # Main scan-in now uses gamified phone view (with fallback to legacy for non-phone businesses)

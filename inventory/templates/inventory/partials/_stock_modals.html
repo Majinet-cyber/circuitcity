@@ -1,0 +1,82 @@
+{% comment %}
+Shared modals and JavaScript for stock control actions (Transfer, Edit IMEI)
+Should be included once at the bottom of templates that use _stock_row_actions.html
+Context required:
+- manager_agents: queryset of agent memberships for transfer dropdown
+{% endcomment %}
+
+{# Transfer Modal #}
+<div id="transferModal" style="display:none; position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.5); z-index:1000; align-items:center; justify-content:center;">
+  <div style="background:#fff; border-radius:12px; padding:24px; max-width:400px; width:90%;">
+    <h3 style="margin:0 0 16px">Transfer Stock</h3>
+    <form method="post" id="transferForm">
+      {% csrf_token %}
+      <p>Transfer stock <strong id="transferImei"></strong> to:</p>
+      <select name="agent_id" class="form-select" style="width:100%; padding:8px; margin:12px 0;">
+        <option value="none">Manager Pool (Unassign)</option>
+        {% for membership in manager_agents %}
+          <option value="{{ membership.user.id }}">{{ membership.user.get_full_name|default:membership.user.username }} {% if membership.location %}({{ membership.location.name }}){% endif %}</option>
+        {% endfor %}
+      </select>
+      <div style="display:flex; gap:8px; margin-top:16px;">
+        <button type="submit" class="btn primary">Transfer</button>
+        <button type="button" class="btn" onclick="hideTransferModal()">Cancel</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+{# Edit IMEI Modal #}
+<div id="editImeiModal" style="display:none; position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.5); z-index:1000; align-items:center; justify-content:center;">
+  <div style="background:#fff; border-radius:12px; padding:24px; max-width:400px; width:90%;">
+    <h3 style="margin:0 0 16px">Edit IMEI</h3>
+    <form method="post" id="editImeiForm">
+      {% csrf_token %}
+      <p>Current IMEI: <strong id="currentImei"></strong></p>
+      <label style="display:block; margin:12px 0;">
+        New IMEI (15 digits):
+        <input type="text" name="imei" pattern="\d{15}" maxlength="15" required 
+               class="form-control" style="width:100%; padding:8px; margin-top:4px;">
+      </label>
+      <div style="display:flex; gap:8px; margin-top:16px;">
+        <button type="submit" class="btn primary">Update IMEI</button>
+        <button type="button" class="btn" onclick="hideEditImeiModal()">Cancel</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+function showTransferModal(itemId, imei) {
+  const modal = document.getElementById('transferModal');
+  const form = document.getElementById('transferForm');
+  document.getElementById('transferImei').textContent = imei || '#' + itemId;
+  form.action = '/inventory/stock/' + itemId + '/transfer/';
+  modal.style.display = 'flex';
+}
+
+function hideTransferModal() {
+  document.getElementById('transferModal').style.display = 'none';
+}
+
+function showEditImeiModal(itemId, imei) {
+  const modal = document.getElementById('editImeiModal');
+  const form = document.getElementById('editImeiForm');
+  document.getElementById('currentImei').textContent = imei || '(none)';
+  form.action = '/inventory/stock/' + itemId + '/edit-imei/';
+  modal.style.display = 'flex';
+}
+
+function hideEditImeiModal() {
+  document.getElementById('editImeiModal').style.display = 'none';
+}
+
+// Close modals on background click
+document.getElementById('transferModal')?.addEventListener('click', function(e) {
+  if (e.target === this) hideTransferModal();
+});
+document.getElementById('editImeiModal')?.addEventListener('click', function(e) {
+  if (e.target === this) hideEditImeiModal();
+});
+</script>
+

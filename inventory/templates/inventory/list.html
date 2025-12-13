@@ -114,20 +114,7 @@ Requires the 'request' context processor.
         </td>
         <td>{{ it.received_at|date:"Y-m-d" }}</td>
         <td class="actions">
-          {% if can_edit %}
-            <a class="btn link" href="{% url 'inventory:update_stock' it.pk %}">Edit</a>
-          {% endif %}
-          {% if is_admin %}
-            {% if it.is_active %}
-              <form method="post" action="{% url 'inventory:delete_stock' it.pk %}" style="display:inline">{% csrf_token %}
-                <button class="btn link" onclick="return confirm('Delete this item?')">Delete</button>
-              </form>
-            {% else %}
-              <form method="post" action="{% url 'inventory:restore_stock' it.pk %}" style="display:inline">{% csrf_token %}
-                <button class="btn link">Restore</button>
-              </form>
-            {% endif %}
-          {% endif %}
+          {% include 'inventory/partials/_stock_row_actions.html' with it=it show_archived=show_archived is_manager=is_manager manager_agents=manager_agents %}
         </td>
       </tr>
     {% empty %}
@@ -152,6 +139,9 @@ Requires the 'request' context processor.
     {% endif %}
   </nav>
 {% endif %}
+
+{# Include modals and JavaScript for stock controls #}
+{% include 'inventory/partials/_stock_modals.html' with manager_agents=manager_agents %}
 
 </body>
 </html>

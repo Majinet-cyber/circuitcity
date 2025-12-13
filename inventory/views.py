@@ -1227,6 +1227,9 @@ def stock_list(request: HttpRequest, *args, **kwargs) -> HttpResponse:
 
     qs = manager.all()
 
+    # ---------- archived filter (manager/admin only) - CHECK EARLY ----------
+    show_archived = request.GET.get("archived") == "1"
+
     # ---------- base scope (biz + active + not archived) ----------
     # Hard guard 1: item must belong to active business
     if _hasf(Model, "business_id"):
@@ -1234,9 +1237,10 @@ def stock_list(request: HttpRequest, *args, **kwargs) -> HttpResponse:
     elif _hasf(Model, "business"):
         qs = qs.filter(business__id=biz_id)
 
-    if _hasf(Model, "is_active"):
+    # Only filter by is_active if NOT showing archived items
+    if _hasf(Model, "is_active") and not show_archived:
         qs = qs.filter(is_active=True)
-    if _hasf(Model, "archived"):
+    if _hasf(Model, "archived") and not show_archived:
         qs = qs.filter(archived=False)
 
     # Hard guard 2: if there’s a location relation, its business must also match
@@ -1304,6 +1308,20 @@ def stock_list(request: HttpRequest, *args, **kwargs) -> HttpResponse:
         # On any error, default to safe behavior (show nothing for non-staff)
         if not (request.user.is_staff or request.user.is_superuser):
             qs = qs.none()
+
+    # ---------- archived filter (manager/admin only) - APPLY ----------
+    # show_archived was already set earlier (before base scope filters)
+    if show_archived:
+        # Only managers/admin can view archived items
+        if user_is_manager and _hasf(Model, "archived_at"):
+            qs = qs.filter(archived_at__isnull=False)
+        else:
+            # Non-managers shouldn't see archived view
+            qs = qs.none()
+    else:
+        # Default: exclude archived items
+        if _hasf(Model, "archived_at"):
+            qs = qs.filter(archived_at__isnull=True)
 
     # ---------- SOLD vs IN-STOCK predicates ----------
     def SOLD_Q() -> Q:
@@ -1510,6 +1528,33 @@ def stock_list(request: HttpRequest, *args, **kwargs) -> HttpResponse:
     except Exception:
         pass
 
+    # Create a simple page_obj-like object for template compatibility
+    class SimplePaginator:
+        def __init__(self, count, per_page):
+            self.num_pages = max(1, (count + per_page - 1) // per_page)
+            self.per_page = per_page
+    
+    class SimplePage:
+        def __init__(self, object_list, number, paginator):
+            self.object_list = object_list
+            self.number = number
+            self.paginator = paginator
+        
+        def has_previous(self):
+            return self.number > 1
+        
+        def has_next(self):
+            return self.number < self.paginator.num_pages
+        
+        def previous_page_number(self):
+            return self.number - 1
+        
+        def next_page_number(self):
+            return self.number + 1
+    
+    paginator = SimplePaginator(total, per_page)
+    page_obj = SimplePage(items, page, paginator)
+
     ctx = {
         "items": items,
         "rows": items,
@@ -1522,6 +1567,15 @@ def stock_list(request: HttpRequest, *args, **kwargs) -> HttpResponse:
         "sum_selling": sum_selling_amt,
         "active_tab": "stock_list",  # ✅ For sidebar nav highlighting
         "manager_agents": manager_agents,  # For stock assignment UI
+        "show_archived": show_archived,
+        "include_archived": show_archived,  # Alias for template compatibility
+        "is_manager": user_is_manager,
+        "can_edit": user_is_manager,
+        "is_admin": user_is_manager,
+        "page_obj": page_obj,  # For pagination in templates
+        "target_full": 100,  # Default target for stock battery
+        "q": q_text,  # Search query
+        "status": status,  # Status filter
         **badge_aliases,
     }
     return render(request, template, ctx)
@@ -3065,7 +3119,42 @@ def scan_in(request):
                     messages.error(request, f"Cannot stock-in: {first_err}")
                     return render(request, template_name, {"form": form})
 
-                for name in ("assigned_agent","assigned_to","assignee","owner","user","agent","created_by","added_by","received_by"):
+                # Set assigned_agent based on user role
+                # Agents get stock assigned to them; Managers get None unless explicitly set
+                if _model_has_field(InventoryItem, "assigned_agent"):
+                    user_is_manager = (
+                        request.user.is_staff 
+                        or request.user.is_superuser
+                        or getattr(getattr(request.user, 'profile', None), 'is_manager', False)
+                    )
+                    # Also check Membership role
+                    if not user_is_manager and biz_id:
+                        try:
+                            from tenants.models import Membership
+                            membership = Membership.objects.filter(
+                                user=request.user,
+                                business_id=biz_id,
+                                role='MANAGER',
+                                status='ACTIVE'
+                            ).first()
+                            if membership:
+                                user_is_manager = True
+                        except Exception:
+                            pass
+                    
+                    if user_is_manager:
+                        # Manager: set to None (unless agent is selected in form - not implemented yet)
+                        item.assigned_agent = None
+                        if _model_has_field(InventoryItem, "assigned_role"):
+                            item.assigned_role = "MANAGER"
+                    else:
+                        # Agent: assign to themselves
+                        item.assigned_agent = request.user
+                        if _model_has_field(InventoryItem, "assigned_role"):
+                            item.assigned_role = "AGENT"
+                
+                # Set other audit fields
+                for name in ("created_by","added_by","received_by"):
                     if _model_has_field(InventoryItem, name) and not getattr(item, name, None):
                         try:
                             setattr(item, name, request.user)
