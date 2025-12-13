@@ -531,6 +531,11 @@ class GymPaymentForm(forms.Form):
             "data-cy": "gym-payment-trainer-fee"
         })
     )
+    payment_method = forms.ChoiceField(
+        required=True,
+        label="Payment Method",
+        widget=forms.Select(attrs={"class": "form-control", "data-cy": "gym-payment-method"})
+    )
     start_date = forms.DateField(
         initial=date.today,
         widget=forms.DateInput(attrs={"class": "form-control", "type": "date"})
@@ -552,6 +557,11 @@ class GymPaymentForm(forms.Form):
                 business=business,
                 is_active=True
             ).order_by("name")
+        
+        # Set payment method choices from PaymentMethod
+        from inventory.models_verticals import PaymentMethod
+        self.fields["payment_method"].choices = PaymentMethod.choices
+        self.fields["payment_method"].initial = PaymentMethod.CASH
     
     def clean(self):
         cleaned_data = super().clean()
@@ -602,6 +612,7 @@ def add_payment(request):
                 trainer = data.get("trainer")
                 trainer_fee = data.get("trainer_fee") or Decimal("0.00")
                 start_date = data["start_date"]
+                payment_method = data["payment_method"]
                 
                 # IMPORTANT: Calculate days granted from membership_amount ONLY
                 # Trainer fee does NOT grant extra days
@@ -622,6 +633,7 @@ def add_payment(request):
                     trainer=trainer,
                     trainer_fee=trainer_fee,
                     amount=total_amount,
+                    payment_method=payment_method,
                     start_date=new_start,
                     end_date=new_end,
                     paid_by=request.user,
@@ -810,6 +822,8 @@ def gym_dashboard(request):
     
     # Payment mix (filtered by date range)
     from django.db.models import Sum, Count
+    from inventory.models_verticals import PaymentMethod
+    
     start_dt = timezone.make_aware(datetime.combine(start_date, datetime.min.time()))
     end_dt = timezone.make_aware(datetime.combine(end_date, datetime.max.time()))
     
@@ -834,6 +848,40 @@ def gym_dashboard(request):
         })
     
     total_revenue = sum(item["total"] for item in payment_mix_list)
+    
+    # Payment by method breakdown for: today, yesterday, this month
+    yesterday = today - timedelta(days=1)
+    month_start = today.replace(day=1)
+    
+    today_start = timezone.make_aware(datetime.combine(today, datetime.min.time()))
+    today_end = timezone.make_aware(datetime.combine(today, datetime.max.time()))
+    yesterday_start = timezone.make_aware(datetime.combine(yesterday, datetime.min.time()))
+    yesterday_end = timezone.make_aware(datetime.combine(yesterday, datetime.max.time()))
+    month_start_dt = timezone.make_aware(datetime.combine(month_start, datetime.min.time()))
+    month_end_dt = timezone.make_aware(datetime.combine(today, datetime.max.time()))
+    
+    # Helper function to get payment method totals
+    def get_payment_method_totals(start, end):
+        payments = GymPayment.objects.filter(
+            member__business=business,
+            paid_at__gte=start,
+            paid_at__lte=end
+        )
+        
+        totals = {}
+        for method_code, method_label in PaymentMethod.choices:
+            method_total = payments.filter(payment_method=method_code).aggregate(
+                total=Sum("amount")
+            )["total"] or Decimal("0.00")
+            totals[method_code] = {
+                "label": method_label,
+                "total": method_total
+            }
+        return totals
+    
+    payments_by_method_today = get_payment_method_totals(today_start, today_end)
+    payments_by_method_yesterday = get_payment_method_totals(yesterday_start, yesterday_end)
+    payments_by_method_month = get_payment_method_totals(month_start_dt, month_end_dt)
     
     # Recent payments
     recent_payments = GymPayment.objects.filter(
@@ -932,6 +980,11 @@ def gym_dashboard(request):
         # Payment mix
         "payment_mix": payment_mix_list,
         "total_revenue": total_revenue,
+        
+        # Payment by method (today, yesterday, this month)
+        "payments_by_method_today": payments_by_method_today,
+        "payments_by_method_yesterday": payments_by_method_yesterday,
+        "payments_by_method_month": payments_by_method_month,
         
         # Trainer stats
         "trainer_stats": trainer_stats,
