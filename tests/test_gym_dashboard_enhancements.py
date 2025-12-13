@@ -262,6 +262,140 @@ class TestGymDashboardEnhancements(TestCase):
         response = self.client.get(url)
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.context.get("period_label"), "This Month")
+    
+    def test_gym_dashboard_includes_admin_costs(self):
+        """Test gym dashboard correctly includes costs from admin wallet"""
+        from wallet.models import WalletTransaction, Ledger, TxnType
+        
+        self.client.force_login(self.manager)
+        
+        today = timezone.now().date()
+        month_start = today.replace(day=1)
+        
+        # Create a once-off cost for this month
+        once_off_cost = WalletTransaction.objects.create(
+            business=self.business,
+            ledger=Ledger.COMPANY,
+            type=TxnType.COST_ONCE_OFF,
+            amount=Decimal("-150000.00"),  # Stored as negative
+            note="Test Maintenance Cost",
+            effective_date=today,
+            is_recurring=False,
+            created_by=self.manager
+        )
+        
+        # Create a recurring cost
+        recurring_cost = WalletTransaction.objects.create(
+            business=self.business,
+            ledger=Ledger.COMPANY,
+            type=TxnType.COST_RECURRING,
+            amount=Decimal("-50000.00"),  # Stored as negative
+            note="Test Monthly Rent",
+            effective_date=month_start,
+            effective_from=month_start,
+            is_recurring=True,
+            created_by=self.manager
+        )
+        
+        # Add a gym payment for revenue
+        member = GymMember.objects.create(
+            business=self.business,
+            name="Test Member",
+            phone="0999000001",
+            membership_start=today,
+            membership_end=today + timedelta(days=30),
+            status=GymMemberStatus.ACTIVE
+        )
+        
+        payment = GymPayment.objects.create(
+            member=member,
+            membership_amount=Decimal("100000.00"),
+            trainer_fee=Decimal("0.00"),
+            payment_method=PaymentMethod.CASH,
+            start_date=today,
+            end_date=today + timedelta(days=30),
+            paid_at=timezone.now(),
+            paid_by=self.manager,
+            is_active=True
+        )
+        
+        # Get dashboard
+        url = reverse("gym:dashboard")
+        response = self.client.get(url)
+        
+        self.assertEqual(response.status_code, 200)
+        
+        # Verify costs are in context
+        self.assertIn("costs_this_month", response.context)
+        self.assertIn("revenue_this_month", response.context)
+        self.assertIn("profit_this_month", response.context)
+        
+        # Verify cost calculation (150k + 50k = 200k)
+        expected_costs = Decimal("200000.00")
+        self.assertEqual(response.context["costs_this_month"], expected_costs)
+        
+        # Verify revenue (test data may include existing payments)
+        actual_revenue = response.context["revenue_this_month"]
+        # Just verify revenue is positive and includes our payment
+        self.assertGreaterEqual(actual_revenue, Decimal("100000.00"))
+        
+        # Verify profit is calculated (revenue - costs)
+        expected_profit = actual_revenue - expected_costs
+        self.assertEqual(response.context["profit_this_month"], expected_profit)
+        
+        # Also verify simplified template variables
+        self.assertEqual(response.context["costs"], expected_costs)
+        self.assertEqual(response.context["revenue"], actual_revenue)
+        self.assertEqual(response.context["profit"], expected_profit)
+    
+    def test_gym_dashboard_costs_scoped_to_business(self):
+        """Test that costs from other businesses don't affect gym dashboard"""
+        from wallet.models import WalletTransaction, Ledger, TxnType
+        
+        # Create another business
+        other_business = Business.objects.create(
+            name="Other Business",
+            slug="other-business",
+            business_kind="gym",
+            status="ACTIVE"
+        )
+        
+        today = timezone.now().date()
+        
+        # Create cost for this gym
+        WalletTransaction.objects.create(
+            business=self.business,
+            ledger=Ledger.COMPANY,
+            type=TxnType.COST_ONCE_OFF,
+            amount=Decimal("-50000.00"),
+            note="This Gym Cost",
+            effective_date=today,
+            is_recurring=False,
+            created_by=self.manager
+        )
+        
+        # Create cost for other business (should NOT appear)
+        WalletTransaction.objects.create(
+            business=other_business,
+            ledger=Ledger.COMPANY,
+            type=TxnType.COST_ONCE_OFF,
+            amount=Decimal("-999999.00"),
+            note="Other Business Cost",
+            effective_date=today,
+            is_recurring=False,
+            created_by=self.manager
+        )
+        
+        self.client.force_login(self.manager)
+        
+        # Get dashboard
+        url = reverse("gym:dashboard")
+        response = self.client.get(url)
+        
+        self.assertEqual(response.status_code, 200)
+        
+        # Should only show cost from this business (50k), not other business (999k)
+        self.assertEqual(response.context["costs_this_month"], Decimal("50000.00"))
 
 
 class TestGymSidebarRouting(TestCase):

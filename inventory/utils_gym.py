@@ -303,3 +303,64 @@ def calculate_membership_period(
     new_end = new_start + timedelta(days=days_granted - 1)
     
     return new_start, new_end, days_granted
+
+
+def get_business_costs_for_period(business, start_date: date, end_date: date) -> Decimal:
+    """
+    Calculate total admin costs for a business in a given period.
+    
+    This uses the same logic as the admin wallet costs page to ensure consistency.
+    Costs are pulled from WalletTransaction with:
+    - ledger=COMPANY
+    - type in [COST_ONCE_OFF, COST_RECURRING]
+    - business scoping (no location scoping since WalletTransaction doesn't have location)
+    
+    Args:
+        business: Business instance
+        start_date: Start date (inclusive)
+        end_date: End date (inclusive)
+    
+    Returns:
+        Total costs as positive Decimal (costs are stored as negative in DB)
+    """
+    from django.db.models import Sum, Q
+    from django.db.models.functions import Coalesce
+    from wallet.models import WalletTransaction, Ledger, TxnType
+    
+    if not business:
+        return Decimal("0.00")
+    
+    # Query admin costs for this business
+    admin_costs_qs = WalletTransaction.objects.filter(
+        business=business,
+        ledger=Ledger.COMPANY,
+        type__in=[TxnType.COST_ONCE_OFF, TxnType.COST_RECURRING],
+    )
+    
+    # Filter by effective date range
+    # For once-off costs: use effective_date within period
+    once_off_q = Q(
+        type=TxnType.COST_ONCE_OFF,
+        is_recurring=False,
+        effective_date__gte=start_date,
+        effective_date__lte=end_date,
+    )
+    
+    # For recurring costs: include if effective_from <= end_date
+    # (assumes they continue indefinitely once started)
+    recurring_q = Q(
+        type=TxnType.COST_RECURRING,
+        is_recurring=True,
+        effective_from__lte=end_date,
+    )
+    
+    period_costs_qs = admin_costs_qs.filter(once_off_q | recurring_q)
+    
+    # Sum costs (they're stored as negative, so we take absolute value)
+    costs_agg = period_costs_qs.aggregate(
+        total=Coalesce(Sum("amount"), Decimal("0.00"))
+    )
+    admin_costs_sum = costs_agg.get("total") or Decimal("0.00")
+    
+    # Convert to positive for display
+    return abs(admin_costs_sum)

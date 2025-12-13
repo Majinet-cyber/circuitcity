@@ -946,6 +946,69 @@ def gym_dashboard(request):
     # Sort by trainer fees (descending) for rankings
     trainer_ranking = sorted(trainer_stats, key=lambda x: x["trainer_fees"], reverse=True)
     
+    # ============================================================================
+    # FINANCIAL METRICS: Costs, Revenue, Profit (for today, yesterday, this month)
+    # ============================================================================
+    from inventory.utils_gym import get_business_costs_for_period
+    
+    # Calculate costs for different periods
+    costs_today = get_business_costs_for_period(business, today, today)
+    costs_yesterday = get_business_costs_for_period(business, yesterday, yesterday)
+    costs_this_month = get_business_costs_for_period(business, month_start, today)
+    
+    # Calculate revenue for different periods (from GymPayment)
+    revenue_today = GymPayment.objects.filter(
+        member__business=business,
+        is_active=True,
+        paid_at__gte=today_start,
+        paid_at__lte=today_end
+    ).aggregate(total=Sum("amount"))["total"] or Decimal("0.00")
+    
+    revenue_yesterday = GymPayment.objects.filter(
+        member__business=business,
+        is_active=True,
+        paid_at__gte=yesterday_start,
+        paid_at__lte=yesterday_end
+    ).aggregate(total=Sum("amount"))["total"] or Decimal("0.00")
+    
+    revenue_this_month = GymPayment.objects.filter(
+        member__business=business,
+        is_active=True,
+        paid_at__gte=month_start_dt,
+        paid_at__lte=month_end_dt
+    ).aggregate(total=Sum("amount"))["total"] or Decimal("0.00")
+    
+    # Calculate profit = revenue - costs
+    profit_today = revenue_today - costs_today
+    profit_yesterday = revenue_yesterday - costs_yesterday
+    profit_this_month = revenue_this_month - costs_this_month
+    
+    # Count of payments this month
+    payment_count_month = GymPayment.objects.filter(
+        member__business=business,
+        is_active=True,
+        paid_at__gte=month_start_dt,
+        paid_at__lte=month_end_dt
+    ).count()
+    
+    # Calculate MRR (Monthly Recurring Revenue)
+    # MRR = sum of active members' monthly fees (those with valid memberships)
+    mrr = Decimal("0.00")
+    try:
+        from inventory.utils_gym import GYM_MONTHLY_FEE
+        # Count active members (membership valid)
+        active_members_count = all_members.filter(
+            membership_end__gte=today
+        ).count()
+        # Estimate MRR based on default monthly fee
+        # (In a more sophisticated system, you'd track each member's fee)
+        if gym_settings and gym_settings.default_membership_price:
+            mrr = gym_settings.default_membership_price * active_members_count
+        else:
+            mrr = GYM_MONTHLY_FEE * active_members_count
+    except Exception:
+        mrr = Decimal("0.00")
+    
     return render(request, "inventory/gym/dashboard.html", {
         "business": business,
         
@@ -989,6 +1052,25 @@ def gym_dashboard(request):
         # Trainer stats
         "trainer_stats": trainer_stats,
         "trainer_ranking": trainer_ranking,  # Sorted by fees earned
+        
+        # Financial metrics (costs, revenue, profit)
+        "costs_today": costs_today,
+        "costs_yesterday": costs_yesterday,
+        "costs_this_month": costs_this_month,
+        "revenue_today": revenue_today,
+        "revenue_yesterday": revenue_yesterday,
+        "revenue_this_month": revenue_this_month,
+        "profit_today": profit_today,
+        "profit_yesterday": profit_yesterday,
+        "profit_this_month": profit_this_month,
+        "payment_count_month": payment_count_month,
+        "mrr": mrr,
+        
+        # For templates/verticals/gym/dashboard.html (simplified template)
+        "costs": costs_this_month,  # Default to this month
+        "revenue": revenue_this_month,
+        "profit": profit_this_month,
+        "payment_count": payment_count_month,
         
         # Legacy fields (for backward compatibility)
         "members_active_count": active_count,
