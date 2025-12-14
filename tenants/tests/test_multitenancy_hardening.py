@@ -127,6 +127,15 @@ class TestDuplicatePrevention(TestCase):
     """Test that duplicates are prevented at form and DB level."""
     
     def setUp(self):
+        # Ensure email unique index exists (for test databases)
+        from django.db import connection
+        with connection.cursor() as cursor:
+            cursor.execute("""
+                CREATE UNIQUE INDEX IF NOT EXISTS uniq_user_email_ci 
+                ON auth_user (LOWER(email))
+                WHERE email != ''
+            """)
+        
         self.user = User.objects.create_user(
             username="testuser",
             email="test@example.com",
@@ -156,6 +165,32 @@ class TestDuplicatePrevention(TestCase):
                 name="majinet store",  # lowercase
                 slug="majinet-store-2",
                 status="ACTIVE"
+            )
+    
+    def test_business_name_case_insensitive_unique_regression(self):
+        """
+        Regression test for migration 0014: case-insensitive uniqueness.
+        
+        This test verifies that the uniq_business_name_ci constraint
+        correctly prevents creating businesses with same name in different cases.
+        Specifically tests the "Emajinet" -> "emajinet" scenario.
+        """
+        # Create business with name "Emajinet"
+        Business.objects.create(
+            name="Emajinet",
+            slug="emajinet",
+            status="ACTIVE",
+            business_kind="phones"
+        )
+        
+        # Attempt to create business with name "emajinet" (different case)
+        # Should raise IntegrityError due to case-insensitive unique constraint
+        with self.assertRaises(IntegrityError):
+            Business.objects.create(
+                name="emajinet",
+                slug="emajinet-2",
+                status="ACTIVE",
+                business_kind="phones"
             )
     
     def test_email_case_insensitive_unique(self):

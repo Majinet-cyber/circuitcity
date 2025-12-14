@@ -1,7 +1,7 @@
 ﻿"""
 Tests for HQ app - Dashboard, Gamification, and Date Helpers.
 """
-from datetime import date, datetime
+from datetime import date, datetime, timedelta, time
 from decimal import Decimal
 
 import pytest
@@ -19,9 +19,13 @@ from hq.utils_gamification import (
     get_next_milestone,
     check_and_award_milestones,
 )
-from hq.models import AgentMilestone
+try:
+    from hq.models import AgentMilestone
+except ImportError:
+    AgentMilestone = None  # Model may have been removed
 from tenants.models import Business, Membership
 from sales.models import Sale
+from billing.models import Invoice
 
 
 User = get_user_model()
@@ -346,6 +350,218 @@ class HQDashboardTestCase(TestCase):
         self.client.login(username="admin", password="password123")
         response = self.client.get(reverse('hq:monthly_drill_down_api') + '?year=2025&month=13')
         self.assertEqual(response.status_code, 400)
+
+    def test_wallet_income_api_requires_staff(self):
+        """Test wallet income API requires staff/superuser."""
+        # Create non-staff user
+        regular_user = User.objects.create_user(
+            username="regular",
+            email="regular@test.com",
+            password="password123"
+        )
+        self.client.login(username="regular", password="password123")
+        
+        response = self.client.get(
+            reverse('hq:hq_wallet_income_api') + '?start=2025-11-15&end=2025-12-14&currency=MWK'
+        )
+        self.assertEqual(response.status_code, 403)
+        data = response.json()
+        self.assertIn('error', data)
+
+    def test_wallet_income_api_staff_access(self):
+        """Test wallet income API allows staff access."""
+        # Create staff user (not superuser)
+        staff_user = User.objects.create_user(
+            username="staff",
+            email="staff@test.com",
+            password="password123",
+            is_staff=True
+        )
+        self.client.login(username="staff", password="password123")
+        
+        response = self.client.get(
+            reverse('hq:hq_wallet_income_api') + '?start=2025-11-15&end=2025-12-14&currency=MWK'
+        )
+        self.assertEqual(response.status_code, 200)
+
+    def test_wallet_income_api_both_urls(self):
+        """Test wallet income API works with both URL patterns (with and without trailing slash)."""
+        self.client.login(username="admin", password="password123")
+        
+        # Test without trailing slash
+        response1 = self.client.get(
+            reverse('hq:hq_wallet_income_api_noslash') + '?start=2025-11-15&end=2025-12-14&currency=MWK'
+        )
+        self.assertEqual(response1.status_code, 200)
+        
+        # Test with trailing slash
+        response2 = self.client.get(
+            reverse('hq:hq_wallet_income_api') + '?start=2025-11-15&end=2025-12-14&currency=MWK'
+        )
+        self.assertEqual(response2.status_code, 200)
+
+    def test_wallet_income_api_missing_params(self):
+        """Test wallet income API returns 400 for missing parameters."""
+        self.client.login(username="admin", password="password123")
+        
+        # Missing start
+        response1 = self.client.get(
+            reverse('hq:hq_wallet_income_api') + '?end=2025-12-14'
+        )
+        self.assertEqual(response1.status_code, 400)
+        
+        # Missing end
+        response2 = self.client.get(
+            reverse('hq:hq_wallet_income_api') + '?start=2025-11-15'
+        )
+        self.assertEqual(response2.status_code, 400)
+
+    def test_wallet_income_api_invalid_dates(self):
+        """Test wallet income API returns 400 for invalid dates."""
+        self.client.login(username="admin", password="password123")
+        
+        # Invalid date format
+        response1 = self.client.get(
+            reverse('hq:hq_wallet_income_api') + '?start=invalid&end=2025-12-14'
+        )
+        self.assertEqual(response1.status_code, 400)
+        
+        # Start after end
+        response2 = self.client.get(
+            reverse('hq:hq_wallet_income_api') + '?start=2025-12-14&end=2025-11-15'
+        )
+        self.assertEqual(response2.status_code, 400)
+
+    def test_wallet_income_api_with_data(self):
+        """Test wallet income API returns correct data structure and filters correctly."""
+        self.client.login(username="admin", password="password123")
+        
+        # Create test invoices
+        today = timezone.now().date()
+        in_range_date = today - timedelta(days=5)  # 5 days ago
+        out_of_range_date = today - timedelta(days=40)  # 40 days ago
+        
+        # Paid invoice in range
+        invoice1 = Invoice.objects.create(
+            business=self.business,
+            status=Invoice.Status.PAID,
+            currency="MWK",
+            subtotal=Decimal("1000.00"),
+            total=Decimal("1000.00"),
+            issue_date=in_range_date,
+            paid_at=timezone.make_aware(datetime.combine(in_range_date, time(12, 0)))
+        )
+        
+        # Paid invoice out of range
+        invoice2 = Invoice.objects.create(
+            business=self.business,
+            status=Invoice.Status.PAID,
+            currency="MWK",
+            subtotal=Decimal("2000.00"),
+            total=Decimal("2000.00"),
+            issue_date=out_of_range_date,
+            paid_at=timezone.make_aware(datetime.combine(out_of_range_date, time(12, 0)))
+        )
+        
+        # Unpaid invoice (should be excluded)
+        invoice3 = Invoice.objects.create(
+            business=self.business,
+            status=Invoice.Status.DRAFT,
+            currency="MWK",
+            subtotal=Decimal("500.00"),
+            total=Decimal("500.00"),
+            issue_date=in_range_date
+        )
+        
+        # Different currency (should be excluded if filtering by MWK)
+        invoice4 = Invoice.objects.create(
+            business=self.business,
+            status=Invoice.Status.PAID,
+            currency="USD",
+            subtotal=Decimal("3000.00"),
+            total=Decimal("3000.00"),
+            issue_date=in_range_date,
+            paid_at=timezone.make_aware(datetime.combine(in_range_date, time(12, 0)))
+        )
+        
+        # Query with date range
+        start_str = (today - timedelta(days=30)).isoformat()
+        end_str = today.isoformat()
+        
+        response = self.client.get(
+            reverse('hq:hq_wallet_income_api') + 
+            f'?start={start_str}&end={end_str}&currency=MWK'
+        )
+        
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertIsInstance(data, list)
+        
+        # Should only include invoice1 (paid, in range, MWK)
+        # invoice2 is out of range, invoice3 is unpaid, invoice4 is different currency
+        total_amount = sum(item['amount'] for item in data)
+        self.assertAlmostEqual(total_amount, 1000.00, places=2)
+        
+        # Verify structure
+        if data:
+            item = data[0]
+            self.assertIn('date', item)
+            self.assertIn('amount', item)
+            self.assertIsInstance(item['date'], str)
+            self.assertIsInstance(item['amount'], (int, float))
+
+    def test_wallet_income_api_currency_filtering(self):
+        """Test wallet income API filters by currency correctly."""
+        self.client.login(username="admin", password="password123")
+        
+        today = timezone.now().date()
+        test_date = today - timedelta(days=5)
+        
+        # Create invoices with different currencies
+        Invoice.objects.create(
+            business=self.business,
+            status=Invoice.Status.PAID,
+            currency="MWK",
+            subtotal=Decimal("1000.00"),
+            total=Decimal("1000.00"),
+            issue_date=test_date,
+            paid_at=timezone.make_aware(datetime.combine(test_date, time(12, 0)))
+        )
+        
+        Invoice.objects.create(
+            business=self.business,
+            status=Invoice.Status.PAID,
+            currency="USD",
+            subtotal=Decimal("2000.00"),
+            total=Decimal("2000.00"),
+            issue_date=test_date,
+            paid_at=timezone.make_aware(datetime.combine(test_date, time(12, 0)))
+        )
+        
+        start_str = (today - timedelta(days=30)).isoformat()
+        end_str = today.isoformat()
+        
+        # Query for MWK only
+        response = self.client.get(
+            reverse('hq:hq_wallet_income_api') + 
+            f'?start={start_str}&end={end_str}&currency=MWK'
+        )
+        
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        total_amount = sum(item['amount'] for item in data)
+        self.assertAlmostEqual(total_amount, 1000.00, places=2)
+        
+        # Query for USD only
+        response2 = self.client.get(
+            reverse('hq:hq_wallet_income_api') + 
+            f'?start={start_str}&end={end_str}&currency=USD'
+        )
+        
+        self.assertEqual(response2.status_code, 200)
+        data2 = response2.json()
+        total_amount2 = sum(item['amount'] for item in data2)
+        self.assertAlmostEqual(total_amount2, 2000.00, places=2)
 
 
 # ============================================================================

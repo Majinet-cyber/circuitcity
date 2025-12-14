@@ -440,10 +440,39 @@ LOGOUT_REDIRECT_URL = "/accounts/login/"
 ADMINS = [("Ops", os.environ.get("ADMIN_EMAIL", "ops@example.com"))]
 EMAIL_SUBJECT_PREFIX = "[CC] "
 USE_SMTP_IN_DEBUG = os.environ.get("FORCE_SMTP_IN_DEBUG") == "1"
-if DEBUG and not USE_SMTP_IN_DEBUG:
+
+# SendGrid via Anymail (production) or console (local dev)
+SENDGRID_API_KEY = os.environ.get("SENDGRID_API_KEY", "").strip()
+DEFAULT_FROM_EMAIL = os.environ.get("DEFAULT_FROM_EMAIL", "Emajinet <noreply@emajinet.africa>")
+
+# Use SendGrid if API key is provided, otherwise fall back to console/SMTP
+if SENDGRID_API_KEY and (not DEBUG or USE_SMTP_IN_DEBUG):
+    try:
+        import anymail  # noqa: F401
+        EMAIL_BACKEND = "anymail.backends.sendgrid.EmailBackend"
+        ANYMAIL = {
+            "SENDGRID_API_KEY": SENDGRID_API_KEY,
+        }
+        # Warn if missing in production
+        if not DEBUG and not SENDGRID_API_KEY:
+            import logging
+            logging.getLogger(__name__).warning(
+                "SENDGRID_API_KEY is missing in production (DEBUG=0). "
+                "Email sending may fail. Set SENDGRID_API_KEY environment variable."
+            )
+    except ImportError:
+        # Fallback if anymail not installed
+        EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"
+        if not DEBUG:
+            import logging
+            logging.getLogger(__name__).warning(
+                "django-anymail not installed. Using console backend. "
+                "Install django-anymail for SendGrid support."
+            )
+elif DEBUG and not USE_SMTP_IN_DEBUG:
     EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"
-    DEFAULT_FROM_EMAIL = os.environ.get("DEFAULT_FROM_EMAIL", "noreply@example.com")
 else:
+    # Fallback to SMTP
     EMAIL_BACKEND = os.environ.get(
         "EMAIL_BACKEND", "django.core.mail.backends.smtp.EmailBackend"
     )
@@ -452,9 +481,8 @@ else:
     EMAIL_USE_TLS = env_bool("EMAIL_USE_TLS", True)
     EMAIL_HOST_USER = os.environ.get("EMAIL_HOST_USER", "")
     EMAIL_HOST_PASSWORD = os.environ.get("EMAIL_HOST_PASSWORD", "")
-    DEFAULT_FROM_EMAIL = os.environ.get(
-        "DEFAULT_FROM_EMAIL", EMAIL_HOST_USER or "noreply@example.com"
-    )
+    if not DEFAULT_FROM_EMAIL:
+        DEFAULT_FROM_EMAIL = EMAIL_HOST_USER or "noreply@example.com"
     EMAIL_TIMEOUT = env_int("EMAIL_TIMEOUT", 10)
 
 # --------------------------- billing ---------------------------

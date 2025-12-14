@@ -42,6 +42,12 @@ class Profile(models.Model):
         default=False,
         help_text="If True, user must change password on next login.",
     )
+    
+    # ---- Email verification ----
+    email_verified = models.BooleanField(
+        default=False,
+        help_text="If True, user's email address has been verified via OTP.",
+    )
 
     class Meta:
         db_table = "accounts_profile"
@@ -136,21 +142,44 @@ class EmailOTP(models.Model):
     Email-based OTP for actions like login/verify email/2FA.
     We store only a hash of the code; never the raw value.
     """
-    email = models.EmailField(db_index=True)
-    purpose = models.CharField(max_length=32, default="login", db_index=True)  # e.g. 'reset', 'verify', 'login'
-    code_hash = models.CharField(max_length=256)  # compatible with Django's password hashers
+    PURPOSE_CHOICES = [
+        ("signup", "Signup"),
+        ("login", "Login"),
+        ("reset", "Password Reset"),
+        ("2fa", "Two-Factor Authentication"),
+    ]
+    
+    email = models.EmailField(db_index=True, help_text="Normalized lowercase email")
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name="email_otps",
+        help_text="Optional user reference (for signup, user may not exist yet)",
+    )
+    purpose = models.CharField(
+        max_length=32,
+        choices=PURPOSE_CHOICES,
+        default="login",
+        db_index=True,
+        help_text="Purpose of this OTP (signup, login, reset, 2fa)",
+    )
+    code_hash = models.CharField(max_length=256, help_text="Hashed OTP code (never store plaintext)")
     created_at = models.DateTimeField(auto_now_add=True)
     expires_at = models.DateTimeField(db_index=True)
     consumed_at = models.DateTimeField(null=True, blank=True)
-    attempts = models.PositiveIntegerField(default=0)
-    requester_ip = models.GenericIPAddressField(null=True, blank=True)
+    attempts = models.PositiveIntegerField(default=0, help_text="Number of verification attempts")
+    requester_ip = models.GenericIPAddressField(null=True, blank=True, help_text="IP address of requester")
+    user_agent = models.TextField(null=True, blank=True, help_text="User agent string")
     meta = models.JSONField(default=dict, blank=True)
 
     class Meta:
         db_table = "accounts_emailotp"
         indexes = [
-            models.Index(fields=["email", "purpose", "expires_at"]),
+            models.Index(fields=["email", "purpose", "-created_at"]),
             models.Index(fields=["email", "purpose", "consumed_at"]),
+            models.Index(fields=["user", "purpose", "-created_at"]),
         ]
         ordering = ["-created_at"]
 

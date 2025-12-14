@@ -11,6 +11,7 @@ from django.apps import apps
 from django.conf import settings
 from django.db import models, transaction
 from django.db.models import Q
+from django.db.models.functions import Lower
 from django.utils import timezone
 from django.core.exceptions import ValidationError
 from django.core.signing import TimestampSigner, BadSignature, SignatureExpired
@@ -122,6 +123,12 @@ class Business(models.Model):
                 fields=["subdomain"],
                 condition=~Q(subdomain=""),
                 name="uniq_business_subdomain_nonblank",
+            ),
+            # Enforce case-insensitive unique business name
+            models.UniqueConstraint(
+                Lower("name"),
+                name="uniq_business_name_ci",
+                violation_error_message="A business with this name already exists (case-insensitive).",
             ),
         ]
 

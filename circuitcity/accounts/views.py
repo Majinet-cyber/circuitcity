@@ -23,7 +23,7 @@ from django.contrib.auth.decorators import login_required
 from django.contrib.auth.models import Group
 from django.contrib.sessions.models import Session
 from django.core.mail import send_mail
-from django.http import HttpResponse, HttpResponseForbidden
+from django.http import HttpResponse, HttpResponseForbidden, JsonResponse
 from django.shortcuts import redirect, render
 from django.template.exceptions import TemplateDoesNotExist
 from django.template.loader import get_template
@@ -53,6 +53,7 @@ from .forms import (
     ManagerWizardStep4Form,
 )
 from .models import EmailOTP, LoginSecurity, Profile, OnboardingProfile
+from .services.email_otp import request_email_otp, verify_email_otp
 
 # Optional tenants (graceful fallbacks if app not installed)
 try:
@@ -1631,7 +1632,33 @@ def _complete_wizard_signup(request, wizard_data):
         except Exception:
             pass
         
-        # 6. Auto-login + select business
+        # 6. Email verification (if enabled)
+        enable_email_otp = getattr(settings, "ENABLE_EMAIL_OTP", False)
+        if enable_email_otp and email:
+            try:
+                profile = getattr(user, "profile", None)
+                if profile:
+                    profile.email_verified = False
+                    profile.save(update_fields=["email_verified"])
+                
+                # Send OTP for signup verification
+                try:
+                    request_email_otp(email, "signup", user=user, request=request)
+                    # Store email in session for verification step
+                    request.session["signup_email"] = email
+                    request.session["signup_user_id"] = user.id
+                    # Clear wizard data but keep session for verification
+                    _clear_wizard_data(request)
+                    # Redirect to verification step
+                    messages.info(request, "Please verify your email address. We've sent you a code.")
+                    return redirect("accounts:signup_verify_email")
+                except Exception as e:
+                    log.warning(f"Failed to send signup OTP: {e}", exc_info=True)
+                    # Continue with signup even if OTP fails
+            except Exception as e:
+                log.warning(f"Failed to set email_verified=False: {e}", exc_info=True)
+        
+        # 7. Auto-login + select business (if email verification not required or skipped)
         login(request, user)
         if biz is not None:
             try:
@@ -1647,6 +1674,186 @@ def _complete_wizard_signup(request, wizard_data):
         
         # Redirect to dashboard
         return redirect(_safe_redirect("inventory:inventory_dashboard", default="/inventory/dashboard/"))
+
+
+# ----------------------------
+# OTP JSON API Endpoints
+# ----------------------------
+@never_cache
+@require_http_methods(["GET", "POST"])
+@ensure_csrf_cookie
+def signup_verify_email(request):
+    """
+    Email verification step after signup.
+    Shows a form to enter the OTP code sent to the user's email.
+    """
+    # Check if we have signup session data
+    signup_email = request.session.get("signup_email")
+    signup_user_id = request.session.get("signup_user_id")
+    
+    if not signup_email or not signup_user_id:
+        messages.error(request, "No pending email verification found. Please sign up again.")
+        return redirect("accounts:signup")
+    
+    # Get user
+    try:
+        user = User.objects.get(id=signup_user_id, email__iexact=signup_email)
+    except User.DoesNotExist:
+        messages.error(request, "User not found. Please sign up again.")
+        request.session.pop("signup_email", None)
+        request.session.pop("signup_user_id", None)
+        return redirect("accounts:signup")
+    
+    # Check if already verified
+    try:
+        if user.profile.email_verified:
+            messages.success(request, "Your email is already verified!")
+            request.session.pop("signup_email", None)
+            request.session.pop("signup_user_id", None)
+            login(request, user)
+            return redirect(_safe_redirect("inventory:inventory_dashboard", default="/inventory/dashboard/"))
+    except Exception:
+        pass
+    
+    if request.method == "POST":
+        action = request.POST.get("action", "verify")
+        
+        if action == "resend":
+            # Resend OTP
+            try:
+                request_email_otp(signup_email, "signup", user=user, request=request)
+                messages.success(request, "Verification code sent! Please check your email.")
+            except ValueError as e:
+                messages.error(request, str(e))
+            except Exception as e:
+                log.error(f"Failed to resend OTP: {e}", exc_info=True)
+                messages.error(request, "Failed to send verification code. Please try again.")
+        else:
+            # Verify code
+            code = (request.POST.get("code") or "").strip()
+            if not code:
+                messages.error(request, "Please enter the verification code.")
+            elif len(code) != 6 or not code.isdigit():
+                messages.error(request, "Code must be 6 digits.")
+            else:
+                if verify_email_otp(signup_email, "signup", code):
+                    # Mark as verified
+                    try:
+                        profile = user.profile
+                        profile.email_verified = True
+                        profile.save(update_fields=["email_verified"])
+                    except Exception:
+                        pass
+                    
+                    # Clear session
+                    request.session.pop("signup_email", None)
+                    request.session.pop("signup_user_id", None)
+                    
+                    # Log in and redirect
+                    login(request, user)
+                    messages.success(request, "Email verified! Welcome to Emajinet!")
+                    
+                    # Set active business if available
+                    try:
+                        if Membership is not None:
+                            membership = Membership.objects.filter(user=user, status="ACTIVE").first()
+                            if membership and hasattr(membership, "business"):
+                                request.session[TENANT_SESSION_KEY] = membership.business.pk
+                    except Exception:
+                        pass
+                    
+                    return redirect(_safe_redirect("inventory:inventory_dashboard", default="/inventory/dashboard/"))
+                else:
+                    messages.error(request, "Invalid or expired code. Please try again.")
+    
+    return render(request, "registration/signup_verify_email.html", {
+        "email": signup_email,
+        "email_masked": _mask_email(signup_email),
+    })
+
+
+@require_http_methods(["POST"])
+@ensure_csrf_cookie
+def otp_request_api(request):
+    """
+    JSON endpoint to request an email OTP.
+    POST /auth/otp/request
+    Body: {"email": "user@example.com", "purpose": "signup"}
+    Returns: {"ok": true} or {"ok": false, "error": "..."}
+    """
+    import json
+    
+    try:
+        data = json.loads(request.body) if request.body else {}
+    except json.JSONDecodeError:
+        return JsonResponse({"ok": False, "error": "Invalid JSON"}, status=400)
+    
+    email = (data.get("email") or "").strip()
+    purpose = (data.get("purpose") or "signup").strip()
+    
+    if not email:
+        return JsonResponse({"ok": False, "error": "Email is required"}, status=400)
+    
+    if purpose not in ["signup", "login", "reset", "2fa"]:
+        return JsonResponse({"ok": False, "error": "Invalid purpose"}, status=400)
+    
+    # Optional: get user if exists (for login/reset purposes)
+    user = None
+    if purpose in ["login", "reset"]:
+        try:
+            user = User.objects.get(email__iexact=email)
+        except User.DoesNotExist:
+            if purpose == "login":
+                # Don't reveal if user exists for security
+                pass
+    
+    try:
+        request_email_otp(email, purpose, user=user, request=request)
+        return JsonResponse({"ok": True})
+    except ValueError as e:
+        error_msg = str(e)
+        status = 429 if "rate" in error_msg.lower() or "too many" in error_msg.lower() else 400
+        return JsonResponse({"ok": False, "error": error_msg}, status=status)
+    except Exception as e:
+        log.error(f"OTP request failed: {e}", exc_info=True)
+        return JsonResponse({"ok": False, "error": "Failed to send OTP. Please try again."}, status=500)
+
+
+@require_http_methods(["POST"])
+@ensure_csrf_cookie
+def otp_verify_api(request):
+    """
+    JSON endpoint to verify an email OTP.
+    POST /auth/otp/verify
+    Body: {"email": "user@example.com", "purpose": "signup", "code": "123456"}
+    Returns: {"ok": true} or {"ok": false, "error": "..."}
+    """
+    import json
+    
+    try:
+        data = json.loads(request.body) if request.body else {}
+    except json.JSONDecodeError:
+        return JsonResponse({"ok": False, "error": "Invalid JSON"}, status=400)
+    
+    email = (data.get("email") or "").strip()
+    purpose = (data.get("purpose") or "signup").strip()
+    code = (data.get("code") or "").strip()
+    
+    if not email or not code:
+        return JsonResponse({"ok": False, "error": "Email and code are required"}, status=400)
+    
+    if purpose not in ["signup", "login", "reset", "2fa"]:
+        return JsonResponse({"ok": False, "error": "Invalid purpose"}, status=400)
+    
+    if len(code) != 6 or not code.isdigit():
+        return JsonResponse({"ok": False, "error": "Code must be 6 digits"}, status=400)
+    
+    success = verify_email_otp(email, purpose, code)
+    
+    if success:
+        return JsonResponse({"ok": True})
+    else:
+        return JsonResponse({"ok": False, "error": "Invalid or expired code"}, status=400)
 
 
 # ----------------------------

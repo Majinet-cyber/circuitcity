@@ -1131,26 +1131,60 @@ def wallet_home(request):
 # -------------------------------------------------------------------
 @login_required
 def api_wallet_income(request):
-    start_raw = request.GET.get('start') or ''
-    end_raw = request.GET.get('end') or ''
-
-    today = timezone.now().date()
+    """
+    JSON API endpoint for wallet income data.
+    Returns daily income breakdown for a date range.
+    
+    Query params:
+    - start (YYYY-MM-DD, required): Start date
+    - end (YYYY-MM-DD, required): End date
+    - currency (default "MWK"): Currency filter
+    """
+    # Permission check: HQ admin only
+    if not (request.user.is_staff or request.user.is_superuser):
+        return JsonResponse({"error": "Forbidden"}, status=403)
+    
+    # Parse query parameters
+    start_raw = request.GET.get('start', '').strip()
+    end_raw = request.GET.get('end', '').strip()
+    currency = request.GET.get('currency', 'MWK').strip().upper()
+    
+    # Validate required parameters
+    if not start_raw or not end_raw:
+        return JsonResponse({"error": "start and end parameters are required (YYYY-MM-DD)"}, status=400)
+    
+    # Parse dates
     try:
-        start_d = datetime.date.fromisoformat(start_raw) if start_raw else (today - datetime.timedelta(days=29))
-        end_d = datetime.date.fromisoformat(end_raw) if end_raw else today
-    except Exception:
-        return JsonResponse([], safe=False)
-
+        start_d = datetime.date.fromisoformat(start_raw)
+        end_d = datetime.date.fromisoformat(end_raw)
+    except (ValueError, TypeError) as e:
+        return JsonResponse({"error": f"Invalid date format: {str(e)}. Use YYYY-MM-DD"}, status=400)
+    
+    # Validate date range
+    if start_d > end_d:
+        return JsonResponse({"error": "start date must be before or equal to end date"}, status=400)
+    
+    # Query paid invoices
     qs = Invoice.objects.filter(status__in=["PAID", "SETTLED", "paid"])
+    
+    # Filter by currency if Invoice model has currency field
+    if _field(Invoice, "currency"):
+        qs = qs.filter(currency=currency)
+    
+    # Determine date field to use
     df_name = "paid_at" if _field(Invoice, "paid_at") else ("issue_date" if _field(Invoice, "issue_date") else ("created_at" if _field(Invoice, "created_at") else None))
     if not df_name:
         return JsonResponse([], safe=False)
-
+    
+    # Filter by date range
     qs = _range_filter(qs, Invoice, df_name, start_d, end_d)
+    
+    # Determine amount field
     amount_field = "total" if _field(Invoice, "total") else ("amount" if _field(Invoice, "amount") else None)
     if not amount_field:
         return JsonResponse([], safe=False)
-
+    
+    # Aggregate by day
     f = _field(Invoice, df_name)
     if isinstance(f, models.DateTimeField):
         agg = (qs.annotate(day=TruncDate(df_name))
@@ -1163,7 +1197,7 @@ def api_wallet_income(request):
                 .order_by(df_name)
                 .annotate(amount=Sum(amount_field)))
         data = [{'date': (row[df_name] or start_d).isoformat(), 'amount': float(row['amount'] or 0)} for row in agg]
-
+    
     return JsonResponse(data, safe=False)
 
 

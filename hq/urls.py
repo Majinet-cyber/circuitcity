@@ -51,6 +51,8 @@ urlpatterns = [
     # API Endpoints
     # =========================
     path("api/monthly-drill-down/", views.monthly_drill_down_api, name="monthly_drill_down_api"),
+    path("api/wallet/income", views.api_wallet_income, name="hq_wallet_income_api_noslash"),
+    path("api/wallet/income/", views.api_wallet_income, name="hq_wallet_income_api"),
 
     # =========================
     # Wallet (HQ shell)

@@ -20,6 +20,7 @@ urlpatterns = [
     # New multi-step wizard (primary signup flow)
     path("signup/", views.signup_wizard, {"step": 0}, name="signup"),
     path("signup/wizard/<int:step>/", views.signup_wizard, name="signup_wizard_step"),
+    path("signup/verify-email/", views.signup_verify_email, name="signup_verify_email"),
     
     # Legacy single-page signup (kept for backwards compatibility)
     path("signup/manager/", views.signup_manager, name="signup_manager"),
@@ -32,6 +33,10 @@ urlpatterns = [
     # OTP (One-Time Password)
     # -------------------------------
     path("otp/", views.otp_challenge, name="otp_challenge"),
+    
+    # OTP JSON API endpoints
+    path("auth/otp/request/", views.otp_request_api, name="otp_request_api"),
+    path("auth/otp/verify/", views.otp_verify_api, name="otp_verify_api"),
 
     # -------------------------------
     # Password Management
