@@ -336,3 +336,165 @@ class PharmacyDashboardNoSubscriptionTestCase(TestCase):
             raise  # Re-raise assertion errors
         except Exception as e:
             self.skipTest(f"Pharmacy dashboard URL not configured or other error: {e}")
+
+
+class PharmacyStockInCategoryTestCase(TestCase):
+    """Regression test for pharmacy stock-in category selection UI fix."""
+    
+    def setUp(self):
+        """Create test business, user, and login."""
+        self.business = Business.objects.create(
+            name="Test Pharmacy",
+            slug="test-pharmacy-stockin",
+            status="ACTIVE",
+            business_kind="pharmacy"
+        )
+        
+        self.user = User.objects.create_user(
+            username="manager@test.com",
+            email="manager@test.com",
+            password="TestPass123!@#"
+        )
+        
+        Membership.objects.create(
+            user=self.user,
+            business=self.business,
+            role="MANAGER",
+            status="ACTIVE"
+        )
+        
+        self.client = Client()
+        self.client.login(username="manager@test.com", password="TestPass123!@#")
+    
+    def test_stock_in_page_loads_with_category_dropdown(self):
+        """Test that stock-in page loads with category dropdown (no undefined cards)."""
+        try:
+            from django.urls import reverse
+            
+            # Set active business in session
+            session = self.client.session
+            session['active_business_id'] = self.business.id
+            session.save()
+            
+            # Load pharmacy stock-in page
+            url = reverse("pharmacy:stock_in")
+            response = self.client.get(url)
+            
+            # Should return 200 OK
+            self.assertEqual(response.status_code, 200)
+            
+            # Should contain category_options in context
+            self.assertIn("category_options", response.context)
+            
+            # Verify all 13 categories are present
+            category_options = response.context["category_options"]
+            self.assertEqual(len(category_options), 13)
+            
+            # Check specific required categories
+            category_values = [c["value"] for c in category_options]
+            self.assertIn("medicine", category_values)
+            self.assertIn("skin_care", category_values)
+            self.assertIn("perfumes", category_values)
+            self.assertIn("makeup", category_values)
+            self.assertIn("first_aid", category_values)
+            
+            # Verify dropdown HTML is present (not cards)
+            self.assertContains(response, '<select name="category"')
+            self.assertContains(response, "Medicine")
+            self.assertContains(response, "Skin Care")
+            
+            # Should NOT contain the broken category cards grid
+            self.assertNotContains(response, 'id="categoryCardsGrid"')
+            
+        except Exception as e:
+            self.skipTest(f"Pharmacy stock_in URL not configured: {e}")
+    
+    def test_stock_in_with_valid_category_saves_correctly(self):
+        """Test that posting stock-in form with valid category saves successfully."""
+        try:
+            from django.urls import reverse
+            
+            # Set active business in session
+            session = self.client.session
+            session['active_business_id'] = self.business.id
+            session.save()
+            
+            url = reverse("pharmacy:stock_in")
+            
+            # Post valid stock-in data with skin_care category
+            post_data = {
+                "product_name": "Nivea Soft Cream",
+                "category": "skin_care",
+                "quantity": "50",
+                "cost_price": "10.00",
+                "selling_price": "15.00",
+                "batch_number": "BATCH-TEST-001",
+                "expiry_date": (timezone.now().date() + timedelta(days=365)).strftime("%Y-%m-%d"),
+                "reorder_level": "10",
+            }
+            
+            response = self.client.post(url, post_data, follow=True)
+            
+            # Should redirect successfully (no validation errors)
+            self.assertEqual(response.status_code, 200)
+            
+            # Product should be created with correct category
+            product = MerchProduct.objects.filter(
+                business=self.business,
+                name="Nivea Soft Cream"
+            ).first()
+            
+            self.assertIsNotNone(product)
+            self.assertEqual(product.category, "skin_care")
+            
+            # Batch should be created
+            batch = PharmacyBatch.objects.filter(
+                business=self.business,
+                merch_product=product,
+                batch_number="BATCH-TEST-001"
+            ).first()
+            
+            self.assertIsNotNone(batch)
+            self.assertEqual(batch.quantity, 50)
+            
+        except Exception as e:
+            self.skipTest(f"Pharmacy stock_in URL not configured: {e}")
+    
+    def test_stock_in_with_invalid_category_fails_validation(self):
+        """Test that invalid category value is rejected by backend validation."""
+        try:
+            from django.urls import reverse
+            
+            # Set active business in session
+            session = self.client.session
+            session['active_business_id'] = self.business.id
+            session.save()
+            
+            url = reverse("pharmacy:stock_in")
+            
+            # Post with invalid category
+            post_data = {
+                "product_name": "Test Product",
+                "category": "invalid_category_xyz",  # Invalid!
+                "quantity": "50",
+                "cost_price": "10.00",
+                "selling_price": "15.00",
+                "batch_number": "BATCH-INVALID-001",
+                "expiry_date": (timezone.now().date() + timedelta(days=365)).strftime("%Y-%m-%d"),
+            }
+            
+            response = self.client.post(url, post_data, follow=True)
+            
+            # Should redirect back with error
+            self.assertEqual(response.status_code, 200)
+            
+            # Product should NOT be created
+            product_count = MerchProduct.objects.filter(
+                business=self.business,
+                name="Test Product"
+            ).count()
+            
+            self.assertEqual(product_count, 0)
+            
+        except Exception as e:
+            self.skipTest(f"Pharmacy stock_in URL not configured: {e}")

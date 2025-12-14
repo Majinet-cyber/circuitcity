@@ -1,0 +1,302 @@
+{% extends "hq/base.html" %}
+{% load static %}
+{% load humanize %}
+
+{% block title %}Account Support - {{ business.name }} - HQ Admin{% endblock %}
+
+{% block extra_head %}
+{{ block.super }}
+<style>
+    .support-header {
+        background: linear-gradient(135deg, #f59e0b 0%, #ef4444 100%);
+        color: white;
+        padding: 48px 0;
+        margin: -24px -24px 32px -24px;
+    }
+    .support-title {
+        font-size: 32px;
+        font-weight: 800;
+        margin-bottom: 8px;
+    }
+    .support-subtitle {
+        opacity: 0.9;
+        font-size: 16px;
+    }
+    .user-card {
+        background: white;
+        border-radius: 16px;
+        padding: 24px;
+        margin-bottom: 16px;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+        transition: all 0.3s ease;
+    }
+    .user-card:hover {
+        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+    }
+    .user-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: start;
+        margin-bottom: 16px;
+    }
+    .user-info {
+        flex: 1;
+    }
+    .user-name {
+        font-size: 20px;
+        font-weight: 700;
+        color: #1a202c;
+        margin-bottom: 4px;
+    }
+    .user-email {
+        color: #718096;
+        font-size: 14px;
+    }
+    .user-role {
+        display: inline-block;
+        padding: 6px 12px;
+        background: #e0e7ff;
+        color: #3730a3;
+        border-radius: 8px;
+        font-size: 13px;
+        font-weight: 600;
+        margin-top: 8px;
+    }
+    .user-actions {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+    }
+    .status-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+        gap: 16px;
+        padding: 16px;
+        background: #f7fafc;
+        border-radius: 12px;
+    }
+    .status-item {
+        text-align: center;
+    }
+    .status-label {
+        font-size: 12px;
+        color: #718096;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        margin-bottom: 4px;
+    }
+    .status-value {
+        font-size: 18px;
+        font-weight: 700;
+        color: #1a202c;
+    }
+    .status-value.locked {
+        color: #dc2626;
+    }
+    .status-value.active {
+        color: #16a34a;
+    }
+    .alert-warning {
+        background: #fef3c7;
+        border-left: 4px solid #f59e0b;
+        padding: 16px;
+        margin-bottom: 24px;
+        border-radius: 8px;
+    }
+    .action-form {
+        display: inline-block;
+    }
+    .btn-danger {
+        background: #dc2626;
+        color: white;
+        border: none;
+    }
+    .btn-danger:hover {
+        background: #b91c1c;
+    }
+    .btn-warning {
+        background: #f59e0b;
+        color: white;
+        border: none;
+    }
+    .btn-warning:hover {
+        background: #d97706;
+    }
+    .empty-state {
+        text-align: center;
+        padding: 48px 24px;
+        color: #718096;
+    }
+    .empty-state-icon {
+        font-size: 64px;
+        margin-bottom: 16px;
+        opacity: 0.5;
+    }
+    .confirm-required {
+        font-size: 12px;
+        color: #dc2626;
+        margin-top: 4px;
+    }
+</style>
+{% endblock %}
+
+{% block page_content %}
+<div class="support-header">
+    <div class="container">
+        <div class="support-title">🔧 Account & Login Support</div>
+        <div class="support-subtitle">
+            Manage user accounts and resolve login issues for {{ business.name }}
+        </div>
+    </div>
+</div>
+
+<div class="container">
+    <!-- Back Link -->
+    <div class="mb-4">
+        <a href="{% url 'hq:business_command_center' business.id %}" class="btn btn-outline-secondary">
+            ← Back to Command Center
+        </a>
+    </div>
+
+    <!-- Warning Notice -->
+    <div class="alert-warning">
+        <strong>⚠️ Caution:</strong> Actions performed here directly affect user accounts and are logged in the audit trail. Always provide a clear reason for any action taken.
+    </div>
+
+    <!-- Users List -->
+    {% if users_with_status %}
+        {% for item in users_with_status %}
+        <div class="user-card">
+            <div class="user-header">
+                <div class="user-info">
+                    <div class="user-name">
+                        {{ item.user.get_full_name|default:"Unnamed User" }}
+                    </div>
+                    <div class="user-email">{{ item.user.email }}</div>
+                    <span class="user-role">{{ item.membership.get_role_display }}</span>
+                </div>
+            </div>
+
+            <!-- User Status -->
+            <div class="status-grid">
+                <div class="status-item">
+                    <div class="status-label">Account Status</div>
+                    <div class="status-value {% if item.is_locked %}locked{% else %}active{% endif %}">
+                        {% if item.is_locked %}
+                            🔒 Locked
+                        {% elif item.is_hard_blocked %}
+                            🚫 Blocked
+                        {% else %}
+                            ✅ Active
+                        {% endif %}
+                    </div>
+                </div>
+                <div class="status-item">
+                    <div class="status-label">Last Login</div>
+                    <div class="status-value">
+                        {% if item.last_login %}
+                            {{ item.last_login|date:"M d, H:i" }}
+                        {% else %}
+                            Never
+                        {% endif %}
+                    </div>
+                </div>
+                <div class="status-item">
+                    <div class="status-label">Active Sessions</div>
+                    <div class="status-value">{{ item.active_sessions }}</div>
+                </div>
+                {% if item.login_sec %}
+                <div class="status-item">
+                    <div class="status-label">Login Stage</div>
+                    <div class="status-value">{{ item.login_sec.stage }}</div>
+                </div>
+                <div class="status-item">
+                    <div class="status-label">Failed Attempts</div>
+                    <div class="status-value">{{ item.login_sec.fail_count }}</div>
+                </div>
+                {% endif %}
+            </div>
+
+            <!-- Actions -->
+            <div class="user-actions mt-3">
+                <!-- Unlock Account -->
+                {% if item.is_locked %}
+                <form method="post" action="{% url 'hq:unlock_account' business.id item.user.id %}" class="action-form" onsubmit="return confirm('Unlock account for {{ item.user.email }}? Please provide a reason.');">
+                    {% csrf_token %}
+                    <input type="text" name="reason" placeholder="Reason for unlock" class="form-control form-control-sm mb-2" required>
+                    <button type="submit" class="btn btn-sm btn-success">
+                        🔓 Unlock Account
+                    </button>
+                </form>
+                {% endif %}
+
+                <!-- Reset Password -->
+                <form method="post" action="{% url 'hq:reset_password_for_user' business.id item.user.id %}" class="action-form" onsubmit="return confirm('Generate password reset link for {{ item.user.email }}?');">
+                    {% csrf_token %}
+                    <input type="text" name="reason" placeholder="Reason for reset" class="form-control form-control-sm mb-2" required>
+                    <button type="submit" class="btn btn-sm btn-warning">
+                        🔑 Reset Password
+                    </button>
+                </form>
+
+                <!-- Resend OTP -->
+                <form method="post" action="{% url 'hq:resend_otp' business.id item.user.id %}" class="action-form" onsubmit="return confirm('Resend OTP to {{ item.user.email }}?');">
+                    {% csrf_token %}
+                    <input type="text" name="reason" placeholder="Reason for OTP" class="form-control form-control-sm mb-2" required>
+                    <button type="submit" class="btn btn-sm btn-info">
+                        📧 Resend OTP
+                    </button>
+                </form>
+
+                <!-- Force Logout -->
+                <form method="post" action="{% url 'hq:force_logout_user' business.id item.user.id %}" class="action-form" onsubmit="return confirm('⚠️ Force logout all sessions for {{ item.user.email }}? This action cannot be undone.');">
+                    {% csrf_token %}
+                    <input type="text" name="reason" placeholder="Reason for logout" class="form-control form-control-sm mb-2" required>
+                    <button type="submit" class="btn btn-sm btn-danger">
+                        🚪 Force Logout
+                    </button>
+                </form>
+
+                <!-- View Sessions -->
+                <a href="{% url 'hq:user_sessions' business.id item.user.id %}" class="btn btn-sm btn-outline-secondary">
+                    👁️ View Sessions
+                </a>
+            </div>
+
+            {% if item.login_sec and item.login_sec.locked_until %}
+            <div class="confirm-required mt-2">
+                🔒 Locked until: {{ item.login_sec.locked_until|date:"M d, Y H:i" }}
+            </div>
+            {% endif %}
+        </div>
+        {% endfor %}
+    {% else %}
+        <div class="empty-state">
+            <div class="empty-state-icon">👥</div>
+            <p>No users found for this business.</p>
+        </div>
+    {% endif %}
+</div>
+{% endblock %}
+
+{% block extra_js %}
+{{ block.super }}
+<script>
+// Confirm actions with reason
+document.addEventListener('DOMContentLoaded', function() {
+    const forms = document.querySelectorAll('form[onsubmit]');
+    forms.forEach(form => {
+        form.addEventListener('submit', function(e) {
+            const reasonInput = form.querySelector('input[name="reason"]');
+            if (reasonInput && !reasonInput.value.trim()) {
+                e.preventDefault();
+                alert('Please provide a reason for this action.');
+                reasonInput.focus();
+                return false;
+            }
+        });
+    });
+});
+</script>
+{% endblock %}
+

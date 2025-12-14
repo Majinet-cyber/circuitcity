@@ -173,6 +173,10 @@ class PreventHQFromClientUI(MiddlewareMixin):
     If user is an HQ admin, redirect any request to tenant/store UI
     back to the HQ shell. We redirect directly to **hq:subscriptions**
     (not hq:home) to avoid alias loops.
+    
+    CRITICAL LOOP GUARDS:
+    - Never redirect when already on /hq/ paths
+    - Never redirect if target equals current path
     """
 
     def process_request(self, request: HttpRequest):
@@ -188,7 +192,11 @@ class PreventHQFromClientUI(MiddlewareMixin):
             # If role resolution fails (e.g., DB hiccup), treat as non-HQ and continue
             return None
 
-        path = (request.path or "")
+        path = (request.path or "").rstrip("/")
+
+        # CRITICAL: Never redirect when already on HQ paths (prevents loops)
+        if path.startswith("/hq"):
+            return None
 
         # HQ/admin/static/etc. are always allowed
         for p in _HQ_ALLOW_PREFIXES:
@@ -198,7 +206,11 @@ class PreventHQFromClientUI(MiddlewareMixin):
         # Block classic store/tenant entry points
         for p in _BLOCK_PREFIXES:
             if path.startswith(p):
-                return redirect(_reverse_or("hq:subscriptions", "/hq/subscriptions/"))
+                target = _reverse_or("hq:subscriptions", "/hq/subscriptions/")
+                # LOOP GUARD: Never redirect if target equals current path
+                if path.rstrip("/") == target.rstrip("/"):
+                    return None
+                return redirect(target)
 
         return None
 

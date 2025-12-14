@@ -338,15 +338,84 @@
                 {% endfor %}
               </select>
             </div>
+            <!-- Chart Context: Totals & Peak -->
+            <div style="display:flex;justify-content:space-between;margin:8px 0;padding:8px;background:rgba(37,99,235,0.06);border-radius:8px">
+              <div>
+                <div style="font-size:11px;color:var(--ink-500);font-weight:700">YTD TOTAL</div>
+                <div style="font-size:20px;font-weight:900;color:var(--ink-900)">{{ sales_ytd_count|default:"0" }}</div>
+                <div style="font-size:11px;color:var(--ink-500)">MWK {{ sales_ytd_revenue|floatformat:0|default:"0" }}</div>
+              </div>
+              <div style="text-align:right">
+                <div style="font-size:11px;color:var(--ink-500);font-weight:700">PEAK MONTH</div>
+                <div style="font-size:16px;font-weight:900;color:#2563eb">{{ sales_peak_month_label|default:"—" }}</div>
+                <div style="font-size:11px;color:var(--ink-500)">{{ sales_peak_month_count|default:"0" }} sales</div>
+              </div>
+            </div>
             <div class="legend"><div class="lg-dot" style="background:#2563eb"></div><span class="muted">Sales Count</span></div>
             <canvas id="salesChart" height="200"></canvas>
+            <!-- Month Table -->
+            {% if sales_month_table %}
+            <div style="margin-top:12px;max-height:200px;overflow-y:auto;font-size:12px">
+              <table style="width:100%;border-collapse:collapse">
+                <thead style="position:sticky;top:0;background:var(--glass);backdrop-filter:blur(10px)">
+                  <tr style="border-bottom:1px solid var(--ring)">
+                    <th style="text-align:left;padding:4px;font-weight:800;color:var(--ink-500)">Month</th>
+                    <th style="text-align:right;padding:4px;font-weight:800;color:var(--ink-500)">Count</th>
+                    <th style="text-align:right;padding:4px;font-weight:800;color:var(--ink-500)">Revenue</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {% for row in sales_month_table %}
+                  <tr style="border-bottom:1px solid rgba(0,0,0,0.05)">
+                    <td style="padding:4px;font-weight:700">{{ row.month }}</td>
+                    <td style="padding:4px;text-align:right">{{ row.count }}</td>
+                    <td style="padding:4px;text-align:right">{{ row.revenue|floatformat:0 }}</td>
+                  </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+            {% endif %}
           </div>
           <div class="card chart-card reveal d2">
             <div class="filters">
               <strong>New Onboardings</strong>
             </div>
+            <!-- Chart Context: Totals & Peak -->
+            <div style="display:flex;justify-content:space-between;margin:8px 0;padding:8px;background:rgba(16,185,129,0.06);border-radius:8px">
+              <div>
+                <div style="font-size:11px;color:var(--ink-500);font-weight:700">YTD TOTAL</div>
+                <div style="font-size:20px;font-weight:900;color:var(--ink-900)">{{ onb_ytd_count|default:"0" }}</div>
+              </div>
+              <div style="text-align:right">
+                <div style="font-size:11px;color:var(--ink-500);font-weight:700">PEAK MONTH</div>
+                <div style="font-size:16px;font-weight:900;color:#10b981">{{ onb_peak_month_label|default:"—" }}</div>
+                <div style="font-size:11px;color:var(--ink-500)">{{ onb_peak_month_count|default:"0" }} agents</div>
+              </div>
+            </div>
             <div class="legend"><div class="lg-dot" style="background:#10b981"></div><span class="muted">New Agents</span></div>
             <canvas id="onboardingsChart" height="200"></canvas>
+            <!-- Month Table -->
+            {% if onb_month_table %}
+            <div style="margin-top:12px;max-height:200px;overflow-y:auto;font-size:12px">
+              <table style="width:100%;border-collapse:collapse">
+                <thead style="position:sticky;top:0;background:var(--glass);backdrop-filter:blur(10px)">
+                  <tr style="border-bottom:1px solid var(--ring)">
+                    <th style="text-align:left;padding:4px;font-weight:800;color:var(--ink-500)">Month</th>
+                    <th style="text-align:right;padding:4px;font-weight:800;color:var(--ink-500)">Count</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {% for row in onb_month_table %}
+                  <tr style="border-bottom:1px solid rgba(0,0,0,0.05)">
+                    <td style="padding:4px;font-weight:700">{{ row.month }}</td>
+                    <td style="padding:4px;text-align:right">{{ row.count }}</td>
+                  </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+            {% endif %}
           </div>
           <div class="card reveal d3">
             <h3>Period Metrics</h3>

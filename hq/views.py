@@ -311,78 +311,225 @@ def dashboard(request):
     year_start = dt(year, 1, 1).date()
     year_end = dt(year + 1, 1, 1).date()
     
-    sales_by_month = Sale.objects.filter(
-        sold_at__gte=year_start,
-        sold_at__lt=year_end
-    ).annotate(
-        month=TruncMonth('sold_at')
-    ).values('month').annotate(
-        count=Count('id'),
-        revenue=Coalesce(Sum('price'), zero_dec)
-    ).order_by('month')
+    # SQLite-safe monthly aggregation
+    from django.db import connection
     
-    # Prepare chart data (monthly sales)
-    monthly_sales_labels = []
-    monthly_sales_data = []
-    monthly_revenue_data = []
-    
-    for item in sales_by_month:
-        month_date = item['month']
-        monthly_sales_labels.append(month_date.strftime('%B'))
-        monthly_sales_data.append(item['count'])
-        monthly_revenue_data.append(float(item['revenue']))
+    if connection.vendor == 'sqlite':
+        # SQLite fallback: fetch raw data and group in Python
+        sales_raw = Sale.objects.filter(
+            sold_at__isnull=False,
+            sold_at__gte=year_start,
+            sold_at__lt=year_end
+        ).values('sold_at', 'price').order_by('sold_at')
+        
+        # Group by month in Python
+        from collections import defaultdict
+        monthly_data = defaultdict(lambda: {'count': 0, 'revenue': 0})
+        
+        for sale in sales_raw:
+            if sale['sold_at']:
+                # Get year-month tuple
+                sold_dt = sale['sold_at']
+                month_key = (sold_dt.year, sold_dt.month)
+                monthly_data[month_key]['count'] += 1
+                monthly_data[month_key]['revenue'] += float(sale['price'] or 0)
+        
+        # Sort and prepare chart data
+        sorted_months = sorted(monthly_data.keys())
+        monthly_sales_labels = [dt(y, m, 1).strftime('%B') for y, m in sorted_months]
+        monthly_sales_data = [monthly_data[k]['count'] for k in sorted_months]
+        monthly_revenue_data = [monthly_data[k]['revenue'] for k in sorted_months]
+    else:
+        # PostgreSQL/MySQL: use DB-level aggregation
+        sales_by_month = Sale.objects.filter(
+            sold_at__isnull=False,
+            sold_at__gte=year_start,
+            sold_at__lt=year_end
+        ).annotate(
+            month=TruncMonth('sold_at')
+        ).values('month').annotate(
+            count=Count('id'),
+            revenue=Coalesce(Sum('price'), zero_dec)
+        ).order_by('month')
+        
+        # Prepare chart data (monthly sales)
+        monthly_sales_labels = []
+        monthly_sales_data = []
+        monthly_revenue_data = []
+        
+        for item in sales_by_month:
+            month_date = item['month']
+            if month_date:
+                monthly_sales_labels.append(month_date.strftime('%B'))
+                monthly_sales_data.append(item['count'])
+                monthly_revenue_data.append(float(item['revenue']))
     
     ctx["monthly_sales_labels"] = json.dumps(monthly_sales_labels)
     ctx["monthly_sales_data"] = json.dumps(monthly_sales_data)
     ctx["monthly_revenue_data"] = json.dumps(monthly_revenue_data)
     
+    # === Chart context: totals, peak month, table data ===
+    sales_ytd_count = sum(monthly_sales_data) if monthly_sales_data else 0
+    sales_ytd_revenue = sum(monthly_revenue_data) if monthly_revenue_data else 0
+    
+    # Find peak month
+    sales_peak_month_label = ""
+    sales_peak_month_count = 0
+    sales_peak_month_revenue = 0
+    if monthly_sales_data and monthly_sales_labels:
+        peak_idx = monthly_sales_data.index(max(monthly_sales_data)) if monthly_sales_data else 0
+        sales_peak_month_label = monthly_sales_labels[peak_idx] if peak_idx < len(monthly_sales_labels) else ""
+        sales_peak_month_count = monthly_sales_data[peak_idx] if peak_idx < len(monthly_sales_data) else 0
+        sales_peak_month_revenue = monthly_revenue_data[peak_idx] if peak_idx < len(monthly_revenue_data) else 0
+    
+    # Build table data
+    sales_month_table = []
+    for i, label in enumerate(monthly_sales_labels):
+        sales_month_table.append({
+            "month": label,
+            "count": monthly_sales_data[i] if i < len(monthly_sales_data) else 0,
+            "revenue": monthly_revenue_data[i] if i < len(monthly_revenue_data) else 0
+        })
+    
+    ctx["sales_ytd_count"] = sales_ytd_count
+    ctx["sales_ytd_revenue"] = sales_ytd_revenue
+    ctx["sales_peak_month_label"] = sales_peak_month_label
+    ctx["sales_peak_month_count"] = sales_peak_month_count
+    ctx["sales_peak_month_revenue"] = sales_peak_month_revenue
+    ctx["sales_month_table"] = sales_month_table
+    
     # === New agent onboardings by month ===
     if _field(Membership, "created_at"):
-        onboardings_by_month = Membership.objects.filter(
-            role="AGENT",
-            created_at__gte=year_start,
-            created_at__lt=year_end
-        ).annotate(
-            month=TruncMonth('created_at')
-        ).values('month').annotate(
-            count=Count('id')
-        ).order_by('month')
+        from django.db import connection
         
-        monthly_onboardings_labels = []
-        monthly_onboardings_data = []
-        
-        for item in onboardings_by_month:
-            month_date = item['month']
-            monthly_onboardings_labels.append(month_date.strftime('%B'))
-            monthly_onboardings_data.append(item['count'])
+        if connection.vendor == 'sqlite':
+            # SQLite fallback: fetch raw data and group in Python
+            onboardings_raw = Membership.objects.filter(
+                role="AGENT",
+                created_at__isnull=False,
+                created_at__gte=year_start,
+                created_at__lt=year_end
+            ).values('created_at').order_by('created_at')
+            
+            # Group by month in Python
+            from collections import defaultdict
+            monthly_counts = defaultdict(int)
+            
+            for item in onboardings_raw:
+                if item['created_at']:
+                    created_dt = item['created_at']
+                    month_key = (created_dt.year, created_dt.month)
+                    monthly_counts[month_key] += 1
+            
+            # Sort and prepare chart data
+            sorted_months = sorted(monthly_counts.keys())
+            monthly_onboardings_labels = [dt(y, m, 1).strftime('%B') for y, m in sorted_months]
+            monthly_onboardings_data = [monthly_counts[k] for k in sorted_months]
+        else:
+            # PostgreSQL/MySQL: use DB-level aggregation
+            onboardings_by_month = Membership.objects.filter(
+                role="AGENT",
+                created_at__isnull=False,
+                created_at__gte=year_start,
+                created_at__lt=year_end
+            ).annotate(
+                month=TruncMonth('created_at')
+            ).values('month').annotate(
+                count=Count('id')
+            ).order_by('month')
+            
+            monthly_onboardings_labels = []
+            monthly_onboardings_data = []
+            
+            for item in onboardings_by_month:
+                month_date = item['month']
+                if month_date:
+                    monthly_onboardings_labels.append(month_date.strftime('%B'))
+                    monthly_onboardings_data.append(item['count'])
         
         ctx["monthly_onboardings_labels"] = json.dumps(monthly_onboardings_labels)
         ctx["monthly_onboardings_data"] = json.dumps(monthly_onboardings_data)
+        
+        # === Chart context for onboardings ===
+        onb_ytd_count = sum(monthly_onboardings_data) if monthly_onboardings_data else 0
+        onb_peak_month_label = ""
+        onb_peak_month_count = 0
+        if monthly_onboardings_data and monthly_onboardings_labels:
+            peak_idx = monthly_onboardings_data.index(max(monthly_onboardings_data)) if monthly_onboardings_data else 0
+            onb_peak_month_label = monthly_onboardings_labels[peak_idx] if peak_idx < len(monthly_onboardings_labels) else ""
+            onb_peak_month_count = monthly_onboardings_data[peak_idx] if peak_idx < len(monthly_onboardings_data) else 0
+        
+        onb_month_table = []
+        for i, label in enumerate(monthly_onboardings_labels):
+            onb_month_table.append({
+                "month": label,
+                "count": monthly_onboardings_data[i] if i < len(monthly_onboardings_data) else 0
+            })
+        
+        ctx["onb_ytd_count"] = onb_ytd_count
+        ctx["onb_peak_month_label"] = onb_peak_month_label
+        ctx["onb_peak_month_count"] = onb_peak_month_count
+        ctx["onb_month_table"] = onb_month_table
     else:
         ctx["monthly_onboardings_labels"] = json.dumps([])
         ctx["monthly_onboardings_data"] = json.dumps([])
+        ctx["onb_ytd_count"] = 0
+        ctx["onb_peak_month_label"] = ""
+        ctx["onb_peak_month_count"] = 0
+        ctx["onb_month_table"] = []
     
     # === Daily drill-down if month is selected ===
     if period_type == "month" and start_date and end_date:
-        sales_by_day = Sale.objects.filter(
-            sold_at__gte=start_date,
-            sold_at__lt=end_date
-        ).annotate(
-            day=TruncDate('sold_at')
-        ).values('day').annotate(
-            count=Count('id'),
-            revenue=Coalesce(Sum('price'), zero_dec)
-        ).order_by('day')
+        # SQLite-safe: filter out null sold_at, then group in Python if needed
+        from django.db import connection
         
-        daily_sales_labels = []
-        daily_sales_data = []
-        daily_revenue_data = []
-        
-        for item in sales_by_day:
-            day_date = item['day']
-            daily_sales_labels.append(day_date.strftime('%d'))
-            daily_sales_data.append(item['count'])
-            daily_revenue_data.append(float(item['revenue']))
+        if connection.vendor == 'sqlite':
+            # SQLite fallback: fetch raw data and group in Python
+            sales_raw = Sale.objects.filter(
+                sold_at__isnull=False,
+                sold_at__gte=start_date,
+                sold_at__lt=end_date
+            ).values('sold_at', 'price').order_by('sold_at')
+            
+            # Group by date in Python
+            from collections import defaultdict
+            daily_data = defaultdict(lambda: {'count': 0, 'revenue': 0})
+            
+            for sale in sales_raw:
+                if sale['sold_at']:
+                    # Convert to date
+                    day = sale['sold_at'].date() if hasattr(sale['sold_at'], 'date') else sale['sold_at']
+                    daily_data[day]['count'] += 1
+                    daily_data[day]['revenue'] += float(sale['price'] or 0)
+            
+            # Sort and prepare chart data
+            sorted_days = sorted(daily_data.keys())
+            daily_sales_labels = [d.strftime('%d') for d in sorted_days]
+            daily_sales_data = [daily_data[d]['count'] for d in sorted_days]
+            daily_revenue_data = [daily_data[d]['revenue'] for d in sorted_days]
+        else:
+            # PostgreSQL/MySQL: use DB-level aggregation
+            sales_by_day = Sale.objects.filter(
+                sold_at__isnull=False,
+                sold_at__gte=start_date,
+                sold_at__lt=end_date
+            ).annotate(
+                day=TruncDate('sold_at')
+            ).values('day').annotate(
+                count=Count('id'),
+                revenue=Coalesce(Sum('price'), zero_dec)
+            ).order_by('day')
+            
+            daily_sales_labels = []
+            daily_sales_data = []
+            daily_revenue_data = []
+            
+            for item in sales_by_day:
+                day_date = item['day']
+                if day_date:
+                    daily_sales_labels.append(day_date.strftime('%d'))
+                    daily_sales_data.append(item['count'])
+                    daily_revenue_data.append(float(item['revenue']))
         
         ctx["daily_sales_labels"] = json.dumps(daily_sales_labels)
         ctx["daily_sales_data"] = json.dumps(daily_sales_data)
@@ -469,49 +616,107 @@ def monthly_drill_down_api(request):
         # Get date range for the month
         start_date, end_date = get_month_range(year, month)
         
-        # Aggregate sales by day
+        # Aggregate sales by day - SQLite-safe
         zero_dec = Value(0, output_field=DecimalField(max_digits=18, decimal_places=2))
-        sales_by_day = Sale.objects.filter(
-            sold_at__gte=start_date,
-            sold_at__lt=end_date
-        ).annotate(
-            day=TruncDate('sold_at')
-        ).values('day').annotate(
-            count=Count('id'),
-            revenue=Coalesce(Sum('price'), zero_dec)
-        ).order_by('day')
+        from django.db import connection
         
-        # Format response
-        daily_data = [
-            {
-                "date": item['day'].isoformat(),
-                "day": item['day'].day,
-                "sales_count": item['count'],
-                "revenue": float(item['revenue'])
-            }
-            for item in sales_by_day
-        ]
-        
-        # Aggregate new onboardings by day (if available)
-        if _field(Membership, "created_at"):
-            onboardings_by_day = Membership.objects.filter(
-                role="AGENT",
-                created_at__gte=start_date,
-                created_at__lt=end_date
+        if connection.vendor == 'sqlite':
+            # SQLite fallback: fetch raw data and group in Python
+            sales_raw = Sale.objects.filter(
+                sold_at__isnull=False,
+                sold_at__gte=start_date,
+                sold_at__lt=end_date
+            ).values('sold_at', 'price').order_by('sold_at')
+            
+            from collections import defaultdict
+            daily_sales = defaultdict(lambda: {'count': 0, 'revenue': 0})
+            
+            for sale in sales_raw:
+                if sale['sold_at']:
+                    day = sale['sold_at'].date() if hasattr(sale['sold_at'], 'date') else sale['sold_at']
+                    daily_sales[day]['count'] += 1
+                    daily_sales[day]['revenue'] += float(sale['price'] or 0)
+            
+            daily_data = [
+                {
+                    "date": day.isoformat(),
+                    "day": day.day,
+                    "sales_count": daily_sales[day]['count'],
+                    "revenue": daily_sales[day]['revenue']
+                }
+                for day in sorted(daily_sales.keys())
+            ]
+        else:
+            # PostgreSQL/MySQL: use DB-level aggregation
+            sales_by_day = Sale.objects.filter(
+                sold_at__isnull=False,
+                sold_at__gte=start_date,
+                sold_at__lt=end_date
             ).annotate(
-                day=TruncDate('created_at')
+                day=TruncDate('sold_at')
             ).values('day').annotate(
-                count=Count('id')
+                count=Count('id'),
+                revenue=Coalesce(Sum('price'), zero_dec)
             ).order_by('day')
             
-            onboarding_data = [
+            daily_data = [
                 {
                     "date": item['day'].isoformat(),
                     "day": item['day'].day,
-                    "count": item['count']
+                    "sales_count": item['count'],
+                    "revenue": float(item['revenue'])
                 }
-                for item in onboardings_by_day
+                for item in sales_by_day if item['day']
             ]
+        
+        # Aggregate new onboardings by day (if available) - SQLite-safe
+        if _field(Membership, "created_at"):
+            if connection.vendor == 'sqlite':
+                # SQLite fallback
+                onboardings_raw = Membership.objects.filter(
+                    role="AGENT",
+                    created_at__isnull=False,
+                    created_at__gte=start_date,
+                    created_at__lt=end_date
+                ).values('created_at').order_by('created_at')
+                
+                from collections import defaultdict
+                daily_onboardings = defaultdict(int)
+                
+                for item in onboardings_raw:
+                    if item['created_at']:
+                        day = item['created_at'].date() if hasattr(item['created_at'], 'date') else item['created_at']
+                        daily_onboardings[day] += 1
+                
+                onboarding_data = [
+                    {
+                        "date": day.isoformat(),
+                        "day": day.day,
+                        "count": daily_onboardings[day]
+                    }
+                    for day in sorted(daily_onboardings.keys())
+                ]
+            else:
+                # PostgreSQL/MySQL
+                onboardings_by_day = Membership.objects.filter(
+                    role="AGENT",
+                    created_at__isnull=False,
+                    created_at__gte=start_date,
+                    created_at__lt=end_date
+                ).annotate(
+                    day=TruncDate('created_at')
+                ).values('day').annotate(
+                    count=Count('id')
+                ).order_by('day')
+                
+                onboarding_data = [
+                    {
+                        "date": item['day'].isoformat(),
+                        "day": item['day'].day,
+                        "count": item['count']
+                    }
+                    for item in onboardings_by_day if item['day']
+                ]
         else:
             onboarding_data = []
         
@@ -600,8 +805,15 @@ def business_detail(request, pk: int):
     agents_qs = Membership.objects.filter(role="AGENT", business=biz).select_related("user")
     limits = _limits_for_business(biz)
     
-    # Get subscription for membership controls
-    subscription = getattr(biz, 'subscription', None)
+    # Get subscription for membership controls - handle missing subscription safely
+    subscription = None
+    try:
+        subscription = biz.subscription
+    except Subscription.DoesNotExist:
+        subscription = None
+    except AttributeError:
+        subscription = None
+    
     total_invoices = inv.count()
 
     ctx = {
@@ -717,6 +929,8 @@ def agents(request):
     # Limits per business to enable UI nudges (e.g., â€œUpgrade to add more agentsâ€)
     biz_limits = {}
     for b_id in rows.values_list("business_id", flat=True).distinct():
+        if not b_id:
+            continue
         try:
             biz = Business.objects.get(pk=b_id)
             lim = _limits_for_business(biz)
@@ -724,7 +938,13 @@ def agents(request):
                 agent_count = Membership.objects.filter(role="AGENT", business_id=b_id).count()
                 lim = {**lim, "agent_count": agent_count}
             biz_limits[b_id] = lim
-        except Exception:
+        except Business.DoesNotExist:
+            biz_limits[b_id] = None
+        except Exception as e:
+            # Don't crash on subscription or other errors
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.warning(f"Error getting limits for business {b_id}: {e}")
             biz_limits[b_id] = None
 
     ctx = {"rows": rows, "page_obj": _paginate(request, rows, per_page=30), "q": q, "biz_limits": biz_limits, "active_tab": "agents"}

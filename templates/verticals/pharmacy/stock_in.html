@@ -87,39 +87,16 @@
         </div>
       </div>
       
-      <div class="form-field">
-        <label>Category <span class="required">*</span></label>
-        <select name="category" required>
-          <option value="">-- Select Category --</option>
-          <optgroup label="Medicine">
-            <option value="analgesic">Analgesic (Pain Relief)</option>
-            <option value="antibiotic">Antibiotic</option>
-            <option value="antifungal">Antifungal</option>
-            <option value="antiviral">Antiviral</option>
-            <option value="antihistamine">Antihistamine</option>
-            <option value="antipyretic">Antipyretic (Fever)</option>
-            <option value="antihypertensive">Antihypertensive (Blood Pressure)</option>
-            <option value="antidiabetic">Antidiabetic</option>
-            <option value="vitamin">Vitamin/Supplement</option>
-            <option value="antiparasitic">Antiparasitic</option>
-            <option value="respiratory">Respiratory</option>
-            <option value="gastrointestinal">Gastrointestinal</option>
-            <option value="contraceptive">Contraceptive</option>
-          </optgroup>
-          <optgroup label="Cosmetics & Personal Care">
-            <option value="skin_care">Skin Care</option>
-            <option value="hair_care">Hair Care</option>
-            <option value="personal_care">Personal Care</option>
-            <option value="beauty_makeup">Beauty & Makeup</option>
-            <option value="baby_care">Baby Care</option>
-            <option value="oral_care">Oral Care</option>
-          </optgroup>
-          <optgroup label="General">
-            <option value="general">General Products</option>
-            <option value="other">Other</option>
-          </optgroup>
+      <!-- Category Selection Dropdown -->
+      <div class="form-field" style="margin-top:16px">
+        <label class="form-label fw-semibold">Select Category <span class="required">*</span></label>
+        <select name="category" class="form-select" required>
+          <option value="" selected disabled>Choose category...</option>
+          {% for c in category_options %}
+            <option value="{{ c.value }}">{{ c.label }}</option>
+          {% endfor %}
         </select>
-        <small>Select the product category</small>
+        <small class="text-muted d-block mt-1">Choose the closest match (medicine, skin care, perfumes, etc.)</small>
       </div>
     </div>
 
@@ -194,15 +171,15 @@
 </div>
 
 <script>
+// Legacy function (kept for compatibility with other product type toggles if any)
 function selectProductType(element, value) {
-  // Remove selected class from all options
   document.querySelectorAll('.product-type-option').forEach(opt => {
     opt.classList.remove('selected');
   });
-  // Add selected class to clicked option
   element.classList.add('selected');
-  // Check the radio button
-  element.querySelector('input[type="radio"]').checked = true;
+  if (element.querySelector('input[type="radio"]')) {
+    element.querySelector('input[type="radio"]').checked = true;
+  }
 }
 </script>
 

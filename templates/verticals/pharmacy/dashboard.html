@@ -226,40 +226,148 @@
     <span style="color:#94a3b8;margin-left:8px">{{ period_label }}</span>
   </div>
   
+  <!-- Quick Actions (moved above KPIs for better UX) -->
+  <div style="background:linear-gradient(120deg,#f8fafc,#f1f5f9);border-radius:18px;padding:20px;border:2px solid #e2e8f0">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:10px">
+      <h3 style="margin:0;color:#475569;font-size:1.2rem;display:flex;align-items:center;gap:8px">
+        <span>⚡</span> Quick Actions
+      </h3>
+      <small style="color:#64748b;font-weight:600">Jump to key tasks</small>
+    </div>
+    <div style="display:flex;gap:12px;flex-wrap:wrap">
+      <a href="{% url 'pharmacy:stock_in' %}" style="padding:12px 20px;background:#3b82f6;color:#fff;border-radius:12px;text-decoration:none;font-weight:700;display:flex;align-items:center;gap:8px;transition:transform .2s" onmouseover="this.style.transform='translateY(-2px)'" onmouseout="this.style.transform='translateY(0)'">
+        <span>📦</span> Stock In
+      </a>
+      <a href="{% url 'pharmacy:sell' %}" style="padding:12px 20px;background:#10b981;color:#fff;border-radius:12px;text-decoration:none;font-weight:700;display:flex;align-items:center;gap:8px;transition:transform .2s" onmouseover="this.style.transform='translateY(-2px)'" onmouseout="this.style.transform='translateY(0)'">
+        <span>💰</span> Sell
+      </a>
+      <a href="{% url 'pharmacy:batch_list' %}" style="padding:12px 20px;background:#6366f1;color:#fff;border-radius:12px;text-decoration:none;font-weight:700;display:flex;align-items:center;gap:8px;transition:transform .2s" onmouseover="this.style.transform='translateY(-2px)'" onmouseout="this.style.transform='translateY(0)'">
+        <span>📋</span> Batches
+      </a>
+      <a href="{% url 'pharmacy:low_stock' %}" style="padding:12px 20px;background:#f59e0b;color:#fff;border-radius:12px;text-decoration:none;font-weight:700;display:flex;align-items:center;gap:8px;transition:transform .2s" onmouseover="this.style.transform='translateY(-2px)'" onmouseout="this.style.transform='translateY(0)'">
+        <span>📉</span> Low Stock
+      </a>
+      <a href="{% url 'pharmacy:near_expiry' %}" style="padding:12px 20px;background:#ef4444;color:#fff;border-radius:12px;text-decoration:none;font-weight:700;display:flex;align-items:center;gap:8px;transition:transform .2s" onmouseover="this.style.transform='translateY(-2px)'" onmouseout="this.style.transform='translateY(0)'">
+        <span>⏰</span> Near Expiry
+      </a>
+    </div>
+  </div>
+  
+  <!-- Stock Health Insights Panel (Gamified) -->
+  <div style="background:#fff;border-radius:18px;padding:24px;box-shadow:0 10px 30px rgba(15,23,42,.08)">
+    <h2 style="margin:0 0 16px;color:#0f172a;font-size:1.4rem;display:flex;align-items:center;gap:10px">
+      <span>🎯</span> Stock Health Insights
+    </h2>
+    
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:16px">
+      <!-- Expiry Risk Gauge -->
+      <div style="padding:16px;border-radius:14px;background:linear-gradient(120deg,{% if near_expiry_count > 0 %}#fef3c7,#fde68a{% else %}#d1fae5,#a7f3d0{% endif %});border:2px solid {% if near_expiry_count > 0 %}#fbbf24{% else %}#86efac{% endif %}">
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
+          <span style="font-size:1.8rem">{% if near_expiry_count > 0 %}⚠️{% else %}✅{% endif %}</span>
+          <div>
+            <h4 style="margin:0;font-size:.9rem;color:{% if near_expiry_count > 0 %}#92400e{% else %}#065f46{% endif %}">Expiry Risk</h4>
+            <p style="margin:4px 0 0;font-size:.85rem;color:{% if near_expiry_count > 0 %}#92400e{% else %}#065f46{% endif %};opacity:.8">Next 30 days</p>
+          </div>
+        </div>
+        <div style="font-size:2rem;font-weight:800;color:{% if near_expiry_count > 0 %}#78350f{% else %}#064e3b{% endif %};margin-top:8px">
+          {{ near_expiry_count }}
+        </div>
+        <p style="margin:6px 0 0;font-size:.85rem;color:{% if near_expiry_count > 0 %}#92400e{% else %}#065f46{% endif %}">
+          {% if near_expiry_count > 0 %}
+            batch{{ near_expiry_count|pluralize:"es" }} expiring soon
+          {% else %}
+            All batches fresh!
+          {% endif %}
+        </p>
+      </div>
+      
+      <!-- Low Stock Mission -->
+      <div style="padding:16px;border-radius:14px;background:linear-gradient(120deg,{% if low_stock_count > 0 %}#fee2e2,#fecaca{% else %}#dbeafe,#bfdbfe{% endif %});border:2px solid {% if low_stock_count > 0 %}#f87171{% else %}#60a5fa{% endif %}">
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
+          <span style="font-size:1.8rem">{% if low_stock_count > 0 %}📦{% else %}✨{% endif %}</span>
+          <div>
+            <h4 style="margin:0;font-size:.9rem;color:{% if low_stock_count > 0 %}#7f1d1d{% else %}#1e40af{% endif %}">Stock Mission</h4>
+            <p style="margin:4px 0 0;font-size:.85rem;color:{% if low_stock_count > 0 %}#7f1d1d{% else %}#1e40af{% endif %};opacity:.8">Reorder needed</p>
+          </div>
+        </div>
+        <div style="font-size:2rem;font-weight:800;color:{% if low_stock_count > 0 %}#991b1b{% else %}#1e3a8a{% endif %};margin-top:8px">
+          {{ low_stock_count }}
+        </div>
+        <p style="margin:6px 0 0;font-size:.85rem;color:{% if low_stock_count > 0 %}#7f1d1d{% else %}#1e40af{% endif %}">
+          {% if low_stock_count > 0 %}
+            item{{ low_stock_count|pluralize }} below reorder level
+          {% else %}
+            Stock levels optimal!
+          {% endif %}
+        </p>
+      </div>
+      
+      <!-- Expired Items Alert -->
+      <div style="padding:16px;border-radius:14px;background:linear-gradient(120deg,{% if expired_count > 0 %}#fecaca,#fca5a5{% else %}#e0e7ff,#c7d2fe{% endif %});border:2px solid {% if expired_count > 0 %}#ef4444{% else %}#a5b4fc{% endif %}">
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
+          <span style="font-size:1.8rem">{% if expired_count > 0 %}🚨{% else %}🎉{% endif %}</span>
+          <div>
+            <h4 style="margin:0;font-size:.9rem;color:{% if expired_count > 0 %}#7f1d1d{% else %}#3730a3{% endif %}">Expired Items</h4>
+            <p style="margin:4px 0 0;font-size:.85rem;color:{% if expired_count > 0 %}#7f1d1d{% else %}#3730a3{% endif %};opacity:.8">Needs attention</p>
+          </div>
+        </div>
+        <div style="font-size:2rem;font-weight:800;color:{% if expired_count > 0 %}#991b1b{% else %}#4338ca{% endif %};margin-top:8px">
+          {{ expired_count }}
+        </div>
+        <p style="margin:6px 0 0;font-size:.85rem;color:{% if expired_count > 0 %}#7f1d1d{% else %}#3730a3{% endif %}">
+          {% if expired_count > 0 %}
+            batch{{ expired_count|pluralize:"es" }} past expiry
+          {% else %}
+            No expired batches!
+          {% endif %}
+        </p>
+      </div>
+    </div>
+    
+    <!-- Stock Health Score (simple text indicator) -->
+    {% if near_expiry_count == 0 and low_stock_count == 0 and expired_count == 0 %}
+    <div style="margin-top:16px;padding:16px;background:linear-gradient(120deg,#d1fae5,#a7f3d0);border:2px solid #86efac;border-radius:14px;text-align:center">
+      <span style="font-size:2rem;display:block;margin-bottom:8px">🏆</span>
+      <h3 style="margin:0;color:#065f46;font-size:1.1rem">Perfect Stock Health!</h3>
+      <p style="margin:6px 0 0;color:#047857;font-size:.9rem">Your pharmacy inventory is in excellent condition. Keep it up!</p>
+    </div>
+    {% endif %}
+  </div>
+  
   <!-- KPI Cards -->
   <div class="kpi-grid">
     <div class="kpi-card">
-      <p class="kpi-label">Total Batches</p>
+      <p class="kpi-label">📦 Total Batches</p>
       <h3 class="kpi-value">{{ total_batches|intcomma }}</h3>
       <p class="kpi-sublabel">Active stock batches</p>
     </div>
     
     <div class="kpi-card">
-      <p class="kpi-label">Stock Value</p>
+      <p class="kpi-label">💰 Stock Value</p>
       <h3 class="kpi-value">MWK {{ total_stock_value|floatformat:0|intcomma }}</h3>
       <p class="kpi-sublabel">At selling price</p>
     </div>
     
     <div class="kpi-card">
-      <p class="kpi-label">Revenue ({{ period_label }})</p>
+      <p class="kpi-label">💵 Revenue ({{ period_label }})</p>
       <h3 class="kpi-value">MWK {{ period_revenue|floatformat:0|intcomma }}</h3>
       <p class="kpi-sublabel">{{ period_sales_count }} sales</p>
     </div>
     
     <div class="kpi-card">
-      <p class="kpi-label">Profit ({{ period_label }})</p>
+      <p class="kpi-label">📈 Profit ({{ period_label }})</p>
       <h3 class="kpi-value" style="color:#10b981">MWK {{ period_profit|floatformat:0|intcomma }}</h3>
       <p class="kpi-sublabel">Gross margin</p>
     </div>
     
     <div class="kpi-card">
-      <p class="kpi-label">Costs ({{ period_label }})</p>
+      <p class="kpi-label">💸 Costs ({{ period_label }})</p>
       <h3 class="kpi-value" style="color:#ef4444">MWK {{ period_costs|floatformat:0|intcomma }}</h3>
       <p class="kpi-sublabel">COGS + Admin</p>
     </div>
     
     <div class="kpi-card">
-      <p class="kpi-label">Products</p>
+      <p class="kpi-label">🏥 Products</p>
       <h3 class="kpi-value">{{ total_products|intcomma }}</h3>
       <p class="kpi-sublabel">Unique medicines & cosmetics</p>
     </div>
@@ -572,16 +680,6 @@
     {% endif %}
   </div>
   
-  <!-- Quick Actions -->
-  <div style="background:#f8fafc;border-radius:18px;padding:24px;border:2px dashed #cbd5e1">
-    <h3 style="margin:0 0 14px;color:#475569;font-size:1.2rem">⚡ Quick Actions</h3>
-    <div style="display:flex;gap:12px;flex-wrap:wrap">
-      <a href="{% url 'pharmacy:stock_in' %}" style="padding:10px 18px;background:#3b82f6;color:#fff;border-radius:12px;text-decoration:none;font-weight:700">+ Add Medicine</a>
-      <a href="{% url 'pharmacy:stock_in' %}?type=cosmetic" style="padding:10px 18px;background:#ec4899;color:#fff;border-radius:12px;text-decoration:none;font-weight:700">+ Add Cosmetic</a>
-      <a href="{% url 'pharmacy:batch_list' %}" style="padding:10px 18px;background:#64748b;color:#fff;border-radius:12px;text-decoration:none;font-weight:700">View All Batches</a>
-      <a href="{% url 'pharmacy:sell' %}" style="padding:10px 18px;background:#10b981;color:#fff;border-radius:12px;text-decoration:none;font-weight:700">Record Sale</a>
-    </div>
-  </div>
 </div>
 
 {% endblock %}

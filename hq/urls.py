@@ -2,7 +2,22 @@
 from django.urls import path
 from django.views.generic import RedirectView
 from . import views
-from . import views_contracts
+
+# Import contracts views (may fail if MerchantContract model not migrated)
+try:
+    from . import views_contracts
+except ImportError:
+    views_contracts = None
+
+# Import new view modules
+try:
+    from . import views_business_directory
+    from . import views_business_detail
+    from . import views_account_support
+except ImportError:
+    views_business_directory = None
+    views_business_detail = None
+    views_account_support = None
 
 # All URLs are namespaced as 'hq:<name>'
 app_name = "hq"
@@ -20,7 +35,8 @@ urlpatterns = [
     # =========================
     # Lists
     # =========================
-    path("businesses/",    views.businesses,    name="businesses"),
+    # Direct view (NO redirect) - prevents redirect loops
+    path("businesses/", views_business_directory.business_directory if views_business_directory else views.subscriptions, name="businesses"),
     path("subscriptions/", views.subscriptions, name="subscriptions"),
     path("invoices/",      views.invoices,      name="invoices"),
     path("agents/",        views.agents,        name="agents"),
@@ -42,13 +58,8 @@ urlpatterns = [
     path("wallet/", views.wallet_home, name="wallet"),
 
     # =========================
-    # Merchant Contracts
+    # Merchant Contracts (conditional)
     # =========================
-    path("contracts/", views_contracts.contracts_list, name="contracts_list"),
-    path("contracts/template/", views_contracts.contract_template, name="contract_template"),
-    path("contracts/<int:business_id>/", views_contracts.contracts_detail, name="contracts_detail"),
-    path("contracts/<int:contract_id>/download/", views_contracts.contract_download, name="contract_download"),
-    path("contracts/<int:contract_id>/delete/", views_contracts.contract_delete, name="contract_delete"),
 
     # ==================================================================
     # Subscription Admin Actions (used by HQ Subscriptions table buttons)
@@ -90,6 +101,47 @@ urlpatterns = [
     path("subscriptions/<int:pk>/cancel/",       views.sub_cancel,       name="sub_cancel"),
 ]
 
+# =========================
+# Merchant Contracts URLs (conditional)
+# =========================
+if views_contracts:
+    urlpatterns += [
+        path("contracts/", views_contracts.contracts_list, name="contracts_list"),
+        path("contracts/template/", views_contracts.contract_template, name="contract_template"),
+        path("contracts/<int:business_id>/", views_contracts.contracts_detail, name="contracts_detail"),
+        path("contracts/<int:contract_id>/download/", views_contracts.contract_download, name="contract_download"),
+        path("contracts/<int:contract_id>/delete/", views_contracts.contract_delete, name="contract_delete"),
+    ]
+
+# =========================
+# Enhanced HQ Overwatch URLs (New)
+# =========================
+if views_business_directory:
+    urlpatterns += [
+        # Business Directory (Enhanced)
+        path("directory/", views_business_directory.business_directory, name="business_directory"),
+        path("api/business-search/", views_business_directory.business_search_api, name="business_search_api"),
+        path("businesses/<int:business_id>/quick-action/", views_business_directory.quick_action, name="quick_action"),
+    ]
+
+if views_business_detail:
+    urlpatterns += [
+        # Business Command Center (Tabbed)
+        path("businesses/<int:business_id>/command-center/", views_business_detail.business_command_center, name="business_command_center"),
+        path("businesses/<int:business_id>/add-note/", views_business_detail.add_business_note, name="add_business_note"),
+    ]
+
+if views_account_support:
+    urlpatterns += [
+        # Account & Login Support Tools
+        path("businesses/<int:business_id>/account-support/", views_account_support.account_support_home, name="account_support"),
+        path("businesses/<int:business_id>/users/<int:user_id>/force-logout/", views_account_support.force_logout_user, name="force_logout_user"),
+        path("businesses/<int:business_id>/users/<int:user_id>/unlock/", views_account_support.unlock_account, name="unlock_account"),
+        path("businesses/<int:business_id>/users/<int:user_id>/reset-password/", views_account_support.reset_password_for_user, name="reset_password_for_user"),
+        path("businesses/<int:business_id>/users/<int:user_id>/resend-otp/", views_account_support.resend_otp, name="resend_otp"),
+        path("businesses/<int:business_id>/users/<int:user_id>/sessions/", views_account_support.user_sessions, name="user_sessions"),
+    ]
+
 # ---------------------------------------------------------------------
 # Optional: legacy â€œunnamespacedâ€ names for old templates doing {% url 'businesses' %}
 # Only include if your project expects these globals under /hq/.
@@ -98,7 +150,8 @@ legacy_urlpatterns = [
     path("",      RedirectView.as_view(pattern_name="hq:dashboard", permanent=False), name="dashboard"),
     path("home/", RedirectView.as_view(pattern_name="hq:home",      permanent=False), name="home"),
 
-    path("businesses/",    views.businesses,    name="businesses"),
+    # Legacy businesses route - direct view (NO redirect to prevent loops)
+    path("businesses/",    views_business_directory.business_directory if views_business_directory else views.subscriptions, name="businesses_legacy"),
     path("subscriptions/", views.subscriptions, name="subscriptions"),
     path("invoices/",      views.invoices,      name="invoices"),
     path("agents/",        views.agents,        name="agents"),

@@ -1,0 +1,176 @@
+{% extends "hq/base.html" %}
+{% load static %}
+{% load humanize %}
+
+{% block title %}User Sessions - {{ user.email }} - HQ Admin{% endblock %}
+
+{% block extra_head %}
+{{ block.super }}
+<style>
+    .sessions-header {
+        background: linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%);
+        color: white;
+        padding: 48px 0;
+        margin: -24px -24px 32px -24px;
+    }
+    .sessions-title {
+        font-size: 32px;
+        font-weight: 800;
+        margin-bottom: 8px;
+    }
+    .sessions-subtitle {
+        opacity: 0.9;
+        font-size: 16px;
+    }
+    .content-card {
+        background: white;
+        border-radius: 16px;
+        padding: 32px;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+        margin-bottom: 24px;
+    }
+    .session-info {
+        background: #f7fafc;
+        border-radius: 12px;
+        padding: 24px;
+        margin-bottom: 24px;
+    }
+    .info-row {
+        display: flex;
+        justify-content: space-between;
+        padding: 12px 0;
+        border-bottom: 1px solid #e2e8f0;
+    }
+    .info-row:last-child {
+        border-bottom: none;
+    }
+    .info-label {
+        font-weight: 600;
+        color: #4a5568;
+    }
+    .info-value {
+        color: #1a202c;
+    }
+    .empty-state {
+        text-align: center;
+        padding: 48px 24px;
+        color: #718096;
+    }
+    .empty-state-icon {
+        font-size: 64px;
+        margin-bottom: 16px;
+        opacity: 0.5;
+    }
+</style>
+{% endblock %}
+
+{% block page_content %}
+<div class="sessions-header">
+    <div class="container">
+        <div class="sessions-title">🔒 User Sessions</div>
+        <div class="sessions-subtitle">
+            Active sessions for {{ user.email }}
+        </div>
+    </div>
+</div>
+
+<div class="container">
+    <!-- Back Link -->
+    <div class="mb-4">
+        <a href="{% url 'hq:account_support' business.id %}" class="btn btn-outline-secondary">
+            ← Back to Account Support
+        </a>
+    </div>
+
+    <!-- User Info -->
+    <div class="content-card">
+        <h5 class="fw-bold mb-3">👤 User Information</h5>
+        <div class="session-info">
+            <div class="info-row">
+                <span class="info-label">Name:</span>
+                <span class="info-value">{{ user.get_full_name|default:"Not set" }}</span>
+            </div>
+            <div class="info-row">
+                <span class="info-label">Email:</span>
+                <span class="info-value">{{ user.email }}</span>
+            </div>
+            <div class="info-row">
+                <span class="info-label">Last Login:</span>
+                <span class="info-value">{{ user.last_login|date:"M d, Y H:i"|default:"Never" }}</span>
+            </div>
+            <div class="info-row">
+                <span class="info-label">Date Joined:</span>
+                <span class="info-value">{{ user.date_joined|date:"M d, Y" }}</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Active Sessions -->
+    <div class="content-card">
+        <h5 class="fw-bold mb-3">🌐 Active Sessions</h5>
+        {% if active_sessions_count > 0 %}
+            <div class="alert alert-info">
+                <strong>ℹ️ Note:</strong> Found {{ active_sessions_count }} active session{{ active_sessions_count|pluralize }} in the system.
+                Full session decoding requires additional implementation.
+            </div>
+            
+            <p class="text-muted">
+                To view detailed session information, you would need to:
+            </p>
+            <ul class="text-muted">
+                <li>Decode Django session data to identify user-specific sessions</li>
+                <li>Track IP addresses, user agents, and login times</li>
+                <li>Implement session management tools</li>
+            </ul>
+
+            <div class="mt-4">
+                <form method="post" action="{% url 'hq:force_logout_user' business.id user.id %}" onsubmit="return confirm('⚠️ Force logout all sessions for {{ user.email }}? This action cannot be undone.');">
+                    {% csrf_token %}
+                    <input type="text" name="reason" placeholder="Reason for force logout" class="form-control mb-3" required>
+                    <button type="submit" class="btn btn-danger">
+                        🚪 Force Logout All Sessions
+                    </button>
+                </form>
+            </div>
+        {% else %}
+            <div class="empty-state">
+                <div class="empty-state-icon">🌐</div>
+                <p>No active sessions found.</p>
+            </div>
+        {% endif %}
+    </div>
+
+    <!-- Session Security Tips -->
+    <div class="content-card">
+        <h5 class="fw-bold mb-3">💡 Session Management Tips</h5>
+        <ul class="text-muted">
+            <li>Users can have multiple active sessions if they log in from different devices or browsers</li>
+            <li>Force logout will invalidate all active sessions for this user</li>
+            <li>The user will need to log in again on all devices</li>
+            <li>Sessions automatically expire based on Django's SESSION_COOKIE_AGE setting</li>
+        </ul>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+{{ block.super }}
+<script>
+// Confirm force logout
+document.addEventListener('DOMContentLoaded', function() {
+    const logoutForm = document.querySelector('form[action*="force-logout"]');
+    if (logoutForm) {
+        logoutForm.addEventListener('submit', function(e) {
+            const reasonInput = this.querySelector('input[name="reason"]');
+            if (!reasonInput.value.trim()) {
+                e.preventDefault();
+                alert('Please provide a reason for force logout.');
+                reasonInput.focus();
+                return false;
+            }
+        });
+    }
+});
+</script>
+{% endblock %}
+

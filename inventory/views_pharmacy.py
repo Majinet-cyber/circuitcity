@@ -451,8 +451,6 @@ def pharmacy_stock_in(request: HttpRequest) -> HttpResponse:
         sku = request.POST.get("sku", "").strip()
         product_name = request.POST.get("product_name", "").strip()
         category = request.POST.get("category", "").strip()  # Category from dropdown
-        if not category:
-            category = "general"  # Default fallback
         quantity = request.POST.get("quantity", "0")
         cost_price = request.POST.get("cost_price", "0")
         selling_price = request.POST.get("selling_price", "0")
@@ -471,6 +469,17 @@ def pharmacy_stock_in(request: HttpRequest) -> HttpResponse:
             errors.append("Batch number is required.")
         if not expiry_date_str:
             errors.append("Expiry date is required.")
+        
+        # Validate category against allowed values
+        VALID_CATEGORIES = [
+            "medicine", "supplements", "skin_care", "hair_care", "body_care",
+            "baby_care", "oral_care", "perfumes", "deodorants", "makeup",
+            "soap_hygiene", "first_aid", "other"
+        ]
+        if not category:
+            errors.append("Category is required.")
+        elif category not in VALID_CATEGORIES:
+            errors.append(f"Invalid category '{category}'. Please select from the dropdown.")
         
         try:
             qty = int(quantity)
@@ -600,13 +609,26 @@ def pharmacy_stock_in(request: HttpRequest) -> HttpResponse:
         if "last_quantity" in request.session:
             del request.session["last_quantity"]
     
-    # Get categories for dropdown (if PharmacyCategory is available)
-    from .models_pharmacy import PharmacyCategory
-    categories = [choice for choice in PharmacyCategory.choices]
+    # Define 13 pharmacy & cosmetics categories for dropdown
+    category_options = [
+        {"value": "medicine", "label": "Medicine"},
+        {"value": "supplements", "label": "Supplements"},
+        {"value": "skin_care", "label": "Skin Care"},
+        {"value": "hair_care", "label": "Hair Care"},
+        {"value": "body_care", "label": "Body Care"},
+        {"value": "baby_care", "label": "Baby Care"},
+        {"value": "oral_care", "label": "Oral Care"},
+        {"value": "perfumes", "label": "Perfumes"},
+        {"value": "deodorants", "label": "Deodorants"},
+        {"value": "makeup", "label": "Makeup"},
+        {"value": "soap_hygiene", "label": "Soap & Hygiene"},
+        {"value": "first_aid", "label": "First Aid"},
+        {"value": "other", "label": "Other"},
+    ]
     
     ctx = {
         "success_data": success_data,
-        "categories": categories,
+        "category_options": category_options,
     }
     
     return render(request, "verticals/pharmacy/stock_in.html", ctx)

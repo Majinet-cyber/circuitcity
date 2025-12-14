@@ -1,0 +1,198 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Subscription Inactive - {{ business.name }}</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        body {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+        }
+        .subscription-blocked-card {
+            background: white;
+            border-radius: 24px;
+            padding: 48px;
+            max-width: 600px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            text-align: center;
+        }
+        .icon-circle {
+            width: 80px;
+            height: 80px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #fef5e7 0%, #fed7d7 100%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 24px auto;
+        }
+        .icon-circle svg {
+            width: 40px;
+            height: 40px;
+            color: #c53030;
+        }
+        h1 {
+            color: #1a202c;
+            font-size: 32px;
+            font-weight: 700;
+            margin: 0 0 16px 0;
+        }
+        .lead {
+            color: #4a5568;
+            font-size: 18px;
+            line-height: 1.6;
+            margin-bottom: 24px;
+        }
+        .status-badge {
+            display: inline-block;
+            padding: 12px 24px;
+            background: #fed7d7;
+            color: #c53030;
+            border-radius: 12px;
+            font-weight: 600;
+            font-size: 16px;
+            margin-bottom: 32px;
+        }
+        .business-name {
+            font-weight: 700;
+            color: #2d3748;
+        }
+        .btn-primary {
+            padding: 16px 40px;
+            font-size: 18px;
+            font-weight: 600;
+            border-radius: 12px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border: none;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+        }
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px rgba(102, 126, 234, 0.5);
+        }
+        .btn-secondary {
+            padding: 12px 32px;
+            font-size: 16px;
+            font-weight: 600;
+            border-radius: 12px;
+            background: #e2e8f0;
+            color: #2d3748;
+            border: none;
+            transition: all 0.3s ease;
+            margin-left: 12px;
+        }
+        .btn-secondary:hover {
+            background: #cbd5e0;
+            transform: translateY(-2px);
+        }
+        .support-section {
+            margin-top: 48px;
+            padding-top: 32px;
+            border-top: 2px solid #e2e8f0;
+        }
+        .support-title {
+            color: #718096;
+            font-size: 14px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            font-weight: 600;
+            margin-bottom: 12px;
+        }
+        .support-email {
+            color: #667eea;
+            font-weight: 600;
+            text-decoration: none;
+            font-size: 18px;
+        }
+        .support-email:hover {
+            color: #5568d3;
+            text-decoration: underline;
+        }
+        .details {
+            background: #f7fafc;
+            border-radius: 12px;
+            padding: 24px;
+            margin: 32px 0;
+            text-align: left;
+        }
+        .details-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 8px 0;
+            border-bottom: 1px solid #e2e8f0;
+        }
+        .details-row:last-child {
+            border-bottom: none;
+        }
+        .details-label {
+            color: #718096;
+            font-weight: 600;
+        }
+        .details-value {
+            color: #2d3748;
+            font-weight: 500;
+        }
+    </style>
+</head>
+<body>
+    <div class="subscription-blocked-card">
+        <div class="icon-circle">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+            </svg>
+        </div>
+        
+        <h1>Subscription Inactive</h1>
+        
+        <p class="lead">
+            The subscription for <span class="business-name">{{ business.name }}</span> is currently inactive.
+            Please update your subscription to continue using the platform.
+        </p>
+        
+        <div class="status-badge">
+            Status: {{ subscription.get_status_display }}
+        </div>
+        
+        {% if subscription.current_period_end %}
+        <div class="details">
+            <div class="details-row">
+                <span class="details-label">Subscription Ended:</span>
+                <span class="details-value">{{ subscription.current_period_end|date:"M d, Y" }}</span>
+            </div>
+            {% if subscription.plan %}
+            <div class="details-row">
+                <span class="details-label">Previous Plan:</span>
+                <span class="details-value">{{ subscription.plan.name }}</span>
+            </div>
+            {% endif %}
+        </div>
+        {% endif %}
+        
+        <div class="mt-4">
+            <a href="{{ billing_url }}" class="btn btn-primary">
+                View Billing & Renew
+            </a>
+            <a href="{% url 'accounts:logout' %}" class="btn btn-secondary">
+                Logout
+            </a>
+        </div>
+        
+        <div class="support-section">
+            <div class="support-title">Need Help?</div>
+            <a href="mailto:{{ support_email }}" class="support-email">{{ support_email }}</a>
+            <p class="mt-2 text-muted small">
+                Our support team is here to help you reactivate your subscription and answer any questions.
+            </p>
+        </div>
+    </div>
+</body>
+</html>
+

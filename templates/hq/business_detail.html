@@ -51,8 +51,8 @@
     <!-- Subscription & Membership Card -->
     <div class="card">
       <h2>💳 Membership & Subscription</h2>
-      {% if biz.subscription %}
-        {% with sub=biz.subscription %}
+      {% if subscription %}
+        {% with sub=subscription %}
         <div class="status-row">
           <strong>Status:</strong>
           {% if sub.status == 'active' or sub.status == 'ACTIVE' %}
@@ -94,7 +94,15 @@
         </div>
         {% endwith %}
       {% else %}
-        <p>No subscription found for this business.</p>
+        <div style="text-align:center;padding:32px 24px;background:#f7fafc;border-radius:12px;border:2px dashed #cbd5e0">
+          <div style="font-size:48px;margin-bottom:16px">📋</div>
+          <h3 style="margin:0 0 12px;color:#2d3748;font-size:20px">No Subscription Found</h3>
+          <p style="color:#718096;margin:0 0 24px;font-size:15px">This business does not have an active subscription.</p>
+          <div style="display:flex;gap:12px;justify-content:center;flex-wrap:wrap">
+            <a href="/hq/subscriptions/?business={{ biz.id }}" class="btn btn-primary btn-sm">Create Trial</a>
+            <button class="btn btn-success btn-sm" onclick="alert('Feature coming soon: Create subscription')">Activate Plan</button>
+          </div>
+        </div>
       {% endif %}
     </div>
 
@@ -191,13 +199,15 @@ document.getElementById('extendForm').addEventListener('submit', async (e) => {
   e.preventDefault();
   const days = document.getElementById('daysInput').value;
   if (!days) return;
-  {% if biz.subscription %}
-  const url = '{% url "hq:sub_extend" biz.subscription.pk %}?days=' + days;
+  {% if subscription %}
+  const url = '{% url "hq:sub_extend" subscription.pk %}?days=' + days;
   try {
     window.location.href = url; // GET request with redirect
   } catch(err) {
     alert('Error extending subscription: ' + err.message);
   }
+  {% else %}
+  alert('No subscription found for this business.');
   {% endif %}
 });
 

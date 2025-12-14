@@ -368,12 +368,23 @@ class TenantResolutionMiddleware(MiddlewareMixin):
         except Exception:
             pass
 
+        # CRITICAL: Bypass HQ paths entirely to prevent redirect loops
+        path = getattr(request, "path", "")
+        if path.startswith("/hq/"):
+            _set_product_mode_on_request(request, None)
+            return
+
+        # CRITICAL: Bypass staff/superusers to prevent redirect loops
+        user = getattr(request, "user", None)
+        if getattr(user, "is_authenticated", False):
+            if getattr(user, "is_staff", False) or getattr(user, "is_superuser", False):
+                _set_product_mode_on_request(request, None)
+                return
+
         if not self._has_business_model:
             # Still allow mode override even if Business model isn't present
             _set_product_mode_on_request(request, None)
             return
-
-        user = getattr(request, "user", None)
 
         # (1) Canonical: use the same util as your views/templates
         try:
