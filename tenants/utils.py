@@ -300,40 +300,73 @@ def ensure_active_business_id(
     auto_select_single: bool = True,
 ) -> Optional[int]:
     """
-    Robustly determine the active business id for API/views.
+    Robustly determine the active business id for API/views with SECURITY ENFORCEMENT.
 
-    Resolution order:
-      1) business_id from request (GET/POST/header)
-      2) session (tolerant keys)
+    Resolution order (UPDATED FOR MULTI-TENANCY HARDENING):
+      0) **SECURITY**: If user has exactly ONE business membership, FORCE that business
+         and IGNORE any session override (prevents business hijacking)
+      1) business_id from request (GET/POST/header) - only if user has membership
+      2) session (tolerant keys) - only if user has membership
       3) if user has EXACTLY ONE membership (pref ACTIVE), set it and return (when auto_select_single=True)
 
     If a concrete Business cannot be resolved for the id discovered in (1) or (2),
     this returns None (and does NOT mutate session) unless auto_select_single can resolve one.
     """
-    # 1) Request-provided id
+    user = getattr(request, "user", None)
+    
+    # 0) SECURITY ENFORCEMENT: Force single-membership users to their business
+    if user and getattr(user, "is_authenticated", False):
+        membership = user_business_membership(user)
+        if membership:
+            forced_business = membership.business
+            # If session/request tries to override, ignore and force correct business
+            current_bid = _read_session_business_id(request) or _read_request_business_id(request)
+            if current_bid and int(current_bid) != forced_business.id:
+                # Security: user trying to access different business - reset to their business
+                set_active_business(request, forced_business)
+            elif not current_bid:
+                # No business set yet - set theirs
+                set_active_business(request, forced_business)
+            return int(forced_business.id)
+    
+    # 1) Request-provided id (validate user has membership)
     bid = _read_request_business_id(request)
     if bid:
         b = _resolve_business_by_id(bid)
         if b is not None:
+            # Verify user has membership in this business
+            if user and getattr(user, "is_authenticated", False):
+                if not user_has_membership(user, b.id):
+                    # User trying to access business they don't belong to - deny
+                    return None
             # Persist as the active business for the session/thread
             set_active_business(request, b)
             return int(getattr(b, "id", bid))
 
-    # 2) Session
+    # 2) Session (validate user has membership)
     bid = _read_session_business_id(request)
     if bid:
         b = _resolve_business_by_id(bid)
         if b is not None:
-            # Cache onto request and mirror thread-local (idempotent)
-            try:
-                setattr(request, "business", b)
-            except Exception:
-                pass
-            try:
-                set_current_business_id(getattr(b, "pk", None))
-            except Exception:
-                pass
-            return int(getattr(b, "id", bid))
+            # Verify user has membership in this business
+            if user and getattr(user, "is_authenticated", False):
+                if not user_has_membership(user, b.id):
+                    # User's session has wrong business - clear and fallback
+                    set_active_business(request, None)
+                    bid = None
+                    b = None
+            
+            if b is not None:
+                # Cache onto request and mirror thread-local (idempotent)
+                try:
+                    setattr(request, "business", b)
+                except Exception:
+                    pass
+                try:
+                    set_current_business_id(getattr(b, "pk", None))
+                except Exception:
+                    pass
+                return int(getattr(b, "id", bid))
 
     # 3) Single membership auto-pick
     if auto_select_single:
@@ -433,6 +466,124 @@ def user_highest_role(user) -> Optional[str]:
             if pref in roles_upper:
                 return pref
         return next(iter(roles_upper), None)
+    except Exception:
+        return None
+
+
+def user_business_membership(user) -> Optional["Membership"]:
+    """
+    Return the user's ACTIVE business membership (single source of truth).
+    Returns None if user has no membership or multiple memberships.
+    Prioritizes MANAGER role over AGENT if exactly one exists.
+    """
+    if Membership is None or not getattr(user, "is_authenticated", False):
+        return None
+    
+    try:
+        qs = Membership.objects.filter(user=user).select_related("business")
+        if _membership_has_status_field():
+            qs = qs.filter(status__iexact="ACTIVE")
+        
+        memberships = list(qs.filter(business__status="ACTIVE"))
+        
+        if len(memberships) == 0:
+            return None
+        if len(memberships) == 1:
+            return memberships[0]
+        
+        # Multiple memberships: prefer MANAGER over AGENT (for same business)
+        managers = [m for m in memberships if (m.role or "").upper() == "MANAGER"]
+        if len(managers) == 1:
+            return managers[0]
+        
+        # Return first if ambiguous
+        return memberships[0]
+    except Exception:
+        return None
+
+
+def user_has_any_business(user) -> bool:
+    """
+    Returns True if user has ANY active membership or owns/created a business.
+    Used to determine if user should see onboarding vs. being locked to their business.
+    """
+    if not getattr(user, "is_authenticated", False):
+        return False
+    
+    # Check membership
+    if user_business_membership(user) is not None:
+        return True
+    
+    # Check if user created any business
+    if Business is not None:
+        try:
+            return Business.objects.filter(created_by=user).exists()
+        except Exception:
+            pass
+    
+    return False
+
+
+def require_business_membership(view_func):
+    """
+    Decorator: Requires user to have an active business membership.
+    Redirects to onboarding if no membership exists.
+    """
+    @wraps(view_func)
+    def wrapper(request, *args, **kwargs):
+        if not request.user.is_authenticated:
+            return redirect(_safe_reverse("login", "/accounts/login/"))
+        
+        if not user_has_any_business(request.user):
+            messages.info(request, "Please set up or join a business first.")
+            return redirect(_safe_reverse("onboarding:start", "/onboarding/"))
+        
+        return view_func(request, *args, **kwargs)
+    
+    return wrapper
+
+
+def scope_queryset_to_business(qs, business):
+    """
+    Helper to scope any queryset to a specific business.
+    Returns filtered queryset if business is valid, otherwise returns empty qs.
+    """
+    if business is None:
+        return qs.none()
+    
+    business_id = getattr(business, "id", None) or getattr(business, "pk", None)
+    if business_id is None:
+        return qs.none()
+    
+    # Try common field names
+    if hasattr(qs.model, "_meta"):
+        field_names = {f.name for f in qs.model._meta.get_fields()}
+        if "business" in field_names:
+            return qs.filter(business_id=business_id)
+        elif "business_id" in field_names:
+            return qs.filter(business_id=business_id)
+    
+    return qs
+
+
+def get_object_for_business(model_class, business, **filter_kwargs):
+    """
+    Business-scoped get_object_or_404 alternative.
+    Returns object only if it belongs to the specified business, else None.
+    """
+    from django.shortcuts import get_object_or_404
+    
+    if business is None:
+        return None
+    
+    business_id = getattr(business, "id", None) or getattr(business, "pk", None)
+    if business_id is None:
+        return None
+    
+    try:
+        # Try to filter by business
+        qs = model_class.objects.filter(business_id=business_id, **filter_kwargs)
+        return qs.first()
     except Exception:
         return None
 

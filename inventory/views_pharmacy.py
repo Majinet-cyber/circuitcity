@@ -239,19 +239,31 @@ def pharmacy_dashboard(request: HttpRequest) -> HttpResponse:
     # Integrate with wallet/costs system
     period_costs = Decimal("0.00")
     try:
-        from wallet.models import Txn, TxnType
+        from wallet.models import WalletTransaction, Ledger, TxnType
+        from wallet.utils_costs import ensure_monthly_recurring_costs
         
-        # Get all costs for pharmacy vertical in this period
-        costs_queryset = Txn.objects.filter(
+        # Ensure recurring costs are auto-created for current month (idempotent)
+        try:
+            from datetime import date as dt_date
+            today = timezone.now().date()
+            month_start = dt_date(today.year, today.month, 1)
+            ensure_monthly_recurring_costs(business, month_start)
+        except Exception as e:
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.warning(f"Could not auto-create recurring costs: {e}")
+        
+        # Get all admin costs for this period (both once-off and recurring instances)
+        costs_queryset = WalletTransaction.objects.filter(
             business=business,
-            type=TxnType.COST,
+            ledger=Ledger.COMPANY,
+            type__in=[TxnType.COST_ONCE_OFF, TxnType.COST_RECURRING],
             effective_date__gte=start_date,
             effective_date__lte=end_date,
         )
         
-        # Try to filter by vertical if meta supports it
-        # For now, sum all costs (can be refined later with meta filtering)
-        period_costs = costs_queryset.aggregate(total=Sum('amount'))['total'] or Decimal("0.00")
+        # Sum costs (they're stored as negative, so take absolute value)
+        period_costs = abs(costs_queryset.aggregate(total=Sum('amount'))['total'] or Decimal("0.00"))
     except Exception:
         pass  # Gracefully handle if wallet app not available
     

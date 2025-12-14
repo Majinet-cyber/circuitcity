@@ -102,8 +102,19 @@ urlpatterns = [
 ]
 
 # =========================
-# Merchant Contracts URLs (conditional)
+# Merchant Contracts URLs (always registered with stub fallback)
 # =========================
+def _contracts_stub(request):
+    """Stub view when contracts module is not available."""
+    from django.http import HttpResponse
+    return HttpResponse(
+        '<html><body style="font-family:system-ui;padding:2rem;">'
+        '<h1>Contracts Module Not Available</h1>'
+        '<p>The contracts feature requires additional configuration.</p>'
+        '<a href="/hq/">← Back to HQ</a></body></html>',
+        status=200
+    )
+
 if views_contracts:
     urlpatterns += [
         path("contracts/", views_contracts.contracts_list, name="contracts_list"),
@@ -111,6 +122,15 @@ if views_contracts:
         path("contracts/<int:business_id>/", views_contracts.contracts_detail, name="contracts_detail"),
         path("contracts/<int:contract_id>/download/", views_contracts.contract_download, name="contract_download"),
         path("contracts/<int:contract_id>/delete/", views_contracts.contract_delete, name="contract_delete"),
+    ]
+else:
+    # Stub routes so templates don't get NoReverseMatch errors
+    urlpatterns += [
+        path("contracts/", _contracts_stub, name="contracts_list"),
+        path("contracts/template/", _contracts_stub, name="contract_template"),
+        path("contracts/<int:business_id>/", _contracts_stub, name="contracts_detail"),
+        path("contracts/<int:contract_id>/download/", _contracts_stub, name="contract_download"),
+        path("contracts/<int:contract_id>/delete/", _contracts_stub, name="contract_delete"),
     ]
 
 # =========================

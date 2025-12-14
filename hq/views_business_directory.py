@@ -28,6 +28,13 @@ except ImportError:
     SupportActionLog = None
     SupportTicket = None
 
+# Check if contracts module is available
+try:
+    from hq import views_contracts
+    CONTRACTS_ENABLED = True
+except ImportError:
+    CONTRACTS_ENABLED = False
+
 
 @hq_admin_required
 def business_directory(request: HttpRequest) -> HttpResponse:
@@ -306,6 +313,7 @@ def business_directory(request: HttpRequest) -> HttpResponse:
         "chart_data": json.dumps(chart_data),
         "support_health_score": support_health_score,
         "failed_payments_count": failed_invoices,
+        "contracts_enabled": CONTRACTS_ENABLED,
     }
     
     return render(request, "hq/business_directory.html", context)

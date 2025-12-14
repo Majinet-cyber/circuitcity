@@ -203,16 +203,29 @@ def _get_admin_wallet_costs(business: Business, start_date, end_date) -> Decimal
     Reuses existing wallet transaction logic if available.
     """
     try:
-        from wallet.models import WalletTransaction
+        from wallet.models import WalletTransaction, Ledger, TxnType
+        from wallet.utils_costs import ensure_monthly_recurring_costs
+        from django.db.models import Sum
         
+        # Ensure recurring costs are auto-created for current month (idempotent)
+        try:
+            from datetime import date
+            today = timezone.now().date()
+            month_start = date(today.year, today.month, 1)
+            ensure_monthly_recurring_costs(business, month_start)
+        except Exception as e:
+            logger.warning(f"Could not auto-create recurring costs: {e}")
+        
+        # Get admin costs (both once-off and recurring instances) for the period
         admin_costs = WalletTransaction.objects.filter(
             business=business,
+            ledger=Ledger.COMPANY,
+            type__in=[TxnType.COST_ONCE_OFF, TxnType.COST_RECURRING],
             effective_date__gte=start_date,
             effective_date__lte=end_date,
-            type="ADMIN_EXPENSE"
         ).aggregate(total=Sum("amount"))["total"] or Decimal("0.00")
         
-        return abs(admin_costs)  # Expenses are typically negative
+        return abs(admin_costs)  # Expenses are stored as negative, return positive
     except ImportError:
         # Wallet app not available
         return Decimal("0.00")

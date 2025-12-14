@@ -471,7 +471,11 @@
                     <span class="tenant-caret"><i class="bi bi-chevron-down"></i></span>
                   </div>
                   <div class="tenant-menu" id="tenantMenu" role="menu" aria-label="Business menu">
-                    <a class="tenant-item" href="{{ url_choose_business|default:'/tenants/choose/' }}"><i class="bi bi-arrow-left-right"></i> Switch business</a>
+                    {# MULTI-TENANCY HARDENING: Only show "Switch business" for superusers #}
+                    {# Regular users are locked to their single business #}
+                    {% if request.user.is_superuser %}
+                      <a class="tenant-item" href="{{ url_choose_business|default:'/tenants/choose/' }}"><i class="bi bi-arrow-left-right"></i> Switch business</a>
+                    {% endif %}
                     {% if request.membership and request.membership.role == "MANAGER" or IS_MANAGER or request.user.is_authenticated and request.user.profile.is_manager %}
                       <a class="tenant-item" href="{{ url_manager_agents|default:'/tenants/manager/agents/' }}"><i class="bi bi-people"></i> {% if BUSINESS_VERTICAL == "gym" %}Trainers{% else %}Agents{% endif %}</a>
                     {% endif %}
@@ -485,6 +489,13 @@
                     <span class="tenant-dot" style="background:#60a5fa"></span>
                     <span class="tenant-name">Platform HQ</span>
                     <span class="tenant-role">· Admin</span>
+                  </a>
+                {% elif request.user.is_authenticated %}
+                  {# MULTI-TENANCY HARDENING: Redirect to onboarding instead of business chooser #}
+                  <a class="tenant-pill hover-lift tap" href="{% url 'onboarding:start' %}">
+                    <span class="tenant-dot" style="background:#f59e0b"></span>
+                    <span class="tenant-name">No active business</span>
+                    <span class="tenant-role">· Set up</span>
                   </a>
                 {% else %}
                   <a class="tenant-pill hover-lift tap" href="{{ url_choose_business|default:'/tenants/choose/' }}">

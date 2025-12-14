@@ -121,6 +121,7 @@ def tenant_context(request) -> Dict[str, Any]:
       - PRODUCT_MODE ∈ {'phones','pharmacy','liquor','grocery','generic'}
       - BUSINESS_VERTICAL (alias for PRODUCT_MODE)
       - sidebar_items (vertical-aware navigation config)
+      - user_has_business (MULTI-TENANCY: True if user has any business membership)
 
     Priority for PRODUCT_MODE:
       1) request.product_mode (set by middleware)
@@ -131,6 +132,12 @@ def tenant_context(request) -> Dict[str, Any]:
     """
     biz = _resolve_business(request)
     bid = getattr(request, "business_id", None) or (getattr(biz, "pk", None) if biz else None)
+    
+    # MULTI-TENANCY HARDENING: Expose user business status to templates
+    user_has_business = False
+    if hasattr(request, 'user') and request.user.is_authenticated:
+        from .utils import user_has_any_business
+        user_has_business = user_has_any_business(request.user)
 
     # 1) middleware (single source of truth if present)
     mode = getattr(request, "product_mode", None)
@@ -189,6 +196,7 @@ def tenant_context(request) -> Dict[str, Any]:
         "BUSINESS_VERTICAL": mode,  # Alias for sidebar compatibility
         "sidebar_items": sidebar_items,  # Vertical-aware navigation config
         "currency": currency,  # Currency for templates
+        "user_has_business": user_has_business,  # MULTI-TENANCY HARDENING
 
         # Legacy-friendly mirrors
         "active_business": biz,

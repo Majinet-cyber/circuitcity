@@ -17,6 +17,7 @@ class BusinessForm(forms.ModelForm):
     Includes validation for:
     - Numeric-only names (rejected)
     - Duplicate store names (rejected)
+    - One-business-per-user rule (SECURITY)
     """
     class Meta:
         model = Business
@@ -27,6 +28,14 @@ class BusinessForm(forms.ModelForm):
                 "placeholder": "Your business name (e.g., Mo Touch Electronics)"
             })
         }
+    
+    def __init__(self, *args, user=None, **kwargs):
+        """
+        Pass `user` to enable one-business-per-user validation.
+        Example: form = BusinessForm(request.POST, user=request.user)
+        """
+        super().__init__(*args, **kwargs)
+        self.user = user
     
     def clean_name(self):
         """Validate business name with comprehensive checks."""
@@ -68,9 +77,23 @@ class BusinessForm(forms.ModelForm):
         return name
     
     def clean(self):
-        """Additional cleaning and slug generation."""
+        """
+        Additional cleaning and slug generation.
+        MULTI-TENANCY HARDENING: Enforce one-business-per-user rule.
+        """
         cleaned = super().clean()
         name = cleaned.get("name")
+        
+        # ONE-BUSINESS-PER-USER VALIDATION
+        if self.user and hasattr(self.user, 'is_authenticated') and self.user.is_authenticated:
+            from tenants.utils import user_has_any_business
+            
+            if user_has_any_business(self.user):
+                raise ValidationError(
+                    "This account is already linked to a business. "
+                    "Each account can only create or belong to one business. "
+                    "Please contact support if you need to transfer or modify your business."
+                )
         
         # Generate unique slug if model has slug field
         if name and hasattr(Business, "_meta"):

@@ -284,20 +284,45 @@ def choose_business(request: HttpRequest) -> HttpResponse:
     """
     Chooser page for users with multiple businesses.
     
-    UPDATED: If user has exactly ONE membership, automatically activate it
-    and redirect to their business home instead of showing the switch UI.
-    Only users with 2+ memberships see the switch UI.
+    MULTI-TENANCY HARDENING: Regular users (non-superusers) with ANY business
+    membership are automatically redirected to their business dashboard.
+    Only superusers can access the switcher.
     """
     user = request.user
 
+    # SECURITY: Block regular users from accessing business switcher
     if not user.is_superuser:
-        bound = get_manager_bound_business(user)
-        if bound:
-            _ensure_seed_on_switch(bound)
-            set_active_business(request, bound)
-            messages.info(request, f"You are bound to {bound.name}.")
-            return _home_redirect(request)
+        from .utils import user_has_any_business
+        
+        # If user has any business, redirect them to their dashboard
+        if user_has_any_business(user):
+            bound = get_manager_bound_business(user)
+            if bound:
+                _ensure_seed_on_switch(bound)
+                set_active_business(request, bound)
+                messages.info(request, f"Your account is linked to {bound.name}.")
+                return _home_redirect(request)
+            
+            # Get their single business membership
+            memberships_list = list(
+                Membership.objects.filter(user=user, status="ACTIVE")
+                .select_related("business")
+                .order_by("-created_at")
+            )
+            
+            if memberships_list:
+                single_biz = memberships_list[0].business
+                _ensure_seed_on_switch(single_biz)
+                set_active_business(request, single_biz)
+                messages.info(request, f"Your account is linked to {single_biz.name}.")
+                home_url = get_business_home_url(user=user, business=single_biz)
+                return redirect(home_url)
+        
+        # No business yet - redirect to onboarding
+        messages.info(request, "Please set up or join a business first.")
+        return redirect("onboarding:start")
 
+    # SUPERUSERS ONLY beyond this point
     memberships_qs = (
         Membership.objects.filter(user=user, status="ACTIVE")
         .select_related("business")
@@ -311,7 +336,7 @@ def choose_business(request: HttpRequest) -> HttpResponse:
     ]
 
     # AUTO-REDIRECT: If user has exactly ONE membership, set it as active and go to their dashboard
-    if len(memberships_list) == 1 and not user.is_superuser:
+    if len(memberships_list) == 1:
         single_biz = memberships_list[0].business
         _ensure_seed_on_switch(single_biz)
         set_active_business(request, single_biz)
@@ -362,12 +387,26 @@ def choose_business(request: HttpRequest) -> HttpResponse:
 def create_business_as_manager(request: HttpRequest) -> HttpResponse:
     """
     Manager proposes a new Business (PENDING).
-    HARDENING:
+    
+    MULTI-TENANCY HARDENING:
+    - Block users who already have a business
     - After creation, set active_business to the new business (even if PENDING)
       so managers will never be offered the agent-join path.
     """
+    # SECURITY: Block users who already have a business
+    from .utils import user_has_any_business
+    
+    if not request.user.is_superuser and user_has_any_business(request.user):
+        messages.error(
+            request,
+            "Your account is already linked to a business. "
+            "Each account can only create or belong to one business. "
+            "Please contact support if you need assistance."
+        )
+        return _home_redirect(request)
+    
     if request.method == "POST":
-        form = CreateBusinessForm(request.POST)
+        form = CreateBusinessForm(request.POST, user=request.user)
         if form.is_valid():
             b: Business = form.save(commit=False)
             b.slug = form.cleaned_data["slug"]
@@ -382,7 +421,7 @@ def create_business_as_manager(request: HttpRequest) -> HttpResponse:
                 status="PENDING",
             )
 
-            # NEW: set active business immediately (privacy-safe; it’s the creator’s)
+            # NEW: set active business immediately (privacy-safe; it's the creator's)
             set_active_business(request, b)
 
             messages.success(
@@ -391,7 +430,7 @@ def create_business_as_manager(request: HttpRequest) -> HttpResponse:
             )
             return redirect_manager_safe_choose(request)
     else:
-        form = CreateBusinessForm()
+        form = CreateBusinessForm(user=request.user)
 
     return render(request, "tenants/create_business.html", {"form": form})
 
@@ -401,17 +440,28 @@ def join_as_agent(request: HttpRequest) -> HttpResponse:
     """
     Agent requests to join an ACTIVE business by name.
 
-    HARDENING:
-    - If user is OWNER/MANAGER/ADMIN anywhere, block this view (never allow demotion path).
-    - If user already has an active business, send them home.
+    MULTI-TENANCY HARDENING:
+    - Block users who already have any business membership
+    - Prevent managers/owners from joining as agents
+    - Only allow users with NO business to join
     """
     if request.user.is_superuser:
         return _superuser_landing(request)
 
+    # SECURITY: Block users who already have a business
+    from .utils import user_has_any_business
+    
+    if user_has_any_business(request.user):
+        messages.error(
+            request,
+            "Your account is already linked to a business. "
+            "Each account can only belong to one business."
+        )
+        return _home_redirect(request)
+
     # Never show agent-join to managers/owners/admins
     role = (user_highest_role(request.user) or "").upper()
     if role in {"OWNER", "MANAGER", "ADMIN"}:
-        # You can change to redirect("/") if you prefer; 403 is explicit
         return HttpResponseForbidden("Managers and owners cannot join as agents.")
 
     if get_active_business(request):

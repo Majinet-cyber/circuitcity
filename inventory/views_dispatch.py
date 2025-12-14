@@ -3,7 +3,7 @@ from django.contrib.auth.decorators import login_required
 from django.shortcuts import redirect
 from django.urls import NoReverseMatch, reverse
 
-from tenants.decorators import require_business
+from tenants.decorators import require_business_access as require_business
 
 from .helpers import (
     PHARMACY,

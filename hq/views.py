@@ -34,6 +34,13 @@ try:
 except Exception:  # pragma: no cover
     Plan = None  # type: ignore
 
+# Check if contracts module is available
+try:
+    from hq import views_contracts
+    CONTRACTS_ENABLED = True
+except ImportError:
+    CONTRACTS_ENABLED = False
+
 
 # -------------------------------------------------------------------
 # Plan catalog (single source of truth for names, prices, limits)
@@ -589,6 +596,9 @@ def dashboard(request):
     
     # active_tab for base.html mobile nav
     ctx["active_tab"] = "home"
+    
+    # Add contracts_enabled flag for sidebar
+    ctx["contracts_enabled"] = CONTRACTS_ENABLED
 
     return _render_safe(request, "hq/dashboard.html", ctx, _dashboard_inline)
 
@@ -752,7 +762,7 @@ def businesses(request):
         rows = rows.filter(Q(name__icontains=q) | Q(slug__icontains=q))
 
     page_obj = _paginate(request, rows, per_page=25)
-    ctx = {"rows": rows, "page_obj": page_obj, "q": q, "range": rng, "start": start, "end": end, "active_tab": "businesses"}
+    ctx = {"rows": rows, "page_obj": page_obj, "q": q, "range": rng, "start": start, "end": end, "active_tab": "businesses", "contracts_enabled": CONTRACTS_ENABLED}
     return _render_safe(request, "hq/businesses.html", ctx, lambda c: "<h1 style='font-family:system-ui'>Businesses</h1>")
 
 
@@ -827,6 +837,7 @@ def business_detail(request, pk: int):
         "series_paid": [{"label": (r["m"].strftime("%Y-%m") if r["m"] else ""), "amount": float(r["amount"] or 0)} for r in paid_series_qs],
         "limits": limits,
         "active_tab": "businesses",
+        "contracts_enabled": CONTRACTS_ENABLED,
     }
     return _render_safe(request, "hq/business_detail.html", ctx, lambda c: f"<h1 style='font-family:system-ui'>{_esc(biz.name)}</h1>")
 
@@ -878,6 +889,7 @@ def subscriptions(request):
         "range": rng, "start": start, "end": end,
         "plan_catalog": PLAN_CATALOG,
         "active_tab": "subscriptions",
+        "contracts_enabled": CONTRACTS_ENABLED,
     }
 
     tpl = select_template(["hq/subscriptions.html", "billing/hq_subscriptions.html"])
@@ -908,7 +920,7 @@ def invoices(request):
     qs = qs.order_by(order_field)
 
     page_obj = Paginator(qs, 25).get_page(request.GET.get('page'))
-    return render(request, 'hq/invoices.html', {'page_obj': page_obj, 'invoices': page_obj, 'active_tab': 'invoices'})
+    return render(request, 'hq/invoices.html', {'page_obj': page_obj, 'invoices': page_obj, 'active_tab': 'invoices', 'contracts_enabled': CONTRACTS_ENABLED})
 
 
 # -------------------------------------------------------------------
@@ -947,7 +959,7 @@ def agents(request):
             logger.warning(f"Error getting limits for business {b_id}: {e}")
             biz_limits[b_id] = None
 
-    ctx = {"rows": rows, "page_obj": _paginate(request, rows, per_page=30), "q": q, "biz_limits": biz_limits, "active_tab": "agents"}
+    ctx = {"rows": rows, "page_obj": _paginate(request, rows, per_page=30), "q": q, "biz_limits": biz_limits, "active_tab": "agents", "contracts_enabled": CONTRACTS_ENABLED}
     return _render_safe(request, "hq/agents.html", ctx, lambda c: "<h1 style='font-family:system-ui'>Agents</h1>")
 
 
@@ -1081,6 +1093,7 @@ def stock_trends(request):
         "avg_daily_out": avg_daily_out,
         "projected_monthly_run_rate": projected_monthly_run_rate,
         "active_tab": "stock",
+        "contracts_enabled": CONTRACTS_ENABLED,
     }
     return _render_safe(
         request,
@@ -1109,7 +1122,7 @@ def wallet_home(request):
 
     ctx = {"income": income, "expense": expense, "balance": balance,
            "range": rng, "start": start, "end": end,
-           "tx_page": None, "active_tab": "wallet"}
+           "tx_page": None, "active_tab": "wallet", "contracts_enabled": CONTRACTS_ENABLED}
     return _render_safe(request, "hq/wallet.html", ctx, lambda c: "<h1 style='font-family:system-ui'>Wallet</h1>")
 
 

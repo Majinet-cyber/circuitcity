@@ -28,10 +28,19 @@ class CreateBusinessForm(forms.ModelForm):
     Minimal manager-onboarding form.
     - Only asks for 'name'
     - Derives a unique slug automatically (appends -2, -3, ... if needed)
+    - SECURITY: Enforces one-business-per-user rule
     """
     class Meta:
         model = Business
         fields = ["name"]  # add "subdomain" here if you want to collect it at create time
+
+    def __init__(self, *args, user=None, **kwargs):
+        """
+        Pass `user` to enable one-business-per-user validation.
+        Example: form = CreateBusinessForm(request.POST, user=request.user)
+        """
+        super().__init__(*args, **kwargs)
+        self.user = user
 
     def _unique_slug(self, base: str) -> str:
         """
@@ -88,8 +97,23 @@ class CreateBusinessForm(forms.ModelForm):
         return name
 
     def clean(self):
+        """
+        MULTI-TENANCY HARDENING: Enforce one-business-per-user rule.
+        If user already owns/belongs to a business, reject business creation.
+        """
         cleaned = super().clean()
         name = (cleaned.get("name") or "").strip()
+        
+        # ONE-BUSINESS-PER-USER VALIDATION
+        if self.user and hasattr(self.user, 'is_authenticated') and self.user.is_authenticated:
+            from .utils import user_has_any_business
+            
+            if user_has_any_business(self.user):
+                raise ValidationError(
+                    "This account is already linked to a business. "
+                    "Each account can only create or belong to one business. "
+                    "Please contact support if you need to transfer or modify your business."
+                )
         
         # Provide a unique slug for views to use (only if model has slug)
         try:

@@ -87,10 +87,10 @@
     <li class="{% if '/hq/businesses' in request.path %}active{% endif %}">
       <a href="{{ url_hq_businesses|default:'/hq/businesses/' }}"><i class="bi bi-buildings"></i><span>Businesses</span></a>
     </li>
-    {% url 'hq:contracts_list' as contracts_url %}
-    {% if contracts_url %}
+    {# Only show Contracts link if the module is actually available (check views_contracts in context) #}
+    {% if contracts_enabled|default:False %}
     <li class="{% if '/hq/contracts' in request.path %}active{% endif %}">
-      <a href="{{ contracts_url }}"><i class="bi bi-file-earmark-text"></i><span>Contracts</span></a>
+      <a href="{% url 'hq:contracts_list' %}"><i class="bi bi-file-earmark-text"></i><span>Contracts</span></a>
     </li>
     {% endif %}
     <li class="{% if '/hq/subscriptions' in request.path %}active{% endif %}">

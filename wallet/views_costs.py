@@ -22,6 +22,7 @@ from .services_costs import (
     add_business_cost,
     get_cost_breakdown_by_category
 )
+from .utils_costs import ensure_monthly_recurring_costs
 
 try:
     from tenants.utils import get_active_business
@@ -89,6 +90,18 @@ def admin_cost_list(request: HttpRequest) -> HttpResponse:
     if not _is_manager(request.user, business):
         messages.error(request, "Manager access required")
         return redirect("wallet:admin_home")
+    
+    # Ensure recurring costs are created for current month (idempotent)
+    try:
+        from datetime import date
+        today = timezone.now().date()
+        month_start = date(today.year, today.month, 1)
+        ensure_monthly_recurring_costs(business, month_start)
+    except Exception as e:
+        # Don't break the page if auto-creation fails, just log it
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.warning(f"Failed to auto-create recurring costs: {e}")
     
     # Get period from query params (default to current month)
     period = request.GET.get('period', 'month')
