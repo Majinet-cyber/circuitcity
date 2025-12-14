@@ -6,9 +6,14 @@ from decimal import Decimal
 from typing import Any, Dict, List, Optional
 
 from django.apps import apps
-from django.db.models import QuerySet, Sum, Count
+from django.db.models import QuerySet, Sum, Count, Q, DecimalField, ExpressionWrapper, F, Value
+from django.db.models.functions import Coalesce, TruncDate
 from django.urls import reverse
 from django.utils import timezone
+
+# Reusable Decimal constants for consistent field types
+DECIMAL_FIELD = DecimalField(max_digits=18, decimal_places=2)
+DECIMAL_ZERO = Value(Decimal("0.00"), output_field=DECIMAL_FIELD)
 
 from inventory.helpers import add_product_url_for_request, business_vertical, get_active_business
 from inventory.models import MerchProduct
@@ -197,6 +202,51 @@ def parse_date_range_from_request(request) -> Dict[str, Any]:
     }
 
 
+def clothing_sales_queryset(
+    business,
+    location=None,
+    start_date: Optional[date] = None,
+    end_date: Optional[date] = None,
+    period: str = "mtd",
+    date_str: Optional[str] = None,
+) -> QuerySet:
+    """
+    Build a properly scoped ClothingSale queryset for the given business, location, and date range.
+    This is a unified helper used by clothing_sales_metrics and sales_trend_json endpoints.
+    
+    Args:
+        business: Business instance
+        location: Optional location filter
+        start_date: Optional explicit start date (inclusive)
+        end_date: Optional explicit end date (exclusive)
+        period: One of "today", "7d", "mtd", "date" (used if start/end not provided)
+        date_str: Specific date string for period="date"
+    
+    Returns:
+        Filtered QuerySet of ClothingSale objects
+    """
+    from datetime import datetime
+    from inventory.models_verticals import ClothingSale
+    
+    # Determine date range
+    if start_date is None or end_date is None:
+        start_date, end_date = _compute_date_range(period, date_str)
+    
+    # Build base sales queryset with timezone-aware datetime filtering
+    sales_qs = ClothingSale.objects.filter(
+        business=business,
+        sold_at__gte=timezone.make_aware(datetime.combine(start_date, datetime.min.time())),
+        sold_at__lt=timezone.make_aware(datetime.combine(end_date, datetime.min.time())),
+    )
+    
+    if location:
+        # If ClothingSale has location field, filter by it
+        if hasattr(ClothingSale, 'location'):
+            sales_qs = sales_qs.filter(location=location)
+    
+    return sales_qs
+
+
 def clothing_sales_metrics(
     business,
     *,
@@ -226,22 +276,20 @@ def clothing_sales_metrics(
     if start_date is None or end_date is None:
         start_date, end_date = _compute_date_range(period, date_str)
     
-    # Build base sales queryset
-    sales_qs = ClothingSale.objects.filter(
+    # Build base sales queryset using unified helper
+    sales_qs = clothing_sales_queryset(
         business=business,
-        sold_at__gte=timezone.make_aware(timezone.datetime.combine(start_date, timezone.datetime.min.time())),
-        sold_at__lt=timezone.make_aware(timezone.datetime.combine(end_date, timezone.datetime.min.time())),
+        location=location,
+        start_date=start_date,
+        end_date=end_date,
+        period=period,
+        date_str=date_str,
     )
-    
-    if location:
-        # If ClothingSale has location field, filter by it
-        if hasattr(ClothingSale, 'location'):
-            sales_qs = sales_qs.filter(location=location)
     
     # Revenue, Cost, Profit (Sales COGS)
     sales_aggregates = sales_qs.aggregate(
-        revenue=Sum('total_price'),
-        cost=Sum('total_cost'),
+        revenue=Coalesce(Sum('total_price'), DECIMAL_ZERO, output_field=DECIMAL_FIELD),
+        cost=Coalesce(Sum('total_cost'), DECIMAL_ZERO, output_field=DECIMAL_FIELD),
         total_sales=Count('id')
     )
     
@@ -263,7 +311,7 @@ def clothing_sales_metrics(
     
     # Payment Mix
     payment_mix = sales_qs.values('payment_method').annotate(
-        total=Sum('total_price'),
+        total=Coalesce(Sum('total_price'), DECIMAL_ZERO, output_field=DECIMAL_FIELD),
         count=Count('id')
     ).order_by('-total')
     
@@ -285,33 +333,45 @@ def clothing_sales_metrics(
     # Top Models
     top_models = sales_qs.values('product__name').annotate(
         units_sold=Sum('quantity'),
-        revenue=Sum('total_price')
+        revenue=Coalesce(Sum('total_price'), DECIMAL_ZERO, output_field=DECIMAL_FIELD)
     ).order_by('-units_sold')[:5]
     
     top_model = top_models[0] if top_models else None
     
-    # Sales Trend (Last 7 Days within the period, or daily breakdown)
-    # For "today" and "date" periods, this might be hourly, but we'll keep it simple
-    sales_trend = []
-    trend_days = 7 if period in ["mtd", "7d"] else 1
+    # Sales Trend - DB-grouped-by-day, then fill missing days in Python
+    # Group sales by day using TruncDate (DB-level grouping)
+    daily_sales = sales_qs.annotate(
+        sale_date=TruncDate('sold_at')
+    ).values('sale_date').annotate(
+        revenue=Coalesce(Sum('total_price'), DECIMAL_ZERO, output_field=DECIMAL_FIELD),
+        count=Count('id')
+    ).order_by('sale_date')
     
-    for i in range(trend_days - 1, -1, -1):
-        day = timezone.now().date() - timedelta(days=i)
-        # Only include if within our period
-        if start_date <= day < end_date:
-            day_sales = ClothingSale.objects.filter(
-                business=business,
-                sold_at__date=day
-            ).aggregate(
-                revenue=Sum('total_price'),
-                count=Count('id')
-            )
-            sales_trend.append({
-                'date': day.strftime('%Y-%m-%d'),
-                'date_short': day.strftime('%b %d'),
-                'revenue': float(day_sales['revenue'] or 0),
-                'count': day_sales['count'] or 0
-            })
+    # Build a dictionary for quick lookup
+    sales_by_date = {}
+    for day_data in daily_sales:
+        sale_date = day_data['sale_date']
+        if sale_date:
+            sales_by_date[sale_date.isoformat()] = {
+                'revenue': float(day_data['revenue'] or 0),
+                'count': day_data['count'] or 0
+            }
+    
+    # Fill missing days in Python (no row-iteration, just date range iteration)
+    sales_trend = []
+    current_date = start_date
+    while current_date < end_date:
+        date_key = current_date.isoformat()
+        day_data = sales_by_date.get(date_key, {'revenue': 0.0, 'count': 0})
+        
+        sales_trend.append({
+            'date': current_date.strftime('%Y-%m-%d'),
+            'date_short': current_date.strftime('%b %d'),
+            'revenue': day_data['revenue'],
+            'count': day_data['count']
+        })
+        
+        current_date += timedelta(days=1)
     
     return {
         'revenue': revenue,
@@ -325,6 +385,77 @@ def clothing_sales_metrics(
         'sales_trend': sales_trend,
         'period_start': start_date,
         'period_end': end_date,
+    }
+
+
+def clothing_inventory_metrics(
+    business,
+    *,
+    location=None,
+) -> Dict[str, Any]:
+    """
+    Calculate inventory value metrics for clothing vertical.
+    These reflect current stock values, not sales.
+    
+    Uses Coalesce to handle null prices and excludes archived/qty<=0 products.
+    
+    Args:
+        business: Business instance
+        location: Optional location filter (if MerchProduct has location field)
+    
+    Returns:
+        Dictionary with inventory_value, retail_value, and expected_margin
+    """
+    from inventory.models import MerchProduct
+    from inventory.business_kinds import BusinessKind
+    
+    # Build base queryset for clothing products with stock
+    # Exclude archived and qty<=0 products
+    products_qs = MerchProduct.objects.filter(
+        business=business,
+        kind=BusinessKind.CLOTHING,
+        is_active=True,
+        is_archived=False,
+        quantity_in_stock__gt=0
+    )
+    
+    # Note: MerchProduct doesn't have a location field in the base model,
+    # but if it's added in the future, we can filter here
+    # if location and hasattr(MerchProduct, 'location'):
+    #     products_qs = products_qs.filter(location=location)
+    
+    # Use Coalesce to handle null prices (default to 0)
+    # Calculate inventory value (cost basis) = sum(qty_on_hand * Coalesce(cost_price, 0))
+    # Calculate retail value = sum(qty_on_hand * Coalesce(selling_price, 0))
+    # Use ExpressionWrapper to ensure proper output_field for arithmetic operations
+    line_cost = ExpressionWrapper(
+        F('quantity_in_stock') * Coalesce(F('cost_price'), DECIMAL_ZERO, output_field=DECIMAL_FIELD),
+        output_field=DECIMAL_FIELD
+    )
+    
+    line_retail = ExpressionWrapper(
+        F('quantity_in_stock') * Coalesce(F('selling_price'), DECIMAL_ZERO, output_field=DECIMAL_FIELD),
+        output_field=DECIMAL_FIELD
+    )
+    
+    inventory_agg = products_qs.aggregate(
+        total=Coalesce(Sum(line_cost), DECIMAL_ZERO, output_field=DECIMAL_FIELD)
+    )
+    
+    retail_agg = products_qs.aggregate(
+        total=Coalesce(Sum(line_retail), DECIMAL_ZERO, output_field=DECIMAL_FIELD)
+    )
+    
+    inventory_value = Decimal(str(inventory_agg['total'] or 0))
+    retail_value = Decimal(str(retail_agg['total'] or 0))
+    
+    # Expected margin = retail_value - inventory_value
+    expected_margin = retail_value - inventory_value
+    
+    return {
+        'inventory_value': inventory_value,
+        'retail_value': retail_value,
+        'expected_margin': expected_margin,
     }
 
 

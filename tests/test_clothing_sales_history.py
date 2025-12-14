@@ -353,4 +353,169 @@ class ClothingSalesHistoryTestCase(TestCase):
         # Check that sales history link exists
         sales_history_url = reverse('verticals:clothing_sales_history')
         self.assertIn(sales_history_url, content)
+    
+    def test_sales_trend_returns_data_when_sales_exist(self):
+        """Test that sales trend endpoint returns non-empty data when sales exist."""
+        url = reverse('verticals:clothing_sales_trend_json')
+        response = self.client.get(url, {'range': '7d'})
+        
+        self.assertEqual(response.status_code, 200)
+        data = json.loads(response.content)
+        
+        # Should have has_data flag
+        self.assertIn('has_data', data)
+        # Since we have sales (created in setUp), should have data
+        self.assertTrue(data['has_data'])
+        
+        # Should have non-zero revenue in at least one day
+        has_non_zero = any(r > 0 for r in data['revenue'])
+        self.assertTrue(has_non_zero, "Trend should show non-zero revenue when sales exist")
+    
+    def test_sales_trend_mtd_includes_sales_from_month(self):
+        """Test that MTD trend includes sales from earlier in the month."""
+        # Create a sale from earlier this month
+        today = timezone.now().date()
+        earlier_this_month = today.replace(day=5) if today.day > 5 else today.replace(day=1)
+        
+        ClothingSale.objects.create(
+            business=self.business,
+            product=self.product1,
+            quantity=1,
+            unit_price=Decimal('500.00'),
+            total_price=Decimal('500.00'),
+            unit_cost=Decimal('250.00'),
+            total_cost=Decimal('250.00'),
+            payment_method=PaymentMethod.CASH,
+            sold_by=self.user,
+            sold_at=timezone.make_aware(
+                timezone.datetime.combine(earlier_this_month, timezone.datetime.min.time())
+            )
+        )
+        
+        url = reverse('verticals:clothing_sales_trend_json')
+        response = self.client.get(url, {'range': 'mtd'})
+        
+        self.assertEqual(response.status_code, 200)
+        data = json.loads(response.content)
+        
+        # Should have data
+        self.assertTrue(data['has_data'])
+        # Total revenue across all days should include the 500.00 sale
+        total_revenue = sum(data['revenue'])
+        self.assertGreaterEqual(total_revenue, 500.0)
+    
+    def test_sales_trend_business_isolation(self):
+        """Test that sales trend only shows data for the correct business."""
+        # Create another business and sale
+        other_business = Business.objects.create(
+            name='Other Clothing Store',
+            slug='other-clothing-store',
+            business_kind=BusinessKind.CLOTHING,
+            created_by=self.user,
+            status='ACTIVE'
+        )
+        
+        other_product = MerchProduct.objects.create(
+            business=other_business,
+            name='Other Product',
+            kind=BusinessKind.CLOTHING,
+            cost_price=Decimal('100.00'),
+            selling_price=Decimal('200.00'),
+            quantity_in_stock=5,
+            is_active=True
+        )
+        
+        ClothingSale.objects.create(
+            business=other_business,
+            product=other_product,
+            quantity=1,
+            unit_price=Decimal('200.00'),
+            total_price=Decimal('200.00'),
+            unit_cost=Decimal('100.00'),
+            total_cost=Decimal('100.00'),
+            payment_method=PaymentMethod.CASH,
+            sold_by=self.user
+        )
+        
+        # Get trend for original business
+        url = reverse('verticals:clothing_sales_trend_json')
+        response = self.client.get(url, {'range': 'mtd'})
+        
+        self.assertEqual(response.status_code, 200)
+        data = json.loads(response.content)
+        
+        # Total revenue should NOT include the other business's sale (200.00)
+        # Should only include sales from self.business (1300.00 from setUp)
+        total_revenue = sum(data['revenue'])
+        # Should be approximately 1300.00, not 1500.00
+        self.assertLess(total_revenue, 1400.0)
+        self.assertGreaterEqual(total_revenue, 1300.0)
+    
+    def test_sales_trend_matches_top_model_data(self):
+        """Test that trend endpoint uses same queryset as Top Model calculation."""
+        from inventory.verticals.base import clothing_sales_metrics
+        
+        # Get metrics from dashboard function (used for Top Model)
+        metrics = clothing_sales_metrics(
+            self.business,
+            period='mtd'
+        )
+        
+        # Get trend JSON
+        url = reverse('verticals:clothing_sales_trend_json')
+        response = self.client.get(url, {'range': 'mtd'})
+        data = json.loads(response.content)
+        
+        # Total revenue from trend should match metrics revenue
+        trend_total_revenue = sum(data['revenue'])
+        metrics_revenue = float(metrics['revenue'])
+        
+        # Allow small floating point differences
+        self.assertAlmostEqual(trend_total_revenue, metrics_revenue, places=2)
+        
+        # Total count from trend should match metrics total_sales
+        trend_total_count = sum(data['count'])
+        metrics_total_sales = metrics['total_sales']
+        self.assertEqual(trend_total_count, metrics_total_sales)
+    
+    def test_sales_trend_date_range_filters(self):
+        """Test that trend endpoint respects date range filters correctly."""
+        url = reverse('verticals:clothing_sales_trend_json')
+        
+        # Test 'today' range - should only have 1 day
+        response = self.client.get(url, {'range': 'today'})
+        data = json.loads(response.content)
+        self.assertEqual(len(data['labels']), 1)
+        self.assertEqual(data['period'], 'today')
+        
+        # Test '7d' range - should have 7 days
+        response = self.client.get(url, {'range': '7d'})
+        data = json.loads(response.content)
+        self.assertEqual(len(data['labels']), 7)
+        self.assertEqual(data['period'], '7d')
+        
+        # Test specific date
+        today = timezone.now().date()
+        response = self.client.get(url, {'range': 'date', 'date': today.isoformat()})
+        data = json.loads(response.content)
+        self.assertEqual(len(data['labels']), 1)
+        self.assertEqual(data['period'], 'date')
+    
+    def test_sales_trend_returns_has_data_false_when_no_sales(self):
+        """Test that has_data is False when there are truly no sales."""
+        # Delete all sales
+        ClothingSale.objects.filter(business=self.business).delete()
+        
+        url = reverse('verticals:clothing_sales_trend_json')
+        response = self.client.get(url, {'range': 'mtd'})
+        
+        self.assertEqual(response.status_code, 200)
+        data = json.loads(response.content)
+        
+        # Should still have labels (for the date range) but no data
+        self.assertGreater(len(data['labels']), 0)
+        # All revenue values should be 0
+        self.assertTrue(all(r == 0 for r in data['revenue']))
+        # has_data should be False
+        self.assertFalse(data['has_data'])
 

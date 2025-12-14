@@ -5,6 +5,7 @@ from datetime import timedelta
 
 from django.contrib.auth.decorators import login_required
 from django.db.models import Sum, Count, F, Q
+from django.db.models.functions import Coalesce
 from django.shortcuts import render
 from django.utils import timezone
 
@@ -44,6 +45,12 @@ def dashboard(request):
         date_str=date_param if range_param == 'date' else None
     )
     
+    # ===== INVENTORY VALUE METRICS (Current Stock) =====
+    inventory_data = base.clothing_inventory_metrics(
+        business,
+        location=location
+    )
+    
     # Extract metrics from sales_data
     revenue_mtd = sales_data['revenue']
     cost_mtd = sales_data['cost_of_goods']
@@ -54,6 +61,11 @@ def dashboard(request):
     top_models = sales_data['top_models']
     top_model = sales_data['top_model']
     sales_trend = sales_data['sales_trend']
+    
+    # Extract inventory metrics
+    inventory_value = inventory_data['inventory_value']
+    retail_value = inventory_data['retail_value']
+    expected_margin = inventory_data['expected_margin']
 
     ctx.update(
         {
@@ -65,12 +77,17 @@ def dashboard(request):
             "inventory_tracked_count": metrics["inventory_tracked"],
             "recent_products": metrics["recent"],
             
-            # KPI Panels
+            # KPI Panels (Sales Metrics)
             "revenue_mtd": revenue_mtd,
             "cost_mtd": cost_mtd,
             "overhead_costs": overhead_costs,
             "profit_mtd": profit_mtd,
             "total_sales_mtd": total_sales_mtd,
+            
+            # Inventory Value KPIs (Current Stock)
+            "inventory_value": inventory_value,
+            "retail_value": retail_value,
+            "expected_margin": expected_margin,
             
             # Payment Mix
             "payment_mix_data": payment_mix_data,
@@ -731,55 +748,81 @@ def sales_export_csv(request):
 @require_business_kind(BusinessKind.CLOTHING)
 def sales_trend_json(request):
     """
-    JSON endpoint for sales trend data (last 7 days by default).
+    JSON endpoint for sales trend data.
     Respects dashboard date filters if provided.
     Returns data suitable for Chart.js or similar libraries.
+    
+    Uses the same queryset logic as clothing_sales_metrics to ensure consistency.
     """
     from django.http import JsonResponse
-    from datetime import datetime, date as date_type
+    from django.db.models.functions import TruncDate
+    from django.db.models import Count, Sum
     
     business = base.base_context(request).get("business")
     location = base.base_context(request).get("location")
     
     # Parse date range from request
-    range_param = request.GET.get('range', '7d')
-    date_param = request.GET.get('date', '')
-    
-    # Use base helper to compute date range
     date_range_ctx = base.parse_date_range_from_request(request)
     start_date = date_range_ctx['start_date']
     end_date = date_range_ctx['end_date']
+    range_param = date_range_ctx['active_range']
     
-    # Build sales queryset
-    sales_qs = ClothingSale.objects.filter(business=business)
+    # Build sales queryset using unified helper (same as clothing_sales_metrics)
+    sales_qs = base.clothing_sales_queryset(
+        business=business,
+        location=location,
+        start_date=start_date,
+        end_date=end_date,
+    )
     
-    if location:
-        if hasattr(ClothingSale, 'location'):
-            sales_qs = sales_qs.filter(location=location)
+    # DB-grouped-by-day using TruncDate (same logic as clothing_sales_metrics)
+    from django.db.models.functions import TruncDate
+    from django.db.models.functions import Coalesce
     
-    # Generate daily data for the date range
+    daily_sales = sales_qs.annotate(
+        sale_date=TruncDate('sold_at')
+    ).values('sale_date').annotate(
+        revenue=Coalesce(Sum('total_price'), base.DECIMAL_ZERO, output_field=base.DECIMAL_FIELD),
+        count=Count('id')
+    ).order_by('sale_date')
+    
+    # Build dictionary for quick lookup
+    sales_by_date = {}
+    for day_data in daily_sales:
+        sale_date = day_data['sale_date']
+        if sale_date:
+            # Convert Decimal to float for JSON serialization
+            revenue_value = float(day_data['revenue'] or Decimal('0.00'))
+            sales_by_date[sale_date.isoformat()] = {
+                'revenue': revenue_value,
+                'count': day_data['count'] or 0
+            }
+    
+    # Fill missing days in Python
     labels = []
     revenue_values = []
     count_values = []
     
     current_date = start_date
     while current_date < end_date:
-        # Get sales for this day
-        day_sales = sales_qs.filter(sold_at__date=current_date)
-        day_revenue = day_sales.aggregate(total=Sum('total_price'))['total'] or Decimal('0.00')
-        day_count = day_sales.count()
+        date_key = current_date.isoformat()
+        day_data = sales_by_date.get(date_key, {'revenue': 0.0, 'count': 0})
         
         labels.append(current_date.strftime('%b %d'))
-        revenue_values.append(float(day_revenue))
-        count_values.append(day_count)
+        revenue_values.append(day_data['revenue'])
+        count_values.append(day_data['count'])
         
         current_date += timedelta(days=1)
     
-    # Add cache-busting metadata
+    # Check if there's actual data (non-zero revenue or count)
+    has_data = any(r > 0 for r in revenue_values) or any(c > 0 for c in count_values)
+    
+    # Return response with cache-busting metadata
     return JsonResponse({
         'labels': labels,
         'revenue': revenue_values,
         'count': count_values,
+        'has_data': has_data,
         'period': range_param,
         'start_date': start_date.isoformat(),
         'end_date': (end_date - timedelta(days=1)).isoformat(),
