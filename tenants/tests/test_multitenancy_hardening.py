@@ -468,6 +468,146 @@ class TestTenancyHelpers(TestCase):
 
 
 # ============================================================================
+# MIGRATION REGRESSION TESTS
+# ============================================================================
+
+class TestMigrationIdempotency(TestCase):
+    """
+    Test that migrations are idempotent and safe to re-run.
+    
+    These tests ensure migrations won't crash when state drift exists,
+    which can happen when migrations are partially applied or when
+    the database state doesn't match Django's migration state.
+    """
+    
+    def test_tenants_0014_is_idempotent_no_state_crash(self):
+        """
+        Test that migration 0014 can be run multiple times without crashing.
+        
+        This test verifies that the migration uses SeparateDatabaseAndState
+        and idempotent SQL operations, so it won't fail if:
+        - The constraint already exists in the database
+        - The constraint doesn't exist in Django's migration state
+        - The migration is partially applied
+        """
+        from django.db import connection
+        from django.db.migrations.executor import MigrationExecutor
+        from django.db.migrations import Migration
+        
+        executor = MigrationExecutor(connection)
+        
+        # Get the migration
+        migration = executor.loader.get_migration('tenants', '0014_add_case_insensitive_unique_constraints')
+        
+        # Ensure we're at the migration before 0014
+        # First, migrate to 0013
+        executor.migrate([('tenants', '0013_add_location_tracking')])
+        
+        # Now apply 0014
+        try:
+            executor.migrate([('tenants', '0014_add_case_insensitive_unique_constraints')])
+        except Exception as e:
+            self.fail(f"Migration 0014 failed on first run: {e}")
+        
+        # Try to apply it again (simulating state drift or re-run)
+        # This should not crash even if the constraint already exists
+        try:
+            # Import the migration module dynamically
+            import importlib.util
+            import os
+            from django.conf import settings
+            from django.apps import apps
+            
+            migration_path = os.path.join(
+                settings.BASE_DIR,
+                'tenants',
+                'migrations',
+                '0014_add_case_insensitive_unique_constraints.py'
+            )
+            
+            spec = importlib.util.spec_from_file_location(
+                "migration_0014", migration_path
+            )
+            migration_0014 = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(migration_0014)
+            
+            # Get a schema editor
+            with connection.schema_editor() as schema_editor:
+                # Run the database operation function directly
+                # This simulates what would happen if the migration ran again
+                migration_0014.create_business_name_ci_constraint_database(
+                    apps, schema_editor
+                )
+        except Exception as e:
+            self.fail(f"Migration 0014 database operation failed on second run (not idempotent): {e}")
+    
+    def test_tenants_0014_no_remove_constraint_operations(self):
+        """
+        Test that migration 0014 does not use RemoveConstraint or RemoveIndex.
+        
+        This is a safety check to ensure the migration follows the pattern
+        of using SeparateDatabaseAndState with idempotent SQL operations.
+        """
+        import importlib.util
+        import os
+        from django.conf import settings
+        
+        # Get the migration file path
+        migration_path = os.path.join(
+            settings.BASE_DIR,
+            'tenants',
+            'migrations',
+            '0014_add_case_insensitive_unique_constraints.py'
+        )
+        
+        # Read the file content
+        with open(migration_path, 'r') as f:
+            content = f.read()
+        
+        # Check that it doesn't contain RemoveConstraint or RemoveIndex
+        # (except in comments or as part of SeparateDatabaseAndState state_operations)
+        # We allow it in state_operations because that's safe - it only updates Django's state
+        
+        # Count occurrences
+        remove_constraint_count = content.count('RemoveConstraint')
+        remove_index_count = content.count('RemoveIndex')
+        
+        # Check if they're only in state_operations (safe) or in database_operations (unsafe)
+        # If RemoveConstraint/RemoveIndex appear outside of state_operations, that's a problem
+        lines = content.split('\n')
+        in_state_operations = False
+        in_database_operations = False
+        unsafe_removals = []
+        
+        for i, line in enumerate(lines):
+            if 'state_operations' in line:
+                in_state_operations = True
+                in_database_operations = False
+            elif 'database_operations' in line:
+                in_database_operations = True
+                in_state_operations = False
+            elif 'SeparateDatabaseAndState' in line and '[' in line:
+                # Reset when we see the start of a new SeparateDatabaseAndState
+                in_state_operations = False
+                in_database_operations = False
+            
+            # Check for unsafe usage
+            if ('RemoveConstraint' in line or 'RemoveIndex' in line) and in_database_operations:
+                unsafe_removals.append((i + 1, line.strip()))
+            elif ('RemoveConstraint' in line or 'RemoveIndex' in line) and not in_state_operations and not in_database_operations:
+                # Outside of SeparateDatabaseAndState entirely - this is unsafe
+                unsafe_removals.append((i + 1, line.strip()))
+        
+        if unsafe_removals:
+            self.fail(
+                f"Migration 0014 contains unsafe RemoveConstraint/RemoveIndex operations:\n" +
+                "\n".join(f"  Line {line_num}: {line}" for line_num, line in unsafe_removals) +
+                "\n\nThese should only appear in state_operations of SeparateDatabaseAndState, "
+                "not in database_operations or as standalone operations."
+            )
+
+
+# ============================================================================
 # RUN TESTS
 # ============================================================================
 

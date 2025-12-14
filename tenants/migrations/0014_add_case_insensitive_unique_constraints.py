@@ -8,68 +8,96 @@ from django.db.models.functions import Lower
 
 def create_email_unique_index(apps, schema_editor):
     """Create case-insensitive unique index on email, excluding blank emails"""
-    with connection.cursor() as cursor:
-        cursor.execute("""
-            CREATE UNIQUE INDEX IF NOT EXISTS uniq_user_email_ci 
-            ON auth_user (LOWER(email))
-            WHERE email != ''
-        """)
+    vendor = schema_editor.connection.vendor
+    with schema_editor.connection.cursor() as cursor:
+        if vendor == 'postgresql':
+            # PostgreSQL: Use IF NOT EXISTS
+            cursor.execute("""
+                CREATE UNIQUE INDEX IF NOT EXISTS uniq_user_email_ci 
+                ON auth_user (LOWER(email))
+                WHERE email != ''
+            """)
+        elif vendor == 'sqlite':
+            # SQLite: Use IF NOT EXISTS
+            cursor.execute("""
+                CREATE UNIQUE INDEX IF NOT EXISTS uniq_user_email_ci 
+                ON auth_user (LOWER(email))
+                WHERE email != ''
+            """)
+        # Other databases: skip (should not happen in production)
 
 
 def drop_email_unique_index(apps, schema_editor):
-    """Drop the email unique index"""
-    with connection.cursor() as cursor:
-        cursor.execute("DROP INDEX IF EXISTS uniq_user_email_ci")
+    """Drop the email unique index (idempotent)"""
+    vendor = schema_editor.connection.vendor
+    with schema_editor.connection.cursor() as cursor:
+        if vendor == 'postgresql':
+            cursor.execute("DROP INDEX IF EXISTS uniq_user_email_ci")
+        elif vendor == 'sqlite':
+            cursor.execute("DROP INDEX IF EXISTS uniq_user_email_ci")
+        # Other databases: skip
 
 
 def create_business_name_ci_constraint_database(apps, schema_editor):
     """
     Create case-insensitive unique constraint/index for business names.
-    This uses raw SQL to safely handle both PostgreSQL and SQLite.
+    IDEMPOTENT: Safe to run multiple times, handles state drift.
+    Uses raw SQL to safely handle both PostgreSQL and SQLite.
     """
     vendor = schema_editor.connection.vendor
     
-    if vendor == 'postgresql':
-        # PostgreSQL: Drop constraint/index if exists, then create unique index
-        with schema_editor.connection.cursor() as cursor:
-            # Drop constraint if it exists (PostgreSQL constraint)
-            cursor.execute("""
-                ALTER TABLE tenants_business 
-                DROP CONSTRAINT IF EXISTS uniq_business_name_ci
-            """)
-            # Drop index if it exists (PostgreSQL index)
-            cursor.execute("DROP INDEX IF EXISTS uniq_business_name_ci")
-            # Create unique index if not exists
-            cursor.execute("""
-                CREATE UNIQUE INDEX IF NOT EXISTS uniq_business_name_ci 
-                ON tenants_business (LOWER(name))
-            """)
-    elif vendor == 'sqlite':
-        # SQLite: Create unique index (SQLite doesn't support constraints the same way)
-        with schema_editor.connection.cursor() as cursor:
-            cursor.execute("""
-                CREATE UNIQUE INDEX IF NOT EXISTS uniq_business_name_ci 
-                ON tenants_business (LOWER(name))
-            """)
-    else:
-        # Other databases: fallback to Django's AddConstraint
-        # This should not happen in production (Render uses PostgreSQL)
-        pass
-
-
-def reverse_business_name_ci_constraint_database(apps, schema_editor):
-    """Reverse operation: drop the constraint/index"""
-    vendor = schema_editor.connection.vendor
+    # Get the actual table name from the model
+    Business = apps.get_model('tenants', 'Business')
+    table_name = Business._meta.db_table
     
     if vendor == 'postgresql':
         with schema_editor.connection.cursor() as cursor:
-            cursor.execute("ALTER TABLE tenants_business DROP CONSTRAINT IF EXISTS uniq_business_name_ci")
+            # Check if index/constraint already exists
+            cursor.execute("""
+                SELECT 1 FROM pg_indexes 
+                WHERE indexname = 'uniq_business_name_ci'
+                LIMIT 1
+            """)
+            index_exists = cursor.fetchone() is not None
+            
+            # Only create if it doesn't exist (idempotent)
+            if not index_exists:
+                # Drop any existing constraint with same name (in case of partial migration)
+                cursor.execute(f"""
+                    ALTER TABLE {table_name} 
+                    DROP CONSTRAINT IF EXISTS uniq_business_name_ci
+                """)
+                # Create unique index
+                cursor.execute(f"""
+                    CREATE UNIQUE INDEX uniq_business_name_ci 
+                    ON {table_name} (LOWER(name))
+                """)
+    elif vendor == 'sqlite':
+        with schema_editor.connection.cursor() as cursor:
+            # SQLite: Use IF NOT EXISTS for idempotency
+            cursor.execute(f"""
+                CREATE UNIQUE INDEX IF NOT EXISTS uniq_business_name_ci 
+                ON {table_name} (LOWER(name))
+            """)
+    # Other databases: skip (should not happen in production)
+
+
+def reverse_business_name_ci_constraint_database(apps, schema_editor):
+    """Reverse operation: drop the constraint/index (idempotent)"""
+    vendor = schema_editor.connection.vendor
+    
+    # Get the actual table name from the model
+    Business = apps.get_model('tenants', 'Business')
+    table_name = Business._meta.db_table
+    
+    if vendor == 'postgresql':
+        with schema_editor.connection.cursor() as cursor:
+            cursor.execute(f"ALTER TABLE {table_name} DROP CONSTRAINT IF EXISTS uniq_business_name_ci")
             cursor.execute("DROP INDEX IF EXISTS uniq_business_name_ci")
     elif vendor == 'sqlite':
         with schema_editor.connection.cursor() as cursor:
             cursor.execute("DROP INDEX IF EXISTS uniq_business_name_ci")
-    else:
-        pass
+    # Other databases: skip
 
 
 class Migration(migrations.Migration):
@@ -96,7 +124,10 @@ class Migration(migrations.Migration):
 
     operations = [
         # Business name unique case-insensitive
-        # Use SeparateDatabaseAndState to safely handle constraint that may not exist in state
+        # Use SeparateDatabaseAndState to completely decouple database ops from state ops.
+        # This prevents Django from trying to remove constraints that don't exist in state.
+        # Database operations are idempotent (IF NOT EXISTS, check before create).
+        # State operations only update Django's migration graph, never touch the database.
         migrations.SeparateDatabaseAndState(
             database_operations=[
                 migrations.RunPython(
@@ -105,6 +136,10 @@ class Migration(migrations.Migration):
                 ),
             ],
             state_operations=[
+                # State operation: Add constraint to Django's migration state only.
+                # This does NOT touch the database - it only updates Django's understanding
+                # of what the model should look like. The actual database constraint
+                # is created by the database_operations above.
                 migrations.AddConstraint(
                     model_name='business',
                     constraint=models.UniqueConstraint(
@@ -119,6 +154,7 @@ class Migration(migrations.Migration):
         # Email unique case-insensitive (User model)
         # Note: Uses partial unique index to exclude blank emails
         # Works in both production and test databases
+        # This is a raw SQL index, so no state operation needed (it's not a Django constraint)
         migrations.RunPython(
             create_email_unique_index,
             drop_email_unique_index,

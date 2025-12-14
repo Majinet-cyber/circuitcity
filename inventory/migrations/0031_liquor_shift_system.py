@@ -6,6 +6,57 @@ import django.utils.timezone
 from decimal import Decimal
 from django.conf import settings
 from django.db import migrations, models
+from django.db.migrations.operations.models import RemoveConstraint, RemoveIndex
+
+
+class SafeRemoveConstraint(RemoveConstraint):
+    """
+    Prevents ValueError if constraint is missing from migration state.
+    """
+    def state_forwards(self, app_label, state):
+        try:
+            super().state_forwards(app_label, state)
+        except ValueError:
+            pass
+
+
+class SafeRemoveIndex(RemoveIndex):
+    """
+    Prevents ValueError if index is missing from migration state.
+    """
+    def state_forwards(self, app_label, state):
+        try:
+            super().state_forwards(app_label, state)
+        except ValueError:
+            pass
+
+
+def drop_constraint_and_index_database(apps, schema_editor):
+    """Drop constraint and index using idempotent SQL. Safe to run even if they don't exist."""
+    vendor = schema_editor.connection.vendor
+    
+    GymMember = apps.get_model('inventory', 'GymMember')
+    gym_table = GymMember._meta.db_table
+    
+    with schema_editor.connection.cursor() as cursor:
+        if vendor == 'postgresql':
+            # Drop constraint if exists (PostgreSQL)
+            cursor.execute(f"""
+                ALTER TABLE {gym_table} 
+                DROP CONSTRAINT IF EXISTS unique_gym_member_phone
+            """)
+            # Drop index if exists
+            cursor.execute("DROP INDEX IF EXISTS inv_wty_stat_exp_idx")
+        elif vendor == 'sqlite':
+            # SQLite: Drop index if exists (SQLite may have created constraint as index)
+            cursor.execute("DROP INDEX IF EXISTS unique_gym_member_phone")
+            cursor.execute("DROP INDEX IF EXISTS inv_wty_stat_exp_idx")
+        # Other databases: skip (should not happen in production)
+
+
+def reverse_drop_constraint_and_index_database(apps, schema_editor):
+    """Reverse: no-op (constraint/index are being removed)"""
+    pass
 
 
 class Migration(migrations.Migration):
@@ -133,13 +184,23 @@ class Migration(migrations.Migration):
                 "ordering": ["shift", "product"],
             },
         ),
-        migrations.RemoveConstraint(
-            model_name="gymmember",
-            name="unique_gym_member_phone",
-        ),
-        migrations.RemoveIndex(
-            model_name="inventoryitem",
-            name="inv_wty_stat_exp_idx",
+        migrations.SeparateDatabaseAndState(
+            database_operations=[
+                migrations.RunPython(
+                    drop_constraint_and_index_database,
+                    reverse_drop_constraint_and_index_database,
+                ),
+            ],
+            state_operations=[
+                SafeRemoveConstraint(
+                    model_name="gymmember",
+                    name="unique_gym_member_phone",
+                ),
+                SafeRemoveIndex(
+                    model_name="inventoryitem",
+                    name="inv_wty_stat_exp_idx",
+                ),
+            ],
         ),
         migrations.RenameIndex(
             model_name="clothingproductlog",

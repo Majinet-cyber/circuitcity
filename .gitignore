@@ -62,3 +62,6 @@ pytest_cache/
 *~
 *.swp
 *.swo
+
+# Duplicate backup directories
+_dup_backup/

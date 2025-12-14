@@ -3,6 +3,48 @@
 import django.core.validators
 from django.conf import settings
 from django.db import migrations, models
+from django.db.migrations.operations.models import RemoveConstraint
+
+
+class SafeRemoveConstraint(RemoveConstraint):
+    """
+    Prevents ValueError if constraint is missing from migration state.
+    """
+    def state_forwards(self, app_label, state):
+        try:
+            super().state_forwards(app_label, state)
+        except ValueError:
+            pass
+
+
+def drop_imei_per_business_constraint_database(apps, schema_editor):
+    """
+    Drop the per-business IMEI constraint using idempotent SQL.
+    Safe to run even if constraint doesn't exist (handles state drift).
+    """
+    vendor = schema_editor.connection.vendor
+    
+    InventoryItem = apps.get_model('inventory', 'InventoryItem')
+    table_name = InventoryItem._meta.db_table
+    
+    with schema_editor.connection.cursor() as cursor:
+        if vendor == 'postgresql':
+            # Drop constraint if exists (PostgreSQL)
+            cursor.execute(f"""
+                ALTER TABLE {table_name} 
+                DROP CONSTRAINT IF EXISTS uniq_imei_per_business
+            """)
+        elif vendor == 'sqlite':
+            # SQLite: Drop index if exists (SQLite may have created it as an index)
+            cursor.execute("DROP INDEX IF EXISTS uniq_imei_per_business")
+        # Other databases: skip (should not happen in production)
+
+
+def reverse_drop_imei_per_business_constraint_database(apps, schema_editor):
+    """Reverse: Recreate the constraint (not typically needed, but for completeness)"""
+    # This is a no-op since we're removing it - reverse would require
+    # knowing the original definition. In practice, this migration should not be reversed.
+    pass
 
 
 class Migration(migrations.Migration):
@@ -14,9 +56,20 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
-        migrations.RemoveConstraint(
-            model_name="inventoryitem",
-            name="uniq_imei_per_business",
+        # Remove constraint using SeparateDatabaseAndState to handle state drift
+        migrations.SeparateDatabaseAndState(
+            database_operations=[
+                migrations.RunPython(
+                    drop_imei_per_business_constraint_database,
+                    reverse_drop_imei_per_business_constraint_database,
+                ),
+            ],
+            state_operations=[
+                SafeRemoveConstraint(
+                    model_name="inventoryitem",
+                    name="uniq_imei_per_business",
+                ),
+            ],
         ),
         migrations.AlterField(
             model_name="inventoryitem",
