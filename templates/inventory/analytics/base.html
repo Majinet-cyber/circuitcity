@@ -1,0 +1,681 @@
+{% extends "base.html" %}
+{% load static %}
+{% load money %}
+
+{% block title %}{% block page_title %}Analytics{% endblock %} - {{ business.name|default:"Dashboard" }}{% endblock %}
+
+{% block content %}
+<div class="cc-page">
+  <div class="cc-header">
+    <div class="topbar">
+      <h1>{% block analytics_title %}Analytics{% endblock %}</h1>
+    </div>
+  </div>
+
+  <main class="content">
+    {% block analytics_filters %}
+    <!-- Filters Bar (Excel-style) -->
+    <div class="glass-card mb-4">
+      <form method="get" class="analytics-filters">
+        <!-- Date Range Presets -->
+        <div class="filter-group">
+          <label class="filter-label">Date Range</label>
+          <div class="filter-pills">
+            <button type="submit" name="preset" value="today" class="filter-pill {% if date_params.active_range == 'today' %}active{% endif %}">
+              Today
+            </button>
+            <button type="submit" name="preset" value="yesterday" class="filter-pill {% if date_params.active_range == 'yesterday' %}active{% endif %}">
+              Yesterday
+            </button>
+            <button type="submit" name="preset" value="this_month" class="filter-pill {% if date_params.active_range == 'this_month' %}active{% endif %}">
+              This Month
+            </button>
+            <button type="submit" name="preset" value="last_month" class="filter-pill {% if date_params.active_range == 'last_month' %}active{% endif %}">
+              Last Month
+            </button>
+            <button type="submit" name="preset" value="custom" class="filter-pill {% if date_params.active_range == 'custom' %}active{% endif %}">
+              Custom
+            </button>
+          </div>
+          {% if date_params.active_range == 'custom' or not date_params.active_range %}
+          <div style="display: flex; gap: 8px; margin-top: 8px;">
+            <input type="date" name="start" value="{{ date_params.start_date|date:'Y-m-d' }}" class="filter-date-input" style="flex: 1;">
+            <span style="align-self: center; color: #64748b;">to</span>
+            <input type="date" name="end" value="{{ date_params.end_date|date:'Y-m-d' }}" class="filter-date-input" style="flex: 1;">
+            <button type="submit" class="filter-pill" style="padding: 6px 12px;">Apply</button>
+          </div>
+          {% endif %}
+        </div>
+        
+        <!-- Location Filter -->
+        {% if locations %}
+        <div class="filter-group">
+          <label class="filter-label">Location</label>
+          <select name="location" class="filter-select" onchange="this.form.submit()">
+            <option value="">All locations</option>
+            {% for loc in locations %}
+            <option value="{{ loc.id }}" {% if selected_location and selected_location.id == loc.id %}selected{% endif %}>{{ loc.name }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        {% endif %}
+        
+        <!-- Staff Filter -->
+        {% if staff_list %}
+        <div class="filter-group">
+          <label class="filter-label">{% if vertical == 'gym' %}Trainer{% elif vertical == 'pharmacy' %}Cashier{% else %}Agent{% endif %}</label>
+          <select name="staff_id" class="filter-select" onchange="this.form.submit()">
+            <option value="">All staff</option>
+            {% for staff in staff_list %}
+            <option value="{{ staff.id }}" {% if selected_staff and selected_staff.id == staff.id %}selected{% endif %}>
+              {{ staff.user.get_full_name|default:staff.user.username }}
+            </option>
+            {% endfor %}
+          </select>
+        </div>
+        {% endif %}
+        
+        <!-- Payment Method Filter -->
+        <div class="filter-group">
+          <label class="filter-label">Payment Method</label>
+          <select name="payment_method" class="filter-select" onchange="this.form.submit()">
+            <option value="">All methods</option>
+            <option value="CASH" {% if payment_mode == 'CASH' %}selected{% endif %}>Cash</option>
+            <option value="BANK" {% if payment_mode == 'BANK' %}selected{% endif %}>Bank</option>
+            <option value="MOBILE_MONEY" {% if payment_mode == 'MOBILE_MONEY' %}selected{% endif %}>Mobile Money</option>
+            <option value="CREDIT" {% if payment_mode == 'CREDIT' %}selected{% endif %}>Credit</option>
+          </select>
+        </div>
+        
+        <!-- Search Query -->
+        <div class="filter-group">
+          <label class="filter-label">Search</label>
+          <input type="text" name="q" value="{{ search_query }}" placeholder="Product, customer, IMEI..." class="filter-select" style="min-width: 200px;">
+        </div>
+        
+        <!-- Export Button -->
+        <div class="filter-group">
+          <label class="filter-label">&nbsp;</label>
+          <button type="submit" name="export" value="csv" class="filter-pill" style="background: #10b981; color: white; border-color: #10b981;">
+            Export CSV
+          </button>
+        </div>
+        
+        <!-- Preserve other filters -->
+        {% for section in selected_sections %}
+        <input type="hidden" name="sections" value="{{ section }}">
+        {% endfor %}
+      </form>
+    </div>
+    {% endblock %}
+
+    {% block analytics_content %}
+    {% if not analytics_ok|default:True %}
+    <!-- Error Banner (shown when analytics fails) -->
+    <div class="glass-card mb-4" style="background: #fee2e2; border: 1px solid #fca5a5; color: #991b1b;">
+      <div style="display: flex; align-items: center; gap: 12px; padding: 16px;">
+        <div style="font-size: 24px;">⚠️</div>
+        <div style="flex: 1;">
+          <strong>Analytics temporarily unavailable</strong>
+          <div style="margin-top: 4px; font-size: 0.9em; opacity: 0.9;">
+            {% if analytics_error %}
+              {{ analytics_error }}
+            {% else %}
+              An error occurred while loading analytics data. Please try again later.
+            {% endif %}
+          </div>
+        </div>
+      </div>
+    </div>
+    {% endif %}
+    
+    <!-- KPI Cards Row (Excel-style) -->
+    <div class="kpi-grid mb-4">
+      {% if 'sales' in selected_sections %}
+      <div class="kpi-card">
+        <div class="kpi-label">Revenue</div>
+        <div class="kpi-value money">{{ analytics_data.kpis.revenue|default:0|format_mwk }}</div>
+      </div>
+      {% endif %}
+      
+      {% if 'profit' in selected_sections %}
+      <div class="kpi-card">
+        <div class="kpi-label">Profit</div>
+        <div class="kpi-value money {% if analytics_data.kpis.profit and analytics_data.kpis.profit < 0 %}text-danger{% else %}text-success{% endif %}">
+          {{ analytics_data.kpis.profit|default:0|format_mwk }}
+        </div>
+      </div>
+      {% endif %}
+      
+      {% if 'sales' in selected_sections %}
+      <div class="kpi-card">
+        <div class="kpi-label">Total Sales</div>
+        <div class="kpi-value">{{ analytics_data.kpis.total_sales|default:analytics_data.kpis.units_sold|default:0 }}</div>
+      </div>
+      {% endif %}
+      
+      {% if 'stock_value' in selected_sections %}
+      <div class="kpi-card">
+        <div class="kpi-label">Stock Value</div>
+        <div class="kpi-value money">{{ analytics_data.kpis.inventory_value|default:0|format_mwk }}</div>
+      </div>
+      {% endif %}
+      
+      {% if 'retail_value' in selected_sections %}
+      <div class="kpi-card">
+        <div class="kpi-label">Retail Value</div>
+        <div class="kpi-value money">{{ analytics_data.kpis.retail_value|default:0|format_mwk }}</div>
+      </div>
+      {% endif %}
+      
+      {% if 'expected_margin' in selected_sections %}
+      <div class="kpi-card">
+        <div class="kpi-label">Expected Margin</div>
+        <div class="kpi-value money">{{ analytics_data.kpis.expected_margin|default:0|format_mwk }}</div>
+      </div>
+      {% endif %}
+      
+      {% if vertical == 'gym' and 'members' in selected_sections %}
+      <div class="kpi-card">
+        <div class="kpi-label">Active Members</div>
+        <div class="kpi-value">{{ analytics_data.kpis.active_members|default:0 }}</div>
+      </div>
+      {% endif %}
+      
+      {% if vertical == 'gym' and 'new_members' in selected_sections %}
+      <div class="kpi-card">
+        <div class="kpi-label">New Members</div>
+        <div class="kpi-value">{{ analytics_data.kpis.new_members|default:0 }}</div>
+      </div>
+      {% endif %}
+    </div>
+
+    <!-- Charts Row -->
+    <div class="charts-grid mb-4">
+      <!-- Sales Trend Chart (Daily) -->
+      {% if analytics_data.charts.sales_trend %}
+      <div class="chart-card">
+        <div class="chart-header">
+          <h3 class="chart-title">Sales Trend (Daily)</h3>
+          <div class="chart-toggle">
+            <button type="button" class="toggle-btn active" data-metric="amount" onclick="toggleChartMetric('amount')">Amount</button>
+            <button type="button" class="toggle-btn" data-metric="count" onclick="toggleChartMetric('count')">Count</button>
+          </div>
+        </div>
+        <div class="chart-container">
+          <canvas id="salesTrendChart" height="250"></canvas>
+        </div>
+      </div>
+      {% endif %}
+      
+      <!-- Cash Mix Chart -->
+      {% if 'cash_mix' in selected_sections and analytics_data.charts.payment_mix %}
+      <div class="chart-card">
+        <div class="chart-header">
+          <h3 class="chart-title">Cash Mix</h3>
+        </div>
+        <div class="chart-container">
+          <canvas id="paymentMixChart" height="250"></canvas>
+        </div>
+      </div>
+      {% endif %}
+    </div>
+
+    <!-- Composition Panels Row -->
+    <div class="composition-grid mb-4">
+      <!-- Top Products/Models -->
+      {% if 'top_products' in selected_sections and analytics_data.top_items %}
+      <div class="composition-card">
+        <h3 class="composition-title">
+          {% if vertical == 'phones' %}Top Models{% elif vertical == 'gym' %}Top Services{% else %}Top Products{% endif %}
+        </h3>
+        <div class="table-responsive">
+          <table class="composition-table">
+            <thead>
+              <tr>
+                <th>Name</th>
+                <th class="text-end">Units</th>
+                <th class="text-end">Revenue</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for item in analytics_data.top_items|slice:":10" %}
+              <tr>
+                <td>{{ item.product__name|default:item.name|default:item.brand|default:item.model|default:"Unknown" }}</td>
+                <td class="text-end">{{ item.units_sold|default:item.units|default:item.count|default:0 }}</td>
+                <td class="text-end money">{{ item.revenue|default:item.amount|default:0|format_mwk }}</td>
+              </tr>
+              {% empty %}
+              <tr>
+                <td colspan="3" class="text-muted text-center">No data available</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+      {% endif %}
+      
+      <!-- Category Mix (if available) -->
+      {% if 'top_categories' in selected_sections and analytics_data.categories %}
+      <div class="composition-card">
+        <h3 class="composition-title">Top Categories</h3>
+        <div class="category-list">
+          {% for cat in analytics_data.categories|slice:":10" %}
+          <div class="category-item">
+            <div class="category-name">{{ cat.name|default:cat.category|default:"Unknown" }}</div>
+            <div class="category-bar-container">
+              <div class="category-bar" style="width: {{ cat.percentage|default:0 }}%"></div>
+            </div>
+            <div class="category-value money">{{ cat.total|default:cat.amount|default:0|format_mwk }}</div>
+          </div>
+          {% empty %}
+          <div class="text-muted text-center py-3">No category data available</div>
+          {% endfor %}
+        </div>
+      </div>
+      {% endif %}
+    </div>
+    {% endblock %}
+  </main>
+</div>
+
+{% include 'partials/bottomnav.html' with active_tab='analytics' %}
+
+{% block analytics_styles %}
+<style>
+  /* Analytics Filters (Excel-style) */
+  .analytics-filters {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 16px;
+    align-items: flex-end;
+  }
+  
+  .filter-group {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  
+  .filter-label {
+    font-size: 12px;
+    font-weight: 600;
+    color: #64748b;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+  
+  .filter-pills {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+  
+  .filter-pill {
+    padding: 6px 14px;
+    border: 1px solid #e2e8f0;
+    background: #ffffff;
+    border-radius: 20px;
+    font-size: 13px;
+    font-weight: 500;
+    color: #475569;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  
+  .filter-pill:hover {
+    background: #f1f5f9;
+    border-color: #cbd5e1;
+  }
+  
+  .filter-pill.active {
+    background: #2563eb;
+    border-color: #2563eb;
+    color: #ffffff;
+  }
+  
+  .filter-select {
+    padding: 6px 12px;
+    border: 1px solid #e2e8f0;
+    border-radius: 6px;
+    font-size: 13px;
+    background: #ffffff;
+    min-width: 150px;
+  }
+  
+  .filter-date-input {
+    padding: 6px 12px;
+    border: 1px solid #e2e8f0;
+    border-radius: 6px;
+    font-size: 13px;
+  }
+  
+  /* KPI Grid (Excel-style cards) */
+  .kpi-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 16px;
+  }
+  
+  .kpi-card {
+    background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+    padding: 20px;
+    text-align: center;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+    transition: transform 0.2s, box-shadow 0.2s;
+  }
+  
+  .kpi-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  }
+  
+  .kpi-label {
+    font-size: 12px;
+    font-weight: 600;
+    color: #64748b;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 8px;
+  }
+  
+  .kpi-value {
+    font-size: 24px;
+    font-weight: 700;
+    color: #0f172a;
+    line-height: 1.2;
+  }
+  
+  /* Charts Grid */
+  .charts-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 16px;
+  }
+  
+  .chart-card {
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+    padding: 20px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+  }
+  
+  .chart-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 16px;
+  }
+  
+  .chart-title {
+    font-size: 16px;
+    font-weight: 600;
+    color: #0f172a;
+    margin: 0;
+  }
+  
+  .chart-toggle {
+    display: flex;
+    gap: 4px;
+    background: #f1f5f9;
+    border-radius: 6px;
+    padding: 2px;
+  }
+  
+  .toggle-btn {
+    padding: 4px 12px;
+    border: none;
+    background: transparent;
+    border-radius: 4px;
+    font-size: 12px;
+    font-weight: 500;
+    color: #64748b;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  
+  .toggle-btn.active {
+    background: #ffffff;
+    color: #2563eb;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  }
+  
+  .chart-container {
+    position: relative;
+    height: 250px;
+  }
+  
+  /* Composition Panels */
+  .composition-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 16px;
+  }
+  
+  .composition-card {
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+    padding: 20px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+  }
+  
+  .composition-title {
+    font-size: 16px;
+    font-weight: 600;
+    color: #0f172a;
+    margin: 0 0 16px 0;
+  }
+  
+  .composition-table {
+    width: 100%;
+    font-size: 13px;
+  }
+  
+  .composition-table thead {
+    border-bottom: 2px solid #e2e8f0;
+  }
+  
+  .composition-table th {
+    padding: 10px;
+    text-align: left;
+    font-weight: 600;
+    color: #64748b;
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+  
+  .composition-table td {
+    padding: 10px;
+    border-bottom: 1px solid #f1f5f9;
+  }
+  
+  .composition-table tbody tr:hover {
+    background: #f8fafc;
+  }
+  
+  /* Category List */
+  .category-list {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+  
+  .category-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  
+  .category-name {
+    font-size: 13px;
+    font-weight: 500;
+    color: #0f172a;
+    min-width: 120px;
+  }
+  
+  .category-bar-container {
+    flex: 1;
+    height: 8px;
+    background: #f1f5f9;
+    border-radius: 4px;
+    overflow: hidden;
+  }
+  
+  .category-bar {
+    height: 100%;
+    background: linear-gradient(90deg, #2563eb, #3b82f6);
+    border-radius: 4px;
+    transition: width 0.3s;
+  }
+  
+  .category-value {
+    font-size: 13px;
+    font-weight: 600;
+    color: #0f172a;
+    min-width: 80px;
+    text-align: right;
+  }
+  
+  /* Mobile Responsive */
+  @media (max-width: 768px) {
+    .analytics-filters {
+      flex-direction: column;
+      align-items: stretch;
+    }
+    
+    .filter-pills {
+      flex-wrap: wrap;
+    }
+    
+    .kpi-grid {
+      grid-template-columns: repeat(2, 1fr);
+    }
+    
+    .charts-grid,
+    .composition-grid {
+      grid-template-columns: 1fr;
+    }
+  }
+</style>
+{% endblock %}
+
+{% block analytics_scripts %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script>
+  let salesTrendChart = null;
+  const metricView = "{{ request.GET.metric_view|default:'amount' }}";
+  
+  // Sales Trend Chart with Amount/Count toggle
+  {% if analytics_data.charts.sales_trend %}
+  const salesTrendData = {{ analytics_data.charts.sales_trend|safe }};
+  const salesTrendCtx = document.getElementById('salesTrendChart');
+  
+  function updateSalesTrendChart(metric) {
+    if (!salesTrendChart || !salesTrendData) return;
+    
+    const isAmount = metric === 'amount';
+    salesTrendChart.data.datasets[0].label = isAmount ? 'Revenue (Amount)' : 'Sales (Count)';
+    salesTrendChart.data.datasets[0].data = salesTrendData.map(d => 
+      isAmount ? parseFloat(d.revenue || 0) : parseInt(d.count || 0)
+    );
+    salesTrendChart.update();
+  }
+  
+  function toggleChartMetric(metric) {
+    // Update toggle buttons
+    document.querySelectorAll('.toggle-btn').forEach(btn => {
+      btn.classList.toggle('active', btn.dataset.metric === metric);
+    });
+    updateSalesTrendChart(metric);
+  }
+  
+  if (salesTrendCtx && salesTrendData && salesTrendData.length > 0) {
+    const isAmount = metricView === 'amount';
+    salesTrendChart = new Chart(salesTrendCtx, {
+      type: 'line',
+      data: {
+        labels: salesTrendData.map(d => d.date_short || d.date),
+        datasets: [{
+          label: isAmount ? 'Revenue (Amount)' : 'Sales (Count)',
+          data: salesTrendData.map(d => isAmount ? parseFloat(d.revenue || 0) : parseInt(d.count || 0)),
+          borderColor: '#2563eb',
+          backgroundColor: 'rgba(37, 99, 235, 0.1)',
+          tension: 0.4,
+          fill: true,
+          pointRadius: 4,
+          pointHoverRadius: 6,
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: {
+            display: true,
+            position: 'top',
+          },
+        },
+        scales: {
+          y: {
+            beginAtZero: true,
+            ticks: {
+              callback: function(value) {
+                return isAmount ? 'MWK ' + value.toLocaleString() : value;
+              }
+            }
+          }
+        }
+      }
+    });
+  }
+  {% endif %}
+  
+  // Payment Mix Chart (Cash Mix)
+  {% if 'cash_mix' in selected_sections and analytics_data.charts.payment_mix %}
+  const paymentMixData = {{ analytics_data.charts.payment_mix|safe }};
+  const paymentMixCtx = document.getElementById('paymentMixChart');
+  if (paymentMixCtx && paymentMixData && paymentMixData.length > 0) {
+    new Chart(paymentMixCtx, {
+      type: 'doughnut',
+      data: {
+        labels: paymentMixData.map(d => d.method_display || d.method),
+        datasets: [{
+          data: paymentMixData.map(d => parseFloat(d.total || d.amount || 0)),
+          backgroundColor: [
+            '#2563eb', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899'
+          ]
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: {
+            position: 'bottom',
+          },
+          tooltip: {
+            callbacks: {
+              label: function(context) {
+                const label = context.label || '';
+                const value = context.parsed || 0;
+                const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                const percentage = ((value / total) * 100).toFixed(1);
+                return label + ': MWK ' + value.toLocaleString() + ' (' + percentage + '%)';
+              }
+            }
+          }
+        }
+      }
+    });
+  }
+  {% endif %}
+</script>
+{% endblock %}
+{% endblock %}
+

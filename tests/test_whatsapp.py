@@ -3,6 +3,7 @@
 Tests for WhatsApp notification functionality.
 """
 import pytest
+from decimal import Decimal
 from unittest.mock import patch, Mock
 from django.test import TestCase
 from django.contrib.auth import get_user_model
@@ -10,6 +11,7 @@ from django.contrib.auth import get_user_model
 from tenants.models import Business
 from notifications.models import WhatsAppPreference
 from notifications import whatsapp_service
+from conftest import unique_slug
 
 User = get_user_model()
 
@@ -115,7 +117,7 @@ class WhatsAppNotificationTests(TestCase):
     """Tests for WhatsApp notification helpers."""
     
     def setUp(self):
-        self.business = Business.objects.create(name="Test Biz", slug="test")
+        self.business = Business.objects.create(name="Test Biz", slug=unique_slug("Test Biz"))
         self.user = User.objects.create_user(
             username="manager",
             email="manager@test.com",
@@ -200,7 +202,7 @@ class WhatsAppIntegrationTest:
         mock_send.return_value = True
         
         # Setup
-        business = Business.objects.create(name="Test", slug="test")
+        business = Business.objects.create(name="Test", slug=unique_slug("Test"))
         user = User.objects.create_user(username="mgr", password="test")
         
         WhatsAppPreference.objects.create(
@@ -232,7 +234,7 @@ class WhatsAppProfitMilestoneTests:
         """Test that crossing a milestone threshold sends notification once."""
         mock_send.return_value = True
         
-        business = Business.objects.create(name="Test", slug="test")
+        business = Business.objects.create(name="Test", slug=unique_slug("Test"))
         user = User.objects.create_user(username="owner", password="test")
         
         pref = WhatsAppPreference.objects.create(
@@ -260,7 +262,7 @@ class WhatsAppProfitMilestoneTests:
         """Test that duplicate milestones are not sent."""
         mock_send.return_value = True
         
-        business = Business.objects.create(name="Test", slug="test")
+        business = Business.objects.create(name="Test", slug=unique_slug("Test"))
         user = User.objects.create_user(username="owner", password="test")
         
         pref = WhatsAppPreference.objects.create(
@@ -293,7 +295,7 @@ class WhatsAppProfitMilestoneTests:
         """Test milestone not sent when user disabled them."""
         mock_send.return_value = True
         
-        business = Business.objects.create(name="Test", slug="test")
+        business = Business.objects.create(name="Test", slug=unique_slug("Test"))
         user = User.objects.create_user(username="owner", password="test")
         
         pref = WhatsAppPreference.objects.create(
@@ -323,7 +325,7 @@ class WhatsAppAgentCommissionTests:
         """Test notifying agent about earned commission."""
         mock_send.return_value = True
         
-        business = Business.objects.create(name="Test", slug="test")
+        business = Business.objects.create(name="Test", slug=unique_slug("Test"))
         agent = User.objects.create_user(username="agent", password="test")
         
         pref = WhatsAppPreference.objects.create(
@@ -354,7 +356,7 @@ class WhatsAppAgentCommissionTests:
         """Test commission notification not sent when disabled."""
         mock_send.return_value = True
         
-        business = Business.objects.create(name="Test", slug="test")
+        business = Business.objects.create(name="Test", slug=unique_slug("Test"))
         agent = User.objects.create_user(username="agent", password="test")
         
         pref = WhatsAppPreference.objects.create(
@@ -386,7 +388,7 @@ class WhatsAppStockAlertTests:
         """Test low stock alert when quantity <= reorder level."""
         mock_send.return_value = True
         
-        business = Business.objects.create(name="Test", slug="test")
+        business = Business.objects.create(name="Test", slug=unique_slug("Test"))
         manager = User.objects.create_user(username="manager", password="test")
         
         pref = WhatsAppPreference.objects.create(
@@ -416,7 +418,7 @@ class WhatsAppStockAlertTests:
         """Test low stock notifies all managers with alerts enabled."""
         mock_send.return_value = True
         
-        business = Business.objects.create(name="Test", slug="test")
+        business = Business.objects.create(name="Test", slug=unique_slug("Test"))
         
         manager1 = User.objects.create_user(username="manager1", password="test")
         pref1 = WhatsAppPreference.objects.create(

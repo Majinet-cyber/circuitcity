@@ -37,18 +37,17 @@ def vertical_dispatcher(request):
     """
     Route users to the correct dashboard for their business vertical.
     
-    PHONES businesses render the PHONES premium dashboard directly (no redirect to avoid loops).
+    PHONES businesses now redirect to Analytics (replaces inventory dashboard).
     Other verticals redirect to their specialized dashboards.
     Falls back to a generic prompt if the vertical is unknown.
     """
     vertical = business_vertical(request)
     
-    # PHONES: render the premium phones dashboard directly to prevent self-redirect loop
-    # (since this view IS mapped to inventory:inventory_dashboard)
+    # PHONES: redirect to analytics (replaces inventory dashboard)
     if vertical == PHONES:
-        # Import here to avoid circular imports
-        from inventory.verticals.phones import dashboard as phones_dashboard
-        return phones_dashboard(request)
+        # Redirect to analytics router endpoint with fallback
+        analytics_url = _safe_reverse("app_router:analytics", "/app/analytics/")
+        return redirect(analytics_url)
     
     # Other verticals: redirect to their specialized dashboards
     target = _VERTICAL_ROUTES.get(vertical, _DEFAULT_ROUTE)

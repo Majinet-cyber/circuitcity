@@ -20,7 +20,8 @@ User = get_user_model()
 
 @pytest.fixture
 def business(db):
-    return Business.objects.create(name="Test Biz", slug="test-biz", status="ACTIVE")
+    from conftest import unique_slug
+    return Business.objects.create(name="Test Biz", slug=unique_slug("Test Biz"), status="ACTIVE")
 
 
 @pytest.fixture

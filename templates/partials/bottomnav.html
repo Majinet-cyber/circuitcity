@@ -1,59 +1,84 @@
 {% comment %}
   Reusable bottom navigation for mobile-first design
   Usage: {% include 'partials/bottomnav.html' with active_tab='home' %}
+  
+  Uses vertical-aware mobile nav config (MOBILE_NAV_ITEMS) to prevent vertical leakage.
 {% endcomment %}
 
 {% load static %}
 
-{# Safely resolve URLs with fallbacks #}
-{% url 'inventory:inventory_dashboard' as url_dashboard %}
-{% url 'dashboard:home' as url_dash_home %}
-{% url 'inventory:scan_in' as url_scan %}
-{% url 'inventory:phone_sale_wizard' as url_sell_wizard %}
-{% url 'inventory:phone_sale_wizard' as url_sell %}
-{% url 'inventory:stock_list' as url_stock %}
-{% url 'wallet:agent_wallet' as url_wallet %}
-{% url 'wallet:admin_home' as url_wallet_admin %}
-
 <nav class="cc-bottomnav" role="navigation" aria-label="Main navigation">
-  <a href="{{ url_dash_home|default:url_dashboard|default:'/' }}" 
-     class="cc-bottomnav__item {% if active_tab|default:'' == 'home' %}cc-bottomnav__item--active{% endif %}"
-     aria-label="Home"
-     aria-current="{% if active_tab|default:'' == 'home' %}page{% endif %}">
-    <i class="bi bi-house-door{% if active_tab|default:'' == 'home' %}-fill{% endif %}"></i>
-    <span>Home</span>
-  </a>
-  
-  <a href="{{ url_scan|default:'/inventory/scan-in/' }}" 
-     class="cc-bottomnav__item {% if active_tab|default:'' == 'scan' %}cc-bottomnav__item--active{% endif %}"
-     aria-label="Scan In"
-     aria-current="{% if active_tab|default:'' == 'scan' %}page{% endif %}">
-    <i class="bi bi-upc-scan"></i>
-    <span>Scan</span>
-  </a>
-  
-  <a href="{{ url_sell_wizard|default:url_sell|default:'/inventory/phone-sale-wizard/' }}" 
-     class="cc-bottomnav__item {% if active_tab|default:'' == 'sell' %}cc-bottomnav__item--active{% endif %}"
-     aria-label="Sell"
-     aria-current="{% if active_tab|default:'' == 'sell' %}page{% endif %}">
-    <i class="bi bi-cart-check{% if active_tab|default:'' == 'sell' %}-fill{% endif %}"></i>
-    <span>Sell</span>
-  </a>
-  
-  <a href="{{ url_stock|default:'/inventory/list/' }}" 
-     class="cc-bottomnav__item {% if active_tab|default:'' == 'stock' %}cc-bottomnav__item--active{% endif %}"
-     aria-label="Stock"
-     aria-current="{% if active_tab|default:'' == 'stock' %}page{% endif %}">
-    <i class="bi bi-box-seam{% if active_tab|default:'' == 'stock' %}-fill{% endif %}"></i>
-    <span>Stock</span>
-  </a>
-  
-  <a href="{% if IS_MANAGER %}{{ url_wallet_admin|default:url_wallet|default:'/wallet/' }}{% else %}{{ url_wallet|default:'/wallet/' }}{% endif %}" 
-     class="cc-bottomnav__item {% if active_tab|default:'' == 'wallet' %}cc-bottomnav__item--active{% endif %}"
-     aria-label="Wallet"
-     aria-current="{% if active_tab|default:'' == 'wallet' %}page{% endif %}">
-    <i class="bi bi-wallet2{% if active_tab|default:'' == 'wallet' %}-fill{% endif %}"></i>
-    <span>Wallet</span>
-  </a>
+  {% for item in MOBILE_NAV_ITEMS|default:'' %}
+    {% if item.is_menu %}
+      <a href="#" 
+         class="cc-bottomnav__item" 
+         onclick="if(window.CC_SIDEBAR){window.CC_SIDEBAR.toggle();} return false;"
+         aria-label="{{ item.label }}"
+         data-cy="mobile-nav-menu">
+        <i class="bi {{ item.icon_class }}"></i>
+        <span>{{ item.label }}</span>
+      </a>
+    {% else %}
+      <a href="{{ item.url }}" 
+         class="cc-bottomnav__item {% if active_tab|default:'' == item.key %}cc-bottomnav__item--active{% endif %}"
+         aria-label="{{ item.label }}"
+         aria-current="{% if active_tab|default:'' == item.key %}page{% endif %}"
+         data-cy="mobile-nav-{{ item.key }}"
+         data-active-prefix="{{ item.active_prefix|default:'' }}">
+        <i class="bi {{ item.icon_class }}{% if active_tab|default:'' == item.key %}-fill{% endif %}"></i>
+        <span>{{ item.label }}</span>
+      </a>
+    {% endif %}
+  {% empty %}
+    {# Fallback to phones nav if MOBILE_NAV_ITEMS not available #}
+    {% url 'app_router:home' as url_home %}
+    {% url 'app_router:scan' as url_scan %}
+    {% url 'app_router:sell' as url_sell %}
+    {% url 'app_router:stock' as url_stock %}
+    {% url 'inventory:inventory_dashboard' as url_dashboard_fallback %}
+    {% url 'inventory:scan_in' as url_scan_fallback %}
+    {% url 'inventory:phone_sale_wizard' as url_sell_fallback %}
+    {% url 'inventory:stock_list' as url_stock_fallback %}
+    
+    <a href="{{ url_home|default:url_dashboard_fallback|default:'/' }}" 
+       class="cc-bottomnav__item {% if active_tab|default:'' == 'home' %}cc-bottomnav__item--active{% endif %}"
+       aria-label="Home"
+       aria-current="{% if active_tab|default:'' == 'home' %}page{% endif %}">
+      <i class="bi bi-house-door{% if active_tab|default:'' == 'home' %}-fill{% endif %}"></i>
+      <span>Home</span>
+    </a>
+    
+    <a href="{{ url_scan|default:url_scan_fallback|default:'/inventory/scan-in/' }}" 
+       class="cc-bottomnav__item {% if active_tab|default:'' == 'scan' %}cc-bottomnav__item--active{% endif %}"
+       aria-label="Scan In"
+       aria-current="{% if active_tab|default:'' == 'scan' %}page{% endif %}">
+      <i class="bi bi-upc-scan{% if active_tab|default:'' == 'scan' %}-fill{% endif %}"></i>
+      <span>Scan</span>
+    </a>
+    
+    <a href="{{ url_sell|default:url_sell_fallback|default:'/inventory/phone-sale-wizard/' }}" 
+       class="cc-bottomnav__item {% if active_tab|default:'' == 'sell' %}cc-bottomnav__item--active{% endif %}"
+       aria-label="Sell"
+       aria-current="{% if active_tab|default:'' == 'sell' %}page{% endif %}">
+      <i class="bi bi-cart-check{% if active_tab|default:'' == 'sell' %}-fill{% endif %}"></i>
+      <span>Sell</span>
+    </a>
+    
+    <a href="{{ url_stock|default:url_stock_fallback|default:'/inventory/list/' }}" 
+       class="cc-bottomnav__item {% if active_tab|default:'' == 'stock' %}cc-bottomnav__item--active{% endif %}"
+       aria-label="Stock"
+       aria-current="{% if active_tab|default:'' == 'stock' %}page{% endif %}">
+      <i class="bi bi-box-seam{% if active_tab|default:'' == 'stock' %}-fill{% endif %}"></i>
+      <span>Stock</span>
+    </a>
+    
+    <a href="#" 
+       class="cc-bottomnav__item"
+       onclick="if(window.CC_SIDEBAR){window.CC_SIDEBAR.toggle();} return false;"
+       aria-label="Menu">
+      <i class="bi bi-list"></i>
+      <span>Menu</span>
+    </a>
+  {% endfor %}
 </nav>
 

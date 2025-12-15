@@ -25,8 +25,9 @@ from hq.utils_dates import get_period_from_request, get_year_from_request, get_m
 from hq.utils_gamification import get_agent_rankings
 from tenants.models import Business, Membership
 from billing.models import Subscription, Invoice  # BusinessSubscription alias
-from inventory.models import InventoryItem
+from inventory.models import InventoryItem, Location
 from sales.models import Sale
+from hq.services.hq_analytics import get_hq_analytics_data
 
 # Try to import Plan model if you have one
 try:
@@ -599,6 +600,25 @@ def dashboard(request):
     
     # Add contracts_enabled flag for sidebar
     ctx["contracts_enabled"] = CONTRACTS_ENABLED
+    
+    # Add filter options for analytics
+    ctx["all_businesses"] = Business.objects.all().order_by('name')[:100]  # Limit for performance
+    ctx["all_agents"] = Membership.objects.filter(role="AGENT").select_related('user', 'business').order_by('user__username')[:100]
+    ctx["all_locations"] = Location.objects.filter(is_active=True).select_related('business').order_by('business__name', 'name')[:100]
+    
+    # Vertical options
+    ctx["vertical_options"] = [
+        ("", "All Verticals"),
+        ("phones", "Phones"),
+        ("clothing", "Clothing"),
+        ("liquor", "Liquor"),
+        ("pharmacy", "Pharmacy"),
+        ("gym", "Gym"),
+    ]
+    
+    # Payment mode options
+    from sales.models import PaymentMethod
+    ctx["payment_mode_options"] = [("", "All")] + list(PaymentMethod.choices)
 
     return _render_safe(request, "hq/dashboard.html", ctx, _dashboard_inline)
 
@@ -1268,6 +1288,230 @@ def api_search_suggest(request):
 @hq_admin_required
 def api_notifications(request):
     return JsonResponse([], safe=False)
+
+
+# -------------------------------------------------------------------
+# HQ Analytics API Endpoint
+# -------------------------------------------------------------------
+@hq_admin_required
+def api_analytics_data(request):
+    """
+    JSON API endpoint for HQ analytics data.
+    Returns KPIs, chart series, breakdowns, and top lists based on filters.
+    
+    Query params:
+    - start_date (YYYY-MM-DD): Start date (default: 30 days ago)
+    - end_date (YYYY-MM-DD): End date (default: today)
+    - business_id (int): Filter by business
+    - agent_id (int): Filter by agent
+    - vertical (str): Filter by vertical (phones, clothing, liquor, pharmacy, gym)
+    - payment_mode (str): Filter by payment method (CASH, BANK, MOBILE_MONEY)
+    - location_id (int): Filter by location
+    - sale_type (str): Filter by sale type (credit/cash) - if supported
+    """
+    try:
+        # Parse date range
+        start_date = None
+        end_date = None
+        start_str = request.GET.get('start_date', '').strip()
+        end_str = request.GET.get('end_date', '').strip()
+        
+        if start_str:
+            try:
+                start_date = dt.strptime(start_str, '%Y-%m-%d').date()
+            except ValueError:
+                pass
+        
+        if end_str:
+            try:
+                end_date = dt.strptime(end_str, '%Y-%m-%d').date()
+            except ValueError:
+                pass
+        
+        # Parse other filters
+        business_id = None
+        if request.GET.get('business_id'):
+            try:
+                business_id = int(request.GET.get('business_id'))
+            except (ValueError, TypeError):
+                pass
+        
+        agent_id = None
+        if request.GET.get('agent_id'):
+            try:
+                agent_id = int(request.GET.get('agent_id'))
+            except (ValueError, TypeError):
+                pass
+        
+        vertical = request.GET.get('vertical', '').strip() or None
+        payment_mode = request.GET.get('payment_mode', '').strip() or None
+        location_id = None
+        if request.GET.get('location_id'):
+            try:
+                location_id = int(request.GET.get('location_id'))
+            except (ValueError, TypeError):
+                pass
+        
+        sale_type = request.GET.get('sale_type', '').strip() or None
+        
+        # Get analytics data
+        data = get_hq_analytics_data(
+            start_date=start_date,
+            end_date=end_date,
+            business_id=business_id,
+            agent_id=agent_id,
+            vertical=vertical,
+            payment_mode=payment_mode,
+            location_id=location_id,
+            sale_type=sale_type,
+        )
+        
+        return JsonResponse(data, safe=False)
+    
+    except Exception as e:
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.exception("Error in api_analytics_data")
+        return JsonResponse({'error': str(e)}, status=500)
+
+
+@hq_admin_required
+def hq_analytics(request):
+    """
+    HQ Analytics page with filters across businesses/verticals.
+    Hardened to never 500: safe filter parsing, defaults for all edge cases.
+    """
+    try:
+        # Parse date range with safe defaults
+        start_date = None
+        end_date = None
+        start_str = request.GET.get('start', '').strip()
+        end_str = request.GET.get('end', '').strip()
+        preset = request.GET.get('preset', '').strip()
+        
+        today = timezone.now().date()
+        
+        # Handle preset (safe: unknown presets fall through to defaults)
+        if preset == 'today':
+            start_date = today
+            end_date = today
+        elif preset == 'yesterday':
+            start_date = today - timedelta(days=1)
+            end_date = start_date
+        elif preset == 'this_month':
+            start_date = today.replace(day=1)
+            end_date = today
+        elif preset == 'last_month':
+            first_day_this_month = today.replace(day=1)
+            last_day_last_month = first_day_this_month - timedelta(days=1)
+            start_date = last_day_last_month.replace(day=1)
+            end_date = last_day_last_month
+        elif start_str or end_str:
+            # Custom date range (safe parsing: invalid dates ignored)
+            if start_str:
+                try:
+                    start_date = dt.strptime(start_str, '%Y-%m-%d').date()
+                except (ValueError, TypeError):
+                    pass
+            if end_str:
+                try:
+                    end_date = dt.strptime(end_str, '%Y-%m-%d').date()
+                except (ValueError, TypeError):
+                    pass
+        
+        # Default: last 30 days if no valid dates parsed
+        if not start_date:
+            start_date = today - timedelta(days=30)
+        if not end_date:
+            end_date = today
+        
+        # Ensure start <= end
+        if start_date > end_date:
+            start_date, end_date = end_date, start_date
+        
+        # Parse filters (safe: invalid values become None)
+        business_id = None
+        if request.GET.get('business_id'):
+            try:
+                business_id = int(request.GET.get('business_id'))
+            except (ValueError, TypeError):
+                pass
+        
+        vertical = request.GET.get('vertical', '').strip() or None
+        # Validate vertical against known options
+        valid_verticals = ['phones', 'clothing', 'liquor', 'pharmacy', 'gym']
+        if vertical and vertical not in valid_verticals:
+            vertical = None
+        
+        location_id = None
+        if request.GET.get('location_id'):
+            try:
+                location_id = int(request.GET.get('location_id'))
+            except (ValueError, TypeError):
+                pass
+        
+        # Get analytics data (wrapped in try/except to prevent 500s)
+        try:
+            analytics_data = get_hq_analytics_data(
+                start_date=start_date,
+                end_date=end_date,
+                business_id=business_id,
+                vertical=vertical,
+                location_id=location_id,
+            )
+        except Exception:
+            # On any error, return empty analytics data structure
+            analytics_data = {
+                'kpis': {
+                    'total_revenue': 0,
+                    'total_sales': 0,
+                    'total_profit': 0,
+                    'active_businesses': 0,
+                },
+                'series': [],
+                'breakdowns': {},
+            }
+        
+        # Get filter options (safe: handle missing models gracefully)
+        try:
+            all_businesses = Business.objects.filter(is_active=True).order_by('name')[:100]
+        except Exception:
+            all_businesses = []
+        
+        all_locations = []
+        if business_id:
+            try:
+                all_locations = Location.objects.filter(business_id=business_id, is_active=True).order_by('name')[:100]
+            except Exception:
+                all_locations = []
+        
+        vertical_options = [
+            ('phones', 'Phones'),
+            ('clothing', 'Clothing'),
+            ('liquor', 'Liquor'),
+            ('pharmacy', 'Pharmacy'),
+            ('gym', 'Gym'),
+        ]
+        
+        ctx = {
+            'analytics_data': analytics_data,
+            'start_date': start_date,
+            'end_date': end_date,
+            'preset': preset,
+            'all_businesses': all_businesses,
+            'selected_business_id': business_id,
+            'all_locations': all_locations,
+            'selected_location_id': location_id,
+            'vertical_options': vertical_options,
+            'selected_vertical': vertical,
+        }
+        
+        return render(request, 'hq/analytics.html', ctx)
+    except Exception:
+        # Ultimate fallback: return minimal page with error message
+        from django.contrib import messages
+        messages.error(request, "An error occurred loading analytics. Please try again.")
+        return redirect('hq:dashboard')
 
 
 # -------------------------------------------------------------------

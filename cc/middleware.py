@@ -113,6 +113,8 @@ class AccessLogMiddleware(MiddlewareMixin):
             )
             user = getattr(request, "user", None)
             user_id = _safe_user_id(user)
+            
+            
             access_logger.info(
                 "http_request",
                 extra={
@@ -179,7 +181,19 @@ class PreventHQFromClientUI(MiddlewareMixin):
     - Never redirect if target equals current path
     """
 
+    def __call__(self, request):
+        # CRITICAL: Bypass HQ paths at the very top to prevent redirect loops
+        path = (request.path_info or request.path or "/")
+        if path.startswith("/hq/"):
+            return self.get_response(request)
+        return super().__call__(request)
+
     def process_request(self, request: HttpRequest):
+        # PART B: Rule 1 - HQ pages must never be redirected by tenant/business enforcement
+        path = (request.path_info or request.path or "/").split("?")[0]
+        if path.startswith("/hq/"):
+            return None
+        
         user = getattr(request, "user", None)
         # ⚠️ Never boolean-cast the lazy user; use the safe helper.
         if not _safe_is_authenticated(user):
@@ -192,11 +206,7 @@ class PreventHQFromClientUI(MiddlewareMixin):
             # If role resolution fails (e.g., DB hiccup), treat as non-HQ and continue
             return None
 
-        path = (request.path or "").rstrip("/")
-
-        # CRITICAL: Never redirect when already on HQ paths (prevents loops)
-        if path.startswith("/hq"):
-            return None
+        path = path.rstrip("/")
 
         # HQ/admin/static/etc. are always allowed
         for p in _HQ_ALLOW_PREFIXES:
@@ -207,9 +217,15 @@ class PreventHQFromClientUI(MiddlewareMixin):
         for p in _BLOCK_PREFIXES:
             if path.startswith(p):
                 target = _reverse_or("hq:subscriptions", "/hq/subscriptions/")
-                # LOOP GUARD: Never redirect if target equals current path
-                if path.rstrip("/") == target.rstrip("/"):
+                # Normalize target (remove query string if present)
+                target = target.split("?")[0] if target else "/"
+                target_normalized = target.rstrip("/")
+                path_normalized = path.rstrip("/")
+                
+                # Anti-loop guard: Never redirect if target equals current path
+                if target.rstrip("/") == path.rstrip("/"):
                     return None
+                
                 return redirect(target)
 
         return None

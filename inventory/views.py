@@ -1569,6 +1569,22 @@ def stock_list(request: HttpRequest, *args, **kwargs) -> HttpResponse:
     paginator = SimplePaginator(total, per_page)
     page_obj = SimplePage(items, page, paginator)
 
+    # Get view mode safely from request
+    view_mode = request.GET.get("view", "table")
+    
+    # Get membership safely (if available)
+    membership = None
+    try:
+        if biz:
+            from tenants.models import Membership
+            membership = Membership.objects.filter(
+                user=request.user,
+                business=biz,
+                status='ACTIVE'
+            ).first()
+    except Exception:
+        pass
+    
     ctx = {
         "items": items,
         "rows": items,
@@ -1591,6 +1607,9 @@ def stock_list(request: HttpRequest, *args, **kwargs) -> HttpResponse:
         "target_full": 100,  # Default target for stock battery
         "q": q_text,  # Search query
         "status": status,  # Status filter
+        "view_mode": view_mode,  # Safe view mode from request.GET
+        "show_search": False,  # Stock list has its own search, don't show global search
+        "membership": membership,  # Safe membership object
         **badge_aliases,
     }
     return render(request, template, ctx)

@@ -421,3 +421,49 @@ class BusinessNote(models.Model):
     
     def __str__(self) -> str:
         return f"Note on {self.business.name}: {self.title}"
+
+
+# ======================================================================
+# Merchant Contract
+# ======================================================================
+class MerchantContract(models.Model):
+    """
+    Signed merchant contract PDF file for each business.
+    One contract per business (OneToOne relationship).
+    """
+    business = models.OneToOneField(
+        "tenants.Business",
+        on_delete=models.CASCADE,
+        related_name="merchant_contract",
+        help_text="The business this contract is for"
+    )
+    file = models.FileField(
+        upload_to="contracts/",
+        help_text="Signed contract PDF file"
+    )
+    uploaded_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="uploaded_contracts",
+        help_text="HQ staff member who uploaded this contract"
+    )
+    uploaded_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    notes = models.TextField(
+        blank=True,
+        help_text="Internal notes about this contract"
+    )
+    
+    class Meta:
+        ordering = ["-uploaded_at"]
+        indexes = [
+            models.Index(fields=["business"]),
+            models.Index(fields=["uploaded_at"]),
+        ]
+        verbose_name = "Merchant Contract"
+        verbose_name_plural = "Merchant Contracts"
+    
+    def __str__(self) -> str:
+        return f"Contract for {self.business.name} (uploaded {self.uploaded_at:%Y-%m-%d})"

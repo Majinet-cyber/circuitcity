@@ -38,9 +38,10 @@ def manager_user(db):
 @pytest.fixture
 def test_business(db):
     """Create a test business."""
+    from conftest import unique_slug
     return Business.objects.create(
         name="Test Business",
-        slug="test-business",
+        slug=unique_slug("Test Business"),
         status="ACTIVE"
     )
 

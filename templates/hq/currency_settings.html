@@ -1,0 +1,103 @@
+{% extends "hq/base_hq.html" %}
+{% load static %}
+
+{% block title %}Currency Settings · HQ{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+  <div class="row">
+    <div class="col-12">
+      <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1 class="h3 mb-0">Currency Settings</h1>
+        <a href="{% url 'hq:dashboard' %}" class="btn btn-outline-secondary">
+          ← Back to Dashboard
+        </a>
+      </div>
+
+      <div class="card">
+        <div class="card-body">
+          <h5 class="card-title">MWK → USD Exchange Rate</h5>
+          <p class="text-muted">
+            Set the global exchange rate used for currency conversion throughout the app.
+            This rate is used when users select USD as their display currency.
+          </p>
+
+          {% if messages %}
+            {% for message in messages %}
+              <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+                {{ message }}
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+              </div>
+            {% endfor %}
+          {% endif %}
+
+          <form method="post" class="mt-4">
+            {% csrf_token %}
+            
+            <div class="mb-3">
+              <label for="mwk_per_usd" class="form-label">
+                <strong>MWK per 1 USD</strong>
+              </label>
+              <input
+                type="number"
+                class="form-control"
+                id="mwk_per_usd"
+                name="mwk_per_usd"
+                step="0.01"
+                min="0.01"
+                value="{{ mwk_per_usd|default:'' }}"
+                required
+                placeholder="e.g., 1750.00"
+              />
+              <div class="form-text">
+                Enter the exchange rate: 1 USD = <span id="rate-display">{{ mwk_per_usd|default:"?" }}</span> MWK
+              </div>
+            </div>
+
+            {% if current_rate %}
+              <div class="alert alert-info">
+                <strong>Current Rate:</strong> 1 USD = {{ current_rate.mwk_per_usd }} MWK
+                {% if current_rate.updated_by %}
+                  <br><small>Last updated by {{ current_rate.updated_by.get_username }} on {{ current_rate.updated_at|date:"F d, Y H:i" }}</small>
+                {% endif %}
+              </div>
+            {% else %}
+              <div class="alert alert-warning">
+                No exchange rate is currently set. Please set one to enable USD currency conversion.
+              </div>
+            {% endif %}
+
+            <button type="submit" class="btn btn-primary">
+              Save Exchange Rate
+            </button>
+          </form>
+        </div>
+      </div>
+
+      <div class="card mt-4">
+        <div class="card-body">
+          <h5 class="card-title">How It Works</h5>
+          <ul class="mb-0">
+            <li>The exchange rate is stored as a singleton (only one rate exists at a time)</li>
+            <li>When users select USD as their display currency, all MWK amounts are converted using this rate</li>
+            <li>Changing this rate instantly affects the entire app for all users viewing USD</li>
+            <li>All monetary values in the database remain stored in MWK (base currency)</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  // Update rate display as user types
+  document.getElementById('mwk_per_usd')?.addEventListener('input', function(e) {
+    const value = e.target.value;
+    const display = document.getElementById('rate-display');
+    if (display) {
+      display.textContent = value || '?';
+    }
+  });
+</script>
+{% endblock %}
+

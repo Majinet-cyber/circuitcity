@@ -122,8 +122,21 @@
     const path = (location.pathname || '/').replace(/\/+$/, '/') || '/';
     $$(SEL.mobileDockTab).forEach(a => {
       const href = (a.getAttribute('href') || '').replace(/\/+$/, '/') || '';
-      if (!href) return;
-      if (path === href || (href !== '/' && path.startsWith(href))) {
+      if (!href || href === '#') return;
+      
+      // Check if there's a data-active-prefix attribute (vertical-aware matching)
+      const activePrefix = a.getAttribute('data-active-prefix');
+      let isActive = false;
+      
+      if (activePrefix && activePrefix.trim()) {
+        // Use active prefix if provided
+        isActive = path.startsWith(activePrefix);
+      } else {
+        // Fallback to href matching
+        isActive = path === href || (href !== '/' && path.startsWith(href));
+      }
+      
+      if (isActive) {
         a.classList.add('active');
         a.setAttribute('aria-current', 'page');
       } else {

@@ -158,4 +158,32 @@ def app_version(request) -> Dict[str, Any]:
     return {"APP_VERSION": getattr(settings, "APP_VERSION", "1.1.0")}
 
 
-__all__ = ["build_meta", "brand", "role_flags", "app_version"]
+def currency_config(request) -> Dict[str, Any]:
+    """
+    Expose currency configuration to all templates.
+    Provides user's display currency preference and exchange rate for JavaScript.
+    """
+    display_currency = "MWK"
+    mwk_per_usd = None
+    
+    try:
+        user = getattr(request, "user", None)
+        if user and hasattr(user, "is_authenticated") and user.is_authenticated:
+            if hasattr(user, "profile") and hasattr(user.profile, "display_currency"):
+                display_currency = user.profile.display_currency or "MWK"
+        
+        # Always get exchange rate (needed for JS conversion even if user prefers MWK)
+        from core.models import ExchangeRate
+        rate_value = ExchangeRate.get_rate_value()
+        if rate_value:
+            mwk_per_usd = float(rate_value)
+    except Exception:
+        pass  # Fail gracefully - never crash on 404 pages or missing context
+    
+    return {
+        "DISPLAY_CURRENCY": display_currency,
+        "MWK_PER_USD": mwk_per_usd,
+    }
+
+
+__all__ = ["build_meta", "brand", "role_flags", "app_version", "currency_config"]

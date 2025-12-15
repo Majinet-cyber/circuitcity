@@ -111,11 +111,37 @@ def inventory_dashboard(request: HttpRequest) -> HttpResponse:
     - Works across all business verticals
     - JSON if: ?format=json or Accept: application/json
     - Otherwise renders inventory/dashboard.html
+    
+    NOTE: For PHONES vertical, this now redirects to Analytics (replaces dashboard).
     """
     # Get business from request
     business = getattr(request, 'business', None) or getattr(request, 'active_business', None)
     if not business:
         return HttpResponse("No active business found", status=400)
+    
+    # For phones, redirect to analytics (replaces inventory dashboard)
+    from inventory.helpers import business_vertical, PHONES
+    vertical = business_vertical(request)
+    if vertical == PHONES:
+        from django.shortcuts import redirect
+        # Check if JSON is requested - if so, we still need to provide data
+        wants_json = (
+            (request.GET.get("format") or "").lower() == "json"
+            or request.headers.get("x-requested-with") == "XMLHttpRequest"
+            or "application/json" in (request.headers.get("Accept") or request.headers.get("accept") or "")
+        )
+        if not wants_json:
+            # Redirect to analytics for phones - safe redirect with fallback
+            try:
+                from django.urls import reverse
+                analytics_url = reverse("app_router:analytics")
+                return redirect(analytics_url)
+            except Exception:
+                # Fallback to safe URL if reverse fails
+                return redirect("/app/analytics/")
+        # For JSON requests, continue with analytics data (analytics view handles JSON)
+        from inventory.views_analytics import analytics_dashboard
+        return analytics_dashboard(request)
     
     # Parse date range
     range_key, start_date, end_date, range_label = _parse_date_range(request)

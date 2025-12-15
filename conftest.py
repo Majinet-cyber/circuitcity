@@ -2,6 +2,8 @@
 
 import os
 import pytest
+from uuid import uuid4
+from django.utils.text import slugify
 
 # Ensure Django settings are discoverable for pytest
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "cc.settings")
@@ -42,3 +44,15 @@ def _relaxed_test_settings(settings):
         pass
     # Speed up password hashing in tests
     settings.PASSWORD_HASHERS = ["django.contrib.auth.hashers.MD5PasswordHasher"]
+
+
+# --- Test helpers for creating unique test data ----------------------------
+def unique_slug(name="test-biz"):
+    """
+    Generate a unique slug for test Business objects.
+    
+    Usage:
+        Business.objects.create(name="Test Biz", slug=unique_slug("Test Biz"), ...)
+    """
+    base = slugify(name) or "test-biz"
+    return f"{base}-{uuid4().hex[:8]}"

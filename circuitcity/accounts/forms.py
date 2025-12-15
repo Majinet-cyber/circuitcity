@@ -170,10 +170,15 @@ class ProfileForm(forms.ModelForm):
     country = forms.ChoiceField(choices=COUNTRY_CHOICES, required=False)
     language = forms.ChoiceField(choices=LANG_CHOICES, required=False)
     timezone = forms.ChoiceField(choices=TZ_CHOICES, required=False)
+    display_currency = forms.ChoiceField(
+        choices=[("MWK", "MWK"), ("USD", "USD")],
+        required=False,
+        help_text="Currency to display amounts in"
+    )
 
     class Meta:
         model = Profile
-        fields = ["display_name", "country", "language", "timezone", "avatar"]
+        fields = ["display_name", "country", "language", "timezone", "display_currency", "avatar"]
         widgets = {
             "display_name": forms.TextInput(
                 attrs={"class": "form-control", "placeholder": "Display name"}
@@ -191,6 +196,7 @@ class ProfileForm(forms.ModelForm):
         # Bootstrap styles
         self.fields["country"].widget.attrs.update({"class": "form-select"})
         self.fields["language"].widget.attrs.update({"class": "form-select"})
+        self.fields["display_currency"].widget.attrs.update({"class": "form-select"})
         self.fields["timezone"].widget.attrs.update({"class": "form-select"})
         if "avatar" in self.fields:
             self.fields["avatar"].widget.attrs.update({"class": "form-control"})

@@ -141,6 +141,9 @@ urlpatterns = [
     # Insights app
     path("", include("insights.urls")),
 
+    # Business-aware router endpoints (prevent vertical leakage)
+    path("app/", include(("inventory.urls_router", "app_router"), namespace="app_router")),
+
     # ---- Hard aliases so these NEVER 404 even if the app's urls module differs ----
     re_path(r"^inventory/api/predictions/?$",        prediction_view),
     re_path(r"^inventory/api/predictions/v2/?$",     inv_views.api_predictions),

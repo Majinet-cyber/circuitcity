@@ -53,6 +53,11 @@ class ActiveContextMiddleware:
         self.get_response = get_response
 
     def __call__(self, request):
+        # CRITICAL: Bypass HQ paths at the very top to prevent redirect loops
+        path = (request.path_info or request.path or "/")
+        if path.startswith("/hq/"):
+            return self.get_response(request)
+        
         try:
             self._prime_context(request)
             resp = self._maybe_redirect_with_qs(request)
@@ -147,6 +152,11 @@ class ActiveContextMiddleware:
         if ?biz/loc are missing but we know them, redirect to add them.
         """
         path = (request.path or "").rstrip("/")
+        
+        # CRITICAL: Never redirect HQ paths to prevent loops
+        if path.startswith("/hq/"):
+            return None
+        
         if not (path.startswith("/inventory") or path == "/dashboard"):
             return None
         # Donâ€™t redirect API calls or POSTs
@@ -164,6 +174,13 @@ class ActiveContextMiddleware:
         qs = request.GET.copy()
         for k, v in need.items():
             qs[k] = v
-        return redirect(f"{request.path}?{qs.urlencode()}")
+        
+        # Anti-loop guard: Never redirect if target equals current path
+        target = f"{request.path}?{qs.urlencode()}"
+        current_path = (request.path_info or request.path or "/")
+        if target.rstrip("/").rstrip("?") == current_path.rstrip("/"):
+            return None
+        
+        return redirect(target)
 
 

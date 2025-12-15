@@ -26,6 +26,14 @@
   {# Provide CSRF to JS in a reliable way #}
   <meta name="csrf-token" content="{{ csrf_token }}">
   {# If you ever customize the cookie name in settings, this still works thanks to the shim checking both names below #}
+  
+  {# Currency configuration for JavaScript #}
+  <script>
+    window.CC_CURRENCY = {
+      code: "{{ DISPLAY_CURRENCY|default:'MWK' }}",
+      mwk_per_usd: {{ MWK_PER_USD|default:'null' }}
+    };
+  </script>
 
   {% with ASSET_V=BUILD_ID|default:STATIC_VERSION|default:"1" %}
 
@@ -54,6 +62,7 @@
   <link rel="stylesheet" href="{% static 'css/app.css' %}?v={{ ASSET_V }}">
   <link rel="stylesheet" href="{% static 'css/inventory-glass.css' %}?v={{ ASSET_V }}">
   <link rel="stylesheet" href="{% static 'css/polish.css' %}?v={{ ASSET_V }}">
+  <link rel="stylesheet" href="{% static 'css/ui-polish.css' %}?v={{ ASSET_V }}">
   <link rel="stylesheet" href="{% static 'css/mobile.css' %}?v={{ ASSET_V }}">
   <link rel="stylesheet" href="{% static 'css/mobile-fixes.css' %}?v={{ ASSET_V }}">
   <link rel="stylesheet" href="{% static 'css/mobile-tables-responsive.css' %}?v={{ ASSET_V }}">
@@ -445,7 +454,7 @@
               {% endif %}
             </h1>
 
-            {% if show_search or "inventory/dashboard" in path %}
+            {% if show_search|default:False or "inventory/dashboard" in path %}
               <div class="cc-search d-flex align-items-center gap-2">
                 <i class="bi bi-search text-muted"></i>
                 <input id="global-search" class="form-control input" type="search" placeholder="Search SKUs, agents, invoices…" autocomplete="off" />
@@ -461,7 +470,9 @@
                   <div class="tenant-pill hover-lift tap" role="button" id="tenantBtn" aria-haspopup="true" aria-expanded="false">
                     <span class="tenant-dot" aria-hidden="true"></span>
                     <span class="tenant-name">{{ request.business.name }}</span>
-                    {% if request.membership %}
+                    {% if membership %}
+                      <span class="tenant-role">· {{ membership.role|title }}</span>
+                    {% elif request.membership %}
                       <span class="tenant-role">· {{ request.membership.role|title }}</span>
                     {% elif IS_MANAGER %}
                       <span class="tenant-role">· Manager</span>
@@ -476,7 +487,7 @@
                     {% if request.user.is_superuser %}
                       <a class="tenant-item" href="{{ url_choose_business|default:'/tenants/choose/' }}"><i class="bi bi-arrow-left-right"></i> Switch business</a>
                     {% endif %}
-                    {% if request.membership and request.membership.role == "MANAGER" or IS_MANAGER or request.user.is_authenticated and request.user.profile.is_manager %}
+                    {% if membership and membership.role == "MANAGER" or request.membership and request.membership.role == "MANAGER" or IS_MANAGER or request.user.is_authenticated and request.user.profile.is_manager %}
                       <a class="tenant-item" href="{{ url_manager_agents|default:'/tenants/manager/agents/' }}"><i class="bi bi-people"></i> {% if BUSINESS_VERTICAL == "gym" %}Trainers{% else %}Agents{% endif %}</a>
                     {% endif %}
                     {% if request.user.is_staff %}
@@ -693,30 +704,40 @@
       {% block main %}{% endblock %}
     </main>
 
-    <!-- Mobile bottom dock -->
+    <!-- Mobile bottom dock - Vertical-aware navigation -->
     <nav class="mobile-tabbar d-flex d-md-none cc-bottom-nav">
-      <a class="tab {% if active_tab|default:'' == 'home' %}active{% endif %}" href="{{ url_home|default:'/inventory/dashboard/' }}">
-        <i class="bi bi-speedometer2 d-block"></i>Home
-      </a>
-      <a class="tab {% if active_tab|default:'' == 'scan_in' %}active{% endif %}" href="{{ url_scan_in|default:'/inventory/scan-in/' }}">
-        <i class="bi bi-upc-scan d-block"></i>Scan
-      </a>
-      <a class="tab {% if active_tab|default:'' == 'sell' %}active{% endif %}" href="{{ url_sell|default:'/inventory/phone-sale-wizard/' }}">
-        <i class="bi bi-cart-check d-block"></i>Sell
-      </a>
-      <a class="tab {% if active_tab|default:'' == 'stock' %}active{% endif %}" href="{{ url_stock|default:'/inventory/list/' }}">
-        <i class="bi bi-box-seam d-block"></i>Stock
-      </a>
-      <a class="tab {% if active_tab|default:'' == 'wallet' %}active{% endif %}" href="{{ url_wallet|default:'/wallet/' }}">
-        <i class="bi bi-wallet2 d-block"></i>Wallet
-      </a>
-      {% if request.user.is_authenticated %}
-        {% if IS_MANAGER or request.user.is_staff or request.user.profile.is_manager %}
-          <a class="tab {% if active_tab|default:'' == 'sim' %}active{% endif %}" href="{{ url_simulator|default:'/simulator/' }}">
-            <i class="bi bi-graph-up d-block"></i>Sim
+      {% for item in MOBILE_NAV_ITEMS|default:'' %}
+        {% if item.is_menu %}
+          <a class="tab" href="#" onclick="if(window.CC_SIDEBAR){window.CC_SIDEBAR.toggle();} return false;" data-cy="mobile-nav-menu">
+            <i class="bi {{ item.icon_class }} d-block"></i>{{ item.label }}
+          </a>
+        {% else %}
+          {# Active state handled by mobile.js based on href matching #}
+          <a class="tab {% if active_tab|default:'' == item.key %}active{% endif %}" 
+             href="{{ item.url }}" 
+             data-cy="mobile-nav-{{ item.key }}"
+             data-active-prefix="{{ item.active_prefix|default:'' }}">
+            <i class="bi {{ item.icon_class }} d-block"></i>{{ item.label }}
           </a>
         {% endif %}
-      {% endif %}
+      {% empty %}
+        {# Fallback to phones nav if MOBILE_NAV_ITEMS not available #}
+        <a class="tab {% if active_tab|default:'' == 'home' %}active{% endif %}" href="{{ url_home|default:'/inventory/dashboard/' }}">
+          <i class="bi bi-speedometer2 d-block"></i>Home
+        </a>
+        <a class="tab {% if active_tab|default:'' == 'scan_in' %}active{% endif %}" href="{{ url_scan_in|default:'/inventory/scan-in/' }}">
+          <i class="bi bi-upc-scan d-block"></i>Scan
+        </a>
+        <a class="tab {% if active_tab|default:'' == 'sell' %}active{% endif %}" href="{{ url_sell|default:'/inventory/phone-sale-wizard/' }}">
+          <i class="bi bi-cart-check d-block"></i>Sell
+        </a>
+        <a class="tab {% if active_tab|default:'' == 'stock' %}active{% endif %}" href="{{ url_stock|default:'/inventory/list/' }}">
+          <i class="bi bi-box-seam d-block"></i>Stock
+        </a>
+        <a class="tab" href="#" onclick="if(window.CC_SIDEBAR){window.CC_SIDEBAR.toggle();} return false;">
+          <i class="bi bi-list d-block"></i>Menu
+        </a>
+      {% endfor %}
     </nav>
   </div>
 </div>
@@ -1322,7 +1343,7 @@
   if (window.location.pathname.startsWith('/admin/')) return;
 
   window.addEventListener('load', function() {
-    navigator.serviceWorker.register('{% static "sw.js" %}', { scope: '/' })
+    navigator.serviceWorker.register('/sw.js', { scope: '/' })
       .then(function(registration) {
         console.log('ServiceWorker registered: ', registration.scope);
         

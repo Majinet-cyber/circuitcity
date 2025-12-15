@@ -1,0 +1,228 @@
+{% extends "base.html" %}
+{% load static %}
+{% load money %}
+
+{% block title %}HQ Analytics{% endblock %}
+
+{% block main %}
+<div class="cc-page">
+  <div class="cc-header">
+    <div class="topbar">
+      <h1>HQ Analytics</h1>
+    </div>
+  </div>
+
+  <main>
+    <!-- Filters Bar -->
+    <div class="card mb-4">
+      <div class="card-body">
+        <form method="get" class="analytics-filters">
+          <!-- Date Range Presets -->
+          <div class="filter-group">
+            <label class="filter-label">Date Range</label>
+            <div class="filter-pills">
+              <button type="submit" name="preset" value="today" class="filter-pill {% if preset == 'today' %}active{% endif %}">
+                Today
+              </button>
+              <button type="submit" name="preset" value="yesterday" class="filter-pill {% if preset == 'yesterday' %}active{% endif %}">
+                Yesterday
+              </button>
+              <button type="submit" name="preset" value="this_month" class="filter-pill {% if preset == 'this_month' %}active{% endif %}">
+                This Month
+              </button>
+              <button type="submit" name="preset" value="last_month" class="filter-pill {% if preset == 'last_month' %}active{% endif %}">
+                Last Month
+              </button>
+              <button type="submit" name="preset" value="custom" class="filter-pill {% if preset == 'custom' %}active{% endif %}">
+                Custom
+              </button>
+            </div>
+            {% if preset == 'custom' or not preset %}
+            <div style="display: flex; gap: 8px; margin-top: 8px;">
+              <input type="date" name="start" value="{{ start_date|date:'Y-m-d' }}" class="filter-date-input" style="flex: 1;">
+              <span style="align-self: center; color: #64748b;">to</span>
+              <input type="date" name="end" value="{{ end_date|date:'Y-m-d' }}" class="filter-date-input" style="flex: 1;">
+              <button type="submit" class="filter-pill" style="padding: 6px 12px;">Apply</button>
+            </div>
+            {% endif %}
+          </div>
+          
+          <!-- Business Filter -->
+          <div class="filter-group">
+            <label class="filter-label">Business</label>
+            <select name="business_id" class="filter-select" onchange="this.form.submit()">
+              <option value="">All businesses</option>
+              {% for biz in all_businesses %}
+              <option value="{{ biz.id }}" {% if selected_business_id == biz.id %}selected{% endif %}>{{ biz.name }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          
+          <!-- Vertical Filter -->
+          <div class="filter-group">
+            <label class="filter-label">Vertical</label>
+            <select name="vertical" class="filter-select" onchange="this.form.submit()">
+              <option value="">All verticals</option>
+              {% for code, name in vertical_options %}
+              <option value="{{ code }}" {% if selected_vertical == code %}selected{% endif %}>{{ name }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          
+          <!-- Location Filter (only if business selected) -->
+          {% if all_locations %}
+          <div class="filter-group">
+            <label class="filter-label">Location</label>
+            <select name="location_id" class="filter-select" onchange="this.form.submit()">
+              <option value="">All locations</option>
+              {% for loc in all_locations %}
+              <option value="{{ loc.id }}" {% if selected_location_id == loc.id %}selected{% endif %}>{{ loc.name }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          {% endif %}
+        </form>
+      </div>
+    </div>
+
+    <!-- KPI Cards -->
+    <div class="kpi-grid mb-4">
+      {% if analytics_data.kpis %}
+      <div class="kpi-card">
+        <div class="kpi-label">Total Revenue</div>
+        <div class="kpi-value money">{{ analytics_data.kpis.total_revenue|default:0|format_mwk }}</div>
+      </div>
+      
+      <div class="kpi-card">
+        <div class="kpi-label">Total Sales</div>
+        <div class="kpi-value">{{ analytics_data.kpis.total_sales|default:0 }}</div>
+      </div>
+      
+      <div class="kpi-card">
+        <div class="kpi-label">Total Profit</div>
+        <div class="kpi-value money">{{ analytics_data.kpis.total_profit|default:0|format_mwk }}</div>
+      </div>
+      
+      <div class="kpi-card">
+        <div class="kpi-label">Active Businesses</div>
+        <div class="kpi-value">{{ analytics_data.kpis.active_businesses|default:0 }}</div>
+      </div>
+      {% endif %}
+    </div>
+
+    <!-- Charts and Tables -->
+    <div class="row">
+      <div class="col-md-12">
+        <div class="card">
+          <div class="card-body">
+            <h3>Analytics Data</h3>
+            <p class="text-muted">Date range: {{ start_date|date:"M d, Y" }} to {{ end_date|date:"M d, Y" }}</p>
+            {% if selected_business_id %}
+            <p class="text-muted">Business: {{ all_businesses|first }}</p>
+            {% endif %}
+            {% if selected_vertical %}
+            <p class="text-muted">Vertical: {{ selected_vertical|title }}</p>
+            {% endif %}
+            
+            <!-- Add charts and tables here based on analytics_data -->
+            <pre style="background: #f5f5f5; padding: 15px; border-radius: 4px; overflow-x: auto;">{{ analytics_data|pprint }}</pre>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+{% endblock %}
+
+<style>
+  .analytics-filters {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 16px;
+    align-items: flex-end;
+  }
+  
+  .filter-group {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  
+  .filter-label {
+    font-size: 12px;
+    font-weight: 600;
+    color: #64748b;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+  
+  .filter-pills {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+  
+  .filter-pill {
+    padding: 6px 14px;
+    border: 1px solid #e2e8f0;
+    background: #ffffff;
+    border-radius: 20px;
+    font-size: 13px;
+    font-weight: 500;
+    color: #475569;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  
+  .filter-pill:hover {
+    background: #f1f5f9;
+    border-color: #cbd5e1;
+  }
+  
+  .filter-pill.active {
+    background: #2563eb;
+    border-color: #2563eb;
+    color: #ffffff;
+  }
+  
+  .filter-select, .filter-date-input {
+    padding: 6px 12px;
+    border: 1px solid #e2e8f0;
+    border-radius: 6px;
+    font-size: 13px;
+    background: #ffffff;
+    min-width: 150px;
+  }
+  
+  .kpi-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 16px;
+  }
+  
+  .kpi-card {
+    background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+    padding: 20px;
+    text-align: center;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+  }
+  
+  .kpi-label {
+    font-size: 12px;
+    font-weight: 600;
+    color: #64748b;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 8px;
+  }
+  
+  .kpi-value {
+    font-size: 24px;
+    font-weight: 700;
+    color: #0f172a;
+  }
+</style>
+{% endblock %}
+

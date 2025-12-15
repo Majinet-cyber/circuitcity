@@ -129,28 +129,49 @@ def tenant_context(request) -> Dict[str, Any]:
       3) derived from active business
       4) session fallback
       5) 'generic'
+    
+    This function is defensive and never raises exceptions, even on 404/500 pages.
     """
-    biz = _resolve_business(request)
-    bid = getattr(request, "business_id", None) or (getattr(biz, "pk", None) if biz else None)
+    try:
+        biz = _resolve_business(request)
+    except Exception:
+        biz = None
+    
+    try:
+        bid = getattr(request, "business_id", None) or (getattr(biz, "pk", None) if biz else None)
+    except Exception:
+        bid = None
     
     # MULTI-TENANCY HARDENING: Expose user business status to templates
     user_has_business = False
-    if hasattr(request, 'user') and request.user.is_authenticated:
-        from .utils import user_has_any_business
-        user_has_business = user_has_any_business(request.user)
+    try:
+        if hasattr(request, 'user') and getattr(request.user, 'is_authenticated', False):
+            from .utils import user_has_any_business
+            user_has_business = user_has_any_business(request.user)
+    except Exception:
+        pass
 
     # 1) middleware (single source of truth if present)
-    mode = getattr(request, "product_mode", None)
+    try:
+        mode = getattr(request, "product_mode", None)
+    except Exception:
+        mode = None
 
     # 2) explicit override (useful in dev)
     if not mode:
-        override = request.GET.get("mode")
-        if override:
-            mode = _normalize_vertical(override)
+        try:
+            override = request.GET.get("mode")
+            if override:
+                mode = _normalize_vertical(override)
+        except Exception:
+            pass
 
     # 3) derive from business
     if not mode or mode == "generic":
-        mode = _derive_mode_from_business(biz)
+        try:
+            mode = _derive_mode_from_business(biz)
+        except Exception:
+            mode = "generic"
 
     # 4) session fallback
     if mode == "generic":
@@ -182,10 +203,21 @@ def tenant_context(request) -> Dict[str, Any]:
     except Exception:
         pass  # Fail gracefully if utils_verticals is not available
 
+    # Get vertical-aware mobile nav items
+    mobile_nav_items = []
+    try:
+        from inventory.mobile_nav import get_mobile_nav_items
+        mobile_nav_items = get_mobile_nav_items(request)
+    except Exception:
+        pass  # Fail gracefully if mobile_nav is not available
+
     # Resolve currency from business or default to MWK
     currency = "MWK"
-    if biz and hasattr(biz, "currency") and getattr(biz, "currency", None):
-        currency = biz.currency
+    try:
+        if biz and hasattr(biz, "currency") and getattr(biz, "currency", None):
+            currency = biz.currency
+    except Exception:
+        pass
 
     # Expose both new and legacy keys so no template breaks
     return {
@@ -195,6 +227,7 @@ def tenant_context(request) -> Dict[str, Any]:
         "PRODUCT_MODE": mode,
         "BUSINESS_VERTICAL": mode,  # Alias for sidebar compatibility
         "sidebar_items": sidebar_items,  # Vertical-aware navigation config
+        "MOBILE_NAV_ITEMS": mobile_nav_items,  # Vertical-aware mobile bottom nav config
         "currency": currency,  # Currency for templates
         "user_has_business": user_has_business,  # MULTI-TENANCY HARDENING
 

@@ -31,6 +31,14 @@ class Profile(models.Model):
     country      = models.CharField(max_length=80,  blank=True, default="")
     language     = models.CharField(max_length=80,  blank=True, default="English - United States")
     timezone     = models.CharField(max_length=80,  blank=True, default=settings.TIME_ZONE)
+    
+    # Currency display preference
+    display_currency = models.CharField(
+        max_length=3,
+        choices=[("MWK", "MWK"), ("USD", "USD")],
+        default="MWK",
+        help_text="Currency to display amounts in (MWK is base currency, USD is converted)"
+    )
 
     # ---- Role flag (no need to replace AUTH_USER_MODEL) ----
     # Mark â€œmanagerâ€ users who can access CFO/approvals/etc.

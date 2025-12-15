@@ -927,6 +927,37 @@ def settings_profile(request):
 
 
 @login_required
+@require_http_methods(["POST"])
+def settings_currency(request):
+    """
+    Quick currency switcher endpoint.
+    Accepts POST with 'currency' parameter ('MWK' or 'USD').
+    Returns JSON response or redirects back.
+    """
+    from django.http import JsonResponse
+    
+    currency = request.POST.get("currency", "").upper().strip()
+    if currency not in ["MWK", "USD"]:
+        if request.headers.get("Accept", "").startswith("application/json"):
+            return JsonResponse({"error": "Invalid currency"}, status=400)
+        messages.error(request, "Invalid currency selection.")
+        return redirect(request.META.get("HTTP_REFERER", "/"))
+    
+    profile = getattr(request.user, "profile", None)
+    if profile is None:
+        profile, _ = Profile.objects.get_or_create(user=request.user)
+    
+    profile.display_currency = currency
+    profile.save(update_fields=["display_currency"])
+    
+    if request.headers.get("Accept", "").startswith("application/json"):
+        return JsonResponse({"success": True, "currency": currency})
+    
+    messages.success(request, f"Display currency set to {currency}.")
+    return redirect(request.META.get("HTTP_REFERER", "/"))
+
+
+@login_required
 @require_http_methods(["GET", "POST"])
 def settings_security(request):
     if request.method == "POST":

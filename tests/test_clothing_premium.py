@@ -20,6 +20,7 @@ from tenants.models import Business, Membership
 from inventory.models import MerchProduct, Location
 from inventory.models_verticals import ClothingSale, ClothingProductLog, ClothingProductAction, PaymentMethod
 from inventory.business_kinds import BusinessKind
+from conftest import unique_slug
 
 User = get_user_model()
 
@@ -38,6 +39,7 @@ class TestClothingDashboardKPIs(TestCase):
         
         self.business = Business.objects.create(
             name='Fashion Store',
+            slug=unique_slug('Fashion Store'),
             business_kind=BusinessKind.CLOTHING
         )
         
@@ -314,6 +316,7 @@ class TestClothingHub(TestCase):
         
         self.business = Business.objects.create(
             name='Fashion Store',
+            slug=unique_slug('Fashion Store'),
             business_kind=BusinessKind.CLOTHING
         )
         
@@ -447,6 +450,7 @@ class TestClothingScanIn(TestCase):
         
         self.business = Business.objects.create(
             name='Fashion Store',
+            slug=unique_slug('Fashion Store'),
             business_kind=BusinessKind.CLOTHING
         )
         
@@ -547,6 +551,7 @@ class TestClothingSell(TestCase):
         
         self.business = Business.objects.create(
             name='Fashion Store',
+            slug=unique_slug('Fashion Store'),
             business_kind=BusinessKind.CLOTHING
         )
         
@@ -677,6 +682,7 @@ class TestClothingDashboardDateFilters(TestCase):
         
         self.business = Business.objects.create(
             name='Fashion Store',
+            slug=unique_slug('Fashion Store'),
             business_kind=BusinessKind.CLOTHING
         )
         
@@ -996,6 +1002,7 @@ class TestClothingDashboardDateFilters(TestCase):
         # Create another business
         other_business = Business.objects.create(
             name='Other Fashion Store',
+            slug=unique_slug('Other Fashion Store'),
             business_kind=BusinessKind.CLOTHING
         )
         

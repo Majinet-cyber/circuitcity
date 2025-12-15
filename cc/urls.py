@@ -322,6 +322,7 @@ if admin_path != "admin/":
 
 # Basics / health / robots / favicon / temporary
 from core import views_debug
+from core import views_well_known
 
 urlpatterns += [
     path("healthz", core_views.healthz, name="healthz_noslash"),
@@ -330,6 +331,10 @@ urlpatterns += [
     path("favicon.ico", RedirectView.as_view(url=f"{settings.STATIC_URL}favicon.ico", permanent=False)),
     path("temporary/", core_views.temporary_ok, name="temporary_ok"),
     path("api/version/", views_debug.app_version_view, name="api_version"),
+    # PWA: Service worker served from root for proper scope control
+    path("sw.js", core_views.sw_js, name="sw_js"),
+    # Chrome DevTools well-known endpoint (must be before other patterns to avoid 404s)
+    path(".well-known/appspecific/com.chrome.devtools.json", views_well_known.chrome_devtools_appspecific, name="chrome_devtools_appspecific"),
 ]
 
 # Legacy static -> brand icons
@@ -573,6 +578,9 @@ urlpatterns += [
     path("liquor/", include_or_raise("inventory.urls_liquor", "liquor")),
     path("pharmacy/", include_or_raise("inventory.urls_pharmacy", "pharmacy")),
 
+    # App router for cross-vertical features (analytics, etc.)
+    path("app/", include(("core.urls_app_router", "app_router"), namespace="app_router")),
+
     path("tenants/",   include_or_raise("tenants.urls", "tenants")),
     path("dashboard/", include_or_raise("dashboard.urls", "dashboard")),
     # Layby app include
@@ -701,9 +709,6 @@ else:
     ]
 
 
-def _hq_businesses_shim(request):
-    target = _first_working_reverse(("hq:businesses", "hq:subscriptions", "hq_subscriptions"))
-    return redirect(target or "/hq/subscriptions/")
 
 
 def _hq_invoices_shim(_request):
@@ -721,28 +726,11 @@ def _hq_home_fallback(_request):
     return redirect(target or "/hq/subscriptions/")
 
 
-if _try_import("hq.urls") or _try_import("circuitcity.hq.urls"):
-    urlpatterns += [path("hq/", include_or_raise("hq.urls", "hq"))]
-else:
-    urlpatterns += [
-        path(
-            "hq/",
-            include((
-                [
-                    path("subscriptions/", billing_admin_views.hq_subscriptions, name="subscriptions"),
-                    path("businesses/", _hq_businesses_shim, name="businesses"),
-                    path("invoices/", _hq_invoices_shim, name="invoices"),
-                    path("agents/", _hq_agents_shim, name="agents"),
-                    path("", _hq_home_fallback, name="hq_home"),
-                    path("home/", _hq_home_fallback, name="hq_home_alt"),
-                ],
-                "hq",
-            ), namespace="hq"),
-        ),
-    ]
-
+# Include HQ URLs with proper namespace (must be before any /hq/ patterns that could shadow it)
+# NOTE: hq.urls is the ONLY source of /hq/... routes. No shim fallbacks.
+# Since hq/urls.py has app_name = "hq", using include("hq.urls") automatically namespaces it
 urlpatterns += [
-    path("hq/subscriptions/", billing_admin_views.hq_subscriptions, name="hq_subscriptions"),
+    path("hq/", include(("hq.urls", "hq"), namespace="hq")),
 ]
 
 # Global Search + Saved Views
@@ -886,6 +874,15 @@ else:
     urlpatterns.append(
         path("reports/", include("reports.urls"))
     )
+
+# ======================================================================================
+# Non-namespaced URL aliases (must be after all other patterns)
+# ======================================================================================
+# NOTE: Removed non-namespaced aliases that were shadowing hq.urls routes.
+# Templates should use {% url 'hq:business_directory' %} and {% url 'hq:business_detail' pk=... %}
+# If non-namespaced URLs are needed, they should redirect to namespaced versions,
+# not call views directly (which bypasses namespace and breaks current_app).
+
 
 # ======================================================================================
 # Error handlers

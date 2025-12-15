@@ -812,3 +812,16 @@ class MembershipLocationHistory(models.Model):
         from_name = self.from_location.name if self.from_location else "New"
         to_name = self.to_location.name if self.to_location else "Unknown"
         return f"{self.membership.user} transferred from {from_name} to {to_name} on {self.changed_at:%Y-%m-%d}"
+
+
+# ===============================
+# Backwards compatibility: Re-export Location from inventory.models
+# ===============================
+# Many modules import Location from tenants.models for convenience.
+# We re-export it here to maintain backwards compatibility.
+try:
+    from inventory.models import Location  # noqa: F401
+except ImportError:
+    # If inventory app isn't available, Location won't be exported
+    # This is fine - modules that need it should import from inventory.models directly
+    pass

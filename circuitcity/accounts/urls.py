@@ -90,6 +90,7 @@ urlpatterns = [
     path("settings/", views.settings_unified, name="settings_unified"),
     path("settings/home/", views.settings_home, name="settings_home"),
     path("settings/profile/", views.settings_profile, name="settings_profile"),
+    path("settings/currency/", views.settings_currency, name="settings_currency"),
     path("settings/security/", views.settings_security, name="settings_security"),
     path("settings/sessions/", views.settings_sessions, name="settings_sessions"),
     path(

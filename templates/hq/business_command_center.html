@@ -191,35 +191,36 @@
 
 <div class="container">
     <!-- Tabs -->
+    {% with active_tab|default:"overview" as current_tab %}
     <div class="tabs-nav">
-        <a href="?tab=overview" class="tab-item {% if active_tab == 'overview' %}active{% endif %}">
+        <a href="?tab=overview" class="tab-item {% if current_tab == 'overview' %}active{% endif %}">
             📊 Overview
         </a>
-        <a href="?tab=subscription" class="tab-item {% if active_tab == 'subscription' %}active{% endif %}">
+        <a href="?tab=subscription" class="tab-item {% if current_tab == 'subscription' %}active{% endif %}">
             💳 Subscription
         </a>
-        <a href="?tab=users" class="tab-item {% if active_tab == 'users' %}active{% endif %}">
+        <a href="?tab=users" class="tab-item {% if current_tab == 'users' %}active{% endif %}">
             👥 Users
         </a>
-        <a href="?tab=data" class="tab-item {% if active_tab == 'data' %}active{% endif %}">
+        <a href="?tab=data" class="tab-item {% if current_tab == 'data' %}active{% endif %}">
             📦 Data & Inventory
         </a>
-        <a href="?tab=sales" class="tab-item {% if active_tab == 'sales' %}active{% endif %}">
+        <a href="?tab=sales" class="tab-item {% if current_tab == 'sales' %}active{% endif %}">
             💰 Sales & Wallet
         </a>
-        <a href="?tab=health" class="tab-item {% if active_tab == 'health' %}active{% endif %}">
+        <a href="?tab=health" class="tab-item {% if current_tab == 'health' %}active{% endif %}">
             ❤️ Health
         </a>
-        <a href="?tab=tickets" class="tab-item {% if active_tab == 'tickets' %}active{% endif %}">
+        <a href="?tab=tickets" class="tab-item {% if current_tab == 'tickets' %}active{% endif %}">
             🎫 Tickets
         </a>
-        <a href="?tab=audit" class="tab-item {% if active_tab == 'audit' %}active{% endif %}">
+        <a href="?tab=audit" class="tab-item {% if current_tab == 'audit' %}active{% endif %}">
             📝 Audit Log
         </a>
     </div>
 
     <!-- Tab Content -->
-    {% if active_tab == 'overview' %}
+    {% if current_tab == 'overview' %}
         <!-- Overview Tab -->
         <div class="quick-actions">
             <a href="{% url 'hq:business_command_center' business.id %}?tab=subscription" class="btn btn-primary">
@@ -291,7 +292,7 @@
             </div>
         </div>
 
-    {% elif active_tab == 'subscription' %}
+    {% elif current_tab == 'subscription' %}
         <!-- Subscription Tab -->
         <div class="content-card">
             <div class="section-title">💳 Subscription Details</div>
@@ -387,7 +388,7 @@
         </div>
         {% endif %}
 
-    {% elif active_tab == 'users' %}
+    {% elif current_tab == 'users' %}
         <!-- Users Tab -->
         <div class="content-card">
             <div class="section-title">👥 Team Members</div>
@@ -435,7 +436,7 @@
             {% endif %}
         </div>
 
-    {% elif active_tab == 'data' %}
+    {% elif current_tab == 'data' %}
         <!-- Data & Inventory Tab -->
         <div class="content-card">
             <div class="section-title">📦 Recent Stock Items</div>
@@ -473,7 +474,7 @@
             {% endif %}
         </div>
 
-    {% elif active_tab == 'sales' %}
+    {% elif current_tab == 'sales' %}
         <!-- Sales & Wallet Tab -->
         <div class="kpi-grid">
             <div class="kpi-card">
@@ -584,7 +585,7 @@
             {% endif %}
         </div>
 
-    {% elif active_tab == 'health' %}
+    {% elif current_tab == 'health' %}
         <!-- Health Tab -->
         <div class="content-card">
             <div class="section-title">❤️ System Health</div>
@@ -606,7 +607,7 @@
             </div>
         </div>
 
-    {% elif active_tab == 'tickets' %}
+    {% elif current_tab == 'tickets' %}
         <!-- Tickets Tab -->
         <div class="content-card">
             <div class="section-title">🎫 Support Tickets</div>
@@ -644,7 +645,7 @@
             {% endif %}
         </div>
 
-    {% elif active_tab == 'audit' %}
+    {% elif current_tab == 'audit' %}
         <!-- Audit Log Tab -->
         <div class="content-card">
             <div class="section-title">📝 Audit Trail</div>
@@ -679,6 +680,7 @@
             {% endif %}
         </div>
     {% endif %}
+    {% endwith %}
 
 </div>
 {% endblock %}

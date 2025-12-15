@@ -1,4 +1,5 @@
 {% load humanize %}
+{% load money %}
 
 <!-- Revenue / Costs / Profit Summary Cards -->
 <section class="kpi-row" style="margin-bottom: 1rem;">
@@ -7,7 +8,7 @@
             <i class="bi bi-graph-up-arrow"></i> Revenue ({{ period|default:"This month"|title }})
         </div>
         <div class="value" style="color: #10b981;">
-            MK {{ total_revenue|default:0|floatformat:0|intcomma }}
+            {% money total_revenue|default:0 %}
         </div>
         <small style="color: var(--cc-muted); font-size: 0.75rem; font-weight: 600;">
             {{ total_units|default:0|intcomma }} unit{{ total_units|pluralize }} sold
@@ -19,7 +20,7 @@
             <i class="bi bi-cash-stack"></i> Costs ({{ period|default:"This month"|title }})
         </div>
         <div class="value" style="color: #f59e0b;">
-            MK {{ costs_total|default:0|floatformat:0|intcomma }}
+            {% money costs_total|default:0 %}
         </div>
         <small style="color: var(--cc-muted); font-size: 0.75rem; font-weight: 600;">
             COGS + Admin costs
@@ -31,7 +32,7 @@
             <i class="bi bi-piggy-bank"></i> Profit ({{ period|default:"This month"|title }})
         </div>
         <div class="value" style="color: #3b82f6;">
-            MK {{ profit_total|default:0|floatformat:0|intcomma }}
+            {% money profit_total|default:0 %}
         </div>
         <small style="color: var(--cc-muted); font-size: 0.75rem; font-weight: 600;">
             {% if total_revenue > 0 %}
@@ -85,7 +86,7 @@
                             {{ rev_cost_mix.revenue.pct }}%
                         </div>
                         <div style="font-size: 0.65rem; color: var(--cc-muted); font-weight: 600;">
-                            MK {{ rev_cost_mix.revenue.amount|floatformat:0|intcomma }}
+                            {% money rev_cost_mix.revenue.amount %}
                         </div>
                     </div>
                 </div>
@@ -98,7 +99,7 @@
                             {{ rev_cost_mix.costs.pct }}%
                         </div>
                         <div style="font-size: 0.65rem; color: var(--cc-muted); font-weight: 600;">
-                            MK {{ rev_cost_mix.costs.amount|floatformat:0|intcomma }}
+                            {% money rev_cost_mix.costs.amount %}
                         </div>
                     </div>
                 </div>
@@ -159,7 +160,7 @@
                             {{ profit_cost_mix.profit.pct }}%
                         </div>
                         <div style="font-size: 0.65rem; color: var(--cc-muted); font-weight: 600;">
-                            MK {{ profit_cost_mix.profit.amount|floatformat:0|intcomma }}
+                            {% money profit_cost_mix.profit.amount %}
                         </div>
                     </div>
                 </div>
@@ -172,7 +173,7 @@
                             {{ profit_cost_mix.costs.pct }}%
                         </div>
                         <div style="font-size: 0.65rem; color: var(--cc-muted); font-weight: 600;">
-                            MK {{ profit_cost_mix.costs.amount|floatformat:0|intcomma }}
+                            {% money profit_cost_mix.costs.amount %}
                         </div>
                     </div>
                 </div>

@@ -99,6 +99,10 @@ class SubscriptionGateMiddleware:
     def __call__(self, request: HttpRequest) -> HttpResponse:
         path = request.path or "/"
 
+        # CRITICAL: Bypass HQ paths entirely to prevent redirect loops
+        if path.startswith("/hq/"):
+            return self.get_response(request)
+
         # Always let safe URLs through
         if _is_safe(path, SAFE_PREFIXES):
             return self.get_response(request)

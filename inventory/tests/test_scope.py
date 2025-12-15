@@ -4,12 +4,14 @@ from __future__ import annotations
 import random
 import string
 from typing import Optional, Iterable, Tuple, Type
+from uuid import uuid4
 
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ImproperlyConfigured
 from django.db import models
 from django.test import TestCase, Client
 from django.urls import reverse, NoReverseMatch
+from django.utils.text import slugify
 
 
 def _rand(n=8) -> str:
@@ -93,9 +95,9 @@ def _create_business(name: str):
     if "name" in all_fields:
         kwargs["name"] = name
     if "slug" in all_fields:
-        # slugify safely here without importing django slugify (not strictly needed)
-        slug = name.lower().replace(" ", "-")
-        kwargs["slug"] = slug[:50] or _rand()
+        # Generate unique slug to avoid constraint violations in tests
+        base = slugify(name) or "test-biz"
+        kwargs["slug"] = f"{base}-{uuid4().hex[:8]}"
 
     # Optional status or active flags
     if "status" in all_fields and getattr(all_fields["status"], "choices", None):

@@ -485,3 +485,48 @@ def feature_unavailable(request: HttpRequest, *args, **kwargs) -> HttpResponse:
     before the real implementation lands.
     """
     return _render_error(request, template="errors/501.html", status=501)
+
+
+# ==============================================================================
+# PWA: Service Worker
+# ==============================================================================
+@require_GET
+def sw_js(request: HttpRequest) -> HttpResponse:
+    """
+    Serve service worker from root path /sw.js with proper headers.
+    This allows the service worker to control the entire site scope (/).
+    """
+    from django.contrib.staticfiles import finders
+    import os
+    from pathlib import Path
+    
+    # Try to find the service worker file using Django's static file finder
+    sw_path = finders.find('sw.js')
+    if not sw_path:
+        # Fallback: try to read from static directory relative to BASE_DIR
+        static_path = Path(settings.BASE_DIR) / 'static' / 'sw.js'
+        if static_path.exists():
+            sw_path = str(static_path)
+        else:
+            # Last resort: try STATIC_ROOT if set
+            if settings.STATIC_ROOT:
+                static_root_path = Path(settings.STATIC_ROOT) / 'sw.js'
+                if static_root_path.exists():
+                    sw_path = str(static_root_path)
+    
+    if sw_path and os.path.exists(sw_path):
+        try:
+            with open(sw_path, 'r', encoding='utf-8') as f:
+                content = f.read()
+        except (IOError, OSError):
+            # Return minimal service worker if file read fails
+            content = "// Service worker file not found\nself.skipWaiting();"
+    else:
+        # Return minimal service worker if file not found
+        content = "// Service worker file not found\nself.skipWaiting();"
+    
+    response = HttpResponse(content, content_type='application/javascript')
+    # Critical headers for service worker scope
+    response['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+    response['Service-Worker-Allowed'] = '/'
+    return response

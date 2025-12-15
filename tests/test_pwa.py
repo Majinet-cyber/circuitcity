@@ -22,6 +22,13 @@ def test_manifest_file_accessible(client):
     
     assert response.status_code == 200 or response.status_code == 404  # 404 ok in dev (collectstatic not run)
     # In production with collectstatic, should be 200
+    
+    if response.status_code == 200:
+        # Verify Content-Type is correct (should be set by mimetypes)
+        content_type = response.get('Content-Type', '')
+        # Should be application/manifest+json or application/json
+        assert 'manifest' in content_type.lower() or 'json' in content_type.lower(), \
+            f"Manifest should have correct Content-Type, got: {content_type}"
 
 
 def test_service_worker_accessible(client):
@@ -29,6 +36,25 @@ def test_service_worker_accessible(client):
     response = client.get('/static/sw.js')
     
     assert response.status_code == 200 or response.status_code == 404  # 404 ok in dev
+
+
+def test_service_worker_root_route(client):
+    """Test that service worker is accessible from /sw.js with proper headers."""
+    response = client.get('/sw.js')
+    
+    assert response.status_code == 200, f"Expected 200, got {response.status_code}"
+    assert 'application/javascript' in response.get('Content-Type', ''), \
+        "Service worker should be served as application/javascript"
+    assert 'Service-Worker-Allowed' in response, \
+        "Service worker response should include Service-Worker-Allowed header"
+    assert response['Service-Worker-Allowed'] == '/', \
+        "Service-Worker-Allowed should be '/' for root scope"
+    assert 'Cache-Control' in response, \
+        "Service worker should have Cache-Control header"
+    # Verify it's actually JavaScript
+    content = response.content.decode()
+    assert 'serviceWorker' in content.lower() or 'self.addEventListener' in content or 'skipWaiting' in content, \
+        "Service worker should contain JavaScript code"
 
 
 def test_base_template_has_manifest_link(client):
@@ -68,6 +94,9 @@ def test_service_worker_registration_in_base(client):
         content = response.content.decode()
         assert 'serviceWorker' in content, "Service worker registration not found"
         assert 'navigator.serviceWorker.register' in content, "Service worker registration code not found"
+        # Verify it registers from /sw.js (not /static/sw.js)
+        assert '/sw.js' in content or 'sw.js' in content, \
+            "Service worker should be registered from /sw.js"
 
 
 def test_offline_page_exists():

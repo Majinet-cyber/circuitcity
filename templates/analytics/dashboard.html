@@ -1,0 +1,671 @@
+{% extends "base.html" %}
+{% load static %}
+{% load money %}
+
+{% block title %}Analytics - {{ business.name|default:"Dashboard" }}{% endblock %}
+
+{% block content %}
+<div class="cc-page">
+  <div class="cc-header">
+    <div class="topbar">
+      <h1>Analytics Dashboard</h1>
+      <div class="last-updated-badge" id="lastUpdatedBadge">
+        <span class="badge-text">Last updated: <span id="lastUpdatedTime">--:--:--</span></span>
+        <span class="refresh-indicator" id="refreshIndicator" style="display: none;">⟳</span>
+      </div>
+    </div>
+  </div>
+
+  <main class="content">
+    <!-- Filters Bar -->
+    <div class="glass-card mb-4">
+      <form method="get" class="analytics-filters" id="analyticsFilters">
+        <!-- Date Range Presets -->
+        <div class="filter-group">
+          <label class="filter-label">Date Range</label>
+          <div class="filter-pills">
+            <button type="button" class="filter-pill" data-range="today">Today</button>
+            <button type="button" class="filter-pill" data-range="yesterday">Yesterday</button>
+            <button type="button" class="filter-pill" data-range="this_month">This Month</button>
+            <button type="button" class="filter-pill" data-range="last_month">Last Month</button>
+            <button type="button" class="filter-pill" data-range="custom">Custom</button>
+          </div>
+          <div id="customDateRange" style="display: none; margin-top: 8px;">
+            <input type="date" name="start" id="startDate" value="{{ date_params.start_date|date:'Y-m-d' }}" class="filter-date-input">
+            <span style="margin: 0 8px; color: #64748b;">to</span>
+            <input type="date" name="end" id="endDate" value="{{ date_params.end_date|date:'Y-m-d' }}" class="filter-date-input">
+            <button type="button" class="filter-pill" onclick="applyCustomRange()">Apply</button>
+          </div>
+        </div>
+        
+        <!-- Location Filter -->
+        {% if locations %}
+        <div class="filter-group">
+          <label class="filter-label">Location</label>
+          <select name="location" id="locationFilter" class="filter-select" onchange="applyFilters()">
+            <option value="">All locations</option>
+            {% for loc in locations %}
+            <option value="{{ loc.id }}" {% if selected_location and selected_location.id == loc.id %}selected{% endif %}>{{ loc.name }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        {% endif %}
+        
+        <!-- Staff Filter -->
+        {% if staff_list %}
+        <div class="filter-group">
+          <label class="filter-label">{% if vertical == 'gym' %}Trainer{% elif vertical == 'pharmacy' %}Cashier{% else %}Agent{% endif %}</label>
+          <select name="agent" id="agentFilter" class="filter-select" onchange="applyFilters()">
+            <option value="">All staff</option>
+            {% for staff in staff_list %}
+            <option value="{{ staff.id }}" {% if selected_staff and selected_staff.id == staff.id %}selected{% endif %}>
+              {{ staff.user.get_full_name|default:staff.user.username }}
+            </option>
+            {% endfor %}
+          </select>
+        </div>
+        {% endif %}
+        
+        <!-- Payment Method Filter -->
+        <div class="filter-group">
+          <label class="filter-label">Payment Method</label>
+          <select name="payment_method" id="paymentMethodFilter" class="filter-select" onchange="applyFilters()">
+            <option value="">All methods</option>
+            <option value="CASH" {% if payment_method == 'CASH' %}selected{% endif %}>Cash</option>
+            <option value="BANK" {% if payment_method == 'BANK' %}selected{% endif %}>Bank</option>
+            <option value="MOBILE_MONEY" {% if payment_method == 'MOBILE_MONEY' %}selected{% endif %}>Mobile Money</option>
+            <option value="CREDIT" {% if payment_method == 'CREDIT' %}selected{% endif %}>Credit</option>
+          </select>
+        </div>
+        
+        <!-- Search Query -->
+        <div class="filter-group">
+          <label class="filter-label">Search</label>
+          <input type="text" name="q" id="searchQuery" value="{{ search_query }}" placeholder="Product, customer, IMEI..." class="filter-select" style="min-width: 200px;">
+        </div>
+        
+        <!-- Export Button -->
+        <div class="filter-group">
+          <label class="filter-label">&nbsp;</label>
+          <button type="button" onclick="exportCSV()" class="filter-pill" style="background: #10b981; color: white; border-color: #10b981;">
+            Export CSV
+          </button>
+        </div>
+      </form>
+    </div>
+
+    <!-- KPI Cards Row -->
+    <div class="kpi-row" id="kpiRow">
+      <div class="kpi-card skeleton-loader">
+        <div class="kpi-label">Revenue</div>
+        <div class="kpi-value">--</div>
+      </div>
+      <div class="kpi-card skeleton-loader">
+        <div class="kpi-label">Profit</div>
+        <div class="kpi-value">--</div>
+      </div>
+      <div class="kpi-card skeleton-loader">
+        <div class="kpi-label">Total Sales</div>
+        <div class="kpi-value">--</div>
+      </div>
+      <div class="kpi-card skeleton-loader">
+        <div class="kpi-label">Avg Order Value</div>
+        <div class="kpi-value">--</div>
+      </div>
+      <div class="kpi-card skeleton-loader">
+        <div class="kpi-label">Gross Margin</div>
+        <div class="kpi-value">--</div>
+      </div>
+      <div class="kpi-card skeleton-loader">
+        <div class="kpi-label">Costs</div>
+        <div class="kpi-value">--</div>
+      </div>
+    </div>
+
+    <!-- Charts Grid -->
+    <div class="charts-grid">
+      <!-- Sales Trend -->
+      <div class="chart-card">
+        <h3>Sales Trend</h3>
+        <canvas id="salesTrendChart"></canvas>
+      </div>
+
+      <!-- Profit Trend -->
+      <div class="chart-card">
+        <h3>Profit Trend</h3>
+        <canvas id="profitTrendChart"></canvas>
+      </div>
+
+      <!-- Payment Mix -->
+      <div class="chart-card">
+        <h3>Payment Mix</h3>
+        <canvas id="paymentMixChart"></canvas>
+      </div>
+
+      <!-- Top Products -->
+      <div class="chart-card">
+        <h3>Top Products</h3>
+        <canvas id="topProductsChart"></canvas>
+      </div>
+
+      <!-- Top Agents -->
+      <div class="chart-card">
+        <h3>Top {% if vertical == 'gym' %}Trainers{% elif vertical == 'pharmacy' %}Cashiers{% else %}Agents{% endif %}</h3>
+        <canvas id="topAgentsChart"></canvas>
+      </div>
+
+      <!-- Stock Overview -->
+      <div class="chart-card">
+        <h3>Stock Overview</h3>
+        <div id="stockOverviewContent">
+          <canvas id="stockOverviewChart"></canvas>
+          <div id="lowStockTable" style="margin-top: 16px;"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Alerts Section -->
+    <div class="alerts-section" id="alertsSection">
+      <h3>Alerts</h3>
+      <div id="alertsList"></div>
+    </div>
+  </main>
+</div>
+
+<style>
+.analytics-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  align-items: flex-end;
+}
+
+.filter-group {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.filter-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: #64748b;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.filter-pills {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.filter-pill {
+  padding: 6px 12px;
+  border: 1px solid #e2e8f0;
+  background: white;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 14px;
+  transition: all 0.2s;
+}
+
+.filter-pill:hover {
+  background: #f1f5f9;
+  border-color: #cbd5e1;
+}
+
+.filter-pill.active {
+  background: #3b82f6;
+  color: white;
+  border-color: #3b82f6;
+}
+
+.filter-select, .filter-date-input {
+  padding: 6px 12px;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  font-size: 14px;
+  min-width: 150px;
+}
+
+.kpi-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.kpi-card {
+  background: white;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 16px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+}
+
+.kpi-label {
+  font-size: 12px;
+  color: #64748b;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 8px;
+}
+
+.kpi-value {
+  font-size: 24px;
+  font-weight: 700;
+  color: #1e293b;
+}
+
+.charts-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+  gap: 24px;
+  margin-bottom: 24px;
+}
+
+.chart-card {
+  background: white;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 20px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+}
+
+.chart-card h3 {
+  margin: 0 0 16px 0;
+  font-size: 16px;
+  font-weight: 600;
+  color: #1e293b;
+}
+
+.last-updated-badge {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: #64748b;
+}
+
+.refresh-indicator {
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.skeleton-loader {
+  animation: pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+.alerts-section {
+  background: white;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 20px;
+  margin-bottom: 24px;
+}
+
+.alert-item {
+  padding: 12px;
+  border-radius: 6px;
+  margin-bottom: 8px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.alert-item.error {
+  background: #fee2e2;
+  border-left: 4px solid #ef4444;
+  color: #991b1b;
+}
+
+.alert-item.warning {
+  background: #fef3c7;
+  border-left: 4px solid #f59e0b;
+  color: #92400e;
+}
+</style>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.js"></script>
+<script>
+// Global state
+let charts = {};
+let refreshInterval = null;
+let currentFilters = {};
+
+// Initialize on page load
+document.addEventListener('DOMContentLoaded', function() {
+  initializeFilters();
+  loadAllData();
+  startAutoRefresh();
+});
+
+// Filter management
+function initializeFilters() {
+  const urlParams = new URLSearchParams(window.location.search);
+  const range = urlParams.get('range') || urlParams.get('preset') || '';
+  
+  // Set active range pill
+  document.querySelectorAll('.filter-pill[data-range]').forEach(pill => {
+    if (pill.dataset.range === range) {
+      pill.classList.add('active');
+    }
+    pill.addEventListener('click', function() {
+      setRange(this.dataset.range);
+    });
+  });
+  
+  if (range === 'custom') {
+    document.getElementById('customDateRange').style.display = 'flex';
+  }
+  
+  // Store current filters
+  currentFilters = {
+    range: range,
+    start: urlParams.get('start') || '',
+    end: urlParams.get('end') || '',
+    location: urlParams.get('location') || '',
+    agent: urlParams.get('agent') || '',
+    payment_method: urlParams.get('payment_method') || '',
+    q: urlParams.get('q') || '',
+  };
+}
+
+function setRange(range) {
+  currentFilters.range = range;
+  if (range === 'custom') {
+    document.getElementById('customDateRange').style.display = 'flex';
+  } else {
+    document.getElementById('customDateRange').style.display = 'none';
+    applyFilters();
+  }
+}
+
+function applyCustomRange() {
+  currentFilters.start = document.getElementById('startDate').value;
+  currentFilters.end = document.getElementById('endDate').value;
+  currentFilters.range = 'custom';
+  applyFilters();
+}
+
+function applyFilters() {
+  currentFilters.location = document.getElementById('locationFilter')?.value || '';
+  currentFilters.agent = document.getElementById('agentFilter')?.value || '';
+  currentFilters.payment_method = document.getElementById('paymentMethodFilter')?.value || '';
+  currentFilters.q = document.getElementById('searchQuery')?.value || '';
+  
+  loadAllData();
+}
+
+function getFilterParams() {
+  const params = new URLSearchParams();
+  if (currentFilters.range) params.set('range', currentFilters.range);
+  if (currentFilters.start) params.set('start', currentFilters.start);
+  if (currentFilters.end) params.set('end', currentFilters.end);
+  if (currentFilters.location) params.set('location', currentFilters.location);
+  if (currentFilters.agent) params.set('agent', currentFilters.agent);
+  if (currentFilters.payment_method) params.set('payment_method', currentFilters.payment_method);
+  if (currentFilters.q) params.set('q', currentFilters.q);
+  return params.toString();
+}
+
+// Data loading
+async function loadAllData() {
+  showRefreshIndicator();
+  
+  try {
+    const params = getFilterParams();
+    const [kpis, salesTrend, profitTrend, paymentMix, topProducts, topAgents, stockOverview, alerts] = await Promise.all([
+      fetch(`/app/analytics/api/kpis/?${params}`).then(r => r.json()),
+      fetch(`/app/analytics/api/sales_trend/?${params}`).then(r => r.json()),
+      fetch(`/app/analytics/api/profit_trend/?${params}`).then(r => r.json()),
+      fetch(`/app/analytics/api/payment_mix/?${params}`).then(r => r.json()),
+      fetch(`/app/analytics/api/top_products/?${params}`).then(r => r.json()),
+      fetch(`/app/analytics/api/top_agents/?${params}`).then(r => r.json()),
+      fetch(`/app/analytics/api/stock_overview/?${params}`).then(r => r.json()),
+      fetch(`/app/analytics/api/alerts/?${params}`).then(r => r.json()),
+    ]);
+    
+    updateKPIs(kpis);
+    updateSalesTrendChart(salesTrend.sales_trend || []);
+    updateProfitTrendChart(profitTrend.profit_trend || []);
+    updatePaymentMixChart(paymentMix.payment_mix || []);
+    updateTopProductsChart(topProducts.top_products || []);
+    updateTopAgentsChart(topAgents.top_agents || []);
+    updateStockOverview(stockOverview.stock_overview || {});
+    updateAlerts(alerts.alerts || []);
+    
+    updateLastUpdated(kpis.last_updated || salesTrend.last_updated);
+  } catch (error) {
+    console.error('Error loading analytics data:', error);
+  } finally {
+    hideRefreshIndicator();
+  }
+}
+
+function updateKPIs(data) {
+  const kpiCards = document.querySelectorAll('.kpi-card');
+  kpiCards.forEach(card => card.classList.remove('skeleton-loader'));
+  
+  const kpis = [
+    { label: 'Revenue', value: data.revenue || 0, formatter: formatMoney },
+    { label: 'Profit', value: data.profit || 0, formatter: formatMoney },
+    { label: 'Total Sales', value: data.total_sales || 0, formatter: formatNumber },
+    { label: 'Avg Order Value', value: data.avg_order_value || 0, formatter: formatMoney },
+    { label: 'Gross Margin', value: data.gross_margin || 0, formatter: (v) => v.toFixed(1) + '%' },
+    { label: 'Costs', value: data.costs || 0, formatter: formatMoney },
+  ];
+  
+  kpiCards.forEach((card, index) => {
+    if (kpis[index]) {
+      const labelEl = card.querySelector('.kpi-label');
+      const valueEl = card.querySelector('.kpi-value');
+      if (labelEl) labelEl.textContent = kpis[index].label;
+      if (valueEl) valueEl.textContent = kpis[index].formatter(kpis[index].value);
+    }
+  });
+}
+
+function updateSalesTrendChart(data) {
+  const ctx = document.getElementById('salesTrendChart').getContext('2d');
+  if (charts.salesTrend) charts.salesTrend.destroy();
+  
+  charts.salesTrend = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: data.map(d => d.date_short || d.date),
+      datasets: [{
+        label: 'Revenue',
+        data: data.map(d => d.revenue || 0),
+        borderColor: '#3b82f6',
+        backgroundColor: 'rgba(59, 130, 246, 0.1)',
+        tension: 0.4,
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: true,
+      plugins: {
+        legend: { display: false }
+      },
+      scales: {
+        y: { beginAtZero: true }
+      }
+    }
+  });
+}
+
+function updateProfitTrendChart(data) {
+  const ctx = document.getElementById('profitTrendChart').getContext('2d');
+  if (charts.profitTrend) charts.profitTrend.destroy();
+  
+  charts.profitTrend = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: data.map(d => d.date_short || d.date),
+      datasets: [{
+        label: 'Profit',
+        data: data.map(d => d.profit || 0),
+        borderColor: '#10b981',
+        backgroundColor: 'rgba(16, 185, 129, 0.1)',
+        tension: 0.4,
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: true,
+      plugins: {
+        legend: { display: false }
+      },
+      scales: {
+        y: { beginAtZero: true }
+      }
+    }
+  });
+}
+
+function updatePaymentMixChart(data) {
+  const ctx = document.getElementById('paymentMixChart').getContext('2d');
+  if (charts.paymentMix) charts.paymentMix.destroy();
+  
+  charts.paymentMix = new Chart(ctx, {
+    type: 'doughnut',
+    data: {
+      labels: data.map(d => d.method_display || d.method),
+      datasets: [{
+        data: data.map(d => d.amount || 0),
+        backgroundColor: ['#3b82f6', '#10b981', '#f59e0b', '#ef4444'],
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: true,
+    }
+  });
+}
+
+function updateTopProductsChart(data) {
+  const ctx = document.getElementById('topProductsChart').getContext('2d');
+  if (charts.topProducts) charts.topProducts.destroy();
+  
+  charts.topProducts = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: data.map(d => d.name || 'Unknown').slice(0, 10),
+      datasets: [{
+        label: 'Revenue',
+        data: data.map(d => d.revenue || 0).slice(0, 10),
+        backgroundColor: '#3b82f6',
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: true,
+      indexAxis: 'y',
+      plugins: {
+        legend: { display: false }
+      },
+      scales: {
+        x: { beginAtZero: true }
+      }
+    }
+  });
+}
+
+function updateTopAgentsChart(data) {
+  const ctx = document.getElementById('topAgentsChart').getContext('2d');
+  if (charts.topAgents) charts.topAgents.destroy();
+  
+  charts.topAgents = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: data.map(d => d.name || 'Unknown').slice(0, 10),
+      datasets: [{
+        label: 'Revenue',
+        data: data.map(d => d.revenue || 0).slice(0, 10),
+        backgroundColor: '#10b981',
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: true,
+      indexAxis: 'y',
+      plugins: {
+        legend: { display: false }
+      },
+      scales: {
+        x: { beginAtZero: true }
+      }
+    }
+  });
+}
+
+function updateStockOverview(data) {
+  // Stock overview would show stock value, low stock items, etc.
+  // Implementation depends on your specific needs
+}
+
+function updateAlerts(alerts) {
+  const alertsList = document.getElementById('alertsList');
+  if (!alertsList) return;
+  
+  if (alerts.length === 0) {
+    alertsList.innerHTML = '<p style="color: #64748b;">No alerts</p>';
+    return;
+  }
+  
+  alertsList.innerHTML = alerts.map(alert => `
+    <div class="alert-item ${alert.severity}">
+      <strong>${alert.message}</strong>
+    </div>
+  `).join('');
+}
+
+function updateLastUpdated(timestamp) {
+  if (!timestamp) return;
+  const date = new Date(timestamp);
+  const timeStr = date.toLocaleTimeString();
+  const timeEl = document.getElementById('lastUpdatedTime');
+  if (timeEl) timeEl.textContent = timeStr;
+}
+
+function showRefreshIndicator() {
+  const indicator = document.getElementById('refreshIndicator');
+  if (indicator) indicator.style.display = 'inline-block';
+}
+
+function hideRefreshIndicator() {
+  const indicator = document.getElementById('refreshIndicator');
+  if (indicator) indicator.style.display = 'none';
+}
+
+function startAutoRefresh() {
+  if (refreshInterval) clearInterval(refreshInterval);
+  refreshInterval = setInterval(loadAllData, 30000); // 30 seconds
+}
+
+function exportCSV() {
+  const params = getFilterParams();
+  window.location.href = `/app/analytics/api/export_csv/?${params}`;
+}
+
+function formatMoney(value) {
+  return 'MWK ' + parseFloat(value).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+function formatNumber(value) {
+  return parseFloat(value).toLocaleString('en-US');
+}
+</script>
+{% endblock %}
+

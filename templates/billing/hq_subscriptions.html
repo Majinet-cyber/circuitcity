@@ -2,6 +2,8 @@
 {% extends "hq/base.html" %}
 {% load humanize %}
 
+{# Safe active_tab handling - prevents VariableDoesNotExist even if view forgets #}
+{% with active_tab|default:"subscriptions" as tab %}
 {% block title %}Subscriptions{% endblock %}
 
 {# ========= COMPAT: your base defines "head", so we mirror extra_head here ========= #}
@@ -444,3 +446,4 @@
     }
   </script>
 {% endblock %}
+{% endwith %}

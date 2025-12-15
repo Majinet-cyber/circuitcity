@@ -143,12 +143,21 @@ def push_notification(user: User, title: str, message: str, *, kind: str = "INFO
     Best-effort; fails silently if model import fails (during setup).
     """
     try:
-        from core.models import Notification  # type: ignore
+        from notifications.models import Notification  # type: ignore
+        # Map kind to level and set audience based on user
+        level_map = {
+            "INFO": "info",
+            "SUCCESS": "success",
+            "WARNING": "warning",
+        }
+        level = level_map.get(kind, "info")
+        # Determine audience: if user is staff, use ADMIN, otherwise AGENT
+        audience = "ADMIN" if user.is_staff else "AGENT"
         Notification.objects.create(
             user=user,
-            kind=kind,
-            title=title[:140],
-            message=message,
+            audience=audience,
+            level=level,
+            message=f"{title}: {message}" if title else message,
             business=business,
         )
     except Exception:

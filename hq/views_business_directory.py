@@ -432,3 +432,11 @@ def quick_action(request: HttpRequest, business_id: int) -> HttpResponse:
     
     return redirect("hq:business_directory")
 
+
+@hq_admin_required
+def business_detail(request: HttpRequest, pk: int) -> HttpResponse:
+    """
+    URL target for the directory 'View' link.
+    Redirects to the business command center for the given business ID.
+    """
+    return redirect("hq:business_command_center", business_id=pk)

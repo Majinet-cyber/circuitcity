@@ -6,6 +6,10 @@ from urllib.parse import urlparse
 import os
 import sys
 import importlib
+import mimetypes
+
+# Register .webmanifest MIME type for PWA installability
+mimetypes.add_type("application/manifest+json", ".webmanifest")
 
 # --------------------------- helpers ---------------------------
 def env_bool(key: str, default: bool = False) -> bool:
@@ -182,6 +186,7 @@ INSTALLED_APPS = [
     # Local apps
     "circuitcity.accounts.apps.AccountsConfig",
     "tenants.apps.TenantsConfig",
+    "core.apps.CoreConfig",
     "inventory",
     "sales",
     "dashboard",
@@ -269,9 +274,13 @@ TEMPLATES = [
                 "cc.context_processors.app_version",
                 "cc.context_processors.role_flags",
                 "cc.context_processors.brand",
+                "cc.context_processors.currency_config",
                 "tenants.context_processors.tenant_context",
                 "tenants.context_processors.notifications_context",
                 "billing.context_processors.trial_banner",
+            ],
+            "builtins": [
+                "inventory.templatetags.money",
             ],
         },
     },

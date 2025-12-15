@@ -38,9 +38,10 @@ User = get_user_model()
 @pytest.fixture
 def business():
     """Create a test phones business"""
+    from conftest import unique_slug
     return Business.objects.create(
         name="Test Phone Store",
-        slug="test-phones",
+        slug=unique_slug("Test Phone Store"),
         status="ACTIVE",
         business_kind=BusinessKind.PHONES
     )

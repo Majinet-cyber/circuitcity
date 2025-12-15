@@ -356,6 +356,13 @@ class TenantResolutionMiddleware(MiddlewareMixin):
     def _has_business_model(self) -> bool:
         return Business is not None
 
+    def __call__(self, request):
+        # CRITICAL: Bypass HQ paths at the very top to prevent redirect loops
+        path = (request.path_info or request.path or "/")
+        if path.startswith("/hq/"):
+            return self.get_response(request)
+        return super().__call__(request)
+
     def process_request(self, request):
         # Start clean every request
         request.business = None

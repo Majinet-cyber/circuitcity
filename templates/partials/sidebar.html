@@ -91,6 +91,10 @@
       <li class="{% if request.path|slice:'0:15' == '/hq/stock-trends' %}active{% endif %}">
         <a class="navlink" href="{{ url_hq_stock_trends|default:'/hq/stock-trends/' }}"><i class="bi bi-graph-up-arrow"></i><span>Stock Trends</span></a>
       </li>
+      {% url 'hq:hq_analytics' as url_hq_analytics %}
+      <li class="{% if request.path|slice:'0:13' == '/hq/analytics' %}active{% endif %}">
+        <a class="navlink" href="{{ url_hq_analytics|default:'/hq/analytics/' }}"><i class="bi bi-bar-chart-line"></i><span>Analytics</span></a>
+      </li>
 
       {# Django Admin shortcut (opens in new tab) #}
       <li class="{% if request.path|slice:'0:7' == '/admin/' %}active{% endif %}">
@@ -117,20 +121,28 @@
             {# Check if item requires manager role #}
             {% if item.require_manager|default:False %}
               {% if request.user.is_superuser or request.user.is_staff or IS_MANAGER %}
-                {# Resolve URL (try named URL first, then use as-is if it starts with /) #}
+                {# Resolve URL (try named URL first, then use as-is if it starts with /, else construct from active_prefix) #}
                 {% url item.url as item_url %}
                 {% if not item_url and item.url|slice:':1' == '/' %}
                   {% with item_url=item.url %}
-                    <li class="{% if item.active_pattern in request.path %}active{% endif %}">
-                      <a class="navlink" href="{{ item_url }}">
+                    <li class="{% if item.active_pattern in request.path or item.active_prefix in request.path %}active{% endif %}">
+                      <a class="navlink" href="{{ item_url }}" {% if item.key %}data-cy="nav-{{ item.key }}"{% endif %}>
                         <i class="bi {{ item.icon }}"></i>
                         <span>{% if vertical == 'gym' and item.label == 'Agents' %}Trainers{% else %}{{ item.label }}{% endif %}</span>
                       </a>
                     </li>
                   {% endwith %}
                 {% elif item_url %}
-                  <li class="{% if item.active_pattern in request.path %}active{% endif %}">
-                    <a class="navlink" href="{{ item_url }}">
+                  <li class="{% if item.active_pattern in request.path or item.active_prefix in request.path %}active{% endif %}">
+                    <a class="navlink" href="{{ item_url }}" {% if item.key %}data-cy="nav-{{ item.key }}"{% endif %}>
+                      <i class="bi {{ item.icon }}"></i>
+                      <span>{% if vertical == 'gym' and item.label == 'Agents' %}Trainers{% else %}{{ item.label }}{% endif %}</span>
+                    </a>
+                  </li>
+                {% elif item.active_prefix %}
+                  {# Fallback: use active_prefix as URL if named URL resolution fails #}
+                  <li class="{% if item.active_pattern in request.path or item.active_prefix in request.path %}active{% endif %}">
+                    <a class="navlink" href="{{ item.active_prefix }}/" {% if item.key %}data-cy="nav-{{ item.key }}"{% endif %}>
                       <i class="bi {{ item.icon }}"></i>
                       <span>{% if vertical == 'gym' and item.label == 'Agents' %}Trainers{% else %}{{ item.label }}{% endif %}</span>
                     </a>
@@ -142,16 +154,24 @@
               {% url item.url as item_url %}
               {% if not item_url and item.url|slice:':1' == '/' %}
                 {% with item_url=item.url %}
-                  <li class="{% if item.active_pattern in request.path %}active{% endif %}">
-                    <a class="navlink" href="{{ item_url }}">
+                  <li class="{% if item.active_pattern in request.path or item.active_prefix in request.path %}active{% endif %}">
+                    <a class="navlink" href="{{ item_url }}" {% if item.key %}data-cy="nav-{{ item.key }}"{% endif %}>
                       <i class="bi {{ item.icon }}"></i>
                       <span>{% if vertical == 'gym' and item.label == 'Agents' %}Trainers{% else %}{{ item.label }}{% endif %}</span>
                     </a>
                   </li>
                 {% endwith %}
               {% elif item_url %}
-                <li class="{% if item.active_pattern in request.path %}active{% endif %}">
-                  <a class="navlink" href="{{ item_url }}">
+                <li class="{% if item.active_pattern in request.path or item.active_prefix in request.path %}active{% endif %}">
+                  <a class="navlink" href="{{ item_url }}" {% if item.key %}data-cy="nav-{{ item.key }}"{% endif %}>
+                    <i class="bi {{ item.icon }}"></i>
+                    <span>{% if vertical == 'gym' and item.label == 'Agents' %}Trainers{% else %}{{ item.label }}{% endif %}</span>
+                  </a>
+                </li>
+              {% elif item.active_prefix %}
+                {# Fallback: use active_prefix as URL if named URL resolution fails #}
+                <li class="{% if item.active_pattern in request.path or item.active_prefix in request.path %}active{% endif %}">
+                  <a class="navlink" href="{{ item.active_prefix }}/" {% if item.key %}data-cy="nav-{{ item.key }}"{% endif %}>
                     <i class="bi {{ item.icon }}"></i>
                     <span>{% if vertical == 'gym' and item.label == 'Agents' %}Trainers{% else %}{{ item.label }}{% endif %}</span>
                   </a>

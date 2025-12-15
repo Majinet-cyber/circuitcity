@@ -258,6 +258,8 @@
         <a href="{{ stock_trends_url|default:'/hq/stock-trends/' }}">Stock trends</a>
 
         <div class="nav-sep"></div>
+        <a href="{% url 'hq:currency_settings' %}">Currency Settings</a>
+        <div class="nav-sep"></div>
         <a href="{{ admin_url|default:'/admin/' }}">↗ Django Admin</a>
         <a href="{{ logout_url|default:'/accounts/logout/' }}">Logout</a>
       </nav>
@@ -324,6 +326,144 @@
           <a class="card link reveal d4" href="{{ agents_url|default:'/hq/agents/' }}?filter=new30"><h3>Agents New (30d)</h3><div class="num">{{ agents_new_30d|default:"0" }}</div></a>
           <a class="card link reveal" href="{{ businesses_url|default:'/hq/businesses/' }}?tab=inventory&view=in"><h3>Stock In (7d)</h3><div class="num">{{ stock_in_7d|default:"0" }}</div></a>
           <a class="card link reveal d2" href="{{ businesses_url|default:'/hq/businesses/' }}?tab=inventory&view=out"><h3>Stock Out (7d)</h3><div class="num">{{ stock_out_7d|default:"0" }}</div></a>
+        </div>
+
+        <!-- HQ Analytics Filter Bar -->
+        <div class="section-title reveal">Analytics Cockpit</div>
+        <div class="card reveal" style="margin-bottom:24px;padding:20px">
+          <h3 style="margin:0 0 16px;font-size:16px;font-weight:900;color:var(--ink-700)">Filters</h3>
+          <div id="analytics-filters" style="display:grid;gap:12px;grid-template-columns:repeat(auto-fit, minmax(200px, 1fr))">
+            <!-- Date Filters -->
+            <div>
+              <label style="display:block;font-size:12px;font-weight:700;color:var(--ink-500);margin-bottom:6px">Date Range</label>
+              <div style="display:flex;gap:6px">
+                <button class="pill" data-date-preset="today" style="font-size:12px;padding:6px 10px">Today</button>
+                <button class="pill" data-date-preset="7d" style="font-size:12px;padding:6px 10px">Last 7 Days</button>
+                <button class="pill" data-date-preset="mtd" style="font-size:12px;padding:6px 10px">Month to Date</button>
+              </div>
+              <div style="display:flex;gap:6px;margin-top:6px">
+                <input type="date" id="analytics-start-date" class="input" style="flex:1;font-size:12px;padding:6px 8px">
+                <span style="align-self:center;color:var(--ink-500);font-size:12px">to</span>
+                <input type="date" id="analytics-end-date" class="input" style="flex:1;font-size:12px;padding:6px 8px">
+              </div>
+            </div>
+            
+            <!-- Business Filter -->
+            <div>
+              <label style="display:block;font-size:12px;font-weight:700;color:var(--ink-500);margin-bottom:6px">Business</label>
+              <select id="analytics-business" class="input" style="width:100%;font-size:12px;padding:6px 8px">
+                <option value="">All Businesses</option>
+                {% for biz in all_businesses|default:"" %}
+                <option value="{{ biz.id }}">{{ biz.name }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            
+            <!-- Vertical Filter -->
+            <div>
+              <label style="display:block;font-size:12px;font-weight:700;color:var(--ink-500);margin-bottom:6px">Vertical</label>
+              <select id="analytics-vertical" class="input" style="width:100%;font-size:12px;padding:6px 8px">
+                {% for val, label in vertical_options|default:"" %}
+                <option value="{{ val }}">{{ label }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            
+            <!-- Location Filter -->
+            <div>
+              <label style="display:block;font-size:12px;font-weight:700;color:var(--ink-500);margin-bottom:6px">Location</label>
+              <select id="analytics-location" class="input" style="width:100%;font-size:12px;padding:6px 8px">
+                <option value="">All Locations</option>
+                {% for loc in all_locations|default:"" %}
+                <option value="{{ loc.id }}">{{ loc.business.name }} - {{ loc.name }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            
+            <!-- Agent Filter -->
+            <div>
+              <label style="display:block;font-size:12px;font-weight:700;color:var(--ink-500);margin-bottom:6px">Agent</label>
+              <select id="analytics-agent" class="input" style="width:100%;font-size:12px;padding:6px 8px">
+                <option value="">All Agents</option>
+                {% for agent in all_agents|default:"" %}
+                <option value="{{ agent.user_id }}">{{ agent.user.get_full_name|default:agent.user.username }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            
+            <!-- Payment Mode Filter -->
+            <div>
+              <label style="display:block;font-size:12px;font-weight:700;color:var(--ink-500);margin-bottom:6px">Payment Mode</label>
+              <select id="analytics-payment-mode" class="input" style="width:100%;font-size:12px;padding:6px 8px">
+                {% for val, label in payment_mode_options|default:"" %}
+                <option value="{{ val }}">{{ label }}</option>
+                {% endfor %}
+              </select>
+            </div>
+          </div>
+          <div style="margin-top:16px;display:flex;gap:8px;justify-content:flex-end">
+            <button id="analytics-apply" class="apply" style="padding:10px 20px;font-size:14px">Apply Filters</button>
+            <button id="analytics-reset" class="input" style="padding:10px 20px;font-size:14px;background:var(--glass);border:1px solid var(--ring);cursor:pointer">Reset</button>
+          </div>
+        </div>
+
+        <!-- Analytics Charts Section -->
+        <div id="analytics-section" style="display:none">
+          <!-- Loading State -->
+          <div id="analytics-loading" style="text-align:center;padding:40px;color:var(--ink-500)">
+            <div style="font-size:16px;font-weight:700;margin-bottom:8px">Loading analytics...</div>
+            <div style="font-size:12px">Fetching data and rendering charts</div>
+          </div>
+          
+          <!-- Analytics KPIs -->
+          <div id="analytics-kpis" class="cards" style="display:none"></div>
+          
+          <!-- Trend Charts (Line) -->
+          <div class="section-title reveal" style="display:none" id="analytics-trends-title">Trends</div>
+          <div class="wallet" id="analytics-trends" style="display:none">
+            <div class="card chart-card reveal">
+              <h3>Revenue Trend (Daily)</h3>
+              <canvas id="chart-revenue-trend" height="200"></canvas>
+            </div>
+            <div class="card chart-card reveal d2">
+              <h3>Sales Count Trend (Daily)</h3>
+              <canvas id="chart-sales-count-trend" height="200"></canvas>
+            </div>
+            <div class="card chart-card reveal d3">
+              <h3>Profit Trend (Daily)</h3>
+              <canvas id="chart-profit-trend" height="200"></canvas>
+            </div>
+          </div>
+          
+          <!-- Breakdown Charts (Pie/Bar) -->
+          <div class="section-title reveal" style="display:none" id="analytics-breakdowns-title">Breakdowns</div>
+          <div class="wallet" id="analytics-breakdowns" style="display:none">
+            <div class="card chart-card reveal">
+              <h3>Cash Mix</h3>
+              <canvas id="chart-cash-mix" height="200"></canvas>
+            </div>
+            <div class="card chart-card reveal d2">
+              <h3>Vertical Mix</h3>
+              <canvas id="chart-vertical-mix" height="200"></canvas>
+            </div>
+            <div class="card chart-card reveal d3">
+              <h3>Top Businesses by Revenue</h3>
+              <canvas id="chart-top-businesses" height="200"></canvas>
+            </div>
+          </div>
+          
+          <!-- Top Lists -->
+          <div class="section-title reveal" style="display:none" id="analytics-tops-title">Top Performers</div>
+          <div class="wallet" id="analytics-tops" style="display:none">
+            <div class="card chart-card reveal">
+              <h3>Top Agents by Revenue</h3>
+              <canvas id="chart-top-agents" height="200"></canvas>
+            </div>
+            <div class="card reveal d2">
+              <h3>Stock Value Overview</h3>
+              <div id="stock-value-kpis" style="margin-top:12px"></div>
+            </div>
+          </div>
         </div>
 
         <!-- Sales & Onboarding Charts -->
@@ -942,6 +1082,379 @@
         new ResizeObserver(drawOnboardingsChart).observe(onboardingsCanvas);
       }
     }catch(e){console.error('Onboardings chart error:', e);}
+
+    /* HQ Analytics Filters & Charts */
+    try{
+      // Load Chart.js from CDN
+      const chartJsScript = document.createElement('script');
+      chartJsScript.src = 'https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js';
+      chartJsScript.onload = initAnalytics;
+      document.head.appendChild(chartJsScript);
+      
+      function initAnalytics(){
+        const analyticsSection = $('#analytics-section');
+        const analyticsLoading = $('#analytics-loading');
+        const analyticsKpis = $('#analytics-kpis');
+        const analyticsTrends = $('#analytics-trends');
+        const analyticsBreakdowns = $('#analytics-breakdowns');
+        const analyticsTops = $('#analytics-tops');
+        
+        let chartInstances = {};
+        
+        // Date preset handlers
+        $$('[data-date-preset]').forEach(btn => {
+          btn.addEventListener('click', (e) => {
+            e.preventDefault();
+            const preset = btn.dataset.datePreset;
+            const today = new Date();
+            const startInput = $('#analytics-start-date');
+            const endInput = $('#analytics-end-date');
+            
+            if(preset === 'today'){
+              startInput.value = endInput.value = today.toISOString().split('T')[0];
+            }else if(preset === '7d'){
+              const weekAgo = new Date(today);
+              weekAgo.setDate(today.getDate() - 7);
+              startInput.value = weekAgo.toISOString().split('T')[0];
+              endInput.value = today.toISOString().split('T')[0];
+            }else if(preset === 'mtd'){
+              const firstDay = new Date(today.getFullYear(), today.getMonth(), 1);
+              startInput.value = firstDay.toISOString().split('T')[0];
+              endInput.value = today.toISOString().split('T')[0];
+            }
+            
+            // Update active state
+            $$('[data-date-preset]').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+          });
+        });
+        
+        // Set default date range (last 30 days)
+        const today = new Date();
+        const monthAgo = new Date(today);
+        monthAgo.setDate(today.getDate() - 30);
+        $('#analytics-start-date').value = monthAgo.toISOString().split('T')[0];
+        $('#analytics-end-date').value = today.toISOString().split('T')[0];
+        
+        // Apply filters
+        $('#analytics-apply').addEventListener('click', fetchAnalytics);
+        $('#analytics-reset').addEventListener('click', () => {
+          $('#analytics-business').value = '';
+          $('#analytics-vertical').value = '';
+          $('#analytics-location').value = '';
+          $('#analytics-agent').value = '';
+          $('#analytics-payment-mode').value = '';
+          const today = new Date();
+          const monthAgo = new Date(today);
+          monthAgo.setDate(today.getDate() - 30);
+          $('#analytics-start-date').value = monthAgo.toISOString().split('T')[0];
+          $('#analytics-end-date').value = today.toISOString().split('T')[0];
+          fetchAnalytics();
+        });
+        
+        async function fetchAnalytics(){
+          analyticsSection.style.display = 'block';
+          analyticsLoading.style.display = 'block';
+          analyticsKpis.style.display = 'none';
+          analyticsTrends.style.display = 'none';
+          analyticsBreakdowns.style.display = 'none';
+          analyticsTops.style.display = 'none';
+          
+          // Build query params
+          const params = new URLSearchParams();
+          const startDate = $('#analytics-start-date').value;
+          const endDate = $('#analytics-end-date').value;
+          if(startDate) params.set('start_date', startDate);
+          if(endDate) params.set('end_date', endDate);
+          
+          const businessId = $('#analytics-business').value;
+          if(businessId) params.set('business_id', businessId);
+          
+          const vertical = $('#analytics-vertical').value;
+          if(vertical) params.set('vertical', vertical);
+          
+          const locationId = $('#analytics-location').value;
+          if(locationId) params.set('location_id', locationId);
+          
+          const agentId = $('#analytics-agent').value;
+          if(agentId) params.set('agent_id', agentId);
+          
+          const paymentMode = $('#analytics-payment-mode').value;
+          if(paymentMode) params.set('payment_mode', paymentMode);
+          
+          try{
+            const response = await fetch(`/hq/api/analytics/data.json?${params.toString()}`);
+            if(!response.ok) throw new Error(`HTTP ${response.status}`);
+            const data = await response.json();
+            
+            renderAnalytics(data);
+          }catch(error){
+            console.error('Analytics fetch error:', error);
+            analyticsLoading.innerHTML = `<div style="color:#ef4444;font-weight:700">Error loading analytics: ${error.message}</div>`;
+          }
+        }
+        
+        function renderAnalytics(data){
+          currentAnalyticsData = data; // Store for use in other functions
+          analyticsLoading.style.display = 'none';
+          
+          // Render KPIs
+          renderKPIs(data.kpis || {});
+          
+          // Render charts
+          renderTrendCharts(data.series || {});
+          renderBreakdownCharts(data.breakdowns || {});
+          renderTopCharts(data.top_lists || {});
+          
+          // Show sections
+          analyticsKpis.style.display = 'grid';
+          if(data.series && (data.series.revenue_trend || data.series.sales_count_trend || data.series.profit_trend)){
+            $('#analytics-trends-title').style.display = 'block';
+            analyticsTrends.style.display = 'grid';
+          }
+          if(data.breakdowns && (data.breakdowns.cash_mix || data.breakdowns.vertical_mix)){
+            $('#analytics-breakdowns-title').style.display = 'block';
+            analyticsBreakdowns.style.display = 'grid';
+          }
+          if(data.top_lists && (data.top_lists.top_businesses || data.top_lists.top_agents)){
+            $('#analytics-tops-title').style.display = 'block';
+            analyticsTops.style.display = 'grid';
+          }
+        }
+        
+        function renderKPIs(kpis){
+          const kpiCards = [
+            {label: 'Revenue', value: kpis.revenue || 0, format: 'currency'},
+            {label: 'Sales Count', value: kpis.sales_count || 0, format: 'number'},
+            {label: 'Profit', value: kpis.profit || 0, format: 'currency'},
+            {label: 'Cost of Goods', value: kpis.cost_of_goods || 0, format: 'currency'},
+            {label: 'Total Businesses', value: kpis.total_businesses || 0, format: 'number'},
+            {label: 'Total Agents', value: kpis.total_agents || 0, format: 'number'},
+          ];
+          
+          if(kpis.stock_value !== undefined){
+            kpiCards.push(
+              {label: 'Stock Value', value: kpis.stock_value || 0, format: 'currency'},
+              {label: 'Retail Value', value: kpis.retail_value || 0, format: 'currency'},
+              {label: 'Expected Margin', value: kpis.expected_margin || 0, format: 'currency'}
+            );
+          }
+          
+          analyticsKpis.innerHTML = kpiCards.map((kpi, idx) => {
+            const formatted = kpi.format === 'currency' 
+              ? `MWK ${(kpi.value || 0).toLocaleString(undefined, {minimumFractionDigits:2, maximumFractionDigits:2})}`
+              : (kpi.value || 0).toLocaleString();
+            return `
+              <div class="card reveal ${idx > 0 ? 'd' + (idx % 4 + 1) : ''}">
+                <h3>${kpi.label}</h3>
+                <div class="num">${formatted}</div>
+              </div>
+            `;
+          }).join('');
+        }
+        
+        function renderTrendCharts(series){
+          // Revenue trend
+          if(series.revenue_trend && series.revenue_trend.length){
+            renderLineChart('chart-revenue-trend', {
+              labels: series.revenue_trend.map(d => d.date_short),
+              data: series.revenue_trend.map(d => d.revenue),
+              label: 'Revenue',
+              color: '#2563eb'
+            });
+          }
+          
+          // Sales count trend
+          if(series.sales_count_trend && series.sales_count_trend.length){
+            renderLineChart('chart-sales-count-trend', {
+              labels: series.sales_count_trend.map(d => d.date_short),
+              data: series.sales_count_trend.map(d => d.count),
+              label: 'Sales Count',
+              color: '#10b981'
+            });
+          }
+          
+          // Profit trend
+          if(series.profit_trend && series.profit_trend.length){
+            renderLineChart('chart-profit-trend', {
+              labels: series.profit_trend.map(d => d.date_short),
+              data: series.profit_trend.map(d => d.profit),
+              label: 'Profit',
+              color: '#f59e0b'
+            });
+          }
+        }
+        
+        let currentAnalyticsData = null;
+        
+        function renderBreakdownCharts(breakdowns){
+          // Cash mix (pie)
+          if(breakdowns.cash_mix && breakdowns.cash_mix.length){
+            renderPieChart('chart-cash-mix', {
+              labels: breakdowns.cash_mix.map(d => d.method_display),
+              data: breakdowns.cash_mix.map(d => d.amount),
+              label: 'Payment Method'
+            });
+          }
+          
+          // Vertical mix (pie)
+          if(breakdowns.vertical_mix && breakdowns.vertical_mix.length){
+            renderPieChart('chart-vertical-mix', {
+              labels: breakdowns.vertical_mix.map(d => d.vertical),
+              data: breakdowns.vertical_mix.map(d => d.revenue),
+              label: 'Revenue by Vertical'
+            });
+          }
+          
+          // Top businesses (bar) - from top_lists, not breakdowns
+          if(currentAnalyticsData && currentAnalyticsData.top_lists && currentAnalyticsData.top_lists.top_businesses){
+            const topBiz = currentAnalyticsData.top_lists.top_businesses;
+            if(topBiz.length){
+              renderBarChart('chart-top-businesses', {
+                labels: topBiz.map(b => b.name.length > 20 ? b.name.substring(0, 20) + '...' : b.name),
+                data: topBiz.map(b => b.revenue),
+                label: 'Revenue'
+              });
+            }
+          }
+        }
+        
+        function renderTopCharts(topLists){
+          // Top agents (bar)
+          if(topLists.top_agents && topLists.top_agents.length){
+            renderBarChart('chart-top-agents', {
+              labels: topLists.top_agents.map(a => a.name.length > 20 ? a.name.substring(0, 20) + '...' : a.name),
+              data: topLists.top_agents.map(a => a.revenue),
+              label: 'Revenue'
+            });
+          }
+          
+          // Stock value KPIs
+          const stockKpis = $('#stock-value-kpis');
+          if(currentAnalyticsData && currentAnalyticsData.kpis && (currentAnalyticsData.kpis.stock_value !== undefined)){
+            stockKpis.innerHTML = `
+              <div style="display:grid;gap:12px">
+                <div style="display:flex;justify-content:space-between;padding:8px;background:rgba(37,99,235,0.06);border-radius:8px">
+                  <span class="muted">Stock Value:</span>
+                  <span style="font-weight:800">MWK ${(currentAnalyticsData.kpis.stock_value || 0).toLocaleString(undefined, {minimumFractionDigits:2})}</span>
+                </div>
+                <div style="display:flex;justify-content:space-between;padding:8px;background:rgba(16,185,129,0.06);border-radius:8px">
+                  <span class="muted">Retail Value:</span>
+                  <span style="font-weight:800">MWK ${(currentAnalyticsData.kpis.retail_value || 0).toLocaleString(undefined, {minimumFractionDigits:2})}</span>
+                </div>
+                <div style="display:flex;justify-content:space-between;padding:8px;background:rgba(245,158,11,0.06);border-radius:8px">
+                  <span class="muted">Expected Margin:</span>
+                  <span style="font-weight:800">MWK ${(currentAnalyticsData.kpis.expected_margin || 0).toLocaleString(undefined, {minimumFractionDigits:2})}</span>
+                </div>
+              </div>
+            `;
+          }else{
+            stockKpis.innerHTML = '<div class="muted">Stock value data not available for selected filters.</div>';
+          }
+        }
+        
+        function renderLineChart(canvasId, config){
+          const canvas = document.getElementById(canvasId);
+          if(!canvas || !window.Chart) return;
+          
+          // Destroy existing chart
+          if(chartInstances[canvasId]){
+            chartInstances[canvasId].destroy();
+          }
+          
+          const ctx = canvas.getContext('2d');
+          chartInstances[canvasId] = new Chart(ctx, {
+            type: 'line',
+            data: {
+              labels: config.labels,
+              datasets: [{
+                label: config.label,
+                data: config.data,
+                borderColor: config.color,
+                backgroundColor: config.color + '20',
+                tension: 0.4,
+                fill: true
+              }]
+            },
+            options: {
+              responsive: true,
+              maintainAspectRatio: false,
+              plugins: {
+                legend: {display: false}
+              },
+              scales: {
+                y: {beginAtZero: true}
+              }
+            }
+          });
+        }
+        
+        function renderPieChart(canvasId, config){
+          const canvas = document.getElementById(canvasId);
+          if(!canvas || !window.Chart) return;
+          
+          if(chartInstances[canvasId]){
+            chartInstances[canvasId].destroy();
+          }
+          
+          const ctx = canvas.getContext('2d');
+          const colors = ['#2563eb', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#06b6d4', '#84cc16'];
+          
+          chartInstances[canvasId] = new Chart(ctx, {
+            type: 'pie',
+            data: {
+              labels: config.labels,
+              datasets: [{
+                data: config.data,
+                backgroundColor: colors.slice(0, config.data.length)
+              }]
+            },
+            options: {
+              responsive: true,
+              maintainAspectRatio: false,
+              plugins: {
+                legend: {position: 'bottom'}
+              }
+            }
+          });
+        }
+        
+        function renderBarChart(canvasId, config){
+          const canvas = document.getElementById(canvasId);
+          if(!canvas || !window.Chart) return;
+          
+          if(chartInstances[canvasId]){
+            chartInstances[canvasId].destroy();
+          }
+          
+          const ctx = canvas.getContext('2d');
+          chartInstances[canvasId] = new Chart(ctx, {
+            type: 'bar',
+            data: {
+              labels: config.labels,
+              datasets: [{
+                label: config.label,
+                data: config.data,
+                backgroundColor: '#2563eb'
+              }]
+            },
+            options: {
+              responsive: true,
+              maintainAspectRatio: false,
+              plugins: {
+                legend: {display: false}
+              },
+              scales: {
+                y: {beginAtZero: true}
+              }
+            }
+          });
+        }
+        
+        // Auto-load analytics on page load (optional - comment out if you want manual trigger only)
+        // fetchAnalytics();
+      }
+    }catch(e){console.error('Analytics init error:', e);}
   })();
   </script>
 </body>
