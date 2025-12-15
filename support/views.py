@@ -152,6 +152,7 @@ def hq_ticket_list(request):
         'current_business': business_filter,
         'current_priority': priority_filter,
         'search_query': search,
+        'active_tab': 'tickets',
     })
 
 

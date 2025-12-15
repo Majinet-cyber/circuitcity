@@ -9,6 +9,7 @@ from collections import deque
 
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
+from django.core.exceptions import FieldError
 from django.core.paginator import Paginator
 from django.db import models
 from django.db.models import Count, Sum, Value, DecimalField, Q
@@ -604,7 +605,13 @@ def dashboard(request):
     # Add filter options for analytics
     ctx["all_businesses"] = Business.objects.all().order_by('name')[:100]  # Limit for performance
     ctx["all_agents"] = Membership.objects.filter(role="AGENT").select_related('user', 'business').order_by('user__username')[:100]
-    ctx["all_locations"] = Location.objects.filter(is_active=True).select_related('business').order_by('business__name', 'name')[:100]
+    # Build base queryset first, then optionally filter by is_active if field exists
+    locations_qs = Location.objects.select_related('business').order_by('business__name', 'name')
+    try:
+        ctx["all_locations"] = locations_qs.filter(is_active=True)[:100]
+    except FieldError:
+        # Location model doesn't have is_active field, return all locations
+        ctx["all_locations"] = locations_qs[:100]
     
     # Vertical options
     ctx["vertical_options"] = [

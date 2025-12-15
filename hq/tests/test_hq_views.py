@@ -204,6 +204,24 @@ class HQViewsTest(TestCase):
         
         self.assertEqual(response.status_code, 200)
         # Should not have OperationalError from user-defined functions
+    
+    def test_hq_dashboard_works_without_location_is_active(self):
+        """HQ dashboard should return 200 even if Location model lacks is_active field."""
+        from inventory.models import Location
+        
+        # Create a location to ensure the query runs
+        location = Location.objects.create(
+            name='Test Location',
+            business=self.business
+        )
+        
+        # The dashboard should work regardless of whether Location has is_active
+        url = reverse('hq:dashboard')
+        response = self.client.get(url)
+        
+        self.assertEqual(response.status_code, 200)
+        # Should not raise FieldError about is_active
+        # The view should handle this gracefully by catching FieldError
 
 
 class TestHQURLRouting(TestCase):
