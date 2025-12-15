@@ -552,6 +552,25 @@ def paywall(request: HttpRequest) -> HttpResponse:
 
 @login_required
 @require_business
+def invoice_list(request: HttpRequest) -> HttpResponse:
+    """
+    List invoices for the current business.
+    Minimal placeholder view that returns 200.
+    """
+    biz: Business = request.business
+    invoices = Invoice.objects.filter(business=biz).order_by('-created_at')[:50]
+    return render(
+        request,
+        "billing/invoices_list.html",
+        {
+            "invoices": invoices,
+            "business": biz,
+        },
+    )
+
+
+@login_required
+@require_business
 def manage(request: HttpRequest) -> HttpResponse:
     """
     Basic "manage subscription" page (stub). You can add upgrade/downgrade actions here later.

@@ -18,6 +18,7 @@ urlpatterns = [
     path("success/",   v.success,   name="success"),
     path("webhook/",   v.webhook,   name="webhook"),
     path("trial-expired/", v.trial_expired, name="trial_expired"),
+    path("invoices/", v.invoice_list, name="invoices"),
 
     # NEW: one-click plan selection + per-plan page
     path("select-plan/", v.select_plan, name="select_plan"),

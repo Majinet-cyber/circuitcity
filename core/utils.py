@@ -135,6 +135,26 @@ def format_money(amount: float, currency: str = "MWK") -> str:
 
 
 # -----------------------------------------------------------------------------
+# URL Pattern Helpers
+# -----------------------------------------------------------------------------
+def flatten_patterns(patterns):
+    """
+    Flatten URL patterns to only include URLPattern items, not URLResolver.
+    This prevents template errors when accessing .name on URLResolver objects.
+    
+    Returns a list of URLPattern objects only.
+    """
+    from django.urls.resolvers import URLPattern, URLResolver
+    out = []
+    for p in patterns:
+        if isinstance(p, URLPattern):
+            out.append(p)
+        elif isinstance(p, URLResolver):
+            out.extend(flatten_patterns(p.url_patterns))
+    return out
+
+
+# -----------------------------------------------------------------------------
 # Notifications
 # -----------------------------------------------------------------------------
 def push_notification(user: User, title: str, message: str, *, kind: str = "INFO", business=None) -> None:
