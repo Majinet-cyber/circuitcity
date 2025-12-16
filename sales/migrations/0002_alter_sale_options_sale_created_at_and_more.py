@@ -31,6 +31,17 @@ def ensure_created_at(apps, schema_editor):
         schema_editor.execute(f'ALTER TABLE "{table}" ADD COLUMN "{col}" datetime;')
 
 
+def drop_sale_price_nonneg_if_exists(apps, schema_editor):
+    if schema_editor.connection.vendor != "postgresql":
+        return
+
+    Sale = apps.get_model("sales", "Sale")
+    table = Sale._meta.db_table  # should be "sales_sale"
+
+    with schema_editor.connection.cursor() as cursor:
+        cursor.execute(f'ALTER TABLE "{table}" DROP CONSTRAINT IF EXISTS "sale_price_nonneg";')
+
+
 class Migration(migrations.Migration):
 
     dependencies = [
@@ -65,6 +76,7 @@ class Migration(migrations.Migration):
             field=models.DecimalField(decimal_places=2, max_digits=12, validators=[django.core.validators.MinValueValidator(0)]),
         ),
         # Indexes already exist from 0001_initial - no need to add them again
+        migrations.RunPython(drop_sale_price_nonneg_if_exists, migrations.RunPython.noop),
         migrations.AddConstraint(
             model_name='sale',
             constraint=models.CheckConstraint(check=models.Q(('price__gte', 0)), name='sale_price_nonneg'),
