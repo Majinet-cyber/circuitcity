@@ -688,8 +688,6 @@
 <!-- Chart Data -->
 {{ chart_data|json_script:"command-center-chart-data" }}
 
-{% endblock %}
-
 {% block extra_js %}
 {{ block.super }}
 <script src="{% static 'vendor/chartjs/chart.umd.min.js' %}" onerror="this.onerror=null; this.src='https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js';"></script>
