@@ -5,7 +5,7 @@ class BusinessKind(models.TextChoices):
     PHONES = "phones", "Phones & Electronics"
     LIQUOR = "liquor", "Liquor / Bar"
     GROCERY = "grocery", "Grocery / General"
-    PHARMACY = "pharmacy", "Pharmacy"
+    PHARMACY = "pharmacy", "Cosmetics & Pharmacy"
     CLOTHING = "clothing", "Clothing"
     GYM = "gym", "Gym / Fitness"
 

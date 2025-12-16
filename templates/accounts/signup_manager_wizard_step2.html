@@ -243,17 +243,15 @@
         {% endwith %}
 
         <!-- Subdomain -->
-        {% with has_err=form.errors.subdomain %}
         <div class="field">
           <div class="label">Subdomain <span style="color:#7c8aa3">(optional)</span></div>
           <span class="addon">🔗</span>
-          <input class="input{% if has_err %} is-error{% endif %}" aria-invalid="{% if has_err %}true{% else %}false{% endif %}"
+          <input class="input{% if form.subdomain.errors %} is-error{% endif %}" aria-invalid="{% if form.subdomain.errors %}true{% else %}false{% endif %}"
                  type="text" name="subdomain" inputmode="lowercase" placeholder="e.g. circuitly"
                  value="{{ form.subdomain.value|default:'' }}">
           <div class="hint">yourstore.imajinet.com</div>
-          {% if has_err %}<div class="err">{{ form.errors.subdomain|striptags }}</div>{% endif %}
+          {% if form.subdomain.errors %}<div class="err">{{ form.subdomain.errors|striptags }}</div>{% endif %}
         </div>
-        {% endwith %}
       </div>
 
       <div class="actions">

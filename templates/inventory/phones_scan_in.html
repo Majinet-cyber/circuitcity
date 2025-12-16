@@ -333,7 +333,28 @@
     </div>
   </div>
 
+  <!-- Empty State (when no catalog products) -->
+  {% if not has_catalog %}
+  <div class="form-section" style="text-align:center;padding:48px 24px;">
+    <h2 style="margin:0 0 12px;color:var(--cc-muted);">📦 No phone models yet</h2>
+    <p style="color:var(--cc-muted);margin:0 0 24px;">
+      You haven't added any phone models to your catalog yet.
+      {% if request.user.is_staff or request.user.is_superuser %}
+        <br>Managers can seed the catalog from Admin or use the phone catalog seeder.
+      {% else %}
+        <br>Contact your manager to add phone models.
+      {% endif %}
+    </p>
+    {% if request.user.is_staff or request.user.is_superuser %}
+    <a href="/admin/inventory/phoneproductcatalog/add/" class="btn btn-primary" style="display:inline-block;">
+      ➕ Add Phone Model
+    </a>
+    {% endif %}
+  </div>
+  {% endif %}
+
   <!-- Brand Selection Cards -->
+  {% if has_catalog %}
   <div class="brand-cards">
     {% for brand in brands %}
     <div class="brand-card" data-brand="{{ brand.key }}" onclick="selectBrand('{{ brand.key }}', '{{ brand.name }}')">
@@ -346,6 +367,7 @@
     </div>
     {% endfor %}
   </div>
+  {% endif %}
 
   <!-- Scan Form with IMEI Picker Sidebar -->
   <div id="scan-form-wrapper" style="display:none;">

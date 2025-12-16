@@ -147,6 +147,104 @@
       </div>
     </div>
 
+    <!-- Commission Settings (Managers Only) -->
+    <div class="col-12">
+      <div class="glass p-3 p-md-4">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+          <div class="section-title">Commission Settings</div>
+          <button class="btn btn-sm" type="button" data-bs-toggle="collapse" data-bs-target="#commissionSettings" aria-expanded="false">
+            <i class="bi bi-gear"></i> Configure
+          </button>
+        </div>
+        
+        <!-- Current Settings Display -->
+        {% if config %}
+        <div class="mb-2">
+          <div class="d-flex gap-3 flex-wrap">
+            <div>
+              <span class="small muted">Status:</span>
+              {% if config.commissions_enabled %}
+                <span class="chip status--accepted">Enabled</span>
+              {% else %}
+                <span class="chip status--revoked">Disabled</span>
+              {% endif %}
+            </div>
+            <div>
+              <span class="small muted">Mode:</span>
+              <strong>{{ config.get_commission_mode_display }}</strong>
+            </div>
+            {% if config.commission_mode == 'PERCENT' %}
+              <div>
+                <span class="small muted">Rate:</span>
+                <strong>{{ config.base_commission_pct }}%</strong>
+              </div>
+            {% else %}
+              <div>
+                <span class="small muted">Amount:</span>
+                <strong>MWK {{ config.fixed_commission_amount|floatformat:0 }}</strong>
+              </div>
+            {% endif %}
+          </div>
+        </div>
+        {% endif %}
+        
+        <!-- Collapsible Settings Form -->
+        <div class="collapse mt-3" id="commissionSettings">
+          <div class="glass-ghost p-3">
+            <form method="post" action="{% url 'tenants:manager_review_agents' %}" id="commissionForm">
+              {% csrf_token %}
+              <input type="hidden" name="action" value="update_commission_settings">
+              
+              <!-- Master Toggle -->
+              <div class="mb-3">
+                <div class="form-check form-switch">
+                  <input class="form-check-input" type="checkbox" role="switch" id="commissionsEnabled" name="commissions_enabled" {% if config.commissions_enabled %}checked{% endif %}>
+                  <label class="form-check-label fw-semibold" for="commissionsEnabled">
+                    Enable Commissions
+                  </label>
+                </div>
+                <small class="text-muted">When disabled, agents stop earning commissions on new sales.</small>
+              </div>
+              
+              <!-- Mode Selector -->
+              <div class="mb-3">
+                <label class="form-label fw-semibold">Commission Mode</label>
+                <div class="btn-group w-100" role="group">
+                  <input type="radio" class="btn-check" name="commission_mode" id="modePercent" value="PERCENT" {% if config.commission_mode == 'PERCENT' %}checked{% endif %} autocomplete="off">
+                  <label class="btn btn-outline-primary" for="modePercent">
+                    <i class="bi bi-percent"></i> Percentage
+                  </label>
+                  
+                  <input type="radio" class="btn-check" name="commission_mode" id="modeFixed" value="FIXED" {% if config.commission_mode == 'FIXED' %}checked{% endif %} autocomplete="off">
+                  <label class="btn btn-outline-primary" for="modeFixed">
+                    <i class="bi bi-cash-coin"></i> Fixed Amount
+                  </label>
+                </div>
+              </div>
+              
+              <!-- Percentage Input -->
+              <div class="mb-3" id="percentField" style="display:{% if config.commission_mode == 'PERCENT' %}block{% else %}none{% endif %};">
+                <label class="form-label fw-semibold" for="baseCommissionPct">Commission Percentage (%)</label>
+                <input type="number" class="form-control" id="baseCommissionPct" name="base_commission_pct" value="{{ config.base_commission_pct|default:'12.00' }}" min="0" max="100" step="0.01">
+                <small class="text-muted">Percentage of sale price (0-100)</small>
+              </div>
+              
+              <!-- Fixed Amount Input -->
+              <div class="mb-3" id="fixedField" style="display:{% if config.commission_mode == 'FIXED' %}block{% else %}none{% endif %};">
+                <label class="form-label fw-semibold" for="fixedCommissionAmount">Fixed Commission Amount (MWK)</label>
+                <input type="number" class="form-control" id="fixedCommissionAmount" name="fixed_commission_amount" value="{{ config.fixed_commission_amount|default:'2000.00' }}" min="0" step="0.01">
+                <small class="text-muted">Fixed amount per sale</small>
+              </div>
+              
+              <button type="submit" class="btn btn-primary">
+                <i class="bi bi-check-lg"></i> Save Settings
+              </button>
+            </form>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <!-- Active agents -->
     <div class="col-12">
       <div class="glass p-3 p-md-4">
@@ -429,6 +527,32 @@
 
   show(0);
   start();
+})();
+
+// Commission settings form toggle
+(function(){
+  const form = document.getElementById('commissionForm');
+  if (!form) return;
+  
+  const modePercent = document.getElementById('modePercent');
+  const modeFixed = document.getElementById('modeFixed');
+  const percentField = document.getElementById('percentField');
+  const fixedField = document.getElementById('fixedField');
+  
+  function updateFieldVisibility() {
+    if (modePercent && modePercent.checked) {
+      percentField.style.display = 'block';
+      fixedField.style.display = 'none';
+    } else if (modeFixed && modeFixed.checked) {
+      percentField.style.display = 'none';
+      fixedField.style.display = 'block';
+    }
+  }
+  
+  if (modePercent) modePercent.addEventListener('change', updateFieldVisibility);
+  if (modeFixed) modeFixed.addEventListener('change', updateFieldVisibility);
+  
+  updateFieldVisibility();
 })();
 </script>
 

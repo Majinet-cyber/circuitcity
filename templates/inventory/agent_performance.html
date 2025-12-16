@@ -1,0 +1,305 @@
+{% extends "base.html" %}
+{% load humanize %}
+
+{% block title %}{{ agent_name }} Performance · Emajinet{% endblock %}
+{% block header_title %}Agent Performance · {{ agent_name }}{% endblock %}
+
+{% block extra_css %}
+<style>
+  :root{
+    --cc-bg:#ffffff;
+    --cc-text:#0f172a;
+    --cc-muted:#64748b;
+    --cc-border:#e2e8f0;
+    --cc-panel:#ffffff;
+    --cc-panel-2:#f8fafc;
+    --cc-accent:#2563eb;
+    --cc-shadow:0 6px 18px rgba(2,6,23,.08);
+  }
+  
+  .page{max-width:1200px;margin:0 auto;padding:clamp(12px,4vw,24px)}
+  .vstack{display:flex;flex-direction:column;gap:.75rem}
+  .hstack{display:flex;align-items:center;gap:.75rem;flex-wrap:wrap}
+  
+  .header-card{
+    background:linear-gradient(135deg,#2563eb,#1d4ed8);
+    border-radius:20px;
+    padding:24px;
+    color:#fff;
+    box-shadow:var(--cc-shadow);
+    margin-bottom:24px;
+  }
+  .header-card h1{margin:0;font-size:clamp(24px,3vw,32px);font-weight:900}
+  .header-card p{margin:8px 0 0;opacity:.9}
+  .header-card .header-actions{margin-top:16px;display:flex;gap:10px;flex-wrap:wrap}
+  .btn-commission{
+    background:rgba(255,255,255,.2);backdrop-filter:blur(10px);
+    border:1px solid rgba(255,255,255,.3);color:#fff;
+    padding:10px 20px;border-radius:10px;font-weight:700;
+    text-decoration:none;transition:all .2s;display:inline-flex;
+    align-items:center;gap:8px;font-size:.95rem;
+  }
+  .btn-commission:hover{background:rgba(255,255,255,.3);transform:translateY(-2px)}
+  
+  .metrics-grid{
+    display:grid;
+    grid-template-columns:repeat(auto-fit,minmax(250px,1fr));
+    gap:18px;
+    margin-bottom:24px;
+  }
+  .metric-card{
+    background:linear-gradient(135deg,#ffffff,#f8fafc);
+    border-radius:16px;
+    padding:20px;
+    box-shadow:var(--cc-shadow);
+    border:1px solid var(--cc-border);
+    transition:all 0.3s;
+  }
+  .metric-card:hover{
+    transform:translateY(-4px);
+    box-shadow:0 12px 32px rgba(2,6,23,.15);
+  }
+  .metric-card h3{
+    margin:0;
+    font-size:.95rem;
+    text-transform:uppercase;
+    color:var(--cc-muted);
+    letter-spacing:0.05em;
+    font-weight:600;
+  }
+  .metric-card p{
+    margin:8px 0 0;
+    font-size:1.8rem;
+    font-weight:900;
+    color:var(--cc-text);
+  }
+  .metric-card small{
+    display:block;
+    margin-top:6px;
+    font-size:.85rem;
+    color:var(--cc-muted);
+  }
+  
+  .section-card{
+    background:var(--cc-panel);
+    border:1px solid var(--cc-border);
+    border-radius:16px;
+    padding:24px;
+    box-shadow:var(--cc-shadow);
+    margin-bottom:24px;
+  }
+  .section-title{
+    font-size:1.3rem;
+    font-weight:800;
+    color:var(--cc-text);
+    margin:0 0 16px;
+    display:flex;
+    align-items:center;
+    gap:10px;
+  }
+  
+  .stock-list{
+    display:flex;
+    flex-direction:column;
+    gap:10px;
+  }
+  .stock-item{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    padding:12px;
+    background:var(--cc-panel-2);
+    border:1px solid var(--cc-border);
+    border-radius:12px;
+    gap:12px;
+    flex-wrap:wrap;
+  }
+  .stock-item-main{
+    flex:1;
+    min-width:0;
+  }
+  .stock-item strong{
+    display:block;
+    font-weight:700;
+    color:var(--cc-text);
+    white-space:nowrap;
+    overflow:hidden;
+    text-overflow:ellipsis;
+  }
+  .stock-item span{
+    display:block;
+    font-size:.85rem;
+    color:var(--cc-muted);
+  }
+  .stock-item-value{
+    font-weight:700;
+    color:#16a34a;
+    white-space:nowrap;
+    text-align:right;
+  }
+  
+  .date-filters{
+    display:flex;
+    gap:8px;
+    flex-wrap:wrap;
+    margin-bottom:16px;
+  }
+  .date-filters .btn{
+    padding:8px 16px;
+    border-radius:20px;
+    font-size:.9rem;
+    min-height:40px;
+  }
+  
+  .empty-state{
+    text-align:center;
+    padding:40px 20px;
+    color:var(--cc-muted);
+  }
+  .empty-state h3{
+    margin:0 0 8px;
+    color:var(--cc-text);
+  }
+  
+  @media (max-width:768px){
+    .metrics-grid{
+      grid-template-columns:1fr;
+    }
+    .stock-item{
+      flex-direction:column;
+      align-items:stretch;
+    }
+    .stock-item-value{
+      text-align:left;
+    }
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page">
+  <!-- Header -->
+  <div class="header-card">
+    <h1>{{ agent_name }}</h1>
+    <p>{{ business.name }} · {{ range_label }}</p>
+    {% if is_manager %}
+    <div class="header-actions">
+      <a href="{% url 'inventory:commission_settings' %}?next={{ request.path }}" class="btn-commission">
+        ⚙️ Commission Settings
+      </a>
+    </div>
+    {% endif %}
+  </div>
+  
+  <!-- Date Range Filters -->
+  <div class="date-filters">
+    <span style="font-weight:700;color:var(--cc-muted);margin-right:8px;display:flex;align-items:center">Date Range:</span>
+    <a href="?range=today" class="btn {% if range_label == 'Today' %}btn-primary{% else %}btn-outline-secondary{% endif %}">
+      Today
+    </a>
+    <a href="?range=7d" class="btn {% if range_label == 'Last 7 Days' %}btn-primary{% else %}btn-outline-secondary{% endif %}">
+      Last 7 Days
+    </a>
+    <a href="?range=mtd" class="btn {% if range_label == 'This Month' %}btn-primary{% else %}btn-outline-secondary{% endif %}">
+      This Month
+    </a>
+  </div>
+  
+  <!-- KPIs Grid -->
+  <div class="metrics-grid">
+    <!-- Stock Held -->
+    <div class="metric-card">
+      <h3>📦 Stock Held</h3>
+      <p>{{ stock_count }}</p>
+      <small>Items currently held</small>
+    </div>
+    
+    <!-- Stock Value (Cost) -->
+    <div class="metric-card">
+      <h3>💰 Stock Cost Value</h3>
+      <p>MK {{ stock_cost_value|floatformat:0|intcomma }}</p>
+      <small>Total cost basis</small>
+    </div>
+    
+    <!-- Stock Value (Selling) -->
+    <div class="metric-card">
+      <h3>💵 Stock Potential Value</h3>
+      <p>MK {{ stock_selling_value|floatformat:0|intcomma }}</p>
+      <small>If all items sell at full price</small>
+    </div>
+    
+    <!-- Sales Count -->
+    <div class="metric-card">
+      <h3>📊 Sales ({{ range_label }})</h3>
+      <p>{{ sales_count }}</p>
+      <small>Units sold</small>
+    </div>
+    
+    <!-- Sales Revenue -->
+    <div class="metric-card">
+      <h3>💳 Revenue ({{ range_label }})</h3>
+      <p>MK {{ sales_revenue|floatformat:0|intcomma }}</p>
+      <small>Total sales revenue</small>
+    </div>
+    
+    <!-- Sales Profit -->
+    <div class="metric-card">
+      <h3>📈 Profit ({{ range_label }})</h3>
+      <p {% if sales_profit < 0 %}style="color:#dc2626"{% endif %}>
+        MK {{ sales_profit|floatformat:0|intcomma }}
+      </p>
+      <small>Revenue minus COGS</small>
+    </div>
+    
+    <!-- Earnings -->
+    <div class="metric-card">
+      <h3>💸 Earnings ({{ range_label }})</h3>
+      <p>MK {{ earnings_total|floatformat:0|intcomma }}</p>
+      <small>Commission & bonuses</small>
+    </div>
+  </div>
+  
+  <!-- Stock Held List -->
+  <div class="section-card">
+    <h2 class="section-title">
+      <i class="bi bi-box-seam"></i> Stock Held by {{ agent_name }}
+    </h2>
+    
+    {% if stock_list %}
+      <div class="stock-list">
+        {% for item in stock_list %}
+          <div class="stock-item">
+            <div class="stock-item-main">
+              <strong>{{ item.product.name|default:item.product|default:"Unknown Product" }}</strong>
+              <span>IMEI: {{ item.imei }} · Location: {{ item.current_location.name|default:"N/A" }}</span>
+            </div>
+            <div class="stock-item-value">
+              Cost: MK {{ item.order_price|floatformat:0|intcomma }}<br>
+              Sell: MK {{ item.selling_price|floatformat:0|intcomma }}
+            </div>
+          </div>
+        {% endfor %}
+      </div>
+      
+      {% if stock_count > 50 %}
+        <p style="margin-top:16px;color:var(--cc-muted);text-align:center">
+          Showing first 50 of {{ stock_count }} items
+        </p>
+      {% endif %}
+    {% else %}
+      <div class="empty-state">
+        <h3>No stock held</h3>
+        <p>{{ agent_name }} is not currently holding any stock.</p>
+      </div>
+    {% endif %}
+  </div>
+  
+  <!-- Back Button -->
+  <div>
+    <a href="{% url 'inventory:stock_list' %}" class="btn btn-outline-secondary">
+      <i class="bi bi-arrow-left"></i> Back to Stock List
+    </a>
+  </div>
+</div>
+{% endblock %}
+

@@ -1205,20 +1205,46 @@ def signup_manager(request):
             action = request.POST.get("action", "next")
             if action == "back":
                 return redirect(f"{reverse('accounts:signup_manager')}?step=2")
-            elif action == "next" and form.is_valid():
-                # Store logo file in session (as base64 if provided)
-                logo_file = form.cleaned_data.get("logo")
-                if logo_file:
-                    import base64
-                    wizard_data["step3"] = {
-                        "logo_name": logo_file.name,
-                        "logo_content_type": logo_file.content_type,
-                        "logo_data": base64.b64encode(logo_file.read()).decode("utf-8"),
-                    }
-                else:
-                    wizard_data["step3"] = {}
+            elif action == "skip":
+                # Skip button: no logo, just store empty step3 and proceed
+                wizard_data["step3"] = {}
                 _set_manager_wizard_data(request, wizard_data)
                 return redirect(f"{reverse('accounts:signup_manager')}?step=4")
+            elif action == "next":
+                # Defensive logo upload handling - never crash signup
+                try:
+                    if form.is_valid():
+                        # Store logo file in session (as base64 if provided)
+                        logo_file = form.cleaned_data.get("logo")
+                        if logo_file:
+                            import base64
+                            # Validate basic constraints (5MB limit)
+                            if logo_file.size > 5 * 1024 * 1024:
+                                raise ValueError("Logo file too large (max 5MB)")
+                            
+                            wizard_data["step3"] = {
+                                "logo_name": logo_file.name,
+                                "logo_content_type": logo_file.content_type,
+                                "logo_data": base64.b64encode(logo_file.read()).decode("utf-8"),
+                            }
+                        else:
+                            wizard_data["step3"] = {}
+                        _set_manager_wizard_data(request, wizard_data)
+                        return redirect(f"{reverse('accounts:signup_manager')}?step=4")
+                except (ValidationError, ValueError, OSError, IOError) as e:
+                    # Expected errors: validation, file I/O, image processing
+                    log.warning("Logo upload failed during wizard step 3: %s", e)
+                    messages.info(request, "Logo upload is not available yet — continuing without a logo.")
+                    wizard_data["step3"] = {}
+                    _set_manager_wizard_data(request, wizard_data)
+                    return redirect(f"{reverse('accounts:signup_manager')}?step=4")
+                except Exception as e:
+                    # Safety net for any unexpected errors
+                    log.error("Unexpected error during logo upload in wizard step 3: %s", e, exc_info=True)
+                    messages.info(request, "Logo upload is not available yet — continuing without a logo.")
+                    wizard_data["step3"] = {}
+                    _set_manager_wizard_data(request, wizard_data)
+                    return redirect(f"{reverse('accounts:signup_manager')}?step=4")
         return render(request, "accounts/signup_manager_wizard_step3.html", {
             "form": form,
             "step": step,
@@ -1354,15 +1380,21 @@ def _complete_manager_wizard_signup(request, wizard_data):
             # Seed defaults
             _seed_defaults_for_business(biz)
 
-            # 3. Save logo if provided
+            # 3. Save logo if provided (with defensive handling)
             logo_data = step3.get("logo_data")
             if logo_data and hasattr(biz, "logo"):
                 try:
+                    import base64
+                    from django.core.files.base import ContentFile
                     logo_bytes = base64.b64decode(logo_data)
                     logo_name = step3.get("logo_name", "logo.png")
                     biz.logo.save(logo_name, ContentFile(logo_bytes), save=True)
-                except Exception as e:
+                except (ValueError, OSError, IOError) as e:
+                    # Expected errors: base64 decode, file storage, I/O
                     log.warning("Failed to save logo during manager wizard: %s", e)
+                except Exception as e:
+                    # Safety net - never crash signup due to logo
+                    log.error("Unexpected error saving logo during manager wizard: %s", e, exc_info=True)
 
         # 4. Ensure Profile exists and mark as manager (NOT an agent)
         try:

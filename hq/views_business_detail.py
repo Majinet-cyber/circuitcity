@@ -114,11 +114,11 @@ def _get_overview_data(business: Business, subscription: Subscription | None) ->
     thirty_days_ago = timezone.now() - timedelta(days=30)
     if Sale:
         sales_30d = Sale.objects.filter(
-            business=business,
+            location__business=business,
             created_at__gte=thirty_days_ago
         ).aggregate(
             count=Count("id"),
-            total=Sum("amount")
+            total=Sum("price")
         )
         sales_count_30d = sales_30d["count"] or 0
         sales_total_30d = sales_30d["total"] or Decimal("0")
@@ -134,9 +134,13 @@ def _get_overview_data(business: Business, subscription: Subscription | None) ->
     
     # Stock summary (if applicable)
     if InventoryItem:
-        stock_count = InventoryItem.objects.filter(business=business, archived=False).count()
+        stock_count = InventoryItem.objects.filter(
+            business=business,
+            archived_at__isnull=True
+        ).count()
         stock_in_7d = InventoryItem.objects.filter(
             business=business,
+            archived_at__isnull=True,
             created_at__gte=timezone.now() - timedelta(days=7)
         ).count()
     else:
@@ -217,15 +221,15 @@ def _get_data_inventory_data(business: Business) -> dict:
     if not InventoryItem:
         return {"stock_items": [], "archived_count": 0}
     
-    # Recent stock
+    # Recent stock (non-archived only)
     stock_items = InventoryItem.objects.filter(
         business=business,
-        archived=False
+        archived_at__isnull=True
     ).order_by("-created_at")[:20]
     
     archived_count = InventoryItem.objects.filter(
         business=business,
-        archived=True
+        archived_at__isnull=False
     ).count()
     
     return {
@@ -240,7 +244,7 @@ def _get_sales_wallet_data(business: Business) -> dict:
     thirty_days_ago = timezone.now() - timedelta(days=30)
     if Sale:
         recent_sales = Sale.objects.filter(
-            business=business,
+            location__business=business,
             created_at__gte=thirty_days_ago
         ).order_by("-created_at")[:20]
     else:
@@ -353,12 +357,12 @@ def _get_chart_data(business: Business) -> dict:
     
     if Sale:
         sales_by_day = Sale.objects.filter(
-            business=business,
+            location__business=business,
             created_at__gte=thirty_days_ago
         ).annotate(
             date=TruncDate("created_at")
         ).values("date").annotate(
-            total=Sum("amount")
+            total=Sum("price")
         ).order_by("date")
         
         for item in sales_by_day:
@@ -368,22 +372,22 @@ def _get_chart_data(business: Business) -> dict:
     # Transactions by type (wallet)
     txn_types = WalletTransaction.objects.filter(
         business=business
-    ).values("transaction_type").annotate(
+    ).values("type").annotate(
         count=Count("id")
     ).order_by("-count")
     
     transactions_by_type = {}
     for item in txn_types:
-        txn_type = item["transaction_type"] or "Other"
+        txn_type = item["type"] or "Other"
         transactions_by_type[txn_type.replace("_", " ").title()] = item["count"]
     
     # Sale amounts distribution (histogram)
     sale_amounts = []
     if Sale:
         recent_sales = Sale.objects.filter(
-            business=business,
+            location__business=business,
             created_at__gte=thirty_days_ago
-        ).values_list("amount", flat=True)
+        ).values_list("price", flat=True)
         sale_amounts = [float(amt) for amt in recent_sales if amt]
     
     # Create bins for histogram

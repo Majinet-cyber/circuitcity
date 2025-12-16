@@ -77,29 +77,50 @@ class CommissionConfig(models.Model):
     Commission and bonus/penalty configuration per business.
     ONE active config per business at a time.
     """
+    
+    COMMISSION_MODE_PERCENT = 'PERCENT'
+    COMMISSION_MODE_FIXED = 'FIXED'
+    COMMISSION_MODE_CHOICES = [
+        (COMMISSION_MODE_PERCENT, 'Percentage'),
+        (COMMISSION_MODE_FIXED, 'Fixed Amount'),
+    ]
+    
     business = models.ForeignKey(
         "tenants.Business",
         on_delete=models.CASCADE,
         related_name="commission_configs",
     )
     
-    # Base commission rate for phone sales
+    # Master toggle for commissions
+    commissions_enabled = models.BooleanField(
+        default=True,
+        help_text="Enable or disable commission calculation for new sales. When OFF, agents do not earn commissions.",
+    )
+    
+    # Commission mode selector
+    commission_mode = models.CharField(
+        max_length=20,
+        choices=COMMISSION_MODE_CHOICES,
+        default=COMMISSION_MODE_PERCENT,
+        help_text="Commission calculation mode: Percentage or Fixed amount per sale.",
+    )
+    
+    # Base commission rate for phone sales (percentage mode)
     base_commission_pct = models.DecimalField(
         max_digits=5,
         decimal_places=2,
         default=Decimal("12.00"),
         validators=[MinValueValidator(0), MaxValueValidator(100)],
-        help_text="Default commission percentage for phone sales (e.g., 12.00 = 12%).",
+        help_text="Commission percentage for phone sales (e.g., 12.00 = 12%). Used when commission_mode=PERCENT.",
     )
     
-    # Alternative: fixed amount per sale
+    # Alternative: fixed amount per sale (fixed mode)
     fixed_commission_amount = models.DecimalField(
         max_digits=12,
         decimal_places=2,
-        null=True,
-        blank=True,
+        default=Decimal("2000.00"),
         validators=[MinValueValidator(0)],
-        help_text="Fixed commission per sale (if set, overrides percentage).",
+        help_text="Fixed commission per sale in MWK. Used when commission_mode=FIXED.",
     )
     
     # Bonus/Penalty configuration for time-based incentives

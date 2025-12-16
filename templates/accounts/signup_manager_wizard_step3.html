@@ -52,18 +52,41 @@
             padding:.7rem 1rem;border-radius:12px;margin:0 0 12px;font-weight:700 }
 
     form{ display:grid; gap:14px; }
-    .grid{ display:grid; grid-template-columns: 1fr; gap:14px; }
-
+    
     .field{ position:relative; }
     .label{ font-weight:800; font-size:.92rem; margin:0 0 6px; color:#08224e; }
     .hint{ font-size:.84rem; color:#6b7e99; margin-top:6px }
 
-    /* File drop */
-    .drop{ position:relative; border:2px dashed #cfe; border-radius:14px; padding:32px; background:#f8fbff; transition:border-color var(--fast), background var(--fast); text-align:center; cursor:pointer; }
-    .drop.drag{ border-color:var(--blue); background:#eef6ff }
-    .drop-icon{ font-size:3rem; margin-bottom:1rem; }
-    .drop-text{ color:var(--ink); font-weight:600; }
-    .file{ display:none; }
+    /* Logo drop zone */
+    .drop{
+      border:2px dashed var(--line); border-radius:16px; padding:40px 20px;
+      background:linear-gradient(135deg, #f8fbff 0%, #fff 100%);
+      text-align:center; cursor:pointer; position:relative;
+      transition: all var(--fast) var(--pop);
+    }
+    .drop:hover{
+      border-color:var(--blue); background:#f0f7ff;
+      box-shadow:0 8px 24px rgba(59,130,246,.12);
+    }
+    .drop input[type="file"]{
+      position:absolute; inset:0; opacity:0; cursor:pointer; width:100%; height:100%;
+    }
+    .drop-icon{ font-size:3rem; margin-bottom:12px; }
+    .drop-text{ font-weight:700; color:var(--ink); margin-bottom:6px; }
+    .drop-hint{ font-size:.85rem; color:var(--muted); }
+    
+    /* Preview area */
+    .preview{
+      display:none; margin-top:12px; text-align:center;
+    }
+    .preview.active{ display:block; }
+    .preview img{
+      max-width:200px; max-height:200px; border-radius:12px;
+      border:1px solid var(--line); box-shadow:0 4px 12px rgba(0,0,0,.08);
+    }
+    .preview-name{
+      margin-top:8px; font-size:.9rem; color:var(--muted); font-weight:600;
+    }
 
     /* Buttons */
     .actions{ display:flex; gap:12px; justify-content:flex-end; margin-top:8px; }
@@ -86,9 +109,6 @@
     }
     .btn.secondary:hover{ filter:brightness(0.98) }
 
-    .skip-link{ color:var(--muted); text-decoration:none; font-size:.9rem; margin-top:1rem; display:inline-block; }
-    .skip-link:hover{ color:var(--blue); text-decoration:underline; }
-
     .footer-links{ margin-top:20px; padding-top:20px; border-top:1px solid var(--line); display:flex; gap:1rem; justify-content:center; flex-wrap:wrap; }
     .footer-link{ color:var(--muted); text-decoration:none; font-size:.9rem; }
     .footer-link:hover{ color:var(--blue); text-decoration:underline; }
@@ -96,7 +116,7 @@
 
     /* Inline error visuals */
     .is-error{ border-color:var(--rose)!important; box-shadow:0 0 0 3px rgba(239,68,68,.12)!important; }
-    .err{ color:var(--rose); font-size:.85rem; margin-top:6px; font-weight:700; text-align:center; }
+    .err{ color:var(--rose); font-size:.85rem; margin-top:6px; font-weight:700 }
   </style>
 </head>
 <body>
@@ -109,7 +129,7 @@
 
     <div class="step-indicator">Step 3 of 4</div>
     <h1 class="page-title">Your brand</h1>
-    <p class="subtitle">Add a logo to make your store stand out (you can always add this later).</p>
+    <p class="subtitle">Add your logo to personalize your store (optional).</p>
 
     {% if messages %}
       {% for m in messages %}
@@ -121,29 +141,29 @@
       {% csrf_token %}
       <input type="hidden" name="step" value="3">
 
-      <div class="grid">
-        <!-- Logo -->
-        {% with has_err=form.errors.logo %}
-        <div class="field">
-          <div class="label">Logo <span style="color:#7c8aa3">(optional)</span></div>
-          <div id="drop" class="drop{% if has_err %} is-error{% endif %}">
-            <div class="drop-icon">🎨</div>
-            <div class="drop-text">Drag & drop a PNG/JPG here or click to browse</div>
-            <div class="hint" style="margin-top:.5rem">Maximum size: 2MB</div>
-            <input id="logo" class="file" type="file" name="logo" accept="image/*">
-          </div>
-          {% if has_err %}<div class="err">{{ form.errors.logo|striptags }}</div>{% endif %}
+      <!-- Logo upload -->
+      <div class="field">
+        <div class="label">Logo <span style="color:#7c8aa3">(optional)</span></div>
+        <div class="drop{% if form.logo.errors %} is-error{% endif %}" id="dropZone">
+          <input type="file" name="logo" id="logoInput" accept="image/*">
+          <div class="drop-icon">🎨</div>
+          <div class="drop-text">Drag & drop your logo here</div>
+          <div class="drop-hint">or click to browse • PNG, JPG, WEBP (max 5MB)</div>
         </div>
-        {% endwith %}
+        <div class="preview" id="preview">
+          <img id="previewImg" src="" alt="Logo preview">
+          <div class="preview-name" id="previewName"></div>
+        </div>
+        {% if form.logo.errors %}
+          <div class="err">{{ form.logo.errors|striptags }}</div>
+        {% else %}
+          <div class="hint">Your logo will appear on receipts, reports, and your custom subdomain.</div>
+        {% endif %}
       </div>
 
       <div class="actions">
         <button class="btn secondary" type="submit" name="action" value="back">← Back</button>
         <button class="btn" type="submit" name="action" value="next">Next →</button>
-      </div>
-
-      <div style="text-align:center;">
-        <button class="skip-link btn secondary" type="submit" name="action" value="next">Skip for now</button>
       </div>
     </form>
 
@@ -157,21 +177,50 @@
 </div>
 
 <script>
-  // Drop highlight
-  const drop=document.getElementById('drop'), file=document.getElementById('logo');
-  if(drop&&file){
-    drop.addEventListener('dragenter',()=>drop.classList.add('drag'));
-    drop.addEventListener('dragleave',()=>drop.classList.remove('drag'));
-    drop.addEventListener('drop',()=>drop.classList.remove('drag'));
-    drop.addEventListener('click',()=>file.click());
-    
-    file.addEventListener('change', (e) => {
-      const files = e.target.files;
-      if (files.length > 0) {
-        const fileName = files[0].name;
-        drop.querySelector('.drop-text').textContent = '✓ ' + fileName;
-        drop.style.borderColor = 'var(--green)';
-        drop.style.background = '#f0fdf4';
+  // Logo preview
+  const input = document.getElementById('logoInput');
+  const preview = document.getElementById('preview');
+  const previewImg = document.getElementById('previewImg');
+  const previewName = document.getElementById('previewName');
+  const dropZone = document.getElementById('dropZone');
+
+  if (input) {
+    input.addEventListener('change', function(e) {
+      const file = e.target.files[0];
+      if (file) {
+        // Show preview
+        const reader = new FileReader();
+        reader.onload = function(event) {
+          previewImg.src = event.target.result;
+          previewName.textContent = file.name;
+          preview.classList.add('active');
+        };
+        reader.readAsDataURL(file);
+      } else {
+        preview.classList.remove('active');
+      }
+    });
+
+    // Drag & drop enhancement
+    dropZone.addEventListener('dragover', function(e) {
+      e.preventDefault();
+      dropZone.style.borderColor = 'var(--blue)';
+      dropZone.style.background = '#f0f7ff';
+    });
+
+    dropZone.addEventListener('dragleave', function(e) {
+      dropZone.style.borderColor = '';
+      dropZone.style.background = '';
+    });
+
+    dropZone.addEventListener('drop', function(e) {
+      e.preventDefault();
+      dropZone.style.borderColor = '';
+      dropZone.style.background = '';
+      
+      if (e.dataTransfer.files.length > 0) {
+        input.files = e.dataTransfer.files;
+        input.dispatchEvent(new Event('change'));
       }
     });
   }

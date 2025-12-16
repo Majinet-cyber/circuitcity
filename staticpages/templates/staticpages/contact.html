@@ -1,0 +1,371 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Contact Us - Emajinet</title>
+  <meta name="description" content="Get in touch with Emajinet for custom plans, feature requests, or support.">
+  <meta name="theme-color" content="#0b1220">
+  <link rel="icon" href="{% static 'favicon.ico' %}">
+  
+  <!-- Bootstrap Icons -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
+  
+  <style>
+    :root {
+      --primary: #4f46e5;
+      --primary-dark: #4338ca;
+      --secondary: #10b981;
+      --text-primary: #1f2937;
+      --text-secondary: #6b7280;
+      --bg-light: #f9fafb;
+      --white: #ffffff;
+      --shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, Roboto, Helvetica, Arial, sans-serif;
+      line-height: 1.6;
+      color: var(--text-primary);
+      background: var(--bg-light);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .navbar {
+      background: rgba(255, 255, 255, 0.95);
+      backdrop-filter: blur(10px);
+      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+      padding: 1rem 2rem;
+    }
+
+    .navbar-content {
+      max-width: 1280px;
+      margin: 0 auto;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .logo-section {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+    }
+
+    .logo {
+      height: 40px;
+      width: auto;
+    }
+
+    .logo-text {
+      font-size: 1.5rem;
+      font-weight: 700;
+      color: var(--primary);
+    }
+
+    .btn {
+      padding: 0.65rem 1.5rem;
+      border-radius: 12px;
+      font-weight: 600;
+      text-decoration: none;
+      transition: all 0.2s ease;
+      display: inline-block;
+      border: none;
+      cursor: pointer;
+      font-size: 1rem;
+    }
+
+    .btn-primary {
+      background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
+      color: var(--white);
+      box-shadow: 0 4px 12px rgba(79, 70, 229, 0.3);
+    }
+
+    .btn-primary:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 20px rgba(79, 70, 229, 0.4);
+    }
+
+    .btn-text {
+      background: transparent;
+      color: var(--text-primary);
+    }
+
+    .btn-text:hover {
+      color: var(--primary);
+    }
+
+    .container {
+      max-width: 800px;
+      margin: 0 auto;
+      padding: 4rem 2rem;
+      flex: 1;
+    }
+
+    .page-title {
+      font-size: 2.5rem;
+      font-weight: 800;
+      margin-bottom: 1rem;
+      color: var(--text-primary);
+      text-align: center;
+    }
+
+    .page-subtitle {
+      font-size: 1.125rem;
+      color: var(--text-secondary);
+      text-align: center;
+      margin-bottom: 3rem;
+    }
+
+    .contact-card {
+      background: var(--white);
+      padding: 2.5rem;
+      border-radius: 20px;
+      box-shadow: var(--shadow);
+      margin-bottom: 2rem;
+    }
+
+    .form-group {
+      margin-bottom: 1.5rem;
+    }
+
+    .form-label {
+      display: block;
+      font-weight: 600;
+      margin-bottom: 0.5rem;
+      color: var(--text-primary);
+    }
+
+    .form-control {
+      width: 100%;
+      padding: 0.875rem 1rem;
+      border: 2px solid #e5e7eb;
+      border-radius: 12px;
+      font-size: 1rem;
+      transition: border-color 0.2s ease;
+      font-family: inherit;
+    }
+
+    .form-control:focus {
+      outline: none;
+      border-color: var(--primary);
+    }
+
+    textarea.form-control {
+      resize: vertical;
+      min-height: 150px;
+    }
+
+    .success-message {
+      background: #d1fae5;
+      border: 2px solid var(--secondary);
+      color: #065f46;
+      padding: 1rem 1.5rem;
+      border-radius: 12px;
+      margin-bottom: 1.5rem;
+      display: none;
+    }
+
+    .success-message.show {
+      display: block;
+    }
+
+    .contact-methods {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 1.5rem;
+      margin-top: 2rem;
+    }
+
+    .contact-method {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      padding: 1.5rem;
+      background: var(--bg-light);
+      border-radius: 12px;
+    }
+
+    .contact-method i {
+      font-size: 2rem;
+      color: var(--primary);
+    }
+
+    .contact-method-content h3 {
+      font-size: 1.125rem;
+      font-weight: 700;
+      margin-bottom: 0.25rem;
+    }
+
+    .contact-method-content p {
+      color: var(--text-secondary);
+      margin: 0;
+    }
+
+    .contact-method-content a {
+      color: var(--primary);
+      text-decoration: none;
+    }
+
+    .contact-method-content a:hover {
+      text-decoration: underline;
+    }
+
+    .footer {
+      padding: 2rem;
+      background: var(--text-primary);
+      color: var(--white);
+      text-align: center;
+      margin-top: auto;
+    }
+
+    @media (max-width: 768px) {
+      .navbar-content {
+        padding: 0;
+      }
+
+      .container {
+        padding: 2rem 1rem;
+      }
+
+      .page-title {
+        font-size: 2rem;
+      }
+
+      .contact-card {
+        padding: 1.5rem;
+      }
+    }
+  </style>
+</head>
+<body>
+  <!-- Navigation -->
+  <nav class="navbar">
+    <div class="navbar-content">
+      <div class="logo-section">
+        <img src="{% static 'img/majn.png' %}" alt="Emajinet Logo" class="logo">
+        <span class="logo-text">Emajinet</span>
+      </div>
+      <div>
+        <a href="{% url 'staticpages:home' %}" class="btn btn-text">Home</a>
+        <a href="{% url 'staticpages:pricing' %}" class="btn btn-text">Pricing</a>
+      </div>
+    </div>
+  </nav>
+
+  <div class="container">
+    <h1 class="page-title">Get in Touch</h1>
+    <p class="page-subtitle">
+      Have questions about custom plans, features, or need support? We're here to help.
+    </p>
+
+    <div class="contact-card">
+      <div class="success-message" id="successMessage">
+        <i class="bi bi-check-circle-fill"></i> Thank you! Your message has been received. We'll get back to you shortly.
+      </div>
+
+      <form id="contactForm" method="post">
+        {% csrf_token %}
+        <div class="form-group">
+          <label for="name" class="form-label">Your Name</label>
+          <input type="text" id="name" name="name" class="form-control" required>
+        </div>
+
+        <div class="form-group">
+          <label for="email" class="form-label">Email Address</label>
+          <input type="email" id="email" name="email" class="form-control" required>
+        </div>
+
+        <div class="form-group">
+          <label for="subject" class="form-label">Subject</label>
+          <select id="subject" name="subject" class="form-control" required>
+            <option value="">Select a topic...</option>
+            <option value="custom_plan">Custom Plan Request</option>
+            <option value="feature_request">Feature Request</option>
+            <option value="feature_suppression">Feature Suppression & Discounts</option>
+            <option value="support">Technical Support</option>
+            <option value="billing">Billing Question</option>
+            <option value="other">Other</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label for="message" class="form-label">Message</label>
+          <textarea id="message" name="message" class="form-control" required></textarea>
+        </div>
+
+        <button type="submit" class="btn btn-primary" style="width: 100%;">
+          Send Message
+        </button>
+      </form>
+    </div>
+
+    <div class="contact-methods">
+      <div class="contact-method">
+        <i class="bi bi-envelope-fill"></i>
+        <div class="contact-method-content">
+          <h3>Email</h3>
+          <p><a href="mailto:support@emajinet.com">support@emajinet.com</a></p>
+        </div>
+      </div>
+
+      <div class="contact-method">
+        <i class="bi bi-whatsapp"></i>
+        <div class="contact-method-content">
+          <h3>WhatsApp</h3>
+          <p>+265 XXX XXX XXX (Coming soon)</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <footer class="footer">
+    <p>&copy; 2025 Emajinet. All rights reserved.</p>
+  </footer>
+
+  <script>
+    document.addEventListener('DOMContentLoaded', function() {
+      const form = document.getElementById('contactForm');
+      const successMessage = document.getElementById('successMessage');
+
+      form.addEventListener('submit', function(e) {
+        e.preventDefault();
+
+        const formData = new FormData(form);
+
+        fetch('{% url "staticpages:contact" %}', {
+          method: 'POST',
+          body: formData,
+          headers: {
+            'X-Requested-With': 'XMLHttpRequest',
+          },
+        })
+        .then(response => response.json())
+        .then(data => {
+          if (data.success) {
+            successMessage.classList.add('show');
+            form.reset();
+            setTimeout(() => {
+              successMessage.classList.remove('show');
+            }, 5000);
+          }
+        })
+        .catch(error => {
+          console.error('Error:', error);
+          alert('There was an error sending your message. Please try emailing us directly at support@emajinet.com');
+        });
+      });
+    });
+  </script>
+</body>
+</html>
+

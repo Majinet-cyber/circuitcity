@@ -9,6 +9,8 @@ urlpatterns = [
     path('terms/', views.terms, name='terms'),
     path('data-deletion/', views.data_deletion, name='data_deletion'),
     path('about/', views.about, name='about'),
+    path('pricing/', views.pricing, name='pricing'),
+    path('contact/', views.contact, name='contact'),
     path('simulator/', views.simulator, name='simulator'),
     
     # Onboarding guides

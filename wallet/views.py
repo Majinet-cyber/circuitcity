@@ -582,6 +582,17 @@ class AgentWalletView(LoginRequiredMixin, TemplateView):
         ctx["filter_start"] = filter_start.date() if hasattr(filter_start, 'date') else filter_start
         ctx["filter_end"] = filter_end.date() if hasattr(filter_end, 'date') else filter_end
 
+        # Check if commissions are enabled
+        commissions_enabled = True
+        try:
+            from sales.models import CommissionConfig
+            config = CommissionConfig.get_active(biz)
+            if config:
+                commissions_enabled = config.commissions_enabled
+        except Exception:
+            pass
+        ctx["commissions_enabled"] = commissions_enabled
+
         # Scope tenant-aware lists where possible
         bqs = BudgetRequest.objects.filter(agent=u).order_by("-created_at")
         ctx["budgets"] = bqs[:5]
@@ -1542,6 +1553,19 @@ def agent_earnings(request: HttpRequest) -> HttpResponse:
     def total(qs):
         return qs.aggregate(s=Sum("amount"))["s"] or Decimal("0")
     
+    # Check if commissions are enabled for this business
+    commissions_enabled = True
+    try:
+        from tenants.utils import get_active_business
+        biz = get_active_business(request)
+        if biz:
+            from sales.models import CommissionConfig
+            config = CommissionConfig.get_active(biz)
+            if config:
+                commissions_enabled = config.commissions_enabled
+    except Exception:
+        pass
+    
     # Summary stats
     summary = {
         "yesterday": total(qs_yesterday.filter(amount__gt=0)),
@@ -1575,6 +1599,7 @@ def agent_earnings(request: HttpRequest) -> HttpResponse:
         "chart_labels": json.dumps(chart_labels),
         "chart_data": json.dumps(chart_data),
         "txns": txns,
+        "commissions_enabled": commissions_enabled,
     })
 
 

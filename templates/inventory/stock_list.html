@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% load humanize static %}
+{% load humanize static agent_links %}
 
 {% block title %}Stock List · Emajinet{% endblock %}
 {% block header_title %}
@@ -217,6 +217,40 @@
 
   /* Prevent dropdowns getting clipped inside responsive tables */
   .table-responsive { overflow-y: visible; }
+  
+  /* ===== FIX: Mobile bottom nav spacing ===== */
+  /* Ensure content isn't hidden behind bottom nav on mobile */
+  @media (max-width: 768px) {
+    section {
+      padding-bottom: 80px; /* Add bottom padding to prevent content being hidden */
+    }
+    
+    /* Ensure table wrapper has horizontal scroll for wide tables */
+    .table-wrapper, .table-responsive {
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+    }
+    
+    /* Make table more mobile-friendly */
+    #stockTable {
+      min-width: 800px; /* Ensure table doesn't squish too much */
+    }
+    
+    /* Ensure dropdowns/modals aren't clipped */
+    .dropdown-menu {
+      position: fixed !important;
+      will-change: transform;
+    }
+  }
+  
+  /* Safe area for devices with notches/home indicators */
+  @supports (padding-bottom: env(safe-area-inset-bottom)) {
+    @media (max-width: 768px) {
+      section {
+        padding-bottom: calc(80px + env(safe-area-inset-bottom));
+      }
+    }
+  }
 </style>
 {% endblock %}
 
@@ -336,6 +370,110 @@
       <a class="btn-deep tap is-primary" href="{{ request.path }}" onclick="window.buzz&&buzz(6)">Hide table</a>
     </div>
 
+    <!-- Mobile: Horizontal scrollable table with hint -->
+    <div class="d-lg-none cc-table-slider-container" style="position:relative;margin-top:8px;">
+      <div class="cc-table-slider__viewport" data-cc-table-slider style="overflow-x:auto;-webkit-overflow-scrolling:touch;border-radius:12px;box-shadow:var(--cc-shadow);">
+        <table id="stockTableMobile" style="width:100%;min-width:900px;border-collapse:separate;border-spacing:0;background:var(--cc-panel);border:1px solid var(--cc-border);">
+          <thead>
+            <tr>
+              <th style="position:sticky;top:0;z-index:1;font-weight:700;color:#fff;background:var(--cc-accent);letter-spacing:.02em;padding:.8rem .75rem;">IMEI</th>
+              <th style="position:sticky;top:0;z-index:1;font-weight:700;color:#fff;background:var(--cc-accent);letter-spacing:.02em;padding:.8rem .75rem;">Product</th>
+              <th style="position:sticky;top:0;z-index:1;font-weight:700;color:#fff;background:var(--cc-accent);letter-spacing:.02em;padding:.8rem .75rem;">Status</th>
+              <th style="position:sticky;top:0;z-index:1;font-weight:700;color:#fff;background:var(--cc-accent);letter-spacing:.02em;padding:.8rem .75rem;">Order Price</th>
+              <th style="position:sticky;top:0;z-index:1;font-weight:700;color:#fff;background:var(--cc-accent);letter-spacing:.02em;padding:.8rem .75rem;">Selling Price</th>
+              <th style="position:sticky;top:0;z-index:1;font-weight:700;color:#fff;background:var(--cc-accent);letter-spacing:.02em;padding:.8rem .75rem;">Location</th>
+              <th style="position:sticky;top:0;z-index:1;font-weight:700;color:#fff;background:var(--cc-accent);letter-spacing:.02em;padding:.8rem .75rem;">{% if BUSINESS_VERTICAL == "gym" %}Trainer{% else %}Agent{% endif %}</th>
+              {% if IS_MANAGER|default:False or request.user.is_staff or request.user.is_superuser or request.user.profile.is_manager %}
+                <th style="position:sticky;top:0;z-index:1;font-weight:700;color:#fff;background:var(--cc-accent);letter-spacing:.02em;padding:.8rem .75rem;text-align:right;">Actions</th>
+              {% endif %}
+            </tr>
+          </thead>
+          <tbody>
+            {% if page_obj %}
+              {% for it in page_obj.object_list %}
+                <tr>
+                  <td style="padding:.5rem .4rem;border-bottom:1px solid var(--cc-border);">{{ it.imei|default:"" }}</td>
+                  <td style="padding:.5rem .4rem;border-bottom:1px solid var(--cc-border);">{{ it.product }}</td>
+                  <td style="padding:.5rem .4rem;border-bottom:1px solid var(--cc-border);">
+                    {% if it.status|lower == 'sold' %}
+                      <span class="badge-chip red">Sold</span>
+                    {% else %}
+                      <span class="badge-chip green">In stock</span>
+                    {% endif %}
+                  </td>
+                  <td style="padding:.5rem .4rem;border-bottom:1px solid var(--cc-border);text-align:right;font-variant-numeric:tabular-nums;">{% if it.order_price is not None %}{{ it.order_price|floatformat:0|intcomma }}{% else %}—{% endif %}</td>
+                  <td style="padding:.5rem .4rem;border-bottom:1px solid var(--cc-border);text-align:right;font-variant-numeric:tabular-nums;">{% if it.selling_price is not None %}{{ it.selling_price|floatformat:0|intcomma }}{% else %}—{% endif %}</td>
+                  <td style="padding:.5rem .4rem;border-bottom:1px solid var(--cc-border);">{% if it.current_location_id %}{{ it.current_location.name }}{% else %}—{% endif %}</td>
+                  <td style="padding:.5rem .4rem;border-bottom:1px solid var(--cc-border);">
+                    {% if it.assigned_agent_id %}
+                      <span class="badge rounded-pill bg-light text-dark border" style="white-space:nowrap;">
+                        {{ it.assigned_agent|agent_link:request.user }}
+                      </span>
+                    {% else %}
+                      <span class="text-muted">—</span>
+                    {% endif %}
+                  </td>
+                  {% if IS_MANAGER|default:False or request.user.is_staff or request.user.is_superuser or request.user.profile.is_manager %}
+                    <td style="padding:.5rem .4rem;border-bottom:1px solid var(--cc-border);text-align:right;white-space:nowrap;">
+                      <!-- Mobile Actions: Use button to open modal instead of dropdown -->
+                      <button class="btn btn-sm btn-outline-secondary" 
+                              type="button"
+                              onclick="showMobileActionsModal({{ it.pk }}, '{{ it.imei|default:""|escapejs }}', {{ show_archived|yesno:'true,false' }})"
+                              style="font-size:.85rem;padding:.35rem .6rem;">
+                        Actions
+                      </button>
+                    </td>
+                  {% endif %}
+                </tr>
+              {% empty %}
+                <tr><td colspan="8" style="text-align:center;color:var(--cc-muted);padding:1rem;">
+                  No stock yet. <a href="{{ scan_in_url|default:'#' }}" class="ms-1">Scan IN your first item →</a>
+                </td></tr>
+              {% endfor %}
+            {% else %}
+              {% for row in rows %}
+              <tr>
+                <td style="padding:.5rem .4rem;border-bottom:1px solid var(--cc-border);">{{ row.imei }}</td>
+                <td style="padding:.5rem .4rem;border-bottom:1px solid var(--cc-border);">{{ row.product }}</td>
+                <td style="padding:.5rem .4rem;border-bottom:1px solid var(--cc-border);">
+                  {% if row.status|lower == 'sold' %}
+                    <span class="badge-chip red">Sold</span>
+                  {% else %}
+                    <span class="badge-chip green">In stock</span>
+                  {% endif %}
+                </td>
+                <td style="padding:.5rem .4rem;border-bottom:1px solid var(--cc-border);text-align:right;">{{ row.order_price }}</td>
+                <td style="padding:.5rem .4rem;border-bottom:1px solid var(--cc-border);text-align:right;">{{ row.selling_price|default:"—" }}</td>
+                <td style="padding:.5rem .4rem;border-bottom:1px solid var(--cc-border);">{{ row.location }}</td>
+                <td style="padding:.5rem .4rem;border-bottom:1px solid var(--cc-border);">{{ row.agent }}</td>
+                <td style="padding:.5rem .4rem;border-bottom:1px solid var(--cc-border);text-align:right;">
+                  <span class="text-muted">—</span>
+                </td>
+              </tr>
+              {% empty %}
+              <tr>
+                <td colspan="8" style="text-align:center;color:var(--cc-muted);padding:1rem;">
+                  No stock yet. <a href="{{ scan_in_url|default:'#' }}" class="ms-1">Scan IN your first item →</a>
+                </td>
+              </tr>
+              {% endfor %}
+            {% endif %}
+          </tbody>
+        </table>
+      </div>
+      <!-- Swipe hint (shown only when overflow exists) -->
+      <div class="cc-table-slider__hint" style="display:none;position:absolute;top:50%;right:10px;transform:translateY(-50%);background:rgba(37,99,235,.9);color:#fff;padding:.45rem .75rem;border-radius:999px;font-size:.85rem;font-weight:700;pointer-events:none;z-index:2;box-shadow:0 4px 12px rgba(37,99,235,.4);">
+        Swipe to see more →
+      </div>
+      <!-- Optional: Scroll chevrons -->
+      <button class="cc-table-slider__prev" style="display:none;position:absolute;left:4px;top:50%;transform:translateY(-50%);background:rgba(255,255,255,.95);border:1px solid var(--cc-border);border-radius:50%;width:36px;height:36px;display:grid;place-items:center;box-shadow:0 4px 12px rgba(0,0,0,.15);z-index:2;cursor:pointer;" aria-label="Scroll left">
+        ◀
+      </button>
+      <button class="cc-table-slider__next" style="display:none;position:absolute;right:4px;top:50%;transform:translateY(-50%);background:rgba(255,255,255,.95);border:1px solid var(--cc-border);border-radius:50%;width:36px;height:36px;display:grid;place-items:center;box-shadow:0 4px 12px rgba(0,0,0,.15);z-index:2;cursor:pointer;" aria-label="Scroll right">
+        ▶
+      </button>
+    </div>
+
     <div class="table-responsive d-none d-lg-block">
       <table id="stockTable" data-kb-table>
         <thead>
@@ -365,7 +503,7 @@
                 <td>
                   {% if it.assigned_agent_id %}
                     <span class="badge rounded-pill bg-light text-dark border">
-                      {{ it.assigned_agent.get_full_name|default:it.assigned_agent.username|default:it.assigned_agent.email }}
+                      {{ it.assigned_agent|agent_link:request.user }}
                     </span>
                   {% else %}
                     <span class="text-muted">—</span>
@@ -405,59 +543,6 @@
             <tr>
               <td colspan="8" style="text-align:center;color:var(--cc-muted)">
                 No stock yet. <a href="{{ scan_in_url|default:'#' }}" class="ms-1">Scan IN your first item →</a>
-              </td>
-            </tr>
-            {% endfor %}
-          {% endif %}
-        </tbody>
-      </table>
-    </div>
-
-    <!-- Mobile table -->
-    <div class="d-lg-none" style="margin-top:8px">
-      <table class="table-mobile">
-        <tbody>
-          {% if page_obj %}
-            {% for it in page_obj.object_list %}
-            <tr>
-              <td data-label="IMEI">{{ it.imei|default:"" }}</td>
-              <td data-label="Product">{{ it.product }}</td>
-              <td data-label="Status">
-                {% if it.status|lower == 'sold' %}
-                  <span class="badge-chip red">Sold</span>
-                {% else %}
-                  <span class="badge-chip green">In stock</span>
-                {% endif %}
-              </td>
-              <td data-label="{% if BUSINESS_VERTICAL == 'gym' %}Trainer{% else %}Agent{% endif %}">
-                {% if it.assigned_agent_id %}
-                  <span class="badge rounded-pill bg-light text-dark border">
-                    {{ it.assigned_agent.get_full_name|default:it.assigned_agent.username|default:it.assigned_agent.email }}
-                  </span>
-                {% else %}
-                  <span class="text-muted">—</span>
-                {% endif %}
-              </td>
-              <td data-label="Actions">
-                {% include "inventory/partials/_stock_row_actions.html" with item=it is_manager=IS_MANAGER show_archived=show_archived %}
-              </td>
-            </tr>
-            {% endfor %}
-          {% else %}
-            {% for row in rows %}
-            <tr>
-              <td data-label="IMEI">{{ row.imei }}</td>
-              <td data-label="Product">{{ row.product }}</td>
-              <td data-label="Status">
-                {% if row.status|lower == 'sold' %}
-                  <span class="badge-chip red">Sold</span>
-                {% else %}
-                  <span class="badge-chip green">In stock</span>
-                {% endif %}
-              </td>
-              <td data-label="{% if BUSINESS_VERTICAL == 'gym' %}Trainer{% else %}Agent{% endif %}">{{ row.agent }}</td>
-              <td data-label="Actions">
-                <span class="text-muted">—</span>
               </td>
             </tr>
             {% endfor %}
@@ -544,6 +629,27 @@
    This prevents duplicate modal IDs from desktop/mobile tables.
    Each modal is dynamically populated via JS when action button is clicked. #}
 {# ============================================================ #}
+
+<!-- Mobile Actions Modal (Offcanvas) -->
+{% if IS_MANAGER|default:False or request.user.is_staff or request.user.is_superuser or request.user.profile.is_manager %}
+<div class="offcanvas offcanvas-bottom" tabindex="-1" id="mobileActionsModal" aria-labelledby="mobileActionsLabel" style="height:auto;max-height:80vh;">
+  <div class="offcanvas-header" style="border-bottom:1px solid var(--cc-border);">
+    <h5 class="offcanvas-title" id="mobileActionsLabel">Stock Actions</h5>
+    <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Close"></button>
+  </div>
+  <div class="offcanvas-body">
+    <p class="mb-3 small text-muted">
+      IMEI: <strong id="mobile-action-imei" class="text-dark"></strong>
+    </p>
+    <input type="hidden" id="mobile-action-item-id">
+    <input type="hidden" id="mobile-action-show-archived">
+    
+    <div class="d-grid gap-2" id="mobile-actions-list">
+      <!-- Actions populated dynamically -->
+    </div>
+  </div>
+</div>
+{% endif %}
 
 <!-- Assign Stock Modal -->
 {% if IS_MANAGER|default:False or request.user.is_staff or request.user.is_superuser or request.user.profile.is_manager %}
@@ -1056,6 +1162,146 @@ $id('invTopPeriod')?.addEventListener('change', loadInvTopModels);
 {# Stock Controls Modal JS (Transfer, Edit IMEI) #}
 {% if IS_MANAGER|default:False or request.user.is_staff or request.user.is_superuser or request.user.profile.is_manager %}
 <script>
+// ===== TABLE SLIDER: Detect overflow and show hints/controls (mobile only) =====
+(function initTableSlider() {
+  const viewport = document.querySelector('[data-cc-table-slider]');
+  if (!viewport) return;
+  
+  const container = viewport.closest('.cc-table-slider-container');
+  if (!container) return;
+  
+  const hint = container.querySelector('.cc-table-slider__hint');
+  const prevBtn = container.querySelector('.cc-table-slider__prev');
+  const nextBtn = container.querySelector('.cc-table-slider__next');
+  
+  function checkOverflow() {
+    // Only on mobile (below 992px)
+    if (window.innerWidth >= 992) {
+      if (hint) hint.style.display = 'none';
+      if (prevBtn) prevBtn.style.display = 'none';
+      if (nextBtn) nextBtn.style.display = 'none';
+      return;
+    }
+    
+    const hasOverflow = viewport.scrollWidth > viewport.clientWidth;
+    
+    if (hasOverflow) {
+      if (hint) hint.style.display = 'block';
+      if (prevBtn) prevBtn.style.display = 'grid';
+      if (nextBtn) nextBtn.style.display = 'grid';
+      
+      // Hide hint after first scroll
+      let hintHidden = false;
+      viewport.addEventListener('scroll', function() {
+        if (!hintHidden && hint) {
+          hint.style.opacity = '0';
+          hint.style.transition = 'opacity 0.3s ease';
+          setTimeout(() => { hint.style.display = 'none'; }, 300);
+          hintHidden = true;
+        }
+      }, { once: true });
+    } else {
+      if (hint) hint.style.display = 'none';
+      if (prevBtn) prevBtn.style.display = 'none';
+      if (nextBtn) nextBtn.style.display = 'none';
+    }
+  }
+  
+  // Scroll buttons
+  if (prevBtn) {
+    prevBtn.addEventListener('click', function() {
+      viewport.scrollBy({ left: -200, behavior: 'smooth' });
+    });
+  }
+  
+  if (nextBtn) {
+    nextBtn.addEventListener('click', function() {
+      viewport.scrollBy({ left: 200, behavior: 'smooth' });
+    });
+  }
+  
+  // Check on load and resize
+  checkOverflow();
+  window.addEventListener('resize', checkOverflow);
+  
+  // Re-check when table becomes visible (view=all)
+  const observer = new MutationObserver(function(mutations) {
+    mutations.forEach(function(mutation) {
+      if (mutation.attributeName === 'hidden') {
+        setTimeout(checkOverflow, 100);
+      }
+    });
+  });
+  
+  const tableWrap = document.getElementById('stockTableWrap');
+  if (tableWrap) {
+    observer.observe(tableWrap, { attributes: true });
+  }
+})();
+
+// ===== MOBILE ACTIONS MODAL =====
+window.showMobileActionsModal = function(itemId, imei, showArchived) {
+  const modal = new bootstrap.Offcanvas(document.getElementById('mobileActionsModal'));
+  
+  document.getElementById('mobile-action-imei').textContent = imei || '#' + itemId;
+  document.getElementById('mobile-action-item-id').value = itemId;
+  document.getElementById('mobile-action-show-archived').value = showArchived ? 'true' : 'false';
+  
+  const actionsList = document.getElementById('mobile-actions-list');
+  actionsList.innerHTML = '';
+  
+  if (!showArchived) {
+    // Transfer button
+    const transferBtn = document.createElement('button');
+    transferBtn.className = 'btn btn-outline-primary';
+    transferBtn.innerHTML = '<i class="bi bi-arrow-left-right me-2"></i>Transfer';
+    transferBtn.onclick = function() {
+      modal.hide();
+      showTransferModal(itemId, imei);
+    };
+    actionsList.appendChild(transferBtn);
+    
+    // Edit IMEI button
+    const editBtn = document.createElement('button');
+    editBtn.className = 'btn btn-outline-secondary';
+    editBtn.innerHTML = '<i class="bi bi-hash me-2"></i>Edit IMEI';
+    editBtn.onclick = function() {
+      modal.hide();
+      showEditImeiModal(itemId, imei);
+    };
+    actionsList.appendChild(editBtn);
+    
+    // Archive button
+    const archiveForm = document.createElement('form');
+    archiveForm.method = 'post';
+    archiveForm.action = '/inventory/stock/' + itemId + '/archive/';
+    archiveForm.onsubmit = function() { 
+      return confirm('Archive this item?'); 
+    };
+    archiveForm.innerHTML = `
+      {% csrf_token %}
+      <button type="submit" class="btn btn-outline-danger w-100">
+        <i class="bi bi-archive me-2"></i>Archive
+      </button>
+    `;
+    actionsList.appendChild(archiveForm);
+  } else {
+    // Restore button
+    const restoreForm = document.createElement('form');
+    restoreForm.method = 'post';
+    restoreForm.action = '/inventory/stock/' + itemId + '/restore/';
+    restoreForm.innerHTML = `
+      {% csrf_token %}
+      <button type="submit" class="btn btn-outline-success w-100">
+        <i class="bi bi-arrow-counterclockwise me-2"></i>Restore
+      </button>
+    `;
+    actionsList.appendChild(restoreForm);
+  }
+  
+  modal.show();
+};
+
 // ===== MOVE MODALS TO BODY (Fixes z-index/stacking-context issues) =====
 document.addEventListener('DOMContentLoaded', function() {
   // Move all Bootstrap modals to document.body so they're not trapped

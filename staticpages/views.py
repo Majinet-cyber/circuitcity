@@ -118,6 +118,15 @@ def about(request):
     })
 
 
+def pricing(request):
+    """
+    Premium pricing page with tiers and 30-day free trial.
+    """
+    return render(request, 'staticpages/pricing.html', {
+        'hide_nav': True,
+    })
+
+
 def onboarding_manager(request):
     """
     Onboarding guide for store managers and business owners.
@@ -197,4 +206,57 @@ def onboarding_hq(request):
     
     return render(request, 'staticpages/onboarding_hq.html', {
         'content_html': content_html,
+    })
+
+
+def contact(request):
+    """
+    Contact form page for custom plan requests, feature requests, and support.
+    """
+    from django.http import JsonResponse
+    from django.core.mail import send_mail
+    from django.conf import settings
+    
+    if request.method == 'POST':
+        # Handle AJAX form submission
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            name = request.POST.get('name', '')
+            email = request.POST.get('email', '')
+            subject = request.POST.get('subject', '')
+            message = request.POST.get('message', '')
+            
+            # Create email body
+            email_body = f"""
+New contact form submission from Emajinet website:
+
+Name: {name}
+Email: {email}
+Subject: {subject}
+
+Message:
+{message}
+"""
+            
+            # Try to send email (fails gracefully if not configured)
+            try:
+                send_mail(
+                    f'Emajinet Contact: {subject}',
+                    email_body,
+                    settings.DEFAULT_FROM_EMAIL,
+                    [settings.DEFAULT_FROM_EMAIL],
+                    fail_silently=True,
+                )
+            except Exception:
+                pass  # Email not configured, that's OK
+            
+            return JsonResponse({'success': True})
+        
+        # Handle regular form submission (redirect to success)
+        from django.contrib import messages
+        from django.shortcuts import redirect
+        messages.success(request, 'Thank you! Your message has been received.')
+        return redirect('staticpages:contact')
+    
+    return render(request, 'staticpages/contact.html', {
+        'hide_nav': True,
     })

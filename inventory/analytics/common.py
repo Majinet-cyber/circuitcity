@@ -189,17 +189,54 @@ def apply_search_filter(qs: QuerySet, search_query: str, search_fields: list[str
 
 
 def get_cache_key(prefix: str, business_id: int, **filters) -> str:
-    """Generate cache key for analytics data."""
+    """
+    Generate cache key for analytics data.
+    Includes all filter parameters to ensure correct cache hits.
+    """
     filter_str = '_'.join(f"{k}:{v}" for k, v in sorted(filters.items()) if v)
-    return f"analytics:{prefix}:biz:{business_id}:{filter_str}"
+    return f"analytics:v2:{prefix}:biz:{business_id}:{filter_str}"
 
 
-def cache_analytics_data(key: str, data: Any, timeout: int = 60) -> None:
-    """Cache analytics data."""
+def cache_analytics_data(key: str, data: Any, timeout: int = 300) -> None:
+    """
+    Cache analytics data with default 5 minute timeout.
+    Increase timeout for expensive aggregates.
+    
+    Args:
+        key: Cache key
+        data: Data to cache
+        timeout: Cache timeout in seconds (default 300 = 5 minutes)
+    """
     cache.set(key, data, timeout)
 
 
 def get_cached_analytics_data(key: str) -> Optional[Any]:
-    """Get cached analytics data."""
+    """Get cached analytics data. Returns None if not cached or expired."""
     return cache.get(key)
+
+
+def cache_or_compute(key: str, compute_fn, timeout: int = 300) -> Any:
+    """
+    Cache-or-compute pattern helper.
+    Checks cache first, computes and caches if miss.
+    
+    Args:
+        key: Cache key
+        compute_fn: Callable that computes the value
+        timeout: Cache timeout in seconds
+    
+    Returns:
+        Cached or computed value
+    """
+    cached = get_cached_analytics_data(key)
+    if cached is not None:
+        return cached
+    
+    # Compute
+    result = compute_fn()
+    
+    # Cache for next time
+    cache_analytics_data(key, result, timeout)
+    
+    return result
 

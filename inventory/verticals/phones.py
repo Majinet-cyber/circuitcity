@@ -166,6 +166,20 @@ def dashboard(request):
     stock_on_hand = stock_items.count()
     
     # ==========================================================================
+    # INVENTORY VALUE METRICS (what user expects for "Revenue" and "COGS")
+    # ==========================================================================
+    # For Phones dashboard, these KPIs must reflect inventory value (stock value)
+    # "Revenue" = potential stock value (sum of selling_price for items in stock)
+    # "COGS" = inventory cost basis (sum of cost_price/order_price for items in stock)
+    stock_cost_value = stock_items.aggregate(
+        total=Coalesce(Sum('order_price'), Decimal('0.00'), output_field=DecimalField())
+    )['total'] or Decimal('0.00')
+    
+    stock_selling_value = stock_items.aggregate(
+        total=Coalesce(Sum('selling_price'), Decimal('0.00'), output_field=DecimalField())
+    )['total'] or Decimal('0.00')
+    
+    # ==========================================================================
     # COSTS AND PROFIT (using centralized metrics service)
     # ==========================================================================
     # Import the centralized metrics service
@@ -270,15 +284,21 @@ def dashboard(request):
     ]
     
     # Package the main dashboard KPIs for the selected range
+    # IMPORTANT: For Phones dashboard, "Revenue" and "COGS" reflect INVENTORY VALUE (not sales)
+    # This aligns with user expectation that these KPIs change when stock is added
     dashboard_kpis = {
         "range_key": range_key,
         "range_label": range_label,
         "start_date": start_date.date() if hasattr(start_date, 'date') else start_date,
         "end_date": end_date.date() if hasattr(end_date, 'date') else end_date,
         "units_sold": units_sold,
-        "revenue": revenue,
+        # INVENTORY VALUE KPIs (reflect current stock)
+        "revenue": stock_selling_value,  # Potential stock value (sum of selling prices)
+        "cost_of_goods": stock_cost_value,  # Inventory cost basis (sum of order prices)
+        # Sales metrics (separate from inventory KPIs)
+        "sales_revenue": revenue,  # Actual sales revenue for selected period
+        "sales_cogs": cost_of_goods,  # COGS for sold items in selected period
         # Enhanced cost breakdown
-        "cost_of_goods": cost_of_goods,
         "business_costs": business_costs,
         "total_costs": total_costs,
         "profit": profit,
@@ -356,6 +376,7 @@ def dashboard(request):
         top_agents = []
         for row in top_agents_data:
             top_agents.append({
+                "agent_id": getattr(row, 'agent_id', None),
                 "agent_name": row.agent_name,
                 "units": row.units_sold,
                 "revenue": row.total_revenue,
@@ -385,6 +406,7 @@ def dashboard(request):
             agent_name = f"{first_name} {last_name}".strip() or username
             
             top_agents.append({
+                "agent_id": item['assigned_agent__id'],
                 "agent_name": agent_name,
                 "units": item['units'],
                 "revenue": item['revenue'],

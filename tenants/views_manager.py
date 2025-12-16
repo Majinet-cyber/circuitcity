@@ -367,43 +367,89 @@ def manager_agents(request: HttpRequest) -> HttpResponse:
 
     # Handle POST creation here too (inline create)
     if request.method == "POST":
-        invited_name = (request.POST.get("invited_name") or "").strip()
-        email = (request.POST.get("email") or "").strip()
-        phone = (request.POST.get("phone") or "").strip()
-        ttl_days = (request.POST.get("ttl_days") or "").strip()
-        message_text = (request.POST.get("message") or "").strip()
-        loc_id = (request.POST.get("location_id") or "").strip()
-        try:
-            ttl_val = int(ttl_days) if ttl_days else 7
-        except Exception:
-            ttl_val = 7
-        try:
-            location_id = int(loc_id) if loc_id else None
-        except Exception:
-            location_id = None
+        action = request.POST.get("action", "")
+        
+        # Handle commission settings update
+        if action == "update_commission_settings":
+            try:
+                from decimal import Decimal
+                from sales.models import CommissionConfig
+                
+                config = CommissionConfig.ensure_config(biz)
+                
+                commissions_enabled = request.POST.get('commissions_enabled') == 'on'
+                commission_mode = request.POST.get('commission_mode', 'PERCENT')
+                
+                # Validate mode
+                if commission_mode not in ['PERCENT', 'FIXED']:
+                    commission_mode = 'PERCENT'
+                
+                # Get values
+                base_commission_pct = Decimal(request.POST.get('base_commission_pct', '12.00'))
+                fixed_commission_amount = Decimal(request.POST.get('fixed_commission_amount', '2000.00'))
+                
+                # Validate ranges
+                if base_commission_pct < 0 or base_commission_pct > 100:
+                    messages.error(request, "Commission percentage must be between 0 and 100.")
+                    return redirect(request.path)
+                
+                if fixed_commission_amount < 0:
+                    messages.error(request, "Fixed commission amount must be non-negative.")
+                    return redirect(request.path)
+                
+                # Update config
+                config.commissions_enabled = commissions_enabled
+                config.commission_mode = commission_mode
+                config.base_commission_pct = base_commission_pct
+                config.fixed_commission_amount = fixed_commission_amount
+                config.save()
+                
+                messages.success(request, "Commission settings updated successfully.")
+                return redirect(reverse("tenants:manager_review_agents"))
+                
+            except ValueError as e:
+                messages.error(request, f"Invalid number format: {e}")
+            except Exception as e:
+                messages.error(request, f"Failed to update settings: {e}")
+        else:
+            # Original invite creation logic
+            invited_name = (request.POST.get("invited_name") or "").strip()
+            email = (request.POST.get("email") or "").strip()
+            phone = (request.POST.get("phone") or "").strip()
+            ttl_days = (request.POST.get("ttl_days") or "").strip()
+            message_text = (request.POST.get("message") or "").strip()
+            loc_id = (request.POST.get("location_id") or "").strip()
+            try:
+                ttl_val = int(ttl_days) if ttl_days else 7
+            except Exception:
+                ttl_val = 7
+            try:
+                location_id = int(loc_id) if loc_id else None
+            except Exception:
+                location_id = None
 
-        try:
-            inv, temp_password = _safe_service_create_invite(
-                business=biz,
-                requested_by=getattr(request, "user", None),
-                invited_name=invited_name,
-                email=email,
-                phone=phone,
-                ttl_days=ttl_val,
-                message=message_text,
-                location_id=location_id,
-            )
-            latest_link = _invite_accept_absolute_url(request, inv)
-            messages.success(request, "Invitation created.")
-            url = reverse("tenants:manager_review_agents")
-            # Pass both link and password via URL params (one-time display)
-            if latest_link:
-                url = f"{url}?latest_link={quote(latest_link)}"
-            if temp_password:
-                url = f"{url}&temp_password={quote(temp_password)}"
-            return redirect(url)  # PRG
-        except Exception as e:
-            messages.error(request, f"Could not create invite: {e}")
+            try:
+                inv, temp_password = _safe_service_create_invite(
+                    business=biz,
+                    requested_by=getattr(request, "user", None),
+                    invited_name=invited_name,
+                    email=email,
+                    phone=phone,
+                    ttl_days=ttl_val,
+                    message=message_text,
+                    location_id=location_id,
+                )
+                latest_link = _invite_accept_absolute_url(request, inv)
+                messages.success(request, "Invitation created.")
+                url = reverse("tenants:manager_review_agents")
+                # Pass both link and password via URL params (one-time display)
+                if latest_link:
+                    url = f"{url}?latest_link={quote(latest_link)}"
+                if temp_password:
+                    url = f"{url}&temp_password={quote(temp_password)}"
+                return redirect(url)  # PRG
+            except Exception as e:
+                messages.error(request, f"Could not create invite: {e}")
 
     # ----- Read-only data for display -----
     active_members: List[Membership] = _active_agents_for_business(biz)
@@ -458,8 +504,17 @@ def manager_agents(request: HttpRequest) -> HttpResponse:
     temp_password = (request.GET.get("temp_password") or "").strip()  # ✅ One-time password display
     latest_share = _latest_share_text(latest_link, getattr(biz, "name", "") or "your shop") if latest_link else ""
 
+    # Get commission config
+    commission_config = None
+    try:
+        from sales.models import CommissionConfig
+        commission_config = CommissionConfig.ensure_config(biz)
+    except Exception:
+        pass
+
     ctx = {
         "tenant": biz,
+        "config": commission_config,     # Commission settings
         "active_members": active_members,
         "invites_all": invites_all,
         "invites_pending": invites_pending,
@@ -474,6 +529,97 @@ def manager_agents(request: HttpRequest) -> HttpResponse:
         "temp_password": temp_password,  # ✅ Temporary password (one-time display)
         "latest_share": latest_share,    # small helper text shown under share box
     }
+    return _render_agents_template(request, ctx)
+
+
+@login_required
+@never_cache
+@require_http_methods(["GET", "POST"])
+def manager_commission_settings(request: HttpRequest) -> HttpResponse:
+    """
+    Manager-only: Configure commission settings (PERCENT or FIXED, and ON/OFF toggle).
+    
+    GET: Show current settings
+    POST: Update settings
+    """
+    from decimal import Decimal
+    from sales.models import CommissionConfig
+    
+    biz = _active_business_from_request(request) or _force_pick_any_membership(request)
+    if not biz:
+        messages.warning(request, "Please choose a business first.")
+        return redirect_manager_safe_choose(request)
+    
+    # Check manager permission
+    user = getattr(request, "user", None)
+    is_manager = False
+    if user and user.is_authenticated:
+        if user.is_staff or user.is_superuser:
+            is_manager = True
+        else:
+            # Check membership
+            try:
+                membership = Membership.objects.filter(
+                    user=user,
+                    business=biz,
+                    status='ACTIVE'
+                ).first()
+                if membership and membership.role in ['MANAGER', 'OWNER']:
+                    is_manager = True
+            except Exception:
+                pass
+    
+    if not is_manager:
+        from django.http import HttpResponseForbidden
+        return HttpResponseForbidden("Manager access required")
+    
+    # Get or create commission config
+    config = CommissionConfig.ensure_config(biz)
+    
+    if request.method == "POST":
+        # Update commission settings
+        try:
+            commissions_enabled = request.POST.get('commissions_enabled') == 'on'
+            commission_mode = request.POST.get('commission_mode', 'PERCENT')
+            
+            # Validate mode
+            if commission_mode not in ['PERCENT', 'FIXED']:
+                commission_mode = 'PERCENT'
+            
+            # Get values
+            base_commission_pct = Decimal(request.POST.get('base_commission_pct', '12.00'))
+            fixed_commission_amount = Decimal(request.POST.get('fixed_commission_amount', '2000.00'))
+            
+            # Validate ranges
+            if base_commission_pct < 0 or base_commission_pct > 100:
+                messages.error(request, "Commission percentage must be between 0 and 100.")
+                return redirect(request.path)
+            
+            if fixed_commission_amount < 0:
+                messages.error(request, "Fixed commission amount must be non-negative.")
+                return redirect(request.path)
+            
+            # Update config
+            config.commissions_enabled = commissions_enabled
+            config.commission_mode = commission_mode
+            config.base_commission_pct = base_commission_pct
+            config.fixed_commission_amount = fixed_commission_amount
+            config.save()
+            
+            messages.success(request, "Commission settings updated successfully.")
+            return redirect(reverse("tenants:manager_review_agents"))
+            
+        except ValueError as e:
+            messages.error(request, f"Invalid number format: {e}")
+        except Exception as e:
+            messages.error(request, f"Failed to update settings: {e}")
+    
+    # Render settings form
+    ctx = {
+        "tenant": biz,
+        "config": config,
+    }
+    
     return _render_agents_template(request, ctx)
 
 

@@ -1,0 +1,666 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Pricing - Emajinet</title>
+  <meta name="description" content="Choose the perfect plan for your business. Start with a 30-day free trial, no commitment required.">
+  <meta name="theme-color" content="#0b1220">
+  <link rel="icon" href="{% static 'favicon.ico' %}">
+  
+  <!-- Bootstrap Icons -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
+  
+  <style>
+    :root {
+      --primary: #4f46e5;
+      --primary-dark: #4338ca;
+      --secondary: #10b981;
+      --text-primary: #1f2937;
+      --text-secondary: #6b7280;
+      --bg-light: #f9fafb;
+      --white: #ffffff;
+      --shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+      --shadow-lg: 0 20px 50px rgba(0, 0, 0, 0.15);
+      --shadow-xl: 0 30px 70px rgba(0, 0, 0, 0.2);
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, Roboto, Helvetica, Arial, sans-serif;
+      line-height: 1.6;
+      color: var(--text-primary);
+      background: var(--white);
+      overflow-x: hidden;
+    }
+
+    /* Navigation */
+    .navbar {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      z-index: 1000;
+      background: rgba(255, 255, 255, 0.95);
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+      transition: all 0.3s ease;
+    }
+
+    .navbar-content {
+      max-width: 1280px;
+      margin: 0 auto;
+      padding: 1rem 2rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .logo-section {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+    }
+
+    .logo {
+      height: 40px;
+      width: auto;
+    }
+
+    .logo-text {
+      font-size: 1.5rem;
+      font-weight: 700;
+      color: var(--primary);
+    }
+
+    .nav-actions {
+      display: flex;
+      gap: 1rem;
+      align-items: center;
+    }
+
+    /* Mobile Menu Toggle */
+    .mobile-menu-toggle {
+      display: none;
+      background: none;
+      border: none;
+      cursor: pointer;
+      padding: 0.5rem;
+      z-index: 1001;
+    }
+
+    .hamburger {
+      width: 24px;
+      height: 20px;
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+    }
+
+    .hamburger span {
+      display: block;
+      height: 3px;
+      width: 100%;
+      background: var(--primary);
+      border-radius: 2px;
+      transition: all 0.3s ease;
+    }
+
+    .mobile-menu-toggle.active .hamburger span:nth-child(1) {
+      transform: rotate(45deg) translateY(8px);
+    }
+
+    .mobile-menu-toggle.active .hamburger span:nth-child(2) {
+      opacity: 0;
+    }
+
+    .mobile-menu-toggle.active .hamburger span:nth-child(3) {
+      transform: rotate(-45deg) translateY(-8px);
+    }
+
+    /* Mobile Menu Dropdown */
+    .mobile-menu {
+      display: none;
+      position: fixed;
+      top: 70px;
+      left: 0;
+      right: 0;
+      background: rgba(255, 255, 255, 0.98);
+      backdrop-filter: blur(10px);
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+      z-index: 999;
+      max-height: 0;
+      overflow: hidden;
+      transition: max-height 0.3s ease;
+    }
+
+    .mobile-menu.active {
+      max-height: 400px;
+    }
+
+    .mobile-menu-items {
+      display: flex;
+      flex-direction: column;
+      padding: 1rem;
+      gap: 0.5rem;
+    }
+
+    .mobile-menu-items .btn {
+      width: 100%;
+      text-align: center;
+      padding: 1rem;
+      justify-content: center;
+    }
+
+    /* Buttons */
+    .btn {
+      padding: 0.75rem 1.5rem;
+      border-radius: 100px;
+      font-weight: 600;
+      font-size: 0.95rem;
+      text-decoration: none;
+      cursor: pointer;
+      border: none;
+      transition: all 0.3s ease;
+      display: inline-block;
+      text-align: center;
+    }
+
+    .btn-primary {
+      background: var(--primary);
+      color: var(--white);
+      box-shadow: 0 4px 12px rgba(79, 70, 229, 0.3);
+    }
+
+    .btn-primary:hover {
+      background: var(--primary-dark);
+      transform: translateY(-2px);
+      box-shadow: 0 6px 20px rgba(79, 70, 229, 0.4);
+    }
+
+    .btn-secondary {
+      background: var(--white);
+      color: var(--primary);
+      border: 2px solid var(--primary);
+    }
+
+    .btn-secondary:hover {
+      background: var(--primary);
+      color: var(--white);
+      transform: translateY(-2px);
+    }
+    
+    .btn-outline {
+      background: transparent;
+      color: var(--primary);
+      border: 2px solid var(--primary);
+    }
+    
+    .btn-outline:hover {
+      background: var(--primary);
+      color: var(--white);
+      transform: translateY(-2px);
+    }
+
+    .btn-text {
+      background: transparent;
+      color: var(--text-secondary);
+      padding: 0.5rem 1rem;
+    }
+
+    .btn-text:hover {
+      color: var(--primary);
+    }
+
+    /* Hero / Banner Section */
+    .pricing-hero {
+      padding: 8rem 2rem 3rem;
+      background: linear-gradient(135deg, #f9fafb 0%, #e0e7ff 100%);
+      text-align: center;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .pricing-hero::before {
+      content: '';
+      position: absolute;
+      top: -50%;
+      right: -20%;
+      width: 800px;
+      height: 800px;
+      background: radial-gradient(circle, rgba(79, 70, 229, 0.08) 0%, transparent 70%);
+      border-radius: 50%;
+    }
+
+    .pricing-hero-content {
+      max-width: 800px;
+      margin: 0 auto;
+      position: relative;
+      z-index: 1;
+    }
+
+    .pricing-title {
+      font-size: 3rem;
+      font-weight: 800;
+      line-height: 1.1;
+      margin-bottom: 1rem;
+      color: var(--text-primary);
+    }
+
+    .pricing-subtitle {
+      font-size: 1.25rem;
+      color: var(--text-secondary);
+      margin-bottom: 2rem;
+    }
+
+    .trial-banner {
+      display: inline-block;
+      background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
+      color: var(--white);
+      padding: 1rem 2rem;
+      border-radius: 100px;
+      font-size: 1.125rem;
+      font-weight: 700;
+      box-shadow: var(--shadow-lg);
+      margin-bottom: 2rem;
+    }
+
+    /* Pricing Grid */
+    .pricing-section {
+      padding: 4rem 2rem;
+      background: var(--white);
+    }
+
+    .pricing-grid {
+      max-width: 1200px;
+      margin: 0 auto;
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+      gap: 2rem;
+      align-items: start;
+    }
+
+    .pricing-card {
+      background: var(--white);
+      border-radius: 24px;
+      padding: 2.5rem;
+      box-shadow: var(--shadow);
+      border: 2px solid rgba(79, 70, 229, 0.1);
+      transition: all 0.3s ease;
+      position: relative;
+    }
+
+    .pricing-card:hover {
+      transform: translateY(-5px);
+      box-shadow: var(--shadow-xl);
+      border-color: var(--primary);
+    }
+
+    .pricing-card.popular {
+      border-color: var(--primary);
+      box-shadow: var(--shadow-lg);
+      border-width: 3px;
+    }
+
+    .popular-badge {
+      position: absolute;
+      top: -12px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
+      color: var(--white);
+      padding: 0.5rem 1.5rem;
+      border-radius: 100px;
+      font-size: 0.875rem;
+      font-weight: 700;
+      box-shadow: 0 4px 12px rgba(79, 70, 229, 0.3);
+    }
+
+    .tier-name {
+      font-size: 1.75rem;
+      font-weight: 800;
+      margin-bottom: 0.5rem;
+      color: var(--text-primary);
+    }
+
+    .tier-description {
+      font-size: 0.95rem;
+      color: var(--text-secondary);
+      margin-bottom: 1.5rem;
+    }
+
+    .tier-price {
+      font-size: 2.5rem;
+      font-weight: 800;
+      color: var(--primary);
+      margin-bottom: 0.5rem;
+    }
+
+    .tier-price-note {
+      font-size: 0.875rem;
+      color: var(--text-secondary);
+      margin-bottom: 2rem;
+    }
+
+    .tier-features {
+      list-style: none;
+      padding: 0;
+      margin: 0 0 2rem 0;
+    }
+
+    .tier-features li {
+      padding: 0.75rem 0;
+      display: flex;
+      align-items: flex-start;
+      gap: 0.75rem;
+      color: var(--text-primary);
+    }
+
+    .tier-features li i {
+      color: var(--secondary);
+      font-size: 1.25rem;
+      flex-shrink: 0;
+      margin-top: 2px;
+    }
+
+    /* Custom Section */
+    .custom-section {
+      padding: 4rem 2rem;
+      background: linear-gradient(135deg, #f9fafb 0%, #e0e7ff 100%);
+      text-align: center;
+    }
+
+    .custom-content {
+      max-width: 800px;
+      margin: 0 auto;
+    }
+
+    .section-title {
+      font-size: 2.5rem;
+      font-weight: 800;
+      margin-bottom: 1rem;
+      color: var(--text-primary);
+    }
+
+    .section-subtitle {
+      font-size: 1.125rem;
+      color: var(--text-secondary);
+      margin-bottom: 2rem;
+    }
+
+    /* Footer */
+    .footer {
+      padding: 2rem;
+      background: var(--text-primary);
+      color: var(--white);
+      text-align: center;
+    }
+
+    .footer-text {
+      opacity: 0.8;
+    }
+
+    /* Responsive */
+    @media (max-width: 768px) {
+      .pricing-title {
+        font-size: 2rem;
+      }
+
+      .pricing-subtitle {
+        font-size: 1.125rem;
+      }
+
+      .trial-banner {
+        font-size: 1rem;
+        padding: 0.75rem 1.5rem;
+      }
+
+      .pricing-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .section-title {
+        font-size: 2rem;
+      }
+
+      /* Hide desktop nav, show mobile toggle */
+      .nav-actions {
+        display: none;
+      }
+
+      .mobile-menu-toggle {
+        display: block;
+      }
+
+      .mobile-menu {
+        display: block;
+      }
+    }
+
+    @media (max-width: 430px) {
+      .navbar-content {
+        padding: 1rem;
+      }
+
+      .logo {
+        height: 32px;
+      }
+
+      .logo-text {
+        font-size: 1.25rem;
+      }
+
+      .pricing-hero {
+        padding: 6rem 1rem 2rem;
+      }
+
+      .pricing-title {
+        font-size: 1.75rem;
+      }
+
+      .pricing-card {
+        padding: 2rem 1.5rem;
+      }
+    }
+  </style>
+</head>
+<body>
+  <!-- Navigation -->
+  <nav class="navbar">
+    <div class="navbar-content">
+      <div class="logo-section">
+        <img src="{% static 'img/majn.png' %}" alt="Emajinet Logo" class="logo">
+        <span class="logo-text">Emajinet</span>
+      </div>
+      
+      <!-- Desktop Nav -->
+      <div class="nav-actions">
+        <a href="{% url 'staticpages:home' %}" class="btn btn-text">Home</a>
+        <a href="{% url 'staticpages:about' %}" class="btn btn-text">About</a>
+        <a href="{% url 'staticpages:pricing' %}" class="btn btn-text">Pricing</a>
+        <a href="{% url 'login' %}" class="btn btn-text">Login</a>
+        <a href="{% url 'accounts:signup_manager' %}" class="btn btn-primary">Get Started</a>
+      </div>
+
+      <!-- Mobile Menu Toggle -->
+      <button class="mobile-menu-toggle" id="mobileMenuToggle" aria-label="Toggle menu">
+        <div class="hamburger">
+          <span></span>
+          <span></span>
+          <span></span>
+        </div>
+      </button>
+    </div>
+
+    <!-- Mobile Menu Dropdown -->
+    <div class="mobile-menu" id="mobileMenu">
+      <div class="mobile-menu-items">
+        <a href="{% url 'staticpages:home' %}" class="btn btn-text">Home</a>
+        <a href="{% url 'staticpages:about' %}" class="btn btn-text">About</a>
+        <a href="{% url 'staticpages:pricing' %}" class="btn btn-text">Pricing</a>
+        <a href="{% url 'login' %}" class="btn btn-text">Login</a>
+        <a href="{% url 'accounts:signup_manager' %}" class="btn btn-primary">Get Started</a>
+      </div>
+    </div>
+  </nav>
+
+  <!-- Hero / Banner Section -->
+  <section class="pricing-hero">
+    <div class="pricing-hero-content">
+      <div class="trial-banner">
+        ✨ Try Emajinet free for 30 days — no commitment
+      </div>
+      <h1 class="pricing-title">Choose the Perfect Plan for Your Business</h1>
+      <p class="pricing-subtitle">
+        Start with a free trial, scale as you grow. All plans include 30-day money-back guarantee.
+      </p>
+    </div>
+  </section>
+
+  <!-- Pricing Tiers -->
+  <section class="pricing-section">
+    <div class="pricing-grid">
+      
+      <!-- Starter Plan -->
+      <div class="pricing-card">
+        <h2 class="tier-name">Starter</h2>
+        <p class="tier-description">Perfect for small shops and solo entrepreneurs</p>
+        <div class="tier-price">MWK 15,000</div>
+        <p class="tier-price-note">per month, billed monthly</p>
+        <a href="{% url 'accounts:signup_manager' %}" class="btn btn-outline" style="display: block; width: 100%; margin-bottom: 1.5rem;">Start free trial</a>
+        <ul class="tier-features">
+          <li><i class="bi bi-check-circle-fill"></i> <span>Up to 500 stock items</span></li>
+          <li><i class="bi bi-check-circle-fill"></i> <span>1 location</span></li>
+          <li><i class="bi bi-check-circle-fill"></i> <span>3 agents / team members</span></li>
+          <li><i class="bi bi-check-circle-fill"></i> <span>Basic inventory tracking</span></li>
+          <li><i class="bi bi-check-circle-fill"></i> <span>Sales reports & analytics</span></li>
+          <li><i class="bi bi-check-circle-fill"></i> <span>Mobile app access</span></li>
+          <li><i class="bi bi-check-circle-fill"></i> <span>Email support</span></li>
+        </ul>
+      </div>
+
+      <!-- Growth Plan (Most Popular) -->
+      <div class="pricing-card popular">
+        <span class="popular-badge">Most Popular</span>
+        <h2 class="tier-name">Growth</h2>
+        <p class="tier-description">For growing businesses with multiple locations</p>
+        <div class="tier-price">MWK 35,000</div>
+        <p class="tier-price-note">per month, billed monthly</p>
+        <a href="{% url 'accounts:signup_manager' %}" class="btn btn-primary" style="display: block; width: 100%; margin-bottom: 1.5rem;">Start free trial</a>
+        <ul class="tier-features">
+          <li><i class="bi bi-check-circle-fill"></i> <span>Up to 2,000 stock items</span></li>
+          <li><i class="bi bi-check-circle-fill"></i> <span>Up to 5 locations</span></li>
+          <li><i class="bi bi-check-circle-fill"></i> <span>10 agents / team members</span></li>
+          <li><i class="bi bi-check-circle-fill"></i> <span>Advanced inventory tracking</span></li>
+          <li><i class="bi bi-check-circle-fill"></i> <span>Sales, profit & agent reports</span></li>
+          <li><i class="bi bi-check-circle-fill"></i> <span>Agent wallet & commission management</span></li>
+          <li><i class="bi bi-check-circle-fill"></i> <span>Layby / installment payments</span></li>
+          <li><i class="bi bi-check-circle-fill"></i> <span>Priority email support</span></li>
+          <li><i class="bi bi-check-circle-fill"></i> <span>WhatsApp notifications</span></li>
+        </ul>
+      </div>
+
+      <!-- Pro Plan -->
+      <div class="pricing-card">
+        <h2 class="tier-name">Pro</h2>
+        <p class="tier-description">For established businesses needing full control</p>
+        <div class="tier-price">MWK 65,000</div>
+        <p class="tier-price-note">per month, billed monthly</p>
+        <a href="{% url 'accounts:signup_manager' %}" class="btn btn-outline" style="display: block; width: 100%; margin-bottom: 1.5rem;">Start free trial</a>
+        <ul class="tier-features">
+          <li><i class="bi bi-check-circle-fill"></i> <span>Unlimited stock items</span></li>
+          <li><i class="bi bi-check-circle-fill"></i> <span>Unlimited locations</span></li>
+          <li><i class="bi bi-check-circle-fill"></i> <span>Unlimited agents</span></li>
+          <li><i class="bi bi-check-circle-fill"></i> <span>All Growth features</span></li>
+          <li><i class="bi bi-check-circle-fill"></i> <span>AI-powered insights & recommendations</span></li>
+          <li><i class="bi bi-check-circle-fill"></i> <span>HQ Command Center dashboard</span></li>
+          <li><i class="bi bi-check-circle-fill"></i> <span>Advanced analytics & forecasting</span></li>
+          <li><i class="bi bi-check-circle-fill"></i> <span>Custom integrations</span></li>
+          <li><i class="bi bi-check-circle-fill"></i> <span>Dedicated account manager</span></li>
+          <li><i class="bi bi-check-circle-fill"></i> <span>24/7 priority support</span></li>
+        </ul>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- Custom Plan Section -->
+  <section class="custom-section">
+    <div class="custom-content">
+      <h2 class="section-title">Need a Custom Plan?</h2>
+      <p class="section-subtitle">
+        Want custom features, feature suppression, or volume discounts? We can build a plan tailored to your exact needs.
+      </p>
+      <a href="{% url 'staticpages:contact' %}" class="btn btn-primary">Request custom plan</a>
+      <p style="margin-top: 1.5rem; color: var(--text-secondary); font-size: 0.95rem;">
+        Or email us at <a href="mailto:support@emajinet.com" style="color: var(--primary); text-decoration: underline;">support@emajinet.com</a>
+      </p>
+    </div>
+  </section>
+
+  <!-- Footer -->
+  <footer class="footer">
+    <p class="footer-text">&copy; 2025 Emajinet. All rights reserved.</p>
+    <div style="margin-top: 1rem; display: flex; gap: 2rem; justify-content: center; flex-wrap: wrap;">
+      <a href="{% url 'staticpages:home' %}" style="color: rgba(255,255,255,0.7); text-decoration: none; font-size: 0.9rem;">Home</a>
+      <a href="{% url 'staticpages:about' %}" style="color: rgba(255,255,255,0.7); text-decoration: none; font-size: 0.9rem;">About</a>
+      <a href="{% url 'staticpages:privacy' %}" style="color: rgba(255,255,255,0.7); text-decoration: none; font-size: 0.9rem;">Privacy Policy</a>
+      <a href="{% url 'staticpages:terms' %}" style="color: rgba(255,255,255,0.7); text-decoration: none; font-size: 0.9rem;">Terms of Service</a>
+      <a href="{% url 'staticpages:data_deletion' %}" style="color: rgba(255,255,255,0.7); text-decoration: none; font-size: 0.9rem;">Data Deletion</a>
+    </div>
+  </footer>
+
+  <script>
+    // Mobile menu toggle
+    document.addEventListener('DOMContentLoaded', function() {
+      const mobileMenuToggle = document.getElementById('mobileMenuToggle');
+      const mobileMenu = document.getElementById('mobileMenu');
+      
+      if (mobileMenuToggle && mobileMenu) {
+        mobileMenuToggle.addEventListener('click', function() {
+          mobileMenuToggle.classList.toggle('active');
+          mobileMenu.classList.toggle('active');
+        });
+
+        // Close menu when clicking a link
+        const menuLinks = mobileMenu.querySelectorAll('a');
+        menuLinks.forEach(link => {
+          link.addEventListener('click', function() {
+            mobileMenuToggle.classList.remove('active');
+            mobileMenu.classList.remove('active');
+          });
+        });
+
+        // Close menu when clicking outside
+        document.addEventListener('click', function(event) {
+          if (!mobileMenuToggle.contains(event.target) && !mobileMenu.contains(event.target)) {
+            mobileMenuToggle.classList.remove('active');
+            mobileMenu.classList.remove('active');
+          }
+        });
+      }
+    });
+
+    // Navbar background on scroll
+    window.addEventListener('scroll', () => {
+      const navbar = document.querySelector('.navbar');
+      if (window.scrollY > 50) {
+        navbar.style.background = 'rgba(255, 255, 255, 0.98)';
+        navbar.style.boxShadow = '0 2px 20px rgba(0, 0, 0, 0.1)';
+      } else {
+        navbar.style.background = 'rgba(255, 255, 255, 0.95)';
+        navbar.style.boxShadow = '0 2px 10px rgba(0, 0, 0, 0.05)';
+      }
+    });
+  </script>
+</body>
+</html>
+

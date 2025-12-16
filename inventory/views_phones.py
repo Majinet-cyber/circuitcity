@@ -251,8 +251,11 @@ def phone_scan_in(request: HttpRequest) -> HttpResponse:
     
     # --- GET: Render UI ---
     if request.method == "GET":
-        # Get brands available in this business's catalog
-        available_brands = get_brands_for_business(business)
+        # Get brands available in this business's catalog (safe: returns [] if empty)
+        try:
+            available_brands = get_brands_for_business(business)
+        except Exception:
+            available_brands = []
         
         # Filter PHONE_BRANDS to only those available
         brands_with_data = [
@@ -260,8 +263,11 @@ def phone_scan_in(request: HttpRequest) -> HttpResponse:
             if b["name"] in available_brands or b["key"].upper() in available_brands
         ]
         
+        # DEFENSIVE: If no brands seeded, show empty state (fallback to all brand cards for UI)
+        # Template must handle empty catalog gracefully with "No models/products yet" message
         context = {
-            "brands": brands_with_data or PHONE_BRANDS,  # fallback to all if none seeded
+            "brands": brands_with_data or PHONE_BRANDS,  # fallback to all brand cards for UI
+            "has_catalog": len(available_brands) > 0,  # Flag for template to show empty state
             "scanned_today": scanned_today,
             "daily_target": daily_target,
             "progress_pct": progress_pct,

@@ -1137,6 +1137,108 @@ urlpatterns += [
 ]
 
 # ---------------------------------------------------------------------
+# Agent Performance (manager-only view for agent metrics)
+# ---------------------------------------------------------------------
+try:
+    from .views_agent_performance import agent_performance as _agent_performance_view
+except Exception:
+    def _agent_performance_view(request, agent_id):
+        return HttpResponse("Agent performance view not available", status=501)
+
+# Commission settings (manager-only)
+try:
+    from sales.views_commission import commission_settings, commission_settings_json
+    _commission_settings_view = commission_settings
+    _commission_settings_json_view = commission_settings_json
+except Exception:
+    def _commission_settings_view(request):
+        return HttpResponse("Commission settings not available", status=501)
+    def _commission_settings_json_view(request):
+        return JsonResponse({"error": "Not available"}, status=501)
+
+# Sales trend (unified across verticals)
+try:
+    from .views_sales_trend import sales_trend_json, sales_trend_test_page
+    _sales_trend_json_view = sales_trend_json
+    _sales_trend_test_view = sales_trend_test_page
+except Exception:
+    def _sales_trend_json_view(request):
+        return JsonResponse({"labels": [], "quantities": [], "revenue": []}, status=501)
+    def _sales_trend_test_view(request):
+        return HttpResponse("Sales trend test not available", status=501)
+
+urlpatterns += [
+    path("agents/<int:agent_id>/", _need_biz(_agent_performance_view), name="agent_performance"),
+    path("settings/commission/", _need_biz(_commission_settings_view), name="commission_settings"),
+    path("api/commission-settings/", _need_biz(_commission_settings_json_view), name="commission_settings_json"),
+    path("api/sales-trend/", _need_biz(_sales_trend_json_view), name="sales_trend_json"),
+    path("test/sales-trend/", _need_biz(_sales_trend_test_view), name="sales_trend_test"),
+]
+
+# Analytics async JSON endpoints (optimized with caching)
+try:
+    from .views_analytics_async import (
+        analytics_kpis_json,
+        analytics_charts_json,
+        analytics_stock_overview_json,
+        analytics_health_check,
+    )
+    _analytics_kpis_json = analytics_kpis_json
+    _analytics_charts_json = analytics_charts_json
+    _analytics_stock_json = analytics_stock_overview_json
+    _analytics_health = analytics_health_check
+except Exception:
+    def _analytics_kpis_json(request):
+        return JsonResponse({"error": "Not available"}, status=501)
+    def _analytics_charts_json(request):
+        return JsonResponse({"error": "Not available"}, status=501)
+    def _analytics_stock_json(request):
+        return JsonResponse({"error": "Not available"}, status=501)
+    def _analytics_health(request):
+        return JsonResponse({"error": "Not available"}, status=501)
+
+urlpatterns += [
+    path("api/analytics/kpis/", _need_biz(_analytics_kpis_json), name="analytics_kpis_json"),
+    path("api/analytics/charts/", _need_biz(_analytics_charts_json), name="analytics_charts_json"),
+    path("api/analytics/stock/", _need_biz(_analytics_stock_json), name="analytics_stock_json"),
+    path("api/analytics/health/", _need_biz(_analytics_health), name="analytics_health"),
+]
+
+# Alerts/Notifications system
+try:
+    from .views_alerts import (
+        alerts_list_json,
+        alert_mark_read,
+        alert_dismiss,
+        alerts_mark_all_read,
+        alerts_page,
+    )
+    _alerts_list = alerts_list_json
+    _alert_mark_read = alert_mark_read
+    _alert_dismiss = alert_dismiss
+    _alerts_mark_all = alerts_mark_all_read
+    _alerts_page = alerts_page
+except Exception:
+    def _alerts_list(request):
+        return JsonResponse({"alerts": [], "unread_count": 0}, status=501)
+    def _alert_mark_read(request, alert_id):
+        return JsonResponse({"error": "Not available"}, status=501)
+    def _alert_dismiss(request, alert_id):
+        return JsonResponse({"error": "Not available"}, status=501)
+    def _alerts_mark_all(request):
+        return JsonResponse({"error": "Not available"}, status=501)
+    def _alerts_page(request):
+        return HttpResponse("Alerts not available", status=501)
+
+urlpatterns += [
+    path("alerts/", _need_biz(_alerts_page), name="alerts"),
+    path("api/alerts/", _need_biz(_alerts_list), name="alerts_list_json"),
+    path("api/alerts/<int:alert_id>/read/", _need_biz(_alert_mark_read), name="alert_mark_read"),
+    path("api/alerts/<int:alert_id>/dismiss/", _need_biz(_alert_dismiss), name="alert_dismiss"),
+    path("api/alerts/mark-all-read/", _need_biz(_alerts_mark_all), name="alerts_mark_all_read"),
+]
+
+# ---------------------------------------------------------------------
 # Nested verticals namespace (for inventory:verticals:* URLs)
 # ---------------------------------------------------------------------
 urlpatterns += [
