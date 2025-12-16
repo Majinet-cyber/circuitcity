@@ -5,6 +5,32 @@ from django.db import migrations, models
 import django.utils.timezone
 
 
+def column_exists(schema_editor, table, column):
+    with schema_editor.connection.cursor() as cursor:
+        desc = schema_editor.connection.introspection.get_table_description(cursor, table)
+    return any(c.name == column for c in desc)
+
+
+def ensure_created_at(apps, schema_editor):
+    table = "sales_sale"
+    col = "created_at"
+
+    if column_exists(schema_editor, table, col):
+        # Column exists already; just ensure no NULLs if later set NOT NULL.
+        if schema_editor.connection.vendor == "postgresql":
+            schema_editor.execute(f'UPDATE "{table}" SET "{col}" = NOW() WHERE "{col}" IS NULL;')
+        return
+
+    if schema_editor.connection.vendor == "postgresql":
+        schema_editor.execute(f'ALTER TABLE "{table}" ADD COLUMN IF NOT EXISTS "{col}" timestamptz;')
+        schema_editor.execute(f'UPDATE "{table}" SET "{col}" = NOW() WHERE "{col}" IS NULL;')
+        # If your field is non-nullable in Django, enforce it:
+        schema_editor.execute(f'ALTER TABLE "{table}" ALTER COLUMN "{col}" SET NOT NULL;')
+    else:
+        # Local dev safety (SQLite etc)
+        schema_editor.execute(f'ALTER TABLE "{table}" ADD COLUMN "{col}" datetime;')
+
+
 class Migration(migrations.Migration):
 
     dependencies = [
@@ -16,10 +42,17 @@ class Migration(migrations.Migration):
             name='sale',
             options={'ordering': ['-created_at']},
         ),
-        migrations.AddField(
-            model_name='sale',
-            name='created_at',
-            field=models.DateTimeField(default=django.utils.timezone.now, editable=False),
+        migrations.SeparateDatabaseAndState(
+            database_operations=[
+                migrations.RunPython(ensure_created_at, migrations.RunPython.noop),
+            ],
+            state_operations=[
+                migrations.AddField(
+                    model_name='sale',
+                    name='created_at',
+                    field=models.DateTimeField(default=django.utils.timezone.now, editable=False),
+                ),
+            ],
         ),
         migrations.AlterField(
             model_name='sale',
