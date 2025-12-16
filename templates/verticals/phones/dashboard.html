@@ -33,17 +33,19 @@
   .hero-actions .ghost{border:2px solid rgba(255,255,255,.9);color:#fff}
   .hero-actions .ghost:hover{background:rgba(255,255,255,.15)}
   
-  .metrics-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:18px}
-  .metric-card{background:linear-gradient(135deg,#ffffff,#f8fafc);border-radius:20px;padding:20px;box-shadow:0 10px 30px rgba(15,23,42,.1);border:1px solid rgba(148,163,184,0.1);transition:all 0.3s}
+  /* Mobile-first dashboard fixes */
+  .metrics-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:18px;min-width:0;overflow:hidden}
+  .metric-card{background:linear-gradient(135deg,#ffffff,#f8fafc);border-radius:20px;padding:20px;box-shadow:0 10px 30px rgba(15,23,42,.1);border:1px solid rgba(148,163,184,0.1);transition:all 0.3s;min-width:0;overflow:hidden}
   .metric-card:hover{transform:translateY(-4px);box-shadow:0 20px 50px rgba(15,23,42,.15)}
   .metric-card h3{margin:0;font-size:.95rem;text-transform:uppercase;color:#64748b;letter-spacing:0.05em;font-weight:600}
-  .metric-card p{margin:8px 0 0;font-size:2rem;font-weight:900;color:#0f172a;word-break:break-word}
-  .metric-card small{display:block;margin-top:6px;font-size:.9rem;color:#64748b;word-break:break-word}
+  .metric-card p{margin:8px 0 0;font-size:2rem;font-weight:900;color:#0f172a;word-break:break-word;min-width:0;overflow:hidden;text-overflow:ellipsis}
+  .metric-card small{display:block;margin-top:6px;font-size:.9rem;color:#64748b;word-break:break-word;overflow-wrap:break-word}
   
   /* Mobile: prevent KPI numbers from breaking layout */
   @media (max-width:640px){
     .metric-card p{font-size:clamp(1.5rem,5vw,2rem)}
     .metric-card small{font-size:clamp(0.75rem,2.5vw,0.9rem);line-height:1.4}
+    .metrics-grid{grid-template-columns:1fr}
   }
   
   .section-title{font-size:1.3rem;font-weight:800;color:#0f172a;margin:0 0 16px;display:flex;align-items:center;gap:10px}

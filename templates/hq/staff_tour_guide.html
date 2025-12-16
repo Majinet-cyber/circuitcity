@@ -1,0 +1,126 @@
+{% extends "hq/base_hq.html" %}
+{% load static %}
+
+{% block title %}HQ Staff Tour Guide - HQ{% endblock %}
+
+{% block content %}
+<div class="container-fluid px-3 px-md-4 py-4">
+  <!-- Header -->
+  <div class="row mb-4">
+    <div class="col-12">
+      <div class="glass-card p-4">
+        <div class="d-flex justify-content-between align-items-center flex-wrap gap-3">
+          <div>
+            <h1 class="h3 mb-1">
+              <i class="bi bi-book text-primary me-2"></i>
+              HQ Staff Tour Guide
+            </h1>
+            <p class="text-muted mb-0">
+              Complete guide for HQ administrators and support staff.
+            </p>
+          </div>
+          <div>
+            <a href="{% url 'hq:dashboard' %}" class="btn btn-outline-secondary">
+              <i class="bi bi-arrow-left me-2"></i>
+              Back to Dashboard
+            </a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Content -->
+  <div class="row">
+    <div class="col-lg-8 mx-auto">
+      <div class="glass-card p-4">
+        <div class="text-center mb-4">
+          <i class="bi bi-file-pdf text-danger" style="font-size: 4rem;"></i>
+          <h2 class="h4 mt-3">Emajinet / Circuit City – HQ Staff Tour Guide</h2>
+          <p class="text-muted">
+            Your comprehensive reference for managing the platform.
+          </p>
+        </div>
+
+        <div class="alert alert-info">
+          <h4 class="alert-heading">
+            <i class="bi bi-info-circle me-2"></i>
+            What's Included
+          </h4>
+          <p class="mb-0">
+            This guide covers HQ dashboard navigation, business management, subscription controls,
+            invoice handling, support workflows, and troubleshooting common issues.
+          </p>
+        </div>
+
+        <div class="d-grid gap-3 my-4">
+          <a href="{% url 'hq:staff_tour_guide_pdf' %}" 
+             class="btn btn-lg btn-primary">
+            <i class="bi bi-download me-2"></i>
+            Download PDF
+          </a>
+        </div>
+
+        <hr class="my-4">
+
+        <div class="card border-0 bg-light">
+          <div class="card-body">
+            <h3 class="h5">
+              <i class="bi bi-list-check me-2"></i>
+              Guide Contents
+            </h3>
+            <p class="text-muted small mb-3">
+              The tour guide includes the following sections:
+            </p>
+            <div class="row">
+              <div class="col-md-6">
+                <ul class="small">
+                  <li>HQ Dashboard Overview</li>
+                  <li>Business Directory & Search</li>
+                  <li>Subscription Management</li>
+                  <li>Trial Extensions & Activations</li>
+                  <li>Invoice & Payment Tracking</li>
+                  <li>Agent Management</li>
+                  <li>Stock Trends & Analytics</li>
+                </ul>
+              </div>
+              <div class="col-md-6">
+                <ul class="small">
+                  <li>Account Support Tools</li>
+                  <li>User Session Management</li>
+                  <li>Password Reset Workflows</li>
+                  <li>Contract Management</li>
+                  <li>Audit Log Review</li>
+                  <li>Common Troubleshooting</li>
+                  <li>Escalation Procedures</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="alert alert-warning mt-4">
+          <h4 class="alert-heading">
+            <i class="bi bi-shield-check me-2"></i>
+            Important Notes
+          </h4>
+          <ul class="mb-0 small">
+            <li><strong>Confidential:</strong> This guide is for HQ staff only and should not be shared externally</li>
+            <li><strong>Updates:</strong> The guide is periodically updated as new features are added</li>
+            <li><strong>Support:</strong> For questions not covered in the guide, consult the HQ team lead</li>
+            <li><strong>Best Practices:</strong> Always follow data protection and privacy guidelines when assisting merchants</li>
+          </ul>
+        </div>
+
+        <div class="text-center mt-4">
+          <a href="{% url 'hq:dashboard' %}" class="btn btn-secondary">
+            <i class="bi bi-arrow-left me-2"></i>
+            Return to Dashboard
+          </a>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+

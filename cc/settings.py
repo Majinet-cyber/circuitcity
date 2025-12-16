@@ -278,6 +278,7 @@ TEMPLATES = [
                 "tenants.context_processors.tenant_context",
                 "tenants.context_processors.notifications_context",
                 "billing.context_processors.trial_banner",
+                "billing.context_processors.pricing_context",
             ],
             "builtins": [
                 "inventory.templatetags.money",
@@ -505,32 +506,48 @@ BILLING = {
         os.environ.get("DEFAULT_FROM_EMAIL", "noreply@example.com"),
     ),
 }
-BILLING_PLANS = {
-    "starter": {
-        "code": "starter",
-        "name": "Starter",
-        "amount": 20000,
-        "currency": "MWK",
-        "max_agents": 0,
-        "max_stores": 1,
-    },
-    "growth": {
-        "code": "growth",
-        "name": "Growth",
-        "amount": 60000,
-        "currency": "MWK",
-        "max_agents": 5,
-        "max_stores": 5,
-    },
-    "pro": {
-        "code": "pro",
-        "name": "Pro",
-        "amount": 120000,
-        "currency": "MWK",
-        "max_agents": None,
-        "max_stores": None,
-    },
-}
+# Import centralized pricing configuration
+try:
+    from billing.pricing import PLANS as BILLING_PLANS_CONFIG
+    BILLING_PLANS = {
+        code: {
+            "code": plan.code,
+            "name": plan.name,
+            "amount": float(plan.amount),
+            "currency": plan.currency,
+            "max_agents": plan.max_agents if plan.max_agents != -1 else None,
+            "max_stores": plan.max_stores if plan.max_stores != -1 else None,
+        }
+        for code, plan in BILLING_PLANS_CONFIG.items()
+    }
+except ImportError:
+    # Fallback during initial setup before billing app is ready
+    BILLING_PLANS = {
+        "starter": {
+            "code": "starter",
+            "name": "Starter",
+            "amount": 20000,
+            "currency": "MWK",
+            "max_agents": 3,
+            "max_stores": 1,
+        },
+        "growth": {
+            "code": "growth",
+            "name": "Growth",
+            "amount": 60000,
+            "currency": "MWK",
+            "max_agents": 15,
+            "max_stores": 5,
+        },
+        "pro": {
+            "code": "pro",
+            "name": "Pro",
+            "amount": 120000,
+            "currency": "MWK",
+            "max_agents": None,
+            "max_stores": None,
+        },
+    }
 
 REPORTS_DEFAULT_CURRENCY = BILLING["DEFAULT_CURRENCY"]
 BILLING_TRIAL_DAYS = BILLING["TRIAL_DAYS"]

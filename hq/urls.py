@@ -142,4 +142,7 @@ if views_contracts is not None:
         path("contracts/<int:business_id>/", views_contracts.contracts_detail, name="contracts_detail"),
         path("contracts/<int:contract_id>/download/", views_contracts.contract_download, name="contract_download"),
         path("contracts/<int:contract_id>/delete/", views_contracts.contract_delete, name="contract_delete"),
+        # HQ Staff Tour Guide
+        path("staff/tour-guide/", views_contracts.staff_tour_guide, name="staff_tour_guide"),
+        path("staff/tour-guide.pdf", views_contracts.staff_tour_guide_pdf, name="staff_tour_guide_pdf"),
     ])

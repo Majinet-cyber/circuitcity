@@ -1,8 +1,10 @@
 # hq/views_contracts.py
 """
-HQ views for managing merchant contracts.
+HQ views for managing merchant contracts and staff documentation.
 """
 from __future__ import annotations
+
+import io
 
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
@@ -16,6 +18,17 @@ from django.views.decorators.http import require_POST
 from hq.models import MerchantContract
 from hq.permissions import hq_admin_required
 from tenants.models import Business
+
+try:
+    from reportlab.lib import colors
+    from reportlab.lib.pagesizes import letter, A4
+    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+    from reportlab.lib.units import inch
+    from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, PageBreak
+    from reportlab.lib.enums import TA_CENTER, TA_LEFT
+    REPORTLAB_AVAILABLE = True
+except ImportError:
+    REPORTLAB_AVAILABLE = False
 
 
 @login_required
@@ -237,4 +250,371 @@ def contract_delete(request: HttpRequest, contract_id: int) -> HttpResponse:
     
     messages.success(request, f"Contract for {business.name} has been deleted.")
     return redirect('hq:contracts_list')
+
+
+# ============================================================================
+# HQ Staff Tour Guide
+# ============================================================================
+
+@login_required
+@hq_admin_required
+def staff_tour_guide(request: HttpRequest) -> HttpResponse:
+    """
+    Show the HQ staff tour guide page with PDF download link.
+    """
+    return render(request, 'hq/staff_tour_guide.html')
+
+
+@login_required
+@hq_admin_required
+def staff_tour_guide_pdf(request: HttpRequest) -> HttpResponse:
+    """
+    Generate and download the HQ Staff Tour Guide as a PDF.
+    
+    Returns:
+        HttpResponse with PDF attachment or error message.
+    """
+    # Check if ReportLab is available
+    if not REPORTLAB_AVAILABLE:
+        return HttpResponse(
+            "PDF generation is not available. Please install reportlab.",
+            status=503,
+            content_type="text/plain"
+        )
+    
+    try:
+        # Create a BytesIO buffer for the PDF
+        buffer = io.BytesIO()
+        
+        # Create the PDF document
+        doc = SimpleDocTemplate(
+            buffer,
+            pagesize=letter,
+            rightMargin=72,
+            leftMargin=72,
+            topMargin=72,
+            bottomMargin=18,
+        )
+        
+        # Container for the 'Flowable' objects
+        elements = []
+        
+        # Define styles
+        styles = getSampleStyleSheet()
+        
+        # Custom styles
+        title_style = ParagraphStyle(
+            'CustomTitle',
+            parent=styles['Heading1'],
+            fontSize=24,
+            textColor=colors.HexColor('#1e40af'),
+            spaceAfter=30,
+            alignment=TA_CENTER,
+            fontName='Helvetica-Bold'
+        )
+        
+        heading_style = ParagraphStyle(
+            'CustomHeading',
+            parent=styles['Heading2'],
+            fontSize=16,
+            textColor=colors.HexColor('#1e40af'),
+            spaceAfter=12,
+            spaceBefore=12,
+            fontName='Helvetica-Bold'
+        )
+        
+        subheading_style = ParagraphStyle(
+            'CustomSubHeading',
+            parent=styles['Heading3'],
+            fontSize=14,
+            textColor=colors.HexColor('#374151'),
+            spaceAfter=10,
+            spaceBefore=10,
+            fontName='Helvetica-Bold'
+        )
+        
+        body_style = ParagraphStyle(
+            'CustomBody',
+            parent=styles['BodyText'],
+            fontSize=11,
+            leading=14,
+            spaceAfter=10,
+        )
+        
+        # Add title
+        elements.append(Paragraph("Emajinet / Circuit City", title_style))
+        elements.append(Paragraph("HQ Staff Tour Guide", title_style))
+        elements.append(Spacer(1, 0.3 * inch))
+        
+        # Add introduction
+        elements.append(Paragraph("Introduction", heading_style))
+        intro_text = """
+        Welcome to the Emajinet HQ Staff Tour Guide. This comprehensive document serves as your 
+        reference for managing the Circuit City platform. As an HQ administrator, you have access 
+        to powerful tools for supporting merchants, managing subscriptions, and ensuring smooth 
+        operations across all businesses.
+        """
+        elements.append(Paragraph(intro_text, body_style))
+        elements.append(Spacer(1, 0.2 * inch))
+        
+        # Section 1: HQ Dashboard Overview
+        elements.append(Paragraph("1. HQ Dashboard Overview", heading_style))
+        
+        elements.append(Paragraph("Key Metrics", subheading_style))
+        dashboard_text = """
+        The HQ Dashboard provides a real-time overview of platform activity:
+        <br/><br/>
+        • <b>Total Businesses:</b> Number of registered merchant accounts<br/>
+        • <b>New Businesses (7d):</b> Recent sign-ups requiring onboarding attention<br/>
+        • <b>Active Subscriptions:</b> Businesses with trial or paid plans<br/>
+        • <b>MRR (Monthly Recurring Revenue):</b> Sum of all active subscription amounts<br/>
+        • <b>Open Invoices:</b> Unpaid or past-due invoices requiring follow-up<br/>
+        • <b>Agent Statistics:</b> Total agents and recent onboardings<br/>
+        • <b>Stock Trends:</b> Inventory movement across all businesses
+        """
+        elements.append(Paragraph(dashboard_text, body_style))
+        elements.append(Spacer(1, 0.2 * inch))
+        
+        # Section 2: Business Management
+        elements.append(Paragraph("2. Business Directory & Management", heading_style))
+        
+        business_text = """
+        Access the Business Directory to view and manage all merchant accounts. You can:
+        <br/><br/>
+        • <b>Search:</b> Find businesses by name or slug<br/>
+        • <b>View Details:</b> Access comprehensive business profiles including subscription history, 
+        invoices, agents, and activity metrics<br/>
+        • <b>Quick Actions:</b> Perform common tasks directly from the directory<br/>
+        • <b>Filter:</b> Sort by date, status, or subscription tier
+        """
+        elements.append(Paragraph(business_text, body_style))
+        elements.append(Spacer(1, 0.2 * inch))
+        
+        # Section 3: Subscription Management
+        elements.append(Paragraph("3. Subscription Management", heading_style))
+        
+        elements.append(Paragraph("Trial Extensions", subheading_style))
+        trial_text = """
+        You can extend trial periods for businesses that need more evaluation time:
+        <br/><br/>
+        • Navigate to Subscriptions list<br/>
+        • Find the business subscription<br/>
+        • Click "Extend Trial"<br/>
+        • Enter number of days or specific end date<br/>
+        • Confirm the extension
+        <br/><br/>
+        <b>Important:</b> Trials can only be extended before the first payment is received.
+        """
+        elements.append(Paragraph(trial_text, body_style))
+        elements.append(Spacer(1, 0.2 * inch))
+        
+        elements.append(Paragraph("Plan Changes", subheading_style))
+        plan_text = """
+        HQ can change subscription plans for businesses:
+        <br/><br/>
+        • <b>Starter:</b> Single location, no agents (K20,000/month)<br/>
+        • <b>Pro:</b> Unlimited locations, up to 5 agents (K35,000/month)<br/>
+        • <b>Pro Max:</b> Unlimited locations and agents (K50,000/month)
+        <br/><br/>
+        Use the "Set Plan" action to upgrade or downgrade as needed.
+        """
+        elements.append(Paragraph(plan_text, body_style))
+        elements.append(Spacer(1, 0.2 * inch))
+        
+        elements.append(Paragraph("Activation", subheading_style))
+        activation_text = """
+        To activate a trial subscription immediately (convert to paid):
+        <br/><br/>
+        • Select the subscription<br/>
+        • Click "Activate Now"<br/>
+        • A 30-day paid period begins immediately<br/>
+        • Next billing date is set automatically
+        """
+        elements.append(Paragraph(activation_text, body_style))
+        
+        # Add page break
+        elements.append(PageBreak())
+        
+        # Section 4: Invoice Management
+        elements.append(Paragraph("4. Invoice & Payment Tracking", heading_style))
+        
+        invoice_text = """
+        Monitor payment status and financial health through the Invoices section:
+        <br/><br/>
+        • <b>Open Invoices:</b> Awaiting payment - may require follow-up<br/>
+        • <b>Past Due:</b> Overdue invoices requiring immediate attention<br/>
+        • <b>Paid/Settled:</b> Completed transactions<br/>
+        • <b>Refunds:</b> Process refunds or credit notes when necessary
+        <br/><br/>
+        <b>Refund Process:</b>
+        <br/>
+        1. Navigate to the invoice<br/>
+        2. Click "Refund"<br/>
+        3. A credit note is automatically generated<br/>
+        4. The original invoice is linked to the refund for audit purposes
+        """
+        elements.append(Paragraph(invoice_text, body_style))
+        elements.append(Spacer(1, 0.2 * inch))
+        
+        # Section 5: Account Support
+        elements.append(Paragraph("5. Account Support Tools", heading_style))
+        
+        support_text = """
+        HQ staff have access to powerful support tools for assisting merchants:
+        <br/><br/>
+        <b>Password Reset:</b><br/>
+        • Navigate to Business → Account Support<br/>
+        • Select the user<br/>
+        • Click "Reset Password"<br/>
+        • A new temporary password is generated and can be shared securely
+        <br/><br/>
+        <b>Account Unlock:</b><br/>
+        • If a user is locked out after failed login attempts<br/>
+        • Use "Unlock Account" to restore access immediately
+        <br/><br/>
+        <b>Force Logout:</b><br/>
+        • Terminate active sessions if suspicious activity is detected<br/>
+        • User must log in again with valid credentials
+        <br/><br/>
+        <b>Session Management:</b><br/>
+        • View all active sessions for a user<br/>
+        • Review IP addresses and device information<br/>
+        • Terminate individual sessions as needed
+        """
+        elements.append(Paragraph(support_text, body_style))
+        elements.append(Spacer(1, 0.2 * inch))
+        
+        # Section 6: Analytics
+        elements.append(Paragraph("6. Analytics & Reporting", heading_style))
+        
+        analytics_text = """
+        The HQ Analytics page provides deep insights into platform performance:
+        <br/><br/>
+        • <b>Filter by Business:</b> Focus on individual merchant metrics<br/>
+        • <b>Filter by Vertical:</b> Compare performance across Phones, Clothing, Liquor, Pharmacy, Gym<br/>
+        • <b>Date Ranges:</b> Analyze trends over custom time periods<br/>
+        • <b>Top Agents:</b> Identify high performers across all businesses<br/>
+        • <b>Revenue Trends:</b> Track sales and profit margins<br/>
+        • <b>Inventory Insights:</b> Monitor stock turnover and sell-through rates
+        """
+        elements.append(Paragraph(analytics_text, body_style))
+        
+        # Add page break
+        elements.append(PageBreak())
+        
+        # Section 7: Contract Management
+        elements.append(Paragraph("7. Contract Management", heading_style))
+        
+        contract_text = """
+        Manage merchant service agreements through the Contracts section:
+        <br/><br/>
+        • <b>Contract Template:</b> Download the standard merchant services agreement<br/>
+        • <b>Upload Contracts:</b> Store signed agreements for each business<br/>
+        • <b>Contract Status:</b> Track which businesses have signed contracts<br/>
+        • <b>Download:</b> Retrieve contracts for review or audit purposes
+        <br/><br/>
+        <b>Best Practice:</b> Ensure all businesses on paid plans have signed contracts on file.
+        """
+        elements.append(Paragraph(contract_text, body_style))
+        elements.append(Spacer(1, 0.2 * inch))
+        
+        # Section 8: Troubleshooting
+        elements.append(Paragraph("8. Common Troubleshooting", heading_style))
+        
+        elements.append(Paragraph("Issue: Merchant can't log in", subheading_style))
+        troubleshoot1 = """
+        1. Check if account is locked (failed login attempts)<br/>
+        2. Use "Unlock Account" if locked<br/>
+        3. Verify email address is correct<br/>
+        4. Reset password if credentials are lost<br/>
+        5. Check if 2FA/OTP is enabled and working
+        """
+        elements.append(Paragraph(troubleshoot1, body_style))
+        elements.append(Spacer(1, 0.15 * inch))
+        
+        elements.append(Paragraph("Issue: Subscription not renewing", subheading_style))
+        troubleshoot2 = """
+        1. Check subscription status (should be ACTIVE)<br/>
+        2. Verify next_billing_date is set<br/>
+        3. Check for failed payment attempts<br/>
+        4. Review business's invoice history<br/>
+        5. Manually activate if payment is confirmed
+        """
+        elements.append(Paragraph(troubleshoot2, body_style))
+        elements.append(Spacer(1, 0.15 * inch))
+        
+        elements.append(Paragraph("Issue: Agent limit reached", subheading_style))
+        troubleshoot3 = """
+        1. Check business's current plan (Starter = 0, Pro = 5, Pro Max = unlimited)<br/>
+        2. Verify actual agent count in Agents section<br/>
+        3. Upgrade plan if business needs more agents<br/>
+        4. Remove inactive agents if at limit
+        """
+        elements.append(Paragraph(troubleshoot3, body_style))
+        elements.append(Spacer(1, 0.2 * inch))
+        
+        # Section 9: Security & Best Practices
+        elements.append(Paragraph("9. Security & Best Practices", heading_style))
+        
+        security_text = """
+        As an HQ administrator, follow these guidelines:
+        <br/><br/>
+        • <b>Data Privacy:</b> Only access business data when necessary for support<br/>
+        • <b>Password Resets:</b> Share temporary passwords through secure channels only<br/>
+        • <b>Audit Trail:</b> All HQ actions are logged - maintain professional conduct<br/>
+        • <b>Confidentiality:</b> Business data is confidential and should not be shared externally<br/>
+        • <b>Escalation:</b> For complex issues, consult with senior HQ staff or technical team<br/>
+        • <b>Documentation:</b> Record support interactions and resolutions for future reference
+        """
+        elements.append(Paragraph(security_text, body_style))
+        elements.append(Spacer(1, 0.3 * inch))
+        
+        # Footer
+        footer_text = """
+        <br/><br/>
+        <i>This guide is for HQ staff only. For questions or updates to this document, 
+        contact the HQ team lead.</i>
+        <br/><br/>
+        <b>Document Version:</b> 1.0<br/>
+        <b>Last Updated:</b> December 2025
+        """
+        elements.append(Paragraph(footer_text, body_style))
+        
+        # Build PDF
+        doc.build(elements)
+        
+        # Get the PDF data from the buffer
+        pdf_data = buffer.getvalue()
+        buffer.close()
+        
+        # Create the HTTP response with PDF
+        response = HttpResponse(content_type='application/pdf')
+        response['Content-Disposition'] = 'attachment; filename="hq_staff_tour_guide.pdf"'
+        response.write(pdf_data)
+        
+        # Log download in audit if available
+        try:
+            from audit.utils import log_hq_action
+            log_hq_action(
+                request,
+                action="DOWNLOAD_TOUR_GUIDE",
+                entity_type="HQ_DOCUMENTATION",
+                message="Downloaded HQ Staff Tour Guide PDF"
+            )
+        except Exception:
+            pass  # Audit logging is optional
+        
+        return response
+    
+    except Exception as e:
+        # Never 500 - return a friendly error
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.exception("Error generating HQ tour guide PDF")
+        
+        return HttpResponse(
+            f"Unable to generate PDF at this time. Please contact support. (Error: {str(e)})",
+            status=500,
+            content_type="text/plain"
+        )
 

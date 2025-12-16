@@ -12,6 +12,7 @@ python-dotenv==1.1.1
 python-json-logger==3.3.0
 Pillow==11.1.0
 requests==2.32.3
+reportlab==4.2.5
 
 # --- Scientific stack (if used by your app) ---
 numpy==2.2.3

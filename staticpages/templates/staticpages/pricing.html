@@ -516,7 +516,7 @@
   <section class="pricing-hero">
     <div class="pricing-hero-content">
       <div class="trial-banner">
-        ✨ Try Emajinet free for 30 days — no commitment
+        ✨ Try Emajinet free for {{ PRICING_TRIAL_DAYS|default:30 }} days — no commitment
       </div>
       <h1 class="pricing-title">Choose the Perfect Plan for Your Business</h1>
       <p class="pricing-subtitle">
@@ -529,65 +529,23 @@
   <section class="pricing-section">
     <div class="pricing-grid">
       
-      <!-- Starter Plan -->
-      <div class="pricing-card">
-        <h2 class="tier-name">Starter</h2>
-        <p class="tier-description">Perfect for small shops and solo entrepreneurs</p>
-        <div class="tier-price">MWK 15,000</div>
-        <p class="tier-price-note">per month, billed monthly</p>
-        <a href="{% url 'accounts:signup_manager' %}" class="btn btn-outline" style="display: block; width: 100%; margin-bottom: 1.5rem;">Start free trial</a>
-        <ul class="tier-features">
-          <li><i class="bi bi-check-circle-fill"></i> <span>Up to 500 stock items</span></li>
-          <li><i class="bi bi-check-circle-fill"></i> <span>1 location</span></li>
-          <li><i class="bi bi-check-circle-fill"></i> <span>3 agents / team members</span></li>
-          <li><i class="bi bi-check-circle-fill"></i> <span>Basic inventory tracking</span></li>
-          <li><i class="bi bi-check-circle-fill"></i> <span>Sales reports & analytics</span></li>
-          <li><i class="bi bi-check-circle-fill"></i> <span>Mobile app access</span></li>
-          <li><i class="bi bi-check-circle-fill"></i> <span>Email support</span></li>
-        </ul>
-      </div>
-
-      <!-- Growth Plan (Most Popular) -->
-      <div class="pricing-card popular">
+      {% for plan in PRICING_PLANS %}
+      <div class="pricing-card{% if plan.code == 'growth' %} popular{% endif %}">
+        {% if plan.code == 'growth' %}
         <span class="popular-badge">Most Popular</span>
-        <h2 class="tier-name">Growth</h2>
-        <p class="tier-description">For growing businesses with multiple locations</p>
-        <div class="tier-price">MWK 35,000</div>
+        {% endif %}
+        <h2 class="tier-name">{{ plan.name }}</h2>
+        <p class="tier-description">{{ plan.description }}</p>
+        <div class="tier-price">{{ plan.currency }} {{ plan.amount|floatformat:0 }}</div>
         <p class="tier-price-note">per month, billed monthly</p>
-        <a href="{% url 'accounts:signup_manager' %}" class="btn btn-primary" style="display: block; width: 100%; margin-bottom: 1.5rem;">Start free trial</a>
+        <a href="{% url 'accounts:signup_manager' %}" class="btn {% if plan.code == 'growth' %}btn-primary{% else %}btn-outline{% endif %}" style="display: block; width: 100%; margin-bottom: 1.5rem;">Start free trial</a>
         <ul class="tier-features">
-          <li><i class="bi bi-check-circle-fill"></i> <span>Up to 2,000 stock items</span></li>
-          <li><i class="bi bi-check-circle-fill"></i> <span>Up to 5 locations</span></li>
-          <li><i class="bi bi-check-circle-fill"></i> <span>10 agents / team members</span></li>
-          <li><i class="bi bi-check-circle-fill"></i> <span>Advanced inventory tracking</span></li>
-          <li><i class="bi bi-check-circle-fill"></i> <span>Sales, profit & agent reports</span></li>
-          <li><i class="bi bi-check-circle-fill"></i> <span>Agent wallet & commission management</span></li>
-          <li><i class="bi bi-check-circle-fill"></i> <span>Layby / installment payments</span></li>
-          <li><i class="bi bi-check-circle-fill"></i> <span>Priority email support</span></li>
-          <li><i class="bi bi-check-circle-fill"></i> <span>WhatsApp notifications</span></li>
+          {% for feature in plan.features %}
+          <li><i class="bi bi-check-circle-fill"></i> <span>{{ feature }}</span></li>
+          {% endfor %}
         </ul>
       </div>
-
-      <!-- Pro Plan -->
-      <div class="pricing-card">
-        <h2 class="tier-name">Pro</h2>
-        <p class="tier-description">For established businesses needing full control</p>
-        <div class="tier-price">MWK 65,000</div>
-        <p class="tier-price-note">per month, billed monthly</p>
-        <a href="{% url 'accounts:signup_manager' %}" class="btn btn-outline" style="display: block; width: 100%; margin-bottom: 1.5rem;">Start free trial</a>
-        <ul class="tier-features">
-          <li><i class="bi bi-check-circle-fill"></i> <span>Unlimited stock items</span></li>
-          <li><i class="bi bi-check-circle-fill"></i> <span>Unlimited locations</span></li>
-          <li><i class="bi bi-check-circle-fill"></i> <span>Unlimited agents</span></li>
-          <li><i class="bi bi-check-circle-fill"></i> <span>All Growth features</span></li>
-          <li><i class="bi bi-check-circle-fill"></i> <span>AI-powered insights & recommendations</span></li>
-          <li><i class="bi bi-check-circle-fill"></i> <span>HQ Command Center dashboard</span></li>
-          <li><i class="bi bi-check-circle-fill"></i> <span>Advanced analytics & forecasting</span></li>
-          <li><i class="bi bi-check-circle-fill"></i> <span>Custom integrations</span></li>
-          <li><i class="bi bi-check-circle-fill"></i> <span>Dedicated account manager</span></li>
-          <li><i class="bi bi-check-circle-fill"></i> <span>24/7 priority support</span></li>
-        </ul>
-      </div>
+      {% endfor %}
 
     </div>
   </section>

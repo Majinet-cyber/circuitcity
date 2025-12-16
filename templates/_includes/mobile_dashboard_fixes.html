@@ -1,0 +1,75 @@
+{% comment %}
+Mobile Dashboard Fixes - Include in all vertical dashboards
+
+Prevents number/currency/text overflow on mobile devices.
+Consistent with homepage standards.
+{% endcomment %}
+
+<style>
+/* Mobile-first dashboard fixes - Prevent overflow */
+.stat-card, .kpi-card, .metric-card, .card, .glass-card {
+  min-width: 0;
+  overflow: hidden;
+}
+
+.stat-value, .kpi-value, .metric-value, .amount, .currency {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Flex children must be able to shrink */
+.stat-card > *, .kpi-card > *, .metric-card > *, .card > * {
+  min-width: 0;
+}
+
+/* Responsive font sizing for large numbers */
+@media (max-width: 768px) {
+  .stat-value, .kpi-value, .metric-value {
+    font-size: clamp(1.5rem, 5vw, 2.5rem);
+  }
+  
+  .amount {
+    font-size: clamp(1rem, 4vw, 1.5rem);
+  }
+}
+
+/* Grid/Flex containers must allow shrinking */
+.stats-grid, .kpi-grid, .metrics-grid {
+  min-width: 0;
+  overflow: hidden;
+}
+
+.stats-grid > *, .kpi-grid > *, .metrics-grid > * {
+  min-width: 0;
+}
+
+/* Table overflow handling */
+.table-responsive {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+table {
+  min-width: 0;
+}
+
+/* Prevent long text from breaking layout */
+.product-name, .agent-name, .item-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 100%;
+}
+
+/* Currency formatting */
+.currency-amount {
+  display: inline-block;
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+</style>
+

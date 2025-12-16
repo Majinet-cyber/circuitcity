@@ -75,3 +75,19 @@ def trial_banner(request):
     return ctx
 
 
+def pricing_context(request):
+    """
+    Add pricing configuration to all templates for consistency.
+    Ensures homepage, checkout, and billing show the same prices.
+    """
+    try:
+        from billing.pricing import get_all_plans, TRIAL_DAYS
+        return {
+            "PRICING_PLANS": get_all_plans(),
+            "PRICING_TRIAL_DAYS": TRIAL_DAYS,
+        }
+    except Exception:
+        # Never let context processors break page rendering
+        return {}
+
+

@@ -29,52 +29,35 @@ def _table_exists(table_name: str) -> bool:
 # ---------- Plan seeding on import (idempotent, safe during migrate) ------
 def _seed_plans() -> None:
     """
-    Safe, idempotent seeding of a few common plans.
+    Safe, idempotent seeding of plans from centralized pricing config.
     Only runs if the subscription plan table exists (no migration breakage).
     """
     if not _table_exists(SubscriptionPlan._meta.db_table):
         return
 
-    currency = getattr(settings, "REPORTS_DEFAULT_CURRENCY", "MWK")
-    plans = [
-        dict(
-            code="starter",
-            name="Starter",
-            amount=Decimal("20000.00"),
-            interval=SubscriptionPlan.Interval.MONTH,
-            max_stores=1,
-            max_agents=3,
-        ),
-        dict(
-            code="growth",
-            name="Growth",
-            amount=Decimal("60000.00"),
-            interval=SubscriptionPlan.Interval.MONTH,
-            max_stores=3,
-            max_agents=15,
-        ),
-        dict(
-            code="pro",
-            name="Pro",
-            amount=Decimal("120000.00"),
-            interval=SubscriptionPlan.Interval.MONTH,
-            max_stores=10,
-            max_agents=50,
-        ),
-    ]
-
+    # Import centralized pricing - single source of truth
+    try:
+        from billing.pricing import PLANS
+    except ImportError:
+        # Fallback if pricing module not yet available
+        PLANS = {}
+    
+    if not PLANS:
+        return
+    
     with transaction.atomic():
-        for p in plans:
+        for plan_config in PLANS.values():
             SubscriptionPlan.objects.update_or_create(
-                code=p["code"],
+                code=plan_config.code,
                 defaults={
-                    "name": p["name"],
-                    "amount": p["amount"],
-                    "interval": p["interval"],
-                    "max_stores": p["max_stores"],
-                    "max_agents": p["max_agents"],
+                    "name": plan_config.name,
+                    "amount": plan_config.amount,
+                    "interval": SubscriptionPlan.Interval.MONTH,
+                    "max_stores": plan_config.max_stores,
+                    "max_agents": plan_config.max_agents,
                     "is_active": True,
-                    "currency": currency,
+                    "currency": plan_config.currency,
+                    "description": plan_config.description,
                 },
             )
 
