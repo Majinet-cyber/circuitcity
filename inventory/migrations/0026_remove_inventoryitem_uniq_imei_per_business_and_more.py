@@ -5,6 +5,24 @@ from django.db.migrations.operations.models import RemoveConstraint, RemoveIndex
 import django.utils.timezone
 
 
+def cleanup_uniq_imei_per_business(apps, schema_editor):
+    """
+    Drop both constraint and index for uniq_imei_per_business if they exist (Postgres only).
+    This handles the case where a previous migration run left behind the constraint or index.
+    """
+    if schema_editor.connection.vendor != "postgresql":
+        return
+
+    InventoryItem = apps.get_model("inventory", "InventoryItem")
+    table = InventoryItem._meta.db_table
+
+    with schema_editor.connection.cursor() as cursor:
+        # 1) Drop constraint if it exists (this also removes its backing index)
+        cursor.execute(f'ALTER TABLE "{table}" DROP CONSTRAINT IF EXISTS "uniq_imei_per_business";')
+        # 2) Drop any leftover index if it still exists
+        cursor.execute('DROP INDEX IF EXISTS "uniq_imei_per_business";')
+
+
 class SafeRemoveConstraint(RemoveConstraint):
     """
     Prevents ValueError if constraint is missing from migration state.
@@ -138,6 +156,8 @@ class Migration(migrations.Migration):
                 max_length=10,
             ),
         ),
+        # Drop stale constraint and index before creating the constraint (fixes Render Postgres deploy)
+        migrations.RunPython(cleanup_uniq_imei_per_business, migrations.RunPython.noop),
         migrations.AddConstraint(
             model_name="inventoryitem",
             constraint=models.UniqueConstraint(
