@@ -9,7 +9,7 @@ class Migration(migrations.Migration):
 
     dependencies = [
         ('inventory', '0043_add_assigned_role_index'),
-        ('tenants', '__latest__'),
+        ('tenants', '0014_add_case_insensitive_unique_constraints'),
         migrations.swappable_dependency(settings.AUTH_USER_MODEL),
     ]
 
