@@ -2,6 +2,7 @@
 
 import django.db.models.deletion
 import django.utils.timezone
+import uuid
 from decimal import Decimal
 from django.conf import settings
 from django.db import migrations, models
@@ -331,8 +332,8 @@ class Migration(migrations.Migration):
         migrations.AlterField(
             model_name="supportactionlog",
             name="id",
-            field=models.BigAutoField(
-                auto_created=True, primary_key=True, serialize=False, verbose_name="ID"
+            field=models.UUIDField(
+                primary_key=True, default=uuid.uuid4, editable=False, serialize=False
             ),
         ),
         migrations.AlterField(
@@ -359,8 +360,8 @@ class Migration(migrations.Migration):
         migrations.AlterField(
             model_name="supportticket",
             name="id",
-            field=models.BigAutoField(
-                auto_created=True, primary_key=True, serialize=False, verbose_name="ID"
+            field=models.UUIDField(
+                primary_key=True, default=uuid.uuid4, editable=False, serialize=False
             ),
         ),
         migrations.AlterField(

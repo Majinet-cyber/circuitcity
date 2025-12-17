@@ -1,4 +1,5 @@
 ﻿# hq/models.py
+import uuid
 from django.db import models
 from django.conf import settings
 from django.utils import timezone
@@ -82,6 +83,7 @@ class SupportTicket(models.Model):
         ("closed", "Closed"),
     ]
     
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     business = models.ForeignKey("tenants.Business", on_delete=models.CASCADE, related_name="support_tickets")
     title = models.CharField(max_length=255)
     description = models.TextField()
@@ -108,6 +110,7 @@ class SupportTicket(models.Model):
 
 class SupportActionLog(models.Model):
     """Log of support actions taken by HQ staff."""
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     ticket = models.ForeignKey(SupportTicket, on_delete=models.CASCADE, null=True, blank=True, related_name="action_logs")
     business = models.ForeignKey("tenants.Business", on_delete=models.CASCADE, null=True, blank=True)
     
