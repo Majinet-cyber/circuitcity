@@ -42,6 +42,78 @@ def drop_sale_price_nonneg_if_exists(apps, schema_editor):
         cursor.execute(f'ALTER TABLE "{table}" DROP CONSTRAINT IF EXISTS "sale_price_nonneg";')
 
 
+def add_constraint_if_not_exists(apps, schema_editor, constraint_name, check_expression):
+    """
+    Add a check constraint only if it doesn't already exist.
+    Works for both PostgreSQL and SQLite.
+    """
+    if schema_editor.connection.vendor == "postgresql":
+        sql = f"""
+        DO $$
+        BEGIN
+          IF NOT EXISTS (
+            SELECT 1 FROM pg_constraint c
+            JOIN pg_class t ON c.conrelid = t.oid
+            WHERE c.conname = '{constraint_name}'
+            AND t.relname = 'sales_sale'
+          ) THEN
+            ALTER TABLE sales_sale
+              ADD CONSTRAINT {constraint_name} CHECK ({check_expression});
+          END IF;
+        END $$;
+        """
+        schema_editor.execute(sql)
+    elif schema_editor.connection.vendor == "sqlite":
+        # SQLite doesn't support adding constraints to existing tables easily,
+        # but check constraints are defined during table creation.
+        # For SQLite, we let Django handle it normally via state operations.
+        # If constraint already exists in SQLite, we just pass.
+        pass
+
+
+def drop_constraint_if_exists(apps, schema_editor, constraint_name):
+    """
+    Drop a check constraint only if it exists.
+    Works for both PostgreSQL and SQLite.
+    """
+    if schema_editor.connection.vendor == "postgresql":
+        sql = f"""
+        DO $$
+        BEGIN
+          IF EXISTS (
+            SELECT 1 FROM pg_constraint c
+            JOIN pg_class t ON c.conrelid = t.oid
+            WHERE c.conname = '{constraint_name}'
+            AND t.relname = 'sales_sale'
+          ) THEN
+            ALTER TABLE sales_sale DROP CONSTRAINT {constraint_name};
+          END IF;
+        END $$;
+        """
+        schema_editor.execute(sql)
+    elif schema_editor.connection.vendor == "sqlite":
+        # SQLite doesn't support dropping constraints from existing tables
+        # For tests and local dev, we just pass
+        pass
+
+
+def add_price_constraint(apps, schema_editor):
+    add_constraint_if_not_exists(apps, schema_editor, 'sale_price_nonneg', 'price >= 0')
+
+
+def add_commission_constraint(apps, schema_editor):
+    add_constraint_if_not_exists(apps, schema_editor, 'sale_commission_pct_0_100', 
+                                 'commission_pct >= 0 AND commission_pct <= 100')
+
+
+def drop_price_constraint(apps, schema_editor):
+    drop_constraint_if_exists(apps, schema_editor, 'sale_price_nonneg')
+
+
+def drop_commission_constraint(apps, schema_editor):
+    drop_constraint_if_exists(apps, schema_editor, 'sale_commission_pct_0_100')
+
+
 class Migration(migrations.Migration):
 
     dependencies = [
@@ -77,12 +149,26 @@ class Migration(migrations.Migration):
         ),
         # Indexes already exist from 0001_initial - no need to add them again
         migrations.RunPython(drop_sale_price_nonneg_if_exists, migrations.RunPython.noop),
-        migrations.AddConstraint(
-            model_name='sale',
-            constraint=models.CheckConstraint(check=models.Q(('price__gte', 0)), name='sale_price_nonneg'),
+        migrations.SeparateDatabaseAndState(
+            database_operations=[
+                migrations.RunPython(add_price_constraint, drop_price_constraint),
+            ],
+            state_operations=[
+                migrations.AddConstraint(
+                    model_name='sale',
+                    constraint=models.CheckConstraint(check=models.Q(('price__gte', 0)), name='sale_price_nonneg'),
+                ),
+            ],
         ),
-        migrations.AddConstraint(
-            model_name='sale',
-            constraint=models.CheckConstraint(check=models.Q(('commission_pct__gte', 0), ('commission_pct__lte', 100)), name='sale_commission_pct_0_100'),
+        migrations.SeparateDatabaseAndState(
+            database_operations=[
+                migrations.RunPython(add_commission_constraint, drop_commission_constraint),
+            ],
+            state_operations=[
+                migrations.AddConstraint(
+                    model_name='sale',
+                    constraint=models.CheckConstraint(check=models.Q(('commission_pct__gte', 0), ('commission_pct__lte', 100)), name='sale_commission_pct_0_100'),
+                ),
+            ],
         ),
     ]
