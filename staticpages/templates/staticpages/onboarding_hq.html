@@ -20,14 +20,12 @@
             </p>
           </div>
           <div>
-            <!-- PDF download temporarily disabled -->
-            <button type="button" 
-                    class="btn btn-outline-secondary" 
-                    disabled
-                    title="PDF version coming soon">
+            <!-- PDF download -->
+            <a href="{% url 'staticpages:hq_onboarding_pdf' %}" 
+               class="btn btn-danger">
               <i class="bi bi-download me-2"></i>
-              Download PDF (Coming Soon)
-            </button>
+              Download PDF
+            </a>
           </div>
         </div>
       </div>

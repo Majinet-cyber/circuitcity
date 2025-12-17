@@ -33,6 +33,17 @@ def _reverse_or(path_name: str, fallback: str) -> str:
         return fallback
 
 
+def _normalize_path(path: str) -> str:
+    """Normalize path by removing duplicate slashes."""
+    # Replace multiple slashes with single slash
+    import re
+    normalized = re.sub(r'/+', '/', path)
+    # Ensure it starts with /
+    if not normalized.startswith('/'):
+        normalized = '/' + normalized
+    return normalized
+
+
 def _import_optional(path: str):
     try:
         return import_module(path)
@@ -403,3 +414,33 @@ class FriendlyErrorsMiddleware(MiddlewareMixin):
         except Exception:
             # As a last resort, return a minimal safe response
             return HttpResponse("Sorry — something went wrong.", status=500)
+
+
+# ------------------------------------------------------------------
+# URL Normalization Middleware (fixes double slashes)
+# ------------------------------------------------------------------
+class NormalizeURLMiddleware(MiddlewareMixin):
+    """
+    Middleware to normalize URLs by removing duplicate slashes.
+    Redirects /foo//bar/ to /foo/bar/ (permanent redirect).
+    Prevents 404s caused by accidental double slashes.
+    """
+
+    def process_request(self, request: HttpRequest):
+        """Normalize URL path by removing duplicate slashes."""
+        original_path = request.path
+        normalized_path = _normalize_path(original_path)
+        
+        # If path changed, redirect to normalized version
+        if original_path != normalized_path:
+            # Preserve query string
+            query_string = request.META.get('QUERY_STRING', '')
+            if query_string:
+                normalized_url = f"{normalized_path}?{query_string}"
+            else:
+                normalized_url = normalized_path
+            
+            # 301 permanent redirect
+            return redirect(normalized_url, permanent=True)
+        
+        return None

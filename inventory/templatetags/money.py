@@ -17,6 +17,7 @@ def _to_decimal(v) -> Decimal | None:
 
 def _fmt_amount(d: Decimal) -> str:
     # 2dp but drop .00 for clean display
+    # Ensure we always use proper thousands separators (comma)
     q = d.quantize(Decimal("0.01"))
     s = f"{q:,.2f}"
     if s.endswith(".00"):

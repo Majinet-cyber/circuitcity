@@ -316,6 +316,7 @@ def _post_login_url(request=None) -> str:
     """
     Best-effort landing page after successful login.
     
+    Prioritizes dashboard (NOT analytics/insights).
     For phone businesses: redirect to phones dashboard.
     Otherwise: prefer general dashboard; fall back to inventory dashboard/list.
     """
@@ -345,7 +346,7 @@ def _post_login_url(request=None) -> str:
             except Exception:
                 pass
     
-    # Default landing pages (general dashboard, inventory, etc.)
+    # Default landing pages (prioritize dashboard:home, NOT analytics/insights)
     for name in (
         "dashboard:home",
         "dashboard:dashboard_home",

@@ -83,7 +83,7 @@
 
     {% if FEATURES.REPORTS|default:1 %}
       <li class="{% if p|slice:'0:9' == '/reports/' %}active{% endif %}">
-        <a href="{{ url_reports|default:'/reports/' }}">Reports</a>
+        <a href="{% url 'reports:home' %}">Reports</a>
       </li>
     {% endif %}
 

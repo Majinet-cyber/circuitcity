@@ -368,6 +368,14 @@ if default_db.get("ENGINE") == "django.db.backends.sqlite3":
     default_db["OPTIONS"] = opts
     DATABASES["default"] = default_db
 
+# ===== RENDER GUARD: Prevent SQLite in production =====
+# On Render, we must use PostgreSQL. Fail fast if misconfigured.
+if os.getenv("RENDER") and DATABASES.get("default", {}).get("ENGINE", "").endswith("sqlite3"):
+    from django.core.exceptions import ImproperlyConfigured
+    raise ImproperlyConfigured(
+        "SQLite is not allowed on Render. Please set DATABASE_URL to a valid PostgreSQL connection string."
+    )
+
 # --------------------------- cache ---------------------------
 CACHE_TTL_DEFAULT = env_int("CACHE_TTL_DEFAULT", 60)
 REDIS_URL = os.environ.get("REDIS_URL", "")

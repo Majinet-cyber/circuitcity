@@ -596,49 +596,51 @@ document.addEventListener('DOMContentLoaded', function() {
     const verticalCtx = document.getElementById('verticalChart');
     if (verticalCtx) {
         try {
-            const verticalData = chartData.businesses_by_vertical || {
-                'Phone Shop': 12,
-                'Retail': 8,
-                'Pharmacy': 5,
-                'Gym': 7,
-                'Restaurant': 3
-            };
+            // Use ONLY real data from database - never show fake verticals
+            const verticalData = chartData.businesses_by_vertical || {};
             
-            new Chart(verticalCtx, {
-                type: 'bar',
-                data: {
-                    labels: Object.keys(verticalData),
-                    datasets: [{
-                        label: 'Businesses',
-                        data: Object.values(verticalData),
-                        backgroundColor: [
-                            'rgba(102, 126, 234, 0.8)',
-                            'rgba(16, 185, 129, 0.8)',
-                            'rgba(245, 158, 11, 0.8)',
-                            'rgba(239, 68, 68, 0.8)',
-                            'rgba(139, 92, 246, 0.8)'
-                        ],
-                        borderColor: [
-                            'rgb(102, 126, 234)',
-                            'rgb(16, 185, 129)',
-                            'rgb(245, 158, 11)',
-                            'rgb(239, 68, 68)',
-                            'rgb(139, 92, 246)'
-                        ],
-                        borderWidth: 2
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: {
-                        legend: { display: false }
+            // Show empty state if no data
+            if (Object.keys(verticalData).length === 0) {
+                verticalCtx.parentElement.innerHTML = '<p style="text-align:center;color:#6b7280;padding:40px;">No business vertical data yet</p>';
+            } else {
+                new Chart(verticalCtx, {
+                    type: 'bar',
+                    data: {
+                        labels: Object.keys(verticalData),
+                        datasets: [{
+                            label: 'Businesses',
+                            data: Object.values(verticalData),
+                            backgroundColor: [
+                                'rgba(102, 126, 234, 0.8)',
+                                'rgba(16, 185, 129, 0.8)',
+                                'rgba(245, 158, 11, 0.8)',
+                                'rgba(239, 68, 68, 0.8)',
+                                'rgba(139, 92, 246, 0.8)',
+                                'rgba(99, 102, 241, 0.8)'
+                            ],
+                            borderColor: [
+                                'rgb(102, 126, 234)',
+                                'rgb(16, 185, 129)',
+                                'rgb(245, 158, 11)',
+                                'rgb(239, 68, 68)',
+                                'rgb(139, 92, 246)',
+                                'rgb(99, 102, 241)'
+                            ],
+                            borderWidth: 2
+                        }]
                     },
-                    scales: {
-                        y: { beginAtZero: true }
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: { display: false }
+                        },
+                        scales: {
+                            y: { beginAtZero: true }
+                        }
                     }
-                }
-            });
+                });
+            }
         } catch (e) {
             console.error('Failed to create vertical chart:', e);
         }

@@ -109,9 +109,18 @@ _activate_mine_view = getattr(_tenants_views, "activate_mine", None)
 
 
 def root_redirect(request):
+    """
+    Smart root redirect based on user authentication and role.
+    
+    Anonymous users -> Marketing home page
+    Authenticated users -> Dashboard (NOT analytics)
+    HQ admins -> HQ dashboard
+    """
     # Anonymous -> public home page / login
     if not getattr(request, "user", None) or not request.user.is_authenticated:
-        # Try our global "home" alias first
+        # Try our global "home" alias first (marketing page)
+        if _reverse_exists("staticpages:home"):
+            return redirect("staticpages:home")
         if _reverse_exists("home"):
             return redirect("home")
         return _redirect_first(("staticpages:home",), "/home/")
@@ -134,11 +143,12 @@ def root_redirect(request):
         if _activate_mine_view:
             return redirect("/tenants/activate-mine/")
     else:
-        dispatcher = _first_working_reverse(("inventory:inventory_dashboard",))
+        # Active business -> dashboard (prioritize dashboard:home over analytics/insights)
+        dispatcher = _first_working_reverse(("dashboard:home", "inventory:inventory_dashboard"))
         if dispatcher:
             return redirect(dispatcher)
 
-    # Store dashboards
+    # Store dashboards (prioritize dashboard:home)
     candidates = (
         "dashboard:home",
         "inventory:inventory_dashboard",
@@ -873,6 +883,11 @@ except ModuleNotFoundError:
 else:
     urlpatterns.append(
         path("reports/", include("reports.urls"))
+    )
+    
+    # Safety net: redirect double-slash /reports// to /reports/
+    urlpatterns.append(
+        re_path(r"^reports//+$", RedirectView.as_view(url="/reports/", permanent=False), name="reports_double_slash_fix")
     )
 
 # ======================================================================================

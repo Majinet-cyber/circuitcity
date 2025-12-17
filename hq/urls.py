@@ -66,6 +66,7 @@ urlpatterns = [
     # Wallet (HQ shell)
     # =========================
     path("wallet/", views.wallet_home, name="wallet"),
+    path("wallet/mark-paid/", views.wallet_mark_paid, name="wallet_mark_paid"),
 
     # ==================================================================
     # Subscription Admin Actions (used by HQ Subscriptions table buttons)
@@ -99,6 +100,7 @@ urlpatterns = [
     # Invoice actions
     # =========================
     path("invoices/<int:pk>/refund/", views.invoice_refund, name="invoice_refund"),
+    path("invoices/create/", views.invoice_create, name="invoice_create"),
 
     # =========================
     # Trial adjustment / cancel (INT pk in your codebase)

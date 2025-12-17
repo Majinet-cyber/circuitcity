@@ -48,11 +48,12 @@ urlpatterns = [
     path("pharmacy/sales/export.csv", pharmacy.sales_export_csv, name="pharmacy_sales_export_csv"),
     path("pharmacy/api/sales-trend/", pharmacy.sales_trend_json, name="pharmacy_sales_trend_json"),
     
-    # Phones vertical (sales history)
+    # Phones vertical (sales history + reports)
     path("phones/dashboard/", phones.dashboard, name="phones_dashboard"),
     path("phones/sales/", phones.sales_history, name="phones_sales_history"),
     path("phones/sales/export.csv", phones.sales_export_csv, name="phones_sales_export_csv"),
     path("phones/api/sales-trend/", phones.sales_trend_json, name="phones_sales_trend_json"),
+    path("phones/reports/", phones.reports, name="phones_reports"),
     
     # Fallback for businesses without a kind
     path("none/", fallback.no_business, name="no_business"),

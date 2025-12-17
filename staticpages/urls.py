@@ -16,5 +16,6 @@ urlpatterns = [
     # Onboarding guides
     path('onboarding/manager/', views.onboarding_manager, name='onboarding_manager'),
     path('onboarding/hq/', views.onboarding_hq, name='onboarding_hq'),
+    path('onboarding/hq/pdf/', views.hq_onboarding_pdf, name='hq_onboarding_pdf'),
 ]
 

@@ -303,13 +303,10 @@ def business_directory(request: HttpRequest) -> HttpResponse:
         "vertical_filter": vertical_filter,
         "sort_by": sort_by,
         "page_obj": page_obj,
+        # Use real BusinessKind choices from database (no hardcoded fake verticals)
         "verticals": [
-            ("phone_shop", "Phone Shop"),
-            ("retail", "Retail"),
-            ("pharmacy", "Pharmacy"),
-            ("gym", "Gym"),
-            ("restaurant", "Restaurant"),
-        ],
+            (choice[0], choice[1]) for choice in Business._meta.get_field('business_kind').choices
+        ] if hasattr(Business._meta.get_field('business_kind'), 'choices') else [],
         "chart_data": json.dumps(chart_data),
         "support_health_score": support_health_score,
         "failed_payments_count": failed_invoices,

@@ -393,14 +393,17 @@
 <body>
 
 <div class="cc-shell">
-  {% block sidebar %}{% include "partials/sidebar.html" %}{% endblock %}
+  {# AUTHENTICATION GUARD: Only show sidebar/nav for authenticated users #}
+  {% if request.user.is_authenticated %}
+    {% block sidebar %}{% include "partials/sidebar.html" %}{% endblock %}
 
-  <!-- Drawer trigger + backdrop -->
-  <button class="mobile-toggle tap focus-ring" id="sidebarOpen" aria-label="Open menu" aria-expanded="false" aria-controls="ccSidebar">
-    <i class="bi bi-list" aria-hidden="true"></i>
-    <span class="hamburger-bars" aria-hidden="true"></span>  <!-- fallback bars -->
-  </button>
-  <div class="cc-backdrop" id="ccBackdrop" aria-hidden="true"></div>
+    <!-- Drawer trigger + backdrop -->
+    <button class="mobile-toggle tap focus-ring" id="sidebarOpen" aria-label="Open menu" aria-expanded="false" aria-controls="ccSidebar">
+      <i class="bi bi-list" aria-hidden="true"></i>
+      <span class="hamburger-bars" aria-hidden="true"></span>  <!-- fallback bars -->
+    </button>
+    <div class="cc-backdrop" id="ccBackdrop" aria-hidden="true"></div>
+  {% endif %}
 
   <div class="cc-main">
 
@@ -432,7 +435,8 @@
     {% url 'logout' as url_logout %}
 
     {% with path=request.path|default:'' %}
-      {% if 'accounts/settings' not in path %}
+      {# AUTHENTICATION GUARD: Only show header/topbar for authenticated users #}
+      {% if 'accounts/settings' not in path and request.user.is_authenticated %}
         <header class="cc-header">
           <div class="cc-page topbar">
             <h1 class="fw-bold d-flex align-items-center gap-2">
@@ -704,6 +708,8 @@
       {% block main %}{% endblock %}
     </main>
 
+    {# AUTHENTICATION GUARD: Only show bottom nav for authenticated users #}
+    {% if request.user.is_authenticated %}
     <!-- Mobile bottom dock - Vertical-aware navigation -->
     <nav class="mobile-tabbar d-flex d-md-none cc-bottom-nav">
       {% for item in MOBILE_NAV_ITEMS|default:'' %}
@@ -739,6 +745,7 @@
         </a>
       {% endfor %}
     </nav>
+    {% endif %}
   </div>
 </div>
 

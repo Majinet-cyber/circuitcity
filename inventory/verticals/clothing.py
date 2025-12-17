@@ -279,15 +279,21 @@ def scan_in(request):
     
     business = base.base_context(request).get("business")
     
-    # Define clothing categories
+    # Define clothing categories (expanded with more product types)
     CLOTHING_CATEGORIES = [
         ('suit', 'Suit', '🤵'),
         ('dress', 'Dress', '👗'),
         ('shirt', 'Shirt', '👔'),
         ('trousers', 'Trousers', '👖'),
+        ('jeans', 'Jeans', '👖'),
+        ('shorts', 'Shorts', '🩳'),
         ('shoes', 'Shoes', '👞'),
         ('jacket', 'Jacket', '🧥'),
         ('skirt', 'Skirt', '🩱'),
+        ('belts', 'Belts', '🔗'),
+        ('perfumes', 'Perfumes', '🌸'),
+        ('handbags', 'Hand Bags', '👜'),
+        ('schoolbags', 'School Bags', '🎒'),
         ('other', 'Other', '👕'),
     ]
     

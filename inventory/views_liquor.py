@@ -118,12 +118,11 @@ def sell_liquor(request):
         # Business has no subscription yet (trial or free tier)
         subscription = None
     
-    # Get active shift (if any)
-    active_shift = get_active_shift(request)
+    # Get or auto-start active shift (prevents "no active shift" blocking)
+    location = getattr(request, "location", None)
+    active_shift = get_or_start_active_shift(request.user, business, location)
     
-    # Warn if no active shift
-    if not active_shift:
-        messages.warning(request, "You don't have an active shift. Start a shift first to track sales properly.")
+    # No warning needed - shift is always available now
     
     if request.method == "POST":
         # POST logic remains intact - handle sale recording
@@ -775,6 +774,69 @@ def get_active_shift(request) -> Optional[Any]:
         barman=request.user,
         status=LiquorShiftStatus.OPEN
     ).order_by("-started_at").first()
+
+
+def get_or_start_active_shift(user, business, location=None):
+    """
+    Get the currently active shift for the user, or create one automatically if missing.
+    
+    This prevents "no active shift" errors from blocking liquor flows.
+    Idempotent: won't create duplicates if a shift already exists.
+    
+    Args:
+        user: The user/barman
+        business: The business instance
+        location: Optional location (defaults to business default location if None)
+    
+    Returns:
+        LiquorShift instance (existing or newly created)
+    """
+    from inventory.models_verticals import LiquorShift, LiquorShiftStatus, LiquorShiftStock
+    from inventory.models import Location, MerchProduct
+    from tenants.models import BusinessKind
+    from django.db import transaction
+    
+    # Check if user already has an active shift
+    existing_shift = LiquorShift.objects.filter(
+        business=business,
+        barman=user,
+        status=LiquorShiftStatus.OPEN
+    ).order_by("-started_at").first()
+    
+    if existing_shift:
+        return existing_shift
+    
+    # No active shift - create one automatically
+    if location is None:
+        location = Location.default_for(business)
+    
+    with transaction.atomic():
+        shift = LiquorShift.objects.create(
+            business=business,
+            location=location,
+            barman=user,
+            created_by=user,
+            opening_notes="Auto-started shift (no manual count)"
+        )
+        
+        # Create opening stock snapshots with zero counts for all active liquor products
+        products = MerchProduct.objects.filter(
+            business=business,
+            kind=BusinessKind.LIQUOR,
+            is_active=True
+        ).order_by("category", "name")
+        
+        for product in products:
+            LiquorShiftStock.objects.create(
+                shift=shift,
+                product=product,
+                bottles_count=0,  # Default to 0 since we don't have actual counts
+                shots_count=0,
+                snapshot_type="opening",
+                recorded_by=user
+            )
+    
+    return shift
 
 
 @login_required

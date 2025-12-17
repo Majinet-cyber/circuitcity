@@ -1,6 +1,9 @@
 from django.shortcuts import render
 import random
 from decimal import Decimal
+from django.http import HttpResponse
+from django.contrib import messages
+from django.shortcuts import redirect
 
 
 def get_cfo_message(total_profit):
@@ -260,3 +263,156 @@ Message:
     return render(request, 'staticpages/contact.html', {
         'hide_nav': True,
     })
+
+
+def hq_onboarding_pdf(request):
+    """
+    Generate and download HQ Staff Onboarding Guide as PDF.
+    HQ staff only. Never crashes - returns friendly error if generation fails.
+    """
+    # Check if user is HQ staff
+    if not request.user.is_authenticated:
+        return redirect('/accounts/login/')
+    
+    if not (request.user.is_staff or request.user.is_superuser):
+        messages.error(request, "Only HQ staff can download this PDF.")
+        return redirect('staticpages:onboarding_hq')
+    
+    try:
+        from reportlab.lib.pagesizes import letter
+        from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+        from reportlab.lib.units import inch
+        from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, PageBreak
+        from reportlab.lib.enums import TA_LEFT, TA_CENTER
+        from io import BytesIO
+        from .onboarding_content import HQ_ONBOARDING_CONTENT
+        
+        # Create PDF in memory
+        buffer = BytesIO()
+        doc = SimpleDocTemplate(
+            buffer,
+            pagesize=letter,
+            rightMargin=72,
+            leftMargin=72,
+            topMargin=72,
+            bottomMargin=18,
+        )
+        
+        # Container for PDF elements
+        story = []
+        
+        # Get styles
+        styles = getSampleStyleSheet()
+        
+        # Custom styles
+        title_style = ParagraphStyle(
+            'CustomTitle',
+            parent=styles['Heading1'],
+            fontSize=24,
+            textColor='#DC3545',  # Bootstrap danger color
+            spaceAfter=30,
+            alignment=TA_CENTER,
+        )
+        
+        heading2_style = ParagraphStyle(
+            'CustomHeading2',
+            parent=styles['Heading2'],
+            fontSize=16,
+            textColor='#212529',
+            spaceAfter=12,
+            spaceBefore=20,
+        )
+        
+        heading3_style = ParagraphStyle(
+            'CustomHeading3',
+            parent=styles['Heading3'],
+            fontSize=14,
+            textColor='#495057',
+            spaceAfter=10,
+            spaceBefore=15,
+        )
+        
+        body_style = ParagraphStyle(
+            'CustomBody',
+            parent=styles['BodyText'],
+            fontSize=11,
+            spaceAfter=10,
+            leading=14,
+        )
+        
+        bullet_style = ParagraphStyle(
+            'CustomBullet',
+            parent=styles['BodyText'],
+            fontSize=11,
+            leftIndent=20,
+            bulletIndent=10,
+            spaceAfter=6,
+            leading=14,
+        )
+        
+        alert_style = ParagraphStyle(
+            'AlertStyle',
+            parent=styles['BodyText'],
+            fontSize=11,
+            spaceAfter=12,
+            spaceBefore=12,
+            leftIndent=15,
+            rightIndent=15,
+            textColor='#721c24',  # Alert text color
+        )
+        
+        # Build PDF content from shared structure
+        for item in HQ_ONBOARDING_CONTENT:
+            item_type = item.get('type')
+            
+            if item_type == 'title':
+                story.append(Paragraph(item['text'], title_style))
+                story.append(Spacer(1, 0.2 * inch))
+                
+            elif item_type == 'heading':
+                level = item.get('level', 2)
+                if level == 2:
+                    story.append(Paragraph(item['text'], heading2_style))
+                elif level == 3:
+                    story.append(Paragraph(item['text'], heading3_style))
+                    
+            elif item_type == 'paragraph':
+                story.append(Paragraph(item['text'], body_style))
+                
+            elif item_type == 'list':
+                for list_item in item.get('items', []):
+                    bullet_text = f'• {list_item}'
+                    story.append(Paragraph(bullet_text, bullet_style))
+                story.append(Spacer(1, 0.1 * inch))
+                
+            elif item_type == 'alert':
+                alert_title = item.get('title', '')
+                alert_text = item.get('text', '')
+                if alert_title:
+                    story.append(Paragraph(f'<b>⚠ {alert_title}</b>', alert_style))
+                story.append(Paragraph(alert_text, alert_style))
+                story.append(Spacer(1, 0.15 * inch))
+        
+        # Build PDF
+        doc.build(story)
+        
+        # Get PDF from buffer
+        pdf = buffer.getvalue()
+        buffer.close()
+        
+        # Return as download
+        response = HttpResponse(pdf, content_type='application/pdf')
+        response['Content-Disposition'] = 'attachment; filename="hq_staff_onboarding_guide.pdf"'
+        return response
+        
+    except ImportError as e:
+        # ReportLab not installed
+        messages.error(request, "PDF generation is not available. Please contact support.")
+        return redirect('staticpages:onboarding_hq')
+    except Exception as e:
+        # Any other error - log it but don't crash
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.error(f"PDF generation failed: {e}", exc_info=True)
+        messages.error(request, "Unable to generate PDF at this time. Please try again later.")
+        return redirect('staticpages:onboarding_hq')

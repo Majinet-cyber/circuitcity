@@ -315,7 +315,8 @@ def dashboard(request):
     # B) ADDITIONAL INSIGHTS (still using 30-day window for trends/highlights)
     # ==========================================================================
     
-    # --- SALES TREND - LAST 30 DAYS (unchanged for visualization) ---
+    # --- SALES TREND - LAST 30 DAYS (line chart, never empty) ---
+    # Always generate 30 days of data (with zeros if no sales) so chart always renders
     sales_trend_data = []
     for i in range(30):
         day_start = today_start - timedelta(days=29-i)
@@ -798,3 +799,30 @@ def sales_trend_json(request):
         'end_date': (end_date - timedelta(days=1)).isoformat(),
         'timestamp': timezone.now().isoformat(),
     })
+
+
+@login_required
+@require_business
+@require_business_kind(BusinessKind.PHONES)
+def reports(request):
+    """
+    Phones Reports page - safe empty state implementation.
+    Future: Will show detailed reports, analytics, and export options.
+    """
+    from django.contrib import messages
+    
+    ctx = base.base_context(request)
+    business = ctx.get("business")
+    
+    # For now, just show an empty-state message
+    # This prevents 404 errors when users click "Reports"
+    messages.info(request, "Reports feature is coming soon! Use Sales History to export data in the meantime.")
+    
+    # Render a simple empty state template
+    ctx.update({
+        "page_title": "Phones Reports",
+        "empty_message": "Reports feature is under construction. Check back soon!",
+        "sales_history_url": "verticals:phones_sales_history",
+    })
+    
+    return render(request, "verticals/phones/reports_empty.html", ctx)
