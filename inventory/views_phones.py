@@ -72,7 +72,7 @@ PHONE_BRANDS = [
     {
         "key": "google_pixel",
         "name": "GOOGLE PIXEL",
-        "logo": "img/brands/pixel.svg",
+        "logo": "img/brands/google-pixel.svg",
         "tagline": "Pure Android",
         "color": "#10b981",  # green
     },

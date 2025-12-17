@@ -1,5 +1,6 @@
 {% extends "base.html" %}
 {% load static %}
+{% load brand_icons %}
 
 {% block title %}Scan Sell Phones · Inventory{% endblock %}
 {% block header_title %}💸 Scan Sell Phones{% endblock %}
@@ -246,7 +247,7 @@
     {% for brand in brands %}
     <div class="brand-card" data-brand="{{ brand.key }}" onclick="selectBrand('{{ brand.key }}', '{{ brand.name }}')">
       {% if brand.logo %}
-      <img src="{% static brand.logo %}" alt="{{ brand.name }}" onerror="this.style.display='none'">
+      <img src="{% brand_icon_path brand.logo %}" alt="{{ brand.name }}" onerror="this.style.display='none'">
       {% endif %}
       <h3>{{ brand.name }}</h3>
       <p class="tagline">{{ brand.tagline }}</p>

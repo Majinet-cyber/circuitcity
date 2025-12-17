@@ -26,6 +26,13 @@ STATIC_URL = "/static/"
 STATIC_ROOT = os.path.join(BASE_DIR, "staticfiles")
 STATICFILES_STORAGE = "whitenoise.storage.CompressedManifestStaticFilesStorage"
 
+# WhiteNoise safety: Don't hard-fail on missing static files in manifest
+# This prevents 500 errors from missing brand icons or other static files
+# during rolling deploys or when static files are added/removed.
+# Note: The brand_icon template tag also provides an additional safety layer
+# by checking file existence before calling .url()
+WHITENOISE_MANIFEST_STRICT = False
+
 # Insert WhiteNoise middleware right after SecurityMiddleware if not already there
 if "whitenoise.middleware.WhiteNoiseMiddleware" not in MIDDLEWARE:
     try:
