@@ -23,33 +23,42 @@ def dedupe_active_memberships(apps, schema_editor):
                 business_id=d["business_id"],
             )
 
-            # Rank: prefer MANAGER, then rows with location, then newest id
+            # Rank: prefer location_id NOT NULL, then OWNER > MANAGER, then highest id
             qs = base_qs.annotate(
-                role_rank=Case(
-                    When(role="MANAGER", then=Value(2)),
-                    When(role="OWNER", then=Value(3)),
-                    default=Value(0),
-                    output_field=IntegerField(),
-                ),
                 loc_rank=Case(
                     When(location_id__isnull=False, then=Value(1)),
                     default=Value(0),
                     output_field=IntegerField(),
                 ),
-            ).order_by("-role_rank", "-loc_rank", "-id")
+                role_rank=Case(
+                    When(role="OWNER", then=Value(3)),
+                    When(role="MANAGER", then=Value(2)),
+                    default=Value(0),
+                    output_field=IntegerField(),
+                ),
+            ).order_by("-loc_rank", "-role_rank", "-id")
 
             keep = qs.first()
             if not keep:
                 continue
 
-            # If keep has no location, copy from another duplicate that has it
-            if getattr(keep, "location_id", None) is None:
-                donor = base_qs.filter(location_id__isnull=False).exclude(id=keep.id).order_by("-id").first()
-                if donor:
-                    keep.location_id = donor.location_id
-                    keep.save(update_fields=["location_id"])
+            # Compute the best role across all duplicates
+            best_role_qs = base_qs.annotate(
+                role_rank=Case(
+                    When(role="OWNER", then=Value(3)),
+                    When(role="MANAGER", then=Value(2)),
+                    default=Value(0),
+                    output_field=IntegerField(),
+                ),
+            ).order_by("-role_rank", "-id")
+            
+            best_role = best_role_qs.values_list("role", flat=True).first()
+            
+            # Promote the kept row's role if necessary
+            if best_role and keep.role != best_role:
+                Membership.objects.filter(id=keep.id).update(role=best_role)
 
-            # Deactivate the rest
+            # Deactivate the rest (do NOT change their location_id)
             base_qs.exclude(id=keep.id).update(status="INACTIVE")
 
 
