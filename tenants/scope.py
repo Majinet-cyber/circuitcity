@@ -1,12 +1,15 @@
 # tenants/scope.py
 from __future__ import annotations
 
+import logging
 from typing import Optional, Tuple, Iterable
 
 from django.conf import settings
 from django.utils.functional import cached_property
 
 from .models import Business, Membership, get_current_business_id
+
+logger = logging.getLogger(__name__)
 
 
 # --------------------------------------------------------------------------------------
@@ -59,19 +62,38 @@ def get_active_business(request) -> Optional[Business]:
 
 
 def get_membership(user, business: Business | int) -> Optional[Membership]:
+    """
+    Get the active membership for a user in a business.
+    Handles duplicate memberships gracefully by selecting the best one and logging a warning.
+    """
     if not user or not getattr(user, "is_authenticated", False):
         return None
     biz_id = business.id if isinstance(business, Business) else business
     if not biz_id:
         return None
-    try:
-        return (
-            Membership.objects
-            .select_related("business", "location", "user")
-            .get(user_id=user.id, business_id=biz_id, status="ACTIVE")
-        )
-    except Membership.DoesNotExist:
+    
+    # Use filter + order_by to handle duplicates gracefully
+    # Prefer memberships with location set (for agents), then most recent
+    qs = (
+        Membership.objects
+        .select_related("business", "location", "user")
+        .filter(user_id=user.id, business_id=biz_id, status="ACTIVE")
+        .order_by("-location_id", "-created_at", "-id")
+    )
+    
+    m = qs.first()
+    if not m:
         return None
+    
+    # Check if duplicates exist and warn (but don't crash)
+    if qs.count() > 1:
+        logger.warning(
+            "Duplicate ACTIVE memberships detected user_id=%s business_id=%s; using membership_id=%s. "
+            "Run 'python manage.py dedupe_memberships --apply' to clean up.",
+            user.id, biz_id, m.id
+        )
+    
+    return m
 
 
 def is_manager(user, business: Business | int) -> bool:

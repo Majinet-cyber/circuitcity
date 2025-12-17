@@ -309,6 +309,14 @@ class Membership(models.Model):
         # Allow multiple rows per (user, business) as long as location differs.
         # This enables attaching an agent to multiple locations in the same business.
         unique_together = [("user", "business", "location")]
+        constraints = [
+            # Prevent duplicate ACTIVE memberships for the same (user, business) pair
+            models.UniqueConstraint(
+                fields=["user", "business"],
+                condition=Q(status="ACTIVE"),
+                name="uniq_active_membership_user_business",
+            )
+        ]
         indexes = [
             models.Index(fields=["user", "business"]),
             models.Index(fields=["role"]),
