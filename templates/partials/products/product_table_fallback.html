@@ -1,0 +1,163 @@
+{% comment %}
+Premium Product Table Fallback
+Table view for product listings (accessible fallback to grid view)
+
+Usage:
+  {% include "partials/products/product_table_fallback.html" with products=products vertical="liquor" %}
+
+Required context:
+  - products: QuerySet or list of product objects
+  - vertical: String identifier (liquor/pharmacy/clothing/phones/gym)
+
+Optional context:
+  - show_prices: Boolean (default True)
+  - show_stock: Boolean (default False)
+  - show_expiry: Boolean (default False)
+  - show_actions: Boolean (default True)
+  - edit_url_name: URL pattern name for edit
+  - delete_url_name: URL pattern name for delete
+  - columns: List of column names to display
+{% endcomment %}
+
+{% load humanize %}
+
+{% with show_prices=show_prices|default:True %}
+{% with show_stock=show_stock|default:False %}
+{% with show_expiry=show_expiry|default:False %}
+{% with show_actions=show_actions|default:True %}
+
+<div class="premium-table-wrapper">
+  <table class="premium-table-fallback" role="table">
+    <thead>
+      <tr>
+        <th scope="col">Product</th>
+        <th scope="col">Category</th>
+        {% if show_prices %}
+        <th scope="col" class="text-end">Cost Price</th>
+        <th scope="col" class="text-end">Selling Price</th>
+        {% endif %}
+        {% if show_stock %}
+        <th scope="col" class="text-end">Stock</th>
+        {% endif %}
+        {% if show_expiry %}
+        <th scope="col">Expiry</th>
+        {% endif %}
+        <th scope="col">Status</th>
+        {% if show_actions %}
+        <th scope="col" class="text-end">Actions</th>
+        {% endif %}
+      </tr>
+    </thead>
+    <tbody>
+      {% for product in products %}
+      <tr>
+        <td>
+          <strong>{{ product.name|default:product.liquor_name|default:product.product_name|default:"Unnamed" }}</strong>
+          {% if product.variant_label or product.model_number or product.sku %}
+          <br><small style="color: #64748b;">{{ product.variant_label|default:product.model_number|default:product.sku }}</small>
+          {% endif %}
+        </td>
+        <td>
+          {% if product.category %}
+          <span class="premium-badge premium-badge-{{ product.category|lower }}">
+            {{ product.get_category_display|default:product.category }}
+          </span>
+          {% else %}
+          <span style="color: #94a3b8;">—</span>
+          {% endif %}
+        </td>
+        {% if show_prices %}
+        <td class="text-end" style="font-variant-numeric: tabular-nums;">
+          {% if product.cost_price or product.cost_per_bottle or product.order_price or product.default_cost_price %}
+            MK {{ product.cost_price|default:product.cost_per_bottle|default:product.order_price|default:product.default_cost_price|floatformat:0|intcomma }}
+          {% else %}
+            <span style="color: #94a3b8;">—</span>
+          {% endif %}
+        </td>
+        <td class="text-end" style="font-variant-numeric: tabular-nums;">
+          {% if product.selling_price or product.price_per_bottle or product.price_bottle or product.default_selling_price %}
+            MK {{ product.selling_price|default:product.price_per_bottle|default:product.price_bottle|default:product.default_selling_price|floatformat:0|intcomma }}
+          {% else %}
+            <span style="color: #94a3b8;">—</span>
+          {% endif %}
+        </td>
+        {% endif %}
+        {% if show_stock %}
+        <td class="text-end" style="font-variant-numeric: tabular-nums;">
+          {% if product.quantity is not None %}
+            <strong>{{ product.quantity }}</strong>
+            {% if product.is_low_stock %}
+            <span class="premium-badge premium-badge-low-stock" style="margin-left: 6px;">Low</span>
+            {% endif %}
+          {% else %}
+            <span style="color: #94a3b8;">—</span>
+          {% endif %}
+        </td>
+        {% endif %}
+        {% if show_expiry %}
+        <td>
+          {% if product.expiry_date %}
+            {{ product.expiry_date|date:"Y-m-d" }}
+            <br><small style="color: #64748b;">({{ product.days_to_expiry|default:"?" }} days)</small>
+          {% else %}
+            <span style="color: #94a3b8;">No expiry</span>
+          {% endif %}
+        </td>
+        {% endif %}
+        <td>
+          {% if product.is_expired %}
+            <span class="premium-badge premium-badge-expired">Expired</span>
+          {% elif product.is_near_expiry %}
+            <span class="premium-badge premium-badge-near-expiry">Near Expiry</span>
+          {% elif product.is_low_stock %}
+            <span class="premium-badge premium-badge-low-stock">Low Stock</span>
+          {% elif product.quantity == 0 %}
+            <span class="premium-badge premium-badge-out-of-stock">Out of Stock</span>
+          {% else %}
+            <span class="premium-badge premium-badge-in-stock">In Stock</span>
+          {% endif %}
+        </td>
+        {% if show_actions %}
+        <td class="text-end">
+          <div style="display: inline-flex; gap: 6px;">
+            {% if edit_url_name %}
+            <a href="{% url edit_url_name product.id|default:product.pk %}" 
+               class="premium-btn premium-btn-secondary" 
+               style="padding: 6px 12px; font-size: 0.8125rem;"
+               aria-label="Edit {{ product.name }}">
+              <i class="bi bi-pencil"></i>
+            </a>
+            {% endif %}
+            {% if delete_url_name %}
+            <form method="post" action="{% url delete_url_name product.id|default:product.pk %}" style="display: inline;"
+                  onsubmit="return confirm('Archive this product?')">
+              {% csrf_token %}
+              <button type="submit" 
+                      class="premium-btn premium-btn-danger" 
+                      style="padding: 6px 12px; font-size: 0.8125rem;"
+                      aria-label="Archive {{ product.name }}">
+                <i class="bi bi-archive"></i>
+              </button>
+            </form>
+            {% endif %}
+          </div>
+        </td>
+        {% endif %}
+      </tr>
+      {% empty %}
+      <tr>
+        <td colspan="{% if show_prices and show_stock and show_expiry and show_actions %}8{% elif show_prices and show_actions %}6{% else %}4{% endif %}" 
+            style="text-align: center; padding: 40px; color: #64748b;">
+          No products found
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+{% endwith %}
+{% endwith %}
+{% endwith %}
+{% endwith %}
+

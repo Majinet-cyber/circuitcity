@@ -6,6 +6,10 @@ Usage in templates:
     {% load roles %}
     {% if is_manager_ %} ... {% endif %}
     {% if is_agent_ %} ... {% endif %}
+    {{ request.user|is_manager }}
+    {{ request.user|is_agent }}
+    {% in_group "Manager" %}
+    {% is_auditor %}
 
 These tags return booleans and are resilient if the tenants utils
 module (or request in context) is unavailable.
@@ -14,8 +18,13 @@ module (or request in context) is unavailable.
 from __future__ import annotations
 
 from django import template
+from django.conf import settings
 
 register = template.Library()
+
+# Settings for role group names
+ROLE_GROUP_MANAGER_NAMES = set(getattr(settings, "ROLE_GROUP_MANAGER_NAMES", ["Manager", "Admin"]))
+ROLE_GROUP_AGENT_NAMES = set(getattr(settings, "ROLE_GROUP_AGENT_NAMES", ["Agent"]))
 
 # -----------------------------------------------------------------------------
 # Import role check functions with robust fallbacks
@@ -88,5 +97,81 @@ def role_is_manager(context) -> bool:
 @register.simple_tag(takes_context=True)
 def role_is_agent(context) -> bool:
     return is_agent_(context)
+
+
+# -----------------------------------------------------------------------------
+# Additional role filters and tags (merged from inventory)
+# -----------------------------------------------------------------------------
+@register.simple_tag(takes_context=True)
+def in_group(context, name: str):
+    """
+    Check if the current user is in a specific group.
+    Usage: {% in_group "Manager" %}
+    """
+    try:
+        user = context.get("request").user
+        return getattr(user, "is_superuser", False) or user.groups.filter(name=name).exists()
+    except Exception:
+        return False
+
+
+@register.simple_tag(takes_context=True)
+def is_auditor(context):
+    """
+    Check if the current user is in the Auditor group.
+    Usage: {% is_auditor %}
+    """
+    try:
+        user = context.get("request").user
+        return user.groups.filter(name="Auditor").exists()
+    except Exception:
+        return False
+
+
+@register.filter(name="is_manager")
+def is_manager_filter(user):
+    """
+    Template filter: {{ request.user|is_manager }}
+    Returns True if user is superuser/staff or in Manager/Admin group.
+    """
+    if not user or not getattr(user, "is_authenticated", False):
+        return False
+    if getattr(user, "is_superuser", False):
+        return True
+    try:
+        group_names = set(user.groups.values_list("name", flat=True))
+        return bool(group_names.intersection(ROLE_GROUP_MANAGER_NAMES))
+    except Exception:
+        return False
+
+
+@register.filter(name="is_agent")
+def is_agent_filter(user):
+    """
+    Template filter: {{ request.user|is_agent }}
+    Returns True if user is in Agent group but NOT a manager.
+    """
+    if not user or not getattr(user, "is_authenticated", False):
+        return False
+    if getattr(user, "is_superuser", False):
+        return False
+    if is_manager_filter(user):
+        return False
+    try:
+        group_names = set(user.groups.values_list("name", flat=True))
+        return bool(group_names.intersection(ROLE_GROUP_AGENT_NAMES))
+    except Exception:
+        return False
+
+
+@register.filter(name="business_kind")
+def business_kind(business, default="phones"):
+    """
+    Template filter: {{ request.business|business_kind }}
+    Returns the business_kind or a default.
+    """
+    if not business:
+        return default
+    return getattr(business, "business_kind", None) or default
 
 

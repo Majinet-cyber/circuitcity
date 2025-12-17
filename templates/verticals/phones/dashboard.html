@@ -41,10 +41,21 @@
   .metric-card p{margin:8px 0 0;font-size:2rem;font-weight:900;color:#0f172a;word-break:break-word;min-width:0;overflow:hidden;text-overflow:ellipsis}
   .metric-card small{display:block;margin-top:6px;font-size:.9rem;color:#64748b;word-break:break-word;overflow-wrap:break-word}
   
-  /* Mobile: prevent KPI numbers from breaking layout */
+  /* Mobile: prevent KPI numbers from breaking layout - ENHANCED */
   @media (max-width:640px){
-    .metric-card p{font-size:clamp(1.5rem,5vw,2rem)}
-    .metric-card small{font-size:clamp(0.75rem,2.5vw,0.9rem);line-height:1.4}
+    .metric-card p{
+      font-size:clamp(1.5rem,5vw,2rem);
+      min-width:0;
+      overflow:hidden;
+      text-overflow:ellipsis;
+      white-space:nowrap;
+      font-variant-numeric:tabular-nums;
+    }
+    .metric-card small{
+      font-size:clamp(0.75rem,2.5vw,0.9rem);
+      line-height:1.4;
+      word-break:break-word;
+    }
     .metrics-grid{grid-template-columns:1fr}
   }
   
@@ -68,11 +79,27 @@
   .leaderboard-name div{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .leaderboard-value{font-weight:700;color:#16a34a;white-space:nowrap;flex-shrink:0;text-align:right;min-width:120px}
   
-  /* Mobile: prevent overflow in leaderboard values */
+  /* Mobile: prevent overflow in leaderboard values - ENHANCED */
   @media (max-width:640px){
-    .leaderboard-value{min-width:100px;font-size:clamp(0.75rem,2.5vw,0.95rem)}
+    .leaderboard-value{
+      min-width:80px;
+      max-width:120px;
+      font-size:clamp(0.75rem,2.5vw,0.95rem);
+      overflow:hidden;
+      text-overflow:ellipsis;
+      white-space:nowrap;
+      font-variant-numeric:tabular-nums;
+    }
     .leaderboard-rank{min-width:32px;font-size:clamp(0.9rem,3vw,1.2rem)}
-    .leaderboard-item{padding:12px;gap:8px}
+    .leaderboard-item{
+      padding:12px;
+      gap:8px;
+      min-width:0;
+    }
+    .leaderboard-name{
+      min-width:0;
+      overflow:hidden;
+    }
   }
   
   /* Mobile responsive: stack dashboard cards vertically */
@@ -166,24 +193,24 @@
       <!-- REVENUE -->
       <article class="metric-card">
         <h3><i class="bi bi-cash-stack"></i> Revenue</h3>
-        <p style="color:#16a34a">MK {{ dashboard_kpis.revenue|floatformat:0|intcomma }}</p>
+        <p class="cc-amount" style="color:#16a34a" title="MK {{ dashboard_kpis.revenue|floatformat:0|intcomma }}">MK {{ dashboard_kpis.revenue|floatformat:0|intcomma }}</p>
         <small>total sales amount</small>
       </article>
       
       <!-- COSTS (Enhanced with breakdown) -->
       <article class="metric-card">
         <h3><i class="bi bi-receipt"></i> Costs</h3>
-        <p style="color:#f59e0b">MK {{ dashboard_kpis.total_costs|floatformat:0|intcomma }}</p>
+        <p class="cc-amount" style="color:#f59e0b" title="MK {{ dashboard_kpis.total_costs|floatformat:0|intcomma }}">MK {{ dashboard_kpis.total_costs|floatformat:0|intcomma }}</p>
         <small style="display:block;margin-top:4px;line-height:1.5">
-          Cost of goods: MK {{ dashboard_kpis.cost_of_goods|floatformat:0|intcomma }}<br>
-          Business costs: MK {{ dashboard_kpis.business_costs|floatformat:0|intcomma }}
+          <span class="cc-amount" title="Cost of goods: MK {{ dashboard_kpis.cost_of_goods|floatformat:0|intcomma }}">Cost of goods: MK {{ dashboard_kpis.cost_of_goods|floatformat:0|intcomma }}</span><br>
+          <span class="cc-amount" title="Business costs: MK {{ dashboard_kpis.business_costs|floatformat:0|intcomma }}">Business costs: MK {{ dashboard_kpis.business_costs|floatformat:0|intcomma }}</span>
         </small>
       </article>
       
       <!-- PROFIT (with enhanced margin display) -->
       <article class="metric-card" style="border:2px solid {% if dashboard_kpis.profit >= 0 %}#16a34a{% else %}#dc2626{% endif %}">
         <h3><i class="bi bi-trophy"></i> Profit</h3>
-        <p style="color:{% if dashboard_kpis.profit >= 0 %}#16a34a{% else %}#dc2626{% endif %}">
+        <p class="cc-amount" style="color:{% if dashboard_kpis.profit >= 0 %}#16a34a{% else %}#dc2626{% endif %}" title="{% if dashboard_kpis.profit < 0 %}-{% endif %}MK {{ dashboard_kpis.profit|abs|floatformat:0|intcomma }}">
           {% if dashboard_kpis.profit < 0 %}-{% endif %}MK {{ dashboard_kpis.profit|abs|floatformat:0|intcomma }}
         </p>
         <small>
@@ -222,7 +249,7 @@
         {% for pm in dashboard_kpis.payment_mix %}
           <div class="metric-card" style="border-left:4px solid {% if pm.method == 'Cash' %}#10b981{% elif pm.method == 'Bank' %}#3b82f6{% else %}#f59e0b{% endif %}">
             <h3><i class="bi {% if pm.method == 'Cash' %}bi-cash-stack{% elif pm.method == 'Bank' %}bi-bank{% else %}bi-phone{% endif %}"></i> {{ pm.method }}</h3>
-            <p style="color:{% if pm.method == 'Cash' %}#10b981{% elif pm.method == 'Bank' %}#3b82f6{% else %}#f59e0b{% endif %}">MK {{ pm.amount|floatformat:0|intcomma }}</p>
+            <p class="cc-amount" style="color:{% if pm.method == 'Cash' %}#10b981{% elif pm.method == 'Bank' %}#3b82f6{% else %}#f59e0b{% endif %}" title="MK {{ pm.amount|floatformat:0|intcomma }}">MK {{ pm.amount|floatformat:0|intcomma }}</p>
             <small>
               <span class="badge" style="background:{% if pm.method == 'Cash' %}#d1fae5{% elif pm.method == 'Bank' %}#dbeafe{% else %}#fef3c7{% endif %};color:{% if pm.method == 'Cash' %}#065f46{% elif pm.method == 'Bank' %}#1e40af{% else %}#92400e{% endif %}">
                 {{ pm.percentage }}% of revenue
@@ -277,10 +304,10 @@
             <div class="leaderboard-item">
               <div class="leaderboard-rank">{{ forloop.counter }}</div>
               <div class="leaderboard-name">
-                <strong>{{ model.brand }} {{ model.model }}</strong>
+                <strong title="{{ model.brand }} {{ model.model }}">{{ model.brand }} {{ model.model }}</strong>
                 <div style="font-size:.85rem;color:#64748b">{{ model.ram_rom }}</div>
               </div>
-              <div class="leaderboard-value">
+              <div class="leaderboard-value cc-amount" title="{{ model.units }} units · MK {{ model.revenue|floatformat:0|intcomma }}">
                 {{ model.units }} units · MK {{ model.revenue|floatformat:0|intcomma }}
               </div>
             </div>
@@ -323,7 +350,7 @@
             </div>
             
             <!-- Revenue -->
-            <div style="min-width:140px;text-align:right;font-weight:700;color:#16a34a;font-size:.95rem">
+            <div class="cc-amount" style="min-width:140px;text-align:right;font-weight:700;color:#16a34a;font-size:.95rem" title="MK {{ model.revenue|floatformat:0|intcomma }}">
               MK {{ model.revenue|floatformat:0|intcomma }}
             </div>
           </div>
@@ -355,7 +382,7 @@
               {% else %}{{ forloop.counter }}{% endif %}
             </div>
             <div class="leaderboard-name">
-              <strong>
+              <strong title="{{ agent.agent_name }}">
                 {% if agent.agent_id and IS_MANAGER %}
                   <a href="{% agent_performance_url agent.agent_id %}" style="color:#2563eb;text-decoration:none">{{ agent.agent_name }}</a>
                 {% else %}
@@ -366,7 +393,7 @@
                 {{ agent.units }} units sold
               </div>
             </div>
-            <div class="leaderboard-value">MK {{ agent.revenue|floatformat:0|intcomma }}</div>
+            <div class="leaderboard-value cc-amount" title="MK {{ agent.revenue|floatformat:0|intcomma }}">MK {{ agent.revenue|floatformat:0|intcomma }}</div>
           </div>
         {% endfor %}
       </div>
@@ -387,8 +414,8 @@
         <p style="margin:4px 0 0;color:#78350f;font-size:1.1rem">Your best day in the selected period!</p>
       </div>
       <div style="text-align:right">
-        <p style="margin:0;font-size:1.8rem;font-weight:800;color:#16a34a">{{ best_sales_day.units }} units</p>
-        <p style="margin:4px 0 0;font-size:1.2rem;color:#78350f">MK {{ best_sales_day.revenue|floatformat:0|intcomma }}</p>
+        <p class="cc-amount" style="margin:0;font-size:1.8rem;font-weight:800;color:#16a34a" title="{{ best_sales_day.units }} units">{{ best_sales_day.units }} units</p>
+        <p class="cc-amount" style="margin:4px 0 0;font-size:1.2rem;color:#78350f" title="MK {{ best_sales_day.revenue|floatformat:0|intcomma }}">MK {{ best_sales_day.revenue|floatformat:0|intcomma }}</p>
       </div>
     </div>
   </section>

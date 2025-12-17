@@ -434,6 +434,26 @@ def quick_action(request: HttpRequest, business_id: int) -> HttpResponse:
 def business_detail(request: HttpRequest, pk: int) -> HttpResponse:
     """
     URL target for the directory 'View' link.
-    Redirects to the business command center for the given business ID.
+    Shows the business command center for the given business ID.
     """
-    return redirect("hq:business_command_center", business_id=pk)
+    # Import and call the command center view directly to avoid redirect
+    try:
+        from hq.views_business_detail import business_command_center
+        return business_command_center(request, business_id=pk)
+    except ImportError:
+        # Fallback: show basic business info if command center not available
+        business = get_object_or_404(Business, id=pk)
+        try:
+            subscription = business.subscription
+            sub_state = get_subscription_state(subscription)
+        except Exception:
+            subscription = None
+            sub_state = {"status": "none", "is_active": False}
+        
+        context = {
+            "business": business,
+            "subscription": subscription,
+            "sub_state": sub_state,
+            "contracts_enabled": CONTRACTS_ENABLED,
+        }
+        return render(request, "hq/business_detail_simple.html", context)

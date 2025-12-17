@@ -293,6 +293,17 @@ class MerchProduct(models.Model):
             return 0
         return max(0, self.shots_per_bottle - self.barman_shots_reserved)
     
+    @property
+    def reorder_level(self):
+        """
+        Safe fallback for reorder level when templates need it.
+        Returns target_bottles if set (for liquor), otherwise 0.
+        This prevents template crashes when accessing product.reorder_level.
+        """
+        if hasattr(self, 'target_bottles') and self.target_bottles:
+            return self.target_bottles
+        return 0
+    
     def get_cost_for_unit(self, unit_type: str):
         """Get cost price based on unit type (bottle or shot)"""
         from decimal import Decimal

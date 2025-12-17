@@ -743,6 +743,17 @@ urlpatterns += [
     path("hq/", include(("hq.urls", "hq"), namespace="hq")),
 ]
 
+# Non-namespaced URL aliases for backward compatibility with templates using {% url 'business_detail' %}
+# These point to the same views as the namespaced versions
+try:
+    from hq import views_business_directory as hq_biz_views
+    urlpatterns += [
+        path("hq/businesses/", hq_biz_views.business_directory, name="business_directory"),
+        path("hq/businesses/<int:pk>/", hq_biz_views.business_detail, name="business_detail"),
+    ]
+except ImportError:
+    pass
+
 # Global Search + Saved Views
 core_search = _try_import("circuitcity.core.views_search") or _try_import("core.views_search")
 core_savedview = _try_import("circuitcity.core.views_savedview") or _try_import("core.views_savedview")

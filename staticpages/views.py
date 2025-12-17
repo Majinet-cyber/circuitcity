@@ -87,29 +87,24 @@ def get_cfo_mood(total_profit, profit_margin):
 
 def simulator(request):
     """
-    Business Simulator page with interactive sliders and charts.
+    LEGACY: Public Business Simulator page - BLOCKED (replaced with manager-only tool).
+    Returns 410 Gone to indicate this public page has been upgraded.
     """
-    # Default values for initial page load
-    units = 50
-    price = 25000
-    cost = 18000
-    months = 6
+    from django.http import HttpResponseGone
+    from django.template.loader import render_to_string
     
-    # Calculate default profit and margin
-    monthly_profit = units * (price - cost)
-    total_profit = monthly_profit * months
-    monthly_revenue = units * price
-    profit_margin = (monthly_profit / monthly_revenue * 100) if monthly_revenue > 0 else 0
-    
-    # Generate CFO message and mood
-    cfo_message = get_cfo_message(total_profit)
-    cfo_mood = get_cfo_mood(total_profit, profit_margin)
-    
-    return render(request, 'staticpages/simulator.html', {
-        'hide_nav': True,
-        'cfo_message': cfo_message,
-        'cfo_mood': cfo_mood,
-    })
+    context = {
+        'title': 'Simulator Upgraded',
+        'message': 'The public simulator has been replaced with a manager-only tool.',
+        'detail': (
+            'The Business Simulator now uses real business data and is only available '
+            'to managers. Please log in to access the new simulator at /simulator/business/.'
+        ),
+        'cta_text': 'Login',
+        'cta_url': '/accounts/login/',
+    }
+    content = render_to_string('legacy_gone.html', context, request=request)
+    return HttpResponseGone(content)
 
 
 def about(request):
@@ -262,6 +257,121 @@ Message:
     
     return render(request, 'staticpages/contact.html', {
         'hide_nav': True,
+    })
+
+
+def join_team(request):
+    """
+    Join the Team application page.
+    Accepts applications and shows success message (even if email is not configured).
+    Safe to use without email backend.
+    """
+    from django import forms
+    from django.core.validators import EmailValidator
+    from django.core.mail import send_mail
+    from django.conf import settings
+    import logging
+    
+    logger = logging.getLogger(__name__)
+    
+    # Define form inline
+    class JoinTeamForm(forms.Form):
+        full_name = forms.CharField(
+            max_length=200,
+            required=True,
+            widget=forms.TextInput(attrs={'placeholder': 'Your full name'})
+        )
+        email = forms.EmailField(
+            required=True,
+            validators=[EmailValidator()],
+            widget=forms.EmailInput(attrs={'placeholder': 'your.email@example.com'})
+        )
+        role = forms.ChoiceField(
+            required=True,
+            choices=[
+                ('', '-- Select a role --'),
+                ('engineering', 'Engineering'),
+                ('operations', 'Operations'),
+                ('sales', 'Sales'),
+                ('design', 'Design'),
+                ('support', 'Customer Support'),
+                ('other', 'Other'),
+            ]
+        )
+        linkedin_portfolio = forms.URLField(
+            required=False,
+            widget=forms.URLInput(attrs={'placeholder': 'https://'})
+        )
+        message = forms.CharField(
+            required=True,
+            widget=forms.Textarea(attrs={
+                'placeholder': 'Tell us about yourself, your experience, and why you want to join Emajinet...',
+                'rows': 5
+            })
+        )
+        
+        def clean_role(self):
+            role = self.cleaned_data.get('role')
+            if not role or role == '':
+                raise forms.ValidationError('Please select a role.')
+            return role
+    
+    success = False
+    
+    if request.method == 'POST':
+        form = JoinTeamForm(request.POST)
+        
+        if form.is_valid():
+            # Extract form data
+            full_name = form.cleaned_data['full_name']
+            email = form.cleaned_data['email']
+            role = form.cleaned_data['role']
+            linkedin_portfolio = form.cleaned_data.get('linkedin_portfolio', '')
+            message_text = form.cleaned_data['message']
+            
+            # Build email body
+            email_body = f"""
+New team application received from Emajinet website:
+
+Name: {full_name}
+Email: {email}
+Role: {role}
+LinkedIn/Portfolio: {linkedin_portfolio or 'Not provided'}
+
+Message:
+{message_text}
+"""
+            
+            # Try to send email (fails gracefully if not configured)
+            try:
+                send_mail(
+                    f'Team Application: {role} - {full_name}',
+                    email_body,
+                    settings.DEFAULT_FROM_EMAIL,
+                    ['team@emajinet.africa'],
+                    fail_silently=True,
+                )
+                logger.info(f"Team application email sent for {email}")
+            except Exception as e:
+                # Email not configured or failed - that's OK, don't crash
+                logger.warning(f"Email sending failed for team application: {e}")
+                pass
+            
+            # Show success message regardless of email status
+            success = True
+            messages.success(request, "Thank you! We received your message and we'll get back to you soon.")
+            
+            return render(request, 'staticpages/join_team.html', {
+                'hide_nav': True,
+                'success': success,
+            })
+    else:
+        form = JoinTeamForm()
+    
+    return render(request, 'staticpages/join_team.html', {
+        'hide_nav': True,
+        'form': form,
+        'success': success,
     })
 
 

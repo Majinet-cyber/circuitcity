@@ -12,6 +12,7 @@ urlpatterns = [
     path('pricing/', views.pricing, name='pricing'),
     path('contact/', views.contact, name='contact'),
     path('simulator/', views.simulator, name='simulator'),
+    path('join/', views.join_team, name='join_team'),
     
     # Onboarding guides
     path('onboarding/manager/', views.onboarding_manager, name='onboarding_manager'),

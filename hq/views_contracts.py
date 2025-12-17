@@ -51,14 +51,14 @@ def contracts_list(request: HttpRequest) -> HttpResponse:
     status_filter = request.GET.get('status', 'all')  # all, signed, unsigned
     search_query = request.GET.get('q', '').strip()
     
-    # Base queryset
-    businesses = Business.objects.all().select_related('merchant_contract').order_by('-created_at')
+    # Base queryset - use prefetch_related for ForeignKey relationship
+    businesses = Business.objects.all().prefetch_related('contracts').order_by('-created_at')
     
-    # Apply filters
+    # Apply filters (using contracts relationship)
     if status_filter == 'signed':
-        businesses = businesses.filter(merchant_contract__isnull=False)
+        businesses = businesses.filter(contracts__isnull=False).distinct()
     elif status_filter == 'unsigned':
-        businesses = businesses.filter(merchant_contract__isnull=True)
+        businesses = businesses.filter(contracts__isnull=True)
     
     # Apply search
     if search_query:
@@ -75,11 +75,14 @@ def contracts_list(request: HttpRequest) -> HttpResponse:
     # Build context with contract status
     businesses_with_status = []
     for biz in page_obj:
-        has_contract = hasattr(biz, 'merchant_contract') and biz.merchant_contract is not None
+        # Get the most recent contract for this business (if any)
+        latest_contract = biz.contracts.first() if hasattr(biz, 'contracts') else None
+        has_contract = latest_contract is not None
+        
         businesses_with_status.append({
             'business': biz,
             'has_contract': has_contract,
-            'contract': biz.merchant_contract if has_contract else None,
+            'contract': latest_contract,
         })
     
     return render(request, 'hq/contracts_list.html', {
@@ -99,11 +102,8 @@ def contracts_detail(request: HttpRequest, business_id: int) -> HttpResponse:
     """
     business = get_object_or_404(Business, id=business_id)
     
-    # Try to get existing contract
-    try:
-        contract = business.merchant_contract
-    except MerchantContract.DoesNotExist:
-        contract = None
+    # Get the most recent contract for this business
+    contract = business.contracts.first() if business.contracts.exists() else None
     
     if request.method == 'POST':
         # Handle file upload

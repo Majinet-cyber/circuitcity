@@ -112,7 +112,7 @@ class SupportActionLog(models.Model):
     business = models.ForeignKey("tenants.Business", on_delete=models.CASCADE, null=True, blank=True)
     
     action_type = models.CharField(max_length=50)
-    description = models.TextField()
+    description = models.TextField(default="", blank=True)
     performed_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, related_name="+")
     metadata = models.JSONField(default=dict, blank=True)
     
@@ -133,19 +133,30 @@ class SupportActionLog(models.Model):
 class MerchantContract(models.Model):
     """Business contract storage and management."""
     business = models.ForeignKey("tenants.Business", on_delete=models.CASCADE, related_name="contracts")
-    title = models.CharField(max_length=255)
+    title = models.CharField(max_length=255, default="Merchant Services Agreement")
     file = models.FileField(upload_to="contracts/", null=True, blank=True)
     contract_type = models.CharField(max_length=50, default="standard")
+    notes = models.TextField(blank=True, default="")
     
     signed_at = models.DateTimeField(null=True, blank=True)
     expires_at = models.DateTimeField(null=True, blank=True)
     
-    created_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, related_name="+")
-    created_at = models.DateTimeField(auto_now_add=True)
+    # Template expects these field names
+    uploaded_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, related_name="+")
+    uploaded_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     
+    # Aliases for backwards compatibility
+    @property
+    def created_by(self):
+        return self.uploaded_by
+    
+    @property
+    def created_at(self):
+        return self.uploaded_at
+    
     class Meta:
-        ordering = ["-created_at"]
+        ordering = ["-uploaded_at"]
         indexes = [
             models.Index(fields=["business", "contract_type"]),
         ]

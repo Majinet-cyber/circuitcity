@@ -39,8 +39,7 @@ class HQAnalyticsTestCase(TestCase):
         # Create location
         self.location = Location.objects.create(
             business=self.business,
-            name='Test Location',
-            is_active=True
+            name='Test Location'
         )
         
         # Create agent

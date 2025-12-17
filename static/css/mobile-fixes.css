@@ -90,3 +90,138 @@ body.kb-open.has-bottomnav .app-main{
   padding-bottom: 12px;  /* collapse when keyboard visible */
 }
 
+/* =====================================================================
+   PART B: Number/Metric Overflow Protection (Dashboard KPIs)
+   Purpose:
+   • Prevent currency amounts, phone numbers, and long numeric strings
+     from leaking/breaking out of cards on mobile
+   • Ensure dashboard metrics remain clean on small screens (360px+)
+   • Provide reusable classes for any dashboard/vertical
+   ===================================================================== */
+
+/* -------- Core overflow-safe amount class -------- */
+.cc-amount,
+.cc-metric,
+.cc-money,
+.dashboard-amount {
+  /* Prevent overflow with ellipsis */
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  
+  /* Use tabular numbers for consistent spacing */
+  font-variant-numeric: tabular-nums;
+  -moz-font-feature-settings: "tnum";
+  -webkit-font-feature-settings: "tnum";
+  font-feature-settings: "tnum";
+}
+
+/* -------- Flex container fix for "label left / number right" rows -------- */
+.cc-amount-row,
+.cc-metric-row,
+.dashboard-metric-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  min-width: 0; /* Critical: allows children to shrink */
+}
+
+.cc-amount-row > *,
+.cc-metric-row > *,
+.dashboard-metric-row > * {
+  min-width: 0; /* Allow flex children to shrink below content size */
+}
+
+/* -------- Safe ellipsis with tooltip -------- */
+.cc-nowrap-ellipsis {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* -------- Leaderboard/list item safe layout -------- */
+.leaderboard-item,
+.dashboard-list-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0; /* Prevent overflow */
+}
+
+.leaderboard-name,
+.dashboard-item-name {
+  flex: 1;
+  min-width: 0; /* Allow name to shrink/ellipsis */
+  overflow: hidden;
+}
+
+.leaderboard-value,
+.dashboard-item-value {
+  flex-shrink: 0; /* Value stays visible */
+  white-space: nowrap;
+  text-align: right;
+  min-width: fit-content; /* Ensure value is readable */
+}
+
+/* -------- Mobile-specific refinements -------- */
+@media (max-width: 640px) {
+  /* KPI cards: ensure numbers never break container */
+  .metric-card p,
+  .metric-card .cc-amount,
+  .kpi-value,
+  .dashboard-kpi-value {
+    font-size: clamp(1.25rem, 5vw, 2rem);
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  
+  /* Leaderboard values must stay compact */
+  .leaderboard-value,
+  .dashboard-item-value {
+    font-size: clamp(0.75rem, 2.5vw, 0.95rem);
+    min-width: 80px; /* Minimum readable width */
+    max-width: 120px; /* Maximum before wrapping parent */
+  }
+  
+  /* Fast-moving models / Sales by model */
+  .model-revenue,
+  .model-amount {
+    font-size: clamp(0.8rem, 2.5vw, 0.95rem);
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+}
+
+/* -------- Prevent horizontal scroll from numbers -------- */
+@media (max-width: 768px) {
+  /* Ensure dashboard containers can't cause horizontal scroll */
+  .dashboard-cards-grid,
+  .metrics-grid,
+  .leaderboard,
+  .vertical-page {
+    max-width: 100vw;
+    overflow-x: hidden;
+  }
+  
+  /* Tables with amounts: make them horizontally scrollable but contained */
+  .table-responsive {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+  
+  /* Prevent any dashboard card from breaking out */
+  .metric-card,
+  .recent-block,
+  .dashboard-card {
+    max-width: 100%;
+    overflow: hidden;
+    word-wrap: break-word;
+  }
+}
+

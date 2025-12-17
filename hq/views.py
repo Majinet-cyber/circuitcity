@@ -637,6 +637,10 @@ def dashboard(request):
     # Payment mode options
     from sales.models import PaymentMethod
     ctx["payment_mode_options"] = [("", "All")] + list(PaymentMethod.choices)
+    
+    # Wallet balance (default to 0 if wallet feature not configured)
+    ctx["wallet_balance"] = Decimal("0")
+    ctx["wallet_currency"] = "MWK"
 
     return _render_safe(request, "hq/dashboard.html", ctx, _dashboard_inline)
 

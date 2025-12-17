@@ -1,6 +1,11 @@
 {% extends "base.html" %}
+{% load static %}
 
 {% block title %}Phone Products · Emajinet{% endblock %}
+
+{% block extra_head %}
+<link rel="stylesheet" href="{% static 'css/premium-products.css' %}">
+{% endblock %}
 
 {% block content %}
 
