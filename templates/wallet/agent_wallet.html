@@ -7,10 +7,35 @@
 {% block extra_css %}
 <style>
   .kpi-card .label{color:var(--muted);font-weight:700}
-  .kpi-card .value{font-size:1.25rem;font-weight:900}
+  .kpi-card .value{
+    font-size:1.25rem;
+    font-weight:900;
+    /* Mobile overflow protection */
+    white-space:nowrap;
+    overflow:hidden;
+    text-overflow:ellipsis;
+    max-width:100%;
+    font-variant-numeric:tabular-nums;
+  }
   .kpi-card .sub{color:var(--muted)}
   .chart-wrap{position:relative;height:220px}
   .table td,.table th{vertical-align:middle}
+  
+  /* Mobile: Ensure KPI values never overflow */
+  @media (max-width:640px){
+    .kpi-card .value{
+      font-size:clamp(1rem,4.5vw,1.25rem);
+      min-width:0;
+    }
+    
+    /* Table amounts */
+    .table .text-end{
+      font-size:clamp(0.75rem,2.5vw,0.95rem);
+      white-space:nowrap;
+      overflow:hidden;
+      text-overflow:ellipsis;
+    }
+  }
 </style>
 {% endblock %}
 
@@ -66,10 +91,10 @@
         <div class="card-body">
           <div class="label mb-1">{{ range_label }} Earnings</div>
           {% if my_earnings %}
-            <div class="value" data-cy="wallet-period-earnings">MWK {{ my_earnings.total_commission|default:0|floatformat:0|intcomma }}</div>
+            <div class="value cc-amount" data-cy="wallet-period-earnings" title="MWK {{ my_earnings.total_commission|default:0|floatformat:0|intcomma }}">MWK {{ my_earnings.total_commission|default:0|floatformat:0|intcomma }}</div>
             <div class="sub small">{{ my_earnings.units_sold }} units sold</div>
           {% else %}
-            <div class="value" data-cy="wallet-period-earnings">MWK 0</div>
+            <div class="value cc-amount" data-cy="wallet-period-earnings">MWK 0</div>
             <div class="sub small">0 units sold</div>
           {% endif %}
         </div>
@@ -80,8 +105,8 @@
       <div class="card shadow-sm border-0 h-100 kpi-card">
         <div class="card-body">
           <div class="label mb-1">Month to Date</div>
-          <div class="value" data-cy="wallet-month-to-date">MWK {{ agent_summary.month_total|default:0|floatformat:0|intcomma }}</div>
-          <div class="sub small">Deductions: MWK {{ agent_summary.month_deductions|default:0|floatformat:0|intcomma }}</div>
+          <div class="value cc-amount" data-cy="wallet-month-to-date" title="MWK {{ agent_summary.month_total|default:0|floatformat:0|intcomma }}">MWK {{ agent_summary.month_total|default:0|floatformat:0|intcomma }}</div>
+          <div class="sub small cc-amount" title="Deductions: MWK {{ agent_summary.month_deductions|default:0|floatformat:0|intcomma }}">Deductions: MWK {{ agent_summary.month_deductions|default:0|floatformat:0|intcomma }}</div>
         </div>
       </div>
     </div>
@@ -90,8 +115,8 @@
       <div class="card shadow-sm border-0 h-100 kpi-card">
         <div class="card-body">
           <div class="label mb-1">All-Time Earnings</div>
-          <div class="value" data-cy="wallet-all-time">MWK {{ agent_summary.all_time_total|default:0|floatformat:0|intcomma }}</div>
-          <div class="sub small">All-Time Deductions: MWK {{ agent_summary.all_time_deductions|default:0|floatformat:0|intcomma }}</div>
+          <div class="value cc-amount" data-cy="wallet-all-time" title="MWK {{ agent_summary.all_time_total|default:0|floatformat:0|intcomma }}">MWK {{ agent_summary.all_time_total|default:0|floatformat:0|intcomma }}</div>
+          <div class="sub small cc-amount" title="All-Time Deductions: MWK {{ agent_summary.all_time_deductions|default:0|floatformat:0|intcomma }}">All-Time Deductions: MWK {{ agent_summary.all_time_deductions|default:0|floatformat:0|intcomma }}</div>
         </div>
       </div>
     </div>
@@ -100,7 +125,7 @@
       <div class="card shadow-sm border-0 h-100 kpi-card">
         <div class="card-body">
           <div class="label mb-1">Current Balance</div>
-          <div class="value {% if agent_summary.balance|default:0 < 0 %}text-danger{% endif %}" data-cy="wallet-current-balance">
+          <div class="value cc-amount {% if agent_summary.balance|default:0 < 0 %}text-danger{% endif %}" data-cy="wallet-current-balance" title="MWK {{ agent_summary.balance|default:0|floatformat:0|intcomma }}">
             MWK {{ agent_summary.balance|default:0|floatformat:0|intcomma }}
           </div>
           <div class="sub small">Updated {% now "M j, Y" %}</div>

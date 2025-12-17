@@ -1,175 +1,394 @@
-# Quick Testing Guide - Gym Fixes
+# Quick Test Guide: Phones Dashboard Fixes
 
-## 🚀 Quick Smoke Test (5 minutes)
+## 🚀 Quick Start
 
-### 1. Test Time Logs (All Verticals)
 ```bash
-# Start server
+# 1. Run automated tests
+pytest inventory/tests/test_phones_agent_scoping.py -v
+
+# 2. Start dev server
 python manage.py runserver
 
-# Navigate to:
-http://localhost:8000/inventory/time/logs/
+# 3. Open browser to http://localhost:8000
 ```
-✅ Should load with NO console errors  
-✅ Should show agent time tracking table
-
-### 2. Test Pharmacy Sales List
-```bash
-# Navigate to:
-http://localhost:8000/pharmacy/sales/
-```
-✅ Should load with NO console errors  
-✅ Should show sales history
-
-### 3. Test Gym Member Check-ins
-```bash
-# Log in as gym manager
-# Navigate to:
-http://localhost:8000/gym/checkin/
-```
-✅ Should show list of gym members  
-✅ Should have check-in buttons  
-✅ Sidebar should say "Member Check-ins" (not "Scan Check-ins")
-
-### 4. Test Gym Dashboard
-```bash
-# Navigate to:
-http://localhost:8000/verticals/gym/dashboard/
-```
-✅ Should show payment mix section  
-✅ Should show active session members  
-✅ Should show trainer earnings  
-✅ Date range filters should work
 
 ---
 
-## 🧪 Run Automated Tests
+## A) Test Custom Date Filter
 
-```bash
-# Run all gym tests
-python manage.py test tests.test_gym_dashboard_enhancements
+### As Manager:
+1. Login as manager (is_staff=True user)
+2. Navigate to `/inventory/verticals/phones/`
+3. Click **"Custom"** button in date range filter
+   - ✅ Date inputs should appear immediately
+4. Select start/end dates → Click **"Apply"**
+   - ✅ Dashboard should reload with custom date range
+5. Click **"Cancel"**
+   - ✅ Date inputs should hide
+6. Click browser **Back** button, then **Forward**
+   - ✅ Custom button should still work (bfcache test)
 
-# Run specific test
-python manage.py test tests.test_gym_dashboard_enhancements.TestGymDashboardEnhancements.test_payment_mix_aggregation
+### Edge Cases:
 ```
+# Invalid dates (should fall back to MTD, not crash)
+/inventory/verticals/phones/?range=custom&start=invalid&end=invalid
 
-**Note:** Some tests may have template issues due to `active_tab` being referenced in vertical dashboards through context processors. This doesn't affect production.
+# Missing dates (should fall back to MTD)
+/inventory/verticals/phones/?range=custom
+
+# Valid custom range
+/inventory/verticals/phones/?range=custom&start=2025-12-01&end=2025-12-17
+```
 
 ---
 
-## 🐛 Known Non-Issues
+## B) Test Agent Scoping
 
-### Template Warning: `active_tab` Variable
-You may see warnings in tests about `active_tab` not being found in gym/pharmacy/liquor/clothing dashboard templates.
+### Setup Test Data:
 
-**This is SAFE because:**
-1. Django templates gracefully handle missing variables (no crash)
-2. The `active_tab` variable is only used for tab highlighting in some views
-3. Vertical dashboards don't use tabs, so the variable isn't needed
-4. Production sites work fine without it
-
-**If you want to fix it (optional):**
-Just add this to any vertical dashboard view:
 ```python
-context["active_tab"] = context.get("active_tab", "dashboard")
+# In Django shell: python manage.py shell
+from django.contrib.auth import get_user_model
+from inventory.models import InventoryItem, Product, Location
+from tenants.models import Business, BusinessKind
+from decimal import Decimal
+
+User = get_user_model()
+
+# Create test users
+manager = User.objects.create_user(username='manager', password='test123', is_staff=True)
+agent1 = User.objects.create_user(username='agent1', password='test123', is_staff=False)
+agent2 = User.objects.create_user(username='agent2', password='test123', is_staff=False)
+
+# Get/create business and location
+business = Business.objects.filter(kind=BusinessKind.PHONES).first()
+location = Location.objects.filter(business=business).first()
+product = Product.objects.filter(business=business).first()
+
+# Create sales for agent1 (2 sales, 120k revenue)
+InventoryItem.objects.create(
+    business=business,
+    product=product,
+    current_location=location,
+    assigned_agent=agent1,
+    status="SOLD",
+    sold_at=timezone.now(),
+    order_price=Decimal("50000"),
+    selling_price=Decimal("60000"),
+)
+
+InventoryItem.objects.create(
+    business=business,
+    product=product,
+    current_location=location,
+    assigned_agent=agent1,
+    status="SOLD",
+    sold_at=timezone.now(),
+    order_price=Decimal("50000"),
+    selling_price=Decimal("60000"),
+)
+
+# Create sales for agent2 (1 sale, 80k revenue)
+InventoryItem.objects.create(
+    business=business,
+    product=product,
+    current_location=location,
+    assigned_agent=agent2,
+    status="SOLD",
+    sold_at=timezone.now(),
+    order_price=Decimal("70000"),
+    selling_price=Decimal("80000"),
+)
+
+print("✅ Test data created!")
+print(f"Agent1 should see: 2 units, MK 120,000")
+print(f"Agent2 should see: 1 unit, MK 80,000")
+print(f"Manager should see: 3 units, MK 200,000")
+```
+
+### Test Manager View:
+
+1. Login as **manager** (username: manager, password: test123)
+2. Navigate to `/inventory/verticals/phones/`
+3. Check KPIs:
+   - ✅ **Units Sold:** 3
+   - ✅ **Revenue:** MK 200,000
+   - ✅ **Stock on hand:** All agents' stock combined
+4. Check top agents leaderboard:
+   - ✅ Should show both agent1 and agent2
+
+### Test Agent View:
+
+1. Logout, login as **agent1** (username: agent1, password: test123)
+2. Navigate to `/inventory/verticals/phones/`
+3. Check KPIs:
+   - ✅ **Units Sold:** 2 (only agent1's sales)
+   - ✅ **Revenue:** MK 120,000 (only agent1's revenue)
+   - ✅ **Stock on hand:** Only agent1's stock
+4. Check top agents leaderboard:
+   - ✅ Should still be visible (agents can see ranking)
+
+5. Logout, login as **agent2** (username: agent2, password: test123)
+6. Navigate to `/inventory/verticals/phones/`
+7. Check KPIs:
+   - ✅ **Units Sold:** 1 (only agent2's sales)
+   - ✅ **Revenue:** MK 80,000 (only agent2's revenue)
+   - ✅ **Stock on hand:** Only agent2's stock
+
+---
+
+## C) Test Mobile Overflow Protection
+
+### Desktop Browser (Chrome DevTools):
+
+1. Open `/inventory/verticals/phones/` as any user
+2. Press **F12** → Toggle device toolbar (Ctrl+Shift+M)
+3. Set device to:
+   - **iPhone SE** (375px)
+   - **Custom:** 360px width
+
+### Test Scenarios:
+
+**Dashboard KPI Cards:**
+```
+Navigate to: /inventory/verticals/phones/
+
+✅ Check: Revenue card (e.g., "MK 1,234,567")
+   - Number should truncate with "..." if too long
+   - Hover → tooltip shows full value
+   - No horizontal scroll
+
+✅ Check: All KPI cards stack vertically (1 column)
+✅ Check: No numbers break out of cards
+```
+
+**Agent Wallet:**
+```
+Navigate to: /wallet/agent_wallet/
+
+✅ Check: "Month to Date" card
+   - "MK 987,654" should truncate if needed
+   - Hover → tooltip shows full value
+
+✅ Check: Transaction table
+   - Amount column uses responsive sizing
+   - No horizontal scroll on table
+
+✅ Check: All 4 KPI cards fit in viewport
+```
+
+**Agent Dashboard:**
+```
+Navigate to: /agent_dashboard/ (or wherever it's mounted)
+
+✅ Check: "My Sales Value" card
+   - "MK 1,500,000" should truncate if needed
+   - Hover → tooltip shows full value
+
+✅ Check: "My Commission" card
+   - Large commission amounts don't overflow
+```
+
+### Mobile Devices (Real Testing):
+
+**Test on actual devices if available:**
+- [ ] iPhone SE (375px) - Safari
+- [ ] Android phone (360px) - Chrome
+- [ ] iPad (768px) - Safari
+- [ ] Samsung Galaxy (414px) - Chrome
+
+**Check:**
+- No horizontal scroll
+- All numbers readable
+- Tooltips work on long-press (mobile)
+- Cards stack properly (1 column on phone)
+
+---
+
+## D) Automated Tests
+
+### Run Full Test Suite:
+
+```bash
+# All phones scoping tests
+pytest inventory/tests/test_phones_agent_scoping.py -v
+
+# Specific test categories
+pytest inventory/tests/test_phones_agent_scoping.py::TestVisibilityScoping -v
+pytest inventory/tests/test_phones_agent_scoping.py::TestStockScoping -v
+pytest inventory/tests/test_phones_agent_scoping.py::TestSalesScoping -v
+pytest inventory/tests/test_phones_agent_scoping.py::TestPhonesDashboardIntegration -v
+
+# Run with coverage
+pytest inventory/tests/test_phones_agent_scoping.py --cov=inventory.utils_scope --cov=inventory.verticals.phones --cov-report=html
+```
+
+### Expected Output:
+
+```
+================================ test session starts =================================
+inventory/tests/test_phones_agent_scoping.py::TestVisibilityScoping::test_manager_visibility PASSED
+inventory/tests/test_phones_agent_scoping.py::TestVisibilityScoping::test_agent_visibility PASSED
+inventory/tests/test_phones_agent_scoping.py::TestVisibilityScoping::test_unauthenticated_visibility PASSED
+inventory/tests/test_phones_agent_scoping.py::TestStockScoping::test_manager_sees_all_stock PASSED
+inventory/tests/test_phones_agent_scoping.py::TestStockScoping::test_agent_sees_only_own_stock PASSED
+inventory/tests/test_phones_agent_scoping.py::TestSalesScoping::test_manager_sees_all_sales PASSED
+inventory/tests/test_phones_agent_scoping.py::TestSalesScoping::test_agent_sees_only_own_sales PASSED
+inventory/tests/test_phones_agent_scoping.py::TestPhonesDashboardIntegration::test_dashboard_loads_for_manager PASSED
+inventory/tests/test_phones_agent_scoping.py::TestPhonesDashboardIntegration::test_dashboard_loads_for_agent PASSED
+inventory/tests/test_phones_agent_scoping.py::TestPhonesDashboardIntegration::test_custom_date_filter_with_valid_dates PASSED
+inventory/tests/test_phones_agent_scoping.py::TestPhonesDashboardIntegration::test_custom_date_filter_with_invalid_dates PASSED
+inventory/tests/test_phones_agent_scoping.py::TestPhonesDashboardIntegration::test_agent_kpis_show_only_own_data PASSED
+
+================================ 12 passed in 2.34s ==================================
 ```
 
 ---
 
-## ✅ Expected Behavior
+## E) Regression Testing
 
-### For Gym Businesses:
-- **Sidebar:**
-  - ✅ "Dashboard" → `/verticals/gym/dashboard/`
-  - ✅ "Members" → `/gym/members/`
-  - ✅ "Member Check-ins" → `/gym/checkin/` ← NEW
-  - ✅ "Staff Time Logs" → `/inventory/time/logs/`
+### Other Verticals (Should Be Unaffected):
 
-- **Dashboard Shows:**
-  - ✅ Payment mix (Cash/Mobile/Bank breakdown)
-  - ✅ Active session members (checked in today)
-  - ✅ Membership expiry metrics
-  - ✅ Trainer earnings with date filters
+```bash
+# Quick smoke test on other verticals
+# Navigate to each and verify no errors:
 
-### For Other Verticals (Phones/Pharmacy/Liquor/Clothing):
-- **Unchanged:**
-  - ✅ Time check-in at `/inventory/time/check-in/`
-  - ✅ Time logs at `/inventory/time/logs/`
-  - ✅ All dashboards work as before
-  - ✅ No regressions
+✅ Clothing: /inventory/verticals/clothing/
+✅ Liquor: /inventory/verticals/liquor/
+✅ Pharmacy: /inventory/verticals/pharmacy/
+✅ Gym: /inventory/verticals/gym/
+
+# Check:
+- Pages load without errors
+- Date filters still work
+- KPIs display correctly
+- No console errors
+```
 
 ---
 
-## 📊 What Was Fixed
+## F) Performance Testing
 
-| Issue | Status | Impact |
-|-------|--------|--------|
-| `active_tab` template errors | ✅ Fixed | Time logs & pharmacy sales |
-| `/time/check-in/` CSRF crash | ✅ Fixed | All verticals |
-| Gym member attendance page | ✅ Added | Gym only |
-| Gym payment mix tracking | ✅ Enhanced | Gym dashboard |
-| Gym trainer earnings | ✅ Enhanced | Gym dashboard |
-| Gym sidebar routing | ✅ Updated | Gym navigation |
-| Default trainers seeding | ✅ Added | New gym businesses |
+### Check Query Count:
 
----
+```python
+# In Django shell with debug toolbar
+from django.test.utils import override_settings
+from django.db import connection
+from django.test import RequestFactory
+from inventory.verticals.phones import dashboard
 
-## 🎯 Files Changed
+@override_settings(DEBUG=True)
+def test_query_count():
+    factory = RequestFactory()
+    request = factory.get('/inventory/verticals/phones/')
+    request.user = User.objects.get(username='manager')
+    request.business = Business.objects.filter(kind=BusinessKind.PHONES).first()
+    
+    with connection.queries as queries:
+        dashboard(request)
+    
+    print(f"Query count: {len(queries)}")
+    for i, q in enumerate(queries, 1):
+        print(f"{i}. {q['sql'][:100]}...")
+    
+    # Should be < 15 queries (ideally < 10)
+    assert len(queries) < 15, f"Too many queries: {len(queries)}"
 
-**Core Fixes:**
-- `inventory/urls.py` - Time check-in wrapper fix
-- `inventory/views_time.py` - Added active_tab context
-- `inventory/views_pharmacy.py` - Added active_tab context
-
-**Gym Enhancements:**
-- `inventory/views_gym.py` - Payment mix & metrics
-- `inventory/utils_verticals.py` - Sidebar routing
-- `tenants/models.py` - Trainer seeding
-
-**Tests:**
-- `tests/test_gym_dashboard_enhancements.py` - New test suite
-
----
-
-## 🚨 Troubleshooting
-
-### Issue: Tests fail with ValidationError about location
-**Solution:** Managers should NOT have a location. Remove `location=` from Membership.objects.create for MANAGER role.
-
-### Issue: Payment mix shows $0.00
-**Solution:** Check that GymPayment records have `paid_at` timestamps within the selected date range.
-
-### Issue: Trainer earnings empty
-**Solution:** Ensure members have `trainer` FK set and payments exist with `paid_at` in range.
-
-### Issue: Active session count is 0
-**Solution:** Check that GymCheckIn records exist with `timestamp__gte=today_start`.
+test_query_count()
+```
 
 ---
 
-## 📞 Quick Reference
+## G) Browser Compatibility
 
-### URLs:
-- Time logs: `/inventory/time/logs/`
-- Time check-in: `/inventory/time/check-in/`
-- Gym dashboard: `/verticals/gym/dashboard/`
-- Gym members: `/gym/members/`
-- Gym check-in: `/gym/checkin/`
-- Pharmacy sales: `/pharmacy/sales/`
+### Test in Multiple Browsers:
 
-### Models:
-- `GymMember` - Has trainer FK, membership dates
-- `GymPayment` - Has payment_method, paid_at
-- `GymTrainer` - Name, phone, email
-- `GymCheckIn` - Member attendance records
+- [ ] **Chrome** (latest) - Desktop + Mobile
+- [ ] **Firefox** (latest) - Desktop + Mobile
+- [ ] **Safari** (latest) - Desktop + Mobile (iOS)
+- [ ] **Edge** (latest) - Desktop
+- [ ] **Safari iOS** (iPhone)
+- [ ] **Chrome Android** (Samsung/Pixel)
 
-### Context Variables:
-- `active_tab` - Tab highlighting (time logs, pharmacy)
-- `payment_mix` - Payment method breakdown (gym)
-- `trainer_stats` - Earnings per trainer (gym)
-- `active_session_members` - Today's checked-in count (gym)
+### Check:
+- Custom date filter works (all events fire correctly)
+- Date picker appears (native browser date input)
+- Mobile overflow protection applied
+- No console errors
 
 ---
 
-**All systems operational. No breaking changes. Safe to deploy.** ✅
+## ✅ Final Acceptance Checklist
 
+### Custom Date Filter:
+- [ ] Opens on first click (no delay)
+- [ ] Works after browser back/forward
+- [ ] Works with HTMX partial updates (if applicable)
+- [ ] Invalid dates fall back to MTD (no crash)
+- [ ] Date picker visible and focusable
+
+### Agent Scoping:
+- [ ] Managers see global totals (all agents)
+- [ ] Agents see only their own totals
+- [ ] Agent leaderboard visible to agents
+- [ ] Stock counts match expected values
+- [ ] Sales revenue matches expected values
+
+### Mobile Overflow:
+- [ ] No horizontal scroll on 360px screens
+- [ ] KPI values never overflow cards
+- [ ] Tooltips show full values
+- [ ] Wallet page safe on mobile
+- [ ] Agent dashboard safe on mobile
+
+### Tests:
+- [ ] All automated tests pass
+- [ ] No regressions in other verticals
+- [ ] No linting errors
+- [ ] Performance acceptable (< 15 queries)
+
+### Documentation:
+- [ ] Implementation summary written
+- [ ] Test guide complete
+- [ ] Deployment checklist ready
+
+---
+
+## 🐛 Common Issues
+
+### Issue: Custom filter doesn't open
+
+**Cause:** JavaScript not initialized  
+**Fix:** Check browser console for errors, ensure IDs match
+
+### Issue: Agent sees other agents' data
+
+**Cause:** `is_staff` flag incorrect  
+**Fix:** Verify user.is_staff=False for agents
+
+### Issue: Numbers still overflow on mobile
+
+**Cause:** `cc-amount` class not applied  
+**Fix:** Add `cc-amount` class + `title` attribute to all amounts
+
+### Issue: Tests fail with "Business not found"
+
+**Cause:** Test fixtures incomplete  
+**Fix:** Ensure business with `kind=PHONES` exists in test DB
+
+---
+
+## 📞 Support
+
+If issues persist after following this guide:
+
+1. Check `PHONES_AGENT_SCOPING_AND_CUSTOM_FILTER_FIX.md` for detailed implementation notes
+2. Review test output for specific failures
+3. Check browser console for JavaScript errors
+4. Verify database has correct test data
+
+---
+
+**Last Updated:** December 17, 2025  
+**Version:** 1.0

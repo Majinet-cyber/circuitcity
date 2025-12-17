@@ -90,7 +90,7 @@ def _parse_date_range(request):
 @require_business_kind(BusinessKind.PHONES)
 def dashboard(request):
     """
-    Premium PHONES Dashboard - Crown Jewel Edition (with Date Filtering)
+    Premium PHONES Dashboard - Crown Jewel Edition (with Date Filtering + Role-Based Scoping)
     
     Provides comprehensive business metrics for phone retailers:
     - Custom date range filtering (Today / Last 7 Days / MTD / Custom)
@@ -102,14 +102,23 @@ def dashboard(request):
     - Best sales day in selected period
     - Business panel with average metrics and sell-through rate
     
+    ROLE-BASED VISIBILITY:
+    - Managers: See GLOBAL numbers (all stock, all sales)
+    - Agents: See ONLY their own numbers (their stock, their sales)
+    
     Uses centralized metrics service for accurate cost/profit calculations.
     """
+    from inventory.utils_scope import get_visible_actor, scope_sales_qs, scope_stock_qs, scope_costs_qs
+    
     ctx = base.base_context(request)
     business = ctx.get("business")
     location = ctx.get("location")
     
     if location is None:
         location = getattr(request, "location", None)
+    
+    # Determine user's visibility scope
+    is_manager, is_agent, actor_user = get_visible_actor(request)
     
     # ==========================================================================
     # DATE RANGE PARSING
@@ -124,7 +133,7 @@ def dashboard(request):
     # Last 30 days range (for trends and fast-moving analysis)
     last_30_days_start = today_start - timedelta(days=30)
     
-    # Base queryset for sold items (scoped to business)
+    # Base queryset for sold items (scoped to business + role)
     sold_items = InventoryItem.objects.filter(
         business=business,
         status="SOLD",
@@ -135,6 +144,11 @@ def dashboard(request):
     # (Following Liquor pattern where location filtering is optional)
     if location:
         sold_items = sold_items.filter(current_location=location)
+    
+    # CRITICAL: Apply agent scoping if user is an agent
+    if is_agent:
+        # Agents see only their own sales
+        sold_items = sold_items.filter(assigned_agent=actor_user)
     
     # ==========================================================================
     # A) PREMIUM KPIs FOR SELECTED RANGE (using centralized metrics service)
@@ -152,7 +166,7 @@ def dashboard(request):
     )['total'] or Decimal('0.00')
     
     # ==========================================================================
-    # STOCK ON HAND (current, not date-filtered)
+    # STOCK ON HAND (current, not date-filtered, scoped by role)
     # ==========================================================================
     stock_items = InventoryItem.objects.filter(
         business=business,
@@ -162,6 +176,11 @@ def dashboard(request):
     
     if location:
         stock_items = stock_items.filter(current_location=location)
+    
+    # CRITICAL: Apply agent scoping if user is an agent
+    if is_agent:
+        # Agents see only their own stock
+        stock_items = stock_items.filter(assigned_agent=actor_user)
     
     stock_on_hand = stock_items.count()
     
@@ -180,75 +199,72 @@ def dashboard(request):
     )['total'] or Decimal('0.00')
     
     # ==========================================================================
-    # COSTS AND PROFIT (using centralized metrics service)
+    # COSTS AND PROFIT (unified computation from ONE sales queryset)
     # ==========================================================================
-    # Import the centralized metrics service
-    from inventory.services.dashboard_metrics import get_inventory_kpis
-    from sales.models import Sale
+    # CRITICAL: All KPIs must use the SAME base queryset for consistency
+    # Revenue, COGS, and Profit all derive from range_sales (sold items in period)
     
-    # Build a Sale queryset for the metrics service
-    # Phones use InventoryItem but we need Sale objects for the metrics service
-    try:
-        sales_qs = Sale.objects.filter(
-            item__business=business,
-            created_at__gte=start_date,
-            created_at__lt=end_date,
-        ).select_related('item', 'agent')
-        
-        # Optional location filter
-        if location:
-            sales_qs = sales_qs.filter(location=location)
-        
-        # Get KPIs from centralized service
-        kpis = get_inventory_kpis(
-            business=business,
-            location=location,
-            sales_qs=sales_qs,
-            start_date=start_date,
-            end_date=end_date,
-        )
-        
-        # Extract metrics from service
-        cost_of_goods = kpis.get('total_cogs', Decimal('0.00'))
-        business_costs = kpis.get('total_admin_costs', Decimal('0.00'))
-        total_costs = kpis.get('total_costs', Decimal('0.00'))
-        profit = kpis.get('total_profit', Decimal('0.00'))
-        profit_margin = Decimal(str(kpis.get('profit_margin', 0.0)))
-        
-        # Profit = revenue - total costs (cost of goods + business costs)
-        # Defensive check: Ensure profit is ALWAYS revenue - costs, never just -costs
-        profit = revenue - total_costs
-        profit_margin = (profit / revenue * 100) if revenue > 0 else Decimal('0.00')
-        
-    except Exception as e:
-        # Fallback to direct calculation if Sale model isn't available or service fails
-        import logging
-        logger = logging.getLogger(__name__)
-        logger.warning(f"Failed to use centralized metrics service, falling back: {e}")
-        
-        # Fallback: Calculate directly from InventoryItem
-        cost_of_goods = range_sales.aggregate(
-            total=Coalesce(Sum('order_price'), Decimal('0.00'), output_field=DecimalField())
-        )['total'] or Decimal('0.00')
-        
-        # Business Costs from Admin Wallet
-        from wallet.models import WalletTransaction, Ledger, TxnType
+    # COGS: Cost of goods sold (sum of order_price for sold items in period)
+    cost_of_goods = range_sales.aggregate(
+        total=Coalesce(Sum('order_price'), Decimal('0.00'), output_field=DecimalField())
+    )['total'] or Decimal('0.00')
+    
+    # Business Costs: Operational costs from Admin Wallet (same period)
+    # CRITICAL: Agents should NOT see global business costs unless assignable to them
+    from wallet.models import WalletTransaction, Ledger, TxnType
+    
+    # Convert datetime to date for effective_date comparison
+    period_start_date = start_date.date() if hasattr(start_date, 'date') else start_date
+    period_end_date = end_date.date() if hasattr(end_date, 'date') else end_date
+    
+    if is_manager:
+        # Managers see all business costs
         business_costs_query = WalletTransaction.objects.filter(
             business=business,
             ledger=Ledger.COMPANY,
             type__in=[TxnType.COST_ONCE_OFF, TxnType.COST_RECURRING],
-            effective_date__gte=start_date.date() if hasattr(start_date, 'date') else start_date,
-            effective_date__lt=end_date.date() if hasattr(end_date, 'date') else end_date,
+            effective_date__gte=period_start_date,
+            effective_date__lt=period_end_date,
         )
         business_costs_sum = business_costs_query.aggregate(
             total=Coalesce(Sum('amount'), Decimal('0.00'), output_field=DecimalField())
         )['total'] or Decimal('0.00')
+        # Costs are stored as negative, so we take absolute value for display
         business_costs = abs(business_costs_sum)
+    else:
+        # Agents: Check if costs can be assigned to them
+        # If WalletTransaction has assigned_to/agent/created_by, filter by that
+        # Otherwise, show 0 (agents don't see global costs)
+        business_costs_query = WalletTransaction.objects.filter(
+            business=business,
+            ledger=Ledger.COMPANY,
+            type__in=[TxnType.COST_ONCE_OFF, TxnType.COST_RECURRING],
+            effective_date__gte=period_start_date,
+            effective_date__lt=period_end_date,
+        )
         
-        total_costs = cost_of_goods + business_costs
-        # Profit = revenue - total costs (cost of goods + business costs)
-        profit = revenue - total_costs
-        profit_margin = (profit / revenue * 100) if revenue > 0 else Decimal('0.00')
+        # Try to scope costs to agent if possible
+        if hasattr(WalletTransaction, 'assigned_to'):
+            business_costs_query = business_costs_query.filter(assigned_to=actor_user)
+        elif hasattr(WalletTransaction, 'created_by'):
+            business_costs_query = business_costs_query.filter(created_by=actor_user)
+        else:
+            # No agent-assignment field exists, agents see 0 costs
+            business_costs_query = business_costs_query.none()
+        
+        business_costs_sum = business_costs_query.aggregate(
+            total=Coalesce(Sum('amount'), Decimal('0.00'), output_field=DecimalField())
+        )['total'] or Decimal('0.00')
+        business_costs = abs(business_costs_sum)
+    
+    # Total Costs = COGS + Business Costs (MUST match breakdown)
+    total_costs = cost_of_goods + business_costs
+    
+    # Profit = Revenue - Total Costs (using sales revenue, not stock value)
+    profit = revenue - total_costs
+    
+    # Margin = (Profit / Revenue) * 100, guard against division by zero
+    profit_margin = (profit / revenue * 100) if revenue > 0 else Decimal('0.00')
     
     # Compute absolute values for template display (Django doesn't have |abs filter)
     profit_abs = abs(profit)
@@ -257,7 +273,9 @@ def dashboard(request):
     # ==========================================================================
     # PAYMENT MIX - Breakdown by payment method for selected period
     # ==========================================================================
-    # Payment mix from InventoryItem (phones track payment_method on the item)
+    # CRITICAL: Payment Mix MUST be computed from the SAME range_sales queryset as Revenue
+    # This ensures Payment Mix totals = Revenue KPI (consistency)
+    
     payment_totals = range_sales.aggregate(
         cash=Coalesce(Sum('selling_price', filter=Q(payment_method='CASH')), Decimal('0.00'), output_field=DecimalField()),
         bank=Coalesce(Sum('selling_price', filter=Q(payment_method='BANK')), Decimal('0.00'), output_field=DecimalField()),
@@ -267,6 +285,16 @@ def dashboard(request):
     cash_amount = payment_totals['cash'] or Decimal('0.00')
     bank_amount = payment_totals['bank'] or Decimal('0.00')
     mobile_amount = payment_totals['mobile'] or Decimal('0.00')
+    
+    # Sanity check: Payment Mix should sum to Revenue (both from range_sales)
+    payment_mix_total = cash_amount + bank_amount + mobile_amount
+    # Allow for small rounding differences (< 1 MWK)
+    if abs(payment_mix_total - revenue) > Decimal('1.00'):
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.warning(
+            f"Payment Mix mismatch: Total={payment_mix_total}, Revenue={revenue}, Diff={payment_mix_total - revenue}"
+        )
     
     # Calculate percentages (ensure they sum to exactly 100%)
     if revenue > 0:
@@ -284,31 +312,31 @@ def dashboard(request):
     ]
     
     # Package the main dashboard KPIs for the selected range
-    # IMPORTANT: For Phones dashboard, "Revenue" and "COGS" reflect INVENTORY VALUE (not sales)
-    # This aligns with user expectation that these KPIs change when stock is added
+    # CRITICAL FIX: Revenue KPI MUST show sales revenue (not stock value)
+    # This ensures Revenue matches Payment Mix totals (both derived from range_sales)
     dashboard_kpis = {
         "range_key": range_key,
         "range_label": range_label,
         "start_date": start_date.date() if hasattr(start_date, 'date') else start_date,
         "end_date": end_date.date() if hasattr(end_date, 'date') else end_date,
         "units_sold": units_sold,
-        # INVENTORY VALUE KPIs (reflect current stock)
-        "revenue": stock_selling_value,  # Potential stock value (sum of selling prices)
-        "cost_of_goods": stock_cost_value,  # Inventory cost basis (sum of order prices)
-        # Sales metrics (separate from inventory KPIs)
-        "sales_revenue": revenue,  # Actual sales revenue for selected period
-        "sales_cogs": cost_of_goods,  # COGS for sold items in selected period
-        # Enhanced cost breakdown
-        "business_costs": business_costs,
-        "total_costs": total_costs,
-        "profit": profit,
-        "profit_margin": profit_margin,
+        "stock_on_hand": stock_on_hand,
+        # PRIMARY KPIs: All derived from range_sales (sold items in period)
+        "revenue": revenue,  # Sales revenue (matches Payment Mix)
+        "cost_of_goods": cost_of_goods,  # COGS for sold items
+        "business_costs": business_costs,  # Operational costs
+        "total_costs": total_costs,  # MUST equal COGS + Business Costs
+        "profit": profit,  # Revenue - Total Costs
+        "profit_margin": profit_margin,  # (Profit / Revenue) * 100
         # Pre-computed absolute values for template (Django lacks |abs filter)
         "profit_abs": profit_abs,
         "profit_margin_abs": profit_margin_abs,
-        "stock_on_hand": stock_on_hand,
-        # Payment mix
+        # Payment mix (must sum to revenue)
         "payment_mix": payment_mix_data,
+        # STOCK METRICS: Separate from sales KPIs (for reference)
+        "stock_cost_value": stock_cost_value,  # Inventory cost basis
+        "stock_selling_value": stock_selling_value,  # Potential stock value
+        "stock_potential_profit": stock_selling_value - stock_cost_value,
     }
     
     # ==========================================================================
@@ -522,6 +550,10 @@ def dashboard(request):
         
         # NEW: Sales by phone model (respects date range filter)
         "sales_by_model": sales_by_model,
+        
+        # Role-based visibility flags
+        "IS_MANAGER": is_manager,
+        "IS_AGENT": is_agent,
         
         # UI flags
         "show_search": False,

@@ -41,6 +41,16 @@
   .metric-card p{margin:8px 0 0;font-size:2rem;font-weight:900;color:#0f172a;word-break:break-word;min-width:0;overflow:hidden;text-overflow:ellipsis}
   .metric-card small{display:block;margin-top:6px;font-size:.9rem;color:#64748b;word-break:break-word;overflow-wrap:break-word}
   
+  /* PREMIUM NUMBER FORMATTING - NO OVERFLOW, ALWAYS READABLE */
+  .cc-amount{
+    white-space:nowrap;
+    overflow:hidden;
+    text-overflow:ellipsis;
+    max-width:100%;
+    font-variant-numeric:tabular-nums;
+    display:inline-block;
+  }
+  
   /* Mobile: prevent KPI numbers from breaking layout - ENHANCED */
   @media (max-width:640px){
     .metric-card p{
@@ -57,6 +67,9 @@
       word-break:break-word;
     }
     .metrics-grid{grid-template-columns:1fr}
+    .cc-amount{
+      font-size:clamp(0.75rem,2.5vw,0.95rem);
+    }
   }
   
   .section-title{font-size:1.3rem;font-weight:800;color:#0f172a;margin:0 0 16px;display:flex;align-items:center;gap:10px}
@@ -125,7 +138,7 @@
   </header>
 
   <!-- DATE RANGE FILTER BAR -->
-  <section class="recent-block" style="padding:16px 22px">
+  <section class="recent-block" style="padding:16px 22px;position:relative;overflow:visible">
     <div style="display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:space-between">
       <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
         <span style="font-weight:700;color:#64748b;margin-right:8px">Date Range:</span>
@@ -138,7 +151,7 @@
         <a href="?range=mtd" class="btn {% if dashboard_kpis.range_key == 'mtd' %}btn-primary{% else %}btn-outline-secondary{% endif %}" style="border-radius:20px;padding:8px 16px;font-size:.9rem">
           <i class="bi bi-calendar-month"></i> This Month
         </a>
-        <button type="button" class="btn {% if dashboard_kpis.range_key == 'custom' %}btn-primary{% else %}btn-outline-secondary{% endif %}" style="border-radius:20px;padding:8px 16px;font-size:.9rem" onclick="toggleCustomRange()">
+        <button type="button" id="customRangeToggle" class="btn {% if dashboard_kpis.range_key == 'custom' %}btn-primary{% else %}btn-outline-secondary{% endif %}" style="border-radius:20px;padding:8px 16px;font-size:.9rem">
           <i class="bi bi-calendar-range"></i> Custom
         </button>
       </div>
@@ -148,7 +161,7 @@
     </div>
     
     <!-- CUSTOM DATE RANGE FORM (hidden by default) -->
-    <form method="get" id="customRangeForm" style="display:{% if dashboard_kpis.range_key == 'custom' %}flex{% else %}none{% endif %};gap:12px;margin-top:16px;padding-top:16px;border-top:1px solid #e2e8f0;flex-wrap:wrap;align-items:end">
+    <form method="get" id="customRangeForm" style="display:{% if dashboard_kpis.range_key == 'custom' %}flex{% else %}none{% endif %};gap:12px;margin-top:16px;padding-top:16px;border-top:1px solid #e2e8f0;flex-wrap:wrap;align-items:end;position:relative;z-index:100">
       {% comment %}GET forms don't need CSRF token - only POST forms do{% endcomment %}
       <input type="hidden" name="range" value="custom">
       <div>
@@ -162,7 +175,7 @@
       <button type="submit" class="btn btn-primary" style="border-radius:10px">
         <i class="bi bi-check-circle"></i> Apply
       </button>
-      <button type="button" class="btn btn-outline-secondary" style="border-radius:10px" onclick="toggleCustomRange()">
+      <button type="button" id="customRangeCancel" class="btn btn-outline-secondary" style="border-radius:10px">
         Cancel
       </button>
     </form>
@@ -237,6 +250,68 @@
     </div>
   </section>
 
+  <!-- BUSINESS PROGRESS CHIPS (Lightweight insights from existing data) -->
+  {% if dashboard_kpis.units_sold > 0 %}
+  <section class="recent-block" style="padding:18px 22px">
+    <h2 class="section-title" style="margin-bottom:14px">
+      <i class="bi bi-graph-up-arrow"></i> Business Progress
+      <span style="font-size:.85rem;font-weight:600;color:#64748b;margin-left:8px">({{ dashboard_kpis.range_label }})</span>
+    </h2>
+    
+    <div style="display:flex;flex-wrap:wrap;gap:12px">
+      <!-- Average Sale Value -->
+      {% with avg_sale=dashboard_kpis.revenue|floatformat:0|add:"0"|default:0 %}
+        {% if dashboard_kpis.units_sold > 0 %}
+          {% widthratio dashboard_kpis.revenue 1 1 as revenue_float %}
+          {% widthratio revenue_float dashboard_kpis.units_sold 1 as avg_sale_value %}
+          <div class="badge" style="background:linear-gradient(135deg,#dbeafe,#bfdbfe);color:#1e40af;font-size:.9rem;padding:10px 18px;border-radius:12px;box-shadow:0 2px 8px rgba(59,130,246,0.2)">
+            <i class="bi bi-receipt"></i>
+            <strong>Avg Sale:</strong> 
+            <span class="cc-amount" title="MK {{ avg_sale_value|floatformat:0|intcomma }}">MK {{ avg_sale_value|floatformat:0|intcomma }}</span>
+          </div>
+        {% endif %}
+      {% endwith %}
+      
+      <!-- Net Margin Badge (color-coded) -->
+      <div class="badge" style="background:linear-gradient(135deg,{% if dashboard_kpis.profit_margin >= 20 %}#dcfce7,#bbf7d0{% elif dashboard_kpis.profit_margin >= 10 %}#fef9c3,#fef08a{% else %}#fee2e2,#fecaca{% endif %});color:{% if dashboard_kpis.profit_margin >= 20 %}#166534{% elif dashboard_kpis.profit_margin >= 10 %}#854d0e{% else %}#991b1b{% endif %};font-size:.9rem;padding:10px 18px;border-radius:12px;box-shadow:0 2px 8px rgba(0,0,0,0.1)">
+        <i class="bi bi-trophy-fill"></i>
+        <strong>Net Margin:</strong> 
+        <span class="cc-amount" title="{% if dashboard_kpis.profit_margin < 0 %}-{% endif %}{{ dashboard_kpis.profit_margin|abs|floatformat:1 }}%">
+          {% if dashboard_kpis.profit_margin < 0 %}-{% endif %}{{ dashboard_kpis.profit_margin|abs|floatformat:1 }}%
+        </span>
+        {% if dashboard_kpis.profit_margin >= 20 %}
+          <i class="bi bi-emoji-smile" style="margin-left:4px"></i>
+        {% elif dashboard_kpis.profit_margin >= 10 %}
+          <i class="bi bi-emoji-neutral" style="margin-left:4px"></i>
+        {% else %}
+          <i class="bi bi-emoji-frown" style="margin-left:4px"></i>
+        {% endif %}
+      </div>
+      
+      <!-- Stock Turnover (units sold / stock on hand) -->
+      {% if dashboard_kpis.stock_on_hand > 0 %}
+        {% widthratio dashboard_kpis.units_sold dashboard_kpis.stock_on_hand 100 as turnover_pct %}
+        <div class="badge" style="background:linear-gradient(135deg,#fef3c7,#fde68a);color:#92400e;font-size:.9rem;padding:10px 18px;border-radius:12px;box-shadow:0 2px 8px rgba(251,191,36,0.2)">
+          <i class="bi bi-arrow-repeat"></i>
+          <strong>Turnover:</strong> 
+          <span class="cc-amount" title="{{ turnover_pct }}% of stock sold this period">{{ turnover_pct }}%</span>
+          <small style="opacity:0.8;margin-left:6px">({{ dashboard_kpis.units_sold }} / {{ dashboard_kpis.stock_on_hand }})</small>
+        </div>
+      {% endif %}
+      
+      <!-- Stock Value At Risk (potential profit if all stock sells) -->
+      {% if dashboard_kpis.stock_on_hand > 0 %}
+        <div class="badge" style="background:linear-gradient(135deg,#e0e7ff,#c7d2fe);color:#4338ca;font-size:.9rem;padding:10px 18px;border-radius:12px;box-shadow:0 2px 8px rgba(99,102,241,0.2)">
+          <i class="bi bi-box-seam"></i>
+          <strong>Stock Potential:</strong> 
+          <span class="cc-amount" title="MK {{ dashboard_kpis.stock_potential_profit|floatformat:0|intcomma }}">MK {{ dashboard_kpis.stock_potential_profit|floatformat:0|intcomma }}</span>
+          <small style="opacity:0.8;margin-left:6px">({{ dashboard_kpis.stock_on_hand }} units)</small>
+        </div>
+      {% endif %}
+    </div>
+  </section>
+  {% endif %}
+
   <!-- PAYMENT MIX (PHONES) -->
   <section class="recent-block">
     <h2 class="section-title">
@@ -244,7 +319,7 @@
       <span style="font-size:.85rem;font-weight:600;color:#64748b;margin-left:8px">({{ dashboard_kpis.range_label }})</span>
     </h2>
     
-    {% if dashboard_kpis.sales_revenue > 0 %}
+    {% if dashboard_kpis.revenue > 0 %}
       <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:16px;margin-bottom:20px">
         {% for pm in dashboard_kpis.payment_mix %}
           <div class="metric-card" style="border-left:4px solid {% if pm.method == 'Cash' %}#10b981{% elif pm.method == 'Bank' %}#3b82f6{% else %}#f59e0b{% endif %}">
@@ -423,12 +498,58 @@
 </div>
 
 <script>
-// Toggle custom date range form
-function toggleCustomRange() {
+// =============================================================================
+// CUSTOM DATE RANGE FILTER - Bound on multiple events for reliability
+// =============================================================================
+function initCustomDateFilter() {
+  const toggleBtn = document.getElementById('customRangeToggle');
+  const cancelBtn = document.getElementById('customRangeCancel');
   const form = document.getElementById('customRangeForm');
-  if (form) {
-    form.style.display = form.style.display === 'none' ? 'flex' : 'none';
+  
+  if (!form || !toggleBtn) return;
+  
+  // Toggle function
+  function toggleCustomRange() {
+    if (form.style.display === 'none' || !form.style.display) {
+      form.style.display = 'flex';
+      // Focus first input for better UX
+      setTimeout(() => {
+        const startInput = document.getElementById('startDate');
+        if (startInput) startInput.focus();
+      }, 100);
+    } else {
+      form.style.display = 'none';
+    }
   }
+  
+  // Bind toggle button
+  toggleBtn.addEventListener('click', toggleCustomRange);
+  
+  // Bind cancel button
+  if (cancelBtn) {
+    cancelBtn.addEventListener('click', () => {
+      form.style.display = 'none';
+    });
+  }
+}
+
+// Initialize on DOMContentLoaded (standard page load)
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', initCustomDateFilter);
+} else {
+  initCustomDateFilter();
+}
+
+// Re-initialize on pageshow (browser back/forward cache)
+window.addEventListener('pageshow', function(event) {
+  if (event.persisted) {
+    initCustomDateFilter();
+  }
+});
+
+// Re-initialize on HTMX afterSwap (if HTMX is used for dynamic content)
+if (typeof htmx !== 'undefined') {
+  document.body.addEventListener('htmx:afterSwap', initCustomDateFilter);
 }
 
 // Sales Trend Chart - LINE GRAPH (always renders, never empty)
