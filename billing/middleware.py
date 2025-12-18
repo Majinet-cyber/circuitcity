@@ -31,13 +31,14 @@ SAFE_PREFIXES: tuple[str, ...] = (
     "/tenants/choose/",
     "/tenants/create/",
     # Billing flows
-    "/billing/subscribe/",
-    "/billing/checkout/",
-    "/billing/success/",
-    "/billing/webhook/",
-    "/billing/invoices/",      # allow users to view/pay invoices
-    # Notifications list is OK even if read-only
-    "/notifications/",
+    "/billing/",               # all billing pages allowed
+    # Public/landing pages
+    "/",                       # root/landing page
+    "/about/",
+    "/pricing/",
+    "/contact/",
+    "/support/",
+    "/landing/",
 )
 
 
@@ -145,6 +146,26 @@ class SubscriptionGateMiddleware:
                 sub.status = BusinessSubscription.Status.EXPIRED
                 sub.save(update_fields=["status", "updated_at"])
 
+        # For AJAX/API/HTMX requests, return JSON error instead of redirect
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest' or request.headers.get('HX-Request'):
+            from django.http import JsonResponse
+            return JsonResponse({
+                'ok': False,
+                'locked': True,
+                'error': 'Trial expired - subscription required',
+                'redirect_url': '/billing/trial-expired/',
+            }, status=402)
+        
+        # For API paths, return JSON
+        if path.startswith('/api/') or path.startswith('/app/api/'):
+            from django.http import JsonResponse
+            return JsonResponse({
+                'ok': False,
+                'locked': True,
+                'error': 'Trial expired - subscription required',
+                'redirect_url': '/billing/trial-expired/',
+            }, status=402)
+        
         # Redirect to trial expired page for better UX
         try:
             expired_url = reverse("billing:trial_expired")

@@ -397,10 +397,15 @@ def gps_ping(request, timelog_id):
 def time_logs_dashboard(request):
     """
     Rich Time Logs UI showing work vs idle time for the selected day.
+    Shows all agents in the business with their work/idle metrics.
     """
     business = get_active_business(request)
     if not business:
         return render(request, "timelogs/no_business.html")
+    
+    # Check if user is manager (can see all agents)
+    from tenants.utils_roles import is_manager
+    user_is_manager = is_manager(request.user, business)
     
     # Get date from query param or default to today
     date_str = request.GET.get("date")
@@ -413,29 +418,78 @@ def time_logs_dashboard(request):
     else:
         selected_date = timezone.localdate()
     
-    # Get work log for the selected date
-    try:
-        work_log = AgentWorkLog.objects.get(
-            agent=request.user,
+    # Get selected agent (for managers, default to "all"; for agents, only themselves)
+    selected_agent_id = request.GET.get("agent")
+    
+    if user_is_manager:
+        # Managers can see all agents
+        if selected_agent_id and selected_agent_id != "all":
+            try:
+                from django.contrib.auth import get_user_model
+                User = get_user_model()
+                selected_agent = User.objects.get(id=selected_agent_id)
+            except:
+                selected_agent = None
+        else:
+            selected_agent = None  # "all" view
+        
+        # Get all agents in business
+        from tenants.models import Membership
+        agent_memberships = Membership.objects.filter(
+            business=business,
+            status="ACTIVE",
+        ).select_related('user').order_by('user__first_name', 'user__last_name', 'user__username')
+        
+        available_agents = [
+            {
+                'id': m.user.id,
+                'name': m.user.get_full_name() or m.user.username,
+                'role': m.role,
+            }
+            for m in agent_memberships
+        ]
+    else:
+        # Agents can only see their own logs
+        selected_agent = request.user
+        available_agents = []
+    
+    # Get work logs
+    if selected_agent:
+        # Single agent view
+        try:
+            work_log = AgentWorkLog.objects.get(
+                agent=selected_agent,
+                business=business,
+                work_date=selected_date,
+            )
+            pings = work_log.pings.order_by("timestamp")
+        except AgentWorkLog.DoesNotExist:
+            work_log = None
+            pings = []
+        
+        # Calculate battery segments for visualization
+        battery_segments = []
+        if work_log:
+            total_minutes = work_log.total_on_site_minutes + work_log.total_idle_minutes
+            if total_minutes > 0:
+                work_percent = (work_log.total_on_site_minutes / total_minutes) * 100
+                idle_percent = (work_log.total_idle_minutes / total_minutes) * 100
+                battery_segments = [
+                    {"type": "work", "percent": work_percent, "label": f"{work_log.total_on_site_minutes} min"},
+                    {"type": "idle", "percent": idle_percent, "label": f"{work_log.total_idle_minutes} min"},
+                ]
+        
+        agent_work_logs = [work_log] if work_log else []
+    else:
+        # All agents view (managers only)
+        agent_work_logs = AgentWorkLog.objects.filter(
             business=business,
             work_date=selected_date,
-        )
-        pings = work_log.pings.order_by("timestamp")
-    except AgentWorkLog.DoesNotExist:
+        ).select_related('agent', 'location').order_by('-total_on_site_minutes')
+        
         work_log = None
         pings = []
-    
-    # Calculate battery segments for visualization
-    battery_segments = []
-    if work_log:
-        total_minutes = work_log.total_on_site_minutes + work_log.total_idle_minutes
-        if total_minutes > 0:
-            work_percent = (work_log.total_on_site_minutes / total_minutes) * 100
-            idle_percent = (work_log.total_idle_minutes / total_minutes) * 100
-            battery_segments = [
-                {"type": "work", "percent": work_percent, "label": f"{work_log.total_on_site_minutes} min"},
-                {"type": "idle", "percent": idle_percent, "label": f"{work_log.total_idle_minutes} min"},
-            ]
+        battery_segments = []
     
     context = {
         "selected_date": selected_date,
@@ -444,6 +498,11 @@ def time_logs_dashboard(request):
         "pings": pings,
         "battery_segments": battery_segments,
         "total_pings": pings.count() if work_log else 0,
+        "user_is_manager": user_is_manager,
+        "available_agents": available_agents,
+        "selected_agent": selected_agent,
+        "selected_agent_id": selected_agent_id,
+        "agent_work_logs": agent_work_logs,
     }
     
     return render(request, "timelogs/dashboard.html", context)

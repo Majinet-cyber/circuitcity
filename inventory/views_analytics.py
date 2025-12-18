@@ -744,6 +744,70 @@ def api_stock_overview(request: HttpRequest) -> JsonResponse:
 @login_required
 @require_business
 @require_http_methods(["GET"])
+def api_stock_overview_cross_vertical(request: HttpRequest) -> JsonResponse:
+    """
+    Get cross-vertical stock overview for unified analytics chart.
+    Returns stock counts across ALL verticals (phones, liquor, pharmacy, clothing).
+    """
+    try:
+        business = get_active_business(request)
+        if not business:
+            return JsonResponse({'error': 'No active business'}, status=400)
+        
+        location_id = request.GET.get('location')
+        location = None
+        if location_id:
+            location = Location.objects.filter(pk=location_id, business=business).first()
+        
+        # Check cache
+        cache_key = get_cache_key(
+            'stock_overview_cross_vertical',
+            business.id,
+            location=location_id or '',
+        )
+        
+        cached = get_cached_analytics_data(cache_key)
+        if cached:
+            return JsonResponse(cached)
+        
+        # Get cross-vertical stock data
+        from inventory.services.analytics_stock_overview import get_cross_vertical_stock_overview
+        
+        stock_data = get_cross_vertical_stock_overview(business, location)
+        
+        result = {
+            'ok': True,
+            'labels': stock_data['labels'],
+            'values': stock_data['values'],
+            'total_units': stock_data['total_units'],
+            'most_stocked_vertical': stock_data['most_stocked_vertical'],
+            'breakdown': stock_data['breakdown'],
+            'last_updated': timezone.now().isoformat(),
+        }
+        
+        # Cache for 2 minutes (stock changes frequently)
+        cache_analytics_data(cache_key, result, timeout=120)
+        
+        return JsonResponse(result)
+    
+    except Exception as e:
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.exception("API cross-vertical stock overview error")
+        return JsonResponse({
+            'ok': False,
+            'error': str(e),
+            'labels': [],
+            'values': [],
+            'total_units': 0,
+            'most_stocked_vertical': 'None',
+            'breakdown': {},
+        }, status=500)
+
+
+@login_required
+@require_business
+@require_http_methods(["GET"])
 def api_cost_breakdown(request: HttpRequest) -> JsonResponse:
     """Get cost breakdown data as JSON."""
     try:

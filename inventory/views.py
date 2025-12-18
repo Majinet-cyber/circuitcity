@@ -1273,31 +1273,37 @@ def stock_list(request: HttpRequest, *args, **kwargs) -> HttpResponse:
 
     # ---------- AGENT VISIBILITY RULES (Part 1: Stock Ownership) ----------
     # Agents can only see stock assigned to them; Managers see all stock
+    # CRITICAL: Use authoritative role flags from middleware
     user_is_manager = False
     try:
-        # Check if user is manager
-        user_is_manager = (
-            request.user.is_staff 
-            or request.user.is_superuser
-            or getattr(getattr(request.user, 'profile', None), 'is_manager', False)
-        )
-        
-        # Also check Membership role
-        if not user_is_manager and biz:
-            try:
-                from tenants.models import Membership
-                membership = Membership.objects.filter(
-                    user=request.user,
-                    business=biz,
-                    role='MANAGER',
-                    status='ACTIVE'
-                ).first()
-                if membership:
-                    user_is_manager = True
-            except Exception:
-                pass
+        # Use AUTHORITATIVE flag from middleware (set by tenants.utils_roles)
+        if hasattr(request, "cc_is_manager"):
+            user_is_manager = getattr(request, "cc_is_manager", False)
+        else:
+            # Fallback: if middleware hasn't set flag (shouldn't happen in normal flow)
+            user_is_manager = (
+                request.user.is_staff 
+                or request.user.is_superuser
+                or getattr(getattr(request.user, 'profile', None), 'is_manager', False)
+            )
+            
+            # Also check Membership role (fallback)
+            if not user_is_manager and biz:
+                try:
+                    from tenants.models import Membership
+                    membership = Membership.objects.filter(
+                        user=request.user,
+                        business=biz,
+                        role='MANAGER',
+                        status='ACTIVE'
+                    ).first()
+                    if membership:
+                        user_is_manager = True
+                except Exception:
+                    pass
         
         # If user is NOT a manager (i.e., they are an agent), filter stock to only what's assigned to them
+        # CRITICAL: Manager precedence means managers see ALL stock even if they have agent indicators
         if not user_is_manager and _hasf(Model, "assigned_agent"):
             # Agents only see items where assigned_agent = them OR assigned_role = 'AGENT' and assigned_agent = them
             qs = qs.filter(

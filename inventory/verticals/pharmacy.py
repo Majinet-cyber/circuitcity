@@ -266,6 +266,117 @@ def sales_export_csv(request):
 @login_required
 @require_business
 @require_business_kind(BusinessKind.PHARMACY)
+def fast_sell(request):
+    """
+    Fast Sell page for pharmacy - barcode scanner + instant sell.
+    Uses front camera for barcode scanning with BarcodeDetector API fallback.
+    """
+    from django.http import JsonResponse
+    
+    business: Business = request.business
+    
+    ctx = {
+        "business": business,
+        "page_title": "Fast Sell",
+        "vertical": "pharmacy",
+        "vertical_name": "Pharmacy",
+    }
+    
+    return render(request, "verticals/pharmacy/fast_sell.html", ctx)
+
+
+# Fast Sell API endpoints
+@login_required
+@require_business
+@require_business_kind(BusinessKind.PHARMACY)
+def fast_sell_lookup_api(request):
+    """API: Look up product/batch by barcode"""
+    from django.http import JsonResponse
+    from inventory.services.fast_sell import lookup_product_by_barcode
+    
+    business: Business = request.business
+    barcode = request.GET.get("barcode", "").strip()
+    
+    if not barcode:
+        return JsonResponse({"ok": False, "error": "Barcode required"}, status=400)
+    
+    result = lookup_product_by_barcode(
+        business=business,
+        vertical="pharmacy",
+        barcode=barcode
+    )
+    
+    return JsonResponse(result)
+
+
+@login_required
+@require_business
+@require_business_kind(BusinessKind.PHARMACY)
+def fast_sell_create_api(request):
+    """API: Create a fast sale"""
+    from django.http import JsonResponse
+    from inventory.services.fast_sell import create_fast_sell
+    import json
+    
+    if request.method != "POST":
+        return JsonResponse({"ok": False, "error": "POST required"}, status=405)
+    
+    business: Business = request.business
+    
+    try:
+        data = json.loads(request.body)
+    except json.JSONDecodeError:
+        return JsonResponse({"ok": False, "error": "Invalid JSON"}, status=400)
+    
+    barcode = data.get("barcode", "").strip()
+    quantity = int(data.get("quantity", 1))
+    payment_method = data.get("payment_method", "cash")
+    selling_price_str = data.get("selling_price")
+    
+    selling_price = None
+    if selling_price_str:
+        try:
+            from decimal import Decimal
+            selling_price = Decimal(str(selling_price_str))
+        except:
+            return JsonResponse({"ok": False, "error": "Invalid price"}, status=400)
+    
+    result = create_fast_sell(
+        business=business,
+        vertical="pharmacy",
+        user=request.user,
+        barcode=barcode,
+        quantity=quantity,
+        payment_method=payment_method,
+        selling_price=selling_price,
+    )
+    
+    return JsonResponse(result)
+
+
+@login_required
+@require_business
+@require_business_kind(BusinessKind.PHARMACY)
+def fast_sell_kpis_api(request):
+    """API: Get Fast Sell KPIs"""
+    from django.http import JsonResponse
+    from inventory.services.fast_sell import get_fast_sell_kpis
+    
+    business: Business = request.business
+    date_range = request.GET.get("range", "today")
+    
+    result = get_fast_sell_kpis(
+        business=business,
+        vertical="pharmacy",
+        date_range=date_range,
+    )
+    
+    return JsonResponse(result)
+
+
+@login_required
+@require_business
+@require_business_kind(BusinessKind.PHARMACY)
 def sales_trend_json(request):
     """
     JSON endpoint for pharmacy sales trend data.

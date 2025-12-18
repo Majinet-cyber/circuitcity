@@ -45,6 +45,11 @@ class Sale(models.Model):
     )
     # Phase 5: index for fast dashboards / recents
     created_at      = models.DateTimeField(default=timezone.now, editable=False)
+    
+    # Rollback tracking fields
+    is_rolled_back  = models.BooleanField(default=False, db_index=True, help_text="Whether this sale has been rolled back/reversed")
+    rolled_back_at  = models.DateTimeField(null=True, blank=True, help_text="When this sale was rolled back")
+    rolled_back_by  = models.ForeignKey(User, null=True, blank=True, on_delete=models.SET_NULL, related_name="rolled_back_sales", help_text="User who rolled back this sale")
 
     class Meta:
         indexes = [
@@ -66,6 +71,74 @@ class Sale(models.Model):
 
     def __str__(self):
         return f"Sale #{self.pk} - item {self.item_id}"
+
+
+class RollbackReason(models.TextChoices):
+    """Reasons for rolling back a sale"""
+    DAMAGED = "DAMAGED", "Damaged"
+    RETURNED = "RETURNED", "Returned"
+    ERROR = "ERROR", "Data Entry Error"
+    OTHER = "OTHER", "Other"
+
+
+class SaleRollback(models.Model):
+    """
+    Audit record for sale rollbacks/reversals.
+    When a sale is rolled back, we create this record and mark the Sale as rolled_back.
+    """
+    sale = models.ForeignKey(
+        Sale,
+        on_delete=models.PROTECT,
+        related_name="rollbacks",
+        help_text="The sale that was rolled back"
+    )
+    reason = models.CharField(
+        max_length=20,
+        choices=RollbackReason.choices,
+        help_text="Reason for rollback"
+    )
+    refunded = models.BooleanField(
+        default=False,
+        help_text="Whether a refund was issued to customer"
+    )
+    refunded_amount = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        default=Decimal("0.00"),
+        validators=[MinValueValidator(0)],
+        help_text="Amount refunded to customer (if any)"
+    )
+    return_to_stock = models.BooleanField(
+        default=False,
+        help_text="Whether item was returned to stock"
+    )
+    notes = models.TextField(
+        blank=True,
+        help_text="Additional notes about the rollback"
+    )
+    created_by = models.ForeignKey(
+        User,
+        on_delete=models.PROTECT,
+        related_name="created_rollbacks",
+        help_text="User who performed the rollback"
+    )
+    created_at = models.DateTimeField(
+        default=timezone.now,
+        editable=False,
+        help_text="When the rollback was performed"
+    )
+    
+    class Meta:
+        db_table = "sales_sale_rollback"
+        indexes = [
+            models.Index(fields=["created_at"], name="rollback_created_idx"),
+            models.Index(fields=["sale"], name="rollback_sale_idx"),
+            models.Index(fields=["created_by"], name="rollback_user_idx"),
+        ]
+        ordering = ["-created_at"]
+    
+    def __str__(self):
+        return f"Rollback #{self.pk} - Sale #{self.sale_id} ({self.get_reason_display()})"
 
 
 # =========================================================================
@@ -257,6 +330,18 @@ class SaleCommission(models.Model):
     
     created_at = models.DateTimeField(auto_now_add=True)
     
+    # Reversal tracking (for rollbacks)
+    is_reversed = models.BooleanField(
+        default=False,
+        db_index=True,
+        help_text="Whether this commission was reversed due to sale rollback"
+    )
+    reversed_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text="When this commission was reversed"
+    )
+    
     class Meta:
         ordering = ["-created_at"]
         indexes = [
@@ -389,5 +474,115 @@ class AgentEarningsSummary:
             "total_penalty": float(self.total_penalty),
             "total_net": float(self.total_net),
         }
+
+
+# =========================================================================
+# LIQUOR BARMAN ATTRIBUTION (for Liquor vertical only)
+# =========================================================================
+
+class LiquorSaleAttribution(models.Model):
+    """
+    Tracks liquor sales attributed by a barman to a specific agent.
+    Used for barman/agent reconciliation workflows in the liquor vertical.
+    
+    When a barman makes a sale via Fast Sell, they can optionally assign it to an agent.
+    This creates an attribution record that needs to be reconciled later.
+    """
+    
+    STATUS_PENDING = 'pending'
+    STATUS_RECONCILED = 'reconciled'
+    STATUS_CHOICES = [
+        (STATUS_PENDING, 'Pending Reconciliation'),
+        (STATUS_RECONCILED, 'Reconciled'),
+    ]
+    
+    # Link to the actual sale (using generic relation since LiquorSale is in inventory app)
+    # We'll store the sale ID and reference it via application logic
+    liquor_sale_id = models.PositiveIntegerField(
+        db_index=True,
+        help_text="ID of the LiquorSale this attribution is for"
+    )
+    
+    # Business context
+    business = models.ForeignKey(
+        "tenants.Business",
+        on_delete=models.CASCADE,
+        related_name="liquor_sale_attributions",
+        db_index=True
+    )
+    
+    # Attribution: who sold it (barman) and who it's assigned to (agent)
+    attributed_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name="liquor_attributions_made",
+        help_text="The barman who made this sale"
+    )
+    
+    attributed_to = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name="liquor_attributions_received",
+        help_text="The agent this sale is attributed to"
+    )
+    
+    # Reconciliation status
+    status = models.CharField(
+        max_length=20,
+        choices=STATUS_CHOICES,
+        default=STATUS_PENDING,
+        db_index=True
+    )
+    
+    # Reconciliation metadata
+    reconciled_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="liquor_attributions_reconciled"
+    )
+    reconciled_at = models.DateTimeField(null=True, blank=True)
+    
+    # Timestamps
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    # Sale amount for quick aggregation (denormalized for performance)
+    sale_amount = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        default=Decimal("0.00"),
+        help_text="Total sale amount (denormalized for performance)"
+    )
+    
+    # Notes
+    notes = models.TextField(blank=True, default="")
+    
+    class Meta:
+        ordering = ["-created_at"]
+        indexes = [
+            models.Index(fields=["business", "status", "-created_at"]),
+            models.Index(fields=["attributed_to", "status", "-created_at"]),
+            models.Index(fields=["attributed_by", "-created_at"]),
+            models.Index(fields=["liquor_sale_id"]),
+        ]
+    
+    def __str__(self):
+        return f"Attribution #{self.pk}: Sale {self.liquor_sale_id} → {self.attributed_to.username} ({self.status})"
+    
+    def mark_reconciled(self, user):
+        """Mark this attribution as reconciled"""
+        self.status = self.STATUS_RECONCILED
+        self.reconciled_by = user
+        self.reconciled_at = timezone.now()
+        self.save(update_fields=["status", "reconciled_by", "reconciled_at", "updated_at"])
+    
+    def mark_pending(self):
+        """Mark this attribution as pending"""
+        self.status = self.STATUS_PENDING
+        self.reconciled_by = None
+        self.reconciled_at = None
+        self.save(update_fields=["status", "reconciled_by", "reconciled_at", "updated_at"])
 
 

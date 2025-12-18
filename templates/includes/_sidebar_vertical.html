@@ -153,26 +153,14 @@
   </ul>
   {% endif %}
 
-  {# ================= SHARED: WALLET & FINANCE ================= #}
+  {# ================= SHARED: FINANCE ================= #}
   <div class="menu-group">FINANCE</div>
   <ul class="navlist">
-    <li>
-      <a class="navlink" href="{{ url_wallet_agent|default:url_wallet_root|default:'/wallet/' }}">
-        <i class="bi bi-wallet2"></i> Wallet
-      </a>
-    </li>
     <li>
       <a class="navlink" href="{% url 'reports:home' %}">
         <i class="bi bi-graph-up-arrow"></i> Reports
       </a>
     </li>
-    {% if request.user.is_staff or request.user|is_manager %}
-    <li>
-      <a class="navlink" href="{{ url_wallet_admin|default:'/wallet/admin/' }}">
-        <i class="bi bi-wallet"></i> Admin Wallet
-      </a>
-    </li>
-    {% endif %}
   </ul>
 
   {# ================= TEAM MANAGEMENT (Managers only) ================= #}
@@ -188,14 +176,8 @@
   </ul>
   {% endif %}
 
-  {# ================= SIMULATOR (Feature flag) ================= #}
-  {% if FEATURES.SIMULATOR %}
-  <div class="menu-group">SIMULATOR</div>
-  <ul class="navlist">
-    <li><a class="navlink" href="{{ url_simulator|default:'/simulator/' }}"><i class="bi bi-graph-up"></i> Scenarios</a></li>
-    {% if url_simulator_new %}<li><a class="navlink" href="{{ url_simulator_new }}"><i class="bi bi-magic"></i> New Simulation</a></li>{% endif %}
-  </ul>
-  {% endif %}
+  {# ================= MORE FEATURES (Collapsible) ================= #}
+  {% include "partials/sidebar_more_features.html" %}
 
   {# ================= ADMIN (Staff/Managers) ================= #}
   {% if request.user.is_staff or request.user|is_manager %}

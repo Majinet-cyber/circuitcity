@@ -143,11 +143,7 @@
         margin-bottom: 16px;
         opacity: 0.5;
     }
-    .chart-container {
-        position: relative;
-        height: 300px;
-        margin-bottom: 24px;
-    }
+    /* Chart containers now use .cc-chart-container from mobile-system.css */
     .quick-actions {
         display: flex;
         gap: 12px;
@@ -287,7 +283,7 @@
         <!-- Chart Placeholder -->
         <div class="content-card">
             <div class="section-title">📈 Sales Trend (Last 30 Days)</div>
-            <div class="chart-container">
+            <div class="cc-chart-container" style="height:300px">
                 <canvas id="salesTrendChart"></canvas>
             </div>
         </div>
@@ -329,7 +325,7 @@
         <div class="content-card">
             <div class="section-title">💰 Payment History</div>
             {% if invoices %}
-                <div class="table-responsive">
+                <div class="cc-table-scroll">
                     <table class="data-table">
                         <thead>
                             <tr>
@@ -363,7 +359,7 @@
         {% if subscription_history %}
         <div class="content-card">
             <div class="section-title">📜 Subscription Change History</div>
-            <div class="table-responsive">
+            <div class="cc-table-scroll">
                 <table class="data-table">
                     <thead>
                         <tr>
@@ -393,7 +389,7 @@
         <div class="content-card">
             <div class="section-title">👥 Team Members</div>
             {% if users_with_sec %}
-                <div class="table-responsive">
+                <div class="cc-table-scroll">
                     <table class="data-table">
                         <thead>
                             <tr>
@@ -441,7 +437,7 @@
         <div class="content-card">
             <div class="section-title">📦 Recent Stock Items</div>
             {% if stock_items %}
-                <div class="table-responsive">
+                <div class="cc-table-scroll">
                     <table class="data-table">
                         <thead>
                             <tr>
@@ -494,7 +490,7 @@
             <div class="col-md-6 mb-3">
                 <div class="content-card">
                     <h5 class="section-title">📊 Transaction Types</h5>
-                    <div class="chart-container">
+                    <div class="cc-chart-container" style="height:300px">
                         <canvas id="transactionTypesChart"></canvas>
                     </div>
                 </div>
@@ -502,7 +498,7 @@
             <div class="col-md-6 mb-3">
                 <div class="content-card">
                     <h5 class="section-title">💵 Sale Amounts Distribution</h5>
-                    <div class="chart-container">
+                    <div class="cc-chart-container" style="height:300px">
                         <canvas id="saleDistributionChart"></canvas>
                     </div>
                 </div>
@@ -512,7 +508,7 @@
         <!-- Tickets Mini Chart -->
         <div class="content-card mb-4">
             <h5 class="section-title">🎫 Tickets Trend (Last 30 Days)</h5>
-            <div class="chart-container" style="height: 200px;">
+            <div class="cc-chart-container" style="height: 200px;">
                 <canvas id="ticketsTrendChart"></canvas>
             </div>
         </div>
@@ -520,7 +516,7 @@
         <div class="content-card">
             <div class="section-title">🛒 Recent Sales</div>
             {% if recent_sales %}
-                <div class="table-responsive">
+                <div class="cc-table-scroll">
                     <table class="data-table">
                         <thead>
                             <tr>
@@ -553,7 +549,7 @@
         <div class="content-card">
             <div class="section-title">💳 Wallet Transactions</div>
             {% if wallet_txns %}
-                <div class="table-responsive">
+                <div class="cc-table-scroll">
                     <table class="data-table">
                         <thead>
                             <tr>
@@ -612,7 +608,7 @@
         <div class="content-card">
             <div class="section-title">🎫 Support Tickets</div>
             {% if tickets %}
-                <div class="table-responsive">
+                <div class="cc-table-scroll">
                     <table class="data-table">
                         <thead>
                             <tr>
@@ -650,7 +646,7 @@
         <div class="content-card">
             <div class="section-title">📝 Audit Trail</div>
             {% if audit_logs %}
-                <div class="table-responsive">
+                <div class="cc-table-scroll">
                     <table class="data-table">
                         <thead>
                             <tr>

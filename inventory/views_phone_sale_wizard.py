@@ -121,6 +121,9 @@ def _clear_wizard_session(request):
         "sale_wizard_imei",
         "sale_wizard_stock_item_id",  # Added for stock lookup flow
         "sale_wizard_selling_price",
+        "sale_wizard_auto_skip_loop",
+        "sale_wizard_auto_skip_loop_model",
+        "sale_wizard_auto_skip_loop_variant",
     ]
     for key in keys_to_clear:
         request.session.pop(key, None)
@@ -139,6 +142,16 @@ def _wizard_step_brand(request, ctx, business):
     
     # Get available brands
     brands = get_brands_for_business(business)
+    
+    # AUTO-SKIP: If only one brand, auto-select it
+    if len(brands) == 1 and not request.session.get("sale_wizard_auto_skip_loop"):
+        request.session["sale_wizard_brand"] = brands[0]["key"]
+        request.session["sale_wizard_step"] = 2
+        request.session["sale_wizard_auto_skip_loop"] = True  # Prevent infinite loops
+        return _redirect_to_step(2)
+    
+    # Clear loop flag if we actually render the page
+    request.session.pop("sale_wizard_auto_skip_loop", None)
     
     ctx.update({
         "step": 1,
@@ -178,6 +191,17 @@ def _wizard_step_model(request, ctx, business):
     # Get models for selected brand
     models = get_models_for_brand(business, brand)
     
+    # AUTO-SKIP: If only one model, auto-select it
+    if len(models) == 1 and not request.session.get("sale_wizard_auto_skip_loop_model"):
+        request.session["sale_wizard_model"] = models[0]["model_name"]
+        request.session["sale_wizard_product_id"] = str(models[0]["id"])
+        request.session["sale_wizard_step"] = 3
+        request.session["sale_wizard_auto_skip_loop_model"] = True
+        return _redirect_to_step(3)
+    
+    # Clear loop flag
+    request.session.pop("sale_wizard_auto_skip_loop_model", None)
+    
     # Group by model_name for display
     models_grouped = {}
     for model in models:
@@ -185,6 +209,14 @@ def _wizard_step_model(request, ctx, business):
         if model_name not in models_grouped:
             models_grouped[model_name] = []
         models_grouped[model_name].append(model)
+    
+    # AUTO-SKIP: If all models are the same (only one model_name), skip to variant
+    if len(models_grouped) == 1 and not request.session.get("sale_wizard_auto_skip_loop_model"):
+        model_name = list(models_grouped.keys())[0]
+        request.session["sale_wizard_model"] = model_name
+        request.session["sale_wizard_step"] = 3
+        request.session["sale_wizard_auto_skip_loop_model"] = True
+        return _redirect_to_step(3)
     
     ctx.update({
         "step": 2,
@@ -229,6 +261,17 @@ def _wizard_step_variant(request, ctx, business):
     else:
         models = get_models_for_brand(business, brand)
         variants = [m for m in models if m["model_name"] == model]
+    
+    # AUTO-SKIP: If only one variant, auto-select it
+    if len(variants) == 1 and not request.session.get("sale_wizard_auto_skip_loop_variant"):
+        request.session["sale_wizard_variant"] = variants[0]["variant_label"]
+        request.session["sale_wizard_product_id"] = str(variants[0]["id"])
+        request.session["sale_wizard_step"] = 4
+        request.session["sale_wizard_auto_skip_loop_variant"] = True
+        return _redirect_to_step(4)
+    
+    # Clear loop flag
+    request.session.pop("sale_wizard_auto_skip_loop_variant", None)
     
     ctx.update({
         "step": 3,

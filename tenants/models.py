@@ -492,6 +492,11 @@ class AgentInvite(BaseTenantModel):
         ("JOINED", "Joined"),   # treated as "Accepted" in UI
         ("EXPIRED", "Expired"),
     ]
+    
+    ROLE_CHOICES = [
+        ("AGENT", "Sales Agent"),
+        ("BAR_MANAGER", "Bar Manager"),  # Liquor-specific: team lead / supervisor
+    ]
 
     created_at = models.DateTimeField(default=timezone.now, db_index=True)
     created_by = models.ForeignKey(
@@ -519,6 +524,15 @@ class AgentInvite(BaseTenantModel):
 
     token = models.CharField(max_length=140, unique=True, db_index=True)
     status = models.CharField(max_length=10, choices=STATUS_CHOICES, default="PENDING", db_index=True)
+    
+    # Role for the invite (default: AGENT for backward compatibility)
+    role = models.CharField(
+        max_length=20,
+        choices=ROLE_CHOICES,
+        default="AGENT",
+        db_index=True,
+        help_text="Role the user will receive upon accepting this invite"
+    )
 
     joined_user = models.ForeignKey(
         User,

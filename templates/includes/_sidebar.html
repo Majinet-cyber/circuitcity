@@ -48,12 +48,6 @@
   <div class="menu-group">BUSINESS</div>
   <ul class="navlist">
     {% if url_sales %}<li><a class="navlink" href="{{ url_sales }}"><i class="bi bi-receipt"></i> Sales</a></li>{% endif %}
-    {# Agent wallet (or generic wallet) #}
-    <li>
-      <a class="navlink" href="{{ url_wallet_agent|default:url_wallet_root|default:'/wallet/' }}">
-        <i class="bi bi-wallet2"></i> Wallet
-      </a>
-    </li>
     <li><a class="navlink" href="{% url 'reports:home' %}"><i class="bi bi-graph-up-arrow"></i> Reports</a></li>
   </ul>
 
@@ -73,13 +67,8 @@
     {% endif %}
   </ul>
 
-  {% if FEATURES.SIMULATOR %}
-  <div class="menu-group">SIMULATOR</div>
-  <ul class="navlist">
-    <li><a class="navlink" href="{{ url_simulator|default:'/simulator/' }}"><i class="bi bi-graph-up"></i> Scenarios</a></li>
-    {% if url_simulator_new %}<li><a class="navlink" href="{{ url_simulator_new }}"><i class="bi bi-magic"></i> New Simulation</a></li>{% endif %}
-  </ul>
-  {% endif %}
+  {# ================= MORE FEATURES (Collapsible) ================= #}
+  {% include "partials/sidebar_more_features.html" %}
 
   <!-- ADMIN -->
   <div class="menu-group">ADMIN</div>

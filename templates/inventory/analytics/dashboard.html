@@ -187,6 +187,32 @@
       {% endif %}
     </div>
 
+    <!-- Stock Overview Panel (Cross-Vertical) -->
+    {% if vertical != 'gym' %}
+    <div class="glass-card mb-4">
+      <div style="padding: 20px;">
+        <h3 style="margin: 0 0 16px; font-size: 1.25rem; font-weight: 700; color: #0f172a;">📦 Stock Overview</h3>
+        <div style="position: relative; height: 300px; margin-bottom: 16px;">
+          <canvas id="stockOverviewChart"></canvas>
+        </div>
+        <div id="stockOverviewEmpty" style="display: none; text-align: center; padding: 40px 20px; color: #64748b;">
+          <p style="margin: 0;">No stock data available yet.</p>
+        </div>
+        <!-- Summary Chips -->
+        <div id="stockOverviewSummary" style="display: flex; gap: 12px; flex-wrap: wrap; justify-content: center;">
+          <div class="stock-chip" style="background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 8px; padding: 8px 16px; display: flex; align-items: center; gap: 8px;">
+            <span style="font-size: 0.875rem; color: #1e40af; font-weight: 600;">Total Units:</span>
+            <span id="stockTotalUnits" style="font-size: 1rem; font-weight: 700; color: #1e3a8a;">-</span>
+          </div>
+          <div class="stock-chip" style="background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 8px; padding: 8px 16px; display: flex; align-items: center; gap: 8px;">
+            <span style="font-size: 0.875rem; color: #15803d; font-weight: 600;">Most Stocked:</span>
+            <span id="stockMostStocked" style="font-size: 1rem; font-weight: 700; color: #14532d;">-</span>
+          </div>
+        </div>
+      </div>
+    </div>
+    {% endif %}
+
     <!-- Charts Row -->
     <div class="charts-grid mb-4">
       <!-- Sales Trend Chart (Daily) -->
@@ -724,6 +750,112 @@
       }
     });
   }
+  {% endif %}
+  
+  // Stock Overview Chart (Cross-Vertical)
+  {% if vertical != 'gym' %}
+  (function() {
+    const stockCanvas = document.getElementById('stockOverviewChart');
+    const stockEmpty = document.getElementById('stockOverviewEmpty');
+    const stockSummary = document.getElementById('stockOverviewSummary');
+    const stockTotalUnits = document.getElementById('stockTotalUnits');
+    const stockMostStocked = document.getElementById('stockMostStocked');
+    
+    if (!stockCanvas) return;
+    
+    // Fetch stock overview data from API
+    const location = '{{ selected_location.id|default:"" }}';
+    const apiUrl = '/app/analytics/stock-overview-cross-vertical.json' + (location ? '?location=' + location : '');
+    
+    fetch(apiUrl)
+      .then(response => response.json())
+      .then(data => {
+        if (!data.ok || !data.labels || data.labels.length === 0) {
+          // No stock data - show empty state
+          if (stockCanvas) stockCanvas.style.display = 'none';
+          if (stockEmpty) stockEmpty.style.display = 'block';
+          if (stockSummary) stockSummary.style.display = 'none';
+          return;
+        }
+        
+        // Update summary chips
+        if (stockTotalUnits) stockTotalUnits.textContent = data.total_units.toLocaleString();
+        if (stockMostStocked) stockMostStocked.textContent = data.most_stocked_vertical;
+        
+        // Render bar chart
+        const colors = [
+          '#2563eb', // Blue for Phones
+          '#f59e0b', // Amber for Liquor
+          '#10b981', // Green for Pharmacy
+          '#8b5cf6', // Purple for Clothing
+        ];
+        
+        new Chart(stockCanvas, {
+          type: 'bar',
+          data: {
+            labels: data.labels,
+            datasets: [{
+              label: 'Units in Stock',
+              data: data.values,
+              backgroundColor: colors.slice(0, data.labels.length),
+              borderRadius: 8,
+              borderSkipped: false,
+            }]
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+              legend: {
+                display: false,
+              },
+              tooltip: {
+                backgroundColor: 'rgba(15, 23, 42, 0.9)',
+                padding: 12,
+                borderRadius: 8,
+                callbacks: {
+                  label: function(context) {
+                    return ' ' + context.parsed.y.toLocaleString() + ' units';
+                  }
+                }
+              }
+            },
+            scales: {
+              y: {
+                beginAtZero: true,
+                ticks: {
+                  callback: function(value) {
+                    if (value >= 1000) return (value / 1000).toFixed(1) + 'K';
+                    return value;
+                  }
+                },
+                grid: {
+                  color: 'rgba(0, 0, 0, 0.05)'
+                }
+              },
+              x: {
+                grid: {
+                  display: false
+                }
+              }
+            },
+            animation: {
+              duration: 750,
+              easing: 'easeInOutQuart'
+            }
+          }
+        });
+      })
+      .catch(error => {
+        console.error('Error loading stock overview:', error);
+        if (stockCanvas) stockCanvas.style.display = 'none';
+        if (stockEmpty) {
+          stockEmpty.style.display = 'block';
+          stockEmpty.innerHTML = '<p style="margin: 0; color: #ef4444;">Error loading stock data. Please refresh the page.</p>';
+        }
+        if (stockSummary) stockSummary.style.display = 'none';
+      });
+  })();
   {% endif %}
 </script>
 {% endblock %}

@@ -90,10 +90,8 @@ def _step1_imei(request, business, wizard_data):
             messages.error(request, "IMEI must be exactly 15 digits.")
         else:
             # Search for stock item
-            # Agent visibility: respect assigned_agent filtering
-            from inventory.views import _is_manager_or_admin
-            from django.db.models import Q
-            
+            # AGENTS CAN SELL ANY UNSOLD PHONE IN BUSINESS INVENTORY
+            # No longer filter by assigned_agent - allow agents to sell any business stock
             qs = InventoryItem.objects.filter(
                 business=business,
                 imei=imei,
@@ -101,11 +99,8 @@ def _step1_imei(request, business, wizard_data):
                 is_active=True
             ).select_related('product', 'current_location')
             
-            # Apply agent visibility filtering
-            if not _is_manager_or_admin(request.user):
-                qs = qs.filter(
-                    Q(assigned_agent=request.user) | Q(assigned_agent__isnull=True)
-                )
+            # No agent filtering - any agent can sell any unsold phone
+            # This allows better inventory utilization and flexibility
             
             stock_item = qs.first()
             
@@ -250,6 +245,7 @@ def _complete_sale(request, business, wizard_data, payment_method):
     selling_price = Decimal(str(wizard_data['selling_price']))
     
     # Get stock item (with lock to prevent race conditions)
+    # AGENTS CAN SELL ANY UNSOLD PHONE IN BUSINESS
     stock_item = InventoryItem.objects.select_for_update().get(
         id=stock_id,
         business=business
@@ -274,10 +270,10 @@ def _complete_sale(request, business, wizard_data, payment_method):
     commission_config = CommissionConfig.get_active(business)
     commission_pct = commission_config.base_commission_pct if commission_config else Decimal('10.00')
     
-    # Create Sale record
+    # Create Sale record (agent is who sold it, regardless of who it was assigned to)
     sale = Sale.objects.create(
         item=stock_item,
-        agent=request.user,
+        agent=request.user,  # Selling agent
         location=location,
         sold_at=timezone.localdate(),
         price=selling_price,
@@ -285,12 +281,13 @@ def _complete_sale(request, business, wizard_data, payment_method):
         payment_method=payment_method
     )
     
-    # Mark stock as SOLD
+    # Mark stock as SOLD and track who sold it
     stock_item.status = 'SOLD'
     stock_item.sold_at = timezone.now()
     stock_item.selling_price = selling_price
     stock_item.payment_method = payment_method
-    stock_item.save(update_fields=['status', 'sold_at', 'selling_price', 'payment_method'])
+    stock_item.sold_by = request.user  # Track selling agent for commission
+    stock_item.save(update_fields=['status', 'sold_at', 'selling_price', 'payment_method', 'sold_by'])
     
     # Commission is automatically created by the post_save signal on Sale
     # (see wallet/signals.py: create_commission_on_phone_sale)

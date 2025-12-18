@@ -1,0 +1,124 @@
+{% load static %}
+{% load roles %}
+
+{# ========================================
+   SIDEBAR "MORE FEATURES" COLLAPSIBLE
+   ======================================== #}
+{# Reusable partial for "More Features" submenu across all verticals #}
+{# Groups: My Wallet, Admin Wallet, Data Backup, Simulator, Layby, Time Logs #}
+
+{# Capture URLs safely #}
+{% url 'wallet:agent_wallet' as url_wallet_agent %}
+{% url 'wallet:admin_dashboard' as url_wallet_admin %}
+{% url 'wallet:wallet' as url_wallet_root %}
+{% url 'backups:manager_list' as url_backups %}
+{% url 'simulator:home' as url_simulator %}
+{% url 'layby:admin_dashboard' as url_layby_admin %}
+{% url 'layby:agent_dashboard' as url_layby_agent %}
+{% url 'inventory:time_logs' as url_time_logs %}
+
+{# Determine which items to show based on context #}
+{% with business_kind=request.business.business_kind|default:"phones" %}
+
+<div class="menu-group more-features-group">
+  <div class="more-features-toggle" id="moreFeaturesToggle" role="button" tabindex="0" aria-expanded="false" aria-controls="moreFeaturesSubmenu">
+    <i class="bi bi-grid-3x3-gap"></i>
+    <span>More Features</span>
+    <i class="bi bi-chevron-down toggle-icon"></i>
+  </div>
+</div>
+
+<ul class="navlist more-features-submenu" id="moreFeaturesSubmenu" style="display:none;">
+  {# My Wallet - Always show for authenticated users #}
+  {% if request.user.is_authenticated %}
+  <li>
+    <a class="navlink submenu-item" href="{{ url_wallet_agent|default:url_wallet_root|default:'/wallet/' }}">
+      <i class="bi bi-wallet2"></i> My Wallet
+    </a>
+  </li>
+  {% endif %}
+  
+  {# Admin Wallet - Staff/Managers only #}
+  {% if request.user.is_staff or request.user|is_manager %}
+  <li>
+    <a class="navlink submenu-item" href="{{ url_wallet_admin|default:'/wallet/admin/' }}">
+      <i class="bi bi-wallet"></i> Admin Wallet
+    </a>
+  </li>
+  {% endif %}
+  
+  {# Data Backup - Managers only #}
+  {% if request.user.is_staff or request.user|is_manager %}
+  <li>
+    <a class="navlink submenu-item" href="{{ url_backups|default:'/backups/manager/' }}">
+      <i class="bi bi-cloud-download"></i> Data Backup
+    </a>
+  </li>
+  {% endif %}
+  
+  {# Simulator - Feature flag #}
+  {% if FEATURES.SIMULATOR %}
+  <li>
+    <a class="navlink submenu-item" href="{{ url_simulator|default:'/simulator/' }}">
+      <i class="bi bi-graph-up"></i> Simulator
+    </a>
+  </li>
+  {% endif %}
+  
+  {# Layby - Show for all authenticated users #}
+  {% if request.user.is_authenticated %}
+  <li>
+    {% if request.user.is_staff or request.user|is_manager %}
+      <a class="navlink submenu-item" href="{{ url_layby_admin|default:'/layby/admin/' }}">
+        <i class="bi bi-bag-check"></i> Layby
+      </a>
+    {% else %}
+      <a class="navlink submenu-item" href="{{ url_layby_agent|default:'/layby/agent/' }}">
+        <i class="bi bi-bag-check"></i> Layby
+      </a>
+    {% endif %}
+  </li>
+  {% endif %}
+  
+  {# Time Logs - Show for all authenticated users #}
+  {% if request.user.is_authenticated %}
+  <li>
+    <a class="navlink submenu-item" href="{{ url_time_logs|default:'/inventory/time/logs/' }}">
+      <i class="bi bi-clock-history"></i> Time Logs
+    </a>
+  </li>
+  {% endif %}
+</ul>
+
+{% endwith %}
+
+<script>
+// Toggle More Features submenu
+(function() {
+  const toggle = document.getElementById('moreFeaturesToggle');
+  const submenu = document.getElementById('moreFeaturesSubmenu');
+  
+  if (toggle && submenu) {
+    toggle.addEventListener('click', function() {
+      const isExpanded = this.getAttribute('aria-expanded') === 'true';
+      this.setAttribute('aria-expanded', !isExpanded);
+      submenu.style.display = isExpanded ? 'none' : 'block';
+      
+      const icon = this.querySelector('.toggle-icon');
+      if (icon) {
+        icon.classList.toggle('bi-chevron-down');
+        icon.classList.toggle('bi-chevron-up');
+      }
+    });
+    
+    // Allow keyboard navigation
+    toggle.addEventListener('keypress', function(e) {
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        this.click();
+      }
+    });
+  }
+})();
+</script>
+

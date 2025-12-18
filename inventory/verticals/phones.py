@@ -836,6 +836,25 @@ def sales_trend_json(request):
 @login_required
 @require_business
 @require_business_kind(BusinessKind.PHONES)
+def fast_sell(request):
+    """
+    Fast Sell page for phones vertical.
+    
+    Renders the universal Fast Sell template with phones-specific context.
+    Uses barcode scanning and manual entry for quick sales.
+    """
+    ctx = base.base_context(request)
+    ctx.update({
+        "vertical": "phones",
+        "vertical_name": "Phones & Electronics",
+        "page_title": "Fast Sell · Phones",
+    })
+    return render(request, "verticals/phones/fast_sell.html", ctx)
+
+
+@login_required
+@require_business
+@require_business_kind(BusinessKind.PHONES)
 def reports(request):
     """
     Phones Reports page - safe empty state implementation.

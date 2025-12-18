@@ -137,6 +137,7 @@
     align-items:center;
     box-shadow:0 2px 8px rgba(2,6,23,.04);
     margin-bottom:16px;
+    min-width:0;
   }
   .field > label{
     position:absolute;
@@ -208,6 +209,37 @@
     background:linear-gradient(135deg,var(--cc-accent-600),#047857);
   }
 
+  /* ===== IMEI Scan Button (Below Input) ===== */
+  .btn-scan-below{
+    appearance:none;
+    background:var(--cc-accent);
+    color:#fff;
+    border:none;
+    border-radius:10px;
+    padding:12px 18px;
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+    gap:8px;
+    cursor:pointer;
+    transition:all 0.2s ease;
+    font-size:15px;
+    font-weight:600;
+    min-height:44px;
+    touch-action:manipulation;
+  }
+  .btn-scan-below:hover{
+    background:var(--cc-accent-600);
+    transform:translateY(-2px);
+    box-shadow:0 4px 12px rgba(16,185,129,.25);
+  }
+  .btn-scan-below:active{
+    transform:translateY(0);
+  }
+  @media (max-width:430px){
+    .btn-scan-below{font-size:14px;padding:10px 16px;}
+  }
+
   /* ===== Mobile Responsive ===== */
   @media (max-width:640px){
     .brand-cards{
@@ -220,6 +252,8 @@
     }
   }
 </style>
+
+<link rel="stylesheet" href="{% static 'css/imei-scanner-modal.css' %}?v={{ BUILD_ID|default:STATIC_VERSION|default:'1' }}">
 {% endblock %}
 
 {% block content %}
@@ -265,11 +299,16 @@
       💸 Sell <span id="selected-brand-name"></span> Phone
     </h3>
 
-    <div class="field">
+    <div class="field" style="min-width:0;">
       <label>IMEI (15 digits)</label>
       <input type="text" name="imei" id="imei-input" maxlength="15" pattern="\d{15}" placeholder="Enter 15-digit IMEI" inputmode="numeric" required>
     </div>
-    <div class="imei-counter" id="imei-counter" style="font-size:11px;color:#64748b;margin-top:-8px;margin-bottom:16px;font-weight:600;">0 / 15 digits</div>
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-top:-8px;margin-bottom:16px;gap:12px;flex-wrap:wrap;">
+      <button type="button" class="btn-scan-below" data-imei-scan-trigger="imei-input" title="Scan IMEI with camera">
+        <i class="bi bi-upc-scan"></i> Scan IMEI
+      </button>
+      <div class="imei-counter" id="imei-counter" style="font-size:11px;color:#64748b;font-weight:600;margin:0;">0 / 15 digits</div>
+    </div>
 
     <div class="row">
       <div class="field">
@@ -358,5 +397,7 @@
     }
   });
 </script>
+
+<script src="{% static 'js/phones-imei-scanner.js' %}?v={{ BUILD_ID|default:STATIC_VERSION|default:'1' %}" defer></script>
 {% endblock %}
 

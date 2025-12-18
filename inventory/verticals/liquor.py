@@ -415,10 +415,67 @@ def dashboard(request):
         for item in payment_mix_data
     ])
     
+    # ========== NEW: Barman Attribution Alerts ==========
+    # For agents: show count of pending attributions assigned to them
+    # For managers/barmen: show count of all pending attributions
+    from sales.models import LiquorSaleAttribution
+    from core.context import _extract_roles_for
+    
+    roles = _extract_roles_for(request.user, business)
+    is_barman = request.user.groups.filter(name=f"biz:{business.pk}:LIQUOR_BARMAN").exists()
+    
+    pending_attributions_count = 0
+    reconciled_today_count = 0
+    attributed_sales_total = Decimal("0.00")
+    
+    if roles.is_agent and not roles.is_manager:
+        # Agent view: Show attributions assigned to them
+        agent_attributions = LiquorSaleAttribution.objects.filter(
+            business=business,
+            attributed_to=request.user
+        )
+        
+        pending_attributions_count = agent_attributions.filter(
+            status=LiquorSaleAttribution.STATUS_PENDING
+        ).count()
+        
+        reconciled_today_count = agent_attributions.filter(
+            status=LiquorSaleAttribution.STATUS_RECONCILED,
+            reconciled_at__gte=today_start
+        ).count()
+        
+        attributed_sales_total = agent_attributions.filter(
+            created_at__gte=start_date,
+            created_at__lt=end_date
+        ).aggregate(total=Sum("sale_amount"))["total"] or Decimal("0.00")
+    
+    elif roles.is_manager or is_barman:
+        # Manager/Barman view: Show all pending attributions
+        all_attributions = LiquorSaleAttribution.objects.filter(business=business)
+        
+        pending_attributions_count = all_attributions.filter(
+            status=LiquorSaleAttribution.STATUS_PENDING
+        ).count()
+        
+        reconciled_today_count = all_attributions.filter(
+            status=LiquorSaleAttribution.STATUS_RECONCILED,
+            reconciled_at__gte=today_start
+        ).count()
+    
+    # Check if agent records are balanced (no pending attributions)
+    records_balanced = (pending_attributions_count == 0)
+    
     ctx.update(
         {
             "hero_title": "Liquor & Bar",
             "hero_blurb": "Monitor bottle counts, shot packs, and wallet balances in one place.",
+            
+            # Barman Attribution Alerts
+            "pending_attributions_count": pending_attributions_count,
+            "reconciled_today_count": reconciled_today_count,
+            "records_balanced": records_balanced,
+            "attributed_sales_total": attributed_sales_total,
+            "is_barman": is_barman,
             
             # Basic product metrics
             "product_count": metrics["total"],
@@ -682,6 +739,344 @@ def sales_export_csv(request):
         ])
     
     return response
+
+
+@login_required
+@require_business
+@require_business_kind(BusinessKind.LIQUOR)
+def fast_sell(request):
+    """
+    Fast Sell page for liquor - barcode scanner + instant sell.
+    Uses front camera for barcode scanning with BarcodeDetector API fallback.
+    
+    BARMAN SUPPORT: If user is a barman, they can assign sales to agents.
+    """
+    from django.http import JsonResponse
+    from django.contrib.auth import get_user_model
+    from core.context import _extract_roles_for
+    
+    ctx = base.base_context(request)
+    business = ctx.get("business")
+    
+    # Check if user is barman
+    User = get_user_model()
+    is_barman = request.user.groups.filter(name=f"biz:{business.pk}:LIQUOR_BARMAN").exists()
+    
+    # Get list of liquor agents (for barman to assign sales)
+    liquor_agents = []
+    if is_barman:
+        # Get all users who have AGENT role for this business
+        agent_group_name = f"biz:{business.pk}:AGENT"
+        liquor_agents = User.objects.filter(
+            groups__name=agent_group_name
+        ).values("id", "first_name", "last_name", "username").distinct()
+    
+    ctx.update({
+        "page_title": "Fast Sell",
+        "vertical": "liquor",
+        "vertical_name": "Liquor",
+        "is_barman": is_barman,
+        "liquor_agents": list(liquor_agents),
+    })
+    
+    return render(request, "verticals/liquor/fast_sell.html", ctx)
+
+
+@login_required
+@require_business
+@require_business_kind(BusinessKind.LIQUOR)
+def barman_invite(request):
+    """
+    Invite a new barman to the liquor business.
+    Manager-only feature.
+    """
+    from django.contrib import messages
+    from django.shortcuts import redirect
+    from django.contrib.auth import get_user_model
+    from django import forms
+    from tenants.utils_people import attach_user_to_business
+    from core.context import _extract_roles_for
+    
+    ctx = base.base_context(request)
+    business = ctx.get("business")
+    
+    # Check if user is manager
+    roles = _extract_roles_for(request.user, business)
+    if not roles.is_manager:
+        messages.error(request, "Only managers can invite barmen")
+        return redirect("verticals:liquor_dashboard")
+    
+    class BarmanInviteForm(forms.Form):
+        username = forms.CharField(max_length=150, help_text="Unique username for login")
+        email = forms.EmailField(required=False)
+        first_name = forms.CharField(max_length=150, required=False)
+        last_name = forms.CharField(max_length=150, required=False)
+        password = forms.CharField(widget=forms.PasswordInput, min_length=6)
+    
+    if request.method == "POST":
+        form = BarmanInviteForm(request.POST)
+        if form.is_valid():
+            data = form.cleaned_data
+            User = get_user_model()
+            
+            # Check if username already exists
+            if User.objects.filter(username=data["username"]).exists():
+                messages.error(request, f"Username '{data['username']}' already exists")
+            else:
+                try:
+                    # Create user
+                    user = User.objects.create_user(
+                        username=data["username"],
+                        email=data.get("email", ""),
+                        password=data["password"],
+                        first_name=data.get("first_name", ""),
+                        last_name=data.get("last_name", ""),
+                    )
+                    
+                    # Attach to business with LIQUOR_BARMAN role
+                    attach_user_to_business(user, business, "LIQUOR_BARMAN")
+                    
+                    messages.success(request, f"Barman '{user.username}' invited successfully!")
+                    return redirect("verticals:liquor_dashboard")
+                except Exception as e:
+                    messages.error(request, f"Failed to create barman: {e}")
+        else:
+            messages.error(request, "Please correct the errors below")
+    else:
+        form = BarmanInviteForm()
+    
+    ctx.update({
+        "page_title": "Invite Barman",
+        "form": form,
+    })
+    
+    return render(request, "verticals/liquor/barman_invite.html", ctx)
+
+
+@login_required
+@require_business
+@require_business_kind(BusinessKind.LIQUOR)
+def barman_reconciliation(request):
+    """
+    Barman/Manager reconciliation screen.
+    Shows sales attributed to agents and allows marking them as reconciled.
+    """
+    from django.contrib import messages
+    from sales.models import LiquorSaleAttribution
+    from django.db.models import Sum, Count
+    from core.context import _extract_roles_for
+    
+    ctx = base.base_context(request)
+    business = ctx.get("business")
+    
+    # Check if user is barman or manager
+    roles = _extract_roles_for(request.user, business)
+    is_barman = request.user.groups.filter(name=f"biz:{business.pk}:LIQUOR_BARMAN").exists()
+    
+    if not (roles.is_manager or is_barman):
+        messages.error(request, "Access denied")
+        return redirect("verticals:liquor_dashboard")
+    
+    # Get filter parameters
+    date_filter = request.GET.get("date", "today")
+    status_filter = request.GET.get("status", "all")
+    
+    # Base queryset
+    attributions_qs = LiquorSaleAttribution.objects.filter(business=business).select_related(
+        "attributed_to", "attributed_by", "reconciled_by"
+    )
+    
+    # Apply filters
+    now = timezone.now()
+    today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+    
+    if date_filter == "today":
+        attributions_qs = attributions_qs.filter(created_at__gte=today_start)
+    elif date_filter == "week":
+        week_start = today_start - timedelta(days=7)
+        attributions_qs = attributions_qs.filter(created_at__gte=week_start)
+    elif date_filter == "month":
+        month_start = today_start.replace(day=1)
+        attributions_qs = attributions_qs.filter(created_at__gte=month_start)
+    
+    if status_filter == "pending":
+        attributions_qs = attributions_qs.filter(status=LiquorSaleAttribution.STATUS_PENDING)
+    elif status_filter == "reconciled":
+        attributions_qs = attributions_qs.filter(status=LiquorSaleAttribution.STATUS_RECONCILED)
+    
+    # Group by agent
+    agent_summaries = attributions_qs.values("attributed_to__id", "attributed_to__first_name", "attributed_to__last_name", "attributed_to__username").annotate(
+        total_sales=Count("id"),
+        total_amount=Sum("sale_amount"),
+        pending_count=Count("id", filter=Q(status=LiquorSaleAttribution.STATUS_PENDING)),
+        reconciled_count=Count("id", filter=Q(status=LiquorSaleAttribution.STATUS_RECONCILED)),
+    ).order_by("-total_amount")
+    
+    # Get detailed attributions for display
+    attributions = attributions_qs.order_by("-created_at")[:100]
+    
+    ctx.update({
+        "page_title": "Barman Reconciliation",
+        "agent_summaries": agent_summaries,
+        "attributions": attributions,
+        "date_filter": date_filter,
+        "status_filter": status_filter,
+        "is_barman": is_barman,
+    })
+    
+    return render(request, "verticals/liquor/barman_reconciliation.html", ctx)
+
+
+# Fast Sell API endpoints
+@login_required
+@require_business
+@require_business_kind(BusinessKind.LIQUOR)
+def fast_sell_lookup_api(request):
+    """API: Look up product by barcode"""
+    from django.http import JsonResponse
+    from inventory.services.fast_sell import lookup_product_by_barcode
+    
+    business = base.base_context(request).get("business")
+    barcode = request.GET.get("barcode", "").strip()
+    
+    if not barcode:
+        return JsonResponse({"ok": False, "error": "Barcode required"}, status=400)
+    
+    result = lookup_product_by_barcode(
+        business=business,
+        vertical="liquor",
+        barcode=barcode
+    )
+    
+    return JsonResponse(result)
+
+
+@login_required
+@require_business
+@require_business_kind(BusinessKind.LIQUOR)
+def fast_sell_create_api(request):
+    """API: Create a fast sale (with optional agent attribution for barman)"""
+    from django.http import JsonResponse
+    from inventory.services.fast_sell import create_fast_sell
+    import json
+    
+    if request.method != "POST":
+        return JsonResponse({"ok": False, "error": "POST required"}, status=405)
+    
+    business = base.base_context(request).get("business")
+    
+    try:
+        data = json.loads(request.body)
+    except json.JSONDecodeError:
+        return JsonResponse({"ok": False, "error": "Invalid JSON"}, status=400)
+    
+    barcode = data.get("barcode", "").strip()
+    quantity = int(data.get("quantity", 1))
+    payment_method = data.get("payment_method", "cash")
+    selling_price_str = data.get("selling_price")
+    attributed_to_agent_id = data.get("attributed_to_agent_id")  # For barman attribution
+    
+    selling_price = None
+    if selling_price_str:
+        try:
+            selling_price = Decimal(str(selling_price_str))
+        except:
+            return JsonResponse({"ok": False, "error": "Invalid price"}, status=400)
+    
+    result = create_fast_sell(
+        business=business,
+        vertical="liquor",
+        user=request.user,
+        barcode=barcode,
+        quantity=quantity,
+        payment_method=payment_method,
+        selling_price=selling_price,
+        attributed_to_agent_id=attributed_to_agent_id,
+    )
+    
+    return JsonResponse(result)
+
+
+@login_required
+@require_business
+@require_business_kind(BusinessKind.LIQUOR)
+def fast_sell_kpis_api(request):
+    """API: Get Fast Sell KPIs"""
+    from django.http import JsonResponse
+    from inventory.services.fast_sell import get_fast_sell_kpis
+    
+    business = base.base_context(request).get("business")
+    date_range = request.GET.get("range", "today")
+    
+    result = get_fast_sell_kpis(
+        business=business,
+        vertical="liquor",
+        date_range=date_range,
+    )
+    
+    return JsonResponse(result)
+
+
+@login_required
+@require_business
+@require_business_kind(BusinessKind.LIQUOR)
+def barman_agents_api(request):
+    """API: Get list of liquor agents (for barman to assign sales)"""
+    from django.http import JsonResponse
+    from django.contrib.auth import get_user_model
+    
+    business = base.base_context(request).get("business")
+    
+    # Get all users who have AGENT role for this business
+    User = get_user_model()
+    agent_group_name = f"biz:{business.pk}:AGENT"
+    agents = User.objects.filter(groups__name=agent_group_name).values(
+        "id", "first_name", "last_name", "username"
+    ).distinct()
+    
+    return JsonResponse({"ok": True, "agents": list(agents)})
+
+
+@login_required
+@require_business
+@require_business_kind(BusinessKind.LIQUOR)
+def barman_reconciliation_toggle_api(request):
+    """API: Toggle reconciliation status of an attribution"""
+    from django.http import JsonResponse
+    from sales.models import LiquorSaleAttribution
+    import json
+    
+    if request.method != "POST":
+        return JsonResponse({"ok": False, "error": "POST required"}, status=405)
+    
+    business = base.base_context(request).get("business")
+    
+    try:
+        data = json.loads(request.body)
+    except json.JSONDecodeError:
+        return JsonResponse({"ok": False, "error": "Invalid JSON"}, status=400)
+    
+    attribution_id = data.get("attribution_id")
+    new_status = data.get("status")  # "pending" or "reconciled"
+    
+    try:
+        attribution = LiquorSaleAttribution.objects.get(
+            id=attribution_id,
+            business=business
+        )
+        
+        if new_status == "reconciled":
+            attribution.mark_reconciled(request.user)
+        elif new_status == "pending":
+            attribution.mark_pending()
+        else:
+            return JsonResponse({"ok": False, "error": "Invalid status"}, status=400)
+        
+        return JsonResponse({"ok": True, "message": "Status updated"})
+    except LiquorSaleAttribution.DoesNotExist:
+        return JsonResponse({"ok": False, "error": "Attribution not found"}, status=404)
+    except Exception as e:
+        return JsonResponse({"ok": False, "error": str(e)}, status=500)
 
 
 @login_required

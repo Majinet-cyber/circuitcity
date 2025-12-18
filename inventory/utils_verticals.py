@@ -240,9 +240,10 @@ def get_vertical_sidebar_items(business_kind: str) -> list[dict]:
     """
     if business_kind == "gym":
         return [
-            # MAIN section - gym-specific operations
+            # MAIN section - gym-specific operations (membership-based, NOT inventory)
             {"section": "MAIN", "key": "dashboard", "url": "verticals:gym_dashboard", "label": "Dashboard", "icon": "bi-speedometer2", "active_prefix": "/verticals/gym/", "active_pattern": "/verticals/gym/", "require_manager": False, "is_menu": False, "is_header": False},
             {"section": "MAIN", "key": "analytics", "url": "app_router:analytics", "label": "Analytics", "icon": "bi-graph-up", "active_prefix": "/app/analytics", "active_pattern": "/app/analytics", "require_manager": False, "is_menu": False, "is_header": False},
+            # Note: Fast Sell removed - gym is membership-based, not product-based
             {"section": "MAIN", "key": "members", "url": "gym:members_list", "label": "Members", "icon": "bi-people", "active_prefix": "/gym/members/", "active_pattern": "/gym/members/", "require_manager": False, "is_menu": False, "is_header": False},
             {"section": "MAIN", "key": "checkin", "url": "gym:checkin_page", "label": "Member Check-ins", "icon": "bi-clipboard-check", "active_prefix": "/gym/checkin", "active_pattern": "/gym/checkin", "require_manager": False, "is_menu": False, "is_header": False},
             
@@ -267,6 +268,7 @@ def get_vertical_sidebar_items(business_kind: str) -> list[dict]:
             # MAIN section
             {"section": "MAIN", "key": "dashboard", "url": "verticals:clothing_dashboard", "label": "Dashboard", "icon": "bi-speedometer2", "active_prefix": "/verticals/clothing/dashboard", "active_pattern": "/verticals/clothing/dashboard", "require_manager": False, "is_menu": False, "is_header": False},
             {"section": "MAIN", "key": "analytics", "url": "app_router:analytics", "label": "Analytics", "icon": "bi-graph-up", "active_prefix": "/app/analytics", "active_pattern": "/app/analytics", "require_manager": False, "is_menu": False, "is_header": False},
+            {"section": "MAIN", "key": "fast_sell", "url": "verticals:clothing_fast_sell", "label": "Fast Sell", "icon": "bi-lightning-charge", "active_prefix": "/verticals/clothing/fast-sell", "active_pattern": "/verticals/clothing/fast-sell", "require_manager": False, "is_menu": False, "is_header": False},
             {"section": "MAIN", "key": "hub", "url": "verticals:clothing_hub", "label": "Clothing Hub", "icon": "bi-person-bounding-box", "active_prefix": "/verticals/clothing/hub", "active_pattern": "/verticals/clothing/hub", "require_manager": False, "is_menu": False, "is_header": False},
             {"section": "MAIN", "key": "add_product", "url": "inventory:clothing_product_new_v2", "label": "Add Product", "icon": "bi-plus-square", "active_prefix": "/clothing/products/new", "active_pattern": "/clothing/products/new", "require_manager": False, "is_menu": False, "is_header": False},
             {"section": "MAIN", "key": "scan_in", "url": "verticals:clothing_scan_in", "label": "Scan IN", "icon": "bi-upc-scan", "active_prefix": "/verticals/clothing/scan-in", "active_pattern": "/verticals/clothing/scan-in", "require_manager": False, "is_menu": False, "is_header": False},
@@ -294,6 +296,7 @@ def get_vertical_sidebar_items(business_kind: str) -> list[dict]:
             # MAIN section
             {"section": "MAIN", "key": "dashboard", "url": "verticals:liquor_dashboard", "label": "Dashboard", "icon": "bi-speedometer2", "active_prefix": "/verticals/liquor/", "active_pattern": "/verticals/liquor/", "require_manager": False, "is_menu": False, "is_header": False},
             {"section": "MAIN", "key": "analytics", "url": "app_router:analytics", "label": "Analytics", "icon": "bi-graph-up", "active_prefix": "/app/analytics", "active_pattern": "/app/analytics", "require_manager": False, "is_menu": False, "is_header": False},
+            # Note: Fast Sell removed - liquor uses dedicated sell flow with barman attribution
             {"section": "MAIN", "key": "hub", "url": "liquor:inventory_dashboard", "label": "Liquor Hub", "icon": "bi-cup-straw", "active_prefix": "/liquor/inventory/", "active_pattern": "/liquor/inventory/", "require_manager": False, "is_menu": False, "is_header": False},
             {"section": "MAIN", "key": "stock", "url": "liquor:stock_overview", "label": "Stock", "icon": "bi-box-seam", "active_prefix": "/liquor/stock/", "active_pattern": "/liquor/stock/", "require_manager": False, "is_menu": False, "is_header": False},
             {"section": "MAIN", "key": "add_product", "url": "inventory:liquor_product_new_v2", "label": "Add Product", "icon": "bi-droplet-half", "active_prefix": "/liquor/products/new", "active_pattern": "/liquor/products/new", "require_manager": False, "is_menu": False, "is_header": False},
@@ -320,6 +323,7 @@ def get_vertical_sidebar_items(business_kind: str) -> list[dict]:
             # MAIN section - pharmacy & cosmetics vertical-aware flows
             {"section": "MAIN", "key": "dashboard", "url": "dashboard:home", "label": "Dashboard", "icon": "bi-speedometer2", "active_prefix": "/dashboard/", "active_pattern": "/dashboard/", "require_manager": False, "is_menu": False, "is_header": False},
             {"section": "MAIN", "key": "analytics", "url": "app_router:analytics", "label": "Analytics", "icon": "bi-graph-up", "active_prefix": "/app/analytics", "active_pattern": "/app/analytics", "require_manager": False, "is_menu": False, "is_header": False},
+            {"section": "MAIN", "key": "fast_sell", "url": "verticals:pharmacy_fast_sell", "label": "Fast Sell", "icon": "bi-lightning-charge-fill", "active_prefix": "/verticals/pharmacy/fast-sell", "active_pattern": "/verticals/pharmacy/fast-sell", "require_manager": False, "is_menu": False, "is_header": False},
             {"section": "MAIN", "key": "hub", "url": "verticals:pharmacy_hub", "label": "Pharmacy & Cosmetics Hub", "icon": "bi-grid-3x3-gap", "active_prefix": "/verticals/pharmacy/hub", "active_pattern": "/verticals/pharmacy/hub", "require_manager": False, "is_menu": False, "is_header": False},
             {"section": "MAIN", "key": "pharmacy_dashboard", "url": "verticals:pharmacy_dashboard", "label": "Pharmacy Dashboard", "icon": "bi-graph-up", "active_prefix": "/verticals/pharmacy/dashboard", "active_pattern": "/verticals/pharmacy/dashboard", "require_manager": False, "is_menu": False, "is_header": False},
             {"section": "MAIN", "key": "stock_in", "url": "pharmacy:stock_in", "label": "Stock In", "icon": "bi-box-arrow-in-down", "active_prefix": "/pharmacy/stock-in", "active_pattern": "/pharmacy/stock-in", "require_manager": False, "is_menu": False, "is_header": False},
@@ -346,7 +350,7 @@ def get_vertical_sidebar_items(business_kind: str) -> list[dict]:
             # MAIN section - Phones Dashboard is the primary entry point
             {"section": "MAIN", "key": "dashboard", "url": "inventory_verticals:phones_dashboard", "label": "Phone Dashboard", "icon": "bi-speedometer2", "active_prefix": "/inventory/verticals/phones", "active_pattern": "/inventory/verticals/phones", "require_manager": False, "is_menu": False, "is_header": False},
             {"section": "MAIN", "key": "analytics", "url": "app_router:analytics", "label": "Analytics", "icon": "bi-graph-up", "active_prefix": "/app/analytics", "active_pattern": "/app/analytics", "require_manager": False, "is_menu": False, "is_header": False},
-            # Note: "Inventory Dashboard" removed for phones - replaced by Analytics above
+            # Note: Fast Sell removed - phones uses dedicated scan/sell flows
             {"section": "MAIN", "key": "stock", "url": "inventory:stock_list", "label": "Stock", "icon": "bi-box-seam", "active_prefix": "/inventory/list/", "active_pattern": "/inventory/list/", "require_manager": False, "is_menu": False, "is_header": False},
             {"section": "MAIN", "key": "products", "url": "inventory:phone_products", "label": "Products", "icon": "bi-grid-3x3-gap", "active_prefix": "/inventory/phone-products", "active_pattern": "/inventory/phone-products", "require_manager": True, "is_menu": False, "is_header": False},
             {"section": "MAIN", "key": "scan_in", "url": "inventory:scan_in", "label": "Scan IN", "icon": "bi-upc-scan", "active_prefix": "/inventory/scan", "active_pattern": "/inventory/scan", "require_manager": False, "is_menu": False, "is_header": False},

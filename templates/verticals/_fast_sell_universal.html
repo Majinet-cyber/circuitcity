@@ -1,0 +1,545 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Fast Sell · {{ business.name }}{% endblock %}
+
+{% block extra_css %}
+<style>
+  .fast-sell-container {
+    max-width: 600px;
+    margin: 0 auto;
+    padding: 1rem;
+  }
+  
+  .scanner-box {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    border-radius: 20px;
+    padding: 2rem;
+    text-align: center;
+    color: white;
+    margin-bottom: 2rem;
+    box-shadow: 0 10px 30px rgba(102, 126, 234, 0.3);
+  }
+  
+  .scanner-icon {
+    font-size: 4rem;
+    margin-bottom: 1rem;
+    animation: pulse 2s ease-in-out infinite;
+  }
+  
+  @keyframes pulse {
+    0%, 100% { transform: scale(1); opacity: 1; }
+    50% { transform: scale(1.05); opacity: 0.8; }
+  }
+  
+  .barcode-input {
+    width: 100%;
+    padding: 1rem;
+    font-size: 1.25rem;
+    border: 3px solid #e5e7eb;
+    border-radius: 12px;
+    text-align: center;
+    font-weight: 600;
+    margin-bottom: 1rem;
+    transition: all 0.3s ease;
+  }
+  
+  .barcode-input:focus {
+    outline: none;
+    border-color: #667eea;
+    box-shadow: 0 0 0 4px rgba(102, 126, 234, 0.1);
+  }
+  
+  .product-card {
+    background: white;
+    border-radius: 16px;
+    padding: 1.5rem;
+    margin-bottom: 1rem;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    display: none;
+  }
+  
+  .product-card.show {
+    display: block;
+    animation: slideIn 0.3s ease-out;
+  }
+  
+  @keyframes slideIn {
+    from {
+      opacity: 0;
+      transform: translateY(-20px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+  
+  .product-name {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: #1f2937;
+    margin-bottom: 0.5rem;
+  }
+  
+  .product-info {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 1rem;
+    margin: 1rem 0;
+  }
+  
+  .info-item {
+    text-align: center;
+    padding: 0.75rem;
+    background: #f9fafb;
+    border-radius: 8px;
+  }
+  
+  .info-label {
+    font-size: 0.75rem;
+    color: #6b7280;
+    text-transform: uppercase;
+    font-weight: 600;
+    margin-bottom: 0.25rem;
+  }
+  
+  .info-value {
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: #667eea;
+  }
+  
+  .payment-methods {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 0.75rem;
+    margin: 1rem 0;
+  }
+  
+  .payment-btn {
+    padding: 1rem;
+    border: 2px solid #e5e7eb;
+    border-radius: 12px;
+    background: white;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    text-align: center;
+    font-weight: 600;
+  }
+  
+  .payment-btn:hover {
+    border-color: #667eea;
+    background: #f9fafb;
+  }
+  
+  .payment-btn.active {
+    border-color: #667eea;
+    background: #667eea;
+    color: white;
+  }
+  
+  .sell-btn {
+    width: 100%;
+    padding: 1.25rem;
+    background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+    color: white;
+    border: none;
+    border-radius: 12px;
+    font-size: 1.25rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
+  }
+  
+  .sell-btn:hover:not(:disabled) {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(16, 185, 129, 0.4);
+  }
+  
+  .sell-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+  
+  .kpi-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 1rem;
+    margin-top: 2rem;
+  }
+  
+  .kpi-card {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    border-radius: 12px;
+    padding: 1.25rem;
+    color: white;
+    text-align: center;
+  }
+  
+  .kpi-label {
+    font-size: 0.875rem;
+    opacity: 0.9;
+    margin-bottom: 0.5rem;
+  }
+  
+  .kpi-value {
+    font-size: 1.75rem;
+    font-weight: 800;
+  }
+  
+  .alert {
+    padding: 1rem;
+    border-radius: 8px;
+    margin-bottom: 1rem;
+    font-weight: 600;
+  }
+  
+  .alert-success {
+    background: #d1fae5;
+    color: #065f46;
+    border-left: 4px solid #10b981;
+  }
+  
+  .alert-error {
+    background: #fee2e2;
+    color: #991b1b;
+    border-left: 4px solid #ef4444;
+  }
+  
+  .hidden {
+    display: none !important;
+  }
+  
+  @media (max-width: 640px) {
+    .product-info {
+      grid-template-columns: 1fr;
+    }
+    
+    .payment-methods {
+      grid-template-columns: 1fr;
+    }
+    
+    .kpi-grid {
+      grid-template-columns: 1fr;
+    }
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="fast-sell-container">
+  <!-- Scanner Box -->
+  <div class="scanner-box">
+    <div class="scanner-icon">📷</div>
+    <h2 style="margin: 0 0 0.5rem 0; font-size: 1.75rem;">Fast Sell</h2>
+    <p style="margin: 0; opacity: 0.9;">Scan barcode to sell instantly</p>
+  </div>
+  
+  <!-- Alerts -->
+  <div id="alert-container"></div>
+  
+  <!-- Barcode Input -->
+  <input 
+    type="text" 
+    id="barcode-input" 
+    class="barcode-input" 
+    placeholder="Scan or enter barcode..."
+    autofocus
+    autocomplete="off"
+  >
+  
+  <!-- Product Card (hidden until product found) -->
+  <div id="product-card" class="product-card">
+    <div class="product-name" id="product-name">—</div>
+    
+    <div class="product-info">
+      <div class="info-item">
+        <div class="info-label">Available</div>
+        <div class="info-value" id="product-qty">—</div>
+      </div>
+      <div class="info-item">
+        <div class="info-label">Price</div>
+        <div class="info-value" id="product-price">—</div>
+      </div>
+    </div>
+    
+    <!-- Price Input (shown if needs_price) -->
+    <div id="price-input-container" class="hidden" style="margin: 1rem 0;">
+      <label for="selling-price-input" style="display: block; font-weight: 600; margin-bottom: 0.5rem;">
+        Enter Selling Price (MWK)
+      </label>
+      <input 
+        type="number" 
+        id="selling-price-input" 
+        class="barcode-input" 
+        placeholder="0.00"
+        step="0.01"
+        min="0"
+      >
+    </div>
+    
+    <!-- Payment Methods -->
+    <div style="margin: 1.5rem 0;">
+      <label style="display: block; font-weight: 600; margin-bottom: 0.75rem; color: #6b7280;">
+        Payment Method
+      </label>
+      <div class="payment-methods">
+        <button class="payment-btn active" data-method="CASH">
+          💵 Cash
+        </button>
+        <button class="payment-btn" data-method="BANK">
+          🏦 Bank
+        </button>
+        <button class="payment-btn" data-method="MOBILE_MONEY">
+          📱 Mobile
+        </button>
+      </div>
+    </div>
+    
+    <!-- Sell Button -->
+    <button id="sell-btn" class="sell-btn">
+      ✅ Sell Now
+    </button>
+  </div>
+  
+  <!-- KPIs -->
+  <div class="kpi-grid">
+    <div class="kpi-card">
+      <div class="kpi-label">Today's Sales</div>
+      <div class="kpi-value" id="kpi-today-sales">0</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-label">Today's Revenue</div>
+      <div class="kpi-value" id="kpi-today-revenue">MWK 0</div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+(function() {
+  'use strict';
+  
+  const vertical = '{{ vertical|default:"" }}';
+  let currentProduct = null;
+  let selectedPaymentMethod = 'CASH';
+  
+  const barcodeInput = document.getElementById('barcode-input');
+  const productCard = document.getElementById('product-card');
+  const productName = document.getElementById('product-name');
+  const productQty = document.getElementById('product-qty');
+  const productPrice = document.getElementById('product-price');
+  const priceInputContainer = document.getElementById('price-input-container');
+  const sellingPriceInput = document.getElementById('selling-price-input');
+  const sellBtn = document.getElementById('sell-btn');
+  const alertContainer = document.getElementById('alert-container');
+  const kpiTodaySales = document.getElementById('kpi-today-sales');
+  const kpiTodayRevenue = document.getElementById('kpi-today-revenue');
+  
+  // Payment method selection
+  document.querySelectorAll('.payment-btn').forEach(btn => {
+    btn.addEventListener('click', function() {
+      document.querySelectorAll('.payment-btn').forEach(b => b.classList.remove('active'));
+      this.classList.add('active');
+      selectedPaymentMethod = this.dataset.method;
+    });
+  });
+  
+  // Barcode input handler
+  barcodeInput.addEventListener('keypress', function(e) {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      lookupProduct(this.value.trim());
+    }
+  });
+  
+  // Sell button handler
+  sellBtn.addEventListener('click', function() {
+    sellProduct();
+  });
+  
+  // Lookup product by barcode
+  function lookupProduct(barcode) {
+    if (!barcode) {
+      showAlert('Please enter a barcode', 'error');
+      return;
+    }
+    
+    showAlert('Looking up product...', 'info');
+    
+    fetch(`/inventory/api/fast-sell/lookup/?barcode=${encodeURIComponent(barcode)}&vertical=${vertical}`, {
+      method: 'GET',
+      headers: {
+        'X-CSRFToken': getCookie('csrftoken')
+      }
+    })
+    .then(response => response.json())
+    .then(data => {
+      if (data.ok && data.found) {
+        currentProduct = data.product;
+        displayProduct(data.product);
+        clearAlert();
+      } else {
+        showAlert(data.message || 'Product not found', 'error');
+        hideProduct();
+      }
+    })
+    .catch(error => {
+      showAlert('Error looking up product: ' + error.message, 'error');
+      hideProduct();
+    });
+  }
+  
+  // Display product
+  function displayProduct(product) {
+    productName.textContent = product.name;
+    productQty.textContent = product.available_qty;
+    productPrice.textContent = product.selling_price ? `MWK ${formatNumber(product.selling_price)}` : '—';
+    
+    if (product.needs_price) {
+      priceInputContainer.classList.remove('hidden');
+      sellingPriceInput.focus();
+    } else {
+      priceInputContainer.classList.add('hidden');
+    }
+    
+    productCard.classList.add('show');
+  }
+  
+  // Hide product card
+  function hideProduct() {
+    productCard.classList.remove('show');
+    currentProduct = null;
+  }
+  
+  // Sell product
+  function sellProduct() {
+    if (!currentProduct) {
+      showAlert('No product selected', 'error');
+      return;
+    }
+    
+    let sellingPrice = currentProduct.selling_price;
+    
+    if (currentProduct.needs_price) {
+      sellingPrice = sellingPriceInput.value;
+      if (!sellingPrice || parseFloat(sellingPrice) <= 0) {
+        showAlert('Please enter a valid selling price', 'error');
+        return;
+      }
+    }
+    
+    sellBtn.disabled = true;
+    sellBtn.textContent = '⏳ Processing...';
+    
+    fetch('/inventory/api/fast-sell/sell/', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-CSRFToken': getCookie('csrftoken')
+      },
+      body: JSON.stringify({
+        barcode: currentProduct.barcode,
+        vertical: vertical,
+        payment_method: selectedPaymentMethod,
+        selling_price: sellingPrice,
+        quantity: 1
+      })
+    })
+    .then(response => response.json())
+    .then(data => {
+      if (data.ok) {
+        showAlert('✅ Sale completed successfully!', 'success');
+        updateKPIs(data.kpis);
+        resetForm();
+      } else {
+        showAlert(data.error || 'Sale failed', 'error');
+      }
+    })
+    .catch(error => {
+      showAlert('Error: ' + error.message, 'error');
+    })
+    .finally(() => {
+      sellBtn.disabled = false;
+      sellBtn.textContent = '✅ Sell Now';
+    });
+  }
+  
+  // Reset form
+  function resetForm() {
+    barcodeInput.value = '';
+    hideProduct();
+    barcodeInput.focus();
+  }
+  
+  // Update KPIs
+  function updateKPIs(kpis) {
+    if (kpis) {
+      kpiTodaySales.textContent = kpis.today_sales || 0;
+      kpiTodayRevenue.textContent = `MWK ${formatNumber(kpis.today_revenue || 0)}`;
+    }
+  }
+  
+  // Load initial KPIs
+  function loadKPIs() {
+    fetch(`/inventory/api/fast-sell/kpis/?vertical=${vertical}&scope=me&range=today`, {
+      method: 'GET',
+      headers: {
+        'X-CSRFToken': getCookie('csRFToken')
+      }
+    })
+    .then(response => response.json())
+    .then(data => {
+      if (data.ok) {
+        updateKPIs(data.kpis);
+      }
+    })
+    .catch(error => {
+      console.error('Error loading KPIs:', error);
+    });
+  }
+  
+  // Show alert
+  function showAlert(message, type) {
+    const alertClass = type === 'error' ? 'alert-error' : type === 'success' ? 'alert-success' : 'alert-info';
+    alertContainer.innerHTML = `<div class="alert ${alertClass}">${message}</div>`;
+  }
+  
+  // Clear alert
+  function clearAlert() {
+    alertContainer.innerHTML = '';
+  }
+  
+  // Format number with commas
+  function formatNumber(num) {
+    return parseFloat(num).toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+  }
+  
+  // Get CSRF cookie
+  function getCookie(name) {
+    let cookieValue = null;
+    if (document.cookie && document.cookie !== '') {
+      const cookies = document.cookie.split(';');
+      for (let i = 0; i < cookies.length; i++) {
+        const cookie = cookies[i].trim();
+        if (cookie.substring(0, name.length + 1) === (name + '=')) {
+          cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+          break;
+        }
+      }
+    }
+    return cookieValue;
+  }
+  
+  // Load KPIs on page load
+  loadKPIs();
+  
+  // Focus barcode input
+  barcodeInput.focus();
+})();
+</script>
+{% endblock %}
+

@@ -1,0 +1,327 @@
+/* HQ Mobile-First Responsive Styles */
+/* Ensures HQ admin pages are usable on mobile without zoom-out */
+
+/* =============================================================================
+ * TABLE RESPONSIVENESS
+ * ============================================================================= */
+
+/* Wrap tables in .hq-table-responsive for horizontal scroll on mobile */
+.hq-table-responsive {
+  width: 100%;
+  overflow-x: auto;
+  overflow-y: visible;
+  -webkit-overflow-scrolling: touch;
+  margin-bottom: 1rem;
+}
+
+@media (max-width: 991.98px) {
+  .hq-table-responsive {
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+  }
+  
+  .hq-table-responsive table {
+    min-width: 800px; /* Force horizontal scroll on narrow screens */
+  }
+}
+
+/* Ensure table cells don't wrap prematurely */
+.hq-table-responsive th,
+.hq-table-responsive td {
+  white-space: nowrap;
+  padding: 10px 12px;
+}
+
+/* Allow specific columns to wrap if needed */
+.hq-table-responsive .text-wrap {
+  white-space: normal;
+  max-width: 300px;
+}
+
+/* Protect action buttons from wrapping */
+.hq-table-responsive .btn-group {
+  white-space: nowrap;
+  display: inline-flex;
+  flex-wrap: nowrap;
+}
+
+.hq-table-responsive .btn-group .btn {
+  flex-shrink: 0;
+}
+
+
+/* =============================================================================
+ * TOOLBAR RESPONSIVENESS
+ * ============================================================================= */
+
+/* Stack toolbar items on mobile */
+@media (max-width: 767.98px) {
+  .hq-toolbar {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+  
+  .hq-toolbar > * {
+    width: 100%;
+  }
+  
+  .hq-toolbar .btn-group {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  
+  .hq-toolbar .btn {
+    flex: 1 1 auto;
+    min-width: fit-content;
+  }
+}
+
+
+/* =============================================================================
+ * CARD STACKING
+ * ============================================================================= */
+
+/* Ensure cards stack properly on mobile */
+@media (max-width: 767.98px) {
+  .row.g-3 > [class*="col"],
+  .row.g-4 > [class*="col"] {
+    margin-bottom: 1rem;
+  }
+  
+  /* Force full-width on mobile */
+  .hq-card-mobile-full {
+    width: 100% !important;
+    flex: 0 0 100%;
+    max-width: 100%;
+  }
+}
+
+
+/* =============================================================================
+ * FORM RESPONSIVENESS
+ * ============================================================================= */
+
+/* Stack form groups on mobile */
+@media (max-width: 575.98px) {
+  .hq-form-row {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+  
+  .hq-form-row > * {
+    width: 100%;
+  }
+}
+
+
+/* =============================================================================
+ * OVERFLOW PROTECTION
+ * ============================================================================= */
+
+/* Prevent any element from breaking mobile layout */
+@media (max-width: 767.98px) {
+  .hq-container {
+    padding-left: 12px !important;
+    padding-right: 12px !important;
+    overflow-x: hidden;
+  }
+  
+  /* Protect long text from overflow */
+  .hq-text-truncate-mobile {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 100%;
+  }
+  
+  /* Badge protection */
+  .hq-badge,
+  .badge {
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+}
+
+
+/* =============================================================================
+ * STAT CARDS
+ * ============================================================================= */
+
+/* Responsive stat cards for HQ dashboard */
+@media (max-width: 767.98px) {
+  .hq-stat-card {
+    padding: 16px;
+  }
+  
+  .hq-stat-value {
+    font-size: clamp(1.5rem, 5vw, 2rem);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  
+  .hq-stat-label {
+    font-size: clamp(0.75rem, 2.5vw, 0.9rem);
+  }
+}
+
+
+/* =============================================================================
+ * FILTERS & SEARCH
+ * ============================================================================= */
+
+/* Stack filters on mobile */
+@media (max-width: 767.98px) {
+  .hq-filters {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+  
+  .hq-filters .form-control,
+  .hq-filters .form-select {
+    width: 100%;
+  }
+  
+  .hq-search-bar {
+    width: 100%;
+  }
+}
+
+
+/* =============================================================================
+ * PAGINATION
+ * ============================================================================= */
+
+/* Responsive pagination */
+@media (max-width: 575.98px) {
+  .hq-pagination {
+    flex-wrap: wrap;
+    gap: 4px;
+  }
+  
+  .hq-pagination .page-link {
+    padding: 6px 12px;
+    font-size: 0.9rem;
+  }
+  
+  /* Hide some page numbers on very small screens */
+  .hq-pagination .page-item:not(.active):not(:first-child):not(:last-child) {
+    display: none;
+  }
+  
+  .hq-pagination .page-item.active,
+  .hq-pagination .page-item:first-child,
+  .hq-pagination .page-item:last-child {
+    display: block;
+  }
+}
+
+
+/* =============================================================================
+ * MODALS
+ * ============================================================================= */
+
+/* Ensure modals are mobile-friendly */
+@media (max-width: 767.98px) {
+  .hq-modal-dialog {
+    margin: 10px;
+    max-width: calc(100% - 20px);
+  }
+  
+  .hq-modal-body {
+    padding: 16px;
+  }
+  
+  .hq-modal-footer {
+    flex-direction: column;
+    gap: 8px;
+  }
+  
+  .hq-modal-footer .btn {
+    width: 100%;
+  }
+}
+
+
+/* =============================================================================
+ * CHARTS & GRAPHS
+ * ============================================================================= */
+
+/* Responsive charts */
+@media (max-width: 767.98px) {
+  .hq-chart-container {
+    height: 250px !important;
+    overflow-x: auto;
+  }
+  
+  canvas {
+    max-width: 100%;
+    height: auto !important;
+  }
+}
+
+
+/* =============================================================================
+ * UTILITY CLASSES
+ * ============================================================================= */
+
+/* Mobile-specific utilities */
+@media (max-width: 767.98px) {
+  .hq-hide-mobile {
+    display: none !important;
+  }
+  
+  .hq-show-mobile {
+    display: block !important;
+  }
+  
+  .hq-text-sm-mobile {
+    font-size: 0.875rem !important;
+  }
+  
+  .hq-p-sm-mobile {
+    padding: 8px !important;
+  }
+}
+
+@media (min-width: 768px) {
+  .hq-hide-desktop {
+    display: none !important;
+  }
+  
+  .hq-show-desktop {
+    display: block !important;
+  }
+}
+
+
+/* =============================================================================
+ * SAFE DEFAULTS
+ * ============================================================================= */
+
+/* Ensure nothing breaks layout on small screens */
+* {
+  min-width: 0;
+}
+
+img, video, iframe {
+  max-width: 100%;
+  height: auto;
+}
+
+pre, code {
+  max-width: 100%;
+  overflow-x: auto;
+}
+
+/* Ensure Bootstrap grid doesn't overflow */
+.container-fluid,
+.container {
+  overflow-x: hidden;
+}

@@ -511,12 +511,17 @@ def home(request):
 
     # ===== Enhanced Dashboard Data =====
     # Determine if user is manager or agent
-    is_manager = (
-        request.user.is_staff
-        or request.user.is_superuser
-        or getattr(request.user, 'is_manager', False)
-        or getattr(getattr(request.user, 'profile', None), 'is_manager', False)
-    )
+    # CRITICAL: Use authoritative flag from middleware (set by tenants.utils_roles)
+    if hasattr(request, "cc_is_manager"):
+        is_manager = getattr(request, "cc_is_manager", False)
+    else:
+        # Fallback: if middleware hasn't set flag (shouldn't happen in normal flow)
+        is_manager = (
+            request.user.is_staff
+            or request.user.is_superuser
+            or getattr(request.user, 'is_manager', False)
+            or getattr(getattr(request.user, 'profile', None), 'is_manager', False)
+        )
 
     # Sales for the filtered period (respects date range selector)
     period_sold = _scope_queryset(InventoryItem.objects.all(), biz).filter(

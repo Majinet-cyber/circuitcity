@@ -32,13 +32,12 @@
   .hero-actions .primary:hover{transform:translateY(-2px);box-shadow:0 6px 20px rgba(0,0,0,0.2);background:#f8fafc}
   .hero-actions .ghost{border:2px solid rgba(255,255,255,.9);color:#fff;background:rgba(255,255,255,0.1);backdrop-filter:blur(10px)}
   .hero-actions .ghost:hover{background:rgba(255,255,255,0.2);transform:translateY(-2px);box-shadow:0 6px 20px rgba(255,255,255,0.2)}
-  .metrics-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:20px;margin-bottom:28px}
-  .metric-card{background:#fff;border-radius:20px;padding:24px;box-shadow:0 4px 20px rgba(15,23,42,.08);transition:all 0.3s cubic-bezier(0.4,0,0.2,1);position:relative;overflow:hidden;border:1px solid rgba(226,232,240,0.5)}
+  .metric-card{background:#fff;border-radius:20px;padding:24px;box-shadow:0 4px 20px rgba(15,23,42,.08);transition:all 0.3s cubic-bezier(0.4,0,0.2,1);position:relative;overflow:hidden;border:1px solid rgba(226,232,240,0.5);min-width:0}
   .metric-card::before{content:'';position:absolute;top:0;left:0;right:0;height:4px;background:linear-gradient(90deg,transparent,rgba(59,130,246,0.4),transparent);opacity:0;transition:opacity 0.3s}
   .metric-card:hover::before{opacity:1}
   .metric-card:hover{transform:translateY(-6px);box-shadow:0 12px 40px rgba(15,23,42,.12);border-color:rgba(59,130,246,0.2)}
   .metric-card h3{margin:0 0 10px;font-size:.85rem;text-transform:uppercase;color:#64748b;letter-spacing:.12em;font-weight:600;display:flex;align-items:center;gap:8px}
-  .metric-card p{margin:0;font-size:2.25rem;font-weight:800;color:#0f172a;line-height:1.1;letter-spacing:-0.02em}
+  .metric-card p{margin:0;font-size:2.25rem;font-weight:800;color:#0f172a;line-height:1.1;letter-spacing:-0.02em;min-width:0}
   .metric-card small{display:block;margin-top:8px;font-size:0.75rem;color:#94a3b8;line-height:1.5;opacity:0.9}
   .metric-card-clickable{cursor:pointer;text-decoration:none;display:block;color:inherit}
   .metric-card-clickable:hover{transform:translateY(-6px);box-shadow:0 15px 45px rgba(15,23,42,.15)}
@@ -80,7 +79,6 @@
   /* Responsive improvements */
   @media (max-width:768px){
     .vertical-page{padding:12px;gap:16px}
-    .metrics-grid{grid-template-columns:1fr;gap:16px}
     .hero-actions{width:100%}
     .hero-actions a{flex:1;text-align:center;min-width:120px}
   }
@@ -134,7 +132,7 @@
     {% endif %}
   </section>
 
-  <section class="metrics-grid">
+  <section class="cc-kpi-grid">
     <article class="metric-card" style="background:linear-gradient(135deg,#10b981,#059669);color:#fff" data-cy="sales-revenue-card">
       <h3 style="color:rgba(255,255,255,.9)">💰 Sales Revenue{% if active_range == 'today' %} (Today){% elif active_range == '7d' %} (7D){% elif active_range == 'date' %} (Day){% else %} (MTD){% endif %}</h3>
       <p style="color:#fff;font-size:2rem;font-weight:800">K {{ revenue_mtd|floatformat:0|default:"0"|intcomma }}</p>
@@ -159,7 +157,7 @@
   </section>
 
   {% comment %}Inventory Value KPIs (Current Stock){% endcomment %}
-  <section class="metrics-grid">
+  <section class="cc-kpi-grid">
     <article class="metric-card" style="background:linear-gradient(135deg,#8b5cf6,#7c3aed);color:#fff" data-cy="inventory-value-card">
       <h3 style="color:rgba(255,255,255,.9)">📦 Inventory Value (Current)</h3>
       <p style="color:#fff;font-size:2rem;font-weight:800">K {{ inventory_value|floatformat:0|default:"0"|intcomma }}</p>
@@ -223,7 +221,7 @@
 
     <section class="recent-block">
       <h2 style="margin:0 0 16px;font-size:1.1rem">📊 Sales Trend{% if active_range == 'today' %} (Today){% elif active_range == '7d' %} (Last 7 Days){% elif active_range == 'date' %} (Selected Day){% else %} (This Month){% endif %}</h2>
-      <div class="chart-wrap" style="position:relative;height:300px" data-cy="sales-trend-chart-container">
+      <div class="chart-wrap cc-chart-container" style="height:300px" data-cy="sales-trend-chart-container">
         <canvas id="sales-trend-chart" data-cy="sales-trend-chart"></canvas>
       </div>
       <div id="sales-trend-fallback" style="display:none;color:#64748b;text-align:center;padding:20px">
@@ -232,7 +230,7 @@
     </section>
   </div>
 
-  <section class="metrics-grid">
+  <section class="cc-kpi-grid">
     <article class="metric-card">
       <h3>Products</h3>
       <p>{{ product_count }}</p>

@@ -91,6 +91,7 @@ def create_agent_invite(
     mark_sent: bool = True,
     generate_temp_password: bool = True,
     location=None,
+    role: str = "AGENT",  # NEW: Default to AGENT for backward compatibility
 ) -> Tuple[AgentInvite, Optional[str]]:
     """
     Create a new invite scoped to a tenant.
@@ -99,10 +100,12 @@ def create_agent_invite(
     - Returns (invite instance, temp_password_plaintext or None).
     - If mark_sent=True, status -> SENT.
     - If generate_temp_password=True, creates a temp password (returned plaintext).
+    - Role can be "AGENT" (default) or "BAR_MANAGER" (liquor only)
     """
     invited_name = (invited_name or "").strip()
     email = (email or "").strip().lower()
     phone = (phone or "").strip()
+    role = (role or "AGENT").upper()  # Normalize role
 
     expires_at = timezone.now() + timedelta(days=max(1, int(ttl_days)))
 
@@ -117,6 +120,7 @@ def create_agent_invite(
         status="PENDING",
         message=(message or "").strip(),
         expires_at=expires_at,
+        role=role,  # NEW: Store role on invite
     )
 
     temp_password = None
@@ -259,7 +263,7 @@ def accept_invite_by_token(
     *,
     token: str,
     user: User,
-    role: str = "AGENT",
+    role: str = "AGENT",  # DEPRECATED: role is now read from invite
     force_password_change: bool = True,
 ) -> Tuple[AgentInvite, Membership]:
     """
@@ -270,6 +274,7 @@ def accept_invite_by_token(
       - If already JOINED, we still ensure membership is ACTIVE and return it.
       - Idempotent on repeat calls for the same user/invite.
       - For AGENT role, ensures location is always set (using default if needed).
+      - For BAR_MANAGER role, location is optional (they manage all locations).
       - If force_password_change=True, sets user's profile.force_password_change=True.
 
     Returns (invite, membership).
@@ -286,19 +291,43 @@ def accept_invite_by_token(
         inv.save(update_fields=["status"])
         raise ValueError("Invite has expired")
 
+    # NEW: Use role from invite (not from parameter)
+    actual_role = getattr(inv, 'role', None) or role or "AGENT"
+    
     # For AGENT role, ensure we have a location (use default if invite doesn't specify one)
+    # For BAR_MANAGER, location is optional (they supervise all locations)
     location_for_membership = inv.location
-    if role == "AGENT" and not location_for_membership:
+    if actual_role == "AGENT" and not location_for_membership:
         location_for_membership = get_default_location_for_business(inv.business)
         logger.info(f"Using default location '{location_for_membership.name}' for agent membership")
+    elif actual_role == "BAR_MANAGER":
+        # Bar managers don't need a specific location
+        location_for_membership = None
 
     # Ensure membership exists / is active
     mem, _created = Membership.objects.get_or_create(
         user=user,
         business=inv.business,
         location=location_for_membership,
-        defaults={"role": role, "status": "ACTIVE"},
+        defaults={"role": actual_role, "status": "ACTIVE"},
     )
+    
+    # If it existed but was not active/role differs, update it
+    if mem.status != "ACTIVE" or mem.role != actual_role:
+        mem.status = "ACTIVE"
+        mem.role = actual_role
+        mem.save(update_fields=["status", "role"])
+    
+    # NEW: Add user to appropriate Django group for role-based permissions
+    from django.contrib.auth.models import Group
+    try:
+        # Create group pattern: biz:{business_id}:{ROLE}
+        group_name = f"biz:{inv.business.pk}:{actual_role}"
+        group, _ = Group.objects.get_or_create(name=group_name)
+        user.groups.add(group)
+        logger.info(f"Added user {user.id} to group '{group_name}'")
+    except Exception as e:
+        logger.warning(f"Failed to add user to group: {e}")
     
     # If it existed but was not active/role differs, gently fix it (do no harm)
     updates = []

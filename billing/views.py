@@ -619,3 +619,33 @@ def force_status(request: HttpRequest, sub_id: str) -> HttpResponse:
         messages.error(request, "Invalid status.")
     return redirect("billing:hq")
 
+
+# ------------------------------------------------------------------------------
+# Trial Lock Page
+# ------------------------------------------------------------------------------
+def trial_expired(request: HttpRequest) -> HttpResponse:
+    """
+    Hard lock page shown when trial has expired.
+    User can only access billing pages, logout, or contact admin.
+    """
+    # Get business from request (set by TenantResolutionMiddleware)
+    business = getattr(request, 'business', None)
+    
+    # If no business, redirect to tenant chooser
+    if not business:
+        return redirect('/accounts/login/')
+    
+    # Check subscription status
+    sub = getattr(business, 'subscription', None)
+    
+    # If subscription is actually active, redirect to dashboard
+    if sub and sub.is_active_now():
+        return redirect('/app/home/')
+    
+    context = {
+        'business': business,
+        'subscription': sub,
+        'reason': request.GET.get('reason', 'expired'),
+    }
+    
+    return render(request, 'billing/trial_expired.html', context)

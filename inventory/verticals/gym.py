@@ -19,6 +19,10 @@ from inventory.models_attendance import TimeLog
 from . import base
 
 
+# Note: fast_sell() removed - gym is membership-based (members + payments),
+# not product-based (inventory + sales). Gym does NOT support Fast Sell.
+
+
 def _membership_stats(business):
     if not business:
         return {"managers": 0, "agents": 0, "recent": []}

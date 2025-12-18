@@ -473,6 +473,10 @@ def pharmacy_stock_in(request: HttpRequest) -> HttpResponse:
         description = request.POST.get("description", "").strip()
         reorder_level = request.POST.get("reorder_level", "10")
         
+        # NEW: Barcode workflow
+        has_barcode = request.POST.get("has_barcode", "no")
+        barcode_value = request.POST.get("barcode", "").strip()
+        
         # Validation
         errors = []
         if not product_name:
@@ -481,6 +485,18 @@ def pharmacy_stock_in(request: HttpRequest) -> HttpResponse:
             errors.append("Batch number is required.")
         if not expiry_date_str:
             errors.append("Expiry date is required.")
+        
+        # NEW: Barcode validation (conditional)
+        if has_barcode == "yes":
+            if not barcode_value:
+                errors.append("Barcode is required when 'Has Barcode' is Yes.")
+            else:
+                from inventory.utils_barcodes import validate_barcode, normalize_barcode
+                is_valid, error_msg = validate_barcode(barcode_value)
+                if not is_valid:
+                    errors.append(f"Invalid barcode: {error_msg}")
+                else:
+                    barcode_value = normalize_barcode(barcode_value)
         
         # Validate category against allowed values
         VALID_CATEGORIES = [
@@ -561,6 +577,12 @@ def pharmacy_stock_in(request: HttpRequest) -> HttpResponse:
                     product.selling_price = selling
                     product.category = category
                     product.save()
+            
+            # NEW: Store barcode if provided
+            if has_barcode == "yes" and barcode_value:
+                from inventory.utils_barcodes import set_barcode
+                set_barcode(product, barcode_value)
+                product.save()
             
             # Check for duplicate batch
             existing_batch = PharmacyBatch.objects.filter(

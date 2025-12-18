@@ -336,6 +336,82 @@ def scan_in(request):
         )
     
     if request.method == 'POST':
+        # NEW: Barcode workflow
+        has_barcode = request.POST.get("has_barcode", "no").strip()
+        barcode_value = request.POST.get("barcode", "").strip()
+        
+        # NEW: Barcode validation (conditional)
+        if has_barcode == "yes":
+            if not barcode_value:
+                messages.error(request, "Barcode is required when 'Has Barcode' is Yes.")
+                form = ClothingStockInForm(request.POST)
+                recent_logs = []
+                try:
+                    from inventory.models_verticals import ClothingProductLog, ClothingProductAction
+                    recent_logs = ClothingProductLog.objects.filter(
+                        product__business=business,
+                        action=ClothingProductAction.STOCK_IN
+                    ).select_related('product', 'performed_by').order_by('-created_at')[:10]
+                except:
+                    pass
+                ctx = {
+                    'business': business,
+                    'form': form,
+                    'categories': CLOTHING_CATEGORIES,
+                    'recent_logs': recent_logs,
+                }
+                return render(request, "verticals/clothing/scan_in.html", ctx)
+            
+            from inventory.utils_barcodes import validate_barcode, normalize_barcode, find_by_barcode
+            is_valid, error_msg = validate_barcode(barcode_value)
+            if not is_valid:
+                messages.error(request, f"Invalid barcode: {error_msg}")
+                form = ClothingStockInForm(request.POST)
+                recent_logs = []
+                try:
+                    from inventory.models_verticals import ClothingProductLog, ClothingProductAction
+                    recent_logs = ClothingProductLog.objects.filter(
+                        product__business=business,
+                        action=ClothingProductAction.STOCK_IN
+                    ).select_related('product', 'performed_by').order_by('-created_at')[:10]
+                except:
+                    pass
+                ctx = {
+                    'business': business,
+                    'form': form,
+                    'categories': CLOTHING_CATEGORIES,
+                    'recent_logs': recent_logs,
+                }
+                return render(request, "verticals/clothing/scan_in.html", ctx)
+            
+            barcode_value = normalize_barcode(barcode_value)
+            
+            # Check for duplicate barcode in this business
+            existing_products = find_by_barcode(barcode_value, business=business)
+            if existing_products.exists():
+                messages.error(
+                    request,
+                    f"Barcode {barcode_value} is already used by another product in your business. "
+                    "Each barcode must be unique."
+                )
+                form = ClothingStockInForm(request.POST)
+                recent_logs = []
+                try:
+                    from inventory.models_verticals import ClothingProductLog, ClothingProductAction
+                    recent_logs = ClothingProductLog.objects.filter(
+                        product__business=business,
+                        action=ClothingProductAction.STOCK_IN
+                    ).select_related('product', 'performed_by').order_by('-created_at')[:10]
+                except:
+                    pass
+                ctx = {
+                    'business': business,
+                    'form': form,
+                    'categories': CLOTHING_CATEGORIES,
+                    'recent_logs': recent_logs,
+                }
+                return render(request, "verticals/clothing/scan_in.html", ctx)
+        
         form = ClothingStockInForm(request.POST)
         if form.is_valid():
             data = form.cleaned_data
@@ -361,6 +437,11 @@ def scan_in(request):
                     }
                 )
                 
+                # NEW: Store barcode if provided
+                if has_barcode == "yes" and barcode_value:
+                    from inventory.utils_barcodes import set_barcode
+                    set_barcode(product, barcode_value)
+                
                 if not created:
                     # Update existing product stock
                     product.quantity_in_stock += data['quantity']
@@ -368,6 +449,10 @@ def scan_in(request):
                     if data.get('selling_price'):
                         product.selling_price = data['selling_price']
                     product.save(update_fields=['quantity_in_stock', 'cost_price', 'selling_price'])
+                else:
+                    # Save barcode for newly created product
+                    if has_barcode == "yes" and barcode_value:
+                        product.save()
                 
                 # Log the stock-in action
                 from inventory.models_verticals import ClothingProductLog, ClothingProductAction
@@ -747,6 +832,116 @@ def sales_export_csv(request):
         ])
     
     return response
+
+
+@login_required
+@require_business
+@require_business_kind(BusinessKind.CLOTHING)
+def fast_sell(request):
+    """
+    Fast Sell page for clothing - barcode scanner + instant sell.
+    Uses front camera for barcode scanning with BarcodeDetector API fallback.
+    """
+    from django.http import JsonResponse
+    
+    ctx = base.base_context(request)
+    business = ctx.get("business")
+    
+    ctx.update({
+        "page_title": "Fast Sell",
+        "vertical": "clothing",
+        "vertical_name": "Clothing",
+    })
+    
+    return render(request, "verticals/clothing/fast_sell.html", ctx)
+
+
+# Fast Sell API endpoints
+@login_required
+@require_business
+@require_business_kind(BusinessKind.CLOTHING)
+def fast_sell_lookup_api(request):
+    """API: Look up product by barcode"""
+    from django.http import JsonResponse
+    from inventory.services.fast_sell import lookup_product_by_barcode
+    
+    business = base.base_context(request).get("business")
+    barcode = request.GET.get("barcode", "").strip()
+    
+    if not barcode:
+        return JsonResponse({"ok": False, "error": "Barcode required"}, status=400)
+    
+    result = lookup_product_by_barcode(
+        business=business,
+        vertical="clothing",
+        barcode=barcode
+    )
+    
+    return JsonResponse(result)
+
+
+@login_required
+@require_business
+@require_business_kind(BusinessKind.CLOTHING)
+def fast_sell_create_api(request):
+    """API: Create a fast sale"""
+    from django.http import JsonResponse
+    from inventory.services.fast_sell import create_fast_sell
+    import json
+    
+    if request.method != "POST":
+        return JsonResponse({"ok": False, "error": "POST required"}, status=405)
+    
+    business = base.base_context(request).get("business")
+    
+    try:
+        data = json.loads(request.body)
+    except json.JSONDecodeError:
+        return JsonResponse({"ok": False, "error": "Invalid JSON"}, status=400)
+    
+    barcode = data.get("barcode", "").strip()
+    quantity = int(data.get("quantity", 1))
+    payment_method = data.get("payment_method", "cash")
+    selling_price_str = data.get("selling_price")
+    
+    selling_price = None
+    if selling_price_str:
+        try:
+            selling_price = Decimal(str(selling_price_str))
+        except:
+            return JsonResponse({"ok": False, "error": "Invalid price"}, status=400)
+    
+    result = create_fast_sell(
+        business=business,
+        vertical="clothing",
+        user=request.user,
+        barcode=barcode,
+        quantity=quantity,
+        payment_method=payment_method,
+        selling_price=selling_price,
+    )
+    
+    return JsonResponse(result)
+
+
+@login_required
+@require_business
+@require_business_kind(BusinessKind.CLOTHING)
+def fast_sell_kpis_api(request):
+    """API: Get Fast Sell KPIs"""
+    from django.http import JsonResponse
+    from inventory.services.fast_sell import get_fast_sell_kpis
+    
+    business = base.base_context(request).get("business")
+    date_range = request.GET.get("range", "today")
+    
+    result = get_fast_sell_kpis(
+        business=business,
+        vertical="clothing",
+        date_range=date_range,
+    )
+    
+    return JsonResponse(result)
 
 
 @login_required

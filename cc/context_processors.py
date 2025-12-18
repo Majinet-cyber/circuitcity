@@ -138,7 +138,8 @@ def role_flags(request) -> Dict[str, Any]:
         is_manager = is_staff
 
     # Agent = authenticated but not manager/staff
-    is_agent = _safe_bool(is_auth and not is_manager and not is_staff)
+    # CRITICAL FIX: Ensure managers are NEVER treated as agents
+    is_agent = _safe_bool(is_auth and not is_manager and not is_staff and not is_superuser)
 
     flags = {
         "IS_MANAGER": is_manager,
@@ -186,4 +187,20 @@ def currency_config(request) -> Dict[str, Any]:
     }
 
 
-__all__ = ["build_meta", "brand", "role_flags", "app_version", "currency_config"]
+def current_year(request) -> Dict[str, Any]:
+    """
+    Expose the current year to all templates for dynamic copyright notices.
+    
+    Returns:
+        dict: Contains CURRENT_YEAR key with the current year as an integer.
+    
+    Example usage in templates:
+        © {{ CURRENT_YEAR }} Emajinet
+    """
+    from django.utils import timezone
+    return {
+        "CURRENT_YEAR": timezone.now().year,
+    }
+
+
+__all__ = ["build_meta", "brand", "role_flags", "app_version", "currency_config", "current_year"]

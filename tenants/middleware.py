@@ -309,7 +309,7 @@ def _attach_location_scope(request) -> None:
     """
     Optional helper: if tenants.scope is available, compute the effective location,
     store it on the request for templates, and persist in session.
-    No-ops if the helpers aren’t importable.
+    No-ops if the helpers aren't importable.
     """
     try:
         # Resolve against the same active business we just activated
@@ -329,6 +329,32 @@ def _attach_location_scope(request) -> None:
         # Never block request flow if scope helpers fail
         request.location_id = None
         request.scope = {}
+
+
+def _attach_role_to_request(request) -> None:
+    """
+    AUTHORITATIVE role attachment: compute role using centralized logic and store on request.
+    This is the single source of truth for role determination used by views, templates, etc.
+    
+    Attaches:
+        - request.cc_business: Business object
+        - request.cc_role: Role string ("MANAGER", "AGENT", "OWNER", "AUDITOR", "BAR_MANAGER", "NONE")
+        - request.cc_is_manager: Boolean (True for managers, owners, staff, superusers)
+        - request.cc_is_agent: Boolean (True ONLY if agent and NOT manager)
+        - request.cc_is_owner: Boolean (True if business owner)
+    
+    CRITICAL: This implements manager precedence - managers are NEVER agents.
+    """
+    try:
+        from tenants.utils_roles import attach_role_to_request
+        attach_role_to_request(request)
+    except Exception:
+        # Fallback: set safe defaults if utils_roles isn't available
+        request.cc_business = getattr(request, "business", None)
+        request.cc_role = "NONE"
+        request.cc_is_manager = False
+        request.cc_is_agent = False
+        request.cc_is_owner = False
 
 
 # ── Middleware ─────────────────────────────────────────────────────────────────
@@ -370,6 +396,12 @@ class TenantResolutionMiddleware(MiddlewareMixin):
         request.product_mode = "generic"
         request.location_id = None
         request.scope = {}
+        # Role flags (will be set after business resolution)
+        request.cc_business = None
+        request.cc_role = "NONE"
+        request.cc_is_manager = False
+        request.cc_is_agent = False
+        request.cc_is_owner = False
         try:
             set_current_business_id(None)  # reset thread-local at request start
         except Exception:
@@ -400,6 +432,7 @@ class TenantResolutionMiddleware(MiddlewareMixin):
                 _activate(request, b)
                 _set_product_mode_on_request(request, b)
                 _attach_location_scope(request)  # safe, optional
+                _attach_role_to_request(request)  # AUTHORITATIVE role determination
                 return
         except Exception:
             # continue with fallbacks
@@ -413,6 +446,7 @@ class TenantResolutionMiddleware(MiddlewareMixin):
                 _activate(request, b)
                 _set_product_mode_on_request(request, b)
                 _attach_location_scope(request)
+                _attach_role_to_request(request)  # AUTHORITATIVE role determination
                 return
             except Exception:
                 pass  # ignore bad ids quietly
@@ -435,6 +469,7 @@ class TenantResolutionMiddleware(MiddlewareMixin):
                     _activate(request, b)
                     _set_product_mode_on_request(request, b)
                     _attach_location_scope(request)
+                    _attach_role_to_request(request)  # AUTHORITATIVE role determination
                     return
             except Exception:
                 pass  # invalid id / inactive business
@@ -454,6 +489,7 @@ class TenantResolutionMiddleware(MiddlewareMixin):
                         _activate(request, b)
                         _set_product_mode_on_request(request, b)
                         _attach_location_scope(request)
+                        _attach_role_to_request(request)  # AUTHORITATIVE role determination
                         return
         except Exception:
             # get_host() may raise in tests or odd proxies
@@ -466,6 +502,7 @@ class TenantResolutionMiddleware(MiddlewareMixin):
                 _activate(request, b)
                 _set_product_mode_on_request(request, b)
                 _attach_location_scope(request)
+                _attach_role_to_request(request)  # AUTHORITATIVE role determination
                 return
 
         # (6) Owned/created business (fresh signups / dev localhost)
@@ -475,11 +512,13 @@ class TenantResolutionMiddleware(MiddlewareMixin):
                 _activate(request, b)
                 _set_product_mode_on_request(request, b)
                 _attach_location_scope(request)
+                _attach_role_to_request(request)  # AUTHORITATIVE role determination
                 return
 
         # Unresolved business → still compute/allow mode override so UI is not blocked
         _set_product_mode_on_request(request, None)
         _attach_location_scope(request)
+        _attach_role_to_request(request)  # AUTHORITATIVE role determination (will set NONE if no business)
 
     def process_response(self, request, response):
         # Clear thread-local after the response is built (belt & suspenders)

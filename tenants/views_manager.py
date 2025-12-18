@@ -275,6 +275,7 @@ def _safe_service_create_invite(
     ttl_days: int,
     message: str,
     location_id: Optional[int] = None,
+    role: str = "AGENT",  # NEW: Support role parameter
 ) -> tuple:
     """
     Call tenants.services.invites.create_agent_invite if compatible.
@@ -301,7 +302,7 @@ def _safe_service_create_invite(
     except Exception:
         pass
 
-    # Try the rich service call; include location if supported.
+    # Try the rich service call; include location and role if supported.
     try:
         kwargs = dict(
             tenant=business,
@@ -313,6 +314,7 @@ def _safe_service_create_invite(
             message=message,
             mark_sent=True,
             generate_temp_password=True,  # ✅ Enable password generation
+            role=role,  # NEW: Pass role parameter
         )
         if location_id is not None:
             # Location model needs to be loaded
@@ -419,6 +421,7 @@ def manager_agents(request: HttpRequest) -> HttpResponse:
             ttl_days = (request.POST.get("ttl_days") or "").strip()
             message_text = (request.POST.get("message") or "").strip()
             loc_id = (request.POST.get("location_id") or "").strip()
+            role = (request.POST.get("role") or "AGENT").strip().upper()  # NEW: Get role from form
             try:
                 ttl_val = int(ttl_days) if ttl_days else 7
             except Exception:
@@ -438,6 +441,7 @@ def manager_agents(request: HttpRequest) -> HttpResponse:
                     ttl_days=ttl_val,
                     message=message_text,
                     location_id=location_id,
+                    role=role,  # NEW: Pass role to service
                 )
                 latest_link = _invite_accept_absolute_url(request, inv)
                 messages.success(request, "Invitation created.")

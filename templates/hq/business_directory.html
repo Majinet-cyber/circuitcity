@@ -214,10 +214,7 @@
         align-items: center;
         gap: 8px;
     }
-    .chart-container {
-        position: relative;
-        height: 300px;
-    }
+    /* Chart containers now use .cc-chart-container from mobile-system.css */
     .mission-card {
         background: #f7fafc;
         border-radius: 12px;
@@ -491,7 +488,7 @@
         <div class="col-md-6 mb-4">
             <div class="content-card">
                 <h4 class="section-title">📈 Active Businesses (Last 30 Days)</h4>
-                <div class="chart-container">
+                <div class="cc-chart-container" style="height:300px">
                     <canvas id="activeBusinessesChart"></canvas>
                 </div>
             </div>
@@ -499,7 +496,7 @@
         <div class="col-md-6 mb-4">
             <div class="content-card">
                 <h4 class="section-title">📊 Businesses by Vertical</h4>
-                <div class="chart-container">
+                <div class="cc-chart-container" style="height:300px">
                     <canvas id="verticalChart"></canvas>
                 </div>
             </div>
@@ -510,7 +507,7 @@
         <div class="col-md-6 mb-4">
             <div class="content-card">
                 <h4 class="section-title">📅 Days Remaining Distribution</h4>
-                <div class="chart-container">
+                <div class="cc-chart-container" style="height:300px">
                     <canvas id="daysDistributionChart"></canvas>
                 </div>
             </div>
@@ -518,7 +515,7 @@
         <div class="col-md-6 mb-4">
             <div class="content-card">
                 <h4 class="section-title">💳 Subscription Status Distribution</h4>
-                <div class="chart-container">
+                <div class="cc-chart-container" style="height:300px">
                     <canvas id="subscriptionStatusChart"></canvas>
                 </div>
             </div>

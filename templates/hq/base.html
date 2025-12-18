@@ -18,6 +18,9 @@
 {% endblock %}
 
 {% block extra_css %}
+<!-- HQ Mobile-First Responsive CSS -->
+<link href="{% static 'css/hq-mobile.css' %}" rel="stylesheet">
+
 <style>
   /* =========================
      Mobile-first baseline
@@ -148,6 +151,7 @@
 
 {# ================= BODY (inside base.html main.cc-page) ================= #}
 {% block body %}
+<div class="hq-page">
 
   {# ---------- Top toolbar row (chips, filters, actions). Override blocks as needed. ---------- #}
   <div class="hq-toolbar" role="toolbar" aria-label="HQ toolbar">
@@ -195,6 +199,7 @@
       <div class="text-muted">This is the HQ base. Extend this template and fill <code>block page_content</code>.</div>
     </div>
   {% endblock %}
+</div>
 
 {% endblock %}
 

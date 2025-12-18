@@ -1,394 +1,229 @@
-# Quick Test Guide: Phones Dashboard Fixes
+# Fast Sell + Liquor Barman - Quick Test Guide
 
-## 🚀 Quick Start
+## What Was Implemented
+
+### 1. Fast Sell Feature (Liquor, Pharmacy, Clothing)
+- **Single-page barcode scanner** using front camera
+- **Native BarcodeDetector API** with manual entry fallback
+- **Instant product lookup** by barcode
+- **Automatic selling price handling** (prompts if missing, saves it)
+- **Fast payment selection** (Cash/Bank/Mobile)
+- **Real-time KPI updates** (Sold Today, Revenue, Profit)
+- **No 500 errors** - all errors handled gracefully
+
+### 2. Liquor Barman Role + Attribution System
+- **LIQUOR_BARMAN role** - separate from agents
+- **Manager can invite barmen** via UI
+- **Barman can assign sales to agents** during Fast Sell
+- **Attribution tracking** with pending/reconciled status
+- **Agent dashboard shows**:
+  - Assigned sales totals
+  - Pending reconciliation count
+  - "Records Balanced ✅" when no pending items
+- **Manager/Barman reconciliation screen**:
+  - View all attributions by agent
+  - Mark pending → reconciled
+  - Filter by date/status
+  - Batch reconciliation support
+
+## Quick Testing Steps
+
+### Test 1: Fast Sell (Clothing)
+```bash
+1. Login as clothing business user
+2. Navigate to /verticals/clothing/fast-sell/
+3. Click "Start Camera" (allow camera access)
+4. Scan a barcode OR use manual entry
+5. Product appears → select quantity
+6. Choose payment method
+7. Click "Sell Now"
+8. Should see "✅ Sold" toast
+9. KPIs should update immediately
+```
+
+### Test 2: Fast Sell (Pharmacy)
+```bash
+1. Login as pharmacy business user
+2. Navigate to /verticals/pharmacy/fast-sell/
+3. Scan barcode for a PharmacyBatch
+4. Should show batch details + expiry date
+5. Complete sale
+6. Batch stock should decrement
+```
+
+### Test 3: Fast Sell (Liquor)
+```bash
+1. Login as liquor business user
+2. Navigate to /verticals/liquor/fast-sell/
+3. Scan barcode
+4. Complete sale
+5. Stock should decrement correctly
+```
+
+### Test 4: Liquor Barman Invite (Manager Only)
+```bash
+1. Login as liquor manager
+2. Navigate to /verticals/liquor/barman/invite/
+3. Fill in barman details:
+   - username: barman1
+   - password: Test123!
+4. Submit
+5. Should see success message
+6. Barman should be able to login
+```
+
+### Test 5: Barman Sale Attribution
+```bash
+1. Login as barman (created in Test 4)
+2. Navigate to /verticals/liquor/fast-sell/
+3. Scan a product
+4. Notice "Assign to Agent" dropdown appears (barman only)
+5. Select an agent from dropdown
+6. Complete sale
+7. Sale attribution should be created with status="pending"
+```
+
+### Test 6: Agent View - Pending Attributions
+```bash
+1. Login as liquor agent (who was assigned sales)
+2. View liquor dashboard
+3. Should see:
+   - "Pending Reconciliation: X" (where X > 0)
+   - Attributed sales total
+4. When all reconciled:
+   - Should show "Records Balanced ✅"
+```
+
+### Test 7: Barman Reconciliation
+```bash
+1. Login as barman or manager
+2. Navigate to /verticals/liquor/barman/reconciliation/
+3. Should see:
+   - Agent summaries (sales, amounts, pending count)
+   - Detailed attribution list
+4. Click "Mark Reconciled" on a pending attribution
+5. Status should change to "Reconciled"
+6. Agent's pending count should decrease
+```
+
+### Test 8: Error Handling
+```bash
+1. Scan invalid barcode → Should show "Product not found"
+2. Try to sell out-of-stock item → Should show "Out of stock"
+3. Try to sell quantity > available → Should show "Insufficient stock"
+4. Try to sell with missing price → Should prompt for price
+5. No crashes, no 500 errors
+```
+
+## Database Migrations
+
+Run migration:
+```bash
+python manage.py migrate sales
+```
+
+This creates the `LiquorSaleAttribution` model with fields:
+- liquor_sale_id
+- business
+- attributed_by (barman)
+- attributed_to (agent)
+- status (pending/reconciled)
+- sale_amount
+- reconciled_by, reconciled_at
+
+## API Endpoints
+
+### Fast Sell APIs (All Verticals)
+```
+GET  /verticals/{vertical}/api/fast-sell/lookup/?barcode=123456
+POST /verticals/{vertical}/api/fast-sell/sell/
+GET  /verticals/{vertical}/api/fast-sell/kpis/?range=today
+```
+
+### Liquor Barman APIs
+```
+GET  /verticals/liquor/api/barman/agents/
+POST /verticals/liquor/api/barman/reconciliation/toggle/
+```
+
+## Running Tests
 
 ```bash
-# 1. Run automated tests
-pytest inventory/tests/test_phones_agent_scoping.py -v
+# Run Fast Sell tests
+pytest sales/tests/test_fast_sell.py -v
 
-# 2. Start dev server
-python manage.py runserver
+# Run all sales tests
+pytest sales/tests/ -v
 
-# 3. Open browser to http://localhost:8000
+# Quick smoke test
+python manage.py check
 ```
 
----
+## Key Files Changed/Added
 
-## A) Test Custom Date Filter
+### Models
+- `sales/models.py` - Added `LiquorSaleAttribution`
+- `sales/migrations/1001_add_liquor_sale_attribution.py` - New migration
 
-### As Manager:
-1. Login as manager (is_staff=True user)
-2. Navigate to `/inventory/verticals/phones/`
-3. Click **"Custom"** button in date range filter
-   - ✅ Date inputs should appear immediately
-4. Select start/end dates → Click **"Apply"**
-   - ✅ Dashboard should reload with custom date range
-5. Click **"Cancel"**
-   - ✅ Date inputs should hide
-6. Click browser **Back** button, then **Forward**
-   - ✅ Custom button should still work (bfcache test)
+### Services
+- `inventory/services/fast_sell.py` - Centralized Fast Sell logic
 
-### Edge Cases:
-```
-# Invalid dates (should fall back to MTD, not crash)
-/inventory/verticals/phones/?range=custom&start=invalid&end=invalid
+### Views (Verticals)
+- `inventory/verticals/liquor.py` - Added Fast Sell + Barman views
+- `inventory/verticals/pharmacy.py` - Added Fast Sell views
+- `inventory/verticals/clothing.py` - Added Fast Sell views
 
-# Missing dates (should fall back to MTD)
-/inventory/verticals/phones/?range=custom
+### URLs
+- `verticals/urls.py` - Added Fast Sell + Barman routes
 
-# Valid custom range
-/inventory/verticals/phones/?range=custom&start=2025-12-01&end=2025-12-17
-```
+### Sidebar
+- `inventory/utils_verticals.py` - Added "Fast Sell" entries
 
----
+### Templates
+- `templates/verticals/liquor/fast_sell.html` - Camera scanner page
+- `templates/verticals/liquor/barman_invite.html` - Barman invite form
+- `templates/verticals/liquor/barman_reconciliation.html` - Reconciliation screen
+- `templates/verticals/pharmacy/fast_sell.html` - Pharmacy scanner
+- `templates/verticals/clothing/fast_sell.html` - Clothing scanner
 
-## B) Test Agent Scoping
+### Tests
+- `sales/tests/test_fast_sell.py` - Comprehensive test suite
 
-### Setup Test Data:
+## Rollback Plan
 
-```python
-# In Django shell: python manage.py shell
-from django.contrib.auth import get_user_model
-from inventory.models import InventoryItem, Product, Location
-from tenants.models import Business, BusinessKind
-from decimal import Decimal
-
-User = get_user_model()
-
-# Create test users
-manager = User.objects.create_user(username='manager', password='test123', is_staff=True)
-agent1 = User.objects.create_user(username='agent1', password='test123', is_staff=False)
-agent2 = User.objects.create_user(username='agent2', password='test123', is_staff=False)
-
-# Get/create business and location
-business = Business.objects.filter(kind=BusinessKind.PHONES).first()
-location = Location.objects.filter(business=business).first()
-product = Product.objects.filter(business=business).first()
-
-# Create sales for agent1 (2 sales, 120k revenue)
-InventoryItem.objects.create(
-    business=business,
-    product=product,
-    current_location=location,
-    assigned_agent=agent1,
-    status="SOLD",
-    sold_at=timezone.now(),
-    order_price=Decimal("50000"),
-    selling_price=Decimal("60000"),
-)
-
-InventoryItem.objects.create(
-    business=business,
-    product=product,
-    current_location=location,
-    assigned_agent=agent1,
-    status="SOLD",
-    sold_at=timezone.now(),
-    order_price=Decimal("50000"),
-    selling_price=Decimal("60000"),
-)
-
-# Create sales for agent2 (1 sale, 80k revenue)
-InventoryItem.objects.create(
-    business=business,
-    product=product,
-    current_location=location,
-    assigned_agent=agent2,
-    status="SOLD",
-    sold_at=timezone.now(),
-    order_price=Decimal("70000"),
-    selling_price=Decimal("80000"),
-)
-
-print("✅ Test data created!")
-print(f"Agent1 should see: 2 units, MK 120,000")
-print(f"Agent2 should see: 1 unit, MK 80,000")
-print(f"Manager should see: 3 units, MK 200,000")
-```
-
-### Test Manager View:
-
-1. Login as **manager** (username: manager, password: test123)
-2. Navigate to `/inventory/verticals/phones/`
-3. Check KPIs:
-   - ✅ **Units Sold:** 3
-   - ✅ **Revenue:** MK 200,000
-   - ✅ **Stock on hand:** All agents' stock combined
-4. Check top agents leaderboard:
-   - ✅ Should show both agent1 and agent2
-
-### Test Agent View:
-
-1. Logout, login as **agent1** (username: agent1, password: test123)
-2. Navigate to `/inventory/verticals/phones/`
-3. Check KPIs:
-   - ✅ **Units Sold:** 2 (only agent1's sales)
-   - ✅ **Revenue:** MK 120,000 (only agent1's revenue)
-   - ✅ **Stock on hand:** Only agent1's stock
-4. Check top agents leaderboard:
-   - ✅ Should still be visible (agents can see ranking)
-
-5. Logout, login as **agent2** (username: agent2, password: test123)
-6. Navigate to `/inventory/verticals/phones/`
-7. Check KPIs:
-   - ✅ **Units Sold:** 1 (only agent2's sales)
-   - ✅ **Revenue:** MK 80,000 (only agent2's revenue)
-   - ✅ **Stock on hand:** Only agent2's stock
-
----
-
-## C) Test Mobile Overflow Protection
-
-### Desktop Browser (Chrome DevTools):
-
-1. Open `/inventory/verticals/phones/` as any user
-2. Press **F12** → Toggle device toolbar (Ctrl+Shift+M)
-3. Set device to:
-   - **iPhone SE** (375px)
-   - **Custom:** 360px width
-
-### Test Scenarios:
-
-**Dashboard KPI Cards:**
-```
-Navigate to: /inventory/verticals/phones/
-
-✅ Check: Revenue card (e.g., "MK 1,234,567")
-   - Number should truncate with "..." if too long
-   - Hover → tooltip shows full value
-   - No horizontal scroll
-
-✅ Check: All KPI cards stack vertically (1 column)
-✅ Check: No numbers break out of cards
-```
-
-**Agent Wallet:**
-```
-Navigate to: /wallet/agent_wallet/
-
-✅ Check: "Month to Date" card
-   - "MK 987,654" should truncate if needed
-   - Hover → tooltip shows full value
-
-✅ Check: Transaction table
-   - Amount column uses responsive sizing
-   - No horizontal scroll on table
-
-✅ Check: All 4 KPI cards fit in viewport
-```
-
-**Agent Dashboard:**
-```
-Navigate to: /agent_dashboard/ (or wherever it's mounted)
-
-✅ Check: "My Sales Value" card
-   - "MK 1,500,000" should truncate if needed
-   - Hover → tooltip shows full value
-
-✅ Check: "My Commission" card
-   - Large commission amounts don't overflow
-```
-
-### Mobile Devices (Real Testing):
-
-**Test on actual devices if available:**
-- [ ] iPhone SE (375px) - Safari
-- [ ] Android phone (360px) - Chrome
-- [ ] iPad (768px) - Safari
-- [ ] Samsung Galaxy (414px) - Chrome
-
-**Check:**
-- No horizontal scroll
-- All numbers readable
-- Tooltips work on long-press (mobile)
-- Cards stack properly (1 column on phone)
-
----
-
-## D) Automated Tests
-
-### Run Full Test Suite:
-
+If issues arise:
 ```bash
-# All phones scoping tests
-pytest inventory/tests/test_phones_agent_scoping.py -v
+# Rollback migration
+python manage.py migrate sales 1000
 
-# Specific test categories
-pytest inventory/tests/test_phones_agent_scoping.py::TestVisibilityScoping -v
-pytest inventory/tests/test_phones_agent_scoping.py::TestStockScoping -v
-pytest inventory/tests/test_phones_agent_scoping.py::TestSalesScoping -v
-pytest inventory/tests/test_phones_agent_scoping.py::TestPhonesDashboardIntegration -v
-
-# Run with coverage
-pytest inventory/tests/test_phones_agent_scoping.py --cov=inventory.utils_scope --cov=inventory.verticals.phones --cov-report=html
+# Hide Fast Sell in sidebar (comment out in utils_verticals.py)
+# Remove Fast Sell URLs (comment out in verticals/urls.py)
 ```
 
-### Expected Output:
+## Known Limitations
 
-```
-================================ test session starts =================================
-inventory/tests/test_phones_agent_scoping.py::TestVisibilityScoping::test_manager_visibility PASSED
-inventory/tests/test_phones_agent_scoping.py::TestVisibilityScoping::test_agent_visibility PASSED
-inventory/tests/test_phones_agent_scoping.py::TestVisibilityScoping::test_unauthenticated_visibility PASSED
-inventory/tests/test_phones_agent_scoping.py::TestStockScoping::test_manager_sees_all_stock PASSED
-inventory/tests/test_phones_agent_scoping.py::TestStockScoping::test_agent_sees_only_own_stock PASSED
-inventory/tests/test_phones_agent_scoping.py::TestSalesScoping::test_manager_sees_all_sales PASSED
-inventory/tests/test_phones_agent_scoping.py::TestSalesScoping::test_agent_sees_only_own_sales PASSED
-inventory/tests/test_phones_agent_scoping.py::TestPhonesDashboardIntegration::test_dashboard_loads_for_manager PASSED
-inventory/tests/test_phones_agent_scoping.py::TestPhonesDashboardIntegration::test_dashboard_loads_for_agent PASSED
-inventory/tests/test_phones_agent_scoping.py::TestPhonesDashboardIntegration::test_custom_date_filter_with_valid_dates PASSED
-inventory/tests/test_phones_agent_scoping.py::TestPhonesDashboardIntegration::test_custom_date_filter_with_invalid_dates PASSED
-inventory/tests/test_phones_agent_scoping.py::TestPhonesDashboardIntegration::test_agent_kpis_show_only_own_data PASSED
+1. **BarcodeDetector API** not supported in all browsers (fallback to manual entry)
+2. **Front camera only** (no camera switching UI)
+3. **Barman role is liquor-only** (not implemented for other verticals)
+4. **Attribution system is manual** (no automatic reconciliation)
 
-================================ 12 passed in 2.34s ==================================
-```
+## Production Checklist
 
----
+- [x] No missing static files
+- [x] No 500 errors
+- [x] All DB queries use select_related/prefetch_related
+- [x] CSRF protection on all POST endpoints
+- [x] Permission checks on all views
+- [x] Graceful error handling
+- [x] Tests passing
+- [x] Django checks passing
+- [x] Migration created
 
-## E) Regression Testing
+## Support
 
-### Other Verticals (Should Be Unaffected):
-
-```bash
-# Quick smoke test on other verticals
-# Navigate to each and verify no errors:
-
-✅ Clothing: /inventory/verticals/clothing/
-✅ Liquor: /inventory/verticals/liquor/
-✅ Pharmacy: /inventory/verticals/pharmacy/
-✅ Gym: /inventory/verticals/gym/
-
-# Check:
-- Pages load without errors
-- Date filters still work
-- KPIs display correctly
-- No console errors
-```
-
----
-
-## F) Performance Testing
-
-### Check Query Count:
-
-```python
-# In Django shell with debug toolbar
-from django.test.utils import override_settings
-from django.db import connection
-from django.test import RequestFactory
-from inventory.verticals.phones import dashboard
-
-@override_settings(DEBUG=True)
-def test_query_count():
-    factory = RequestFactory()
-    request = factory.get('/inventory/verticals/phones/')
-    request.user = User.objects.get(username='manager')
-    request.business = Business.objects.filter(kind=BusinessKind.PHONES).first()
-    
-    with connection.queries as queries:
-        dashboard(request)
-    
-    print(f"Query count: {len(queries)}")
-    for i, q in enumerate(queries, 1):
-        print(f"{i}. {q['sql'][:100]}...")
-    
-    # Should be < 15 queries (ideally < 10)
-    assert len(queries) < 15, f"Too many queries: {len(queries)}"
-
-test_query_count()
-```
-
----
-
-## G) Browser Compatibility
-
-### Test in Multiple Browsers:
-
-- [ ] **Chrome** (latest) - Desktop + Mobile
-- [ ] **Firefox** (latest) - Desktop + Mobile
-- [ ] **Safari** (latest) - Desktop + Mobile (iOS)
-- [ ] **Edge** (latest) - Desktop
-- [ ] **Safari iOS** (iPhone)
-- [ ] **Chrome Android** (Samsung/Pixel)
-
-### Check:
-- Custom date filter works (all events fire correctly)
-- Date picker appears (native browser date input)
-- Mobile overflow protection applied
-- No console errors
-
----
-
-## ✅ Final Acceptance Checklist
-
-### Custom Date Filter:
-- [ ] Opens on first click (no delay)
-- [ ] Works after browser back/forward
-- [ ] Works with HTMX partial updates (if applicable)
-- [ ] Invalid dates fall back to MTD (no crash)
-- [ ] Date picker visible and focusable
-
-### Agent Scoping:
-- [ ] Managers see global totals (all agents)
-- [ ] Agents see only their own totals
-- [ ] Agent leaderboard visible to agents
-- [ ] Stock counts match expected values
-- [ ] Sales revenue matches expected values
-
-### Mobile Overflow:
-- [ ] No horizontal scroll on 360px screens
-- [ ] KPI values never overflow cards
-- [ ] Tooltips show full values
-- [ ] Wallet page safe on mobile
-- [ ] Agent dashboard safe on mobile
-
-### Tests:
-- [ ] All automated tests pass
-- [ ] No regressions in other verticals
-- [ ] No linting errors
-- [ ] Performance acceptable (< 15 queries)
-
-### Documentation:
-- [ ] Implementation summary written
-- [ ] Test guide complete
-- [ ] Deployment checklist ready
-
----
-
-## 🐛 Common Issues
-
-### Issue: Custom filter doesn't open
-
-**Cause:** JavaScript not initialized  
-**Fix:** Check browser console for errors, ensure IDs match
-
-### Issue: Agent sees other agents' data
-
-**Cause:** `is_staff` flag incorrect  
-**Fix:** Verify user.is_staff=False for agents
-
-### Issue: Numbers still overflow on mobile
-
-**Cause:** `cc-amount` class not applied  
-**Fix:** Add `cc-amount` class + `title` attribute to all amounts
-
-### Issue: Tests fail with "Business not found"
-
-**Cause:** Test fixtures incomplete  
-**Fix:** Ensure business with `kind=PHONES` exists in test DB
-
----
-
-## 📞 Support
-
-If issues persist after following this guide:
-
-1. Check `PHONES_AGENT_SCOPING_AND_CUSTOM_FILTER_FIX.md` for detailed implementation notes
-2. Review test output for specific failures
-3. Check browser console for JavaScript errors
-4. Verify database has correct test data
-
----
-
-**Last Updated:** December 17, 2025  
-**Version:** 1.0
+If you encounter issues:
+1. Check browser console for JavaScript errors
+2. Check Django logs for backend errors
+3. Verify camera permissions are granted
+4. Test manual barcode entry as fallback
+5. Check that business has correct `business_kind`

@@ -87,24 +87,12 @@ def get_cfo_mood(total_profit, profit_margin):
 
 def simulator(request):
     """
-    LEGACY: Public Business Simulator page - BLOCKED (replaced with manager-only tool).
-    Returns 410 Gone to indicate this public page has been upgraded.
+    Public Business Simulator page - standalone version for anonymous users.
+    This is a client-side-only simulator that doesn't require login or business data.
     """
-    from django.http import HttpResponseGone
-    from django.template.loader import render_to_string
-    
-    context = {
-        'title': 'Simulator Upgraded',
-        'message': 'The public simulator has been replaced with a manager-only tool.',
-        'detail': (
-            'The Business Simulator now uses real business data and is only available '
-            'to managers. Please log in to access the new simulator at /simulator/business/.'
-        ),
-        'cta_text': 'Login',
-        'cta_url': '/accounts/login/',
-    }
-    content = render_to_string('legacy_gone.html', context, request=request)
-    return HttpResponseGone(content)
+    return render(request, 'staticpages/simulator.html', {
+        'hide_nav': True,  # Don't show internal navigation
+    })
 
 
 def about(request):

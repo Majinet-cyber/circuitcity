@@ -173,6 +173,7 @@ class InviteAgentForm(forms.Form):
       - optional 'message' field is included for convenience
       - optional 'ttl_days' (default 7; 1..30 allowed)
       - optional 'location_id' (choices populated when form initialized with business=...)
+      - optional 'role' (default AGENT; can be BAR_MANAGER for liquor stores)
     """
     invited_name = forms.CharField(
         max_length=120,
@@ -201,6 +202,17 @@ class InviteAgentForm(forms.Form):
         max_value=30,
         initial=7,
         help_text="Optional. Expiry in days for the invite link (1–30). Default is 7."
+    )
+    
+    role = forms.ChoiceField(
+        required=False,
+        choices=[
+            ("AGENT", "Sales Agent"),
+            ("BAR_MANAGER", "Bar Manager"),
+        ],
+        initial="AGENT",
+        label="Role",
+        help_text="Role for the invitee. Bar Manager is for liquor stores only."
     )
 
     location_id = forms.ChoiceField(

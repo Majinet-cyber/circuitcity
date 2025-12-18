@@ -94,6 +94,33 @@
           {% endif %}
         </div>
 
+        <!-- LIQUOR ONLY: Invite Bar Manager (Supervisor/Team Lead) -->
+        {% if BUSINESS_VERTICAL == "liquor" %}
+        <div class="glass glass-info p-3 p-md-4 mt-3" style="border-left: 4px solid #3b82f6;">
+          <div class="d-flex justify-content-between align-items-center mb-2">
+            <div class="section-title"><i class="bi bi-people-fill"></i> Invite Bar Manager</div>
+            <span class="small muted">Team Lead / Supervisor</span>
+          </div>
+          <p class="small text-muted mb-3">
+            Bar Managers can access liquor dashboards, manage agents, and oversee stock. They <strong>cannot</strong> access billing or HQ settings.
+          </p>
+          <form method="post" action="{% url 'tenants:create_agent_invite' %}" class="needs-validation-bar-mgr" novalidate>
+            {% csrf_token %}
+            <input type="hidden" name="role" value="BAR_MANAGER">
+            <div class="mb-3">
+              <label class="form-label fw-semibold" for="bar_mgr_invited_name">Manager name</label>
+              <input id="bar_mgr_invited_name" type="text" name="invited_name" class="form-control" placeholder="e.g. John (Bar Manager)" required>
+              <div class="invalid-feedback">Please enter a name.</div>
+            </div>
+            <input type="hidden" name="email" value="">
+            <input type="hidden" name="phone" value="">
+            <button class="btn btn-primary" type="submit"><i class="bi bi-shield-check"></i> Create Bar Manager Invite</button>
+            <div class="small muted mt-2">This person will have supervisor-level access to liquor operations.</div>
+          </form>
+        </div>
+        {% endif %}
+        <!-- END LIQUOR BAR MANAGER INVITE -->
+
         <script>
         (function(){
           // simple client-side validation feedback for the form
@@ -104,6 +131,17 @@
                 e.preventDefault(); e.stopPropagation();
               }
               form.classList.add('was-validated');
+            }, false);
+          }
+          
+          // Bar manager form validation
+          const barMgrForm = document.querySelector('form.needs-validation-bar-mgr');
+          if (barMgrForm){
+            barMgrForm.addEventListener('submit', function(e){
+              if (!barMgrForm.checkValidity()){
+                e.preventDefault(); e.stopPropagation();
+              }
+              barMgrForm.classList.add('was-validated');
             }, false);
           }
 

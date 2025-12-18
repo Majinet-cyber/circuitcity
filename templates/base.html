@@ -63,10 +63,13 @@
   <link rel="stylesheet" href="{% static 'css/inventory-glass.css' %}?v={{ ASSET_V }}">
   <link rel="stylesheet" href="{% static 'css/polish.css' %}?v={{ ASSET_V }}">
   <link rel="stylesheet" href="{% static 'css/ui-polish.css' %}?v={{ ASSET_V }}">
+  <!-- Mobile-First UI System (NEW) -->
+  <link rel="stylesheet" href="{% static 'css/mobile-system.css' %}?v={{ ASSET_V }}">
   <link rel="stylesheet" href="{% static 'css/mobile.css' %}?v={{ ASSET_V }}">
   <link rel="stylesheet" href="{% static 'css/mobile-fixes.css' %}?v={{ ASSET_V }}">
   <link rel="stylesheet" href="{% static 'css/mobile-tables-responsive.css' %}?v={{ ASSET_V }}">
   <link rel="stylesheet" href="{% static 'css/glassmorphic-enhancement.css' %}?v={{ ASSET_V }}">
+  <link rel="stylesheet" href="{% static 'css/sidebar-more-features.css' %}?v={{ ASSET_V }}">
 
   <!-- FINAL: versioned overrides must load LAST to win the cascade -->
   <link rel="stylesheet" href="{% static 'css/v2-overrides.2025-09-25.css' %}?v={{ ASSET_V }}">
@@ -1341,6 +1344,9 @@
 {% endif %}
 
   {% include "partials/loading_spinner.html" %}
+
+{# ===== Sidebar More Features Toggle ===== #}
+<script src="{% static 'js/sidebar-more-features.js' %}?v={{ BUILD_ID|default:STATIC_VERSION|default:'1' }}"></script>
 
 {# ===== PWA Service Worker Registration ===== #}
 <script>

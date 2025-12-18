@@ -1,0 +1,706 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}⚡ Fast Sell - Pharmacy{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'css/barcode-scanner-rear-camera.css' %}">
+<style>
+.fast-sell-container {
+    max-width: 1000px;
+    margin: 2rem auto;
+    padding: 1rem;
+}
+
+.page-header {
+    background: linear-gradient(135deg, #8b5cf6 0%, #6366f1 100%);
+    color: white;
+    padding: 2rem;
+    border-radius: 20px;
+    margin-bottom: 2rem;
+    text-align: center;
+    box-shadow: 0 8px 32px rgba(139, 92, 246, 0.3);
+}
+
+.page-header h1 {
+    margin: 0 0 0.5rem 0;
+    font-size: clamp(1.8rem, 4vw, 2.5rem);
+    font-weight: 800;
+}
+
+.page-header p {
+    margin: 0;
+    opacity: 0.95;
+    font-size: 1.1rem;
+}
+
+.scanner-trigger-btn {
+    width: 100%;
+    padding: 1.5rem;
+    background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+    color: white;
+    border: none;
+    border-radius: 16px;
+    font-size: 1.25rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    box-shadow: 0 8px 24px rgba(16, 185, 129, 0.3);
+    margin-bottom: 2rem;
+}
+
+.scanner-trigger-btn:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 12px 32px rgba(16, 185, 129, 0.4);
+}
+
+.scanner-trigger-btn i {
+    font-size: 1.5rem;
+}
+
+.product-card {
+    background: linear-gradient(135deg, #8b5cf6 0%, #6366f1 100%);
+    border-radius: 20px;
+    padding: 2rem;
+    color: white;
+    margin-bottom: 2rem;
+    box-shadow: 0 10px 40px rgba(139, 92, 246, 0.3);
+    animation: slideIn 0.4s ease-out;
+}
+
+@keyframes slideIn {
+    from { opacity: 0; transform: translateY(20px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+.product-card h3 {
+    margin: 0 0 1.5rem 0;
+    font-size: clamp(1.3rem, 3vw, 1.8rem);
+    font-weight: 800;
+}
+
+.product-info {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+}
+
+.info-item {
+    background: rgba(255, 255, 255, 0.15);
+    padding: 1rem;
+    border-radius: 12px;
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.info-label {
+    font-size: 0.875rem;
+    opacity: 0.9;
+    margin-bottom: 0.5rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.info-value {
+    font-size: clamp(1.2rem, 3vw, 1.5rem);
+    font-weight: 700;
+}
+
+.qty-controls {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 1.5rem;
+    margin: 2rem 0;
+    padding: 1rem;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 16px;
+}
+
+.qty-btn {
+    width: 52px;
+    height: 52px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.25);
+    border: 2px solid rgba(255, 255, 255, 0.4);
+    color: white;
+    font-size: 1.8rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.qty-btn:hover {
+    background: rgba(255, 255, 255, 0.35);
+    transform: scale(1.15);
+}
+
+.qty-btn:active {
+    transform: scale(1.05);
+}
+
+.qty-display {
+    font-size: 2.5rem;
+    font-weight: 800;
+    min-width: 80px;
+    text-align: center;
+}
+
+.sell-btn {
+    width: 100%;
+    padding: 1.5rem;
+    background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+    color: white;
+    border: none;
+    border-radius: 16px;
+    font-size: 1.3rem;
+    font-weight: 800;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    box-shadow: 0 8px 24px rgba(16, 185, 129, 0.4);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+}
+
+.sell-btn:hover:not(:disabled) {
+    background: linear-gradient(135deg, #059669 0%, #047857 100%);
+    transform: translateY(-3px);
+    box-shadow: 0 12px 32px rgba(16, 185, 129, 0.5);
+}
+
+.sell-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    transform: none !important;
+}
+
+.kpi-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 1.5rem;
+    margin-top: 2rem;
+}
+
+.kpi-card {
+    background: white;
+    padding: 1.75rem;
+    border-radius: 16px;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+    transition: all 0.3s ease;
+    border: 2px solid transparent;
+}
+
+.kpi-card:hover {
+    border-color: #8b5cf6;
+    transform: translateY(-4px);
+    box-shadow: 0 8px 24px rgba(139, 92, 246, 0.15);
+}
+
+.kpi-label {
+    font-size: 0.9rem;
+    color: #64748b;
+    font-weight: 600;
+    margin-bottom: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.kpi-value {
+    font-size: clamp(1.8rem, 4vw, 2.2rem);
+    font-weight: 800;
+    color: #1e293b;
+}
+
+.recent-sales-panel {
+    background: white;
+    padding: 2rem;
+    border-radius: 16px;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+    margin-top: 2rem;
+}
+
+.recent-sales-panel h3 {
+    margin: 0 0 1.5rem 0;
+    font-size: 1.3rem;
+    color: #1e293b;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.sales-list {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+
+.sale-item {
+    padding: 1rem;
+    background: #f8fafc;
+    border-radius: 12px;
+    border-left: 4px solid #10b981;
+    animation: fadeIn 0.3s ease-out;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateX(-10px); }
+    to { opacity: 1; transform: translateX(0); }
+}
+
+.sale-item-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.5rem;
+}
+
+.sale-item-product {
+    font-weight: 700;
+    color: #1e293b;
+    font-size: 1.05rem;
+}
+
+.sale-item-price {
+    font-weight: 800;
+    color: #8b5cf6;
+    font-size: 1.1rem;
+}
+
+.sale-item-meta {
+    font-size: 0.85rem;
+    color: #64748b;
+}
+
+.toast {
+    position: fixed;
+    top: 2rem;
+    right: 2rem;
+    background: #10b981;
+    color: white;
+    padding: 1rem 1.5rem;
+    border-radius: 12px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
+    animation: slideInRight 0.3s ease-out;
+    z-index: 9999;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-weight: 600;
+}
+
+@keyframes slideInRight {
+    from { transform: translateX(400px); opacity: 0; }
+    to { transform: translateX(0); opacity: 1; }
+}
+
+.toast.error-toast {
+    background: #ef4444;
+}
+
+.toast i {
+    font-size: 1.3rem;
+}
+
+.hidden {
+    display: none !important;
+}
+
+/* Mobile Optimizations */
+@media (max-width: 640px) {
+    .fast-sell-container {
+        padding: 0.75rem;
+    }
+    
+    .page-header {
+        padding: 1.5rem 1rem;
+    }
+    
+    .product-card {
+        padding: 1.5rem;
+    }
+    
+    .product-info {
+        grid-template-columns: 1fr 1fr;
+    }
+    
+    .qty-controls {
+        gap: 1rem;
+    }
+    
+    .qty-btn {
+        width: 46px;
+        height: 46px;
+        font-size: 1.5rem;
+    }
+    
+    .qty-display {
+        font-size: 2rem;
+        min-width: 60px;
+    }
+    
+    .kpi-grid {
+        grid-template-columns: 1fr;
+        gap: 1rem;
+    }
+    
+    .toast {
+        top: 1rem;
+        right: 1rem;
+        left: 1rem;
+        max-width: none;
+    }
+    
+    .sale-item-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 0.5rem;
+    }
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="fast-sell-container">
+    <!-- Page Header -->
+    <div class="page-header">
+        <h1>⚡ Fast Sell</h1>
+        <p>Scan. Select payment. Sell. Done.</p>
+    </div>
+    
+    <!-- Scanner Trigger Button -->
+    <button class="scanner-trigger-btn" id="scannerTriggerBtn">
+        <i class="bi bi-upc-scan"></i>
+        <span>Open Barcode Scanner</span>
+    </button>
+    
+    <!-- Product Card (hidden until product found) -->
+    <div class="product-card hidden" id="productCard">
+        <h3 id="productName">Product Name</h3>
+        
+        <div class="product-info">
+            <div class="info-item">
+                <div class="info-label">In Stock</div>
+                <div class="info-value" id="stockQty">0</div>
+            </div>
+            <div class="info-item">
+                <div class="info-label">Price (MWK)</div>
+                <div class="info-value" id="sellingPrice">0.00</div>
+            </div>
+            <div class="info-item">
+                <div class="info-label">Batch</div>
+                <div class="info-value" id="batchCode">-</div>
+            </div>
+        </div>
+        
+        <!-- Quantity Controls -->
+        <div class="qty-controls">
+            <button class="qty-btn" id="qtyDecrease">−</button>
+            <div class="qty-display" id="qtyDisplay">1</div>
+            <button class="qty-btn" id="qtyIncrease">+</button>
+        </div>
+        
+        <!-- Payment Mix Bar -->
+        {% include "payments/_payment_mix_bar.html" with total_amount=0 %}
+        
+        <!-- Complete Sale Button -->
+        <button class="sell-btn" id="completeSaleBtn">
+            <i class="bi bi-check-circle-fill"></i>
+            <span>Complete Sale</span>
+        </button>
+    </div>
+    
+    <!-- Recent Fast Sales -->
+    <div class="recent-sales-panel hidden" id="recentSalesPanel">
+        <h3>
+            <i class="bi bi-receipt"></i>
+            Recent Fast Sales
+        </h3>
+        <div class="sales-list" id="salesList"></div>
+    </div>
+    
+    <!-- KPI Cards -->
+    <div class="kpi-grid">
+        <div class="kpi-card">
+            <div class="kpi-label">Sold Today</div>
+            <div class="kpi-value" id="kpiSold">0</div>
+        </div>
+        <div class="kpi-card">
+            <div class="kpi-label">Revenue Today</div>
+            <div class="kpi-value">MWK <span id="kpiRevenue">0</span></div>
+        </div>
+        <div class="kpi-card">
+            <div class="kpi-label">Profit Today</div>
+            <div class="kpi-value">MWK <span id="kpiProfit">0</span></div>
+        </div>
+    </div>
+</div>
+
+<script src="{% static 'js/barcode-scanner-rear-camera.js' %}"></script>
+<script>
+let currentProduct = null;
+let currentQty = 1;
+let barcodeScanner = null;
+let recentSales = [];
+
+// Initialize scanner
+document.getElementById('scannerTriggerBtn').addEventListener('click', () => {
+    if (!barcodeScanner) {
+        barcodeScanner = new RearCameraBarcodeScanner({
+            onScan: handleBarcodeScan,
+            onError: (error) => {
+                console.error('Scanner error:', error);
+            }
+        });
+    }
+    barcodeScanner.open();
+});
+
+// Handle barcode scan
+async function handleBarcodeScan(barcode) {
+    showToast(`🔍 Looking up: ${barcode}`, 'info');
+    await lookupProduct(barcode);
+}
+
+// Lookup product by barcode
+async function lookupProduct(barcode) {
+    try {
+        const resp = await fetch(`/verticals/pharmacy/api/fast-sell/lookup/?barcode=${encodeURIComponent(barcode)}`);
+        const data = await resp.json();
+        
+        if (data.ok && data.found) {
+            currentProduct = data;
+            currentQty = 1;
+            displayProduct(data);
+            showToast(`✅ Found: ${data.product.name}`, 'success');
+        } else {
+            showToast(data.error || '❌ Product not found', 'error');
+        }
+    } catch (err) {
+        console.error('Lookup error:', err);
+        showToast('❌ Lookup failed', 'error');
+    }
+}
+
+// Display product info
+function displayProduct(product) {
+    document.getElementById('productName').textContent = product.product.name;
+    document.getElementById('stockQty').textContent = product.stock_qty;
+    document.getElementById('sellingPrice').textContent = parseFloat(product.selling_price).toFixed(2);
+    document.getElementById('batchCode').textContent = product.batch_code || '-';
+    document.getElementById('qtyDisplay').textContent = currentQty;
+    document.getElementById('productCard').classList.remove('hidden');
+    
+    // Update payment mix bar total
+    const totalPrice = parseFloat(product.selling_price) * currentQty;
+    if (window.updatePaymentTotal) {
+        window.updatePaymentTotal(totalPrice);
+    }
+    
+    // Scroll to product card
+    document.getElementById('productCard').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+// Quantity controls
+document.getElementById('qtyDecrease').addEventListener('click', () => {
+    if (!currentProduct) return;
+    currentQty = Math.max(1, currentQty - 1);
+    updateQtyDisplay();
+});
+
+document.getElementById('qtyIncrease').addEventListener('click', () => {
+    if (!currentProduct) return;
+    const maxQty = currentProduct.stock_qty || 999;
+    currentQty = Math.min(currentQty + 1, maxQty);
+    updateQtyDisplay();
+});
+
+function updateQtyDisplay() {
+    document.getElementById('qtyDisplay').textContent = currentQty;
+    
+    // Update payment total
+    if (currentProduct && window.updatePaymentTotal) {
+        const totalPrice = parseFloat(currentProduct.selling_price) * currentQty;
+        window.updatePaymentTotal(totalPrice);
+    }
+}
+
+// Complete sale
+document.getElementById('completeSaleBtn').addEventListener('click', async () => {
+    if (!currentProduct) return;
+    
+    // Validate payment
+    if (!window.validatePaymentMix || !window.validatePaymentMix()) {
+        return;
+    }
+    
+    const btn = document.getElementById('completeSaleBtn');
+    btn.disabled = true;
+    btn.innerHTML = '<i class="bi bi-hourglass-split"></i> Processing...';
+    
+    try {
+        // Gather payment data
+        const paymentMode = document.getElementById('paymentMode')?.value || 'single';
+        const paymentMethod = document.getElementById('paymentMethod')?.value || 'CASH';
+        
+        const payload = {
+            batch_id: currentProduct.batch_id,
+            quantity: currentQty,
+            payment_mode: paymentMode,
+            payment_method: paymentMethod
+        };
+        
+        // Add multi-method amounts if applicable
+        if (paymentMode === 'multi') {
+            payload.cash_amount = parseFloat(document.getElementById('cashAmount')?.value || 0);
+            payload.bank_amount = parseFloat(document.getElementById('bankAmount')?.value || 0);
+            payload.mobile_money_amount = parseFloat(document.getElementById('mobileMoneyAmount')?.value || 0);
+        }
+        
+        const resp = await fetch('/verticals/pharmacy/api/fast-sell/sell/', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': '{{ csrf_token }}'
+            },
+            body: JSON.stringify(payload)
+        });
+        
+        const data = await resp.json();
+        
+        if (data.ok) {
+            showToast(`✅ ${data.message}`, 'success');
+            
+            // Add to recent sales
+            addRecentSale({
+                product: currentProduct.product.name,
+                quantity: currentQty,
+                price: currentProduct.selling_price,
+                payment_method: paymentMethod,
+                timestamp: new Date().toLocaleTimeString()
+            });
+            
+            // Refresh KPIs
+            await refreshKPIs();
+            
+            // Reset for next sale
+            resetForNextSale();
+        } else {
+            showToast(`❌ ${data.error || 'Sale failed'}`, 'error');
+            btn.disabled = false;
+            btn.innerHTML = '<i class="bi bi-check-circle-fill"></i> <span>Complete Sale</span>';
+        }
+    } catch (err) {
+        console.error('Sale error:', err);
+        showToast('❌ Sale failed', 'error');
+        btn.disabled = false;
+        btn.innerHTML = '<i class="bi bi-check-circle-fill"></i> <span>Complete Sale</span>';
+    }
+});
+
+// Add recent sale to list
+function addRecentSale(sale) {
+    recentSales.unshift(sale);
+    
+    // Keep only last 10
+    if (recentSales.length > 10) {
+        recentSales.pop();
+    }
+    
+    renderRecentSales();
+}
+
+// Render recent sales
+function renderRecentSales() {
+    const panel = document.getElementById('recentSalesPanel');
+    const list = document.getElementById('salesList');
+    
+    if (recentSales.length === 0) {
+        panel.classList.add('hidden');
+        return;
+    }
+    
+    panel.classList.remove('hidden');
+    
+    list.innerHTML = recentSales.map(sale => `
+        <div class="sale-item">
+            <div class="sale-item-header">
+                <span class="sale-item-product">${sale.product}</span>
+                <span class="sale-item-price">MWK ${(parseFloat(sale.price) * sale.quantity).toFixed(2)}</span>
+            </div>
+            <div class="sale-item-meta">
+                Qty: ${sale.quantity} • ${sale.payment_method} • ${sale.timestamp}
+            </div>
+        </div>
+    `).join('');
+}
+
+// Reset for next sale
+function resetForNextSale() {
+    currentProduct = null;
+    currentQty = 1;
+    document.getElementById('productCard').classList.add('hidden');
+    
+    // Reset payment mix bar
+    document.querySelectorAll('.payment-amount-input').forEach(input => {
+        input.value = '';
+    });
+    document.querySelector('input[name="payment_method_single"][value="CASH"]').checked = true;
+    document.getElementById('paymentMode').value = 'single';
+    document.getElementById('paymentMethod').value = 'CASH';
+    
+    const btn = document.getElementById('completeSaleBtn');
+    btn.disabled = false;
+    btn.innerHTML = '<i class="bi bi-check-circle-fill"></i> <span>Complete Sale</span>';
+}
+
+// Refresh KPIs
+async function refreshKPIs() {
+    try {
+        const resp = await fetch('/verticals/pharmacy/api/fast-sell/kpis/?range=today');
+        const data = await resp.json();
+        
+        if (data.ok) {
+            document.getElementById('kpiSold').textContent = data.sold_today || 0;
+            document.getElementById('kpiRevenue').textContent = parseFloat(data.revenue_today || 0).toFixed(2);
+            document.getElementById('kpiProfit').textContent = parseFloat(data.profit_today || 0).toFixed(2);
+        }
+    } catch (err) {
+        console.error('KPI refresh failed:', err);
+    }
+}
+
+// Show toast notification
+function showToast(message, type = 'success') {
+    const toast = document.createElement('div');
+    toast.className = `toast ${type === 'error' ? 'error-toast' : ''}`;
+    
+    const icon = type === 'error' ? '<i class="bi bi-x-circle-fill"></i>' :
+                 type === 'info' ? '<i class="bi bi-info-circle-fill"></i>' :
+                 '<i class="bi bi-check-circle-fill"></i>';
+    
+    toast.innerHTML = `${icon}<span>${message}</span>`;
+    document.body.appendChild(toast);
+    
+    setTimeout(() => {
+        toast.style.opacity = '0';
+        setTimeout(() => toast.remove(), 300);
+    }, 3000);
+}
+
+// Initialize
+document.addEventListener('DOMContentLoaded', () => {
+    refreshKPIs();
+});
+</script>
+{% endblock %}

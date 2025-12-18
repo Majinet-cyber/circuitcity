@@ -1,0 +1,325 @@
+{% extends "base.html" %}
+{% load static %}
+{% load humanize %}
+
+{% block title %}Rollback #{{ rollback.pk }} · Audit{% endblock %}
+{% block header_title %}📜 Rollback Audit Trail{% endblock %}
+
+{% block extra_css %}
+<style>
+  .page{max-width:900px;margin:0 auto;padding:clamp(12px,4vw,24px)}
+  
+  .card{
+    background:#fff;
+    border:1px solid #e2e8f0;
+    border-radius:16px;
+    padding:24px;
+    box-shadow:0 4px 12px rgba(0,0,0,.05);
+    margin-bottom:24px;
+  }
+  
+  .badge{
+    display:inline-block;
+    padding:6px 14px;
+    border-radius:999px;
+    font-size:13px;
+    font-weight:600;
+  }
+  .badge-success{background:#d1fae5;color:#065f46}
+  .badge-warning{background:#fef3c7;color:#92400e}
+  .badge-danger{background:#fee2e2;color:#991b1b}
+  .badge-info{background:#dbeafe;color:#1e40af}
+  
+  .detail-row{
+    display:flex;
+    justify-content:space-between;
+    align-items:flex-start;
+    padding:14px 0;
+    border-bottom:1px solid #f1f5f9;
+  }
+  .detail-row:last-child{border-bottom:none}
+  .detail-label{color:#64748b;font-size:14px;flex:0 0 180px}
+  .detail-value{font-weight:600;font-size:15px;flex:1;text-align:right}
+  
+  .timeline{
+    position:relative;
+    padding-left:32px;
+    margin-top:20px;
+  }
+  .timeline::before{
+    content:'';
+    position:absolute;
+    left:8px;
+    top:8px;
+    bottom:8px;
+    width:2px;
+    background:#e2e8f0;
+  }
+  .timeline-item{
+    position:relative;
+    padding:12px 0;
+  }
+  .timeline-dot{
+    position:absolute;
+    left:-28px;
+    top:16px;
+    width:16px;
+    height:16px;
+    background:#10b981;
+    border:3px solid #fff;
+    border-radius:50%;
+    box-shadow:0 0 0 2px #e2e8f0;
+  }
+  .timeline-content{
+    background:#f8fafc;
+    border-radius:10px;
+    padding:14px 16px;
+  }
+  .timeline-title{
+    font-weight:600;
+    font-size:15px;
+    margin-bottom:4px;
+  }
+  .timeline-desc{
+    font-size:13px;
+    color:#64748b;
+  }
+  
+  .alert{
+    padding:16px 20px;
+    border-radius:12px;
+    margin-bottom:24px;
+    display:flex;
+    align-items:center;
+    gap:12px;
+  }
+  .alert-success{background:#d1fae5;border:1px solid #10b981;color:#065f46}
+  .alert i{font-size:24px}
+  
+  .btn{
+    appearance:none;
+    border:none;
+    padding:12px 24px;
+    border-radius:10px;
+    font-weight:600;
+    font-size:14px;
+    cursor:pointer;
+    transition:all .2s;
+    display:inline-flex;
+    align-items:center;
+    gap:8px;
+    min-height:44px;
+    text-decoration:none;
+  }
+  .btn-secondary{background:#f1f5f9;color:#475569}
+  .btn-secondary:hover{background:#e2e8f0}
+  
+  @media (max-width:640px){
+    .detail-row{flex-direction:column;gap:6px}
+    .detail-label{flex:1}
+    .detail-value{text-align:left}
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page">
+  <!-- Success Alert -->
+  <div class="alert alert-success">
+    <i class="bi bi-check-circle-fill"></i>
+    <div>
+      <strong>Rollback Completed Successfully</strong>
+      <p style="margin:4px 0 0">Sale #{{ rollback.sale.pk }} has been rolled back and marked as reversed.</p>
+    </div>
+  </div>
+  
+  <!-- Rollback Summary -->
+  <div class="card">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px">
+      <h2 style="margin:0;font-size:20px;">🔄 Rollback Summary</h2>
+      <span style="color:#64748b;font-size:14px">ID: #{{ rollback.pk }}</span>
+    </div>
+    
+    <div class="detail-row">
+      <span class="detail-label">Sale ID</span>
+      <span class="detail-value">#{{ rollback.sale.pk }}</span>
+    </div>
+    
+    <div class="detail-row">
+      <span class="detail-label">Reason</span>
+      <span class="detail-value">
+        {% if rollback.reason == 'DAMAGED' %}
+        <span class="badge badge-danger">{{ rollback.get_reason_display }}</span>
+        {% elif rollback.reason == 'RETURNED' %}
+        <span class="badge badge-warning">{{ rollback.get_reason_display }}</span>
+        {% elif rollback.reason == 'ERROR' %}
+        <span class="badge badge-info">{{ rollback.get_reason_display }}</span>
+        {% else %}
+        <span class="badge">{{ rollback.get_reason_display }}</span>
+        {% endif %}
+      </span>
+    </div>
+    
+    <div class="detail-row">
+      <span class="detail-label">Refunded</span>
+      <span class="detail-value">
+        {% if rollback.refunded %}
+        <span class="badge badge-success">K{{ rollback.refunded_amount|floatformat:0|intcomma }}</span>
+        {% else %}
+        <span style="color:#94a3b8">No refund</span>
+        {% endif %}
+      </span>
+    </div>
+    
+    <div class="detail-row">
+      <span class="detail-label">Returned to Stock</span>
+      <span class="detail-value">
+        {% if rollback.return_to_stock %}
+        <i class="bi bi-check-circle" style="color:#10b981"></i> Yes
+        {% else %}
+        <span style="color:#94a3b8">No</span>
+        {% endif %}
+      </span>
+    </div>
+    
+    <div class="detail-row">
+      <span class="detail-label">Performed By</span>
+      <span class="detail-value">{{ rollback.created_by.get_full_name|default:rollback.created_by.username }}</span>
+    </div>
+    
+    <div class="detail-row">
+      <span class="detail-label">Date & Time</span>
+      <span class="detail-value">
+        {{ rollback.created_at|date:"F d, Y" }} at {{ rollback.created_at|time:"g:i A" }}
+        <br><small style="color:#64748b;font-weight:normal">{{ rollback.created_at|timesince }} ago</small>
+      </span>
+    </div>
+    
+    {% if rollback.notes %}
+    <div class="detail-row">
+      <span class="detail-label">Notes</span>
+      <span class="detail-value" style="font-weight:normal;font-style:italic;color:#64748b">
+        "{{ rollback.notes }}"
+      </span>
+    </div>
+    {% endif %}
+  </div>
+  
+  <!-- Original Sale Details -->
+  <div class="card">
+    <h2 style="margin:0 0 20px;font-size:20px;">📋 Original Sale Details</h2>
+    
+    <div class="detail-row">
+      <span class="detail-label">Item</span>
+      <span class="detail-value">
+        {{ rollback.sale.item.product.name|default:"Unknown" }}
+        {% if rollback.sale.item.product.variant_label %}
+        <br><small style="color:#64748b;font-weight:normal">{{ rollback.sale.item.product.variant_label }}</small>
+        {% endif %}
+      </span>
+    </div>
+    
+    {% if rollback.sale.item.imei %}
+    <div class="detail-row">
+      <span class="detail-label">IMEI</span>
+      <span class="detail-value"><code>{{ rollback.sale.item.imei }}</code></span>
+    </div>
+    {% elif rollback.sale.item.barcode %}
+    <div class="detail-row">
+      <span class="detail-label">Barcode</span>
+      <span class="detail-value"><code>{{ rollback.sale.item.barcode }}</code></span>
+    </div>
+    {% endif %}
+    
+    <div class="detail-row">
+      <span class="detail-label">Sale Price</span>
+      <span class="detail-value" style="color:#10b981">K{{ rollback.sale.price|floatformat:0|intcomma }}</span>
+    </div>
+    
+    <div class="detail-row">
+      <span class="detail-label">Agent</span>
+      <span class="detail-value">{{ rollback.sale.agent.get_full_name|default:rollback.sale.agent.username }}</span>
+    </div>
+    
+    <div class="detail-row">
+      <span class="detail-label">Location</span>
+      <span class="detail-value">{{ rollback.sale.location.name }}</span>
+    </div>
+    
+    <div class="detail-row">
+      <span class="detail-label">Original Sale Date</span>
+      <span class="detail-value">
+        {{ rollback.sale.sold_at|date:"F d, Y" }}
+        <br><small style="color:#64748b;font-weight:normal">{{ rollback.sale.created_at|date:"g:i A" }}</small>
+      </span>
+    </div>
+    
+    <div class="detail-row">
+      <span class="detail-label">Payment Method</span>
+      <span class="detail-value">{{ rollback.sale.get_payment_method_display }}</span>
+    </div>
+  </div>
+  
+  <!-- Actions Timeline -->
+  <div class="card">
+    <h2 style="margin:0 0 8px;font-size:20px;">⚡ Actions Taken</h2>
+    
+    <div class="timeline">
+      <div class="timeline-item">
+        <div class="timeline-dot"></div>
+        <div class="timeline-content">
+          <div class="timeline-title">Sale Marked as Rolled Back</div>
+          <div class="timeline-desc">Sale #{{ rollback.sale.pk }} flagged as rolled back in the database</div>
+        </div>
+      </div>
+      
+      {% if rollback.return_to_stock %}
+      <div class="timeline-item">
+        <div class="timeline-dot"></div>
+        <div class="timeline-content">
+          <div class="timeline-title">Inventory Restored</div>
+          <div class="timeline-desc">Item returned to stock and marked as available</div>
+        </div>
+      </div>
+      {% endif %}
+      
+      <div class="timeline-item">
+        <div class="timeline-dot"></div>
+        <div class="timeline-content">
+          <div class="timeline-title">Commissions Reversed</div>
+          <div class="timeline-desc">All commission entries for this sale have been reversed</div>
+        </div>
+      </div>
+      
+      {% if rollback.refunded %}
+      <div class="timeline-item">
+        <div class="timeline-dot"></div>
+        <div class="timeline-content">
+          <div class="timeline-title">Refund Recorded</div>
+          <div class="timeline-desc">Negative ledger entry created: K{{ rollback.refunded_amount|floatformat:0|intcomma }}</div>
+        </div>
+      </div>
+      {% endif %}
+      
+      <div class="timeline-item">
+        <div class="timeline-dot"></div>
+        <div class="timeline-content">
+          <div class="timeline-title">Audit Record Created</div>
+          <div class="timeline-desc">Rollback #{{ rollback.pk }} logged for compliance and tracking</div>
+        </div>
+      </div>
+    </div>
+  </div>
+  
+  <!-- Actions -->
+  <div style="display:flex;gap:12px">
+    <a href="{% url 'sales:rollback_home' %}" class="btn btn-secondary" style="flex:1">
+      <i class="bi bi-arrow-left"></i> Back to Rollback Home
+    </a>
+    <a href="{% url 'inventory:stock_list' %}" class="btn btn-secondary" style="flex:1">
+      <i class="bi bi-box-seam"></i> View Stock
+    </a>
+  </div>
+</div>
+{% endblock %}
+

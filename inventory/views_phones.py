@@ -282,10 +282,43 @@ def phone_scan_in(request: HttpRequest) -> HttpResponse:
     catalog_id = request.POST.get("catalog_product_id", "").strip()
     imei = request.POST.get("imei", "").strip()
     
+    # NEW: Barcode workflow
+    has_barcode = request.POST.get("has_barcode", "no").strip()
+    barcode_value = request.POST.get("barcode", "").strip()
+    
     # Basic validation
     if not (brand_key and catalog_id and imei):
         messages.error(request, "Please select a brand, model, and enter IMEI.")
         return redirect("inventory:phone_scan_in")
+    
+    # NEW: Barcode validation (conditional)
+    if has_barcode == "yes":
+        if not barcode_value:
+            messages.error(request, "Barcode is required when 'Has Barcode' is Yes.")
+            return redirect("inventory:phone_scan_in")
+        
+        from inventory.utils_barcodes import validate_barcode, normalize_barcode, find_by_barcode
+        is_valid, error_msg = validate_barcode(barcode_value)
+        if not is_valid:
+            messages.error(request, f"Invalid barcode: {error_msg}")
+            return redirect("inventory:phone_scan_in")
+        
+        barcode_value = normalize_barcode(barcode_value)
+        
+        # Check for duplicate barcode in this business (prevent two different products sharing same barcode)
+        existing_products = find_by_barcode(barcode_value, business=business)
+        if existing_products.exists():
+            # Check if it's a different product (not the one we're about to create)
+            # For phones, we check by brand+model+variant
+            for existing_prod in existing_products:
+                # If barcode already used by a different product, reject
+                # (We'll allow same product to have same barcode, but not different products)
+                messages.error(
+                    request,
+                    f"Barcode {barcode_value} is already used by another product in your business. "
+                    "Each barcode must be unique."
+                )
+                return redirect("inventory:phone_scan_in")
     
     # Security: Ensure the catalog product belongs to THIS business (prevent cross-business attacks)
     try:
@@ -336,6 +369,12 @@ def phone_scan_in(request: HttpRequest) -> HttpResponse:
             "sale_price": catalog_product.default_selling_price or Decimal("0.00"),
         }
     )
+    
+    # NEW: Store barcode on product if provided
+    if has_barcode == "yes" and barcode_value:
+        from inventory.utils_barcodes import set_barcode
+        set_barcode(product, barcode_value)
+        product.save()
     
     # Create inventory item
     try:
@@ -477,7 +516,8 @@ def phone_scan_sell(request: HttpRequest) -> HttpResponse:
         messages.error(request, f"IMEI must be exactly 15 digits. Got {len(imei_clean)} digits.")
         return redirect("inventory:phone_scan_sell")
     
-    # Find in-stock item
+    # Find in-stock item (AGENTS CAN SELL ANY UNSOLD PHONE IN BUSINESS)
+    # No longer filter by assigned_agent - allow agents to sell any business stock
     item_qs = InventoryItem.objects.filter(
         business=business,
         imei=imei_clean,
@@ -488,7 +528,8 @@ def phone_scan_sell(request: HttpRequest) -> HttpResponse:
     if location:
         item_qs = item_qs.filter(current_location=location)
     
-    item = item_qs.first()
+    # Use select_for_update to prevent race conditions (double-sell)
+    item = item_qs.select_for_update().first()
     
     if not item:
         messages.error(
@@ -511,13 +552,14 @@ def phone_scan_sell(request: HttpRequest) -> HttpResponse:
     cost = item.order_price or Decimal("0.00")
     profit = selling_price - cost
     
-    # Mark as sold
+    # Mark as sold and track who sold it (for commission attribution)
     try:
         item.status = "SOLD"
         item.selling_price = selling_price
         item.sold_at = timezone.now()
         item.payment_method = payment_method
-        item.save(update_fields=["status", "selling_price", "sold_at", "payment_method", "updated_at"])
+        item.sold_by = request.user  # Track selling agent for commission
+        item.save(update_fields=["status", "selling_price", "sold_at", "payment_method", "sold_by", "updated_at"])
         
         # Premium success message with profit
         sales_left = max(0, daily_sales_target - (sold_today + 1))

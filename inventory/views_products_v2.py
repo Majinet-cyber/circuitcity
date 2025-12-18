@@ -468,6 +468,83 @@ def product_create_liquor_v2(request):
     qs = _product_base_qs(request)
 
     if request.method == "POST":
+        # NEW: Barcode workflow
+        has_barcode = request.POST.get("has_barcode", "no").strip()
+        barcode_value = request.POST.get("barcode", "").strip()
+        
+        # NEW: Barcode validation (conditional)
+        if has_barcode == "yes":
+            if not barcode_value:
+                messages.error(request, "Barcode is required when 'Has Barcode' is Yes.")
+                # Re-render form with error
+                form = LiquorProductForm(request.POST)
+                products = LiquorProduct.objects.filter(
+                    business=business,
+                    is_archived=False,
+                ).order_by("category", "name")
+                try:
+                    from core.decorators import _is_manager
+                    is_manager = _is_manager(request.user)
+                except (ImportError, AttributeError):
+                    is_manager = request.user.is_staff or request.user.is_superuser
+                return render(request, "inventory/products/liquor_v2.html", {
+                    "form": form,
+                    "products": products,
+                    "vertical": "liquor",
+                    "active_tab": "liquor_products",
+                    "IS_MANAGER": is_manager,
+                })
+            
+            from inventory.utils_barcodes import validate_barcode, normalize_barcode, find_by_barcode
+            is_valid, error_msg = validate_barcode(barcode_value)
+            if not is_valid:
+                messages.error(request, f"Invalid barcode: {error_msg}")
+                form = LiquorProductForm(request.POST)
+                products = LiquorProduct.objects.filter(
+                    business=business,
+                    is_archived=False,
+                ).order_by("category", "name")
+                try:
+                    from core.decorators import _is_manager
+                    is_manager = _is_manager(request.user)
+                except (ImportError, AttributeError):
+                    is_manager = request.user.is_staff or request.user.is_superuser
+                return render(request, "inventory/products/liquor_v2.html", {
+                    "form": form,
+                    "products": products,
+                    "vertical": "liquor",
+                    "active_tab": "liquor_products",
+                    "IS_MANAGER": is_manager,
+                })
+            
+            barcode_value = normalize_barcode(barcode_value)
+            
+            # Check for duplicate barcode in this business
+            existing_products = find_by_barcode(barcode_value, business=business)
+            if existing_products.exists():
+                messages.error(
+                    request,
+                    f"Barcode {barcode_value} is already used by another product in your business. "
+                    "Each barcode must be unique."
+                )
+                form = LiquorProductForm(request.POST)
+                products = LiquorProduct.objects.filter(
+                    business=business,
+                    is_archived=False,
+                ).order_by("category", "name")
+                try:
+                    from core.decorators import _is_manager
+                    is_manager = _is_manager(request.user)
+                except (ImportError, AttributeError):
+                    is_manager = request.user.is_staff or request.user.is_superuser
+                return render(request, "inventory/products/liquor_v2.html", {
+                    "form": form,
+                    "products": products,
+                    "vertical": "liquor",
+                    "active_tab": "liquor_products",
+                    "IS_MANAGER": is_manager,
+                })
+        
         form = LiquorProductForm(request.POST)
         if form.is_valid():
             p = Product()
@@ -476,6 +553,12 @@ def product_create_liquor_v2(request):
                 if biz is not None:
                     setattr(p, "business_id", getattr(biz, "id", biz))
             _inflate_liquor(p, form.cleaned_data)
+            
+            # NEW: Store barcode if provided
+            if has_barcode == "yes" and barcode_value:
+                from inventory.utils_barcodes import set_barcode
+                set_barcode(p, barcode_value)
+            
             try:
                 p.save()
                 messages.success(request, "Liquor item saved.")

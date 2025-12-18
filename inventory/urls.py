@@ -926,6 +926,18 @@ urlpatterns = [
 # to ensure the namespace is properly registered
 
 # -------------------- JSON APIs (NO require_business wrapper) --------------------
+# Fast Sell API (universal for all verticals)
+try:
+    from . import api_fast_sell as _fast_sell_api
+except Exception:
+    _fast_sell_api = SimpleNamespace()
+
+urlpatterns += [
+    path("api/fast-sell/lookup/", _need_biz(getattr(_fast_sell_api, "fast_sell_lookup", _stub("fast_sell_lookup not found"))), name="api_fast_sell_lookup"),
+    path("api/fast-sell/sell/", _need_biz(getattr(_fast_sell_api, "fast_sell_sell", _stub("fast_sell_sell not found"))), name="api_fast_sell_sell"),
+    path("api/fast-sell/kpis/", _need_biz(getattr(_fast_sell_api, "fast_sell_kpis", _stub("fast_sell_kpis not found"))), name="api_fast_sell_kpis"),
+]
+
 urlpatterns += [
     path("api/scan-in/", _scan_in_api, name="api_scan_in"),
     path("api/scan-sold/", _scan_sold_api, name="api_scan_sold"),
@@ -1202,6 +1214,18 @@ urlpatterns += [
     path("api/analytics/charts/", _need_biz(_analytics_charts_json), name="analytics_charts_json"),
     path("api/analytics/stock/", _need_biz(_analytics_stock_json), name="analytics_stock_json"),
     path("api/analytics/health/", _need_biz(_analytics_health), name="analytics_health"),
+]
+
+# Stock Overview Cross-Vertical endpoint
+try:
+    from .views_analytics import api_stock_overview_cross_vertical
+    _stock_overview_cross_vertical = api_stock_overview_cross_vertical
+except Exception:
+    def _stock_overview_cross_vertical(request):
+        return JsonResponse({"ok": False, "error": "Not available"}, status=501)
+
+urlpatterns += [
+    path("analytics/stock-overview-cross-vertical.json", _need_biz(_stock_overview_cross_vertical), name="analytics_stock_overview_cross_vertical"),
 ]
 
 # Alerts/Notifications system

@@ -3,6 +3,34 @@
 
 {% block title %}Stock In · Pharmacy & Cosmetics · Emajinet{% endblock %}
 
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'css/barcode-scanner-rear-camera.css' %}?v={{ BUILD_ID|default:STATIC_VERSION|default:'1' }}">
+<style>
+.btn-scanner {
+  background: linear-gradient(120deg, #667eea, #764ba2);
+  color: white;
+  border: none;
+  border-radius: 12px;
+  padding: 12px 16px;
+  font-size: 1.2rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 48px;
+  min-height: 48px;
+}
+.btn-scanner:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(102, 126, 234, 0.4);
+}
+.btn-scanner:active {
+  transform: scale(0.95);
+}
+</style>
+{% endblock %}
+
 {% block content %}
 
 <style>
@@ -82,7 +110,7 @@
           <small>Generic or brand name</small>
         </div>
         <div class="form-field">
-          <label>SKU / Barcode</label>
+          <label>SKU</label>
           <input type="text" name="sku" placeholder="Optional">
         </div>
       </div>
@@ -97,6 +125,33 @@
           {% endfor %}
         </select>
         <small class="text-muted d-block mt-1">Choose the closest match (medicine, skin care, perfumes, etc.)</small>
+      </div>
+
+      <!-- Barcode Workflow -->
+      <div class="form-field" style="margin-top:20px">
+        <label style="display:block;margin-bottom:8px;font-weight:600;">Has Barcode?</label>
+        <div style="display:flex;gap:16px;margin-bottom:8px;">
+          <label style="display:flex;align-items:center;gap:6px;cursor:pointer;">
+            <input type="radio" name="has_barcode" value="no" checked style="cursor:pointer;">
+            <span>No</span>
+          </label>
+          <label style="display:flex;align-items:center;gap:6px;cursor:pointer;">
+            <input type="radio" name="has_barcode" value="yes" style="cursor:pointer;">
+            <span>Yes</span>
+          </label>
+        </div>
+        <small style="color:#64748b;font-size:0.85rem;">If your product has a printed barcode, choose Yes and scan/type it. If not, choose No.</small>
+      </div>
+
+      <div class="form-field" id="barcode-field" style="display:none;margin-top:12px">
+        <label>Barcode <span class="required">*</span></label>
+        <div style="display:flex;gap:8px;align-items:center;">
+          <input type="text" name="barcode" id="barcode-input" placeholder="Scan or type barcode" maxlength="100" style="flex:1;">
+          <button type="button" id="openScannerBtn" class="btn-scanner" title="Open camera scanner">
+            <i class="bi bi-upc-scan"></i>
+          </button>
+        </div>
+        <small style="color:#64748b;font-size:0.85rem;">Required when Has Barcode = Yes</small>
       </div>
     </div>
 
@@ -181,6 +236,89 @@ function selectProductType(element, value) {
     element.querySelector('input[type="radio"]').checked = true;
   }
 }
+
+// Barcode workflow: show/hide barcode field based on radio selection
+function toggleBarcodeField() {
+  const hasBarcodeYes = document.querySelector('input[name="has_barcode"][value="yes"]');
+  const barcodeField = document.getElementById('barcode-field');
+  const barcodeInput = document.getElementById('barcode-input');
+  
+  if (hasBarcodeYes && hasBarcodeYes.checked) {
+    barcodeField.style.display = 'block';
+    if (barcodeInput) barcodeInput.required = true;
+  } else {
+    barcodeField.style.display = 'none';
+    if (barcodeInput) {
+      barcodeInput.required = false;
+      barcodeInput.value = '';
+    }
+  }
+}
+
+// Initialize barcode workflow on page load and bfcache restore
+document.addEventListener('DOMContentLoaded', function() {
+  const barcodeRadios = document.querySelectorAll('input[name="has_barcode"]');
+  barcodeRadios.forEach(radio => {
+    radio.addEventListener('change', toggleBarcodeField);
+  });
+  toggleBarcodeField();
+});
+
+window.addEventListener('pageshow', function(event) {
+  if (event.persisted) {
+    toggleBarcodeField();
+  }
+});
+</script>
+
+<!-- Barcode Scanner Integration (Rear Camera) -->
+<script src="{% static 'js/barcode-scanner-rear-camera.js' %}?v={{ BUILD_ID|default:STATIC_VERSION|default:'1' }}"></script>
+<script>
+(function() {
+  'use strict';
+  
+  let barcodeScanner = null;
+  
+  // Initialize scanner when DOM is ready
+  document.addEventListener('DOMContentLoaded', function() {
+    const openScannerBtn = document.getElementById('openScannerBtn');
+    const barcodeInput = document.getElementById('barcode-input');
+    
+    if (!openScannerBtn || !barcodeInput) return;
+    
+    // Create rear camera scanner instance
+    barcodeScanner = new RearCameraBarcodeScanner({
+      onScan: function(barcode) {
+        // Auto-fill barcode field
+        barcodeInput.value = barcode;
+        barcodeInput.dispatchEvent(new Event('input', { bubbles: true }));
+        
+        // Show success feedback
+        barcodeInput.style.borderColor = '#10b981';
+        barcodeInput.style.boxShadow = '0 0 0 3px rgba(16, 185, 129, 0.2)';
+        setTimeout(() => {
+          barcodeInput.style.borderColor = '';
+          barcodeInput.style.boxShadow = '';
+        }, 1500);
+      },
+      onError: function(error) {
+        console.error('Scanner error:', error);
+      }
+    });
+    
+    // Open scanner on button click
+    openScannerBtn.addEventListener('click', function() {
+      barcodeScanner.open();
+    });
+  });
+  
+  // Cleanup on page unload
+  window.addEventListener('beforeunload', function() {
+    if (barcodeScanner) {
+      barcodeScanner.destroy();
+    }
+  });
+})();
 </script>
 
 {% endblock %}

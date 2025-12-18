@@ -129,6 +129,9 @@ urlpatterns = [
 
     # Layby app
     path("layby/", include(("layby.urls", "layby"), namespace="layby")),
+    
+    # Sales app (rollback, commissions, etc.)
+    path("sales/", include(("sales.urls", "sales"), namespace="sales")),
 
     # Accounts app (login, password reset, avatars, etc.)
     path("accounts/", include("accounts.urls")),

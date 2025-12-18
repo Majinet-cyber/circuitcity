@@ -192,6 +192,34 @@
       transform: translateY(-2px);
       box-shadow: 0 6px 20px rgba(79, 70, 229, 0.4);
     }
+    
+    /* Glassmorphic Get Started button in navbar */
+    .nav-actions .btn-primary {
+      background: linear-gradient(135deg, rgba(79, 70, 229, 0.9), rgba(67, 56, 202, 0.95));
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      box-shadow: 0 4px 20px rgba(79, 70, 229, 0.4), 0 0 20px rgba(79, 70, 229, 0.2);
+      font-size: 1rem;
+    }
+    
+    .nav-actions .btn-primary:hover {
+      background: linear-gradient(135deg, rgba(79, 70, 229, 1), rgba(67, 56, 202, 1));
+      box-shadow: 0 6px 30px rgba(79, 70, 229, 0.5), 0 0 30px rgba(79, 70, 229, 0.3);
+      transform: translateY(-2px) scale(1.02);
+    }
+    
+    .nav-actions .btn-primary:active {
+      transform: translateY(0) scale(0.98);
+    }
+    
+    /* Mobile menu Get Started button - same glassmorphic style */
+    .mobile-menu-items .btn-primary {
+      background: linear-gradient(135deg, rgba(79, 70, 229, 0.9), rgba(67, 56, 202, 0.95));
+      backdrop-filter: blur(10px);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      box-shadow: 0 4px 20px rgba(79, 70, 229, 0.4);
+    }
 
     .btn-secondary {
       background: var(--white);
@@ -290,6 +318,9 @@
       display: flex;
       gap: 1rem;
       flex-wrap: wrap;
+      justify-content: center;
+      align-items: center;
+      width: 100%;
     }
 
     .hero-image {
@@ -525,12 +556,14 @@
 
       .hero-buttons {
         justify-content: center;
+        align-items: center;
         flex-direction: column;
       }
 
       .hero-buttons .btn {
         width: 100%;
         max-width: 300px;
+        text-align: center;
       }
 
       .section-title {
@@ -673,10 +706,6 @@
         <p class="hero-subtitle">
           Run your phone shop, liquor store, gym, or pharmacy with ease. Track inventory, manage agents, and grow your business—all in one powerful platform.
         </p>
-        <div class="hero-buttons">
-          <a href="{% url 'login' %}" class="btn btn-primary">Get Started</a>
-          <a href="#how-it-works" class="btn btn-outline">See How It Works</a>
-        </div>
       </div>
       <div class="hero-image">
         <img src="{% static 'img/majn.png' %}" alt="Emajinet" class="hero-logo">
@@ -1053,7 +1082,7 @@
 
   <!-- Footer -->
   <footer class="footer">
-    <p class="footer-text">&copy; 2025 Emajinet. All rights reserved.</p>
+    <p class="footer-text">&copy; {{ CURRENT_YEAR }} Emajinet. All rights reserved.</p>
     <div style="margin-top: 1rem; display: flex; gap: 2rem; justify-content: center; flex-wrap: wrap;">
       <a href="{% url 'staticpages:about' %}" style="color: rgba(255,255,255,0.7); text-decoration: none; font-size: 0.9rem;">About</a>
       <a href="{% url 'staticpages:privacy' %}" style="color: rgba(255,255,255,0.7); text-decoration: none; font-size: 0.9rem;">Privacy Policy</a>

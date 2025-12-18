@@ -33,43 +33,32 @@
   .hero-actions .ghost{border:2px solid rgba(255,255,255,.9);color:#fff}
   .hero-actions .ghost:hover{background:rgba(255,255,255,.15)}
   
-  /* Mobile-first dashboard fixes */
-  .metrics-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:18px;min-width:0;overflow:hidden}
-  .metric-card{background:linear-gradient(135deg,#ffffff,#f8fafc);border-radius:20px;padding:20px;box-shadow:0 10px 30px rgba(15,23,42,.1);border:1px solid rgba(148,163,184,0.1);transition:all 0.3s;min-width:0;overflow:hidden}
+  /* Dashboard-specific card styling (glassmorphic premium look) */
+  .metric-card{
+    background:linear-gradient(135deg,#ffffff,#f8fafc);
+    border-radius:20px;
+    padding:20px;
+    box-shadow:0 10px 30px rgba(15,23,42,.1);
+    border:1px solid rgba(148,163,184,0.1);
+    transition:all 0.3s;
+    min-width:0;
+    overflow:hidden;
+  }
   .metric-card:hover{transform:translateY(-4px);box-shadow:0 20px 50px rgba(15,23,42,.15)}
   .metric-card h3{margin:0;font-size:.95rem;text-transform:uppercase;color:#64748b;letter-spacing:0.05em;font-weight:600}
-  .metric-card p{margin:8px 0 0;font-size:2rem;font-weight:900;color:#0f172a;word-break:break-word;min-width:0;overflow:hidden;text-overflow:ellipsis}
-  .metric-card small{display:block;margin-top:6px;font-size:.9rem;color:#64748b;word-break:break-word;overflow-wrap:break-word}
-  
-  /* PREMIUM NUMBER FORMATTING - NO OVERFLOW, ALWAYS READABLE */
-  .cc-amount{
-    white-space:nowrap;
-    overflow:hidden;
-    text-overflow:ellipsis;
-    max-width:100%;
-    font-variant-numeric:tabular-nums;
-    display:inline-block;
+  .metric-card p{
+    margin:8px 0 0;
+    font-size:2rem;
+    font-weight:900;
+    color:#0f172a;
+    min-width:0;
   }
+  .metric-card small{display:block;margin-top:6px;font-size:.9rem;color:#64748b}
   
-  /* Mobile: prevent KPI numbers from breaking layout - ENHANCED */
+  /* Mobile: responsive KPI values (use clamp from mobile-system.css utilities) */
   @media (max-width:640px){
-    .metric-card p{
-      font-size:clamp(1.5rem,5vw,2rem);
-      min-width:0;
-      overflow:hidden;
-      text-overflow:ellipsis;
-      white-space:nowrap;
-      font-variant-numeric:tabular-nums;
-    }
-    .metric-card small{
-      font-size:clamp(0.75rem,2.5vw,0.9rem);
-      line-height:1.4;
-      word-break:break-word;
-    }
-    .metrics-grid{grid-template-columns:1fr}
-    .cc-amount{
-      font-size:clamp(0.75rem,2.5vw,0.95rem);
-    }
+    .metric-card p{font-size:clamp(1.5rem,5vw,2rem)}
+    .metric-card small{font-size:clamp(0.75rem,2.5vw,0.9rem);line-height:1.4}
   }
   
   .section-title{font-size:1.3rem;font-weight:800;color:#0f172a;margin:0 0 16px;display:flex;align-items:center;gap:10px}
@@ -82,7 +71,6 @@
   .badge.yellow{background:#fef9c3;color:#854d0e}
   .badge.red{background:#fee2e2;color:#991b1b}
   
-  .chart-container{position:relative;height:280px;margin-top:16px}
   .leaderboard{display:grid;gap:12px}
   .leaderboard-item{display:flex;justify-content:space-between;align-items:center;padding:14px;background:linear-gradient(135deg,#f1f5f9,#e2e8f0);border-radius:14px;transition:all 0.2s;gap:12px}
   .leaderboard-item:hover{background:linear-gradient(135deg,#e2e8f0,#cbd5e1);transform:translateX(4px)}
@@ -134,6 +122,9 @@
       <a class="primary" href="{% url 'inventory:scan_in' %}"><i class="bi bi-box-arrow-in-down"></i> Scan IN</a>
       <a class="primary" href="{% url 'inventory:scan_sold' %}"><i class="bi bi-phone"></i> Sell Phone</a>
       <a class="ghost" href="{% url 'inventory:stock_list' %}"><i class="bi bi-list-ul"></i> Stock List</a>
+      {% if IS_MANAGER %}
+      <a class="ghost" href="{% url 'sales:rollback_home' %}" style="border-color:rgba(251,191,36,.9);color:#fbbf24"><i class="bi bi-arrow-counterclockwise"></i> Rollback Sale</a>
+      {% endif %}
     </div>
   </header>
 
@@ -188,42 +179,42 @@
       <span style="font-size:.85rem;font-weight:600;color:#64748b;margin-left:12px">{{ dashboard_kpis.range_label }}</span>
     </h2>
     
-    <div class="metrics-grid">
+    <div class="cc-kpi-grid">
       <!-- STOCK ON HAND -->
       <article class="metric-card">
         <h3><i class="bi bi-box-seam"></i> Stock on Hand</h3>
-        <p style="color:#0f172a">{{ dashboard_kpis.stock_on_hand|intcomma }}</p>
+        <p class="cc-minw-0" style="color:#0f172a">{{ dashboard_kpis.stock_on_hand|intcomma }}</p>
         <small>units in stock</small>
       </article>
       
       <!-- UNITS SOLD -->
       <article class="metric-card">
         <h3><i class="bi bi-cart-check"></i> Units Sold</h3>
-        <p style="color:#3b82f6">{{ dashboard_kpis.units_sold|intcomma }}</p>
+        <p class="cc-minw-0" style="color:#3b82f6">{{ dashboard_kpis.units_sold|intcomma }}</p>
         <small>in selected period</small>
       </article>
       
       <!-- REVENUE -->
       <article class="metric-card">
         <h3><i class="bi bi-cash-stack"></i> Revenue</h3>
-        <p class="cc-amount" style="color:#16a34a" title="MK {{ dashboard_kpis.revenue|floatformat:0|intcomma }}">MK {{ dashboard_kpis.revenue|floatformat:0|intcomma }}</p>
+        <p class="cc-amount cc-minw-0" style="color:#16a34a" title="MK {{ dashboard_kpis.revenue|floatformat:0|intcomma }}">MK {{ dashboard_kpis.revenue|floatformat:0|intcomma }}</p>
         <small>total sales amount</small>
       </article>
       
       <!-- COSTS (Enhanced with breakdown) -->
       <article class="metric-card">
         <h3><i class="bi bi-receipt"></i> Costs</h3>
-        <p class="cc-amount" style="color:#f59e0b" title="MK {{ dashboard_kpis.total_costs|floatformat:0|intcomma }}">MK {{ dashboard_kpis.total_costs|floatformat:0|intcomma }}</p>
+        <p class="cc-amount cc-minw-0" style="color:#f59e0b" title="MK {{ dashboard_kpis.total_costs|floatformat:0|intcomma }}">MK {{ dashboard_kpis.total_costs|floatformat:0|intcomma }}</p>
         <small style="display:block;margin-top:4px;line-height:1.5">
-          <span class="cc-amount" title="Cost of goods: MK {{ dashboard_kpis.cost_of_goods|floatformat:0|intcomma }}">Cost of goods: MK {{ dashboard_kpis.cost_of_goods|floatformat:0|intcomma }}</span><br>
-          <span class="cc-amount" title="Business costs: MK {{ dashboard_kpis.business_costs|floatformat:0|intcomma }}">Business costs: MK {{ dashboard_kpis.business_costs|floatformat:0|intcomma }}</span>
+          <span class="cc-amount cc-minw-0" title="Cost of goods: MK {{ dashboard_kpis.cost_of_goods|floatformat:0|intcomma }}">Cost of goods: MK {{ dashboard_kpis.cost_of_goods|floatformat:0|intcomma }}</span><br>
+          <span class="cc-amount cc-minw-0" title="Business costs: MK {{ dashboard_kpis.business_costs|floatformat:0|intcomma }}">Business costs: MK {{ dashboard_kpis.business_costs|floatformat:0|intcomma }}</span>
         </small>
       </article>
       
       <!-- PROFIT (with enhanced margin display) -->
       <article class="metric-card" style="border:2px solid {% if dashboard_kpis.profit >= 0 %}#16a34a{% else %}#dc2626{% endif %}">
         <h3><i class="bi bi-trophy"></i> Profit</h3>
-        <p class="cc-amount" style="color:{% if dashboard_kpis.profit >= 0 %}#16a34a{% else %}#dc2626{% endif %}" title="{% if dashboard_kpis.profit < 0 %}-{% endif %}MK {{ dashboard_kpis.profit|abs|floatformat:0|intcomma }}">
+        <p class="cc-amount cc-minw-0" style="color:{% if dashboard_kpis.profit >= 0 %}#16a34a{% else %}#dc2626{% endif %}" title="{% if dashboard_kpis.profit < 0 %}-{% endif %}MK {{ dashboard_kpis.profit|abs|floatformat:0|intcomma }}">
           {% if dashboard_kpis.profit < 0 %}-{% endif %}MK {{ dashboard_kpis.profit|abs|floatformat:0|intcomma }}
         </p>
         <small>
@@ -362,7 +353,7 @@
     <!-- SALES TREND CHART -->
     <section class="recent-block">
       <h2 class="section-title"><i class="bi bi-graph-up"></i> Sales Trend (Last 30 Days)</h2>
-      <div class="chart-wrap chart-container">
+      <div class="chart-wrap cc-chart-container" style="height:280px;margin-top:16px">
         <canvas id="salesTrendChart"></canvas>
       </div>
     </section>
@@ -376,13 +367,13 @@
       {% if fast_models %}
         <div class="leaderboard">
           {% for model in fast_models %}
-            <div class="leaderboard-item">
+            <div class="leaderboard-item cc-flex-safe">
               <div class="leaderboard-rank">{{ forloop.counter }}</div>
-              <div class="leaderboard-name">
-                <strong title="{{ model.brand }} {{ model.model }}">{{ model.brand }} {{ model.model }}</strong>
-                <div style="font-size:.85rem;color:#64748b">{{ model.ram_rom }}</div>
+              <div class="leaderboard-name cc-minw-0">
+                <strong class="cc-ellipsis" title="{{ model.brand }} {{ model.model }}">{{ model.brand }} {{ model.model }}</strong>
+                <div class="cc-ellipsis" style="font-size:.85rem;color:#64748b">{{ model.ram_rom }}</div>
               </div>
-              <div class="leaderboard-value cc-amount" title="{{ model.units }} units · MK {{ model.revenue|floatformat:0|intcomma }}">
+              <div class="leaderboard-value cc-amount cc-minw-0" title="{{ model.units }} units · MK {{ model.revenue|floatformat:0|intcomma }}">
                 {{ model.units }} units · MK {{ model.revenue|floatformat:0|intcomma }}
               </div>
             </div>
@@ -449,26 +440,26 @@
     {% if top_agents %}
       <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:14px">
         {% for agent in top_agents %}
-          <div class="leaderboard-item">
+          <div class="leaderboard-item cc-flex-safe">
             <div class="leaderboard-rank">
               {% if forloop.counter == 1 %}🥇
               {% elif forloop.counter == 2 %}🥈
               {% elif forloop.counter == 3 %}🥉
               {% else %}{{ forloop.counter }}{% endif %}
             </div>
-            <div class="leaderboard-name">
-              <strong title="{{ agent.agent_name }}">
+            <div class="leaderboard-name cc-minw-0">
+              <strong class="cc-ellipsis" title="{{ agent.agent_name }}">
                 {% if agent.agent_id and IS_MANAGER %}
-                  <a href="{% agent_performance_url agent.agent_id %}" style="color:#2563eb;text-decoration:none">{{ agent.agent_name }}</a>
+                  <a href="{% agent_performance_url agent.agent_id %}" style="color:#2563eb;text-decoration:none" class="cc-ellipsis">{{ agent.agent_name }}</a>
                 {% else %}
                   {{ agent.agent_name }}
                 {% endif %}
               </strong>
-              <div style="font-size:.85rem;color:#64748b">
+              <div class="cc-ellipsis" style="font-size:.85rem;color:#64748b">
                 {{ agent.units }} units sold
               </div>
             </div>
-            <div class="leaderboard-value cc-amount" title="MK {{ agent.revenue|floatformat:0|intcomma }}">MK {{ agent.revenue|floatformat:0|intcomma }}</div>
+            <div class="leaderboard-value cc-amount cc-minw-0" title="MK {{ agent.revenue|floatformat:0|intcomma }}">MK {{ agent.revenue|floatformat:0|intcomma }}</div>
           </div>
         {% endfor %}
       </div>
