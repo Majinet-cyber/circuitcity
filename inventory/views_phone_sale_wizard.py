@@ -21,6 +21,7 @@ from django.http import HttpResponse, JsonResponse
 from django.shortcuts import render, redirect
 from django.urls import reverse
 from django.utils import timezone
+from django.views.decorators.csrf import ensure_csrf_cookie
 from django.views.decorators.http import require_http_methods
 
 from tenants.utils import require_business
@@ -56,6 +57,7 @@ def _redirect_to_step(step: int) -> HttpResponse:
 @login_required
 @require_business
 @require_business_kind(BusinessKind.PHONES)
+@ensure_csrf_cookie
 def phone_sale_wizard(request):
     """
     Gamified phone sale wizard - multi-step flow.

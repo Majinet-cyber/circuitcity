@@ -117,8 +117,15 @@ def dashboard(request):
     if location is None:
         location = getattr(request, "location", None)
     
-    # Determine user's visibility scope
+    # Determine user's visibility scope using middleware-set flags
+    # CRITICAL: get_visible_actor uses request.is_manager_plus and request.is_agent_only
+    # which are set by RoleResolutionMiddleware using tenants.utils_roles
+    # This ensures managers NEVER downgrade to agent scope
     is_manager, is_agent, actor_user = get_visible_actor(request)
+    
+    # Add role flags to context for template use
+    ctx['IS_MANAGER'] = is_manager
+    ctx['IS_AGENT'] = is_agent
     
     # ==========================================================================
     # DATE RANGE PARSING
@@ -562,6 +569,11 @@ def dashboard(request):
         **ctx_enhancements,
     })
     
+    # FAILSAFE: Ensure YESTERDAY_SUMMARY is always present (even if None)
+    # This prevents template crashes if dashboard helpers fail
+    ctx.setdefault("YESTERDAY_SUMMARY", None)
+    ctx.setdefault("yesterday_summary", None)
+    
     return render(request, "verticals/phones/dashboard.html", ctx)
 
 
@@ -782,12 +794,19 @@ def sales_trend_json(request):
     """
     JSON endpoint for phone sales trend data.
     Returns data suitable for Chart.js.
+    
+    CRITICAL: Uses role-based scoping to ensure managers see all data
+    and agents see only their own data.
     """
     from django.http import JsonResponse
     from sales.models import Sale
+    from inventory.utils_scope import get_visible_actor
     
     business = base.base_context(request).get("business")
     location = base.base_context(request).get("location")
+    
+    # Determine user's visibility scope
+    is_manager, is_agent, actor_user = get_visible_actor(request)
     
     # Parse date range from request
     range_param = request.GET.get('range', '7d')
@@ -797,11 +816,15 @@ def sales_trend_json(request):
     start_date = date_range_ctx['start_date']
     end_date = date_range_ctx['end_date']
     
-    # Build sales queryset
+    # Build sales queryset with role-based scoping
     sales_qs = Sale.objects.filter(item__business=business)
     
     if location:
         sales_qs = sales_qs.filter(location=location)
+    
+    # CRITICAL: Apply agent scoping if user is an agent
+    if is_agent and actor_user:
+        sales_qs = sales_qs.filter(agent=actor_user)
     
     # Generate daily data for the date range
     labels = []

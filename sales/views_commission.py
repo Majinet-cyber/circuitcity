@@ -8,7 +8,7 @@ from django.contrib.auth.decorators import login_required
 from django.views.decorators.http import require_http_methods
 
 from inventory.decorators import require_business
-from inventory import base as inventory_base
+from inventory.verticals import base as inventory_base
 from .models import CommissionConfig
 from .forms import CommissionSettingsForm
 

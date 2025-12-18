@@ -47,18 +47,15 @@ def role_flags(request) -> Dict[str, Any]:
     Adds lightweight role booleans commonly used in templates & JS.
 
     Exposed keys:
-      - IS_MANAGER: True if membership role == MANAGER, Manager group, profile.is_manager, or staff
+      - IS_MANAGER: True if user is a manager (uses middleware-set flags)
       - IS_STAFF: True if user.is_staff
       - IS_SUPERUSER: True if user.is_superuser
       - IS_AGENT: True for authenticated users who are NOT manager/staff
       - SHOW_BILLING: True for managers (same as IS_MANAGER)
 
-    Manager detection (in order of priority):
-      1. request.membership.role == "MANAGER" (set by middleware if present)
-      2. User is in "Manager" group
-      3. user.profile.is_manager == True
-      4. User has Membership with role=MANAGER for active business
-      5. user.is_staff (fallback)
+    CRITICAL: Uses middleware-set role flags (request.is_manager_plus, request.is_agent_only)
+    which are computed by RoleResolutionMiddleware using tenants.utils_roles.
+    This ensures managers NEVER downgrade to agent scope.
 
     Important:
       * Lazy evaluation: only checks DB if absolutely necessary
@@ -90,56 +87,68 @@ def role_flags(request) -> Dict[str, Any]:
     is_superuser = _safe_bool(getattr(user, "is_superuser", False))
     is_auth = _safe_bool(getattr(user, "is_authenticated", False))
 
-    # Initialize manager flag
-    is_manager = False
+    # ✅ PRIMARY: Use middleware-set role flags (set by RoleResolutionMiddleware)
+    # These flags are computed using the centralized tenants.utils_roles logic
+    # which implements proper manager precedence
+    if hasattr(request, 'is_manager_plus') and hasattr(request, 'is_agent_only'):
+        is_manager = _safe_bool(request.is_manager_plus)
+        is_agent = _safe_bool(request.is_agent_only)
+        
+        # Safety check: manager cannot be agent (middleware should prevent this)
+        if is_manager and is_agent:
+            is_agent = False
+    else:
+        # ✅ FALLBACK: If middleware didn't run, use legacy detection
+        # Initialize manager flag
+        is_manager = False
 
-    # 1) Check request.membership (set by middleware if present)
-    membership = getattr(request, "membership", None)
-    if membership:
-        membership_role = getattr(membership, "role", None)
-        is_manager = _safe_bool((membership_role or "").upper() == "MANAGER")
+        # 1) Check request.membership (set by middleware if present)
+        membership = getattr(request, "membership", None)
+        if membership:
+            membership_role = getattr(membership, "role", None)
+            is_manager = _safe_bool((membership_role or "").upper() == "MANAGER")
 
-    # 2) Check user groups (Manager group)
-    if not is_manager and is_auth:
-        try:
-            is_manager = user.groups.filter(name__iexact="Manager").exists()
-        except Exception:
-            pass
+        # 2) Check user groups (Manager group)
+        if not is_manager and is_auth:
+            try:
+                is_manager = user.groups.filter(name__iexact="Manager").exists()
+            except Exception:
+                pass
 
-    # 3) Check user.profile.is_manager
-    if not is_manager and is_auth:
-        try:
-            profile = getattr(user, "profile", None)
-            if profile:
-                is_manager = _safe_bool(getattr(profile, "is_manager", False))
-        except Exception:
-            pass
+        # 3) Check user.profile.is_manager
+        if not is_manager and is_auth:
+            try:
+                profile = getattr(user, "profile", None)
+                if profile:
+                    is_manager = _safe_bool(getattr(profile, "is_manager", False))
+            except Exception:
+                pass
 
-    # 4) Check Membership model for active business
-    if not is_manager and is_auth:
-        try:
-            from tenants.models import Membership
-            biz = getattr(request, "business", None)
-            if biz:
-                membership_qs = Membership.objects.filter(
-                    user=user,
-                    business=biz,
-                    role__iexact="MANAGER"
-                )
-                # Filter by status if field exists
-                if hasattr(Membership, "status"):
-                    membership_qs = membership_qs.filter(status__iexact="ACTIVE")
-                is_manager = membership_qs.exists()
-        except Exception:
-            pass
+        # 4) Check Membership model for active business
+        if not is_manager and is_auth:
+            try:
+                from tenants.models import Membership
+                biz = getattr(request, "business", None)
+                if biz:
+                    membership_qs = Membership.objects.filter(
+                        user=user,
+                        business=biz,
+                        role__iexact="MANAGER"
+                    )
+                    # Filter by status if field exists
+                    if hasattr(Membership, "status"):
+                        membership_qs = membership_qs.filter(status__iexact="ACTIVE")
+                    is_manager = membership_qs.exists()
+            except Exception:
+                pass
 
-    # 5) Staff fallback
-    if not is_manager:
-        is_manager = is_staff
+        # 5) Staff fallback
+        if not is_manager:
+            is_manager = is_staff
 
-    # Agent = authenticated but not manager/staff
-    # CRITICAL FIX: Ensure managers are NEVER treated as agents
-    is_agent = _safe_bool(is_auth and not is_manager and not is_staff and not is_superuser)
+        # Agent = authenticated but not manager/staff
+        # CRITICAL FIX: Ensure managers are NEVER treated as agents
+        is_agent = _safe_bool(is_auth and not is_manager and not is_staff and not is_superuser)
 
     flags = {
         "IS_MANAGER": is_manager,

@@ -8,7 +8,7 @@
 {% block extra_css %}
 <style>
   .page{max-width:900px;margin:0 auto;padding:clamp(12px,4vw,24px)}
-  
+
   .card{
     background:#fff;
     border:1px solid #e2e8f0;
@@ -17,7 +17,7 @@
     box-shadow:0 4px 12px rgba(0,0,0,.05);
     margin-bottom:24px;
   }
-  
+
   .badge{
     display:inline-block;
     padding:6px 14px;
@@ -29,7 +29,7 @@
   .badge-warning{background:#fef3c7;color:#92400e}
   .badge-danger{background:#fee2e2;color:#991b1b}
   .badge-info{background:#dbeafe;color:#1e40af}
-  
+
   .detail-row{
     display:flex;
     justify-content:space-between;
@@ -40,7 +40,7 @@
   .detail-row:last-child{border-bottom:none}
   .detail-label{color:#64748b;font-size:14px;flex:0 0 180px}
   .detail-value{font-weight:600;font-size:15px;flex:1;text-align:right}
-  
+
   .timeline{
     position:relative;
     padding-left:32px;
@@ -84,7 +84,7 @@
     font-size:13px;
     color:#64748b;
   }
-  
+
   .alert{
     padding:16px 20px;
     border-radius:12px;
@@ -95,7 +95,7 @@
   }
   .alert-success{background:#d1fae5;border:1px solid #10b981;color:#065f46}
   .alert i{font-size:24px}
-  
+
   .btn{
     appearance:none;
     border:none;
@@ -113,7 +113,7 @@
   }
   .btn-secondary{background:#f1f5f9;color:#475569}
   .btn-secondary:hover{background:#e2e8f0}
-  
+
   @media (max-width:640px){
     .detail-row{flex-direction:column;gap:6px}
     .detail-label{flex:1}
@@ -132,19 +132,19 @@
       <p style="margin:4px 0 0">Sale #{{ rollback.sale.pk }} has been rolled back and marked as reversed.</p>
     </div>
   </div>
-  
+
   <!-- Rollback Summary -->
   <div class="card">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px">
       <h2 style="margin:0;font-size:20px;">🔄 Rollback Summary</h2>
       <span style="color:#64748b;font-size:14px">ID: #{{ rollback.pk }}</span>
     </div>
-    
+
     <div class="detail-row">
       <span class="detail-label">Sale ID</span>
       <span class="detail-value">#{{ rollback.sale.pk }}</span>
     </div>
-    
+
     <div class="detail-row">
       <span class="detail-label">Reason</span>
       <span class="detail-value">
@@ -159,7 +159,7 @@
         {% endif %}
       </span>
     </div>
-    
+
     <div class="detail-row">
       <span class="detail-label">Refunded</span>
       <span class="detail-value">
@@ -170,7 +170,7 @@
         {% endif %}
       </span>
     </div>
-    
+
     <div class="detail-row">
       <span class="detail-label">Returned to Stock</span>
       <span class="detail-value">
@@ -181,12 +181,12 @@
         {% endif %}
       </span>
     </div>
-    
+
     <div class="detail-row">
       <span class="detail-label">Performed By</span>
       <span class="detail-value">{{ rollback.created_by.get_full_name|default:rollback.created_by.username }}</span>
     </div>
-    
+
     <div class="detail-row">
       <span class="detail-label">Date & Time</span>
       <span class="detail-value">
@@ -194,7 +194,7 @@
         <br><small style="color:#64748b;font-weight:normal">{{ rollback.created_at|timesince }} ago</small>
       </span>
     </div>
-    
+
     {% if rollback.notes %}
     <div class="detail-row">
       <span class="detail-label">Notes</span>
@@ -204,11 +204,11 @@
     </div>
     {% endif %}
   </div>
-  
+
   <!-- Original Sale Details -->
   <div class="card">
     <h2 style="margin:0 0 20px;font-size:20px;">📋 Original Sale Details</h2>
-    
+
     <div class="detail-row">
       <span class="detail-label">Item</span>
       <span class="detail-value">
@@ -218,7 +218,7 @@
         {% endif %}
       </span>
     </div>
-    
+
     {% if rollback.sale.item.imei %}
     <div class="detail-row">
       <span class="detail-label">IMEI</span>
@@ -230,22 +230,22 @@
       <span class="detail-value"><code>{{ rollback.sale.item.barcode }}</code></span>
     </div>
     {% endif %}
-    
+
     <div class="detail-row">
       <span class="detail-label">Sale Price</span>
       <span class="detail-value" style="color:#10b981">K{{ rollback.sale.price|floatformat:0|intcomma }}</span>
     </div>
-    
+
     <div class="detail-row">
       <span class="detail-label">Agent</span>
       <span class="detail-value">{{ rollback.sale.agent.get_full_name|default:rollback.sale.agent.username }}</span>
     </div>
-    
+
     <div class="detail-row">
       <span class="detail-label">Location</span>
       <span class="detail-value">{{ rollback.sale.location.name }}</span>
     </div>
-    
+
     <div class="detail-row">
       <span class="detail-label">Original Sale Date</span>
       <span class="detail-value">
@@ -253,17 +253,17 @@
         <br><small style="color:#64748b;font-weight:normal">{{ rollback.sale.created_at|date:"g:i A" }}</small>
       </span>
     </div>
-    
+
     <div class="detail-row">
       <span class="detail-label">Payment Method</span>
       <span class="detail-value">{{ rollback.sale.get_payment_method_display }}</span>
     </div>
   </div>
-  
+
   <!-- Actions Timeline -->
   <div class="card">
     <h2 style="margin:0 0 8px;font-size:20px;">⚡ Actions Taken</h2>
-    
+
     <div class="timeline">
       <div class="timeline-item">
         <div class="timeline-dot"></div>
@@ -272,7 +272,7 @@
           <div class="timeline-desc">Sale #{{ rollback.sale.pk }} flagged as rolled back in the database</div>
         </div>
       </div>
-      
+
       {% if rollback.return_to_stock %}
       <div class="timeline-item">
         <div class="timeline-dot"></div>
@@ -282,7 +282,7 @@
         </div>
       </div>
       {% endif %}
-      
+
       <div class="timeline-item">
         <div class="timeline-dot"></div>
         <div class="timeline-content">
@@ -290,7 +290,7 @@
           <div class="timeline-desc">All commission entries for this sale have been reversed</div>
         </div>
       </div>
-      
+
       {% if rollback.refunded %}
       <div class="timeline-item">
         <div class="timeline-dot"></div>
@@ -300,7 +300,7 @@
         </div>
       </div>
       {% endif %}
-      
+
       <div class="timeline-item">
         <div class="timeline-dot"></div>
         <div class="timeline-content">
@@ -310,7 +310,7 @@
       </div>
     </div>
   </div>
-  
+
   <!-- Actions -->
   <div style="display:flex;gap:12px">
     <a href="{% url 'sales:rollback_home' %}" class="btn btn-secondary" style="flex:1">

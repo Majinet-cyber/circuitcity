@@ -70,8 +70,10 @@
       <label class="muted" for="agent" style="font-weight:800">{% if BUSINESS_VERTICAL == "gym" %}Trainer{% else %}Agent{% endif %}</label>
       <select id="agent" name="agent">
         <option value="">All {% if BUSINESS_VERTICAL == "gym" %}trainers{% else %}agents{% endif %}</option>
-        {% for a in agents|default:[] %}
+        {% for a in agents %}
           <option value="{{ a.id }}" {% if request.GET.agent|default:'' == a.id|stringformat:'s' %}selected{% endif %}>{{ a.name }}</option>
+        {% empty %}
+          {# No agents available #}
         {% endfor %}
       </select>
       <button class="btn" type="submit"><i class="bi bi-sliders"></i> Apply</button>

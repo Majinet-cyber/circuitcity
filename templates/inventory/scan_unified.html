@@ -33,8 +33,10 @@
       <label class="form-label small fw-semibold">Location</label>
       <select id="loc" class="input w-100">
         <option value="">Default</option>
-        {% for l in locations|default:[] %}
+        {% for l in locations %}
           <option value="{{ l.id }}">{{ l.name }}</option>
+        {% empty %}
+          {# No locations available #}
         {% endfor %}
       </select>
     </div>

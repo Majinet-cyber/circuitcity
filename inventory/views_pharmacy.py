@@ -129,24 +129,15 @@ def pharmacy_dashboard(request: HttpRequest) -> HttpResponse:
     avg_sale_value = period_revenue / period_sales_count if period_sales_count > 0 else Decimal("0.00")
     
     # ===== PAYMENT MIX (for selected period) =====
-    # Using same payment method constants as phones vertical
-    payment_mix_data = {
-        "CASH": {"count": 0, "amount": Decimal("0.00")},
-        "BANK": {"count": 0, "amount": Decimal("0.00")},
-        "MOBILE_MONEY": {"count": 0, "amount": Decimal("0.00")},
-    }
-    
-    for sale in period_sales:
-        method = (sale.payment_method or "CASH").upper()
-        if method == "CASH":
-            payment_mix_data["CASH"]["count"] += 1
-            payment_mix_data["CASH"]["amount"] += sale.total_amount
-        elif method == "BANK":
-            payment_mix_data["BANK"]["count"] += 1
-            payment_mix_data["BANK"]["amount"] += sale.total_amount
-        elif method in ("MOBILE_MONEY", "MOBILEMONEY"):
-            payment_mix_data["MOBILE_MONEY"]["count"] += 1
-            payment_mix_data["MOBILE_MONEY"]["amount"] += sale.total_amount
+    # Use standardized payment mix helper for consistency across all verticals
+    from dashboard.helpers_payments import get_payment_mix
+    payment_mix_list = get_payment_mix(
+        business=business,
+        start_date=start_date,
+        end_date=end_date,
+        user=None,  # Global view for managers
+        vertical="pharmacy"
+    )
     
     # ===== PRODUCT TYPE BREAKDOWN =====
     # Count medicines vs other products
@@ -412,8 +403,8 @@ def pharmacy_dashboard(request: HttpRequest) -> HttpResponse:
         "start_date": start_date,
         "end_date": end_date,
         
-        # Payment mix for the period
-        "payment_mix": payment_mix_data,
+        # Payment mix for the period (standardized format for shared partial)
+        "payment_mix": payment_mix_list,
         
         # Top products & categories analytics
         "top_products": top_products_data,

@@ -1,11 +1,14 @@
 ﻿from django.views.generic import ListView
+from django.contrib.auth.decorators import login_required
+from django.utils.decorators import method_decorator
 from common.pagination import paginate_qs
 from sales.models import Sale
 
+@method_decorator(login_required, name='dispatch')
 class SaleListView(ListView):
     template_name = "sales/list.html"
     context_object_name = "page_obj"  # so templates match
-    paginate_by = None  # weâ€™ll handle it ourselves
+    paginate_by = None  # we'll handle it ourselves
 
     def get_queryset(self):
         return (Sale.objects
@@ -18,5 +21,9 @@ class SaleListView(ListView):
         page_obj, url_for = paginate_qs(self.request, self.get_queryset())
         ctx.update({"page_obj": page_obj, "url_for": url_for})
         return ctx
+
+
+# Function-based view wrapper for URL routing
+sales_list = SaleListView.as_view()
 
 

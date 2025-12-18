@@ -32,7 +32,7 @@
 {% block content %}
   <div class="cc-card">
     <h2 class="mb-1">
-      Customer · <span class="pill" style="background: {{ color_for|default_if_none:''|default:'' }}{{ color_for(cust_name) if color_for }}">{% if color_for %}{{ cust_name }}{% else %}{{ cust_name }}{% endif %}</span>
+      Customer · <span class="pill" style="background: {{ cust_name|color_for }}">{{ cust_name }}</span>
     </h2>
     <div class="meta">Phone: {{ cust_phone }}</div>
   </div>

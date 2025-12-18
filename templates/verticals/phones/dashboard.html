@@ -303,50 +303,8 @@
   </section>
   {% endif %}
 
-  <!-- PAYMENT MIX (PHONES) -->
-  <section class="recent-block">
-    <h2 class="section-title">
-      <i class="bi bi-wallet2"></i> Payment Mix
-      <span style="font-size:.85rem;font-weight:600;color:#64748b;margin-left:8px">({{ dashboard_kpis.range_label }})</span>
-    </h2>
-    
-    {% if dashboard_kpis.revenue > 0 %}
-      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:16px;margin-bottom:20px">
-        {% for pm in dashboard_kpis.payment_mix %}
-          <div class="metric-card" style="border-left:4px solid {% if pm.method == 'Cash' %}#10b981{% elif pm.method == 'Bank' %}#3b82f6{% else %}#f59e0b{% endif %}">
-            <h3><i class="bi {% if pm.method == 'Cash' %}bi-cash-stack{% elif pm.method == 'Bank' %}bi-bank{% else %}bi-phone{% endif %}"></i> {{ pm.method }}</h3>
-            <p class="cc-amount" style="color:{% if pm.method == 'Cash' %}#10b981{% elif pm.method == 'Bank' %}#3b82f6{% else %}#f59e0b{% endif %}" title="MK {{ pm.amount|floatformat:0|intcomma }}">MK {{ pm.amount|floatformat:0|intcomma }}</p>
-            <small>
-              <span class="badge" style="background:{% if pm.method == 'Cash' %}#d1fae5{% elif pm.method == 'Bank' %}#dbeafe{% else %}#fef3c7{% endif %};color:{% if pm.method == 'Cash' %}#065f46{% elif pm.method == 'Bank' %}#1e40af{% else %}#92400e{% endif %}">
-                {{ pm.percentage }}% of revenue
-              </span>
-            </small>
-          </div>
-        {% endfor %}
-      </div>
-      
-      <!-- Visual bar showing payment mix breakdown -->
-      <div style="display:flex;height:40px;border-radius:12px;overflow:hidden;box-shadow:0 4px 12px rgba(0,0,0,0.1)">
-        {% for pm in dashboard_kpis.payment_mix %}
-          {% if pm.percentage > 0 %}
-            <div style="flex:0 0 {{ pm.percentage }}%;background:{% if pm.method == 'Cash' %}linear-gradient(135deg,#10b981,#059669){% elif pm.method == 'Bank' %}linear-gradient(135deg,#3b82f6,#2563eb){% else %}linear-gradient(135deg,#f59e0b,#d97706){% endif %};display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:.9rem">
-              {{ pm.percentage }}%
-            </div>
-          {% endif %}
-        {% endfor %}
-      </div>
-      <div style="display:flex;justify-content:space-around;margin-top:12px;font-size:.9rem">
-        {% for pm in dashboard_kpis.payment_mix %}
-          <span style="color:#64748b">
-            <span style="display:inline-block;width:12px;height:12px;border-radius:2px;background:{% if pm.method == 'Cash' %}#10b981{% elif pm.method == 'Bank' %}#3b82f6{% else %}#f59e0b{% endif %};margin-right:6px"></span>
-            {{ pm.method }}
-          </span>
-        {% endfor %}
-      </div>
-    {% else %}
-      <p style="color:#64748b;text-align:center;padding:40px 0">No revenue data for {{ dashboard_kpis.range_label|lower }}</p>
-    {% endif %}
-  </section>
+  <!-- PAYMENT MIX (PHONES) - Using standardized component -->
+  {% include "partials/payment_mix_bar_standard.html" with payment_mix=dashboard_kpis.payment_mix range_label=dashboard_kpis.range_label %}
 
   <!-- SALES TREND & FAST MOVERS -->
   <div class="dashboard-cards-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:18px">
@@ -597,7 +555,17 @@ if (typeof htmx !== 'undefined') {
               maxRotation: 45,
               minRotation: 0,
               autoSkip: true,
-              autoSkipPadding: 10,
+              autoSkipPadding: 15,
+              maxTicksLimit: 10,
+              callback: function(value, index, ticks) {
+                // Show short date format (MM-DD) to reduce clutter
+                const label = this.getLabelForValue(value);
+                if (label && label.length > 6) {
+                  // If label is long (e.g., "Jan 15"), keep it short
+                  return label;
+                }
+                return label;
+              }
             }
           },
           y: {

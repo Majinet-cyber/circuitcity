@@ -591,6 +591,9 @@ urlpatterns += [
     # App router for cross-vertical features (analytics, etc.)
     path("app/", include(("core.urls_app_router", "app_router"), namespace="app_router")),
 
+    # Sales app (rollback, commissions, etc.)
+    path("sales/", include_or_raise("sales.urls", "sales")),
+
     path("tenants/",   include_or_raise("tenants.urls", "tenants")),
     path("dashboard/", include_or_raise("dashboard.urls", "dashboard")),
     # Layby app include

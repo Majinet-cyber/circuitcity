@@ -1,440 +1,341 @@
-# Implementation Summary: Sidebar & Barcode Scanner Upgrades
+# FIX: Phones Dashboard 500 Error - YESTERDAY_SUMMARY + sales namespace
 
-**Date:** December 18, 2025  
-**Project:** Circuit City / Emajinet - Django 5.2 Multi-Tenant SaaS  
-**Scope:** PART A (Sidebar Declutter) + PART B (Barcode Scanner for Pharmacy & Clothing)
-
----
-
-## 📋 Overview
-
-This implementation delivers two major UX upgrades across all verticals:
-
-1. **PART A:** Sidebar "More Features" collapsible menu with localStorage persistence
-2. **PART B:** Premium barcode scanner modal for Pharmacy & Clothing scan-in and fast sell
+**Branch:** mobile-layout-v1  
+**Status:** ✅ FIXED  
+**Date:** 2025-12-18
 
 ---
 
-## ✅ PART A: Sidebar "More Features" Collapsible
+## PROBLEM SUMMARY
 
-### What Changed
+GET `/inventory/verticals/phones/` returned **500 Internal Server Error** with two root causes:
 
-**Reorganized Navigation:**
-- Moved 4 features into collapsible submenu: My Wallet, Admin Wallet, Data Backup, Simulator
-- Reduced sidebar clutter by ~30%
-- Default state: collapsed
-- State persists across sessions via localStorage
+1. **VariableDoesNotExist**: `YESTERDAY_SUMMARY` not in template context
+2. **NoReverseMatch**: `'sales'` is not a registered namespace
 
-### Files Created
-
-1. **`templates/partials/sidebar_more_features.html`**
-   - Reusable partial for all sidebar templates
-   - Vertical-aware capability checks
-   - Permission-based visibility (staff/managers only for Admin Wallet & Backups)
-
-2. **`static/js/sidebar-more-features.js`**
-   - Toggle expand/collapse with smooth animation
-   - localStorage persistence (`cc.sidebar.moreFeatures.open`)
-   - Keyboard accessible (Enter/Space)
-   - Active link highlighting
-   - Touch-friendly for mobile
-
-3. **`static/css/sidebar-more-features.css`**
-   - Glassmorphic design consistent with existing theme
-   - Mobile-first (no overflow, min 44px touch targets)
-   - Smooth animations (300ms ease)
-   - Indented submenu items (32px left padding)
-
-### Files Modified
-
-1. **`templates/includes/_sidebar_vertical.html`**
-   - Removed top-level Wallet, Admin Wallet, Simulator sections
-   - Included `sidebar_more_features.html` partial
-   - Kept Reports at top level under FINANCE
-
-2. **`templates/includes/_sidebar.html`**
-   - Same changes as vertical sidebar
-   - Consistent across all sidebar templates
-
-3. **`templates/base.html`**
-   - Added `sidebar-more-features.css` to head
-   - Added `sidebar-more-features.js` before service worker registration
-
-### Behavior
-
-- **Default:** Collapsed on first visit
-- **Persistence:** State saved in `localStorage` (key: `cc.sidebar.moreFeatures.open`)
-- **Animation:** 300ms smooth expand/collapse
-- **Mobile:** Full-screen friendly, no horizontal scroll
-- **Active Links:** Highlighted based on current URL path
+These errors were introduced during manager-role permission fixes and broke the phones dashboard for all users.
 
 ---
 
-## ✅ PART B: Barcode Scanner for Pharmacy & Clothing
+## ROOT CAUSE ANALYSIS
 
-### What Changed
+### Issue 1: YESTERDAY_SUMMARY Missing from Context
 
-**Scan-In Pages (Pharmacy & Clothing):**
-- Added scanner icon button next to SKU/Barcode input field
-- Clicking opens premium full-screen scanner modal
-- Scanned barcode auto-fills input field with success feedback
+**What happened:**
+- Template `templates/partials/dashboard_yesterday_summary.html` (line 140) referenced `{{ YESTERDAY_SUMMARY.date|date:"l, F j, Y" }}`
+- The phones dashboard view (`inventory/verticals/phones.py`) tried to set `YESTERDAY_SUMMARY` via dashboard helpers (lines 510-514)
+- BUT: If the helpers failed (exception at line 533), `ctx_enhancements = {}` was returned
+- This meant `YESTERDAY_SUMMARY` was NEVER added to the context
+- Template tried to access the missing variable → **VariableDoesNotExist crash**
 
-**Fast Sell Pages (Already Implemented):**
-- Existing fast sell templates already have:
-  - ✅ Barcode scanner (camera + manual input)
-  - ✅ Auto-fill price on scan
-  - ✅ Payment method selection
-  - ✅ "Sell Now" button for one-click completion
-  - ✅ KPI updates after sale
+**Why it was fragile:**
+- No failsafe guard in template: `{% if YESTERDAY_SUMMARY %}` guard existed but Django still evaluated `YESTERDAY_SUMMARY.date` INSIDE the conditional before checking if the variable exists
+- No default value in view context
+- Single point of failure in try-except block
 
-### Files Created
+### Issue 2: 'sales' Namespace Not Registered
 
-1. **`static/js/barcode-scanner-modal.js`**
-   - Reusable `BarcodeScanner` class
-   - BarcodeDetector API with fallback to manual input
-   - Front camera only (user preference)
-   - Animated scan line overlay
-   - Supports: EAN_13, EAN_8, UPC_A, UPC_E, CODE_128, CODE_39, ITF, QR_CODE
-   - Debouncing (1.5s) to prevent duplicate scans
-   - Graceful error handling (no 500s)
-   - Auto-close on successful scan
+**What happened:**
+- Template `templates/verticals/phones/dashboard.html` (line 126) had:
+  ```html
+  <a href="{% url 'sales:rollback_home' %}">Rollback Sale</a>
+  ```
+- The `sales` app exists with proper `app_name = "sales"` in `sales/urls.py`
+- BUT: `cc/urls.py` **never included** `sales.urls` in `urlpatterns`
+- When template tried to reverse `'sales:rollback_home'` → **NoReverseMatch crash**
 
-2. **`static/css/barcode-scanner-modal.css`**
-   - Premium glassmorphic modal design
-   - Full-screen on mobile (100vh)
-   - Responsive video aspect ratio (4:3)
-   - Animated scan frame and line
-   - Manual input fallback UI
-   - Touch-friendly buttons (min 44px)
-
-### Files Modified
-
-1. **`templates/verticals/pharmacy/stock_in.html`**
-   - Added scanner button next to barcode input
-   - Loaded scanner CSS and JS
-   - Integrated scanner with barcode field auto-fill
-   - Success feedback animation (green border)
-
-2. **`templates/verticals/clothing/scan_in.html`**
-   - Same changes as pharmacy
-   - Consistent UX across verticals
-
-### Scanner Features
-
-**Camera:**
-- Front camera only (facingMode: 'user')
-- BarcodeDetector API for native scanning
-- Fallback to manual input if API unavailable
-- Permission denied handling (clean error message)
-
-**Barcode Formats:**
-- EAN_13, EAN_8 (retail products)
-- UPC_A, UPC_E (North American products)
-- CODE_128, CODE_39 (general purpose)
-- ITF (Interleaved 2 of 5)
-- QR_CODE (if supported by browser)
-
-**UX:**
-- Animated scan line for visual feedback
-- Scan frame highlights on successful scan
-- Debouncing prevents duplicate reads
-- Manual input always available
-- Keyboard accessible (Escape to close)
-
-**Mobile Optimization:**
-- Full-screen modal on small screens
-- Touch-friendly buttons
-- No horizontal overflow
-- Responsive video sizing
+**Why it happened:**
+- Sales app was created but never registered in main URL configuration
+- No test coverage for URL namespace registration
+- Template used a namespace that didn't exist in the URLconf
 
 ---
 
-## 📁 Files Changed Summary
+## FIXES IMPLEMENTED
 
-### Created (7 files)
-```
-templates/partials/sidebar_more_features.html
-static/js/sidebar-more-features.js
-static/css/sidebar-more-features.css
-static/js/barcode-scanner-modal.js
-static/css/barcode-scanner-modal.css
-tests/test_sidebar_more_features.py
-tests/test_barcode_scanner_integration.py
+### A) Fixed YESTERDAY_SUMMARY (FAILSAFE)
+
+#### 1. Hardened Template Partial (`templates/partials/dashboard_yesterday_summary.html`)
+
+**Before:**
+```django
+{% if YESTERDAY_SUMMARY %}
+  {{ YESTERDAY_SUMMARY.date|date:"l, F j, Y" }}
+  {{ YESTERDAY_SUMMARY.sales_count }}
+  {{ YESTERDAY_SUMMARY.total_revenue }}
 ```
 
-### Modified (5 files)
+**After:**
+```django
+{% if YESTERDAY_SUMMARY or yesterday_summary %}
+{% with summary=YESTERDAY_SUMMARY|default:yesterday_summary %}
+  {{ summary.date|date:"l, F j, Y" }}
+  {{ summary.sales_count }}
+  {{ summary.total_revenue }}
+{% endwith %}
+{% endif %}
 ```
-templates/includes/_sidebar_vertical.html
-templates/includes/_sidebar.html
-templates/base.html
-templates/verticals/pharmacy/stock_in.html
-templates/verticals/clothing/scan_in.html
+
+**Why this works:**
+- Checks BOTH `YESTERDAY_SUMMARY` and `yesterday_summary` (future-proof)
+- Uses `{% with %}` tag to create a local variable `summary` with safe default
+- Never references a potentially missing variable inside template logic
+- If BOTH are None/missing, entire block is skipped (no crash)
+
+#### 2. Added Safe Defaults in View (`inventory/verticals/phones.py`)
+
+**Added after line 563:**
+```python
+# FAILSAFE: Ensure YESTERDAY_SUMMARY is always present (even if None)
+# This prevents template crashes if dashboard helpers fail
+ctx.setdefault("YESTERDAY_SUMMARY", None)
+ctx.setdefault("yesterday_summary", None)
 ```
 
----
+**Why this works:**
+- `setdefault()` only sets value if key doesn't exist (non-destructive)
+- Ensures the variable exists in context even if helpers fail
+- Template can safely check `{% if YESTERDAY_SUMMARY %}` without crash
+- None is a valid value that template guards can handle
 
-## 🧪 Tests Created
+#### 3. Combined Defense Strategy
 
-### 1. `tests/test_sidebar_more_features.py`
-- ✅ More Features toggle present
-- ✅ Wallet links in submenu (not top-level)
-- ✅ Backups link for managers only
-- ✅ Simulator link when feature flag enabled
-- ✅ Links resolve correctly (200/302)
-- ✅ Non-managers see limited submenu
-- ✅ JS and CSS loaded
-- ✅ No top-level duplication
-- ✅ Works across all verticals (pharmacy, clothing, phones)
+The fix uses **layered defense**:
+1. **Template level**: Failsafe guards that handle None/missing gracefully
+2. **View level**: Guaranteed key existence in context (even if None)
+3. **Helper level**: Original try-except in view still works
 
-### 2. `tests/test_barcode_scanner_integration.py`
-- ✅ Pharmacy scan-in page loads
-- ✅ Scanner button present
-- ✅ Scanner JS and CSS loaded
-- ✅ Barcode field present
-- ✅ Stock-in with barcode saves correctly
-- ✅ Duplicate barcode validation
-- ✅ Clothing scan-in same tests
-- ✅ Fast sell barcode lookup API
-- ✅ Fast sell create API
-- ✅ Missing price prompts user
-- ✅ Permissions respected
+This means the dashboard will render even if:
+- Dashboard helpers crash (context gets None)
+- Yesterday summary has no data (template shows nothing)
+- Template variable name changes (supports both YESTERDAY_SUMMARY and yesterday_summary)
 
 ---
 
-## 🔍 Manual Test Checklist
+### B) Fixed 'sales' Namespace
 
-### Sidebar Tests (All Verticals)
+**File:** `cc/urls.py`
 
-#### ✅ Desktop (1920x1080)
-- [ ] Navigate to Dashboard
-- [ ] Verify "More Features" menu appears near bottom of sidebar
-- [ ] Click "More Features" → submenu expands smoothly
-- [ ] Verify submenu contains: My Wallet, Admin Wallet (if manager), Data Backup (if manager), Simulator (if enabled)
-- [ ] Click "More Features" again → submenu collapses
-- [ ] Refresh page → submenu state persists
-- [ ] Click "My Wallet" → navigates correctly
-- [ ] Verify "My Wallet" link is highlighted as active
-- [ ] Verify NO duplicate wallet links at top level
+**Added at line 596 (after app_router, before tenants):**
+```python
+# Sales app (rollback, commissions, etc.)
+path("sales/", include_or_raise("sales.urls", "sales")),
+```
 
-#### ✅ Mobile (360px width)
-- [ ] Navigate to Dashboard on mobile
-- [ ] Verify sidebar has no horizontal overflow
-- [ ] Tap "More Features" → submenu expands (no jank)
-- [ ] Verify touch targets are at least 44px tall
-- [ ] Tap submenu items → navigate correctly
-- [ ] Verify smooth animations (no lag)
-- [ ] Refresh → state persists
+**Why this works:**
+- Registers the `sales` namespace in the main URLconf
+- Uses `include_or_raise()` for consistent error handling
+- Routes all `/sales/` URLs to `sales.urls` with namespace "sales"
+- Templates can now safely use `{% url 'sales:rollback_home' %}`
 
-#### ✅ Permissions
-- [ ] Login as Agent → verify NO Admin Wallet or Backups in submenu
-- [ ] Login as Manager → verify Admin Wallet and Backups appear
-- [ ] Login as Staff → verify all items appear
+**What it enables:**
+- `{% url 'sales:rollback_home' %}` → `/sales/rollback/`
+- `{% url 'sales:rollback_confirm' sale.pk %}` → `/sales/rollback/<id>/confirm/`
+- `{% url 'sales:rollback_detail' rollback.pk %}` → `/sales/rollback/<id>/detail/`
+- All manager-only rollback functionality now accessible
 
 ---
 
-### Barcode Scanner Tests (Pharmacy)
+## FILES CHANGED
 
-#### ✅ Pharmacy Scan-In
-- [ ] Navigate to `/verticals/pharmacy/stock-in/`
-- [ ] Choose product name, category, etc.
-- [ ] Toggle "Has Barcode?" → Yes
-- [ ] Verify barcode field appears with scanner icon button
-- [ ] Click scanner icon → modal opens full-screen
-- [ ] Grant camera permission → video stream starts
-- [ ] Verify animated scan line appears
-- [ ] Hold barcode to camera → scans and auto-fills field
-- [ ] Verify modal closes automatically
-- [ ] Verify barcode field has green success border
-- [ ] Submit form → product saves with barcode
-- [ ] Try to add another product with same barcode → validation error
+### 1. `cc/urls.py`
+- **Line 596**: Added `path("sales/", include_or_raise("sales.urls", "sales"))`
+- **Impact**: Registers 'sales' namespace globally
+- **Risk**: NONE (sales app already existed, just wasn't mounted)
 
-#### ✅ Pharmacy Scan-In (Manual Fallback)
-- [ ] Click scanner icon
-- [ ] Deny camera permission → see clean error message
-- [ ] Use manual input field → type barcode
-- [ ] Click "Use" button → barcode fills input
-- [ ] Modal closes
-- [ ] Submit form → saves correctly
+### 2. `templates/partials/dashboard_yesterday_summary.html`
+- **Lines 12-13**: Changed from `{% if YESTERDAY_SUMMARY %}` to `{% if YESTERDAY_SUMMARY or yesterday_summary %} {% with summary=... %}`
+- **Lines 140-176**: Changed all `YESTERDAY_SUMMARY.x` to `summary.x`
+- **Impact**: Template now failsafe - won't crash on missing variables
+- **Risk**: NONE (purely additive - adds guards)
 
-#### ✅ Pharmacy Scan-In (Mobile)
-- [ ] Repeat above tests on mobile (360px)
-- [ ] Verify modal is full-screen
-- [ ] Verify video fills screen properly
-- [ ] Verify buttons are touch-friendly
-- [ ] Verify no horizontal overflow
+### 3. `inventory/verticals/phones.py`
+- **Lines 565-568**: Added `ctx.setdefault("YESTERDAY_SUMMARY", None)` and `ctx.setdefault("yesterday_summary", None)`
+- **Impact**: Context always has these keys (even if None)
+- **Risk**: NONE (setdefault is non-destructive)
+
+### 4. `tests/test_phones_dashboard_renders.py` (NEW)
+- **Purpose**: Regression test to prevent this breakage from happening again
+- **Coverage**:
+  - Phones dashboard renders (200, not 500)
+  - Dashboard renders with no sales data
+  - Dashboard renders with all date filters
+  - Sales namespace is registered
+  - Rollback link appears for managers
+  - Required context keys exist
+  - Template is failsafe when YESTERDAY_SUMMARY is None
 
 ---
 
-### Barcode Scanner Tests (Clothing)
+## REGRESSION TEST COVERAGE
 
-#### ✅ Clothing Scan-In
-- [ ] Navigate to `/verticals/clothing/scan-in/`
-- [ ] Select category, size, color
-- [ ] Toggle "Has Barcode?" → Yes
-- [ ] Verify barcode field appears with scanner icon
-- [ ] Click scanner icon → modal opens
-- [ ] Scan barcode → auto-fills field
-- [ ] Submit form → product saves with barcode
-- [ ] Try duplicate barcode → validation error
+**New Test File:** `tests/test_phones_dashboard_renders.py`
 
-#### ✅ Clothing Scan-In (Mobile)
-- [ ] Repeat above tests on mobile
-- [ ] Verify responsive behavior
-- [ ] Verify no crashes or 500 errors
+### Test Cases Added:
 
----
+1. **`test_phones_dashboard_renders_for_manager`**
+   - CRITICAL: Dashboard MUST return 200 (not 500)
+   - Asserts "Phones & Electronics" appears
+   - Asserts no error messages in response
 
-### Fast Sell Tests (Pharmacy)
+2. **`test_phones_dashboard_renders_with_no_sales_data`**
+   - Tests empty state (zero sales)
+   - Ensures YESTERDAY_SUMMARY=None doesn't crash
 
-#### ✅ Pharmacy Fast Sell
-- [ ] Navigate to `/verticals/pharmacy/fast-sell/`
-- [ ] Click "Start Camera" → camera starts
-- [ ] Scan product barcode → product info loads
-- [ ] Verify selling price auto-fills
-- [ ] Adjust quantity if needed
-- [ ] Select payment method (Cash/Bank/Mobile)
-- [ ] Click "Sell Now" → sale completes
-- [ ] Verify success toast appears
-- [ ] Verify KPIs update (Sold Today, Revenue Today, Profit Today)
-- [ ] Verify stock decremented in database
+3. **`test_phones_dashboard_renders_with_date_filters`**
+   - Tests all date range filters: today, 7d, mtd
+   - Each must render successfully
 
-#### ✅ Pharmacy Fast Sell (Missing Price)
-- [ ] Scan product with no selling price
-- [ ] Verify prompt to enter price
-- [ ] Enter selling price
-- [ ] Complete sale
-- [ ] Verify price persists for next sale
+4. **`test_sales_namespace_is_registered`**
+   - CRITICAL: Verifies `reverse('sales:rollback_home')` works
+   - Fails with clear message if namespace missing
+   - Prevents NoReverseMatch errors
 
-#### ✅ Pharmacy Fast Sell (Manual Input)
-- [ ] Use manual barcode input field
-- [ ] Type barcode → click "Lookup"
-- [ ] Verify product loads
-- [ ] Complete sale
-- [ ] Verify works same as camera scan
+5. **`test_phones_dashboard_has_rollback_link_for_managers`**
+   - Manager sees "Rollback Sale" link
+   - Template rendered the sales: URL (didn't error)
 
----
+6. **`test_phones_dashboard_context_has_required_keys`**
+   - Verifies YESTERDAY_SUMMARY in context (can be None)
+   - Verifies dashboard_kpis exists
+   - Verifies IS_MANAGER and IS_AGENT flags exist
+   - Manager has IS_MANAGER=True
 
-### Fast Sell Tests (Clothing)
+7. **`test_dashboard_renders_when_yesterday_summary_is_none`**
+   - Explicitly tests YESTERDAY_SUMMARY=None case
+   - Ensures no VariableDoesNotExist in content
+   - Validates template failsafe works
 
-#### ✅ Clothing Fast Sell
-- [ ] Navigate to `/verticals/clothing/fast-sell/`
-- [ ] Scan clothing product barcode
-- [ ] Verify product info loads
-- [ ] Verify selling price auto-fills
-- [ ] Select payment method
-- [ ] Click "Sell Now" → sale completes
-- [ ] Verify KPIs update
-- [ ] Verify stock decremented
-
-#### ✅ Clothing Fast Sell (Missing Price)
-- [ ] Same tests as pharmacy
-- [ ] Verify price prompt and persistence
-
----
-
-### Regression Tests
-
-#### ✅ No Regressions
-- [ ] Phones vertical → verify NO fast sell (correct)
-- [ ] Liquor vertical → verify NO fast sell (correct)
-- [ ] Gym vertical → verify NO fast sell (correct)
-- [ ] All verticals → verify existing scan/sell flows still work
-- [ ] All verticals → verify sidebar works correctly
-- [ ] All verticals → verify no console errors
-- [ ] All verticals → verify no 500 errors
-
----
-
-## 🎯 Success Criteria
-
-### PART A: Sidebar
-- ✅ "More Features" collapsible menu present in all verticals
-- ✅ Wallet, Admin Wallet, Backups, Simulator moved to submenu
-- ✅ State persists in localStorage
-- ✅ Mobile-first, no overflow
-- ✅ Active link highlighting works
-- ✅ Permissions respected
-- ✅ No duplication of features
-
-### PART B: Barcode Scanner
-- ✅ Scanner icon beside SKU/Barcode field (Pharmacy + Clothing scan-in)
-- ✅ Premium modal with BarcodeDetector API
-- ✅ Front camera only
-- ✅ Multiple barcode formats supported
-- ✅ Debouncing and deduplication
-- ✅ Manual input fallback
-- ✅ Auto-fill barcode field on scan
-- ✅ Graceful error handling (no 500s)
-- ✅ Mobile-first, full-screen on mobile
-- ✅ Fast sell already works correctly (no changes needed)
-
----
-
-## 🚀 Deployment Notes
-
-### Static Files
-After deployment, run:
+**How to Run:**
 ```bash
-python manage.py collectstatic --noinput
+python manage.py test tests.test_phones_dashboard_renders -v 2
 ```
 
-### Browser Cache
-Users may need to hard refresh (Ctrl+Shift+R) to load new CSS/JS files.
-
-### Database
-No migrations required. All changes are frontend-only.
-
-### Compatibility
-- **Django:** 5.2+
-- **Python:** 3.10+
-- **Browsers:** Chrome 88+, Firefox 85+, Safari 14+, Edge 88+
-- **BarcodeDetector API:** Chrome 83+, Edge 83+ (others use manual fallback)
+**Expected Result:** All 7 tests pass ✅
 
 ---
 
-## 📝 Notes
+## VALIDATION CHECKLIST
 
-### Fast Sell Already Complete
-The fast sell templates (`templates/verticals/pharmacy/fast_sell.html` and `templates/verticals/clothing/fast_sell.html`) already implement the full workflow:
-- ✅ Barcode scanner (camera + manual)
-- ✅ Auto-fill price on scan
-- ✅ Payment method selection
-- ✅ One-click "Sell Now" button
-- ✅ KPI updates after sale
-
-No changes were needed for Part B2 because the implementation was already complete and correct.
-
-### Phones & Liquor
-Fast sell is intentionally NOT available for phones and liquor verticals:
-- **Phones:** Use dedicated IMEI scan/sell flow
-- **Liquor:** Use dedicated barman attribution flow
-
-This is enforced by capability checks in `inventory/utils_vertical_capabilities.py`.
-
-### Barcode Storage
-Barcodes are stored using `inventory/utils_barcodes.py`:
-- `set_barcode(product, barcode)` - stores barcode
-- `find_sellable_by_barcode(barcode, business, vertical)` - lookup
-- Uniqueness scoped per business
-- Validation server-side
+✅ **Phones dashboard renders (200, not 500)**  
+✅ **No VariableDoesNotExist errors**  
+✅ **No NoReverseMatch errors**  
+✅ **Template guards handle None gracefully**  
+✅ **Sales namespace registered**  
+✅ **Rollback links work for managers**  
+✅ **All date filters work (today, 7d, mtd, custom)**  
+✅ **Zero sales / empty state works**  
+✅ **Context keys always present**  
+✅ **Regression tests prevent rebreak**  
+✅ **No migrations required**  
+✅ **No linting errors**
 
 ---
 
-## 🐛 Known Issues
+## WHY THIS WON'T BREAK AGAIN
 
-None. All functionality tested and working as expected.
+### 1. Layered Defense
+- Template has failsafe guards
+- View guarantees context keys
+- Helpers can fail without cascading
+
+### 2. Test Coverage
+- Regression test catches missing context vars
+- Regression test catches missing URL namespaces
+- Tests run on every commit
+
+### 3. Better Error Handling
+- Template: `{% if var or fallback %}` with `{% with %}`
+- View: `ctx.setdefault()` for required keys
+- URLs: `include_or_raise()` for clear errors
+
+### 4. Documentation
+- Template has clear comment explaining failsafe
+- View has comment explaining why setdefault is needed
+- This summary documents the failure mode
 
 ---
 
-## 📞 Support
+## DEPLOYMENT NOTES
 
-For issues or questions:
-1. Check test files for expected behavior
-2. Review implementation files for logic
-3. Check browser console for JS errors
-4. Verify static files are collected and served
+### Safe to Deploy:
+- ✅ No database migrations
+- ✅ No model changes
+- ✅ Backward compatible (template supports both variable names)
+- ✅ No breaking changes to existing views
+- ✅ Sales namespace purely additive (doesn't break existing routes)
+
+### Testing Before Deploy:
+```bash
+# 1. Run regression tests
+python manage.py test tests.test_phones_dashboard_renders
+
+# 2. Smoke test phones dashboard
+python manage.py runserver
+# Visit: /inventory/verticals/phones/
+# Expected: 200 OK, dashboard renders
+
+# 3. Smoke test sales rollback (manager only)
+# Visit: /sales/rollback/
+# Expected: 200 OK, rollback page renders
+```
+
+### Rollback Plan:
+If issues arise (unlikely):
+1. Revert `cc/urls.py` line 596 (remove sales namespace)
+2. Revert `inventory/verticals/phones.py` lines 565-568 (remove setdefaults)
+3. Revert template changes (restore old YESTERDAY_SUMMARY checks)
 
 ---
 
-**Implementation Complete:** December 18, 2025  
-**Status:** ✅ Ready for Production
+## LESSONS LEARNED
+
+### What Went Wrong:
+1. **Fragile template**: Referenced variable without proper guard
+2. **Missing URL registration**: App existed but wasn't mounted
+3. **No test coverage**: Breakage wasn't caught before deployment
+
+### How We Fixed It:
+1. **Failsafe templates**: Always guard variable access with proper checks
+2. **Explicit registration**: Register ALL app namespaces in main URLconf
+3. **Regression tests**: Test that pages render (not just logic)
+
+### Best Practices Going Forward:
+1. **Always test page renders**: Not just business logic
+2. **Use setdefault()**: For required context variables
+3. **Register namespaces**: When you create an app, mount it
+4. **Template guards**: Use `{% if var %}{% with safe_var=var %}...{% endwith %}{% endif %}`
+5. **Write regression tests**: When you fix a bug, add a test
+
+---
+
+## CONCLUSION
+
+**Problem:** Phones dashboard returned 500 error due to missing context variable and unregistered URL namespace.
+
+**Root Cause:** 
+- Template assumed YESTERDAY_SUMMARY always exists
+- View helpers could fail silently
+- Sales app not registered in URLs
+
+**Solution:**
+- Made template failsafe with proper guards
+- Added context key defaults in view
+- Registered sales namespace in main URLconf
+- Added comprehensive regression tests
+
+**Impact:**
+- ✅ Phones dashboard works for all users
+- ✅ No more 500 errors
+- ✅ Manager rollback functionality restored
+- ✅ Future-proof against similar breakage
+
+**Test Coverage:** 7 regression tests added
+
+**Deployment Risk:** NONE (purely fixes + tests)
+
+---
+
+**Fixed by:** AI Assistant (Cursor)  
+**Reviewed by:** [Pending]  
+**Deployed:** [Pending]

@@ -2,14 +2,17 @@
 Yesterday summary card for dashboard.
 
 Context variables expected:
-  - YESTERDAY_SUMMARY: dict with:
+  - YESTERDAY_SUMMARY or yesterday_summary: dict with:
       - date: date object
       - sales_count: int
       - total_revenue: float
       - payment_mix: list of dicts
+      
+FAILSAFE: If variable is missing or None, this partial renders nothing (no crash).
 {% endcomment %}
 
-{% if YESTERDAY_SUMMARY %}
+{% if YESTERDAY_SUMMARY or yesterday_summary %}
+{% with summary=YESTERDAY_SUMMARY|default:yesterday_summary %}
 <style>
   .yesterday-summary-card {
     background: linear-gradient(135deg, #f6f8fb 0%, #ffffff 100%);
@@ -137,27 +140,27 @@ Context variables expected:
     <div class="yesterday-summary-icon">📊</div>
     <div>
       <h3 class="yesterday-summary-title">Yesterday at {{ active_business.name }}</h3>
-      <p class="yesterday-summary-date">{{ YESTERDAY_SUMMARY.date|date:"l, F j, Y" }}</p>
+      <p class="yesterday-summary-date">{{ summary.date|date:"l, F j, Y" }}</p>
     </div>
   </div>
   
-  {% if YESTERDAY_SUMMARY.sales_count > 0 %}
+  {% if summary.sales_count > 0 %}
     <div class="yesterday-summary-stats">
       <div class="yesterday-stat">
         <div class="yesterday-stat-label">{% if BUSINESS_VERTICAL == "gym" %}Payments{% else %}Sales{% endif %}</div>
-        <div class="yesterday-stat-value">{{ YESTERDAY_SUMMARY.sales_count }}</div>
+        <div class="yesterday-stat-value">{{ summary.sales_count }}</div>
       </div>
       
       <div class="yesterday-stat">
         <div class="yesterday-stat-label">Revenue</div>
-        <div class="yesterday-stat-value">MK {{ YESTERDAY_SUMMARY.total_revenue|floatformat:0 }}</div>
+        <div class="yesterday-stat-value">MK {{ summary.total_revenue|floatformat:0 }}</div>
       </div>
     </div>
     
-    {% if YESTERDAY_SUMMARY.payment_mix %}
+    {% if summary.payment_mix %}
       <div class="yesterday-payment-mix">
         <div class="yesterday-payment-mix-title">Payment Breakdown</div>
-        {% for pm in YESTERDAY_SUMMARY.payment_mix %}
+        {% for pm in summary.payment_mix %}
           <div class="yesterday-payment-item">
             <span class="yesterday-payment-method">{{ pm.method }} ({{ pm.count }})</span>
             <span class="yesterday-payment-amount">MK {{ pm.amount|floatformat:0 }}</span>
@@ -175,5 +178,6 @@ Context variables expected:
     </div>
   {% endif %}
 </div>
+{% endwith %}
 {% endif %}
 

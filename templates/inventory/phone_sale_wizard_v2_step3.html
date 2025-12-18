@@ -288,10 +288,13 @@
     {# Sale Summary #}
     <div class="sale-summary">
       <h4>📱 {{ wizard_data.product_name }}</h4>
+      {# SECURITY: Only managers can see IMEI on this step - agents don't need it here #}
+      {% if request.is_manager_plus %}
       <div class="sale-detail">
         <span class="sale-detail-label">IMEI</span>
         <span class="sale-detail-value">{{ wizard_data.imei }}</span>
       </div>
+      {% endif %}
       <div class="sale-detail highlight">
         <span class="sale-detail-label">Selling Price</span>
         <span class="sale-detail-value">MWK {{ wizard_data.selling_price|floatformat:0 }}</span>

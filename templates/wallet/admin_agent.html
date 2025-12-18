@@ -64,10 +64,10 @@
       <div class="input-group input-group-sm" style="width: 260px;">
         <label class="input-group-text" for="psYear">Payslip</label>
         <select class="form-select" id="psYear" aria-label="Year">
-          {% for y in "now"|date:"Y"|add:"0"|make_list %}{% endfor %}
+          {# Year options would go here #}
         </select>
         <select class="form-select" id="psMonth" aria-label="Month">
-          {% for m in 1|to_int|default_if_none:1 %}{% endfor %}
+          {# Month options would go here #}
         </select>
       </div>
       <button type="button" id="btnIssuePayslip" class="btn btn-outline-primary btn-sm">

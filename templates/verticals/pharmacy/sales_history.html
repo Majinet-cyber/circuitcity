@@ -217,15 +217,15 @@
         </div>
         <div class="pagination-links">
           {% if sales.has_previous %}
-            <a href="?page=1{% if start_date %}&start={{ start_date }}{% endif %}{% if end_date %}&end={{ end_date }}{% endif %}{% if search_query %}&q={{ search_query }}{% endif %}">First</a>
-            <a href="?page={{ sales.previous_page_number %}{% if start_date %}&start={{ start_date }}{% endif %}{% if end_date %}&end={{ end_date }}{% endif %}{% if search_query %}&q={{ search_query }}{% endif %}">← Prev</a>
+            <a href="?page=1{% if start_date %}&start={{ start_date|urlencode }}{% endif %}{% if end_date %}&end={{ end_date|urlencode }}{% endif %}{% if search_query %}&q={{ search_query|urlencode }}{% endif %}">First</a>
+            <a href="?page={{ sales.previous_page_number }}{% if start_date %}&start={{ start_date|urlencode }}{% endif %}{% if end_date %}&end={{ end_date|urlencode }}{% endif %}{% if search_query %}&q={{ search_query|urlencode }}{% endif %}">← Prev</a>
           {% endif %}
           
           <span class="current">Page {{ sales.number }} of {{ sales.paginator.num_pages }}</span>
           
           {% if sales.has_next %}
-            <a href="?page={{ sales.next_page_number }}{% if start_date %}&start={{ start_date }}{% endif %}{% if end_date %}&end={{ end_date }}{% endif %}{% if search_query %}&q={{ search_query }}{% endif %}">Next →</a>
-            <a href="?page={{ sales.paginator.num_pages }}{% if start_date %}&start={{ start_date }}{% endif %}{% if end_date %}&end={{ end_date }}{% endif %}{% if search_query %}&q={{ search_query }}{% endif %}">Last</a>
+            <a href="?page={{ sales.next_page_number }}{% if start_date %}&start={{ start_date|urlencode }}{% endif %}{% if end_date %}&end={{ end_date|urlencode }}{% endif %}{% if search_query %}&q={{ search_query|urlencode }}{% endif %}">Next →</a>
+            <a href="?page={{ sales.paginator.num_pages }}{% if start_date %}&start={{ start_date|urlencode }}{% endif %}{% if end_date %}&end={{ end_date|urlencode }}{% endif %}{% if search_query %}&q={{ search_query|urlencode }}{% endif %}">Last</a>
           {% endif %}
         </div>
       </div>

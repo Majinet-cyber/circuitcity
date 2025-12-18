@@ -119,24 +119,45 @@ class SubscriptionGateMiddleware(MiddlewareMixin):
         return True
     
     def _render_subscription_blocked(self, request, business, subscription):
-        """Render the subscription blocked page."""
+        """Render the subscription blocked page with role-specific messaging."""
+        # Determine role-specific message
+        is_agent = getattr(request, "is_agent_only", False)
+        is_manager = getattr(request, "is_manager_plus", False)
+        
+        if is_agent:
+            message = "Account locked. Contact your manager."
+            can_manage = False
+        elif is_manager:
+            message = "Account locked. Pay subscription or contact admin to resolve."
+            can_manage = True
+        else:
+            # Default for unauthenticated or unknown roles
+            message = "Account locked. Please contact support."
+            can_manage = False
+        
         context = {
             "business": business,
             "subscription": subscription,
             "status": subscription.status,
-            "billing_url": reverse("billing:home") if self._has_url("billing:home") else "/billing/",
-            "support_email": "support@circuitcity.com",  # Configure this
+            "billing_url": reverse("billing:subscribe") if self._has_url("billing:subscribe") else "/billing/subscribe/",
+            "support_email": "support@circuitcity.com",
+            "lockout_message": message,
+            "is_agent": is_agent,
+            "is_manager": is_manager,
+            "can_manage_subscription": can_manage,
         }
         
         try:
             return render(request, "billing/subscription_blocked.html", context, status=403)
         except Exception:
             # Fallback if template doesn't exist
+            action_btn = f'<a href="{context["billing_url"]}" class="btn">Manage Subscription</a>' if can_manage else ""
             html = f"""
             <!DOCTYPE html>
             <html>
             <head>
-                <title>Subscription Inactive</title>
+                <title>Account Locked</title>
+                <meta name="viewport" content="width=device-width, initial-scale=1.0">
                 <style>
                     body {{
                         font-family: system-ui, -apple-system, sans-serif;
@@ -164,6 +185,7 @@ class SubscriptionGateMiddleware(MiddlewareMixin):
                         color: #4a5568;
                         line-height: 1.6;
                         margin: 0 0 24px 0;
+                        font-size: 16px;
                     }}
                     .status {{
                         display: inline-block;
@@ -183,6 +205,7 @@ class SubscriptionGateMiddleware(MiddlewareMixin):
                         border-radius: 8px;
                         font-weight: 600;
                         transition: all 0.2s;
+                        margin-top: 16px;
                     }}
                     .btn:hover {{
                         background: #5568d3;
@@ -200,13 +223,15 @@ class SubscriptionGateMiddleware(MiddlewareMixin):
             </head>
             <body>
                 <div class="card">
-                    <h1>🔒 Subscription Inactive</h1>
-                    <div class="status">Status: {subscription.get_status_display()}</div>
+                    <h1>🔒 Account Locked</h1>
+                    <div class="status">{subscription.status.title() if subscription else 'Inactive'}</div>
                     <p>
-                        Your subscription for <strong>{business.name}</strong> is currently inactive.
-                        To continue using the platform, please update your subscription or contact support.
+                        <strong>{message}</strong>
                     </p>
-                    <a href="{context['billing_url']}" class="btn">View Billing & Payments</a>
+                    <p style="font-size: 14px; color: #718096;">
+                        Business: <strong>{business.name}</strong>
+                    </p>
+                    {action_btn}
                     <div class="support">
                         Need help? Contact us at <strong>{context['support_email']}</strong>
                     </div>

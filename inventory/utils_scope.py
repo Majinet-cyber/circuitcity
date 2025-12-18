@@ -5,6 +5,10 @@ This module provides helpers to determine what data a user can see:
 - Managers see GLOBAL numbers (all stock, all sales)
 - Agents see ONLY their own numbers (their stock, their sales)
 
+CRITICAL: This module now uses the centralized role resolution from
+tenants.utils_roles via middleware-set request attributes. This ensures
+managers NEVER downgrade to agent scope.
+
 Usage:
     from inventory.utils_scope import get_visible_actor, scope_sales_qs, scope_stock_qs
     
@@ -29,19 +33,34 @@ def get_visible_actor(request) -> Tuple[bool, bool, Optional[User]]:
             - is_agent: True if user can only see their own data
             - actor_user: The User object for filtering
     
-    Managers are defined as:
-    - is_staff = True
-    - is_superuser = True
-    - or has explicit "can_view_all_sales" permission
+    CRITICAL: Uses middleware-set role flags (request.is_manager_plus, request.is_agent_only)
+    which are computed by RoleResolutionMiddleware using tenants.utils_roles.
     
-    Everyone else is considered an agent with limited visibility.
+    This ensures manager precedence - managers are NEVER treated as agents,
+    even if they have location memberships or agent assignments.
+    
+    Fallback: If middleware flags are not present, checks is_staff/is_superuser.
     """
     if not hasattr(request, 'user') or not request.user.is_authenticated:
         return False, False, None
     
     user = request.user
     
-    # Check if user is a manager (can see all data)
+    # ✅ PRIMARY: Use middleware-set role flags (set by RoleResolutionMiddleware)
+    # These flags are computed using the centralized tenants.utils_roles logic
+    # which implements proper manager precedence
+    if hasattr(request, 'is_manager_plus') and hasattr(request, 'is_agent_only'):
+        is_manager = request.is_manager_plus
+        is_agent = request.is_agent_only
+        
+        # Safety check: manager cannot be agent (middleware should prevent this, but belt & suspenders)
+        if is_manager and is_agent:
+            is_agent = False
+        
+        return is_manager, is_agent, user
+    
+    # ✅ FALLBACK: If middleware didn't run (shouldn't happen in production),
+    # use simple checks to avoid breaking the app
     is_manager = (
         user.is_staff or 
         user.is_superuser or

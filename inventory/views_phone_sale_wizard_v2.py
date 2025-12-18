@@ -212,11 +212,20 @@ def _step3_payment(request, business, wizard_data):
             
             _clear_wizard(request)
             
-            messages.success(
-                request,
-                f"🎉 Sale recorded! {result['product_name']} (IMEI: {result['imei']}) "
-                f"sold for MK {result['price']:,.0f} – {result['payment_method_display']}"
-            )
+            # Success message - hide IMEI from agents (security best practice)
+            is_manager = getattr(request, 'is_manager_plus', False)
+            if is_manager:
+                success_msg = (
+                    f"🎉 Sale recorded! {result['product_name']} (IMEI: {result['imei']}) "
+                    f"sold for MK {result['price']:,.0f} – {result['payment_method_display']}"
+                )
+            else:
+                success_msg = (
+                    f"🎉 Sale recorded! {result['product_name']} "
+                    f"sold for MK {result['price']:,.0f} – {result['payment_method_display']}"
+                )
+            
+            messages.success(request, success_msg)
             
             return redirect('inventory:inventory_dashboard')
             

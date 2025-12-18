@@ -272,14 +272,20 @@ def fast_sell(request):
     Uses front camera for barcode scanning with BarcodeDetector API fallback.
     """
     from django.http import JsonResponse
+    from inventory.utils_scope import get_visible_actor
     
     business: Business = request.business
+    
+    # Get role flags for template
+    is_manager, is_agent, actor_user = get_visible_actor(request)
     
     ctx = {
         "business": business,
         "page_title": "Fast Sell",
         "vertical": "pharmacy",
         "vertical_name": "Pharmacy",
+        "IS_MANAGER": is_manager,
+        "IS_AGENT": is_agent,
     }
     
     return render(request, "verticals/pharmacy/fast_sell.html", ctx)

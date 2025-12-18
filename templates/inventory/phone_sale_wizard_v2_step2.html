@@ -231,10 +231,13 @@
     {# Phone Summary #}
     <div class="phone-summary">
       <h4>📱 {{ wizard_data.product_name }}</h4>
+      {# SECURITY: Only managers can see IMEI on this step - agents don't need it here #}
+      {% if request.is_manager_plus %}
       <div class="phone-detail">
         <span class="phone-detail-label">IMEI</span>
         <span class="phone-detail-value">{{ wizard_data.imei }}</span>
       </div>
+      {% endif %}
       {% if wizard_data.variant %}
       <div class="phone-detail">
         <span class="phone-detail-label">Specs</span>

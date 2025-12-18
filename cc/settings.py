@@ -173,6 +173,9 @@ SESSION_ENGINE = "django.contrib.sessions.backends.db"
 # Canonical session key for active tenant (used by middleware/utils)
 TENANT_SESSION_KEY = os.environ.get("TENANT_SESSION_KEY", "active_business_id")
 
+# Branded CSRF failure view (replaces Django's default 403 CSRF page)
+CSRF_FAILURE_VIEW = "core.views_csrf.csrf_failure"
+
 # --------------------------- apps ---------------------------
 INSTALLED_APPS = [
     # Django
@@ -234,6 +237,13 @@ MIDDLEWARE = [
     # Tenant resolution + compat alias
     "tenants.middleware.TenantResolutionMiddleware",
     "tenants.middleware.ActiveBusinessMiddleware",
+    # ✅ CRITICAL: Role resolution (AFTER tenant, BEFORE views)
+    # This ensures managers NEVER downgrade to agent scope on dashboard
+    "tenants.middleware_roles.RoleResolutionMiddleware",
+    # ✅ Subscription lockout enforcement (AFTER role resolution)
+    # Blocks ALL users (agents + managers) when subscription is expired/canceled
+    # Shows role-specific messaging
+    "billing.middleware_subscription_gate.SubscriptionGateMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
 ]
@@ -282,6 +292,7 @@ TEMPLATES = [
             ],
             "builtins": [
                 "inventory.templatetags.money",
+                "core.templatetags.cc_extras",
             ],
         },
     },

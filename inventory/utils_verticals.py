@@ -231,6 +231,7 @@ def get_vertical_sidebar_items(business_kind: str) -> list[dict]:
         - is_menu: bool (default False, True if item opens menu drawer)
         - is_header: bool (default False, True if item is a section header)
         - require_manager: bool (default False, True if item requires manager role)
+        - group: str (optional, "more" for items in collapsible More section)
     
     Args:
         business_kind: Vertical code (e.g., "phones", "gym", "clothing", "liquor", "pharmacy")
@@ -248,19 +249,20 @@ def get_vertical_sidebar_items(business_kind: str) -> list[dict]:
             {"section": "MAIN", "key": "checkin", "url": "gym:checkin_page", "label": "Member Check-ins", "icon": "bi-clipboard-check", "active_prefix": "/gym/checkin", "active_pattern": "/gym/checkin", "require_manager": False, "is_menu": False, "is_header": False},
             
             # TIME section
-            {"section": "TIME", "key": "time_logs", "url": "inventory:time_logs", "label": "Staff Time Logs", "icon": "bi-journal-text", "active_prefix": "/inventory/time/logs", "active_pattern": "/inventory/time/logs", "require_manager": False, "is_menu": False, "is_header": False},
+            {"section": "TIME", "key": "time_logs", "url": "inventory:time_logs", "label": "Time Logs", "icon": "bi-journal-text", "active_prefix": "/inventory/time/logs", "active_pattern": "/inventory/time/logs", "require_manager": False, "is_menu": False, "is_header": False},
             
             # MONEY section
-            {"section": "MONEY", "key": "wallet", "url": "wallet:agent_wallet", "label": "My Wallet", "icon": "bi-wallet2", "active_prefix": "/wallet/", "active_pattern": "/wallet/", "require_manager": False, "is_menu": False, "is_header": False},
-            {"section": "MONEY", "key": "admin_wallet", "url": "wallet:admin_home", "label": "Admin Wallet", "icon": "bi-briefcase", "active_prefix": "/wallet/admin/", "active_pattern": "/wallet/admin/", "require_manager": True, "is_menu": False, "is_header": False},
-            {"section": "MONEY", "key": "costs", "url": "wallet:admin_cost_list", "label": "Costs", "icon": "bi-cash-stack", "active_prefix": "/wallet/admin/costs/", "active_pattern": "/wallet/admin/costs/", "require_manager": True, "is_menu": False, "is_header": False},
+            {"section": "MONEY", "key": "wallet", "url": "wallet:agent_wallet", "label": "Wallet", "icon": "bi-wallet2", "active_prefix": "/wallet/", "active_pattern": "/wallet/", "require_manager": False, "is_menu": False, "is_header": False},
             
-            # BUSINESS section (for managers)
-            {"section": "BUSINESS", "key": "simulator", "url": "simulator:business_home", "label": "Simulator", "icon": "bi-cpu", "active_prefix": "/simulator/business/", "active_pattern": "/simulator/business/", "require_manager": True, "is_menu": False, "is_header": False},
-            {"section": "BUSINESS", "key": "trainers", "url": "tenants:manager_review_agents", "label": "Trainers", "icon": "bi-people", "active_prefix": "/tenants/manager/agents/", "active_pattern": "/tenants/manager/agents/", "require_manager": True, "is_menu": False, "is_header": False},
-            {"section": "BUSINESS", "key": "locations", "url": "tenants:manager_locations", "label": "Locations", "icon": "bi-geo", "active_prefix": "/tenants/manager/locations/", "active_pattern": "/tenants/manager/locations/", "require_manager": True, "is_menu": False, "is_header": False},
-            {"section": "BUSINESS", "key": "backups", "url": "backups:manager_list", "label": "Data Backup", "icon": "bi-cloud-download", "active_prefix": "/backups/", "active_pattern": "/backups/", "require_manager": True, "is_menu": False, "is_header": False},
-            {"section": "BUSINESS", "key": "billing", "url": "billing:plans", "label": "Choose Plan", "icon": "bi-credit-card-2-front", "active_prefix": "/billing/plans", "active_pattern": "/billing/plans", "require_manager": True, "is_menu": False, "is_header": False},
+            # MORE section - Collapsible manager tools (premium, less button-heavy)
+            {"section": "MORE", "key": "reports", "url": "reports:home", "label": "Reports", "icon": "bi-file-earmark-bar-graph", "active_prefix": "/reports/", "active_pattern": "/reports/", "require_manager": True, "is_menu": False, "is_header": False, "group": "more"},
+            {"section": "MORE", "key": "admin_wallet", "url": "wallet:admin_home", "label": "Admin Wallet", "icon": "bi-briefcase", "active_prefix": "/wallet/admin/", "active_pattern": "/wallet/admin/", "require_manager": True, "is_menu": False, "is_header": False, "group": "more"},
+            {"section": "MORE", "key": "costs", "url": "wallet:admin_cost_list", "label": "Costs", "icon": "bi-cash-stack", "active_prefix": "/wallet/admin/costs/", "active_pattern": "/wallet/admin/costs/", "require_manager": True, "is_menu": False, "is_header": False, "group": "more"},
+            {"section": "MORE", "key": "simulator", "url": "simulator:business_home", "label": "Simulator", "icon": "bi-cpu", "active_prefix": "/simulator/business/", "active_pattern": "/simulator/business/", "require_manager": True, "is_menu": False, "is_header": False, "group": "more"},
+            {"section": "MORE", "key": "trainers", "url": "tenants:manager_review_agents", "label": "Trainers", "icon": "bi-people", "active_prefix": "/tenants/manager/agents/", "active_pattern": "/tenants/manager/agents/", "require_manager": True, "is_menu": False, "is_header": False, "group": "more"},
+            {"section": "MORE", "key": "locations", "url": "tenants:manager_locations", "label": "Locations", "icon": "bi-geo", "active_prefix": "/tenants/manager/locations/", "active_pattern": "/tenants/manager/locations/", "require_manager": True, "is_menu": False, "is_header": False, "group": "more"},
+            {"section": "MORE", "key": "backups", "url": "backups:manager_list", "label": "Data Backup", "icon": "bi-cloud-download", "active_prefix": "/backups/", "active_pattern": "/backups/", "require_manager": True, "is_menu": False, "is_header": False, "group": "more"},
+            {"section": "MORE", "key": "billing", "url": "billing:plans", "label": "Choose Plan", "icon": "bi-credit-card-2-front", "active_prefix": "/billing/plans", "active_pattern": "/billing/plans", "require_manager": True, "is_menu": False, "is_header": False, "group": "more"},
         ]
     
     elif business_kind == "clothing":
@@ -278,17 +280,18 @@ def get_vertical_sidebar_items(business_kind: str) -> list[dict]:
             {"section": "TIME", "key": "time_logs", "url": "inventory:time_logs", "label": "Time Logs", "icon": "bi-journal-text", "active_prefix": "/inventory/time/logs", "active_pattern": "/inventory/time/logs", "require_manager": False, "is_menu": False, "is_header": False},
             
             # MONEY section
-            {"section": "MONEY", "key": "wallet", "url": "wallet:agent_wallet", "label": "My Wallet", "icon": "bi-wallet2", "active_prefix": "/wallet/", "active_pattern": "/wallet/", "require_manager": False, "is_menu": False, "is_header": False},
-            {"section": "MONEY", "key": "admin_wallet", "url": "wallet:admin_home", "label": "Admin Wallet", "icon": "bi-briefcase", "active_prefix": "/wallet/admin/", "active_pattern": "/wallet/admin/", "require_manager": True, "is_menu": False, "is_header": False},
-            {"section": "MONEY", "key": "costs", "url": "wallet:admin_cost_list", "label": "Costs", "icon": "bi-cash-stack", "active_prefix": "/wallet/admin/costs/", "active_pattern": "/wallet/admin/costs/", "require_manager": True, "is_menu": False, "is_header": False},
+            {"section": "MONEY", "key": "wallet", "url": "wallet:agent_wallet", "label": "Wallet", "icon": "bi-wallet2", "active_prefix": "/wallet/", "active_pattern": "/wallet/", "require_manager": False, "is_menu": False, "is_header": False},
             
-            # BUSINESS section (for managers)
-            {"section": "BUSINESS", "key": "simulator", "url": "simulator:business_home", "label": "Simulator", "icon": "bi-cpu", "active_prefix": "/simulator/business/", "active_pattern": "/simulator/business/", "require_manager": True, "is_menu": False, "is_header": False},
-            {"section": "BUSINESS", "key": "agents", "url": "tenants:manager_review_agents", "label": "Agents", "icon": "bi-people", "active_prefix": "/tenants/manager/agents/", "active_pattern": "/tenants/manager/agents/", "require_manager": True, "is_menu": False, "is_header": False},
-            {"section": "BUSINESS", "key": "locations", "url": "tenants:manager_locations", "label": "Locations", "icon": "bi-geo", "active_prefix": "/tenants/manager/locations/", "active_pattern": "/tenants/manager/locations/", "require_manager": True, "is_menu": False, "is_header": False},
-            {"section": "BUSINESS", "key": "backups", "url": "backups:manager_list", "label": "Data Backup", "icon": "bi-cloud-download", "active_prefix": "/backups/", "active_pattern": "/backups/", "require_manager": True, "is_menu": False, "is_header": False},
-            {"section": "BUSINESS", "key": "billing", "url": "billing:plans", "label": "Choose Plan", "icon": "bi-credit-card-2-front", "active_prefix": "/billing/plans", "active_pattern": "/billing/plans", "require_manager": True, "is_menu": False, "is_header": False},
-            {"section": "BUSINESS", "key": "orders", "url": "inventory:orders_list", "label": "Orders", "icon": "bi-clipboard-data", "active_prefix": "/inventory/orders/", "active_pattern": "/inventory/orders/", "require_manager": True, "is_menu": False, "is_header": False},
+            # MORE section - Collapsible manager tools
+            {"section": "MORE", "key": "reports", "url": "reports:home", "label": "Reports", "icon": "bi-file-earmark-bar-graph", "active_prefix": "/reports/", "active_pattern": "/reports/", "require_manager": True, "is_menu": False, "is_header": False, "group": "more"},
+            {"section": "MORE", "key": "admin_wallet", "url": "wallet:admin_home", "label": "Admin Wallet", "icon": "bi-briefcase", "active_prefix": "/wallet/admin/", "active_pattern": "/wallet/admin/", "require_manager": True, "is_menu": False, "is_header": False, "group": "more"},
+            {"section": "MORE", "key": "costs", "url": "wallet:admin_cost_list", "label": "Costs", "icon": "bi-cash-stack", "active_prefix": "/wallet/admin/costs/", "active_pattern": "/wallet/admin/costs/", "require_manager": True, "is_menu": False, "is_header": False, "group": "more"},
+            {"section": "MORE", "key": "simulator", "url": "simulator:business_home", "label": "Simulator", "icon": "bi-cpu", "active_prefix": "/simulator/business/", "active_pattern": "/simulator/business/", "require_manager": True, "is_menu": False, "is_header": False, "group": "more"},
+            {"section": "MORE", "key": "agents", "url": "tenants:manager_review_agents", "label": "Agents", "icon": "bi-people", "active_prefix": "/tenants/manager/agents/", "active_pattern": "/tenants/manager/agents/", "require_manager": True, "is_menu": False, "is_header": False, "group": "more"},
+            {"section": "MORE", "key": "locations", "url": "tenants:manager_locations", "label": "Locations", "icon": "bi-geo", "active_prefix": "/tenants/manager/locations/", "active_pattern": "/tenants/manager/locations/", "require_manager": True, "is_menu": False, "is_header": False, "group": "more"},
+            {"section": "MORE", "key": "backups", "url": "backups:manager_list", "label": "Data Backup", "icon": "bi-cloud-download", "active_prefix": "/backups/", "active_pattern": "/backups/", "require_manager": True, "is_menu": False, "is_header": False, "group": "more"},
+            {"section": "MORE", "key": "billing", "url": "billing:plans", "label": "Choose Plan", "icon": "bi-credit-card-2-front", "active_prefix": "/billing/plans", "active_pattern": "/billing/plans", "require_manager": True, "is_menu": False, "is_header": False, "group": "more"},
+            {"section": "MORE", "key": "orders", "url": "inventory:orders_list", "label": "Orders", "icon": "bi-clipboard-data", "active_prefix": "/inventory/orders/", "active_pattern": "/inventory/orders/", "require_manager": True, "is_menu": False, "is_header": False, "group": "more"},
         ]
     
     elif business_kind == "liquor":
@@ -306,16 +309,17 @@ def get_vertical_sidebar_items(business_kind: str) -> list[dict]:
             {"section": "TIME", "key": "time_logs", "url": "inventory:time_logs", "label": "Time Logs", "icon": "bi-journal-text", "active_prefix": "/inventory/time/logs", "active_pattern": "/inventory/time/logs", "require_manager": False, "is_menu": False, "is_header": False},
             
             # MONEY section
-            {"section": "MONEY", "key": "wallet", "url": "wallet:agent_wallet", "label": "My Wallet", "icon": "bi-wallet2", "active_prefix": "/wallet/", "active_pattern": "/wallet/", "require_manager": False, "is_menu": False, "is_header": False},
+            {"section": "MONEY", "key": "wallet", "url": "wallet:agent_wallet", "label": "Wallet", "icon": "bi-wallet2", "active_prefix": "/wallet/", "active_pattern": "/wallet/", "require_manager": False, "is_menu": False, "is_header": False},
             {"section": "MONEY", "key": "credits", "url": "liquor:credits_list", "label": "Credits", "icon": "bi-person-lines-fill", "active_prefix": "/liquor/credits/", "active_pattern": "/liquor/credits/", "require_manager": False, "is_menu": False, "is_header": False},
-            {"section": "MONEY", "key": "admin_wallet", "url": "wallet:admin_home", "label": "Admin Wallet", "icon": "bi-briefcase", "active_prefix": "/wallet/admin/", "active_pattern": "/wallet/admin/", "require_manager": True, "is_menu": False, "is_header": False},
-            {"section": "MONEY", "key": "costs", "url": "wallet:admin_cost_list", "label": "Costs", "icon": "bi-cash-stack", "active_prefix": "/wallet/admin/costs/", "active_pattern": "/wallet/admin/costs/", "require_manager": True, "is_menu": False, "is_header": False},
             
-            # BUSINESS section (for managers)
-            {"section": "BUSINESS", "key": "agents", "url": "tenants:manager_review_agents", "label": "Agents", "icon": "bi-people", "active_prefix": "/tenants/manager/agents/", "active_pattern": "/tenants/manager/agents/", "require_manager": True, "is_menu": False, "is_header": False},
-            {"section": "BUSINESS", "key": "locations", "url": "tenants:manager_locations", "label": "Locations", "icon": "bi-geo", "active_prefix": "/tenants/manager/locations/", "active_pattern": "/tenants/manager/locations/", "require_manager": True, "is_menu": False, "is_header": False},
-            {"section": "BUSINESS", "key": "backups", "url": "backups:manager_list", "label": "Data Backup", "icon": "bi-cloud-download", "active_prefix": "/backups/", "active_pattern": "/backups/", "require_manager": True, "is_menu": False, "is_header": False},
-            {"section": "BUSINESS", "key": "billing", "url": "billing:plans", "label": "Choose Plan", "icon": "bi-credit-card-2-front", "active_prefix": "/billing/plans", "active_pattern": "/billing/plans", "require_manager": True, "is_menu": False, "is_header": False},
+            # MORE section - Collapsible manager tools
+            {"section": "MORE", "key": "reports", "url": "reports:home", "label": "Reports", "icon": "bi-file-earmark-bar-graph", "active_prefix": "/reports/", "active_pattern": "/reports/", "require_manager": True, "is_menu": False, "is_header": False, "group": "more"},
+            {"section": "MORE", "key": "admin_wallet", "url": "wallet:admin_home", "label": "Admin Wallet", "icon": "bi-briefcase", "active_prefix": "/wallet/admin/", "active_pattern": "/wallet/admin/", "require_manager": True, "is_menu": False, "is_header": False, "group": "more"},
+            {"section": "MORE", "key": "costs", "url": "wallet:admin_cost_list", "label": "Costs", "icon": "bi-cash-stack", "active_prefix": "/wallet/admin/costs/", "active_pattern": "/wallet/admin/costs/", "require_manager": True, "is_menu": False, "is_header": False, "group": "more"},
+            {"section": "MORE", "key": "agents", "url": "tenants:manager_review_agents", "label": "Agents", "icon": "bi-people", "active_prefix": "/tenants/manager/agents/", "active_pattern": "/tenants/manager/agents/", "require_manager": True, "is_menu": False, "is_header": False, "group": "more"},
+            {"section": "MORE", "key": "locations", "url": "tenants:manager_locations", "label": "Locations", "icon": "bi-geo", "active_prefix": "/tenants/manager/locations/", "active_pattern": "/tenants/manager/locations/", "require_manager": True, "is_menu": False, "is_header": False, "group": "more"},
+            {"section": "MORE", "key": "backups", "url": "backups:manager_list", "label": "Data Backup", "icon": "bi-cloud-download", "active_prefix": "/backups/", "active_pattern": "/backups/", "require_manager": True, "is_menu": False, "is_header": False, "group": "more"},
+            {"section": "MORE", "key": "billing", "url": "billing:plans", "label": "Choose Plan", "icon": "bi-credit-card-2-front", "active_prefix": "/billing/plans", "active_pattern": "/billing/plans", "require_manager": True, "is_menu": False, "is_header": False, "group": "more"},
         ]
     
     elif business_kind == "pharmacy":
@@ -334,25 +338,25 @@ def get_vertical_sidebar_items(business_kind: str) -> list[dict]:
             {"section": "TIME", "key": "time_logs", "url": "inventory:time_logs", "label": "Time Logs", "icon": "bi-journal-text", "active_prefix": "/inventory/time/logs", "active_pattern": "/inventory/time/logs", "require_manager": False, "is_menu": False, "is_header": False},
             
             # MONEY section
-            {"section": "MONEY", "key": "wallet", "url": "wallet:agent_wallet", "label": "My Wallet", "icon": "bi-wallet2", "active_prefix": "/wallet/", "active_pattern": "/wallet/", "require_manager": False, "is_menu": False, "is_header": False},
-            {"section": "MONEY", "key": "admin_wallet", "url": "wallet:admin_home", "label": "Admin Wallet", "icon": "bi-briefcase", "active_prefix": "/wallet/admin/", "active_pattern": "/wallet/admin/", "require_manager": True, "is_menu": False, "is_header": False},
-            {"section": "MONEY", "key": "costs", "url": "wallet:admin_cost_list", "label": "Costs", "icon": "bi-cash-stack", "active_prefix": "/wallet/admin/costs/", "active_pattern": "/wallet/admin/costs/", "require_manager": True, "is_menu": False, "is_header": False},
+            {"section": "MONEY", "key": "wallet", "url": "wallet:agent_wallet", "label": "Wallet", "icon": "bi-wallet2", "active_prefix": "/wallet/", "active_pattern": "/wallet/", "require_manager": False, "is_menu": False, "is_header": False},
             
-            # BUSINESS section (for managers)
-            {"section": "BUSINESS", "key": "agents", "url": "tenants:manager_review_agents", "label": "Agents", "icon": "bi-people", "active_prefix": "/tenants/manager/agents/", "active_pattern": "/tenants/manager/agents/", "require_manager": True, "is_menu": False, "is_header": False},
-            {"section": "BUSINESS", "key": "locations", "url": "tenants:manager_locations", "label": "Locations", "icon": "bi-geo", "active_prefix": "/tenants/manager/locations/", "active_pattern": "/tenants/manager/locations/", "require_manager": True, "is_menu": False, "is_header": False},
-            {"section": "BUSINESS", "key": "backups", "url": "backups:manager_list", "label": "Data Backup", "icon": "bi-cloud-download", "active_prefix": "/backups/", "active_pattern": "/backups/", "require_manager": True, "is_menu": False, "is_header": False},
-            {"section": "BUSINESS", "key": "billing", "url": "billing:plans", "label": "Choose Plan", "icon": "bi-credit-card-2-front", "active_prefix": "/billing/plans", "active_pattern": "/billing/plans", "require_manager": True, "is_menu": False, "is_header": False},
+            # MORE section - Collapsible manager tools
+            {"section": "MORE", "key": "reports", "url": "reports:home", "label": "Reports", "icon": "bi-file-earmark-bar-graph", "active_prefix": "/reports/", "active_pattern": "/reports/", "require_manager": True, "is_menu": False, "is_header": False, "group": "more"},
+            {"section": "MORE", "key": "admin_wallet", "url": "wallet:admin_home", "label": "Admin Wallet", "icon": "bi-briefcase", "active_prefix": "/wallet/admin/", "active_pattern": "/wallet/admin/", "require_manager": True, "is_menu": False, "is_header": False, "group": "more"},
+            {"section": "MORE", "key": "costs", "url": "wallet:admin_cost_list", "label": "Costs", "icon": "bi-cash-stack", "active_prefix": "/wallet/admin/costs/", "active_pattern": "/wallet/admin/costs/", "require_manager": True, "is_menu": False, "is_header": False, "group": "more"},
+            {"section": "MORE", "key": "agents", "url": "tenants:manager_review_agents", "label": "Agents", "icon": "bi-people", "active_prefix": "/tenants/manager/agents/", "active_pattern": "/tenants/manager/agents/", "require_manager": True, "is_menu": False, "is_header": False, "group": "more"},
+            {"section": "MORE", "key": "locations", "url": "tenants:manager_locations", "label": "Locations", "icon": "bi-geo", "active_prefix": "/tenants/manager/locations/", "active_pattern": "/tenants/manager/locations/", "require_manager": True, "is_menu": False, "is_header": False, "group": "more"},
+            {"section": "MORE", "key": "backups", "url": "backups:manager_list", "label": "Data Backup", "icon": "bi-cloud-download", "active_prefix": "/backups/", "active_pattern": "/backups/", "require_manager": True, "is_menu": False, "is_header": False, "group": "more"},
+            {"section": "MORE", "key": "billing", "url": "billing:plans", "label": "Choose Plan", "icon": "bi-credit-card-2-front", "active_prefix": "/billing/plans", "active_pattern": "/billing/plans", "require_manager": True, "is_menu": False, "is_header": False, "group": "more"},
         ]
     
     else:  # "phones" or default
         return [
             # MAIN section - Phones Dashboard is the primary entry point
-            {"section": "MAIN", "key": "dashboard", "url": "inventory_verticals:phones_dashboard", "label": "Phone Dashboard", "icon": "bi-speedometer2", "active_prefix": "/inventory/verticals/phones", "active_pattern": "/inventory/verticals/phones", "require_manager": False, "is_menu": False, "is_header": False},
+            {"section": "MAIN", "key": "dashboard", "url": "inventory_verticals:phones_dashboard", "label": "Dashboard", "icon": "bi-speedometer2", "active_prefix": "/inventory/verticals/phones", "active_pattern": "/inventory/verticals/phones", "require_manager": False, "is_menu": False, "is_header": False},
             {"section": "MAIN", "key": "analytics", "url": "app_router:analytics", "label": "Analytics", "icon": "bi-graph-up", "active_prefix": "/app/analytics", "active_pattern": "/app/analytics", "require_manager": False, "is_menu": False, "is_header": False},
             # Note: Fast Sell removed - phones uses dedicated scan/sell flows
             {"section": "MAIN", "key": "stock", "url": "inventory:stock_list", "label": "Stock", "icon": "bi-box-seam", "active_prefix": "/inventory/list/", "active_pattern": "/inventory/list/", "require_manager": False, "is_menu": False, "is_header": False},
-            {"section": "MAIN", "key": "products", "url": "inventory:phone_products", "label": "Products", "icon": "bi-grid-3x3-gap", "active_prefix": "/inventory/phone-products", "active_pattern": "/inventory/phone-products", "require_manager": True, "is_menu": False, "is_header": False},
             {"section": "MAIN", "key": "scan_in", "url": "inventory:scan_in", "label": "Scan IN", "icon": "bi-upc-scan", "active_prefix": "/inventory/scan", "active_pattern": "/inventory/scan", "require_manager": False, "is_menu": False, "is_header": False},
             {"section": "MAIN", "key": "sell", "url": "inventory:phone_sale_wizard", "label": "Scan & Sell", "icon": "bi-bag-check", "active_prefix": "/inventory/phone-sale-wizard/", "active_pattern": "/inventory/phone-sale-wizard/", "require_manager": False, "is_menu": False, "is_header": False},
             
@@ -360,21 +364,22 @@ def get_vertical_sidebar_items(business_kind: str) -> list[dict]:
             {"section": "TIME", "key": "time_logs", "url": "inventory:time_logs", "label": "Time Logs", "icon": "bi-journal-text", "active_prefix": "/inventory/time/logs", "active_pattern": "/inventory/time/logs", "require_manager": False, "is_menu": False, "is_header": False},
             
             # MONEY section
-            {"section": "MONEY", "key": "wallet", "url": "wallet:agent_wallet", "label": "My Wallet", "icon": "bi-wallet2", "active_prefix": "/wallet/", "active_pattern": "/wallet/", "require_manager": False, "is_menu": False, "is_header": False},
-            {"section": "MONEY", "key": "admin_wallet", "url": "wallet:admin_home", "label": "Admin Wallet", "icon": "bi-briefcase", "active_prefix": "/wallet/admin/", "active_pattern": "/wallet/admin/", "require_manager": True, "is_menu": False, "is_header": False},
-            {"section": "MONEY", "key": "costs", "url": "wallet:admin_cost_list", "label": "Costs", "icon": "bi-cash-stack", "active_prefix": "/wallet/admin/costs/", "active_pattern": "/wallet/admin/costs/", "require_manager": True, "is_menu": False, "is_header": False},
-            
-            # BUSINESS section (for managers)
-            {"section": "BUSINESS", "key": "simulator", "url": "simulator:business_home", "label": "Simulator", "icon": "bi-cpu", "active_prefix": "/simulator/business/", "active_pattern": "/simulator/business/", "require_manager": True, "is_menu": False, "is_header": False},
-            {"section": "BUSINESS", "key": "reports", "url": "reports:home", "label": "Reports", "icon": "bi-graph-up", "active_prefix": "/reports/", "active_pattern": "/reports/", "require_manager": True, "is_menu": False, "is_header": False},
-            {"section": "BUSINESS", "key": "agents", "url": "tenants:manager_review_agents", "label": "Agents", "icon": "bi-people", "active_prefix": "/tenants/manager/agents/", "active_pattern": "/tenants/manager/agents/", "require_manager": True, "is_menu": False, "is_header": False},
-            {"section": "BUSINESS", "key": "locations", "url": "tenants:manager_locations", "label": "Locations", "icon": "bi-geo", "active_prefix": "/tenants/manager/locations/", "active_pattern": "/tenants/manager/locations/", "require_manager": True, "is_menu": False, "is_header": False},
-            {"section": "BUSINESS", "key": "backups", "url": "backups:manager_list", "label": "Data Backup", "icon": "bi-cloud-download", "active_prefix": "/backups/", "active_pattern": "/backups/", "require_manager": True, "is_menu": False, "is_header": False},
-            {"section": "BUSINESS", "key": "billing", "url": "billing:plans", "label": "Choose Plan", "icon": "bi-credit-card-2-front", "active_prefix": "/billing/plans", "active_pattern": "/billing/plans", "require_manager": True, "is_menu": False, "is_header": False},
-            {"section": "BUSINESS", "key": "orders", "url": "inventory:orders_list", "label": "Orders", "icon": "bi-clipboard-data", "active_prefix": "/inventory/orders/", "active_pattern": "/inventory/orders/", "require_manager": True, "is_menu": False, "is_header": False},
+            {"section": "MONEY", "key": "wallet", "url": "wallet:agent_wallet", "label": "Wallet", "icon": "bi-wallet2", "active_prefix": "/wallet/", "active_pattern": "/wallet/", "require_manager": False, "is_menu": False, "is_header": False},
             
             # LAYBY section (phones specific)
             {"section": "LAYBY", "key": "layby", "url": "layby:dashboard", "label": "Layby", "icon": "bi-journal-check", "active_prefix": "/layby/", "active_pattern": "/layby/", "require_manager": False, "is_menu": False, "is_header": False},
+            
+            # MORE section - Collapsible manager tools (premium, less button-heavy)
+            {"section": "MORE", "key": "reports", "url": "reports:home", "label": "Reports", "icon": "bi-file-earmark-bar-graph", "active_prefix": "/reports/", "active_pattern": "/reports/", "require_manager": True, "is_menu": False, "is_header": False, "group": "more"},
+            {"section": "MORE", "key": "products", "url": "inventory:phone_products", "label": "Products", "icon": "bi-grid-3x3-gap", "active_prefix": "/inventory/phone-products", "active_pattern": "/inventory/phone-products", "require_manager": True, "is_menu": False, "is_header": False, "group": "more"},
+            {"section": "MORE", "key": "admin_wallet", "url": "wallet:admin_home", "label": "Admin Wallet", "icon": "bi-briefcase", "active_prefix": "/wallet/admin/", "active_pattern": "/wallet/admin/", "require_manager": True, "is_menu": False, "is_header": False, "group": "more"},
+            {"section": "MORE", "key": "costs", "url": "wallet:admin_cost_list", "label": "Costs", "icon": "bi-cash-stack", "active_prefix": "/wallet/admin/costs/", "active_pattern": "/wallet/admin/costs/", "require_manager": True, "is_menu": False, "is_header": False, "group": "more"},
+            {"section": "MORE", "key": "simulator", "url": "simulator:business_home", "label": "Simulator", "icon": "bi-cpu", "active_prefix": "/simulator/business/", "active_pattern": "/simulator/business/", "require_manager": True, "is_menu": False, "is_header": False, "group": "more"},
+            {"section": "MORE", "key": "agents", "url": "tenants:manager_review_agents", "label": "Agents", "icon": "bi-people", "active_prefix": "/tenants/manager/agents/", "active_pattern": "/tenants/manager/agents/", "require_manager": True, "is_menu": False, "is_header": False, "group": "more"},
+            {"section": "MORE", "key": "locations", "url": "tenants:manager_locations", "label": "Locations", "icon": "bi-geo", "active_prefix": "/tenants/manager/locations/", "active_pattern": "/tenants/manager/locations/", "require_manager": True, "is_menu": False, "is_header": False, "group": "more"},
+            {"section": "MORE", "key": "backups", "url": "backups:manager_list", "label": "Data Backup", "icon": "bi-cloud-download", "active_prefix": "/backups/", "active_pattern": "/backups/", "require_manager": True, "is_menu": False, "is_header": False, "group": "more"},
+            {"section": "MORE", "key": "billing", "url": "billing:plans", "label": "Choose Plan", "icon": "bi-credit-card-2-front", "active_prefix": "/billing/plans", "active_pattern": "/billing/plans", "require_manager": True, "is_menu": False, "is_header": False, "group": "more"},
+            {"section": "MORE", "key": "orders", "url": "inventory:orders_list", "label": "Orders", "icon": "bi-clipboard-data", "active_prefix": "/inventory/orders/", "active_pattern": "/inventory/orders/", "require_manager": True, "is_menu": False, "is_header": False, "group": "more"},
         ]
 
 

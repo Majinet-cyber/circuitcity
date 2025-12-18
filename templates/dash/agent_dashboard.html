@@ -264,8 +264,8 @@
         <form method="post" class="grid" style="grid-template-columns:1fr auto; gap:.6rem; align-items:center">
           {% csrf_token %}
           <input type="hidden" name="action" value="log_time">
-          {% now "Y-m-d\\TH:i" as _now_val %}
-          <input class="input" type="datetime-local" name="logged_at" value="{{ _now_val }}" aria-label="Log time" />
+          {% now "Y-m-d\\TH:i" as now_val %}
+          <input class="input" type="datetime-local" name="logged_at" value="{{ now_val }}" aria-label="Log time" />
           <button class="btn" type="submit">Log arrival ({% now "M. d, Y" %})</button>
           <textarea class="input" name="note" placeholder="Optional note (e.g., opening)"></textarea>
         </form>

@@ -841,12 +841,25 @@ def fast_sell(request):
     """
     Fast Sell page for clothing - barcode scanner + instant sell.
     Uses front camera for barcode scanning with BarcodeDetector API fallback.
-    """
-    from django.http import JsonResponse
     
+    Fixed: Ensures all context variables are present to prevent 500 errors.
+    """
+    # Use base_context which provides role flags, business, and all standard context
     ctx = base.base_context(request)
     business = ctx.get("business")
     
+    # Defensively ensure all required context variables exist
+    # This prevents template errors from missing variables in partials
+    ctx.setdefault("IS_MANAGER", ctx.get("is_manager", False))
+    ctx.setdefault("IS_AGENT", ctx.get("is_agent", False))
+    ctx.setdefault("SHOW_BILLING", ctx.get("show_billing", False))
+    ctx.setdefault("ROLE_FLAGS", {
+        "is_manager": ctx.get("is_manager", False),
+        "is_agent": ctx.get("is_agent", False),
+        "show_billing": ctx.get("show_billing", False),
+    })
+    
+    # Page-specific context
     ctx.update({
         "page_title": "Fast Sell",
         "vertical": "clothing",

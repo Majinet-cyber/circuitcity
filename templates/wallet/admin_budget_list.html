@@ -9,7 +9,7 @@
         <div class="col-auto">
           <select class="form-select" name="status" onchange="this.form.submit()">
             <option value="">All</option>
-            {% for s in "PENDING,APPROVED,REJECTED,PAID".split(",") %}
+            {% for s in "PENDING,APPROVED,REJECTED,PAID"|split:"," %}
               <option value="{{ s }}" {% if request.GET.status == s %}selected{% endif %}>{{ s|title }}</option>
             {% endfor %}
           </select>

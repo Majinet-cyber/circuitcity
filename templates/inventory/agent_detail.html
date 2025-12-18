@@ -87,11 +87,11 @@
   {% if page_obj.has_other_pages %}
     <nav class="pagination" style="margin-top:.75rem; display:flex; gap:.5rem;">
       {% if page_obj.has_previous %}
-        <a class="btn-deep" href="{{ url_for(page_obj.previous_page_number) }}">← Prev</a>
+        <a class="btn-deep" href="{% url_for page=page_obj.previous_page_number %}">← Prev</a>
       {% endif %}
       <span class="pill">Page {{ page_obj.number }} / {{ page_obj.paginator.num_pages }}</span>
       {% if page_obj.has_next %}
-        <a class="btn-deep" href="{{ url_for(page_obj.next_page_number) }}">Next →</a>
+        <a class="btn-deep" href="{% url_for page=page_obj.next_page_number %}">Next →</a>
       {% endif %}
     </nav>
   {% endif %}

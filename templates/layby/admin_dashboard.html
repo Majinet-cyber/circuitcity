@@ -101,7 +101,7 @@
               {% else %}
                 <a href="{% url 'layby:admin_customer' %}?name={{ o.customer_name|urlencode }}" class="text-decoration-none">
               {% endif %}
-                  <span class="pill" style="background: {{ color_for(o.customer_name) }}">{{ o.customer_name }}</span>
+                  <span class="pill" style="background: {{ o.customer_name|color_for }}">{{ o.customer_name }}</span>
                 </a>
             </td>
             <td>

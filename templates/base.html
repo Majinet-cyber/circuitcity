@@ -648,45 +648,54 @@
 
     <main id="app-main" class="cc-page">
       {# ===== Billing banners ===== #}
-      {% if request.business and request.business.subscription %}
+      {# MANAGER-ONLY: Subscription management UI #}
+      {% if request.is_manager_plus and request.business and request.business.subscription %}
         {% with sub=request.business.subscription %}
           {% if sub.status == 'trial' %}
-            <div class="msg msg-info fade-in d-flex align-items-center justify-content-between">
+            <div class="msg msg-info fade-in d-flex align-items-center justify-content-between" id="subscription-actions" data-testid="subscription-actions">
               <div>
                 <strong>You're on a free trial.</strong>
                 {% if sub.trial_end %} Trial ends on {{ sub.trial_end|date:"M j, Y" }}.{% endif %}
               </div>
+              {% if IS_MANAGER %}
               <div class="d-flex gap-2">
                 <a class="btn btn-sm btn-primary" href="{{ url_billing_sub|default:'/billing/subscribe/' }}"><i class="bi bi-lightning-charge"></i> Choose plan</a>
                 <a class="btn btn-sm btn-outline-primary" href="{{ url_billing_checkout|default:'/billing/checkout/' }}"><i class="bi bi-credit-card"></i> Checkout</a>
               </div>
+              {% endif %}
             </div>
           {% elif sub.status == 'grace' %}
-            <div class="msg msg-warning fade-in d-flex align-items-center justify-content-between">
+            <div class="msg msg-warning fade-in d-flex align-items-center justify-content-between" id="subscription-actions" data-testid="subscription-actions">
               <div>
-                <strong>Payment needed.</strong> You're in a grace period to restore access.
+                <strong>Payment needed.</strong> {% if IS_MANAGER %}You're in a grace period to restore access.{% else %}Contact your manager to restore access.{% endif %}
               </div>
+              {% if IS_MANAGER %}
               <div class="d-flex gap-2">
                 <a class="btn btn-sm btn-outline-secondary" href="{{ url_billing_sub|default:'/billing/subscribe/' }}"><i class="bi bi-gear"></i> Manage plan</a>
               </div>
+              {% endif %}
             </div>
           {% elif sub.status == 'past_due' %}
-            <div class="msg msg-warning fade-in d-flex align-items-center justify-content-between">
+            <div class="msg msg-warning fade-in d-flex align-items-center justify-content-between" id="subscription-actions" data-testid="subscription-actions">
               <div>
-                <strong>Payment is past due.</strong> Some features may be limited.
+                <strong>Payment is past due.</strong> {% if IS_MANAGER %}Some features may be limited.{% else %}Contact your manager.{% endif %}
               </div>
+              {% if IS_MANAGER %}
               <div class="d-flex gap-2">
                 <a class="btn btn-sm btn-warning" href="{{ url_billing_checkout|default:'/billing/checkout/' }}"><i class="bi bi-credit-card"></i> Retry payment</a>
               </div>
+              {% endif %}
             </div>
           {% elif sub.status == 'expired' or sub.status == 'canceled' %}
-            <div class="msg msg-danger fade-in d-flex align-items-center justify-content-between">
+            <div class="msg msg-danger fade-in d-flex align-items-center justify-content-between" id="subscription-actions" data-testid="subscription-actions">
               <div>
-                <strong>Subscription inactive.</strong> To continue, pick a plan and pay.
+                <strong>Subscription inactive.</strong> {% if IS_MANAGER %}To continue, pick a plan and pay.{% else %}Contact your manager to reactivate.{% endif %}
               </div>
+              {% if IS_MANAGER %}
               <div class="d-flex gap-2">
                 <a class="btn btn-sm btn-danger" href="{{ url_billing_sub|default:'/billing/subscribe/' }}"><i class="bi bi-cart-check"></i> Subscribe</a>
               </div>
+              {% endif %}
             </div>
           {% endif %}
         {% endwith %}
