@@ -747,6 +747,10 @@ def home(request):
             pass
 
     ctx.setdefault("latest_notifications", [])
+    
+    # Inject dashboard enhancements and normalize context
+    from core.dashboard_context import normalize_dashboard_context
+    ctx = normalize_dashboard_context(request, ctx)
 
     return render(request, "dashboard/home.html", ctx)
 

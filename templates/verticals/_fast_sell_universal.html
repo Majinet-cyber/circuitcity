@@ -1,9 +1,8 @@
-{% extends "base.html" %}
 {% load static %}
 
-{% block title %}Fast Sell · {{ business.name }}{% endblock %}
+{# This is a partial template meant to be included, not extended #}
+{# DO NOT add {% extends %} here - it will cause recursion #}
 
-{% block extra_css %}
 <style>
   .fast-sell-container {
     max-width: 600px;
@@ -226,9 +225,8 @@
     }
   }
 </style>
-{% endblock %}
 
-{% block content %}
+{# Content starts here - no block tags needed since this is included #}
 <div class="fast-sell-container">
   <!-- Scanner Box -->
   <div class="scanner-box">
@@ -316,9 +314,8 @@
     </div>
   </div>
 </div>
-{% endblock %}
 
-{% block extra_js %}
+{# JavaScript for Fast Sell functionality #}
 <script>
 (function() {
   'use strict';
@@ -541,5 +538,4 @@
   barcodeInput.focus();
 })();
 </script>
-{% endblock %}
 

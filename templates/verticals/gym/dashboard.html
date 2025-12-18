@@ -52,8 +52,8 @@
     </div>
     <div class="hero-actions">
       <a class="primary" href="{{ members_url|default:'/gym/members/' }}">Manage members</a>
-      <a class="ghost" href="{{ checkin_url|default:'/inventory/time/logs/' }}">Scan check-ins</a>
       <a class="ghost" href="{{ add_payment_url|default:'/gym/payment/add/' }}">Record payment</a>
+      {% include "partials/vertical_more_dropdown.html" %}
     </div>
   </header>
 
@@ -100,8 +100,8 @@
     </div>
   </section>
 
-  <!-- Payment Mix - fallback if PAYMENT_MIX not available -->
-  {% if not PAYMENT_MIX and payment_mix %}
+  <!-- Payment Mix -->
+  {% if payment_mix %}
   <section class="recent-block">
     <h2 style="margin:0 0 10px;font-size:1.1rem">Payment Mix (This Month)</h2>
     <div class="metrics-grid">

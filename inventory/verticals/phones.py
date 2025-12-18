@@ -318,6 +318,22 @@ def dashboard(request):
         {'method': 'Mobile Money', 'amount': mobile_amount, 'percentage': mobile_pct},
     ]
     
+    # ==========================================================================
+    # STOCK POTENTIAL PROFIT (NEVER NEGATIVE)
+    # ==========================================================================
+    # Correct formula: sum over stock of max(0, selling_price - cost_price) * qty
+    # For phones, qty is always 1 (individual items), so:
+    # stock_potential_profit = sum(max(0, selling_price - order_price) for each item)
+    
+    stock_potential_profit = Decimal('0.00')
+    for item in stock_items:
+        # Get selling price and cost price, defaulting to 0 if None
+        selling = item.selling_price or Decimal('0.00')
+        cost = item.order_price or Decimal('0.00')
+        # Contribution is max(0, profit_per_unit)
+        contribution = max(Decimal('0.00'), selling - cost)
+        stock_potential_profit += contribution
+    
     # Package the main dashboard KPIs for the selected range
     # CRITICAL FIX: Revenue KPI MUST show sales revenue (not stock value)
     # This ensures Revenue matches Payment Mix totals (both derived from range_sales)
@@ -343,7 +359,7 @@ def dashboard(request):
         # STOCK METRICS: Separate from sales KPIs (for reference)
         "stock_cost_value": stock_cost_value,  # Inventory cost basis
         "stock_selling_value": stock_selling_value,  # Potential stock value
-        "stock_potential_profit": stock_selling_value - stock_cost_value,
+        "stock_potential_profit": stock_potential_profit,  # NEVER negative (max per item)
     }
     
     # ==========================================================================
@@ -502,45 +518,7 @@ def dashboard(request):
     # Serialize data for JavaScript charts
     sales_trend_json = json.dumps(sales_trend_30d)
     
-    # Dashboard enhancements (greeting, quotes, etc.)
-    try:
-        from dashboard.helpers_greetings import get_personalized_greeting
-        from dashboard.helpers_yesterday import get_yesterday_summary, should_show_yesterday_summary, mark_yesterday_summary_shown
-        from dashboard.helpers_quotes import get_todays_quotes
-        
-        greeting_ctx = get_personalized_greeting(request.user, business)
-        
-        brand_logo_url = None
-        if business and hasattr(business, 'logo') and business.logo:
-            brand_logo_url = business.logo.url
-        
-        yesterday_summary = None
-        if should_show_yesterday_summary(request):
-            yesterday_summary = get_yesterday_summary(request.user, business)
-            if yesterday_summary:
-                mark_yesterday_summary_shown(request)
-        
-        daily_quotes = get_todays_quotes(request.user, count=10)
-        
-        # Extract just the quote text for JavaScript rotation
-        quote_texts = [q.get("quote", "") for q in daily_quotes if q.get("quote")]
-        quotes_json = json.dumps(quote_texts)
-        
-        ctx_enhancements = {
-            "DASHBOARD_GREETING": greeting_ctx.get("greeting"),
-            "DASHBOARD_USER_NAME": greeting_ctx.get("user_name"),
-            "DASHBOARD_SHOW_WELCOME": greeting_ctx.get("show_welcome"),
-            "DASHBOARD_MILESTONE_MESSAGE": greeting_ctx.get("milestone"),
-            "DASHBOARD_BRAND_LOGO_URL": brand_logo_url,
-            "DASHBOARD_BRAND_TITLE": business.name if business else "Phones Dashboard",
-            "YESTERDAY_SUMMARY": yesterday_summary,
-            "DASHBOARD_QUOTES": daily_quotes,
-            "quotes_json": quotes_json,  # For JS rotation
-        }
-    except Exception:
-        ctx_enhancements = {}
-    
-    # Update context
+    # Update context with dashboard data
     ctx.update({
         "hero_title": "Phones & Electronics",
         "hero_blurb": "Track your phone sales, stock, and agents with premium KPIs and custom date filtering.",
@@ -565,14 +543,11 @@ def dashboard(request):
         # UI flags
         "show_search": False,
         "active_tab": "home",
-        
-        **ctx_enhancements,
     })
     
-    # FAILSAFE: Ensure YESTERDAY_SUMMARY is always present (even if None)
-    # This prevents template crashes if dashboard helpers fail
-    ctx.setdefault("YESTERDAY_SUMMARY", None)
-    ctx.setdefault("yesterday_summary", None)
+    # Inject dashboard enhancements and normalize context
+    from core.dashboard_context import normalize_dashboard_context
+    ctx = normalize_dashboard_context(request, ctx)
     
     return render(request, "verticals/phones/dashboard.html", ctx)
 

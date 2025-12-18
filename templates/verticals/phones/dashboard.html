@@ -125,6 +125,7 @@
       {% if IS_MANAGER %}
       <a class="ghost" href="{% url 'sales:rollback_home' %}" style="border-color:rgba(251,191,36,.9);color:#fbbf24"><i class="bi bi-arrow-counterclockwise"></i> Rollback Sale</a>
       {% endif %}
+      {% include "partials/vertical_more_dropdown.html" %}
     </div>
   </header>
 

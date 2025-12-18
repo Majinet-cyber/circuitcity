@@ -3,16 +3,16 @@
 {# ========================================
    PAYMENT MIX BAR - Reusable Component
    ======================================== #}
-{# 
+{% comment %}
   Usage:
-    {% include "payments/_payment_mix_bar.html" with total_amount=product_price %}
+    {%  include "payments/_payment_mix_bar.html" with total_amount=product_price  %}
   
   Features:
   - Single method auto-fill OR multi-method split
   - Mobile-first, premium UI
   - Real-time validation (client-side)
   - Server-side validation required on submit
-#}
+{% endcomment %}
 
 <div class="payment-mix-bar" id="paymentMixBar">
   <h3 class="payment-mix-title">

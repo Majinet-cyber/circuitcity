@@ -104,44 +104,9 @@ def dashboard(request):
         }
     )
     
-    # ===== NEW: Personalized dashboard enhancements =====
-    try:
-        from dashboard.helpers_greetings import get_personalized_greeting
-        from dashboard.helpers_yesterday import get_yesterday_summary, should_show_yesterday_summary, mark_yesterday_summary_shown
-        from dashboard.helpers_payments import get_payment_mix_for_dashboard
-        from dashboard.helpers_quotes import get_todays_quotes
-        
-        # Personalized greeting
-        greeting_ctx = get_personalized_greeting(request.user, business)
-        
-        # Brand header context
-        brand_logo_url = None
-        if business and hasattr(business, 'logo') and business.logo:
-            brand_logo_url = business.logo.url
-        
-        # Yesterday summary (show once per day)
-        yesterday_summary = None
-        if should_show_yesterday_summary(request):
-            yesterday_summary = get_yesterday_summary(request.user, business)
-            if yesterday_summary:
-                mark_yesterday_summary_shown(request)
-        
-        # Daily quotes
-        daily_quotes = get_todays_quotes(request.user, count=10)
-        
-        # Add to context
-        ctx.update({
-            "DASHBOARD_GREETING": greeting_ctx.get("greeting"),
-            "DASHBOARD_USER_NAME": greeting_ctx.get("user_name"),
-            "DASHBOARD_SHOW_WELCOME": greeting_ctx.get("show_welcome"),
-            "DASHBOARD_MILESTONE_MESSAGE": greeting_ctx.get("milestone"),
-            "DASHBOARD_BRAND_LOGO_URL": brand_logo_url,
-            "DASHBOARD_BRAND_TITLE": business.name if business else "Clothing Dashboard",
-            "YESTERDAY_SUMMARY": yesterday_summary,
-            "DASHBOARD_QUOTES": daily_quotes,
-        })
-    except Exception:
-        pass  # Gracefully degrade if helpers not available
+    # Inject dashboard enhancements and normalize context
+    from core.dashboard_context import normalize_dashboard_context
+    ctx = normalize_dashboard_context(request, ctx)
     
     return render(request, "verticals/clothing/dashboard.html", ctx)
 

@@ -2,7 +2,7 @@
 Yesterday summary card for dashboard.
 
 Context variables expected:
-  - YESTERDAY_SUMMARY or yesterday_summary: dict with:
+  - yesterday_summary: dict with:
       - date: date object
       - sales_count: int
       - total_revenue: float
@@ -11,8 +11,8 @@ Context variables expected:
 FAILSAFE: If variable is missing or None, this partial renders nothing (no crash).
 {% endcomment %}
 
-{% if YESTERDAY_SUMMARY or yesterday_summary %}
-{% with summary=YESTERDAY_SUMMARY|default:yesterday_summary %}
+{% if yesterday_summary %}
+{% with summary=yesterday_summary %}
 <style>
   .yesterday-summary-card {
     background: linear-gradient(135deg, #f6f8fb 0%, #ffffff 100%);

@@ -59,6 +59,7 @@
       <a class="primary" href="{{ liquor_add_url|default:'/inventory/liquor/products/new/v2/' }}">Add liquor item</a>
       <a class="ghost" href="/liquor/inventory/">Liquor Hub</a>
       <a class="ghost" href="/liquor/sell/">Sell</a>
+      {% include "partials/vertical_more_dropdown.html" %}
     </div>
   </header>
 
@@ -168,7 +169,7 @@
   {% include "partials/dashboard_rotating_insights.html" %}
 
   {% comment %}Payment Mix Card - fallback if PAYMENT_MIX not available{% endcomment %}
-  {% if not PAYMENT_MIX and payment_mix %}
+  {% if payment_mix %}
   <section class="recent-block">
     <h2 style="margin:0 0 10px;font-size:1.1rem">Payment Mix ({{ period_days }} days)</h2>
     

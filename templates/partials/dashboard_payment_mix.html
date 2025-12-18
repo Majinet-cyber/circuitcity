@@ -1,17 +1,17 @@
 {% comment %}
 Payment mix card for dashboard and sales views.
 
-Context variables expected:
-  - PAYMENT_MIX: list of dicts with:
+Context variables expected (lowercase, with UPPERCASE fallback):
+  - payment_mix: list of dicts with:
       - method: str (display name)
       - method_code: str
       - amount: float
       - count: int
       - percentage: float
-  - PAYMENT_MIX_PERIOD: str (optional, e.g., "Today", "This Month")
+  - payment_mix_period: str (optional, e.g., "Today", "This Month")
 {% endcomment %}
 
-{% if PAYMENT_MIX %}
+{% if payment_mix %}
 <style>
   .payment-mix-card {
     background: white;
@@ -148,13 +148,13 @@ Context variables expected:
 <div class="payment-mix-card">
   <div class="payment-mix-header">
     <h3 class="payment-mix-title">💳 Payment Mix</h3>
-    {% if PAYMENT_MIX_PERIOD %}
-      <span class="payment-mix-period">{{ PAYMENT_MIX_PERIOD }}</span>
+    {% if payment_mix_period %}
+    <span class="payment-mix-period">{{ payment_mix_period }}</span>
     {% endif %}
   </div>
   
   <div class="payment-mix-list">
-    {% for pm in PAYMENT_MIX %}
+    {% for pm in payment_mix %}
       <div class="payment-mix-item">
         <div class="payment-mix-item-header">
           <span class="payment-mix-method">{{ pm.method }}</span>

@@ -433,6 +433,10 @@ def pharmacy_dashboard(request: HttpRequest) -> HttpResponse:
     # Merge enhancements from above (includes quotes)
     ctx.update(ctx_enhancements)
     
+    # Inject dashboard enhancements and normalize context
+    from core.dashboard_context import normalize_dashboard_context
+    ctx = normalize_dashboard_context(request, ctx)
+    
     return render(request, "verticals/pharmacy/dashboard.html", ctx)
 
 

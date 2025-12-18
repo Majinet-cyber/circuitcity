@@ -74,6 +74,27 @@ def base_context(request) -> Dict[str, Any]:
         url_sell = reverse("inventory:scan_sold")
         url_scan_in = reverse("inventory:scan_in")
 
+    # Safely resolve common feature URLs (may not exist in all deployments)
+    try:
+        url_wallet = reverse("wallet:agent_wallet")
+    except Exception:
+        url_wallet = ""
+    
+    try:
+        url_time_logs = reverse("inventory:time_logs")
+    except Exception:
+        url_time_logs = ""
+    
+    try:
+        url_reports = reverse("reports:home")
+    except Exception:
+        url_reports = ""
+    
+    try:
+        url_simulator = reverse("simulator:home")
+    except Exception:
+        url_simulator = ""
+
     ctx: Dict[str, Any] = {
         "business": business,
         "location": location,
@@ -89,6 +110,11 @@ def base_context(request) -> Dict[str, Any]:
         "scan_sold_url": url_sell,
         "stock_url": url_stock,
         "add_product_url": add_product_url_for_request(request),
+        # Feature URLs (for More dropdown)
+        "url_wallet": url_wallet,
+        "url_time_logs": url_time_logs,
+        "url_reports": url_reports,
+        "url_simulator": url_simulator,
     }
     return ctx
 

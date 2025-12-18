@@ -4,31 +4,7 @@
 {% block title %}Stock In · Clothing · Emajinet{% endblock %}
 
 {% block extra_css %}
-<link rel="stylesheet" href="{% static 'css/barcode-scanner-rear-camera.css' %}?v={{ BUILD_ID|default:STATIC_VERSION|default:'1' }}">
-<style>
-.btn-scanner {
-  background: linear-gradient(135deg, #10b981, #059669);
-  color: white;
-  border: none;
-  border-radius: 12px;
-  padding: 12px 16px;
-  font-size: 1.2rem;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 48px;
-  min-height: 48px;
-}
-.btn-scanner:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 6px 20px rgba(16, 185, 129, 0.4);
-}
-.btn-scanner:active {
-  transform: scale(0.95);
-}
-</style>
+<!-- Old barcode-scanner CSS removed - now using smart_scanner.html partial styles -->
 {% endblock %}
 
 {% block content %}
@@ -133,13 +109,13 @@
 
       <div class="form-step" id="barcode-field" style="display:none;">
         <label for="barcode-input">Barcode <span style="color:#dc2626;">*</span></label>
-        <div style="display:flex;gap:8px;align-items:center;">
-          <input type="text" name="barcode" id="barcode-input" class="form-control" placeholder="Scan or type barcode" maxlength="100" style="flex:1;">
-          <button type="button" id="openScannerBtn" class="btn-scanner" title="Open camera scanner">
-            <i class="bi bi-upc-scan"></i>
-          </button>
+        <div style="margin-bottom:8px;">
+          <input type="text" name="barcode" id="barcode-input" class="form-control" placeholder="Scan or type barcode" maxlength="100" style="width:100%;">
         </div>
-        <small style="color:#64748b;font-size:0.85rem;">Required when Has Barcode = Yes</small>
+        <small style="color:#64748b;font-size:0.85rem;display:block;margin-bottom:8px;">Required when Has Barcode = Yes</small>
+        
+        <!-- Smart Scanner Integration -->
+        {% include "partials/smart_scanner.html" with scanner_title="📷 Scan Barcode with Camera" scanner_target_input_id="barcode-input" scanner_mode="barcode" scanner_container_id="clothingBarcodeScanner" scanner_video_id="clothingBarcodeVideo" scanner_scanline_id="clothingBarcodeScanline" %}
       </div>
 
       <button type="submit" class="btn-submit">✅ Add to Stock</button>
@@ -247,55 +223,8 @@ window.addEventListener('pageshow', function(event) {
 });
 </script>
 
-<!-- Barcode Scanner Integration (Rear Camera) -->
-<script src="{% static 'js/barcode-scanner-rear-camera.js' %}?v={{ BUILD_ID|default:STATIC_VERSION|default:'1' }}"></script>
-<script>
-(function() {
-  'use strict';
-  
-  let barcodeScanner = null;
-  
-  // Initialize scanner when DOM is ready
-  document.addEventListener('DOMContentLoaded', function() {
-    const openScannerBtn = document.getElementById('openScannerBtn');
-    const barcodeInput = document.getElementById('barcode-input');
-    
-    if (!openScannerBtn || !barcodeInput) return;
-    
-    // Create rear camera scanner instance
-    barcodeScanner = new RearCameraBarcodeScanner({
-      onScan: function(barcode) {
-        // Auto-fill barcode field
-        barcodeInput.value = barcode;
-        barcodeInput.dispatchEvent(new Event('input', { bubbles: true }));
-        
-        // Show success feedback
-        barcodeInput.style.borderColor = '#10b981';
-        barcodeInput.style.boxShadow = '0 0 0 3px rgba(16, 185, 129, 0.2)';
-        setTimeout(() => {
-          barcodeInput.style.borderColor = '';
-          barcodeInput.style.boxShadow = '';
-        }, 1500);
-      },
-      onError: function(error) {
-        console.error('Scanner error:', error);
-      }
-    });
-    
-    // Open scanner on button click
-    openScannerBtn.addEventListener('click', function() {
-      barcodeScanner.open();
-    });
-  });
-  
-  // Cleanup on page unload
-  window.addEventListener('beforeunload', function() {
-    if (barcodeScanner) {
-      barcodeScanner.destroy();
-    }
-  });
-})();
-</script>
+<!-- Barcode Scanner: Now handled by smart_scanner.js + smart_scanner.html partial -->
+<!-- The old barcode-scanner-rear-camera.js integration has been replaced with the unified SmartScanner module. -->
 
 {% endblock %}
 

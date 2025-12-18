@@ -491,68 +491,9 @@
   </div>
   {% endif %}
 
-  {# Payment Mix Panel (Manager Only) #}
-  {% if PAYMENT_MIX and IS_MANAGER %}
-  <div class="chart-card" style="margin-bottom: 2rem;">
-    <div class="chart-header">
-      <div>
-        <div class="chart-title" style="font-size: 1.25rem; margin-bottom: 0.25rem;">💳 Payment Mix (Last 30 Days)</div>
-        <div style="font-size: 0.875rem; color: var(--dash-muted);">
-          Breakdown of sales by payment method
-        </div>
-      </div>
-    </div>
-
-    <div class="stats-grid" style="margin-top: 1rem;">
-      <div style="background: linear-gradient(135deg, #dcfce7, #f0fdf4); border: 2px solid #86efac; border-radius: 14px; padding: 1.25rem; text-align: center;">
-        <div style="font-size: 2.5rem; margin-bottom: 0.5rem;">💵</div>
-        <div style="font-size: 0.875rem; color: #166534; margin-bottom: 0.5rem; font-weight: 600;">Cash</div>
-        <div style="font-size: 1.5rem; font-weight: 800; color: #166534;">
-          MK {{ PAYMENT_MIX.CASH|floatformat:0|intcomma }}
-        </div>
-        {% if PAYMENT_MIX.total > 0 %}
-        <div style="font-size: 0.8rem; color: #14532d; margin-top: 0.5rem;">
-          {% widthratio PAYMENT_MIX.CASH PAYMENT_MIX.total 100 %}%
-        </div>
-        {% endif %}
-      </div>
-
-      <div style="background: linear-gradient(135deg, #dbeafe, #eff6ff); border: 2px solid #93c5fd; border-radius: 14px; padding: 1.25rem; text-align: center;">
-        <div style="font-size: 2.5rem; margin-bottom: 0.5rem;">🏦</div>
-        <div style="font-size: 0.875rem; color: #1e40af; margin-bottom: 0.5rem; font-weight: 600;">Bank</div>
-        <div style="font-size: 1.5rem; font-weight: 800; color: #1e40af;">
-          MK {{ PAYMENT_MIX.BANK|floatformat:0|intcomma }}
-        </div>
-        {% if PAYMENT_MIX.total > 0 %}
-        <div style="font-size: 0.8rem; color: #1e3a8a; margin-top: 0.5rem;">
-          {% widthratio PAYMENT_MIX.BANK PAYMENT_MIX.total 100 %}%
-        </div>
-        {% endif %}
-      </div>
-
-      <div style="background: linear-gradient(135deg, #fef3c7, #fefce8); border: 2px solid #fbbf24; border-radius: 14px; padding: 1.25rem; text-align: center;">
-        <div style="font-size: 2.5rem; margin-bottom: 0.5rem;">📱</div>
-        <div style="font-size: 0.875rem; color: #92400e; margin-bottom: 0.5rem; font-weight: 600;">Mobile Money</div>
-        <div style="font-size: 1.5rem; font-weight: 800; color: #92400e;">
-          MK {{ PAYMENT_MIX.MOBILE_MONEY|floatformat:0|intcomma }}
-        </div>
-        {% if PAYMENT_MIX.total > 0 %}
-        <div style="font-size: 0.8rem; color: #78350f; margin-top: 0.5rem;">
-          {% widthratio PAYMENT_MIX.MOBILE_MONEY PAYMENT_MIX.total 100 %}%
-        </div>
-        {% endif %}
-      </div>
-
-      <div style="background: linear-gradient(135deg, #e0e7ff, #eef2ff); border: 2px solid #a5b4fc; border-radius: 14px; padding: 1.25rem; text-align: center;">
-        <div style="font-size: 2.5rem; margin-bottom: 0.5rem;">💰</div>
-        <div style="font-size: 0.875rem; color: #4338ca; margin-bottom: 0.5rem; font-weight: 600;">Total Sales</div>
-        <div style="font-size: 1.5rem; font-weight: 800; color: #4338ca;">
-          MK {{ PAYMENT_MIX.total|floatformat:0|intcomma }}
-        </div>
-        <div style="font-size: 0.75rem; color: #3730a3; margin-top: 0.5rem;">All payment methods</div>
-      </div>
-    </div>
-  </div>
+  {# Payment Mix Panel (Manager Only) - Use standardized partial #}
+  {% if payment_mix and IS_MANAGER %}
+  {% include "partials/dashboard_payment_mix.html" %}
   {% endif %}
 
   {# Charts #}
