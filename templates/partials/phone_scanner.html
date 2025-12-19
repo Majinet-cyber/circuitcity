@@ -1,0 +1,91 @@
+{% comment %}
+==============================================================================
+SHARED PHONE SCANNER COMPONENT
+==============================================================================
+Reusable scanner UI for IMEI/barcode scanning with camera overlay + moving line.
+Used by: Scan In, Scan & Sell (sale wizard), and other phone inventory flows.
+
+REQUIRED CONTEXT:
+  - input_id: ID for the IMEI input field (e.g., "imei", "id_imei")
+  - input_name: Name attribute for the input (e.g., "imei")
+  - input_placeholder: Placeholder text (default: "Enter 15-digit IMEI")
+  - show_paste_btn: Boolean, show paste button (default: true)
+  - show_torch_btn: Boolean, show torch toggle button (default: true)
+  - show_hint: Boolean, show IMEI hint text (default: true)
+
+EXAMPLE USAGE:
+  {% include "partials/phone_scanner.html" with input_id="imei" input_name="imei" input_placeholder="Enter 15-digit IMEI" show_paste_btn=True show_torch_btn=True show_hint=True %}
+
+JAVASCRIPT REQUIREMENTS:
+  - Include phone_scanner.js after this template
+  - Scanner libraries: Quagga, ZXing (loaded via CDN or static)
+==============================================================================
+{% endcomment %}
+
+<div class="phone-scanner-container">
+  <!-- IMEI Input Field -->
+  <div class="imei-input-group">
+    <label for="{{ input_id }}" style="font-weight:600;margin-bottom:10px;display:block">IMEI Number</label>
+    <div class="imei-field" id="{{ input_id }}Field">
+      <input 
+        type="text" 
+        name="{{ input_name }}" 
+        id="{{ input_id }}" 
+        class="imei-input" 
+        placeholder="{{ input_placeholder|default:'Enter 15-digit IMEI' }}" 
+        maxlength="15"
+        pattern="\d{15}" 
+        required 
+        autofocus 
+        inputmode="numeric" 
+        autocomplete="off"
+        data-phone-scanner-input>
+      <!-- Live counter badge -->
+      <span id="{{ input_id }}Len" class="imei-badge" data-phone-scanner-badge>0/15</span>
+    </div>
+    <div id="{{ input_id }}Help" class="imei-error" hidden data-phone-scanner-error>Enter a valid IMEI (exactly 15 digits).</div>
+
+    <!-- Scanner Controls -->
+    <div class="scanner-controls cc-btn-group" style="margin-top:12px">
+      {% if show_paste_btn|default:True %}
+      <button type="button" id="{{ input_id }}PasteBtn" class="btn btn-secondary" style="padding:10px 16px" data-phone-scanner-paste>
+        <i class="bi bi-clipboard"></i> Paste from Clipboard
+      </button>
+      {% endif %}
+      <button type="button" id="{{ input_id }}CamToggle" class="btn-scanner" data-phone-scanner-cam-toggle>
+        <i class="bi bi-camera"></i> Start Camera
+      </button>
+      {% if show_torch_btn|default:True %}
+      <button type="button" id="{{ input_id }}TorchBtn" class="btn btn-secondary" style="padding:10px 16px" data-phone-scanner-torch>
+        <i class="bi bi-lightning-fill"></i> Toggle Torch
+      </button>
+      {% endif %}
+    </div>
+
+    <!-- Camera Shell (Initially Hidden) -->
+    <div id="{{ input_id }}CameraBox" class="camera-box" style="display:none;margin-top:16px" data-phone-scanner-camera-box>
+      <div class="scan-shell">
+        <video id="{{ input_id }}Camera" autoplay playsinline muted data-phone-scanner-video></video>
+        <div class="scan-overlay" aria-hidden="true">
+          <div class="scan-frame"></div>
+          <div id="{{ input_id }}Scanline" class="scanline" data-phone-scanner-scanline></div>
+        </div>
+      </div>
+      <div style="display:flex;gap:10px;margin-top:10px">
+        <select id="{{ input_id }}CameraSelect" class="btn btn-secondary" style="flex:1;min-width:200px"
+          aria-label="Choose camera" data-phone-scanner-camera-select></select>
+        <button type="button" id="{{ input_id }}CamStop" class="btn btn-secondary" data-phone-scanner-cam-stop>Stop Camera</button>
+      </div>
+    </div>
+
+    {% if show_hint|default:True %}
+    <div class="imei-hint">
+      <i class="bi bi-info-circle"></i> Dial *#06# on the phone to view IMEI
+    </div>
+    {% endif %}
+  </div>
+</div>
+
+<!-- Toast for Scanner Notifications -->
+<div id="{{ input_id }}Toast" class="toast" role="status" aria-live="polite" data-phone-scanner-toast></div>
+

@@ -1,0 +1,275 @@
+/**
+ * ==============================================================================
+ * SHARED PHONE SCANNER STYLES
+ * ==============================================================================
+ * Reusable styles for IMEI/barcode scanner with camera overlay + moving line.
+ * Used by: Scan In, Scan & Sell (sale wizard), and other phone inventory flows.
+ * ==============================================================================
+ */
+
+/* Scanner Container */
+.phone-scanner-container {
+  width: 100%;
+  max-width: 100%;
+}
+
+/* IMEI Input Group */
+.imei-input-group {
+  width: 100%;
+}
+
+.imei-field {
+  position: relative;
+  display: flex;
+  align-items: center;
+  background: #fff;
+  border: 2px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 0;
+  transition: all 0.3s ease;
+}
+
+.imei-input {
+  flex: 1;
+  border: none;
+  background: transparent;
+  padding: 12px 60px 12px 14px;
+  font-size: 16px;
+  font-weight: 600;
+  color: #0f172a;
+  outline: none;
+  width: 100%;
+}
+
+.imei-input:focus {
+  outline: none;
+}
+
+.imei-field:focus-within {
+  border-color: #1f6feb;
+  box-shadow: 0 0 0 3px rgba(31, 111, 235, 0.1);
+}
+
+/* IMEI Badge (Counter) */
+.imei-badge {
+  position: absolute;
+  right: 16px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: #e2e8f0;
+  color: #0f172a;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 0.85rem;
+  font-weight: 700;
+  transition: all 0.3s ease;
+}
+
+/* IMEI Field States */
+.imei-field.state-bad {
+  border-color: #ef4444 !important;
+  box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.1) !important;
+}
+
+.imei-field.state-bad .imei-badge {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.imei-field.state-ok {
+  border-color: #10b981 !important;
+  box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.1) !important;
+}
+
+.imei-field.state-ok .imei-badge {
+  background: #dcfce7;
+  color: #065f46;
+}
+
+/* IMEI Error Message */
+.imei-error {
+  font-size: 12px;
+  color: #ef4444;
+  margin-top: 6px;
+}
+
+.imei-error[hidden] {
+  display: none;
+}
+
+/* Scanner Controls */
+.scanner-controls {
+  display: flex;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.btn-scanner {
+  background: linear-gradient(135deg, #38bdf8, #0ea5e9);
+  color: #052c3b;
+  border: none;
+  padding: 10px 16px;
+  border-radius: 12px;
+  cursor: pointer;
+  font-weight: 700;
+  transition: all 0.3s ease;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 44px;
+}
+
+.btn-scanner:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px rgba(56, 189, 248, 0.3);
+}
+
+.btn-scanner:active {
+  transform: translateY(0);
+}
+
+/* Camera Box */
+.camera-box {
+  background: #f8fafc;
+  border: 2px dashed #cbd5e1;
+  border-radius: 16px;
+  padding: 16px;
+  margin-top: 16px;
+}
+
+/* Scan Shell (Camera Container) */
+.scan-shell {
+  position: relative;
+  border-radius: 14px;
+  overflow: hidden;
+  background: #000;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.25);
+}
+
+.scan-shell video {
+  width: 100%;
+  max-height: 360px;
+  min-height: 220px;
+  background: #000;
+  display: block;
+  object-fit: cover;
+}
+
+/* Scan Overlay (Frame + Scanline) */
+.scan-overlay {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.scan-frame {
+  position: absolute;
+  inset: 10% 8%;
+  border: 2px solid rgba(255, 255, 255, 0.25);
+  border-radius: 12px;
+  box-shadow: inset 0 0 0 9999px rgba(0, 0, 0, 0.20);
+}
+
+/* Animated Scanline (Green Moving Line) */
+.scanline {
+  position: absolute;
+  left: 8%;
+  right: 8%;
+  height: 2px;
+  border-radius: 2px;
+  background: linear-gradient(90deg, transparent, #00ff5a, transparent);
+  box-shadow: 0 0 10px #00ff5a, 0 0 20px rgba(0, 255, 90, 0.6);
+  animation: sweep 2.0s linear infinite alternate;
+}
+
+.scanline.paused {
+  animation-play-state: paused;
+}
+
+@keyframes sweep {
+  from {
+    top: 10%;
+  }
+  to {
+    top: 90%;
+  }
+}
+
+/* IMEI Hint */
+.imei-hint {
+  font-size: 0.85rem;
+  color: #64748b;
+  margin-top: 10px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.imei-hint i {
+  color: #1f6feb;
+}
+
+/* Toast Notifications */
+.toast {
+  position: fixed;
+  right: 18px;
+  bottom: 18px;
+  min-width: 240px;
+  max-width: 400px;
+  padding: 14px 18px;
+  border-radius: 12px;
+  font-weight: 600;
+  font-size: 14px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+  z-index: 10000;
+  display: none;
+  animation: slideInUp 0.3s ease;
+}
+
+.toast.ok {
+  background: #10b981;
+  color: #fff;
+}
+
+.toast.err {
+  background: #ef4444;
+  color: #fff;
+}
+
+@keyframes slideInUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Responsive Adjustments */
+@media (max-width: 640px) {
+  .scanner-controls {
+    flex-direction: column;
+    width: 100%;
+  }
+
+  .scanner-controls button,
+  .scanner-controls .btn {
+    width: 100%;
+  }
+
+  .scan-shell video {
+    max-height: 280px;
+    min-height: 180px;
+  }
+
+  .toast {
+    right: 12px;
+    bottom: 12px;
+    min-width: 200px;
+    max-width: calc(100vw - 24px);
+  }
+}
+

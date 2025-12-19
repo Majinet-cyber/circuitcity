@@ -8,6 +8,9 @@
 {% block notif_allow %}stock_in,stock_sold,low_stock{% endblock %}
 
 {% block extra_css %}
+<!-- Shared Phone Scanner CSS -->
+<link rel="stylesheet" href="{% static 'css/phone_scanner.css' %}">
+
 <style>
   /* ===== Layout ===== */
   .page{margin:0 auto;max-width:1120px;padding:clamp(12px,4vw,24px)}
@@ -183,54 +186,25 @@
       {% csrf_token %}
       {% if form.non_field_errors %}<div class="help-error">{{ form.non_field_errors }}</div>{% endif %}
 
-      <!-- IMEI -->
+      <!-- IMEI Scanner (Using Shared Phone Scanner Component) -->
       <div>
-        <label for="id_imei">IMEI</label>
-        
-        <!-- 
-        INTELLIGENT SCANNER - SCAN IN MODE (IMPLEMENTED)
-        ================================================
+        {% comment %}
+        SHARED PHONE SCANNER - SCAN IN MODE
+        ====================================
         ✅ IMEI validation: Exactly 15 digits enforced
         ✅ Global uniqueness: DB constraint + model validation
-        ✅ API endpoint: /inventory/api/imei-lookup/?imei=...&mode=scan_in
         ✅ Real-time validation with clear error messages
+        ✅ Camera scanner with overlay + moving line (same as Scan & Sell)
         ✅ Accepts: keyboard, paste, barcode scanner, camera
-        -->
+        {% endcomment %}
         
-        <!-- Smart IMEI Scanner Integration -->
-        <div class="cc-imei-scanner" data-cc-imei-mode="scan_in" style="margin-bottom: 8px;">
-          <div class="field" id="imeiField">
-            <!-- never more than 15 -->
-            <input type="text"
-                   id="id_imei"
-                   name="imei"
-                   inputmode="numeric"
-                   autocomplete="off"
-                   placeholder="Scan or paste IMEI (15 digits)"
-                   aria-required="true"
-                   aria-invalid="false"
-                   maxlength="15"
-                   data-cc-imei-input
-                   style="width:100%;background:transparent;border:0;padding:12px 14px;">
-            <!-- live counter badge -->
-            <span id="imeiLen"
-                  class="badge rounded-pill"
-                  style="position:absolute;right:12px;top:50%;transform:translateY(-50%);background:#e2e8f0;color:#0f172a;padding:.15rem .5rem;">
-              0/15
-            </span>
-          </div>
-          <div id="imeiHelp" class="help-error" hidden>Enter a valid IMEI (exactly 15 digits).</div>
-          <div data-cc-imei-message class="cc-imei-message"></div>
-        </div>
+        {% include "partials/phone_scanner.html" with input_id="id_imei" input_name="imei" input_placeholder="Scan or paste IMEI (15 digits)" show_paste_btn=True show_torch_btn=True show_hint=True %}
+        
         <div class="hstack cc-btn-group" style="margin-top:6px">
           <button type="button" data-cc-imei-scan class="btn btn-primary">🔍 Check IMEI</button>
-          <button type="button" id="pasteBtn" class="btn btn-secondary">Paste from Clipboard</button>
           <span class="pill cc-desktop-only">Shortcut: <span class="kbd">Enter</span> submits</span>
           <span class="pill cc-desktop-only">Focus: <span class="kbd">F2</span></span>
         </div>
-
-        <!-- Smart Scanner Integration -->
-        {% include "partials/smart_scanner.html" with scanner_title="📷 Scan IMEI with Camera" scanner_target_input_id="id_imei" scanner_mode="imei" scanner_container_id="imeiScannerBox" scanner_video_id="imeiScannerVideo" scanner_scanline_id="imeiScannerScanline" %}
       </div>
 
       <!-- Product / Location -->
@@ -826,17 +800,16 @@
 })();
 </script>
 
-<!-- Smart IMEI Scanner Integration -->
-<script src="{% static 'js/imei_scanner.js' %}"></script>
+<!-- Shared Phone Scanner Integration -->
+<script src="https://unpkg.com/quagga@0.12.1/dist/quagga.min.js"></script>
+<script src="https://unpkg.com/@zxing/library@0.20.0"></script>
+<script src="{% static 'js/phone_scanner.js' %}"></script>
 <script>
 (function() {
-  // Initialize smart IMEI scanner
-  ImeiScanner.init({
-    autoValidate: false, // Manual validation via button
-    onSuccess: function(data) {
-      // IMEI is valid and available for scan in
-      console.log('IMEI check passed:', data);
-      
+  // Initialize shared phone scanner
+  PhoneScanner.init('id_imei', {
+    onSuccess: function(imei) {
+      console.log('IMEI scanned successfully:', imei);
       // Focus on product selection
       const prodEl = document.getElementById('id_product');
       if (prodEl) {

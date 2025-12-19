@@ -10,6 +10,9 @@
   <link rel="icon" href="{% static 'favicon.ico' %}">
   <link rel="manifest" href="{% static 'manifest.webmanifest' %}">
   
+  <!-- Chart.js for Stats Section -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  
   <!-- Open Graph / Social Media -->
   <meta property="og:type" content="website">
   <meta property="og:title" content="Emajinet - A digital record and AI driven MBA manager">
@@ -653,6 +656,544 @@
         font-size: 0.95rem;
       }
     }
+
+    /* ============================================
+       REALITY → SOLUTION STATS SECTION (MOBILE-FIRST PREMIUM)
+       ============================================ */
+    .reality-stats-section {
+      padding: 3rem 1rem;
+      background: linear-gradient(135deg, #fefefe 0%, #f0f4ff 100%);
+      position: relative;
+      overflow: hidden;
+      max-width: 100%;
+    }
+
+    .reality-stats-container {
+      max-width: 1200px;
+      margin: 0 auto;
+      background: rgba(255, 255, 255, 0.98);
+      backdrop-filter: blur(10px);
+      border-radius: 20px;
+      padding: 1.5rem 1rem;
+      box-shadow: 0 12px 40px rgba(79, 70, 229, 0.08);
+      border: 1px solid rgba(79, 70, 229, 0.06);
+      position: relative;
+      /* HARD SAFETY: Ensure nothing overflows */
+      overflow: hidden;
+      max-width: 100%;
+      min-width: 0;
+    }
+
+    .reality-stats-header {
+      text-align: center;
+      margin-bottom: 2rem;
+      max-width: 100%;
+      overflow: hidden;
+      min-width: 0;
+    }
+
+    .reality-stats-title {
+      font-size: 1.5rem;
+      font-weight: 800;
+      margin-bottom: 0.5rem;
+      background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      line-height: 1.3;
+      max-width: 100%;
+      word-wrap: break-word;
+      overflow-wrap: anywhere;
+    }
+
+    .reality-stats-subtitle {
+      font-size: 0.9rem;
+      color: var(--text-secondary);
+      line-height: 1.5;
+      max-width: 100%;
+      word-wrap: break-word;
+      overflow-wrap: anywhere;
+    }
+
+    /* Carousel Container - Mobile First */
+    .stats-carousel {
+      position: relative;
+      overflow: hidden;
+      max-width: 100%;
+      min-width: 0;
+      /* Touch action for swipe */
+      touch-action: pan-y;
+      user-select: none;
+    }
+
+    .stats-slides-wrapper {
+      display: flex;
+      transition: transform 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+      will-change: transform;
+      max-width: 100%;
+      min-width: 0;
+    }
+
+    .stats-slide {
+      min-width: 100%;
+      max-width: 100%;
+      flex-shrink: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 1.5rem;
+      padding: 0;
+      /* CRITICAL: Prevent any internal overflow */
+      overflow: hidden;
+      min-width: 0;
+    }
+
+    .stats-slide-content {
+      animation: fadeIn 0.5s ease;
+      padding: 0 0.5rem;
+      max-width: 100%;
+      min-width: 0;
+      overflow: hidden;
+    }
+
+    .stats-problem-headline {
+      font-size: 1.25rem;
+      font-weight: 700;
+      color: var(--text-primary);
+      margin-bottom: 1rem;
+      line-height: 1.3;
+      max-width: 100%;
+      word-wrap: break-word;
+      overflow-wrap: anywhere;
+      min-width: 0;
+    }
+
+    .stats-pain-bullets {
+      list-style: none;
+      padding: 0;
+      margin: 0 0 1.5rem 0;
+      max-width: 100%;
+      min-width: 0;
+    }
+
+    .stats-pain-bullets li {
+      position: relative;
+      padding-left: 1.75rem;
+      margin-bottom: 0.75rem;
+      color: var(--text-secondary);
+      font-size: 0.9rem;
+      line-height: 1.5;
+      max-width: 100%;
+      word-wrap: break-word;
+      overflow-wrap: anywhere;
+      word-break: break-word;
+      min-width: 0;
+    }
+
+    .stats-pain-bullets li::before {
+      content: '•';
+      position: absolute;
+      left: 0;
+      top: 0;
+      font-size: 1.5rem;
+      color: var(--primary);
+      font-weight: 700;
+      flex-shrink: 0;
+    }
+
+    .stats-cta-btn {
+      display: inline-block;
+      padding: 0.875rem 1.5rem;
+      background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
+      color: var(--white);
+      font-weight: 600;
+      border-radius: 100px;
+      text-decoration: none;
+      box-shadow: 0 3px 15px rgba(79, 70, 229, 0.25);
+      transition: all 0.3s ease;
+      font-size: 0.95rem;
+      width: 100%;
+      text-align: center;
+      max-width: 100%;
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .stats-cta-btn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 5px 20px rgba(79, 70, 229, 0.35);
+    }
+
+    .stats-slide-visual {
+      position: relative;
+      padding: 0 0.5rem;
+      max-width: 100%;
+      min-width: 0;
+      overflow: hidden;
+    }
+
+    /* Compact Chart Container - Fixed Height Mobile */
+    .stats-chart-container {
+      position: relative;
+      height: 160px;
+      margin-bottom: 1rem;
+      background: var(--white);
+      border-radius: 12px;
+      padding: 0.75rem;
+      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.04);
+      /* CRITICAL: prevent overflow */
+      overflow: hidden;
+      max-width: 100%;
+      min-width: 0;
+    }
+
+    .stats-chart-canvas {
+      width: 100% !important;
+      height: 100% !important;
+      max-width: 100%;
+      max-height: 100%;
+      min-width: 0;
+    }
+
+    /* Pill-style Citation - WRAPPING */
+    .stats-citation {
+      font-size: 0.75rem;
+      color: var(--text-secondary);
+      padding: 0.5rem 0.75rem;
+      background: rgba(79, 70, 229, 0.04);
+      border-radius: 20px;
+      border: 1px solid rgba(79, 70, 229, 0.1);
+      display: inline-flex;
+      flex-wrap: wrap;
+      gap: 0.25rem;
+      align-items: center;
+      max-width: 100%;
+      word-wrap: break-word;
+      overflow-wrap: anywhere;
+      word-break: break-word;
+      line-height: 1.4;
+      min-width: 0;
+    }
+
+    .stats-citation strong {
+      font-weight: 600;
+      color: var(--text-primary);
+      flex-shrink: 0;
+    }
+
+    .stats-citation a {
+      color: var(--primary);
+      text-decoration: none;
+      font-weight: 500;
+      word-break: break-word;
+      overflow-wrap: anywhere;
+      min-width: 0;
+    }
+
+    .stats-citation a:hover {
+      text-decoration: underline;
+    }
+
+    /* Compact Solution Panel */
+    .stats-solution-panel {
+      margin-top: 1.25rem;
+      padding: 1rem;
+      background: linear-gradient(135deg, rgba(16, 185, 129, 0.04) 0%, rgba(79, 70, 229, 0.04) 100%);
+      border-radius: 12px;
+      border: 1px solid rgba(16, 185, 129, 0.15);
+      animation: slideInRight 0.6s ease 0.2s both;
+      max-width: 100%;
+      min-width: 0;
+      overflow: hidden;
+    }
+
+    .stats-solution-header {
+      font-size: 0.95rem;
+      font-weight: 700;
+      color: var(--secondary);
+      margin-bottom: 0.75rem;
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+      max-width: 100%;
+      word-wrap: break-word;
+      overflow-wrap: anywhere;
+      min-width: 0;
+    }
+
+    .stats-solution-features {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 0.5rem;
+      max-width: 100%;
+      min-width: 0;
+    }
+
+    .stats-solution-feature {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      font-size: 0.85rem;
+      color: var(--text-secondary);
+      max-width: 100%;
+      word-wrap: break-word;
+      overflow-wrap: anywhere;
+      min-width: 0;
+    }
+
+    .stats-solution-feature::before {
+      content: '✓';
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 18px;
+      height: 18px;
+      background: var(--secondary);
+      color: var(--white);
+      border-radius: 50%;
+      font-size: 0.7rem;
+      font-weight: 700;
+      flex-shrink: 0;
+    }
+
+    /* Carousel Controls */
+    .stats-carousel-controls {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      gap: 1.5rem;
+      margin-top: 2rem;
+      padding: 0 1rem;
+    }
+
+    .stats-carousel-arrow {
+      background: var(--white);
+      border: 2px solid var(--primary);
+      color: var(--primary);
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      font-size: 1.1rem;
+      font-weight: 700;
+      flex-shrink: 0;
+    }
+
+    .stats-carousel-arrow:hover {
+      background: var(--primary);
+      color: var(--white);
+      transform: scale(1.08);
+    }
+
+    .stats-carousel-arrow:active {
+      transform: scale(0.92);
+    }
+
+    .stats-carousel-dots {
+      display: flex;
+      gap: 0.5rem;
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+
+    .stats-carousel-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: rgba(79, 70, 229, 0.2);
+      border: none;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      padding: 0;
+      flex-shrink: 0;
+    }
+
+    .stats-carousel-dot.active {
+      background: var(--primary);
+      width: 28px;
+      border-radius: 5px;
+    }
+
+    .stats-carousel-dot:hover {
+      background: var(--primary);
+      opacity: 0.7;
+    }
+
+    /* Animations */
+    @keyframes fadeIn {
+      from {
+        opacity: 0;
+      }
+      to {
+        opacity: 1;
+      }
+    }
+
+    @keyframes slideInRight {
+      from {
+        opacity: 0;
+        transform: translateX(20px);
+      }
+      to {
+        opacity: 1;
+        transform: translateX(0);
+      }
+    }
+
+    /* Desktop Enhancements */
+    @media (min-width: 769px) {
+      .reality-stats-section {
+        padding: 5rem 2rem;
+      }
+
+      .reality-stats-container {
+        padding: 3rem 2.5rem;
+        border-radius: 24px;
+      }
+
+      .reality-stats-header {
+        margin-bottom: 3rem;
+      }
+
+      .reality-stats-title {
+        font-size: 2.5rem;
+      }
+
+      .reality-stats-subtitle {
+        font-size: 1.125rem;
+      }
+
+      .stats-slide {
+        flex-direction: row;
+        grid-template-columns: 1fr 1fr;
+        gap: 3rem;
+        align-items: center;
+        display: grid;
+      }
+
+      .stats-problem-headline {
+        font-size: 1.75rem;
+        margin-bottom: 1.5rem;
+      }
+
+      .stats-pain-bullets li {
+        font-size: 1rem;
+        margin-bottom: 1rem;
+      }
+
+      .stats-cta-btn {
+        width: auto;
+        padding: 1rem 2rem;
+        font-size: 1rem;
+      }
+
+      .stats-chart-container {
+        height: 220px;
+        padding: 1.25rem;
+      }
+
+      .stats-citation {
+        font-size: 0.85rem;
+        padding: 0.75rem 1rem;
+      }
+
+      .stats-solution-panel {
+        margin-top: 2rem;
+        padding: 1.5rem;
+      }
+
+      .stats-solution-header {
+        font-size: 1.125rem;
+      }
+
+      .stats-solution-features {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 0.75rem;
+      }
+
+      .stats-solution-feature {
+        font-size: 0.9rem;
+      }
+
+      .stats-carousel-controls {
+        gap: 2rem;
+        margin-top: 2.5rem;
+      }
+
+      .stats-carousel-arrow {
+        width: 48px;
+        height: 48px;
+        font-size: 1.25rem;
+      }
+
+      .stats-carousel-dots {
+        gap: 0.75rem;
+      }
+
+      .stats-carousel-dot {
+        width: 12px;
+        height: 12px;
+      }
+
+      .stats-carousel-dot.active {
+        width: 32px;
+      }
+    }
+
+    /* Extra Small Mobile (360px) */
+    @media (max-width: 390px) {
+      .reality-stats-section {
+        padding: 2.5rem 0.75rem;
+      }
+
+      .reality-stats-container {
+        padding: 1.25rem 0.75rem;
+        border-radius: 16px;
+      }
+
+      .reality-stats-title {
+        font-size: 1.35rem;
+      }
+
+      .reality-stats-subtitle {
+        font-size: 0.85rem;
+      }
+
+      .stats-problem-headline {
+        font-size: 1.15rem;
+      }
+
+      .stats-pain-bullets li {
+        font-size: 0.85rem;
+        padding-left: 1.5rem;
+      }
+
+      .stats-chart-container {
+        height: 140px;
+        padding: 0.5rem;
+      }
+
+      .stats-cta-btn {
+        padding: 0.75rem 1.25rem;
+        font-size: 0.9rem;
+      }
+
+      .stats-citation {
+        font-size: 0.7rem;
+        padding: 0.4rem 0.6rem;
+      }
+
+      .stats-carousel-arrow {
+        width: 36px;
+        height: 36px;
+        font-size: 1rem;
+      }
+    }
   </style>
 </head>
 <body>
@@ -709,6 +1250,129 @@
       </div>
       <div class="hero-image">
         <img src="{% static 'img/majn.png' %}" alt="Emajinet" class="hero-logo">
+      </div>
+    </div>
+  </section>
+
+  <!-- Reality → Solution Stats Section -->
+  <section class="reality-stats-section" id="reality-stats">
+    <div class="reality-stats-container">
+      <div class="reality-stats-header">
+        <h2 class="reality-stats-title">The Reality → Our Solution</h2>
+        <p class="reality-stats-subtitle">Real data from Malawi & global retail. See how Emajinet changes the game.</p>
+      </div>
+
+      <div class="stats-carousel" id="statsCarousel" aria-label="Business statistics carousel" role="region">
+        <div class="stats-slides-wrapper" id="statsSlides">
+          
+          <!-- Slide A: Digital Gap -->
+          <div class="stats-slide" data-slide="0">
+            <div class="stats-slide-content">
+              <h3 class="stats-problem-headline">Most MSMEs lack digital tools</h3>
+              <ul class="stats-pain-bullets">
+                <li>Only 2% of MSMEs in Malawi use the internet for business</li>
+                <li>Among medium enterprises, just 9% use computerized record keeping</li>
+                <li>Without digital systems, owners lose track of inventory, sales, and profits</li>
+              </ul>
+              <a href="#how-it-works" class="stats-cta-btn">See how Emajinet fixes this</a>
+            </div>
+            <div class="stats-slide-visual">
+              <div class="stats-chart-container">
+                <canvas id="chartDigitalGap" class="stats-chart-canvas" role="img" aria-label="Chart showing digital adoption rates"></canvas>
+              </div>
+              <div class="stats-citation">
+                📊 <strong>Source:</strong> <a href="https://imanidevelopment.com/wp-content/uploads/2020/07/Finscope-MSME-2019-survey-Full-Report.pdf" target="_blank" rel="noopener">FinScope MSME Malawi 2019 Survey</a> (FinMark Trust / Imani Development)
+              </div>
+              <div class="stats-solution-panel">
+                <div class="stats-solution-header">
+                  ✨ Emajinet solves this:
+                </div>
+                <div class="stats-solution-features">
+                  <div class="stats-solution-feature">Live sales dashboards</div>
+                  <div class="stats-solution-feature">Real-time stock alerts</div>
+                  <div class="stats-solution-feature">Digital record keeping</div>
+                  <div class="stats-solution-feature">Mobile-first design</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Slide B: Informality + Scale -->
+          <div class="stats-slide" data-slide="1">
+            <div class="stats-slide-content">
+              <h3 class="stats-problem-headline">89% operate informally—but they matter</h3>
+              <ul class="stats-pain-bullets">
+                <li>Only 11% of MSMEs are officially registered</li>
+                <li>Yet MSMEs contribute 24% of total labour force employment</li>
+                <li>Informal businesses struggle with trust, compliance, and growth</li>
+              </ul>
+              <a href="#how-it-works" class="stats-cta-btn">See how Emajinet fixes this</a>
+            </div>
+            <div class="stats-slide-visual">
+              <div class="stats-chart-container">
+                <canvas id="chartInformality" class="stats-chart-canvas" role="img" aria-label="Chart showing business registration rates"></canvas>
+              </div>
+              <div class="stats-citation">
+                📊 <strong>Source:</strong> <a href="https://imanidevelopment.com/wp-content/uploads/2020/07/Finscope-MSME-2019-survey-Full-Report.pdf" target="_blank" rel="noopener">FinScope MSME Malawi 2019 Survey</a> (FinMark Trust / Imani Development)
+              </div>
+              <div class="stats-solution-panel">
+                <div class="stats-solution-header">
+                  ✨ Emajinet solves this:
+                </div>
+                <div class="stats-solution-features">
+                  <div class="stats-solution-feature">Professional records</div>
+                  <div class="stats-solution-feature">Audit logs for compliance</div>
+                  <div class="stats-solution-feature">Role-based permissions</div>
+                  <div class="stats-solution-feature">Investor-ready reports</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Slide C: Shrinkage & Theft -->
+          <div class="stats-slide" data-slide="2">
+            <div class="stats-slide-content">
+              <h3 class="stats-problem-headline">Retail loses 1.6% to shrink—mostly theft</h3>
+              <ul class="stats-pain-bullets">
+                <li>Average retail shrink rate: 1.6% of sales (global benchmark)</li>
+                <li>Nearly two-thirds of shrink is due to theft (internal & external)</li>
+                <li>Without tracking, theft and errors go undetected for months</li>
+              </ul>
+              <a href="#how-it-works" class="stats-cta-btn">See how Emajinet fixes this</a>
+            </div>
+            <div class="stats-slide-visual">
+              <div class="stats-chart-container">
+                <canvas id="chartShrinkage" class="stats-chart-canvas" role="img" aria-label="Chart showing retail shrinkage breakdown"></canvas>
+              </div>
+              <div class="stats-citation">
+                📊 <strong>Source:</strong> <a href="https://nrf.com/research/national-retail-security-survey-2023" target="_blank" rel="noopener">NRF National Retail Security Survey 2023</a> (FY2022 data)
+              </div>
+              <div class="stats-solution-panel">
+                <div class="stats-solution-header">
+                  ✨ Emajinet solves this:
+                </div>
+                <div class="stats-solution-features">
+                  <div class="stats-solution-feature">Stock movement tracking</div>
+                  <div class="stats-solution-feature">Audit trail logs</div>
+                  <div class="stats-solution-feature">Agent accountability</div>
+                  <div class="stats-solution-feature">Automated alerts</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+      <!-- Carousel Controls -->
+      <div class="stats-carousel-controls">
+        <button class="stats-carousel-arrow" id="statsPrevBtn" aria-label="Previous slide">‹</button>
+        <div class="stats-carousel-dots" id="statsDots" role="tablist">
+          <button class="stats-carousel-dot active" data-slide="0" aria-label="Go to slide 1" role="tab" aria-selected="true"></button>
+          <button class="stats-carousel-dot" data-slide="1" aria-label="Go to slide 2" role="tab" aria-selected="false"></button>
+          <button class="stats-carousel-dot" data-slide="2" aria-label="Go to slide 3" role="tab" aria-selected="false"></button>
+        </div>
+        <button class="stats-carousel-arrow" id="statsNextBtn" aria-label="Next slide">›</button>
       </div>
     </div>
   </section>
@@ -1243,6 +1907,431 @@
         });
       }
     });
+
+    // ============================================
+    // REALITY STATS CAROUSEL
+    // ============================================
+    (function() {
+      let currentSlide = 0;
+      let autoRotateInterval = null;
+      let charts = {};
+      let isPaused = false;
+
+      function initStatsCarousel() {
+        const carousel = document.getElementById('statsCarousel');
+        if (!carousel) return; // Not on this page
+
+        const slidesWrapper = document.getElementById('statsSlides');
+        const prevBtn = document.getElementById('statsPrevBtn');
+        const nextBtn = document.getElementById('statsNextBtn');
+        const dotsContainer = document.getElementById('statsDots');
+        const dots = dotsContainer.querySelectorAll('.stats-carousel-dot');
+        const totalSlides = dots.length;
+
+        // Initialize charts
+        initCharts();
+
+        // Touch/swipe support
+        let touchStartX = 0;
+        let touchEndX = 0;
+        const swipeThreshold = 50;
+
+        carousel.addEventListener('touchstart', (e) => {
+          touchStartX = e.changedTouches[0].screenX;
+        }, { passive: true });
+
+        carousel.addEventListener('touchend', (e) => {
+          touchEndX = e.changedTouches[0].screenX;
+          handleSwipe();
+        }, { passive: true });
+
+        function handleSwipe() {
+          const diff = touchStartX - touchEndX;
+          if (Math.abs(diff) > swipeThreshold) {
+            if (diff > 0) {
+              // Swipe left - next slide
+              nextSlide();
+            } else {
+              // Swipe right - previous slide
+              prevSlide();
+            }
+            stopAutoRotate();
+            startAutoRotate();
+          }
+        }
+
+        // Function to go to a specific slide
+        function goToSlide(index) {
+          currentSlide = index;
+          slidesWrapper.style.transform = `translateX(-${currentSlide * 100}%)`;
+          
+          // Update dots
+          dots.forEach((dot, i) => {
+            if (i === currentSlide) {
+              dot.classList.add('active');
+              dot.setAttribute('aria-selected', 'true');
+            } else {
+              dot.classList.remove('active');
+              dot.setAttribute('aria-selected', 'false');
+            }
+          });
+        }
+
+        // Next slide
+        function nextSlide() {
+          currentSlide = (currentSlide + 1) % totalSlides;
+          goToSlide(currentSlide);
+        }
+
+        // Previous slide
+        function prevSlide() {
+          currentSlide = (currentSlide - 1 + totalSlides) % totalSlides;
+          goToSlide(currentSlide);
+        }
+
+        // Auto-rotate
+        function startAutoRotate() {
+          if (!isPaused) {
+            autoRotateInterval = setInterval(nextSlide, 5000); // Rotate every 5 seconds
+          }
+        }
+
+        function stopAutoRotate() {
+          if (autoRotateInterval) {
+            clearInterval(autoRotateInterval);
+            autoRotateInterval = null;
+          }
+        }
+
+        // Event listeners
+        prevBtn.addEventListener('click', () => {
+          prevSlide();
+          stopAutoRotate();
+          startAutoRotate(); // Restart timer after manual interaction
+        });
+
+        nextBtn.addEventListener('click', () => {
+          nextSlide();
+          stopAutoRotate();
+          startAutoRotate();
+        });
+
+        dots.forEach(dot => {
+          dot.addEventListener('click', () => {
+            const slideIndex = parseInt(dot.getAttribute('data-slide'));
+            goToSlide(slideIndex);
+            stopAutoRotate();
+            startAutoRotate();
+          });
+        });
+
+        // Pause on hover (desktop only)
+        if (window.matchMedia('(hover: hover)').matches) {
+          carousel.addEventListener('mouseenter', () => {
+            isPaused = true;
+            stopAutoRotate();
+          });
+
+          carousel.addEventListener('mouseleave', () => {
+            isPaused = false;
+            startAutoRotate();
+          });
+        }
+
+        // Keyboard navigation
+        carousel.addEventListener('keydown', (e) => {
+          if (e.key === 'ArrowLeft') {
+            prevSlide();
+            stopAutoRotate();
+            startAutoRotate();
+          } else if (e.key === 'ArrowRight') {
+            nextSlide();
+            stopAutoRotate();
+            startAutoRotate();
+          }
+        });
+
+        // Start auto-rotate
+        startAutoRotate();
+
+        // Cleanup on page unload
+        window.addEventListener('beforeunload', () => {
+          stopAutoRotate();
+          Object.values(charts).forEach(chart => {
+            if (chart) chart.destroy();
+          });
+        });
+      }
+
+      function initCharts() {
+        // Check if Chart.js is loaded
+        if (typeof Chart === 'undefined') {
+          console.warn('Chart.js not loaded');
+          return;
+        }
+
+        // Mobile-first common options
+        const isMobile = window.innerWidth < 769;
+        
+        const commonOptions = {
+          responsive: true,
+          maintainAspectRatio: false, // Critical for fixed height containers
+          plugins: {
+            legend: {
+              display: !isMobile, // Hide legend on mobile
+              position: 'bottom',
+              labels: {
+                padding: 8,
+                font: {
+                  size: 10,
+                  family: '-apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, Roboto, Helvetica, Arial, sans-serif'
+                },
+                boxWidth: 12
+              }
+            },
+            tooltip: {
+              backgroundColor: 'rgba(0, 0, 0, 0.85)',
+              padding: 8,
+              cornerRadius: 6,
+              titleFont: {
+                size: 11,
+                weight: 'bold'
+              },
+              bodyFont: {
+                size: 10
+              }
+            }
+          }
+        };
+
+        // Chart A: Digital Gap - Compact Horizontal Bar (PREMIUM BRAND COLORS)
+        const ctxA = document.getElementById('chartDigitalGap');
+        if (ctxA) {
+          charts.digitalGap = new Chart(ctxA, {
+            type: 'bar',
+            data: {
+              labels: isMobile ? ['Internet', 'Comp. Records'] : ['Internet for Business', 'Computerized Records'],
+              datasets: [
+                {
+                  label: 'Using',
+                  data: [2, 9],
+                  backgroundColor: 'rgba(79, 70, 229, 0.85)',
+                  borderColor: 'rgba(79, 70, 229, 1)',
+                  borderWidth: 2,
+                  borderRadius: 6
+                },
+                {
+                  label: 'Not Using',
+                  data: [98, 91],
+                  backgroundColor: 'rgba(148, 163, 184, 0.5)',
+                  borderColor: 'rgba(148, 163, 184, 0.8)',
+                  borderWidth: 2,
+                  borderRadius: 6
+                }
+              ]
+            },
+            options: {
+              ...commonOptions,
+              indexAxis: 'y',
+              layout: {
+                padding: {
+                  left: 0,
+                  right: 0,
+                  top: 0,
+                  bottom: 0
+                }
+              },
+              scales: {
+                x: {
+                  stacked: true,
+                  max: 100,
+                  ticks: {
+                    font: { size: 9 },
+                    maxRotation: 0,
+                    autoSkipPadding: 10,
+                    callback: function(value) {
+                      return value + '%';
+                    }
+                  },
+                  grid: {
+                    display: false
+                  }
+                },
+                y: {
+                  stacked: true,
+                  ticks: {
+                    font: { size: 9 },
+                    autoSkip: true,
+                    maxTicksLimit: 3
+                  },
+                  grid: {
+                    display: false
+                  }
+                }
+              },
+              plugins: {
+                ...commonOptions.plugins,
+                legend: {
+                  display: false  // Disable legend for mobile
+                },
+                title: {
+                  display: false  // Remove title to save space
+                }
+              }
+            }
+          });
+        }
+
+        // Chart B: Informality - Donut with Center Text (PREMIUM BRAND COLORS)
+        const ctxB = document.getElementById('chartInformality');
+        if (ctxB) {
+          charts.informality = new Chart(ctxB, {
+            type: 'doughnut',
+            data: {
+              labels: ['Informal', 'Registered'],
+              datasets: [{
+                data: [89, 11],
+                backgroundColor: [
+                  'rgba(148, 163, 184, 0.6)',
+                  'rgba(79, 70, 229, 0.9)'
+                ],
+                borderColor: [
+                  'rgba(148, 163, 184, 1)',
+                  'rgba(79, 70, 229, 1)'
+                ],
+                borderWidth: 3
+              }]
+            },
+            options: {
+              ...commonOptions,
+              cutout: '65%',
+              layout: {
+                padding: 0
+              },
+              plugins: {
+                ...commonOptions.plugins,
+                legend: {
+                  display: false  // Disable legend - info in center text
+                },
+                title: {
+                  display: false
+                },
+                tooltip: {
+                  ...commonOptions.plugins.tooltip,
+                  callbacks: {
+                    label: function(context) {
+                      return context.label + ': ' + context.parsed + '%';
+                    }
+                  }
+                }
+              }
+            },
+            plugins: [{
+              id: 'centerText',
+              beforeDraw: function(chart) {
+                const ctx = chart.ctx;
+                const centerX = chart.chartArea.left + (chart.chartArea.right - chart.chartArea.left) / 2;
+                const centerY = chart.chartArea.top + (chart.chartArea.bottom - chart.chartArea.top) / 2;
+                
+                ctx.save();
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillStyle = '#4f46e5';
+                ctx.font = isMobile ? 'bold 20px sans-serif' : 'bold 24px sans-serif';
+                ctx.fillText('89%', centerX, centerY - 8);
+                
+                ctx.fillStyle = '#64748b';
+                ctx.font = isMobile ? '10px sans-serif' : '12px sans-serif';
+                ctx.fillText('Informal', centerX, centerY + 12);
+                ctx.restore();
+              }
+            }]
+          });
+        }
+
+        // Chart C: Shrinkage - Compact Bar (PREMIUM BRAND COLORS)
+        const ctxC = document.getElementById('chartShrinkage');
+        if (ctxC) {
+          charts.shrinkage = new Chart(ctxC, {
+            type: 'bar',
+            data: {
+              labels: isMobile ? ['Total', 'Theft', 'Other'] : ['Total Shrink', 'Theft-Related', 'Other Causes'],
+              datasets: [{
+                label: '% of Sales',
+                data: [1.6, 1.07, 0.53],
+                backgroundColor: [
+                  'rgba(139, 92, 246, 0.8)',
+                  'rgba(79, 70, 229, 0.85)',
+                  'rgba(168, 85, 247, 0.75)'
+                ],
+                borderColor: [
+                  'rgba(139, 92, 246, 1)',
+                  'rgba(79, 70, 229, 1)',
+                  'rgba(168, 85, 247, 1)'
+                ],
+                borderWidth: 2,
+                borderRadius: 6
+              }]
+            },
+            options: {
+              ...commonOptions,
+              layout: {
+                padding: {
+                  left: 0,
+                  right: 0,
+                  top: 0,
+                  bottom: 0
+                }
+              },
+              scales: {
+                y: {
+                  beginAtZero: true,
+                  max: 2,
+                  ticks: {
+                    font: { size: 9 },
+                    maxTicksLimit: 4,
+                    callback: function(value) {
+                      return value + '%';
+                    }
+                  },
+                  grid: {
+                    display: true,
+                    color: 'rgba(0,0,0,0.05)'
+                  }
+                },
+                x: {
+                  ticks: {
+                    font: { size: 9 },
+                    maxRotation: 0,
+                    autoSkip: true,
+                    maxTicksLimit: 3
+                  },
+                  grid: {
+                    display: false
+                  }
+                }
+              },
+              plugins: {
+                ...commonOptions.plugins,
+                title: {
+                  display: false  // Remove title to save space
+                },
+                legend: {
+                  display: false  // Disable legend
+                }
+              }
+            }
+          });
+        }
+      }
+
+      // Initialize on DOM ready
+      if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', initStatsCarousel);
+      } else {
+        initStatsCarousel();
+      }
+    })();
   </script>
 </body>
 </html>
