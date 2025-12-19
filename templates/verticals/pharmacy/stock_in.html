@@ -5,7 +5,7 @@
 {% block title %}Stock In · Pharmacy & Cosmetics · Emajinet{% endblock %}
 
 {% block extra_css %}
-<link rel="stylesheet" href="{% static 'css/barcode-scanner-rear-camera.css' %}?v={{ BUILD_ID|default:STATIC_VERSION|default:'1' }}">
+<link rel="stylesheet" href="{% static 'css/unified-scanner.css' %}?v={{ BUILD_ID|default:STATIC_VERSION|default:'1' }}">
 <style>
 .btn-scanner {
   background: linear-gradient(120deg, #667eea, #764ba2);
@@ -273,7 +273,7 @@ window.addEventListener('pageshow', function(event) {
 </script>
 
 <!-- Barcode Scanner Integration (Rear Camera) -->
-<script src="{% static 'js/barcode-scanner-rear-camera.js' %}?v={{ BUILD_ID|default:STATIC_VERSION|default:'1' }}"></script>
+<script src="{% static 'js/unified-scanner.js' %}?v={{ BUILD_ID|default:STATIC_VERSION|default:'1' }}"></script>
 <script>
 (function() {
   'use strict';
@@ -287,14 +287,12 @@ window.addEventListener('pageshow', function(event) {
     
     if (!openScannerBtn || !barcodeInput) return;
     
-    // Create rear camera scanner instance
-    barcodeScanner = new RearCameraBarcodeScanner({
-      onScan: function(barcode) {
-        // Auto-fill barcode field
-        barcodeInput.value = barcode;
-        barcodeInput.dispatchEvent(new Event('input', { bubbles: true }));
-        
-        // Show success feedback
+    // Create unified scanner instance
+    barcodeScanner = new UnifiedScanner({
+      mode: 'barcode',
+      targetInput: barcodeInput,
+      onSelect: function(barcode) {
+        // Show success feedback (input is already auto-filled by UnifiedScanner)
         barcodeInput.style.borderColor = '#10b981';
         barcodeInput.style.boxShadow = '0 0 0 3px rgba(16, 185, 129, 0.2)';
         setTimeout(() => {

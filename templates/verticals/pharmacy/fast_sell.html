@@ -4,7 +4,7 @@
 {% block title %}⚡ Fast Sell - Pharmacy{% endblock %}
 
 {% block extra_css %}
-<link rel="stylesheet" href="{% static 'css/barcode-scanner-rear-camera.css' %}">
+<link rel="stylesheet" href="{% static 'css/unified-scanner.css' %}">
 <style>
 .fast-sell-container {
     max-width: 1000px;
@@ -446,7 +446,7 @@
     </div>
 </div>
 
-<script src="{% static 'js/barcode-scanner-rear-camera.js' %}"></script>
+<script src="{% static 'js/unified-scanner.js' %}"></script>
 <script>
 let currentProduct = null;
 let currentQty = 1;
@@ -456,8 +456,9 @@ let recentSales = [];
 // Initialize scanner
 document.getElementById('scannerTriggerBtn').addEventListener('click', () => {
     if (!barcodeScanner) {
-        barcodeScanner = new RearCameraBarcodeScanner({
-            onScan: handleBarcodeScan,
+        barcodeScanner = new UnifiedScanner({
+            mode: 'barcode',
+            onSelect: handleBarcodeScan,
             onError: (error) => {
                 console.error('Scanner error:', error);
             }
