@@ -70,6 +70,10 @@
   <link rel="stylesheet" href="{% static 'css/mobile-tables-responsive.css' %}?v={{ ASSET_V }}">
   <link rel="stylesheet" href="{% static 'css/glassmorphic-enhancement.css' %}?v={{ ASSET_V }}">
   <link rel="stylesheet" href="{% static 'css/sidebar-more-features.css' %}?v={{ ASSET_V }}">
+  
+  <!-- PRODUCTION ENHANCEMENTS 2025-12-19 -->
+  <link rel="stylesheet" href="{% static 'css/numeric-display.css' %}?v={{ ASSET_V }}">
+  <link rel="stylesheet" href="{% static 'css/glassmorphic-design-system.css' %}?v={{ ASSET_V }}">
 
   <!-- FINAL: versioned overrides must load LAST to win the cascade -->
   <link rel="stylesheet" href="{% static 'css/v2-overrides.2025-09-25.css' %}?v={{ ASSET_V }}">
@@ -509,8 +513,8 @@
                     <span class="tenant-role">· Admin</span>
                   </a>
                 {% elif request.user.is_authenticated %}
-                  {# MULTI-TENANCY HARDENING: Redirect to onboarding instead of business chooser #}
-                  <a class="tenant-pill hover-lift tap" href="{% url 'onboarding:start' %}">
+                  {# MULTI-TENANCY HARDENING: Redirect to tenant chooser/join page #}
+                  <a class="tenant-pill hover-lift tap" href="{{ url_choose_business|default:'/tenants/join/' }}">
                     <span class="tenant-dot" style="background:#f59e0b"></span>
                     <span class="tenant-name">No active business</span>
                     <span class="tenant-role">· Set up</span>

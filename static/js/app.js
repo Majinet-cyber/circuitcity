@@ -407,7 +407,7 @@
     
     let currentIndex = 0;
     
-    // Initialize chart
+    // Initialize chart with premium AI-generated styling
     const ctx = canvas.getContext('2d');
     const chart = new Chart(ctx, {
       type: 'bar',
@@ -417,28 +417,55 @@
           label: 'Value',
           data: [],
           backgroundColor: [],
-          borderRadius: 8,
-          borderSkipped: false
+          borderRadius: 12,
+          borderSkipped: false,
+          barPercentage: 0.7,
+          categoryPercentage: 0.8
         }]
       },
       options: {
         responsive: true,
         maintainAspectRatio: false,
+        layout: {
+          padding: {
+            top: 10,
+            right: 10,
+            bottom: 0,
+            left: 10
+          }
+        },
         plugins: {
           legend: {
             display: false
           },
           tooltip: {
-            backgroundColor: 'rgba(15, 23, 42, 0.9)',
-            padding: 12,
-            borderRadius: 8,
-            titleFont: { size: 14, weight: 'bold' },
-            bodyFont: { size: 13 },
+            enabled: true,
+            backgroundColor: 'rgba(15, 23, 42, 0.95)',
+            padding: 16,
+            borderRadius: 12,
+            titleFont: { 
+              size: 15, 
+              weight: '700',
+              family: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
+            },
+            bodyFont: { 
+              size: 14,
+              family: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
+            },
+            titleColor: '#ffffff',
+            bodyColor: '#e2e8f0',
+            borderColor: 'rgba(99, 102, 241, 0.3)',
+            borderWidth: 1,
+            displayColors: true,
+            boxWidth: 12,
+            boxHeight: 12,
+            boxPadding: 6,
+            usePointStyle: true,
             callbacks: {
               label: function(context) {
                 const value = context.parsed.y;
-                // Format numbers with commas
-                return ' ' + value.toLocaleString();
+                // Format numbers with commas and add currency/unit
+                return ' ' + value.toLocaleString('en-US');
               }
             }
           }
@@ -446,27 +473,64 @@
         scales: {
           y: {
             beginAtZero: true,
+            border: {
+              display: false
+            },
+            grid: {
+              color: 'rgba(148, 163, 184, 0.08)',
+              lineWidth: 1,
+              drawTicks: false
+            },
             ticks: {
+              padding: 8,
+              font: {
+                size: 11,
+                weight: '600',
+                family: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
+              },
+              color: '#64748b',
               callback: function(value) {
                 // Format large numbers (e.g., 1000 -> 1K)
                 if (value >= 1000000) return (value / 1000000).toFixed(1) + 'M';
-                if (value >= 1000) return (value / 1000).toFixed(1) + 'K';
+                if (value >= 1000) return (value / 1000).toFixed(0) + 'K';
                 return value;
               }
-            },
-            grid: {
-              color: 'rgba(0, 0, 0, 0.05)'
             }
           },
           x: {
+            border: {
+              display: false
+            },
             grid: {
               display: false
+            },
+            ticks: {
+              padding: 8,
+              font: {
+                size: 11,
+                weight: '600',
+                family: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
+              },
+              color: '#64748b',
+              maxRotation: 0,
+              minRotation: 0,
+              autoSkip: true,
+              autoSkipPadding: 20
             }
           }
         },
         animation: {
-          duration: 750,
-          easing: 'easeInOutQuart'
+          duration: 800,
+          easing: 'easeInOutCubic',
+          onComplete: function() {
+            // Add subtle pulse effect on bars
+            const meta = chart.getDatasetMeta(0);
+            meta.data.forEach((bar, index) => {
+              if (bar) {
+                bar.$animations = {};
+              }
+            });
+          }
         }
       }
     });

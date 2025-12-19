@@ -1,0 +1,12 @@
+{% comment %}
+    Simple numeric display component
+    Used by {% numeric_display %} template tag
+{% endcomment %}
+
+<div class="numeric-display-wrapper">
+    {% if label %}
+        <span class="numeric-label">{{ label }}</span>
+    {% endif %}
+    <span class="num-value" title="{{ raw_value }}">{{ value }}</span>
+</div>
+

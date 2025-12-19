@@ -226,6 +226,10 @@
     background: #ef4444;
 }
 
+.info-toast {
+    background: #3b82f6;
+}
+
 .manual-input-panel {
     background: white;
     padding: 2rem;
@@ -406,9 +410,9 @@ document.querySelectorAll('.payment-btn').forEach(btn => {
 // Initialize camera scanner
 async function startScanner() {
     try {
-        // Request front camera
+        // ⚡ ALWAYS REQUEST REAR CAMERA (environment = rear camera)
         videoStream = await navigator.mediaDevices.getUserMedia({
-            video: { facingMode: 'user' },
+            video: { facingMode: { ideal: 'environment' } },
             audio: false
         });
         
@@ -423,6 +427,7 @@ async function startScanner() {
             const formats = await BarcodeDetector.getSupportedFormats();
             barcodeDetector = new BarcodeDetector({ formats });
             scanningActive = true;
+            showToast('📹 Scanning with rear camera...', 'info');
             scanLoop();
         } else {
             showToast('Camera started. BarcodeDetector not supported - use manual entry', 'info');
@@ -458,6 +463,8 @@ async function scanLoop() {
 // Lookup product by barcode
 async function lookupProduct(barcode) {
     try {
+        showToast(`🔍 Looking up: ${barcode}`, 'info');
+        
         const resp = await fetch(`/verticals/{{ vertical }}/api/fast-sell/lookup/?barcode=${encodeURIComponent(barcode)}`);
         const data = await resp.json();
         
@@ -465,12 +472,15 @@ async function lookupProduct(barcode) {
             currentProduct = data;
             currentQty = 1;
             displayProduct(data);
+            showToast('✅ Product found! Ready to sell.', 'success');
         } else {
-            showToast(data.error || 'Product not found', 'error');
+            // ⚡ NEVER CLOSE SILENTLY - Show clear message and keep scanning
+            showToast(data.error || '❌ This product is not in your inventory.', 'error', 5000);
+            // Keep scanner active for next scan
             resetScanner();
         }
     } catch (err) {
-        showToast('Lookup failed', 'error');
+        showToast('❌ Lookup failed. Please try again.', 'error', 5000);
         resetScanner();
     }
 }
@@ -573,16 +583,20 @@ async function refreshKPIs() {
     }
 }
 
-// Show toast notification
-function showToast(message, type = 'success') {
+// Show toast notification (with configurable duration)
+function showToast(message, type = 'success', duration = 3000) {
+    // Remove existing toasts to avoid stacking
+    document.querySelectorAll('.toast').forEach(t => t.remove());
+    
     const toast = document.createElement('div');
-    toast.className = `toast ${type === 'error' ? 'error-toast' : ''}`;
+    toast.className = `toast ${type === 'error' ? 'error-toast' : type === 'info' ? 'info-toast' : ''}`;
     toast.textContent = message;
     document.body.appendChild(toast);
     
     setTimeout(() => {
-        toast.remove();
-    }, 3000);
+        toast.style.opacity = '0';
+        setTimeout(() => toast.remove(), 300);
+    }, duration);
 }
 
 // Initialize

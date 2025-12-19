@@ -218,13 +218,15 @@
     </div>
   </div>
   
-  <!-- Period Selector -->
+  <!-- Period Selector (Single Button) -->
   <div class="period-selector">
-    <label>Period:</label>
-    <a href="?range=today" class="period-btn {% if range_param == 'today' %}active{% endif %}">Today</a>
-    <a href="?range=7d" class="period-btn {% if range_param == '7d' %}active{% endif %}">Last 7 Days</a>
-    <a href="?range=month" class="period-btn {% if range_param == 'month' %}active{% endif %}">This Month</a>
-    <span style="color:#94a3b8;margin-left:8px">{{ period_label }}</span>
+    <div style="display:flex;gap:12px;align-items:center;justify-content:space-between;width:100%;flex-wrap:wrap">
+      <div style="display:flex;gap:12px;align-items:center">
+        <label>Period:</label>
+        {% include "partials/date_filter_unified.html" with range_key=range_param start_date=start_date end_date=end_date range_label=period_label %}
+      </div>
+      <span style="color:#94a3b8;font-size:.9rem"><strong>Showing:</strong> {{ period_label }}</span>
+    </div>
   </div>
   
   <!-- Quick Actions (moved above KPIs for better UX) -->
