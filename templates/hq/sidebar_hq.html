@@ -15,23 +15,17 @@
 {% url 'admin:index' as url_django_admin %}
 
 <style>
-  /* HQ Sidebar - NEVER collapses, always visible */
-  .cc-sidebar { 
-    position: fixed; 
-    left: 0; 
-    top: 0; 
-    bottom: 0; 
-    width: 260px; 
-    min-width: 260px;
-    max-width: 260px;
+  /* HQ Sidebar - Responsive (off-canvas on mobile, fixed on desktop) */
+  .cc-sidebar,
+  #hqSidebar { 
+    /* Mobile styles are handled by hq-mobile-responsive.css */
+    /* Desktop: fixed sidebar */
     background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%); 
     color: #e2e8f0; 
     overflow-y: auto;
     overflow-x: hidden;
-    z-index: 1000; 
     box-shadow: 2px 0 12px rgba(0,0,0,0.3);
     flex-shrink: 0;
-    height: 100vh;
   }
   
   /* Smooth scrolling for sidebar */
@@ -63,17 +57,11 @@
   .cc-nav li a:hover { background: rgba(255,255,255,0.05); color: #fff; }
   .cc-nav li.active a { background: rgba(16,185,129,0.15); color: #10b981; font-weight: 600; }
   
-  /* Ensure sidebar is ALWAYS visible on all screen sizes */
-  @media (max-width: 768px) {
-    /* Even on mobile, keep sidebar visible but allow horizontal scroll if needed */
-    .cc-sidebar {
-      width: 260px;
-      min-width: 260px;
-    }
-  }
+  /* Mobile: Off-canvas sidebar behavior handled by hq-mobile-responsive.css */
+  /* Desktop: Fixed sidebar styling here */
 </style>
 
-<aside class="cc-sidebar">
+<aside id="hqSidebar" class="cc-sidebar hq-sidebar">
   <a class="cc-brand" href="{{ url_hq_home|default:'/hq/' }}">
     <span class="logo"><img src="{% static 'img/logo-32.png' %}" width="20" height="20" alt=""></span>
     <span>Emajinet HQ</span>

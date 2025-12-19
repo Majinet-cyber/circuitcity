@@ -3,8 +3,11 @@
 <html lang="en">
 <head>
   <meta charset="utf-8"/>
-  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"/>
   <title>HQ · Dashboard</title>
+  
+  <!-- HQ Mobile-First Responsive CSS -->
+  <link href="{% static 'css/hq-mobile-responsive.css' %}" rel="stylesheet">
 
   <style>
     :root{
@@ -33,13 +36,21 @@
       color:var(--ink-900);
       font:500 15px/1.45 system-ui,-apple-system,Segoe UI,Roboto,Inter,"Helvetica Neue",Arial;
     }
-    .layout{display:grid;grid-template-columns:250px 1fr;min-height:100%}
+    
+    /* Layout: Mobile-first (flex column), Desktop (grid with sidebar) */
+    .layout{display:flex;flex-direction:column;min-height:100%}
+    @media (min-width:992px){
+      .layout{display:grid;grid-template-columns:250px 1fr}
+    }
 
-    /* Sidebar */
+    /* Sidebar: Mobile styles handled by hq-mobile-responsive.css */
     .sidebar{
-      position:sticky;top:0;height:100dvh;
       background:#0b0f14;color:#cfe0ff;border-right:1px solid rgba(255,255,255,.06);
       padding:14px 10px;display:flex;flex-direction:column;gap:10px;overflow:hidden;
+    }
+    /* Desktop: sticky sidebar */
+    @media (min-width:992px){
+      .sidebar{position:sticky;top:0;height:100dvh}
     }
     .brand{display:flex;align-items:center;gap:10px;padding:10px;border-radius:12px;background:rgba(255,255,255,.05);
       box-shadow:inset 0 0 0 1px rgba(255,255,255,.06);font-weight:700}
@@ -240,8 +251,8 @@
 
   <script id="income-series" type="application/json">{{ income_series_json|default:"[]"|safe }}</script>
 
-  <div class="layout">
-    <aside class="sidebar">
+  <div class="layout hq-shell">
+    <aside id="hqSidebar" class="sidebar hq-sidebar">
       <div class="brand">
         <div class="dot">HQ</div>
         <div class="hide-sm">Control Center</div>
@@ -265,7 +276,15 @@
       </nav>
     </aside>
 
-    <main class="content">
+    <div class="hq-main" style="flex: 1;">
+      <!-- Mobile Topbar -->
+      <header class="hq-topbar">
+        <button id="hqSidebarToggle" class="hq-icon-btn" aria-controls="hqSidebar" aria-expanded="false" aria-label="Toggle navigation">☰</button>
+        <div class="hq-topbar-title">HQ Dashboard</div>
+        <div class="hq-topbar-actions"></div>
+      </header>
+
+      <main class="content">
       <div class="shell">
         <!-- Header -->
         <div class="header reveal">
@@ -332,7 +351,8 @@
         <div class="section-title reveal">Analytics Cockpit</div>
         <div class="card reveal" style="margin-bottom:24px;padding:20px">
           <h3 style="margin:0 0 16px;font-size:16px;font-weight:900;color:var(--ink-700)">Filters</h3>
-          <div id="analytics-filters" style="display:grid;gap:12px;grid-template-columns:repeat(auto-fit, minmax(200px, 1fr))">
+          <!-- Analytics filters now use responsive grid from hq-mobile-responsive.css -->
+          <div id="analytics-filters">
             <!-- Date Filters -->
             <div>
               <label style="display:block;font-size:12px;font-weight:700;color:var(--ink-500);margin-bottom:6px">Date Range</label>
@@ -666,7 +686,11 @@
              style="display:none"></div>
       </div>
     </main>
-  </div>
+    </div><!-- /.hq-main -->
+
+    <!-- Backdrop for Mobile Sidebar -->
+    <div id="hqBackdrop" class="hq-backdrop" hidden></div>
+  </div><!-- /.hq-shell/.layout -->
 
   <!-- Notifications portal -->
   <div class="panel" id="panel" role="dialog" aria-modal="false" style="display:none">
@@ -1467,5 +1491,8 @@
     }catch(e){console.error('Analytics init error:', e);}
   })();
   </script>
+
+  <!-- HQ Mobile Navigation -->
+  <script src="{% static 'js/hq-mobile.js' %}"></script>
 </body>
 </html>

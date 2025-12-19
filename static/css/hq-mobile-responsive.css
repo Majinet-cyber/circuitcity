@@ -1,0 +1,584 @@
+/**
+ * HQ Mobile-First Responsive Styles
+ * Makes the entire HQ admin area mobile-friendly with off-canvas sidebar
+ * 
+ * Breakpoint: < 992px = mobile
+ *           >= 992px = desktop
+ */
+
+/* ========================================
+   GLOBAL OVERFLOW PREVENTION
+   ======================================== */
+html, body {
+  max-width: 100%;
+  overflow-x: hidden;
+}
+
+body.hq-nav-open {
+  overflow: hidden; /* Lock scroll when sidebar is open on mobile */
+}
+
+/* ========================================
+   HQ SHELL STRUCTURE
+   ======================================== */
+.hq-shell {
+  position: relative;
+  min-height: 100vh;
+  display: flex;
+}
+
+/* ========================================
+   SIDEBAR (OFF-CANVAS ON MOBILE)
+   ======================================== */
+.hq-sidebar,
+.cc-sidebar,
+aside.sidebar {
+  /* Mobile first: off-canvas by default */
+  position: fixed;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  width: 86vw;
+  max-width: 320px;
+  background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+  color: #e2e8f0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  z-index: 1040;
+  transform: translateX(-100%);
+  transition: transform 0.2s ease;
+  box-shadow: 2px 0 12px rgba(0, 0, 0, 0.3);
+}
+
+.hq-sidebar.is-open,
+.cc-sidebar.is-open,
+aside.sidebar.is-open {
+  transform: translateX(0);
+}
+
+/* Desktop: sidebar is always visible, fixed in place */
+@media (min-width: 992px) {
+  .hq-sidebar,
+  .cc-sidebar,
+  aside.sidebar {
+    position: sticky;
+    top: 0;
+    transform: translateX(0);
+    width: 260px;
+    min-width: 260px;
+    max-width: 260px;
+    height: 100vh;
+  }
+}
+
+/* ========================================
+   MAIN CONTENT AREA
+   ======================================== */
+.hq-main {
+  flex: 1;
+  width: 100%;
+  min-width: 0; /* Allow content to shrink below its content size */
+  margin-left: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Desktop: add left margin for sidebar */
+@media (min-width: 992px) {
+  .hq-main {
+    margin-left: 260px;
+  }
+}
+
+.hq-content {
+  flex: 1;
+  padding: 1rem;
+  max-width: 100%;
+  overflow-x: hidden;
+}
+
+@media (min-width: 768px) {
+  .hq-content {
+    padding: 1.25rem;
+  }
+}
+
+@media (min-width: 992px) {
+  .hq-content {
+    padding: 1.5rem;
+  }
+}
+
+/* ========================================
+   MOBILE TOPBAR
+   ======================================== */
+.hq-topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.75rem 1rem;
+  background: #ffffff;
+  border-bottom: 1px solid #e2e8f0;
+  position: sticky;
+  top: 0;
+  z-index: 1030;
+  gap: 0.75rem;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+@media (min-width: 992px) {
+  .hq-topbar {
+    display: none; /* Hide on desktop - sidebar is always visible */
+  }
+}
+
+.hq-icon-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border: none;
+  background: transparent;
+  color: #1e293b;
+  font-size: 1.5rem;
+  cursor: pointer;
+  border-radius: 0.5rem;
+  transition: background-color 0.15s ease;
+  padding: 0;
+}
+
+.hq-icon-btn:hover,
+.hq-icon-btn:focus {
+  background-color: #f1f5f9;
+}
+
+.hq-topbar-title {
+  flex: 1;
+  font-size: 1.125rem;
+  font-weight: 700;
+  color: #0f172a;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.hq-topbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+/* ========================================
+   BACKDROP OVERLAY
+   ======================================== */
+.hq-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  z-index: 1035;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+  pointer-events: none;
+}
+
+.hq-backdrop[hidden] {
+  display: none;
+}
+
+.hq-backdrop.is-open {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+@media (min-width: 992px) {
+  .hq-backdrop {
+    display: none !important; /* Never show backdrop on desktop */
+  }
+}
+
+/* ========================================
+   LAYOUT COMPATIBILITY (for dashboard.html)
+   ======================================== */
+.layout {
+  display: flex;
+  min-height: 100vh;
+}
+
+@media (max-width: 991px) {
+  .layout {
+    flex-direction: column;
+  }
+  
+  .layout .sidebar {
+    /* Override inline styles for mobile */
+    position: fixed !important;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    width: 86vw !important;
+    max-width: 320px !important;
+    transform: translateX(-100%);
+    transition: transform 0.2s ease;
+    z-index: 1040;
+    height: 100vh !important;
+  }
+  
+  .layout .sidebar.is-open {
+    transform: translateX(0);
+  }
+  
+  .layout .content {
+    padding-top: 60px; /* Make room for mobile topbar */
+  }
+}
+
+/* ========================================
+   RESPONSIVE CONTENT
+   ======================================== */
+
+/* KPI Cards Grid */
+.cards {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: 1fr;
+}
+
+@media (min-width: 576px) {
+  .cards {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (min-width: 992px) {
+  .cards {
+    grid-template-columns: repeat(4, 1fr);
+    gap: 14px;
+  }
+}
+
+/* Ensure cards don't overflow */
+.card {
+  max-width: 100%;
+  overflow: hidden;
+}
+
+/* Wallet/Analytics Grid */
+.wallet {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: 1fr;
+}
+
+@media (min-width: 768px) {
+  .wallet {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (min-width: 980px) {
+  .wallet {
+    grid-template-columns: 1fr 1fr 2fr;
+    gap: 14px;
+  }
+}
+
+/* Filters - Stack on Mobile */
+.filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+@media (max-width: 767px) {
+  .filters {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  
+  .filters > * {
+    width: 100%;
+  }
+  
+  .filters .input,
+  .filters select,
+  .filters .apply {
+    width: 100% !important;
+    max-width: 100% !important;
+  }
+}
+
+/* Analytics Filters Grid */
+#analytics-filters {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: 1fr;
+}
+
+@media (min-width: 576px) {
+  #analytics-filters {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (min-width: 992px) {
+  #analytics-filters {
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  }
+}
+
+/* Top Filter Pills */
+.filters-top {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+@media (max-width: 767px) {
+  .filters-top {
+    justify-content: flex-start;
+  }
+  
+  .filters-top .pill {
+    font-size: 0.875rem;
+    padding: 6px 10px;
+  }
+}
+
+/* Header Responsive */
+.header {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 0.75rem;
+  align-items: flex-start;
+  margin-bottom: 1rem;
+}
+
+@media (min-width: 768px) {
+  .header {
+    gap: 1rem;
+  }
+}
+
+@media (min-width: 980px) {
+  .header {
+    grid-template-columns: auto 1fr auto;
+    align-items: center;
+  }
+}
+
+.header h1 {
+  font-size: 1.5rem;
+  margin: 0;
+}
+
+@media (min-width: 768px) {
+  .header h1 {
+    font-size: 1.75rem;
+  }
+}
+
+/* Search Bar Responsive */
+.search-wrap {
+  width: 100%;
+}
+
+.search {
+  width: 100%;
+  max-width: 100%;
+}
+
+@media (min-width: 768px) {
+  .search {
+    max-width: 640px;
+  }
+}
+
+/* Right Section (chips, bell) */
+.right {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+@media (max-width: 767px) {
+  .right .chip {
+    font-size: 0.75rem;
+    padding: 0.25rem 0.5rem;
+  }
+}
+
+/* ========================================
+   TABLE RESPONSIVENESS
+   ======================================== */
+.table-responsive {
+  width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  max-width: 100%;
+}
+
+.table-responsive table {
+  min-width: 600px;
+}
+
+@media (max-width: 767px) {
+  /* Option: Convert tables to cards on very small screens */
+  .table-mobile-cards {
+    display: block;
+  }
+  
+  .table-mobile-cards thead {
+    display: none;
+  }
+  
+  .table-mobile-cards tbody,
+  .table-mobile-cards tr {
+    display: block;
+    width: 100%;
+  }
+  
+  .table-mobile-cards tr {
+    margin-bottom: 1rem;
+    border: 1px solid #e2e8f0;
+    border-radius: 0.5rem;
+    padding: 0.75rem;
+    background: #ffffff;
+  }
+  
+  .table-mobile-cards td {
+    display: flex;
+    justify-content: space-between;
+    padding: 0.5rem 0;
+    border: none;
+  }
+  
+  .table-mobile-cards td::before {
+    content: attr(data-label);
+    font-weight: 700;
+    margin-right: 1rem;
+  }
+}
+
+/* ========================================
+   CHARTS RESPONSIVENESS
+   ======================================== */
+.chart-card canvas,
+.cc-chart-container canvas {
+  max-width: 100% !important;
+  height: auto !important;
+}
+
+.chart-card,
+.cc-chart-container {
+  max-width: 100%;
+  overflow: hidden;
+}
+
+/* ========================================
+   NOTIFICATIONS PANEL (MOBILE)
+   ======================================== */
+.panel {
+  position: fixed;
+  top: 72px;
+  right: 1rem;
+  left: 1rem;
+  width: auto;
+  max-width: 360px;
+  margin: 0 auto;
+}
+
+@media (min-width: 480px) {
+  .panel {
+    left: auto;
+    right: 1rem;
+    width: 360px;
+  }
+}
+
+/* ========================================
+   UTILITY CLASSES
+   ======================================== */
+@media (max-width: 991px) {
+  .hide-mobile {
+    display: none !important;
+  }
+}
+
+@media (min-width: 992px) {
+  .hide-desktop {
+    display: none !important;
+  }
+}
+
+/* Container Overrides */
+.container,
+.container-fluid,
+.shell {
+  max-width: 100%;
+  overflow-x: hidden;
+}
+
+/* Prevent Wide Elements */
+pre,
+code,
+.wide-content {
+  max-width: 100%;
+  overflow-x: auto;
+}
+
+/* ========================================
+   FORM ELEMENTS ON MOBILE
+   ======================================== */
+@media (max-width: 767px) {
+  input[type="text"],
+  input[type="email"],
+  input[type="password"],
+  input[type="search"],
+  input[type="date"],
+  select,
+  textarea,
+  .input {
+    font-size: 16px; /* Prevent zoom on focus in iOS */
+  }
+}
+
+/* ========================================
+   INSIGHTS & AI CARDS
+   ======================================== */
+.insights {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: 1fr;
+}
+
+@media (min-width: 768px) {
+  .insights {
+    gap: 12px;
+  }
+}
+
+/* ========================================
+   SAFE GUARDS
+   ======================================== */
+* {
+  box-sizing: border-box;
+}
+
+img,
+svg,
+video,
+canvas,
+iframe {
+  max-width: 100%;
+  height: auto;
+}
+
+/* Prevent horizontal scroll caused by wide elements */
+.hq-content > * {
+  max-width: 100%;
+}
+

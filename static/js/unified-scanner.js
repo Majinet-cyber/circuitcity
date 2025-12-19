@@ -136,6 +136,11 @@
       this.videoElement = null;
       this.statusElement = null;
       this.candidatesListElement = null;
+      this.confirmPanel = null;
+      this.confirmCodeElement = null;
+      
+      // Confirmation state
+      this.pendingBarcodeValue = null;
       
       this.init();
     }
@@ -241,6 +246,21 @@
                 <div class="unified-scanner-status" id="scannerStatus">
                   Initializing camera...
                 </div>
+                <!-- Barcode Confirmation Panel -->
+                <div class="scan-confirm" id="scanConfirm" hidden>
+                  <div class="scan-confirm-code" id="scanConfirmCode"></div>
+                  <div class="scan-confirm-actions">
+                    <button type="button" class="btn btn-primary scan-use" id="scanUseBtn">
+                      <i class="bi bi-check-circle-fill"></i> Use
+                    </button>
+                    <button type="button" class="btn btn-outline-secondary scan-again" id="scanAgainBtn">
+                      <i class="bi bi-arrow-repeat"></i> Scan Again
+                    </button>
+                  </div>
+                  <div class="scan-confirm-hint">
+                    Barcode detected and filled. Tap <strong>Use</strong> to continue or <strong>Scan Again</strong> to rescan.
+                  </div>
+                </div>
               </div>
               
               <!-- Camera Controls -->
@@ -279,6 +299,8 @@
       this.statusElement = this.modal.querySelector('#scannerStatus');
       this.candidatesListElement = this.modal.querySelector('#candidatesList');
       this.manualInput = this.modal.querySelector('#scannerManualInput');
+      this.confirmPanel = this.modal.querySelector('#scanConfirm');
+      this.confirmCodeElement = this.modal.querySelector('#scanConfirmCode');
     }
 
     /**
@@ -336,6 +358,20 @@
         }
       }
       
+      // Barcode confirmation buttons
+      if (this.confirmPanel) {
+        const useBtn = this.modal.querySelector('#scanUseBtn');
+        const againBtn = this.modal.querySelector('#scanAgainBtn');
+        
+        if (useBtn) {
+          useBtn.addEventListener('click', () => this.confirmUseBarcode());
+        }
+        
+        if (againBtn) {
+          againBtn.addEventListener('click', () => this.confirmScanAgain());
+        }
+      }
+      
       // ESC key to close
       document.addEventListener('keydown', (e) => {
         if (e.key === 'Escape' && this.isOpen) {
@@ -380,6 +416,9 @@
         this.manualInput.value = '';
       }
       
+      // Hide confirmation panel
+      this.hideConfirmPanel();
+      
       // Try to start camera automatically
       await this.startCamera();
     }
@@ -411,6 +450,8 @@
       if (this.candidatesListElement) {
         this.updateCandidatesList();
       }
+      
+      this.hideConfirmPanel();
       
       this.options.onClose();
     }
@@ -610,11 +651,11 @@
           this.addCandidate(imei);
         });
       } else {
-        // Barcode mode - use directly
+        // Barcode mode - show confirmation instead of auto-closing
         const now = Date.now();
         if (now - this.lastScanTime >= this.options.debounceMs) {
           this.lastScanTime = now;
-          this.selectValue(rawValue);
+          this.showBarcodeConfirmation(rawValue);
         }
       }
     }
@@ -739,8 +780,92 @@
       
       const value = this.manualInput.value.trim();
       if (value) {
-        this.selectValue(value);
+        // Show confirmation panel instead of directly closing
+        this.showBarcodeConfirmation(value);
       }
+    }
+
+    /**
+     * Show barcode confirmation panel (barcode mode)
+     */
+    showBarcodeConfirmation(value) {
+      if (!this.confirmPanel || !this.confirmCodeElement) {
+        // Fallback: if no confirmation panel, use old behavior
+        this.selectValue(value);
+        return;
+      }
+      
+      // Pause scanning
+      this.scanningActive = false;
+      
+      // Store the barcode value
+      this.pendingBarcodeValue = value;
+      
+      // Fill the target input (if provided)
+      if (this.targetInput) {
+        this.targetInput.value = value;
+        this.targetInput.dispatchEvent(new Event('input', { bubbles: true }));
+        this.targetInput.dispatchEvent(new Event('change', { bubbles: true }));
+      }
+      
+      // Show confirmation panel
+      this.confirmCodeElement.textContent = value;
+      this.confirmPanel.hidden = false;
+      
+      // Vibrate feedback
+      if (navigator.vibrate) {
+        navigator.vibrate([50, 100, 50]);
+      }
+      
+      console.log('[UnifiedScanner] Barcode detected, showing confirmation:', value);
+    }
+
+    /**
+     * Hide barcode confirmation panel
+     */
+    hideConfirmPanel() {
+      if (this.confirmPanel) {
+        this.confirmPanel.hidden = true;
+      }
+      this.pendingBarcodeValue = null;
+    }
+
+    /**
+     * User confirmed to use the scanned barcode
+     */
+    confirmUseBarcode() {
+      console.log('[UnifiedScanner] User confirmed barcode:', this.pendingBarcodeValue);
+      
+      // Call the onSelect callback
+      if (this.pendingBarcodeValue) {
+        this.options.onSelect(this.pendingBarcodeValue);
+      }
+      
+      // Close the modal
+      this.close();
+    }
+
+    /**
+     * User wants to scan again
+     */
+    confirmScanAgain() {
+      console.log('[UnifiedScanner] User requested rescan');
+      
+      // Clear the input if targetInput is provided
+      if (this.targetInput) {
+        this.targetInput.value = '';
+        this.targetInput.dispatchEvent(new Event('input', { bubbles: true }));
+        this.targetInput.dispatchEvent(new Event('change', { bubbles: true }));
+      }
+      
+      // Hide confirmation panel
+      this.hideConfirmPanel();
+      
+      // Resume scanning
+      this.scanningActive = true;
+      this.scanLoop();
+      
+      this.showStatus('📹 Scanning resumed...', 'info');
     }
 
     /**

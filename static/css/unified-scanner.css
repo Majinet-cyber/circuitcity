@@ -399,6 +399,97 @@
   gap: 0.75rem;
 }
 
+/* Barcode Confirmation Panel */
+.scan-confirm {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.95);
+  backdrop-filter: blur(10px);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem;
+  gap: 1.5rem;
+  z-index: 10;
+  animation: fadeIn 0.3s ease-out;
+}
+
+.scan-confirm[hidden] {
+  display: none;
+}
+
+.scan-confirm-code {
+  font-family: 'Monaco', 'Menlo', 'Courier New', monospace;
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: #10b981;
+  background: rgba(16, 185, 129, 0.15);
+  padding: 1rem 1.5rem;
+  border-radius: 12px;
+  border: 2px solid #10b981;
+  text-align: center;
+  word-break: break-all;
+  max-width: 100%;
+}
+
+.scan-confirm-actions {
+  display: flex;
+  gap: 1rem;
+  width: 100%;
+  max-width: 400px;
+}
+
+.scan-confirm-actions .btn {
+  flex: 1;
+  padding: 1rem 1.5rem;
+  font-size: 1rem;
+  font-weight: 600;
+  border-radius: 12px;
+  border: none;
+  cursor: pointer;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+}
+
+.scan-confirm-actions .btn-primary {
+  background: linear-gradient(135deg, #10b981, #059669);
+  color: #fff;
+  box-shadow: 0 4px 12px rgba(16, 185, 129, 0.4);
+}
+
+.scan-confirm-actions .btn-primary:hover {
+  background: linear-gradient(135deg, #059669, #047857);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(16, 185, 129, 0.5);
+}
+
+.scan-confirm-actions .btn-outline-secondary {
+  background: transparent;
+  color: #fff;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+}
+
+.scan-confirm-actions .btn-outline-secondary:hover {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.5);
+  transform: translateY(-2px);
+}
+
+.scan-confirm-hint {
+  color: rgba(255, 255, 255, 0.8);
+  font-size: 0.95rem;
+  text-align: center;
+  line-height: 1.6;
+  max-width: 400px;
+}
+
 /* Mobile Optimizations */
 @media (max-width: 640px) {
   .unified-scanner-modal {
@@ -442,6 +533,28 @@
   
   .unified-scanner-controls .btn {
     min-width: 100px;
+    font-size: 0.875rem;
+  }
+  
+  .scan-confirm {
+    padding: 1rem;
+  }
+  
+  .scan-confirm-code {
+    font-size: 1.25rem;
+    padding: 0.875rem 1.25rem;
+  }
+  
+  .scan-confirm-actions {
+    flex-direction: column;
+    width: 100%;
+  }
+  
+  .scan-confirm-actions .btn {
+    width: 100%;
+  }
+  
+  .scan-confirm-hint {
     font-size: 0.875rem;
   }
 }
