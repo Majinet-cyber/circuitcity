@@ -425,7 +425,7 @@
           <input type="text" name="imei" id="imei-input" data-cy="scan-imei-input" maxlength="15" pattern="[0-9]{15}" placeholder="Enter 15-digit IMEI" inputmode="numeric" required>
         </div>
         <div style="display:flex;align-items:center;justify-content:space-between;margin-top:-8px;margin-bottom:16px;gap:12px;">
-          <button type="button" class="btn-scan-below" data-scanner-trigger="imei" data-scanner-target="#imei-input" title="Scan IMEI with camera">
+          <button type="button" class="btn-scan-below" data-imei-scan-trigger="imei-input" title="Scan IMEI with camera">
             <i class="bi bi-upc-scan"></i> Scan IMEI
           </button>
           <div class="imei-counter" id="imei-counter" style="margin:0;">0 / 15 digits</div>
@@ -645,7 +645,7 @@
   }
 </script>
 
-<link rel="stylesheet" href="{% static 'css/unified-scanner.css' %}?v={{ BUILD_ID|default:STATIC_VERSION|default:'1' }}">
-<script src="{% static 'js/unified-scanner.js' %}?v={{ BUILD_ID|default:STATIC_VERSION|default:'1' %}" defer></script>
+<link rel="stylesheet" href="{% static 'css/imei-scanner-modal.css' %}?v={{ BUILD_ID|default:STATIC_VERSION|default:'1' }}">
+<script src="{% static 'js/phones-imei-scanner.js' %}?v={{ BUILD_ID|default:STATIC_VERSION|default:'1' %}"></script>
 {% endblock %}
 

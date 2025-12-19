@@ -327,6 +327,42 @@
         this.videoStream = await navigator.mediaDevices.getUserMedia(constraints);
         this.videoTrack = this.videoStream.getVideoTracks()[0];
         
+        // CRITICAL: Verify we got rear camera, not front
+        const settings = this.videoTrack.getSettings();
+        const label = this.videoTrack.label || '';
+        const facingMode = settings.facingMode || '';
+        
+        console.log('[IMEI Scanner] Camera started:', { facingMode, label });
+        
+        // Check if we accidentally got front camera
+        const isFrontCamera = 
+          facingMode === 'user' || 
+          /front|user|selfie/i.test(label);
+        
+        if (isFrontCamera) {
+          console.warn('[IMEI Scanner] Front camera detected, forcing rear camera...');
+          this.showStatus('Switching to rear camera...');
+          
+          // Stop front camera
+          this.videoStream.getTracks().forEach(track => track.stop());
+          
+          // Try to force rear camera by enumerating devices
+          const rearStream = await this.forceRearCamera();
+          if (rearStream) {
+            this.videoStream = rearStream;
+            this.videoTrack = this.videoStream.getVideoTracks()[0];
+            console.log('[IMEI Scanner] Successfully forced rear camera');
+          } else {
+            // Fallback: restart with exact environment constraint
+            console.log('[IMEI Scanner] Retrying with exact environment constraint');
+            this.videoStream = await navigator.mediaDevices.getUserMedia({
+              video: { facingMode: { exact: 'environment' } },
+              audio: false
+            });
+            this.videoTrack = this.videoStream.getVideoTracks()[0];
+          }
+        }
+        
         // Try to apply advanced camera settings (autofocus)
         try {
           const capabilities = this.videoTrack.getCapabilities();
@@ -347,8 +383,8 @@
         this.modal.querySelector('#stopCameraBtn').style.display = 'inline-flex';
         this.modal.querySelector('#switchCameraBtn').style.display = 'inline-flex';
         
-        const facingMode = this.videoTrack.getSettings().facingMode || 'unknown';
-        const facingLabel = facingMode === 'environment' ? 'Rear Camera' : facingMode === 'user' ? 'Front Camera' : 'Camera';
+        const finalFacingMode = this.videoTrack.getSettings().facingMode || 'unknown';
+        const facingLabel = finalFacingMode === 'environment' ? 'Rear Camera' : finalFacingMode === 'user' ? 'Front Camera' : 'Camera';
         this.showStatus(`📹 ${facingLabel} Active - Point at IMEI barcode`);
         
         // Start scanning
@@ -370,6 +406,60 @@
         
         this.showStatus(message, 'error');
         this.modal.querySelector('#startCameraBtn').style.display = 'inline-flex';
+      }
+    }
+    
+    /**
+     * Force rear camera by enumerating devices
+     */
+    async forceRearCamera() {
+      try {
+        const devices = await navigator.mediaDevices.enumerateDevices();
+        const videoInputs = devices.filter(d => d.kind === 'videoinput');
+        
+        if (videoInputs.length === 0) {
+          console.warn('[IMEI Scanner] No video inputs found');
+          return null;
+        }
+        
+        // Find rear camera by label heuristics
+        let rearCamera = videoInputs.find(d => 
+          /back|rear|environment/i.test(d.label)
+        );
+        
+        // Fallback: pick last device (often rear on Android)
+        if (!rearCamera && videoInputs.length > 1) {
+          rearCamera = videoInputs[videoInputs.length - 1];
+        }
+        
+        // Fallback: pick first non-front device
+        if (!rearCamera) {
+          rearCamera = videoInputs.find(d => 
+            !/front|user|selfie/i.test(d.label)
+          );
+        }
+        
+        // Last resort: use any available camera
+        if (!rearCamera) {
+          rearCamera = videoInputs[0];
+        }
+        
+        console.log('[IMEI Scanner] Selected camera:', rearCamera.label, rearCamera.deviceId);
+        
+        // Request specific device
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: {
+            deviceId: { exact: rearCamera.deviceId },
+            width: { ideal: 1920 },
+            height: { ideal: 1080 }
+          },
+          audio: false
+        });
+        
+        return stream;
+      } catch (error) {
+        console.error('[IMEI Scanner] Failed to force rear camera:', error);
+        return null;
       }
     }
     

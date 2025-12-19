@@ -348,17 +348,24 @@
      * Open scanner modal
      */
     async open() {
-      // Resolve target input
-      if (typeof this.options.targetInput === 'string') {
-        this.targetInput = document.querySelector(this.options.targetInput);
-      } else {
-        this.targetInput = this.options.targetInput;
-      }
-      
-      if (!this.targetInput) {
-        console.error('[UnifiedScanner] Target input not found:', this.options.targetInput);
+      // Resolve target input (optional for barcode mode with onSelect callback)
+      if (this.options.targetInput) {
+        if (typeof this.options.targetInput === 'string') {
+          this.targetInput = document.querySelector(this.options.targetInput);
+        } else {
+          this.targetInput = this.options.targetInput;
+        }
+        
+        if (!this.targetInput) {
+          console.error('[UnifiedScanner] Target input not found:', this.options.targetInput);
+          return;
+        }
+      } else if (this.options.mode === 'imei') {
+        // IMEI mode requires targetInput
+        console.error('[UnifiedScanner] IMEI mode requires targetInput');
         return;
       }
+      // Barcode mode can work without targetInput (using onSelect callback)
       
       this.isOpen = true;
       this.modal.classList.add('active');
@@ -737,25 +744,25 @@
     }
 
     /**
-     * Select a value and fill target input
+     * Select a value and fill target input (if provided) or call callback
      */
     selectValue(value) {
-      if (!this.targetInput) return;
-      
-      // Fill the input
-      this.targetInput.value = value;
-      
-      // Trigger events so existing validation/button-enable logic updates
-      setTimeout(() => {
-        this.targetInput.dispatchEvent(new Event('input', { bubbles: true }));
-        this.targetInput.dispatchEvent(new Event('change', { bubbles: true }));
-        this.targetInput.dispatchEvent(new Event('keyup', { bubbles: true }));
+      // Fill the input if targetInput is provided
+      if (this.targetInput) {
+        this.targetInput.value = value;
         
-        // Focus the input
-        this.targetInput.focus();
-      }, 50);
+        // Trigger events so existing validation/button-enable logic updates
+        setTimeout(() => {
+          this.targetInput.dispatchEvent(new Event('input', { bubbles: true }));
+          this.targetInput.dispatchEvent(new Event('change', { bubbles: true }));
+          this.targetInput.dispatchEvent(new Event('keyup', { bubbles: true }));
+          
+          // Focus the input
+          this.targetInput.focus();
+        }, 50);
+      }
       
-      // Callback
+      // Always call onSelect callback
       this.options.onSelect(value);
       
       // Close modal
