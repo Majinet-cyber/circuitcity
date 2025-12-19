@@ -1,0 +1,182 @@
+warning: in the working copy of 'circuitcity/accounts/views.py', LF will be replaced by CRLF the next time Git touches it
+[1mdiff --git a/circuitcity/accounts/views.py b/circuitcity/accounts/views.py[m
+[1mindex 3ede9b5..d0b64ad 100644[m
+[1m--- a/circuitcity/accounts/views.py[m
+[1m+++ b/circuitcity/accounts/views.py[m
+[36m@@ -1,4 +1,4 @@[m
+[31m-﻿# circuitcity/accounts/views.py[m
+[32m+[m[32m# circuitcity/accounts/views.py[m
+ from __future__ import annotations[m
+ [m
+ import hashlib[m
+[36m@@ -49,6 +49,7 @@[m [mfrom .forms import ([m
+     WizardStep4Form,[m
+     ManagerWizardStep1Form,[m
+     ManagerWizardStep2Form,[m
+[32m+[m[32m    ManagerWizardStep2bForm,[m
+     ManagerWizardStep3Form,[m
+     ManagerWizardStep4Form,[m
+ )[m
+[36m@@ -417,10 +418,17 @@[m [mdef _select_active_business_for_user(request, user) -> None:[m
+ @ensure_csrf_cookie[m
+ @never_cache[m
+ @require_http_methods(["GET", "POST"])[m
+[32m+[m[32m@never_cache[m
+[32m+[m[32m@ensure_csrf_cookie[m
+ def login_view(request):[m
+     """[m
+     Implements PRG (Post -> Redirect -> Get) so refresh/back never re-POSTs.[m
+     Shows clear error messages and repopulates identifier after a failed attempt.[m
+[32m+[m[41m    [m
+[32m+[m[32m    Security:[m
+[32m+[m[32m    - @never_cache: Prevents browser caching of login page[m
+[32m+[m[32m    - @ensure_csrf_cookie: Ensures CSRF cookie is set on GET requests[m
+[32m+[m[32m    - _no_store: Adds Cache-Control: no-store header[m
+     """[m
+     next_url = request.POST.get("next") or request.GET.get("next") or ""[m
+ [m
+[36m@@ -1138,9 +1146,10 @@[m [mdef _clear_manager_wizard_data(request):[m
+ @require_http_methods(["GET", "POST"])[m
+ def signup_manager(request):[m
+     """[m
+[31m-    4-step wizard for manager signup:[m
+[32m+[m[32m    4-step wizard for manager signup (with conditional step 2b):[m
+     Step 1: Account (email, full name, password)[m
+     Step 2: Store basics (business name, type, subdomain)[m
+[32m+[m[32m    Step 2b (conditional): Section selection (Pharmacy/Cosmetics) - only if pharmacy or cosmetics selected[m
+     Step 3: Brand (logo upload)[m
+     Step 4: Review & Create[m
+     """[m
+[36m@@ -1151,9 +1160,17 @@[m [mdef signup_manager(request):[m
+                                        default="/inventory/dashboard/"))[m
+ [m
+     # Determine current step from query param or POST[m
+[31m-    step = int(request.GET.get("step", request.POST.get("step", 1)))[m
+[31m-    if step < 1 or step > 4:[m
+[31m-        step = 1[m
+[32m+[m[32m    step_param = request.GET.get("step", request.POST.get("step", "1"))[m
+[32m+[m[32m    # Support step 2b as string[m
+[32m+[m[32m    if step_param == "2b":[m
+[32m+[m[32m        step = "2b"[m
+[32m+[m[32m    else:[m
+[32m+[m[32m        try:[m
+[32m+[m[32m            step = int(step_param)[m
+[32m+[m[32m            if step < 1 or step > 4:[m
+[32m+[m[32m                step = 1[m
+[32m+[m[32m        except (ValueError, TypeError):[m
+[32m+[m[32m            step = 1[m
+ [m
+     wizard_data = _get_manager_wizard_data(request)[m
+ [m
+[36m@@ -1187,25 +1204,70 @@[m [mdef signup_manager(request):[m
+             elif action == "next" and form.is_valid():[m
+                 wizard_data["step2"] = form.cleaned_data[m
+                 _set_manager_wizard_data(request, wizard_data)[m
+[31m-                return redirect(f"{reverse('accounts:signup_manager')}?step=3")[m
+[32m+[m[41m                [m
+[32m+[m[32m                # Check if we need step 2b (pharmacy/cosmetics section selection)[m
+[32m+[m[32m                business_kind = form.cleaned_data.get("business_kind", "")[m
+[32m+[m[32m                if business_kind in ("pharmacy", "cosmetics"):[m
+[32m+[m[32m                    return redirect(f"{reverse('accounts:signup_manager')}?step=2b")[m
+[32m+[m[32m                else:[m
+[32m+[m[32m                    # Skip step 2b, go directly to step 3[m
+[32m+[m[32m                    return redirect(f"{reverse('accounts:signup_manager')}?step=3")[m
+         return render(request, "accounts/signup_manager_wizard_step2.html", {[m
+             "form": form,[m
+             "step": step,[m
+             "total_steps": 4,[m
+             "wizard_data": wizard_data,[m
+         })[m
+[32m+[m[41m    [m
+[32m+[m[32m    # Step 2b: Section Selection (Pharmacy/Cosmetics) - conditional[m
+[32m+[m[32m    elif step == "2b":[m
+[32m+[m[32m        # Must have completed steps 1 & 2[m
+[32m+[m[32m        if "step1" not in wizard_data or "step2" not in wizard_data:[m
+[32m+[m[32m            return redirect(f"{reverse('accounts:signup_manager')}?step=1")[m
+[32m+[m[41m        [m
+[32m+[m[32m        # Only show this step if business_kind is pharmacy or cosmetics[m
+[32m+[m[32m        business_kind = wizard_data.get("step2", {}).get("business_kind", "")[m
+[32m+[m[32m        if business_kind not in ("pharmacy", "cosmetics"):[m
+[32m+[m[32m            # Skip this step[m
+[32m+[m[32m            return redirect(f"{reverse('accounts:signup_manager')}?step=3")[m
+[32m+[m[41m        [m
+[32m+[m[32m        form = ManagerWizardStep2bForm(request.POST or None, initial=wizard_data.get("step2b", {}))[m
+[32m+[m[32m        if request.method == "POST":[m
+[32m+[m[32m            action = request.POST.get("action", "next")[m
+[32m+[m[32m            if action == "back":[m
+[32m+[m[32m                return redirect(f"{reverse('accounts:signup_manager')}?step=2")[m
+[32m+[m[32m            elif action == "next" and form.is_valid():[m
+[32m+[m[32m                wizard_data["step2b"] = form.cleaned_data[m
+[32m+[m[32m                _set_manager_wizard_data(request, wizard_data)[m
+[32m+[m[32m                return redirect(f"{reverse('accounts:signup_manager')}?step=3")[m
+[32m+[m[41m        [m
+[32m+[m[32m        return render(request, "accounts/signup_manager_wizard_step2b.html", {[m
+[32m+[m[32m            "form": form,[m
+[32m+[m[32m            "step": "2b",[m
+[32m+[m[32m            "total_steps": 4,[m
+[32m+[m[32m            "wizard_data": wizard_data,[m
+[32m+[m[32m        })[m
+ [m
+     # Step 3: Brand[m
+     elif step == 3:[m
+[31m-        # Must have completed steps 1 & 2[m
+[32m+[m[32m        # Must have completed steps 1 & 2 (and 2b if applicable)[m
+         if "step1" not in wizard_data or "step2" not in wizard_data:[m
+             return redirect(f"{reverse('accounts:signup_manager')}?step=1")[m
+[32m+[m[41m        [m
+[32m+[m[32m        # Check if step 2b is required but not completed[m
+[32m+[m[32m        business_kind = wizard_data.get("step2", {}).get("business_kind", "")[m
+[32m+[m[32m        if business_kind in ("pharmacy", "cosmetics") and "step2b" not in wizard_data:[m
+[32m+[m[32m            return redirect(f"{reverse('accounts:signup_manager')}?step=2b")[m
+ [m
+         form = ManagerWizardStep3Form(request.POST or None, request.FILES or None, initial=wizard_data.get("step3", {}))[m
+         if request.method == "POST":[m
+             action = request.POST.get("action", "next")[m
+             if action == "back":[m
+[31m-                return redirect(f"{reverse('accounts:signup_manager')}?step=2")[m
+[32m+[m[32m                # Go back to step 2b if it was shown, otherwise step 2[m
+[32m+[m[32m                if business_kind in ("pharmacy", "cosmetics"):[m
+[32m+[m[32m                    return redirect(f"{reverse('accounts:signup_manager')}?step=2b")[m
+[32m+[m[32m                else:[m
+[32m+[m[32m                    return redirect(f"{reverse('accounts:signup_manager')}?step=2")[m
+             elif action == "skip":[m
+                 # Skip button: no logo, just store empty step3 and proceed[m
+                 wizard_data["step3"] = {}[m
+[36m@@ -1255,9 +1317,14 @@[m [mdef signup_manager(request):[m
+ [m
+     # Step 4: Review & Create[m
+     elif step == 4:[m
+[31m-        # Must have completed steps 1, 2, & 3[m
+[32m+[m[32m        # Must have completed steps 1, 2, & 3 (and 2b if applicable)[m
+         if "step1" not in wizard_data or "step2" not in wizard_data or "step3" not in wizard_data:[m
+             return redirect(f"{reverse('accounts:signup_manager')}?step=1")[m
+[32m+[m[41m        [m
+[32m+[m[32m        # Check if step 2b is required but not completed[m
+[32m+[m[32m        business_kind = wizard_data.get("step2", {}).get("business_kind", "")[m
+[32m+[m[32m        if business_kind in ("pharmacy", "cosmetics") and "step2b" not in wizard_data:[m
+[32m+[m[32m            return redirect(f"{reverse('accounts:signup_manager')}?step=2b")[m
+ [m
+         form = ManagerWizardStep4Form(request.POST or None)[m
+         if request.method == "POST":[m
+[36m@@ -1305,6 +1372,7 @@[m [mdef _complete_manager_wizard_signup(request, wizard_data):[m
+ [m
+     step1 = wizard_data.get("step1", {})[m
+     step2 = wizard_data.get("step2", {})[m
+[32m+[m[32m    step2b = wizard_data.get("step2b", {})[m
+     step3 = wizard_data.get("step3", {})[m
+ [m
+     with transaction.atomic():[m
+[36m@@ -1368,6 +1436,13 @@[m [mdef _complete_manager_wizard_signup(request, wizard_data):[m
+                 bkwargs["status"] = "ACTIVE"[m
+             if hasattr(Business, "business_kind"):[m
+                 bkwargs["business_kind"] = business_kind[m
+[32m+[m[41m            [m
+[32m+[m[32m            # Set section flags (pharmacy/cosmetics)[m
+[32m+[m[32m            if business_kind in ("pharmacy", "cosmetics"):[m
+[32m+[m[32m                if hasattr(Business, "has_pharmacy_section"):[m
+[32m+[m[32m                    bkwargs["has_pharmacy_section"] = step2b.get("has_pharmacy", False)[m
+[32m+[m[32m                if hasattr(Business, "has_cosmetics_section"):[m
+[32m+[m[32m                    bkwargs["has_cosmetics_section"] = step2b.get("has_cosmetics", False)[m
+ [m
+             biz = Business.objects.create(**bkwargs)[m
+ [m

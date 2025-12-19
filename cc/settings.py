@@ -289,6 +289,7 @@ TEMPLATES = [
                 "tenants.context_processors.notifications_context",
                 "billing.context_processors.trial_banner",
                 "billing.context_processors.pricing_context",
+                "inventory.context_processors_quotes.quotes_and_greetings",
             ],
             "builtins": [
                 "inventory.templatetags.money",

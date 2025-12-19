@@ -13,6 +13,8 @@ CLOTHING = "clothing"
 LIQUOR   = "liquor"
 GROCERY  = "grocery"
 GYM      = "gym"
+CEMENT   = "cement"
+HARDWARE = "hardware"
 GENERIC  = "generic"
 
 # Synonyms / legacy labels -> canonical keys
@@ -29,9 +31,12 @@ _ALIASES: Dict[str, str] = {
     "liquor": LIQUOR, "alcohol": LIQUOR, "bar": LIQUOR, "bottle-store": LIQUOR, "bottle store": LIQUOR,
     # grocery / retail
     "grocery": GROCERY, "groceries": GROCERY, "supermarket": GROCERY, "retail": GROCERY,
-    "supermarket & groceries": GROCERY,
+    "supermarket & groceries": GROCERY, "general": GROCERY,
     # gym / fitness
     "gym": GYM, "fitness": GYM, "fit": GYM,
+    # cement / hardware
+    "cement": CEMENT, "cement & hardware": CEMENT,
+    "hardware": HARDWARE, "hardware store": HARDWARE,
 }
 
 # Which fields on Business we will probe to determine vertical

@@ -13,7 +13,7 @@ from tenants.utils import require_business
 
 from inventory.authz import require_business_kind
 from inventory.business_kinds import BusinessKind
-from inventory.verticals import clothing, fallback, gym, liquor, pharmacy, phones
+from inventory.verticals import clothing, fallback, gym, liquor, pharmacy, phones, grocery, cement, hardware
 
 app_name = "verticals"
 
@@ -70,6 +70,18 @@ urlpatterns = [
     path("phones/sales/export.csv", phones.sales_export_csv, name="phones_sales_export_csv"),
     path("phones/api/sales-trend/", phones.sales_trend_json, name="phones_sales_trend_json"),
     path("phones/reports/", phones.reports, name="phones_reports"),
+    
+    # Grocery vertical
+    path("grocery/dashboard/", grocery.dashboard, name="grocery_dashboard"),
+    path("grocery/hub/", grocery.hub, name="grocery_hub"),
+    
+    # Cement & Hardware vertical
+    path("cement/dashboard/", cement.dashboard, name="cement_dashboard"),
+    path("cement/hub/", cement.hub, name="cement_hub"),
+    
+    # Hardware Store vertical
+    path("hardware/dashboard/", hardware.dashboard, name="hardware_dashboard"),
+    path("hardware/hub/", hardware.hub, name="hardware_hub"),
     
     # Fallback for businesses without a kind
     path("none/", fallback.no_business, name="no_business"),

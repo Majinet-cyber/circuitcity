@@ -61,7 +61,7 @@ def fast_sell_lookup(request):
         return JsonResponse({
             "ok": True,
             "found": False,
-            "message": f"No in-stock items found for barcode: {barcode}"
+            "message": f"Not found in your inventory."
         })
     
     # Get first available item
@@ -154,7 +154,7 @@ def fast_sell_sell(request):
     if not items or not items.exists():
         return JsonResponse({
             "ok": False,
-            "error": f"No in-stock items found for barcode: {barcode}"
+            "error": f"Not found in your inventory."
         }, status=404)
     
     # Check available quantity

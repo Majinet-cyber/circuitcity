@@ -2777,13 +2777,24 @@ import logging
 @transaction.atomic
 def scan_in(request):
     """
-    Inventory · Scan IN
+    Inventory · Scan IN (PHONES ONLY - LEGACY - use phone_scan_in instead)
     HTML by default; JSON only when ?as=json or XHR.
 
     Validates IMEI/serial length via single source of truth (inventory.validators).
     Supports models that use either `imei` OR `serial` (prefers `imei`).
     Duplicate guard checks the correct identifier field within the active business.
+    
+    NOTE: This is legacy phones-only. New code should use phone_scan_in from views_phones.py
     """
+    # Check if this is a phones business
+    from core.verticals import get_active_vertical
+    vertical = get_active_vertical(request)
+    if vertical != 'phones':
+        from django.contrib import messages
+        from django.shortcuts import redirect
+        from core.verticals import vertical_home_url
+        messages.info(request, "That feature is only available for phones businesses.")
+        return redirect(vertical_home_url(vertical) or 'dashboard:home')
     # --- local imports ---
     import logging
     from decimal import Decimal
@@ -6747,31 +6758,11 @@ def inventory_dashboard(request):
         biz, biz_id = (None, None)
     
     # ============================================================================
-    # VERTICAL ROUTING: Redirect non-phone businesses to their vertical dashboards
+    # VERTICAL ROUTING: DISABLED to prevent redirect loops
     # ============================================================================
-    # This is the PHONES inventory dashboard - only phone businesses should see it
-    try:
-        from inventory.utils_verticals import get_vertical_kind, get_vertical_dashboard_url
-        
-        # Try request.business first (set by middleware), then fall back to biz from gate
-        active_business = getattr(request, 'business', None) or biz
-        vertical_kind = get_vertical_kind(active_business)
-        
-        # If not a phones business, redirect to the appropriate vertical dashboard
-        if vertical_kind and vertical_kind != "phones":
-            vertical_url_name = get_vertical_dashboard_url(vertical_kind)
-            if vertical_url_name:
-                from django.urls import reverse, NoReverseMatch
-                try:
-                    return redirect(reverse(vertical_url_name))
-                except NoReverseMatch:
-                    # If vertical dashboard doesn't exist, continue to default
-                    pass
-    except Exception as e:
-        # If vertical utilities aren't available, continue to default dashboard
-        import logging
-        logging.getLogger(__name__).debug(f"Vertical routing failed: {e}")
-        pass
+    # TODO: Re-enable once vertical dashboards are fully implemented
+    # For now, all businesses (including grocery) see the phones dashboard
+    pass
 
     # NEW: calendar filter (range: all | 7d | month | day; day: YYYY-MM-DD)
     range_preset, day_str, start_dt, end_dt = get_preset_window(request, default_preset="month")

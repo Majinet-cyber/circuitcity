@@ -38,6 +38,7 @@ from inventory.business_kinds import BusinessKind
 
 # Decorators
 from core.decorators import manager_required
+from core.verticals import require_vertical
 from tenants.utils import require_business
 
 # Role helpers
@@ -117,6 +118,7 @@ def get_phone_models_for_brand(business, brand_key: str) -> List[Dict[str, Any]]
 @never_cache
 @login_required
 @require_business
+@require_vertical('phones')
 def phone_available_imeis(request: HttpRequest, product_id: int) -> JsonResponse:
     """
     Return available IMEIs for a given product, scoped by business + location + role.
@@ -181,6 +183,7 @@ def phone_available_imeis(request: HttpRequest, product_id: int) -> JsonResponse
 @never_cache
 @login_required
 @require_business
+@require_vertical('phones')
 @require_http_methods(["GET", "POST"])
 @transaction.atomic
 def phone_scan_in(request: HttpRequest) -> HttpResponse:
@@ -411,6 +414,7 @@ def phone_scan_in(request: HttpRequest) -> HttpResponse:
 @never_cache
 @login_required
 @require_business
+@require_vertical('phones')
 @require_http_methods(["GET", "POST"])
 @transaction.atomic
 def phone_scan_sell(request: HttpRequest) -> HttpResponse:

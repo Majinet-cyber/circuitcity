@@ -1,0 +1,128 @@
+{% extends "base.html" %}
+{% load humanize %}
+
+{% block title %}Stock In - Unique Products{% endblock %}
+
+{% block content %}
+<div class="container-fluid px-3 px-md-4 py-4">
+    <div class="card shadow-sm">
+        <div class="card-header bg-success text-white">
+            <h2 class="mb-0">📥 Stock In - Unique Products</h2>
+        </div>
+        <div class="card-body">
+            <form method="post">
+                {% csrf_token %}
+                
+                <div class="mb-3">
+                    <label class="form-label"><strong>Mode:</strong></label>
+                    <select name="mode" id="modeSelect" class="form-select" onchange="toggleMode()">
+                        <option value="existing">Existing Product</option>
+                        <option value="new">New Product</option>
+                    </select>
+                </div>
+                
+                <!-- Existing Product Mode -->
+                <div id="existingMode">
+                    <div class="mb-3">
+                        <label for="product_id" class="form-label">Select Product *</label>
+                        <select name="product_id" id="product_id" class="form-select">
+                            <option value="">-- Select Product --</option>
+                            {% for p in products %}
+                            <option value="{{ p.id }}">{{ p.name }} ({{ p.barcode }}) - {{ p.quantity }} {{ p.unit }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+                
+                <!-- New Product Mode -->
+                <div id="newMode" style="display: none;">
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label for="vertical" class="form-label">Vertical *</label>
+                            <select name="vertical" id="vertical" class="form-select">
+                                <option value="">-- Select --</option>
+                                {% for v_code, v_label in verticals %}
+                                <option value="{{ v_code }}">{{ v_label }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label for="barcode" class="form-label">Barcode/SKU *</label>
+                            <input type="text" name="barcode" id="barcode" class="form-control">
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label for="name" class="form-label">Product Name *</label>
+                            <input type="text" name="name" id="name" class="form-control">
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label for="unit" class="form-label">Unit</label>
+                            <input type="text" name="unit" id="unit" class="form-control" value="unit">
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Stock In Details (common) -->
+                <hr class="my-4">
+                <h5>Stock In Details</h5>
+                
+                <div class="row">
+                    <div class="col-md-4 mb-3">
+                        <label for="quantity" class="form-label">Quantity *</label>
+                        <input type="number" name="quantity" id="quantity" class="form-control" step="0.01" required>
+                    </div>
+                    <div class="col-md-4 mb-3">
+                        <label for="cost_price" class="form-label">Cost Price</label>
+                        <input type="number" name="cost_price" id="cost_price" class="form-control" step="0.01">
+                    </div>
+                    <div class="col-md-4 mb-3">
+                        <label for="selling_price" class="form-label">Selling Price</label>
+                        <input type="number" name="selling_price" id="selling_price" class="form-control" step="0.01">
+                    </div>
+                </div>
+                
+                <div class="mb-3">
+                    <label for="supplier" class="form-label">Supplier (Optional)</label>
+                    <input type="text" name="supplier" id="supplier" class="form-control">
+                </div>
+                
+                <div class="mb-3">
+                    <label for="notes" class="form-label">Notes (Optional)</label>
+                    <textarea name="notes" id="notes" class="form-control" rows="2"></textarea>
+                </div>
+                
+                <div class="d-grid gap-2">
+                    <button type="submit" class="btn btn-success btn-lg">✅ Add Stock</button>
+                    <a href="{% url 'inventory:unique_products:list' %}" class="btn btn-outline-secondary">Cancel</a>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+function toggleMode() {
+    const mode = document.getElementById('modeSelect').value;
+    const existingMode = document.getElementById('existingMode');
+    const newMode = document.getElementById('newMode');
+    
+    if (mode === 'existing') {
+        existingMode.style.display = 'block';
+        newMode.style.display = 'none';
+        document.getElementById('product_id').required = true;
+        document.getElementById('vertical').required = false;
+        document.getElementById('barcode').required = false;
+        document.getElementById('name').required = false;
+    } else {
+        existingMode.style.display = 'none';
+        newMode.style.display = 'block';
+        document.getElementById('product_id').required = false;
+        document.getElementById('vertical').required = true;
+        document.getElementById('barcode').required = true;
+        document.getElementById('name').required = true;
+    }
+}
+</script>
+{% endblock %}
+

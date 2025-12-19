@@ -55,11 +55,17 @@ def analytics_dashboard(request: HttpRequest) -> HttpResponse:
         except Exception:
             ctx = {}
         
-        # Parse date range
-        range_preset = request.GET.get('range', request.GET.get('preset', ''))
-        start_str = request.GET.get('start', '')
-        end_str = request.GET.get('end', '')
-        date_params = parse_date_range(range_preset, start_str, end_str)
+        # Parse date range using unified filter
+        from common.utils.date_filters import parse_date_filter
+        filter_data = parse_date_filter(request, default_range='month')
+        
+        # Map to expected format for backward compatibility
+        date_params = {
+            'start_date': filter_data['start_date'],
+            'end_date': filter_data['end_date'],
+            'range_label': filter_data['range_label'],
+            'active_range': filter_data['range_key'],
+        }
         
         # Get location filter
         location_id = request.GET.get('location')

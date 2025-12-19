@@ -1268,3 +1268,30 @@ urlpatterns += [
 urlpatterns += [
     path("verticals/", include(("verticals.urls", "verticals"), namespace="verticals")),
 ]
+
+# ---------------------------------------------------------------------
+# Unique Products namespace (for inventory:unique_products:* URLs)
+# ---------------------------------------------------------------------
+urlpatterns += [
+    path("unique-products/", include("inventory.urls_unique_products", namespace="unique_products")),
+]
+
+# ---------------------------------------------------------------------
+# KPI Breakdown Pages (Clickable KPI Cards)
+# ---------------------------------------------------------------------
+urlpatterns += [
+    path("breakdown/", include("inventory.urls_kpi_breakdown", namespace="kpi_breakdown")),
+]
+
+# ---------------------------------------------------------------------
+# Outlier Detection API (AI-Driven Advice)
+# ---------------------------------------------------------------------
+try:
+    from .views_outlier_api import check_outlier_api as _check_outlier_api
+except Exception:
+    def _check_outlier_api(request):
+        return JsonResponse({"error": "Not available", "is_outlier": False}, status=501)
+
+urlpatterns += [
+    path("api/check-outlier/", _need_biz(_check_outlier_api), name="api_check_outlier"),
+]

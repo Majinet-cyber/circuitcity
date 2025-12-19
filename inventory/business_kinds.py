@@ -5,10 +5,12 @@ class BusinessKind(models.TextChoices):
     PHONES = "phones", "Phones & Electronics"
     LIQUOR = "liquor", "Liquor / Bar"
     GROCERY = "grocery", "Grocery / General"
-    PHARMACY = "pharmacy", "Cosmetics & Pharmacy"
+    PHARMACY = "pharmacy", "Pharmacy"
+    COSMETICS = "cosmetics", "Cosmetics"
     CLOTHING = "clothing", "Clothing"
     GYM = "gym", "Gym / Fitness"
+    CEMENT = "cement", "Cement"
+    HARDWARE = "hardware", "Hardware"
 
 
 __all__ = ["BusinessKind"]
-

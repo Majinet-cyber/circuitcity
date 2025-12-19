@@ -1,0 +1,424 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Stock In · Liquor{% endblock %}
+
+{% block extra_head %}
+<style>
+/* Glassmorphic cards */
+.glass-card {
+    background: rgba(255, 255, 255, 0.9);
+    backdrop-filter: blur(10px);
+    border-radius: 12px;
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+/* Gamification bar */
+.gamification-bar {
+    background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+    border-radius: 16px;
+    padding: 1.5rem;
+    color: white;
+    margin-bottom: 2rem;
+    box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
+}
+
+.gamification-bar h3 {
+    margin: 0 0 0.5rem 0;
+    font-size: 1.5rem;
+}
+
+.gamification-bar p {
+    margin: 0;
+    opacity: 0.9;
+}
+
+/* Product cards */
+.product-card {
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.95), rgba(240, 240, 255, 0.95));
+    border: 2px solid rgba(100, 100, 255, 0.2);
+    border-radius: 16px;
+    padding: 1.5rem;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    margin-bottom: 1rem;
+}
+
+.product-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 8px 16px rgba(0, 0, 0, 0.15);
+    border-color: rgba(100, 100, 255, 0.5);
+}
+
+.product-card.selected {
+    border-color: #10b981;
+    background: linear-gradient(135deg, rgba(16, 185, 129, 0.1), rgba(16, 185, 129, 0.05));
+    box-shadow: 0 0 0 4px rgba(16, 185, 129, 0.2);
+}
+
+.product-card h4 {
+    margin: 0 0 0.5rem 0;
+    font-size: 1.25rem;
+    font-weight: 700;
+}
+
+.product-card .category-badge {
+    display: inline-block;
+    background: rgba(102, 126, 234, 0.15);
+    color: #667eea;
+    padding: 0.25rem 0.75rem;
+    border-radius: 999px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+}
+
+/* Stock In Form */
+.stock-in-form {
+    background: white;
+    border-radius: 16px;
+    padding: 2rem;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    margin-top: 2rem;
+}
+
+.form-group {
+    margin-bottom: 1.5rem;
+}
+
+.form-group label {
+    display: block;
+    font-weight: 700;
+    margin-bottom: 0.5rem;
+    color: #1f2937;
+}
+
+.form-control {
+    width: 100%;
+    padding: 0.75rem 1rem;
+    border: 2px solid #e5e7eb;
+    border-radius: 8px;
+    font-size: 1rem;
+    transition: all 0.2s ease;
+}
+
+.form-control:focus {
+    outline: none;
+    border-color: #10b981;
+    box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.1);
+}
+
+.quantity-type-toggle {
+    display: flex;
+    gap: 0.5rem;
+    margin-bottom: 1rem;
+}
+
+.quantity-type-btn {
+    flex: 1;
+    padding: 0.75rem;
+    border: 2px solid #e5e7eb;
+    border-radius: 8px;
+    background: white;
+    cursor: pointer;
+    font-weight: 600;
+    transition: all 0.2s ease;
+}
+
+.quantity-type-btn:hover {
+    border-color: #10b981;
+    background: #f0fdf4;
+}
+
+.quantity-type-btn.active {
+    border-color: #10b981;
+    background: #10b981;
+    color: white;
+}
+
+.btn-primary {
+    width: 100%;
+    padding: 1rem;
+    background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+    color: white;
+    border: none;
+    border-radius: 8px;
+    font-size: 1.125rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.btn-primary:hover:not(:disabled) {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(16, 185, 129, 0.4);
+}
+
+.btn-primary:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.hidden {
+    display: none !important;
+}
+
+/* Mobile responsive */
+@media (max-width: 768px) {
+    .product-card {
+        padding: 1rem;
+    }
+    
+    .stock-in-form {
+        padding: 1.5rem;
+    }
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <!-- Gamification Bar -->
+    <div class="gamification-bar">
+        <h3>📦 Stock In Liquor</h3>
+        <p>Stocked {{ today_stock_in_count }} product(s) today. Keep your inventory fresh!</p>
+    </div>
+
+    {% if messages %}
+        {% for message in messages %}
+        <div class="alert alert-{% if 'error' in message.tags %}danger{% else %}success{% endif %} mb-3">
+            {{ message }}
+        </div>
+        {% endfor %}
+    {% endif %}
+
+    {% if not active_shift %}
+    <div class="alert alert-warning mb-4">
+        <strong>⚠️ No active shift!</strong> A shift will be auto-created when you stock in products.
+    </div>
+    {% endif %}
+
+    <div class="row">
+        <div class="col-lg-8">
+            <!-- Product Selection -->
+            <div class="glass-card p-4">
+                <h5 class="mb-4">Select Product to Stock In</h5>
+                
+                {% if categories %}
+                    {% for cat in categories %}
+                    <div class="mb-4">
+                        <h6 class="text-uppercase text-muted mb-3">{{ cat }}</h6>
+                        <div class="row g-3">
+                            {% for product in products_by_category|get_item:cat %}
+                            <div class="col-md-6">
+                                <div class="product-card" 
+                                     data-product-card
+                                     data-product-id="{{ product.id }}"
+                                     data-product-name="{{ product.name }}"
+                                     data-has-shots="{{ product.has_shots|yesno:'true,false' }}"
+                                     data-bottle-price="{{ product.price_per_bottle|default:'0' }}"
+                                     data-shot-price="{{ product.price_per_shot|default:'0' }}"
+                                     onclick="selectProduct(this)">
+                                    <h4>{{ product.name }}</h4>
+                                    <span class="category-badge">{{ cat }}</span>
+                                    <div class="mt-2 text-muted small">
+                                        {% if product.price_per_bottle %}
+                                            Bottle: MK {{ product.price_per_bottle|floatformat:0 }}
+                                        {% endif %}
+                                        {% if product.has_shots and product.price_per_shot %}
+                                            | Shot: MK {{ product.price_per_shot|floatformat:0 }}
+                                        {% endif %}
+                                    </div>
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                    {% endfor %}
+                {% else %}
+                    <div class="text-center text-muted py-5">
+                        <i class="bi bi-inbox" style="font-size: 3rem; opacity: 0.3;"></i>
+                        <div class="mt-3">No products available. Add some products first.</div>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+
+        <div class="col-lg-4">
+            <!-- Stock In Form -->
+            <div id="stock-in-form" class="stock-in-form hidden">
+                <h5 class="mb-4">Stock In: <span id="selected-product-name">—</span></h5>
+                
+                <form method="post">
+                    {% csrf_token %}
+                    <input type="hidden" name="product_id" id="input-product-id">
+                    
+                    <!-- Quantity Type Toggle -->
+                    <div class="form-group">
+                        <label>Quantity Type</label>
+                        <div class="quantity-type-toggle">
+                            <button type="button" class="quantity-type-btn active" data-type="crates" onclick="setQuantityType('crates')">
+                                📦 Crates
+                            </button>
+                            <button type="button" class="quantity-type-btn" data-type="bottles" onclick="setQuantityType('bottles')">
+                                🍾 Bottles
+                            </button>
+                        </div>
+                        <input type="hidden" name="quantity_type" id="input-quantity-type" value="crates">
+                    </div>
+
+                    <!-- Crates Input (default visible) -->
+                    <div id="crates-container">
+                        <div class="form-group">
+                            <label for="input-crates-count">Number of Crates</label>
+                            <input type="number" 
+                                   class="form-control" 
+                                   id="input-crates-count" 
+                                   name="crates_count" 
+                                   min="1" 
+                                   value="1"
+                                   placeholder="e.g., 5">
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="input-crate-size">Bottles per Crate</label>
+                            <input type="number" 
+                                   class="form-control" 
+                                   id="input-crate-size" 
+                                   name="crate_size" 
+                                   min="1" 
+                                   value="20"
+                                   placeholder="Default: 20">
+                            <small class="text-muted">Default is 20, but you can edit it per entry</small>
+                        </div>
+                        
+                        <div class="alert alert-info">
+                            <strong>Total Bottles:</strong> <span id="total-bottles-display">20</span>
+                        </div>
+                    </div>
+
+                    <!-- Bottles Input (hidden by default) -->
+                    <div id="bottles-container" class="hidden">
+                        <div class="form-group">
+                            <label for="input-bottles-count">Number of Bottles</label>
+                            <input type="number" 
+                                   class="form-control" 
+                                   id="input-bottles-count" 
+                                   name="bottles_count" 
+                                   min="1" 
+                                   value="1"
+                                   placeholder="e.g., 24">
+                        </div>
+                    </div>
+
+                    <!-- Pricing -->
+                    <div class="form-group">
+                        <label for="input-price-bottle">Price per Bottle (MWK)</label>
+                        <input type="number" 
+                               class="form-control" 
+                               id="input-price-bottle" 
+                               name="price_per_bottle" 
+                               step="0.01" 
+                               min="0"
+                               placeholder="0.00">
+                    </div>
+
+                    <div id="shot-price-container" class="form-group hidden">
+                        <label for="input-price-shot">Price per Shot (MWK) - Optional</label>
+                        <input type="number" 
+                               class="form-control" 
+                               id="input-price-shot" 
+                               name="price_per_shot" 
+                               step="0.01" 
+                               min="0"
+                               placeholder="0.00">
+                    </div>
+
+                    <button type="submit" class="btn-primary">
+                        ✅ Stock In
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+let selectedProductId = null;
+
+function selectProduct(card) {
+    // Remove previous selection
+    document.querySelectorAll('.product-card').forEach(c => c.classList.remove('selected'));
+    
+    // Mark as selected
+    card.classList.add('selected');
+    
+    // Get product data
+    selectedProductId = card.dataset.productId;
+    const productName = card.dataset.productName;
+    const hasShots = card.dataset.hasShots === 'true';
+    const bottlePrice = card.dataset.bottlePrice;
+    const shotPrice = card.dataset.shotPrice;
+    
+    // Update form
+    document.getElementById('input-product-id').value = selectedProductId;
+    document.getElementById('selected-product-name').textContent = productName;
+    
+    // Pre-fill prices if available
+    if (bottlePrice && bottlePrice !== '0') {
+        document.getElementById('input-price-bottle').value = bottlePrice;
+    }
+    
+    if (hasShots && shotPrice && shotPrice !== '0') {
+        document.getElementById('input-price-shot').value = shotPrice;
+        document.getElementById('shot-price-container').classList.remove('hidden');
+    } else {
+        document.getElementById('shot-price-container').classList.add('hidden');
+    }
+    
+    // Show form
+    document.getElementById('stock-in-form').classList.remove('hidden');
+    
+    // Scroll to form on mobile
+    if (window.innerWidth < 992) {
+        document.getElementById('stock-in-form').scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+}
+
+function setQuantityType(type) {
+    // Update toggle buttons
+    document.querySelectorAll('.quantity-type-btn').forEach(btn => {
+        btn.classList.remove('active');
+    });
+    document.querySelector(`[data-type="${type}"]`).classList.add('active');
+    
+    // Update hidden input
+    document.getElementById('input-quantity-type').value = type;
+    
+    // Show/hide containers
+    if (type === 'crates') {
+        document.getElementById('crates-container').classList.remove('hidden');
+        document.getElementById('bottles-container').classList.add('hidden');
+    } else {
+        document.getElementById('crates-container').classList.add('hidden');
+        document.getElementById('bottles-container').classList.remove('hidden');
+    }
+}
+
+// Calculate total bottles dynamically
+document.getElementById('input-crates-count').addEventListener('input', updateTotalBottles);
+document.getElementById('input-crate-size').addEventListener('input', updateTotalBottles);
+
+function updateTotalBottles() {
+    const crates = parseInt(document.getElementById('input-crates-count').value) || 0;
+    const crateSize = parseInt(document.getElementById('input-crate-size').value) || 20;
+    const total = crates * crateSize;
+    document.getElementById('total-bottles-display').textContent = total;
+}
+
+// Initialize
+updateTotalBottles();
+</script>
+{% endblock %}
+

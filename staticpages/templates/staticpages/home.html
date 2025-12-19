@@ -666,6 +666,8 @@
       position: relative;
       overflow: hidden;
       max-width: 100%;
+      width: 100%;
+      box-sizing: border-box;
     }
 
     .reality-stats-container {
@@ -678,10 +680,12 @@
       box-shadow: 0 12px 40px rgba(79, 70, 229, 0.08);
       border: 1px solid rgba(79, 70, 229, 0.06);
       position: relative;
-      /* HARD SAFETY: Ensure nothing overflows */
+      /* CRITICAL FIX: Ensure nothing overflows */
       overflow: hidden;
+      width: calc(100% - 2rem);
       max-width: 100%;
       min-width: 0;
+      box-sizing: border-box;
     }
 
     .reality-stats-header {
@@ -736,23 +740,29 @@
 
     .stats-slide {
       min-width: 100%;
+      width: 100%;
       max-width: 100%;
       flex-shrink: 0;
       display: flex;
       flex-direction: column;
       gap: 1.5rem;
       padding: 0;
-      /* CRITICAL: Prevent any internal overflow */
+      /* CRITICAL FIX: Prevent any internal overflow */
       overflow: hidden;
-      min-width: 0;
+      box-sizing: border-box;
+      contain: layout;
     }
 
     .stats-slide-content {
       animation: fadeIn 0.5s ease;
       padding: 0 0.5rem;
+      width: 100%;
       max-width: 100%;
       min-width: 0;
       overflow: hidden;
+      box-sizing: border-box;
+      word-wrap: break-word;
+      overflow-wrap: anywhere;
     }
 
     .stats-problem-headline {
@@ -833,7 +843,7 @@
       overflow: hidden;
     }
 
-    /* Compact Chart Container - Fixed Height Mobile */
+    /* Compact Chart Container - Fixed Height Mobile - GUARANTEED NO OVERFLOW */
     .stats-chart-container {
       position: relative;
       height: 160px;
@@ -842,10 +852,13 @@
       border-radius: 12px;
       padding: 0.75rem;
       box-shadow: 0 2px 10px rgba(0, 0, 0, 0.04);
-      /* CRITICAL: prevent overflow */
+      /* CRITICAL FIX: prevent overflow completely */
       overflow: hidden;
+      width: 100%;
       max-width: 100%;
       min-width: 0;
+      box-sizing: border-box;
+      contain: layout style paint;
     }
 
     .stats-chart-canvas {
@@ -854,9 +867,11 @@
       max-width: 100%;
       max-height: 100%;
       min-width: 0;
+      display: block;
+      box-sizing: border-box;
     }
 
-    /* Pill-style Citation - WRAPPING */
+    /* Pill-style Citation - CRITICAL FIX: GUARANTEED WRAPPING */
     .stats-citation {
       font-size: 0.75rem;
       color: var(--text-secondary);
@@ -864,31 +879,37 @@
       background: rgba(79, 70, 229, 0.04);
       border-radius: 20px;
       border: 1px solid rgba(79, 70, 229, 0.1);
-      display: inline-flex;
+      display: flex;
       flex-wrap: wrap;
       gap: 0.25rem;
       align-items: center;
+      width: 100%;
       max-width: 100%;
       word-wrap: break-word;
       overflow-wrap: anywhere;
       word-break: break-word;
       line-height: 1.4;
       min-width: 0;
+      box-sizing: border-box;
+      overflow: hidden;
     }
 
     .stats-citation strong {
       font-weight: 600;
       color: var(--text-primary);
-      flex-shrink: 0;
+      word-wrap: break-word;
+      overflow-wrap: anywhere;
     }
 
     .stats-citation a {
       color: var(--primary);
       text-decoration: none;
       font-weight: 500;
-      word-break: break-word;
+      word-break: break-all;
       overflow-wrap: anywhere;
       min-width: 0;
+      max-width: 100%;
+      display: inline-block;
     }
 
     .stats-citation a:hover {

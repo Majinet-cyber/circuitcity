@@ -643,7 +643,8 @@
         this.addCandidate(imei);
         this.manualInput.value = '';
       } else {
-        this.showStatus('IMEI must be exactly 15 digits', 'error');
+        // ⚡ Show clear message, keep scanner open for retry
+        this.showStatus('Invalid IMEI. IMEI must be 15 digits.', 'error');
       }
     }
     
@@ -659,7 +660,9 @@
         return;
       }
       
-      const isValid = validateIMEILuhn(imei);
+      // ⚡ ACCEPT ANY 15-DIGIT NUMERIC STRING (No Luhn validation required)
+      // Business logic: If it's 15 digits, it's valid for scanning
+      const isValid = (imei.length === 15 && /^\d{15}$/.test(imei));
       
       this.candidates.set(imei, {
         valid: isValid,
@@ -669,15 +672,15 @@
       this.updateCandidatesList();
       
       if (isValid) {
-        this.showStatus(`✅ Valid IMEI: ${imei}`, 'success');
+        this.showStatus(`✅ IMEI detected: ${imei}`, 'success');
         
         // Vibrate if supported
         if (navigator.vibrate) {
           navigator.vibrate(50);
         }
       } else {
-        // Show invalid IMEIs too, but less prominently
-        console.log(`Invalid IMEI checksum: ${imei}`);
+        // Should not reach here if extractIMEICandidates works correctly
+        console.log(`Invalid IMEI format: ${imei}`);
       }
     }
     
@@ -704,7 +707,7 @@
       sorted.forEach(([imei, data]) => {
         const statusClass = data.valid ? 'valid' : 'invalid';
         const statusIcon = data.valid ? 'bi-check-circle-fill' : 'bi-x-circle-fill';
-        const statusText = data.valid ? 'Valid' : 'Invalid checksum';
+        const statusText = data.valid ? '15 digits' : 'Invalid';
         
         html += `
           <div class="imei-candidate-item ${statusClass}" data-imei="${imei}">

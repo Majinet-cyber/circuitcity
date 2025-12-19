@@ -52,6 +52,56 @@ except Exception:
     StockActivityLog = None  # safe fallback
     StockAction = None
 
+# Re-export Grocery models
+try:
+    from .models_grocery import (  # noqa: F401
+        GroceryProduct,
+        GroceryStockIn,
+        GrocerySale,
+        GroceryCost,
+        GroceryCategory,
+        GroceryUnitType,
+        GrocerySaleType,
+    )
+except Exception:
+    GroceryProduct = None  # safe fallback
+    GroceryStockIn = None
+    GrocerySale = None
+    GroceryCost = None
+    GroceryCategory = None
+    GroceryUnitType = None
+    GrocerySaleType = None
+
+# Re-export Cement models
+try:
+    from .models_cement import (  # noqa: F401
+        CementProduct,
+        CementStockIn,
+        CementSale,
+        CementCost,
+        CementType,
+        HardwareCategory,
+    )
+except Exception:
+    CementProduct = None  # safe fallback
+    CementStockIn = None
+    CementSale = None
+    CementCost = None
+    CementType = None
+    HardwareCategory = None
+
+# Re-export Unique Products models (for Fast Sell verticals)
+try:
+    from .models_unique_products import (  # noqa: F401
+        UniqueProduct,
+        UniqueProductStockIn,
+        UniqueSale,
+    )
+except Exception:
+    UniqueProduct = None  # safe fallback
+    UniqueProductStockIn = None
+    UniqueSale = None
+
 
 # ==========================================================
 # SINGLE SOURCE OF TRUTH: IMEI normalization (15 digits)

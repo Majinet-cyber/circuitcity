@@ -27,14 +27,14 @@ def get_vertical_kind(business) -> str:
         business: Business model instance (or None)
     
     Returns:
-        str: One of "phones", "gym", "clothing", "liquor", "pharmacy", "grocery", or "generic"
+        str: One of "phones", "gym", "clothing", "liquor", "pharmacy", "grocery", "cement", "hardware", or None
     """
     if business is None:
-        return "generic"
+        return None
     
     kind = getattr(business, "business_kind", None)
     if not kind:
-        return "phones"  # Default to phones for legacy businesses
+        return None  # No default - business must have a kind set
     
     # Normalize to lowercase string
     if hasattr(kind, "value"):
@@ -57,15 +57,21 @@ def get_vertical_dashboard_url(vertical_kind: str) -> Optional[str]:
         vertical_kind: Vertical code (e.g., "gym", "pharmacy")
     
     Returns:
-        str: URL name to redirect to, or None if default dashboard should be used
+        str: URL name to redirect to, or None if no vertical is set
     """
+    if not vertical_kind:
+        return None
+    
     vertical_dashboard_map = {
+        "phones": "inventory:dashboard",
         "gym": "verticals:gym_dashboard",
         "pharmacy": "verticals:pharmacy_hub",
         "clothing": "verticals:clothing_dashboard",
         "liquor": "verticals:liquor_dashboard",
-        # "phones" uses the default dashboard at /inventory/dashboard/
-        # "grocery" uses default dashboard (for now)
+        "grocery": "verticals:grocery_dashboard",
+        "cement": "verticals:cement_dashboard",
+        "hardware": "verticals:hardware_dashboard",
+        "cosmetics": "inventory:dashboard",  # Use default for now
     }
     return vertical_dashboard_map.get(vertical_kind)
 
@@ -295,6 +301,7 @@ def get_vertical_sidebar_items(business_kind: str) -> list[dict]:
             {"section": "MAIN", "key": "hub", "url": "liquor:inventory_dashboard", "label": "Liquor Hub", "icon": "bi-cup-straw", "active_prefix": "/liquor/inventory/", "active_pattern": "/liquor/inventory/", "require_manager": False, "is_menu": False, "is_header": False},
             {"section": "MAIN", "key": "stock", "url": "liquor:stock_overview", "label": "Stock", "icon": "bi-box-seam", "active_prefix": "/liquor/stock/", "active_pattern": "/liquor/stock/", "require_manager": False, "is_menu": False, "is_header": False},
             {"section": "MAIN", "key": "add_product", "url": "inventory:liquor_product_new_v2", "label": "Add Product", "icon": "bi-droplet-half", "active_prefix": "/liquor/products/new", "active_pattern": "/liquor/products/new", "require_manager": False, "is_menu": False, "is_header": False},
+            {"section": "MAIN", "key": "stock_in", "url": "liquor:stock_in", "label": "Stock In", "icon": "bi-box-arrow-in-down", "active_prefix": "/liquor/stock-in", "active_pattern": "/liquor/stock-in", "require_manager": False, "is_menu": False, "is_header": False},
             {"section": "MAIN", "key": "sell", "url": "liquor:sell", "label": "Sell", "icon": "bi-lightning-charge", "active_prefix": "/liquor/sell", "active_pattern": "/liquor/sell", "require_manager": False, "is_menu": False, "is_header": False},
             
             # MONEY section (keep Credits here - liquor-specific feature)
@@ -316,11 +323,11 @@ def get_vertical_sidebar_items(business_kind: str) -> list[dict]:
     elif business_kind == "pharmacy":
         return [
             # MAIN section - pharmacy & cosmetics vertical-aware flows
-            {"section": "MAIN", "key": "dashboard", "url": "dashboard:home", "label": "Dashboard", "icon": "bi-speedometer2", "active_prefix": "/dashboard/", "active_pattern": "/dashboard/", "require_manager": False, "is_menu": False, "is_header": False},
+            # ⚡ FIX: Home must land on vertical dashboard, NOT analytics
+            {"section": "MAIN", "key": "dashboard", "url": "verticals:pharmacy_dashboard", "label": "Dashboard", "icon": "bi-speedometer2", "active_prefix": "/verticals/pharmacy/dashboard", "active_pattern": "/verticals/pharmacy/dashboard", "require_manager": False, "is_menu": False, "is_header": False},
             {"section": "MAIN", "key": "analytics", "url": "app_router:analytics", "label": "Analytics", "icon": "bi-graph-up", "active_prefix": "/app/analytics", "active_pattern": "/app/analytics", "require_manager": False, "is_menu": False, "is_header": False},
             {"section": "MAIN", "key": "fast_sell", "url": "verticals:pharmacy_fast_sell", "label": "Fast Sell", "icon": "bi-lightning-charge-fill", "active_prefix": "/verticals/pharmacy/fast-sell", "active_pattern": "/verticals/pharmacy/fast-sell", "require_manager": False, "is_menu": False, "is_header": False},
             {"section": "MAIN", "key": "hub", "url": "verticals:pharmacy_hub", "label": "Pharmacy & Cosmetics Hub", "icon": "bi-grid-3x3-gap", "active_prefix": "/verticals/pharmacy/hub", "active_pattern": "/verticals/pharmacy/hub", "require_manager": False, "is_menu": False, "is_header": False},
-            {"section": "MAIN", "key": "pharmacy_dashboard", "url": "verticals:pharmacy_dashboard", "label": "Pharmacy Dashboard", "icon": "bi-graph-up", "active_prefix": "/verticals/pharmacy/dashboard", "active_pattern": "/verticals/pharmacy/dashboard", "require_manager": False, "is_menu": False, "is_header": False},
             {"section": "MAIN", "key": "stock_in", "url": "pharmacy:stock_in", "label": "Stock In", "icon": "bi-box-arrow-in-down", "active_prefix": "/pharmacy/stock-in", "active_pattern": "/pharmacy/stock-in", "require_manager": False, "is_menu": False, "is_header": False},
             {"section": "MAIN", "key": "sell", "url": "pharmacy:sell", "label": "Sell", "icon": "bi-bag-check", "active_prefix": "/pharmacy/sell", "active_pattern": "/pharmacy/sell", "require_manager": False, "is_menu": False, "is_header": False},
             {"section": "MAIN", "key": "batches", "url": "pharmacy:batch_list", "label": "Batches", "icon": "bi-boxes", "active_prefix": "/pharmacy/batches", "active_pattern": "/pharmacy/batches", "require_manager": False, "is_menu": False, "is_header": False},
@@ -341,7 +348,8 @@ def get_vertical_sidebar_items(business_kind: str) -> list[dict]:
     else:  # "phones" or default
         return [
             # MAIN section - Phones Dashboard is the primary entry point
-            {"section": "MAIN", "key": "dashboard", "url": "inventory_verticals:phones_dashboard", "label": "Dashboard", "icon": "bi-speedometer2", "active_prefix": "/inventory/verticals/phones", "active_pattern": "/inventory/verticals/phones", "require_manager": False, "is_menu": False, "is_header": False},
+            # ⚡ FIX: Home must land on vertical dashboard, NOT analytics
+            {"section": "MAIN", "key": "dashboard", "url": "verticals:phones_dashboard", "label": "Dashboard", "icon": "bi-speedometer2", "active_prefix": "/verticals/phones/dashboard", "active_pattern": "/verticals/phones/dashboard", "require_manager": False, "is_menu": False, "is_header": False},
             {"section": "MAIN", "key": "analytics", "url": "app_router:analytics", "label": "Analytics", "icon": "bi-graph-up", "active_prefix": "/app/analytics", "active_pattern": "/app/analytics", "require_manager": False, "is_menu": False, "is_header": False},
             # Note: Fast Sell removed - phones uses dedicated scan/sell flows
             {"section": "MAIN", "key": "stock", "url": "inventory:stock_list", "label": "Stock", "icon": "bi-box-seam", "active_prefix": "/inventory/list/", "active_pattern": "/inventory/list/", "require_manager": False, "is_menu": False, "is_header": False},

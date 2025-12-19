@@ -1,0 +1,439 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Fast Sell - {{ business.name }}{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'css/fast_sell_universal.css' %}">
+<style>
+  .grocery-fast-sell-container {
+    max-width: 900px;
+    margin: 0 auto;
+    padding: 1.5rem;
+  }
+
+  .scan-card {
+    background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+    border-radius: 20px;
+    padding: 2rem;
+    color: white;
+    margin-bottom: 2rem;
+    box-shadow: 0 20px 50px rgba(99, 102, 241, 0.2);
+  }
+
+  .scan-input-group {
+    display: flex;
+    gap: 1rem;
+    margin-bottom: 1rem;
+  }
+
+  .scan-input {
+    flex: 1;
+    padding: 1rem;
+    border: 2px solid rgba(255, 255, 255, 0.3);
+    border-radius: 12px;
+    font-size: 1.1rem;
+    background: rgba(255, 255, 255, 0.15);
+    color: white;
+    backdrop-filter: blur(10px);
+  }
+
+  .scan-input::placeholder {
+    color: rgba(255, 255, 255, 0.7);
+  }
+
+  .scan-input:focus {
+    outline: none;
+    border-color: white;
+    background: rgba(255, 255, 255, 0.25);
+  }
+
+  .btn-scan {
+    padding: 1rem 2rem;
+    background: white;
+    color: #6366f1;
+    border: none;
+    border-radius: 12px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.3s ease;
+  }
+
+  .btn-scan:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 20px rgba(255, 255, 255, 0.3);
+  }
+
+  .product-result {
+    background: white;
+    border-radius: 16px;
+    padding: 2rem;
+    margin-bottom: 2rem;
+    box-shadow: 0 4px 14px rgba(15, 23, 42, 0.08);
+    display: none;
+  }
+
+  .product-result.show {
+    display: block;
+    animation: slideIn 0.4s ease;
+  }
+
+  @keyframes slideIn {
+    from {
+      opacity: 0;
+      transform: translateY(20px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  .product-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 1.5rem;
+    padding-bottom: 1.5rem;
+    border-bottom: 2px solid #e2e8f0;
+  }
+
+  .product-name {
+    font-size: 1.5rem;
+    font-weight: 900;
+    color: #0f172a;
+  }
+
+  .stock-badge {
+    padding: 0.5rem 1rem;
+    border-radius: 20px;
+    font-weight: 700;
+    font-size: 0.9rem;
+  }
+
+  .stock-badge.in-stock {
+    background: #d1fae5;
+    color: #065f46;
+  }
+
+  .stock-badge.low-stock {
+    background: #fef3c7;
+    color: #92400e;
+  }
+
+  .stock-badge.out-of-stock {
+    background: #fee2e2;
+    color: #991b1b;
+  }
+
+  .sale-form-grid {
+    display: grid;
+    gap: 1.5rem;
+    margin-bottom: 1.5rem;
+  }
+
+  .form-group label {
+    display: block;
+    font-weight: 600;
+    color: #0f172a;
+    margin-bottom: 0.5rem;
+  }
+
+  .form-control {
+    width: 100%;
+    padding: 0.875rem;
+    border: 2px solid #e2e8f0;
+    border-radius: 10px;
+    font-size: 1rem;
+    transition: all 0.3s ease;
+  }
+
+  .form-control:focus {
+    outline: none;
+    border-color: #6366f1;
+    box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
+  }
+
+  .btn-complete-sale {
+    width: 100%;
+    padding: 1.25rem;
+    background: linear-gradient(135deg, #10b981, #059669);
+    color: white;
+    border: none;
+    border-radius: 12px;
+    font-size: 1.1rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.3s ease;
+  }
+
+  .btn-complete-sale:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 20px rgba(16, 185, 129, 0.3);
+  }
+
+  .recent-sales {
+    background: white;
+    border-radius: 16px;
+    padding: 2rem;
+    box-shadow: 0 4px 14px rgba(15, 23, 42, 0.08);
+  }
+
+  .recent-sales h3 {
+    font-size: 1.2rem;
+    font-weight: 700;
+    margin-bottom: 1rem;
+  }
+
+  .sale-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1rem;
+    background: #f8fafc;
+    border-radius: 10px;
+    margin-bottom: 0.75rem;
+  }
+
+  @media (max-width: 768px) {
+    .grocery-fast-sell-container {
+      padding: 1rem;
+    }
+
+    .scan-card {
+      padding: 1.5rem;
+    }
+
+    .scan-input-group {
+      flex-direction: column;
+    }
+
+    .product-header {
+      flex-direction: column;
+      gap: 1rem;
+    }
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="grocery-fast-sell-container">
+  <h1 style="font-size: 2rem; font-weight: 900; color: #0f172a; margin-bottom: 1.5rem;">
+    ⚡ Fast Sell
+  </h1>
+
+  <!-- Scan Card -->
+  <div class="scan-card">
+    <h2 style="font-size: 1.3rem; font-weight: 700; margin-bottom: 1rem;">Scan or Enter Barcode</h2>
+    <div class="scan-input-group">
+      <input 
+        type="text" 
+        id="barcodeInput" 
+        class="scan-input" 
+        placeholder="Scan barcode or enter product name..."
+        autofocus
+      >
+      <button type="button" class="btn-scan" onclick="lookupProduct()">
+        🔍 Search
+      </button>
+    </div>
+    <p style="font-size: 0.9rem; opacity: 0.9; margin: 0;">
+      Scan barcode with scanner or type product name to search
+    </p>
+  </div>
+
+  <!-- Product Result (hidden by default) -->
+  <div class="product-result" id="productResult">
+    <div class="product-header">
+      <div>
+        <div class="product-name" id="productName">-</div>
+        <p style="color: #64748b; margin: 0.5rem 0 0 0;" id="productCategory">-</p>
+      </div>
+      <div class="stock-badge" id="stockBadge">-</div>
+    </div>
+
+    <form method="post" id="saleForm">
+      {% csrf_token %}
+      <input type="hidden" name="product_id" id="productId">
+      
+      <div class="sale-form-grid">
+        <div class="form-group">
+          <label>Quantity <span style="color: #ef4444;">*</span></label>
+          <input 
+            type="number" 
+            name="quantity" 
+            class="form-control" 
+            min="0.01" 
+            step="0.01" 
+            required
+            id="quantityInput"
+          >
+          <small style="color: #64748b;" id="stockInfo">Available: -</small>
+        </div>
+
+        <div class="form-group">
+          <label>Unit Price (MWK) <span style="color: #ef4444;">*</span></label>
+          <input 
+            type="number" 
+            name="unit_price" 
+            class="form-control" 
+            min="0" 
+            step="0.01" 
+            required
+            id="unitPriceInput"
+          >
+        </div>
+
+        <div class="form-group">
+          <label>Payment Method</label>
+          <select name="payment_method" class="form-control">
+            <option value="CASH">Cash</option>
+            <option value="MOBILE_MONEY">Mobile Money</option>
+            <option value="BANK">Bank Transfer</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label>Customer Name (Optional)</label>
+          <input type="text" name="customer_name" class="form-control" placeholder="Customer name">
+        </div>
+
+        <div class="form-group">
+          <label>Customer Phone (Optional)</label>
+          <input type="tel" name="customer_phone" class="form-control" placeholder="+265...">
+        </div>
+      </div>
+
+      <button type="submit" class="btn-complete-sale">
+        ✅ Complete Sale
+      </button>
+    </form>
+  </div>
+
+  <!-- Not Found Message -->
+  <div class="product-result" id="notFoundMessage" style="text-align: center;">
+    <div style="font-size: 3rem; margin-bottom: 1rem;">🔍</div>
+    <h3 style="font-size: 1.5rem; font-weight: 700; color: #0f172a; margin-bottom: 0.5rem;">
+      Not Found in Unique Products
+    </h3>
+    <p style="color: #64748b; margin-bottom: 1.5rem;">
+      This barcode/SKU was not found in your Unique Products inventory. Add it now to use Fast Sell.
+    </p>
+    <div id="notFoundBarcode" style="font-family: 'Courier New', monospace; font-size: 1.2rem; font-weight: 700; color: #6366f1; margin-bottom: 1.5rem;"></div>
+    <a href="#" id="addUniqueProductLink" class="btn-scan" style="display: inline-block; text-decoration: none; margin-right: 0.5rem;">
+      ➕ Add as Unique Product
+    </a>
+  </div>
+
+  <!-- Recent Sales -->
+  {% if recent_sales %}
+  <div class="recent-sales">
+    <h3>💰 Recent Unique Sales</h3>
+    {% for sale in recent_sales %}
+    <div class="sale-item">
+      <div>
+        <strong>{{ sale.product.name }}</strong>
+        <div style="font-size: 0.85rem; color: #64748b;">
+          {{ sale.quantity }} {{ sale.product.unit }} | Code: {{ sale.product.barcode }}
+        </div>
+      </div>
+      <div style="text-align: right;">
+        <strong style="color: #10b981;">K {{ sale.total_amount|floatformat:0 }}</strong>
+        <div style="font-size: 0.85rem; color: #64748b;">
+          {{ sale.sold_at|timesince }} ago
+        </div>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+  {% endif %}
+</div>
+
+<script>
+(function() {
+  const barcodeInput = document.getElementById('barcodeInput');
+  const productResult = document.getElementById('productResult');
+  const notFoundMessage = document.getElementById('notFoundMessage');
+  const saleForm = document.getElementById('saleForm');
+
+  // Auto-submit on barcode scan (Enter key)
+  barcodeInput.addEventListener('keypress', function(e) {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      lookupProduct();
+    }
+  });
+
+  window.lookupProduct = function() {
+    const query = barcodeInput.value.trim();
+    if (!query) {
+      alert('Please enter a barcode or product name');
+      return;
+    }
+
+    // Show loading state
+    productResult.classList.remove('show');
+    notFoundMessage.classList.remove('show');
+
+    // Lookup product via API
+    fetch('{% url "grocery:fast_sell_lookup" %}?q=' + encodeURIComponent(query), {
+      credentials: 'same-origin'
+    })
+      .then(res => res.json())
+      .then(data => {
+        if (data.success && data.product) {
+          // Show product form
+          displayProduct(data.product);
+          productResult.classList.add('show');
+        } else {
+          // Show not found message with link to add
+          const barcode = data.barcode || query;
+          document.getElementById('notFoundBarcode').textContent = barcode;
+          const addLink = document.getElementById('addUniqueProductLink');
+          addLink.href = '{% url "inventory:unique_products:create" %}?barcode=' + encodeURIComponent(barcode) + '&vertical=groceries&from_fast_sell=1';
+          notFoundMessage.classList.add('show');
+        }
+      })
+      .catch(err => {
+        alert('Error looking up product: ' + err.message);
+      });
+  };
+
+  function displayProduct(product) {
+    document.getElementById('productName').textContent = product.name;
+    document.getElementById('productCategory').textContent = `Code: ${product.barcode} | Unit: ${product.unit}`;
+    document.getElementById('productId').value = product.id;
+    document.getElementById('stockInfo').textContent = `Available: ${product.quantity} ${product.unit}`;
+    document.getElementById('unitPriceInput').value = product.selling_price;
+    document.getElementById('quantityInput').value = '1';
+    document.getElementById('quantityInput').max = product.quantity;
+
+    // Update stock badge
+    const stockBadge = document.getElementById('stockBadge');
+    if (product.quantity <= 0) {
+      stockBadge.textContent = 'Out of Stock';
+      stockBadge.className = 'stock-badge out-of-stock';
+    } else if (product.quantity < 10) {
+      stockBadge.textContent = 'Low Stock';
+      stockBadge.className = 'stock-badge low-stock';
+    } else {
+      stockBadge.textContent = 'In Stock';
+      stockBadge.className = 'stock-badge in-stock';
+    }
+
+    // Focus quantity input
+    document.getElementById('quantityInput').focus();
+  }
+
+  // Clear input after successful sale
+  saleForm.addEventListener('submit', function() {
+    setTimeout(() => {
+      barcodeInput.value = '';
+      barcodeInput.focus();
+      productResult.classList.remove('show');
+    }, 1000);
+  });
+})();
+</script>
+{% endblock %}
+

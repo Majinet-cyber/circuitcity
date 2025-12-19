@@ -1,0 +1,277 @@
+{% extends "base.html" %}
+
+{% block title %}Create Unique Product - {{ business.name }}{% endblock %}
+
+{% block extra_head %}
+<style>
+    /* Premium mobile-first styling for create form */
+    .create-header {
+        background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+        color: white;
+        padding: 2rem 1rem;
+        border-radius: 12px;
+        margin-bottom: 1.5rem;
+        box-shadow: 0 4px 15px rgba(16, 185, 129, 0.3);
+    }
+    
+    .create-header h1 {
+        font-size: 1.75rem;
+        font-weight: 700;
+        margin: 0 0 0.5rem 0;
+    }
+    
+    .create-header p {
+        font-size: 0.95rem;
+        margin: 0;
+        opacity: 0.95;
+    }
+    
+    .form-card {
+        background: white;
+        border-radius: 12px;
+        padding: 1.5rem;
+        box-shadow: 0 2px 12px rgba(0, 0, 0, 0.1);
+        margin-bottom: 1.5rem;
+    }
+    
+    .form-card h3 {
+        font-size: 1.25rem;
+        font-weight: 600;
+        margin-bottom: 1.25rem;
+        padding-bottom: 0.75rem;
+        border-bottom: 2px solid #10b981;
+        color: #1f2937;
+    }
+    
+    .form-grid {
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: 1.25rem;
+    }
+    
+    @media (min-width: 768px) {
+        .form-grid.two-col {
+            grid-template-columns: 1fr 1fr;
+        }
+    }
+    
+    .form-label {
+        font-weight: 600;
+        color: #374151;
+        margin-bottom: 0.5rem;
+        font-size: 0.95rem;
+    }
+    
+    .form-label .required {
+        color: #dc2626;
+        margin-left: 0.25rem;
+    }
+    
+    .form-control, .form-select {
+        border-radius: 8px;
+        border: 2px solid #e5e7eb;
+        padding: 0.75rem 1rem;
+        font-size: 1rem;
+        transition: all 0.2s;
+    }
+    
+    .form-control:focus, .form-select:focus {
+        border-color: #10b981;
+        box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.1);
+    }
+    
+    .barcode-display {
+        font-family: 'Courier New', monospace;
+        font-size: 1.5rem;
+        font-weight: 700;
+        color: #10b981;
+        background: #f0fdf4;
+        padding: 1rem;
+        border-radius: 8px;
+        text-align: center;
+        margin-top: 0.5rem;
+        letter-spacing: 2px;
+    }
+    
+    .btn-submit {
+        width: 100%;
+        padding: 1rem;
+        font-size: 1.1rem;
+        font-weight: 600;
+        border-radius: 10px;
+        border: none;
+        background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+        color: white;
+        box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
+        transition: all 0.2s;
+    }
+    
+    .btn-submit:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 16px rgba(16, 185, 129, 0.4);
+    }
+    
+    .btn-cancel {
+        width: 100%;
+        padding: 1rem;
+        font-size: 1.1rem;
+        font-weight: 600;
+        border-radius: 10px;
+        background: #f3f4f6;
+        color: #374151;
+        border: 2px solid #e5e7eb;
+        margin-top: 1rem;
+    }
+    
+    .info-box {
+        background: #eff6ff;
+        border-left: 4px solid #3b82f6;
+        padding: 1rem;
+        border-radius: 8px;
+        margin-bottom: 1.5rem;
+    }
+    
+    .info-box p {
+        margin: 0;
+        color: #1e3a8a;
+        font-size: 0.95rem;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid px-3 px-md-4 py-4">
+    <!-- Header -->
+    <div class="create-header">
+        <h1>➕ Create Unique Product</h1>
+        <p>Add a new barcode/SKU product for Fast Sell</p>
+    </div>
+    
+    <!-- Info Box -->
+    {% if prefill_barcode %}
+    <div class="alert alert-info">
+        <strong>ℹ️ Product Not Found</strong><br>
+        Barcode <strong>{{ prefill_barcode }}</strong> was not found. Create it now.
+    </div>
+    {% endif %}
+    
+    <div class="info-box">
+        <p>
+            <strong>💡 Important:</strong> Unique Products have barcode/SKU codes and are used exclusively 
+            by Fast Sell. They do NOT replace your existing bundled products.
+        </p>
+    </div>
+    
+    <!-- Create Form -->
+    <form method="post" action="{% url 'inventory:unique_products:create' %}">
+        {% csrf_token %}
+        
+        <!-- Hidden field for redirect -->
+        {% if redirect_to_fast_sell %}
+        <input type="hidden" name="redirect_to_fast_sell" value="{{ redirect_to_fast_sell }}">
+        {% endif %}
+        
+        <!-- Product Identification -->
+        <div class="form-card">
+            <h3>📋 Product Identification</h3>
+            <div class="form-grid two-col">
+                <div>
+                    <label for="vertical" class="form-label">Vertical <span class="required">*</span></label>
+                    <select name="vertical" id="vertical" class="form-select" required>
+                        <option value="">-- Select Vertical --</option>
+                        {% for v_code, v_label in verticals %}
+                        <option value="{{ v_code }}" {% if prefill_vertical == v_code %}selected{% endif %}>
+                            {{ v_label }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                
+                <div>
+                    <label for="barcode" class="form-label">Barcode / SKU Code <span class="required">*</span></label>
+                    <input type="text" name="barcode" id="barcode" class="form-control" 
+                           placeholder="Enter barcode/SKU code" 
+                           value="{{ prefill_barcode }}" required>
+                    <div class="barcode-display" id="barcodeDisplay" style="display: none;"></div>
+                </div>
+            </div>
+            
+            <div class="mt-3">
+                <label for="name" class="form-label">Product Name <span class="required">*</span></label>
+                <input type="text" name="name" id="name" class="form-control" 
+                       placeholder="E.g., White Dress XL, Sugar 9kg bundle" required>
+                <small class="text-muted">Include size, weight, or any attributes in the name</small>
+            </div>
+            
+            <div class="mt-3">
+                <label for="description" class="form-label">Description (Optional)</label>
+                <textarea name="description" id="description" class="form-control" rows="2" 
+                          placeholder="Additional product details"></textarea>
+            </div>
+        </div>
+        
+        <!-- Stock & Pricing -->
+        <div class="form-card">
+            <h3>💰 Stock & Pricing</h3>
+            <div class="form-grid two-col">
+                <div>
+                    <label for="quantity" class="form-label">Initial Quantity</label>
+                    <input type="number" name="quantity" id="quantity" class="form-control" 
+                           value="0" step="0.01" min="0">
+                </div>
+                
+                <div>
+                    <label for="unit" class="form-label">Unit of Measurement</label>
+                    <input type="text" name="unit" id="unit" class="form-control" 
+                           placeholder="E.g., pieces, kg, liters" value="unit">
+                </div>
+            </div>
+            
+            <div class="form-grid two-col mt-3">
+                <div>
+                    <label for="cost_price" class="form-label">Cost Price (Optional)</label>
+                    <input type="number" name="cost_price" id="cost_price" class="form-control" 
+                           value="0" step="0.01" min="0" placeholder="0.00">
+                    <small class="text-muted">Recommended for profit tracking</small>
+                </div>
+                
+                <div>
+                    <label for="selling_price" class="form-label">Selling Price <span class="required">*</span></label>
+                    <input type="number" name="selling_price" id="selling_price" class="form-control" 
+                           step="0.01" min="0.01" placeholder="0.00" required>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Actions -->
+        <button type="submit" class="btn-submit">
+            ✅ Create Unique Product
+        </button>
+        <a href="{% url 'inventory:unique_products:list' %}" class="btn btn-cancel">
+            ❌ Cancel
+        </a>
+    </form>
+</div>
+
+<script>
+    // Display barcode as you type
+    document.getElementById('barcode').addEventListener('input', function(e) {
+        const display = document.getElementById('barcodeDisplay');
+        const value = e.target.value.trim().toUpperCase();
+        
+        if (value) {
+            display.textContent = value;
+            display.style.display = 'block';
+        } else {
+            display.style.display = 'none';
+        }
+    });
+    
+    // Trigger on page load if prefilled
+    {% if prefill_barcode %}
+    document.getElementById('barcodeDisplay').textContent = '{{ prefill_barcode }}';
+    document.getElementById('barcodeDisplay').style.display = 'block';
+    {% endif %}
+</script>
+{% endblock %}
+

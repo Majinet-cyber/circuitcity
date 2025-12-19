@@ -1,0 +1,289 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Membership Card - {{ member.name }}{% endblock %}
+
+{% block extra_css %}
+<style>
+  body {
+    background: #f8fafc;
+  }
+
+  .card-container {
+    max-width: 900px;
+    margin: 2rem auto;
+    padding: 1.5rem;
+  }
+
+  .card-header {
+    text-align: center;
+    margin-bottom: 2rem;
+  }
+
+  .card-header h1 {
+    font-size: 2rem;
+    font-weight: 900;
+    color: #0f172a;
+    margin-bottom: 0.5rem;
+  }
+
+  .card-header p {
+    color: #64748b;
+  }
+
+  .membership-card {
+    background: linear-gradient(135deg, {{ theme_color }}, {{ theme_color_secondary }});
+    border-radius: 20px;
+    padding: 3rem;
+    box-shadow: 0 20px 50px rgba(15, 23, 42, 0.2);
+    color: white;
+    position: relative;
+    overflow: hidden;
+    margin-bottom: 2rem;
+  }
+
+  .membership-card::before {
+    content: '';
+    position: absolute;
+    top: -50%;
+    right: -50%;
+    width: 200%;
+    height: 200%;
+    background: radial-gradient(circle, rgba(255, 255, 255, 0.1) 0%, transparent 70%);
+    animation: pulse 4s ease-in-out infinite;
+  }
+
+  @keyframes pulse {
+    0%, 100% {
+      transform: scale(1);
+      opacity: 0.5;
+    }
+    50% {
+      transform: scale(1.1);
+      opacity: 0.3;
+    }
+  }
+
+  .card-content {
+    position: relative;
+    z-index: 1;
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 2rem;
+    align-items: center;
+  }
+
+  .card-info h2 {
+    font-size: 0.9rem;
+    opacity: 0.9;
+    margin-bottom: 0.5rem;
+    letter-spacing: 2px;
+  }
+
+  .card-info h3 {
+    font-size: 2.5rem;
+    font-weight: 900;
+    margin-bottom: 1rem;
+  }
+
+  .card-info p {
+    font-size: 1.1rem;
+    opacity: 0.95;
+    margin-bottom: 0.5rem;
+  }
+
+  .card-qr {
+    background: white;
+    padding: 1rem;
+    border-radius: 16px;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+  }
+
+  .card-qr img {
+    display: block;
+    width: 200px;
+    height: 200px;
+  }
+
+  .card-footer {
+    margin-top: 1rem;
+    padding-top: 1rem;
+    border-top: 1px solid rgba(255, 255, 255, 0.3);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .card-footer-item {
+    font-size: 0.9rem;
+    opacity: 0.9;
+  }
+
+  .action-buttons {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 1rem;
+    margin-bottom: 2rem;
+  }
+
+  .btn-action {
+    padding: 1rem 1.5rem;
+    border: none;
+    border-radius: 12px;
+    font-weight: 700;
+    font-size: 1rem;
+    cursor: pointer;
+    text-align: center;
+    text-decoration: none;
+    transition: all 0.3s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+  }
+
+  .btn-primary {
+    background: linear-gradient(135deg, #6366f1, #4f46e5);
+    color: white;
+  }
+
+  .btn-primary:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 20px rgba(99, 102, 241, 0.3);
+  }
+
+  .btn-secondary {
+    background: white;
+    color: #0f172a;
+    border: 2px solid #e2e8f0;
+  }
+
+  .btn-secondary:hover {
+    background: #f8fafc;
+  }
+
+  .print-only {
+    display: none;
+  }
+
+  @media print {
+    body {
+      background: white;
+    }
+
+    .card-container {
+      max-width: 100%;
+      margin: 0;
+      padding: 0;
+    }
+
+    .card-header,
+    .action-buttons,
+    .no-print {
+      display: none !important;
+    }
+
+    .membership-card {
+      box-shadow: none;
+      page-break-inside: avoid;
+    }
+
+    .print-only {
+      display: block;
+    }
+  }
+
+  @media (max-width: 768px) {
+    .card-content {
+      grid-template-columns: 1fr;
+      text-align: center;
+    }
+
+    .card-qr {
+      margin: 0 auto;
+    }
+
+    .card-info h3 {
+      font-size: 1.8rem;
+    }
+
+    .card-footer {
+      flex-direction: column;
+      gap: 0.5rem;
+      text-align: center;
+    }
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="card-container">
+  <!-- Header -->
+  <div class="card-header no-print">
+    <h1>🎫 Membership Card</h1>
+    <p>{{ business.name }}</p>
+  </div>
+
+  <!-- Action Buttons -->
+  <div class="action-buttons no-print">
+    <button onclick="window.print()" class="btn-action btn-primary">
+      🖨️ Print Card
+    </button>
+    <a href="{% url 'gym:member_qr_card_download' member.id %}?format=image" class="btn-action btn-secondary">
+      📥 Download Image
+    </a>
+    <a href="{% url 'gym:member_qr_card_download' member.id %}?format=pdf" class="btn-action btn-secondary">
+      📄 Download PDF
+    </a>
+    <a href="{% url 'gym:member_detail' member.id %}" class="btn-action btn-secondary">
+      👤 View Profile
+    </a>
+  </div>
+
+  <!-- Membership Card -->
+  <div class="membership-card" style="--theme-color: {{ theme_color }}; --theme-color-secondary: {{ theme_color_secondary }};">
+    <div class="card-content">
+      <div class="card-info">
+        <h2>{{ business.name|upper }}</h2>
+        <p style="font-size: 1rem; opacity: 0.9; margin-bottom: 1.5rem;">GYM MEMBERSHIP</p>
+        
+        <h3>{{ member.name|upper }}</h3>
+        
+        <p>📱 {{ member.phone }}</p>
+        {% if member.email %}
+        <p>📧 {{ member.email }}</p>
+        {% endif %}
+        
+        <div class="card-footer">
+          <div class="card-footer-item">
+            <strong>ID:</strong> #{{ member.id }}
+          </div>
+          {% if member.membership_end %}
+          <div class="card-footer-item">
+            <strong>Valid Until:</strong> {{ member.membership_end|date:"Y-m-d" }}
+          </div>
+          {% endif %}
+        </div>
+      </div>
+
+      <div class="card-qr">
+        <img src="https://api.qrserver.com/v1/create-qr-code/?size=200x200&data={{ member.qr_token }}" alt="QR Code">
+      </div>
+    </div>
+  </div>
+
+  <!-- Instructions -->
+  <div class="no-print" style="background: white; border-radius: 16px; padding: 2rem; box-shadow: 0 4px 14px rgba(15, 23, 42, 0.08);">
+    <h3 style="font-size: 1.3rem; font-weight: 700; color: #0f172a; margin-bottom: 1rem;">
+      📱 How to Use
+    </h3>
+    <ul style="color: #64748b; line-height: 1.8;">
+      <li>Present this QR code at the gym entrance for check-in</li>
+      <li>Print the card or save it to your phone</li>
+      <li>The QR code is unique to this member</li>
+      <li>Scan the QR code to view membership status instantly</li>
+    </ul>
+  </div>
+</div>
+{% endblock %}
+

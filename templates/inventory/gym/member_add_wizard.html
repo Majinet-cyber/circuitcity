@@ -1,0 +1,724 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Add New Member - {{ business.name }}{% endblock %}
+
+{% block extra_css %}
+<style>
+  :root {
+    --gym-primary: #6366f1;
+    --gym-primary-dark: #4f46e5;
+    --gym-success: #10b981;
+    --gym-warning: #f59e0b;
+    --gym-bg: #f8fafc;
+    --gym-card: #ffffff;
+    --gym-border: #e2e8f0;
+    --gym-text: #0f172a;
+    --gym-muted: #64748b;
+  }
+
+  body {
+    background: var(--gym-bg);
+  }
+
+  .wizard-container {
+    max-width: 800px;
+    margin: 0 auto;
+    padding: 1.5rem;
+  }
+
+  /* Progress Steps */
+  .wizard-progress {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 2rem;
+    position: relative;
+  }
+
+  .wizard-progress::before {
+    content: '';
+    position: absolute;
+    top: 20px;
+    left: 0;
+    right: 0;
+    height: 2px;
+    background: var(--gym-border);
+    z-index: 0;
+  }
+
+  .wizard-step {
+    flex: 1;
+    text-align: center;
+    position: relative;
+    z-index: 1;
+  }
+
+  .wizard-step-circle {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background: var(--gym-card);
+    border: 2px solid var(--gym-border);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto 0.5rem;
+    font-weight: 700;
+    color: var(--gym-muted);
+    transition: all 0.3s ease;
+  }
+
+  .wizard-step.active .wizard-step-circle {
+    background: var(--gym-primary);
+    border-color: var(--gym-primary);
+    color: white;
+    transform: scale(1.1);
+    box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);
+  }
+
+  .wizard-step.completed .wizard-step-circle {
+    background: var(--gym-success);
+    border-color: var(--gym-success);
+    color: white;
+  }
+
+  .wizard-step-label {
+    font-size: 0.75rem;
+    color: var(--gym-muted);
+    font-weight: 500;
+  }
+
+  .wizard-step.active .wizard-step-label {
+    color: var(--gym-primary);
+    font-weight: 700;
+  }
+
+  /* Step Panels */
+  .wizard-panel {
+    display: none;
+    animation: fadeIn 0.4s ease;
+  }
+
+  .wizard-panel.active {
+    display: block;
+  }
+
+  @keyframes fadeIn {
+    from {
+      opacity: 0;
+      transform: translateY(10px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  .panel-card {
+    background: var(--gym-card);
+    border-radius: 16px;
+    padding: 2rem;
+    box-shadow: 0 4px 14px rgba(15, 23, 42, 0.08);
+    margin-bottom: 1.5rem;
+  }
+
+  .panel-title {
+    font-size: 1.5rem;
+    font-weight: 800;
+    color: var(--gym-text);
+    margin-bottom: 0.5rem;
+  }
+
+  .panel-subtitle {
+    color: var(--gym-muted);
+    margin-bottom: 1.5rem;
+  }
+
+  /* Choice Cards */
+  .choice-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+  }
+
+  .choice-card {
+    background: var(--gym-bg);
+    border: 2px solid var(--gym-border);
+    border-radius: 12px;
+    padding: 1.5rem;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    text-align: center;
+    position: relative;
+  }
+
+  .choice-card:hover {
+    border-color: var(--gym-primary);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(99, 102, 241, 0.15);
+  }
+
+  .choice-card.selected {
+    border-color: var(--gym-primary);
+    background: linear-gradient(135deg, rgba(99, 102, 241, 0.1), rgba(99, 102, 241, 0.05));
+    box-shadow: 0 4px 12px rgba(99, 102, 241, 0.2);
+  }
+
+  .choice-card .icon {
+    font-size: 2.5rem;
+    margin-bottom: 0.75rem;
+  }
+
+  .choice-card .label {
+    font-weight: 700;
+    color: var(--gym-text);
+    margin-bottom: 0.25rem;
+  }
+
+  .choice-card .description {
+    font-size: 0.85rem;
+    color: var(--gym-muted);
+  }
+
+  .choice-card .price {
+    font-size: 1.25rem;
+    font-weight: 800;
+    color: var(--gym-primary);
+    margin-top: 0.5rem;
+  }
+
+  /* Form Inputs */
+  .form-group {
+    margin-bottom: 1.25rem;
+  }
+
+  .form-label {
+    display: block;
+    font-weight: 600;
+    color: var(--gym-text);
+    margin-bottom: 0.5rem;
+    font-size: 0.9rem;
+  }
+
+  .form-input {
+    width: 100%;
+    padding: 0.75rem 1rem;
+    border: 2px solid var(--gym-border);
+    border-radius: 10px;
+    font-size: 1rem;
+    transition: all 0.3s ease;
+  }
+
+  .form-input:focus {
+    outline: none;
+    border-color: var(--gym-primary);
+    box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
+  }
+
+  .form-input::placeholder {
+    color: var(--gym-muted);
+  }
+
+  /* Review Summary */
+  .summary-grid {
+    display: grid;
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+  }
+
+  .summary-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1rem;
+    background: var(--gym-bg);
+    border-radius: 10px;
+  }
+
+  .summary-label {
+    font-weight: 600;
+    color: var(--gym-muted);
+    font-size: 0.9rem;
+  }
+
+  .summary-value {
+    font-weight: 700;
+    color: var(--gym-text);
+    font-size: 1rem;
+  }
+
+  .summary-total {
+    background: linear-gradient(135deg, var(--gym-primary), var(--gym-primary-dark));
+    color: white;
+    padding: 1.5rem;
+    border-radius: 12px;
+    text-align: center;
+    margin-bottom: 1.5rem;
+  }
+
+  .summary-total-label {
+    font-size: 0.9rem;
+    opacity: 0.9;
+    margin-bottom: 0.5rem;
+  }
+
+  .summary-total-value {
+    font-size: 2.5rem;
+    font-weight: 900;
+  }
+
+  /* Navigation Buttons */
+  .wizard-nav {
+    display: flex;
+    gap: 1rem;
+    justify-content: space-between;
+  }
+
+  .btn-wizard {
+    flex: 1;
+    padding: 0.875rem 1.5rem;
+    border: none;
+    border-radius: 10px;
+    font-weight: 700;
+    font-size: 1rem;
+    cursor: pointer;
+    transition: all 0.3s ease;
+  }
+
+  .btn-back {
+    background: var(--gym-bg);
+    color: var(--gym-text);
+    border: 2px solid var(--gym-border);
+  }
+
+  .btn-back:hover {
+    background: var(--gym-border);
+  }
+
+  .btn-next {
+    background: var(--gym-primary);
+    color: white;
+  }
+
+  .btn-next:hover {
+    background: var(--gym-primary-dark);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);
+  }
+
+  .btn-next:disabled {
+    background: var(--gym-border);
+    color: var(--gym-muted);
+    cursor: not-allowed;
+    transform: none;
+  }
+
+  .btn-submit {
+    background: var(--gym-success);
+    color: white;
+  }
+
+  .btn-submit:hover {
+    background: #059669;
+  }
+
+  /* Mobile Responsive */
+  @media (max-width: 768px) {
+    .wizard-container {
+      padding: 1rem;
+    }
+
+    .panel-card {
+      padding: 1.5rem;
+    }
+
+    .choice-grid {
+      grid-template-columns: 1fr;
+    }
+
+    .wizard-step-label {
+      font-size: 0.65rem;
+    }
+
+    .wizard-step-circle {
+      width: 35px;
+      height: 35px;
+      font-size: 0.9rem;
+    }
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="wizard-container">
+  <!-- Header -->
+  <div style="text-align: center; margin-bottom: 2rem;">
+    <h1 style="font-size: 2rem; font-weight: 900; color: var(--gym-text); margin-bottom: 0.5rem;">
+      ✨ Add New Member
+    </h1>
+    <p style="color: var(--gym-muted);">{{ business.name }}</p>
+  </div>
+
+  <!-- Progress Steps -->
+  <div class="wizard-progress">
+    <div class="wizard-step active" data-step="1">
+      <div class="wizard-step-circle">1</div>
+      <div class="wizard-step-label">Membership</div>
+    </div>
+    <div class="wizard-step" data-step="2">
+      <div class="wizard-step-circle">2</div>
+      <div class="wizard-step-label">Duration</div>
+    </div>
+    <div class="wizard-step" data-step="3">
+      <div class="wizard-step-circle">3</div>
+      <div class="wizard-step-label">Details</div>
+    </div>
+    <div class="wizard-step" data-step="4">
+      <div class="wizard-step-circle">4</div>
+      <div class="wizard-step-label">Review</div>
+    </div>
+  </div>
+
+  <form method="post" id="wizardForm">
+    {% csrf_token %}
+
+    <!-- Step 1: Choose Membership Type -->
+    <div class="wizard-panel active" data-panel="1">
+      <div class="panel-card">
+        <h2 class="panel-title">Choose Membership Type</h2>
+        <p class="panel-subtitle">Select the type of membership for this member</p>
+
+        <div class="choice-grid">
+          <div class="choice-card" data-choice="membership" data-value="standard">
+            <div class="icon">🏋️</div>
+            <div class="label">Standard</div>
+            <div class="description">Gym access only</div>
+            <div class="price">MK {{ gym_settings.default_membership_price|floatformat:0 }}</div>
+          </div>
+
+          <div class="choice-card" data-choice="membership" data-value="with_trainer">
+            <div class="icon">💪</div>
+            <div class="label">With Trainer</div>
+            <div class="description">Gym + Personal trainer</div>
+            <div class="price">MK {{ total_with_trainer|floatformat:0 }}</div>
+          </div>
+        </div>
+
+        <input type="hidden" name="has_trainer" id="has_trainer" value="false">
+      </div>
+
+      <div class="wizard-nav">
+        <a href="{% url 'gym:members_list' %}" class="btn-wizard btn-back">Cancel</a>
+        <button type="button" class="btn-wizard btn-next" id="step1Next" disabled>Next</button>
+      </div>
+    </div>
+
+    <!-- Step 2: Choose Duration -->
+    <div class="wizard-panel" data-panel="2">
+      <div class="panel-card">
+        <h2 class="panel-title">Choose Duration</h2>
+        <p class="panel-subtitle">How long should the membership last?</p>
+
+        <div class="choice-grid">
+          <div class="choice-card" data-choice="duration" data-value="7">
+            <div class="icon">📅</div>
+            <div class="label">1 Week</div>
+            <div class="description">7 days</div>
+          </div>
+
+          <div class="choice-card" data-choice="duration" data-value="14">
+            <div class="icon">📅</div>
+            <div class="label">2 Weeks</div>
+            <div class="description">14 days</div>
+          </div>
+
+          <div class="choice-card" data-choice="duration" data-value="30">
+            <div class="icon">⭐</div>
+            <div class="label">1 Month</div>
+            <div class="description">30 days (Standard)</div>
+          </div>
+
+          <div class="choice-card" data-choice="duration" data-value="90">
+            <div class="icon">🔥</div>
+            <div class="label">3 Months</div>
+            <div class="description">90 days</div>
+          </div>
+
+          <div class="choice-card" data-choice="duration" data-value="custom">
+            <div class="icon">✏️</div>
+            <div class="label">Custom</div>
+            <div class="description">Enter days</div>
+          </div>
+        </div>
+
+        <div id="customDurationInput" style="display: none; margin-top: 1rem;">
+          <label class="form-label">Enter number of days</label>
+          <input type="number" class="form-input" id="customDays" min="1" placeholder="Enter days">
+        </div>
+
+        <input type="hidden" name="duration_days" id="duration_days" value="">
+      </div>
+
+      <div class="wizard-nav">
+        <button type="button" class="btn-wizard btn-back" id="step2Back">Back</button>
+        <button type="button" class="btn-wizard btn-next" id="step2Next" disabled>Next</button>
+      </div>
+    </div>
+
+    <!-- Step 3: Member Details -->
+    <div class="wizard-panel" data-panel="3">
+      <div class="panel-card">
+        <h2 class="panel-title">Member Details</h2>
+        <p class="panel-subtitle">Enter the member's information</p>
+
+        <div class="form-group">
+          <label class="form-label">Full Name <span style="color: #ef4444;">*</span></label>
+          <input type="text" name="name" class="form-input" placeholder="John Doe" required>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Phone Number <span style="color: #ef4444;">*</span></label>
+          <input type="tel" name="phone" class="form-input" placeholder="+265 999 123 456" required>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Email (Optional)</label>
+          <input type="email" name="email" class="form-input" placeholder="john@example.com">
+        </div>
+
+        {% if trainers %}
+        <div class="form-group">
+          <label class="form-label">Assign Trainer (Optional)</label>
+          <select name="trainer" class="form-input">
+            <option value="">No trainer</option>
+            {% for trainer in trainers %}
+            <option value="{{ trainer.id }}">{{ trainer.name }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        {% endif %}
+
+        <div class="form-group">
+          <label class="form-label">Notes (Optional)</label>
+          <textarea name="notes" class="form-input" rows="3" placeholder="Any additional notes..."></textarea>
+        </div>
+      </div>
+
+      <div class="wizard-nav">
+        <button type="button" class="btn-wizard btn-back" id="step3Back">Back</button>
+        <button type="button" class="btn-wizard btn-next" id="step3Next">Next</button>
+      </div>
+    </div>
+
+    <!-- Step 4: Review & Create -->
+    <div class="wizard-panel" data-panel="4">
+      <div class="panel-card">
+        <h2 class="panel-title">Review & Create</h2>
+        <p class="panel-subtitle">Confirm the details below</p>
+
+        <div class="summary-grid">
+          <div class="summary-item">
+            <span class="summary-label">Membership Type</span>
+            <span class="summary-value" id="reviewMembershipType">-</span>
+          </div>
+          <div class="summary-item">
+            <span class="summary-label">Duration</span>
+            <span class="summary-value" id="reviewDuration">-</span>
+          </div>
+          <div class="summary-item">
+            <span class="summary-label">Member Name</span>
+            <span class="summary-value" id="reviewName">-</span>
+          </div>
+          <div class="summary-item">
+            <span class="summary-label">Phone</span>
+            <span class="summary-value" id="reviewPhone">-</span>
+          </div>
+          <div class="summary-item" id="reviewEmailRow" style="display: none;">
+            <span class="summary-label">Email</span>
+            <span class="summary-value" id="reviewEmail">-</span>
+          </div>
+          <div class="summary-item" id="reviewTrainerRow" style="display: none;">
+            <span class="summary-label">Trainer</span>
+            <span class="summary-value" id="reviewTrainer">-</span>
+          </div>
+        </div>
+
+        <div class="summary-total">
+          <div class="summary-total-label">Total Amount</div>
+          <div class="summary-total-value" id="reviewTotal">MK 0</div>
+        </div>
+
+        <div style="background: #fef3c7; border: 2px solid #fbbf24; border-radius: 10px; padding: 1rem; margin-bottom: 1.5rem;">
+          <strong style="color: #92400e;">💡 Note:</strong>
+          <p style="color: #92400e; margin: 0.5rem 0 0 0; font-size: 0.9rem;">
+            After creating the member, remember to record their payment to activate the membership.
+          </p>
+        </div>
+      </div>
+
+      <div class="wizard-nav">
+        <button type="button" class="btn-wizard btn-back" id="step4Back">Back</button>
+        <button type="submit" class="btn-wizard btn-submit">✅ Create Member</button>
+      </div>
+    </div>
+  </form>
+</div>
+
+<script>
+(function() {
+  let currentStep = 1;
+  const totalSteps = 4;
+  
+  // Wizard data
+  const wizardData = {
+    hasTrainer: false,
+    durationDays: null,
+    membershipFee: {{ gym_settings.default_membership_price }},
+    trainerFee: {{ gym_settings.default_trainer_fee }},
+  };
+
+  // Update progress steps
+  function updateProgress() {
+    document.querySelectorAll('.wizard-step').forEach((step, index) => {
+      const stepNum = index + 1;
+      step.classList.remove('active', 'completed');
+      
+      if (stepNum < currentStep) {
+        step.classList.add('completed');
+        step.querySelector('.wizard-step-circle').innerHTML = '✓';
+      } else if (stepNum === currentStep) {
+        step.classList.add('active');
+        step.querySelector('.wizard-step-circle').innerHTML = stepNum;
+      } else {
+        step.querySelector('.wizard-step-circle').innerHTML = stepNum;
+      }
+    });
+
+    // Show/hide panels
+    document.querySelectorAll('.wizard-panel').forEach((panel, index) => {
+      panel.classList.toggle('active', index + 1 === currentStep);
+    });
+  }
+
+  // Step 1: Membership type selection
+  document.querySelectorAll('[data-choice="membership"]').forEach(card => {
+    card.addEventListener('click', function() {
+      document.querySelectorAll('[data-choice="membership"]').forEach(c => c.classList.remove('selected'));
+      this.classList.add('selected');
+      
+      const value = this.dataset.value;
+      wizardData.hasTrainer = value === 'with_trainer';
+      document.getElementById('has_trainer').value = wizardData.hasTrainer;
+      document.getElementById('step1Next').disabled = false;
+    });
+  });
+
+  document.getElementById('step1Next').addEventListener('click', () => {
+    currentStep = 2;
+    updateProgress();
+  });
+
+  // Step 2: Duration selection
+  document.querySelectorAll('[data-choice="duration"]').forEach(card => {
+    card.addEventListener('click', function() {
+      document.querySelectorAll('[data-choice="duration"]').forEach(c => c.classList.remove('selected'));
+      this.classList.add('selected');
+      
+      const value = this.dataset.value;
+      if (value === 'custom') {
+        document.getElementById('customDurationInput').style.display = 'block';
+        document.getElementById('step2Next').disabled = true;
+      } else {
+        document.getElementById('customDurationInput').style.display = 'none';
+        wizardData.durationDays = parseInt(value);
+        document.getElementById('duration_days').value = value;
+        document.getElementById('step2Next').disabled = false;
+      }
+    });
+  });
+
+  document.getElementById('customDays').addEventListener('input', function() {
+    const days = parseInt(this.value);
+    if (days > 0) {
+      wizardData.durationDays = days;
+      document.getElementById('duration_days').value = days;
+      document.getElementById('step2Next').disabled = false;
+    } else {
+      document.getElementById('step2Next').disabled = true;
+    }
+  });
+
+  document.getElementById('step2Back').addEventListener('click', () => {
+    currentStep = 1;
+    updateProgress();
+  });
+
+  document.getElementById('step2Next').addEventListener('click', () => {
+    currentStep = 3;
+    updateProgress();
+  });
+
+  // Step 3: Member details
+  document.getElementById('step3Back').addEventListener('click', () => {
+    currentStep = 2;
+    updateProgress();
+  });
+
+  document.getElementById('step3Next').addEventListener('click', () => {
+    // Validate required fields
+    const name = document.querySelector('[name="name"]').value.trim();
+    const phone = document.querySelector('[name="phone"]').value.trim();
+    
+    if (!name || !phone) {
+      alert('Please fill in all required fields (Name and Phone)');
+      return;
+    }
+    
+    // Update review
+    updateReview();
+    currentStep = 4;
+    updateProgress();
+  });
+
+  // Step 4: Review
+  function updateReview() {
+    const name = document.querySelector('[name="name"]').value;
+    const phone = document.querySelector('[name="phone"]').value;
+    const email = document.querySelector('[name="email"]').value;
+    const trainerSelect = document.querySelector('[name="trainer"]');
+    const trainer = trainerSelect ? trainerSelect.options[trainerSelect.selectedIndex].text : '';
+
+    document.getElementById('reviewMembershipType').textContent = wizardData.hasTrainer ? 'With Trainer' : 'Standard';
+    document.getElementById('reviewDuration').textContent = `${wizardData.durationDays} days`;
+    document.getElementById('reviewName').textContent = name;
+    document.getElementById('reviewPhone').textContent = phone;
+
+    if (email) {
+      document.getElementById('reviewEmailRow').style.display = 'flex';
+      document.getElementById('reviewEmail').textContent = email;
+    }
+
+    if (trainer && trainer !== 'No trainer') {
+      document.getElementById('reviewTrainerRow').style.display = 'flex';
+      document.getElementById('reviewTrainer').textContent = trainer;
+    }
+
+    const total = wizardData.hasTrainer 
+      ? wizardData.membershipFee + wizardData.trainerFee 
+      : wizardData.membershipFee;
+    
+    document.getElementById('reviewTotal').textContent = `MK ${total.toLocaleString()}`;
+  }
+
+  document.getElementById('step4Back').addEventListener('click', () => {
+    currentStep = 3;
+    updateProgress();
+  });
+
+  // Initialize
+  updateProgress();
+})();
+</script>
+{% endblock %}
+

@@ -129,48 +129,16 @@
     </div>
   </header>
 
-  <!-- DATE RANGE FILTER BAR -->
+  <!-- DATE RANGE FILTER BAR (SINGLE BUTTON) -->
   <section class="recent-block" style="padding:16px 22px;position:relative;overflow:visible">
     <div style="display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:space-between">
-      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
-        <span style="font-weight:700;color:#64748b;margin-right:8px">Date Range:</span>
-        <a href="?range=today" class="btn {% if dashboard_kpis.range_key == 'today' %}btn-primary{% else %}btn-outline-secondary{% endif %}" style="border-radius:20px;padding:8px 16px;font-size:.9rem">
-          <i class="bi bi-calendar-day"></i> Today
-        </a>
-        <a href="?range=7d" class="btn {% if dashboard_kpis.range_key == '7d' %}btn-primary{% else %}btn-outline-secondary{% endif %}" style="border-radius:20px;padding:8px 16px;font-size:.9rem">
-          <i class="bi bi-calendar-week"></i> Last 7 Days
-        </a>
-        <a href="?range=mtd" class="btn {% if dashboard_kpis.range_key == 'mtd' %}btn-primary{% else %}btn-outline-secondary{% endif %}" style="border-radius:20px;padding:8px 16px;font-size:.9rem">
-          <i class="bi bi-calendar-month"></i> This Month
-        </a>
-        <button type="button" id="customRangeToggle" class="btn {% if dashboard_kpis.range_key == 'custom' %}btn-primary{% else %}btn-outline-secondary{% endif %}" style="border-radius:20px;padding:8px 16px;font-size:.9rem">
-          <i class="bi bi-calendar-range"></i> Custom
-        </button>
+      <div style="display:flex;gap:12px;align-items:center">
+        {% include "partials/date_filter_unified.html" with range_key=dashboard_kpis.range_key start_date=dashboard_kpis.start_date end_date=dashboard_kpis.end_date range_label=dashboard_kpis.range_label %}
       </div>
       <div style="font-size:.9rem;color:#64748b">
         <strong>Showing:</strong> {{ dashboard_kpis.range_label }}
       </div>
     </div>
-    
-    <!-- CUSTOM DATE RANGE FORM (hidden by default) -->
-    <form method="get" id="customRangeForm" style="display:{% if dashboard_kpis.range_key == 'custom' %}flex{% else %}none{% endif %};gap:12px;margin-top:16px;padding-top:16px;border-top:1px solid #e2e8f0;flex-wrap:wrap;align-items:end;position:relative;z-index:100">
-      {% comment %}GET forms don't need CSRF token - only POST forms do{% endcomment %}
-      <input type="hidden" name="range" value="custom">
-      <div>
-        <label for="startDate" style="display:block;font-size:.85rem;font-weight:600;color:#64748b;margin-bottom:4px">Start Date</label>
-        <input type="date" id="startDate" name="start" value="{% if dashboard_kpis.range_key == 'custom' %}{{ dashboard_kpis.start_date|date:'Y-m-d' }}{% endif %}" class="form-control" required style="border-radius:10px">
-      </div>
-      <div>
-        <label for="endDate" style="display:block;font-size:.85rem;font-weight:600;color:#64748b;margin-bottom:4px">End Date</label>
-        <input type="date" id="endDate" name="end" value="{% if dashboard_kpis.range_key == 'custom' %}{{ dashboard_kpis.end_date|date:'Y-m-d' }}{% endif %}" class="form-control" required style="border-radius:10px">
-      </div>
-      <button type="submit" class="btn btn-primary" style="border-radius:10px">
-        <i class="bi bi-check-circle"></i> Apply
-      </button>
-      <button type="button" id="customRangeCancel" class="btn btn-outline-secondary" style="border-radius:10px">
-        Cancel
-      </button>
-    </form>
   </section>
 
   <!-- PREMIUM KPI CARDS (with date range filtering) -->

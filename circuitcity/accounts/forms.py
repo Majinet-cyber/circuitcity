@@ -614,6 +614,27 @@ class WizardStep2Form(forms.Form):
         return name
 
 
+class WizardStep2bForm(forms.Form):
+    """Step 2b: Section Selection (Pharmacy/Cosmetics) - shown only if pharmacy or cosmetics selected"""
+    has_pharmacy = forms.BooleanField(
+        required=False,
+        label="Pharmacy",
+        widget=forms.CheckboxInput(attrs={"class": "wizard-checkbox"}),
+    )
+    has_cosmetics = forms.BooleanField(
+        required=False,
+        label="Cosmetics",
+        widget=forms.CheckboxInput(attrs={"class": "wizard-checkbox"}),
+    )
+    
+    def clean(self):
+        data = super().clean()
+        # At least one must be selected
+        if not data.get("has_pharmacy") and not data.get("has_cosmetics"):
+            raise forms.ValidationError("Please select at least one section (Pharmacy or Cosmetics).")
+        return data
+
+
 class WizardStep3Form(forms.Form):
     """Step 3: First Location / Shop"""
     location_name = forms.CharField(
@@ -783,6 +804,25 @@ class ManagerWizardStep2Form(forms.Form):
             raise forms.ValidationError(e.messages)
         
         return name
+
+
+class ManagerWizardStep2bForm(forms.Form):
+    """Manager Signup Step 2b: Section Selection (Pharmacy/Cosmetics) - conditional step"""
+    has_pharmacy = forms.BooleanField(
+        required=False,
+        label="Pharmacy",
+    )
+    has_cosmetics = forms.BooleanField(
+        required=False,
+        label="Cosmetics",
+    )
+    
+    def clean(self):
+        data = super().clean()
+        # At least one must be selected
+        if not data.get("has_pharmacy") and not data.get("has_cosmetics"):
+            raise forms.ValidationError("Please select at least one section (Pharmacy or Cosmetics).")
+        return data
 
 
 class ManagerWizardStep3Form(forms.Form):

@@ -365,7 +365,8 @@
       return;
     }
     
-    showAlert('Looking up product...', 'info');
+    // CRITICAL: Always show checking state (never close silently)
+    showAlert('⏳ Checking inventory...', 'info');
     
     fetch(`/inventory/api/fast-sell/lookup/?barcode=${encodeURIComponent(barcode)}&vertical=${vertical}`, {
       method: 'GET',
@@ -376,17 +377,25 @@
     .then(response => response.json())
     .then(data => {
       if (data.ok && data.found) {
+        // SUCCESS: Product found in inventory
         currentProduct = data.product;
         displayProduct(data.product);
-        clearAlert();
+        showAlert('✅ Product found! Ready to sell.', 'success');
+        // Auto-clear success message after 2 seconds
+        setTimeout(clearAlert, 2000);
       } else {
-        showAlert(data.message || 'Product not found', 'error');
+        // NOT FOUND: Show clear message (never close silently)
+        showAlert(`❌ Not found in your inventory: ${barcode}`, 'error');
         hideProduct();
+        // Keep barcode input focused for retry
+        barcodeInput.select();
       }
     })
     .catch(error => {
-      showAlert('Error looking up product: ' + error.message, 'error');
+      // ERROR: Network or server issue
+      showAlert('❌ Error checking inventory: ' + error.message, 'error');
       hideProduct();
+      barcodeInput.select();
     });
   }
   

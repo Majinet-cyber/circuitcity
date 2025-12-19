@@ -12,62 +12,132 @@ Context variables expected:
 
 <style>
   .rotating-insights-card {
-    background: #fff;
-    border-radius: 20px;
-    padding: 20px;
-    box-shadow: 0 10px 30px rgba(15,23,42,.08);
-    margin-bottom: 20px;
+    background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
+    border-radius: 24px;
+    padding: 28px;
+    box-shadow: 0 20px 50px rgba(99, 102, 241, 0.08), 0 4px 12px rgba(15, 23, 42, 0.04);
+    margin-bottom: 24px;
+    border: 1px solid rgba(99, 102, 241, 0.08);
+    position: relative;
+    overflow: hidden;
+  }
+  
+  .rotating-insights-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 4px;
+    background: linear-gradient(90deg, #6366f1, #8b5cf6, #ec4899, #f59e0b, #10b981);
+    background-size: 200% 100%;
+    animation: gradientShift 3s ease infinite;
+  }
+  
+  @keyframes gradientShift {
+    0%, 100% { background-position: 0% 50%; }
+    50% { background-position: 100% 50%; }
   }
   
   .rotating-insights-header {
     display: flex;
     justify-content: space-between;
-    align-items: center;
-    margin-bottom: 16px;
+    align-items: flex-start;
+    margin-bottom: 20px;
+    flex-wrap: wrap;
+    gap: 12px;
   }
   
   .rotating-insights-title {
-    font-size: 1.1rem;
-    font-weight: 700;
+    font-size: 1.25rem;
+    font-weight: 800;
     color: #0f172a;
     margin: 0;
+    letter-spacing: -0.02em;
+    background: linear-gradient(135deg, #0f172a 0%, #475569 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
   }
   
   .rotating-insights-subtitle {
-    font-size: 0.85rem;
+    font-size: 0.875rem;
     color: #64748b;
-    margin: 4px 0 0 0;
+    margin: 6px 0 0 0;
+    font-weight: 500;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
   
   .rotating-insights-indicator {
     display: flex;
-    gap: 6px;
+    gap: 8px;
     align-items: center;
+    flex-shrink: 0;
   }
   
   .rotating-insights-dot {
-    width: 8px;
-    height: 8px;
+    width: 10px;
+    height: 10px;
     border-radius: 50%;
+    background: #e2e8f0;
+    transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    cursor: pointer;
+  }
+  
+  .rotating-insights-dot:hover {
     background: #cbd5e1;
-    transition: background 0.3s ease;
+    transform: scale(1.1);
   }
   
   .rotating-insights-dot.active {
-    background: #6366f1;
-    width: 24px;
-    border-radius: 4px;
+    background: linear-gradient(135deg, #6366f1, #8b5cf6);
+    width: 28px;
+    border-radius: 5px;
+    box-shadow: 0 2px 8px rgba(99, 102, 241, 0.3);
   }
   
   .rotating-insights-canvas-wrapper {
     position: relative;
-    height: 280px;
+    height: 300px;
     width: 100%;
+    padding: 8px 0;
   }
   
   @media (max-width: 768px) {
+    .rotating-insights-card {
+      padding: 20px;
+      border-radius: 20px;
+    }
+    
+    .rotating-insights-title {
+      font-size: 1.1rem;
+    }
+    
+    .rotating-insights-subtitle {
+      font-size: 0.8rem;
+    }
+    
     .rotating-insights-canvas-wrapper {
       height: 240px;
+    }
+    
+    .rotating-insights-header {
+      flex-direction: column;
+      align-items: flex-start;
+    }
+    
+    .rotating-insights-indicator {
+      width: 100%;
+      justify-content: center;
+    }
+  }
+  
+  @media (max-width: 480px) {
+    .rotating-insights-canvas-wrapper {
+      height: 220px;
     }
   }
 </style>

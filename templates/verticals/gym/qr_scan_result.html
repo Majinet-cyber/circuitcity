@@ -1,0 +1,251 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Member Check-In - {{ business.name }}{% endblock %}
+
+{% block extra_css %}
+<style>
+  :root {
+    --status-active: #10b981;
+    --status-warning: #f59e0b;
+    --status-expired: #ef4444;
+  }
+
+  body {
+    background: #f8fafc;
+  }
+
+  .scan-result-container {
+    max-width: 600px;
+    margin: 2rem auto;
+    padding: 1.5rem;
+  }
+
+  .result-card {
+    background: white;
+    border-radius: 20px;
+    padding: 2rem;
+    box-shadow: 0 10px 30px rgba(15, 23, 42, 0.1);
+    text-align: center;
+  }
+
+  .status-badge {
+    display: inline-block;
+    padding: 0.75rem 1.5rem;
+    border-radius: 50px;
+    font-weight: 700;
+    font-size: 1.1rem;
+    margin-bottom: 1.5rem;
+  }
+
+  .status-active {
+    background: linear-gradient(135deg, #10b981, #059669);
+    color: white;
+  }
+
+  .status-warning {
+    background: linear-gradient(135deg, #f59e0b, #d97706);
+    color: white;
+  }
+
+  .status-expired {
+    background: linear-gradient(135deg, #ef4444, #dc2626);
+    color: white;
+  }
+
+  .member-name {
+    font-size: 2rem;
+    font-weight: 900;
+    color: #0f172a;
+    margin-bottom: 0.5rem;
+  }
+
+  .member-phone {
+    color: #64748b;
+    font-size: 1.1rem;
+    margin-bottom: 2rem;
+  }
+
+  .info-grid {
+    display: grid;
+    gap: 1rem;
+    margin-bottom: 2rem;
+    text-align: left;
+  }
+
+  .info-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1rem;
+    background: #f8fafc;
+    border-radius: 12px;
+  }
+
+  .info-label {
+    font-weight: 600;
+    color: #64748b;
+  }
+
+  .info-value {
+    font-weight: 700;
+    color: #0f172a;
+  }
+
+  .days-indicator {
+    font-size: 3rem;
+    font-weight: 900;
+    margin: 1.5rem 0;
+  }
+
+  .days-indicator.positive {
+    color: var(--status-active);
+  }
+
+  .days-indicator.warning {
+    color: var(--status-warning);
+  }
+
+  .days-indicator.negative {
+    color: var(--status-expired);
+  }
+
+  .action-buttons {
+    display: flex;
+    gap: 1rem;
+    margin-top: 2rem;
+  }
+
+  .btn-action {
+    flex: 1;
+    padding: 1rem;
+    border: none;
+    border-radius: 12px;
+    font-weight: 700;
+    font-size: 1rem;
+    cursor: pointer;
+    transition: all 0.3s ease;
+  }
+
+  .btn-primary {
+    background: linear-gradient(135deg, #6366f1, #4f46e5);
+    color: white;
+  }
+
+  .btn-primary:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 20px rgba(99, 102, 241, 0.3);
+  }
+
+  .btn-secondary {
+    background: #f8fafc;
+    color: #0f172a;
+    border: 2px solid #e2e8f0;
+  }
+
+  .btn-secondary:hover {
+    background: #e2e8f0;
+  }
+
+  @media (max-width: 768px) {
+    .scan-result-container {
+      padding: 1rem;
+    }
+
+    .result-card {
+      padding: 1.5rem;
+    }
+
+    .member-name {
+      font-size: 1.5rem;
+    }
+
+    .action-buttons {
+      flex-direction: column;
+    }
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="scan-result-container">
+  <div class="result-card">
+    <!-- Status Badge -->
+    <div class="status-badge status-{{ status_class }}">
+      {% if status == "Active" %}
+        ✅ {{ status }}
+      {% elif status == "Expires Soon" %}
+        ⚠️ {{ status }}
+      {% else %}
+        ❌ {{ status }}
+      {% endif %}
+    </div>
+
+    <!-- Member Info -->
+    <h1 class="member-name">{{ member.name }}</h1>
+    <p class="member-phone">📱 {{ member.phone }}</p>
+
+    <!-- Days Indicator -->
+    {% if not is_expired %}
+      <div class="days-indicator {% if days_left <= 3 %}warning{% else %}positive{% endif %}">
+        {{ days_left }} day{{ days_left|pluralize }}
+      </div>
+      <p style="color: #64748b; margin-bottom: 2rem;">remaining</p>
+    {% else %}
+      <div class="days-indicator negative">
+        {{ arrears_days }} day{{ arrears_days|pluralize }}
+      </div>
+      <p style="color: #64748b; margin-bottom: 2rem;">in arrears</p>
+    {% endif %}
+
+    <!-- Info Grid -->
+    <div class="info-grid">
+      {% if member.email %}
+      <div class="info-item">
+        <span class="info-label">Email</span>
+        <span class="info-value">{{ member.email }}</span>
+      </div>
+      {% endif %}
+
+      {% if member.trainer %}
+      <div class="info-item">
+        <span class="info-label">Trainer</span>
+        <span class="info-value">{{ member.trainer.name }}</span>
+      </div>
+      {% endif %}
+
+      {% if expiry_date %}
+      <div class="info-item">
+        <span class="info-label">Expiry Date</span>
+        <span class="info-value">{{ expiry_date }}</span>
+      </div>
+      {% endif %}
+
+      <div class="info-item">
+        <span class="info-label">Member ID</span>
+        <span class="info-value">#{{ member.id }}</span>
+      </div>
+    </div>
+
+    <!-- Action Buttons -->
+    <div class="action-buttons">
+      <a href="{% url 'gym:member_detail' member.id %}" class="btn-action btn-primary">
+        View Profile
+      </a>
+      <a href="{% url 'gym:qr_scanner' %}" class="btn-action btn-secondary">
+        Scan Another
+      </a>
+    </div>
+
+    {% if is_expired %}
+    <div style="margin-top: 2rem; padding: 1rem; background: #fef3c7; border-radius: 12px; border: 2px solid #fbbf24;">
+      <strong style="color: #92400e;">⚠️ Membership Expired</strong>
+      <p style="color: #92400e; margin: 0.5rem 0 0 0; font-size: 0.9rem;">
+        Please renew membership to continue accessing the gym.
+      </p>
+    </div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}
+

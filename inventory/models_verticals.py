@@ -496,6 +496,16 @@ class GymMember(models.Model):
     phone = models.CharField(max_length=20, blank=True, default="")
     email = models.EmailField(blank=True, default="")
     
+    # QR code for check-in (unique token)
+    qr_token = models.CharField(
+        max_length=64,
+        unique=True,
+        db_index=True,
+        blank=True,
+        default="",
+        help_text="Unique QR code token for member check-in"
+    )
+    
     # Trainer assignment
     trainer = models.ForeignKey(
         GymTrainer, 
@@ -561,6 +571,16 @@ class GymMember(models.Model):
     
     def __str__(self):
         return f"{self.name} ({self.phone})"
+    
+    def save(self, *args, **kwargs):
+        """Auto-generate QR token if not set"""
+        if not self.qr_token:
+            import uuid
+            import hashlib
+            # Generate a unique, stable QR token
+            raw_token = f"{self.business_id}:{self.phone}:{uuid.uuid4().hex}"
+            self.qr_token = hashlib.sha256(raw_token.encode()).hexdigest()[:32]
+        super().save(*args, **kwargs)
     
     # ==============================================================================
     # CENTRALIZED MEMBERSHIP CALCULATION PROPERTIES

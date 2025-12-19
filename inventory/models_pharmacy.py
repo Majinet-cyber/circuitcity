@@ -58,10 +58,19 @@ class PharmacyCategory(models.TextChoices):
     GASTROINTESTINAL = "gastrointestinal", "Gastrointestinal"
     CONTRACEPTIVE = "contraceptive", "Contraceptive"
     
-    # === COSMETICS & PERSONAL CARE CATEGORIES ===
+    # === COSMETICS & PERSONAL CARE CATEGORIES (Detailed) ===
     SKIN_CARE = "skin_care", "Skin Care"
-    HAIR_CARE = "hair_care", "Hair Care"
-    PERSONAL_CARE = "personal_care", "Personal Care"
+    BODY_CARE = "body_care", "Body Care"
+    OILS = "oils", "Oils"
+    CREAMS = "creams", "Creams"
+    SERUMS = "serums", "Serums"
+    LOTIONS = "lotions", "Lotions"
+    SOAPS_CLEANSERS = "soaps_cleansers", "Soaps / Cleansers"
+    SCRUBS = "scrubs", "Scrubs"
+    ROLL_ON_DEO = "roll_on_deo", "Roll-on / Deodorants"
+    HAIR_CARE = "hair_care", "Shampoo / Hair Care"
+    PERFUMES = "perfumes", "Perfumes / Body Sprays"
+    FACE_MASK_SUNSCREEN = "face_mask_sunscreen", "Face Mask / Sunscreen"
     BEAUTY_MAKEUP = "beauty_makeup", "Beauty & Makeup"
     BABY_CARE = "baby_care", "Baby Care"
     ORAL_CARE = "oral_care", "Oral Care"

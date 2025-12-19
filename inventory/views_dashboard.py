@@ -47,52 +47,37 @@ _format_rank = _try_import("inventory.services.agent_ranking", "format_rank")
 
 def _parse_date_range(request):
     """
-    Parse date range from query parameters.
+    Parse date range from query parameters using unified filter system.
     
     Supports:
     - ?range=today
+    - ?range=yesterday
     - ?range=7d (last 7 days)
-    - ?range=mtd (month to date, DEFAULT)
+    - ?range=30d (last 30 days)
+    - ?range=month (month to date, DEFAULT)
     - ?range=custom&start=YYYY-MM-DD&end=YYYY-MM-DD
     
     Returns:
         tuple: (range_key, start_datetime, end_datetime, display_label)
     """
-    now = timezone.now()
-    today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
-    today_end = today_start + timedelta(days=1)
+    from common.utils.date_filters import parse_date_filter
     
-    range_param = request.GET.get('range', 'mtd').lower()
+    # Use unified filter parser
+    filter_data = parse_date_filter(request, default_range='month')
     
-    if range_param == 'today':
-        return ('today', today_start, today_end, 'Today')
+    # Convert date objects to timezone-aware datetimes for queries
+    start_date = filter_data['start_date']
+    end_date = filter_data['end_date']
     
-    elif range_param == '7d':
-        start = today_start - timedelta(days=7)
-        return ('7d', start, today_end, 'Last 7 Days')
+    start_dt = timezone.make_aware(datetime.combine(start_date, datetime.min.time()))
+    end_dt = timezone.make_aware(datetime.combine(end_date, datetime.max.time()))
     
-    elif range_param == 'custom':
-        # Parse custom dates from query params
-        start_str = request.GET.get('start', '')
-        end_str = request.GET.get('end', '')
-        
-        try:
-            start_date = datetime.strptime(start_str, '%Y-%m-%d').date()
-            end_date = datetime.strptime(end_str, '%Y-%m-%d').date()
-            
-            # Convert to timezone-aware datetimes
-            start_dt = timezone.make_aware(datetime.combine(start_date, datetime.min.time()))
-            end_dt = timezone.make_aware(datetime.combine(end_date, datetime.max.time()))
-            
-            label = f"{start_date.strftime('%b %d')} – {end_date.strftime('%b %d, %Y')}"
-            return ('custom', start_dt, end_dt, label)
-        except (ValueError, TypeError):
-            # Fall back to MTD if custom dates are invalid
-            pass
-    
-    # Default: month-to-date
-    month_start = today_start.replace(day=1)
-    return ('mtd', month_start, today_end, 'This Month')
+    return (
+        filter_data['range_key'],
+        start_dt,
+        end_dt,
+        filter_data['range_label']
+    )
 
 
 @login_required

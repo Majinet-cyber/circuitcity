@@ -1,4 +1,4 @@
-﻿# circuitcity/accounts/views.py
+# circuitcity/accounts/views.py
 from __future__ import annotations
 
 import hashlib
@@ -49,6 +49,7 @@ from .forms import (
     WizardStep4Form,
     ManagerWizardStep1Form,
     ManagerWizardStep2Form,
+    ManagerWizardStep2bForm,
     ManagerWizardStep3Form,
     ManagerWizardStep4Form,
 )
@@ -1138,9 +1139,10 @@ def _clear_manager_wizard_data(request):
 @require_http_methods(["GET", "POST"])
 def signup_manager(request):
     """
-    4-step wizard for manager signup:
+    4-step wizard for manager signup (with conditional step 2b):
     Step 1: Account (email, full name, password)
     Step 2: Store basics (business name, type, subdomain)
+    Step 2b (conditional): Section selection (Pharmacy/Cosmetics) - only if pharmacy or cosmetics selected
     Step 3: Brand (logo upload)
     Step 4: Review & Create
     """
@@ -1151,9 +1153,17 @@ def signup_manager(request):
                                        default="/inventory/dashboard/"))
 
     # Determine current step from query param or POST
-    step = int(request.GET.get("step", request.POST.get("step", 1)))
-    if step < 1 or step > 4:
-        step = 1
+    step_param = request.GET.get("step", request.POST.get("step", "1"))
+    # Support step 2b as string
+    if step_param == "2b":
+        step = "2b"
+    else:
+        try:
+            step = int(step_param)
+            if step < 1 or step > 4:
+                step = 1
+        except (ValueError, TypeError):
+            step = 1
 
     wizard_data = _get_manager_wizard_data(request)
 
@@ -1187,25 +1197,70 @@ def signup_manager(request):
             elif action == "next" and form.is_valid():
                 wizard_data["step2"] = form.cleaned_data
                 _set_manager_wizard_data(request, wizard_data)
-                return redirect(f"{reverse('accounts:signup_manager')}?step=3")
+                
+                # Check if we need step 2b (pharmacy/cosmetics section selection)
+                business_kind = form.cleaned_data.get("business_kind", "")
+                if business_kind in ("pharmacy", "cosmetics"):
+                    return redirect(f"{reverse('accounts:signup_manager')}?step=2b")
+                else:
+                    # Skip step 2b, go directly to step 3
+                    return redirect(f"{reverse('accounts:signup_manager')}?step=3")
         return render(request, "accounts/signup_manager_wizard_step2.html", {
             "form": form,
             "step": step,
             "total_steps": 4,
             "wizard_data": wizard_data,
         })
-
-    # Step 3: Brand
-    elif step == 3:
+    
+    # Step 2b: Section Selection (Pharmacy/Cosmetics) - conditional
+    elif step == "2b":
         # Must have completed steps 1 & 2
         if "step1" not in wizard_data or "step2" not in wizard_data:
             return redirect(f"{reverse('accounts:signup_manager')}?step=1")
+        
+        # Only show this step if business_kind is pharmacy or cosmetics
+        business_kind = wizard_data.get("step2", {}).get("business_kind", "")
+        if business_kind not in ("pharmacy", "cosmetics"):
+            # Skip this step
+            return redirect(f"{reverse('accounts:signup_manager')}?step=3")
+        
+        form = ManagerWizardStep2bForm(request.POST or None, initial=wizard_data.get("step2b", {}))
+        if request.method == "POST":
+            action = request.POST.get("action", "next")
+            if action == "back":
+                return redirect(f"{reverse('accounts:signup_manager')}?step=2")
+            elif action == "next" and form.is_valid():
+                wizard_data["step2b"] = form.cleaned_data
+                _set_manager_wizard_data(request, wizard_data)
+                return redirect(f"{reverse('accounts:signup_manager')}?step=3")
+        
+        return render(request, "accounts/signup_manager_wizard_step2b.html", {
+            "form": form,
+            "step": "2b",
+            "total_steps": 4,
+            "wizard_data": wizard_data,
+        })
+
+    # Step 3: Brand
+    elif step == 3:
+        # Must have completed steps 1 & 2 (and 2b if applicable)
+        if "step1" not in wizard_data or "step2" not in wizard_data:
+            return redirect(f"{reverse('accounts:signup_manager')}?step=1")
+        
+        # Check if step 2b is required but not completed
+        business_kind = wizard_data.get("step2", {}).get("business_kind", "")
+        if business_kind in ("pharmacy", "cosmetics") and "step2b" not in wizard_data:
+            return redirect(f"{reverse('accounts:signup_manager')}?step=2b")
 
         form = ManagerWizardStep3Form(request.POST or None, request.FILES or None, initial=wizard_data.get("step3", {}))
         if request.method == "POST":
             action = request.POST.get("action", "next")
             if action == "back":
-                return redirect(f"{reverse('accounts:signup_manager')}?step=2")
+                # Go back to step 2b if it was shown, otherwise step 2
+                if business_kind in ("pharmacy", "cosmetics"):
+                    return redirect(f"{reverse('accounts:signup_manager')}?step=2b")
+                else:
+                    return redirect(f"{reverse('accounts:signup_manager')}?step=2")
             elif action == "skip":
                 # Skip button: no logo, just store empty step3 and proceed
                 wizard_data["step3"] = {}
@@ -1255,9 +1310,14 @@ def signup_manager(request):
 
     # Step 4: Review & Create
     elif step == 4:
-        # Must have completed steps 1, 2, & 3
+        # Must have completed steps 1, 2, & 3 (and 2b if applicable)
         if "step1" not in wizard_data or "step2" not in wizard_data or "step3" not in wizard_data:
             return redirect(f"{reverse('accounts:signup_manager')}?step=1")
+        
+        # Check if step 2b is required but not completed
+        business_kind = wizard_data.get("step2", {}).get("business_kind", "")
+        if business_kind in ("pharmacy", "cosmetics") and "step2b" not in wizard_data:
+            return redirect(f"{reverse('accounts:signup_manager')}?step=2b")
 
         form = ManagerWizardStep4Form(request.POST or None)
         if request.method == "POST":
@@ -1305,6 +1365,7 @@ def _complete_manager_wizard_signup(request, wizard_data):
 
     step1 = wizard_data.get("step1", {})
     step2 = wizard_data.get("step2", {})
+    step2b = wizard_data.get("step2b", {})
     step3 = wizard_data.get("step3", {})
 
     with transaction.atomic():
@@ -1368,6 +1429,13 @@ def _complete_manager_wizard_signup(request, wizard_data):
                 bkwargs["status"] = "ACTIVE"
             if hasattr(Business, "business_kind"):
                 bkwargs["business_kind"] = business_kind
+            
+            # Set section flags (pharmacy/cosmetics)
+            if business_kind in ("pharmacy", "cosmetics"):
+                if hasattr(Business, "has_pharmacy_section"):
+                    bkwargs["has_pharmacy_section"] = step2b.get("has_pharmacy", False)
+                if hasattr(Business, "has_cosmetics_section"):
+                    bkwargs["has_cosmetics_section"] = step2b.get("has_cosmetics", False)
 
             biz = Business.objects.create(**bkwargs)
 

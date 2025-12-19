@@ -25,8 +25,10 @@ except Exception:  # pragma: no cover
         LIQUOR = "liquor", "Liquor / Bar"
         GROCERY = "grocery", "Grocery / General"
         PHARMACY = "pharmacy", "Pharmacy"
+        COSMETICS = "cosmetics", "Cosmetics"
         CLOTHING = "clothing", "Clothing"
         GYM = "gym", "Gym / Fitness"
+        CEMENT = "cement", "Cement & Hardware"
 
 User = settings.AUTH_USER_MODEL
 
@@ -93,6 +95,16 @@ class Business(models.Model):
         blank=True,
         db_index=True,
         help_text="Business vertical (drives tailored dashboards and flows).",
+    )
+    
+    # Section selections for pharmacy/cosmetics (both can be true)
+    has_pharmacy_section = models.BooleanField(
+        default=False,
+        help_text="True if this business operates a Pharmacy section"
+    )
+    has_cosmetics_section = models.BooleanField(
+        default=False,
+        help_text="True if this business operates a Cosmetics section"
     )
 
     # Optional for subdomain routing later (e.g., acme.circuit.city)

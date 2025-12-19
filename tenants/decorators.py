@@ -43,10 +43,13 @@ def require_vertical(*allowed_verticals):
             business = get_active_business(request)
             
             if not business:
-                # No business active - redirect to onboarding
+                # No business active - redirect to tenant chooser
                 if request.user.is_authenticated:
                     messages.info(request, "Please set up or join a business first.")
-                    return redirect("onboarding:start")
+                    try:
+                        return redirect("tenants:choose_business")
+                    except:
+                        return redirect("/tenants/join/")
                 raise Http404("No active business")
             
             # Get business vertical/kind
@@ -88,7 +91,10 @@ def require_business_access(view_func):
         
         if not user_has_any_business(request.user) and not request.user.is_superuser:
             messages.info(request, "Please set up or join a business first.")
-            return redirect("onboarding:start")
+            try:
+                return redirect("tenants:choose_business")
+            except:
+                return redirect("/tenants/join/")
         
         return view_func(request, *args, **kwargs)
     

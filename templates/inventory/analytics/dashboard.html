@@ -13,37 +13,16 @@
   </div>
 
   <main class="content">
-    <!-- Filters Bar (Excel-style) -->
+    <!-- Filters Bar (Excel-style with Single Filter Button) -->
     <div class="glass-card mb-4">
       <form method="get" class="analytics-filters">
-        <!-- Date Range Presets -->
+        <!-- Date Range Filter (Single Button) -->
         <div class="filter-group">
           <label class="filter-label">Date Range</label>
-          <div class="filter-pills">
-            <button type="submit" name="preset" value="today" class="filter-pill {% if date_params.active_range == 'today' %}active{% endif %}">
-              Today
-            </button>
-            <button type="submit" name="preset" value="yesterday" class="filter-pill {% if date_params.active_range == 'yesterday' %}active{% endif %}">
-              Yesterday
-            </button>
-            <button type="submit" name="preset" value="this_month" class="filter-pill {% if date_params.active_range == 'this_month' %}active{% endif %}">
-              This Month
-            </button>
-            <button type="submit" name="preset" value="last_month" class="filter-pill {% if date_params.active_range == 'last_month' %}active{% endif %}">
-              Last Month
-            </button>
-            <button type="submit" name="preset" value="custom" class="filter-pill {% if date_params.active_range == 'custom' %}active{% endif %}">
-              Custom
-            </button>
+          <div style="display:flex;gap:12px;align-items:center">
+            {% include "partials/date_filter_unified.html" with range_key=date_params.active_range start_date=date_params.start_date end_date=date_params.end_date range_label=date_params.range_label %}
+            <span style="color:#64748b;font-size:.9rem"><strong>Showing:</strong> {{ date_params.range_label|default:"All time" }}</span>
           </div>
-          {% if date_params.active_range == 'custom' or not date_params.active_range %}
-          <div style="display: flex; gap: 8px; margin-top: 8px;">
-            <input type="date" name="start" value="{{ date_params.start_date|date:'Y-m-d' }}" class="filter-date-input" style="flex: 1;">
-            <span style="align-self: center; color: #64748b;">to</span>
-            <input type="date" name="end" value="{{ date_params.end_date|date:'Y-m-d' }}" class="filter-date-input" style="flex: 1;">
-            <button type="submit" class="filter-pill" style="padding: 6px 12px;">Apply</button>
-          </div>
-          {% endif %}
         </div>
         
         <!-- Location Filter -->

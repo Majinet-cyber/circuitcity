@@ -472,14 +472,26 @@ def pharmacy_stock_in(request: HttpRequest) -> HttpResponse:
         has_barcode = request.POST.get("has_barcode", "no")
         barcode_value = request.POST.get("barcode", "").strip()
         
+        # Determine if this is a cosmetics product (vs pharmacy/medicine)
+        COSMETICS_CATEGORIES = [
+            "skin_care", "body_care", "oils", "creams", "serums", "lotions",
+            "soaps_cleansers", "scrubs", "roll_on_deo", "hair_care", "perfumes",
+            "face_mask_sunscreen", "beauty_makeup", "baby_care", "oral_care"
+        ]
+        is_cosmetics = category in COSMETICS_CATEGORIES
+        
         # Validation
         errors = []
         if not product_name:
             errors.append("Product name is required.")
-        if not batch_number:
-            errors.append("Batch number is required.")
-        if not expiry_date_str:
-            errors.append("Expiry date is required.")
+        
+        # For cosmetics: batch_number, expiry_date, and manufacture_date are OPTIONAL
+        # For pharmacy: they are REQUIRED
+        if not is_cosmetics:
+            if not batch_number:
+                errors.append("Batch number is required for pharmacy products.")
+            if not expiry_date_str:
+                errors.append("Expiry date is required for pharmacy products.")
         
         # NEW: Barcode validation (conditional)
         if has_barcode == "yes":
@@ -495,9 +507,16 @@ def pharmacy_stock_in(request: HttpRequest) -> HttpResponse:
         
         # Validate category against allowed values
         VALID_CATEGORIES = [
-            "medicine", "supplements", "skin_care", "hair_care", "body_care",
-            "baby_care", "oral_care", "perfumes", "deodorants", "makeup",
-            "soap_hygiene", "first_aid", "other"
+            # Medicine categories
+            "analgesic", "antibiotic", "antifungal", "antiviral", "antihistamine",
+            "antipyretic", "antihypertensive", "antidiabetic", "vitamin", "antiparasitic",
+            "respiratory", "gastrointestinal", "contraceptive",
+            # Cosmetics categories
+            "skin_care", "body_care", "oils", "creams", "serums", "lotions",
+            "soaps_cleansers", "scrubs", "roll_on_deo", "hair_care", "perfumes",
+            "face_mask_sunscreen", "beauty_makeup", "baby_care", "oral_care", "personal_care",
+            # General
+            "general", "other"
         ]
         if not category:
             errors.append("Category is required.")
@@ -528,12 +547,13 @@ def pharmacy_stock_in(request: HttpRequest) -> HttpResponse:
             errors.append("Invalid selling price.")
             selling = Decimal("0.00")
         
-        # Parse dates
-        try:
-            expiry_date = timezone.datetime.strptime(expiry_date_str, "%Y-%m-%d").date()
-        except (ValueError, TypeError):
-            errors.append("Invalid expiry date format.")
-            expiry_date = None
+        # Parse dates (optional for cosmetics)
+        expiry_date = None
+        if expiry_date_str:
+            try:
+                expiry_date = timezone.datetime.strptime(expiry_date_str, "%Y-%m-%d").date()
+            except (ValueError, TypeError):
+                errors.append("Invalid expiry date format.")
         
         manufacture_date = None
         if manufacture_date_str:
@@ -543,6 +563,16 @@ def pharmacy_stock_in(request: HttpRequest) -> HttpResponse:
                     errors.append("Manufacture date must be before expiry date.")
             except (ValueError, TypeError):
                 errors.append("Invalid manufacture date format.")
+        
+        # For cosmetics without expiry date, use a far-future default (e.g., 10 years)
+        if is_cosmetics and not expiry_date:
+            from datetime import date
+            expiry_date = date.today() + timedelta(days=3650)  # 10 years
+        
+        # For cosmetics without batch number, generate a default one
+        if is_cosmetics and not batch_number:
+            import uuid
+            batch_number = f"COSM-{uuid.uuid4().hex[:8].upper()}"
         
         if errors:
             for error in errors:

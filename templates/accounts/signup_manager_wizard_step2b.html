@@ -1,0 +1,231 @@
+{% load static %}
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Select your sections · Step 2b of 4 · Emajinet</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#0b1220" />
+  <style>
+    :root{
+      --ink:#0b1220;
+      --muted:#54627a;
+      --line:#d6dfed;
+      --bg1:#eef4ff; --bg2:#ffffff;
+      --blue:#3b82f6;
+      --green:#10b981;
+      --rose:#ef4444;
+
+      --shadow: 0 14px 36px rgba(15,23,42,.14), 0 1px 0 rgba(255,255,255,.6) inset;
+      --glass: color-mix(in oklab, #ffffffaa 78%, transparent);
+      --pop: cubic-bezier(.17,.67,.25,1.35);
+      --fast:160ms; --slow:420ms;
+    }
+    *{box-sizing:border-box}
+    html,body{height:100%}
+    body{
+      margin:0; color:var(--ink);
+      font:500 16px/1.45 system-ui, Segoe UI, Inter, Roboto, Arial, "Noto Sans";
+      background:
+        radial-gradient(1200px 800px at -10% -10%, rgba(34,211,238,.12), transparent 45%),
+        radial-gradient(1400px 800px at 110% 110%, rgba(59,130,246,.12), transparent 46%),
+        linear-gradient(180deg, var(--bg1), var(--bg2));
+    }
+
+    .wrap{ min-height:100dvh; display:grid; place-items:start center; padding:clamp(14px, 2.8vw, 28px); }
+    .card{
+      width:min(720px, 96vw);
+      background:var(--glass); backdrop-filter: blur(18px) saturate(120%);
+      border:1px solid var(--line); border-radius:24px; box-shadow:var(--shadow);
+      padding:clamp(16px,3.4vw,32px); animation:popIn var(--slow) var(--pop) both;
+    }
+    @keyframes popIn{ from{opacity:0; transform:translateY(8px) scale(.985)} to{opacity:1; transform:none} }
+
+    .brand{ display:flex; align-items:center; gap:.6rem; font-weight:900; color:#0b2868; margin:6px 2px 20px; }
+    .brand img{ width:22px; height:22px }
+    .page-title{ font-size:clamp(26px,3.6vw,36px); line-height:1.1; margin:.1rem 0 .5rem; font-weight:900 }
+    .subtitle{ color:var(--muted); margin:0 0 20px; }
+    .step-indicator{ color:var(--blue); font-weight:800; font-size:.9rem; margin:0 0 10px; }
+
+    .alert{ background:#fef2f2;border:1px solid #fecaca;color:#991b1b;
+            padding:.7rem 1rem;border-radius:12px;margin:0 0 12px;font-weight:700 }
+
+    form{ display:grid; gap:14px; }
+
+    /* Section cards */
+    .section-grid{ display:grid; gap:16px; margin:20px 0; }
+    .section-card{
+      background:#fff; border:2px solid var(--line); border-radius:16px;
+      padding:20px; display:flex; align-items:flex-start; gap:16px;
+      cursor:pointer; transition:all var(--fast) var(--pop);
+      position:relative;
+    }
+    .section-card:hover{ border-color:color-mix(in oklab, var(--green) 50%, white); transform:translateY(-2px); box-shadow:0 12px 28px rgba(16,185,129,.14); }
+    .section-card.selected{ border-color:var(--green); background:color-mix(in oklab, var(--green) 4%, white); box-shadow:0 8px 24px rgba(16,185,129,.16); }
+
+    .section-checkbox{
+      width:24px; height:24px; border:2px solid var(--line); border-radius:8px;
+      flex-shrink:0; display:grid; place-items:center; transition:all var(--fast);
+      background:#fff;
+    }
+    .section-card.selected .section-checkbox{
+      background:var(--green); border-color:var(--green);
+    }
+    .section-checkbox svg{
+      width:16px; height:16px; stroke:#fff; stroke-width:3; opacity:0; transition:opacity var(--fast);
+    }
+    .section-card.selected .section-checkbox svg{ opacity:1; }
+
+    .section-content{ flex:1; }
+    .section-title{ font-weight:900; font-size:1.2rem; color:#0b1220; margin:0 0 6px; }
+    .section-desc{ color:var(--muted); font-size:.92rem; }
+
+    .section-icon{
+      width:48px; height:48px; background:color-mix(in oklab, var(--green) 8%, white);
+      border-radius:12px; display:grid; place-items:center; flex-shrink:0;
+    }
+    .section-icon svg{ width:28px; height:28px; fill:var(--green); }
+
+    .actions{ display:flex; gap:12px; justify-content:flex-end; margin-top:8px; }
+    .btn{
+      border:1px solid color-mix(in oklab, var(--blue) 35%, white);
+      background:linear-gradient(180deg, var(--blue), color-mix(in oklab, var(--blue) 82%, black));
+      color:#fff; padding:12px 18px; font-weight:900; border-radius:14px; min-width:180px;
+      box-shadow:0 16px 40px rgba(59,130,246,.26);
+      transition: transform var(--fast) var(--pop), box-shadow var(--fast) var(--pop);
+      cursor:pointer;
+    }
+    .btn:hover{ transform:translateY(-1px); box-shadow:0 22px 50px rgba(59,130,246,.32) }
+    .btn:active{ transform:translateY(0) scale(.98) }
+
+    .btn.secondary{
+      background:linear-gradient(180deg,#f9fbff,#eef2ff);
+      color:#0b1f46; border-color:#cdd9f1; box-shadow:0 10px 24px rgba(2,6,23,.08);
+      min-width:auto;
+    }
+    .btn.secondary:hover{ filter:brightness(0.98) }
+
+    .err{ color:var(--rose); font-size:.92rem; margin-top:10px; font-weight:700; text-align:center; }
+
+    .footer-links{ margin-top:20px; padding-top:20px; border-top:1px solid var(--line); display:flex; gap:1rem; justify-content:center; flex-wrap:wrap; }
+    .footer-link{ color:var(--muted); text-decoration:none; font-size:.9rem; }
+    .footer-link:hover{ color:var(--blue); text-decoration:underline; }
+  </style>
+</head>
+<body>
+<div class="wrap">
+  <section class="card">
+    <div class="brand">
+      <img src="{% static 'brand/mjn-32.png' %}" alt="" />
+      <span>Emajinet</span>
+    </div>
+
+    <div class="step-indicator">Step 2b of 4</div>
+    <h1 class="page-title">Which section(s) will you operate?</h1>
+    <p class="subtitle">Select the departments your business will manage. You can choose both if you offer pharmacy products AND cosmetics.</p>
+
+    {% if messages %}
+      {% for m in messages %}
+        <div class="alert">{{ m }}</div>
+      {% endfor %}
+    {% endif %}
+
+    <form method="post" action="{% url 'accounts:signup_manager' %}?step=2b" id="sectionForm">
+      {% csrf_token %}
+      <input type="hidden" name="step" value="2b">
+
+      <div class="section-grid">
+        <!-- Pharmacy Section -->
+        <div class="section-card" data-section="pharmacy" onclick="toggleSection('pharmacy')">
+          <div class="section-icon">
+            <svg viewBox="0 0 24 24"><path d="M10 4h4v6h6v4h-6v6h-4v-6H4v-4h6z"/></svg>
+          </div>
+          <div class="section-content">
+            <div class="section-title">Pharmacy</div>
+            <div class="section-desc">Medicines, prescriptions, medical supplies, and healthcare products</div>
+          </div>
+          <div class="section-checkbox">
+            <svg viewBox="0 0 24 24" fill="none"><polyline points="20 6 9 17 4 12" /></svg>
+          </div>
+          <input type="checkbox" name="has_pharmacy" value="true" style="display:none" id="check_pharmacy">
+        </div>
+
+        <!-- Cosmetics Section -->
+        <div class="section-card" data-section="cosmetics" onclick="toggleSection('cosmetics')">
+          <div class="section-icon">
+            <svg viewBox="0 0 24 24"><path d="M3 8h2v13H3V8zm4-3h2v16H7V5zm4 6h2v10h-2V11zm4-4h2v14h-2V7zm4 2h2v12h-2V9z"/></svg>
+          </div>
+          <div class="section-content">
+            <div class="section-title">Cosmetics</div>
+            <div class="section-desc">Beauty products, skincare, body care, perfumes, and personal care items</div>
+          </div>
+          <div class="section-checkbox">
+            <svg viewBox="0 0 24 24" fill="none"><polyline points="20 6 9 17 4 12" /></svg>
+          </div>
+          <input type="checkbox" name="has_cosmetics" value="true" style="display:none" id="check_cosmetics">
+        </div>
+      </div>
+
+      <div class="err" id="errorMsg" style="display:none;">Please select at least one section (Pharmacy or Cosmetics).</div>
+
+      <div class="actions">
+        <button class="btn secondary" type="submit" name="action" value="back">← Back</button>
+        <button class="btn" type="submit" name="action" value="next">Next →</button>
+      </div>
+    </form>
+
+    <div class="footer-links">
+      <a href="{% url 'accounts:login' %}" class="footer-link">Login</a>
+      <a href="{% url 'staticpages:privacy' %}" class="footer-link">Privacy Policy</a>
+      <a href="{% url 'staticpages:terms' %}" class="footer-link">Terms & Legal</a>
+    </div>
+  </section>
+</div>
+
+<script>
+  function toggleSection(section) {
+    const card = document.querySelector(`.section-card[data-section="${section}"]`);
+    const checkbox = document.getElementById(`check_${section}`);
+    
+    if (card.classList.contains('selected')) {
+      card.classList.remove('selected');
+      checkbox.checked = false;
+    } else {
+      card.classList.add('selected');
+      checkbox.checked = true;
+    }
+    
+    // Hide error if at least one is selected
+    if (document.querySelector('.section-card.selected')) {
+      document.getElementById('errorMsg').style.display = 'none';
+    }
+  }
+
+  // Form validation
+  document.getElementById('sectionForm').addEventListener('submit', function(e) {
+    const action = e.submitter?.value;
+    if (action === 'back') return; // Allow back without validation
+    
+    const hasPharmacy = document.getElementById('check_pharmacy').checked;
+    const hasCosmetics = document.getElementById('check_cosmetics').checked;
+    
+    if (!hasPharmacy && !hasCosmetics) {
+      e.preventDefault();
+      document.getElementById('errorMsg').style.display = 'block';
+      document.getElementById('errorMsg').scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+  });
+
+  // Initialize based on form values
+  document.addEventListener('DOMContentLoaded', function() {
+    if (document.getElementById('check_pharmacy').checked) {
+      document.querySelector('.section-card[data-section="pharmacy"]').classList.add('selected');
+    }
+    if (document.getElementById('check_cosmetics').checked) {
+      document.querySelector('.section-card[data-section="cosmetics"]').classList.add('selected');
+    }
+  });
+</script>
+</body>
+</html>
+

@@ -531,4 +531,12 @@ try:
 except ImportError:
     pass  # Verticals not yet migrated
 
+# =====================================================================
+#           Import unique products admin
+# =====================================================================
+try:
+    from . import admin_unique_products  # noqa
+except ImportError:
+    pass  # Unique products not yet available
+
 

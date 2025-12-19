@@ -186,7 +186,9 @@
             <option value="clothing" {% if form.business_kind.value == 'clothing' %}selected{% endif %}>Clothing & Fashion</option>
             <option value="liquor" {% if form.business_kind.value == 'liquor' %}selected{% endif %}>Liquor / Bar</option>
             <option value="pharmacy" {% if form.business_kind.value == 'pharmacy' %}selected{% endif %}>Pharmacy</option>
+            <option value="cosmetics" {% if form.business_kind.value == 'cosmetics' %}selected{% endif %}>Cosmetics</option>
             <option value="grocery" {% if form.business_kind.value == 'grocery' %}selected{% endif %}>Grocery / General</option>
+            <option value="cement" {% if form.business_kind.value == 'cement' %}selected{% endif %}>Cement & Hardware</option>
             <option value="gym" {% if form.business_kind.value == 'gym' %}selected{% endif %}>Gym & Fitness</option>
           </select>
 
@@ -224,11 +226,23 @@
                 </span>
                 Pharmacy
               </div>
+              <div class="cc-option" data-value="cosmetics">
+                <span class="cc-icon">
+                  <svg viewBox="0 0 24 24"><path d="M3 8h2v13H3V8zm4-3h2v16H7V5zm4 6h2v10h-2V11zm4-4h2v14h-2V7zm4 2h2v12h-2V9z"/></svg>
+                </span>
+                Cosmetics
+              </div>
               <div class="cc-option" data-value="grocery">
                 <span class="cc-icon">
                   <svg viewBox="0 0 24 24"><path d="M4 7h16l-2 10H6L4 7zm5 11a2 2 0 110 4 2 2 0 010-4zm6 0a2 2 0 110 4 2 2 0 010-4z"/></svg>
                 </span>
                 Grocery / General
+              </div>
+              <div class="cc-option" data-value="cement">
+                <span class="cc-icon">
+                  <svg viewBox="0 0 24 24"><path d="M4 4h16v4H4V4zm0 6h16v2H4v-2zm2 4h12v2H6v-2zm2 4h8v2H8v-2z"/></svg>
+                </span>
+                Cement &amp; Hardware
               </div>
               <div class="cc-option" data-value="gym">
                 <span class="cc-icon">
@@ -284,7 +298,9 @@
       clothing:'<svg viewBox="0 0 24 24"><path d="M12 6a2 2 0 10-2-2h2a4 4 0 014 4l6 5v3H2v-3l10-8z"/></svg>',
       liquor:'<svg viewBox="0 0 24 24"><path d="M7 3h10v3l-3 5v7a2 2 0 0 1-4 0V11L7 6zM6 21h12"/></svg>',
       pharmacy:'<svg viewBox="0 0 24 24"><path d="M10 4h4v6h6v4h-6v6h-4v-6H4v-4h6z"/></svg>',
+      cosmetics:'<svg viewBox="0 0 24 24"><path d="M3 8h2v13H3V8zm4-3h2v16H7V5zm4 6h2v10h-2V11zm4-4h2v14h-2V7zm4 2h2v12h-2V9z"/></svg>',
       grocery:'<svg viewBox="0 0 24 24"><path d="M4 7h16l-2 10H6L4 7zm5 11a2 2 0 110 4 2 2 0 010-4zm6 0a2 2 0 110 4 2 2 0 010-4z"/></svg>',
+      cement:'<svg viewBox="0 0 24 24"><path d="M4 4h16v4H4V4zm0 6h16v2H4v-2zm2 4h12v2H6v-2zm2 4h8v2H8v-2z"/></svg>',
       gym:'<svg viewBox="0 0 24 24"><path d="M5 7h2l1-2h8l1 2h2v2h-1l1 3-1 3h1v2h-2l-1 2H8l-1-2H5v-2h1l-1-3 1-3H5z"/></svg>'
     };
     const textMap={
@@ -292,7 +308,9 @@
       clothing:'Clothing & Fashion',
       liquor:'Liquor / Bar',
       pharmacy:'Pharmacy',
+      cosmetics:'Cosmetics',
       grocery:'Grocery / General',
+      cement:'Cement & Hardware',
       gym:'Gym & Fitness'
     };
     function setValue(v){

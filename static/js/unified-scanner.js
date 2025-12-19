@@ -817,7 +817,8 @@
         navigator.vibrate([50, 100, 50]);
       }
       
-      console.log('[UnifiedScanner] Barcode detected, showing confirmation:', value);
+      console.log('[UnifiedScanner] Barcode detected and filled, showing confirmation:', value);
+      this.showStatus('✅ Barcode scanned! Review and confirm.', 'success');
     }
 
     /**

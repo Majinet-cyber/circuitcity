@@ -11,6 +11,9 @@ from .helpers import (
     CLOTHING,
     GYM,
     LIQUOR,
+    GROCERY,
+    CEMENT,
+    HARDWARE,
     business_vertical,
     product_new_url_for_business,
 )
@@ -20,6 +23,9 @@ _VERTICAL_ROUTES = {
     LIQUOR: "verticals:liquor_dashboard",
     PHARMACY: "verticals:pharmacy_dashboard",
     GYM: "verticals:gym_dashboard",
+    GROCERY: "verticals:grocery_dashboard",
+    CEMENT: "verticals:cement_dashboard",
+    HARDWARE: "verticals:hardware_dashboard",
 }
 _DEFAULT_ROUTE = "verticals:no_business"
 

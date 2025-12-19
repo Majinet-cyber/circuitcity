@@ -1,0 +1,343 @@
+{% extends "base.html" %}
+{% load humanize %}
+
+{% block title %}Unique Products - {{ business.name }}{% endblock %}
+
+{% block extra_head %}
+<style>
+    /* Premium mobile-first styling for unique products list */
+    .unique-products-header {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        padding: 2rem 1rem;
+        border-radius: 12px;
+        margin-bottom: 1.5rem;
+        box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+    }
+    
+    .unique-products-header h1 {
+        font-size: 1.75rem;
+        font-weight: 700;
+        margin: 0 0 0.5rem 0;
+    }
+    
+    .unique-products-header p {
+        font-size: 0.95rem;
+        margin: 0;
+        opacity: 0.95;
+    }
+    
+    .stats-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+        gap: 1rem;
+        margin-bottom: 1.5rem;
+    }
+    
+    .stat-card {
+        background: white;
+        border-radius: 10px;
+        padding: 1.25rem 1rem;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+        border: 1px solid #e5e7eb;
+        text-align: center;
+    }
+    
+    .stat-card .label {
+        font-size: 0.85rem;
+        color: #6b7280;
+        margin-bottom: 0.5rem;
+        font-weight: 500;
+    }
+    
+    .stat-card .value {
+        font-size: 1.5rem;
+        font-weight: 700;
+        color: #1f2937;
+    }
+    
+    .stat-card.primary .value {
+        color: #667eea;
+    }
+    
+    .stat-card.success .value {
+        color: #10b981;
+    }
+    
+    .filters-card {
+        background: white;
+        border-radius: 10px;
+        padding: 1.25rem;
+        margin-bottom: 1.5rem;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+    }
+    
+    .filters-grid {
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: 1rem;
+    }
+    
+    @media (min-width: 768px) {
+        .filters-grid {
+            grid-template-columns: 1fr 1fr auto;
+        }
+    }
+    
+    .btn-group-mobile {
+        display: flex;
+        flex-direction: column;
+        gap: 0.75rem;
+        margin-bottom: 1.5rem;
+    }
+    
+    @media (min-width: 768px) {
+        .btn-group-mobile {
+            flex-direction: row;
+        }
+    }
+    
+    .product-card {
+        background: white;
+        border-radius: 10px;
+        padding: 1.25rem;
+        margin-bottom: 1rem;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+        border-left: 4px solid #667eea;
+        transition: all 0.2s;
+    }
+    
+    .product-card:hover {
+        box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+        transform: translateY(-2px);
+    }
+    
+    .product-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        margin-bottom: 1rem;
+    }
+    
+    .product-name {
+        font-size: 1.1rem;
+        font-weight: 600;
+        color: #1f2937;
+        margin: 0 0 0.25rem 0;
+    }
+    
+    .product-barcode {
+        font-family: 'Courier New', monospace;
+        font-size: 0.9rem;
+        color: #667eea;
+        font-weight: 600;
+        background: #eef2ff;
+        padding: 0.25rem 0.75rem;
+        border-radius: 6px;
+        display: inline-block;
+    }
+    
+    .product-meta {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+        gap: 0.75rem;
+        margin-top: 1rem;
+        padding-top: 1rem;
+        border-top: 1px solid #e5e7eb;
+    }
+    
+    .meta-item {
+        text-align: center;
+    }
+    
+    .meta-label {
+        font-size: 0.75rem;
+        color: #6b7280;
+        margin-bottom: 0.25rem;
+        text-transform: uppercase;
+        font-weight: 600;
+        letter-spacing: 0.5px;
+    }
+    
+    .meta-value {
+        font-size: 1rem;
+        font-weight: 600;
+        color: #1f2937;
+    }
+    
+    .badge-vertical {
+        display: inline-block;
+        padding: 0.35rem 0.75rem;
+        border-radius: 20px;
+        font-size: 0.8rem;
+        font-weight: 600;
+        text-transform: capitalize;
+    }
+    
+    .badge-clothing {
+        background: #fef3c7;
+        color: #92400e;
+    }
+    
+    .badge-pharmacy {
+        background: #dbeafe;
+        color: #1e40af;
+    }
+    
+    .badge-cosmetics {
+        background: #fce7f3;
+        color: #9f1239;
+    }
+    
+    .badge-groceries {
+        background: #d1fae5;
+        color: #065f46;
+    }
+    
+    .empty-state {
+        text-align: center;
+        padding: 3rem 1rem;
+        background: white;
+        border-radius: 10px;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+    }
+    
+    .empty-state-icon {
+        font-size: 4rem;
+        margin-bottom: 1rem;
+        opacity: 0.3;
+    }
+    
+    .empty-state h3 {
+        font-size: 1.25rem;
+        font-weight: 600;
+        color: #1f2937;
+        margin-bottom: 0.5rem;
+    }
+    
+    .empty-state p {
+        color: #6b7280;
+        margin-bottom: 1.5rem;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid px-3 px-md-4 py-4">
+    <!-- Header -->
+    <div class="unique-products-header">
+        <h1>📦 Unique Products</h1>
+        <p>Barcode/SKU-based inventory for Fast Sell. Separate from bundled products.</p>
+    </div>
+    
+    <!-- Stats -->
+    <div class="stats-grid">
+        <div class="stat-card primary">
+            <div class="label">Total Products</div>
+            <div class="value">{{ total_products }}</div>
+        </div>
+        <div class="stat-card success">
+            <div class="label">Stock Value (Cost)</div>
+            <div class="value">K{{ total_stock_value_cost|floatformat:0|intcomma }}</div>
+        </div>
+        <div class="stat-card">
+            <div class="label">Stock Value (Selling)</div>
+            <div class="value">K{{ total_stock_value_selling|floatformat:0|intcomma }}</div>
+        </div>
+    </div>
+    
+    <!-- Action Buttons -->
+    <div class="btn-group-mobile">
+        <a href="{% url 'inventory:unique_products:create' %}" class="btn btn-primary btn-lg">
+            ➕ Create Unique Product
+        </a>
+        <a href="{% url 'inventory:unique_products:stock_in' %}" class="btn btn-success btn-lg">
+            📥 Stock In
+        </a>
+        <a href="{% url 'inventory:unique_products:sales_history' %}" class="btn btn-info btn-lg">
+            📊 Sales History
+        </a>
+    </div>
+    
+    <!-- Filters -->
+    <div class="filters-card">
+        <form method="get" action="">
+            <div class="filters-grid">
+                <div>
+                    <label for="vertical" class="form-label">Vertical</label>
+                    <select name="vertical" id="vertical" class="form-select">
+                        <option value="">All Verticals</option>
+                        {% for v_code, v_label in verticals %}
+                        <option value="{{ v_code }}" {% if vertical == v_code %}selected{% endif %}>
+                            {{ v_label }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div>
+                    <label for="search" class="form-label">Search</label>
+                    <input type="text" name="search" id="search" class="form-control" 
+                           placeholder="Name or barcode..." value="{{ search }}">
+                </div>
+                <div style="align-self: end;">
+                    <button type="submit" class="btn btn-outline-primary w-100">🔍 Filter</button>
+                </div>
+            </div>
+        </form>
+    </div>
+    
+    <!-- Products List -->
+    {% if products %}
+        <div class="products-container">
+            {% for product in products %}
+            <div class="product-card">
+                <div class="product-header">
+                    <div>
+                        <h3 class="product-name">{{ product.name }}</h3>
+                        <span class="badge-vertical badge-{{ product.vertical }}">
+                            {{ product.get_vertical_display }}
+                        </span>
+                    </div>
+                    <div class="product-barcode">
+                        {{ product.barcode }}
+                    </div>
+                </div>
+                
+                {% if product.description %}
+                <p class="text-muted mb-0" style="font-size: 0.9rem;">{{ product.description }}</p>
+                {% endif %}
+                
+                <div class="product-meta">
+                    <div class="meta-item">
+                        <div class="meta-label">Quantity</div>
+                        <div class="meta-value">{{ product.quantity|floatformat:0 }} {{ product.unit }}</div>
+                    </div>
+                    <div class="meta-item">
+                        <div class="meta-label">Cost Price</div>
+                        <div class="meta-value">K{{ product.cost_price|floatformat:0|intcomma }}</div>
+                    </div>
+                    <div class="meta-item">
+                        <div class="meta-label">Selling Price</div>
+                        <div class="meta-value" style="color: #10b981;">K{{ product.selling_price|floatformat:0|intcomma }}</div>
+                    </div>
+                    <div class="meta-item">
+                        <div class="meta-label">Stock Value</div>
+                        <div class="meta-value">K{{ product.stock_value_cost|floatformat:0|intcomma }}</div>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    {% else %}
+        <div class="empty-state">
+            <div class="empty-state-icon">📦</div>
+            <h3>No Unique Products Yet</h3>
+            <p>Create your first barcode/SKU product to get started with Fast Sell.</p>
+            <a href="{% url 'inventory:unique_products:create' %}" class="btn btn-primary btn-lg">
+                ➕ Create First Product
+            </a>
+        </div>
+    {% endif %}
+</div>
+{% endblock %}
+

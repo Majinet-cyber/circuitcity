@@ -31,11 +31,17 @@ def dashboard(request):
     metrics = base.merch_metrics(business, BusinessKind.CLOTHING)
     
     # ===== DATE FILTER PARAMS =====
-    # Use shared date range parser
-    date_range_ctx = base.parse_date_range_from_request(request)
-    range_param = date_range_ctx['active_range']
-    selected_date = date_range_ctx['selected_date']
-    date_param = date_range_ctx['date_param']
+    # Use unified date filter parser
+    from common.utils.date_filters import parse_date_filter
+    date_range_ctx = parse_date_filter(request, default_range='month')
+    range_param = date_range_ctx['range_key']
+    start_date = date_range_ctx['start_date']
+    end_date = date_range_ctx['end_date']
+    range_label = date_range_ctx['range_label']
+    
+    # For backward compatibility with existing code
+    selected_date = start_date if range_param == 'custom' else None
+    date_param = start_date.isoformat() if range_param == 'custom' else ''
     
     # ===== SALES METRICS WITH DATE FILTERING =====
     sales_data = base.clothing_sales_metrics(
@@ -97,8 +103,12 @@ def dashboard(request):
             "top_models": top_models,
             "sales_trend": sales_trend,
             
-            # Date Filter State
+            # Date Filter State (Unified)
             "active_range": range_param,
+            "range_key": range_param,
+            "start_date": start_date,
+            "end_date": end_date,
+            "range_label": range_label,
             "selected_date": selected_date,
             "date_param": date_param,
         }

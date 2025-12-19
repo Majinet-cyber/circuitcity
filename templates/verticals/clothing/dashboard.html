@@ -99,38 +99,16 @@
     </div>
   </header>
 
-  {% comment %}Date Filter Controls{% endcomment %}
-  <section class="date-filter-container">
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
-      <h3 style="margin:0;font-size:1rem;color:#64748b;text-transform:uppercase;letter-spacing:0.08em">📅 Date Range</h3>
+  {% comment %}Date Filter Controls - Unified (Single Button){% endcomment %}
+  <section class="recent-block" style="padding:16px 22px">
+    <div style="display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:space-between">
+      <div style="display:flex;gap:12px;align-items:center">
+        {% include "partials/date_filter_unified.html" with range_key=active_range start_date=start_date end_date=end_date range_label=range_label %}
+      </div>
+      <div style="font-size:.9rem;color:#64748b">
+        <strong>Showing:</strong> {{ range_label }}
+      </div>
     </div>
-    <div class="date-filter-pills">
-      <a href="?range=today" class="date-pill {% if active_range == 'today' %}active{% endif %}">
-        Today
-      </a>
-      <a href="?range=7d" class="date-pill {% if active_range == '7d' %}active{% endif %}">
-        Last 7 Days
-      </a>
-      <a href="?range=mtd" class="date-pill {% if active_range == 'mtd' %}active{% endif %}">
-        Month to Date
-      </a>
-      
-      <form method="get" class="date-input-group" style="margin-left:auto">
-        <input type="hidden" name="range" value="date">
-        <input 
-          type="date" 
-          name="date" 
-          value="{{ date_param|default:'' }}"
-          required
-        >
-        <button type="submit">Pick Date</button>
-      </form>
-    </div>
-    {% if active_range == 'date' and selected_date %}
-    <div style="margin-top:12px;padding:8px 12px;background:#eff6ff;border-radius:12px;font-size:0.85rem;color:#1e40af">
-      📆 Showing data for: <strong>{{ selected_date|date:"F j, Y" }}</strong>
-    </div>
-    {% endif %}
   </section>
 
   <section class="cc-kpi-grid">

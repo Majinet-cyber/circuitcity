@@ -94,7 +94,7 @@ def members_list(request):
 @require_business
 @require_business_kind(BusinessKind.GYM)
 def member_add(request):
-    """Add a new gym member"""
+    """Add a new gym member - Gamified wizard flow"""
     business = get_active_business(request)
     
     # Get gym settings for default fees
@@ -103,66 +103,87 @@ def member_add(request):
     except GymSettings.DoesNotExist:
         gym_settings = GymSettings.objects.create(business=business)
     
+    # Get active trainers
+    trainers = GymTrainer.objects.filter(
+        business=business,
+        is_active=True
+    ).order_by("name")
+    
     if request.method == "POST":
-        form = GymMemberForm(business, request.POST)
-        if form.is_valid():
-            with transaction.atomic():
-                member = form.save(commit=False)
-                member.business = business
-                
-                # Set fees from settings
-                member.membership_fee = gym_settings.default_membership_price
-                # Set has_trainer based on whether a trainer is assigned
-                if member.trainer:
+        # Extract wizard data
+        name = request.POST.get("name", "").strip()
+        phone = request.POST.get("phone", "").strip()
+        email = request.POST.get("email", "").strip()
+        trainer_id = request.POST.get("trainer", "").strip()
+        notes = request.POST.get("notes", "").strip()
+        has_trainer = request.POST.get("has_trainer", "false") == "true"
+        duration_days = request.POST.get("duration_days", "").strip()
+        
+        # Validate required fields
+        if not name or not phone:
+            messages.error(request, "Name and phone are required.")
+            return redirect("gym:member_add")
+        
+        try:
+            duration_days = int(duration_days) if duration_days else 30
+        except ValueError:
+            duration_days = 30
+        
+        with transaction.atomic():
+            # Create member
+            member = GymMember(
+                business=business,
+                name=name,
+                phone=phone,
+                email=email,
+                notes=notes,
+                membership_fee=gym_settings.default_membership_price,
+                has_trainer=has_trainer,
+                trainer_fee=gym_settings.default_trainer_fee if has_trainer else Decimal("0.00"),
+                status=GymMemberStatus.PENDING_PAYMENT
+            )
+            
+            # Assign trainer if provided
+            if trainer_id:
+                try:
+                    trainer = GymTrainer.objects.get(id=trainer_id, business=business)
+                    member.trainer = trainer
                     member.has_trainer = True
                     member.trainer_fee = gym_settings.default_trainer_fee
-                else:
-                    member.has_trainer = False
-                    member.trainer_fee = Decimal("0.00")
-                
-                member.save()
-                
-                # If marked as paid, activate membership for 30 days
-                mark_as_paid = form.cleaned_data.get("mark_as_paid", False)
-                if mark_as_paid:
-                    member.set_paid(
-                        payment_date=None,  # Today
-                        membership_fee=member.membership_fee,
-                        trainer_fee=member.trainer_fee,
-                        paid_by=request.user
-                    )
-                    messages.success(
-                        request, 
-                        f"Member '{member.name}' added and activated. Membership valid until {member.membership_end.strftime('%Y-%m-%d')}."
-                    )
-                else:
-                    member.status = GymMemberStatus.PENDING_PAYMENT
-                    member.save(update_fields=["status"])
-                    messages.success(request, f"Member '{member.name}' added. Remember to mark as paid when payment is received.")
-                
-                # Log the creation
-                GymMemberLog.objects.create(
-                    member=member,
-                    action=GymMemberAction.CREATED,
-                    changes={
-                        "name": member.name, 
-                        "phone": member.phone, 
-                        "email": member.email,
-                        "trainer": member.trainer.name if member.trainer else None,
-                        "marked_as_paid": mark_as_paid
-                    },
-                    performed_by=request.user
-                )
+                except GymTrainer.DoesNotExist:
+                    pass
             
+            member.save()
+            
+            # Log the creation
+            GymMemberLog.objects.create(
+                member=member,
+                action=GymMemberAction.CREATED,
+                changes={
+                    "name": member.name, 
+                    "phone": member.phone, 
+                    "email": member.email,
+                    "trainer": member.trainer.name if member.trainer else None,
+                    "duration_days": duration_days,
+                    "has_trainer": has_trainer,
+                },
+                performed_by=request.user
+            )
+            
+            messages.success(
+                request, 
+                f"✅ Member '{member.name}' created successfully! Remember to record their payment to activate the membership."
+            )
             return redirect("gym:member_detail", member_id=member.id)
-    else:
-        form = GymMemberForm(business)
     
-    return render(request, "inventory/gym/member_form.html", {
-        "form": form,
+    # Calculate total with trainer
+    total_with_trainer = gym_settings.default_membership_price + gym_settings.default_trainer_fee
+    
+    return render(request, "inventory/gym/member_add_wizard.html", {
         "business": business,
         "gym_settings": gym_settings,
-        "title": "Add New Member",
+        "trainers": trainers,
+        "total_with_trainer": total_with_trainer,
     })
 
 

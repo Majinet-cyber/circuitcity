@@ -527,7 +527,7 @@ def user_has_any_business(user) -> bool:
 def require_business_membership(view_func):
     """
     Decorator: Requires user to have an active business membership.
-    Redirects to onboarding if no membership exists.
+    Redirects to tenant chooser if no membership exists.
     """
     @wraps(view_func)
     def wrapper(request, *args, **kwargs):
@@ -536,7 +536,8 @@ def require_business_membership(view_func):
         
         if not user_has_any_business(request.user):
             messages.info(request, "Please set up or join a business first.")
-            return redirect(_safe_reverse("onboarding:start", "/onboarding/"))
+            # Redirect to tenants chooser/join page
+            return redirect(_safe_reverse("tenants:choose_business", "/tenants/join/"))
         
         return view_func(request, *args, **kwargs)
     

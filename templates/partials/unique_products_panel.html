@@ -1,0 +1,47 @@
+{% comment %}
+    Unique Products Panel - Premium card to display at top of Stock/Inventory pages
+    for verticals with Fast Sell (Clothing, Pharmacy, Cosmetics, Groceries).
+    
+    Usage:
+    {% include "partials/unique_products_panel.html" with vertical="groceries" %}
+{% endcomment %}
+
+<div class="unique-products-panel card shadow-sm mb-4" style="border-left: 4px solid #667eea; overflow: hidden;">
+    <div class="card-body" style="background: linear-gradient(135deg, #667eea15 0%, #764ba215 100%);">
+        <div class="row align-items-center">
+            <div class="col-md-8 mb-3 mb-md-0">
+                <h4 class="mb-2" style="color: #667eea; font-weight: 700;">
+                    📦 Unique Products
+                </h4>
+                <p class="mb-2" style="font-size: 0.95rem; color: #4b5563;">
+                    Manage barcode/SKU products separately for Fast Sell. Unique Products have individual codes 
+                    and work alongside your bundled stock.
+                </p>
+                <div class="d-flex flex-wrap gap-2 mt-3">
+                    <a href="{% url 'inventory:unique_products:list' %}?vertical={{ vertical }}" 
+                       class="btn btn-sm btn-outline-primary"
+                       style="border-radius: 20px; font-weight: 600;">
+                        📋 View Unique Products
+                    </a>
+                    <a href="{% url 'inventory:unique_products:create' %}?vertical={{ vertical }}" 
+                       class="btn btn-sm btn-primary"
+                       style="border-radius: 20px; font-weight: 600; background: #667eea; border-color: #667eea;">
+                        ➕ Create Unique Product
+                    </a>
+                    <a href="{% url 'inventory:unique_products:stock_in' %}" 
+                       class="btn btn-sm btn-success"
+                       style="border-radius: 20px; font-weight: 600;">
+                        📥 Stock In
+                    </a>
+                </div>
+            </div>
+            <div class="col-md-4 text-center">
+                <div style="font-size: 4rem; opacity: 0.3;">📦</div>
+                <p class="mb-0" style="font-size: 0.85rem; color: #6b7280; font-weight: 600;">
+                    Separate from bundled products
+                </p>
+            </div>
+        </div>
+    </div>
+</div>
+

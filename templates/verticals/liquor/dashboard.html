@@ -22,28 +22,173 @@
 {% include "partials/dashboard_payment_mix.html" %}
 
 <style>
-  .vertical-page{display:flex;flex-direction:column;gap:18px;padding:18px}
-  .vertical-hero{background:linear-gradient(120deg,#a855f7,#ec4899);padding:24px;border-radius:20px;color:#fff;display:flex;flex-wrap:wrap;gap:18px;align-items:center;justify-content:space-between}
-  .vertical-hero h1{margin:0;font-size:clamp(24px,3vw,32px)}
-  .vertical-hero p{margin:4px 0 0}
-  .hero-actions{display:flex;gap:12px;flex-wrap:wrap}
-  .hero-actions a{border-radius:999px;padding:10px 16px;font-weight:700;text-decoration:none}
-  .hero-actions .primary{background:#fff;color:#111827}
-  .hero-actions .ghost{border:1px solid rgba(255,255,255,.8);color:#fff}
-  /* Mobile-first dashboard fixes */
-  .metrics-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:16px;min-width:0;overflow:hidden}
-  .metric-card{background:#fff;border-radius:18px;padding:18px;box-shadow:0 10px 30px rgba(15,23,42,.08);min-width:0;overflow:hidden}
-  .metric-card h3{margin:0;font-size:.9rem;text-transform:uppercase;color:#64748b}
-  .metric-card p{margin:6px 0 0;font-size:1.8rem;font-weight:800;color:#0f172a;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-  .metric-card small{display:block;margin-top:4px;font-size:.85rem;overflow-wrap:break-word}
-  @media (max-width:640px){
-    .metric-card p{font-size:clamp(1.3rem,5vw,1.8rem)}
-    .metrics-grid{grid-template-columns:1fr}
+  /* ===== MOBILE-FIRST LIQUOR DASHBOARD ===== */
+  .vertical-page{
+    display:flex;
+    flex-direction:column;
+    gap:24px;
+    padding:clamp(12px,3vw,24px);
+    max-width:1400px;
+    margin:0 auto;
   }
-  .recent-block{background:#fff;border-radius:20px;padding:18px;box-shadow:0 10px 30px rgba(15,23,42,.08)}
-  .recent-list{list-style:none;margin:0;padding:0;display:grid;gap:12px}
-  .recent-item{display:flex;justify-content:space-between;gap:12px;border:1px solid #e2e8f0;border-radius:16px;padding:14px}
-  .badge{display:inline-flex;align-items:center;gap:6px;border-radius:20px;padding:4px 10px;font-size:.75rem;font-weight:700}
+  
+  .vertical-hero{
+    background:linear-gradient(120deg,#a855f7,#ec4899);
+    padding:clamp(20px,4vw,32px);
+    border-radius:20px;
+    color:#fff;
+    display:flex;
+    flex-direction:column;
+    gap:20px;
+  }
+  
+  .vertical-hero h1{
+    margin:0;
+    font-size:clamp(24px,5vw,36px);
+    font-weight:800;
+  }
+  
+  .vertical-hero p{margin:4px 0 0;font-size:clamp(14px,2vw,16px)}
+  
+  .hero-actions{
+    display:flex;
+    gap:12px;
+    flex-wrap:wrap;
+    width:100%;
+  }
+  
+  .hero-actions a{
+    border-radius:999px;
+    padding:12px 20px;
+    font-weight:700;
+    text-decoration:none;
+    transition:all 0.2s;
+  }
+  
+  .hero-actions .primary{background:#fff;color:#111827}
+  .hero-actions .ghost{border:2px solid rgba(255,255,255,.8);color:#fff}
+  .hero-actions a:hover{transform:translateY(-2px);opacity:0.9}
+  
+  /* ===== METRICS GRID (Mobile-First) ===== */
+  .metrics-grid{
+    display:grid;
+    grid-template-columns:1fr;
+    gap:16px;
+    min-width:0;
+  }
+  
+  .metric-card{
+    background:#fff;
+    border-radius:18px;
+    padding:20px;
+    box-shadow:0 4px 20px rgba(15,23,42,.08);
+    min-width:0;
+    transition:all 0.3s;
+  }
+  
+  .metric-card:hover{
+    transform:translateY(-4px);
+    box-shadow:0 8px 30px rgba(15,23,42,.12);
+  }
+  
+  .metric-card h3{
+    margin:0 0 12px 0;
+    font-size:.95rem;
+    text-transform:uppercase;
+    color:#64748b;
+    font-weight:600;
+    letter-spacing:0.5px;
+  }
+  
+  .metric-card p{
+    margin:0;
+    font-size:clamp(1.5rem,6vw,2rem);
+    font-weight:800;
+    color:#0f172a;
+    line-height:1.2;
+    word-wrap:break-word;
+  }
+  
+  .metric-card small{
+    display:block;
+    margin-top:8px;
+    font-size:.9rem;
+    color:#64748b;
+    line-height:1.4;
+  }
+  
+  /* ===== TABLET+ (2 columns) ===== */
+  @media (min-width:640px){
+    .metrics-grid{
+      grid-template-columns:repeat(2,1fr);
+      gap:20px;
+    }
+    
+    .vertical-hero{
+      flex-direction:row;
+      align-items:center;
+      justify-content:space-between;
+    }
+    
+    .hero-actions{
+      width:auto;
+    }
+  }
+  
+  /* ===== DESKTOP (3+ columns) ===== */
+  @media (min-width:1024px){
+    .metrics-grid{
+      grid-template-columns:repeat(3,1fr);
+    }
+  }
+  
+  /* ===== PANELS ===== */
+  .recent-block{
+    background:#fff;
+    border-radius:20px;
+    padding:clamp(18px,4vw,24px);
+    box-shadow:0 4px 20px rgba(15,23,42,.08);
+  }
+  
+  .recent-block h2{
+    font-size:clamp(1rem,2.5vw,1.25rem);
+  }
+  
+  .recent-list{
+    list-style:none;
+    margin:0;
+    padding:0;
+    display:grid;
+    gap:12px;
+  }
+  
+  .recent-item{
+    display:flex;
+    flex-direction:column;
+    gap:8px;
+    border:1px solid #e2e8f0;
+    border-radius:16px;
+    padding:16px;
+  }
+  
+  @media (min-width:640px){
+    .recent-item{
+      flex-direction:row;
+      justify-content:space-between;
+      align-items:center;
+    }
+  }
+  
+  .badge{
+    display:inline-flex;
+    align-items:center;
+    gap:6px;
+    border-radius:20px;
+    padding:6px 12px;
+    font-size:.8rem;
+    font-weight:700;
+  }
+  
   .badge.shots{background:#fef9c3;color:#b45309}
   .badge.scan{background:#ecfeff;color:#0369a1}
 </style>
@@ -64,34 +209,34 @@
   </header>
 
   <!-- Financial KPIs: Enhanced with cost breakdown -->
-  <section class="metrics-grid" style="grid-template-columns:repeat(auto-fit,minmax(200px,1fr))">
+  <section class="metrics-grid">
     <article class="metric-card">
-      <h3>Revenue ({{ period_days }} days)</h3>
+      <h3>💰 Revenue ({{ period_days }} days)</h3>
       <p style="color:#16a34a">MK {{ revenue|floatformat:2|default:"0.00" }}</p>
-      <small style="color:#64748b">Total sales revenue</small>
+      <small>Total sales revenue</small>
     </article>
     <article class="metric-card">
-      <h3>Inventory Costs</h3>
+      <h3>📦 Inventory Costs</h3>
       <p>MK {{ inventory_costs|floatformat:2|default:"0.00" }}</p>
-      <small style="color:#64748b">Cost of goods sold</small>
+      <small>Cost of goods sold</small>
     </article>
     <article class="metric-card">
-      <h3>Admin Costs ({{ period_days }} days)</h3>
+      <h3>⚙️ Admin Costs ({{ period_days }} days)</h3>
       <p>MK {{ admin_costs|floatformat:2|default:"0.00" }}</p>
-      <small style="color:#64748b">Operational expenses</small>
+      <small>Operational expenses</small>
     </article>
     <article class="metric-card">
-      <h3>Total Costs</h3>
+      <h3>💸 Total Costs</h3>
       <p style="color:#dc2626">MK {{ total_costs|floatformat:2|default:"0.00" }}</p>
-      <small style="color:#64748b">Inventory + Admin</small>
+      <small>Inventory + Admin</small>
     </article>
-    <article class="metric-card" style="grid-column:span 2">
-      <h3>{% if net_profit >= 0 %}Net Profit{% else %}Net Loss{% endif %} ({{ period_days }} days)</h3>
-      <p style="{% if net_profit < 0 %}color:#dc2626{% else %}color:#16a34a{% endif %};font-size:2.2rem">MK {{ net_profit|floatformat:2|default:"0.00" }}</p>
-      <small style="color:#64748b">Revenue minus all costs</small>
+    <article class="metric-card" style="grid-column:span 1">
+      <h3>{% if net_profit >= 0 %}✅ Net Profit{% else %}⚠️ Net Loss{% endif %} ({{ period_days }} days)</h3>
+      <p style="{% if net_profit < 0 %}color:#dc2626{% else %}color:#16a34a{% endif %}">MK {{ net_profit|floatformat:2|default:"0.00" }}</p>
+      <small>Revenue minus all costs</small>
       {% if net_profit < 0 %}
-        <div style="margin-top:10px;padding:8px;background:#fef2f2;border-left:3px solid #dc2626;border-radius:6px">
-          <small style="color:#991b1b;font-weight:600">⚠️ Loss period - review costs and pricing</small>
+        <div style="margin-top:12px;padding:12px;background:#fef2f2;border-left:3px solid #dc2626;border-radius:8px">
+          <small style="color:#991b1b;font-weight:600;font-size:.85rem">⚠️ Loss period - review costs and pricing</small>
         </div>
       {% endif %}
     </article>

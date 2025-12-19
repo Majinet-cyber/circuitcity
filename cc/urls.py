@@ -587,6 +587,9 @@ urlpatterns += [
     path("gym/", include_or_raise("inventory.urls_gym", "gym")),
     path("liquor/", include_or_raise("inventory.urls_liquor", "liquor")),
     path("pharmacy/", include_or_raise("inventory.urls_pharmacy", "pharmacy")),
+    path("grocery/", include_or_raise("inventory.urls_grocery", "grocery")),
+    path("cement/", include_or_raise("inventory.urls_cement", "cement")),
+    path("hardware/", include_or_raise("inventory.urls_hardware", "hardware")),
 
     # App router for cross-vertical features (analytics, etc.)
     path("app/", include(("core.urls_app_router", "app_router"), namespace="app_router")),
