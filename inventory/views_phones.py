@@ -572,7 +572,8 @@ def phone_scan_sell(request: HttpRequest) -> HttpResponse:
             f"{profit_msg} · {target_msg}"
         )
         
-        return redirect("inventory:phone_scan_sell")
+        # FIXED: Redirect to phones dashboard (not scan-sell page)
+        return redirect("inventory_verticals:phones_dashboard")
         
     except Exception as e:
         messages.error(request, f"Failed to record sale: {str(e)}")

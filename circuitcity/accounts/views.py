@@ -316,11 +316,10 @@ def _post_login_url(request=None) -> str:
     """
     Best-effort landing page after successful login.
     
-    Prioritizes dashboard (NOT analytics/insights).
-    For phone businesses: redirect to phones dashboard.
-    Otherwise: prefer general dashboard; fall back to inventory dashboard/list.
+    CRITICAL: Always redirect to vertical dashboard (NOT analytics/insights).
+    Routes by business_kind: phones → phones dashboard, liquor → liquor dashboard, etc.
     """
-    # If we have a request with an active business, check if it's phones
+    # If we have a request with an active business, route to vertical dashboard
     if request:
         business = getattr(request, 'business', None)
         if not business:
@@ -333,20 +332,36 @@ def _post_login_url(request=None) -> str:
             except Exception:
                 pass
         
-        # Redirect phones businesses to their dedicated dashboard
+        # Redirect to vertical-specific dashboard based on business_kind
         if business:
             try:
                 from inventory.business_kinds import BusinessKind
                 business_kind = getattr(business, 'business_kind', None)
-                if business_kind == BusinessKind.PHONES or business_kind == 'phones':
+                
+                # Map business_kind to vertical dashboard
+                vertical_routes = {
+                    BusinessKind.PHONES: "inventory_verticals:phones_dashboard",
+                    'phones': "inventory_verticals:phones_dashboard",
+                    BusinessKind.LIQUOR: "inventory_verticals:liquor_dashboard",
+                    'liquor': "inventory_verticals:liquor_dashboard",
+                    BusinessKind.CLOTHING: "inventory_verticals:clothing_dashboard",
+                    'clothing': "inventory_verticals:clothing_dashboard",
+                    BusinessKind.PHARMACY: "inventory_verticals:pharmacy_dashboard",
+                    'pharmacy': "inventory_verticals:pharmacy_dashboard",
+                    BusinessKind.GYM: "inventory_verticals:gym_dashboard",
+                    'gym': "inventory_verticals:gym_dashboard",
+                }
+                
+                route = vertical_routes.get(business_kind)
+                if route:
                     try:
-                        return reverse("inventory_verticals:phones_dashboard")
+                        return reverse(route)
                     except NoReverseMatch:
                         pass
             except Exception:
                 pass
     
-    # Default landing pages (prioritize dashboard:home, NOT analytics/insights)
+    # Fallback: try generic dashboard routes (NOT analytics)
     for name in (
         "dashboard:home",
         "dashboard:dashboard_home",

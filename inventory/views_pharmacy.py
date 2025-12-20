@@ -441,15 +441,331 @@ def pharmacy_dashboard(request: HttpRequest) -> HttpResponse:
 
 
 # ==============================================================================
-# GAMIFIED STOCK IN (Vertical-aware)
+# GAMIFIED STOCK IN WIZARD (Card-Based Flow)
+# ==============================================================================
+
+@login_required
+@require_business
+def pharmacy_stock_in_wizard(request: HttpRequest) -> HttpResponse:
+    """
+    NEW: Gamified wizard-based stock-in flow with card selections.
+    Multi-step process: Category → Subcategory/Product → Details → Save
+    Uses session to track wizard state across steps.
+    """
+    from inventory.pharmacy_constants import (
+        get_top_categories,
+        get_subcategories_for_category,
+        get_items_for_subcategory,
+        get_items_for_top_category,
+    )
+    
+    business: Business = request.business
+    
+    # Handle form submission
+    if request.method == "POST":
+        action = request.POST.get("action", "next")
+        
+        # Jump action - allow user to jump to any previous step (clickable breadcrumb)
+        if action == "jump":
+            target_step = int(request.POST.get("jump_to_step", 1))
+            current_step = int(request.POST.get("wizard_step", 1))
+            
+            # Only allow jumping backwards (to completed steps)
+            if target_step < current_step:
+                request.session["pharmacy_wizard_step"] = target_step
+                # Clear selections for steps after the target
+                if target_step <= 1:
+                    request.session.pop("pharmacy_wizard_category", None)
+                    request.session.pop("pharmacy_wizard_subcategory", None)
+                    request.session.pop("pharmacy_wizard_item", None)
+                elif target_step <= 2:
+                    request.session.pop("pharmacy_wizard_subcategory", None)
+                    request.session.pop("pharmacy_wizard_item", None)
+                elif target_step <= 3:
+                    request.session.pop("pharmacy_wizard_item", None)
+            
+            return redirect("pharmacy:stock_in_wizard")
+        
+        # Back button - decrement step
+        if action == "back":
+            current_step = int(request.POST.get("wizard_step", 1))
+            request.session["pharmacy_wizard_step"] = max(1, current_step - 1)
+            # Clear selections if going back to earlier steps
+            if current_step <= 2:
+                request.session.pop("pharmacy_wizard_category", None)
+            if current_step <= 3:
+                request.session.pop("pharmacy_wizard_subcategory", None)
+                request.session.pop("pharmacy_wizard_item", None)
+            return redirect("pharmacy:stock_in_wizard")
+        
+        # Save action - final step
+        if action == "save":
+            return _handle_wizard_save(request, business)
+        
+        # Next button - advance to next step
+        current_step = int(request.POST.get("wizard_step", 1))
+        
+        if current_step == 1:
+            # Step 1: Category selected
+            selected_category = request.POST.get("selected_category", "").strip()
+            if selected_category:
+                request.session["pharmacy_wizard_category"] = selected_category
+                request.session["pharmacy_wizard_step"] = 2
+            return redirect("pharmacy:stock_in_wizard")
+        
+        elif current_step == 2:
+            # Step 2: Subcategory or Item selected
+            selected_subcategory = request.POST.get("selected_subcategory", "").strip()
+            selected_item = request.POST.get("selected_item", "").strip()
+            
+            if selected_subcategory:
+                request.session["pharmacy_wizard_subcategory"] = selected_subcategory
+                request.session["pharmacy_wizard_step"] = 3
+            elif selected_item:
+                request.session["pharmacy_wizard_item"] = selected_item
+                request.session["pharmacy_wizard_step"] = 4  # Skip to details
+            
+            return redirect("pharmacy:stock_in_wizard")
+        
+        elif current_step == 3:
+            # Step 3: Specific item selected (for subcategories)
+            selected_item = request.POST.get("selected_item", "").strip()
+            if selected_item:
+                request.session["pharmacy_wizard_item"] = selected_item
+                request.session["pharmacy_wizard_step"] = 4
+            return redirect("pharmacy:stock_in_wizard")
+    
+    # GET: Display current step
+    step = request.session.get("pharmacy_wizard_step", 1)
+    selected_category = request.session.get("pharmacy_wizard_category", "")
+    selected_subcategory = request.session.get("pharmacy_wizard_subcategory", "")
+    selected_item = request.session.get("pharmacy_wizard_item", "")
+    
+    # Check for success flag
+    success_data = None
+    if request.session.get("pharmacy_wizard_success"):
+        success_data = {
+            "product_name": request.session.get("last_product_name"),
+            "quantity": request.session.get("last_quantity"),
+        }
+        # Clear success data
+        request.session.pop("pharmacy_wizard_success", None)
+        request.session.pop("last_product_name", None)
+        request.session.pop("last_quantity", None)
+        # Reset wizard
+        request.session["pharmacy_wizard_step"] = 1
+        request.session.pop("pharmacy_wizard_category", None)
+        request.session.pop("pharmacy_wizard_subcategory", None)
+        request.session.pop("pharmacy_wizard_item", None)
+    
+    # Build context based on current step
+    ctx = {
+        "step": step,
+        "success_data": success_data,
+        "selected_category": selected_category,
+        "selected_subcategory": selected_subcategory,
+        "selected_item": selected_item,
+    }
+    
+    if step == 1:
+        # Step 1: Show top-level categories
+        ctx["top_categories"] = get_top_categories()
+    
+    elif step == 2:
+        # Step 2: Show subcategories or items based on selected category
+        category_labels = {cat["key"]: cat["label"] for cat in get_top_categories()}
+        ctx["selected_category_label"] = category_labels.get(selected_category, selected_category)
+        
+        subcategories = get_subcategories_for_category(selected_category)
+        if subcategories:
+            ctx["subcategories"] = subcategories
+        else:
+            # Direct items for this category
+            ctx["items"] = get_items_for_top_category(selected_category)
+    
+    elif step == 3:
+        # Step 3: Show specific items for selected subcategory
+        category_labels = {cat["key"]: cat["label"] for cat in get_top_categories()}
+        ctx["selected_category_label"] = category_labels.get(selected_category, selected_category)
+        
+        subcategories = get_subcategories_for_category(selected_category)
+        subcat_labels = {sub["key"]: sub["label"] for sub in subcategories}
+        ctx["selected_subcategory_label"] = subcat_labels.get(selected_subcategory, selected_subcategory)
+        
+        ctx["show_item_selection"] = True
+        ctx["items"] = get_items_for_subcategory(selected_category, selected_subcategory)
+    
+    return render(request, "verticals/pharmacy/stock_in_wizard.html", ctx)
+
+
+def _handle_wizard_save(request: HttpRequest, business: Business) -> HttpResponse:
+    """Handle the final save step of the pharmacy wizard."""
+    # Extract form data
+    product_name = request.POST.get("product_name", "").strip()
+    unit_type = request.POST.get("unit_type", "").strip()
+    quantity = request.POST.get("quantity", "0")
+    cost_price = request.POST.get("cost_price", "0")
+    selling_price = request.POST.get("selling_price", "0")
+    batch_number = request.POST.get("batch_number", "").strip()
+    expiry_date_str = request.POST.get("expiry_date", "")
+    supplier = request.POST.get("supplier", "").strip()
+    has_barcode = request.POST.get("has_barcode", "no")
+    barcode_value = request.POST.get("barcode", "").strip()
+    
+    # Get selected category from session to determine if expiry is required
+    selected_category = request.session.get("pharmacy_wizard_category", "")
+    is_cosmetics = (selected_category == "cosmetics")
+    
+    # Validation
+    errors = []
+    if not product_name:
+        errors.append("Product name is required.")
+    if not batch_number:
+        errors.append("Batch number is required.")
+    
+    # Expiry date validation: REQUIRED for Medicines, OPTIONAL for Cosmetics
+    if not is_cosmetics and not expiry_date_str:
+        errors.append("Expiry date is required for medicines.")
+    
+    # Barcode validation
+    if has_barcode == "yes":
+        if not barcode_value:
+            errors.append("Barcode is required when 'Has Barcode' is Yes.")
+        else:
+            from inventory.utils_barcodes import validate_barcode, normalize_barcode
+            is_valid, error_msg = validate_barcode(barcode_value)
+            if not is_valid:
+                errors.append(f"Invalid barcode: {error_msg}")
+            else:
+                barcode_value = normalize_barcode(barcode_value)
+    
+    try:
+        qty = int(quantity)
+        if qty <= 0:
+            errors.append("Quantity must be greater than 0.")
+    except (ValueError, TypeError):
+        errors.append("Invalid quantity.")
+        qty = 0
+    
+    try:
+        cost = Decimal(cost_price)
+        if cost < 0:
+            errors.append("Cost price cannot be negative.")
+    except (ValueError, TypeError):
+        errors.append("Invalid cost price.")
+        cost = Decimal("0.00")
+    
+    try:
+        selling = Decimal(selling_price)
+        if selling < 0:
+            errors.append("Selling price cannot be negative.")
+    except (ValueError, TypeError):
+        errors.append("Invalid selling price.")
+        selling = Decimal("0.00")
+    
+    # Parse expiry date (optional for cosmetics, required for medicines)
+    expiry_date = None
+    if expiry_date_str:
+        try:
+            expiry_date = timezone.datetime.strptime(expiry_date_str, "%Y-%m-%d").date()
+        except (ValueError, TypeError):
+            errors.append("Invalid expiry date format.")
+            expiry_date = None
+    
+    # For medicines, expiry date must be parsed successfully
+    if not is_cosmetics and not expiry_date:
+        errors.append("Valid expiry date is required for medicines.")
+    
+    if errors:
+        for error in errors:
+            messages.error(request, error)
+        return redirect("pharmacy:stock_in_wizard")
+    
+    # Create or get product
+    with transaction.atomic():
+        product, created = MerchProduct.objects.get_or_create(
+            business=business,
+            name=product_name,
+            kind="pharmacy",
+            defaults={
+                "is_active": True,
+                "category": "medicine",  # Default category
+                "cost_price": cost,
+                "selling_price": selling,
+            }
+        )
+        
+        if not created:
+            # Update if prices changed
+            if product.cost_price != cost or product.selling_price != selling:
+                product.cost_price = cost
+                product.selling_price = selling
+                product.save()
+        
+        # Store barcode if provided
+        if has_barcode == "yes" and barcode_value:
+            from inventory.utils_barcodes import set_barcode
+            set_barcode(product, barcode_value)
+            product.save()
+        
+        # Check for duplicate batch
+        existing_batch = PharmacyBatch.objects.filter(
+            business=business,
+            merch_product=product,
+            batch_number=batch_number,
+            expiry_date=expiry_date
+        ).first()
+        
+        if existing_batch:
+            # Update existing batch quantity
+            existing_batch.quantity += qty
+            existing_batch.cost_price = cost
+            existing_batch.selling_price = selling
+            if supplier:
+                existing_batch.supplier = supplier
+            existing_batch.save()
+            messages.success(
+                request,
+                f"✅ Stock updated! Added {qty} units to existing batch. Total: {existing_batch.quantity}"
+            )
+        else:
+            # Create new batch
+            PharmacyBatch.objects.create(
+                business=business,
+                merch_product=product,
+                batch_number=batch_number,
+                expiry_date=expiry_date,
+                quantity=qty,
+                cost_price=cost,
+                selling_price=selling,
+                supplier=supplier,
+                received_date=timezone.now().date(),
+                reorder_level=10,
+            )
+            messages.success(
+                request,
+                f"🎉 Stock added successfully! {product_name} - {qty} units (Batch: {batch_number})"
+            )
+        
+        # Store success flag in session
+        request.session["pharmacy_wizard_success"] = True
+        request.session["last_product_name"] = product_name
+        request.session["last_quantity"] = qty
+    
+    return redirect("pharmacy:stock_in_wizard")
+
+
+# ==============================================================================
+# GAMIFIED STOCK IN (Vertical-aware - LEGACY FORM-BASED)
 # ==============================================================================
 
 @login_required
 @require_business
 def pharmacy_stock_in(request: HttpRequest) -> HttpResponse:
     """
-    Gamified Stock In panel for pharmacy vertical.
+    LEGACY: Form-based stock-in (kept as fallback).
     Single-page form for adding new stock with validation and celebration.
+    NEW USERS SHOULD USE pharmacy_stock_in_wizard INSTEAD.
     """
     business: Business = request.business
     

@@ -9,6 +9,227 @@ Import from there, not here. This file contains only helper constants and functi
 from django.db import models
 
 
+# ==============================================================================
+# GAMIFIED WIZARD: Top-Level Categories (Malawi Systematic)
+# ==============================================================================
+
+PHARMACY_TOP_CATEGORIES = [
+    {"key": "medicines", "label": "Medicines", "icon": "💊", "color": "#3b82f6"},
+    {"key": "first_aid", "label": "First Aid", "icon": "🩹", "color": "#ef4444"},
+    {"key": "chronic", "label": "Chronic / BP & Diabetes", "icon": "❤️", "color": "#dc2626"},
+    {"key": "cold_flu", "label": "Cold & Flu", "icon": "🤧", "color": "#06b6d4"},
+    {"key": "stomach", "label": "Stomach / Digestive", "icon": "🩺", "color": "#8b5cf6"},
+    {"key": "allergy", "label": "Allergy", "icon": "🌸", "color": "#ec4899"},
+    {"key": "womens_health", "label": "Women's Health", "icon": "💝", "color": "#f472b6"},
+    {"key": "child_health", "label": "Child Health", "icon": "👶", "color": "#fbbf24"},
+    {"key": "vitamins", "label": "Vitamins & Supplements", "icon": "💪", "color": "#10b981"},
+    {"key": "cosmetics", "label": "Cosmetics & Personal Care", "icon": "✨", "color": "#a855f7"},
+]
+
+# Medicine Subcategories (when user selects "Medicines")
+MEDICINE_SUBCATEGORIES = [
+    {"key": "painkillers", "label": "Pain Killers", "icon": "💊"},
+    {"key": "antibiotics", "label": "Antibiotics", "icon": "🛡️"},
+    {"key": "antimalarials", "label": "Antimalarials", "icon": "🦟"},
+    {"key": "cough_throat", "label": "Cough & Sore Throat", "icon": "🍯"},
+    {"key": "deworming", "label": "Deworming", "icon": "🪱"},
+    {"key": "eye_ear", "label": "Eye/Ear Drops", "icon": "👁️"},
+    {"key": "skin_treatments", "label": "Skin Treatments", "icon": "🧴"},
+    {"key": "emergency", "label": "Emergency / Clinic Items", "icon": "🚨"},
+    {"key": "other_medicine", "label": "Other Medicine", "icon": "📦"},
+]
+
+# Specific items for each medicine subcategory (Malawi-realistic)
+MEDICINE_ITEMS = {
+    "painkillers": [
+        {"name": "Panado / Paracetamol (tabs)", "icon": "💊"},
+        {"name": "Paracetamol Syrup", "icon": "🍼"},
+        {"name": "Ibuprofen (tabs)", "icon": "💊"},
+        {"name": "Diclofenac", "icon": "💊"},
+        {"name": "Aspirin", "icon": "💊"},
+        {"name": "Other painkiller", "icon": "📝"},
+    ],
+    "antibiotics": [
+        {"name": "Azithromycin", "icon": "💊"},
+        {"name": "Amoxicillin", "icon": "💊"},
+        {"name": "Ciprofloxacin", "icon": "💊"},
+        {"name": "Doxycycline", "icon": "💊"},
+        {"name": "Metronidazole", "icon": "💊"},
+        {"name": "Cotrimoxazole (Septrin)", "icon": "💊"},
+        {"name": "Erythromycin", "icon": "💊"},
+        {"name": "Other antibiotic", "icon": "📝"},
+    ],
+    "antimalarials": [
+        {"name": "LA (Lumefantrine/Artemether)", "icon": "🦟"},
+        {"name": "Coartem", "icon": "🦟"},
+        {"name": "Fansidar", "icon": "💊"},
+        {"name": "Quinine (tabs)", "icon": "💊"},
+        {"name": "Quinine (IV)", "icon": "💉"},
+        {"name": "Other antimalarial", "icon": "📝"},
+    ],
+    "cough_throat": [
+        {"name": "Good Morning Malawi", "icon": "☀️"},
+        {"name": "Actifed / Cold+Flu combos", "icon": "💊"},
+        {"name": "Cough syrup", "icon": "🍯"},
+        {"name": "Lozenges", "icon": "🍬"},
+        {"name": "Other flu med", "icon": "📝"},
+    ],
+    "deworming": [
+        {"name": "Mebendazole", "icon": "💊"},
+        {"name": "Albendazole", "icon": "💊"},
+        {"name": "Other deworming", "icon": "📝"},
+    ],
+    "eye_ear": [
+        {"name": "Eye drops", "icon": "👁️"},
+        {"name": "Ear drops", "icon": "👂"},
+        {"name": "Other eye/ear", "icon": "📝"},
+    ],
+    "skin_treatments": [
+        {"name": "Hydrocortisone cream", "icon": "🧴"},
+        {"name": "Antifungal cream", "icon": "🧴"},
+        {"name": "Betadine ointment", "icon": "🩹"},
+        {"name": "Other skin treatment", "icon": "📝"},
+    ],
+    "emergency": [
+        {"name": "IV fluids / Drips", "icon": "💉"},
+        {"name": "ORS (Oral Rehydration Salts)", "icon": "💧"},
+        {"name": "Syringes & needles", "icon": "💉"},
+        {"name": "Other clinic item", "icon": "📝"},
+    ],
+    "other_medicine": [
+        {"name": "Custom medicine", "icon": "📝"},
+    ],
+}
+
+# Items for top-level categories (non-medicine)
+STOMACH_ITEMS = [
+    {"name": "ORS", "icon": "💧"},
+    {"name": "Antacid", "icon": "💊"},
+    {"name": "Omeprazole", "icon": "💊"},
+    {"name": "Loperamide", "icon": "💊"},
+    {"name": "Other stomach med", "icon": "📝"},
+]
+
+ALLERGY_ITEMS = [
+    {"name": "Cetirizine", "icon": "💊"},
+    {"name": "Chlorpheniramine", "icon": "💊"},
+    {"name": "Hydrocortisone cream", "icon": "🧴"},
+    {"name": "Other allergy med", "icon": "📝"},
+]
+
+CHRONIC_ITEMS = [
+    {"name": "Amlodipine", "icon": "💊"},
+    {"name": "Enalapril", "icon": "💊"},
+    {"name": "Losartan", "icon": "💊"},
+    {"name": "Hydrochlorothiazide", "icon": "💊"},
+    {"name": "Metformin", "icon": "💊"},
+    {"name": "Glibenclamide", "icon": "💊"},
+    {"name": "Other BP/diabetes", "icon": "📝"},
+]
+
+FIRST_AID_ITEMS = [
+    {"name": "Surgical spirit", "icon": "🧴"},
+    {"name": "Hydrogen peroxide", "icon": "💧"},
+    {"name": "Betadine (iodine)", "icon": "🩹"},
+    {"name": "Plasters / bandages", "icon": "🩹"},
+    {"name": "Gauze", "icon": "🩹"},
+    {"name": "Cotton wool", "icon": "☁️"},
+    {"name": "Savlon / antiseptic cream", "icon": "🧴"},
+    {"name": "Other first aid", "icon": "📝"},
+]
+
+COLD_FLU_ITEMS = [
+    {"name": "Good Morning Malawi", "icon": "☀️"},
+    {"name": "Actifed", "icon": "💊"},
+    {"name": "Cough syrup", "icon": "🍯"},
+    {"name": "Lozenges", "icon": "🍬"},
+    {"name": "Other cold/flu", "icon": "📝"},
+]
+
+WOMENS_HEALTH_ITEMS = [
+    {"name": "Emergency pills", "icon": "💊"},
+    {"name": "Pregnancy tests", "icon": "🧪"},
+    {"name": "Sanitary pads", "icon": "🩹"},
+    {"name": "Other", "icon": "📝"},
+]
+
+CHILD_HEALTH_ITEMS = [
+    {"name": "Paracetamol syrup", "icon": "🍼"},
+    {"name": "ORS", "icon": "💧"},
+    {"name": "Zinc", "icon": "⚡"},
+    {"name": "Other", "icon": "📝"},
+]
+
+VITAMINS_ITEMS = [
+    {"name": "Vitamin C", "icon": "🍊"},
+    {"name": "Multivitamin", "icon": "💪"},
+    {"name": "Iron/Folic", "icon": "🦴"},
+    {"name": "Vitamin D", "icon": "☀️"},
+    {"name": "Calcium", "icon": "🦴"},
+    {"name": "Other", "icon": "📝"},
+]
+
+# Cosmetics Subcategories (when user selects "Cosmetics & Personal Care")
+COSMETICS_SUBCATEGORIES = [
+    {"key": "skin_care", "label": "Skin Care", "icon": "✨"},
+    {"key": "hair_care", "label": "Hair Care", "icon": "💇"},
+    {"key": "body_care", "label": "Body Care", "icon": "🧴"},
+    {"key": "perfumes", "label": "Perfumes", "icon": "🌹"},
+    {"key": "mens_grooming", "label": "Men's Grooming", "icon": "🧔"},
+    {"key": "makeup", "label": "Makeup", "icon": "💄"},
+    {"key": "other_cosmetics", "label": "Other", "icon": "📦"},
+]
+
+# Cosmetics Brand Items (common brands for each subcategory)
+COSMETICS_BRAND_ITEMS = {
+    "skin_care": [
+        {"name": "Avon", "icon": "✨"},
+        {"name": "CeraVe", "icon": "💎"},
+        {"name": "Nivea", "icon": "🌟"},
+        {"name": "Vaseline", "icon": "💧"},
+        {"name": "Garnier", "icon": "🌿"},
+        {"name": "Dove", "icon": "🕊️"},
+        {"name": "Other brand", "icon": "📝"},
+    ],
+    "hair_care": [
+        {"name": "Avon", "icon": "💇"},
+        {"name": "Pantene", "icon": "✨"},
+        {"name": "Dove", "icon": "🕊️"},
+        {"name": "Garnier", "icon": "🌿"},
+        {"name": "TRESemmé", "icon": "💫"},
+        {"name": "Other brand", "icon": "📝"},
+    ],
+    "body_care": [
+        {"name": "Dove", "icon": "🕊️"},
+        {"name": "Nivea", "icon": "🌟"},
+        {"name": "Vaseline", "icon": "💧"},
+        {"name": "Palmolive", "icon": "🧴"},
+        {"name": "Other brand", "icon": "📝"},
+    ],
+    "perfumes": [
+        {"name": "Pure Black", "icon": "🖤"},
+        {"name": "Emerald", "icon": "💎"},
+        {"name": "Arabic perfumes", "icon": "🏺"},
+        {"name": "Bond", "icon": "🎩"},
+        {"name": "Avon", "icon": "✨"},
+        {"name": "Other perfume", "icon": "📝"},
+    ],
+    "mens_grooming": [
+        {"name": "Beard oil", "icon": "🧔"},
+        {"name": "Hair gel", "icon": "💈"},
+        {"name": "Aftershave", "icon": "💧"},
+        {"name": "Other", "icon": "📝"},
+    ],
+    "makeup": [
+        {"name": "Avon", "icon": "💄"},
+        {"name": "Other brand", "icon": "📝"},
+    ],
+    "other_cosmetics": [
+        {"name": "Custom product", "icon": "📝"},
+    ],
+}
+
+
 # Premium cosmetics brands for quick selection
 # Keys match the category values from PharmacyCategory in models_pharmacy.py
 COSMETICS_BRANDS = {
@@ -188,6 +409,52 @@ def get_all_categories_with_icons() -> dict:
         "respiratory": {"label": "Respiratory", "icon": "💨", "color": "#06b6d4"},
         "gastrointestinal": {"label": "Digestive", "icon": "🩺", "color": "#8b5cf6"},
     }
+
+
+# ==============================================================================
+# GAMIFIED WIZARD HELPER FUNCTIONS
+# ==============================================================================
+
+def get_top_categories():
+    """Get all top-level categories for the wizard."""
+    return PHARMACY_TOP_CATEGORIES
+
+
+def get_subcategories_for_category(category_key: str):
+    """Get subcategories for a top-level category."""
+    if category_key == "medicines":
+        return MEDICINE_SUBCATEGORIES
+    elif category_key == "cosmetics":
+        return COSMETICS_SUBCATEGORIES
+    return []
+
+
+def get_items_for_subcategory(category_key: str, subcategory_key: str):
+    """Get item suggestions for a specific subcategory."""
+    # Medicine items
+    if category_key == "medicines" and subcategory_key in MEDICINE_ITEMS:
+        return MEDICINE_ITEMS[subcategory_key]
+    
+    # Cosmetics items (brands)
+    if category_key == "cosmetics" and subcategory_key in COSMETICS_BRAND_ITEMS:
+        return COSMETICS_BRAND_ITEMS[subcategory_key]
+    
+    return []
+
+
+def get_items_for_top_category(category_key: str):
+    """Get item suggestions for top-level categories that don't have subcategories."""
+    items_map = {
+        "first_aid": FIRST_AID_ITEMS,
+        "chronic": CHRONIC_ITEMS,
+        "cold_flu": COLD_FLU_ITEMS,
+        "stomach": STOMACH_ITEMS,
+        "allergy": ALLERGY_ITEMS,
+        "womens_health": WOMENS_HEALTH_ITEMS,
+        "child_health": CHILD_HEALTH_ITEMS,
+        "vitamins": VITAMINS_ITEMS,
+    }
+    return items_map.get(category_key, [])
 
 
 def get_brands_for_category(category: str) -> list[str]:

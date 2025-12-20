@@ -580,9 +580,9 @@ def phone_sales_metrics(
         cash_pct = bank_pct = mobile_pct = 0
     
     payment_mix_data = [
-        {'method': 'Cash', 'amount': cash_amount, 'percentage': cash_pct},
-        {'method': 'Bank', 'amount': bank_amount, 'percentage': bank_pct},
-        {'method': 'Mobile Money', 'amount': mobile_amount, 'percentage': mobile_pct},
+        {'method': 'Cash', 'method_code': 'CASH', 'amount': cash_amount, 'percentage': cash_pct},
+        {'method': 'Bank', 'method_code': 'BANK', 'amount': bank_amount, 'percentage': bank_pct},
+        {'method': 'Mobile Money', 'method_code': 'MOBILE_MONEY', 'amount': mobile_amount, 'percentage': mobile_pct},
     ]
     
     # Stock on hand (current snapshot, not date-filtered)

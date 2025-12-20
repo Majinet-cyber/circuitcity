@@ -37,7 +37,7 @@ Features:
   <!-- Payment Method Cards -->
   <div class="payment-mix-cards">
     {% for pm in payment_mix %}
-      <div class="payment-mix-card" data-method="{{ pm.method_code|lower }}">
+      <div class="payment-mix-card" data-method="{{ pm.method_code|default:pm.method|lower|slugify }}">
         <h3>
           <i class="bi {% if pm.method == 'Cash' %}bi-cash-stack{% elif pm.method == 'Bank' %}bi-bank{% else %}bi-phone{% endif %}"></i>
           {{ pm.method }}
@@ -55,7 +55,7 @@ Features:
     {% for pm in payment_mix %}
       {% if pm.percentage > 0 %}
         <div class="payment-mix-bar-segment" 
-             data-method="{{ pm.method_code|lower }}"
+             data-method="{{ pm.method_code|default:pm.method|lower|slugify }}"
              style="flex: 0 0 {{ pm.percentage }}%">
           {{ pm.percentage }}%
         </div>
@@ -66,7 +66,7 @@ Features:
   <!-- Legend -->
   <div class="payment-mix-legend">
     {% for pm in payment_mix %}
-      <span class="legend-item" data-method="{{ pm.method_code|lower }}">
+      <span class="legend-item" data-method="{{ pm.method_code|default:pm.method|lower|slugify }}">
         <span class="legend-color"></span>
         {{ pm.method }}
       </span>

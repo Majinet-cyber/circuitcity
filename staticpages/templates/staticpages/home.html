@@ -1741,12 +1741,15 @@
   <section class="cta-section">
     <h2 class="cta-title">Ready to Transform Your Business?</h2>
     <p class="cta-subtitle">Join thousands of merchants already using Emajinet</p>
-    <a href="{% url 'login' %}" class="btn btn-primary">Get Started Today</a>
+    <a href="{% url 'login' %}" class="btn btn-light">Get Started Today</a>
   </section>
 
   <!-- Footer -->
   <footer class="footer">
-    <p class="footer-text">&copy; {{ CURRENT_YEAR }} Emajinet. All rights reserved.</p>
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; flex-wrap: wrap; gap: 1rem;">
+      <p class="footer-text" style="margin: 0;">&copy; Emajinet</p>
+      <p class="footer-text" style="margin: 0;">{% now "Y" %}</p>
+    </div>
     <div style="margin-top: 1rem; display: flex; gap: 2rem; justify-content: center; flex-wrap: wrap;">
       <a href="{% url 'staticpages:about' %}" style="color: rgba(255,255,255,0.7); text-decoration: none; font-size: 0.9rem;">About</a>
       <a href="{% url 'staticpages:privacy' %}" style="color: rgba(255,255,255,0.7); text-decoration: none; font-size: 0.9rem;">Privacy Policy</a>

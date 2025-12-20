@@ -85,6 +85,20 @@
     margin-bottom: 8px;
   }
 
+  .brand-info {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .brand-icon {
+    width: 48px;
+    height: 48px;
+    object-fit: contain;
+    flex-shrink: 0;
+    filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.1));
+  }
+
   .brand-name {
     font-size: 1.4rem;
     font-weight: 700;
@@ -147,6 +161,75 @@
     box-shadow: 0 0 0 3px rgba(var(--brand-color-rgb), 0.1);
   }
 
+  /* Glassmorphic RAM/ROM Cards */
+  .specs-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(85px, 1fr));
+    gap: 8px;
+    margin: 10px 0;
+  }
+
+  .spec-card {
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.9), rgba(248, 250, 252, 0.9));
+    border: 2px solid #e2e8f0;
+    border-radius: 12px;
+    padding: 14px 10px;
+    font-weight: 800;
+    font-size: 0.9rem;
+    color: #0f172a;
+    cursor: pointer;
+    transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+    text-align: center;
+    box-shadow: 0 2px 6px rgba(15, 23, 42, 0.04);
+    position: relative;
+  }
+
+  .spec-card:hover {
+    background: linear-gradient(135deg, #f8fafc, #e2e8f0);
+    border-color: var(--brand-color);
+    transform: translateY(-2px);
+    box-shadow: 0 6px 16px rgba(59, 130, 246, 0.15);
+  }
+
+  .spec-card.selected {
+    background: linear-gradient(135deg, var(--brand-color), rgba(var(--brand-color-rgb), 0.85));
+    color: #fff;
+    border-color: var(--brand-color);
+    box-shadow: 0 6px 20px rgba(var(--brand-color-rgb), 0.4);
+    transform: translateY(-2px);
+  }
+
+  .spec-card.selected::before {
+    content: "✓";
+    position: absolute;
+    top: 4px;
+    right: 4px;
+    background: #10b981;
+    color: #fff;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.7rem;
+    font-weight: 900;
+  }
+
+  /* Model Selection Cards */
+  .model-card:hover {
+    background: linear-gradient(135deg, #f8fafc, #e2e8f0) !important;
+    border-color: var(--brand-color) !important;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(59, 130, 246, 0.15);
+  }
+
+  .model-card.selected {
+    background: linear-gradient(135deg, var(--brand-color), rgba(var(--brand-color-rgb), 0.85)) !important;
+    color: #fff !important;
+    border-color: var(--brand-color) !important;
+  }
+
   .form-help {
     font-size: 0.8rem;
     color: #94a3b8;
@@ -201,6 +284,12 @@
     display: flex;
     justify-content: space-between;
     align-items: center;
+    gap: 12px;
+  }
+
+  .model-info {
+    flex: 1;
+    min-width: 0;
   }
 
   .model-name {
@@ -216,6 +305,25 @@
   .model-price {
     color: var(--brand-color);
     font-weight: 600;
+    white-space: nowrap;
+  }
+
+  .btn-remove {
+    padding: 6px 12px;
+    background: #ef4444;
+    color: white;
+    border: none;
+    border-radius: 6px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+    white-space: nowrap;
+  }
+
+  .btn-remove:hover {
+    background: #dc2626;
+    transform: scale(1.05);
   }
 
   .empty-state {
@@ -239,12 +347,31 @@
       padding: 16px;
     }
 
+    .brand-icon {
+      width: 40px;
+      height: 40px;
+    }
+
+    .brand-info {
+      gap: 10px;
+    }
+
     .brand-name {
       font-size: 1.2rem;
     }
 
     .form-group input {
       font-size: 16px; /* Prevents zoom on iOS */
+    }
+
+    .specs-grid {
+      grid-template-columns: repeat(2, 1fr);
+      gap: 8px;
+    }
+
+    .spec-card {
+      padding: 12px 8px;
+      font-size: 0.85rem;
     }
   }
 </style>
@@ -263,9 +390,19 @@
     {% for item in brands_with_models %}
     <div class="brand-panel" data-brand="{{ item.config.key }}" onclick="toggleBrand(this)">
       <div class="brand-header">
-        <div>
-          <h3 class="brand-name">{{ item.config.display }}</h3>
-          <p class="brand-description">{{ item.config.description }}</p>
+        <div class="brand-info">
+          {% load static %}
+          <img 
+            src="{% if item.config.icon %}{% static item.config.icon %}{% else %}{% static 'img/brands/default.svg' %}{% endif %}" 
+            alt="{{ item.config.display }}" 
+            class="brand-icon"
+            data-fallback="{% static 'img/brands/default.svg' %}"
+            onerror="handleImageError(this);"
+          >
+          <div>
+            <h3 class="brand-name">{{ item.config.display }}</h3>
+            <p class="brand-description">{{ item.config.description }}</p>
+          </div>
         </div>
         <div class="expand-icon">▼</div>
       </div>
@@ -278,8 +415,17 @@
 
           <div class="form-group">
             <label>Model Name <span style="color: #ef4444;">*</span></label>
-            <input type="text" name="model_name" placeholder="e.g., Spark 40" required>
-            <div class="form-help">Official model name</div>
+            {% if item.flagship_models %}
+            <div class="model-selection-grid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 8px; margin-bottom: 12px;">
+              {% for model in item.flagship_models %}
+              <button type="button" class="model-card" data-model="{{ model }}" style="background: linear-gradient(135deg, rgba(255, 255, 255, 0.95), rgba(248, 250, 252, 0.95)); border: 2px solid #e2e8f0; border-radius: 10px; padding: 10px 8px; font-weight: 700; font-size: 0.85rem; color: #0f172a; cursor: pointer; transition: all 0.2s; text-align: center;">
+                {{ model }}
+              </button>
+              {% endfor %}
+            </div>
+            {% endif %}
+            <input type="text" name="model_name" placeholder="Or type custom model name..." required>
+            <div class="form-help">Select above or enter custom model</div>
           </div>
 
           <div class="form-group">
@@ -289,9 +435,18 @@
           </div>
 
           <div class="form-group">
-            <label>Specs (RAM+ROM) <span style="color: #ef4444;">*</span></label>
-            <input type="text" name="specs" placeholder="e.g., 4+128" pattern="\d+\+\d+" required>
-            <div class="form-help">Format: RAM+ROM (e.g., 4+128, 8+256)</div>
+            <label>Storage + RAM Configuration <span style="color: #ef4444;">*</span></label>
+            <div class="specs-grid">
+              <button type="button" class="spec-card" data-specs="64+2">64+2</button>
+              <button type="button" class="spec-card" data-specs="64+3">64+3</button>
+              <button type="button" class="spec-card" data-specs="128+3">128+3</button>
+              <button type="button" class="spec-card" data-specs="128+4">128+4</button>
+              <button type="button" class="spec-card" data-specs="128+8">128+8</button>
+              <button type="button" class="spec-card" data-specs="256+4">256+4</button>
+              <button type="button" class="spec-card" data-specs="256+8">256+8</button>
+            </div>
+            <input type="hidden" name="specs" required>
+            <div class="form-help">ROM+RAM format (Storage+Memory), Malawi-relevant specs</div>
           </div>
 
           <div class="form-group">
@@ -313,12 +468,21 @@
         <div class="model-list">
           {% for model in item.recent_models %}
           <div class="model-item">
-            <div>
+            <div class="model-info">
               <span class="model-name">{{ model.model_name }}</span>
               <span class="model-specs">{{ model.variant_label }}</span>
             </div>
             {% if model.default_cost_price %}
             <div class="model-price">MWK {{ model.default_cost_price|floatformat:0 }}</div>
+            {% endif %}
+            <!-- Manager-only Remove button -->
+            {% if request.user.is_staff or user.role == 'manager' or user.role == 'owner' %}
+            <form method="post" action="{% url 'inventory:phone_product_remove' model.id %}" style="margin: 0;" onsubmit="return confirm('Remove {{ model.display_name }} from catalog? Historical sales will remain intact.');">
+              {% csrf_token %}
+              <button type="submit" class="btn-remove" onclick="event.stopPropagation();">
+                🗑️ Remove
+              </button>
+            </form>
             {% endif %}
           </div>
           {% endfor %}
@@ -344,6 +508,14 @@
 
 {% block extra_js %}
 <script>
+function handleImageError(img) {
+  // Fallback to default icon if image fails to load
+  if (img.dataset.fallback && img.src !== img.dataset.fallback) {
+    img.src = img.dataset.fallback;
+  }
+  img.onerror = null; // Prevent infinite loop
+}
+
 function toggleBrand(panel) {
   // Don't toggle if clicking inside form
   if (event.target.closest('.inline-form')) {
@@ -370,6 +542,55 @@ function toggleBrand(panel) {
     }, 100);
   }
 }
+
+// Handle model and spec card selection
+document.addEventListener('DOMContentLoaded', function() {
+  document.querySelectorAll('.brand-panel').forEach(panel => {
+    // Model card selection
+    const modelCards = panel.querySelectorAll('.model-card');
+    const modelInput = panel.querySelector('input[name="model_name"]');
+
+    modelCards.forEach(card => {
+      card.addEventListener('click', function(e) {
+        e.preventDefault();
+        e.stopPropagation();
+
+        // Remove selected class from all model cards in this panel
+        panel.querySelectorAll('.model-card').forEach(c => c.classList.remove('selected'));
+
+        // Add selected class to clicked card
+        this.classList.add('selected');
+
+        // Update model input value
+        if (modelInput) {
+          modelInput.value = this.dataset.model;
+        }
+      });
+    });
+
+    // Spec card selection
+    const specCards = panel.querySelectorAll('.spec-card');
+    const specsInput = panel.querySelector('input[name="specs"]');
+
+    specCards.forEach(card => {
+      card.addEventListener('click', function(e) {
+        e.preventDefault();
+        e.stopPropagation();
+
+        // Remove selected class from all spec cards in this panel
+        panel.querySelectorAll('.spec-card').forEach(c => c.classList.remove('selected'));
+
+        // Add selected class to clicked card
+        this.classList.add('selected');
+
+        // Update hidden input value
+        if (specsInput) {
+          specsInput.value = this.dataset.specs;
+        }
+      });
+    });
+  });
+});
 </script>
 {% endblock %}
 

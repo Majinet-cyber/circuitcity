@@ -17,46 +17,134 @@ from django.db import transaction
 from tenants.models import Business
 
 
-# Flagship phone definitions - 5 BRANDS
+# Flagship phone definitions - 7 BRANDS (Latest models + Malawi common)
 FLAGSHIP_PHONES = [
-    # TECNO
-    {"brand": "TECNO", "model": "Spark 40", "ram": 4, "rom": 128},
-    {"brand": "TECNO", "model": "Spark 40", "ram": 8, "rom": 256},
-    {"brand": "TECNO", "model": "Pop 10", "ram": 2, "rom": 64},
-    {"brand": "TECNO", "model": "Pop 10", "ram": 3, "rom": 64},
-    {"brand": "TECNO", "model": "Pop 10", "ram": 4, "rom": 128},
-    {"brand": "TECNO", "model": "Pop 10c", "ram": 2, "rom": 64},
-    {"brand": "TECNO", "model": "Camon 40", "ram": 8, "rom": 256},
+    # ========== TECNO (Latest 2024-2025 + Malawi common) ==========
+    # CAMON 40 Series (Latest)
+    {"brand": "TECNO", "model": "CAMON 40", "ram": 8, "rom": 256},
+    {"brand": "TECNO", "model": "CAMON 40 Pro", "ram": 8, "rom": 256},
+    {"brand": "TECNO", "model": "CAMON 40 Pro 5G", "ram": 8, "rom": 256},
+    {"brand": "TECNO", "model": "CAMON 40 Premier 5G", "ram": 8, "rom": 256},
     
-    # ITEL
-    {"brand": "ITEL", "model": "City 100", "ram": 4, "rom": 128},
-    {"brand": "ITEL", "model": "A90", "ram": 3, "rom": 128},
-    {"brand": "ITEL", "model": "A80", "ram": 3, "rom": 128},
-    {"brand": "ITEL", "model": "A50", "ram": 2, "rom": 64},
+    # SPARK 40 Series (Latest)
+    {"brand": "TECNO", "model": "SPARK 40", "ram": 4, "rom": 128},
+    {"brand": "TECNO", "model": "SPARK 40 Pro", "ram": 8, "rom": 128},
+    {"brand": "TECNO", "model": "SPARK 40 Pro+", "ram": 8, "rom": 256},
+    {"brand": "TECNO", "model": "SPARK 40 5G", "ram": 8, "rom": 256},
+    
+    # POVA 7 Series (Latest)
+    {"brand": "TECNO", "model": "POVA 7", "ram": 8, "rom": 128},
+    {"brand": "TECNO", "model": "POVA 7 Pro 5G", "ram": 8, "rom": 256},
+    
+    # Malawi Common (budget-friendly)
+    {"brand": "TECNO", "model": "POP 10", "ram": 2, "rom": 64},
+    {"brand": "TECNO", "model": "POP 10C", "ram": 3, "rom": 64},
+    {"brand": "TECNO", "model": "POVA Neo 6", "ram": 8, "rom": 128},
+    
+    # ========== ITEL (Latest 2 years + Malawi common) ==========
+    # S Series (Latest)
+    {"brand": "ITEL", "model": "S25 Ultra", "ram": 8, "rom": 256},
     {"brand": "ITEL", "model": "S25", "ram": 4, "rom": 128},
+    {"brand": "ITEL", "model": "RS4", "ram": 8, "rom": 256},
+    {"brand": "ITEL", "model": "S24", "ram": 4, "rom": 128},
+    {"brand": "ITEL", "model": "S23+", "ram": 8, "rom": 128},
+    {"brand": "ITEL", "model": "S23", "ram": 4, "rom": 128},
     
-    # SAMSUNG (common models with sensible RAM/ROM)
-    {"brand": "SAMSUNG", "model": "Galaxy A15", "ram": 4, "rom": 128},
-    {"brand": "SAMSUNG", "model": "Galaxy A15", "ram": 6, "rom": 128},
-    {"brand": "SAMSUNG", "model": "Galaxy A25", "ram": 6, "rom": 128},
-    {"brand": "SAMSUNG", "model": "Galaxy A25", "ram": 8, "rom": 256},
-    {"brand": "SAMSUNG", "model": "Galaxy A05s", "ram": 4, "rom": 64},
-    {"brand": "SAMSUNG", "model": "Galaxy A05s", "ram": 4, "rom": 128},
+    # P Series (Latest)
+    {"brand": "ITEL", "model": "Power 70", "ram": 8, "rom": 256},
+    {"brand": "ITEL", "model": "P65", "ram": 4, "rom": 128},
+    {"brand": "ITEL", "model": "P55 5G", "ram": 8, "rom": 128},
     
-    # GOOGLE PIXEL
-    {"brand": "GOOGLE PIXEL", "model": "Pixel 8", "ram": 8, "rom": 128},
-    {"brand": "GOOGLE PIXEL", "model": "Pixel 8", "ram": 8, "rom": 256},
-    {"brand": "GOOGLE PIXEL", "model": "Pixel 7a", "ram": 8, "rom": 128},
+    # A Series (Latest)
+    {"brand": "ITEL", "model": "A80", "ram": 3, "rom": 128},
+    
+    # Malawi Common (budget-friendly)
+    {"brand": "ITEL", "model": "A50", "ram": 2, "rom": 64},
+    {"brand": "ITEL", "model": "City 100", "ram": 4, "rom": 128},
+    {"brand": "ITEL", "model": "A100C", "ram": 3, "rom": 64},
+    
+    # ========== SAMSUNG (Latest 2 years) ==========
+    # Galaxy S25 Series (Latest 2025)
+    {"brand": "SAMSUNG", "model": "Galaxy S25 Ultra", "ram": 12, "rom": 256},
+    {"brand": "SAMSUNG", "model": "Galaxy S25+", "ram": 8, "rom": 256},
+    {"brand": "SAMSUNG", "model": "Galaxy S25", "ram": 8, "rom": 128},
+    
+    # Galaxy S24 Series (2024)
+    {"brand": "SAMSUNG", "model": "Galaxy S24 Ultra", "ram": 12, "rom": 256},
+    {"brand": "SAMSUNG", "model": "Galaxy S24+", "ram": 8, "rom": 256},
+    {"brand": "SAMSUNG", "model": "Galaxy S24", "ram": 8, "rom": 128},
+    
+    # Galaxy Foldables (Latest)
+    {"brand": "SAMSUNG", "model": "Galaxy Z Fold6", "ram": 12, "rom": 256},
+    {"brand": "SAMSUNG", "model": "Galaxy Z Flip6", "ram": 8, "rom": 256},
+    
+    # Galaxy A Series (Mid-range)
+    {"brand": "SAMSUNG", "model": "Galaxy A55 5G", "ram": 8, "rom": 128},
+    {"brand": "SAMSUNG", "model": "Galaxy A35 5G", "ram": 8, "rom": 128},
+    
+    # ========== IPHONE (Latest 2 years) ==========
+    # iPhone 16 Series (Latest 2024)
+    {"brand": "IPHONE", "model": "iPhone 16 Pro Max", "ram": 8, "rom": 256},
+    {"brand": "IPHONE", "model": "iPhone 16 Pro", "ram": 8, "rom": 128},
+    {"brand": "IPHONE", "model": "iPhone 16 Plus", "ram": 8, "rom": 128},
+    {"brand": "IPHONE", "model": "iPhone 16", "ram": 8, "rom": 128},
+    
+    # iPhone 15 Series (2023)
+    {"brand": "IPHONE", "model": "iPhone 15 Pro Max", "ram": 8, "rom": 256},
+    {"brand": "IPHONE", "model": "iPhone 15 Pro", "ram": 8, "rom": 128},
+    {"brand": "IPHONE", "model": "iPhone 15 Plus", "ram": 8, "rom": 128},
+    {"brand": "IPHONE", "model": "iPhone 15", "ram": 8, "rom": 128},
+    
+    # ========== HUAWEI (Latest 2 years) ==========
+    # Pura 70 Series (Latest 2024)
+    {"brand": "HUAWEI", "model": "Pura 70 Ultra", "ram": 16, "rom": 256},
+    {"brand": "HUAWEI", "model": "Pura 70 Pro+", "ram": 12, "rom": 256},
+    {"brand": "HUAWEI", "model": "Pura 70 Pro", "ram": 12, "rom": 256},
+    {"brand": "HUAWEI", "model": "Pura 70", "ram": 8, "rom": 256},
+    
+    # Mate 60 Series (2024)
+    {"brand": "HUAWEI", "model": "Mate 60 RS Ultimate", "ram": 16, "rom": 256},
+    {"brand": "HUAWEI", "model": "Mate 60 Pro+", "ram": 12, "rom": 256},
+    {"brand": "HUAWEI", "model": "Mate 60 Pro", "ram": 12, "rom": 256},
+    {"brand": "HUAWEI", "model": "Mate 60", "ram": 8, "rom": 256},
+    
+    # Foldables (Latest)
+    {"brand": "HUAWEI", "model": "Mate XT Ultimate Design", "ram": 16, "rom": 256},
+    {"brand": "HUAWEI", "model": "Mate X5", "ram": 12, "rom": 256},
+    
+    # ========== REDMI/Xiaomi (Latest 2 years) ==========
+    # Redmi Note 14 Series (Latest 2024-2025)
+    {"brand": "REDMI", "model": "Redmi Note 14 Pro+ 5G", "ram": 8, "rom": 256},
+    {"brand": "REDMI", "model": "Redmi Note 14 Pro 5G", "ram": 8, "rom": 256},
+    {"brand": "REDMI", "model": "Redmi Note 14 5G", "ram": 8, "rom": 128},
+    {"brand": "REDMI", "model": "Redmi Note 14 (4G)", "ram": 8, "rom": 128},
+    
+    # Redmi Note 13 Series (2023-2024)
+    {"brand": "REDMI", "model": "Redmi Note 13 Pro+ 5G", "ram": 8, "rom": 256},
+    {"brand": "REDMI", "model": "Redmi Note 13 Pro 5G", "ram": 8, "rom": 256},
+    {"brand": "REDMI", "model": "Redmi Note 13", "ram": 8, "rom": 128},
+    
+    # Redmi Numbered Series (Latest)
+    {"brand": "REDMI", "model": "Redmi 14C", "ram": 4, "rom": 128},
+    {"brand": "REDMI", "model": "Redmi 13", "ram": 8, "rom": 128},
+    {"brand": "REDMI", "model": "Redmi 13C", "ram": 4, "rom": 128},
+    
+    # ========== GOOGLE PIXEL (Latest 2 years) ==========
+    # Pixel 10 Series (Latest 2025 - projected)
+    {"brand": "GOOGLE PIXEL", "model": "Pixel 10", "ram": 8, "rom": 128},
+    {"brand": "GOOGLE PIXEL", "model": "Pixel 10 Pro", "ram": 12, "rom": 256},
+    {"brand": "GOOGLE PIXEL", "model": "Pixel 10 Pro XL", "ram": 12, "rom": 256},
+    {"brand": "GOOGLE PIXEL", "model": "Pixel 10 Pro Fold", "ram": 12, "rom": 256},
+    
+    # Pixel 9 Series (2024)
+    {"brand": "GOOGLE PIXEL", "model": "Pixel 9", "ram": 8, "rom": 128},
+    {"brand": "GOOGLE PIXEL", "model": "Pixel 9 Pro", "ram": 12, "rom": 256},
+    {"brand": "GOOGLE PIXEL", "model": "Pixel 9 Pro XL", "ram": 12, "rom": 256},
+    {"brand": "GOOGLE PIXEL", "model": "Pixel 9 Pro Fold", "ram": 12, "rom": 256},
+    
+    # Pixel A Series (Budget)
+    {"brand": "GOOGLE PIXEL", "model": "Pixel 9a", "ram": 8, "rom": 128},
     {"brand": "GOOGLE PIXEL", "model": "Pixel 8a", "ram": 8, "rom": 128},
-    {"brand": "GOOGLE PIXEL", "model": "Pixel 8 Pro", "ram": 12, "rom": 256},
-    
-    # REDMI
-    {"brand": "REDMI", "model": "Note 13", "ram": 6, "rom": 128},
-    {"brand": "REDMI", "model": "Note 13", "ram": 8, "rom": 256},
-    {"brand": "REDMI", "model": "Note 13 Pro", "ram": 8, "rom": 256},
-    {"brand": "REDMI", "model": "13C", "ram": 4, "rom": 128},
-    {"brand": "REDMI", "model": "13C", "ram": 6, "rom": 128},
-    {"brand": "REDMI", "model": "12", "ram": 8, "rom": 256},
 ]
 
 

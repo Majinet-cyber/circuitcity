@@ -227,7 +227,8 @@ def _step3_payment(request, business, wizard_data):
             
             messages.success(request, success_msg)
             
-            return redirect('inventory:inventory_dashboard')
+            # FIXED: Redirect to phones dashboard (not generic inventory dashboard)
+            return redirect('inventory_verticals:phones_dashboard')
             
         except Exception as e:
             messages.error(request, f"Error completing sale: {e}")

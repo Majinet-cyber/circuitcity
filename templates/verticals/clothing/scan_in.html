@@ -98,6 +98,20 @@
           <button type="button" class="size-btn" data-size="42">42</button>
           <button type="button" class="size-btn" data-size="44">44</button>
         </div>
+        
+        <!-- Custom Size Input -->
+        <div style="margin-top:16px;padding:14px;background:#f8fafc;border:2px dashed #cbd5e1;border-radius:12px">
+          <label style="display:block;margin-bottom:6px;font-size:0.9rem;color:#64748b;font-weight:600">
+            <input type="checkbox" id="use-custom-size" style="margin-right:6px;cursor:pointer">
+            Use custom size
+          </label>
+          <input type="text" id="custom-size-input" placeholder="e.g., 3XL, 46, Free Size" 
+                 style="width:100%;padding:10px 14px;border:2px solid #e2e8f0;border-radius:8px;display:none">
+          <small style="color:#64748b;font-size:0.85rem;display:block;margin-top:4px">
+            Enter any size not listed above
+          </small>
+        </div>
+        
         {{ form.size }}
       </div>
 
@@ -234,6 +248,10 @@ document.addEventListener('DOMContentLoaded', function() {
       if (sizeSelect) {
         sizeSelect.value = sizeValue;
       }
+      // Uncheck custom size when clicking a button
+      const customCheckbox = document.getElementById('use-custom-size');
+      if (customCheckbox) customCheckbox.checked = false;
+      document.getElementById('custom-size-input').style.display = 'none';
     });
   });
 
@@ -241,6 +259,31 @@ document.addEventListener('DOMContentLoaded', function() {
   if (sizeSelect && sizeSelect.value) {
     const selectedSize = document.querySelector(`.size-btn[data-size="${sizeSelect.value}"]`);
     if (selectedSize) selectedSize.classList.add('selected');
+  }
+
+  // Custom size toggle
+  const customSizeCheckbox = document.getElementById('use-custom-size');
+  const customSizeInput = document.getElementById('custom-size-input');
+  if (customSizeCheckbox && customSizeInput) {
+    customSizeCheckbox.addEventListener('change', function() {
+      if (this.checked) {
+        customSizeInput.style.display = 'block';
+        customSizeInput.focus();
+        // Deselect all size buttons
+        sizeButtons.forEach(b => b.classList.remove('selected'));
+        if (sizeSelect) sizeSelect.value = '';
+      } else {
+        customSizeInput.style.display = 'none';
+        customSizeInput.value = '';
+      }
+    });
+
+    // Update hidden select when custom input changes
+    customSizeInput.addEventListener('input', function() {
+      if (customSizeCheckbox.checked && this.value) {
+        if (sizeSelect) sizeSelect.value = this.value.trim();
+      }
+    });
   }
 
   // Color button selection

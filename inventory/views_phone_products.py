@@ -23,6 +23,7 @@ from django.views.decorators.http import require_http_methods
 from tenants.utils import get_active_business, require_business
 from inventory.models_phone_products import PhoneProductCatalog
 from inventory.business_kinds import BusinessKind
+from inventory.authz import require_business_kind
 from core.decorators import manager_required
 
 
@@ -35,42 +36,56 @@ PHONE_BRANDS = [
         "name": "Tecno",
         "display": "TECNO",
         "color": "#3b82f6",  # blue
-        "description": "Africa's bestseller"
+        "description": "Africa's bestseller",
+        "icon": "img/brands/tecno.svg"
     },
     {
         "key": "itel",
         "name": "Itel",
         "display": "ITEL",
         "color": "#ef4444",  # red
-        "description": "Budget workhorse"
+        "description": "Budget workhorse",
+        "icon": "img/brands/itel.svg"
     },
     {
         "key": "samsung",
         "name": "Samsung",
         "display": "SAMSUNG",
         "color": "#f97316",  # orange
-        "description": "Premium experience"
+        "description": "Premium experience",
+        "icon": "img/brands/samsung.svg"
     },
     {
         "key": "google_pixel",
         "name": "Google Pixel",
         "display": "GOOGLE PIXEL",
         "color": "#10b981",  # green
-        "description": "Pure Android"
+        "description": "Pure Android",
+        "icon": "img/brands/google-pixel.svg"
     },
     {
         "key": "redmi",
         "name": "Redmi",
         "display": "REDMI",
         "color": "#8b5cf6",  # purple/neutral
-        "description": "Value leader"
+        "description": "Value leader",
+        "icon": "img/brands/redmi.svg"
     },
     {
         "key": "iphone",
         "name": "iPhone",
         "display": "IPHONE",
         "color": "#111827",  # dark gray/black
-        "description": "Premium Apple experience"
+        "description": "Premium Apple experience",
+        "icon": "img/brands/iphone.svg"
+    },
+    {
+        "key": "huawei",
+        "name": "Huawei",
+        "display": "HUAWEI",
+        "color": "#dc2626",  # red
+        "description": "Innovation leader",
+        "icon": "img/brands/default.svg"
     },
 ]
 
@@ -139,20 +154,20 @@ def add_phone_products(request: HttpRequest) -> HttpResponse:
             return redirect(request.path)
         
         if not specs:
-            messages.error(request, "Specs (RAM+ROM, e.g., '4+128') are required.")
+            messages.error(request, "Specs (ROM+RAM, e.g., '128+4') are required.")
             return redirect(request.path)
         
-        # Parse specs (e.g., "4+128" or "8+256")
+        # Parse specs - Format: ROM+RAM (e.g., "128+4" or "256+8")
         try:
             parts = specs.replace(" ", "").split("+")
             if len(parts) != 2:
                 raise ValueError("Invalid format")
-            ram_gb = int(parts[0])
-            rom_gb = int(parts[1])
+            rom_gb = int(parts[0])  # First part is ROM (storage)
+            ram_gb = int(parts[1])  # Second part is RAM (memory)
             if ram_gb <= 0 or rom_gb <= 0:
                 raise ValueError("RAM and ROM must be positive")
         except (ValueError, IndexError):
-            messages.error(request, "Invalid specs format. Use format like '4+128' or '8+256'.")
+            messages.error(request, "Invalid specs format. Use format like '128+4' or '256+8' (ROM+RAM).")
             return redirect(request.path)
         
         # Parse order price (optional)
@@ -199,13 +214,23 @@ def add_phone_products(request: HttpRequest) -> HttpResponse:
         
         return redirect(request.path)
     
-    # GET: Show brand panels with recent models
+    # GET: Show brand panels with recent models and flagship suggestions
+    from inventory.phone_catalog_seed import FLAGSHIP_PHONES
+    
     brands_with_models = []
     for brand_config in PHONE_BRANDS:
         recent_models = get_recent_models_for_brand(business, brand_config["display"], limit=10)
+        
+        # Get flagship model suggestions for this brand
+        flagship_models = [
+            phone["model"] for phone in FLAGSHIP_PHONES 
+            if phone["brand"].upper() == brand_config["display"].upper()
+        ]
+        
         brands_with_models.append({
             "config": brand_config,
             "recent_models": recent_models,
+            "flagship_models": flagship_models,
         })
     
     context = {
@@ -252,3 +277,179 @@ def api_phone_models_for_brand(request: HttpRequest, brand_key: str) -> JsonResp
     }
     
     return JsonResponse(data)
+
+
+# =============================================================================
+# Gamified Phone Product Wizard
+# =============================================================================
+@login_required
+@require_business
+@manager_required
+@require_business_kind(BusinessKind.PHONES)
+def phone_product_wizard(request: HttpRequest) -> HttpResponse:
+    """
+    Gamified phone product wizard - matches clothing wizard quality.
+    
+    Multi-step flow:
+    1. Choose Brand (Tecno, Itel, Infinix, Samsung, iPhone, Redmi, Huawei, Other)
+    2. Choose Model (show popular models + allow custom)
+    3. Choose Specs (2/32, 3/64, 4/64, 4/128, 6/128, 8/128, 8/256)
+    4. Price + Cost
+    5. Tracking (IMEI / Barcode / Both)
+    6. Save
+    """
+    business = get_active_business(request)
+    if not business:
+        messages.error(request, "No active business selected.")
+        return redirect("tenants:activate_mine")
+    
+    # Handle POST - save the product
+    if request.method == "POST":
+        try:
+            brand_key = request.POST.get("brand", "").strip()
+            model_name = request.POST.get("model", "").strip()
+            specs = request.POST.get("specs", "").strip()  # e.g., "4/128"
+            cost_price_str = request.POST.get("cost_price", "").strip()
+            selling_price_str = request.POST.get("selling_price", "").strip()
+            tracking_type = request.POST.get("tracking_type", "imei").strip()
+            
+            # Validate brand
+            brand_config = get_brand_config(brand_key)
+            if not brand_config:
+                messages.error(request, "Invalid brand selected.")
+                return redirect(request.path)
+            
+            # Validate required fields
+            if not model_name:
+                messages.error(request, "Model name is required.")
+                return redirect(request.path)
+            
+            if not specs:
+                messages.error(request, "Specs (RAM/ROM) are required.")
+                return redirect(request.path)
+            
+            # Parse specs (e.g., "4/128" or "8/256")
+            try:
+                parts = specs.replace(" ", "").split("/")
+                if len(parts) != 2:
+                    raise ValueError("Invalid format")
+                ram_gb = int(parts[0])
+                rom_gb = int(parts[1])
+                if ram_gb <= 0 or rom_gb <= 0:
+                    raise ValueError("RAM and ROM must be positive")
+            except (ValueError, IndexError):
+                messages.error(request, "Invalid specs format. Use format like '4/128' or '8/256'.")
+                return redirect(request.path)
+            
+            # Parse prices
+            cost_price = None
+            if cost_price_str:
+                try:
+                    cost_price = Decimal(cost_price_str)
+                    if cost_price < 0:
+                        raise ValueError("Cost must be non-negative")
+                except (ValueError, Exception):
+                    messages.error(request, "Invalid cost price.")
+                    return redirect(request.path)
+            
+            selling_price = None
+            if selling_price_str:
+                try:
+                    selling_price = Decimal(selling_price_str)
+                    if selling_price < 0:
+                        raise ValueError("Price must be non-negative")
+                except (ValueError, Exception):
+                    messages.error(request, "Invalid selling price.")
+                    return redirect(request.path)
+            
+            # Create or update product
+            with transaction.atomic():
+                product, created = PhoneProductCatalog.objects.update_or_create(
+                    business=business,
+                    brand=brand_config["display"],
+                    model_name=model_name,
+                    ram_gb=ram_gb,
+                    rom_gb=rom_gb,
+                    defaults={
+                        "variant_label": specs,
+                        "default_cost_price": cost_price,
+                        "is_active": True,
+                        "created_by": request.user,
+                    }
+                )
+                
+                if created:
+                    messages.success(
+                        request,
+                        f"✅ Added {brand_config['display']} {model_name} ({specs}) to catalog"
+                    )
+                else:
+                    messages.info(
+                        request,
+                        f"📝 Updated {brand_config['display']} {model_name} ({specs})"
+                    )
+                
+                # Redirect to products list or dashboard
+                return redirect("inventory:phone_products")
+                
+        except Exception as e:
+            messages.error(request, f"Error saving product: {e}")
+            return redirect(request.path)
+    
+    # GET: Show wizard
+    context = {
+        "business": business,
+        "brands": PHONE_BRANDS,
+        "page_title": "Add Phone Product",
+    }
+    
+    return render(request, "inventory/wizards/phone_product_wizard.html", context)
+
+
+# =============================================================================
+# MANAGER ONLY: Remove/Soft Delete Phone Product
+# =============================================================================
+@login_required
+@require_business
+@manager_required
+@require_http_methods(["POST"])
+def remove_phone_product(request: HttpRequest, product_id: int) -> HttpResponse:
+    """
+    Soft-delete a phone product (manager only).
+    
+    This sets is_active=False so the product is hidden from selectable products
+    going forward, but does NOT delete historical sales/stock records.
+    
+    Security:
+    - Manager-only (via decorator)
+    - Business-scoped (product must belong to active business)
+    - Preserves historical data (soft delete only)
+    """
+    business = get_active_business(request)
+    if not business:
+        messages.error(request, "No active business selected.")
+        return redirect("tenants:activate_mine")
+    
+    try:
+        product = PhoneProductCatalog.objects.get(
+            id=product_id,
+            business=business
+        )
+        
+        # Soft delete: set is_active=False
+        product.is_active = False
+        product.save(update_fields=["is_active", "updated_at"])
+        
+        messages.success(
+            request,
+            f"✅ Removed {product.display_name} from catalog. "
+            "Historical sales and stock remain intact."
+        )
+        
+    except PhoneProductCatalog.DoesNotExist:
+        messages.error(request, "Product not found or does not belong to your business.")
+    except Exception as e:
+        messages.error(request, f"Error removing product: {e}")
+    
+    # Redirect back to products page
+    return redirect("inventory:phone_products")

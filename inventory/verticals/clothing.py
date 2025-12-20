@@ -627,7 +627,8 @@ def sell(request):
                         f"Stock updated · Revenue added · Well done!\n"
                         f"{quantity} × {product.name} | Revenue: K {total_price:,.2f} | Profit: K {profit:,.2f}"
                     )
-                    return redirect('verticals:clothing_sell')
+                    # FIXED: Redirect to clothing dashboard (not sell page)
+                    return redirect('verticals:clothing_dashboard')
         else:
             messages.error(request, "Please correct the errors below.")
     else:

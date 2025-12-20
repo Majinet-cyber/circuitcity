@@ -512,7 +512,8 @@ def _wizard_step_confirm(request, ctx, business):
         except Exception:
             pass
         
-        return redirect("inventory:inventory_dashboard")
+        # FIXED: Redirect to phones dashboard (not generic inventory dashboard)
+        return redirect("inventory_verticals:phones_dashboard")
     
     # Pre-fill prices from catalog if available
     default_selling_price = catalog_product.default_selling_price or Decimal("0.00")
