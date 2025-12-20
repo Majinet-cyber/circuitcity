@@ -50,6 +50,7 @@
 </style>
 
 <div class="scan-in-page">
+  <!-- 🔍 VISUAL PROOF: Clothing Smart Pricing Template Active -->
   <header class="scan-header">
     <h1>📦 Stock In</h1>
     <p>Add new clothing items to your inventory</p>
@@ -286,13 +287,20 @@ document.addEventListener('DOMContentLoaded', function() {
   toggleBarcodeField();
   
   // Smart Pricing Feedback
+  // 🔍 VISUAL PROOF: Smart pricing JavaScript loaded
+  // Clothing Smart Pricing JS loaded
+  
   (function() {
     const costPriceInput = document.getElementById('id_cost_price');
     const sellingPriceInput = document.getElementById('id_selling_price');
     const feedbackContainer = document.getElementById('clothing-pricing-feedback');
     const costPriceStep = document.getElementById('cost-price-step');
     
-    if (!costPriceInput || !sellingPriceInput || !feedbackContainer) return;
+    if (!costPriceInput || !sellingPriceInput || !feedbackContainer) {
+      console.error("❌ Smart pricing elements not found");
+      return;
+    }
+    console.log("✅ Smart pricing elements found and wired");
     
     let costPrice = null;
     let costPriceEntered = false;

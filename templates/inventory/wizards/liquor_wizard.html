@@ -1,0 +1,204 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Add Liquor Product · Wizard{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'css/wizard-system.css' %}">
+<style>
+.wizard-active-banner {
+  background: linear-gradient(135deg, #10b981, #059669);
+  color: white;
+  padding: 12px 20px;
+  text-align: center;
+  font-weight: 700;
+  font-size: 16px;
+  box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
+  position: sticky;
+  top: 0;
+  z-index: 10000;
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<!-- Wizard Active Confirmation Banner -->
+
+<div id="wizard-container"></div>
+
+<script src="{% static 'js/wizard-engine.js' %}"></script>
+<script>
+(function() {
+  // Liquor categories
+  const categories = [
+    { value: 'beer', label: 'Beer', icon: '🍺' },
+    { value: 'cider', label: 'Cider', icon: '🍎' },
+    { value: 'wine', label: 'Wine', icon: '🍷' },
+    { value: 'spirits', label: 'Spirits', icon: '🥃' },
+    { value: 'whiskey', label: 'Whiskey', icon: '🥃' },
+    { value: 'gin', label: 'Gin', icon: '🍸' },
+    { value: 'vodka', label: 'Vodka', icon: '🧊' },
+    { value: 'rum', label: 'Rum', icon: '🏝️' },
+    { value: 'brandy', label: 'Brandy', icon: '🍇' },
+    { value: 'tequila', label: 'Tequila', icon: '🌵' },
+    { value: 'mixers', label: 'Mixers', icon: '🧃' },
+    { value: 'energy', label: 'Energy Drinks', icon: '⚡' },
+    { value: 'water', label: 'Water', icon: '💧' },
+    { value: 'other', label: 'Other', icon: '📦' }
+  ];
+
+  // Popular liquor names by category (loaded from single source of truth)
+  const popularNames = {{ liquor_suggestions_json|safe }};
+
+  // Selling modes
+  const sellingModes = [
+    { value: 'bottle', label: 'Bottle Only', icon: '🍾', description: 'Sell full bottles' },
+    { value: 'shot', label: 'Shots Only', icon: '🥃', description: 'Sell individual shots' },
+    { value: 'both', label: 'Both', icon: '🎯', description: 'Bottle & shot sales', featured: true }
+  ];
+
+  // Barcode options
+  const barcodeOptions = [
+    { value: 'yes', label: 'Yes, has barcode', icon: '📱' },
+    { value: 'no', label: 'No barcode', icon: '✋' }
+  ];
+
+  // Wizard configuration
+  wizard = new WizardEngine('wizard-container', {
+    steps: [
+      // Step 1: Category
+      {
+        type: 'cards',
+        key: 'category',
+        title: 'Choose Category',
+        subtitle: 'What type of liquor are you adding?',
+        options: categories,
+        columns: 'auto'
+      },
+      
+      // Step 2: Product Name
+      {
+        type: 'cards',
+        key: 'product_name',
+        title: 'Product Name',
+        subtitle: 'Select a popular product or enter custom name',
+        options: (data) => {
+          const cat = data.category;
+          const names = popularNames[cat] || [];
+          return names.map(name => ({ value: name, label: name, icon: '🏷️' }));
+        },
+        allowCustom: true,
+        customPlaceholder: 'Enter product name',
+        searchable: true
+      },
+      
+      // Step 3: Selling Mode
+      {
+        type: 'cards',
+        key: 'selling_mode',
+        title: 'Selling Mode',
+        subtitle: 'How will you sell this product?',
+        options: sellingModes,
+        columns: 'auto'
+      },
+      
+      // Step 4: Pricing
+      {
+        type: 'multi-input',
+        key: 'pricing',
+        title: 'Pricing',
+        subtitle: 'Set your prices',
+        fields: (data) => {
+          const fields = [];
+          
+          if (data.selling_mode === 'bottle' || data.selling_mode === 'both') {
+            fields.push(
+              { key: 'price_per_bottle', label: 'Price per Bottle (MWK)', type: 'number', min: 0, step: '0.01', required: true },
+              { key: 'cost_per_bottle', label: 'Cost per Bottle (MWK) - Optional', type: 'number', min: 0, step: '0.01' }
+            );
+          }
+          
+          if (data.selling_mode === 'shot' || data.selling_mode === 'both') {
+            fields.push(
+              { key: 'shots_per_bottle', label: 'Shots per Bottle', type: 'number', min: 1, required: true },
+              { key: 'price_per_shot', label: 'Price per Shot (MWK)', type: 'number', min: 0, step: '0.01', required: true },
+              { key: 'barman_reserved', label: 'Barman Reserved Shots', type: 'number', min: 0, value: 2 }
+            );
+          }
+          
+          return fields;
+        }
+      },
+      
+      // Step 5: Barcode
+      {
+        type: 'cards',
+        key: 'has_barcode',
+        title: 'Barcode',
+        subtitle: 'Does this product have a barcode?',
+        options: barcodeOptions,
+        columns: 'two-col'
+      },
+      
+      // Step 6: Barcode Entry (conditional)
+      {
+        type: 'input',
+        key: 'barcode',
+        title: 'Scan or Enter Barcode',
+        subtitle: 'Use camera to scan or type manually',
+        inputType: 'text',
+        placeholder: 'Barcode number',
+        required: true,
+        skip: (data) => data.has_barcode !== 'yes'
+      }
+    ],
+    
+    onComplete: async (data) => {
+      console.log('Wizard complete:', data);
+      
+      // Show loading
+      const loading = document.createElement('div');
+      loading.className = 'wizard-loading';
+      loading.innerHTML = '<div class="wizard-loading-spinner"></div>';
+      document.body.appendChild(loading);
+      
+      try {
+        // Submit to server
+        const csrfToken = document.querySelector('[name=csrf-token]')?.content || 
+                          document.querySelector('[name=csrfmiddlewaretoken]')?.value;
+        
+        const response = await fetch('{% url "inventory:liquor_wizard_submit" %}', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': csrfToken
+          },
+          body: JSON.stringify(data)
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+          // Success! Redirect
+          window.location.href = result.redirect || '{% url "verticals:liquor_dashboard" %}';
+        } else {
+          loading.remove();
+          alert(result.error || 'Failed to create product');
+        }
+      } catch (error) {
+        loading.remove();
+        console.error('Submit error:', error);
+        alert('Failed to create product. Please try again.');
+      }
+    },
+    
+    onCancel: () => {
+      if (confirm('Cancel adding product?')) {
+        window.location.href = '{% url "verticals:liquor_dashboard" %}';
+      }
+    }
+  });
+})();
+</script>
+{% endblock %}
+

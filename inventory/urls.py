@@ -82,6 +82,13 @@ try:
 except Exception:
     _phone_products_views = SimpleNamespace()
 
+# Gamified Wizard views
+try:
+    from . import views_wizard as _wizard_views
+except Exception as e:
+    print(f"WARNING: Failed to import views_wizard: {e}")
+    _wizard_views = SimpleNamespace()
+
 # Stock assignment views (manager-only)
 try:
     from . import views_stock_assign as _stock_assign
@@ -1070,11 +1077,12 @@ urlpatterns += [
     path("products/new/generic/", _redirect_to("inventory:product_new_entry"), name="product_create"),
     path("product/new/", _redirect_to("inventory:product_new_entry"), name="product_create_short"),
 
-    path("phones/products/new/",   manager_required(_need_biz(getattr(_phone_products_views, "add_phone_products", _product_create_for_mode_factory("phones")))),   name="product_create_phones"),
-    path("pharmacy/products/new/", manager_required(_need_biz(_product_create_for_mode_factory("pharmacy"))), name="product_create_pharmacy"),
-    path("liquor/products/new/",   manager_required(_need_biz(_product_create_for_mode_factory("liquor"))),   name="product_create_liquor"),
+    # Product creation - NOW POINTS TO WIZARDS WHERE AVAILABLE
+    path("phones/products/new/",   manager_required(_need_biz(getattr(_wizard_views, "phones_wizard", getattr(_phone_products_views, "add_phone_products", _product_create_for_mode_factory("phones"))))),   name="product_create_phones"),
+    path("pharmacy/products/new/", manager_required(_need_biz(getattr(_wizard_views, "pharmacy_wizard", _product_create_for_mode_factory("pharmacy")))), name="product_create_pharmacy"),
+    path("liquor/products/new/",   manager_required(_need_biz(getattr(_wizard_views, "liquor_wizard", _product_create_for_mode_factory("liquor")))),   name="product_create_liquor"),
     path("grocery/products/new/",  manager_required(_need_biz(_product_create_for_mode_factory("grocery"))),  name="product_create_grocery"),
-    path("clothing/products/new/", manager_required(_need_biz(_product_create_for_mode_factory("clothing"))), name="product_create_clothing"),
+    path("clothing/products/new/", manager_required(_need_biz(getattr(_wizard_views, "clothing_wizard", _product_create_for_mode_factory("clothing")))), name="product_create_clothing"),
 
     # v2 merch router — left undecorated to avoid auth/guard loops
     path("merch/products/new/v2/", prodv2.product_create_v2_router, name="merch_product_new"),
@@ -1088,9 +1096,12 @@ urlpatterns += [
     path("clothing/products/new/v2/", manager_required(_need_biz(prodv2.product_create_clothing_v2)), name="clothing_product_new_v2"),
     path("clothing/products/<int:pk>/edit/", manager_required(_need_biz(prodv2.product_edit_clothing_v2)), name="clothing_product_edit_v2"),
 
-    # liquor v2 (explicit)
-    path("liquor/products/new/v2/", manager_required(_need_biz(prodv2.product_create_liquor_v2)), name="liquor_product_new_v2"),
+    # liquor v2 (explicit) - NOW POINTS TO WIZARD
+    path("liquor/products/new/v2/", manager_required(_need_biz(_wizard_views.liquor_wizard)), name="liquor_product_new_v2"),
     path("liquor/products/<int:pk>/edit/v2/", manager_required(_need_biz(prodv2.product_edit_liquor_v2)), name="liquor_product_edit_v2"),
+    
+    # Classic form fallback (for users who prefer the old form)
+    path("liquor/products/new/v2/classic/", manager_required(_need_biz(prodv2.product_create_liquor_v2)), name="liquor_product_new_v2_classic"),
 ]
 
 # Manager Locations + Alerts pages
@@ -1267,4 +1278,19 @@ urlpatterns += [
 # ---------------------------------------------------------------------
 urlpatterns += [
     path("verticals/", include(("verticals.urls", "verticals"), namespace="verticals")),
+]
+
+# Gamified Add-Product Wizards
+urlpatterns += [
+    # Wizard pages - Direct imports (no fallback stubs)
+    path("wizard/liquor/", manager_required(_need_biz(_wizard_views.liquor_wizard)), name="liquor_wizard"),
+    path("wizard/phones/", manager_required(_need_biz(_wizard_views.phones_wizard)), name="phones_wizard"),
+    path("wizard/pharmacy/", manager_required(_need_biz(_wizard_views.pharmacy_wizard)), name="pharmacy_wizard"),
+    path("wizard/clothing/", manager_required(_need_biz(_wizard_views.clothing_wizard)), name="clothing_wizard"),
+    
+    # Wizard submission endpoints - Direct imports (no fallback stubs)
+    path("wizard/liquor/submit/", manager_required(_need_biz(_wizard_views.liquor_wizard_submit)), name="liquor_wizard_submit"),
+    path("wizard/phones/submit/", manager_required(_need_biz(_wizard_views.phones_wizard_submit)), name="phones_wizard_submit"),
+    path("wizard/pharmacy/submit/", manager_required(_need_biz(_wizard_views.pharmacy_wizard_submit)), name="pharmacy_wizard_submit"),
+    path("wizard/clothing/submit/", manager_required(_need_biz(_wizard_views.clothing_wizard_submit)), name="clothing_wizard_submit"),
 ]

@@ -18,11 +18,24 @@
     --dash-shadow: 0 4px 14px rgba(2, 6, 23, .08);
   }
 
+  /* Prevent horizontal scroll and text overflow */
+  body {
+    overflow-x: hidden;
+    max-width: 100vw;
+  }
+
+  * {
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+  }
+
   .dash-container {
     max-width: 1280px;
     margin: 0 auto;
     padding: 1.5rem;
     color: var(--dash-text);
+    overflow-x: hidden;
+    word-wrap: break-word;
   }
 
   /* Hero Section */
@@ -34,11 +47,17 @@
     font-size: 2rem;
     font-weight: 800;
     margin-bottom: .5rem;
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+    max-width: 100%;
   }
 
   .hero-greeting p {
     color: var(--dash-muted);
     font-size: 1.1rem;
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+    max-width: 100%;
   }
 
   /* Stats Cards */
@@ -76,12 +95,16 @@
     display: flex;
     align-items: center;
     gap: .5rem;
+    word-wrap: break-word;
+    overflow-wrap: break-word;
   }
 
   .stat-value {
     font-size: 2rem;
     font-weight: 800;
     color: var(--dash-text);
+    word-wrap: break-word;
+    overflow-wrap: break-word;
   }
 
   .stat-change {

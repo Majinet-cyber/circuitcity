@@ -196,7 +196,7 @@ def liquor_scan_in(request):
             # Calculate actual bottles to add
             bottles_to_add = quantity
             if unit_type == "crate":
-                bottles_per_crate = product.bottles_per_crate or 24  # Default 24 bottles per crate
+                bottles_per_crate = getattr(product, 'bottles_per_crate', 24)  # Default 24, no schema dependency
                 bottles_to_add = quantity * bottles_per_crate
             
             with transaction.atomic():
@@ -205,8 +205,9 @@ def liquor_scan_in(request):
                 
                 # Update cost price if provided
                 if cost_per_unit > 0:
-                    if unit_type == "crate" and product.bottles_per_crate:
-                        product.cost_per_bottle = cost_per_unit / product.bottles_per_crate
+                    bottles_per_crate = getattr(product, 'bottles_per_crate', 24)
+                    if unit_type == "crate" and bottles_per_crate:
+                        product.cost_per_bottle = cost_per_unit / bottles_per_crate
                     else:
                         product.cost_per_bottle = cost_per_unit
                 
@@ -235,7 +236,7 @@ def liquor_scan_in(request):
                 'id': p.id,
                 'name': p.name,
                 'quantity_in_stock': p.quantity_in_stock or 0,
-                'bottles_per_crate': p.bottles_per_crate or 24,
+                'bottles_per_crate': getattr(p, 'bottles_per_crate', 24),  # Safe fallback
             })
     
     # Build categories list in order

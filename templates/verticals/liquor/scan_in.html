@@ -313,6 +313,7 @@
 
 {% block content %}
 <div class="scan-in-container">
+    <!-- 🔍 VISUAL PROOF: Liquor Smart Pricing Template Active -->
     <h1 class="text-3xl font-bold mb-6">📦 Stock In - Liquor</h1>
     
     <!-- Step 1: Category Selection -->
@@ -429,6 +430,9 @@
 </div>
 
 <script>
+// 🔍 VISUAL PROOF: Smart pricing JavaScript loaded
+// Liquor Smart Pricing JS loaded
+
 let selectedCategory = null;
 let selectedProduct = null;
 let selectedUnit = null;
@@ -726,5 +730,22 @@ function resetForm() {
 <form method="post" style="display:none;" id="hidden-form">
     {% csrf_token %}
 </form>
+
+<!-- Quick Add Floating Button -->
+<a href="{% url 'inventory:liquor_wizard' %}" style="position:fixed;bottom:24px;right:24px;z-index:999;display:flex;align-items:center;gap:10px;padding:16px 24px;background:linear-gradient(135deg,#6366f1,#8b5cf6);color:white;border-radius:50px;font-weight:600;box-shadow:0 8px 24px rgba(99,102,241,0.4);text-decoration:none;transition:all 0.3s">
+  <i class="bi bi-plus-circle" style="font-size:20px"></i>
+  <span>Add Product</span>
+</a>
+
+<style>
+@media (max-width: 640px) {
+  a[href*="wizard"] {
+    bottom: 80px !important;
+    right: 16px !important;
+    padding: 14px 20px !important;
+    font-size: 15px !important;
+  }
+}
+</style>
 {% endblock %}
 

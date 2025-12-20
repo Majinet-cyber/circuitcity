@@ -1,0 +1,375 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Add Clothing Product · Wizard{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'css/wizard-system.css' %}">
+{% endblock %}
+
+{% block content %}
+<div id="wizard-container"></div>
+
+<script src="{% static 'js/wizard-engine.js' %}"></script>
+<script>
+(function() {
+  // Clothing categories
+  const categories = [
+    { value: 'shoes', label: 'Shoes', icon: '👟' },
+    { value: 'suits', label: 'Suits', icon: '🤵' },
+    { value: 'shirts', label: 'Shirts', icon: '👔' },
+    { value: 'tshirts', label: 'T-Shirts', icon: '👕' },
+    { value: 'jeans', label: 'Jeans', icon: '👖' },
+    { value: 'trousers', label: 'Trousers', icon: '👖' },
+    { value: 'jackets', label: 'Jackets', icon: '🧥' },
+    { value: 'dresses', label: 'Dresses', icon: '👗' },
+    { value: 'skirts', label: 'Skirts', icon: '👗' },
+    { value: 'sweaters', label: 'Sweaters', icon: '🧶' },
+    { value: 'other', label: 'Other', icon: '📦' }
+  ];
+
+  // Shoe subtypes
+  const shoeSubtypes = [
+    { value: 'dress', label: 'Dress Shoes', icon: '👞' },
+    { value: 'sports', label: 'Sports Shoes', icon: '👟', featured: true },
+    { value: 'sneakers', label: 'Sneakers', icon: '👟', featured: true },
+    { value: 'boots', label: 'Boots', icon: '🥾' },
+    { value: 'slip_on', label: 'Slip-on', icon: '🥿' },
+    { value: 'sandals', label: 'Sandals', icon: '👡' },
+    { value: 'formal', label: 'Formal', icon: '👞' },
+    { value: 'casual', label: 'Casual', icon: '👟' },
+    { value: 'other', label: 'Other', icon: '👟' }
+  ];
+
+  // Sports shoe brands
+  const sportsBrands = [
+    { value: 'Jordan', label: 'Jordan', icon: '🏀', badge: 'Premium' },
+    { value: 'Nike', label: 'Nike', icon: '✓', featured: true },
+    { value: 'Adidas', label: 'Adidas', icon: '⚽' },
+    { value: 'Puma', label: 'Puma', icon: '🐆' },
+    { value: 'Air Force', label: 'Air Force', icon: '✈️' },
+    { value: 'Air Max', label: 'Air Max', icon: '💨' },
+    { value: 'Converse', label: 'Converse', icon: '⭐' },
+    { value: 'Vans', label: 'Vans', icon: '🛹' }
+  ];
+
+  // Jordan models
+  const jordanModels = [
+    { value: 'Air 1', label: 'Jordan Air 1', icon: '👟' },
+    { value: 'Air 4', label: 'Jordan Air 4', icon: '👟' },
+    { value: 'Air 6', label: 'Jordan Air 6', icon: '👟' },
+    { value: 'Retro', label: 'Jordan Retro', icon: '👟' }
+  ];
+
+  // Suit subtypes
+  const suitSubtypes = [
+    { value: 'two_piece', label: 'Two-piece', icon: '🤵' },
+    { value: 'three_piece', label: 'Three-piece', icon: '🤵', badge: 'Classic' },
+    { value: 'casual', label: 'Casual suit', icon: '👔' },
+    { value: 'formal', label: 'Formal suit', icon: '🤵' },
+    { value: 'wedding', label: 'Wedding suit', icon: '💒', badge: 'Special' },
+    { value: 'office', label: 'Office suit', icon: '💼' },
+    { value: 'other', label: 'Other', icon: '👔' }
+  ];
+
+  // Suit fits
+  const suitFits = [
+    { value: 'slim', label: 'Slim', icon: '📏' },
+    { value: 'regular', label: 'Regular', icon: '📏', featured: true },
+    { value: 'loose', label: 'Loose', icon: '📏' }
+  ];
+
+  // Jeans types
+  const jeansTypes = [
+    { value: 'soft_denim', label: 'Soft Denim', icon: '👖' },
+    { value: 'english_denim', label: 'English Denim', icon: '👖' },
+    { value: 'skinny', label: 'Skinny', icon: '👖' },
+    { value: 'straight', label: 'Straight', icon: '👖', featured: true },
+    { value: 'bootcut', label: 'Bootcut', icon: '👖' },
+    { value: 'stretch', label: 'Stretch', icon: '👖' },
+    { value: 'other', label: 'Other', icon: '👖' }
+  ];
+
+  // Colors
+  const colors = [
+    { value: 'blue', label: 'Blue', icon: '🔵' },
+    { value: 'black', label: 'Black', icon: '⚫' },
+    { value: 'grey', label: 'Grey', icon: '⚪' },
+    { value: 'light_wash', label: 'Light wash', icon: '💙' },
+    { value: 'dark_wash', label: 'Dark wash', icon: '🔷' }
+  ];
+
+  // Sizes
+  const sizes = [
+    { value: 'S', label: 'S', icon: '📏' },
+    { value: 'M', label: 'M', icon: '📏', featured: true },
+    { value: 'L', label: 'L', icon: '📏', featured: true },
+    { value: 'XL', label: 'XL', icon: '📏' },
+    { value: 'XXL', label: 'XXL', icon: '📏' }
+  ];
+
+  // Numeric sizes
+  const numericSizes = [
+    { value: '28', label: '28', icon: '📐' },
+    { value: '30', label: '30', icon: '📐' },
+    { value: '32', label: '32', icon: '📐', featured: true },
+    { value: '34', label: '34', icon: '📐', featured: true },
+    { value: '36', label: '36', icon: '📐' },
+    { value: '38', label: '38', icon: '📐' },
+    { value: '40', label: '40', icon: '📐' }
+  ];
+
+  // Genders
+  const genders = [
+    { value: 'men', label: 'Men', icon: '👨' },
+    { value: 'women', label: 'Women', icon: '👩' },
+    { value: 'unisex', label: 'Unisex', icon: '👥', featured: true }
+  ];
+
+  // Barcode options
+  const barcodeOptions = [
+    { value: 'yes', label: 'Yes, has barcode', icon: '📱' },
+    { value: 'no', label: 'No barcode', icon: '✋' }
+  ];
+
+  // Dynamic step generator
+  function getStepsForCategory(category) {
+    const baseSteps = [
+      // Step 1: Category (always first)
+      {
+        type: 'cards',
+        key: 'category',
+        title: 'Clothing Category',
+        subtitle: 'What type of clothing are you adding?',
+        options: categories,
+        columns: 'auto'
+      }
+    ];
+
+    // Shoes flow
+    if (category === 'shoes') {
+      return baseSteps.concat([
+        // Step 2: Shoe subtype
+        {
+          type: 'cards',
+          key: 'shoe_subtype',
+          title: 'Shoe Type',
+          subtitle: 'Select the shoe type',
+          options: shoeSubtypes,
+          columns: 'auto'
+        },
+        // Step 3: Brand (conditional for sports/sneakers)
+        {
+          type: 'cards',
+          key: 'brand',
+          title: 'Brand',
+          subtitle: 'Select the brand',
+          options: sportsBrands,
+          allowCustom: true,
+          customPlaceholder: 'Enter brand',
+          columns: 'auto'
+        },
+        // Step 4: Model (conditional for Jordan)
+        {
+          type: 'cards',
+          key: 'model',
+          title: 'Model',
+          subtitle: 'Select the Jordan model',
+          options: jordanModels,
+          allowCustom: true,
+          customPlaceholder: 'Enter model'
+        }
+      ]);
+    }
+
+    // Suits flow
+    if (category === 'suits') {
+      return baseSteps.concat([
+        // Step 2: Suit subtype
+        {
+          type: 'cards',
+          key: 'suit_subtype',
+          title: 'Suit Type',
+          subtitle: 'Select the suit type',
+          options: suitSubtypes,
+          columns: 'auto'
+        },
+        // Step 3: Fit (optional)
+        {
+          type: 'cards',
+          key: 'fit',
+          title: 'Fit',
+          subtitle: 'Select the fit style',
+          options: suitFits,
+          skipable: true,
+          columns: 'three-col'
+        }
+      ]);
+    }
+
+    // Jeans flow
+    if (category === 'jeans') {
+      return baseSteps.concat([
+        // Step 2: Jeans type
+        {
+          type: 'cards',
+          key: 'jeans_type',
+          title: 'Jeans Type',
+          subtitle: 'Select the jeans style',
+          options: jeansTypes,
+          columns: 'auto'
+        },
+        // Step 3: Color (optional)
+        {
+          type: 'cards',
+          key: 'color',
+          title: 'Color',
+          subtitle: 'Select the color',
+          options: colors,
+          skipable: true,
+          columns: 'auto'
+        }
+      ]);
+    }
+
+    // Default flow for other categories
+    return baseSteps;
+  }
+
+  // Common final steps
+  const commonFinalSteps = [
+    // Size
+    {
+      type: 'cards',
+      key: 'size',
+      title: 'Size',
+      subtitle: 'Select the size',
+      options: (data) => {
+        // Use numeric sizes for trousers/jeans, letter sizes for others
+        if (['trousers', 'jeans'].includes(data.category)) {
+          return numericSizes;
+        }
+        return sizes;
+      },
+      skipable: true,
+      columns: 'auto'
+    },
+    // Gender
+    {
+      type: 'cards',
+      key: 'gender',
+      title: 'Gender',
+      subtitle: 'Who is this for?',
+      options: genders,
+      skipable: true,
+      columns: 'three-col'
+    },
+    // Pricing
+    {
+      type: 'multi-input',
+      key: 'pricing',
+      title: 'Pricing & Stock',
+      subtitle: 'Set prices and initial stock',
+      fields: [
+        { key: 'selling_price', label: 'Selling Price (MWK)', type: 'number', min: 0, step: '0.01', required: true },
+        { key: 'cost_price', label: 'Cost Price (MWK)', type: 'number', min: 0, step: '0.01' },
+        { key: 'initial_stock', label: 'Initial Stock Quantity', type: 'number', min: 0, value: 0, required: true }
+      ]
+    },
+    // Barcode
+    {
+      type: 'cards',
+      key: 'has_barcode',
+      title: 'Barcode',
+      subtitle: 'Does this product have a barcode?',
+      options: barcodeOptions,
+      columns: 'two-col'
+    },
+    // Barcode Entry (conditional)
+    {
+      type: 'input',
+      key: 'barcode',
+      title: 'Scan or Enter Barcode',
+      subtitle: 'Use camera to scan or type manually',
+      inputType: 'text',
+      placeholder: 'Barcode number',
+      required: false,
+      skip: (data) => data.has_barcode !== 'yes'
+    }
+  ];
+
+  // Initialize wizard with category step only
+  let wizardSteps = [
+    {
+      type: 'cards',
+      key: 'category',
+      title: 'Clothing Category',
+      subtitle: 'What type of clothing are you adding?',
+      options: categories,
+      columns: 'auto'
+    }
+  ];
+
+  wizard = new WizardEngine('wizard-container', {
+    steps: wizardSteps,
+    
+    onComplete: async (data) => {
+      console.log('Clothing wizard complete:', data);
+      
+      // Show loading
+      const loading = document.createElement('div');
+      loading.className = 'wizard-loading';
+      loading.innerHTML = '<div class="wizard-loading-spinner"></div>';
+      document.body.appendChild(loading);
+      
+      try {
+        // Submit to server
+        const csrfToken = document.querySelector('[name=csrf-token]')?.content || 
+                          document.querySelector('[name=csrfmiddlewaretoken]')?.value;
+        
+        const response = await fetch('{% url "inventory:clothing_wizard_submit" %}', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': csrfToken
+          },
+          body: JSON.stringify(data)
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+          // Success! Redirect
+          window.location.href = result.redirect || '{% url "verticals:clothing_dashboard" %}';
+        } else {
+          loading.remove();
+          alert(result.error || 'Failed to create product');
+        }
+      } catch (error) {
+        loading.remove();
+        console.error('Submit error:', error);
+        alert('Failed to create product. Please try again.');
+      }
+    },
+    
+    onCancel: () => {
+      if (confirm('Cancel adding clothing?')) {
+        window.location.href = '{% url "verticals:clothing_dashboard" %}';
+      }
+    }
+  });
+
+  // Override next() to rebuild steps dynamically
+  const originalNext = wizard.next.bind(wizard);
+  wizard.next = function() {
+    // If we just selected category, rebuild the wizard steps
+    if (this.currentStep === 0 && this.data.category) {
+      const categorySteps = getStepsForCategory(this.data.category);
+      this.config.steps = [...categorySteps, ...commonFinalSteps];
+    }
+    originalNext();
+  };
+})();
+</script>
+{% endblock %}
+

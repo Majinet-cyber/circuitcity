@@ -27,10 +27,10 @@
                 <label class="form-label">Filter by Status</label>
                 <select name="status" class="form-select" onchange="this.form.submit()">
                     <option value="">All Statuses</option>
-                    <option value="pending" {% if request.GET.status == "pending" %}selected{% endif %}>Pending</option>
+                    <option value="open" {% if request.GET.status == "open" %}selected{% endif %}>Outstanding</option>
                     <option value="partial" {% if request.GET.status == "partial" %}selected{% endif %}>Partially Paid</option>
                     <option value="settled" {% if request.GET.status == "settled" %}selected{% endif %}>Settled</option>
-                    <option value="written_off" {% if request.GET.status == "written_off" %}selected{% endif %}>Written Off</option>
+                    <option value="cancelled" {% if request.GET.status == "cancelled" %}selected{% endif %}>Cancelled</option>
                 </select>
             </div>
             <div class="col-12 col-md-4">
@@ -123,14 +123,14 @@
                                 {% endif %}
                             </td>
                             <td>
-                                {% if credit.status == "pending" %}
-                                    <span class="badge bg-warning-subtle text-warning">Pending</span>
+                                {% if credit.status == "open" %}
+                                    <span class="badge bg-warning-subtle text-warning">Outstanding</span>
                                 {% elif credit.status == "partial" %}
-                                    <span class="badge bg-info-subtle text-info">Partial</span>
+                                    <span class="badge bg-info-subtle text-info">Partially Paid</span>
                                 {% elif credit.status == "settled" %}
                                     <span class="badge bg-success-subtle text-success">Settled</span>
-                                {% elif credit.status == "written_off" %}
-                                    <span class="badge bg-secondary-subtle text-secondary">Written Off</span>
+                                {% elif credit.status == "cancelled" %}
+                                    <span class="badge bg-secondary-subtle text-secondary">Cancelled</span>
                                 {% else %}
                                     <span class="badge bg-light text-dark">{{ credit.get_status_display }}</span>
                                 {% endif %}
@@ -146,12 +146,14 @@
                                        title="View Details">
                                         <i class="bi bi-eye"></i>
                                     </a>
-                                    {% if credit.status != "settled" and credit.status != "written_off" %}
-                                        <a href="{% url 'liquor:submit_credit_payment' credit_id=credit.id %}" 
-                                           class="btn btn-outline-success btn-sm" 
-                                           title="Add Payment">
-                                            <i class="bi bi-cash"></i>
-                                        </a>
+                                    {% if credit.status != "settled" and credit.status != "cancelled" %}
+                                        <button type="button" 
+                                                class="btn btn-success btn-sm" 
+                                                title="Clear Credit (Customer Paid)"
+                                                data-bs-toggle="modal" 
+                                                data-bs-target="#clearModal{{ credit.id }}">
+                                            <i class="bi bi-check-circle"></i> Clear
+                                        </button>
                                     {% endif %}
                                 </div>
                             </td>
@@ -160,6 +162,62 @@
                     </tbody>
                 </table>
             </div>
+            
+            <!-- Clear Confirmation Modals (one per credit) -->
+            {% for credit in credits %}
+            {% if credit.status != "settled" and credit.status != "cancelled" %}
+            <div class="modal fade" id="clearModal{{ credit.id }}" tabindex="-1" aria-labelledby="clearModalLabel{{ credit.id }}" aria-hidden="true">
+                <div class="modal-dialog">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h5 class="modal-title" id="clearModalLabel{{ credit.id }}">
+                                <i class="bi bi-check-circle text-success"></i> Clear Credit
+                            </h5>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                        </div>
+                        <div class="modal-body">
+                            <div class="alert alert-info mb-3">
+                                <i class="bi bi-info-circle"></i>
+                                <strong>What does "Clear" mean?</strong>
+                                <p class="mb-0 small mt-1">
+                                    Clearing confirms the customer has paid. This will:
+                                </p>
+                                <ul class="small mb-0 mt-2">
+                                    <li>Mark this credit as <strong>Settled (Paid)</strong></li>
+                                    <li><strong>Add MK {{ credit.amount|floatformat:2 }} to your revenue</strong></li>
+                                    <li>Update your KPIs and profit calculations</li>
+                                </ul>
+                            </div>
+                            
+                            <h6>Customer: <strong>{{ credit.customer_name }}</strong></h6>
+                            <p class="mb-2">
+                                Outstanding Amount: <span class="text-danger fw-bold fs-5">MK {{ credit.balance|floatformat:2 }}</span>
+                            </p>
+                            
+                            {% if credit.related_sale %}
+                            <p class="small text-muted mb-0">
+                                Product: {{ credit.related_sale.product.name }} ({{ credit.related_sale.quantity }} {{ credit.related_sale.get_unit_display }}{% if credit.related_sale.quantity > 1 %}s{% endif %})
+                            </p>
+                            {% endif %}
+                            
+                            <p class="mt-3 mb-0">
+                                <strong>Confirm customer has paid MK {{ credit.amount|floatformat:2 }}?</strong>
+                            </p>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                            <form method="post" action="{% url 'liquor:clear_credit' credit_id=credit.id %}" style="display: inline;">
+                                {% csrf_token %}
+                                <button type="submit" class="btn btn-success">
+                                    <i class="bi bi-check-circle"></i> Yes, Clear Credit
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+            {% endfor %}
         {% else %}
             <!-- Empty State -->
             <div class="text-center py-5">

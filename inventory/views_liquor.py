@@ -131,6 +131,10 @@ def sell_liquor(request):
             product_id = int(request.POST.get("product_id", 0))
             quantity = int(request.POST.get("quantity", 1))
             mode = request.POST.get("mode", "bottle")  # "bottle" or "shot"
+            sale_type = request.POST.get("sale_type", "cash")  # "cash" or "credit"
+            customer_name = request.POST.get("customer_name", "").strip()
+            customer_phone = request.POST.get("customer_phone", "").strip()
+            notes = request.POST.get("notes", "").strip()
             
             product = MerchProduct.objects.get(
                 pk=product_id,
@@ -139,12 +143,31 @@ def sell_liquor(request):
                 is_active=True
             )
             
+            # Validate credit sale requires customer name
+            if sale_type == "credit" and not customer_name:
+                messages.error(request, "❌ Customer name is required for credit sales.")
+                return redirect("liquor:sell")
+            
             # Map mode to unit
             unit = LiquorUnitType.SHOT if mode == "shot" else LiquorUnitType.BOTTLE
             
             # Validate shot sales
             if mode == "shot" and not product.has_shots:
                 messages.error(request, f"{product.name} does not support shot sales.")
+                return redirect("liquor:sell")
+            
+            # CRITICAL: Check stock availability before allowing sale
+            current_stock = product.quantity_in_stock or 0
+            if current_stock <= 0:
+                messages.error(request, f"❌ Out of stock: {product.name}. Please scan in stock first.")
+                return redirect("liquor:sell")
+            
+            # For bottle sales, check if enough bottles available
+            if mode == "bottle" and quantity > current_stock:
+                messages.error(
+                    request, 
+                    f"❌ Insufficient stock: {product.name}. Available: {current_stock}, Requested: {quantity}"
+                )
                 return redirect("liquor:sell")
             
             # Get price
@@ -158,7 +181,11 @@ def sell_liquor(request):
                 # Calculate total price
                 total = Decimal(quantity) * unit_price
                 
-                # Create sale (always cash for quick flow; free/credit can use old form if needed)
+                # Determine sale type
+                is_credit = sale_type == "credit"
+                liquor_sale_type = LiquorSaleType.CREDIT if is_credit else LiquorSaleType.SALE
+                
+                # Create sale
                 sale = LiquorSale.objects.create(
                     business=business,
                     product=product,
@@ -169,22 +196,47 @@ def sell_liquor(request):
                     total_price=total,
                     unit_cost=unit_cost,
                     total_cost=total_cost,
-                    sale_type=LiquorSaleType.SALE,
+                    sale_type=liquor_sale_type,
+                    is_credit=is_credit,
                     sold_by=request.user,
-                    notes=""
+                    notes=notes
                 )
                 
-                # Create wallet entry for cash sale
-                LiquorWalletEntry.objects.create(
-                    business=business,
-                    amount=total,
-                    description=f"Sale: {product.name} ({quantity} {unit})",
-                    entry_type="income",
-                    related_sale=sale,
-                    created_by=request.user
-                )
+                # CRITICAL: Reduce stock after sale (bottle sales only, even for credit)
+                # Credit sales still remove product from inventory
+                if mode == "bottle":
+                    product.quantity_in_stock = max(0, (product.quantity_in_stock or 0) - quantity)
+                    product.save(update_fields=['quantity_in_stock'])
+                
+                if is_credit:
+                    # Create credit record
+                    LiquorCredit.objects.create(
+                        business=business,
+                        customer_name=customer_name,
+                        customer_phone=customer_phone,
+                        amount=total,
+                        amount_paid=Decimal("0.00"),
+                        status=LiquorCreditStatus.OPEN,
+                        notes=notes or f"{product.name} - {quantity} {unit}",
+                        related_sale=sale,
+                        created_by=request.user
+                    )
+                    messages.success(
+                        request, 
+                        f"✅ Credit sale recorded: {quantity} × {product.name} ({mode}) for {customer_name}"
+                    )
+                else:
+                    # Create wallet entry for cash sale only
+                    LiquorWalletEntry.objects.create(
+                        business=business,
+                        amount=total,
+                        description=f"Sale: {product.name} ({quantity} {unit})",
+                        entry_type="income",
+                        related_sale=sale,
+                        created_by=request.user
+                    )
+                    messages.success(request, f"✅ Sold {quantity} × {product.name} ({mode})")
             
-            messages.success(request, f"Sold {quantity} × {product.name} ({mode})")
             return redirect("liquor:sell")
             
         except (ValueError, MerchProduct.DoesNotExist, KeyError) as e:
@@ -205,6 +257,10 @@ def sell_liquor(request):
     for p in products:
         cat = (p.category or "").lower()
         if cat:
+            # Add stock information to each product
+            p.current_stock = p.quantity_in_stock or 0
+            p.is_in_stock = p.current_stock > 0
+            p.is_low_stock = 0 < p.current_stock <= 5
             products_by_category[cat].append(p)
     
     # Build categories list in order, but include only those that have products
@@ -383,6 +439,49 @@ def credit_detail(request, credit_id):
         "payments": payments,
         "business": business,
     })
+
+
+@login_required
+@require_business
+@require_business_kind(BusinessKind.LIQUOR)
+@manager_required
+@require_POST
+def clear_credit(request, credit_id):
+    """
+    Manager clears/settles a credit (confirms customer has paid).
+    This converts the credit into revenue immediately.
+    """
+    business = get_active_business(request)
+    credit = get_object_or_404(LiquorCredit, pk=credit_id, business=business)
+    
+    # Check if already settled
+    if credit.status == LiquorCreditStatus.SETTLED:
+        messages.warning(request, f"Credit for {credit.customer_name} is already settled.")
+        return redirect("liquor:credits_list")
+    
+    with transaction.atomic():
+        # Mark credit as settled
+        credit.status = LiquorCreditStatus.SETTLED
+        credit.amount_paid = credit.amount
+        credit.settled_at = timezone.now()
+        credit.settled_by = request.user
+        credit.save(update_fields=["status", "amount_paid", "settled_at", "settled_by"])
+        
+        # Create wallet entry for the cleared credit (now it's real income)
+        LiquorWalletEntry.objects.create(
+            business=business,
+            amount=credit.amount,
+            description=f"Credit cleared: {credit.customer_name} - {credit.notes or 'No notes'}",
+            entry_type="income",
+            created_by=request.user
+        )
+        
+        messages.success(
+            request, 
+            f"✅ Credit cleared for {credit.customer_name}! MK {credit.amount:,.2f} now included in revenue."
+        )
+    
+    return redirect("liquor:credits_list")
 
 
 # ==============================================================================

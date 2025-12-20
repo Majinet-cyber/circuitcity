@@ -1,167 +1,142 @@
-{% extends "base.html" %}
-{% load static %}
-{% load money %}
+{% comment %}
+Reusable Analytics Filter Offcanvas Component
+Usage: {% include "partials/analytics_filter_offcanvas.html" %}
+{% endcomment %}
 
-{% block title %}HQ Analytics{% endblock %}
-
-{% block main %}
-<div class="cc-page">
-  <div class="cc-header">
-    <div class="topbar">
-      <h1>HQ Analytics</h1>
+<!-- Single Filter Button -->
+<div class="glass-card mb-4" style="padding: 16px;">
+  <div style="display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap;">
+    <div style="display: flex; align-items: center; gap: 12px;">
+      <button type="button" id="filterToggleBtn" class="filter-main-btn">
+        <i class="bi bi-funnel"></i> Filters
+        <span id="filterBadge" class="filter-badge" style="display: none;">0</span>
+      </button>
+      <span id="filterSummary" class="filter-summary">{{ date_params.active_range|default:"All time" }}</span>
     </div>
+    <form method="get" style="display: inline;">
+      {% for key, value in request.GET.items %}
+        {% if key != 'export' %}
+        <input type="hidden" name="{{ key }}" value="{{ value }}">
+        {% endif %}
+      {% endfor %}
+      <button type="submit" name="export" value="csv" class="btn-export">
+        <i class="bi bi-download"></i> Export CSV
+      </button>
+    </form>
   </div>
+</div>
 
-  <main>
-    <!-- Single Filter Button -->
-    <div class="card mb-4">
-      <div class="card-body" style="padding: 16px;">
-        <div style="display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap;">
-          <button type="button" id="filterToggleBtn" class="filter-main-btn">
-            <i class="bi bi-funnel"></i> Filters
-          </button>
-          <span id="filterSummary" class="filter-summary">{{ preset|default:"All time" }}</span>
-        </div>
-      </div>
+<!-- Filter Offcanvas/Modal -->
+<div id="filterOffcanvas" class="filter-offcanvas">
+  <div class="filter-offcanvas-content">
+    <div class="filter-offcanvas-header">
+      <h3><i class="bi bi-funnel"></i> Filters</h3>
+      <button type="button" id="filterCloseBtn" class="filter-close-btn" aria-label="Close filters">
+        <i class="bi bi-x-lg"></i>
+      </button>
     </div>
-
-    <!-- Filter Offcanvas/Modal -->
-    <div id="filterOffcanvas" class="filter-offcanvas">
-      <div class="filter-offcanvas-content">
-        <div class="filter-offcanvas-header">
-          <h3><i class="bi bi-funnel"></i> Filters</h3>
-          <button type="button" id="filterCloseBtn" class="filter-close-btn" aria-label="Close filters">
-            <i class="bi bi-x-lg"></i>
+    
+    <form method="get" id="analyticsFilterForm" class="filter-offcanvas-body">
+      <!-- Date Range Presets -->
+      <div class="filter-section">
+        <label class="filter-section-label">Date Range</label>
+        <div class="filter-pills-vertical">
+          <button type="button" class="filter-pill-option {% if date_params.active_range == 'today' %}active{% endif %}" data-preset="today">
+            Today
+          </button>
+          <button type="button" class="filter-pill-option {% if date_params.active_range == 'yesterday' %}active{% endif %}" data-preset="yesterday">
+            Yesterday
+          </button>
+          <button type="button" class="filter-pill-option {% if date_params.active_range == 'last_7_days' %}active{% endif %}" data-preset="last_7_days">
+            Last 7 Days
+          </button>
+          <button type="button" class="filter-pill-option {% if date_params.active_range == 'last_30_days' %}active{% endif %}" data-preset="last_30_days">
+            Last 30 Days
+          </button>
+          <button type="button" class="filter-pill-option {% if date_params.active_range == 'this_month' %}active{% endif %}" data-preset="this_month">
+            This Month
+          </button>
+          <button type="button" class="filter-pill-option {% if date_params.active_range == 'last_month' %}active{% endif %}" data-preset="last_month">
+            Last Month
+          </button>
+          <button type="button" class="filter-pill-option {% if date_params.active_range == 'custom' %}active{% endif %}" data-preset="custom">
+            Custom Range
           </button>
         </div>
+        <input type="hidden" name="preset" id="presetInput" value="{{ date_params.active_range }}">
         
-        <form method="get" id="hqFilterForm" class="filter-offcanvas-body">
-          <!-- Date Range Presets -->
-          <div class="filter-section">
-            <label class="filter-section-label">Date Range</label>
-            <div class="filter-pills-vertical">
-              <button type="button" class="filter-pill-option {% if preset == 'today' %}active{% endif %}" data-preset="today">
-                Today
-              </button>
-              <button type="button" class="filter-pill-option {% if preset == 'yesterday' %}active{% endif %}" data-preset="yesterday">
-                Yesterday
-              </button>
-              <button type="button" class="filter-pill-option {% if preset == 'this_month' %}active{% endif %}" data-preset="this_month">
-                This Month
-              </button>
-              <button type="button" class="filter-pill-option {% if preset == 'last_month' %}active{% endif %}" data-preset="last_month">
-                Last Month
-              </button>
-              <button type="button" class="filter-pill-option {% if preset == 'custom' %}active{% endif %}" data-preset="custom">
-                Custom Range
-              </button>
-            </div>
-            <input type="hidden" name="preset" id="presetInput" value="{{ preset }}">
-            
-            <div id="customDateRange" style="{% if preset != 'custom' %}display: none;{% endif %} margin-top: 12px;">
-              <div style="display: flex; gap: 8px; flex-direction: column;">
-                <input type="date" name="start" value="{{ start_date|date:'Y-m-d' }}" class="filter-input">
-                <span style="text-align: center; color: #64748b; font-size: 0.875rem;">to</span>
-                <input type="date" name="end" value="{{ end_date|date:'Y-m-d' }}" class="filter-input">
-              </div>
-            </div>
+        <div id="customDateRange" style="{% if date_params.active_range != 'custom' %}display: none;{% endif %} margin-top: 12px;">
+          <div style="display: flex; gap: 8px; flex-direction: column;">
+            <input type="date" name="start" value="{{ date_params.start_date|date:'Y-m-d' }}" class="filter-input">
+            <span style="text-align: center; color: #64748b; font-size: 0.875rem;">to</span>
+            <input type="date" name="end" value="{{ date_params.end_date|date:'Y-m-d' }}" class="filter-input">
           </div>
-          
-          <!-- Business Filter -->
-          <div class="filter-section">
-            <label class="filter-section-label">Business</label>
-            <select name="business_id" class="filter-input">
-              <option value="">All businesses</option>
-              {% for biz in all_businesses %}
-              <option value="{{ biz.id }}" {% if selected_business_id == biz.id %}selected{% endif %}>{{ biz.name }}</option>
-              {% endfor %}
-            </select>
-          </div>
-          
-          <!-- Vertical Filter -->
-          <div class="filter-section">
-            <label class="filter-section-label">Vertical</label>
-            <select name="vertical" class="filter-input">
-              <option value="">All verticals</option>
-              {% for code, name in vertical_options %}
-              <option value="{{ code }}" {% if selected_vertical == code %}selected{% endif %}>{{ name }}</option>
-              {% endfor %}
-            </select>
-          </div>
-          
-          <!-- Location Filter (only if business selected) -->
-          {% if all_locations %}
-          <div class="filter-section">
-            <label class="filter-section-label">Location</label>
-            <select name="location_id" class="filter-input">
-              <option value="">All locations</option>
-              {% for loc in all_locations %}
-              <option value="{{ loc.id }}" {% if selected_location_id == loc.id %}selected{% endif %}>{{ loc.name }}</option>
-              {% endfor %}
-            </select>
-          </div>
-          {% endif %}
-          
-          <div class="filter-offcanvas-footer">
-            <button type="button" id="filterResetBtn" class="btn-filter-reset">
-              <i class="bi bi-arrow-counterclockwise"></i> Reset
-            </button>
-            <button type="submit" class="btn-filter-apply">
-              <i class="bi bi-check-lg"></i> Apply Filters
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
-    <div id="filterBackdrop" class="filter-backdrop"></div>
-
-    <!-- KPI Cards -->
-    <div class="kpi-grid mb-4">
-      {% if analytics_data.kpis %}
-      <div class="kpi-card">
-        <div class="kpi-label">Total Revenue</div>
-        <div class="kpi-value money">{{ analytics_data.kpis.total_revenue|default:0|format_mwk }}</div>
+        </div>
       </div>
       
-      <div class="kpi-card">
-        <div class="kpi-label">Total Sales</div>
-        <div class="kpi-value">{{ analytics_data.kpis.total_sales|default:0 }}</div>
-      </div>
-      
-      <div class="kpi-card">
-        <div class="kpi-label">Total Profit</div>
-        <div class="kpi-value money">{{ analytics_data.kpis.total_profit|default:0|format_mwk }}</div>
-      </div>
-      
-      <div class="kpi-card">
-        <div class="kpi-label">Active Businesses</div>
-        <div class="kpi-value">{{ analytics_data.kpis.active_businesses|default:0 }}</div>
+      <!-- Location Filter -->
+      {% if locations %}
+      <div class="filter-section">
+        <label class="filter-section-label">Location</label>
+        <select name="location" class="filter-input">
+          <option value="">All locations</option>
+          {% for loc in locations %}
+          <option value="{{ loc.id }}" {% if selected_location and selected_location.id == loc.id %}selected{% endif %}>{{ loc.name }}</option>
+          {% endfor %}
+        </select>
       </div>
       {% endif %}
-    </div>
-
-    <!-- Charts and Tables -->
-    <div class="row">
-      <div class="col-md-12">
-        <div class="card">
-          <div class="card-body">
-            <h3>Analytics Data</h3>
-            <p class="text-muted">Date range: {{ start_date|date:"M d, Y" }} to {{ end_date|date:"M d, Y" }}</p>
-            {% if selected_business_id %}
-            <p class="text-muted">Business: {{ all_businesses|first }}</p>
-            {% endif %}
-            {% if selected_vertical %}
-            <p class="text-muted">Vertical: {{ selected_vertical|title }}</p>
-            {% endif %}
-            
-            <!-- Add charts and tables here based on analytics_data -->
-            <pre style="background: #f5f5f5; padding: 15px; border-radius: 4px; overflow-x: auto;">{{ analytics_data|pprint }}</pre>
-          </div>
-        </div>
+      
+      <!-- Staff Filter -->
+      {% if staff_list %}
+      <div class="filter-section">
+        <label class="filter-section-label">{% if vertical == 'gym' %}Trainer{% elif vertical == 'pharmacy' %}Cashier{% else %}Agent{% endif %}</label>
+        <select name="staff_id" class="filter-input">
+          <option value="">All staff</option>
+          {% for staff in staff_list %}
+          <option value="{{ staff.id }}" {% if selected_staff and selected_staff.id == staff.id %}selected{% endif %}>
+            {{ staff.user.get_full_name|default:staff.user.username }}
+          </option>
+          {% endfor %}
+        </select>
       </div>
-    </div>
-  </main>
+      {% endif %}
+      
+      <!-- Payment Method Filter -->
+      <div class="filter-section">
+        <label class="filter-section-label">Payment Method</label>
+        <select name="payment_method" class="filter-input">
+          <option value="">All methods</option>
+          <option value="CASH" {% if payment_mode == 'CASH' %}selected{% endif %}>Cash</option>
+          <option value="BANK" {% if payment_mode == 'BANK' %}selected{% endif %}>Bank</option>
+          <option value="MOBILE_MONEY" {% if payment_mode == 'MOBILE_MONEY' %}selected{% endif %}>Mobile Money</option>
+          <option value="CREDIT" {% if payment_mode == 'CREDIT' %}selected{% endif %}>Credit</option>
+        </select>
+      </div>
+      
+      <!-- Search Query -->
+      <div class="filter-section">
+        <label class="filter-section-label">Search</label>
+        <input type="text" name="q" value="{{ search_query }}" placeholder="Product, customer, IMEI..." class="filter-input">
+      </div>
+      
+      <!-- Preserve other filters -->
+      {% for section in selected_sections %}
+      <input type="hidden" name="sections" value="{{ section }}">
+      {% endfor %}
+      
+      <div class="filter-offcanvas-footer">
+        <button type="button" id="filterResetBtn" class="btn-filter-reset">
+          <i class="bi bi-arrow-counterclockwise"></i> Reset
+        </button>
+        <button type="submit" class="btn-filter-apply">
+          <i class="bi bi-check-lg"></i> Apply Filters
+        </button>
+      </div>
+    </form>
+  </div>
 </div>
+<div id="filterBackdrop" class="filter-backdrop"></div>
 
 <style>
   /* Single Filter Button */
@@ -186,10 +161,41 @@
     box-shadow: 0 6px 20px rgba(59, 130, 246, 0.4);
   }
   
+  .filter-main-btn:active {
+    transform: translateY(0);
+  }
+  
+  .filter-badge {
+    background: rgba(255, 255, 255, 0.3);
+    padding: 2px 8px;
+    border-radius: 10px;
+    font-size: 12px;
+    font-weight: 700;
+  }
+  
   .filter-summary {
     color: #64748b;
     font-size: 14px;
     font-weight: 500;
+  }
+  
+  .btn-export {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 10px 16px;
+    background: #10b981;
+    color: #fff;
+    border: none;
+    border-radius: 10px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  
+  .btn-export:hover {
+    background: #059669;
   }
   
   /* Filter Offcanvas */
@@ -398,36 +404,7 @@
     transform: translateY(0);
   }
   
-  .kpi-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-    gap: 16px;
-  }
-  
-  .kpi-card {
-    background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
-    border: 1px solid #e2e8f0;
-    border-radius: 12px;
-    padding: 20px;
-    text-align: center;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
-  }
-  
-  .kpi-label {
-    font-size: 12px;
-    font-weight: 600;
-    color: #64748b;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-    margin-bottom: 8px;
-  }
-  
-  .kpi-value {
-    font-size: 24px;
-    font-weight: 700;
-    color: #0f172a;
-  }
-  
+  /* Mobile Responsive */
   @media (max-width: 768px) {
     .filter-offcanvas {
       max-width: 100%;
@@ -510,6 +487,4 @@
     });
   })();
 </script>
-
-{% endblock %}
 

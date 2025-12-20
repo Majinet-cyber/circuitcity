@@ -4,6 +4,10 @@
 
 {% block title %}Clothing · Emajinet{% endblock %}
 
+{% block extra_head %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+{% endblock %}
+
 {% block content %}
 {% url 'inventory:clothing_product_new_v2' as clothing_add_url %}
 
@@ -227,29 +231,90 @@
 
   {% comment %}Recent Sales Section{% endcomment %}
   <section class="recent-block">
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
       <h2 style="margin:0;font-size:1.1rem">💰 Recent Sales</h2>
       <a class="btn btn-sm btn-primary" href="{% url 'verticals:clothing_sales_history' %}" style="border-radius:20px;padding:6px 14px;font-weight:600">View All →</a>
     </div>
     {% if sales_trend %}
-      <div style="display:flex;flex-direction:column;gap:10px">
-        {% for day in sales_trend|slice:":5" %}
-        <a href="{% url 'verticals:clothing_sales_history' %}?start={{ day.date }}&end={{ day.date }}" 
-           style="display:flex;justify-content:space-between;align-items:center;padding:12px;background:#f8fafc;border-radius:12px;text-decoration:none;color:inherit;transition:all 0.2s"
-           onmouseover="this.style.background='#eff6ff';this.style.transform='translateX(4px)'" 
-           onmouseout="this.style.background='#f8fafc';this.style.transform='translateX(0)'">
-          <div>
-            <strong style="font-size:1rem;color:#0f172a">{{ day.date_short }}</strong>
-            <div style="font-size:0.85rem;color:#64748b;margin-top:2px">{{ day.count }} sale{{ day.count|pluralize }}</div>
-          </div>
-          <div style="text-align:right">
-            <div style="font-size:1.2rem;font-weight:700;color:#10b981">K {{ day.revenue|floatformat:0 }}</div>
-          </div>
-        </a>
-        {% endfor %}
+      <div style="position:relative;height:300px;margin-bottom:16px">
+        <canvas id="recentSalesChart"></canvas>
       </div>
+      <script>
+      (function() {
+        const ctx = document.getElementById('recentSalesChart');
+        if (!ctx) return;
+        
+        const salesData = [
+          {% for day in sales_trend|slice:":7" %}
+          {
+            date_short: "{{ day.date_short|default:'' }}",
+            revenue: {{ day.revenue|default:0 }},
+            count: {{ day.count|default:0 }}
+          }{% if not forloop.last %},{% endif %}
+          {% endfor %}
+        ];
+        const labels = salesData.map(d => d.date_short || '');
+        const revenues = salesData.map(d => parseFloat(d.revenue) || 0);
+        const counts = salesData.map(d => parseInt(d.count) || 0);
+        
+        new Chart(ctx, {
+          type: 'bar',
+          data: {
+            labels: labels,
+            datasets: [{
+              label: 'Revenue (MK)',
+              data: revenues,
+              backgroundColor: 'rgba(16, 185, 129, 0.8)',
+              borderColor: 'rgba(16, 185, 129, 1)',
+              borderWidth: 1,
+              borderRadius: 8,
+            }]
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+              legend: {
+                display: false
+              },
+              tooltip: {
+                callbacks: {
+                  label: function(context) {
+                    const index = context.dataIndex;
+                    const revenue = revenues[index];
+                    const count = counts[index];
+                    return [
+                      `Revenue: MK ${revenue.toFixed(0)}`,
+                      `Sales: ${count}`
+                    ];
+                  }
+                }
+              }
+            },
+            scales: {
+              y: {
+                beginAtZero: true,
+                ticks: {
+                  callback: function(value) {
+                    return 'K ' + value.toFixed(0);
+                  }
+                },
+                grid: {
+                  color: 'rgba(0, 0, 0, 0.05)'
+                }
+              },
+              x: {
+                grid: {
+                  display: false
+                }
+              }
+            }
+          }
+        });
+      })();
+      </script>
     {% else %}
-      <p style="margin:0;color:#64748b">No recent sales to display.</p>
+      <p style="margin:0;color:#64748b;text-align:center;padding:40px 20px">No recent sales to display.</p>
     {% endif %}
   </section>
 

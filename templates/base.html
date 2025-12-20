@@ -49,6 +49,8 @@
         const saved = localStorage.getItem("cc-theme");
         if (saved) document.documentElement.setAttribute("data-theme", saved);
       } catch (_) {}
+      
+      // Base.html loaded
     })();
   </script>
 
@@ -114,6 +116,9 @@
 
       /* Mobile drawer width: Reduced to ~28-30% of viewport for lighter feel (60% reduction) */
       --nav-drawer-w: clamp(180px, 28vw, 280px);
+      
+      /* VISUAL PROOF: Sidebar width reduction active */
+      --proof-sidebar-reduced: true;
     }
 
     @media (prefers-reduced-motion: reduce){
@@ -176,6 +181,7 @@
     .msg-danger  { background: #fef2f2; border-color:#fecaca; color:#991b1b; }
 
     /* Mobile drawer behavior */
+    /* 🔍 VISUAL PROOF: Mobile sidebar CSS loaded */
     @media (max-width: 992px){
       .cc-sidebar{
         position:fixed; left:0; top:0; height:100dvh;
@@ -498,7 +504,7 @@
                     {% if request.user.is_superuser %}
                       <a class="tenant-item" href="{{ url_choose_business|default:'/tenants/choose/' }}"><i class="bi bi-arrow-left-right"></i> Switch business</a>
                     {% endif %}
-                    {% if membership and membership.role == "MANAGER" or request.membership and request.membership.role == "MANAGER" or IS_MANAGER or request.user.is_authenticated and request.user.profile.is_manager %}
+                    {% if membership and membership.role == "MANAGER" or IS_MANAGER or request.user.is_authenticated and request.user.profile.is_manager %}
                       <a class="tenant-item" href="{{ url_manager_agents|default:'/tenants/manager/agents/' }}"><i class="bi bi-people"></i> {% if BUSINESS_VERTICAL == "gym" %}Trainers{% else %}Agents{% endif %}</a>
                     {% endif %}
                     {% if request.user.is_staff %}

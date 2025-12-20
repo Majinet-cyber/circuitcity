@@ -70,6 +70,20 @@
     border-color: #4299e1;
 }
 
+/* Out of stock styling */
+.product-row.out-of-stock {
+    opacity: 0.6;
+    cursor: not-allowed;
+    background: #f8f9fa;
+    border: 1px dashed #dee2e6;
+}
+
+.product-row.out-of-stock:hover {
+    background: #f8f9fa;
+    border-color: #dee2e6;
+    transform: none;
+}
+
 /* Confirmation card */
 .confirm-card {
     position: sticky;
@@ -224,19 +238,31 @@
                 
                 <div class="products-container">
                     {% for p in products %}
-                    <div class="product-row" 
+                    <div class="product-row {% if not p.is_in_stock %}out-of-stock{% endif %}" 
                          data-product-row
                          data-product-id="{{ p.id }}"
                          data-product-name="{{ p.name }}"
                          data-has-shots="{{ p.has_shots|yesno:'true,false' }}"
                          data-bottle-price="{{ p.price_per_bottle }}"
                          data-shot-price="{{ p.price_per_shot|default:'0' }}"
+                         data-stock="{{ p.current_stock }}"
+                         data-in-stock="{{ p.is_in_stock|yesno:'true,false' }}"
                          data-category="{{ cat }}">
                         <div class="d-flex justify-content-between align-items-center">
                             <div class="flex-grow-1">
-                                <div class="fw-semibold">{{ p.name }}</div>
+                                <div class="fw-semibold">
+                                    {{ p.name }}
+                                    {% if not p.is_in_stock %}
+                                        <span class="badge bg-danger-subtle text-danger ms-2">Out of Stock</span>
+                                    {% elif p.is_low_stock %}
+                                        <span class="badge bg-warning-subtle text-warning ms-2">Low Stock</span>
+                                    {% else %}
+                                        <span class="badge bg-success-subtle text-success ms-2">In Stock</span>
+                                    {% endif %}
+                                </div>
                                 <div class="small text-muted">
-                                    <span>Bottle: MK {{ p.price_per_bottle|floatformat:0 }}</span>
+                                    <span><i class="bi bi-box"></i> Stock: {{ p.current_stock }} bottles</span>
+                                    <span class="ms-2">Bottle: MK {{ p.price_per_bottle|floatformat:0 }}</span>
                                     {% if p.has_shots and p.price_per_shot %}
                                         <span class="ms-2">Shot: MK {{ p.price_per_shot|floatformat:0 }}</span>
                                     {% endif %}
@@ -297,6 +323,37 @@
                                required>
                     </div>
                     
+                    <!-- Sale Type -->
+                    <div class="mb-3">
+                        <label class="form-label">Payment Type</label>
+                        <select class="form-select" name="sale_type" id="input-sale-type">
+                            <option value="cash">Cash Sale</option>
+                            <option value="credit">Credit Sale</option>
+                        </select>
+                    </div>
+                    
+                    <!-- Credit Customer Details (hidden by default) -->
+                    <div id="credit-details-container" class="mb-3 hidden">
+                        <label class="form-label">Customer Name *</label>
+                        <input type="text" 
+                               class="form-control mb-2" 
+                               name="customer_name" 
+                               id="input-customer-name" 
+                               placeholder="Full name">
+                        <label class="form-label">Phone Number (optional)</label>
+                        <input type="text" 
+                               class="form-control mb-2" 
+                               name="customer_phone" 
+                               id="input-customer-phone" 
+                               placeholder="+265...">
+                        <label class="form-label">Notes (optional)</label>
+                        <textarea class="form-control" 
+                                  name="notes" 
+                                  id="input-notes" 
+                                  rows="2" 
+                                  placeholder="Location, table number, etc."></textarea>
+                    </div>
+                    
                     <!-- Estimated Total -->
                     <div class="mb-4">
                         <label class="form-label">Estimated Total</label>
@@ -306,8 +363,8 @@
                     </div>
                     
                     <!-- Action Buttons -->
-                    <button type="submit" class="btn btn-light btn-lg w-100 mb-2">
-                        <i class="bi bi-check-circle"></i> Mark as Sold
+                    <button type="submit" class="btn btn-light btn-lg w-100 mb-2" id="submit-btn">
+                        <i class="bi bi-check-circle"></i> <span id="submit-text">Mark as Sold</span>
                     </button>
                 </form>
             </div>
@@ -371,6 +428,8 @@
     const inputProductId = document.getElementById('input-product-id');
     const inputMode = document.getElementById('input-mode');
     const inputQuantity = document.getElementById('input-quantity');
+    const inputSaleType = document.getElementById('input-sale-type');
+    const inputCustomerName = document.getElementById('input-customer-name');
     
     // Display elements
     const confirmProductName = document.getElementById('confirm-product-name');
@@ -380,6 +439,8 @@
     const modeShotRadio = document.getElementById('mode-shot');
     const quantityLabel = document.getElementById('quantity-label');
     const estimatedTotal = document.getElementById('estimated-total');
+    const creditDetailsContainer = document.getElementById('credit-details-container');
+    const submitText = document.getElementById('submit-text');
     
     // State
     let currentProduct = null;
@@ -402,6 +463,16 @@
     // Step 2: Product row click
     productRows.forEach(row => {
         row.addEventListener('click', function() {
+            // Check if product is in stock
+            const inStock = this.dataset.inStock === 'true';
+            const stock = parseInt(this.dataset.stock || 0);
+            
+            if (!inStock || stock <= 0) {
+                // Show out of stock modal/alert
+                alert('❌ Out of stock! This product cannot be sold. Please scan in stock first.');
+                return;
+            }
+            
             // Remove previous selection
             productRows.forEach(r => r.classList.remove('selected'));
             this.classList.add('selected');
@@ -413,7 +484,8 @@
                 category: this.dataset.category,
                 hasShots: this.dataset.hasShots === 'true',
                 bottlePrice: parseFloat(this.dataset.bottlePrice),
-                shotPrice: parseFloat(this.dataset.shotPrice || 0)
+                shotPrice: parseFloat(this.dataset.shotPrice || 0),
+                stock: stock
             };
             
             showConfirmCard();
@@ -447,6 +519,30 @@
     
     // Quantity change
     inputQuantity.addEventListener('input', updateTotal);
+    
+    // Sale type change
+    inputSaleType.addEventListener('change', function() {
+        if (this.value === 'credit') {
+            creditDetailsContainer.classList.remove('hidden');
+            submitText.textContent = 'Record Credit Sale';
+        } else {
+            creditDetailsContainer.classList.add('hidden');
+            submitText.textContent = 'Mark as Sold';
+        }
+    });
+    
+    // Form validation before submit
+    sellForm.addEventListener('submit', function(e) {
+        if (inputSaleType.value === 'credit') {
+            const customerName = inputCustomerName.value.trim();
+            if (!customerName) {
+                e.preventDefault();
+                alert('⚠️ Customer name is required for credit sales!');
+                inputCustomerName.focus();
+                return false;
+            }
+        }
+    });
     
     // Functions
     function showProductList(category) {
@@ -484,11 +580,12 @@
             quantityLabel.textContent = 'Bottles';
         }
         
-        // Reset form
+        // Reset form and set max quantity based on stock
         inputQuantity.value = 1;
+        inputQuantity.max = currentProduct.stock;
         if (modeBottleRadio) modeBottleRadio.checked = true;
         inputMode.value = 'bottle';
-        quantityLabel.textContent = 'Bottles';
+        quantityLabel.textContent = `Bottles (max: ${currentProduct.stock})`;
         
         updateTotal();
         confirmCard.classList.remove('hidden');
@@ -504,6 +601,13 @@
         
         const quantity = parseInt(inputQuantity.value) || 1;
         const mode = inputMode.value;
+        
+        // Validate quantity against stock (for bottle mode only)
+        if (mode === 'bottle' && quantity > currentProduct.stock) {
+            inputQuantity.value = currentProduct.stock;
+            alert(`⚠️ Only ${currentProduct.stock} bottles available in stock!`);
+        }
+        
         const price = mode === 'shot' ? currentProduct.shotPrice : currentProduct.bottlePrice;
         const total = quantity * price;
         

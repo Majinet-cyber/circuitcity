@@ -312,10 +312,17 @@
   }
 
   /* Scanner CSS */
+  .imei-field-wrapper {
+    display: flex;
+    gap: 12px;
+    align-items: center
+  }
+
   .imei-field {
     position: relative;
     display: flex;
-    align-items: center
+    align-items: center;
+    flex: 1
   }
 
   .imei-badge {
@@ -329,6 +336,33 @@
     border-radius: 999px;
     font-size: .85rem;
     font-weight: 700
+  }
+
+  .scanner-icon-btn {
+    width: 56px;
+    height: 56px;
+    border-radius: 12px;
+    background: linear-gradient(135deg, #3b82f6, #8b5cf6);
+    color: #fff;
+    border: none;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.5rem;
+    transition: all 0.3s;
+    box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+    flex-shrink: 0
+  }
+
+  .scanner-icon-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(59, 130, 246, 0.4)
+  }
+
+  .scanner-icon-btn:active {
+    transform: translateY(0);
+    box-shadow: 0 2px 8px rgba(59, 130, 246, 0.3)
   }
 
   .imei-field.state-bad {
@@ -411,6 +445,36 @@
     border: 2px solid rgba(255, 255, 255, .25);
     border-radius: 12px;
     box-shadow: inset 0 0 0 9999px rgba(0, 0, 0, .20)
+  }
+
+  .torch-overlay-btn {
+    position: absolute;
+    bottom: 20px;
+    right: 20px;
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.2);
+    backdrop-filter: blur(10px);
+    border: 2px solid rgba(255, 255, 255, 0.3);
+    color: #fff;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.2rem;
+    transition: all 0.3s;
+    pointer-events: auto;
+    z-index: 10
+  }
+
+  .torch-overlay-btn:hover {
+    background: rgba(255, 255, 255, 0.3);
+    transform: scale(1.1)
+  }
+
+  .torch-overlay-btn:active {
+    transform: scale(0.95)
   }
 
   .scanline {
@@ -651,26 +715,19 @@
 
       <div class="imei-input-group">
         <label for="imei" style="font-weight:600;margin-bottom:10px;display:block">IMEI Number</label>
-        <div class="imei-field" id="imeiField">
-          <input type="text" name="imei" id="imei" class="imei-input" data-cy="sale-imei-input" placeholder="Enter 15-digit IMEI" maxlength="15"
-            pattern="\d{15}" required autofocus inputmode="numeric" autocomplete="off">
-          <!-- Live counter badge -->
-          <span id="imeiLen" class="imei-badge">0/15</span>
+        <div class="imei-field-wrapper">
+          <div class="imei-field" id="imeiField">
+            <input type="text" name="imei" id="imei" class="imei-input" data-cy="sale-imei-input" placeholder="Enter 15-digit IMEI" maxlength="15"
+              pattern="\d{15}" required autofocus inputmode="numeric" autocomplete="off">
+            <!-- Live counter badge -->
+            <span id="imeiLen" class="imei-badge">0/15</span>
+          </div>
+          <!-- Single scanner icon button -->
+          <button type="button" id="scannerBtn" class="scanner-icon-btn" title="Scan IMEI" aria-label="Open scanner">
+            <i class="bi bi-upc-scan"></i>
+          </button>
         </div>
         <div id="imeiHelp" class="imei-error" hidden>Enter a valid IMEI (exactly 15 digits).</div>
-
-        <!-- Scanner controls -->
-        <div class="scanner-controls cc-btn-group" style="margin-top:12px">
-          <button type="button" id="pasteBtn" class="btn btn-secondary" style="padding:10px 16px">
-            <i class="bi bi-clipboard"></i> Paste from Clipboard
-          </button>
-          <button type="button" id="camToggle" class="btn-scanner">
-            <i class="bi bi-camera"></i> Start Camera
-          </button>
-          <button type="button" id="torchBtn" class="btn btn-secondary" style="padding:10px 16px">
-            <i class="bi bi-lightning-fill"></i> Toggle Torch
-          </button>
-        </div>
 
         <!-- Camera shell (initially hidden) -->
         <div id="cameraBox" class="camera-box" style="display:none;margin-top:16px">
@@ -680,6 +737,10 @@
               <div class="scan-frame"></div>
               <div id="scanline" class="scanline"></div>
             </div>
+            <!-- Torch toggle inside scanner overlay -->
+            <button type="button" id="torchBtn" class="torch-overlay-btn" title="Toggle flashlight" aria-label="Toggle torch">
+              <i class="bi bi-lightning-fill"></i>
+            </button>
           </div>
           <div style="display:flex;gap:10px;margin-top:10px">
             <select id="cameraSelect" class="btn btn-secondary" style="flex:1;min-width:200px"
@@ -812,8 +873,7 @@
     const imeiField = document.getElementById('imeiField');
     const imeiLen = document.getElementById('imeiLen');
     const imeiHelp = document.getElementById('imeiHelp');
-    const pasteBtn = document.getElementById('pasteBtn');
-    const camToggle = document.getElementById('camToggle');
+    const scannerBtn = document.getElementById('scannerBtn');
     const camStop = document.getElementById('camStop');
     const camBox = document.getElementById('cameraBox');
     const camNode = document.getElementById('camera');
@@ -1103,8 +1163,8 @@
     }
 
     // UI event handlers
-    if (camToggle) {
-      camToggle.addEventListener('click', async () => {
+    if (scannerBtn) {
+      scannerBtn.addEventListener('click', async () => {
         if (camBox) camBox.style.display = 'block';
         const cams = await listCameras();
         const firstId = (cams[0] && cams[0].deviceId) || undefined;
@@ -1117,7 +1177,7 @@
           } else {
             await startQuagga(firstId);
           }
-          camToggle.textContent = 'Restart Camera';
+          showToast('Scanner started', true);
         } catch (err) {
           showToast('Could not start camera. Check permission / origin.', false);
         }
@@ -1145,31 +1205,14 @@
       camStop.addEventListener('click', () => {
         stopAll();
         if (camBox) camBox.style.display = 'none';
-        if (camToggle) camToggle.textContent = 'Start Camera';
       });
     }
 
     if (torchBtn) {
-      torchBtn.addEventListener('click', () => enableTorch(true));
-    }
-
-    if (pasteBtn) {
-      pasteBtn.addEventListener('click', async () => {
-        try {
-          const txt = await navigator.clipboard.readText();
-          if (!txt) { showToast('Clipboard is empty.', false); return; }
-          const d = digitsOnly(txt);
-          imeiInput.value = d.length > 15 ? d.slice(-15) : d;
-          updateImeiCounter();
-          if (lenDigits(imeiInput.value) === 15) {
-            showToast('Pasted 15-digit IMEI!', true);
-          } else {
-            showToast('Pasted. Need 15 digits.', false);
-          }
-        } catch {
-          showToast('Clipboard blocked. Paste manually (Ctrl+V).', false);
-          imeiInput.focus();
-        }
+      let torchOn = false;
+      torchBtn.addEventListener('click', () => {
+        torchOn = !torchOn;
+        enableTorch(torchOn);
       });
     }
 

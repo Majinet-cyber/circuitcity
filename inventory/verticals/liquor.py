@@ -6,7 +6,7 @@ from decimal import Decimal
 
 from django.contrib.auth.decorators import login_required
 from django.db.models import Sum, Count, Q, OuterRef, Subquery
-from django.shortcuts import render
+from django.shortcuts import render, redirect
 from django.utils import timezone
 
 from tenants.utils import require_business
@@ -14,7 +14,7 @@ from tenants.utils import require_business
 from inventory.authz import require_business_kind
 from inventory.business_kinds import BusinessKind
 from inventory.models_verticals import (
-    LiquorSale, LiquorCredit, PaymentMethod, LiquorShiftStock, MonthlySalesTarget
+    LiquorSale, LiquorCredit, LiquorCreditStatus, PaymentMethod, LiquorShiftStock, MonthlySalesTarget
 )
 from inventory.models import MerchProduct
 from inventory.liquor_seed import create_default_liquor_catalog, should_seed_liquor_products
@@ -70,11 +70,33 @@ def dashboard(request):
         sold_at__gte=start_date
     )
     
-    # Revenue (exclude free sales)
-    revenue = sales_qs.exclude(is_free=True).aggregate(total=Sum("total_price"))["total"] or Decimal("0.00")
+    # Revenue (exclude free sales AND outstanding credit sales)
+    # Credit sales only count as revenue when the credit is SETTLED (cleared/paid)
+    revenue = sales_qs.exclude(is_free=True).exclude(is_credit=True).aggregate(total=Sum("total_price"))["total"] or Decimal("0.00")
     
-    # Inventory costs (cost of goods sold)
-    inventory_costs = sales_qs.aggregate(total=Sum("total_cost"))["total"] or Decimal("0.00")
+    # Add settled credit revenue (credits that have been cleared/paid)
+    settled_credits_revenue = (
+        LiquorCredit.objects.filter(
+            business=business,
+            status=LiquorCreditStatus.SETTLED,
+            settled_at__gte=start_date
+        ).aggregate(total=Sum("amount"))["total"] or Decimal("0.00")
+    )
+    revenue += settled_credits_revenue
+    
+    # Inventory costs (cost of goods sold - exclude outstanding credits)
+    inventory_costs = sales_qs.exclude(is_credit=True).aggregate(total=Sum("total_cost"))["total"] or Decimal("0.00")
+    
+    # Add costs from settled credits
+    settled_credits_cost = (
+        LiquorCredit.objects.filter(
+            business=business,
+            status=LiquorCreditStatus.SETTLED,
+            settled_at__gte=start_date,
+            related_sale__isnull=False
+        ).aggregate(total=Sum("related_sale__total_cost"))["total"] or Decimal("0.00")
+    )
+    inventory_costs += settled_credits_cost
     
     # Admin costs from wallet (if available)
     admin_costs_period = Decimal("0.00")
@@ -150,7 +172,9 @@ def dashboard(request):
     
     # Get open credits for ticker
     open_credits = (
-        LiquorCredit.objects.filter(business=business, status="open")
+        LiquorCredit.objects.filter(business=business)
+        .exclude(status=LiquorCreditStatus.SETTLED)
+        .exclude(status=LiquorCreditStatus.CANCELLED)
         .order_by("-created_at")[:20]
     )
     
@@ -386,6 +410,10 @@ def dashboard(request):
     pending_attributions_count = 0
     reconciled_today_count = 0
     attributed_sales_total = Decimal("0.00")
+    
+    # Define today_start for attribution queries
+    today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+    end_date = now
     
     if roles.is_agent and not roles.is_manager:
         # Agent view: Show attributions assigned to them
