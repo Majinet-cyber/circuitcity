@@ -718,6 +718,16 @@ class InventoryItem(models.Model):
 
     # Marked when a sale is recorded (used by 15-minute theft alert)
     sold_at = models.DateTimeField(null=True, blank=True, db_index=True)  # fast recent-sold lookups
+    
+    # Agent/user who sold this item (for commission attribution)
+    sold_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name='items_sold',
+        help_text='Agent/user who sold this item (for commission attribution)'
+    )
     # ----------------------------------------------------------------
 
     # Tenant-aware managers
@@ -740,6 +750,8 @@ class InventoryItem(models.Model):
             models.Index(fields=["warranty_status", "warranty_expiration"], name="inv_wty_stat_exp_idx"),
             # Stock aging
             models.Index(fields=["received_at"], name="inv_received_idx"),
+            # sold_by tracking (for commission attribution)
+            models.Index(fields=["sold_by", "sold_at"], name="inv_sold_by_at_idx"),
         ]
         constraints = [
             # GLOBAL IMEI uniqueness (across ALL tenants) - enforced when IMEI present

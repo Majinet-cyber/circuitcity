@@ -21,6 +21,21 @@
   .btn-secondary{background:#f1f5f9;color:#475569}
   .btn-secondary:hover{background:#e2e8f0}
   .form-row{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+  .specs-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:10px;margin:12px 0}
+  .spec-button{background:#f1f5f9;border:2px solid #e2e8f0;border-radius:12px;padding:14px 10px;font-weight:700;color:#475569;cursor:pointer;transition:all 0.2s;font-size:0.95rem;text-align:center}
+  .spec-button:hover{background:#e2e8f0;border-color:#cbd5e1;transform:translateY(-2px)}
+  .spec-button.selected{background:linear-gradient(135deg,#3b82f6,#8b5cf6);color:#fff;border-color:#3b82f6;box-shadow:0 4px 12px rgba(59,130,246,0.3)}
+  .brand-selection-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(110px,1fr));gap:10px;margin:12px 0}
+  .brand-card-btn{background:#ffffff;border:2px solid #e2e8f0;border-radius:12px;padding:16px 12px;font-weight:700;color:#0f172a;cursor:pointer;transition:all 0.2s;font-size:0.95rem;text-align:center;position:relative}
+  .brand-card-btn:hover{transform:translateY(-3px);box-shadow:0 8px 20px rgba(15,23,42,0.1)}
+  .brand-card-btn.selected{border-color:var(--brand-color,#3b82f6);background:linear-gradient(135deg,var(--brand-color,#3b82f6),rgba(255,255,255,0.95));color:#fff;box-shadow:0 6px 20px rgba(0,0,0,0.15)}
+  .brand-card-btn .brand-name{display:block;font-size:1rem;font-weight:800}
+  @media (max-width:640px){
+    .specs-grid{grid-template-columns:repeat(auto-fill,minmax(110px,1fr));gap:8px}
+    .spec-button{padding:12px 8px;font-size:0.9rem}
+    .brand-selection-grid{grid-template-columns:repeat(auto-fill,minmax(100px,1fr));gap:8px}
+    .brand-card-btn{padding:14px 10px;font-size:0.9rem}
+  }
 </style>
 
 <div class="form-page">
@@ -32,42 +47,68 @@
       {% csrf_token %}
       
       {% if not product %}
-      <!-- Brand and Model (immutable after creation) -->
-      <div class="form-row">
-        <div class="form-group">
-          <label for="brand">Brand *</label>
-          <select id="brand" name="brand" required>
-            <option value="">Select brand...</option>
-            <option value="TECNO">TECNO</option>
-            <option value="ITEL">ITEL</option>
-            <option value="SAMSUNG">SAMSUNG</option>
-            <option value="INFINIX">INFINIX</option>
-            <option value="XIAOMI">XIAOMI</option>
-            <option value="OPPO">OPPO</option>
-            <option value="VIVO">VIVO</option>
-            <option value="OTHER">OTHER</option>
-          </select>
+      <!-- Brand Selection - Clickable Cards -->
+      <div class="form-group">
+        <label>Select Brand *</label>
+        <div class="brand-selection-grid">
+          <button type="button" class="brand-card-btn" data-brand="TECNO" data-color="#3b82f6">
+            <span class="brand-name">TECNO</span>
+          </button>
+          <button type="button" class="brand-card-btn" data-brand="ITEL" data-color="#ef4444">
+            <span class="brand-name">ITEL</span>
+          </button>
+          <button type="button" class="brand-card-btn" data-brand="SAMSUNG" data-color="#f97316">
+            <span class="brand-name">SAMSUNG</span>
+          </button>
+          <button type="button" class="brand-card-btn" data-brand="INFINIX" data-color="#10b981">
+            <span class="brand-name">INFINIX</span>
+          </button>
+          <button type="button" class="brand-card-btn" data-brand="XIAOMI" data-color="#8b5cf6">
+            <span class="brand-name">XIAOMI</span>
+          </button>
+          <button type="button" class="brand-card-btn" data-brand="IPHONE" data-color="#111827">
+            <span class="brand-name">IPHONE</span>
+          </button>
+          <button type="button" class="brand-card-btn" data-brand="OPPO" data-color="#06b6d4">
+            <span class="brand-name">OPPO</span>
+          </button>
+          <button type="button" class="brand-card-btn" data-brand="VIVO" data-color="#0ea5e9">
+            <span class="brand-name">VIVO</span>
+          </button>
+          <button type="button" class="brand-card-btn" data-brand="OTHER" data-color="#6b7280">
+            <span class="brand-name">OTHER</span>
+          </button>
         </div>
-        
-        <div class="form-group">
-          <label for="model_name">Model Name *</label>
-          <input type="text" id="model_name" name="model_name" placeholder="e.g., Spark 40" required>
-        </div>
+        <small>Tap a brand to select it</small>
+        <input type="hidden" id="brand" name="brand" required>
       </div>
       
-      <!-- RAM and ROM -->
-      <div class="form-row">
-        <div class="form-group">
-          <label for="ram_gb">RAM (GB) *</label>
-          <input type="number" id="ram_gb" name="ram_gb" min="1" max="32" placeholder="e.g., 4" required>
-          <small>RAM in gigabytes</small>
+      <!-- Model Name -->
+      <div class="form-group">
+        <label for="model_name">Model Name *</label>
+        <input type="text" id="model_name" name="model_name" placeholder="e.g., Spark 40" required>
+      </div>
+      
+      <!-- RAM and ROM - Clickable Panels -->
+      <div class="form-group">
+        <label>Storage + RAM Configuration *</label>
+        <div class="specs-grid">
+          <button type="button" class="spec-button" data-rom="64" data-ram="2">64GB + 2GB</button>
+          <button type="button" class="spec-button" data-rom="64" data-ram="3">64GB + 3GB</button>
+          <button type="button" class="spec-button" data-rom="64" data-ram="4">64GB + 4GB</button>
+          <button type="button" class="spec-button" data-rom="128" data-ram="3">128GB + 3GB</button>
+          <button type="button" class="spec-button" data-rom="128" data-ram="4">128GB + 4GB</button>
+          <button type="button" class="spec-button" data-rom="128" data-ram="6">128GB + 6GB</button>
+          <button type="button" class="spec-button" data-rom="128" data-ram="8">128GB + 8GB</button>
+          <button type="button" class="spec-button" data-rom="256" data-ram="6">256GB + 6GB</button>
+          <button type="button" class="spec-button" data-rom="256" data-ram="8">256GB + 8GB</button>
+          <button type="button" class="spec-button" data-rom="256" data-ram="12">256GB + 12GB</button>
+          <button type="button" class="spec-button" data-rom="512" data-ram="8">512GB + 8GB</button>
+          <button type="button" class="spec-button" data-rom="512" data-ram="12">512GB + 12GB</button>
         </div>
-        
-        <div class="form-group">
-          <label for="rom_gb">ROM/Storage (GB) *</label>
-          <input type="number" id="rom_gb" name="rom_gb" min="8" max="1024" placeholder="e.g., 128" required>
-          <small>Internal storage in gigabytes</small>
-        </div>
+        <small>Tap a configuration to select it</small>
+        <input type="hidden" id="ram_gb" name="ram_gb" required>
+        <input type="hidden" id="rom_gb" name="rom_gb" required>
       </div>
       {% else %}
       <!-- Display immutable fields -->
@@ -125,6 +166,54 @@
     </form>
   </div>
 </div>
+
+<script>
+  // Handle brand card selection
+  document.addEventListener('DOMContentLoaded', function() {
+    const brandButtons = document.querySelectorAll('.brand-card-btn');
+    const brandInput = document.getElementById('brand');
+    
+    brandButtons.forEach(button => {
+      button.addEventListener('click', function() {
+        // Remove selected class from all buttons
+        brandButtons.forEach(btn => btn.classList.remove('selected'));
+        
+        // Add selected class to clicked button
+        this.classList.add('selected');
+        
+        // Set brand color as CSS variable for selected state
+        const brandColor = this.getAttribute('data-color');
+        this.style.setProperty('--brand-color', brandColor);
+        
+        // Update hidden input
+        const brand = this.getAttribute('data-brand');
+        if (brandInput) brandInput.value = brand;
+      });
+    });
+    
+    // Handle specs (Storage + RAM) panel selection
+    const specButtons = document.querySelectorAll('.spec-button');
+    const ramInput = document.getElementById('ram_gb');
+    const romInput = document.getElementById('rom_gb');
+    
+    specButtons.forEach(button => {
+      button.addEventListener('click', function() {
+        // Remove selected class from all buttons
+        specButtons.forEach(btn => btn.classList.remove('selected'));
+        
+        // Add selected class to clicked button
+        this.classList.add('selected');
+        
+        // Update hidden inputs
+        const rom = this.getAttribute('data-rom');
+        const ram = this.getAttribute('data-ram');
+        
+        if (romInput) romInput.value = rom;
+        if (ramInput) ramInput.value = ram;
+      });
+    });
+  });
+</script>
 
 {% endblock %}
 

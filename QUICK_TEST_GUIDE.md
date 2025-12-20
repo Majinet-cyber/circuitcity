@@ -1,229 +1,261 @@
-# Fast Sell + Liquor Barman - Quick Test Guide
+# 🧪 Quick Test Guide - Gamification UX Upgrade
 
-## What Was Implemented
+**Time Required:** 10-15 minutes  
+**Device Needed:** Mobile phone or browser DevTools (mobile view)
 
-### 1. Fast Sell Feature (Liquor, Pharmacy, Clothing)
-- **Single-page barcode scanner** using front camera
-- **Native BarcodeDetector API** with manual entry fallback
-- **Instant product lookup** by barcode
-- **Automatic selling price handling** (prompts if missing, saves it)
-- **Fast payment selection** (Cash/Bank/Mobile)
-- **Real-time KPI updates** (Sold Today, Revenue, Profit)
-- **No 500 errors** - all errors handled gracefully
+---
 
-### 2. Liquor Barman Role + Attribution System
-- **LIQUOR_BARMAN role** - separate from agents
-- **Manager can invite barmen** via UI
-- **Barman can assign sales to agents** during Fast Sell
-- **Attribution tracking** with pending/reconciled status
-- **Agent dashboard shows**:
-  - Assigned sales totals
-  - Pending reconciliation count
-  - "Records Balanced ✅" when no pending items
-- **Manager/Barman reconciliation screen**:
-  - View all attributions by agent
-  - Mark pending → reconciled
-  - Filter by date/status
-  - Batch reconciliation support
+## 🚀 QUICK START
 
-## Quick Testing Steps
-
-### Test 1: Fast Sell (Clothing)
+### 1. Start Development Server
 ```bash
-1. Login as clothing business user
-2. Navigate to /verticals/clothing/fast-sell/
-3. Click "Start Camera" (allow camera access)
-4. Scan a barcode OR use manual entry
-5. Product appears → select quantity
-6. Choose payment method
-7. Click "Sell Now"
-8. Should see "✅ Sold" toast
-9. KPIs should update immediately
+cd c:\Users\CHRIS PAUL MWALE\PycharmProjects\circuitcity_clean
+python manage.py runserver
 ```
 
-### Test 2: Fast Sell (Pharmacy)
-```bash
-1. Login as pharmacy business user
-2. Navigate to /verticals/pharmacy/fast-sell/
-3. Scan barcode for a PharmacyBatch
-4. Should show batch details + expiry date
-5. Complete sale
-6. Batch stock should decrement
-```
+---
 
-### Test 3: Fast Sell (Liquor)
-```bash
-1. Login as liquor business user
-2. Navigate to /verticals/liquor/fast-sell/
-3. Scan barcode
-4. Complete sale
-5. Stock should decrement correctly
-```
+## 📱 Test 1: Mobile Sidebar (2 minutes)
 
-### Test 4: Liquor Barman Invite (Manager Only)
-```bash
-1. Login as liquor manager
-2. Navigate to /verticals/liquor/barman/invite/
-3. Fill in barman details:
-   - username: barman1
-   - password: Test123!
+### Steps:
+1. Open browser on mobile OR use DevTools mobile view (F12 → Toggle device toolbar)
+2. Navigate to any page (dashboard, scan-in, etc.)
+3. Click the hamburger menu (☰) button in top-left
+
+### Expected Results:
+✅ Sidebar opens and occupies ~28-30% of screen width (much narrower than before)
+✅ Sidebar content is still readable
+✅ Backdrop (dark overlay) covers remaining ~70% of screen
+✅ Clicking backdrop closes sidebar
+✅ All menu items visible and clickable
+✅ Scrolling works if sidebar content is long
+
+### Before vs After:
+- **Before:** Sidebar = 70% of screen width (obstructive)
+- **After:** Sidebar = 28% of screen width (lighter feel)
+
+---
+
+## 🍺 Test 2: Liquor Smart Pricing (3 minutes)
+
+### Steps:
+1. Navigate to: `/liquor/scan-in/`
+2. Click a category (e.g., Beer 🍺)
+3. Click a product
+4. Select "Bottles" or "Crates"
+5. Select quantity (e.g., 10)
+6. **Enter cost price** (e.g., 500) and click away or press Tab
+
+### Expected Results:
+✅ Cost price field **disappears** after you enter it
+✅ Selling price field appears automatically
+✅ When you enter selling price:
+  - **Below cost (e.g., 400):** Yellow warning "🟡 This price is below your cost price..."
+  - **Above cost (e.g., 600):** Green success "🟢 Nice 👍 — this is 20% above your cost price"
+  - **High margin (e.g., 800):** Green success "🟢 Excellent 🚀 — 60% profit margin"
+✅ You can still proceed with below-cost price (non-blocking)
+✅ Submit button works
+✅ Success message: "🟢 Sale recorded 🎉\nStock updated · Pricing set · Well done!"
+
+---
+
+## 👕 Test 3: Clothing Smart Pricing (3 minutes)
+
+### Steps:
+1. Navigate to: `/verticals/clothing/scan-in/`
+2. Select category (e.g., Shoes 👟)
+3. Select size (e.g., M)
+4. Select color (e.g., Black)
+5. Enter quantity (e.g., 5)
+6. **Enter cost price** (e.g., 2000) and click away or press Tab
+
+### Expected Results:
+✅ Cost price field **disappears** after you enter it
+✅ Selling price field appears/gets focus
+✅ When you enter selling price:
+  - **Below cost (e.g., 1500):** Yellow warning appears
+  - **Above cost (e.g., 2500):** Green success message appears
+✅ Real-time margin calculation shows
+✅ Form submits successfully
+
+---
+
+## 🛒 Test 4: Sell Flow Success Messages (2 minutes)
+
+### Clothing Sell:
+1. Navigate to: `/verticals/clothing/sell/`
+2. Select a product with stock
+3. Enter quantity and selling price
 4. Submit
-5. Should see success message
-6. Barman should be able to login
+
+### Expected Result:
+✅ Success message appears in this format:
+```
+🟢 Sale recorded 🎉
+Stock updated · Revenue added · Well done!
+5 × Blue T-Shirt | Revenue: K 10,000.00 | Profit: K 2,500.00
 ```
 
-### Test 5: Barman Sale Attribution
-```bash
-1. Login as barman (created in Test 4)
-2. Navigate to /verticals/liquor/fast-sell/
-3. Scan a product
-4. Notice "Assign to Agent" dropdown appears (barman only)
-5. Select an agent from dropdown
-6. Complete sale
-7. Sale attribution should be created with status="pending"
+### Pharmacy Sell:
+1. Navigate to: `/inventory/scan-sold/` or pharmacy sell page
+2. Complete a sale
+
+### Expected Result:
+✅ Success message appears:
+```
+🟢 Sale recorded 🎉
+Stock updated · Revenue added · Well done!
+Paracetamol x10 | Total: MWK 5,000.00
 ```
 
-### Test 6: Agent View - Pending Attributions
-```bash
-1. Login as liquor agent (who was assigned sales)
-2. View liquor dashboard
-3. Should see:
-   - "Pending Reconciliation: X" (where X > 0)
-   - Attributed sales total
-4. When all reconciled:
-   - Should show "Records Balanced ✅"
+---
+
+## 🖥️ Test 5: Desktop Behavior (1 minute)
+
+### Steps:
+1. Switch to desktop view (browser width > 992px)
+2. Navigate through the app
+
+### Expected Results:
+✅ Sidebar is sticky (always visible, not a drawer)
+✅ Sidebar width is normal (270px, not affected by mobile changes)
+✅ No hamburger menu button visible
+✅ No backdrop overlay
+✅ All functionality works as before
+
+---
+
+## ✅ ACCEPTANCE CRITERIA
+
+### Mobile Sidebar
+- [ ] Width is ~28-30vw (visibly narrower)
+- [ ] Opens/closes smoothly
+- [ ] Backdrop works
+- [ ] All content readable
+
+### Smart Pricing (Liquor + Clothing)
+- [ ] Cost price hides after entry
+- [ ] Selling price gets focus
+- [ ] Below-cost warning shows (yellow)
+- [ ] Above-cost success shows (green)
+- [ ] Margin calculates correctly
+- [ ] Can submit below-cost (non-blocking)
+
+### Success Messages
+- [ ] All sell flows show new format
+- [ ] Green indicator (🟢) present
+- [ ] Celebration emoji (🎉) present
+- [ ] Multi-line format displays correctly
+- [ ] Encouraging text present
+
+### Zero Regressions
+- [ ] All existing features work
+- [ ] No broken links
+- [ ] No console errors
+- [ ] No visual glitches
+- [ ] Desktop unchanged
+- [ ] All verticals work
+
+---
+
+## 🐛 TROUBLESHOOTING
+
+### Issue: Sidebar too wide on mobile
+**Fix:** Clear browser cache, hard refresh (Ctrl+Shift+R)
+
+### Issue: Cost price doesn't hide
+**Check:** 
+1. JavaScript console for errors
+2. Ensure you clicked away or pressed Tab after entering cost price
+3. Try entering a valid number (e.g., 100)
+
+### Issue: Smart pricing feedback doesn't show
+**Check:**
+1. Ensure cost price was entered first
+2. Ensure selling price input has a value
+3. Check JavaScript console for errors
+
+### Issue: Old success messages still showing
+**Fix:** Clear cache, ensure server restarted
+
+---
+
+## 📊 VISUAL COMPARISON
+
+### Mobile Sidebar Width
+```
+BEFORE (70vw):
+|████████████████████████████████████████████████|     Screen
+|████████SIDEBAR████████|     CONTENT     |
+
+AFTER (28vw):
+|████████████████████████████████████████████████|     Screen
+|██SIDEBAR██|        CONTENT               |
 ```
 
-### Test 7: Barman Reconciliation
-```bash
-1. Login as barman or manager
-2. Navigate to /verticals/liquor/barman/reconciliation/
-3. Should see:
-   - Agent summaries (sales, amounts, pending count)
-   - Detailed attribution list
-4. Click "Mark Reconciled" on a pending attribution
-5. Status should change to "Reconciled"
-6. Agent's pending count should decrease
+### Smart Pricing Flow
+```
+BEFORE:
+[ Cost Price: ___ ]
+[ Selling Price: ___ ]
+(Both always visible)
+
+AFTER:
+[ Cost Price: 500 ] ← Type and blur
+   ↓ (auto-hides)
+[ Selling Price: ___ ] ← Appears, gets focus
+🟢 "Great choice 💡 — 25% margin"
 ```
 
-### Test 8: Error Handling
-```bash
-1. Scan invalid barcode → Should show "Product not found"
-2. Try to sell out-of-stock item → Should show "Out of stock"
-3. Try to sell quantity > available → Should show "Insufficient stock"
-4. Try to sell with missing price → Should prompt for price
-5. No crashes, no 500 errors
-```
+---
 
-## Database Migrations
+## 🎯 WHAT TO LOOK FOR
 
-Run migration:
-```bash
-python manage.py migrate sales
-```
+### Positive Indicators:
+✅ Sidebar feels lighter and less obstructive
+✅ Pricing flow feels effortless (no repeated inputs)
+✅ Feedback messages are encouraging and helpful
+✅ Success messages feel celebratory
+✅ UI animations are smooth
+✅ Touch targets are easy to hit (mobile)
 
-This creates the `LiquorSaleAttribution` model with fields:
-- liquor_sale_id
-- business
-- attributed_by (barman)
-- attributed_to (agent)
-- status (pending/reconciled)
-- sale_amount
-- reconciled_by, reconciled_at
+### Red Flags:
+❌ Sidebar content cut off or unreadable
+❌ Cost price not hiding
+❌ JavaScript errors in console
+❌ Form submissions failing
+❌ Desktop layout broken
+❌ Missing success messages
 
-## API Endpoints
+---
 
-### Fast Sell APIs (All Verticals)
-```
-GET  /verticals/{vertical}/api/fast-sell/lookup/?barcode=123456
-POST /verticals/{vertical}/api/fast-sell/sell/
-GET  /verticals/{vertical}/api/fast-sell/kpis/?range=today
-```
+## 📞 SUPPORT
 
-### Liquor Barman APIs
-```
-GET  /verticals/liquor/api/barman/agents/
-POST /verticals/liquor/api/barman/reconciliation/toggle/
-```
+If you encounter any issues:
 
-## Running Tests
+1. **Check JavaScript Console:**
+   - Press F12 → Console tab
+   - Look for red errors
+   - Report any errors related to pricing or sidebar
 
-```bash
-# Run Fast Sell tests
-pytest sales/tests/test_fast_sell.py -v
+2. **Check Network Tab:**
+   - Press F12 → Network tab
+   - Submit a form
+   - Check if requests succeed (200 status)
 
-# Run all sales tests
-pytest sales/tests/ -v
+3. **Clear Cache:**
+   - Hard refresh: Ctrl+Shift+R (Windows) or Cmd+Shift+R (Mac)
+   - Clear all browser cache if needed
 
-# Quick smoke test
-python manage.py check
-```
+4. **Restart Server:**
+   ```bash
+   # Stop server (Ctrl+C)
+   python manage.py runserver
+   ```
 
-## Key Files Changed/Added
+---
 
-### Models
-- `sales/models.py` - Added `LiquorSaleAttribution`
-- `sales/migrations/1001_add_liquor_sale_attribution.py` - New migration
+**Happy Testing! 🎉**
 
-### Services
-- `inventory/services/fast_sell.py` - Centralized Fast Sell logic
+If everything passes, you're ready to deploy to production! 🚀
 
-### Views (Verticals)
-- `inventory/verticals/liquor.py` - Added Fast Sell + Barman views
-- `inventory/verticals/pharmacy.py` - Added Fast Sell views
-- `inventory/verticals/clothing.py` - Added Fast Sell views
-
-### URLs
-- `verticals/urls.py` - Added Fast Sell + Barman routes
-
-### Sidebar
-- `inventory/utils_verticals.py` - Added "Fast Sell" entries
-
-### Templates
-- `templates/verticals/liquor/fast_sell.html` - Camera scanner page
-- `templates/verticals/liquor/barman_invite.html` - Barman invite form
-- `templates/verticals/liquor/barman_reconciliation.html` - Reconciliation screen
-- `templates/verticals/pharmacy/fast_sell.html` - Pharmacy scanner
-- `templates/verticals/clothing/fast_sell.html` - Clothing scanner
-
-### Tests
-- `sales/tests/test_fast_sell.py` - Comprehensive test suite
-
-## Rollback Plan
-
-If issues arise:
-```bash
-# Rollback migration
-python manage.py migrate sales 1000
-
-# Hide Fast Sell in sidebar (comment out in utils_verticals.py)
-# Remove Fast Sell URLs (comment out in verticals/urls.py)
-```
-
-## Known Limitations
-
-1. **BarcodeDetector API** not supported in all browsers (fallback to manual entry)
-2. **Front camera only** (no camera switching UI)
-3. **Barman role is liquor-only** (not implemented for other verticals)
-4. **Attribution system is manual** (no automatic reconciliation)
-
-## Production Checklist
-
-- [x] No missing static files
-- [x] No 500 errors
-- [x] All DB queries use select_related/prefetch_related
-- [x] CSRF protection on all POST endpoints
-- [x] Permission checks on all views
-- [x] Graceful error handling
-- [x] Tests passing
-- [x] Django checks passing
-- [x] Migration created
-
-## Support
-
-If you encounter issues:
-1. Check browser console for JavaScript errors
-2. Check Django logs for backend errors
-3. Verify camera permissions are granted
-4. Test manual barcode entry as fallback
-5. Check that business has correct `business_kind`

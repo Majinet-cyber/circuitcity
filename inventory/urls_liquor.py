@@ -12,6 +12,9 @@ urlpatterns = [
     # Inventory Dashboard
     path("inventory/", views_liquor_inventory.liquor_inventory_dashboard, name="inventory_dashboard"),
     
+    # Scan In
+    path("scan-in/", views_liquor_inventory.liquor_scan_in, name="scan_in"),
+    
     # Stock Overview
     path("stock/", views_liquor.stock_overview, name="stock_overview"),
     path("stock/settings/", views_liquor.stock_settings, name="stock_settings"),

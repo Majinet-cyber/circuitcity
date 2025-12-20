@@ -161,3 +161,94 @@ def liquor_inventory_dashboard(request):
     
     return render(request, "verticals/liquor/inventory_dashboard.html", context)
 
+
+@login_required
+@require_business
+@require_business_kind(BusinessKind.LIQUOR)
+def liquor_scan_in(request):
+    """
+    Gamified scan-in page for LIQUOR vertical.
+    Mirrors the sell scanner: Beer cards, Bottle/crate panels, Quantity panels, Price panels.
+    """
+    from django.contrib import messages
+    from django.shortcuts import redirect
+    from django.db import transaction
+    from django.views.decorators.http import require_http_methods
+    from collections import defaultdict
+    
+    business = get_active_business(request)
+    
+    if request.method == "POST":
+        # POST logic: process stock-in
+        try:
+            product_id = int(request.POST.get("product_id", 0))
+            quantity = int(request.POST.get("quantity", 1))
+            unit_type = request.POST.get("unit_type", "bottle")  # "bottle" or "crate"
+            cost_per_unit = Decimal(request.POST.get("cost_per_unit", "0.00"))
+            
+            product = MerchProduct.objects.get(
+                pk=product_id,
+                business=business,
+                kind=BusinessKind.LIQUOR,
+                is_active=True
+            )
+            
+            # Calculate actual bottles to add
+            bottles_to_add = quantity
+            if unit_type == "crate":
+                bottles_per_crate = product.bottles_per_crate or 24  # Default 24 bottles per crate
+                bottles_to_add = quantity * bottles_per_crate
+            
+            with transaction.atomic():
+                # Update product stock
+                product.quantity_in_stock = (product.quantity_in_stock or 0) + bottles_to_add
+                
+                # Update cost price if provided
+                if cost_per_unit > 0:
+                    if unit_type == "crate" and product.bottles_per_crate:
+                        product.cost_per_bottle = cost_per_unit / product.bottles_per_crate
+                    else:
+                        product.cost_per_bottle = cost_per_unit
+                
+                product.save()
+            
+            messages.success(request, f"Added {bottles_to_add} × {product.name} to stock")
+            return redirect("liquor:scan_in")
+            
+        except (ValueError, MerchProduct.DoesNotExist, KeyError) as e:
+            messages.error(request, f"Stock-in failed: {e}")
+            return redirect("liquor:scan_in")
+    
+    # GET: Build category-grouped products
+    products = MerchProduct.objects.filter(
+        business=business,
+        kind=BusinessKind.LIQUOR,
+        is_archived=False,
+        is_active=True
+    ).order_by("category", "name")
+    
+    products_by_category = defaultdict(list)
+    for p in products:
+        cat = (p.category or "").lower()
+        if cat:
+            products_by_category[cat].append({
+                'id': p.id,
+                'name': p.name,
+                'quantity_in_stock': p.quantity_in_stock or 0,
+                'bottles_per_crate': p.bottles_per_crate or 24,
+            })
+    
+    # Build categories list in order
+    category_order = ["beer", "cider", "wine", "spirits", "whiskey"]
+    categories = [cat for cat in category_order if cat in products_by_category]
+    
+    # Serialize products to JSON for JavaScript
+    import json
+    products_json = json.dumps(dict(products_by_category))
+    
+    return render(request, "verticals/liquor/scan_in.html", {
+        "categories": categories,
+        "products_by_category": products_json,
+        "business": business,
+        "active_tab": "scan_in",
+    })

@@ -1,0 +1,207 @@
+{% comment %}
+  Smart Pricing Feedback Component
+  
+  Usage:
+  {% include "partials/smart_pricing_feedback.html" with 
+    cost_price_input_id="id_cost_price"
+    selling_price_input_id="id_selling_price"
+    feedback_container_id="pricing-feedback"
+  %}
+  
+  Requirements:
+  - Cost price input (hidden after first entry)
+  - Selling price input (primary)
+  - Feedback container (displays smart messages)
+{% endcomment %}
+
+<style>
+/* Smart Pricing Feedback Styles */
+.pricing-feedback-container {
+  margin-top: 12px;
+  padding: 14px 18px;
+  border-radius: 12px;
+  font-size: 0.95rem;
+  font-weight: 600;
+  line-height: 1.4;
+  transition: all 0.3s cubic-bezier(0.2, 0.8, 0.2, 1);
+  opacity: 0;
+  transform: translateY(-8px);
+  display: none;
+}
+
+.pricing-feedback-container.show {
+  opacity: 1;
+  transform: translateY(0);
+  display: block;
+}
+
+/* Below Cost - Warning (Yellow) */
+.pricing-feedback-container.below-cost {
+  background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
+  border: 2px solid #fbbf24;
+  color: #92400e;
+}
+
+/* Above Cost - Success (Green) */
+.pricing-feedback-container.above-cost {
+  background: linear-gradient(135deg, #d1fae5 0%, #86efac 100%);
+  border: 2px solid #4ade80;
+  color: #065f46;
+}
+
+.pricing-feedback-icon {
+  display: inline-block;
+  margin-right: 8px;
+  font-size: 1.2em;
+}
+
+.pricing-feedback-message {
+  display: inline;
+}
+
+/* Hidden cost price after first entry */
+.cost-price-hidden {
+  display: none !important;
+}
+
+/* Selling price becomes primary */
+.selling-price-primary {
+  width: 100%;
+  padding: 16px;
+  border: 3px solid #e2e8f0;
+  border-radius: 12px;
+  font-size: 1.3rem;
+  font-weight: 700;
+  transition: all 0.2s;
+}
+
+.selling-price-primary:focus {
+  outline: none;
+  border-color: #667eea;
+  box-shadow: 0 0 0 4px rgba(102, 126, 234, 0.1);
+}
+
+@media (max-width: 768px) {
+  .pricing-feedback-container {
+    padding: 12px 16px;
+    font-size: 0.9rem;
+  }
+  
+  .selling-price-primary {
+    padding: 14px;
+    font-size: 1.2rem;
+  }
+}
+</style>
+
+<!-- Pricing Feedback Container -->
+<div id="{{ feedback_container_id|default:'pricing-feedback' }}" class="pricing-feedback-container">
+  <span class="pricing-feedback-icon"></span>
+  <span class="pricing-feedback-message"></span>
+</div>
+
+<script>
+(function() {
+  // Configuration
+  const costPriceInputId = '{{ cost_price_input_id|default:"id_cost_price" }}';
+  const sellingPriceInputId = '{{ selling_price_input_id|default:"id_selling_price" }}';
+  const feedbackContainerId = '{{ feedback_container_id|default:"pricing-feedback" }}';
+  
+  // Get elements
+  const costPriceInput = document.getElementById(costPriceInputId);
+  const sellingPriceInput = document.getElementById(sellingPriceInputId);
+  const feedbackContainer = document.getElementById(feedbackContainerId);
+  
+  if (!costPriceInput || !sellingPriceInput || !feedbackContainer) {
+    console.warn('Smart Pricing Feedback: Missing required elements');
+    return;
+  }
+  
+  let costPrice = null;
+  let costPriceEntered = false;
+  
+  // Hide cost price after first entry
+  costPriceInput.addEventListener('blur', function() {
+    const value = parseFloat(this.value);
+    if (value && value > 0 && !costPriceEntered) {
+      costPrice = value;
+      costPriceEntered = true;
+      
+      // Hide cost price container after a brief moment
+      setTimeout(() => {
+        const costPriceContainer = this.closest('.form-step') || this.closest('.form-group') || this.closest('.price-panel');
+        if (costPriceContainer) {
+          costPriceContainer.classList.add('cost-price-hidden');
+        }
+        
+        // Focus on selling price
+        sellingPriceInput.focus();
+      }, 500);
+    }
+  });
+  
+  // Real-time feedback on selling price input
+  sellingPriceInput.addEventListener('input', function() {
+    updatePricingFeedback();
+  });
+  
+  sellingPriceInput.addEventListener('change', function() {
+    updatePricingFeedback();
+  });
+  
+  function updatePricingFeedback() {
+    const sellingPrice = parseFloat(sellingPriceInput.value);
+    
+    // If no cost price yet or no selling price, hide feedback
+    if (!costPrice || !sellingPrice || sellingPrice <= 0) {
+      feedbackContainer.classList.remove('show', 'above-cost', 'below-cost');
+      return;
+    }
+    
+    const margin = ((sellingPrice - costPrice) / costPrice) * 100;
+    const icon = feedbackContainer.querySelector('.pricing-feedback-icon');
+    const message = feedbackContainer.querySelector('.pricing-feedback-message');
+    
+    // Below cost - Warning
+    if (sellingPrice < costPrice) {
+      feedbackContainer.classList.remove('above-cost');
+      feedbackContainer.classList.add('below-cost', 'show');
+      icon.textContent = '🟡';
+      message.textContent = `This price is below your cost price (MWK ${costPrice.toLocaleString()}). Proceed if intentional.`;
+    }
+    // Above cost - Success with encouraging message
+    else {
+      feedbackContainer.classList.remove('below-cost');
+      feedbackContainer.classList.add('above-cost', 'show');
+      icon.textContent = '🟢';
+      
+      // Gamified encouraging messages based on margin
+      if (margin < 10) {
+        message.textContent = `Nice 👍 — this is ${margin.toFixed(0)}% above your cost price`;
+      } else if (margin < 25) {
+        message.textContent = `Great choice 💡 — ${margin.toFixed(0)}% margin`;
+      } else if (margin < 50) {
+        message.textContent = `Excellent 🚀 — ${margin.toFixed(0)}% profit margin`;
+      } else {
+        message.textContent = `Amazing deal 🎉 — ${margin.toFixed(0)}% profit margin!`;
+      }
+    }
+  }
+  
+  // Initialize cost price if already set
+  const initialCostPrice = parseFloat(costPriceInput.value);
+  if (initialCostPrice && initialCostPrice > 0) {
+    costPrice = initialCostPrice;
+    costPriceEntered = true;
+  }
+  
+  // If cost price already entered on page load, show selling price as primary
+  if (costPriceEntered) {
+    const costPriceContainer = costPriceInput.closest('.form-step') || costPriceInput.closest('.form-group') || costPriceInput.closest('.price-panel');
+    if (costPriceContainer) {
+      costPriceContainer.classList.add('cost-price-hidden');
+    }
+  }
+})();
+</script>
+

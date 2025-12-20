@@ -337,42 +337,30 @@
     {% endif %}
   </div>
   
-  <!-- KPI Cards -->
+  <!-- KPI Cards (Global Color Standard) -->
   <div class="kpi-grid">
-    <div class="kpi-card">
-      <p class="kpi-label">📦 Total Batches</p>
-      <h3 class="kpi-value">{{ total_batches|intcomma }}</h3>
-      <p class="kpi-sublabel">Active stock batches</p>
+    <div class="kpi-card" style="background:linear-gradient(135deg,#3b82f6,#2563eb);color:#fff;border:none">
+      <p class="kpi-label" style="color:rgba(255,255,255,.9)">💰 Revenue ({{ period_label }})</p>
+      <h3 class="kpi-value" style="color:#fff">MWK {{ period_revenue|floatformat:0|intcomma }}</h3>
+      <p class="kpi-sublabel" style="color:rgba(255,255,255,.8)">{{ period_sales_count }} sales</p>
     </div>
     
-    <div class="kpi-card">
-      <p class="kpi-label">💰 Stock Value</p>
-      <h3 class="kpi-value">MWK {{ total_stock_value|floatformat:0|intcomma }}</h3>
-      <p class="kpi-sublabel">At selling price</p>
+    <div class="kpi-card" style="background:linear-gradient(135deg,#10b981,#059669);color:#fff;border:none">
+      <p class="kpi-label" style="color:rgba(255,255,255,.9)">📈 Profit ({{ period_label }})</p>
+      <h3 class="kpi-value" style="color:#fff">MWK {{ period_profit|floatformat:0|intcomma }}</h3>
+      <p class="kpi-sublabel" style="color:rgba(255,255,255,.8)">Gross margin</p>
     </div>
     
-    <div class="kpi-card">
-      <p class="kpi-label">💵 Revenue ({{ period_label }})</p>
-      <h3 class="kpi-value">MWK {{ period_revenue|floatformat:0|intcomma }}</h3>
-      <p class="kpi-sublabel">{{ period_sales_count }} sales</p>
+    <div class="kpi-card" style="background:linear-gradient(135deg,#ef4444,#dc2626);color:#fff;border:none">
+      <p class="kpi-label" style="color:rgba(255,255,255,.9)">💸 Total Costs ({{ period_label }})</p>
+      <h3 class="kpi-value" style="color:#fff">MWK {{ period_costs|floatformat:0|intcomma }}</h3>
+      <p class="kpi-sublabel" style="color:rgba(255,255,255,.8)">COGS + Admin</p>
     </div>
     
-    <div class="kpi-card">
-      <p class="kpi-label">📈 Profit ({{ period_label }})</p>
-      <h3 class="kpi-value" style="color:#10b981">MWK {{ period_profit|floatformat:0|intcomma }}</h3>
-      <p class="kpi-sublabel">Gross margin</p>
-    </div>
-    
-    <div class="kpi-card">
-      <p class="kpi-label">💸 Costs ({{ period_label }})</p>
-      <h3 class="kpi-value" style="color:#ef4444">MWK {{ period_costs|floatformat:0|intcomma }}</h3>
-      <p class="kpi-sublabel">COGS + Admin</p>
-    </div>
-    
-    <div class="kpi-card">
-      <p class="kpi-label">🏥 Products</p>
-      <h3 class="kpi-value">{{ total_products|intcomma }}</h3>
-      <p class="kpi-sublabel">Unique medicines & cosmetics</p>
+    <div class="kpi-card" style="background:linear-gradient(135deg,#eab308,#ca8a04);color:#fff;border:none">
+      <p class="kpi-label" style="color:rgba(255,255,255,.9)">📦 Stock Value</p>
+      <h3 class="kpi-value" style="color:#fff">MWK {{ total_stock_value|floatformat:0|intcomma }}</h3>
+      <p class="kpi-sublabel" style="color:rgba(255,255,255,.8)">At selling price</p>
     </div>
   </div>
   

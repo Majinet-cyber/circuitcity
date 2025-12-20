@@ -1191,9 +1191,12 @@ def sale_create(request: HttpRequest) -> HttpResponse:
             # Check and notify low stock
             _check_and_notify_low_stock(batch, business)
         
+        # Gamified success message
         messages.success(
             request,
-            f"Sale recorded: {batch.merch_product.name} x{quantity} for {sale.total_amount:,.2f}"
+            f"🟢 Sale recorded 🎉\n"
+            f"Stock updated · Revenue added · Well done!\n"
+            f"{batch.merch_product.name} x{quantity} | Total: MWK {sale.total_amount:,.2f}"
         )
         return redirect("inventory:pharmacy_dashboard")
     

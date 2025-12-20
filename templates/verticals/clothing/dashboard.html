@@ -112,45 +112,23 @@
   </section>
 
   <section class="cc-kpi-grid">
-    <article class="metric-card" style="background:linear-gradient(135deg,#10b981,#059669);color:#fff" data-cy="sales-revenue-card">
-      <h3 style="color:rgba(255,255,255,.9)">💰 Sales Revenue{% if active_range == 'today' %} (Today){% elif active_range == '7d' %} (7D){% elif active_range == 'date' %} (Day){% else %} (MTD){% endif %}</h3>
+    <article class="metric-card" style="background:linear-gradient(135deg,#3b82f6,#2563eb);color:#fff" data-cy="sales-revenue-card">
+      <h3 style="color:rgba(255,255,255,.9)">💰 Total Revenue{% if active_range == 'today' %} (Today){% elif active_range == '7d' %} (7D){% elif active_range == 'date' %} (Day){% else %} (MTD){% endif %}</h3>
       <p style="color:#fff;font-size:2rem;font-weight:800">K {{ revenue_mtd|floatformat:0|default:"0"|intcomma }}</p>
     </article>
-    <article class="metric-card" style="background:linear-gradient(135deg,#f59e0b,#d97706);color:#fff">
-      <h3 style="color:rgba(255,255,255,.9)">📦 Cost of Goods{% if active_range == 'today' %} (Today){% elif active_range == '7d' %} (7D){% elif active_range == 'date' %} (Day){% else %} (MTD){% endif %}</h3>
-      <p style="color:#fff;font-size:2rem;font-weight:800">K {{ cost_mtd|floatformat:0|default:"0"|intcomma }}</p>
-    </article>
-    <article class="metric-card" style="background:linear-gradient(135deg,#ef4444,#dc2626);color:#fff">
-      <h3 style="color:rgba(255,255,255,.9)">🏢 Overhead{% if active_range == 'today' %} (Today){% elif active_range == '7d' %} (7D){% elif active_range == 'date' %} (Day){% else %} (MTD){% endif %}</h3>
-      <p style="color:#fff;font-size:2rem;font-weight:800">K {{ overhead_costs|floatformat:0|default:"0"|intcomma }}</p>
-    </article>
-    <article class="metric-card" style="background:linear-gradient(135deg,#3b82f6,#2563eb);color:#fff">
-      <h3 style="color:rgba(255,255,255,.9)">📊 Profit{% if active_range == 'today' %} (Today){% elif active_range == '7d' %} (7D){% elif active_range == 'date' %} (Day){% else %} (MTD){% endif %}</h3>
+    <article class="metric-card" style="background:linear-gradient(135deg,#10b981,#059669);color:#fff">
+      <h3 style="color:rgba(255,255,255,.9)">📈 Total Profit{% if active_range == 'today' %} (Today){% elif active_range == '7d' %} (7D){% elif active_range == 'date' %} (Day){% else %} (MTD){% endif %}</h3>
       <p style="color:#fff;font-size:2rem;font-weight:800">K {{ profit_mtd|floatformat:0|default:"0"|intcomma }}</p>
     </article>
-    <a href="{% url 'verticals:clothing_sales_history' %}?{% if start_date %}start={{ start_date }}&{% endif %}{% if end_date %}end={{ end_date }}{% endif %}" class="metric-card metric-card-clickable" style="text-decoration:none;color:inherit">
-      <h3>🛒 Sales{% if active_range == 'today' %} (Today){% elif active_range == '7d' %} (7D){% elif active_range == 'date' %} (Day){% else %} (MTD){% endif %}</h3>
-      <p style="font-size:2rem;font-weight:800">{{ total_sales_mtd|intcomma }}</p>
-      <small style="color:#3b82f6;font-weight:600;margin-top:8px;display:block">Click to view →</small>
-    </a>
-  </section>
-
-  {% comment %}Inventory Value KPIs (Current Stock){% endcomment %}
-  <section class="cc-kpi-grid">
-    <article class="metric-card" style="background:linear-gradient(135deg,#8b5cf6,#7c3aed);color:#fff" data-cy="inventory-value-card">
-      <h3 style="color:rgba(255,255,255,.9)">📦 Inventory Value (Current)</h3>
+    <article class="metric-card" style="background:linear-gradient(135deg,#ef4444,#dc2626);color:#fff">
+      <h3 style="color:rgba(255,255,255,.9)">💸 Total Costs{% if active_range == 'today' %} (Today){% elif active_range == '7d' %} (7D){% elif active_range == 'date' %} (Day){% else %} (MTD){% endif %}</h3>
+      <p style="color:#fff;font-size:2rem;font-weight:800">K {{ total_costs_mtd|floatformat:0|default:"0"|intcomma }}</p>
+      <small style="color:rgba(255,255,255,.8);font-size:0.7rem;display:block;margin-top:6px">COGS + Overhead</small>
+    </article>
+    <article class="metric-card" style="background:linear-gradient(135deg,#eab308,#ca8a04);color:#fff">
+      <h3 style="color:rgba(255,255,255,.9)">📦 Stock Value{% if active_range == 'today' %} (Current){% endif %}</h3>
       <p style="color:#fff;font-size:2rem;font-weight:800">K {{ inventory_value|floatformat:0|default:"0"|intcomma }}</p>
-      <small style="color:rgba(255,255,255,.8);font-size:0.75rem;display:block;margin-top:6px">Cost basis of current stock</small>
-    </article>
-    <article class="metric-card" style="background:linear-gradient(135deg,#06b6d4,#0891b2);color:#fff" data-cy="retail-value-card">
-      <h3 style="color:rgba(255,255,255,.9)">💰 Retail Value (Current)</h3>
-      <p style="color:#fff;font-size:2rem;font-weight:800">K {{ retail_value|floatformat:0|default:"0"|intcomma }}</p>
-      <small style="color:rgba(255,255,255,.8);font-size:0.75rem;display:block;margin-top:6px">Potential revenue from stock</small>
-    </article>
-    <article class="metric-card" style="background:linear-gradient(135deg,#14b8a6,#0d9488);color:#fff">
-      <h3 style="color:rgba(255,255,255,.9)">📊 Expected Margin (Current)</h3>
-      <p style="color:#fff;font-size:2rem;font-weight:800">K {{ expected_margin|floatformat:0|default:"0"|intcomma }}</p>
-      <small style="color:rgba(255,255,255,.8);font-size:0.75rem;display:block;margin-top:6px">Retail - Inventory value</small>
+      <small style="color:rgba(255,255,255,.8);font-size:0.7rem;display:block;margin-top:6px">Current inventory</small>
     </article>
   </section>
 
@@ -208,6 +186,25 @@
       </div>
     </section>
   </div>
+
+  {% comment %}Stock Summary Section - Visual overview of inventory by category{% endcomment %}
+  {% if stock_summary %}
+  <section class="recent-block">
+    <h2 style="margin:0 0 16px;font-size:1.1rem">📦 Stock Summary</h2>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:14px">
+      {% for category in stock_summary %}
+      <div style="padding:16px;background:linear-gradient(135deg,#f8fafc,#f1f5f9);border-radius:14px;border:2px solid #e2e8f0;transition:all 0.2s"
+           onmouseover="this.style.transform='translateY(-2px)';this.style.borderColor='#cbd5e1'"
+           onmouseout="this.style.transform='translateY(0)';this.style.borderColor='#e2e8f0'">
+        <div style="font-size:2rem;margin-bottom:8px">{{ category.icon }}</div>
+        <div style="font-size:1rem;font-weight:700;color:#0f172a;margin-bottom:4px">{{ category.category }}</div>
+        <div style="font-size:1.6rem;font-weight:800;color:#3b82f6;margin-bottom:4px">{{ category.total_quantity|intcomma }}</div>
+        <div style="font-size:0.85rem;color:#64748b">{{ category.total_items }} style{{ category.total_items|pluralize }}</div>
+      </div>
+      {% endfor %}
+    </div>
+  </section>
+  {% endif %}
 
   <section class="cc-kpi-grid">
     <article class="metric-card">

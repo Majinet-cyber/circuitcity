@@ -62,10 +62,53 @@ def dashboard(request):
     top_model = sales_data['top_model']
     sales_trend = sales_data['sales_trend']
     
+    # Calculate total costs (COGS + Overhead)
+    total_costs_mtd = cost_mtd + overhead_costs
+    
     # Extract inventory metrics
     inventory_value = inventory_data['inventory_value']
     retail_value = inventory_data['retail_value']
     expected_margin = inventory_data['expected_margin']
+    
+    # ===== STOCK SUMMARY BY CATEGORY =====
+    # Group products by category and sum quantities
+    stock_summary = MerchProduct.objects.filter(
+        business=business,
+        kind=BusinessKind.CLOTHING,
+        is_active=True,
+        is_archived=False
+    ).values('category').annotate(
+        total_items=Count('id'),
+        total_quantity=Sum('quantity_in_stock')
+    ).order_by('-total_quantity')
+    
+    # Format for display
+    stock_summary_display = []
+    category_icons = {
+        'shoes': '👞',
+        'shirt': '👔',
+        'dress': '👗',
+        'suit': '🤵',
+        'trousers': '👖',
+        'jeans': '👖',
+        'shorts': '🩳',
+        'jacket': '🧥',
+        'skirt': '🩱',
+        'belts': '🔗',
+        'perfumes': '🌸',
+        'handbags': '👜',
+        'schoolbags': '🎒',
+    }
+    
+    for item in stock_summary:
+        category = item['category'] or 'other'
+        icon = category_icons.get(category, '👕')
+        stock_summary_display.append({
+            'category': category.title(),
+            'icon': icon,
+            'total_items': item['total_items'],
+            'total_quantity': item['total_quantity'] or 0
+        })
 
     ctx.update(
         {
@@ -81,6 +124,7 @@ def dashboard(request):
             "revenue_mtd": revenue_mtd,
             "cost_mtd": cost_mtd,
             "overhead_costs": overhead_costs,
+            "total_costs_mtd": total_costs_mtd,
             "profit_mtd": profit_mtd,
             "total_sales_mtd": total_sales_mtd,
             
@@ -96,6 +140,9 @@ def dashboard(request):
             "top_model": top_model,
             "top_models": top_models,
             "sales_trend": sales_trend,
+            
+            # Stock Summary
+            "stock_summary": stock_summary_display,
             
             # Date Filter State
             "active_range": range_param,
@@ -573,10 +620,12 @@ def sell(request):
                     )
                     
                     profit = total_price - total_cost
+                    # Gamified success message
                     messages.success(
                         request,
-                        f"✅ Sale recorded: {quantity} × {product.name} | "
-                        f"Revenue: K {total_price} | Profit: K {profit}"
+                        f"🟢 Sale recorded 🎉\n"
+                        f"Stock updated · Revenue added · Well done!\n"
+                        f"{quantity} × {product.name} | Revenue: K {total_price:,.2f} | Profit: K {profit:,.2f}"
                     )
                     return redirect('verticals:clothing_sell')
         else:

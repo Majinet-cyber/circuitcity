@@ -1,0 +1,730 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Stock In - Liquor{% endblock %}
+
+{% block extra_css %}
+<style>
+.scan-in-container {
+    max-width: 1100px;
+    margin: 2rem auto;
+    padding: 1rem;
+}
+
+/* ===== Category Cards (Beer, Cider, etc.) ===== */
+.category-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 1rem;
+    margin: 2rem 0;
+}
+
+.category-card {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    border-radius: 1rem;
+    padding: 2rem 1.5rem;
+    color: white;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    box-shadow: 0 4px 16px rgba(102,126,234,0.3);
+}
+
+.category-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 8px 24px rgba(102,126,234,0.5);
+}
+
+.category-card.selected {
+    box-shadow: 0 0 0 4px #4ade80;
+    transform: scale(1.05);
+}
+
+.category-card h3 {
+    margin: 0.5rem 0 0 0;
+    font-size: 1.3rem;
+}
+
+.category-card .icon {
+    font-size: 2rem;
+}
+
+/* ===== Product Selection ===== */
+.product-list {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 1rem;
+    margin: 1.5rem 0;
+}
+
+.product-item {
+    background: white;
+    border: 2px solid #e2e8f0;
+    border-radius: 0.75rem;
+    padding: 1rem;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.product-item:hover {
+    border-color: #667eea;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+}
+
+.product-item.selected {
+    border-color: #4ade80;
+    background: linear-gradient(135deg, rgba(74,222,128,0.1), rgba(102,126,234,0.1));
+    box-shadow: 0 0 0 3px rgba(74,222,128,0.2);
+}
+
+.product-name {
+    font-weight: 700;
+    color: #1a1a2e;
+    margin-bottom: 0.5rem;
+}
+
+.product-stock {
+    font-size: 0.875rem;
+    color: #64748b;
+}
+
+/* ===== Unit Selection (Bottle / Crate) ===== */
+.unit-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+    margin: 1.5rem 0;
+}
+
+.unit-btn {
+    padding: 1.5rem;
+    background: white;
+    border: 3px solid #e2e8f0;
+    border-radius: 0.75rem;
+    font-weight: 700;
+    font-size: 1.1rem;
+    cursor: pointer;
+    transition: all 0.2s;
+    text-align: center;
+}
+
+.unit-btn:hover {
+    border-color: #667eea;
+    transform: translateY(-2px);
+}
+
+.unit-btn.selected {
+    border-color: #4ade80;
+    background: linear-gradient(135deg, rgba(74,222,128,0.15), rgba(102,126,234,0.15));
+    box-shadow: 0 0 0 3px rgba(74,222,128,0.2);
+}
+
+.unit-icon {
+    font-size: 2rem;
+    display: block;
+    margin-bottom: 0.5rem;
+}
+
+/* ===== Quantity Panels ===== */
+.qty-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(80px, 1fr));
+    gap: 0.75rem;
+    margin: 1.5rem 0;
+}
+
+.qty-panel {
+    padding: 1.25rem 0.75rem;
+    background: white;
+    border: 2px solid #e2e8f0;
+    border-radius: 0.5rem;
+    font-weight: 700;
+    font-size: 1.25rem;
+    cursor: pointer;
+    transition: all 0.2s;
+    text-align: center;
+}
+
+.qty-panel:hover {
+    border-color: #667eea;
+    transform: scale(1.05);
+}
+
+.qty-panel.selected {
+    border-color: #4ade80;
+    background: linear-gradient(135deg, rgba(74,222,128,0.2), rgba(102,126,234,0.2));
+    color: #1a1a2e;
+}
+
+/* ===== Price Input ===== */
+.price-panel {
+    background: white;
+    padding: 1.5rem;
+    border-radius: 0.75rem;
+    border: 2px solid #e2e8f0;
+    margin: 1.5rem 0;
+}
+
+.price-panel label {
+    display: block;
+    font-weight: 600;
+    color: #334155;
+    margin-bottom: 0.75rem;
+}
+
+.price-panel input {
+    width: 100%;
+    padding: 1rem;
+    border: 2px solid #e2e8f0;
+    border-radius: 0.5rem;
+    font-size: 1.25rem;
+    font-weight: 600;
+}
+
+.price-panel input:focus {
+    outline: none;
+    border-color: #667eea;
+}
+
+/* ===== Submit Button ===== */
+.submit-btn {
+    width: 100%;
+    padding: 1.5rem;
+    background: #4ade80;
+    color: #1a1a2e;
+    border: none;
+    border-radius: 0.75rem;
+    font-size: 1.25rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.2s;
+    box-shadow: 0 4px 16px rgba(74,222,128,0.4);
+}
+
+.submit-btn:hover:not(:disabled) {
+    background: #22c55e;
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(74,222,128,0.6);
+}
+
+.submit-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.section-title {
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: #1a1a2e;
+    margin: 2rem 0 1rem 0;
+}
+
+.step-indicator {
+    display: inline-block;
+    background: #667eea;
+    color: white;
+    padding: 0.25rem 0.75rem;
+    border-radius: 999px;
+    font-size: 0.875rem;
+    font-weight: 600;
+    margin-right: 0.5rem;
+}
+
+.hidden {
+    display: none !important;
+}
+
+/* Smart Pricing Feedback Styles */
+.pricing-feedback-container {
+    margin-top: 12px;
+    padding: 14px 18px;
+    border-radius: 12px;
+    font-size: 0.95rem;
+    font-weight: 600;
+    line-height: 1.4;
+    transition: all 0.3s cubic-bezier(0.2, 0.8, 0.2, 1);
+    opacity: 0;
+    transform: translateY(-8px);
+    display: none;
+}
+
+.pricing-feedback-container.show {
+    opacity: 1;
+    transform: translateY(0);
+    display: block;
+}
+
+/* Below Cost - Warning (Yellow) */
+.pricing-feedback-container.below-cost {
+    background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
+    border: 2px solid #fbbf24;
+    color: #92400e;
+}
+
+/* Above Cost - Success (Green) */
+.pricing-feedback-container.above-cost {
+    background: linear-gradient(135deg, #d1fae5 0%, #86efac 100%);
+    border: 2px solid #4ade80;
+    color: #065f46;
+}
+
+.pricing-feedback-icon {
+    display: inline-block;
+    margin-right: 8px;
+    font-size: 1.2em;
+}
+
+.pricing-feedback-message {
+    display: inline;
+}
+
+/* Selling price primary style */
+.selling-price-primary {
+    width: 100%;
+    padding: 1rem;
+    border: 2px solid #e2e8f0;
+    border-radius: 0.5rem;
+    font-size: 1.25rem;
+    font-weight: 600;
+}
+
+.selling-price-primary:focus {
+    outline: none;
+    border-color: #667eea;
+    box-shadow: 0 0 0 4px rgba(102, 126, 234, 0.1);
+}
+
+@media (max-width: 768px) {
+    .category-grid {
+        grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    }
+    
+    .product-list {
+        grid-template-columns: 1fr;
+    }
+    
+    .qty-grid {
+        grid-template-columns: repeat(auto-fit, minmax(70px, 1fr));
+    }
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="scan-in-container">
+    <h1 class="text-3xl font-bold mb-6">📦 Stock In - Liquor</h1>
+    
+    <!-- Step 1: Category Selection -->
+    <div id="step-1">
+        <h2 class="section-title">
+            <span class="step-indicator">Step 1</span>
+            Select Category
+        </h2>
+        <div class="category-grid">
+            {% for category in categories %}
+            <div class="category-card" data-category="{{ category }}" onclick="selectCategory('{{ category }}')">
+                <div class="icon">
+                    {% if category == 'beer' %}🍺
+                    {% elif category == 'cider' %}🍻
+                    {% elif category == 'wine' %}🍷
+                    {% elif category == 'spirits' %}🥃
+                    {% elif category == 'whiskey' %}🥃
+                    {% else %}🍶
+                    {% endif %}
+                </div>
+                <h3>{{ category|title }}</h3>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    
+    <!-- Step 2: Product Selection -->
+    <div id="step-2" class="hidden">
+        <h2 class="section-title">
+            <span class="step-indicator">Step 2</span>
+            Select Product
+        </h2>
+        <div class="product-list" id="product-list">
+            <!-- Products will be populated here -->
+        </div>
+    </div>
+    
+    <!-- Step 3: Unit Selection (Bottle or Crate) -->
+    <div id="step-3" class="hidden">
+        <h2 class="section-title">
+            <span class="step-indicator">Step 3</span>
+            Select Unit Type
+        </h2>
+        <div class="unit-grid">
+            <button class="unit-btn" data-unit="bottle" onclick="selectUnit('bottle')">
+                <span class="unit-icon">🍾</span>
+                Bottles
+            </button>
+            <button class="unit-btn" data-unit="crate" onclick="selectUnit('crate')">
+                <span class="unit-icon">📦</span>
+                Crates
+            </button>
+        </div>
+    </div>
+    
+    <!-- Step 4: Quantity Selection -->
+    <div id="step-4" class="hidden">
+        <h2 class="section-title">
+            <span class="step-indicator">Step 4</span>
+            How Many?
+        </h2>
+        <div class="qty-grid">
+            <button class="qty-panel" data-qty="1" onclick="selectQuantity(1)">1</button>
+            <button class="qty-panel" data-qty="2" onclick="selectQuantity(2)">2</button>
+            <button class="qty-panel" data-qty="3" onclick="selectQuantity(3)">3</button>
+            <button class="qty-panel" data-qty="4" onclick="selectQuantity(4)">4</button>
+            <button class="qty-panel" data-qty="5" onclick="selectQuantity(5)">5</button>
+            <button class="qty-panel" data-qty="10" onclick="selectQuantity(10)">10</button>
+            <button class="qty-panel" data-qty="15" onclick="selectQuantity(15)">15</button>
+            <button class="qty-panel" data-qty="20" onclick="selectQuantity(20)">20</button>
+            <button class="qty-panel" data-qty="30" onclick="selectQuantity(30)">30</button>
+            <button class="qty-panel" data-qty="50" onclick="selectQuantity(50)">50</button>
+            <button class="qty-panel" data-qty="100" onclick="selectQuantity(100)">100</button>
+            <button class="qty-panel" data-qty="custom" onclick="customQuantity()">Custom</button>
+        </div>
+        <input type="number" id="custom-qty-input" class="hidden" style="width:100%;padding:1rem;font-size:1.25rem;border:2px solid #e2e8f0;border-radius:0.5rem;margin-top:1rem;" placeholder="Enter custom quantity">
+    </div>
+    
+    <!-- Step 5: Cost Price (Hidden after entry) -->
+    <div id="step-5" class="hidden">
+        <h2 class="section-title">
+            <span class="step-indicator">Step 5</span>
+            Cost Price per <span id="unit-label">Unit</span>
+        </h2>
+        <div class="price-panel" id="cost-price-panel">
+            <label for="cost-price">Cost Price (MWK)</label>
+            <input type="number" id="cost-price" step="0.01" min="0" placeholder="0.00">
+        </div>
+    </div>
+    
+    <!-- Step 6: Selling Price (Primary) with Smart Feedback -->
+    <div id="step-6" class="hidden">
+        <h2 class="section-title">
+            <span class="step-indicator">Step 6</span>
+            Selling Price per <span id="selling-unit-label">Unit</span>
+        </h2>
+        <div class="price-panel">
+            <label for="selling-price">Selling Price (MWK)</label>
+            <input type="number" id="selling-price" class="selling-price-primary" step="0.01" min="0" placeholder="0.00">
+        </div>
+        
+        <!-- Smart Pricing Feedback -->
+        <div id="pricing-feedback" class="pricing-feedback-container">
+            <span class="pricing-feedback-icon"></span>
+            <span class="pricing-feedback-message"></span>
+        </div>
+    </div>
+    
+    <!-- Step 7: Submit -->
+    <div id="step-7" class="hidden">
+        <button class="submit-btn" onclick="submitStockIn()">✅ Add to Stock</button>
+        <button class="submit-btn" style="background:#64748b;margin-top:1rem;" onclick="resetForm()">↺ Start Over</button>
+    </div>
+</div>
+
+<script>
+let selectedCategory = null;
+let selectedProduct = null;
+let selectedUnit = null;
+let selectedQuantity = null;
+let costPrice = null;
+let sellingPrice = null;
+let costPriceEntered = false;
+
+const productsData = {{ products_by_category|safe }};
+
+function selectCategory(category) {
+    selectedCategory = category;
+    
+    // Update UI
+    document.querySelectorAll('.category-card').forEach(card => card.classList.remove('selected'));
+    document.querySelector(`.category-card[data-category="${category}"]`).classList.add('selected');
+    
+    // Populate products
+    const products = productsData[category] || [];
+    const productList = document.getElementById('product-list');
+    productList.innerHTML = '';
+    
+    products.forEach(product => {
+        const item = document.createElement('div');
+        item.className = 'product-item';
+        item.dataset.productId = product.id;
+        item.onclick = () => selectProduct(product.id, product.name);
+        item.innerHTML = `
+            <div class="product-name">${product.name}</div>
+            <div class="product-stock">Stock: ${product.quantity_in_stock || 0}</div>
+        `;
+        productList.appendChild(item);
+    });
+    
+    // Show step 2
+    document.getElementById('step-2').classList.remove('hidden');
+    document.getElementById('step-2').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+function selectProduct(productId, productName) {
+    selectedProduct = { id: productId, name: productName };
+    
+    // Update UI
+    document.querySelectorAll('.product-item').forEach(item => item.classList.remove('selected'));
+    document.querySelector(`.product-item[data-product-id="${productId}"]`).classList.add('selected');
+    
+    // Show step 3
+    document.getElementById('step-3').classList.remove('hidden');
+    document.getElementById('step-3').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+function selectUnit(unit) {
+    selectedUnit = unit;
+    
+    // Update UI
+    document.querySelectorAll('.unit-btn').forEach(btn => btn.classList.remove('selected'));
+    document.querySelector(`.unit-btn[data-unit="${unit}"]`).classList.add('selected');
+    
+    // Update labels in step 5 and 6
+    document.getElementById('unit-label').textContent = unit === 'crate' ? 'Crate' : 'Bottle';
+    document.getElementById('selling-unit-label').textContent = unit === 'crate' ? 'Crate' : 'Bottle';
+    
+    // Show step 4
+    document.getElementById('step-4').classList.remove('hidden');
+    document.getElementById('step-4').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+function selectQuantity(qty) {
+    if (qty === 'custom') {
+        return;  // Handle custom separately
+    }
+    
+    selectedQuantity = qty;
+    
+    // Update UI
+    document.querySelectorAll('.qty-panel').forEach(panel => panel.classList.remove('selected'));
+    document.querySelector(`.qty-panel[data-qty="${qty}"]`).classList.add('selected');
+    document.getElementById('custom-qty-input').classList.add('hidden');
+    
+    // Show step 5 (cost price)
+    document.getElementById('step-5').classList.remove('hidden');
+    document.getElementById('step-5').scrollIntoView({ behavior: 'smooth', block: 'start' });
+    
+    // Setup cost price handler (only once)
+    setupCostPriceHandler();
+}
+
+function customQuantity() {
+    // Update UI
+    document.querySelectorAll('.qty-panel').forEach(panel => panel.classList.remove('selected'));
+    document.querySelector(`.qty-panel[data-qty="custom"]`).classList.add('selected');
+    
+    const customInput = document.getElementById('custom-qty-input');
+    customInput.classList.remove('hidden');
+    customInput.focus();
+    
+    customInput.onchange = function() {
+        selectedQuantity = parseInt(this.value) || 1;
+        // Show step 5 (cost price)
+        document.getElementById('step-5').classList.remove('hidden');
+        document.getElementById('step-5').scrollIntoView({ behavior: 'smooth', block: 'start' });
+        // Setup cost price handler
+        setupCostPriceHandler();
+    };
+}
+
+function setupCostPriceHandler() {
+    const costPriceInput = document.getElementById('cost-price');
+    if (!costPriceInput || costPriceEntered) return;
+    
+    // When cost price is entered, hide it and show selling price
+    costPriceInput.addEventListener('blur', function() {
+        const value = parseFloat(this.value);
+        if (value && value > 0) {
+            costPrice = value;
+            costPriceEntered = true;
+            
+            // Hide cost price panel
+            setTimeout(() => {
+                document.getElementById('cost-price-panel').style.display = 'none';
+                
+                // Show step 6 (selling price)
+                document.getElementById('step-6').classList.remove('hidden');
+                document.getElementById('step-6').scrollIntoView({ behavior: 'smooth', block: 'start' });
+                
+                // Show step 7 (submit)
+                document.getElementById('step-7').classList.remove('hidden');
+                
+                // Setup smart pricing feedback
+                setupSmartPricingFeedback();
+            }, 500);
+        }
+    }, { once: true });
+}
+
+function setupSmartPricingFeedback() {
+    const sellingPriceInput = document.getElementById('selling-price');
+    const feedbackContainer = document.getElementById('pricing-feedback');
+    
+    if (!sellingPriceInput || !feedbackContainer) return;
+    
+    function updateFeedback() {
+        const selling = parseFloat(sellingPriceInput.value);
+        
+        if (!costPrice || !selling || selling <= 0) {
+            feedbackContainer.classList.remove('show', 'above-cost', 'below-cost');
+            return;
+        }
+        
+        const margin = ((selling - costPrice) / costPrice) * 100;
+        const icon = feedbackContainer.querySelector('.pricing-feedback-icon');
+        const message = feedbackContainer.querySelector('.pricing-feedback-message');
+        
+        if (selling < costPrice) {
+            // Below cost - Warning
+            feedbackContainer.classList.remove('above-cost');
+            feedbackContainer.classList.add('below-cost', 'show');
+            icon.textContent = '🟡';
+            message.textContent = `This price is below your cost price (MWK ${costPrice.toLocaleString()}). Proceed if intentional.`;
+        } else {
+            // Above cost - Success with encouraging message
+            feedbackContainer.classList.remove('below-cost');
+            feedbackContainer.classList.add('above-cost', 'show');
+            icon.textContent = '🟢';
+            
+            if (margin < 10) {
+                message.textContent = `Nice 👍 — this is ${margin.toFixed(0)}% above your cost price`;
+            } else if (margin < 25) {
+                message.textContent = `Great choice 💡 — ${margin.toFixed(0)}% margin`;
+            } else if (margin < 50) {
+                message.textContent = `Excellent 🚀 — ${margin.toFixed(0)}% profit margin`;
+            } else {
+                message.textContent = `Amazing deal 🎉 — ${margin.toFixed(0)}% profit margin!`;
+            }
+        }
+    }
+    
+    sellingPriceInput.addEventListener('input', updateFeedback);
+    sellingPriceInput.addEventListener('change', updateFeedback);
+}
+
+async function submitStockIn() {
+    // Validate all selections
+    if (!selectedProduct || !selectedUnit || !selectedQuantity) {
+        alert('Please complete all steps');
+        return;
+    }
+    
+    // Get final prices
+    costPrice = costPrice || parseFloat(document.getElementById('cost-price').value) || 0;
+    sellingPrice = parseFloat(document.getElementById('selling-price').value) || 0;
+    
+    // Prepare form data
+    const formData = new FormData();
+    formData.append('product_id', selectedProduct.id);
+    formData.append('unit_type', selectedUnit);
+    formData.append('quantity', selectedQuantity);
+    formData.append('cost_per_unit', costPrice.toFixed(2));
+    if (sellingPrice > 0) {
+        formData.append('selling_price', sellingPrice.toFixed(2));
+    }
+    
+    // Get CSRF token
+    const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]')?.value || '{{ csrf_token }}';
+    
+    try {
+        const response = await fetch(window.location.href, {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': csrfToken
+            },
+            body: formData
+        });
+        
+        if (response.ok) {
+            // Success - Show gamified success message
+            const bottlesAdded = selectedUnit === 'crate' ? selectedQuantity * 20 : selectedQuantity;
+            showSuccessMessage(`🟢 Sale recorded 🎉\nAdded ${bottlesAdded} bottles of ${selectedProduct.name}\nStock updated · Pricing set · Well done!`);
+            
+            // Reload after brief delay
+            setTimeout(() => window.location.reload(), 2000);
+        } else {
+            alert('❌ Failed to add stock. Please try again.');
+        }
+    } catch (error) {
+        console.error('Error:', error);
+        alert('❌ Network error. Please try again.');
+    }
+}
+
+function showSuccessMessage(message) {
+    // Create success overlay
+    const overlay = document.createElement('div');
+    overlay.style.cssText = `
+        position: fixed;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        background: linear-gradient(135deg, #d1fae5 0%, #86efac 100%);
+        border: 3px solid #4ade80;
+        border-radius: 20px;
+        padding: 32px 48px;
+        font-size: 1.25rem;
+        font-weight: 700;
+        color: #065f46;
+        text-align: center;
+        z-index: 10000;
+        box-shadow: 0 20px 60px rgba(74, 222, 128, 0.4);
+        white-space: pre-line;
+        line-height: 1.6;
+    `;
+    overlay.textContent = message;
+    document.body.appendChild(overlay);
+    
+    // Remove after delay
+    setTimeout(() => overlay.remove(), 3000);
+}
+
+function resetForm() {
+    // Reset all selections
+    selectedCategory = null;
+    selectedProduct = null;
+    selectedUnit = null;
+    selectedQuantity = null;
+    costPrice = null;
+    sellingPrice = null;
+    costPriceEntered = false;
+    
+    // Reset UI
+    document.querySelectorAll('.selected').forEach(el => el.classList.remove('selected'));
+    document.querySelectorAll('.hidden').forEach(el => el.classList.add('hidden'));
+    document.getElementById('step-2').classList.add('hidden');
+    document.getElementById('step-3').classList.add('hidden');
+    document.getElementById('step-4').classList.add('hidden');
+    document.getElementById('step-5').classList.add('hidden');
+    document.getElementById('step-6').classList.add('hidden');
+    document.getElementById('step-7').classList.add('hidden');
+    document.getElementById('cost-price').value = '';
+    document.getElementById('selling-price').value = '';
+    document.getElementById('custom-qty-input').value = '';
+    document.getElementById('custom-qty-input').classList.add('hidden');
+    document.getElementById('cost-price-panel').style.display = 'block';
+    
+    // Hide feedback
+    const feedbackContainer = document.getElementById('pricing-feedback');
+    if (feedbackContainer) {
+        feedbackContainer.classList.remove('show', 'above-cost', 'below-cost');
+    }
+    
+    // Scroll to top
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+</script>
+
+<form method="post" style="display:none;" id="hidden-form">
+    {% csrf_token %}
+</form>
+{% endblock %}
+

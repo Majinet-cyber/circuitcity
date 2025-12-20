@@ -25,6 +25,9 @@
   .category-card.selected{border-color:#10b981;background:#f0fdf4}
   .category-icon{font-size:2.5rem}
   .category-name{font-size:.9rem;font-weight:600;color:#0f172a}
+  .size-btn,.color-btn{padding:12px 16px;border:2px solid #e2e8f0;border-radius:12px;background:#fff;cursor:pointer;transition:all .2s;font-weight:600;color:#0f172a;font-size:.95rem}
+  .size-btn:hover,.color-btn:hover{border-color:#10b981;transform:translateY(-2px);box-shadow:0 6px 16px rgba(16,185,129,.15)}
+  .size-btn.selected,.color-btn.selected{border-color:#10b981;background:#f0fdf4;color:#15803d;box-shadow:0 0 0 3px rgba(16,185,129,.15)}
   .btn-submit{width:100%;padding:16px;background:linear-gradient(135deg,#10b981,#059669);color:#fff;border:none;border-radius:999px;font-size:1.1rem;font-weight:700;cursor:pointer;transition:transform .2s,box-shadow .2s}
   .btn-submit:hover{transform:translateY(-2px);box-shadow:0 12px 30px rgba(16,185,129,.3)}
   .recent-section{background:#fff;border-radius:20px;padding:24px;box-shadow:0 10px 40px rgba(15,23,42,.1)}
@@ -35,6 +38,15 @@
   .recent-item strong{display:block;font-size:.95rem;color:#0f172a}
   .recent-item small{color:#64748b;font-size:.85rem}
   .alert-success{background:#f0fdf4;border:1px solid #86efac;color:#15803d;padding:14px 18px;border-radius:12px;margin-bottom:20px}
+  
+  /* Smart Pricing Feedback */
+  .pricing-feedback-container{margin-top:12px;padding:14px 18px;border-radius:12px;font-size:.95rem;font-weight:600;line-height:1.4;transition:all .3s cubic-bezier(.2,.8,.2,1);opacity:0;transform:translateY(-8px);display:none}
+  .pricing-feedback-container.show{opacity:1;transform:translateY(0);display:block}
+  .pricing-feedback-container.below-cost{background:linear-gradient(135deg,#fef3c7 0%,#fde68a 100%);border:2px solid #fbbf24;color:#92400e}
+  .pricing-feedback-container.above-cost{background:linear-gradient(135deg,#d1fae5 0%,#86efac 100%);border:2px solid #4ade80;color:#065f46}
+  .pricing-feedback-icon{display:inline-block;margin-right:8px;font-size:1.2em}
+  .pricing-feedback-message{display:inline}
+  .cost-price-hidden{display:none!important}
 </style>
 
 <div class="scan-in-page">
@@ -68,11 +80,40 @@
 
       <div class="form-step">
         <label for="id_size">2️⃣ Select Size</label>
+        <div class="size-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(70px,1fr));gap:10px;margin-top:8px">
+          <button type="button" class="size-btn" data-size="XS">XS</button>
+          <button type="button" class="size-btn" data-size="S">S</button>
+          <button type="button" class="size-btn" data-size="M">M</button>
+          <button type="button" class="size-btn" data-size="L">L</button>
+          <button type="button" class="size-btn" data-size="XL">XL</button>
+          <button type="button" class="size-btn" data-size="XXL">XXL</button>
+          <button type="button" class="size-btn" data-size="28">28</button>
+          <button type="button" class="size-btn" data-size="30">30</button>
+          <button type="button" class="size-btn" data-size="32">32</button>
+          <button type="button" class="size-btn" data-size="34">34</button>
+          <button type="button" class="size-btn" data-size="36">36</button>
+          <button type="button" class="size-btn" data-size="38">38</button>
+          <button type="button" class="size-btn" data-size="40">40</button>
+          <button type="button" class="size-btn" data-size="42">42</button>
+          <button type="button" class="size-btn" data-size="44">44</button>
+        </div>
         {{ form.size }}
       </div>
 
       <div class="form-step">
         <label for="id_color">3️⃣ Select Color</label>
+        <div class="color-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(100px,1fr));gap:10px;margin-top:8px">
+          <button type="button" class="color-btn" data-color="Black">Black</button>
+          <button type="button" class="color-btn" data-color="Navy">Navy</button>
+          <button type="button" class="color-btn" data-color="Grey">Grey</button>
+          <button type="button" class="color-btn" data-color="White">White</button>
+          <button type="button" class="color-btn" data-color="Beige">Beige</button>
+          <button type="button" class="color-btn" data-color="Brown">Brown</button>
+          <button type="button" class="color-btn" data-color="Blue">Blue</button>
+          <button type="button" class="color-btn" data-color="Red">Red</button>
+          <button type="button" class="color-btn" data-color="Green">Green</button>
+          <button type="button" class="color-btn" data-color="Other">Other</button>
+        </div>
         {{ form.color }}
       </div>
 
@@ -81,14 +122,20 @@
         {{ form.quantity }}
       </div>
 
-      <div class="form-step">
+      <div class="form-step" id="cost-price-step">
         <label for="id_cost_price">5️⃣ Cost Price (per unit)</label>
         {{ form.cost_price }}
       </div>
 
       <div class="form-step">
-        <label for="id_selling_price">6️⃣ Selling Price (optional)</label>
+        <label for="id_selling_price">6️⃣ Selling Price</label>
         {{ form.selling_price }}
+        
+        <!-- Smart Pricing Feedback -->
+        <div id="clothing-pricing-feedback" class="pricing-feedback-container">
+          <span class="pricing-feedback-icon"></span>
+          <span class="pricing-feedback-message"></span>
+        </div>
       </div>
 
       <!-- Barcode Workflow -->
@@ -148,21 +195,21 @@
 
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-  // Hide the actual select element for category
+  // Hide the actual select elements
   const categorySelect = document.getElementById('id_category');
-  if (categorySelect) {
-    categorySelect.style.display = 'none';
-  }
+  const sizeSelect = document.getElementById('id_size');
+  const colorSelect = document.getElementById('id_color');
+  
+  if (categorySelect) categorySelect.style.display = 'none';
+  if (sizeSelect) sizeSelect.style.display = 'none';
+  if (colorSelect) colorSelect.style.display = 'none';
 
   // Category card selection
   const categoryCards = document.querySelectorAll('.category-card');
   categoryCards.forEach(card => {
     card.addEventListener('click', function() {
-      // Remove selected class from all
       categoryCards.forEach(c => c.classList.remove('selected'));
-      // Add to clicked
       this.classList.add('selected');
-      // Update hidden select
       const categoryValue = this.dataset.category;
       if (categorySelect) {
         categorySelect.value = categoryValue;
@@ -173,9 +220,45 @@ document.addEventListener('DOMContentLoaded', function() {
   // Pre-select if value exists
   if (categorySelect && categorySelect.value) {
     const selectedCard = document.querySelector(`.category-card[data-category="${categorySelect.value}"]`);
-    if (selectedCard) {
-      selectedCard.classList.add('selected');
-    }
+    if (selectedCard) selectedCard.classList.add('selected');
+  }
+
+  // Size button selection
+  const sizeButtons = document.querySelectorAll('.size-btn');
+  sizeButtons.forEach(btn => {
+    btn.addEventListener('click', function() {
+      sizeButtons.forEach(b => b.classList.remove('selected'));
+      this.classList.add('selected');
+      const sizeValue = this.dataset.size;
+      if (sizeSelect) {
+        sizeSelect.value = sizeValue;
+      }
+    });
+  });
+
+  // Pre-select size if value exists
+  if (sizeSelect && sizeSelect.value) {
+    const selectedSize = document.querySelector(`.size-btn[data-size="${sizeSelect.value}"]`);
+    if (selectedSize) selectedSize.classList.add('selected');
+  }
+
+  // Color button selection
+  const colorButtons = document.querySelectorAll('.color-btn');
+  colorButtons.forEach(btn => {
+    btn.addEventListener('click', function() {
+      colorButtons.forEach(b => b.classList.remove('selected'));
+      this.classList.add('selected');
+      const colorValue = this.dataset.color;
+      if (colorSelect) {
+        colorSelect.value = colorValue;
+      }
+    });
+  });
+
+  // Pre-select color if value exists
+  if (colorSelect && colorSelect.value) {
+    const selectedColor = document.querySelector(`.color-btn[data-color="${colorSelect.value}"]`);
+    if (selectedColor) selectedColor.classList.add('selected');
   }
 
   // Barcode workflow: show/hide barcode field based on radio selection
@@ -201,6 +284,83 @@ document.addEventListener('DOMContentLoaded', function() {
     radio.addEventListener('change', toggleBarcodeField);
   });
   toggleBarcodeField();
+  
+  // Smart Pricing Feedback
+  (function() {
+    const costPriceInput = document.getElementById('id_cost_price');
+    const sellingPriceInput = document.getElementById('id_selling_price');
+    const feedbackContainer = document.getElementById('clothing-pricing-feedback');
+    const costPriceStep = document.getElementById('cost-price-step');
+    
+    if (!costPriceInput || !sellingPriceInput || !feedbackContainer) return;
+    
+    let costPrice = null;
+    let costPriceEntered = false;
+    
+    // Hide cost price after entry
+    costPriceInput.addEventListener('blur', function() {
+      const value = parseFloat(this.value);
+      if (value && value > 0 && !costPriceEntered) {
+        costPrice = value;
+        costPriceEntered = true;
+        
+        setTimeout(() => {
+          if (costPriceStep) {
+            costPriceStep.classList.add('cost-price-hidden');
+          }
+          sellingPriceInput.focus();
+        }, 500);
+      }
+    });
+    
+    // Real-time feedback
+    function updateFeedback() {
+      const selling = parseFloat(sellingPriceInput.value);
+      
+      if (!costPrice || !selling || selling <= 0) {
+        feedbackContainer.classList.remove('show', 'above-cost', 'below-cost');
+        return;
+      }
+      
+      const margin = ((selling - costPrice) / costPrice) * 100;
+      const icon = feedbackContainer.querySelector('.pricing-feedback-icon');
+      const message = feedbackContainer.querySelector('.pricing-feedback-message');
+      
+      if (selling < costPrice) {
+        feedbackContainer.classList.remove('above-cost');
+        feedbackContainer.classList.add('below-cost', 'show');
+        icon.textContent = '🟡';
+        message.textContent = `This price is below your cost price (MWK ${costPrice.toLocaleString()}). Proceed if intentional.`;
+      } else {
+        feedbackContainer.classList.remove('below-cost');
+        feedbackContainer.classList.add('above-cost', 'show');
+        icon.textContent = '🟢';
+        
+        if (margin < 10) {
+          message.textContent = `Nice 👍 — this is ${margin.toFixed(0)}% above your cost price`;
+        } else if (margin < 25) {
+          message.textContent = `Great choice 💡 — ${margin.toFixed(0)}% margin`;
+        } else if (margin < 50) {
+          message.textContent = `Excellent 🚀 — ${margin.toFixed(0)}% profit margin`;
+        } else {
+          message.textContent = `Amazing deal 🎉 — ${margin.toFixed(0)}% profit margin!`;
+        }
+      }
+    }
+    
+    sellingPriceInput.addEventListener('input', updateFeedback);
+    sellingPriceInput.addEventListener('change', updateFeedback);
+    
+    // Initialize if already set
+    const initialCostPrice = parseFloat(costPriceInput.value);
+    if (initialCostPrice && initialCostPrice > 0) {
+      costPrice = initialCostPrice;
+      costPriceEntered = true;
+      if (costPriceStep) {
+        costPriceStep.classList.add('cost-price-hidden');
+      }
+    }
+  })();
 });
 
 window.addEventListener('pageshow', function(event) {

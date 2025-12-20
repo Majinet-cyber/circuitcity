@@ -112,8 +112,8 @@
       --safe-bottom: max(env(safe-area-inset-bottom), 0px);
       --dock-h: 64px;
 
-      /* Mobile drawer width: 60-70% of viewport with sane limits */
-      --nav-drawer-w: clamp(240px, 70vw, 400px);
+      /* Mobile drawer width: Reduced to ~28-30% of viewport for lighter feel (60% reduction) */
+      --nav-drawer-w: clamp(180px, 28vw, 280px);
     }
 
     @media (prefers-reduced-motion: reduce){
@@ -183,9 +183,9 @@
         transition: transform .26s var(--elevate);
         box-shadow: 0 20px 60px rgba(0,0,0,.35);
 
-        /* 60-70% width with bounds for lighter feel */
+        /* Reduced width (~28-30vw) for lighter, less obstructive feel */
         width: var(--nav-drawer-w) !important;
-        max-width: 90vw !important;
+        max-width: 75vw !important;
 
         /* Solid black, no transparency on mobile */
         background: #0f1115 !important;

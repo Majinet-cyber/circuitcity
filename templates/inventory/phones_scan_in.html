@@ -308,6 +308,52 @@
     transform:translateY(0);
   }
 
+  /* ===== Model Cards ===== */
+  .model-card{
+    background:var(--cc-panel);
+    border:2px solid var(--cc-border);
+    border-radius:12px;
+    padding:16px;
+    cursor:pointer;
+    transition:all 0.2s ease;
+    text-align:left;
+  }
+  .model-card:hover{
+    transform:translateY(-3px);
+    box-shadow:0 8px 20px rgba(2,6,23,0.12);
+    border-color:var(--cc-accent);
+  }
+  .model-card.selected{
+    border-color:var(--cc-accent);
+    background:linear-gradient(135deg,rgba(31,111,235,0.08),rgba(31,111,235,0.03));
+    box-shadow:0 0 0 3px rgba(31,111,235,.15);
+  }
+  .model-card-name{
+    font-size:16px;
+    font-weight:700;
+    color:var(--cc-text);
+    margin:0 0 6px;
+  }
+  .model-card-variant{
+    font-size:13px;
+    color:var(--cc-muted);
+    margin:0;
+  }
+  .model-card-price{
+    font-size:12px;
+    color:#10b981;
+    font-weight:600;
+    margin:8px 0 0;
+  }
+  #model-cards-container:empty::before{
+    content:'Loading models...';
+    display:block;
+    text-align:center;
+    padding:32px;
+    color:var(--cc-muted);
+    font-style:italic;
+  }
+
   /* ===== Mobile Responsive ===== */
   @media (max-width:430px){
     .page{
@@ -334,10 +380,17 @@
     .field > input, .field > select{
       font-size:16px; /* Prevents zoom on iOS */
     }
+    #model-cards-container{
+      grid-template-columns:1fr;
+      gap:10px;
+    }
   }
   @media (max-width:640px){
     .brand-cards{
       grid-template-columns:repeat(auto-fit,minmax(160px,1fr));
+    }
+    #model-cards-container{
+      grid-template-columns:repeat(auto-fill,minmax(160px,1fr));
     }
   }
 </style>
@@ -413,12 +466,11 @@
           <span id="selected-brand-name"></span> Models
         </h3>
 
-        <div class="field">
-          <label>Model & Variant</label>
-          <select name="catalog_product_id" id="model-select" data-cy="scan-model-select" required>
-            <option value="">Loading models...</option>
-          </select>
+        <div id="model-cards-container" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px;margin-bottom:20px;">
+          <!-- Model cards will be dynamically inserted here -->
         </div>
+        
+        <input type="hidden" name="catalog_product_id" id="catalog-product-id-input" required>
 
         <div class="field" style="min-width:0;">
           <label>IMEI (15 digits)</label>
@@ -530,37 +582,72 @@
   });
 
   async function fetchModels(brandKey) {
-    const select = document.getElementById('model-select');
-    select.innerHTML = '<option value="">Loading...</option>';
+    const container = document.getElementById('model-cards-container');
+    container.innerHTML = ''; // Shows "Loading models..." via CSS
     
     try {
       const response = await fetch(`/inventory/api/phone-models/?brand=${encodeURIComponent(brandKey.toUpperCase())}`);
       const data = await response.json();
       
       if (data.models && data.models.length > 0) {
-        select.innerHTML = '<option value="">-- Select a model --</option>';
         data.models.forEach(model => {
-          const option = document.createElement('option');
-          option.value = model.id;
-          option.textContent = model.display_name;
+          const card = document.createElement('div');
+          card.className = 'model-card';
+          card.setAttribute('data-model-id', model.id);
+          card.setAttribute('data-cy', 'model-card');
           
-          // Add data-model-id for stable selection in tests
-          option.setAttribute('data-model-id', model.id);
+          // Parse display name to show model and variant separately
+          const displayParts = model.display_name.split('(');
+          const modelName = displayParts[0].trim();
+          const variantInfo = displayParts[1] ? displayParts[1].replace(')', '').trim() : '';
           
-          // Store cost price as data attribute for potential auto-fill
-          if (model.default_cost_price) {
-            option.dataset.cost = model.default_cost_price;
+          let cardHTML = `
+            <div class="model-card-name">${modelName}</div>
+          `;
+          
+          if (variantInfo) {
+            cardHTML += `<div class="model-card-variant">${variantInfo}</div>`;
           }
           
-          select.appendChild(option);
+          if (model.default_cost_price) {
+            cardHTML += `<div class="model-card-price">Cost: MWK ${parseFloat(model.default_cost_price).toFixed(2)}</div>`;
+          }
+          
+          card.innerHTML = cardHTML;
+          
+          // Add click handler
+          card.addEventListener('click', function() {
+            selectModel(model.id, this);
+          });
+          
+          container.appendChild(card);
         });
       } else {
-        select.innerHTML = '<option value="">No models found for this brand</option>';
+        container.innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:32px;color:var(--cc-muted);">No models found for this brand</div>';
       }
     } catch (error) {
       console.error('Failed to fetch models:', error);
-      select.innerHTML = '<option value="">Error loading models</option>';
+      container.innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:32px;color:#ef4444;">Error loading models</div>';
     }
+  }
+  
+  function selectModel(modelId, cardElement) {
+    // Remove selected class from all model cards
+    document.querySelectorAll('.model-card').forEach(card => {
+      card.classList.remove('selected');
+    });
+    
+    // Add selected class to clicked card
+    cardElement.classList.add('selected');
+    
+    // Update hidden input
+    document.getElementById('catalog-product-id-input').value = modelId;
+    
+    // Fetch available IMEIs for this model
+    fetchAvailableImeis(modelId);
+    
+    // Scroll to IMEI input
+    document.getElementById('imei-input').scrollIntoView({ behavior: 'smooth', block: 'center' });
   }
 
   // IMEI input: auto-format as digits only + live counter
@@ -591,17 +678,6 @@
     } else {
       submitButton.disabled = true;
     }
-  });
-
-  // Model select: fetch available IMEIs when model changes
-  const modelSelect = document.getElementById('model-select');
-  modelSelect.addEventListener('change', function() {
-    const productId = this.value;
-    if (!productId) {
-      document.getElementById('imei-list-container').innerHTML = '<div class="imei-empty">Select a model to see available IMEIs</div>';
-      return;
-    }
-    fetchAvailableImeis(productId);
   });
 
   async function fetchAvailableImeis(productId) {
