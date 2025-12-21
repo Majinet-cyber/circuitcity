@@ -36,6 +36,7 @@ class LiquorUnitType(models.TextChoices):
     """Unit types for liquor sales"""
     BOTTLE = "bottle", "Bottle"
     SHOT = "shot", "Shot"
+    GLASS = "glass", "Glass"
 
 
 class LiquorSaleType(models.TextChoices):
@@ -202,6 +203,26 @@ class LiquorSale(models.Model):
         help_text="Payment method used for this sale"
     )
     
+    # Payment Mix (for split payments across multiple methods)
+    cash_amount = models.DecimalField(
+        max_digits=12, 
+        decimal_places=2, 
+        default=Decimal("0.00"),
+        help_text="Amount paid in cash"
+    )
+    bank_amount = models.DecimalField(
+        max_digits=12, 
+        decimal_places=2, 
+        default=Decimal("0.00"),
+        help_text="Amount paid via bank transfer"
+    )
+    mobile_money_amount = models.DecimalField(
+        max_digits=12, 
+        decimal_places=2, 
+        default=Decimal("0.00"),
+        help_text="Amount paid via mobile money"
+    )
+    
     # Metadata
     sold_by = models.ForeignKey(User, null=True, blank=True, on_delete=models.SET_NULL, related_name="liquor_sales_made")
     sold_at = models.DateTimeField(default=timezone.now, db_index=True)
@@ -238,6 +259,22 @@ class LiquorSale(models.Model):
         # Sync is_credit and is_free with sale_type
         self.is_credit = self.sale_type == LiquorSaleType.CREDIT
         self.is_free = self.sale_type == LiquorSaleType.FREE
+        
+        # Handle payment mix: if all amounts are 0, default to cash = total_price
+        payment_mix_total = self.cash_amount + self.bank_amount + self.mobile_money_amount
+        if payment_mix_total == 0 and self.total_price > 0:
+            # Default: entire amount is cash
+            self.cash_amount = self.total_price
+            self.payment_method = PaymentMethod.CASH
+        elif payment_mix_total > 0:
+            # Set payment_method based on which amount is largest (or "MIXED" if multiple)
+            if self.cash_amount > 0 and self.bank_amount == 0 and self.mobile_money_amount == 0:
+                self.payment_method = PaymentMethod.CASH
+            elif self.bank_amount > 0 and self.cash_amount == 0 and self.mobile_money_amount == 0:
+                self.payment_method = PaymentMethod.BANK
+            elif self.mobile_money_amount > 0 and self.cash_amount == 0 and self.bank_amount == 0:
+                self.payment_method = PaymentMethod.MOBILE_MONEY
+            # If mixed, keep current payment_method or default to CASH
         
         super().save(*args, **kwargs)
 

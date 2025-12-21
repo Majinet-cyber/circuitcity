@@ -231,11 +231,29 @@ class MerchProduct(models.Model):
         default="", 
         help_text="Product category (e.g., liquor: beer/cider/spirits; pharmacy: medicine/cosmetics)"
     )
+    
+    # Liquor: Crate handling (beer, cider, wine)
+    bottles_per_crate = models.PositiveIntegerField(
+        default=20, 
+        help_text="Number of bottles in a crate (default 20 for Malawi beers)"
+    )
+    supports_crates = models.BooleanField(
+        default=False, 
+        help_text="True for beer/cider/wine; False for spirits"
+    )
+    
+    # Liquor: Shot handling (spirits, whiskey)
     has_shots = models.BooleanField(default=False)
     shots_per_bottle = models.PositiveIntegerField(null=True, blank=True)
     barman_shots_reserved = models.PositiveIntegerField(default=2, help_text="Shots reserved for bartender (typically 2)")
     price_per_bottle = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True, help_text="Price for a full bottle")
     price_per_shot = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True, help_text="Price per individual shot")
+    
+    # Liquor: Glass handling (wine)
+    has_glasses = models.BooleanField(default=False, help_text="True for wine products sold by glass")
+    glasses_per_bottle = models.PositiveIntegerField(null=True, blank=True, help_text="Number of glasses per bottle (typically 5 for wine)")
+    price_per_glass = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True, help_text="Price per individual glass (for wine)")
+    cost_per_glass = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True, help_text="Cost price per glass")
     
     # Cost price for profit calculation (nullable for backwards compatibility)
     cost_per_bottle = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True, help_text="Cost price for a full bottle")
@@ -306,21 +324,25 @@ class MerchProduct(models.Model):
         return 0
     
     def get_cost_for_unit(self, unit_type: str):
-        """Get cost price based on unit type (bottle or shot)"""
+        """Get cost price based on unit type (bottle, shot, or glass)"""
         from decimal import Decimal
         if unit_type == "bottle":
             return self.cost_per_bottle or Decimal("0.00")
         elif unit_type == "shot":
             return self.cost_per_shot or Decimal("0.00")
+        elif unit_type == "glass":
+            return self.cost_per_glass or Decimal("0.00")
         return Decimal("0.00")
     
     def get_price_for_unit(self, unit_type: str):
-        """Get selling price based on unit type (bottle or shot)"""
+        """Get selling price based on unit type (bottle, shot, or glass)"""
         from decimal import Decimal
         if unit_type == "bottle":
             return self.price_per_bottle or Decimal("0.00")
         elif unit_type == "shot":
             return self.price_per_shot or Decimal("0.00")
+        elif unit_type == "glass":
+            return self.price_per_glass or Decimal("0.00")
         return Decimal("0.00")
 
     def clean(self):

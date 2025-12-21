@@ -130,11 +130,16 @@ def sell_liquor(request):
         try:
             product_id = int(request.POST.get("product_id", 0))
             quantity = int(request.POST.get("quantity", 1))
-            mode = request.POST.get("mode", "bottle")  # "bottle" or "shot"
+            mode = request.POST.get("mode", "bottle")  # "bottle", "shot", or "glass"
             sale_type = request.POST.get("sale_type", "cash")  # "cash" or "credit"
             customer_name = request.POST.get("customer_name", "").strip()
             customer_phone = request.POST.get("customer_phone", "").strip()
             notes = request.POST.get("notes", "").strip()
+            
+            # Payment mix amounts (if provided)
+            cash_amount = Decimal(request.POST.get("cash_amount", "0") or "0")
+            bank_amount = Decimal(request.POST.get("bank_amount", "0") or "0")
+            mobile_money_amount = Decimal(request.POST.get("mobile_money_amount", "0") or "0")
             
             product = MerchProduct.objects.get(
                 pk=product_id,
@@ -149,11 +154,21 @@ def sell_liquor(request):
                 return redirect("liquor:sell")
             
             # Map mode to unit
-            unit = LiquorUnitType.SHOT if mode == "shot" else LiquorUnitType.BOTTLE
+            if mode == "shot":
+                unit = LiquorUnitType.SHOT
+            elif mode == "glass":
+                unit = LiquorUnitType.GLASS
+            else:
+                unit = LiquorUnitType.BOTTLE
             
             # Validate shot sales
             if mode == "shot" and not product.has_shots:
                 messages.error(request, f"{product.name} does not support shot sales.")
+                return redirect("liquor:sell")
+            
+            # Validate glass sales
+            if mode == "glass" and not product.has_glasses:
+                messages.error(request, f"{product.name} does not support glass sales.")
                 return redirect("liquor:sell")
             
             # CRITICAL: Check stock availability before allowing sale
@@ -170,8 +185,13 @@ def sell_liquor(request):
                 )
                 return redirect("liquor:sell")
             
-            # Get price
-            unit_price = product.price_per_shot if mode == "shot" else product.price_per_bottle
+            # Get price based on mode
+            if mode == "shot":
+                unit_price = product.price_per_shot
+            elif mode == "glass":
+                unit_price = product.price_per_glass
+            else:
+                unit_price = product.price_per_bottle
             
             with transaction.atomic():
                 # Calculate cost for profit tracking
@@ -181,11 +201,20 @@ def sell_liquor(request):
                 # Calculate total price
                 total = Decimal(quantity) * unit_price
                 
+                # Validate payment mix (if used)
+                payment_mix_total = cash_amount + bank_amount + mobile_money_amount
+                if payment_mix_total > 0 and payment_mix_total != total:
+                    messages.error(
+                        request,
+                        f"❌ Payment mix total (K{payment_mix_total}) must equal sale total (K{total})"
+                    )
+                    return redirect("liquor:sell")
+                
                 # Determine sale type
                 is_credit = sale_type == "credit"
                 liquor_sale_type = LiquorSaleType.CREDIT if is_credit else LiquorSaleType.SALE
                 
-                # Create sale
+                # Create sale with payment mix
                 sale = LiquorSale.objects.create(
                     business=business,
                     product=product,
@@ -199,7 +228,10 @@ def sell_liquor(request):
                     sale_type=liquor_sale_type,
                     is_credit=is_credit,
                     sold_by=request.user,
-                    notes=notes
+                    notes=notes,
+                    cash_amount=cash_amount,
+                    bank_amount=bank_amount,
+                    mobile_money_amount=mobile_money_amount
                 )
                 
                 # CRITICAL: Reduce stock after sale (bottle sales only, even for credit)

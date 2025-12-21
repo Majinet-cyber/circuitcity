@@ -325,17 +325,17 @@
 }
 
 /* =====================================================================
-   9. HEADERS — COMPACT ON MOBILE
+   9. HEADERS — COMPACT ON MOBILE (WITH CENTERED CONTENT EXCEPTION)
    ===================================================================== */
 
 /**
  * Page headers should also respect mobile gutters
+ * BUT preserve centered alignment for hero cards and action buttons
  */
 
 @media (max-width: 576px) {
   .cc-header,
-  .page-header,
-  header.vertical-hero {
+  .page-header {
     padding-left: 0 !important;
     padding-right: 0 !important;
     margin-left: 0;
@@ -347,10 +347,106 @@
     padding-left: 0;
     padding-right: 0;
   }
+  
+  /* EXCEPTION: Vertical hero cards must keep internal padding for centered layout */
+  header.vertical-hero {
+    padding-left: 28px !important;  /* Restore original padding */
+    padding-right: 28px !important; /* Restore original padding */
+    margin-left: 0;
+    margin-right: 0;
+  }
+  
+  /* EXCEPTION: Hero actions (buttons) must stay centered */
+  .hero-actions {
+    text-align: center !important;
+    justify-content: center !important;
+    align-items: center !important;
+  }
+  
+  /* EXCEPTION: Business name/location in hero */
+  .vertical-hero h1,
+  .vertical-hero p,
+  .vertical-hero .eyebrow {
+    text-align: center !important;
+  }
 }
 
 /* =====================================================================
-   10. VISUAL PROOF — LANDING PAGE MATCH
+   10. HERO CARDS & DASHBOARD HEADERS — PRESERVE CENTERED LAYOUT
+   ===================================================================== */
+
+/**
+ * CRITICAL: Hero cards across all verticals must maintain centered alignment
+ * These are the prominent cards showing business name, location, and primary actions
+ * 
+ * Affected verticals: liquor, clothing, pharmacy, phones, gym, etc.
+ */
+
+@media (max-width: 576px) {
+  /* Hero card wrapper - restore internal padding for centering */
+  .vertical-hero,
+  header.vertical-hero,
+  .hero-card,
+  .dashboard-hero {
+    padding-left: 24px !important;
+    padding-right: 24px !important;
+    text-align: center;
+  }
+  
+  /* Hero content - force centered text alignment */
+  .vertical-hero h1,
+  .vertical-hero h2,
+  .vertical-hero p,
+  .vertical-hero .eyebrow,
+  .hero-card h1,
+  .hero-card h2,
+  .hero-card p,
+  .dashboard-hero h1,
+  .dashboard-hero h2,
+  .dashboard-hero p {
+    text-align: center !important;
+    margin-left: auto !important;
+    margin-right: auto !important;
+  }
+  
+  /* Hero actions (buttons) - force centered layout */
+  .hero-actions,
+  .vertical-hero .hero-actions,
+  .hero-card .hero-actions,
+  .dashboard-hero .hero-actions {
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 12px !important;
+    align-items: center !important;
+    justify-content: center !important;
+    text-align: center !important;
+    width: 100% !important;
+  }
+  
+  /* Hero action buttons - centered and full width */
+  .hero-actions a,
+  .hero-actions button,
+  .hero-actions .btn {
+    text-align: center !important;
+    justify-content: center !important;
+    width: 100%;
+    max-width: 300px;
+    margin-left: auto;
+    margin-right: auto;
+  }
+  
+  /* Scan In / Roll Back buttons - centered */
+  .hero-actions .primary,
+  .hero-actions .ghost,
+  .hero-actions .btn-primary,
+  .hero-actions .btn-secondary {
+    text-align: center !important;
+    justify-content: center !important;
+  }
+}
+
+/* =====================================================================
+   11. VISUAL PROOF — LANDING PAGE MATCH
    ===================================================================== */
 
 /**
@@ -379,6 +475,19 @@
 
 /* =====================================================================
    END OF GLOBAL MOBILE GUTTER SYSTEM
+   
+   SECTIONS:
+   1. CSS Variables (Single Source of Truth)
+   2. App Content Wrapper — Mobile Gutter Application
+   3. Safety — Modals, Offcanvas, Overlays (NOT affected)
+   4. Tablet & Desktop — NO changes
+   5. No Horizontal Scroll Guarantee
+   6. Card Internal Padding — Premium Feel
+   7. Grid Systems — Mobile Optimization
+   8. Section Wrappers — Neutralize Extra Padding
+   9. Headers — Compact on Mobile (With Centered Content Exception)
+   10. Hero Cards & Dashboard Headers — Preserve Centered Layout
+   11. Visual Proof — Landing Page Match
    ===================================================================== */
 
 /**

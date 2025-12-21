@@ -364,6 +364,26 @@ class LiquorProductForm(forms.Form):
         max_digits=12, decimal_places=2, required=False,
         widget=forms.NumberInput(attrs={"class": "form-control input", "step": "0.01", "min": "0", "placeholder": "0.00"})
     )
+    
+    # Wine glass pricing
+    has_glasses = forms.BooleanField(
+        required=False,
+        widget=forms.CheckboxInput(attrs={"class": "form-check-input", "id": "id_has_glasses"}),
+        label="Sell by glass (wine)"
+    )
+    glasses_per_bottle = forms.IntegerField(
+        min_value=1, required=False,
+        widget=forms.NumberInput(attrs={"class": "form-control input", "placeholder": "e.g. 5", "min": "1"})
+    )
+    price_glass = forms.DecimalField(
+        max_digits=12, decimal_places=2, required=False,
+        widget=forms.NumberInput(attrs={"class": "form-control input", "step": "0.01", "min": "0", "placeholder": "0.00"})
+    )
+    cost_per_glass = forms.DecimalField(
+        max_digits=12, decimal_places=2, required=False,
+        widget=forms.NumberInput(attrs={"class": "form-control input", "step": "0.01", "min": "0", "placeholder": "0.00"})
+    )
+    
     qty_bottles = forms.IntegerField(
         min_value=0, required=False,
         widget=forms.NumberInput(attrs={"class": "form-control input", "min": "0", "placeholder": "0"})
@@ -390,12 +410,23 @@ class LiquorProductForm(forms.Form):
         shots_per_bottle = cleaned_data.get("shots_per_bottle")
         price_shot = cleaned_data.get("price_shot")
         
+        has_glasses = cleaned_data.get("has_glasses")
+        glasses_per_bottle = cleaned_data.get("glasses_per_bottle")
+        price_glass = cleaned_data.get("price_glass")
+        
         # If has_shots is enabled, require shots_per_bottle and price_shot
         if has_shots:
             if not shots_per_bottle:
                 raise forms.ValidationError("Shots per bottle is required when shot sales are enabled.")
             if not price_shot:
                 raise forms.ValidationError("Price per shot is required when shot sales are enabled.")
+        
+        # If has_glasses is enabled, require glasses_per_bottle and price_glass
+        if has_glasses:
+            if not glasses_per_bottle:
+                raise forms.ValidationError("Glasses per bottle is required when glass sales are enabled.")
+            if not price_glass:
+                raise forms.ValidationError("Price per glass is required when glass sales are enabled.")
         
         return cleaned_data
 
@@ -428,10 +459,23 @@ def _inflate_liquor(instance: Product, data: dict):
         _assign_if_has(instance, "price_per_shot", price_shot)
         _assign_if_has(instance, "price_shot", price_shot)
     
+    # Wine glass configuration and pricing
+    _assign_if_has(instance, "has_glasses", data.get("has_glasses") or False)
+    _assign_if_has(instance, "glasses_per_bottle", data.get("glasses_per_bottle"))
+    
+    price_glass = data.get("price_glass")
+    if price_glass is not None:
+        _assign_if_has(instance, "price_per_glass", price_glass)
+        _assign_if_has(instance, "price_glass", price_glass)
+    
     # Cost prices for profit tracking
     cost_per_bottle = data.get("cost_per_bottle")
     if cost_per_bottle is not None:
         _assign_if_has(instance, "cost_per_bottle", cost_per_bottle)
+    
+    cost_per_glass = data.get("cost_per_glass")
+    if cost_per_glass is not None:
+        _assign_if_has(instance, "cost_per_glass", cost_per_glass)
     
     # Smart stock targets
     target_bottles = data.get("target_bottles")

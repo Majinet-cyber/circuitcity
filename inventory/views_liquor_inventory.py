@@ -197,43 +197,79 @@ def liquor_scan_in(request):
                 is_active=True
             )
             
+            # VALIDATION: Spirits cannot use crates
+            if unit_type == "crate" and product.category in ["spirits", "whiskey"]:
+                messages.error(request, "❌ Spirits cannot be stocked in crates. Please use bottles.")
+                return redirect("liquor:scan_in")
+            
             # Calculate actual bottles to add
             bottles_to_add = quantity
+            bottles_per_crate = product.bottles_per_crate or 20
+            
             if unit_type == "crate":
-                # MALAWI STANDARD: Default 20 bottles per crate (Kuche Kuche, Carlsberg, etc.)
-                bottles_per_crate = getattr(product, 'bottles_per_crate', 20)
                 bottles_to_add = quantity * bottles_per_crate
             
+            # Calculate cost per bottle (always store in per-bottle terms)
+            cost_per_bottle = cost_per_unit
+            if unit_type == "crate" and cost_per_unit > 0:
+                cost_per_bottle = cost_per_unit / Decimal(bottles_per_crate)
+            
             with transaction.atomic():
-                # Update product stock
+                # Update product stock (in bottles)
                 product.quantity_in_stock = (product.quantity_in_stock or 0) + bottles_to_add
                 
-                # Update cost price if provided
-                if cost_per_unit > 0:
-                    # MALAWI STANDARD: Default 20 bottles per crate
-                    bottles_per_crate = getattr(product, 'bottles_per_crate', 20)
-                    if unit_type == "crate" and bottles_per_crate:
-                        product.cost_per_bottle = cost_per_unit / bottles_per_crate
-                    else:
-                        product.cost_per_bottle = cost_per_unit
+                # Store cost per bottle (single source of truth)
+                if cost_per_bottle > 0:
+                    product.cost_per_bottle = cost_per_bottle
                 
-                # Optional: Update selling price if provided
+                # Update selling price per bottle (ALWAYS per bottle, never per crate)
                 selling_price_raw = request.POST.get("selling_price", "").strip()
                 if selling_price_raw:
                     try:
                         selling_price = Decimal(selling_price_raw)
                         if selling_price > 0:
                             product.price_per_bottle = selling_price
-                    except (ValueError, InvalidOperation):
+                    except (ValueError, Exception):
+                        pass
+                
+                # Handle spirits shots pricing
+                shots_per_bottle_raw = request.POST.get("shots_per_bottle", "").strip()
+                price_per_shot_raw = request.POST.get("price_per_shot", "").strip()
+                
+                if product.category in ["spirits", "whiskey"] and shots_per_bottle_raw and price_per_shot_raw:
+                    try:
+                        shots_per_bottle = int(shots_per_bottle_raw)
+                        price_per_shot = Decimal(price_per_shot_raw)
+                        
+                        if shots_per_bottle > 0 and price_per_shot > 0:
+                            product.has_shots = True
+                            product.shots_per_bottle = shots_per_bottle
+                            product.price_per_shot = price_per_shot
+                            
+                            # Compute cost per shot
+                            if cost_per_bottle > 0:
+                                product.cost_per_shot = cost_per_bottle / Decimal(shots_per_bottle)
+                    except (ValueError, Exception):
                         pass
                 
                 product.save()
             
-            # UX SAFETY: Redirect with success param (clean state, no overlay confusion)
-            return redirect("liquor:scan_in") + "?added=1"
+            # Build success message
+            if unit_type == "crate":
+                success_msg = f"✅ Added: {quantity} crate{'s' if quantity != 1 else ''} ({bottles_to_add} bottles) — {product.name}"
+            else:
+                success_msg = f"✅ Added: {bottles_to_add} bottle{'s' if bottles_to_add != 1 else ''} — {product.name}"
+            
+            # Add shots info if applicable
+            if product.has_shots and product.shots_per_bottle:
+                total_shots = bottles_to_add * product.shots_per_bottle
+                success_msg += f" ({total_shots} shots)"
+            
+            messages.success(request, success_msg)
+            return redirect("liquor:scan_in")
             
         except (ValueError, MerchProduct.DoesNotExist, KeyError) as e:
-            messages.error(request, f"Stock-in failed: {e}")
+            messages.error(request, f"❌ Stock-in failed: {e}")
             return redirect("liquor:scan_in")
     
     # GET: Build category-grouped products
@@ -252,7 +288,11 @@ def liquor_scan_in(request):
                 'id': p.id,
                 'name': p.name,
                 'quantity_in_stock': p.quantity_in_stock or 0,
-                'bottles_per_crate': getattr(p, 'bottles_per_crate', 20),  # MALAWI STANDARD: 20 bottles per crate
+                'bottles_per_crate': p.bottles_per_crate or 20,  # MALAWI STANDARD: 20 bottles per crate
+                'supports_crates': p.supports_crates,
+                'has_shots': p.has_shots,
+                'shots_per_bottle': p.shots_per_bottle,
+                'category': p.category,
             })
     
     # Build categories list in order

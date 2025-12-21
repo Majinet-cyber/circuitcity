@@ -401,6 +401,10 @@
         <div class="price-panel" id="cost-price-panel">
             <label for="cost-price">Cost Price (MWK)</label>
             <input type="number" id="cost-price" step="0.01" min="0" placeholder="0.00">
+            <!-- Helper text showing computed per-bottle cost for crates -->
+            <div id="cost-helper-text" style="margin-top:12px;padding:12px;background:#f0f9ff;border:2px solid #38bdf8;border-radius:8px;color:#075985;font-size:0.95rem;font-weight:600;display:none;">
+                <i class="bi bi-calculator"></i> <span id="cost-helper-content"></span>
+            </div>
         </div>
     </div>
     
@@ -436,9 +440,11 @@
 
 let selectedCategory = null;
 let selectedProduct = null;
+let selectedProductData = null;  // Store full product data
 let selectedUnit = null;
 let selectedQuantity = null;
 let costPrice = null;
+let costPricePerBottle = null;  // Computed cost per bottle (for crates)
 let sellingPrice = null;
 let costPriceEntered = false;
 
@@ -474,11 +480,25 @@ function selectCategory(category) {
 }
 
 function selectProduct(productId, productName) {
+    // Find full product data
+    const products = productsData[selectedCategory] || [];
+    selectedProductData = products.find(p => p.id === productId);
     selectedProduct = { id: productId, name: productName };
     
     // Update UI
     document.querySelectorAll('.product-item').forEach(item => item.classList.remove('selected'));
     document.querySelector(`.product-item[data-product-id="${productId}"]`).classList.add('selected');
+    
+    // Hide/show crate option based on category
+    const crateBtn = document.querySelector('.unit-btn[data-unit="crate"]');
+    if (crateBtn) {
+        // Spirits and whiskey cannot use crates
+        if (selectedCategory === 'spirits' || selectedCategory === 'whiskey') {
+            crateBtn.style.display = 'none';
+        } else {
+            crateBtn.style.display = 'block';
+        }
+    }
     
     // Show step 3
     document.getElementById('step-3').classList.remove('hidden');
@@ -493,8 +513,9 @@ function selectUnit(unit) {
     document.querySelector(`.unit-btn[data-unit="${unit}"]`).classList.add('selected');
     
     // Update labels in step 5 and 6
+    // CRITICAL FIX: Step 5 shows cost per crate/bottle, but Step 6 ALWAYS shows selling price per BOTTLE
     document.getElementById('unit-label').textContent = unit === 'crate' ? 'Crate' : 'Bottle';
-    document.getElementById('selling-unit-label').textContent = unit === 'crate' ? 'Crate' : 'Bottle';
+    document.getElementById('selling-unit-label').textContent = 'Bottle';  // ALWAYS per bottle!
     
     // Show step 4
     document.getElementById('step-4').classList.remove('hidden');
@@ -544,11 +565,38 @@ function setupCostPriceHandler() {
     const costPriceInput = document.getElementById('cost-price');
     if (!costPriceInput || costPriceEntered) return;
     
+    const costHelperText = document.getElementById('cost-helper-text');
+    const costHelperContent = document.getElementById('cost-helper-content');
+    
+    // Show helper text as user types (for crates)
+    costPriceInput.addEventListener('input', function() {
+        const value = parseFloat(this.value);
+        if (selectedUnit === 'crate' && value && value > 0 && selectedProductData) {
+            const bottlesPerCrate = selectedProductData.bottles_per_crate || 20;
+            const costPerBottle = (value / bottlesPerCrate).toFixed(2);
+            costHelperContent.textContent = `≈ MWK ${costPerBottle} per bottle (${bottlesPerCrate} bottles per crate)`;
+            costHelperText.style.display = 'block';
+            costPricePerBottle = parseFloat(costPerBottle);
+        } else {
+            costHelperText.style.display = 'none';
+            costPricePerBottle = value;
+        }
+    });
+    
     // When cost price is entered, hide it and show selling price
     costPriceInput.addEventListener('blur', function() {
         const value = parseFloat(this.value);
         if (value && value > 0) {
             costPrice = value;
+            
+            // Calculate cost per bottle for comparison
+            if (selectedUnit === 'crate' && selectedProductData) {
+                const bottlesPerCrate = selectedProductData.bottles_per_crate || 20;
+                costPricePerBottle = value / bottlesPerCrate;
+            } else {
+                costPricePerBottle = value;
+            }
+            
             costPriceEntered = true;
             
             // Hide cost price panel
@@ -578,13 +626,16 @@ function setupSmartPricingFeedback() {
     function updateFeedback() {
         const selling = parseFloat(sellingPriceInput.value);
         
-        if (!costPrice || !selling || selling <= 0) {
+        // CRITICAL FIX: Compare bottle-to-bottle prices (not crate vs bottle)
+        const costToCompare = costPricePerBottle || costPrice;
+        
+        if (!costToCompare || !selling || selling <= 0) {
             feedbackContainer.classList.remove('show', 'above-cost', 'below-cost');
             return;
         }
         
-        // Use PricingHelpers for consistent calculation
-        const calc = PricingHelpers.calculate(costPrice, selling);
+        // Use PricingHelpers for consistent calculation (bottle vs bottle)
+        const calc = PricingHelpers.calculate(costToCompare, selling);
         const feedback = PricingHelpers.getFeedback(calc);
         
         const icon = feedbackContainer.querySelector('.pricing-feedback-icon');

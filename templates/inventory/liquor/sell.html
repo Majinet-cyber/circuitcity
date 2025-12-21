@@ -243,8 +243,10 @@
                          data-product-id="{{ p.id }}"
                          data-product-name="{{ p.name }}"
                          data-has-shots="{{ p.has_shots|yesno:'true,false' }}"
+                         data-has-glasses="{{ p.has_glasses|yesno:'true,false' }}"
                          data-bottle-price="{{ p.price_per_bottle }}"
                          data-shot-price="{{ p.price_per_shot|default:'0' }}"
+                         data-glass-price="{{ p.price_per_glass|default:'0' }}"
                          data-stock="{{ p.current_stock }}"
                          data-in-stock="{{ p.is_in_stock|yesno:'true,false' }}"
                          data-category="{{ cat }}">
@@ -299,15 +301,18 @@
                     <input type="hidden" name="product_id" id="input-product-id">
                     <input type="hidden" name="mode" id="input-mode" value="bottle">
                     
-                    <!-- Shot/Bottle Toggle (for shot-enabled products) -->
+                    <!-- Bottle/Shot/Glass Toggle (for products with extra units) -->
                     <div id="mode-toggle-container" class="mb-3 hidden">
                         <label class="form-label">Sell as:</label>
-                        <div class="btn-group w-100" role="group">
+                        <div class="btn-group w-100" role="group" id="mode-buttons">
                             <input type="radio" class="btn-check" name="mode-radio" id="mode-bottle" value="bottle" checked>
                             <label class="btn btn-outline-light" for="mode-bottle">Bottles</label>
                             
                             <input type="radio" class="btn-check" name="mode-radio" id="mode-shot" value="shot">
                             <label class="btn btn-outline-light" for="mode-shot">Shots</label>
+                            
+                            <input type="radio" class="btn-check" name="mode-radio" id="mode-glass" value="glass">
+                            <label class="btn btn-outline-light" for="mode-glass">Glasses</label>
                         </div>
                     </div>
                     
@@ -330,6 +335,59 @@
                             <option value="cash">Cash Sale</option>
                             <option value="credit">Credit Sale</option>
                         </select>
+                    </div>
+                    
+                    <!-- Payment Mix (only for cash sales) -->
+                    <div id="payment-mix-container" class="mb-3">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <label class="form-label mb-0">Payment Mix</label>
+                            <button type="button" class="btn btn-sm btn-outline-light" id="toggle-payment-mix">
+                                <i class="bi bi-plus-circle"></i> Split Payment
+                            </button>
+                        </div>
+                        
+                        <div id="payment-mix-inputs" class="hidden">
+                            <div class="mb-2">
+                                <label class="form-label small">Cash (MWK)</label>
+                                <input type="number" 
+                                       class="form-control form-control-sm" 
+                                       name="cash_amount" 
+                                       id="input-cash-amount" 
+                                       min="0" 
+                                       step="0.01"
+                                       value="0">
+                            </div>
+                            <div class="mb-2">
+                                <label class="form-label small">Bank Transfer (MWK)</label>
+                                <input type="number" 
+                                       class="form-control form-control-sm" 
+                                       name="bank_amount" 
+                                       id="input-bank-amount" 
+                                       min="0" 
+                                       step="0.01"
+                                       value="0">
+                            </div>
+                            <div class="mb-2">
+                                <label class="form-label small">Mobile Money (MWK)</label>
+                                <input type="number" 
+                                       class="form-control form-control-sm" 
+                                       name="mobile_money_amount" 
+                                       id="input-mobile-money-amount" 
+                                       min="0" 
+                                       step="0.01"
+                                       value="0">
+                            </div>
+                            <div class="alert alert-info py-2 px-3 small" id="payment-mix-summary">
+                                <div class="d-flex justify-content-between">
+                                    <span>Total Paid:</span>
+                                    <strong id="payment-mix-total">MK 0</strong>
+                                </div>
+                                <div class="d-flex justify-content-between mt-1">
+                                    <span>Remaining:</span>
+                                    <strong id="payment-mix-remaining">MK 0</strong>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                     
                     <!-- Credit Customer Details (hidden by default) -->
@@ -430,6 +488,9 @@
     const inputQuantity = document.getElementById('input-quantity');
     const inputSaleType = document.getElementById('input-sale-type');
     const inputCustomerName = document.getElementById('input-customer-name');
+    const inputCashAmount = document.getElementById('input-cash-amount');
+    const inputBankAmount = document.getElementById('input-bank-amount');
+    const inputMobileMoneyAmount = document.getElementById('input-mobile-money-amount');
     
     // Display elements
     const confirmProductName = document.getElementById('confirm-product-name');
@@ -437,10 +498,16 @@
     const modeToggleContainer = document.getElementById('mode-toggle-container');
     const modeBottleRadio = document.getElementById('mode-bottle');
     const modeShotRadio = document.getElementById('mode-shot');
+    const modeGlassRadio = document.getElementById('mode-glass');
     const quantityLabel = document.getElementById('quantity-label');
     const estimatedTotal = document.getElementById('estimated-total');
     const creditDetailsContainer = document.getElementById('credit-details-container');
     const submitText = document.getElementById('submit-text');
+    const paymentMixContainer = document.getElementById('payment-mix-container');
+    const paymentMixInputs = document.getElementById('payment-mix-inputs');
+    const togglePaymentMixBtn = document.getElementById('toggle-payment-mix');
+    const paymentMixTotal = document.getElementById('payment-mix-total');
+    const paymentMixRemaining = document.getElementById('payment-mix-remaining');
     
     // State
     let currentProduct = null;
@@ -483,8 +550,10 @@
                 name: this.dataset.productName,
                 category: this.dataset.category,
                 hasShots: this.dataset.hasShots === 'true',
+                hasGlasses: this.dataset.hasGlasses === 'true',
                 bottlePrice: parseFloat(this.dataset.bottlePrice),
                 shotPrice: parseFloat(this.dataset.shotPrice || 0),
+                glassPrice: parseFloat(this.dataset.glassPrice || 0),
                 stock: stock
             };
             
@@ -499,7 +568,7 @@
     });
     
     // Mode toggle
-    if (modeBottleRadio && modeShotRadio) {
+    if (modeBottleRadio) {
         modeBottleRadio.addEventListener('change', function() {
             if (this.checked) {
                 inputMode.value = 'bottle';
@@ -507,11 +576,23 @@
                 updateTotal();
             }
         });
-        
+    }
+    
+    if (modeShotRadio) {
         modeShotRadio.addEventListener('change', function() {
             if (this.checked) {
                 inputMode.value = 'shot';
                 quantityLabel.textContent = 'Shots';
+                updateTotal();
+            }
+        });
+    }
+    
+    if (modeGlassRadio) {
+        modeGlassRadio.addEventListener('change', function() {
+            if (this.checked) {
+                inputMode.value = 'glass';
+                quantityLabel.textContent = 'Glasses';
                 updateTotal();
             }
         });
@@ -524,12 +605,37 @@
     inputSaleType.addEventListener('change', function() {
         if (this.value === 'credit') {
             creditDetailsContainer.classList.remove('hidden');
+            paymentMixContainer.classList.add('hidden');
             submitText.textContent = 'Record Credit Sale';
         } else {
             creditDetailsContainer.classList.add('hidden');
+            paymentMixContainer.classList.remove('hidden');
             submitText.textContent = 'Mark as Sold';
         }
     });
+    
+    // Payment mix toggle
+    if (togglePaymentMixBtn) {
+        togglePaymentMixBtn.addEventListener('click', function() {
+            if (paymentMixInputs.classList.contains('hidden')) {
+                paymentMixInputs.classList.remove('hidden');
+                this.innerHTML = '<i class="bi bi-dash-circle"></i> Simple Payment';
+            } else {
+                paymentMixInputs.classList.add('hidden');
+                this.innerHTML = '<i class="bi bi-plus-circle"></i> Split Payment';
+                // Reset payment mix inputs
+                if (inputCashAmount) inputCashAmount.value = '0';
+                if (inputBankAmount) inputBankAmount.value = '0';
+                if (inputMobileMoneyAmount) inputMobileMoneyAmount.value = '0';
+                updatePaymentMix();
+            }
+        });
+    }
+    
+    // Payment mix input handlers
+    if (inputCashAmount) inputCashAmount.addEventListener('input', updatePaymentMix);
+    if (inputBankAmount) inputBankAmount.addEventListener('input', updatePaymentMix);
+    if (inputMobileMoneyAmount) inputMobileMoneyAmount.addEventListener('input', updatePaymentMix);
     
     // Form validation before submit
     sellForm.addEventListener('submit', function(e) {
@@ -540,6 +646,26 @@
                 alert('⚠️ Customer name is required for credit sales!');
                 inputCustomerName.focus();
                 return false;
+            }
+        } else {
+            // Validate payment mix if split payment is used
+            if (paymentMixInputs && !paymentMixInputs.classList.contains('hidden')) {
+                const cashAmt = parseFloat(inputCashAmount?.value || 0);
+                const bankAmt = parseFloat(inputBankAmount?.value || 0);
+                const mobileAmt = parseFloat(inputMobileMoneyAmount?.value || 0);
+                const totalPaid = cashAmt + bankAmt + mobileAmt;
+                const saleTotal = parseFloat(estimatedTotal?.textContent || 0);
+                
+                if (totalPaid === 0) {
+                    // If payment mix is shown but all zeros, that's ok - will default to cash
+                    return true;
+                }
+                
+                if (Math.abs(totalPaid - saleTotal) > 0.01) {
+                    e.preventDefault();
+                    alert(`❌ Payment mix total (MK ${totalPaid.toFixed(0)}) must equal sale total (MK ${saleTotal.toFixed(0)})`);
+                    return false;
+                }
             }
         }
     });
@@ -571,13 +697,20 @@
         confirmCategory.textContent = currentProduct.category.charAt(0).toUpperCase() + currentProduct.category.slice(1);
         inputProductId.value = currentProduct.id;
         
-        // Show/hide mode toggle
-        if (currentProduct.hasShots) {
+        // Show/hide mode toggle and configure buttons
+        const showModeToggle = currentProduct.hasShots || currentProduct.hasGlasses;
+        if (showModeToggle) {
             modeToggleContainer.classList.remove('hidden');
+            
+            // Show/hide specific mode buttons
+            if (modeShotRadio) {
+                modeShotRadio.parentElement.style.display = currentProduct.hasShots ? '' : 'none';
+            }
+            if (modeGlassRadio) {
+                modeGlassRadio.parentElement.style.display = currentProduct.hasGlasses ? '' : 'none';
+            }
         } else {
             modeToggleContainer.classList.add('hidden');
-            inputMode.value = 'bottle';
-            quantityLabel.textContent = 'Bottles';
         }
         
         // Reset form and set max quantity based on stock
@@ -587,7 +720,17 @@
         inputMode.value = 'bottle';
         quantityLabel.textContent = `Bottles (max: ${currentProduct.stock})`;
         
+        // Reset payment mix
+        if (inputCashAmount) inputCashAmount.value = '0';
+        if (inputBankAmount) inputBankAmount.value = '0';
+        if (inputMobileMoneyAmount) inputMobileMoneyAmount.value = '0';
+        if (paymentMixInputs) paymentMixInputs.classList.add('hidden');
+        if (togglePaymentMixBtn) {
+            togglePaymentMixBtn.innerHTML = '<i class="bi bi-plus-circle"></i> Split Payment';
+        }
+        
         updateTotal();
+        updatePaymentMix();
         confirmCard.classList.remove('hidden');
     }
     
@@ -608,10 +751,45 @@
             alert(`⚠️ Only ${currentProduct.stock} bottles available in stock!`);
         }
         
-        const price = mode === 'shot' ? currentProduct.shotPrice : currentProduct.bottlePrice;
-        const total = quantity * price;
+        // Get price based on mode
+        let price;
+        if (mode === 'shot') {
+            price = currentProduct.shotPrice;
+        } else if (mode === 'glass') {
+            price = currentProduct.glassPrice;
+        } else {
+            price = currentProduct.bottlePrice;
+        }
         
+        const total = quantity * price;
         estimatedTotal.textContent = total.toFixed(0);
+        
+        // Update payment mix when total changes
+        updatePaymentMix();
+    }
+    
+    function updatePaymentMix() {
+        if (!paymentMixTotal || !paymentMixRemaining) return;
+        
+        const cashAmt = parseFloat(inputCashAmount?.value || 0);
+        const bankAmt = parseFloat(inputBankAmount?.value || 0);
+        const mobileAmt = parseFloat(inputMobileMoneyAmount?.value || 0);
+        
+        const totalPaid = cashAmt + bankAmt + mobileAmt;
+        const saleTotal = parseFloat(estimatedTotal?.textContent || 0);
+        const remaining = saleTotal - totalPaid;
+        
+        paymentMixTotal.textContent = 'MK ' + totalPaid.toFixed(0);
+        paymentMixRemaining.textContent = 'MK ' + remaining.toFixed(0);
+        
+        // Change color based on remaining
+        if (remaining === 0 && totalPaid > 0) {
+            paymentMixRemaining.style.color = '#10b981';
+        } else if (remaining < 0) {
+            paymentMixRemaining.style.color = '#ef4444';
+        } else {
+            paymentMixRemaining.style.color = '#f59e0b';
+        }
     }
     
     // Form submit (just ensure form submits normally)
