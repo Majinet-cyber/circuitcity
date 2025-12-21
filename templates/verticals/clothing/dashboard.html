@@ -229,10 +229,10 @@
     </article>
   </section>
 
-  {% comment %}Recent Sales Section{% endcomment %}
+  {% comment %}Recent Sales Section with Rotating Revenue/Profit Graph{% endcomment %}
   <section class="recent-block">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
-      <h2 style="margin:0;font-size:1.1rem">💰 Recent Sales</h2>
+      <h2 style="margin:0;font-size:1.1rem">💰 Recent Sales - <span id="chartModeLabel">Revenue</span></h2>
       <a class="btn btn-sm btn-primary" href="{% url 'verticals:clothing_sales_history' %}" style="border-radius:20px;padding:6px 14px;font-weight:600">View All →</a>
     </div>
     {% if sales_trend %}
@@ -245,79 +245,110 @@
         if (!ctx) return;
         
         const salesData = [
-          {% for day in sales_trend|slice:":7" %}
+          {% for day in sales_trend|slice:":14" %}
           {
             date_short: "{{ day.date_short|default:'' }}",
             revenue: {{ day.revenue|default:0 }},
+            profit: {{ day.profit|default:0 }},
+            units: {{ day.units_sold|default:0 }},
             count: {{ day.count|default:0 }}
           }{% if not forloop.last %},{% endif %}
           {% endfor %}
         ];
+        
         const labels = salesData.map(d => d.date_short || '');
         const revenues = salesData.map(d => parseFloat(d.revenue) || 0);
-        const counts = salesData.map(d => parseInt(d.count) || 0);
+        const profits = salesData.map(d => parseFloat(d.profit) || 0);
+        const unitsSold = salesData.map(d => parseInt(d.units) || 0);
         
-        new Chart(ctx, {
-          type: 'bar',
-          data: {
-            labels: labels,
-            datasets: [{
-              label: 'Revenue (MK)',
-              data: revenues,
-              backgroundColor: 'rgba(16, 185, 129, 0.8)',
-              borderColor: 'rgba(16, 185, 129, 1)',
-              borderWidth: 1,
-              borderRadius: 8,
-            }]
-          },
-          options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: {
-              legend: {
-                display: false
-              },
-              tooltip: {
-                callbacks: {
-                  label: function(context) {
-                    const index = context.dataIndex;
-                    const revenue = revenues[index];
-                    const count = counts[index];
-                    return [
-                      `Revenue: MK ${revenue.toFixed(0)}`,
-                      `Sales: ${count}`
-                    ];
-                  }
-                }
-              }
+        let currentMode = 'revenue'; // 'revenue' or 'profit'
+        let chartInstance = null;
+        
+        function createChart(mode) {
+          if (chartInstance) {
+            chartInstance.destroy();
+          }
+          
+          const data = mode === 'revenue' ? revenues : profits;
+          const bgColor = mode === 'revenue' ? 'rgba(59, 130, 246, 0.8)' : 'rgba(16, 185, 129, 0.8)';
+          const borderColor = mode === 'revenue' ? 'rgba(59, 130, 246, 1)' : 'rgba(16, 185, 129, 1)';
+          const label = mode === 'revenue' ? 'Revenue (MWK)' : 'Profit (MWK)';
+          
+          chartInstance = new Chart(ctx, {
+            type: 'bar',
+            data: {
+              labels: labels,
+              datasets: [{
+                label: label,
+                data: data,
+                backgroundColor: bgColor,
+                borderColor: borderColor,
+                borderWidth: 1,
+                borderRadius: 8,
+              }]
             },
-            scales: {
-              y: {
-                beginAtZero: true,
-                ticks: {
-                  callback: function(value) {
-                    if (value === 0) return 'K 0';
-                    if (value >= 1000000) {
-                      return 'K ' + (value / 1000000).toFixed(1) + 'M';
-                    } else if (value >= 1000) {
-                      return 'K ' + (value / 1000).toFixed(0) + 'K';
-                    } else {
-                      return 'K ' + value.toFixed(0);
+            options: {
+              responsive: true,
+              maintainAspectRatio: false,
+              plugins: {
+                legend: {
+                  display: false
+                },
+                tooltip: {
+                  callbacks: {
+                    label: function(context) {
+                      const index = context.dataIndex;
+                      const revenue = revenues[index];
+                      const profit = profits[index];
+                      const units = unitsSold[index];
+                      return [
+                        `Revenue: MWK ${revenue.toLocaleString()}`,
+                        `Profit: MWK ${profit.toLocaleString()}`,
+                        `Units Sold: ${units}`
+                      ];
                     }
                   }
-                },
-                grid: {
-                  color: 'rgba(0, 0, 0, 0.05)'
                 }
               },
-              x: {
-                grid: {
-                  display: false
+              scales: {
+                y: {
+                  beginAtZero: true,
+                  ticks: {
+                    callback: function(value) {
+                      if (value === 0) return 'K 0';
+                      if (value >= 1000000) {
+                        return 'K ' + (value / 1000000).toFixed(1) + 'M';
+                      } else if (value >= 1000) {
+                        return 'K ' + (value / 1000).toFixed(0) + 'K';
+                      } else {
+                        return 'K ' + value.toFixed(0);
+                      }
+                    }
+                  },
+                  grid: {
+                    color: 'rgba(0, 0, 0, 0.05)'
+                  }
+                },
+                x: {
+                  grid: {
+                    display: false
+                  }
                 }
               }
             }
-          }
-        });
+          });
+        }
+        
+        // Initial chart render
+        createChart('revenue');
+        
+        // Rotate between revenue and profit every 10 seconds
+        setInterval(function() {
+          currentMode = currentMode === 'revenue' ? 'profit' : 'revenue';
+          const modeLabel = currentMode === 'revenue' ? 'Revenue' : 'Profit';
+          document.getElementById('chartModeLabel').textContent = modeLabel;
+          createChart(currentMode);
+        }, 10000);
       })();
       </script>
     {% else %}

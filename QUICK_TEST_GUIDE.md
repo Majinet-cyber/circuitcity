@@ -1,261 +1,210 @@
-# 🧪 Quick Test Guide - Gamification UX Upgrade
+# Quick Test Guide - Circuit City Restoration Fixes
 
-**Time Required:** 10-15 minutes  
-**Device Needed:** Mobile phone or browser DevTools (mobile view)
-
----
-
-## 🚀 QUICK START
-
-### 1. Start Development Server
-```bash
-cd c:\Users\CHRIS PAUL MWALE\PycharmProjects\circuitcity_clean
-python manage.py runserver
-```
+**Date:** December 21, 2025  
+**Purpose:** Quick manual testing checklist for all 10 implemented fixes
 
 ---
 
-## 📱 Test 1: Mobile Sidebar (2 minutes)
+## ✅ Test Checklist
 
-### Steps:
-1. Open browser on mobile OR use DevTools mobile view (F12 → Toggle device toolbar)
-2. Navigate to any page (dashboard, scan-in, etc.)
-3. Click the hamburger menu (☰) button in top-left
+### 1. Pharmacy/Cosmetics Stock-In Wizard (5 min)
 
-### Expected Results:
-✅ Sidebar opens and occupies ~28-30% of screen width (much narrower than before)
-✅ Sidebar content is still readable
-✅ Backdrop (dark overlay) covers remaining ~70% of screen
-✅ Clicking backdrop closes sidebar
-✅ All menu items visible and clickable
-✅ Scrolling works if sidebar content is long
+**Steps:**
+1. Navigate to Pharmacy → Stock In (wizard)
+2. Select "Cosmetics" mode
+3. Select any category (e.g., "Skin Care")
+4. **Verify:** Product cards appear (should see prefills like "CeraVe", "Vaseline", etc.)
+5. Click a product card
+6. **Verify:** Card highlights, "Next" button enables
+7. Click "Next"
+8. **Verify:** Progress to details step (quantity, pricing, etc.)
+9. Fill in details, click "Add to Stock"
+10. **Verify:** Success message, product saved
 
-### Before vs After:
-- **Before:** Sidebar = 70% of screen width (obstructive)
-- **After:** Sidebar = 28% of screen width (lighter feel)
-
----
-
-## 🍺 Test 2: Liquor Smart Pricing (3 minutes)
-
-### Steps:
-1. Navigate to: `/liquor/scan-in/`
-2. Click a category (e.g., Beer 🍺)
-3. Click a product
-4. Select "Bottles" or "Crates"
-5. Select quantity (e.g., 10)
-6. **Enter cost price** (e.g., 500) and click away or press Tab
-
-### Expected Results:
-✅ Cost price field **disappears** after you enter it
-✅ Selling price field appears automatically
-✅ When you enter selling price:
-  - **Below cost (e.g., 400):** Yellow warning "🟡 This price is below your cost price..."
-  - **Above cost (e.g., 600):** Green success "🟢 Nice 👍 — this is 20% above your cost price"
-  - **High margin (e.g., 800):** Green success "🟢 Excellent 🚀 — 60% profit margin"
-✅ You can still proceed with below-cost price (non-blocking)
-✅ Submit button works
-✅ Success message: "🟢 Sale recorded 🎉\nStock updated · Pricing set · Well done!"
+**Expected Result:** ✅ No dead ends, products always visible, wizard completes successfully
 
 ---
 
-## 👕 Test 3: Clothing Smart Pricing (3 minutes)
+### 2. Cosmetics Prefills - Never 0 Products (2 min)
 
-### Steps:
-1. Navigate to: `/verticals/clothing/scan-in/`
-2. Select category (e.g., Shoes 👟)
-3. Select size (e.g., M)
-4. Select color (e.g., Black)
-5. Enter quantity (e.g., 5)
-6. **Enter cost price** (e.g., 2000) and click away or press Tab
+**Steps:**
+1. Create a fresh business (or use one with no cosmetics products)
+2. Go to Pharmacy → Stock In (wizard)
+3. Select "Cosmetics" mode
+4. Check each category: Skin Care, Hair Care, Body Care, Perfumes, Makeup, Men's Grooming
 
-### Expected Results:
-✅ Cost price field **disappears** after you enter it
-✅ Selling price field appears/gets focus
-✅ When you enter selling price:
-  - **Below cost (e.g., 1500):** Yellow warning appears
-  - **Above cost (e.g., 2500):** Green success message appears
-✅ Real-time margin calculation shows
-✅ Form submits successfully
+**Expected Result:** ✅ Every category shows product count > 0, prefills appear as clickable cards
 
 ---
 
-## 🛒 Test 4: Sell Flow Success Messages (2 minutes)
+### 3. Barcode Scanner - Below Input (3 min)
 
-### Clothing Sell:
-1. Navigate to: `/verticals/clothing/sell/`
-2. Select a product with stock
-3. Enter quantity and selling price
-4. Submit
+**Steps:**
+1. Go to Pharmacy → Stock In (wizard)
+2. Complete wizard to details step
+3. Select "Has Barcode = Yes"
+4. **Verify:** Barcode input field appears
+5. **Verify:** "Scan Barcode" button appears BELOW the input
+6. Click "Scan Barcode"
+7. **Verify:** Camera opens (rear camera preferred)
+8. Scan a barcode (or cancel)
+9. **Verify:** Barcode auto-fills input on successful scan
 
-### Expected Result:
-✅ Success message appears in this format:
-```
-🟢 Sale recorded 🎉
-Stock updated · Revenue added · Well done!
-5 × Blue T-Shirt | Revenue: K 10,000.00 | Profit: K 2,500.00
-```
-
-### Pharmacy Sell:
-1. Navigate to: `/inventory/scan-sold/` or pharmacy sell page
-2. Complete a sale
-
-### Expected Result:
-✅ Success message appears:
-```
-🟢 Sale recorded 🎉
-Stock updated · Revenue added · Well done!
-Paracetamol x10 | Total: MWK 5,000.00
-```
+**Expected Result:** ✅ Scanner button visible, camera opens, auto-fills input
 
 ---
 
-## 🖥️ Test 5: Desktop Behavior (1 minute)
+### 4. Total Costs (Today) KPI (5 min)
 
-### Steps:
-1. Switch to desktop view (browser width > 992px)
-2. Navigate through the app
+**Steps:**
+1. Make 2 pharmacy sales with known costs:
+   - Sale 1: Product cost MWK 1,000, selling price MWK 1,500, qty 2
+   - Sale 2: Product cost MWK 500, selling price MWK 800, qty 3
+2. Go to Pharmacy Dashboard
+3. Select date range: "Today"
+4. Check "Total Costs (Today)" KPI
 
-### Expected Results:
-✅ Sidebar is sticky (always visible, not a drawer)
-✅ Sidebar width is normal (270px, not affected by mobile changes)
-✅ No hamburger menu button visible
-✅ No backdrop overlay
-✅ All functionality works as before
+**Expected Calculation:**
+- Sale 1 COGS: 1,000 × 2 = 2,000
+- Sale 2 COGS: 500 × 3 = 1,500
+- **Total Costs = 3,500** (plus any admin costs from wallet)
 
----
-
-## ✅ ACCEPTANCE CRITERIA
-
-### Mobile Sidebar
-- [ ] Width is ~28-30vw (visibly narrower)
-- [ ] Opens/closes smoothly
-- [ ] Backdrop works
-- [ ] All content readable
-
-### Smart Pricing (Liquor + Clothing)
-- [ ] Cost price hides after entry
-- [ ] Selling price gets focus
-- [ ] Below-cost warning shows (yellow)
-- [ ] Above-cost success shows (green)
-- [ ] Margin calculates correctly
-- [ ] Can submit below-cost (non-blocking)
-
-### Success Messages
-- [ ] All sell flows show new format
-- [ ] Green indicator (🟢) present
-- [ ] Celebration emoji (🎉) present
-- [ ] Multi-line format displays correctly
-- [ ] Encouraging text present
-
-### Zero Regressions
-- [ ] All existing features work
-- [ ] No broken links
-- [ ] No console errors
-- [ ] No visual glitches
-- [ ] Desktop unchanged
-- [ ] All verticals work
+**Expected Result:** ✅ Total Costs shows MWK 3,500+ (not MWK 0)
 
 ---
 
-## 🐛 TROUBLESHOOTING
+### 5. Phones Rollback - No business.kind Error (3 min)
 
-### Issue: Sidebar too wide on mobile
-**Fix:** Clear browser cache, hard refresh (Ctrl+Shift+R)
+**Steps:**
+1. Make a phone sale (any phone)
+2. Go to Sales → Rollback (or sales history → rollback)
+3. Select the sale to rollback
+4. Click "Rollback"
+5. **Verify:** No error message about "business.kind"
+6. **Verify:** Rollback completes successfully
+7. Check inventory: phone should be back in stock
 
-### Issue: Cost price doesn't hide
-**Check:** 
-1. JavaScript console for errors
-2. Ensure you clicked away or pressed Tab after entering cost price
-3. Try entering a valid number (e.g., 100)
-
-### Issue: Smart pricing feedback doesn't show
-**Check:**
-1. Ensure cost price was entered first
-2. Ensure selling price input has a value
-3. Check JavaScript console for errors
-
-### Issue: Old success messages still showing
-**Fix:** Clear cache, ensure server restarted
+**Expected Result:** ✅ Rollback completes without errors, inventory restored
 
 ---
 
-## 📊 VISUAL COMPARISON
+### 6. Phones Agents - Clickable Cards (2 min)
 
-### Mobile Sidebar Width
-```
-BEFORE (70vw):
-|████████████████████████████████████████████████|     Screen
-|████████SIDEBAR████████|     CONTENT     |
+**Steps:**
+1. Go to Agents page (Phones vertical: More → Agents)
+2. **Verify:** "Joined Agents" section shows agents as cards (not just table)
+3. **Verify:** Each card shows: avatar, name, email, status, location, join date
+4. Hover over a card
+5. **Verify:** Border color changes, card lifts up (translateY effect)
+6. Click a card
+7. **Verify:** Navigates to agent detail/performance page
+8. Go back, scroll down
+9. **Verify:** "Invites" section still intact
 
-AFTER (28vw):
-|████████████████████████████████████████████████|     Screen
-|██SIDEBAR██|        CONTENT               |
-```
-
-### Smart Pricing Flow
-```
-BEFORE:
-[ Cost Price: ___ ]
-[ Selling Price: ___ ]
-(Both always visible)
-
-AFTER:
-[ Cost Price: 500 ] ← Type and blur
-   ↓ (auto-hides)
-[ Selling Price: ___ ] ← Appears, gets focus
-🟢 "Great choice 💡 — 25% margin"
-```
+**Expected Result:** ✅ Agents displayed as clickable cards, invites section preserved
 
 ---
 
-## 🎯 WHAT TO LOOK FOR
+### 7. IMEI Auto-Fill - Phones Scanners (3 min)
 
-### Positive Indicators:
-✅ Sidebar feels lighter and less obstructive
-✅ Pricing flow feels effortless (no repeated inputs)
-✅ Feedback messages are encouraging and helpful
-✅ Success messages feel celebratory
-✅ UI animations are smooth
-✅ Touch targets are easy to hit (mobile)
+**Test A: Scan In**
+1. Go to Phones → Scan In
+2. Select a brand (e.g., Tecno)
+3. Select a model
+4. **Verify:** IMEI list appears in sidebar (if any existing IMEIs)
+5. Click an IMEI from the list
+6. **Verify:** IMEI auto-fills the input field
+7. **Verify:** Input counter updates (e.g., "15 / 15 digits")
 
-### Red Flags:
-❌ Sidebar content cut off or unreadable
-❌ Cost price not hiding
-❌ JavaScript errors in console
-❌ Form submissions failing
-❌ Desktop layout broken
-❌ Missing success messages
+**Test B: Scan & Sell**
+1. Go to Phones → Scan & Sell
+2. Select a brand and model
+3. **Verify:** IMEI list appears (if any in-stock phones)
+4. Click an IMEI
+5. **Verify:** IMEI auto-fills input
 
----
-
-## 📞 SUPPORT
-
-If you encounter any issues:
-
-1. **Check JavaScript Console:**
-   - Press F12 → Console tab
-   - Look for red errors
-   - Report any errors related to pricing or sidebar
-
-2. **Check Network Tab:**
-   - Press F12 → Network tab
-   - Submit a form
-   - Check if requests succeed (200 status)
-
-3. **Clear Cache:**
-   - Hard refresh: Ctrl+Shift+R (Windows) or Cmd+Shift+R (Mac)
-   - Clear all browser cache if needed
-
-4. **Restart Server:**
-   ```bash
-   # Stop server (Ctrl+C)
-   python manage.py runserver
-   ```
+**Expected Result:** ✅ Clicking IMEI auto-fills input in both Scan In and Scan & Sell
 
 ---
 
-**Happy Testing! 🎉**
+### 8. Performance - Lighter App (2 min)
 
-If everything passes, you're ready to deploy to production! 🚀
+**Steps:**
+1. Open browser DevTools → Network tab
+2. Navigate to Pharmacy Dashboard
+3. **Verify:** Static assets (CSS, JS) cached (304 Not Modified)
+4. Change date filter (Today → Last 7 Days)
+5. **Verify:** Only necessary API calls made (no full page reload)
+6. Check page load time
+7. **Verify:** Dashboard loads in < 2 seconds
 
+**Expected Result:** ✅ Static assets cached, minimal network requests, fast load times
+
+---
+
+### 9. Offline Queue - Critical Actions (5 min)
+
+**Note:** This is a minimal implementation. Full PWA offline support is deferred to future phase.
+
+**Steps:**
+1. Open browser DevTools → Network tab
+2. Set network to "Offline" (throttling)
+3. Try to submit a stock-in form
+4. **Verify:** Form doesn't crash
+5. **Verify:** User sees "Saved offline" message (if implemented)
+6. Set network back to "Online"
+7. **Verify:** Queued action syncs automatically (if implemented)
+
+**Expected Result:** ✅ App doesn't crash offline, graceful degradation
+
+**Note:** Full offline queue requires additional JavaScript implementation. Current implementation focuses on defensive error handling.
+
+---
+
+### 10. No Regressions - Other Verticals (10 min)
+
+**Quick Smoke Test:**
+1. **Liquor:** Go to Liquor dashboard → verify no errors
+2. **Gym:** Go to Gym dashboard → verify no errors
+3. **Clothing:** Go to Clothing dashboard → verify no errors
+4. **Phones:** Go to Phones dashboard → verify no errors
+5. **Pharmacy:** Go to Pharmacy dashboard → verify no errors
+
+**Expected Result:** ✅ All verticals load without errors, no 500s
+
+---
+
+## 🎯 Success Criteria
+
+All tests should pass with:
+- ✅ No 500 errors
+- ✅ No JavaScript console errors
+- ✅ No broken templates
+- ✅ No broken routes
+- ✅ All features functional as described
+
+---
+
+## 🐛 If You Find Issues
+
+1. Check browser console for errors
+2. Check Django logs for server errors
+3. Verify database migrations are applied: `python manage.py migrate`
+4. Clear browser cache and retry
+5. Report issue with:
+   - Steps to reproduce
+   - Expected vs actual behavior
+   - Screenshots/error messages
+   - Browser and version
+
+---
+
+## 📊 Estimated Testing Time
+
+- **Quick Test (all 10 items):** ~30-40 minutes
+- **Full Regression Test:** ~1-2 hours
+- **Automated Tests:** `pytest` (5-10 minutes)
+
+---
+
+**Happy Testing! 🚀**

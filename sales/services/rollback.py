@@ -169,7 +169,10 @@ class RollbackService:
         For gym: Reverse membership payment (complex, handled separately)
         """
         item = sale.item
-        vertical = business.kind.lower() if business.kind else "phones"
+        
+        # Resolve vertical safely (business doesn't have .kind attribute)
+        from inventory.authz import resolve_business_kind
+        vertical = resolve_business_kind(business=business).lower()
         
         if vertical == "phones":
             # Phones: Mark item as back in stock

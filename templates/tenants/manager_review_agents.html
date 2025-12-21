@@ -283,76 +283,122 @@
       </div>
     </div>
 
-    <!-- Active agents -->
+    <!-- Active agents (Card View - NEW) -->
     <div class="col-12">
       <div class="glass p-3 p-md-4">
-        <div class="section-title mb-2">Active agents</div>
+        <div class="section-title mb-3">Joined Agents</div>
         {% if active_members %}
-          <div class="table-responsive">
-            <table class="table">
-              <thead>
-                <tr>
-                  <th>Agent</th>
-                  <th>Location</th>
-                  <th>Status</th>
-                  <th>Joined</th>
-                  <th style="width:200px">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {% for m in active_members %}
-                <tr>
-                  <td class="ellipsis">
-                    <strong>{{ m.user.get_full_name|default:m.user.username }}</strong>
-                    <br><small class="text-muted">{{ m.user.email }}</small>
-                  </td>
-                  <td>
-                    {% if m.location %}
-                      <span class="badge bg-info">{{ m.location.name }}</span>
-                    {% else %}
-                      <span class="text-muted">—</span>
-                    {% endif %}
-                  </td>
-                  <td>
-                    {% if m.status == "ACTIVE" and m.user.is_active %}
-                      <span class="chip status--accepted">Active</span>
-                    {% elif m.status == "SUSPENDED" or not m.user.is_active %}
-                      <span class="chip status--revoked">Suspended</span>
-                    {% else %}
-                      <span class="chip">{{ m.status|title }}</span>
-                    {% endif %}
-                  </td>
-                  <td class="small muted">{{ m.created_at|date:"M j, Y" }}</td>
-                  <td>
-                    <div class="d-flex flex-wrap gap-1">
-                      <!-- Location assignment -->
-                      <div class="dropdown">
-                        <button class="btn btn-sm dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
-                          <i class="bi bi-geo-alt"></i>
-                        </button>
-                        <ul class="dropdown-menu">
-                          {% if locations %}
-                            {% for loc in locations %}
-                            <li>
-                              <form method="post" action="{% url 'tenants:edit_agent_location' m.id %}" class="d-inline">
-                                {% csrf_token %}
-                                <input type="hidden" name="location_id" value="{{ loc.id }}">
-                                <button type="submit" class="dropdown-item">{{ loc.name }}</button>
-                              </form>
-                            </li>
-                            {% endfor %}
-                            <li><hr class="dropdown-divider"></li>
-                            <li>
-                              <form method="post" action="{% url 'tenants:edit_agent_location' m.id %}" class="d-inline">
-                                {% csrf_token %}
-                                <button type="submit" class="dropdown-item text-muted">Clear location</button>
-                              </form>
-                            </li>
-                          {% else %}
-                            <li><span class="dropdown-item text-muted">No locations</span></li>
-                          {% endif %}
-                        </ul>
-                      </div>
+          <!-- Card Grid -->
+          <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:16px;margin-bottom:24px;">
+            {% for m in active_members %}
+            <div class="glass-ghost p-3" style="cursor:pointer;transition:all 0.2s;border:2px solid transparent;" 
+                 onclick="window.location.href='{% url 'inventory:agent_detail' m.user.id %}';"
+                 onmouseover="this.style.borderColor='#1f6feb';this.style.transform='translateY(-3px)';"
+                 onmouseout="this.style.borderColor='transparent';this.style.transform='translateY(0)';">
+              <div class="d-flex align-items-center gap-3 mb-2">
+                <div style="width:48px;height:48px;border-radius:50%;background:linear-gradient(135deg,#1f6feb,#0969da);display:grid;place-items:center;font-weight:900;color:#fff;font-size:1.2rem;">
+                  {{ m.user.get_full_name|default:m.user.username|first|upper }}
+                </div>
+                <div class="flex-grow-1 min-w-0">
+                  <div class="fw-bold ellipsis">{{ m.user.get_full_name|default:m.user.username }}</div>
+                  <div class="small text-muted ellipsis">{{ m.user.email|default:"No email" }}</div>
+                </div>
+              </div>
+              <div class="d-flex justify-content-between align-items-center">
+                <div>
+                  {% if m.status == "ACTIVE" and m.user.is_active %}
+                    <span class="chip status--accepted">Active</span>
+                  {% elif m.status == "SUSPENDED" or not m.user.is_active %}
+                    <span class="chip status--revoked">Suspended</span>
+                  {% else %}
+                    <span class="chip">{{ m.status|title }}</span>
+                  {% endif %}
+                </div>
+                <div class="small muted">
+                  {% if m.location %}
+                    <i class="bi bi-geo-alt"></i> {{ m.location.name }}
+                  {% else %}
+                    <i class="bi bi-building"></i> All
+                  {% endif %}
+                </div>
+              </div>
+              <div class="small muted mt-2">
+                <i class="bi bi-calendar"></i> Joined {{ m.created_at|date:"M j, Y" }}
+              </div>
+            </div>
+            {% endfor %}
+          </div>
+          
+          <!-- Table View (Collapsed by default - for advanced management) -->
+          <details>
+            <summary class="btn btn-sm mb-3" style="cursor:pointer;">
+              <i class="bi bi-table"></i> Show detailed table
+            </summary>
+            <div class="table-responsive">
+              <table class="table">
+                <thead>
+                  <tr>
+                    <th>Agent</th>
+                    <th>Location</th>
+                    <th>Status</th>
+                    <th>Joined</th>
+                    <th style="width:200px">Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {% for m in active_members %}
+                  <tr>
+                    <td class="ellipsis">
+                      <strong>{{ m.user.get_full_name|default:m.user.username }}</strong>
+                      <br><small class="text-muted">{{ m.user.email }}</small>
+                    </td>
+                    <td>
+                      {% if m.location %}
+                        <span class="badge bg-info">{{ m.location.name }}</span>
+                      {% else %}
+                        <span class="text-muted">—</span>
+                      {% endif %}
+                    </td>
+                    <td>
+                      {% if m.status == "ACTIVE" and m.user.is_active %}
+                        <span class="chip status--accepted">Active</span>
+                      {% elif m.status == "SUSPENDED" or not m.user.is_active %}
+                        <span class="chip status--revoked">Suspended</span>
+                      {% else %}
+                        <span class="chip">{{ m.status|title }}</span>
+                      {% endif %}
+                    </td>
+                    <td class="small muted">{{ m.created_at|date:"M j, Y" }}</td>
+                    <td>
+                      <div class="d-flex flex-wrap gap-1">
+                        <!-- Location assignment -->
+                        <div class="dropdown">
+                          <button class="btn btn-sm dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+                            <i class="bi bi-geo-alt"></i>
+                          </button>
+                          <ul class="dropdown-menu">
+                            {% if locations %}
+                              {% for loc in locations %}
+                              <li>
+                                <form method="post" action="{% url 'tenants:edit_agent_location' m.id %}" class="d-inline">
+                                  {% csrf_token %}
+                                  <input type="hidden" name="location_id" value="{{ loc.id }}">
+                                  <button type="submit" class="dropdown-item">{{ loc.name }}</button>
+                                </form>
+                              </li>
+                              {% endfor %}
+                              <li><hr class="dropdown-divider"></li>
+                              <li>
+                                <form method="post" action="{% url 'tenants:edit_agent_location' m.id %}" class="d-inline">
+                                  {% csrf_token %}
+                                  <button type="submit" class="dropdown-item text-muted">Clear location</button>
+                                </form>
+                              </li>
+                            {% else %}
+                              <li><span class="dropdown-item text-muted">No locations</span></li>
+                            {% endif %}
+                          </ul>
+                        </div>
                       
                       <!-- Suspend/Restore -->
                       {% if m.status == "ACTIVE" and m.user.is_active %}
@@ -373,10 +419,11 @@
                     </div>
                   </td>
                 </tr>
-                {% endfor %}
-              </tbody>
-            </table>
-          </div>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+          </details>
         {% else %}
           <div class="glass-ghost p-3 text-center muted">No active agents yet.</div>
         {% endif %}

@@ -32,13 +32,16 @@ class PharmacyWizardCosmeticsFlowTest(TestCase):
         )
         self.business = Business.objects.create(
             name='Test Pharmacy',
-            vertical='pharmacy',
-            owner=self.user
+            slug='test-pharmacy',
+            business_kind='pharmacy',
+            status='ACTIVE',
+            created_by=self.user
         )
         Membership.objects.create(
             user=self.user,
             business=self.business,
-            role='manager'
+            role='MANAGER',
+            status='ACTIVE'
         )
         
         self.client = Client()
@@ -326,13 +329,16 @@ class PharmacyWizardMedicinesFlowTest(TestCase):
         )
         self.business = Business.objects.create(
             name='Test Pharmacy',
-            vertical='pharmacy',
-            owner=self.user
+            slug='test-pharmacy',
+            business_kind='pharmacy',
+            status='ACTIVE',
+            created_by=self.user
         )
         Membership.objects.create(
             user=self.user,
             business=self.business,
-            role='manager'
+            role='MANAGER',
+            status='ACTIVE'
         )
         
         self.client = Client()
@@ -499,13 +505,16 @@ class PharmacyWizardButtonFlowTest(TestCase):
         )
         self.business = Business.objects.create(
             name='Test Pharmacy',
-            vertical='pharmacy',
-            owner=self.user
+            slug='test-pharmacy',
+            business_kind='pharmacy',
+            status='ACTIVE',
+            created_by=self.user
         )
         Membership.objects.create(
             user=self.user,
             business=self.business,
-            role='manager'
+            role='MANAGER',
+            status='ACTIVE'
         )
         
         self.client = Client()

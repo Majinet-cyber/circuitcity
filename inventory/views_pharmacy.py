@@ -227,9 +227,18 @@ def pharmacy_dashboard(request: HttpRequest) -> HttpResponse:
             if total_category_revenue > 0 else 0
         )
     
-    # ===== COSTS FOR PERIOD =====
-    # Integrate with wallet/costs system
-    period_costs = Decimal("0.00")
+    # ===== COSTS FOR PERIOD (COGS + ADMIN COSTS) =====
+    # CRITICAL FIX: Total Costs = COGS (cost of goods sold) + Admin Wallet Costs
+    # COGS = Sum of (cost_price * quantity) for all sales in period
+    period_cogs = Decimal("0.00")
+    period_admin_costs = Decimal("0.00")
+    
+    # Calculate COGS from sales
+    for sale in period_sales:
+        # COGS = unit_cost * quantity
+        period_cogs += (sale.unit_cost * sale.quantity)
+    
+    # Get admin costs from wallet (rent, salaries, utilities, etc.)
     try:
         from wallet.models import WalletTransaction, Ledger, TxnType
         from wallet.utils_costs import ensure_monthly_recurring_costs
@@ -255,9 +264,12 @@ def pharmacy_dashboard(request: HttpRequest) -> HttpResponse:
         )
         
         # Sum costs (they're stored as negative, so take absolute value)
-        period_costs = abs(costs_queryset.aggregate(total=Sum('amount'))['total'] or Decimal("0.00"))
+        period_admin_costs = abs(costs_queryset.aggregate(total=Sum('amount'))['total'] or Decimal("0.00"))
     except Exception:
         pass  # Gracefully handle if wallet app not available
+    
+    # Total Costs = COGS + Admin Costs
+    period_costs = period_cogs + period_admin_costs
     
     # ===== COSMETICS TRACKING =====
     # Track cosmetics (skin care, hair care, beauty, personal care, etc.) separately
@@ -395,6 +407,8 @@ def pharmacy_dashboard(request: HttpRequest) -> HttpResponse:
         "period_revenue": period_revenue,
         "period_profit": period_profit,
         "period_costs": period_costs,
+        "period_cogs": period_cogs,  # Cost of goods sold (inventory cost)
+        "period_admin_costs": period_admin_costs,  # Admin wallet costs (rent, salaries, etc.)
         "period_sales_count": period_sales_count,
         "avg_sale_value": avg_sale_value,
         
@@ -702,9 +716,17 @@ def pharmacy_stock_in_wizard(request: HttpRequest) -> HttpResponse:
             ctx["subcategories"] = subcategories
         else:
             # Direct items for this category
-            # FIXED: For cosmetics, show DB products + prefills + custom option
+            # FIXED: For cosmetics, ALWAYS show DB products + prefills + custom option
             if wizard_mode == "cosmetics":
-                from inventory.pharmacy_constants import get_prefills_for_cosmetics_category
+                from inventory.pharmacy_constants import get_prefills_for_cosmetics_category, COSMETICS_SUBCATEGORIES
+                
+                # Validate that selected_category is a valid cosmetics subcategory
+                valid_cosmetics_keys = [sub["key"] for sub in COSMETICS_SUBCATEGORIES]
+                if selected_category not in valid_cosmetics_keys:
+                    # Fallback: treat as "other_cosmetics"
+                    logger.warning(f"Invalid cosmetics category: {selected_category}, using other_cosmetics")
+                    selected_category = "other_cosmetics"
+                    request.session["pharmacy_wizard_category"] = "other_cosmetics"
                 
                 # Map wizard subcategory keys to model category enum values
                 wizard_to_model_map = {
@@ -719,6 +741,9 @@ def pharmacy_stock_in_wizard(request: HttpRequest) -> HttpResponse:
                 
                 model_category = wizard_to_model_map.get(selected_category)
                 
+                # Get prefills for this category (ALWAYS, even if model category not found)
+                prefills = get_prefills_for_cosmetics_category(selected_category)
+                
                 if model_category:
                     # Fetch existing products for this business + category
                     existing_products = list(MerchProduct.objects.filter(
@@ -727,9 +752,6 @@ def pharmacy_stock_in_wizard(request: HttpRequest) -> HttpResponse:
                         category=model_category,
                         is_active=True
                     ).values_list("name", flat=True))
-                    
-                    # Get prefills for this category
-                    prefills = get_prefills_for_cosmetics_category(selected_category)
                     
                     # Normalize for deduplication (case-insensitive)
                     existing_normalized = {name.lower().strip() for name in existing_products}
@@ -740,17 +762,19 @@ def pharmacy_stock_in_wizard(request: HttpRequest) -> HttpResponse:
                     for prefill_name in prefills:
                         if prefill_name.lower().strip() not in existing_normalized:
                             items.append({"name": prefill_name, "icon": "💡", "is_prefill": True})
-                    
-                    # Always add "+ Add Custom Product" option at the end
-                    items.append({"name": "+ Add Custom Product", "icon": "📝", "is_custom": True})
-                    
-                    ctx["items"] = items
                 else:
-                    # Fallback: just show prefills + custom
-                    prefills = get_prefills_for_cosmetics_category(selected_category)
-                    items = [{"name": name, "icon": "💡"} for name in prefills]
-                    items.append({"name": "+ Add Custom Product", "icon": "📝", "is_custom": True})
-                    ctx["items"] = items
+                    # No model mapping found: just show all prefills (no DB filter)
+                    items = [{"name": name, "icon": "💡", "is_prefill": True} for name in prefills]
+                
+                # ALWAYS add "+ Add Custom Product" option at the end
+                items.append({"name": "+ Add Custom Product", "icon": "📝", "is_custom": True})
+                
+                # CRITICAL: Ensure items list is never empty
+                if len(items) == 1:  # Only custom option
+                    # Add a fallback message item (won't be selectable, just informational)
+                    items.insert(0, {"name": "Generic Product", "icon": "📦", "is_prefill": True})
+                
+                ctx["items"] = items
             else:
                 # Pharmacy mode: use standard items
                 items = get_items_for_top_category(selected_category)
@@ -787,6 +811,9 @@ def pharmacy_stock_in_wizard(request: HttpRequest) -> HttpResponse:
             
             model_category = wizard_to_model_map.get(selected_subcategory)
             
+            # Get prefills for this category (ALWAYS, even if model category not found)
+            prefills = get_prefills_for_cosmetics_category(selected_subcategory)
+            
             if model_category:
                 # Fetch existing products for this business + category
                 existing_products = list(MerchProduct.objects.filter(
@@ -795,9 +822,6 @@ def pharmacy_stock_in_wizard(request: HttpRequest) -> HttpResponse:
                     category=model_category,
                     is_active=True
                 ).values_list("name", flat=True))
-                
-                # Get prefills for this category
-                prefills = get_prefills_for_cosmetics_category(selected_subcategory)
                 
                 # Normalize for deduplication (case-insensitive)
                 existing_normalized = {name.lower().strip() for name in existing_products}
@@ -808,14 +832,22 @@ def pharmacy_stock_in_wizard(request: HttpRequest) -> HttpResponse:
                 for prefill_name in prefills:
                     if prefill_name.lower().strip() not in existing_normalized:
                         items.append({"name": prefill_name, "icon": "💡", "is_prefill": True})
-                
-                # Always add "+ Add Custom Product" option at the end
-                items.append({"name": "+ Add Custom Product", "icon": "📝", "is_custom": True})
-                
-                ctx["items"] = items
             else:
-                # Fallback to brand items if no mapping found
-                ctx["items"] = get_items_for_subcategory(selected_category, selected_subcategory)
+                # No model mapping: try standard items, or show all prefills
+                items = get_items_for_subcategory(selected_category, selected_subcategory)
+                if not items or len(items) == 0:
+                    # Fall back to prefills
+                    items = [{"name": name, "icon": "💡", "is_prefill": True} for name in prefills]
+            
+            # ALWAYS add "+ Add Custom Product" option at the end
+            items.append({"name": "+ Add Custom Product", "icon": "📝", "is_custom": True})
+            
+            # CRITICAL: Ensure items list is never empty
+            if len(items) == 1:  # Only custom option
+                # Add a fallback message item
+                items.insert(0, {"name": "Generic Product", "icon": "📦", "is_prefill": True})
+            
+            ctx["items"] = items
         else:
             # For pharmacy mode, use the standard brand items
             ctx["items"] = get_items_for_subcategory(selected_category, selected_subcategory)

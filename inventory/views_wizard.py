@@ -351,9 +351,9 @@ def clothing_wizard_submit(request):
             
             # Handle barcode if provided
             if data.get('has_barcode') == 'yes' and data.get('barcode'):
-                product.sku = data.get('barcode')
+                product.barcode = data.get('barcode')
                 product.scan_required = True
-                product.save(update_fields=['sku', 'scan_required'])
+                product.save(update_fields=['barcode', 'scan_required'])
         
         return JsonResponse({
             'success': True,

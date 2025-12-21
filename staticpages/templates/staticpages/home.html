@@ -678,9 +678,8 @@
       box-shadow: 0 12px 40px rgba(79, 70, 229, 0.08);
       border: 1px solid rgba(79, 70, 229, 0.06);
       position: relative;
-      /* HARD SAFETY: Ensure nothing overflows */
+      /* Mobile only: overflow hidden for carousel */
       overflow: hidden;
-      max-width: 100%;
       min-width: 0;
     }
 
@@ -688,12 +687,11 @@
       text-align: center;
       margin-bottom: 2rem;
       max-width: 100%;
-      overflow: hidden;
       min-width: 0;
     }
 
     .reality-stats-title {
-      font-size: 1.5rem;
+      font-size: clamp(1.5rem, 3vw, 2.5rem);
       font-weight: 800;
       margin-bottom: 0.5rem;
       background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
@@ -704,10 +702,11 @@
       max-width: 100%;
       word-wrap: break-word;
       overflow-wrap: anywhere;
+      hyphens: auto;
     }
 
     .reality-stats-subtitle {
-      font-size: 0.9rem;
+      font-size: clamp(0.9rem, 1.5vw, 1.125rem);
       color: var(--text-secondary);
       line-height: 1.5;
       max-width: 100%;
@@ -742,7 +741,7 @@
       flex-direction: column;
       gap: 1.5rem;
       padding: 0;
-      /* CRITICAL: Prevent any internal overflow */
+      /* Mobile: overflow hidden for carousel */
       overflow: hidden;
       min-width: 0;
     }
@@ -752,11 +751,10 @@
       padding: 0 0.5rem;
       max-width: 100%;
       min-width: 0;
-      overflow: hidden;
     }
 
     .stats-problem-headline {
-      font-size: 1.25rem;
+      font-size: clamp(1.15rem, 2.5vw, 1.75rem);
       font-weight: 700;
       color: var(--text-primary);
       margin-bottom: 1rem;
@@ -764,6 +762,7 @@
       max-width: 100%;
       word-wrap: break-word;
       overflow-wrap: anywhere;
+      hyphens: auto;
       min-width: 0;
     }
 
@@ -785,7 +784,8 @@
       max-width: 100%;
       word-wrap: break-word;
       overflow-wrap: anywhere;
-      word-break: break-word;
+      word-break: normal;
+      hyphens: auto;
       min-width: 0;
     }
 
@@ -842,7 +842,7 @@
       border-radius: 12px;
       padding: 0.75rem;
       box-shadow: 0 2px 10px rgba(0, 0, 0, 0.04);
-      /* CRITICAL: prevent overflow */
+      /* Mobile: prevent chart overflow */
       overflow: hidden;
       max-width: 100%;
       min-width: 0;
@@ -871,7 +871,8 @@
       max-width: 100%;
       word-wrap: break-word;
       overflow-wrap: anywhere;
-      word-break: break-word;
+      word-break: normal;
+      hyphens: auto;
       line-height: 1.4;
       min-width: 0;
     }
@@ -886,8 +887,9 @@
       color: var(--primary);
       text-decoration: none;
       font-weight: 500;
-      word-break: break-word;
+      word-break: normal;
       overflow-wrap: anywhere;
+      hyphens: auto;
       min-width: 0;
     }
 
@@ -905,7 +907,6 @@
       animation: slideInRight 0.6s ease 0.2s both;
       max-width: 100%;
       min-width: 0;
-      overflow: hidden;
     }
 
     .stats-solution-header {
@@ -919,7 +920,9 @@
       max-width: 100%;
       word-wrap: break-word;
       overflow-wrap: anywhere;
+      hyphens: auto;
       min-width: 0;
+      flex-wrap: wrap;
     }
 
     .stats-solution-features {
@@ -939,6 +942,7 @@
       max-width: 100%;
       word-wrap: break-word;
       overflow-wrap: anywhere;
+      hyphens: auto;
       min-width: 0;
     }
 
@@ -1045,7 +1049,7 @@
       }
     }
 
-    /* Desktop Enhancements */
+    /* Desktop Enhancements - CLIPPING FIX */
     @media (min-width: 769px) {
       .reality-stats-section {
         padding: 5rem 2rem;
@@ -1054,61 +1058,100 @@
       .reality-stats-container {
         padding: 3rem 2.5rem;
         border-radius: 24px;
+        /* CRITICAL FIX: Remove overflow hidden on desktop to prevent clipping */
+        overflow: visible;
       }
 
       .reality-stats-header {
         margin-bottom: 3rem;
+        overflow: visible;
       }
 
-      .reality-stats-title {
-        font-size: 2.5rem;
+      /* Desktop: Disable carousel transform and show all slides */
+      .stats-carousel {
+        overflow: visible;
       }
 
-      .reality-stats-subtitle {
-        font-size: 1.125rem;
+      .stats-slides-wrapper {
+        /* Disable carousel transform on desktop */
+        transform: none !important;
+        display: block;
       }
 
       .stats-slide {
-        flex-direction: row;
+        /* CRITICAL FIX: Remove conflicting flex-direction, use only grid */
+        display: grid;
         grid-template-columns: 1fr 1fr;
         gap: 3rem;
-        align-items: center;
-        display: grid;
+        align-items: start;
+        /* Remove carousel behavior on desktop */
+        min-width: auto;
+        max-width: 100%;
+        margin-bottom: 4rem;
+        /* CRITICAL FIX: Remove overflow hidden to prevent text clipping */
+        overflow: visible;
+        padding: 0 1rem;
+      }
+
+      /* Ensure grid children can shrink */
+      .stats-slide-content,
+      .stats-slide-visual {
+        min-width: 0;
+        overflow: visible;
+      }
+
+      .stats-slide-content {
+        padding: 0;
+      }
+
+      .stats-slide-visual {
+        padding: 0;
       }
 
       .stats-problem-headline {
-        font-size: 1.75rem;
+        font-size: clamp(1.5rem, 2vw, 1.75rem);
         margin-bottom: 1.5rem;
+        overflow-wrap: anywhere;
+        word-break: normal;
+        hyphens: auto;
       }
 
       .stats-pain-bullets li {
-        font-size: 1rem;
+        font-size: clamp(0.95rem, 1.2vw, 1rem);
         margin-bottom: 1rem;
+        overflow-wrap: anywhere;
+        word-break: normal;
       }
 
       .stats-cta-btn {
         width: auto;
         padding: 1rem 2rem;
         font-size: 1rem;
+        white-space: normal;
       }
 
       .stats-chart-container {
         height: 220px;
         padding: 1.25rem;
+        overflow: visible;
       }
 
       .stats-citation {
         font-size: 0.85rem;
         padding: 0.75rem 1rem;
+        overflow-wrap: anywhere;
+        word-break: normal;
       }
 
       .stats-solution-panel {
         margin-top: 2rem;
         padding: 1.5rem;
+        overflow: visible;
       }
 
       .stats-solution-header {
         font-size: 1.125rem;
+        overflow-wrap: anywhere;
       }
 
       .stats-solution-features {
@@ -1118,30 +1161,12 @@
 
       .stats-solution-feature {
         font-size: 0.9rem;
+        overflow-wrap: anywhere;
       }
 
+      /* Hide carousel controls on desktop since slides are stacked */
       .stats-carousel-controls {
-        gap: 2rem;
-        margin-top: 2.5rem;
-      }
-
-      .stats-carousel-arrow {
-        width: 48px;
-        height: 48px;
-        font-size: 1.25rem;
-      }
-
-      .stats-carousel-dots {
-        gap: 0.75rem;
-      }
-
-      .stats-carousel-dot {
-        width: 12px;
-        height: 12px;
-      }
-
-      .stats-carousel-dot.active {
-        width: 32px;
+        display: none;
       }
     }
 
@@ -1192,6 +1217,59 @@
         width: 36px;
         height: 36px;
         font-size: 1rem;
+      }
+    }
+
+    /* Additional Desktop Breakpoints for Zero Clipping */
+    @media (min-width: 1024px) {
+      .reality-stats-container {
+        max-width: 960px;
+        padding: 3rem 2rem;
+      }
+
+      .stats-slide {
+        gap: 2.5rem;
+        padding: 0 0.5rem;
+      }
+    }
+
+    @media (min-width: 1280px) {
+      .reality-stats-container {
+        max-width: 1140px;
+        padding: 3rem 2.5rem;
+      }
+
+      .stats-slide {
+        gap: 3rem;
+        padding: 0 1rem;
+      }
+    }
+
+    @media (min-width: 1440px) {
+      .reality-stats-container {
+        max-width: 1200px;
+        padding: 3.5rem 3rem;
+      }
+
+      .stats-slide {
+        gap: 3.5rem;
+        padding: 0 1.5rem;
+      }
+
+      .stats-problem-headline {
+        font-size: 1.75rem;
+      }
+    }
+
+    @media (min-width: 1920px) {
+      .reality-stats-container {
+        max-width: 1200px;
+        padding: 4rem 3rem;
+      }
+
+      .stats-slide {
+        gap: 4rem;
+        padding: 0 2rem;
       }
     }
   </style>

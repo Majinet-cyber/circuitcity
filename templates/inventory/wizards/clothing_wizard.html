@@ -105,7 +105,8 @@
     { value: 'M', label: 'M', icon: '📏', featured: true },
     { value: 'L', label: 'L', icon: '📏', featured: true },
     { value: 'XL', label: 'XL', icon: '📏' },
-    { value: 'XXL', label: 'XXL', icon: '📏' }
+    { value: 'XXL', label: 'XXL', icon: '📏' },
+    { value: 'XXXL', label: 'XXXL', icon: '📏' }
   ];
 
   // Numeric sizes
@@ -116,7 +117,9 @@
     { value: '34', label: '34', icon: '📐', featured: true },
     { value: '36', label: '36', icon: '📐' },
     { value: '38', label: '38', icon: '📐' },
-    { value: '40', label: '40', icon: '📐' }
+    { value: '40', label: '40', icon: '📐' },
+    { value: '42', label: '42', icon: '📐' },
+    { value: '44', label: '44', icon: '📐' }
   ];
 
   // Genders
@@ -243,7 +246,7 @@
       type: 'cards',
       key: 'size',
       title: 'Size',
-      subtitle: 'Select the size',
+      subtitle: 'Select the size or enter custom',
       options: (data) => {
         // Use numeric sizes for trousers/jeans, letter sizes for others
         if (['trousers', 'jeans'].includes(data.category)) {
@@ -251,6 +254,8 @@
         }
         return sizes;
       },
+      allowCustom: true,
+      customPlaceholder: 'Enter custom size (e.g., "36", "XXXL", "Waist 32")',
       skipable: true,
       columns: 'auto'
     },
@@ -264,18 +269,6 @@
       skipable: true,
       columns: 'three-col'
     },
-    // Pricing
-    {
-      type: 'multi-input',
-      key: 'pricing',
-      title: 'Pricing & Stock',
-      subtitle: 'Set prices and initial stock',
-      fields: [
-        { key: 'selling_price', label: 'Selling Price (MWK)', type: 'number', min: 0, step: '0.01', required: true },
-        { key: 'cost_price', label: 'Cost Price (MWK)', type: 'number', min: 0, step: '0.01' },
-        { key: 'initial_stock', label: 'Initial Stock Quantity', type: 'number', min: 0, value: 0, required: true }
-      ]
-    },
     // Barcode
     {
       type: 'cards',
@@ -285,18 +278,105 @@
       options: barcodeOptions,
       columns: 'two-col'
     },
-    // Barcode Entry (conditional)
+    // Barcode Entry (conditional - only if has_barcode === 'yes')
     {
-      type: 'input',
+      type: 'custom',
       key: 'barcode',
       title: 'Scan or Enter Barcode',
       subtitle: 'Use camera to scan or type manually',
-      inputType: 'text',
-      placeholder: 'Barcode number',
-      required: false,
-      skip: (data) => data.has_barcode !== 'yes'
+      skip: (data) => data.has_barcode !== 'yes',
+      render: (data) => {
+        return `
+          <div class="wizard-input-group">
+            <label class="wizard-label">Barcode</label>
+            <input 
+              type="text" 
+              class="wizard-input"
+              id="input-barcode"
+              placeholder="Scan or type barcode..."
+              autocomplete="off"
+            >
+            <button class="wizard-btn wizard-btn-outline mt-2 w-100" onclick="openBarcodeScanner()">
+              <i class="bi bi-upc-scan me-2"></i>Scan Barcode with Camera
+            </button>
+            <button class="wizard-btn wizard-btn-primary mt-3" onclick="wizard.submitInput('barcode')">
+              Continue <i class="bi bi-arrow-right ms-1"></i>
+            </button>
+          </div>
+        `;
+      }
+    },
+    // Pricing (final step for NO barcode OR after barcode scan)
+    {
+      type: 'multi-input',
+      key: 'pricing',
+      title: 'Final Details',
+      subtitle: 'Set prices and initial stock',
+      fields: [
+        { key: 'selling_price', label: 'Selling Price (MWK)', type: 'number', min: 0, step: '0.01', required: true },
+        { key: 'cost_price', label: 'Cost Price/Order Price (MWK)', type: 'number', min: 0, step: '0.01' },
+        { key: 'initial_stock', label: 'Initial Stock Quantity', type: 'number', min: 0, value: 0, required: true }
+      ]
     }
   ];
+
+  // Barcode Scanner Function (using existing scanner component)
+  function openBarcodeScanner() {
+    // Check if UnifiedScanner is available (from unified-scanner.js)
+    if (typeof UnifiedScanner !== 'undefined') {
+      const scanner = new UnifiedScanner({
+        mode: 'barcode',
+        onSelect: (barcode) => {
+          const input = document.getElementById('input-barcode');
+          if (input) {
+            input.value = barcode;
+            input.dispatchEvent(new Event('input'));
+          }
+        },
+        onError: (error) => {
+          alert('Scanner error: ' + error);
+        }
+      });
+      scanner.open();
+    } else {
+      // Fallback: try simple camera access
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        alert('Camera access not available. Please type the barcode manually.');
+        return;
+      }
+      
+      // Simple camera modal (basic fallback)
+      const modalHtml = `
+        <div id="scanner-modal" style="position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.95);z-index:9999;display:flex;flex-direction:column;align-items:center;justify-content:center;">
+          <video id="scanner-video" autoplay playsinline style="max-width:90%;max-height:70%;border-radius:12px;"></video>
+          <button onclick="closeScannerModal()" style="margin-top:20px;padding:12px 24px;background:#fff;border:none;border-radius:8px;font-size:16px;font-weight:600;cursor:pointer;">Cancel</button>
+          <p style="color:#fff;margin-top:12px;font-size:14px;">Note: Automatic scanning requires barcode scanner library. Please type barcode manually or install scanner.</p>
+        </div>
+      `;
+      document.body.insertAdjacentHTML('beforeend', modalHtml);
+      
+      const video = document.getElementById('scanner-video');
+      navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } })
+        .then(stream => {
+          video.srcObject = stream;
+        })
+        .catch(err => {
+          alert('Camera access denied: ' + err.message);
+          closeScannerModal();
+        });
+    }
+  }
+
+  function closeScannerModal() {
+    const modal = document.getElementById('scanner-modal');
+    if (modal) {
+      const video = document.getElementById('scanner-video');
+      if (video && video.srcObject) {
+        video.srcObject.getTracks().forEach(track => track.stop());
+      }
+      modal.remove();
+    }
+  }
 
   // Initialize wizard with category step only
   let wizardSteps = [

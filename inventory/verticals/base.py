@@ -370,6 +370,8 @@ def clothing_sales_metrics(
         sale_date=TruncDate('sold_at')
     ).values('sale_date').annotate(
         revenue=Coalesce(Sum('total_price'), DECIMAL_ZERO, output_field=DECIMAL_FIELD),
+        cost=Coalesce(Sum('total_cost'), DECIMAL_ZERO, output_field=DECIMAL_FIELD),
+        units_sold=Coalesce(Sum('quantity'), 0),
         count=Count('id')
     ).order_by('sale_date')
     
@@ -380,6 +382,9 @@ def clothing_sales_metrics(
         if sale_date:
             sales_by_date[sale_date.isoformat()] = {
                 'revenue': float(day_data['revenue'] or 0),
+                'cost': float(day_data['cost'] or 0),
+                'profit': float((day_data['revenue'] or 0) - (day_data['cost'] or 0)),
+                'units_sold': int(day_data['units_sold'] or 0),
                 'count': day_data['count'] or 0
             }
     
@@ -388,12 +393,14 @@ def clothing_sales_metrics(
     current_date = start_date
     while current_date < end_date:
         date_key = current_date.isoformat()
-        day_data = sales_by_date.get(date_key, {'revenue': 0.0, 'count': 0})
+        day_data = sales_by_date.get(date_key, {'revenue': 0.0, 'cost': 0.0, 'profit': 0.0, 'units_sold': 0, 'count': 0})
         
         sales_trend.append({
             'date': current_date.strftime('%Y-%m-%d'),
             'date_short': current_date.strftime('%b %d'),
             'revenue': day_data['revenue'],
+            'profit': day_data['profit'],
+            'units_sold': day_data['units_sold'],
             'count': day_data['count']
         })
         
