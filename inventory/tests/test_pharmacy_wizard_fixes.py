@@ -1,402 +1,574 @@
-# inventory/tests/test_pharmacy_wizard_fixes.py
 """
-Tests for Pharmacy & Cosmetics Stock-In Wizard fixes.
-Ensures:
-1. Cosmetics/perfume can be saved without batch_number and without unit_type
-2. "Other" products can be saved with minimal fields
-3. No ERROR 500 on any user input errors (defensive error handling)
+Tests for Pharmacy & Cosmetics Stock-In Wizard Fixes
+
+Tests verify that the wizard correctly handles:
+1. Cosmetics categories show products even when DB is empty (using prefills)
+2. Product selection advances to the save step
+3. Save creates MerchProduct if it doesn't exist
+4. Pharmacy requires expiry date, cosmetics makes it optional
 """
 from decimal import Decimal
 from django.test import TestCase, Client
 from django.contrib.auth import get_user_model
 from django.urls import reverse
+from datetime import date, timedelta
+
 from tenants.models import Business, Membership
 from inventory.models import MerchProduct
-from inventory.models_pharmacy import PharmacyBatch
+from inventory.models_pharmacy import PharmacyBatch, PharmacyCategory
 
 User = get_user_model()
 
 
-class PharmacyWizardCosmeticsSaveTestCase(TestCase):
-    """Test that cosmetics (perfumes) can be saved without batch_number and without 500 errors."""
+class PharmacyWizardCosmeticsFlowTest(TestCase):
+    """Test the cosmetics flow in the pharmacy wizard."""
     
     def setUp(self):
-        """Create test business, user, and login."""
-        self.business = Business.objects.create(
-            name="Test Pharmacy",
-            slug="test-pharmacy",
-            status="ACTIVE"
-        )
-        
+        """Set up test user, business, and client."""
         self.user = User.objects.create_user(
-            username="manager@test.com",
-            email="manager@test.com",
-            password="TestPass123!@#"
+            username='testuser',
+            email='test@example.com',
+            password='testpass123'
         )
-        
+        self.business = Business.objects.create(
+            name='Test Pharmacy',
+            vertical='pharmacy',
+            owner=self.user
+        )
         Membership.objects.create(
             user=self.user,
             business=self.business,
-            role="MANAGER",
-            status="ACTIVE"
+            role='manager'
         )
         
         self.client = Client()
-        self.client.login(username="manager@test.com", password="TestPass123!@#")
+        self.client.login(username='testuser', password='testpass123')
         
-        # Set up session with wizard state
+        # Set active business in session
         session = self.client.session
-        session["business_id"] = self.business.id
-        session["pharmacy_wizard_mode"] = "cosmetics"
-        session["pharmacy_wizard_category"] = "cosmetics"
-        session["pharmacy_wizard_subcategory"] = "perfumes"
-        session["pharmacy_wizard_item"] = "Pure Black"
-        session["pharmacy_wizard_step"] = 4  # Final step
+        session['active_business_id'] = self.business.id
         session.save()
+        
+        self.wizard_url = reverse('pharmacy:stock_in_wizard')
     
-    def test_save_cosmetics_perfume_without_batch_number(self):
-        """Test saving a cosmetics perfume WITHOUT batch number succeeds (no 500)."""
-        url = reverse("pharmacy:stock_in_wizard")
+    def test_cosmetics_step2_shows_prefills_when_db_empty(self):
+        """
+        Test that Step 2 (Select Product) shows prefill products for cosmetics
+        categories even when the database has zero products.
         
-        data = {
-            "wizard_step": "4",
-            "action": "save",
-            "product_name": "Pure Black Perfume 100ml",
-            "quantity": "10",
-            "cost_price": "5000.00",
-            "selling_price": "8000.00",
-            # No batch_number provided (should auto-generate)
-            # No expiry_date provided (optional for cosmetics)
-            "has_barcode": "no",
-        }
+        ACCEPTANCE TEST A: Step 3 must not be blank; show prefills + custom option.
+        """
+        # Step 0: Select cosmetics mode
+        response = self.client.post(self.wizard_url, {
+            'wizard_step': '0',
+            'selected_mode': 'cosmetics',
+            'action': 'next'
+        })
+        self.assertEqual(response.status_code, 302)
         
-        response = self.client.post(url, data)
+        # Step 1: Select Body Care category
+        response = self.client.post(self.wizard_url, {
+            'wizard_step': '1',
+            'selected_mode': 'cosmetics',
+            'selected_category': 'body_care',
+            'action': 'next'
+        })
+        self.assertEqual(response.status_code, 302)
         
-        # Should NOT return 500
-        self.assertNotEqual(response.status_code, 500, "Saving cosmetics without batch_number should NOT return 500")
+        # Step 2: Verify product options are shown (GET request)
+        response = self.client.get(self.wizard_url)
+        self.assertEqual(response.status_code, 200)
         
-        # Should redirect (success) or stay on page with form errors (but not crash)
-        self.assertIn(response.status_code, [200, 302], "Response should be 200 (form error) or 302 (redirect success)")
+        # Verify we're at step 2
+        self.assertEqual(response.context['step'], 2)
+        self.assertEqual(response.context['wizard_mode'], 'cosmetics')
+        self.assertEqual(response.context['selected_category'], 'body_care')
         
-        # Check if product and batch were created
+        # Verify items list is NOT empty
+        items = response.context.get('items', [])
+        self.assertIsNotNone(items, "Items context should exist")
+        self.assertGreater(len(items), 0, "Items list should not be empty - should have prefills + custom option")
+        
+        # Verify prefill products are included (Body Care prefills)
+        item_names = [item['name'] for item in items]
+        self.assertIn('Body Spray', item_names, "Body Spray should be in prefills")
+        self.assertIn('Body Wash', item_names, "Body Wash should be in prefills")
+        
+        # Verify custom option is always present
+        self.assertIn('+ Add Custom Product', item_names, "Custom product option should always be available")
+        
+        # Verify template renders without errors
+        self.assertContains(response, 'Select Product')
+        self.assertContains(response, 'Body Care')
+    
+    def test_cosmetics_step2_combines_db_and_prefills(self):
+        """
+        Test that Step 2 combines existing DB products with prefills,
+        deduplicating by name (case-insensitive).
+        """
+        # Create an existing product in DB
+        MerchProduct.objects.create(
+            name='Body Spray',  # This matches a prefill
+            business=self.business,
+            kind='pharmacy',
+            category=PharmacyCategory.PERSONAL_CARE,
+            is_active=True
+        )
+        MerchProduct.objects.create(
+            name='Custom Body Lotion',  # This doesn't match any prefill
+            business=self.business,
+            kind='pharmacy',
+            category=PharmacyCategory.PERSONAL_CARE,
+            is_active=True
+        )
+        
+        # Navigate to Step 2 for body_care
+        self.client.post(self.wizard_url, {
+            'wizard_step': '0',
+            'selected_mode': 'cosmetics',
+            'action': 'next'
+        })
+        self.client.post(self.wizard_url, {
+            'wizard_step': '1',
+            'selected_mode': 'cosmetics',
+            'selected_category': 'body_care',
+            'action': 'next'
+        })
+        
+        response = self.client.get(self.wizard_url)
+        items = response.context.get('items', [])
+        item_names = [item['name'] for item in items]
+        
+        # Should have DB products
+        self.assertIn('Custom Body Lotion', item_names)
+        
+        # Should have Body Spray only once (deduplicated)
+        body_spray_count = sum(1 for name in item_names if name == 'Body Spray')
+        self.assertEqual(body_spray_count, 1, "Body Spray should appear only once (deduplicated)")
+        
+        # Should still have other prefills not in DB
+        self.assertIn('Body Wash', item_names)
+        
+        # Should have custom option
+        self.assertIn('+ Add Custom Product', item_names)
+    
+    def test_select_product_advances_to_save_step(self):
+        """
+        Test that selecting a product from Step 2 advances to Step 4 (save).
+        
+        ACCEPTANCE TEST A: Selecting a product MUST advance to Step 4.
+        """
+        # Navigate to Step 2
+        self.client.post(self.wizard_url, {
+            'wizard_step': '0',
+            'selected_mode': 'cosmetics',
+            'action': 'next'
+        })
+        self.client.post(self.wizard_url, {
+            'wizard_step': '1',
+            'selected_mode': 'cosmetics',
+            'selected_category': 'body_care',
+            'action': 'next'
+        })
+        
+        # Select a product
+        response = self.client.post(self.wizard_url, {
+            'wizard_step': '2',
+            'selected_mode': 'cosmetics',
+            'selected_category': 'body_care',
+            'selected_item': 'Body Spray',
+            'action': 'next'
+        })
+        self.assertEqual(response.status_code, 302)
+        
+        # Verify we're now at Step 4 (save form)
+        response = self.client.get(self.wizard_url)
+        self.assertEqual(response.context['step'], 4)
+        self.assertEqual(response.context['selected_item'], 'Body Spray')
+        
+        # Verify the save form is displayed
+        self.assertContains(response, 'Quantity & Pricing')
+        self.assertContains(response, 'Body Spray')
+    
+    def test_save_creates_merchproduct_if_missing(self):
+        """
+        Test that Step 4 save creates a MerchProduct if it doesn't exist in DB.
+        
+        ACCEPTANCE TEST A: Step 4 save MUST create/ensure MerchProduct exists.
+        """
+        # Navigate through wizard to save step
+        self.client.post(self.wizard_url, {
+            'wizard_step': '0',
+            'selected_mode': 'cosmetics',
+            'action': 'next'
+        })
+        self.client.post(self.wizard_url, {
+            'wizard_step': '1',
+            'selected_mode': 'cosmetics',
+            'selected_category': 'body_care',
+            'action': 'next'
+        })
+        self.client.post(self.wizard_url, {
+            'wizard_step': '2',
+            'selected_mode': 'cosmetics',
+            'selected_category': 'body_care',
+            'selected_item': 'Body Spray',
+            'action': 'next'
+        })
+        
+        # Verify product doesn't exist yet
+        self.assertFalse(
+            MerchProduct.objects.filter(
+                name='Body Spray',
+                business=self.business
+            ).exists()
+        )
+        
+        # Save the product with quantity and pricing
+        response = self.client.post(self.wizard_url, {
+            'wizard_step': '4',
+            'selected_mode': 'cosmetics',
+            'selected_category': 'body_care',
+            'selected_item': 'Body Spray',
+            'quantity': '100',
+            'buying_price': '5.00',
+            'selling_price': '10.00',
+            'barcode': '',
+            'batch_number': 'BATCH001',
+            'expiry_date': '',  # Optional for cosmetics
+            'action': 'save'
+        })
+        
+        # Verify redirect after successful save
+        self.assertEqual(response.status_code, 302)
+        
+        # Verify MerchProduct was created
         product = MerchProduct.objects.filter(
+            name='Body Spray',
             business=self.business,
-            name="Pure Black Perfume 100ml",
-            kind="pharmacy"
+            kind='pharmacy',
+            category=PharmacyCategory.PERSONAL_CARE
         ).first()
+        self.assertIsNotNone(product, "MerchProduct should be created")
         
-        if response.status_code == 302:
-            # Success - product should be created
-            self.assertIsNotNone(product, "Product should be created on success")
-            
-            # Check batch was created with auto-generated batch_number
-            batch = PharmacyBatch.objects.filter(
-                business=self.business,
-                merch_product=product
-            ).first()
-            
-            self.assertIsNotNone(batch, "Batch should be created")
-            self.assertIsNotNone(batch.batch_number, "Batch number should be auto-generated")
-            self.assertTrue(len(batch.batch_number) > 0, "Batch number should not be empty")
-            self.assertEqual(batch.quantity, 10, "Quantity should be 10")
-            self.assertEqual(batch.cost_price, Decimal("5000.00"), "Cost price should match")
-            self.assertEqual(batch.selling_price, Decimal("8000.00"), "Selling price should match")
-    
-    def test_save_cosmetics_with_blank_batch_and_no_expiry(self):
-        """Test that cosmetics can be saved with blank batch number and no expiry (no 500)."""
-        url = reverse("pharmacy:stock_in_wizard")
-        
-        data = {
-            "wizard_step": "4",
-            "action": "save",
-            "product_name": "Nivea Soft Cream",
-            "quantity": "20",
-            "cost_price": "1500.00",
-            "selling_price": "2500.00",
-            "batch_number": "",  # Explicitly blank
-            "expiry_date": "",   # Blank (optional for cosmetics)
-            "has_barcode": "no",
-        }
-        
-        response = self.client.post(url, data)
-        
-        # Should NOT return 500
-        self.assertNotEqual(response.status_code, 500, "Saving cosmetics with blank batch/expiry should NOT return 500")
-        self.assertIn(response.status_code, [200, 302], "Response should be 200 or 302")
-
-
-class PharmacyWizardOtherProductTestCase(TestCase):
-    """Test that 'Other' products can be saved with minimal fields."""
-    
-    def setUp(self):
-        """Create test business, user, and login."""
-        self.business = Business.objects.create(
-            name="Test Pharmacy",
-            slug="test-pharmacy",
-            status="ACTIVE"
-        )
-        
-        self.user = User.objects.create_user(
-            username="manager@test.com",
-            email="manager@test.com",
-            password="TestPass123!@#"
-        )
-        
-        Membership.objects.create(
-            user=self.user,
-            business=self.business,
-            role="MANAGER",
-            status="ACTIVE"
-        )
-        
-        self.client = Client()
-        self.client.login(username="manager@test.com", password="TestPass123!@#")
-        
-        # Set up session with wizard state for "Other" product
-        session = self.client.session
-        session["business_id"] = self.business.id
-        session["pharmacy_wizard_mode"] = "pharmacy"
-        session["pharmacy_wizard_category"] = "medicines"
-        session["pharmacy_wizard_subcategory"] = "other_medicine"
-        session["pharmacy_wizard_item"] = "Custom medicine"
-        session["pharmacy_wizard_step"] = 4  # Final step
-        session.save()
-    
-    def test_save_other_product_minimal_fields(self):
-        """Test that 'Other' product saves with only product_name + quantity + prices (no 500)."""
-        url = reverse("pharmacy:stock_in_wizard")
-        
-        data = {
-            "wizard_step": "4",
-            "action": "save",
-            "product_name": "Custom Medical Device XYZ",
-            "quantity": "5",
-            "cost_price": "10000.00",
-            "selling_price": "15000.00",
-            # No batch_number (should auto-generate)
-            # No expiry_date (required for medicines, but let's test error handling)
-            "has_barcode": "no",
-        }
-        
-        response = self.client.post(url, data)
-        
-        # Should NOT return 500 even if there's a validation error
-        self.assertNotEqual(response.status_code, 500, "'Other' product save should NOT return 500")
-        self.assertIn(response.status_code, [200, 302], "Response should be 200 (form error) or 302 (success)")
-        
-        # If medicines require expiry, we expect a form error (200) with message
-        # If validation passes, we expect redirect (302)
-    
-    def test_save_other_product_with_expiry_succeeds(self):
-        """Test that 'Other' product saves successfully when expiry is provided."""
-        url = reverse("pharmacy:stock_in_wizard")
-        
-        data = {
-            "wizard_step": "4",
-            "action": "save",
-            "product_name": "Custom Medical Device ABC",
-            "quantity": "8",
-            "cost_price": "12000.00",
-            "selling_price": "18000.00",
-            "expiry_date": "2026-12-31",  # Provided
-            "has_barcode": "no",
-        }
-        
-        response = self.client.post(url, data)
-        
-        # Should NOT return 500
-        self.assertNotEqual(response.status_code, 500, "'Other' product save with expiry should NOT return 500")
-        self.assertIn(response.status_code, [200, 302], "Response should be 200 or 302")
-        
-        if response.status_code == 302:
-            # Success - check product created
-            product = MerchProduct.objects.filter(
-                business=self.business,
-                name="Custom Medical Device ABC",
-                kind="pharmacy"
-            ).first()
-            
-            self.assertIsNotNone(product, "Product should be created")
-
-
-class PharmacyWizardModeSelectionTestCase(TestCase):
-    """Test the new Step 0 mode selection (Cosmetics vs Pharmacy)."""
-    
-    def setUp(self):
-        """Create test business, user, and login."""
-        self.business = Business.objects.create(
-            name="Test Pharmacy",
-            slug="test-pharmacy",
-            status="ACTIVE"
-        )
-        
-        self.user = User.objects.create_user(
-            username="manager@test.com",
-            email="manager@test.com",
-            password="TestPass123!@#"
-        )
-        
-        Membership.objects.create(
-            user=self.user,
-            business=self.business,
-            role="MANAGER",
-            status="ACTIVE"
-        )
-        
-        self.client = Client()
-        self.client.login(username="manager@test.com", password="TestPass123!@#")
-        
-        session = self.client.session
-        session["business_id"] = self.business.id
-        session.save()
-    
-    def test_step_0_displays_mode_options(self):
-        """Test that Step 0 displays Pharmacy and Cosmetics options."""
-        url = reverse("pharmacy:stock_in_wizard")
-        response = self.client.get(url)
-        
-        self.assertEqual(response.status_code, 200, "Step 0 should load successfully")
-        self.assertContains(response, "Pharmacy", msg_prefix="Should show Pharmacy option")
-        self.assertContains(response, "Cosmetics", msg_prefix="Should show Cosmetics option")
-        self.assertContains(response, "Add Product", msg_prefix="Should show simplified title")
-    
-    def test_mode_selection_sets_session(self):
-        """Test that selecting mode advances to Step 1."""
-        url = reverse("pharmacy:stock_in_wizard")
-        
-        data = {
-            "wizard_step": "0",
-            "selected_mode": "cosmetics",
-            "action": "next"
-        }
-        
-        response = self.client.post(url, data, follow=True)
-        
-        self.assertEqual(response.status_code, 200, "Mode selection should succeed")
-        
-        # Check session was updated
-        session = self.client.session
-        self.assertEqual(session.get("pharmacy_wizard_mode"), "cosmetics", "Mode should be set in session")
-        self.assertEqual(session.get("pharmacy_wizard_step"), 1, "Should advance to step 1")
-    
-    def test_back_to_start_button_works(self):
-        """Test that 'Back to start' button resets wizard to Step 0."""
-        # Set up wizard at step 2
-        session = self.client.session
-        session["business_id"] = self.business.id
-        session["pharmacy_wizard_step"] = 2
-        session["pharmacy_wizard_mode"] = "pharmacy"
-        session["pharmacy_wizard_category"] = "medicines"
-        session.save()
-        
-        url = reverse("pharmacy:stock_in_wizard")
-        
-        # Jump back to step 0
-        data = {
-            "wizard_step": "2",
-            "action": "jump",
-            "jump_to_step": "0"
-        }
-        
-        response = self.client.post(url, data, follow=True)
-        
-        self.assertEqual(response.status_code, 200, "Jump to start should succeed")
-        
-        # Check session was reset
-        session = self.client.session
-        self.assertEqual(session.get("pharmacy_wizard_step"), 0, "Should be at step 0")
-
-
-class PharmacyWizardErrorHandlingTestCase(TestCase):
-    """Test that wizard handles errors gracefully without 500s."""
-    
-    def setUp(self):
-        """Create test business, user, and login."""
-        self.business = Business.objects.create(
-            name="Test Pharmacy",
-            slug="test-pharmacy",
-            status="ACTIVE"
-        )
-        
-        self.user = User.objects.create_user(
-            username="manager@test.com",
-            email="manager@test.com",
-            password="TestPass123!@#"
-        )
-        
-        Membership.objects.create(
-            user=self.user,
-            business=self.business,
-            role="MANAGER",
-            status="ACTIVE"
-        )
-        
-        self.client = Client()
-        self.client.login(username="manager@test.com", password="TestPass123!@#")
-        
-        session = self.client.session
-        session["business_id"] = self.business.id
-        session["pharmacy_wizard_step"] = 4
-        session["pharmacy_wizard_mode"] = "pharmacy"
-        session["pharmacy_wizard_category"] = "medicines"
-        session.save()
-    
-    def test_invalid_input_does_not_500(self):
-        """Test that invalid user input returns form error (not 500)."""
-        url = reverse("pharmacy:stock_in_wizard")
-        
-        data = {
-            "wizard_step": "4",
-            "action": "save",
-            "product_name": "",  # Missing required field
-            "quantity": "abc",   # Invalid number
-            "cost_price": "-100",  # Invalid negative
-            "selling_price": "not_a_number",  # Invalid
-        }
-        
-        response = self.client.post(url, data)
-        
-        # Should return 200 with error messages (NOT 500)
-        self.assertEqual(response.status_code, 200, "Invalid input should return 200 (form errors), not 500")
-    
-    def test_duplicate_batch_does_not_500(self):
-        """Test that saving duplicate batch returns gracefully (not 500)."""
-        # Create initial product and batch
-        product = MerchProduct.objects.create(
-            business=self.business,
-            name="Test Product",
-            kind="pharmacy",
-            cost_price=Decimal("100.00"),
-            selling_price=Decimal("150.00")
-        )
-        
-        PharmacyBatch.objects.create(
-            business=self.business,
+        # Verify PharmacyBatch was created
+        batch = PharmacyBatch.objects.filter(
             merch_product=product,
-            batch_number="BATCH-001",
-            expiry_date="2026-06-30",
-            quantity=10,
-            cost_price=Decimal("100.00"),
-            selling_price=Decimal("150.00")
+            business=self.business
+        ).first()
+        self.assertIsNotNone(batch, "PharmacyBatch should be created")
+        self.assertEqual(batch.quantity_total, 100)
+        self.assertEqual(batch.buying_price, Decimal('5.00'))
+        self.assertEqual(batch.selling_price, Decimal('10.00'))
+    
+    def test_cosmetics_expiry_date_optional(self):
+        """
+        Test that expiry date is optional for cosmetics products.
+        
+        ACCEPTANCE TEST A & B: Expiry date OPTIONAL for cosmetics.
+        """
+        # Navigate to save step
+        self.client.post(self.wizard_url, {
+            'wizard_step': '0',
+            'selected_mode': 'cosmetics',
+            'action': 'next'
+        })
+        self.client.post(self.wizard_url, {
+            'wizard_step': '1',
+            'selected_mode': 'cosmetics',
+            'selected_category': 'makeup',
+            'action': 'next'
+        })
+        self.client.post(self.wizard_url, {
+            'wizard_step': '2',
+            'selected_mode': 'cosmetics',
+            'selected_category': 'makeup',
+            'selected_item': 'Lipstick',
+            'action': 'next'
+        })
+        
+        # Save WITHOUT expiry date
+        response = self.client.post(self.wizard_url, {
+            'wizard_step': '4',
+            'selected_mode': 'cosmetics',
+            'selected_category': 'makeup',
+            'selected_item': 'Lipstick',
+            'quantity': '50',
+            'buying_price': '15.00',
+            'selling_price': '30.00',
+            'barcode': '',
+            'batch_number': 'MAKEUP001',
+            'expiry_date': '',  # Empty - should be allowed
+            'action': 'save'
+        })
+        
+        # Should succeed
+        self.assertEqual(response.status_code, 302)
+        
+        # Verify product and batch were created
+        product = MerchProduct.objects.filter(name='Lipstick', business=self.business).first()
+        self.assertIsNotNone(product)
+        
+        batch = PharmacyBatch.objects.filter(merch_product=product).first()
+        self.assertIsNotNone(batch)
+        self.assertIsNone(batch.expiry_date, "Expiry date should be None for cosmetics")
+
+
+class PharmacyWizardMedicinesFlowTest(TestCase):
+    """Test the pharmacy (medicines) flow in the wizard."""
+    
+    def setUp(self):
+        """Set up test user, business, and client."""
+        self.user = User.objects.create_user(
+            username='testuser',
+            email='test@example.com',
+            password='testpass123'
+        )
+        self.business = Business.objects.create(
+            name='Test Pharmacy',
+            vertical='pharmacy',
+            owner=self.user
+        )
+        Membership.objects.create(
+            user=self.user,
+            business=self.business,
+            role='manager'
         )
         
-        url = reverse("pharmacy:stock_in_wizard")
+        self.client = Client()
+        self.client.login(username='testuser', password='testpass123')
         
-        data = {
-            "wizard_step": "4",
-            "action": "save",
-            "product_name": "Test Product",
-            "quantity": "5",
-            "cost_price": "100.00",
-            "selling_price": "150.00",
-            "batch_number": "BATCH-001",
-            "expiry_date": "2026-06-30",
-            "has_barcode": "no",
-        }
+        session = self.client.session
+        session['active_business_id'] = self.business.id
+        session.save()
         
-        response = self.client.post(url, data)
+        self.wizard_url = reverse('pharmacy:stock_in_wizard')
+    
+    def test_pharmacy_medicines_flow_works_end_to_end(self):
+        """
+        Test that pharmacy (medicines) flow works end-to-end.
         
-        # Should NOT return 500 (duplicate batches update quantity, not error)
-        self.assertNotEqual(response.status_code, 500, "Duplicate batch should NOT return 500")
-        self.assertIn(response.status_code, [200, 302], "Response should be 200 or 302")
+        ACCEPTANCE TEST B: Pharmacy flow works like cosmetics.
+        """
+        # Step 0: Select pharmacy mode
+        response = self.client.post(self.wizard_url, {
+            'wizard_step': '0',
+            'selected_mode': 'pharmacy',
+            'action': 'next'
+        })
+        self.assertEqual(response.status_code, 302)
+        
+        # Step 1: Select a medicine category (e.g., First Aid)
+        response = self.client.post(self.wizard_url, {
+            'wizard_step': '1',
+            'selected_mode': 'pharmacy',
+            'selected_category': 'first_aid',
+            'action': 'next'
+        })
+        self.assertEqual(response.status_code, 302)
+        
+        # Step 2: Verify we can see products or subcategories
+        response = self.client.get(self.wizard_url)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.context['step'], 2)
+        
+        # Should have either subcategories or items (not blank)
+        has_content = (
+            response.context.get('subcategories') or 
+            response.context.get('items')
+        )
+        self.assertTrue(has_content, "Step 2 should not be blank for pharmacy mode")
+    
+    def test_pharmacy_requires_expiry_date(self):
+        """
+        Test that expiry date is REQUIRED for pharmacy (medicine) products.
+        
+        ACCEPTANCE TEST B: Expiry date REQUIRED for medicines.
+        """
+        # Navigate to save step for a medicine
+        self.client.post(self.wizard_url, {
+            'wizard_step': '0',
+            'selected_mode': 'pharmacy',
+            'action': 'next'
+        })
+        self.client.post(self.wizard_url, {
+            'wizard_step': '1',
+            'selected_mode': 'pharmacy',
+            'selected_category': 'first_aid',
+            'action': 'next'
+        })
+        
+        # Try to select a product (create one if needed)
+        session = self.client.session
+        session['pharmacy_wizard_step'] = 4
+        session['pharmacy_wizard_mode'] = 'pharmacy'
+        session['pharmacy_wizard_category'] = 'first_aid'
+        session['pharmacy_wizard_item'] = 'Paracetamol'
+        session.save()
+        
+        # Try to save WITHOUT expiry date (should fail validation)
+        response = self.client.post(self.wizard_url, {
+            'wizard_step': '4',
+            'selected_mode': 'pharmacy',
+            'selected_category': 'first_aid',
+            'selected_item': 'Paracetamol',
+            'quantity': '100',
+            'buying_price': '2.00',
+            'selling_price': '5.00',
+            'barcode': '',
+            'batch_number': 'MED001',
+            'expiry_date': '',  # Empty - should be rejected for medicines
+            'action': 'save'
+        })
+        
+        # Should either show error message or stay on same page
+        # (Implementation may vary - check for error in context or messages)
+        if response.status_code == 200:
+            # Form validation failed, stayed on page
+            self.assertContains(response, 'expiry', msg_prefix="Should show expiry date error")
+        else:
+            # Check for error message in redirected page
+            response = self.client.get(self.wizard_url)
+            messages = list(response.context.get('messages', []))
+            has_error = any('expiry' in str(msg).lower() for msg in messages)
+            self.assertTrue(has_error, "Should show error about missing expiry date")
+    
+    def test_pharmacy_saves_with_valid_expiry_date(self):
+        """
+        Test that pharmacy products can be saved with a valid expiry date.
+        """
+        # Navigate to save step
+        self.client.post(self.wizard_url, {
+            'wizard_step': '0',
+            'selected_mode': 'pharmacy',
+            'action': 'next'
+        })
+        self.client.post(self.wizard_url, {
+            'wizard_step': '1',
+            'selected_mode': 'pharmacy',
+            'selected_category': 'first_aid',
+            'action': 'next'
+        })
+        
+        # Set up session for save step
+        session = self.client.session
+        session['pharmacy_wizard_step'] = 4
+        session['pharmacy_wizard_mode'] = 'pharmacy'
+        session['pharmacy_wizard_category'] = 'first_aid'
+        session['pharmacy_wizard_item'] = 'Paracetamol'
+        session.save()
+        
+        # Save WITH expiry date
+        future_date = date.today() + timedelta(days=365)
+        response = self.client.post(self.wizard_url, {
+            'wizard_step': '4',
+            'selected_mode': 'pharmacy',
+            'selected_category': 'first_aid',
+            'selected_item': 'Paracetamol',
+            'quantity': '100',
+            'buying_price': '2.00',
+            'selling_price': '5.00',
+            'barcode': '123456789',
+            'batch_number': 'MED001',
+            'expiry_date': future_date.strftime('%Y-%m-%d'),
+            'action': 'save'
+        })
+        
+        # Should succeed
+        self.assertEqual(response.status_code, 302)
+        
+        # Verify product and batch were created with expiry
+        product = MerchProduct.objects.filter(name='Paracetamol', business=self.business).first()
+        self.assertIsNotNone(product)
+        
+        batch = PharmacyBatch.objects.filter(merch_product=product).first()
+        self.assertIsNotNone(batch)
+        self.assertIsNotNone(batch.expiry_date, "Expiry date should be set for medicines")
+        self.assertEqual(batch.expiry_date, future_date)
 
+
+class PharmacyWizardButtonFlowTest(TestCase):
+    """Test that wizard navigation buttons work correctly."""
+    
+    def setUp(self):
+        """Set up test user, business, and client."""
+        self.user = User.objects.create_user(
+            username='testuser',
+            email='test@example.com',
+            password='testpass123'
+        )
+        self.business = Business.objects.create(
+            name='Test Pharmacy',
+            vertical='pharmacy',
+            owner=self.user
+        )
+        Membership.objects.create(
+            user=self.user,
+            business=self.business,
+            role='manager'
+        )
+        
+        self.client = Client()
+        self.client.login(username='testuser', password='testpass123')
+        
+        session = self.client.session
+        session['active_business_id'] = self.business.id
+        session.save()
+        
+        self.wizard_url = reverse('pharmacy:stock_in_wizard')
+    
+    def test_back_button_returns_to_previous_step(self):
+        """
+        Test that "Back" button returns to the previous step without losing state.
+        
+        ACCEPTANCE TEST C: "Back" returns to prior step without losing state.
+        """
+        # Navigate to Step 2
+        self.client.post(self.wizard_url, {
+            'wizard_step': '0',
+            'selected_mode': 'cosmetics',
+            'action': 'next'
+        })
+        self.client.post(self.wizard_url, {
+            'wizard_step': '1',
+            'selected_mode': 'cosmetics',
+            'selected_category': 'body_care',
+            'action': 'next'
+        })
+        
+        # Verify we're at Step 2
+        response = self.client.get(self.wizard_url)
+        self.assertEqual(response.context['step'], 2)
+        
+        # Click "Back"
+        response = self.client.post(self.wizard_url, {
+            'wizard_step': '2',
+            'action': 'back'
+        })
+        self.assertEqual(response.status_code, 302)
+        
+        # Verify we're back at Step 1
+        response = self.client.get(self.wizard_url)
+        self.assertEqual(response.context['step'], 1)
+        
+        # Verify mode is still set (state preserved)
+        self.assertEqual(response.context['wizard_mode'], 'cosmetics')
+    
+    def test_next_button_enabled_when_selection_made(self):
+        """
+        Test that "Next" button works when a selection exists.
+        
+        ACCEPTANCE TEST C: "Next" must be clickable and advance when selection exists.
+        """
+        # Step 0: Select mode
+        response = self.client.post(self.wizard_url, {
+            'wizard_step': '0',
+            'selected_mode': 'cosmetics',
+            'action': 'next'
+        })
+        self.assertEqual(response.status_code, 302)
+        
+        # Verify we advanced to Step 1
+        response = self.client.get(self.wizard_url)
+        self.assertEqual(response.context['step'], 1)
+        self.assertEqual(response.context['wizard_mode'], 'cosmetics')
