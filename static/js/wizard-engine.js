@@ -51,7 +51,7 @@ class WizardEngine {
         <!-- Step indicator -->
         <div class="wizard-header">
           <div class="wizard-step-indicator">
-            <span class="wizard-step-number">Step ${this.currentStep + 1} of ${this.config.steps.length}</span>
+            <span class="wizard-step-number">Step ${this.getVisibleStepNumber()} of ${this.getTotalVisibleSteps()}</span>
             ${this.currentStep > 0 ? '<button class="wizard-back-btn" onclick="wizard.back()"><i class="bi bi-arrow-left"></i> Back</button>' : ''}
           </div>
           <h2 class="wizard-title">${step.title}</h2>
@@ -95,12 +95,28 @@ class WizardEngine {
   renderCards(step) {
     const options = typeof step.options === 'function' ? step.options(this.data) : step.options;
     
+    // Show search box if searchable or if there are many options
+    const showSearch = step.searchable || (options.length > 6);
+    
     return `
-      <div class="wizard-cards-grid ${step.columns || 'auto'}">
+      ${showSearch ? `
+        <div class="wizard-search-box mb-3">
+          <div class="input-group">
+            <span class="input-group-text"><i class="bi bi-search"></i></span>
+            <input type="text" 
+                   class="form-control" 
+                   id="search-${step.key}" 
+                   placeholder="Search ${step.title.toLowerCase()}..."
+                   oninput="wizard.filterCards('${step.key}', this.value)">
+          </div>
+        </div>
+      ` : ''}
+      <div class="wizard-cards-grid ${step.columns || 'auto'}" id="cards-grid-${step.key}">
         ${options.map((opt, idx) => `
           <button class="wizard-card ${opt.featured ? 'wizard-card-featured' : ''}" 
                   onclick="wizard.selectCard('${step.key}', ${JSON.stringify(opt.value).replace(/"/g, '&quot;')}, ${idx})"
-                  data-card-index="${idx}">
+                  data-card-index="${idx}"
+                  data-card-label="${opt.label.toLowerCase()}">
             ${opt.icon ? `<div class="wizard-card-icon">${opt.icon}</div>` : ''}
             <div class="wizard-card-label">${opt.label}</div>
             ${opt.badge ? `<div class="wizard-card-badge">${opt.badge}</div>` : ''}
@@ -120,6 +136,23 @@ class WizardEngine {
         </div>
       ` : ''}
     `;
+  }
+  
+  filterCards(key, searchTerm) {
+    const grid = document.getElementById(`cards-grid-${key}`);
+    if (!grid) return;
+    
+    const cards = grid.querySelectorAll('.wizard-card');
+    const term = searchTerm.toLowerCase().trim();
+    
+    cards.forEach(card => {
+      const label = card.getAttribute('data-card-label') || '';
+      if (term === '' || label.includes(term)) {
+        card.style.display = '';
+      } else {
+        card.style.display = 'none';
+      }
+    });
   }
   
   renderInput(step) {
@@ -298,6 +331,17 @@ class WizardEngine {
   next() {
     if (this.currentStep < this.config.steps.length - 1) {
       this.currentStep++;
+      
+      // Check if the next step should be skipped
+      const nextStep = this.config.steps[this.currentStep];
+      if (nextStep && nextStep.skip && typeof nextStep.skip === 'function') {
+        if (nextStep.skip(this.data)) {
+          // Skip this step and move to next
+          this.next();
+          return;
+        }
+      }
+      
       this.render();
     } else {
       this.complete();
@@ -329,6 +373,30 @@ class WizardEngine {
     if (this.config.onComplete) {
       this.config.onComplete(this.data);
     }
+  }
+  
+  getVisibleStepNumber() {
+    // Count only non-skipped steps up to current
+    let count = 0;
+    for (let i = 0; i <= this.currentStep; i++) {
+      const step = this.config.steps[i];
+      if (!step.skip || !step.skip(this.data)) {
+        count++;
+      }
+    }
+    return count;
+  }
+  
+  getTotalVisibleSteps() {
+    // Count only non-skipped steps in total
+    let count = 0;
+    for (let i = 0; i < this.config.steps.length; i++) {
+      const step = this.config.steps[i];
+      if (!step.skip || !step.skip(this.data)) {
+        count++;
+      }
+    }
+    return count;
   }
   
   toast(message, type = 'info') {

@@ -208,6 +208,7 @@
   {% endif %}
 </div>
 
+<script src="{% static 'js/pricing-helpers.js' %}"></script>
 <script>
 document.addEventListener('DOMContentLoaded', function() {
   // Hide the actual select elements
@@ -373,30 +374,18 @@ document.addEventListener('DOMContentLoaded', function() {
         return;
       }
       
-      const margin = ((selling - costPrice) / costPrice) * 100;
+      // Use PricingHelpers for consistent calculation
+      const calc = PricingHelpers.calculate(costPrice, selling);
+      const feedback = PricingHelpers.getFeedback(calc);
+      
       const icon = feedbackContainer.querySelector('.pricing-feedback-icon');
       const message = feedbackContainer.querySelector('.pricing-feedback-message');
       
-      if (selling < costPrice) {
-        feedbackContainer.classList.remove('above-cost');
-        feedbackContainer.classList.add('below-cost', 'show');
-        icon.textContent = '🟡';
-        message.textContent = `This price is below your cost price (MWK ${costPrice.toLocaleString()}). Proceed if intentional.`;
-      } else {
-        feedbackContainer.classList.remove('below-cost');
-        feedbackContainer.classList.add('above-cost', 'show');
-        icon.textContent = '🟢';
-        
-        if (margin < 10) {
-          message.textContent = `Nice 👍 — this is ${margin.toFixed(0)}% above your cost price`;
-        } else if (margin < 25) {
-          message.textContent = `Great choice 💡 — ${margin.toFixed(0)}% margin`;
-        } else if (margin < 50) {
-          message.textContent = `Excellent 🚀 — ${margin.toFixed(0)}% profit margin`;
-        } else {
-          message.textContent = `Amazing deal 🎉 — ${margin.toFixed(0)}% profit margin!`;
-        }
-      }
+      // Update UI
+      feedbackContainer.classList.remove('above-cost', 'below-cost');
+      feedbackContainer.classList.add(feedback.type, 'show');
+      icon.textContent = feedback.icon;
+      message.textContent = feedback.message;
     }
     
     sellingPriceInput.addEventListener('input', updateFeedback);

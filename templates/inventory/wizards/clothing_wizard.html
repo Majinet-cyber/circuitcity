@@ -241,7 +241,7 @@
 
   // Common final steps
   const commonFinalSteps = [
-    // Size
+    // Size (Step 4)
     {
       type: 'cards',
       key: 'size',
@@ -259,7 +259,7 @@
       skipable: true,
       columns: 'auto'
     },
-    // Gender
+    // Gender (Step 5)
     {
       type: 'cards',
       key: 'gender',
@@ -269,13 +269,26 @@
       skipable: true,
       columns: 'three-col'
     },
-    // Barcode
+    // Pricing (Step 4)
+    {
+      type: 'multi-input',
+      key: 'pricing',
+      title: 'Pricing & Stock',
+      subtitle: 'Set prices and initial stock',
+      fields: [
+        { key: 'selling_price', label: 'Selling Price (MWK)', type: 'number', min: 0, step: '0.01', required: true },
+        { key: 'cost_price', label: 'Cost Price/Order Price (MWK)', type: 'number', min: 0, step: '0.01' },
+        { key: 'initial_stock', label: 'Initial Stock Quantity', type: 'number', min: 0, value: 0, required: true }
+      ]
+    },
+    // Barcode (Step 5 - optional)
     {
       type: 'cards',
       key: 'has_barcode',
       title: 'Barcode',
       subtitle: 'Does this product have a barcode?',
       options: barcodeOptions,
+      skipable: true,
       columns: 'two-col'
     },
     // Barcode Entry (conditional - only if has_barcode === 'yes')
@@ -295,28 +308,17 @@
               id="input-barcode"
               placeholder="Scan or type barcode..."
               autocomplete="off"
+              required
             >
             <button class="wizard-btn wizard-btn-outline mt-2 w-100" onclick="openBarcodeScanner()">
               <i class="bi bi-upc-scan me-2"></i>Scan Barcode with Camera
             </button>
-            <button class="wizard-btn wizard-btn-primary mt-3" onclick="wizard.submitInput('barcode')">
+            <button class="wizard-btn wizard-btn-primary mt-3" id="barcode-continue-btn" onclick="wizard.submitBarcodeInput()" disabled>
               Continue <i class="bi bi-arrow-right ms-1"></i>
             </button>
           </div>
         `;
       }
-    },
-    // Pricing (final step for NO barcode OR after barcode scan)
-    {
-      type: 'multi-input',
-      key: 'pricing',
-      title: 'Final Details',
-      subtitle: 'Set prices and initial stock',
-      fields: [
-        { key: 'selling_price', label: 'Selling Price (MWK)', type: 'number', min: 0, step: '0.01', required: true },
-        { key: 'cost_price', label: 'Cost Price/Order Price (MWK)', type: 'number', min: 0, step: '0.01' },
-        { key: 'initial_stock', label: 'Initial Stock Quantity', type: 'number', min: 0, value: 0, required: true }
-      ]
     }
   ];
 
@@ -399,7 +401,7 @@
       // Show loading
       const loading = document.createElement('div');
       loading.className = 'wizard-loading';
-      loading.innerHTML = '<div class="wizard-loading-spinner"></div>';
+      loading.innerHTML = '<div class="wizard-loading-spinner"></div><p style="color: #fff; margin-top: 12px;">Saving product...</p>';
       document.body.appendChild(loading);
       
       try {
@@ -419,16 +421,23 @@
         const result = await response.json();
         
         if (result.success) {
-          // Success! Redirect
-          window.location.href = result.redirect || '{% url "verticals:clothing_dashboard" %}';
+          // Success! Show success message
+          loading.remove();
+          const message = result.message || 'Product saved successfully!';
+          showSuccessBanner(message + ' Redirecting...');
+          
+          // Redirect after brief delay
+          setTimeout(() => {
+            window.location.href = result.redirect || '{% url "verticals:clothing_dashboard" %}';
+          }, 1500);
         } else {
           loading.remove();
-          alert(result.error || 'Failed to create product');
+          showErrorBanner(result.error || 'Failed to create product');
         }
       } catch (error) {
         loading.remove();
         console.error('Submit error:', error);
-        alert('Failed to create product. Please try again.');
+        showErrorBanner('Failed to create product. Please try again.');
       }
     },
     
@@ -439,6 +448,44 @@
     }
   });
 
+  // Success/Error banner helpers
+  function showSuccessBanner(message) {
+    const banner = document.createElement('div');
+    banner.className = 'wizard-banner wizard-banner-success';
+    banner.innerHTML = `
+      <div style="display: flex; align-items: center; gap: 12px;">
+        <span style="font-size: 24px;">✅</span>
+        <span style="font-weight: 600;">${message}</span>
+      </div>
+    `;
+    document.body.appendChild(banner);
+    
+    setTimeout(() => {
+      banner.classList.add('show');
+    }, 100);
+    
+    setTimeout(() => {
+      banner.classList.remove('show');
+      setTimeout(() => banner.remove(), 300);
+    }, 3000);
+  }
+  
+  function showErrorBanner(message) {
+    const banner = document.createElement('div');
+    banner.className = 'wizard-banner wizard-banner-error';
+    banner.innerHTML = `
+      <div style="display: flex; align-items: center; gap: 12px;">
+        <span style="font-size: 24px;">❌</span>
+        <span style="font-weight: 600;">${message}</span>
+      </div>
+    `;
+    document.body.appendChild(banner);
+    
+    setTimeout(() => {
+      banner.classList.add('show');
+    }, 100);
+  }
+
   // Override next() to rebuild steps dynamically
   const originalNext = wizard.next.bind(wizard);
   wizard.next = function() {
@@ -448,6 +495,54 @@
       this.config.steps = [...categorySteps, ...commonFinalSteps];
     }
     originalNext();
+  };
+  
+  // Override selectCard to auto-open scanner when "Yes barcode" is selected
+  const originalSelectCard = wizard.selectCard.bind(wizard);
+  wizard.selectCard = function(key, value, index) {
+    originalSelectCard(key, value, index);
+    
+    // If user selects "No" for barcode, skip barcode input step entirely
+    if (key === 'has_barcode' && value === 'no') {
+      // Clear any barcode data
+      delete this.data.barcode;
+      // Move to next step after has_barcode (skip barcode input)
+      setTimeout(() => {
+        this.next();
+      }, 300);
+    }
+    
+    // If user selects "Yes" for barcode, auto-open scanner on next step
+    if (key === 'has_barcode' && value === 'yes') {
+      setTimeout(() => {
+        this.next(); // Move to barcode input step
+        setTimeout(() => {
+          // Scanner should auto-open on the barcode step
+          const barcodeInput = document.getElementById('input-barcode');
+          if (barcodeInput) {
+            openBarcodeScanner();
+            // Enable continue button when barcode is entered
+            barcodeInput.addEventListener('input', function() {
+              const continueBtn = document.getElementById('barcode-continue-btn');
+              if (continueBtn) {
+                continueBtn.disabled = !this.value.trim();
+              }
+            });
+          }
+        }, 400); // Small delay to let the step render
+      }, 300);
+    }
+  };
+  
+  // Add submitBarcodeInput method to wizard
+  wizard.submitBarcodeInput = function() {
+    const barcodeInput = document.getElementById('input-barcode');
+    if (barcodeInput && barcodeInput.value.trim()) {
+      this.data.barcode = barcodeInput.value.trim();
+      this.next();
+    } else {
+      alert('Please enter or scan a barcode to continue.');
+    }
   };
 })();
 </script>

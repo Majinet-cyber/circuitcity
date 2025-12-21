@@ -178,6 +178,10 @@ def liquor_scan_in(request):
     
     business = get_active_business(request)
     
+    # UX SAFETY: Show success message if redirected with ?added=1
+    if request.GET.get('added') == '1':
+        messages.success(request, "✅ Stock added successfully! Add another product below.")
+    
     if request.method == "POST":
         # POST logic: process stock-in
         try:
@@ -196,7 +200,8 @@ def liquor_scan_in(request):
             # Calculate actual bottles to add
             bottles_to_add = quantity
             if unit_type == "crate":
-                bottles_per_crate = getattr(product, 'bottles_per_crate', 24)  # Default 24, no schema dependency
+                # MALAWI STANDARD: Default 20 bottles per crate (Kuche Kuche, Carlsberg, etc.)
+                bottles_per_crate = getattr(product, 'bottles_per_crate', 20)
                 bottles_to_add = quantity * bottles_per_crate
             
             with transaction.atomic():
@@ -205,16 +210,27 @@ def liquor_scan_in(request):
                 
                 # Update cost price if provided
                 if cost_per_unit > 0:
-                    bottles_per_crate = getattr(product, 'bottles_per_crate', 24)
+                    # MALAWI STANDARD: Default 20 bottles per crate
+                    bottles_per_crate = getattr(product, 'bottles_per_crate', 20)
                     if unit_type == "crate" and bottles_per_crate:
                         product.cost_per_bottle = cost_per_unit / bottles_per_crate
                     else:
                         product.cost_per_bottle = cost_per_unit
                 
+                # Optional: Update selling price if provided
+                selling_price_raw = request.POST.get("selling_price", "").strip()
+                if selling_price_raw:
+                    try:
+                        selling_price = Decimal(selling_price_raw)
+                        if selling_price > 0:
+                            product.price_per_bottle = selling_price
+                    except (ValueError, InvalidOperation):
+                        pass
+                
                 product.save()
             
-            messages.success(request, f"Added {bottles_to_add} × {product.name} to stock")
-            return redirect("liquor:scan_in")
+            # UX SAFETY: Redirect with success param (clean state, no overlay confusion)
+            return redirect("liquor:scan_in") + "?added=1"
             
         except (ValueError, MerchProduct.DoesNotExist, KeyError) as e:
             messages.error(request, f"Stock-in failed: {e}")
@@ -236,7 +252,7 @@ def liquor_scan_in(request):
                 'id': p.id,
                 'name': p.name,
                 'quantity_in_stock': p.quantity_in_stock or 0,
-                'bottles_per_crate': getattr(p, 'bottles_per_crate', 24),  # Safe fallback
+                'bottles_per_crate': getattr(p, 'bottles_per_crate', 20),  # MALAWI STANDARD: 20 bottles per crate
             })
     
     # Build categories list in order

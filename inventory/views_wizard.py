@@ -334,6 +334,17 @@ def clothing_wizard_submit(request):
         except (ValueError, InvalidOperation) as e:
             return JsonResponse({'success': False, 'error': f'Invalid data: {str(e)}'}, status=400)
         
+        # Validate barcode requirement
+        has_barcode = data.get('has_barcode', 'no')
+        barcode_value = data.get('barcode', '').strip()
+        
+        # If user selected "yes" for barcode, barcode value is required
+        if has_barcode == 'yes' and not barcode_value:
+            return JsonResponse({
+                'success': False,
+                'error': 'Barcode is required when "Has Barcode" is selected.'
+            }, status=400)
+        
         # Create product
         with transaction.atomic():
             product = MerchProduct.objects.create(
@@ -350,15 +361,21 @@ def clothing_wizard_submit(request):
             )
             
             # Handle barcode if provided
-            if data.get('has_barcode') == 'yes' and data.get('barcode'):
-                product.barcode = data.get('barcode')
+            if has_barcode == 'yes' and barcode_value:
+                product.barcode = barcode_value
                 product.scan_required = True
+                product.save(update_fields=['barcode', 'scan_required'])
+            else:
+                # Explicitly set barcode to None and scan_required to False
+                product.barcode = None
+                product.scan_required = False
                 product.save(update_fields=['barcode', 'scan_required'])
         
         return JsonResponse({
             'success': True,
             'product_id': product.id,
-            'redirect': '/verticals/clothing/dashboard/'
+            'redirect': '/verticals/clothing/dashboard/',
+            'message': f'Product "{product_name}" created successfully!'
         })
         
     except Exception as e:

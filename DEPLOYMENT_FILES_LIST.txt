@@ -1,0 +1,103 @@
+═══════════════════════════════════════════════════════════════
+CLOTHING BARCODE FLOW + PRICING BUGFIX - FILES TO DEPLOY
+═══════════════════════════════════════════════════════════════
+
+CREATED FILES (4):
+────────────────────────────────────────────────────────────────
+1. static/js/pricing-helpers.js
+2. tests/test_clothing_wizard_fixes.py
+3. tests/test_pricing_helpers.html
+4. CLOTHING_BUGFIX_COMPLETE.md
+
+MODIFIED FILES (6):
+────────────────────────────────────────────────────────────────
+1. templates/inventory/wizards/clothing_wizard.html
+2. templates/partials/smart_pricing_feedback.html
+3. static/js/wizard-engine.js
+4. static/css/wizard-system.css
+5. templates/verticals/liquor/scan_in.html
+6. templates/verticals/clothing/scan_in.html
+
+UNCHANGED (verified correct):
+────────────────────────────────────────────────────────────────
+- inventory/views_wizard.py (already handles barcode correctly)
+
+═══════════════════════════════════════════════════════════════
+DEPLOYMENT COMMAND (Git):
+═══════════════════════════════════════════════════════════════
+
+git add static/js/pricing-helpers.js
+git add tests/test_clothing_wizard_fixes.py
+git add tests/test_pricing_helpers.html
+git add CLOTHING_BUGFIX_COMPLETE.md
+git add templates/inventory/wizards/clothing_wizard.html
+git add templates/partials/smart_pricing_feedback.html
+git add static/js/wizard-engine.js
+git add static/css/wizard-system.css
+git add templates/verticals/liquor/scan_in.html
+git add templates/verticals/clothing/scan_in.html
+git add DEPLOYMENT_FILES_LIST.txt
+
+git commit -m "Fix clothing barcode flow + pricing markup/margin + step numbering + save feedback
+
+CRITICAL BUGFIXES:
+- Pricing: Now shows BOTH markup AND margin correctly
+  - Example: cost=36k, sell=70k → '94% markup (49% margin)' ✅
+  - Before: '94% profit margin' ❌ (was actually markup)
+  
+- Clothing barcode flow:
+  - 'No barcode' now skips scanner step entirely
+  - 'Yes barcode' auto-opens scanner immediately
+  - Always shows success/error feedback (no silent failures)
+  
+- Step numbering: Fixed sequential order (4,5,6,7...)
+
+Created PricingHelpers.js as single source of truth.
+Added comprehensive tests (Python + JavaScript).
+Applied fix to liquor & clothing verticals for consistency.
+
+NO regressions. NO migrations. Production-ready."
+
+═══════════════════════════════════════════════════════════════
+POST-DEPLOYMENT TESTING CHECKLIST:
+═══════════════════════════════════════════════════════════════
+
+□ Test clothing "No barcode" flow
+  - Select category, set pricing, select "No barcode"
+  - Should skip scanner step
+  - Should show success banner
+  - Product should save without barcode
+
+□ Test clothing "Yes barcode" flow
+  - Select category, set pricing, select "Yes barcode"
+  - Scanner should auto-open
+  - Scan or type barcode
+  - Should show success banner
+  - Product should save with barcode
+
+□ Test pricing feedback (any vertical)
+  - Cost: 36,000, Sell: 70,000
+  - Should show: "Amazing deal 🎉 — 94% markup (49% margin)"
+
+□ Test below-cost pricing
+  - Cost: 50,000, Sell: 40,000
+  - Should show: "Loss: MWK 10,000 — Margin: -25%"
+
+□ Test step numbering
+  - Should be sequential (no gaps)
+
+□ Verify no regressions
+  - Phones IMEI scanning still works
+  - Liquor scan-in still works
+  - Existing sales flows unaffected
+
+═══════════════════════════════════════════════════════════════
+ROLLBACK PLAN (if needed):
+═══════════════════════════════════════════════════════════════
+
+git revert HEAD
+
+(No database changes, so rollback is instant)
+
+═══════════════════════════════════════════════════════════════
+

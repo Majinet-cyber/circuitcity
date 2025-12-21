@@ -235,7 +235,7 @@
       <h2 style="margin:0;font-size:1.1rem">💰 Recent Sales - <span id="chartModeLabel">Revenue</span></h2>
       <a class="btn btn-sm btn-primary" href="{% url 'verticals:clothing_sales_history' %}" style="border-radius:20px;padding:6px 14px;font-weight:600">View All →</a>
     </div>
-    {% if sales_trend %}
+    {% if sales_by_day %}
       <div style="position:relative;height:300px;margin-bottom:16px">
         <canvas id="recentSalesChart"></canvas>
       </div>
@@ -245,7 +245,7 @@
         if (!ctx) return;
         
         const salesData = [
-          {% for day in sales_trend|slice:":14" %}
+          {% for day in sales_by_day %}
           {
             date_short: "{{ day.date_short|default:'' }}",
             revenue: {{ day.revenue|default:0 }},
@@ -259,9 +259,9 @@
         const labels = salesData.map(d => d.date_short || '');
         const revenues = salesData.map(d => parseFloat(d.revenue) || 0);
         const profits = salesData.map(d => parseFloat(d.profit) || 0);
-        const unitsSold = salesData.map(d => parseInt(d.units) || 0);
+        const counts = salesData.map(d => parseInt(d.count) || 0);
         
-        let currentMode = 'revenue'; // 'revenue' or 'profit'
+        let currentMode = 'count'; // 'count' or 'profit'
         let chartInstance = null;
         
         function createChart(mode) {
@@ -269,10 +269,13 @@
             chartInstance.destroy();
           }
           
-          const data = mode === 'revenue' ? revenues : profits;
-          const bgColor = mode === 'revenue' ? 'rgba(59, 130, 246, 0.8)' : 'rgba(16, 185, 129, 0.8)';
-          const borderColor = mode === 'revenue' ? 'rgba(59, 130, 246, 1)' : 'rgba(16, 185, 129, 1)';
-          const label = mode === 'revenue' ? 'Revenue (MWK)' : 'Profit (MWK)';
+          // Default: count bars with revenue tooltip
+          // Profit mode: profit bars with revenue + count tooltip
+          const isCountMode = mode === 'count';
+          const data = isCountMode ? counts : profits;
+          const bgColor = isCountMode ? 'rgba(59, 130, 246, 0.8)' : 'rgba(16, 185, 129, 0.8)';
+          const borderColor = isCountMode ? 'rgba(59, 130, 246, 1)' : 'rgba(16, 185, 129, 1)';
+          const label = isCountMode ? 'Sales Count' : 'Profit (MWK)';
           
           chartInstance = new Chart(ctx, {
             type: 'bar',
@@ -300,12 +303,22 @@
                       const index = context.dataIndex;
                       const revenue = revenues[index];
                       const profit = profits[index];
-                      const units = unitsSold[index];
-                      return [
-                        `Revenue: MWK ${revenue.toLocaleString()}`,
-                        `Profit: MWK ${profit.toLocaleString()}`,
-                        `Units Sold: ${units}`
-                      ];
+                      const count = counts[index];
+                      
+                      if (isCountMode) {
+                        // Count mode: show count + revenue
+                        return [
+                          `Sales: ${count}`,
+                          `Revenue: MWK ${revenue.toLocaleString()}`
+                        ];
+                      } else {
+                        // Profit mode: show profit + revenue + count
+                        return [
+                          `Profit: MWK ${profit.toLocaleString()}`,
+                          `Revenue: MWK ${revenue.toLocaleString()}`,
+                          `Sales: ${count}`
+                        ];
+                      }
                     }
                   }
                 }
@@ -315,13 +328,19 @@
                   beginAtZero: true,
                   ticks: {
                     callback: function(value) {
-                      if (value === 0) return 'K 0';
-                      if (value >= 1000000) {
-                        return 'K ' + (value / 1000000).toFixed(1) + 'M';
-                      } else if (value >= 1000) {
-                        return 'K ' + (value / 1000).toFixed(0) + 'K';
+                      if (isCountMode) {
+                        // Count mode: just show numbers
+                        return Math.round(value);
                       } else {
-                        return 'K ' + value.toFixed(0);
+                        // Profit mode: show currency
+                        if (value === 0) return 'MWK 0';
+                        if (value >= 1000000) {
+                          return 'MWK ' + (value / 1000000).toFixed(1) + 'M';
+                        } else if (value >= 1000) {
+                          return 'MWK ' + (value / 1000).toFixed(0) + 'K';
+                        } else {
+                          return 'MWK ' + value.toFixed(0);
+                        }
                       }
                     }
                   },
@@ -339,13 +358,13 @@
           });
         }
         
-        // Initial chart render
-        createChart('revenue');
+        // Initial chart render (count mode)
+        createChart('count');
         
-        // Rotate between revenue and profit every 10 seconds
+        // Rotate between count and profit every 10 seconds
         setInterval(function() {
-          currentMode = currentMode === 'revenue' ? 'profit' : 'revenue';
-          const modeLabel = currentMode === 'revenue' ? 'Revenue' : 'Profit';
+          currentMode = currentMode === 'count' ? 'profit' : 'count';
+          const modeLabel = currentMode === 'count' ? 'Sales Count' : 'Profit';
           document.getElementById('chartModeLabel').textContent = modeLabel;
           createChart(currentMode);
         }, 10000);

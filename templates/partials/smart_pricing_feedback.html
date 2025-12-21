@@ -94,6 +94,9 @@
 }
 </style>
 
+<!-- Load pricing helpers -->
+<script src="{% static 'js/pricing-helpers.js' %}"></script>
+
 <!-- Pricing Feedback Container -->
 <div id="{{ feedback_container_id|default:'pricing-feedback' }}" class="pricing-feedback-container">
   <span class="pricing-feedback-icon"></span>
@@ -158,34 +161,18 @@
       return;
     }
     
-    const margin = ((sellingPrice - costPrice) / costPrice) * 100;
+    // Use PricingHelpers for consistent calculation
+    const calc = PricingHelpers.calculate(costPrice, sellingPrice);
+    const feedback = PricingHelpers.getFeedback(calc);
+    
     const icon = feedbackContainer.querySelector('.pricing-feedback-icon');
     const message = feedbackContainer.querySelector('.pricing-feedback-message');
     
-    // Below cost - Warning
-    if (sellingPrice < costPrice) {
-      feedbackContainer.classList.remove('above-cost');
-      feedbackContainer.classList.add('below-cost', 'show');
-      icon.textContent = '🟡';
-      message.textContent = `This price is below your cost price (MWK ${costPrice.toLocaleString()}). Proceed if intentional.`;
-    }
-    // Above cost - Success with encouraging message
-    else {
-      feedbackContainer.classList.remove('below-cost');
-      feedbackContainer.classList.add('above-cost', 'show');
-      icon.textContent = '🟢';
-      
-      // Gamified encouraging messages based on margin
-      if (margin < 10) {
-        message.textContent = `Nice 👍 — this is ${margin.toFixed(0)}% above your cost price`;
-      } else if (margin < 25) {
-        message.textContent = `Great choice 💡 — ${margin.toFixed(0)}% margin`;
-      } else if (margin < 50) {
-        message.textContent = `Excellent 🚀 — ${margin.toFixed(0)}% profit margin`;
-      } else {
-        message.textContent = `Amazing deal 🎉 — ${margin.toFixed(0)}% profit margin!`;
-      }
-    }
+    // Update UI
+    feedbackContainer.classList.remove('above-cost', 'below-cost');
+    feedbackContainer.classList.add(feedback.type, 'show');
+    icon.textContent = feedback.icon;
+    message.textContent = feedback.message;
   }
   
   // Initialize cost price if already set

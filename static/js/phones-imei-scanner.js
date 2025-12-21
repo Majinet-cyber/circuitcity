@@ -738,22 +738,21 @@
       // Fill the input
       this.targetInput.value = imei;
       
-      // Trigger input and change events so existing validation/lookup logic runs
-      // Use setTimeout to ensure the value is set before events fire
-      setTimeout(() => {
-        this.targetInput.dispatchEvent(new Event('input', { bubbles: true }));
-        this.targetInput.dispatchEvent(new Event('change', { bubbles: true }));
-        
-        // Also trigger any keyup/blur listeners that might exist
-        this.targetInput.dispatchEvent(new Event('keyup', { bubbles: true }));
-        this.targetInput.dispatchEvent(new Event('blur', { bubbles: true }));
-        
-        // Focus the input to show visual feedback
-        this.targetInput.focus();
-      }, 50);
+      // Trigger input and change events BEFORE closing so they complete properly
+      this.targetInput.dispatchEvent(new Event('input', { bubbles: true }));
+      this.targetInput.dispatchEvent(new Event('change', { bubbles: true }));
+      this.targetInput.dispatchEvent(new Event('keyup', { bubbles: true }));
+      this.targetInput.dispatchEvent(new Event('blur', { bubbles: true }));
       
-      // Close modal
+      // Close modal IMMEDIATELY (camera off, UI hidden)
       this.close();
+      
+      // Focus the input after modal closes (using short delay)
+      setTimeout(() => {
+        if (this.targetInput) {
+          this.targetInput.focus();
+        }
+      }, 100);
       
       // Show success feedback
       if (navigator.vibrate) {

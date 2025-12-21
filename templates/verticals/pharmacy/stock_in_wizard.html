@@ -92,6 +92,16 @@
     .wizard-actions .btn-wizard{width:100%}
     .progress-step-label{font-size:.65rem}
   }
+  
+  /* FIX: Mobile overflow for "Choose product type" cards (360px) */
+  @media (max-width:480px){
+    .wizard-container{max-width:100%;padding:12px;overflow-x:hidden}
+    .wizard-panel{overflow-x:hidden;box-sizing:border-box}
+    .card-grid{grid-template-columns:1fr !important;gap:12px;max-width:100% !important}
+    .option-card{min-width:0;box-sizing:border-box;width:100%}
+    .option-card .card-label{word-break:break-word;overflow-wrap:break-word;white-space:normal}
+    .mode-card{min-height:140px !important}
+  }
 </style>
 {% endblock %}
 
@@ -162,7 +172,7 @@
     {% if step == 0 %}
     <div class="wizard-panel">
       <h2 class="wizard-section-title">Choose Product Type</h2>
-      <div class="card-grid" style="grid-template-columns: 1fr 1fr; max-width: 600px; margin: 0 auto;">
+      <div class="card-grid" style="max-width: 600px; margin: 0 auto;">
         {% for mode in mode_options %}
         <div class="option-card mode-card" data-mode="{{ mode.key }}" onclick="selectMode('{{ mode.key }}')" style="min-height:160px; padding: 32px 24px;">
           <div class="card-label" style="font-size:1.4rem; font-weight: 800;">{{ mode.label }}</div>

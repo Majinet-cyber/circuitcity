@@ -991,10 +991,15 @@
           data: salesTrendData.map(d => isAmount ? parseFloat(d.revenue || 0) : parseInt(d.count || 0)),
           borderColor: '#2563eb',
           backgroundColor: 'rgba(37, 99, 235, 0.1)',
+          borderWidth: 3,
           tension: 0.4,
           fill: true,
-          pointRadius: 4,
-          pointHoverRadius: 6,
+          showLine: true,
+          pointRadius: 5,
+          pointHoverRadius: 8,
+          pointBackgroundColor: '#2563eb',
+          pointBorderColor: '#fff',
+          pointBorderWidth: 2,
         }]
       },
       options: {

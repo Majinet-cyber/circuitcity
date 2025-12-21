@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pricing Helpers Tests</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            max-width: 800px;
+            margin: 40px auto;
+            padding: 20px;
+            background: #f8fafc;
+        }
+        h1 {
+            color: #0f172a;
+            border-bottom: 3px solid #6366f1;
+            padding-bottom: 12px;
+        }
+        .test-section {
+            background: white;
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+        }
+        .test-case {
+            padding: 12px;
+            margin: 8px 0;
+            border-left: 4px solid #cbd5e1;
+            background: #f8fafc;
+            border-radius: 4px;
+        }
+        .test-case.pass {
+            border-left-color: #4ade80;
+            background: #f0fdf4;
+        }
+        .test-case.fail {
+            border-left-color: #ef4444;
+            background: #fef2f2;
+        }
+        .test-name {
+            font-weight: 600;
+            margin-bottom: 4px;
+        }
+        .test-result {
+            font-size: 14px;
+            color: #64748b;
+        }
+        .summary {
+            background: linear-gradient(135deg, #6366f1, #8b5cf6);
+            color: white;
+            padding: 16px 20px;
+            border-radius: 12px;
+            margin-bottom: 24px;
+            font-weight: 600;
+            font-size: 18px;
+        }
+    </style>
+</head>
+<body>
+    <h1>🧪 Pricing Helpers Unit Tests</h1>
+    <div id="summary" class="summary">Running tests...</div>
+    <div id="test-results"></div>
+
+    <script src="../static/js/pricing-helpers.js"></script>
+    <script>
+        const results = [];
+        
+        function assert(condition, message) {
+            if (!condition) {
+                throw new Error(`Assertion failed: ${message}`);
+            }
+        }
+        
+        function assertAlmostEqual(a, b, tolerance = 0.01, message = '') {
+            if (Math.abs(a - b) > tolerance) {
+                throw new Error(`${message}: Expected ${a} ≈ ${b}, diff: ${Math.abs(a - b)}`);
+            }
+        }
+        
+        function test(name, fn) {
+            try {
+                fn();
+                results.push({ name, pass: true });
+            } catch (error) {
+                results.push({ name, pass: false, error: error.message });
+            }
+        }
+        
+        // ===== TESTS =====
+        
+        test('Markup vs Margin: cost=36000, sell=70000', () => {
+            const calc = PricingHelpers.calculate(36000, 70000);
+            assert(calc.profit === 34000, 'Profit should be 34000');
+            assertAlmostEqual(calc.markupPercent, 94.44, 0.01, 'Markup');
+            assertAlmostEqual(calc.marginPercent, 48.57, 0.01, 'Margin');
+            assert(calc.isProfit === true, 'Should be profit');
+            
+            // Test rounded values
+            const markupRounded = PricingHelpers.roundPercent(calc.markupPercent);
+            const marginRounded = PricingHelpers.roundPercent(calc.marginPercent);
+            assert(markupRounded === 94, 'Rounded markup should be 94');
+            assert(marginRounded === 49, 'Rounded margin should be 49');
+        });
+        
+        test('Below cost pricing: cost=50000, sell=40000', () => {
+            const calc = PricingHelpers.calculate(50000, 40000);
+            assert(calc.profit === -10000, 'Profit should be -10000 (loss)');
+            assertAlmostEqual(calc.marginPercent, -25.0, 0.01, 'Margin');
+            assert(calc.isProfit === false, 'Should be loss');
+        });
+        
+        test('Zero cost: no divide by zero', () => {
+            const calc = PricingHelpers.calculate(0, 50000);
+            assert(calc.profit === 50000, 'Profit should be 50000');
+            assert(calc.marginPercent === 100, 'Margin should be 100%');
+            assert(calc.markupPercent === null, 'Markup should be N/A (null)');
+        });
+        
+        test('Zero selling price: edge case', () => {
+            const calc = PricingHelpers.calculate(10000, 0);
+            assert(calc.profit === -10000, 'Profit should be -10000');
+            assert(calc.marginPercent === null, 'Margin should be null (can\'t divide by zero)');
+            assertAlmostEqual(calc.markupPercent, -100, 0.01, 'Markup');
+        });
+        
+        test('Feedback message: Amazing deal (>50% markup)', () => {
+            const calc = PricingHelpers.calculate(36000, 70000);
+            const feedback = PricingHelpers.getFeedback(calc);
+            assert(feedback.type === 'above-cost', 'Type should be above-cost');
+            assert(feedback.icon === '🟢', 'Icon should be green');
+            assert(feedback.message.includes('Amazing deal'), 'Should say Amazing deal');
+            assert(feedback.message.includes('94%'), 'Should show 94% markup');
+            assert(feedback.message.includes('49%'), 'Should show 49% margin');
+            assert(feedback.message.includes('markup'), 'Should mention markup');
+            assert(feedback.message.includes('margin'), 'Should mention margin');
+        });
+        
+        test('Feedback message: Below cost (loss)', () => {
+            const calc = PricingHelpers.calculate(50000, 40000);
+            const feedback = PricingHelpers.getFeedback(calc);
+            assert(feedback.type === 'below-cost', 'Type should be below-cost');
+            assert(feedback.icon === '🟡', 'Icon should be yellow');
+            assert(feedback.message.includes('Loss'), 'Should say Loss');
+            assert(feedback.message.includes('-25%'), 'Should show -25% margin');
+        });
+        
+        test('Format currency with commas', () => {
+            const formatted1 = PricingHelpers.formatCurrency(70000);
+            assert(formatted1 === 'MWK 70,000', `Expected "MWK 70,000", got "${formatted1}"`);
+            
+            const formatted2 = PricingHelpers.formatCurrency(1234567.89);
+            assert(formatted2.includes('1,234,567'), 'Should format large numbers with commas');
+        });
+        
+        test('Round percentage to nearest integer', () => {
+            assert(PricingHelpers.roundPercent(94.44) === 94, '94.44 rounds to 94');
+            assert(PricingHelpers.roundPercent(48.57) === 49, '48.57 rounds to 49');
+            assert(PricingHelpers.roundPercent(50.5) === 51, '50.5 rounds to 51');
+            assert(PricingHelpers.roundPercent(null) === null, 'null stays null');
+        });
+        
+        test('Barcode requirement: global disabled', () => {
+            const required = PricingHelpers.isBarcodeRequired({
+                globalBarcodeDisabled: true,
+                userSelectedNo: false
+            });
+            assert(required === false, 'Should not require barcode if globally disabled');
+        });
+        
+        test('Barcode requirement: user selected No', () => {
+            const required = PricingHelpers.isBarcodeRequired({
+                globalBarcodeDisabled: false,
+                userSelectedNo: true
+            });
+            assert(required === false, 'Should not require barcode if user selected No');
+        });
+        
+        test('Barcode requirement: user selected Yes', () => {
+            const required = PricingHelpers.isBarcodeRequired({
+                globalBarcodeDisabled: false,
+                userSelectedNo: false
+            });
+            assert(required === true, 'Should require barcode if enabled and user didn\'t select No');
+        });
+        
+        test('Excellent message: 25-50% markup', () => {
+            const calc = PricingHelpers.calculate(10000, 14000); // 40% markup
+            const feedback = PricingHelpers.getFeedback(calc);
+            assert(feedback.message.includes('Excellent'), 'Should say Excellent');
+        });
+        
+        test('Great choice message: 10-25% markup', () => {
+            const calc = PricingHelpers.calculate(10000, 12000); // 20% markup
+            const feedback = PricingHelpers.getFeedback(calc);
+            assert(feedback.message.includes('Great choice'), 'Should say Great choice');
+        });
+        
+        test('Nice message: <10% markup', () => {
+            const calc = PricingHelpers.calculate(10000, 10500); // 5% markup
+            const feedback = PricingHelpers.getFeedback(calc);
+            assert(feedback.message.includes('Nice'), 'Should say Nice');
+        });
+        
+        // ===== RENDER RESULTS =====
+        
+        const summaryEl = document.getElementById('summary');
+        const resultsEl = document.getElementById('test-results');
+        
+        const passed = results.filter(r => r.pass).length;
+        const failed = results.filter(r => !r.pass).length;
+        
+        summaryEl.innerHTML = `
+            ✅ ${passed} passed &nbsp;&nbsp; ${failed > 0 ? `❌ ${failed} failed` : ''}
+            &nbsp;&nbsp; Total: ${results.length}
+        `;
+        
+        results.forEach(result => {
+            const div = document.createElement('div');
+            div.className = `test-case ${result.pass ? 'pass' : 'fail'}`;
+            div.innerHTML = `
+                <div class="test-name">${result.pass ? '✅' : '❌'} ${result.name}</div>
+                ${result.error ? `<div class="test-result" style="color: #dc2626;">Error: ${result.error}</div>` : ''}
+            `;
+            resultsEl.appendChild(div);
+        });
+    </script>
+</body>
+</html>
+

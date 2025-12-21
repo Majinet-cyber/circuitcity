@@ -1,0 +1,414 @@
+/* =====================================================================
+   GLOBAL MOBILE GUTTER SYSTEM — Circuit City / Emajinet
+   Version: 1.0.0
+   Created: 2025-12-21
+   
+   Purpose:
+   - Match landing page "near-edge premium" feel on mobile across ALL app pages
+   - Single source of truth for mobile gutters (no double/triple padding)
+   - NO horizontal scroll, NO breaking desktop/tablet layouts
+   - NO changes to modals, offcanvas, toasts, scanners
+   
+   Reference: 
+   - Landing page (/landing/) uses 1rem (16px) for mobile card gutters
+   - This system replicates that exact pattern app-wide
+   ===================================================================== */
+
+/* =====================================================================
+   1. SINGLE SOURCE OF TRUTH — MOBILE GUTTER VARIABLE
+   ===================================================================== */
+
+:root {
+  /* Landing page mobile gutter pattern: near-edge but premium */
+  --cc-gutter-mobile: 10px;
+  
+  /* Desktop/tablet remain spacious */
+  --cc-gutter-tablet: 18px;
+  --cc-gutter-desktop: 20px;
+}
+
+/* =====================================================================
+   2. GLOBAL APP CONTENT WRAPPER — MOBILE GUTTER APPLICATION
+   ===================================================================== */
+
+/**
+ * CRITICAL: Apply mobile gutter ONLY to main app page content
+ * Scoped to authenticated app pages (not landing/public pages)
+ * 
+ * This targets:
+ * - .cc-main (main content area inside .cc-shell)
+ * - main#app-main (main content element)
+ * - .cc-page (page content wrapper)
+ */
+
+@media (max-width: 576px) {
+  /* Apply near-edge gutters to outermost app content wrapper */
+  .cc-main,
+  main#app-main,
+  main.cc-page {
+    padding-left: var(--cc-gutter-mobile) !important;
+    padding-right: var(--cc-gutter-mobile) !important;
+  }
+  
+  /* Neutralize nested container padding to prevent double-padding */
+  .cc-main .container,
+  .cc-main .container-fluid,
+  main#app-main .container,
+  main#app-main .container-fluid,
+  main.cc-page .container,
+  main.cc-page .container-fluid {
+    padding-left: 0 !important;
+    padding-right: 0 !important;
+  }
+  
+  /* Neutralize nested .cc-page wrappers (when stacked) */
+  .cc-main .cc-page,
+  main#app-main .cc-page {
+    padding-left: 0 !important;
+    padding-right: 0 !important;
+  }
+  
+  /* Reduce .vertical-page padding (used in clothing, liquor, phones dashboards) */
+  .vertical-page {
+    padding-left: 0 !important;
+    padding-right: 0 !important;
+  }
+  
+  /* Tighten Bootstrap row gutters on mobile (match landing) */
+  .cc-main .row,
+  main#app-main .row,
+  main.cc-page .row {
+    --bs-gutter-x: 0.75rem; /* 12px, down from Bootstrap default 24px */
+  }
+  
+  /* Ensure cards inside grids sit near edge */
+  .cc-main .row > [class^="col"],
+  main#app-main .row > [class^="col"],
+  main.cc-page .row > [class^="col"] {
+    padding-left: calc(var(--bs-gutter-x) * 0.5);
+    padding-right: calc(var(--bs-gutter-x) * 0.5);
+  }
+}
+
+/* =====================================================================
+   3. SAFETY — DO NOT AFFECT MODALS, OFFCANVAS, OVERLAYS
+   ===================================================================== */
+
+/**
+ * CRITICAL: Exclude overlays from mobile gutter changes
+ * These need their own padding for proper UX
+ */
+
+/* Modals — restore default padding */
+@media (max-width: 576px) {
+  .modal,
+  .modal-dialog,
+  .modal-content,
+  .modal-body {
+    padding-left: revert !important;
+    padding-right: revert !important;
+  }
+  
+  /* Offcanvas menus — restore default padding */
+  .offcanvas,
+  .offcanvas-body {
+    padding-left: revert !important;
+    padding-right: revert !important;
+  }
+  
+  /* Toasts/alerts — restore default positioning */
+  .toast,
+  .toast-container,
+  .cc-alert {
+    margin-left: revert !important;
+    margin-right: revert !important;
+    padding-left: revert !important;
+    padding-right: revert !important;
+  }
+  
+  /* Scanner overlays — full width/no gutter */
+  .scanner-overlay,
+  .barcode-scanner-modal,
+  .imei-scanner-modal,
+  [id*="scanner"],
+  [class*="scanner-modal"] {
+    padding-left: 0 !important;
+    padding-right: 0 !important;
+    margin-left: 0 !important;
+    margin-right: 0 !important;
+  }
+  
+  /* Bottom navigation — exclude */
+  .mobile-tabbar,
+  .cc-bottomnav,
+  nav.mobile-tabbar {
+    padding-left: revert !important;
+    padding-right: revert !important;
+  }
+  
+  /* Sidebar — exclude (has own mobile width logic) */
+  .cc-sidebar,
+  nav.cc-sidebar {
+    padding-left: revert !important;
+    padding-right: revert !important;
+  }
+}
+
+/* =====================================================================
+   4. TABLET & DESKTOP — NO CHANGES
+   ===================================================================== */
+
+/**
+ * Tablet (577px - 991px): Slightly increase gutters for comfort
+ * Desktop (992px+): Premium spacious layout unchanged
+ */
+
+@media (min-width: 577px) and (max-width: 991px) {
+  .cc-main,
+  main#app-main,
+  main.cc-page {
+    padding-left: var(--cc-gutter-tablet) !important;
+    padding-right: var(--cc-gutter-tablet) !important;
+  }
+}
+
+@media (min-width: 992px) {
+  .cc-main,
+  main#app-main,
+  main.cc-page {
+    padding-left: var(--cc-gutter-desktop) !important;
+    padding-right: var(--cc-gutter-desktop) !important;
+  }
+}
+
+/* =====================================================================
+   5. NO HORIZONTAL SCROLL GUARANTEE
+   ===================================================================== */
+
+/**
+ * Final safety net — prevent ANY horizontal scroll
+ */
+
+@media (max-width: 576px) {
+  html {
+    overflow-x: hidden !important;
+    max-width: 100vw;
+  }
+  
+  body {
+    overflow-x: hidden !important;
+    max-width: 100vw;
+  }
+  
+  /* Ensure main content areas respect viewport width */
+  .cc-main,
+  main#app-main,
+  main.cc-page {
+    max-width: 100vw;
+    overflow-x: hidden;
+  }
+  
+  /* Ensure all direct children of main content respect width */
+  .cc-main > *,
+  main#app-main > *,
+  main.cc-page > * {
+    max-width: 100%;
+    box-sizing: border-box;
+  }
+}
+
+/* =====================================================================
+   6. CARD INTERNAL PADDING — KEEP PREMIUM
+   ===================================================================== */
+
+/**
+ * IMPORTANT: Cards maintain internal padding for premium feel
+ * We're only reducing outer gutters, not card content spacing
+ */
+
+@media (max-width: 576px) {
+  /* Ensure cards have proper internal padding (no change needed if already set) */
+  .card,
+  .metric-card,
+  .glass-card,
+  .cc-card,
+  .cc-panel,
+  .recent-block,
+  .kpi {
+    padding: 12px !important; /* Landing page uses similar */
+    margin-left: 0;
+    margin-right: 0;
+  }
+  
+  /* Card bodies inside Bootstrap cards */
+  .card > .card-body {
+    padding: 12px !important;
+  }
+  
+  /* Preserve vertical spacing between cards */
+  .card,
+  .metric-card,
+  .glass-card,
+  .cc-card,
+  .cc-panel {
+    margin-bottom: 10px;
+  }
+}
+
+/* =====================================================================
+   7. GRID SYSTEMS — MOBILE OPTIMIZATION
+   ===================================================================== */
+
+/**
+ * Reduce grid gaps on mobile to match landing page density
+ */
+
+@media (max-width: 576px) {
+  /* Bootstrap grids */
+  .row {
+    margin-left: calc(var(--bs-gutter-x, 0.75rem) * -0.5);
+    margin-right: calc(var(--bs-gutter-x, 0.75rem) * -0.5);
+  }
+  
+  /* Custom grids (dashboard, analytics) */
+  .dashboard-grid,
+  .analytics-grid,
+  .kpi-grid,
+  .metrics-grid,
+  [class*="grid-"] {
+    gap: 12px !important;
+    padding-left: 0;
+    padding-right: 0;
+  }
+  
+  /* CSS Grid containers */
+  [style*="display: grid"],
+  [style*="display:grid"] {
+    gap: 12px;
+  }
+}
+
+/* =====================================================================
+   8. SECTION WRAPPERS — NEUTRALIZE EXTRA PADDING
+   ===================================================================== */
+
+/**
+ * Common section wrappers that add extra padding
+ */
+
+@media (max-width: 576px) {
+  /* Generic section wrappers */
+  .section,
+  .block,
+  .panel,
+  section {
+    padding-left: 0 !important;
+    padding-right: 0 !important;
+  }
+  
+  /* Dashboard-specific wrappers */
+  .dashboard-content,
+  .dashboard-wrapper,
+  .page-wrapper,
+  .content-wrapper {
+    padding-left: 0 !important;
+    padding-right: 0 !important;
+  }
+  
+  /* Vertical-specific wrappers (phones, liquor, clothing, pharmacy) */
+  .vertical-page,
+  .vertical-content,
+  .vertical-wrapper {
+    padding-left: 0 !important;
+    padding-right: 0 !important;
+  }
+}
+
+/* =====================================================================
+   9. HEADERS — COMPACT ON MOBILE
+   ===================================================================== */
+
+/**
+ * Page headers should also respect mobile gutters
+ */
+
+@media (max-width: 576px) {
+  .cc-header,
+  .page-header,
+  header.vertical-hero {
+    padding-left: 0 !important;
+    padding-right: 0 !important;
+    margin-left: 0;
+    margin-right: 0;
+  }
+  
+  /* Topbar inside header */
+  .cc-header .topbar {
+    padding-left: 0;
+    padding-right: 0;
+  }
+}
+
+/* =====================================================================
+   10. VISUAL PROOF — LANDING PAGE MATCH
+   ===================================================================== */
+
+/**
+ * Debug helper (remove after verification)
+ * Uncomment to visually verify mobile gutter is applied
+ */
+
+/*
+@media (max-width: 576px) {
+  .cc-main::before,
+  main#app-main::before {
+    content: '✓ Mobile Gutter Active: ' var(--cc-gutter-mobile);
+    display: block;
+    background: rgba(59, 130, 246, 0.1);
+    border: 2px dashed rgba(59, 130, 246, 0.5);
+    padding: 8px;
+    margin-bottom: 12px;
+    border-radius: 8px;
+    font-size: 12px;
+    font-weight: 700;
+    color: #3b82f6;
+    text-align: center;
+  }
+}
+*/
+
+/* =====================================================================
+   END OF GLOBAL MOBILE GUTTER SYSTEM
+   ===================================================================== */
+
+/**
+ * USAGE NOTES:
+ * 
+ * 1. This file must load AFTER base styles but BEFORE page-specific CSS
+ * 2. Include in base.html: <link rel="stylesheet" href="{% static 'css/mobile-gutter-system.css' %}">
+ * 3. Order in base.html:
+ *    - tokens.css
+ *    - ui.css
+ *    - app.css
+ *    - mobile-system.css
+ *    - mobile.css
+ *    - mobile-gutter-system.css (THIS FILE)
+ *    - polish.css
+ * 
+ * 4. Verification:
+ *    - Open any app page on mobile (≤576px)
+ *    - Cards should sit ~10px from screen edge (like landing)
+ *    - No horizontal scroll
+ *    - Desktop/tablet layouts unchanged
+ * 
+ * 5. Troubleshooting:
+ *    - If cards still have too much padding, check for inline styles
+ *    - If horizontal scroll appears, check for fixed-width elements
+ *    - If modals break, verify exclusion rules above
+ * 
+ * 6. Future maintenance:
+ *    - To adjust mobile gutter: change --cc-gutter-mobile variable
+ *    - To add exceptions: add class to section 3 (SAFETY)
+ *    - To match new landing gutter: update variable to match
+ */
+

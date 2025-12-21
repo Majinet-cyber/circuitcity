@@ -293,12 +293,15 @@ def clothing_dashboard(request):
     for i in range(6, -1, -1):
         day = now.date() - timedelta(days=i)
         day_sales = all_sales.filter(sold_at__date=day)
-        day_total = day_sales.aggregate(Sum("total_price"))["total_price__sum"] or Decimal("0.00")
+        day_revenue = day_sales.aggregate(Sum("total_price"))["total_price__sum"] or Decimal("0.00")
+        day_cost = day_sales.aggregate(Sum("total_cost"))["total_cost__sum"] or Decimal("0.00")
+        day_profit = day_revenue - day_cost
         day_count = day_sales.count()
         sales_by_day.append({
             "date": day.strftime("%Y-%m-%d"),
             "date_short": day.strftime("%b %d"),
-            "total": float(day_total),
+            "revenue": float(day_revenue),
+            "profit": float(day_profit),
             "count": day_count,
         })
     

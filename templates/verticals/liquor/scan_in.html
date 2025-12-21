@@ -429,6 +429,7 @@
     </div>
 </div>
 
+<script src="{% static 'js/pricing-helpers.js' %}"></script>
 <script>
 // 🔍 VISUAL PROOF: Smart pricing JavaScript loaded
 // Liquor Smart Pricing JS loaded
@@ -582,32 +583,18 @@ function setupSmartPricingFeedback() {
             return;
         }
         
-        const margin = ((selling - costPrice) / costPrice) * 100;
+        // Use PricingHelpers for consistent calculation
+        const calc = PricingHelpers.calculate(costPrice, selling);
+        const feedback = PricingHelpers.getFeedback(calc);
+        
         const icon = feedbackContainer.querySelector('.pricing-feedback-icon');
         const message = feedbackContainer.querySelector('.pricing-feedback-message');
         
-        if (selling < costPrice) {
-            // Below cost - Warning
-            feedbackContainer.classList.remove('above-cost');
-            feedbackContainer.classList.add('below-cost', 'show');
-            icon.textContent = '🟡';
-            message.textContent = `This price is below your cost price (MWK ${costPrice.toLocaleString()}). Proceed if intentional.`;
-        } else {
-            // Above cost - Success with encouraging message
-            feedbackContainer.classList.remove('below-cost');
-            feedbackContainer.classList.add('above-cost', 'show');
-            icon.textContent = '🟢';
-            
-            if (margin < 10) {
-                message.textContent = `Nice 👍 — this is ${margin.toFixed(0)}% above your cost price`;
-            } else if (margin < 25) {
-                message.textContent = `Great choice 💡 — ${margin.toFixed(0)}% margin`;
-            } else if (margin < 50) {
-                message.textContent = `Excellent 🚀 — ${margin.toFixed(0)}% profit margin`;
-            } else {
-                message.textContent = `Amazing deal 🎉 — ${margin.toFixed(0)}% profit margin!`;
-            }
-        }
+        // Update UI
+        feedbackContainer.classList.remove('above-cost', 'below-cost');
+        feedbackContainer.classList.add(feedback.type, 'show');
+        icon.textContent = feedback.icon;
+        message.textContent = feedback.message;
     }
     
     sellingPriceInput.addEventListener('input', updateFeedback);
@@ -648,12 +635,14 @@ async function submitStockIn() {
         });
         
         if (response.ok) {
-            // Success - Show gamified success message
+            // Success - Redirect server-side with success param (clean state reset, no accidental clicks)
             const bottlesAdded = selectedUnit === 'crate' ? selectedQuantity * 20 : selectedQuantity;
-            showSuccessMessage(`🟢 Sale recorded 🎉\nAdded ${bottlesAdded} bottles of ${selectedProduct.name}\nStock updated · Pricing set · Well done!`);
+            showSuccessMessage(`🟢 Stock added 🎉\n${bottlesAdded} bottles of ${selectedProduct.name}\nRedirecting...`);
             
-            // Reload after brief delay
-            setTimeout(() => window.location.reload(), 2000);
+            // Server-side redirect with success param (prevents overlay/click confusion)
+            setTimeout(() => {
+                window.location.href = window.location.pathname + '?added=1';
+            }, 1500);
         } else {
             alert('❌ Failed to add stock. Please try again.');
         }
@@ -731,21 +720,23 @@ function resetForm() {
     {% csrf_token %}
 </form>
 
-<!-- Quick Add Floating Button -->
-<a href="{% url 'inventory:liquor_wizard' %}" style="position:fixed;bottom:24px;right:24px;z-index:999;display:flex;align-items:center;gap:10px;padding:16px 24px;background:linear-gradient(135deg,#6366f1,#8b5cf6);color:white;border-radius:50px;font-weight:600;box-shadow:0 8px 24px rgba(99,102,241,0.4);text-decoration:none;transition:all 0.3s">
-  <i class="bi bi-plus-circle" style="font-size:20px"></i>
-  <span>Add Product</span>
-</a>
+<!-- UX SAFETY FIX: Collapsible "Create new product" section (no fixed positioning, clear separation) -->
+<div style="max-width:1100px;margin:2rem auto;padding:1rem">
+  <details style="background:#f8fafc;border:2px solid #e2e8f0;border-radius:12px;padding:16px;margin-top:24px">
+    <summary style="cursor:pointer;font-weight:600;color:#64748b;font-size:0.95rem;user-select:none">
+      Need to create a new product? (Catalog)
+    </summary>
+    <div style="margin-top:16px;padding-top:16px;border-top:1px solid #e2e8f0">
+      <p style="margin:0 0 12px;color:#64748b;font-size:0.9rem">
+        If the product you want to stock doesn't exist yet, create it in the product catalog first.
+      </p>
+      <a href="{% url 'inventory:liquor_wizard' %}" style="display:inline-flex;align-items:center;gap:8px;padding:10px 20px;background:#6366f1;color:white;border-radius:8px;font-weight:600;text-decoration:none;font-size:0.95rem;transition:background 0.2s">
+        <i class="bi bi-plus-circle"></i>
+        <span>Create new product (Catalog)</span>
+      </a>
+    </div>
+  </details>
+</div>
 
-<style>
-@media (max-width: 640px) {
-  a[href*="wizard"] {
-    bottom: 80px !important;
-    right: 16px !important;
-    padding: 14px 20px !important;
-    font-size: 15px !important;
-  }
-}
-</style>
 {% endblock %}
 
