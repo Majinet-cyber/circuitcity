@@ -4,7 +4,8 @@
 {% block title %}Stock In · Clothing · Emajinet{% endblock %}
 
 {% block extra_css %}
-<!-- Old barcode-scanner CSS removed - now using smart_scanner.html partial styles -->
+<!-- Standard Scanner CSS -->
+<link rel="stylesheet" href="{% static 'css/scanner_standard.css' %}">
 {% endblock %}
 
 {% block content %}
@@ -176,8 +177,8 @@
         </div>
         <small style="color:#64748b;font-size:0.85rem;display:block;margin-bottom:8px;">Required when Has Barcode = Yes</small>
         
-        <!-- Smart Scanner Integration -->
-        {% include "partials/smart_scanner.html" with scanner_title="📷 Scan Barcode with Camera" scanner_target_input_id="barcode-input" scanner_mode="barcode" scanner_container_id="clothingBarcodeScanner" scanner_video_id="clothingBarcodeVideo" scanner_scanline_id="clothingBarcodeScanline" %}
+        <!-- Standard Scanner Integration -->
+        {% include "components/scanner_modal.html" with input_id="barcode-input" mode="general" button_text="📷 Scan Barcode" %}
       </div>
 
       <button type="submit" class="btn-submit">✅ Add to Stock</button>
@@ -423,8 +424,30 @@ window.addEventListener('pageshow', function(event) {
 });
 </script>
 
-<!-- Barcode Scanner: Now handled by smart_scanner.js + smart_scanner.html partial -->
-<!-- The old barcode-scanner-rear-camera.js integration has been replaced with the unified SmartScanner module. -->
+<!-- Standard Scanner Integration -->
+<script src="https://unpkg.com/quagga@0.12.1/dist/quagga.min.js"></script>
+<script src="https://unpkg.com/@zxing/library@0.20.0"></script>
+<script src="{% static 'js/scanner_standard.js' %}"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  // Initialize standard scanner for barcode (clothing)
+  const barcodeInput = document.getElementById('barcode-input');
+  if (barcodeInput) {
+    StandardScanner.init('barcode-input', {
+      mode: 'general',
+      onSuccess: function(barcode) {
+        console.log('Barcode scanned successfully:', barcode);
+        // Barcode already filled by scanner
+        // Trigger input event to update UI
+        barcodeInput.dispatchEvent(new Event('input', { bubbles: true }));
+      },
+      onError: function(message) {
+        console.error('Barcode scan failed:', message);
+      }
+    });
+  }
+});
+</script>
 
 {% endblock %}
 

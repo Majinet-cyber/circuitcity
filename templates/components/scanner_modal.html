@@ -1,0 +1,140 @@
+{% comment %}
+STANDARD SCANNER MODAL - CIRCUIT CITY SaaS
+==========================================
+This is the ONLY scanner component used across ALL verticals.
+Based on Fast Sell scanner UX with Use/Scan Again buttons.
+
+FEATURES:
+- Back camera ONLY (no front camera, no switch option)
+- Shows detected code with Use / Scan Again buttons
+- Proper aspect ratio (no warped preview)
+- Multi-code picker when multiple barcodes detected
+- BarcodeDetector → ZXing → Quagga fallback chain
+- Torch support (when available)
+
+USAGE:
+{% include "components/scanner_modal.html" with input_id="id_imei" validate_fn="validatePhoneIMEI" mode="phone_scan_sell" %}
+
+PARAMETERS:
+- input_id: ID of the input field to fill with scanned value
+- validate_fn: Optional JavaScript function name for validation (e.g., "validatePhoneIMEI")
+- mode: Optional mode for vertical-specific behavior (e.g., "phone_scan_sell", "phone_scan_in", "general")
+- button_text: Text for the scan button (default: "📷 Start Camera")
+- container_class: Additional CSS class for the container (optional)
+{% endcomment %}
+
+<!-- Scanner Button -->
+<button type="button" 
+        class="btn btn-primary {{ container_class }}" 
+        id="btn_open_scanner_{{ input_id }}" 
+        data-scanner-trigger="{{ input_id }}">
+  {{ button_text|default:"📷 Start Camera" }}
+</button>
+
+<!-- Scanner Modal Overlay -->
+<div id="scanner_modal_{{ input_id }}" 
+     class="cc-scanner-modal" 
+     style="display: none;"
+     data-scanner-modal="{{ input_id }}">
+  <div class="cc-scanner-shell">
+    <!-- Camera Preview -->
+    <div class="cc-scanner-video-container">
+      <video id="scanner_video_{{ input_id }}" 
+             class="cc-scanner-video" 
+             autoplay 
+             playsinline 
+             muted></video>
+      <div class="cc-scanner-overlay">
+        <div class="cc-scanner-frame"></div>
+        <div class="cc-scanner-scanline" id="scanner_scanline_{{ input_id }}"></div>
+      </div>
+    </div>
+
+    <!-- Detection Result Box -->
+    <div id="scanner_result_box_{{ input_id }}" 
+         class="cc-scanner-result-box" 
+         style="display: none;">
+      <div class="cc-scanner-result-value" id="scanner_result_value_{{ input_id }}"></div>
+      <div class="cc-scanner-result-actions">
+        <button type="button" 
+                class="btn btn-success cc-scanner-use-btn" 
+                id="scanner_use_btn_{{ input_id }}">
+          ✅ Use
+        </button>
+        <button type="button" 
+                class="btn btn-secondary cc-scanner-rescan-btn" 
+                id="scanner_rescan_btn_{{ input_id }}">
+          🔁 Scan Again
+        </button>
+      </div>
+      <div class="cc-scanner-result-hint">
+        Barcode detected and filled. Tap <strong>Use</strong> to continue or <strong>Scan Again</strong> to rescan.
+      </div>
+    </div>
+
+    <!-- Controls -->
+    <div class="cc-scanner-controls">
+      <button type="button" 
+              class="btn btn-secondary" 
+              id="scanner_torch_btn_{{ input_id }}"
+              style="display: none;">
+        🔦 Torch
+      </button>
+      <button type="button" 
+              class="btn btn-danger" 
+              id="scanner_close_btn_{{ input_id }}">
+        ✖ Close
+      </button>
+    </div>
+
+    <!-- Status Message -->
+    <div class="cc-scanner-status" id="scanner_status_{{ input_id }}">
+      Starting camera...
+    </div>
+  </div>
+</div>
+
+<!-- Multi-code Picker Modal -->
+<div id="scanner_picker_{{ input_id }}" 
+     class="cc-scanner-picker" 
+     style="display: none;">
+  <div class="cc-scanner-picker-card">
+    <div class="cc-scanner-picker-title">Multiple codes found — pick one</div>
+    <div class="cc-scanner-picker-list" id="scanner_picker_list_{{ input_id }}"></div>
+    <div class="cc-scanner-picker-actions">
+      <button type="button" 
+              class="btn btn-secondary" 
+              id="scanner_picker_cancel_{{ input_id }}">
+        Cancel
+      </button>
+    </div>
+  </div>
+</div>
+
+{% comment %}
+INTEGRATION NOTE:
+This template must be used with:
+1. static/css/scanner_standard.css - Shared styles
+2. static/js/scanner_standard.js - Core scanner logic
+3. Quagga JS library (loaded in page)
+4. ZXing JS library (loaded in page)
+
+Example page setup:
+{% load static %}
+<link rel="stylesheet" href="{% static 'css/scanner_standard.css' %}">
+<script src="https://unpkg.com/quagga@0.12.1/dist/quagga.min.js"></script>
+<script src="https://unpkg.com/@zxing/library@0.20.0"></script>
+<script src="{% static 'js/scanner_standard.js' %}"></script>
+
+<script>
+// Initialize scanner for specific input
+StandardScanner.init('{{ input_id }}', {
+  mode: '{{ mode|default:"general" }}',
+  validateFn: window.{{ validate_fn }},
+  onSuccess: function(value) {
+    console.log('Scanned:', value);
+  }
+});
+</script>
+{% endcomment %}
+

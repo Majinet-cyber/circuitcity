@@ -292,7 +292,7 @@
           <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:16px;margin-bottom:24px;">
             {% for m in active_members %}
             <div class="glass-ghost p-3" style="cursor:pointer;transition:all 0.2s;border:2px solid transparent;" 
-                 onclick="window.location.href='{% url 'inventory:agent_detail' m.user.id %}';"
+                 onclick="window.location.href='{% url 'tenants:agent_detail' m.user.id %}';"
                  onmouseover="this.style.borderColor='#1f6feb';this.style.transform='translateY(-3px)';"
                  onmouseout="this.style.borderColor='transparent';this.style.transform='translateY(0)';">
               <div class="d-flex align-items-center gap-3 mb-2">

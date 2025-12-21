@@ -354,20 +354,7 @@
     zxingControls = null;
   }
 
-  // Optional helper: switch camera (front/back/next)
-  async function switchCamera(videoEl) {
-    try { stopTracks(); } catch {}
-    const cams = await getDevices("videoinput");
-    if (!cams.length) return false;
-
-    const idx = Math.max(0, cams.findIndex((c) => c.deviceId === currentDeviceId));
-    const next = cams[(idx + 1) % cams.length];
-    currentDeviceId = next.deviceId;
-
-    await openStream(videoEl, currentDeviceId);
-    return true;
-  }
-
   // ---------- expose minimal API ----------
-  window.CCScanner = { startScan, stopScan, tryTorch, switchCamera };
+  // NOTE: switchCamera removed - back camera only policy
+  window.CCScanner = { startScan, stopScan, tryTorch };
 })();

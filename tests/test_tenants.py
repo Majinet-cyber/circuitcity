@@ -192,3 +192,70 @@ def test_crud_and_audit(client_as_manager, biz_a):
 
     # --- audit written ---
     assert AuditLog.objects.filter(entity_id=str(item.pk)).exists()
+
+
+def test_manager_agents_page_loads(client_as_manager, biz_a):
+    """
+    Regression test: Ensure /tenants/manager/agents/ loads without 500 error.
+    Verifies the agent_detail URL name is correctly namespaced.
+    """
+    try:
+        url = reverse("tenants:manager_review_agents")
+    except NoReverseMatch:
+        pytest.skip("tenants:manager_review_agents route not available")
+    
+    resp = client_as_manager.get(url)
+    assert resp.status_code == 200, f"Expected 200, got {resp.status_code}"
+    
+    # Verify page contains "Agents" or similar text
+    content = resp.content.decode("utf-8")
+    assert "agent" in content.lower() or "team" in content.lower(), "Expected agents-related content"
+
+
+def test_agent_detail_url_reversal(manager, biz_a):
+    """
+    Regression test: Ensure tenants:agent_detail URL can be reversed.
+    This was broken when template used 'inventory:agent_detail' instead.
+    """
+    try:
+        url = reverse("tenants:agent_detail", args=[manager.id])
+    except NoReverseMatch as e:
+        pytest.fail(f"tenants:agent_detail URL not found: {e}")
+    
+    assert url, "URL should not be empty"
+    assert str(manager.id) in url, f"URL should contain agent ID {manager.id}"
+    # Expected pattern: /tenants/agents/<agent_id>/
+    assert "/agents/" in url, "URL should contain /agents/ path segment"
+
+
+def test_agent_detail_page_loads(client_as_manager, biz_a):
+    """
+    Regression test: Ensure agent detail page loads for valid agent.
+    """
+    # Create an agent user
+    if Membership is None:
+        pytest.skip("Membership model not available")
+    
+    agent_user = User.objects.create_user("agent1", password="x")
+    Membership.objects.create(
+        user=agent_user,
+        business=biz_a,
+        role="AGENT",
+        status="ACTIVE"
+    )
+    
+    try:
+        url = reverse("tenants:agent_detail", args=[agent_user.id])
+    except NoReverseMatch:
+        pytest.skip("tenants:agent_detail route not available")
+    
+    resp = client_as_manager.get(url)
+    # Should return 200 (success) or 403 (permission denied) or 302 (redirect)
+    # but NOT 500 (server error) or 404 with wrong URL
+    assert resp.status_code in (200, 302, 403), \
+        f"Expected 200/302/403, got {resp.status_code}"
+    
+    # If successful, verify agent name appears
+    if resp.status_code == 200:
+        content = resp.content.decode("utf-8")
+        assert agent_user.username in content or "agent1" in content.lower()

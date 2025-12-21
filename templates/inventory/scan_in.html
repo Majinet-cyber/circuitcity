@@ -8,8 +8,8 @@
 {% block notif_allow %}stock_in,stock_sold,low_stock{% endblock %}
 
 {% block extra_css %}
-<!-- Shared Phone Scanner CSS -->
-<link rel="stylesheet" href="{% static 'css/phone_scanner.css' %}">
+<!-- Standard Scanner CSS -->
+<link rel="stylesheet" href="{% static 'css/scanner_standard.css' %}">
 
 <style>
   /* ===== Layout ===== */
@@ -101,25 +101,7 @@
   .pill{font-size:12px;color:var(--cc-accent-700);background:rgba(31,111,235,.10);border:1px solid rgba(31,111,235,.25);padding:4px 8px;border-radius:999px}
   .kbd{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;background:var(--cc-panel);border:1px solid var(--cc-border);color:var(--cc-text);padding:2px 6px;border-radius:6px}
 
-  /* ===== Camera shell + overlay scanline ===== */
-  #cameraBox{margin-top:8px;display:none;background:var(--cc-panel);border:1px dashed var(--cc-border);border-radius:14px;padding:12px}
-  .scan-shell{position:relative;border-radius:14px;overflow:hidden;background:#000;box-shadow:var(--cc-shadow)}
-  #camera{width:100%;max-height:360px;min-height:220px;background:#000;display:block;object-fit:cover}
-  .scan-overlay{position:absolute;inset:0;pointer-events:none}
-  .scan-frame{
-    position:absolute; inset:10% 8%;
-    border:2px solid rgba(255,255,255,.25);
-    border-radius:12px;
-    box-shadow: inset 0 0 0 9999px rgba(0,0,0,.20);
-  }
-  .scanline{
-    position:absolute; left:8%; right:8%; height:2px; border-radius:2px;
-    background:linear-gradient(90deg, transparent, #00ff5a, transparent);
-    box-shadow:0 0 10px #00ff5a, 0 0 20px rgba(0,255,90,.6);
-    animation: sweep 2.0s linear infinite alternate;
-  }
-  .scanline.paused{ animation-play-state: paused; }
-  @keyframes sweep { from{ top:10%; } to{ top:90%; } }
+  /* Camera styles now handled by scanner_standard.css */
 
   /* Toast */
   .toast{
@@ -136,25 +118,7 @@
     display:none;margin-top:.5rem;padding:.6rem .8rem;border:1px solid #fbbf24;background:#fffbeb;color:#92400e;border-radius:10px
   }
 
-  /* Picker overlay when multiple codes detected */
-  #ccscan-picker{
-    position:fixed;inset:0;display:flex;align-items:center;justify-content:center;
-    background:rgba(0,0,0,.55);z-index:9999
-  }
-  #ccscan-picker .card{
-    background:#fff;max-width:90vw;width:520px;padding:16px;border-radius:12px;
-    box-shadow:0 10px 40px rgba(0,0,0,.35);font-family:system-ui,Segoe UI,Roboto,Arial,sans-serif;
-  }
-  #ccscan-picker .list{max-height:55vh;overflow:auto;display:flex;flex-direction:column;gap:8px}
-  #ccscan-picker .item{
-    text-align:left;padding:10px 12px;border-radius:10px;border:1px solid #e5e7eb;
-    background:#f9fafb;cursor:pointer;word-break:break-all
-  }
-  #ccscan-picker .item small{display:block;color:#6b7280;margin-top:2px}
-  #ccscan-picker .actions{margin-top:12px;display:flex;justify-content:flex-end;gap:8px}
-  #ccscan-picker .cancel,.secondary{
-    padding:8px 12px;border-radius:10px;border:1px solid #e5e7eb;background:#fff;cursor:pointer
-  }
+  /* Picker styles now handled by scanner_standard.css */
 </style>
 {% endblock %}
 
@@ -186,24 +150,43 @@
       {% csrf_token %}
       {% if form.non_field_errors %}<div class="help-error">{{ form.non_field_errors }}</div>{% endif %}
 
-      <!-- IMEI Scanner (Using Shared Phone Scanner Component) -->
+      <!-- IMEI Scanner (Using Standard Scanner Component) -->
       <div>
         {% comment %}
-        SHARED PHONE SCANNER - SCAN IN MODE
-        ====================================
+        STANDARD SCANNER - SCAN IN MODE (PHONES)
+        =========================================
         ✅ IMEI validation: Exactly 15 digits enforced
-        ✅ Global uniqueness: DB constraint + model validation
-        ✅ Real-time validation with clear error messages
-        ✅ Camera scanner with overlay + moving line (same as Scan & Sell)
-        ✅ Accepts: keyboard, paste, barcode scanner, camera
+        ✅ Global uniqueness: Checked via API before accepting
+        ✅ Back camera only (no front camera, no switch option)
+        ✅ Use/Scan Again UX (Fast Sell standard)
+        ✅ Multi-code picker when multiple barcodes detected
         {% endcomment %}
         
-        {% include "partials/phone_scanner.html" with input_id="id_imei" input_name="imei" input_placeholder="Scan or paste IMEI (15 digits)" show_paste_btn=True show_torch_btn=True show_hint=True %}
+        <label for="id_imei">IMEI / Barcode</label>
+        <div class="field" id="imeiField">
+          <input
+            type="text"
+            id="id_imei"
+            name="imei"
+            maxlength="15"
+            pattern="\d{15}"
+            inputmode="numeric"
+            autocomplete="off"
+            placeholder="Enter or scan 15-digit IMEI"
+            aria-required="true"
+            aria-invalid="false">
+          <span id="imeiLen" class="badge badge-warn" style="margin-left:8px">0/15</span>
+        </div>
         
-        <div class="hstack cc-btn-group" style="margin-top:6px">
-          <button type="button" data-cc-imei-scan class="btn btn-primary">🔍 Check IMEI</button>
-          <span class="pill cc-desktop-only">Shortcut: <span class="kbd">Enter</span> submits</span>
-          <span class="pill cc-desktop-only">Focus: <span class="kbd">F2</span></span>
+        <div class="hstack" style="margin-top:6px;gap:8px">
+          <button type="button" id="pasteBtn" class="btn">📋 Paste</button>
+          {% include "components/scanner_modal.html" with input_id="id_imei" mode="phone_scan_in" button_text="📷 Scan with Camera" %}
+          <button type="button" id="btnClear" class="btn btn-muted">✖ Clear</button>
+          <span class="pill">Shortcut: <span class="kbd">Enter</span> submits</span>
+        </div>
+        
+        <div class="hint" style="margin-top:8px" id="imeiHelp" hidden>
+          IMEI must be exactly 15 digits.
         </div>
       </div>
 
@@ -314,15 +297,7 @@
   const submitBtn  = document.getElementById('submitBtn');
   const pasteBtn   = document.getElementById('pasteBtn');
 
-  const camToggle  = document.getElementById('camToggle');
-  const camStop    = document.getElementById('camStop');
-  const camBox     = document.getElementById('cameraBox');
-  const camNode    = document.getElementById('camera');
-  const camSelect  = document.getElementById('cameraSelect');
-  const torchBtn   = document.getElementById('torchBtn');
-
   const toast      = document.getElementById('toast');
-  const scanLine   = document.getElementById('scanline');
   const secureWarn = document.getElementById('secureWarn');
   const orderPriceHint = document.getElementById('orderPriceHint');
 
@@ -667,10 +642,6 @@
     }
   });
 
-  // ===== Camera Scanner: Now handled by smart_scanner.js + smart_scanner.html partial =====
-  // The old inline scanner code has been replaced with the reusable SmartScanner module.
-  // Multi-barcode detection, scan line animation, and camera controls are now unified across all verticals.
-
   // ---- Form submit guard: IMEI must be exactly 15 ----
   form.addEventListener('submit', (e)=>{
     clampTo15KeepLast(); // just in case
@@ -800,16 +771,24 @@
 })();
 </script>
 
-<!-- Shared Phone Scanner Integration -->
+<!-- Standard Scanner Integration -->
 <script src="https://unpkg.com/quagga@0.12.1/dist/quagga.min.js"></script>
 <script src="https://unpkg.com/@zxing/library@0.20.0"></script>
-<script src="{% static 'js/phone_scanner.js' %}"></script>
+<script src="{% static 'js/scanner_standard.js' %}"></script>
 <script>
 (function() {
-  // Initialize shared phone scanner
-  PhoneScanner.init('id_imei', {
+  // Initialize standard scanner for Scan In (phones)
+  StandardScanner.init('id_imei', {
+    mode: 'phone_scan_in',
     onSuccess: function(imei) {
       console.log('IMEI scanned successfully:', imei);
+      // IMEI already filled by scanner, update UI
+      if (typeof updateImeiCounter === 'function') {
+        updateImeiCounter();
+      }
+      if (typeof updateFormValidity === 'function') {
+        updateFormValidity();
+      }
       // Focus on product selection
       const prodEl = document.getElementById('id_product');
       if (prodEl) {
@@ -817,20 +796,31 @@
         prodEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
       }
     },
-    onError: function(message, data) {
-      // IMEI validation failed or already exists
-      console.error('IMEI check failed:', message, data);
-      
-      // Clear the IMEI input if it already exists
-      if (data && data.error_code === 'IMEI_EXISTS') {
-        const imeiInput = document.getElementById('id_imei');
-        if (imeiInput && confirm('This IMEI already exists in the system. Clear and try another?')) {
-          imeiInput.value = '';
-          imeiInput.focus();
-        }
+    onError: function(message) {
+      console.error('IMEI scan failed:', message);
+      if (window.showToast) {
+        showToast(message, false);
       }
     }
   });
+  
+  // Add Clear button handler
+  const btnClear = document.getElementById('btnClear');
+  if (btnClear) {
+    btnClear.addEventListener('click', function() {
+      const imeiEl = document.getElementById('id_imei');
+      if (imeiEl) {
+        imeiEl.value = '';
+        if (typeof updateImeiCounter === 'function') {
+          updateImeiCounter();
+        }
+        if (typeof updateFormValidity === 'function') {
+          updateFormValidity();
+        }
+        imeiEl.focus();
+      }
+    });
+  }
 })();
 </script>
 
