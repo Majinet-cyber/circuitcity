@@ -195,11 +195,22 @@ class PharmacyBatch(models.Model):
     # Batch identification
     batch_number = models.CharField(
         max_length=100,
-        help_text="Manufacturer batch/lot number"
+        blank=True,
+        default="",
+        help_text="Manufacturer batch/lot number (optional)"
+    )
+    barcode = models.CharField(
+        max_length=100,
+        blank=True,
+        default="",
+        db_index=True,
+        help_text="Batch-specific barcode for Fast Sell lookup"
     )
     expiry_date = models.DateField(
         db_index=True,
-        help_text="Expiry date (day/month/year)"
+        blank=True,
+        null=True,
+        help_text="Expiry date (day/month/year, optional for cosmetics)"
     )
     
     # Stock levels

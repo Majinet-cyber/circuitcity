@@ -2,7 +2,7 @@
 {% load static %}
 {% load humanize %}
 
-{% block title %}Stock In Wizard · Pharmacy & Cosmetics · Emajinet{% endblock %}
+{% block title %}Add Product · Emajinet{% endblock %}
 
 {% block extra_css %}
 <style>
@@ -35,8 +35,22 @@
   .option-card:hover{border-color:#cbd5e1;transform:translateY(-3px);box-shadow:0 8px 24px rgba(15,23,42,.12)}
   .option-card.selected{border-color:#10b981;background:linear-gradient(135deg,#f0fdf4,#dcfce7);box-shadow:0 6px 20px rgba(16,185,129,.2)}
   .option-card .card-icon{font-size:2.8rem;margin-bottom:4px;flex-shrink:0}
-  .option-card .card-label{font-size:.95rem;font-weight:700;color:#0f172a;line-height:1.3;word-wrap:break-word;overflow-wrap:break-word;hyphens:auto;max-width:100%;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;text-overflow:ellipsis}
+  .option-card .card-label{font-size:.95rem;font-weight:700;color:#0f172a;line-height:1.3;word-wrap:break-word;overflow-wrap:break-word;hyphens:auto;max-width:100%;display:-webkit-box;-webkit-line-clamp:3;line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;text-overflow:ellipsis}
   .option-card.selected::after{content:"✓";position:absolute;top:8px;right:8px;background:#10b981;color:#fff;width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:.9rem;font-weight:800}
+  
+  /* Premium category cards (text-only, subtle colors, with counts) */
+  .premium-category-card{backdrop-filter:blur(8px);border:2px solid rgba(148,163,184,0.3)}
+  .premium-category-card:hover{transform:translateY(-4px);box-shadow:0 12px 32px rgba(15,23,42,0.15)}
+  .premium-category-card.selected{border-color:#10b981 !important;background:linear-gradient(135deg,#f0fdf4,#dcfce7) !important}
+  .product-count-badge{display:inline-block;padding:4px 10px;border-radius:8px;background:rgba(15,23,42,0.08);color:#475569;font-size:0.8rem;font-weight:600;margin-top:4px}
+  
+  /* Premium mode cards (Step 0) */
+  .mode-card{background:linear-gradient(135deg,rgba(255,255,255,0.9),rgba(248,250,252,0.95));backdrop-filter:blur(10px);border:2px solid rgba(148,163,184,0.2);box-shadow:0 4px 16px rgba(15,23,42,0.08)}
+  .mode-card:hover{border-color:rgba(148,163,184,0.4);transform:translateY(-4px);box-shadow:0 12px 32px rgba(15,23,42,0.15)}
+  .mode-card.selected{background:linear-gradient(135deg,#f0fdf4,#dcfce7);border-color:#10b981;box-shadow:0 8px 28px rgba(16,185,129,0.25)}
+  
+  /* Back to start button */
+  .btn-back-to-start:hover{background:#e2e8f0 !important;transform:translateY(-1px)}
   
   /* Form Fields */
   .form-group{margin-bottom:20px}
@@ -97,52 +111,62 @@
   {% endif %}
 
   <header class="wizard-header">
-    <h1>📦 Pharmacy Stock In Wizard</h1>
-    <p>Select categories, choose products, and add stock in just a few clicks</p>
+    <h1>Add Product</h1>
+    <p>Choose Cosmetics or Pharmacy, then add stock in a few clicks</p>
   </header>
+
+  <!-- Back to Start Button (always visible) -->
+  {% if step > 0 %}
+  <div style="text-align: center; margin-bottom: 16px;">
+    <button type="button" onclick="backToStart()" class="btn-back-to-start" style="background: #f1f5f9; color: #475569; border: none; padding: 10px 20px; border-radius: 999px; font-weight: 600; cursor: pointer; transition: all 0.2s;">
+      ← Back to Start
+    </button>
+  </div>
+  {% endif %}
 
   <!-- Progress Stepper (Clickable for completed steps) -->
   <div class="progress-stepper">
-    <div class="progress-step {% if step == 1 %}active{% elif step > 1 %}completed{% endif %}" 
-         {% if step > 1 %}onclick="jumpToStep(1)" style="cursor:pointer;"{% endif %}>
+    <div class="progress-step {% if step == 0 %}active{% elif step > 0 %}completed{% endif %}" 
+         {% if step > 0 %}onclick="jumpToStep(0)" style="cursor:pointer;"{% endif %}>
       <div class="progress-step-circle">1</div>
-      <div class="progress-step-label">Category</div>
+      <div class="progress-step-label">Start</div>
     </div>
     <div class="progress-divider"></div>
-    <div class="progress-step {% if step == 2 %}active{% elif step > 2 %}completed{% endif %}"
-         {% if step > 2 %}onclick="jumpToStep(2)" style="cursor:pointer;"{% endif %}>
+    <div class="progress-step {% if step == 1 %}active{% elif step > 1 %}completed{% endif %}" 
+         {% if step > 1 %}onclick="jumpToStep(1)" style="cursor:pointer;"{% endif %}>
       <div class="progress-step-circle">2</div>
       <div class="progress-step-label">Product</div>
     </div>
     <div class="progress-divider"></div>
-    <div class="progress-step {% if step == 3 %}active{% elif step > 3 %}completed{% endif %}"
-         {% if step > 3 %}onclick="jumpToStep(3)" style="cursor:pointer;"{% endif %}>
+    <div class="progress-step {% if step >= 2 and step <= 3 %}active{% elif step > 3 %}completed{% endif %}"
+         {% if step > 3 %}onclick="jumpToStep(2)" style="cursor:pointer;"{% endif %}>
       <div class="progress-step-circle">3</div>
-      <div class="progress-step-label">Details</div>
+      <div class="progress-step-label">Select</div>
     </div>
     <div class="progress-divider"></div>
     <div class="progress-step {% if step == 4 %}active{% elif step > 4 %}completed{% endif %}">
       <div class="progress-step-circle">4</div>
-      <div class="progress-step-label">Pricing</div>
+      <div class="progress-step-label">Save</div>
     </div>
   </div>
 
   <form method="post" id="wizardForm">
     {% csrf_token %}
     <input type="hidden" name="wizard_step" value="{{ step }}">
+    <input type="hidden" name="selected_mode" id="selected_mode" value="{{ wizard_mode }}">
     <input type="hidden" name="selected_category" id="selected_category" value="{{ selected_category }}">
     <input type="hidden" name="selected_subcategory" id="selected_subcategory" value="{{ selected_subcategory }}">
     <input type="hidden" name="selected_item" id="selected_item" value="{{ selected_item }}">
 
-    <!-- STEP 1: Select Top Category -->
-    {% if step == 1 %}
+    <!-- STEP 0: Select Mode (Pharmacy or Cosmetics) -->
+    {% if step == 0 %}
     <div class="wizard-panel">
-      <h2 class="wizard-section-title"><span class="icon">🎯</span> Step 1: Select Category</h2>
-      <div class="card-grid">
-        {% for cat in top_categories %}
-        <div class="option-card" data-category="{{ cat.key }}" onclick="selectCategory('{{ cat.key }}')">
-          <div class="card-icon">{{ cat.icon }}</div>
-          <div class="card-label">{{ cat.label }}</div>
+      <h2 class="wizard-section-title">Choose Product Type</h2>
+      <div class="card-grid" style="grid-template-columns: 1fr 1fr; max-width: 600px; margin: 0 auto;">
+        {% for mode in mode_options %}
+        <div class="option-card mode-card" data-mode="{{ mode.key }}" onclick="selectMode('{{ mode.key }}')" style="min-height:160px; padding: 32px 24px;">
+          <div class="card-label" style="font-size:1.4rem; font-weight: 800;">{{ mode.label }}</div>
+          <small style="color:#64748b; font-size:0.9rem; margin-top: 8px;">{{ mode.description }}</small>
         </div>
         {% endfor %}
       </div>
@@ -154,10 +178,32 @@
     </div>
     {% endif %}
 
+    <!-- STEP 1: Select Top Category -->
+    {% if step == 1 %}
+    <div class="wizard-panel">
+      <h2 class="wizard-section-title">Select Category</h2>
+      <div class="card-grid">
+        {% for cat in top_categories %}
+        <div class="option-card premium-category-card" data-category="{{ cat.key }}" onclick="selectCategory('{{ cat.key }}')" style="background:linear-gradient(135deg,{{ cat.color|default:'#f1f5f9' }}15,{{ cat.color|default:'#f1f5f9' }}05);border-left:4px solid {{ cat.color|default:'#94a3b8' }}">
+          <div class="card-label">{{ cat.label }}</div>
+          {% if cat.product_count is not None %}
+          <small class="product-count-badge">{{ cat.product_count }} product{{ cat.product_count|pluralize }}</small>
+          {% endif %}
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+
+    <div class="wizard-actions">
+      <button type="submit" name="action" value="back" class="btn-wizard btn-back">← Back</button>
+      <button type="submit" class="btn-wizard btn-next" id="btnNext" disabled>Next →</button>
+    </div>
+    {% endif %}
+
     <!-- STEP 2: Select Subcategory/Item -->
     {% if step == 2 %}
     <div class="wizard-panel">
-      <h2 class="wizard-section-title"><span class="icon">📦</span> Step 2: Select Product</h2>
+      <h2 class="wizard-section-title">Select Product</h2>
       <p style="color:#64748b;margin:0 0 20px;"><strong>Category:</strong> {{ selected_category_label }}</p>
       
       {% if subcategories %}
@@ -165,20 +211,31 @@
       <div class="card-grid">
         {% for subcat in subcategories %}
         <div class="option-card" data-subcategory="{{ subcat.key }}" onclick="selectSubcategory('{{ subcat.key }}')">
-          <div class="card-icon">{{ subcat.icon }}</div>
           <div class="card-label">{{ subcat.label }}</div>
         </div>
         {% endfor %}
       </div>
-      {% else %}
-      <!-- Direct items for top-level categories (First Aid, Chronic, etc.) -->
+      {% elif items %}
+      <!-- Direct items for top-level categories (First Aid, Chronic, etc.) OR Cosmetics products -->
       <div class="card-grid">
         {% for item in items %}
         <div class="option-card" data-item="{{ item.name }}" onclick="selectItem('{{ item.name }}')">
-          <div class="card-icon">{{ item.icon }}</div>
+          {% if item.icon %}<span class="card-icon">{{ item.icon }}</span>{% endif %}
           <div class="card-label">{{ item.name }}</div>
         </div>
         {% endfor %}
+      </div>
+      {% else %}
+      <!-- Fallback: No items available -->
+      <div style="background:linear-gradient(135deg,#fef3c7,#fde68a);border-left:4px solid #f59e0b;padding:20px;border-radius:12px;margin-bottom:20px;text-align:center;">
+        <p style="color:#92400e;font-weight:600;margin:0 0 12px;">No products found for this category.</p>
+        <p style="color:#92400e;margin:0;">You can add a custom product by clicking below.</p>
+      </div>
+      <div class="card-grid" style="max-width:300px;margin:0 auto;">
+        <div class="option-card" data-item="+ Add Custom Product" onclick="selectItem('+ Add Custom Product')">
+          <span class="card-icon">📝</span>
+          <div class="card-label">+ Add Custom Product</div>
+        </div>
       </div>
       {% endif %}
     </div>
@@ -189,22 +246,42 @@
     </div>
     {% endif %}
 
-    <!-- STEP 2.5: Select Specific Item (for subcategories) -->
+    <!-- STEP 3: Select Specific Item (for subcategories) -->
     {% if step == 3 and show_item_selection %}
     <div class="wizard-panel">
-      <h2 class="wizard-section-title"><span class="icon">💊</span> Step 3: Select Specific Item</h2>
+      <h2 class="wizard-section-title">Select Specific Item</h2>
       <p style="color:#64748b;margin:0 0 20px;">
         <strong>Category:</strong> {{ selected_category_label }} → {{ selected_subcategory_label }}
       </p>
       
+      {% if no_products_message %}
+      <div style="background:linear-gradient(135deg,#fef3c7,#fde68a);border-left:4px solid #f59e0b;padding:16px;border-radius:12px;margin-bottom:20px;color:#92400e;font-weight:600;">
+        <i class="bi bi-info-circle"></i> {{ no_products_message }}
+      </div>
+      {% endif %}
+      
+      {% if items %}
       <div class="card-grid">
         {% for item in items %}
         <div class="option-card" data-item="{{ item.name }}" onclick="selectItem('{{ item.name }}')">
-          <div class="card-icon">{{ item.icon }}</div>
+          {% if item.icon %}<span class="card-icon">{{ item.icon }}</span>{% endif %}
           <div class="card-label">{{ item.name }}</div>
         </div>
         {% endfor %}
       </div>
+      {% else %}
+      <!-- Fallback if no items -->
+      <div style="background:linear-gradient(135deg,#fef3c7,#fde68a);border-left:4px solid #f59e0b;padding:20px;border-radius:12px;margin-bottom:20px;text-align:center;">
+        <p style="color:#92400e;font-weight:600;margin:0 0 12px;">No products found.</p>
+        <p style="color:#92400e;margin:0;">Add a custom product below.</p>
+      </div>
+      <div class="card-grid" style="max-width:300px;margin:0 auto;">
+        <div class="option-card" data-item="+ Add Custom Product" onclick="selectItem('+ Add Custom Product')">
+          <span class="card-icon">📝</span>
+          <div class="card-label">+ Add Custom Product</div>
+        </div>
+      </div>
+      {% endif %}
     </div>
 
     <div class="wizard-actions">
@@ -216,7 +293,7 @@
     <!-- STEP 3/4: Product Details -->
     {% if step == 3 and not show_item_selection or step == 4 %}
     <div class="wizard-panel">
-      <h2 class="wizard-section-title"><span class="icon">📝</span> Product Details & Pricing</h2>
+      <h2 class="wizard-section-title">Quantity & Pricing</h2>
       
       <div class="form-group">
         <label>Product Name <span class="required">*</span></label>
@@ -226,26 +303,10 @@
         <small>This will be the display name in your system</small>
       </div>
 
-      <div class="form-row">
-        <div class="form-group">
-          <label>Unit Type <span class="required">*</span></label>
-          <select name="unit_type" required>
-            <option value="">Choose unit...</option>
-            <option value="tabs">Tablets</option>
-            <option value="syrup">Syrup</option>
-            <option value="cream">Cream</option>
-            <option value="injection">Injection</option>
-            <option value="pack">Pack</option>
-            <option value="bottle">Bottle</option>
-            <option value="sachet">Sachet</option>
-            <option value="other">Other</option>
-          </select>
-        </div>
-        <div class="form-group">
-          <label>Quantity <span class="required">*</span></label>
-          <input type="number" name="quantity" required min="1" placeholder="0">
-          <small>Number of units</small>
-        </div>
+      <div class="form-group">
+        <label>Quantity <span class="required">*</span></label>
+        <input type="number" name="quantity" required min="1" placeholder="0">
+        <small>Number of units to add</small>
       </div>
 
       <div class="form-row">
@@ -263,14 +324,15 @@
 
       <div class="form-row">
         <div class="form-group">
-          <label>Batch Number <span class="required">*</span></label>
-          <input type="text" name="batch_number" required placeholder="e.g., BT-2025-001">
+          <label>Batch Number <span style="color:#64748b;">(optional)</span></label>
+          <input type="text" name="batch_number" placeholder="e.g., BT-2025-001">
+          <small>Leave blank to auto-generate</small>
         </div>
         <div class="form-group">
-          <label>Expiry Date {% if selected_category != 'cosmetics' %}<span class="required">*</span>{% else %}<span style="color:#64748b;">(optional for cosmetics)</span>{% endif %}</label>
-          <input type="date" name="expiry_date" {% if selected_category != 'cosmetics' %}required{% endif %}>
-          {% if selected_category == 'cosmetics' %}
-          <small>Optional for cosmetics, but recommended for tracking</small>
+          <label>Expiry Date {% if wizard_mode != 'cosmetics' %}<span class="required">*</span>{% else %}<span style="color:#64748b;">(optional)</span>{% endif %}</label>
+          <input type="date" name="expiry_date" {% if wizard_mode != 'cosmetics' and selected_category != 'cosmetics' %}required{% endif %}>
+          {% if wizard_mode == 'cosmetics' or selected_category == 'cosmetics' %}
+          <small>Optional for cosmetics</small>
           {% endif %}
         </div>
       </div>
@@ -292,6 +354,10 @@
       <div class="form-group" id="barcode-field" style="display:none;">
         <label>Barcode <span class="required">*</span></label>
         <input type="text" name="barcode" id="barcode-input" placeholder="Scan or type barcode" maxlength="100">
+        <button type="button" id="scan-barcode-btn" class="btn-scan-barcode" style="margin-top:8px;padding:10px 20px;background:linear-gradient(135deg,#8b5cf6,#6366f1);color:#fff;border:none;border-radius:12px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:8px;transition:all 0.2s;">
+          <i class="bi bi-upc-scan"></i>
+          <span>Scan Barcode</span>
+        </button>
       </div>
 
       <div class="form-group">
@@ -310,6 +376,24 @@
 
 <script>
 document.addEventListener('DOMContentLoaded', function() {
+  // Back to start - reset wizard to step 0
+  window.backToStart = function() {
+    const form = document.getElementById('wizardForm');
+    const input = document.createElement('input');
+    input.type = 'hidden';
+    input.name = 'jump_to_step';
+    input.value = 0;
+    form.appendChild(input);
+    
+    const actionInput = document.createElement('input');
+    actionInput.type = 'hidden';
+    actionInput.name = 'action';
+    actionInput.value = 'jump';
+    form.appendChild(actionInput);
+    
+    form.submit();
+  };
+
   // Jump to previous step (clickable breadcrumb navigation)
   window.jumpToStep = function(targetStep) {
     const form = document.getElementById('wizardForm');
@@ -326,6 +410,14 @@ document.addEventListener('DOMContentLoaded', function() {
     form.appendChild(actionInput);
     
     form.submit();
+  };
+
+  // Mode selection (Step 0)
+  window.selectMode = function(key) {
+    document.querySelectorAll('[data-mode]').forEach(el => el.classList.remove('selected'));
+    event.target.closest('[data-mode]').classList.add('selected');
+    document.getElementById('selected_mode').value = key;
+    document.getElementById('btnNext').disabled = false;
   };
 
   // Category selection
@@ -352,8 +444,19 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Auto-fill product name if available
     const productNameInput = document.getElementById('product_name');
-    if (productNameInput && name && !name.includes('Other') && !name.includes('Custom')) {
-      productNameInput.value = name;
+    if (productNameInput && name) {
+      // Clear the field if "Other", "Custom", or "Create new" is selected
+      if (name.toLowerCase().includes('other') || 
+          name.toLowerCase().includes('custom') || 
+          name.toLowerCase().includes('create new') ||
+          name.toLowerCase().includes('add custom')) {
+        productNameInput.value = '';
+        productNameInput.placeholder = 'Enter custom product name';
+        productNameInput.focus();
+      } else {
+        // Auto-fill with the selected product name
+        productNameInput.value = name;
+      }
     }
     
     document.getElementById('btnNext').disabled = false;
@@ -384,6 +487,12 @@ document.addEventListener('DOMContentLoaded', function() {
   toggleBarcodeField();
 
   // Pre-select if values exist
+  const selectedMode = document.getElementById('selected_mode').value;
+  if (selectedMode) {
+    const card = document.querySelector(`[data-mode="${selectedMode}"]`);
+    if (card) card.classList.add('selected');
+  }
+
   const selectedCategory = document.getElementById('selected_category').value;
   if (selectedCategory) {
     const card = document.querySelector(`[data-category="${selectedCategory}"]`);
@@ -401,8 +510,35 @@ document.addEventListener('DOMContentLoaded', function() {
     const card = document.querySelector(`[data-item="${selectedItem}"]`);
     if (card) card.classList.add('selected');
   }
+
+  // ===== BARCODE SCANNER INTEGRATION =====
+  let barcodeScanner = null;
+  const scanBtn = document.getElementById('scan-barcode-btn');
+  const barcodeInput = document.getElementById('barcode-input');
+  
+  if (scanBtn && barcodeInput) {
+    scanBtn.addEventListener('click', function() {
+      if (!barcodeScanner) {
+        barcodeScanner = new RearCameraBarcodeScanner({
+          onScan: function(barcode) {
+            barcodeInput.value = barcode;
+            console.log('Barcode scanned:', barcode);
+          },
+          onError: function(error) {
+            console.error('Scanner error:', error);
+          }
+        });
+      }
+      barcodeScanner.open();
+    });
+  }
 });
 </script>
 
+{% endblock %}
+
+{% block extra_js %}
+<script src="{% static 'js/barcode-scanner-rear-camera.js' %}"></script>
+<link rel="stylesheet" href="{% static 'css/barcode-scanner-rear-camera.css' %}">
 {% endblock %}
 

@@ -219,6 +219,7 @@ class MerchProduct(models.Model):
     name = models.CharField(max_length=160)
     kind = models.CharField(max_length=20, choices=BusinessKind.choices, default=BusinessKind.GROCERY)
     sku = models.CharField(max_length=64, blank=True, null=True)
+    barcode = models.CharField(max_length=100, blank=True, default='', db_index=True, help_text="Product barcode (EAN, UPC, QR, etc.)")
     scan_required = models.BooleanField(default=False)  # set True if you want barcode scanning for some items
     base_unit = models.CharField(max_length=10, choices=BaseUnit.choices, default=BaseUnit.UNIT)
     track_inventory = models.BooleanField(default=True)

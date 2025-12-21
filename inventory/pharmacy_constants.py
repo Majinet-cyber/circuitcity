@@ -171,14 +171,78 @@ VITAMINS_ITEMS = [
 
 # Cosmetics Subcategories (when user selects "Cosmetics & Personal Care")
 COSMETICS_SUBCATEGORIES = [
-    {"key": "skin_care", "label": "Skin Care", "icon": "✨"},
-    {"key": "hair_care", "label": "Hair Care", "icon": "💇"},
-    {"key": "body_care", "label": "Body Care", "icon": "🧴"},
-    {"key": "perfumes", "label": "Perfumes", "icon": "🌹"},
-    {"key": "mens_grooming", "label": "Men's Grooming", "icon": "🧔"},
-    {"key": "makeup", "label": "Makeup", "icon": "💄"},
-    {"key": "other_cosmetics", "label": "Other", "icon": "📦"},
+    {"key": "perfumes", "label": "Perfumes", "icon": "🌹", "color": "#9333ea"},  # purple/indigo
+    {"key": "skin_care", "label": "Skin Care", "icon": "✨", "color": "#14b8a6"},  # teal/green
+    {"key": "hair_care", "label": "Hair Care", "icon": "💇", "color": "#3b82f6"},  # blue
+    {"key": "body_care", "label": "Body Care", "icon": "🧴", "color": "#f59e0b"},  # amber
+    {"key": "makeup", "label": "Makeup", "icon": "💄", "color": "#ec4899"},  # pink
+    {"key": "mens_grooming", "label": "Men's Grooming", "icon": "🧔", "color": "#64748b"},  # neutral gray
+    {"key": "other_cosmetics", "label": "Other", "icon": "📦", "color": "#94a3b8"},  # neutral gray
 ]
+
+# ==============================================================================
+# COSMETICS PREFILLS FOR STOCK-IN WIZARD (Lightweight, No DB Tables)
+# ==============================================================================
+
+COSMETICS_PREFILLS = {
+    "perfumes": [
+        "Arabic",
+        "Emerald",
+        "Monalisa",
+        "Pure Black",
+        "Bond",
+        "Chris Adams",
+        "Lattafa",
+    ],
+    "skin_care": [
+        "CeraVe Lotion",
+        "Vaseline Body Lotion",
+        "Nivea Body Lotion",
+        "Garnier Lotion",
+        "Dove Cream",
+        "Olay Total Effects",
+        "Fair & Lovely",
+    ],
+    "hair_care": [
+        "Relaxer",
+        "Hair Food",
+        "Shampoo",
+        "Conditioner",
+        "Hair Oil",
+        "Pantene",
+        "Dove Shampoo",
+    ],
+    "body_care": [
+        "Body Spray",
+        "Roll-on",
+        "Body Wash",
+        "Soap",
+        "Petroleum Jelly",
+        "Dove Soap",
+        "Nivea Roll-on",
+    ],
+    "makeup": [
+        "Lipstick",
+        "Foundation",
+        "Powder",
+        "Mascara",
+        "Eyeliner",
+        "Blush",
+    ],
+    "mens_grooming": [
+        "Aftershave",
+        "Beard Oil",
+        "Hair Gel",
+        "Shaving Cream",
+        "Cologne",
+    ],
+    "other_cosmetics": [
+        "Cotton Wool",
+        "Wet Wipes",
+        "Tissue Paper",
+        "Hand Sanitizer",
+    ],
+}
 
 # Cosmetics Brand Items (common brands for each subcategory)
 COSMETICS_BRAND_ITEMS = {
@@ -440,6 +504,14 @@ def get_items_for_subcategory(category_key: str, subcategory_key: str):
         return COSMETICS_BRAND_ITEMS[subcategory_key]
     
     return []
+
+
+def get_prefills_for_cosmetics_category(category_key: str) -> list[str]:
+    """
+    Get prefill product names for a cosmetics category.
+    Returns list of product names (strings).
+    """
+    return COSMETICS_PREFILLS.get(category_key, [])
 
 
 def get_items_for_top_category(category_key: str):

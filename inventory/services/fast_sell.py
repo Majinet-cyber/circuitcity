@@ -50,19 +50,29 @@ def lookup_product_by_barcode(
     
     try:
         if vertical == "pharmacy":
-            # Pharmacy: Look up by barcode in PharmacyBatch
+            # Pharmacy: Look up by barcode in PharmacyBatch or MerchProduct
+            # Try batch barcode first (most specific)
             batch = PharmacyBatch.objects.filter(
                 business=business,
                 is_archived=False,
                 barcode=barcode,
-                units_remaining__gt=0
+                quantity__gt=0
             ).select_related("merch_product").order_by("expiry_date").first()
+            
+            # Fall back to product barcode if batch not found
+            if not batch:
+                batch = PharmacyBatch.objects.filter(
+                    business=business,
+                    is_archived=False,
+                    merch_product__barcode=barcode,
+                    quantity__gt=0
+                ).select_related("merch_product").order_by("expiry_date").first()
             
             if not batch:
                 return {"ok": True, "found": False, "error": "Batch not found or out of stock"}
             
             product = batch.merch_product
-            selling_price = batch.selling_price_per_unit or Decimal("0.00")
+            selling_price = batch.selling_price or Decimal("0.00")
             needs_price = selling_price == 0
             
             return {
@@ -74,9 +84,10 @@ def lookup_product_by_barcode(
                     "category": getattr(product, "category", ""),
                 },
                 "batch_id": batch.id,
-                "batch_number": batch.batch_number,
+                "batch_number": batch.batch_number or "N/A",
+                "batch_code": batch.batch_number or "N/A",
                 "expiry_date": batch.expiry_date.isoformat() if batch.expiry_date else None,
-                "stock_qty": batch.units_remaining,
+                "stock_qty": batch.quantity,
                 "selling_price": float(selling_price),
                 "needs_price": needs_price,
             }
@@ -176,13 +187,22 @@ def create_fast_sell(
         payment_method = payment_map.get(payment_method.lower(), "cash")
         
         if vertical == "pharmacy":
-            # Pharmacy Fast Sell
+            # Pharmacy Fast Sell - lookup by barcode (batch or product)
             batch = PharmacyBatch.objects.select_for_update().filter(
                 business=business,
                 is_archived=False,
                 barcode=barcode,
-                units_remaining__gte=quantity
+                quantity__gte=quantity
             ).select_related("merch_product").order_by("expiry_date").first()
+            
+            # Fall back to product barcode if batch barcode not found
+            if not batch:
+                batch = PharmacyBatch.objects.select_for_update().filter(
+                    business=business,
+                    is_archived=False,
+                    merch_product__barcode=barcode,
+                    quantity__gte=quantity
+                ).select_related("merch_product").order_by("expiry_date").first()
             
             if not batch:
                 return {"ok": False, "error": "Batch not found or insufficient stock"}
@@ -191,24 +211,24 @@ def create_fast_sell(
             
             # Determine selling price
             if selling_price is None:
-                selling_price = batch.selling_price_per_unit or Decimal("0.00")
+                selling_price = batch.selling_price or Decimal("0.00")
             
             if selling_price == 0:
                 if selling_price is None:
                     return {"ok": False, "needs_price": True, "error": "Selling price required"}
                 else:
                     # Update batch selling price
-                    batch.selling_price_per_unit = selling_price
-                    batch.save(update_fields=["selling_price_per_unit"])
+                    batch.selling_price = selling_price
+                    batch.save(update_fields=["selling_price"])
             
             # Calculate totals
             unit_price = selling_price
             total_amount = unit_price * quantity
-            unit_cost = batch.cost_price_per_unit or Decimal("0.00")
+            unit_cost = batch.cost_price or Decimal("0.00")
             
             # Decrease batch stock
-            batch.units_remaining -= quantity
-            batch.save(update_fields=["units_remaining"])
+            batch.quantity -= quantity
+            batch.save(update_fields=["quantity"])
             
             # Create sale
             sale = PharmacySale.objects.create(

@@ -98,11 +98,18 @@
     letter-spacing:.5px
   }
   .kpi-value{
-    font-size:clamp(1.8rem,3vw,2.5rem);
+    font-size:clamp(1.4rem,3vw,2rem);
     font-weight:800;
     color:#0f172a;
     margin:0;
-    line-height:1.2
+    line-height:1.2;
+    word-wrap:break-word;
+    overflow-wrap:break-word;
+    word-wrap:break-word;
+    overflow-wrap:break-word;
+    white-space:normal;
+    overflow:visible;
+    text-overflow:clip
   }
   .kpi-sublabel{
     font-size:.85rem;
@@ -359,7 +366,7 @@
     
     <div class="kpi-card" style="background:linear-gradient(135deg,#eab308,#ca8a04);color:#fff;border:none">
       <p class="kpi-label" style="color:rgba(255,255,255,.9)">📦 Stock Value</p>
-      <h3 class="kpi-value" style="color:#fff">MWK {{ total_stock_value|floatformat:0|intcomma }}</h3>
+      <h3 class="kpi-value" style="color:#fff;font-size:clamp(1.4rem,3vw,2rem);word-wrap:break-word">MWK {{ total_stock_value|floatformat:0|intcomma }}</h3>
       <p class="kpi-sublabel" style="color:rgba(255,255,255,.8)">At selling price</p>
     </div>
   </div>

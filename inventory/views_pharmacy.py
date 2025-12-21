@@ -12,7 +12,8 @@ from typing import Optional
 from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
-from django.db import transaction
+from django.core.exceptions import ValidationError
+from django.db import transaction, IntegrityError
 from django.db.models import Sum, Count, Q, F
 from django.http import HttpRequest, HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
@@ -467,14 +468,19 @@ def pharmacy_stock_in_wizard(request: HttpRequest) -> HttpResponse:
         
         # Jump action - allow user to jump to any previous step (clickable breadcrumb)
         if action == "jump":
-            target_step = int(request.POST.get("jump_to_step", 1))
-            current_step = int(request.POST.get("wizard_step", 1))
+            target_step = int(request.POST.get("jump_to_step", 0))
+            current_step = int(request.POST.get("wizard_step", 0))
             
             # Only allow jumping backwards (to completed steps)
             if target_step < current_step:
                 request.session["pharmacy_wizard_step"] = target_step
                 # Clear selections for steps after the target
-                if target_step <= 1:
+                if target_step <= 0:
+                    request.session.pop("pharmacy_wizard_mode", None)
+                    request.session.pop("pharmacy_wizard_category", None)
+                    request.session.pop("pharmacy_wizard_subcategory", None)
+                    request.session.pop("pharmacy_wizard_item", None)
+                elif target_step <= 1:
                     request.session.pop("pharmacy_wizard_category", None)
                     request.session.pop("pharmacy_wizard_subcategory", None)
                     request.session.pop("pharmacy_wizard_item", None)
@@ -488,9 +494,11 @@ def pharmacy_stock_in_wizard(request: HttpRequest) -> HttpResponse:
         
         # Back button - decrement step
         if action == "back":
-            current_step = int(request.POST.get("wizard_step", 1))
-            request.session["pharmacy_wizard_step"] = max(1, current_step - 1)
+            current_step = int(request.POST.get("wizard_step", 0))
+            request.session["pharmacy_wizard_step"] = max(0, current_step - 1)
             # Clear selections if going back to earlier steps
+            if current_step <= 1:
+                request.session.pop("pharmacy_wizard_mode", None)
             if current_step <= 2:
                 request.session.pop("pharmacy_wizard_category", None)
             if current_step <= 3:
@@ -503,9 +511,17 @@ def pharmacy_stock_in_wizard(request: HttpRequest) -> HttpResponse:
             return _handle_wizard_save(request, business)
         
         # Next button - advance to next step
-        current_step = int(request.POST.get("wizard_step", 1))
+        current_step = int(request.POST.get("wizard_step", 0))
         
-        if current_step == 1:
+        if current_step == 0:
+            # Step 0: Mode selected (Pharmacy or Cosmetics)
+            selected_mode = request.POST.get("selected_mode", "").strip()
+            if selected_mode:
+                request.session["pharmacy_wizard_mode"] = selected_mode
+                request.session["pharmacy_wizard_step"] = 1
+            return redirect("pharmacy:stock_in_wizard")
+        
+        elif current_step == 1:
             # Step 1: Category selected
             selected_category = request.POST.get("selected_category", "").strip()
             if selected_category:
@@ -536,7 +552,8 @@ def pharmacy_stock_in_wizard(request: HttpRequest) -> HttpResponse:
             return redirect("pharmacy:stock_in_wizard")
     
     # GET: Display current step
-    step = request.session.get("pharmacy_wizard_step", 1)
+    step = request.session.get("pharmacy_wizard_step", 0)
+    wizard_mode = request.session.get("pharmacy_wizard_mode", "")
     selected_category = request.session.get("pharmacy_wizard_category", "")
     selected_subcategory = request.session.get("pharmacy_wizard_subcategory", "")
     selected_item = request.session.get("pharmacy_wizard_item", "")
@@ -553,7 +570,8 @@ def pharmacy_stock_in_wizard(request: HttpRequest) -> HttpResponse:
         request.session.pop("last_product_name", None)
         request.session.pop("last_quantity", None)
         # Reset wizard
-        request.session["pharmacy_wizard_step"] = 1
+        request.session["pharmacy_wizard_step"] = 0
+        request.session.pop("pharmacy_wizard_mode", None)
         request.session.pop("pharmacy_wizard_category", None)
         request.session.pop("pharmacy_wizard_subcategory", None)
         request.session.pop("pharmacy_wizard_item", None)
@@ -562,26 +580,184 @@ def pharmacy_stock_in_wizard(request: HttpRequest) -> HttpResponse:
     ctx = {
         "step": step,
         "success_data": success_data,
+        "wizard_mode": wizard_mode,
         "selected_category": selected_category,
         "selected_subcategory": selected_subcategory,
         "selected_item": selected_item,
     }
     
-    if step == 1:
-        # Step 1: Show top-level categories
-        ctx["top_categories"] = get_top_categories()
+    if step == 0:
+        # Step 0: Show Pharmacy vs Cosmetics mode selection (TEXT ONLY - no icons)
+        ctx["mode_options"] = [
+            {"key": "pharmacy", "label": "Pharmacy", "description": "Medicines & medical supplies"},
+            {"key": "cosmetics", "label": "Cosmetics", "description": "Beauty & personal care products"},
+        ]
+    
+    elif step == 1:
+        # Step 1: Show top-level categories filtered by mode
+        all_categories = get_top_categories()
+        
+        # Filter categories based on mode
+        if wizard_mode == "cosmetics":
+            # Show cosmetics subcategories directly as top-level categories
+            from inventory.pharmacy_constants import COSMETICS_SUBCATEGORIES, get_prefills_for_cosmetics_category
+            categories_to_show = COSMETICS_SUBCATEGORIES
+            
+            # Add product counts for cosmetics categories
+            cosmetics_category_codes = [
+                PharmacyCategory.SKIN_CARE,
+                PharmacyCategory.HAIR_CARE,
+                PharmacyCategory.PERSONAL_CARE,
+                PharmacyCategory.BEAUTY_MAKEUP,
+                PharmacyCategory.BABY_CARE,
+                PharmacyCategory.ORAL_CARE,
+            ]
+            
+            # Map wizard keys to model enum values
+            wizard_to_model_map = {
+                "skin_care": PharmacyCategory.SKIN_CARE,
+                "hair_care": PharmacyCategory.HAIR_CARE,
+                "body_care": PharmacyCategory.PERSONAL_CARE,  # Map body_care to personal_care
+                "perfumes": PharmacyCategory.BEAUTY_MAKEUP,  # Map perfumes to beauty_makeup
+                "mens_grooming": PharmacyCategory.PERSONAL_CARE,
+                "makeup": PharmacyCategory.BEAUTY_MAKEUP,
+                "other_cosmetics": PharmacyCategory.OTHER,
+            }
+            
+            # Add counts to each category (DB products + prefills)
+            for cat in categories_to_show:
+                model_category = wizard_to_model_map.get(cat["key"])
+                db_count = 0
+                if model_category:
+                    # Get existing DB products
+                    existing_products = list(MerchProduct.objects.filter(
+                        business=business,
+                        kind="pharmacy",
+                        category=model_category,
+                        is_active=True
+                    ).values_list("name", flat=True))
+                    db_count = len(existing_products)
+                    
+                    # Get prefills for this category
+                    prefills = get_prefills_for_cosmetics_category(cat["key"])
+                    
+                    # Normalize names for comparison (case-insensitive, strip whitespace)
+                    existing_normalized = {name.lower().strip() for name in existing_products}
+                    
+                    # Count prefills not already in DB
+                    prefill_count = sum(1 for p in prefills if p.lower().strip() not in existing_normalized)
+                    
+                    cat["product_count"] = db_count + prefill_count
+                else:
+                    # Fallback: just count prefills
+                    prefills = get_prefills_for_cosmetics_category(cat["key"])
+                    cat["product_count"] = len(prefills)
+            
+            ctx["top_categories"] = categories_to_show
+            
+        elif wizard_mode == "pharmacy":
+            # Show all pharmacy categories (exclude cosmetics)
+            categories_to_show = [cat for cat in all_categories if cat["key"] != "cosmetics"]
+            
+            # Add product counts for pharmacy categories (approximate based on wizard structure)
+            # Since wizard categories don't map 1:1 to model categories, we'll show total pharmacy products
+            total_pharmacy_products = MerchProduct.objects.filter(
+                business=business,
+                kind="pharmacy",
+                is_active=True
+            ).exclude(
+                category__in=[
+                    PharmacyCategory.SKIN_CARE,
+                    PharmacyCategory.HAIR_CARE,
+                    PharmacyCategory.PERSONAL_CARE,
+                    PharmacyCategory.BEAUTY_MAKEUP,
+                    PharmacyCategory.BABY_CARE,
+                    PharmacyCategory.ORAL_CARE,
+                ]
+            ).count()
+            
+            # Distribute count info across categories (show total for now)
+            for cat in categories_to_show:
+                cat["product_count"] = total_pharmacy_products
+            
+            ctx["top_categories"] = categories_to_show
+        else:
+            # Fallback: show all
+            ctx["top_categories"] = all_categories
     
     elif step == 2:
-        # Step 2: Show subcategories or items based on selected category
+        # Step 2: Show subcategories or items based on selected category (after mode and category selection)
         category_labels = {cat["key"]: cat["label"] for cat in get_top_categories()}
-        ctx["selected_category_label"] = category_labels.get(selected_category, selected_category)
+        
+        # Handle cosmetics subcategories labels
+        if wizard_mode == "cosmetics":
+            from inventory.pharmacy_constants import COSMETICS_SUBCATEGORIES
+            cosmetics_labels = {sub["key"]: sub["label"] for sub in COSMETICS_SUBCATEGORIES}
+            ctx["selected_category_label"] = cosmetics_labels.get(selected_category, selected_category)
+        else:
+            ctx["selected_category_label"] = category_labels.get(selected_category, selected_category)
         
         subcategories = get_subcategories_for_category(selected_category)
         if subcategories:
             ctx["subcategories"] = subcategories
         else:
             # Direct items for this category
-            ctx["items"] = get_items_for_top_category(selected_category)
+            # FIXED: For cosmetics, show DB products + prefills + custom option
+            if wizard_mode == "cosmetics":
+                from inventory.pharmacy_constants import get_prefills_for_cosmetics_category
+                
+                # Map wizard subcategory keys to model category enum values
+                wizard_to_model_map = {
+                    "skin_care": PharmacyCategory.SKIN_CARE,
+                    "hair_care": PharmacyCategory.HAIR_CARE,
+                    "body_care": PharmacyCategory.PERSONAL_CARE,
+                    "perfumes": PharmacyCategory.BEAUTY_MAKEUP,
+                    "mens_grooming": PharmacyCategory.PERSONAL_CARE,
+                    "makeup": PharmacyCategory.BEAUTY_MAKEUP,
+                    "other_cosmetics": PharmacyCategory.OTHER,
+                }
+                
+                model_category = wizard_to_model_map.get(selected_category)
+                
+                if model_category:
+                    # Fetch existing products for this business + category
+                    existing_products = list(MerchProduct.objects.filter(
+                        business=business,
+                        kind="pharmacy",
+                        category=model_category,
+                        is_active=True
+                    ).values_list("name", flat=True))
+                    
+                    # Get prefills for this category
+                    prefills = get_prefills_for_cosmetics_category(selected_category)
+                    
+                    # Normalize for deduplication (case-insensitive)
+                    existing_normalized = {name.lower().strip() for name in existing_products}
+                    
+                    # Build items list: DB products first, then prefills not in DB
+                    items = [{"name": name, "icon": "✨"} for name in existing_products]
+                    
+                    for prefill_name in prefills:
+                        if prefill_name.lower().strip() not in existing_normalized:
+                            items.append({"name": prefill_name, "icon": "💡", "is_prefill": True})
+                    
+                    # Always add "+ Add Custom Product" option at the end
+                    items.append({"name": "+ Add Custom Product", "icon": "📝", "is_custom": True})
+                    
+                    ctx["items"] = items
+                else:
+                    # Fallback: just show prefills + custom
+                    prefills = get_prefills_for_cosmetics_category(selected_category)
+                    items = [{"name": name, "icon": "💡"} for name in prefills]
+                    items.append({"name": "+ Add Custom Product", "icon": "📝", "is_custom": True})
+                    ctx["items"] = items
+            else:
+                # Pharmacy mode: use standard items
+                items = get_items_for_top_category(selected_category)
+                # Safety: if no items found, add a custom option
+                if not items:
+                    items = [{"name": "+ Add Custom Product", "icon": "📝"}]
+                ctx["items"] = items
     
     elif step == 3:
         # Step 3: Show specific items for selected subcategory
@@ -593,166 +769,277 @@ def pharmacy_stock_in_wizard(request: HttpRequest) -> HttpResponse:
         ctx["selected_subcategory_label"] = subcat_labels.get(selected_subcategory, selected_subcategory)
         
         ctx["show_item_selection"] = True
-        ctx["items"] = get_items_for_subcategory(selected_category, selected_subcategory)
+        
+        # For cosmetics, show existing products + prefills as clickable cards + "Other" option
+        if wizard_mode == "cosmetics" and selected_subcategory:
+            from inventory.pharmacy_constants import get_prefills_for_cosmetics_category
+            
+            # Map wizard subcategory keys to model category enum values
+            wizard_to_model_map = {
+                "skin_care": PharmacyCategory.SKIN_CARE,
+                "hair_care": PharmacyCategory.HAIR_CARE,
+                "body_care": PharmacyCategory.PERSONAL_CARE,
+                "perfumes": PharmacyCategory.BEAUTY_MAKEUP,
+                "mens_grooming": PharmacyCategory.PERSONAL_CARE,
+                "makeup": PharmacyCategory.BEAUTY_MAKEUP,
+                "other_cosmetics": PharmacyCategory.OTHER,
+            }
+            
+            model_category = wizard_to_model_map.get(selected_subcategory)
+            
+            if model_category:
+                # Fetch existing products for this business + category
+                existing_products = list(MerchProduct.objects.filter(
+                    business=business,
+                    kind="pharmacy",
+                    category=model_category,
+                    is_active=True
+                ).values_list("name", flat=True))
+                
+                # Get prefills for this category
+                prefills = get_prefills_for_cosmetics_category(selected_subcategory)
+                
+                # Normalize for deduplication (case-insensitive)
+                existing_normalized = {name.lower().strip() for name in existing_products}
+                
+                # Build items list: DB products first, then prefills not in DB
+                items = [{"name": name, "icon": "✨"} for name in existing_products]
+                
+                for prefill_name in prefills:
+                    if prefill_name.lower().strip() not in existing_normalized:
+                        items.append({"name": prefill_name, "icon": "💡", "is_prefill": True})
+                
+                # Always add "+ Add Custom Product" option at the end
+                items.append({"name": "+ Add Custom Product", "icon": "📝", "is_custom": True})
+                
+                ctx["items"] = items
+            else:
+                # Fallback to brand items if no mapping found
+                ctx["items"] = get_items_for_subcategory(selected_category, selected_subcategory)
+        else:
+            # For pharmacy mode, use the standard brand items
+            ctx["items"] = get_items_for_subcategory(selected_category, selected_subcategory)
     
     return render(request, "verticals/pharmacy/stock_in_wizard.html", ctx)
 
 
 def _handle_wizard_save(request: HttpRequest, business: Business) -> HttpResponse:
-    """Handle the final save step of the pharmacy wizard."""
-    # Extract form data
-    product_name = request.POST.get("product_name", "").strip()
-    unit_type = request.POST.get("unit_type", "").strip()
-    quantity = request.POST.get("quantity", "0")
-    cost_price = request.POST.get("cost_price", "0")
-    selling_price = request.POST.get("selling_price", "0")
-    batch_number = request.POST.get("batch_number", "").strip()
-    expiry_date_str = request.POST.get("expiry_date", "")
-    supplier = request.POST.get("supplier", "").strip()
-    has_barcode = request.POST.get("has_barcode", "no")
-    barcode_value = request.POST.get("barcode", "").strip()
-    
-    # Get selected category from session to determine if expiry is required
-    selected_category = request.session.get("pharmacy_wizard_category", "")
-    is_cosmetics = (selected_category == "cosmetics")
-    
-    # Validation
-    errors = []
-    if not product_name:
-        errors.append("Product name is required.")
-    if not batch_number:
-        errors.append("Batch number is required.")
-    
-    # Expiry date validation: REQUIRED for Medicines, OPTIONAL for Cosmetics
-    if not is_cosmetics and not expiry_date_str:
-        errors.append("Expiry date is required for medicines.")
-    
-    # Barcode validation
-    if has_barcode == "yes":
-        if not barcode_value:
-            errors.append("Barcode is required when 'Has Barcode' is Yes.")
-        else:
-            from inventory.utils_barcodes import validate_barcode, normalize_barcode
-            is_valid, error_msg = validate_barcode(barcode_value)
-            if not is_valid:
-                errors.append(f"Invalid barcode: {error_msg}")
-            else:
-                barcode_value = normalize_barcode(barcode_value)
-    
+    """Handle the final save step of the pharmacy wizard with defensive error handling."""
     try:
-        qty = int(quantity)
-        if qty <= 0:
-            errors.append("Quantity must be greater than 0.")
-    except (ValueError, TypeError):
-        errors.append("Invalid quantity.")
-        qty = 0
-    
-    try:
-        cost = Decimal(cost_price)
-        if cost < 0:
-            errors.append("Cost price cannot be negative.")
-    except (ValueError, TypeError):
-        errors.append("Invalid cost price.")
-        cost = Decimal("0.00")
-    
-    try:
-        selling = Decimal(selling_price)
-        if selling < 0:
-            errors.append("Selling price cannot be negative.")
-    except (ValueError, TypeError):
-        errors.append("Invalid selling price.")
-        selling = Decimal("0.00")
-    
-    # Parse expiry date (optional for cosmetics, required for medicines)
-    expiry_date = None
-    if expiry_date_str:
-        try:
-            expiry_date = timezone.datetime.strptime(expiry_date_str, "%Y-%m-%d").date()
-        except (ValueError, TypeError):
-            errors.append("Invalid expiry date format.")
-            expiry_date = None
-    
-    # For medicines, expiry date must be parsed successfully
-    if not is_cosmetics and not expiry_date:
-        errors.append("Valid expiry date is required for medicines.")
-    
-    if errors:
-        for error in errors:
-            messages.error(request, error)
-        return redirect("pharmacy:stock_in_wizard")
-    
-    # Create or get product
-    with transaction.atomic():
-        product, created = MerchProduct.objects.get_or_create(
-            business=business,
-            name=product_name,
-            kind="pharmacy",
-            defaults={
-                "is_active": True,
-                "category": "medicine",  # Default category
-                "cost_price": cost,
-                "selling_price": selling,
+        # Extract form data
+        product_name = request.POST.get("product_name", "").strip()
+        quantity = request.POST.get("quantity", "0")
+        cost_price = request.POST.get("cost_price", "0")
+        selling_price = request.POST.get("selling_price", "0")
+        batch_number = request.POST.get("batch_number", "").strip()
+        expiry_date_str = request.POST.get("expiry_date", "")
+        supplier = request.POST.get("supplier", "").strip()
+        has_barcode = request.POST.get("has_barcode", "no")
+        barcode_value = request.POST.get("barcode", "").strip()
+        
+        # Get wizard mode from session
+        wizard_mode = request.session.get("pharmacy_wizard_mode", "pharmacy")
+        selected_category = request.session.get("pharmacy_wizard_category", "")
+        selected_subcategory = request.session.get("pharmacy_wizard_subcategory", "")
+        selected_item = request.session.get("pharmacy_wizard_item", "")
+        
+        # Determine if this is cosmetics
+        is_cosmetics = (wizard_mode == "cosmetics" or selected_category == "cosmetics")
+        
+        # Determine the correct product category for the database
+        product_category = "medicine"  # Default
+        
+        if wizard_mode == "cosmetics" and selected_subcategory:
+            # Map wizard subcategory to PharmacyCategory enum value
+            wizard_to_model_map = {
+                "skin_care": PharmacyCategory.SKIN_CARE,
+                "hair_care": PharmacyCategory.HAIR_CARE,
+                "body_care": PharmacyCategory.PERSONAL_CARE,
+                "perfumes": PharmacyCategory.BEAUTY_MAKEUP,
+                "mens_grooming": PharmacyCategory.PERSONAL_CARE,
+                "makeup": PharmacyCategory.BEAUTY_MAKEUP,
+                "other_cosmetics": PharmacyCategory.OTHER,
             }
-        )
+            product_category = wizard_to_model_map.get(selected_subcategory, PharmacyCategory.OTHER)
+        elif wizard_mode == "cosmetics" and selected_category:
+            # Fallback: map category directly
+            wizard_to_model_map = {
+                "skin_care": PharmacyCategory.SKIN_CARE,
+                "hair_care": PharmacyCategory.HAIR_CARE,
+                "body_care": PharmacyCategory.PERSONAL_CARE,
+                "perfumes": PharmacyCategory.BEAUTY_MAKEUP,
+                "mens_grooming": PharmacyCategory.PERSONAL_CARE,
+                "makeup": PharmacyCategory.BEAUTY_MAKEUP,
+                "other_cosmetics": PharmacyCategory.OTHER,
+            }
+            product_category = wizard_to_model_map.get(selected_category, PharmacyCategory.OTHER)
         
-        if not created:
-            # Update if prices changed
-            if product.cost_price != cost or product.selling_price != selling:
-                product.cost_price = cost
-                product.selling_price = selling
-                product.save()
+        # Is this an "Other" product?
+        is_other_product = selected_item and ("Other" in selected_item or "Custom" in selected_item or "other" in selected_item.lower())
         
-        # Store barcode if provided
-        if has_barcode == "yes" and barcode_value:
-            from inventory.utils_barcodes import set_barcode
-            set_barcode(product, barcode_value)
-            product.save()
+        # Validation
+        errors = []
+        if not product_name:
+            errors.append("Product name is required.")
         
-        # Check for duplicate batch
-        existing_batch = PharmacyBatch.objects.filter(
-            business=business,
-            merch_product=product,
-            batch_number=batch_number,
-            expiry_date=expiry_date
-        ).first()
+        # Batch number is now OPTIONAL (not required)
+        # Auto-generate if missing
+        if not batch_number:
+            import uuid
+            batch_number = f"BATCH-{uuid.uuid4().hex[:8].upper()}"
         
-        if existing_batch:
-            # Update existing batch quantity
-            existing_batch.quantity += qty
-            existing_batch.cost_price = cost
-            existing_batch.selling_price = selling
-            if supplier:
-                existing_batch.supplier = supplier
-            existing_batch.save()
-            messages.success(
-                request,
-                f"✅ Stock updated! Added {qty} units to existing batch. Total: {existing_batch.quantity}"
+        # Expiry date validation: REQUIRED for Medicines, OPTIONAL for Cosmetics
+        if not is_cosmetics and not expiry_date_str:
+            errors.append("Expiry date is required for medicines.")
+        
+        # Barcode validation
+        if has_barcode == "yes":
+            if not barcode_value:
+                errors.append("Barcode is required when 'Has Barcode' is Yes.")
+            else:
+                from inventory.utils_barcodes import validate_barcode, normalize_barcode
+                is_valid, error_msg = validate_barcode(barcode_value)
+                if not is_valid:
+                    errors.append(f"Invalid barcode: {error_msg}")
+                else:
+                    barcode_value = normalize_barcode(barcode_value)
+        
+        try:
+            qty = int(quantity)
+            if qty <= 0:
+                errors.append("Quantity must be greater than 0.")
+        except (ValueError, TypeError):
+            errors.append("Invalid quantity.")
+            qty = 0
+        
+        try:
+            cost = Decimal(cost_price)
+            if cost < 0:
+                errors.append("Cost price cannot be negative.")
+        except (ValueError, TypeError):
+            errors.append("Invalid cost price.")
+            cost = Decimal("0.00")
+        
+        try:
+            selling = Decimal(selling_price)
+            if selling < 0:
+                errors.append("Selling price cannot be negative.")
+        except (ValueError, TypeError):
+            errors.append("Invalid selling price.")
+            selling = Decimal("0.00")
+        
+        # Parse expiry date (optional for cosmetics, required for medicines)
+        expiry_date = None
+        if expiry_date_str:
+            try:
+                expiry_date = timezone.datetime.strptime(expiry_date_str, "%Y-%m-%d").date()
+            except (ValueError, TypeError):
+                errors.append("Invalid expiry date format.")
+                expiry_date = None
+        
+        # For medicines, expiry date must be parsed successfully
+        if not is_cosmetics and not expiry_date:
+            errors.append("Valid expiry date is required for medicines.")
+        
+        if errors:
+            for error in errors:
+                messages.error(request, error)
+            return redirect("pharmacy:stock_in_wizard")
+        
+        # Create or get product
+        with transaction.atomic():
+            product, created = MerchProduct.objects.get_or_create(
+                business=business,
+                name=product_name,
+                kind="pharmacy",
+                defaults={
+                    "is_active": True,
+                    "category": product_category,
+                    "cost_price": cost,
+                    "selling_price": selling,
+                }
             )
-        else:
-            # Create new batch
-            PharmacyBatch.objects.create(
+            
+            if not created:
+                # Update if prices changed
+                if product.cost_price != cost or product.selling_price != selling:
+                    product.cost_price = cost
+                    product.selling_price = selling
+                    product.save()
+            
+            # Store barcode if provided
+            if has_barcode == "yes" and barcode_value:
+                from inventory.utils_barcodes import set_barcode
+                set_barcode(product, barcode_value)
+                product.save()
+            
+            # Check for duplicate batch
+            existing_batch = PharmacyBatch.objects.filter(
                 business=business,
                 merch_product=product,
                 batch_number=batch_number,
-                expiry_date=expiry_date,
-                quantity=qty,
-                cost_price=cost,
-                selling_price=selling,
-                supplier=supplier,
-                received_date=timezone.now().date(),
-                reorder_level=10,
-            )
-            messages.success(
-                request,
-                f"🎉 Stock added successfully! {product_name} - {qty} units (Batch: {batch_number})"
-            )
+                expiry_date=expiry_date
+            ).first()
+            
+            if existing_batch:
+                # Update existing batch quantity
+                existing_batch.quantity += qty
+                existing_batch.cost_price = cost
+                existing_batch.selling_price = selling
+                if supplier:
+                    existing_batch.supplier = supplier
+                # Update barcode if provided
+                if has_barcode == "yes" and barcode_value:
+                    existing_batch.barcode = barcode_value
+                existing_batch.save()
+                messages.success(
+                    request,
+                    f"✅ Stock updated! Added {qty} units to existing batch. Total: {existing_batch.quantity}"
+                )
+            else:
+                # Create new batch
+                PharmacyBatch.objects.create(
+                    business=business,
+                    merch_product=product,
+                    batch_number=batch_number,
+                    barcode=barcode_value if has_barcode == "yes" else "",
+                    expiry_date=expiry_date,
+                    quantity=qty,
+                    cost_price=cost,
+                    selling_price=selling,
+                    supplier=supplier,
+                    received_date=timezone.now().date(),
+                    reorder_level=10,
+                )
+                messages.success(
+                    request,
+                    f"🎉 Stock added successfully! {product_name} - {qty} units (Batch: {batch_number})"
+                )
+            
+            # Store success flag in session
+            request.session["pharmacy_wizard_success"] = True
+            request.session["last_product_name"] = product_name
+            request.session["last_quantity"] = qty
         
-        # Store success flag in session
-        request.session["pharmacy_wizard_success"] = True
-        request.session["last_product_name"] = product_name
-        request.session["last_quantity"] = qty
+        return redirect("pharmacy:stock_in_wizard")
     
-    return redirect("pharmacy:stock_in_wizard")
+    except ValidationError as e:
+        # Django model validation errors
+        messages.error(request, f"Validation error: {str(e)}")
+        logger.error(f"Validation error in pharmacy wizard save: {e}")
+        return redirect("pharmacy:stock_in_wizard")
+    
+    except IntegrityError as e:
+        # Database integrity errors (e.g., duplicate, constraint violation)
+        messages.error(request, "Database error: This item may already exist or there's a data conflict. Please check your input.")
+        logger.error(f"Integrity error in pharmacy wizard save: {e}")
+        return redirect("pharmacy:stock_in_wizard")
+    
+    except Exception as e:
+        # Catch-all for any other errors - NEVER return 500
+        messages.error(request, f"An unexpected error occurred while saving. Please try again or contact support. Error: {str(e)}")
+        logger.exception(f"Unexpected error in pharmacy wizard save: {e}")
+        return redirect("pharmacy:stock_in_wizard")
 
 
 # ==============================================================================

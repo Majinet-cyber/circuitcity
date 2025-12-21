@@ -91,7 +91,9 @@ def get_payment_mix(
         revenue_field = 'price'  # Default for Sale model
         if hasattr(sales_qs.model, '_meta'):
             field_names = [f.name for f in sales_qs.model._meta.get_fields()]
-            if 'total_price' in field_names:
+            if 'total_amount' in field_names:
+                revenue_field = 'total_amount'
+            elif 'total_price' in field_names:
                 revenue_field = 'total_price'
             elif 'amount' in field_names:
                 revenue_field = 'amount'
