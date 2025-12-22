@@ -71,6 +71,15 @@ urlpatterns = [
     path("phones/api/sales-trend/", phones.sales_trend_json, name="phones_sales_trend_json"),
     path("phones/reports/", phones.reports, name="phones_reports"),
     
+    # Phones Accessories (quantity-based, separate from IMEI phones)
+    path("phones/accessories/", phones.accessories_dashboard, name="phones_accessories_dashboard"),
+    path("phones/accessories/stock-in/", phones.accessories_stock_in, name="phones_accessories_stock_in"),
+    path("phones/accessories/fast-sell/", phones.accessories_fast_sell, name="phones_accessories_fast_sell"),
+    path("phones/accessories/sell/", phones.accessories_normal_sell, name="phones_accessories_sell"),  # NEW: Normal sell
+    path("phones/accessories/api/lookup/", phones.accessories_lookup_api, name="phones_accessories_lookup_api"),
+    path("phones/accessories/api/stock-in/", phones.accessories_stock_in_api, name="phones_accessories_stock_in_api"),
+    path("phones/accessories/api/sell/", phones.accessories_sell_api, name="phones_accessories_sell_api"),
+    
     # Fallback for businesses without a kind
     path("none/", fallback.no_business, name="no_business"),
 ]

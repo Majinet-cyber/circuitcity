@@ -533,6 +533,15 @@ class GymMember(models.Model):
     phone = models.CharField(max_length=20, blank=True, default="")
     email = models.EmailField(blank=True, default="")
     
+    # Unique member barcode/QR code for scanning
+    member_code = models.CharField(
+        max_length=20, 
+        blank=True, 
+        default="",
+        db_index=True,
+        help_text="Unique barcode/QR code for member scanning (auto-generated)"
+    )
+    
     # Trainer assignment
     trainer = models.ForeignKey(
         GymTrainer, 
@@ -589,15 +598,43 @@ class GymMember(models.Model):
     notes = models.TextField(blank=True, default="")
     
     class Meta:
-        unique_together = [("business", "phone")]
+        unique_together = [("business", "phone"), ("business", "member_code")]
         ordering = ["-joined_at"]
         indexes = [
             models.Index(fields=["business", "is_active", "is_archived"]),
             models.Index(fields=["phone"]),
+            models.Index(fields=["member_code"]),
         ]
     
     def __str__(self):
         return f"{self.name} ({self.phone})"
+    
+    def save(self, *args, **kwargs):
+        """Auto-generate member_code if not present"""
+        if not self.member_code and self.business_id:
+            self.member_code = self._generate_unique_member_code()
+        super().save(*args, **kwargs)
+    
+    def _generate_unique_member_code(self) -> str:
+        """
+        Generate a unique member code in format: GYM-XXXXXX
+        Retries up to 20 times to avoid collisions.
+        """
+        import random
+        for _ in range(20):
+            code = f"GYM-{random.randint(100000, 999999)}"
+            if not GymMember.objects.filter(business=self.business, member_code=code).exists():
+                return code
+        # Ultra-rare fallback
+        import uuid
+        return f"GYM-{uuid.uuid4().hex[:6].upper()}"
+    
+    def get_qr_code_data_url(self) -> str:
+        """Get QR code as base64 data URL for this member"""
+        if not self.member_code:
+            return ""
+        from inventory.utils_gym_barcode import generate_member_qr_code_url
+        return generate_member_qr_code_url(self.member_code)
     
     # ==============================================================================
     # CENTRALIZED MEMBERSHIP CALCULATION PROPERTIES

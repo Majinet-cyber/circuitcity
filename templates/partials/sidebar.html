@@ -107,11 +107,13 @@
   {% endif %}
 
   <!-- ---------- Tenant Business Navigation (Vertical-Aware) ---------- -->
+  <!-- DEBUG: sidebar_items count = {{ sidebar_items|length }}, vertical = {{ BUSINESS_VERTICAL }} -->
   {% if request.business and sidebar_items %}
     {% with vertical=BUSINESS_VERTICAL|default:'phones' %}
     
     {# Group items by section #}
     {% regroup sidebar_items by section as sections %}
+    <!-- DEBUG: Found {{ sections|length }} sections -->
     
     {% for section in sections %}
       {# Special handling for MORE section - make it collapsible #}
@@ -140,7 +142,7 @@
                     {% endwith %}
                   {% elif item_url %}
                     <li class="{% if item.active_pattern in request.path or item.active_prefix in request.path %}active{% endif %}">
-                      <a class="navlink" href="{{ item_url }}" {% if item.key %}data-cy="nav-{{ item.key }}"{% endif %}>
+                      <a class="navlink" href="{{ item_url }}" {% if item.key %}data-cy="nav-{{ item.key }}"{% endif %} {% if item.testid %}data-testid="{{ item.testid }}"{% endif %}>
                         <i class="bi {{ item.icon }}"></i>
                         <span>{% if vertical == 'gym' and item.label == 'Agents' %}Trainers{% else %}{{ item.label }}{% endif %}</span>
                       </a>
@@ -148,7 +150,7 @@
                   {% elif item.active_prefix %}
                     {# Fallback: use active_prefix as URL if named URL resolution fails #}
                     <li class="{% if item.active_pattern in request.path or item.active_prefix in request.path %}active{% endif %}">
-                      <a class="navlink" href="{{ item.active_prefix }}/" {% if item.key %}data-cy="nav-{{ item.key }}"{% endif %}>
+                      <a class="navlink" href="{{ item.active_prefix }}/" {% if item.key %}data-cy="nav-{{ item.key }}"{% endif %} {% if item.testid %}data-testid="{{ item.testid }}"{% endif %}>
                         <i class="bi {{ item.icon }}"></i>
                         <span>{% if vertical == 'gym' and item.label == 'Agents' %}Trainers{% else %}{{ item.label }}{% endif %}</span>
                       </a>
@@ -161,7 +163,7 @@
                 {% if not item_url and item.url|slice:':1' == '/' %}
                   {% with item_url=item.url %}
                     <li class="{% if item.active_pattern in request.path or item.active_prefix in request.path %}active{% endif %}">
-                      <a class="navlink" href="{{ item_url }}" {% if item.key %}data-cy="nav-{{ item.key }}"{% endif %}>
+                      <a class="navlink" href="{{ item_url }}" {% if item.key %}data-cy="nav-{{ item.key }}"{% endif %} {% if item.testid %}data-testid="{{ item.testid }}"{% endif %}>
                         <i class="bi {{ item.icon }}"></i>
                         <span>{% if vertical == 'gym' and item.label == 'Agents' %}Trainers{% else %}{{ item.label }}{% endif %}</span>
                       </a>
@@ -191,8 +193,10 @@
       {% else %}
       <div>
         <div class="cc-section">{{ section.grouper }}</div>
+        <!-- DEBUG: Section {{ section.grouper }} has {{ section.list|length }} items -->
         <ul class="cc-nav">
           {% for item in section.list %}
+            <!-- DEBUG: Item {{ item.key }} ({{ item.label }}) -->
             {# Check if item requires manager role #}
             {% if item.require_manager|default:False %}
               {% if request.user.is_superuser or request.user.is_staff or IS_MANAGER %}
@@ -201,7 +205,7 @@
                 {% if not item_url and item.url|slice:':1' == '/' %}
                   {% with item_url=item.url %}
                     <li class="{% if item.active_pattern in request.path or item.active_prefix in request.path %}active{% endif %}">
-                      <a class="navlink" href="{{ item_url }}" {% if item.key %}data-cy="nav-{{ item.key }}"{% endif %}>
+                      <a class="navlink" href="{{ item_url }}" {% if item.key %}data-cy="nav-{{ item.key }}"{% endif %} {% if item.testid %}data-testid="{{ item.testid }}"{% endif %}>
                         <i class="bi {{ item.icon }}"></i>
                         <span>{% if vertical == 'gym' and item.label == 'Agents' %}Trainers{% else %}{{ item.label }}{% endif %}</span>
                       </a>
@@ -209,7 +213,7 @@
                   {% endwith %}
                 {% elif item_url %}
                   <li class="{% if item.active_pattern in request.path or item.active_prefix in request.path %}active{% endif %}">
-                    <a class="navlink" href="{{ item_url }}" {% if item.key %}data-cy="nav-{{ item.key }}"{% endif %}>
+                    <a class="navlink" href="{{ item_url }}" {% if item.key %}data-cy="nav-{{ item.key }}"{% endif %} {% if item.testid %}data-testid="{{ item.testid }}"{% endif %}>
                       <i class="bi {{ item.icon }}"></i>
                       <span>{% if vertical == 'gym' and item.label == 'Agents' %}Trainers{% else %}{{ item.label }}{% endif %}</span>
                     </a>
@@ -217,7 +221,7 @@
                 {% elif item.active_prefix %}
                   {# Fallback: use active_prefix as URL if named URL resolution fails #}
                   <li class="{% if item.active_pattern in request.path or item.active_prefix in request.path %}active{% endif %}">
-                    <a class="navlink" href="{{ item.active_prefix }}/" {% if item.key %}data-cy="nav-{{ item.key }}"{% endif %}>
+                    <a class="navlink" href="{{ item.active_prefix }}/" {% if item.key %}data-cy="nav-{{ item.key }}"{% endif %} {% if item.testid %}data-testid="{{ item.testid }}"{% endif %}>
                       <i class="bi {{ item.icon }}"></i>
                       <span>{% if vertical == 'gym' and item.label == 'Agents' %}Trainers{% else %}{{ item.label }}{% endif %}</span>
                     </a>
@@ -227,10 +231,11 @@
             {% else %}
               {# No manager requirement - show to all #}
               {% url item.url as item_url %}
+              <!-- DEBUG: Resolved {{ item.key }} URL: {{ item_url|default:"FAILED" }} -->
               {% if not item_url and item.url|slice:':1' == '/' %}
                 {% with item_url=item.url %}
                   <li class="{% if item.active_pattern in request.path or item.active_prefix in request.path %}active{% endif %}">
-                    <a class="navlink" href="{{ item_url }}" {% if item.key %}data-cy="nav-{{ item.key }}"{% endif %}>
+                    <a class="navlink" href="{{ item_url }}" {% if item.key %}data-cy="nav-{{ item.key }}"{% endif %} {% if item.testid %}data-testid="{{ item.testid }}"{% endif %}>
                       <i class="bi {{ item.icon }}"></i>
                       <span>{% if vertical == 'gym' and item.label == 'Agents' %}Trainers{% else %}{{ item.label }}{% endif %}</span>
                     </a>
@@ -238,15 +243,15 @@
                 {% endwith %}
               {% elif item_url %}
                 <li class="{% if item.active_pattern in request.path or item.active_prefix in request.path %}active{% endif %}">
-                  <a class="navlink" href="{{ item_url }}" {% if item.key %}data-cy="nav-{{ item.key }}"{% endif %}>
+                  <a class="navlink" href="{{ item_url }}" {% if item.key %}data-cy="nav-{{ item.key }}"{% endif %} {% if item.testid %}data-testid="{{ item.testid }}"{% endif %}>
                     <i class="bi {{ item.icon }}"></i>
                     <span>{% if vertical == 'gym' and item.label == 'Agents' %}Trainers{% else %}{{ item.label }}{% endif %}</span>
                   </a>
-                </li>
+                  </li>
               {% elif item.active_prefix %}
                 {# Fallback: use active_prefix as URL if named URL resolution fails #}
                 <li class="{% if item.active_pattern in request.path or item.active_prefix in request.path %}active{% endif %}">
-                  <a class="navlink" href="{{ item.active_prefix }}/" {% if item.key %}data-cy="nav-{{ item.key }}"{% endif %}>
+                  <a class="navlink" href="{{ item.active_prefix }}/" {% if item.key %}data-cy="nav-{{ item.key }}"{% endif %} {% if item.testid %}data-testid="{{ item.testid }}"{% endif %}>
                     <i class="bi {{ item.icon }}"></i>
                     <span>{% if vertical == 'gym' and item.label == 'Agents' %}Trainers{% else %}{{ item.label }}{% endif %}</span>
                   </a>

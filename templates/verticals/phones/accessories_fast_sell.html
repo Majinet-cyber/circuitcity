@@ -1,0 +1,400 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Fast Sell Accessories · Emajinet{% endblock %}
+
+{% block content %}
+
+<style>
+  .fastsell-container{max-width:1200px;margin:20px auto;padding:20px}
+  .fastsell-hero{background:linear-gradient(120deg,#10b981,#059669);padding:30px;border-radius:20px;color:#fff;text-align:center;margin-bottom:30px;box-shadow:0 20px 50px rgba(16,185,129,0.3)}
+  .fastsell-hero h1{margin:0;font-size:2rem;font-weight:900}
+  .fastsell-hero p{margin:10px 0 0;opacity:.9}
+  
+  .scan-panel{background:linear-gradient(135deg,#ffffff,#f8fafc);border:2px solid #e2e8f0;border-radius:20px;padding:32px;margin-bottom:24px;box-shadow:0 10px 30px rgba(15,23,42,0.1)}
+  .scan-input{width:100%;padding:16px;border:2px solid #e2e8f0;border-radius:12px;font-size:1.2rem;margin-bottom:16px;transition:all 0.2s}
+  .scan-input:focus{outline:none;border-color:#10b981;box-shadow:0 0 0 3px rgba(16,185,129,0.1)}
+  
+  .btn-sell{padding:14px 28px;border-radius:999px;font-weight:700;font-size:1rem;border:none;cursor:pointer;transition:all 0.2s;display:inline-flex;align-items:center;gap:8px}
+  .btn-sell.primary{background:#10b981;color:#fff}
+  .btn-sell.primary:hover{background:#059669;transform:translateY(-2px);box-shadow:0 8px 20px rgba(16,185,129,0.3)}
+  .btn-sell.secondary{background:#e2e8f0;color:#0f172a}
+  .btn-sell.secondary:hover{background:#cbd5e1}
+  
+  .product-card{background:linear-gradient(135deg,#ffffff,#f8fafc);border:2px solid #e2e8f0;border-radius:16px;padding:24px;margin-bottom:16px;box-shadow:0 4px 12px rgba(15,23,42,0.08);display:none}
+  .product-card.show{display:block}
+  .product-card h3{margin:0 0 12px;font-size:1.3rem;font-weight:700;color:#0f172a}
+  .product-card .info-row{display:flex;justify-content:space-between;margin-bottom:8px;font-size:0.95rem}
+  .product-card .info-row strong{color:#64748b}
+  .product-card .info-row span{color:#0f172a;font-weight:600}
+  
+  .recent-sales{background:linear-gradient(135deg,#ffffff,#f8fafc);border-radius:20px;padding:24px;box-shadow:0 10px 30px rgba(15,23,42,0.1)}
+  .recent-sales h2{margin:0 0 20px;font-size:1.3rem;font-weight:800;color:#0f172a;display:flex;align-items:center;gap:10px}
+  .recent-sales h2 i{color:#10b981}
+  
+  .sale-item{background:#f8fafc;border-radius:12px;padding:16px;margin-bottom:12px;display:flex;justify-content:space-between;align-items:center}
+  .sale-item:hover{background:#f1f5f9}
+  
+  .toast{position:fixed;top:20px;right:20px;background:#10b981;color:#fff;padding:20px 24px;border-radius:12px;box-shadow:0 10px 30px rgba(16,185,129,0.3);display:none;z-index:1000;min-width:300px}
+  .toast.show{display:block;animation:slideIn 0.3s}
+  .toast.error{background:#dc2626}
+  
+  @keyframes slideIn{from{transform:translateX(100%)}to{transform:translateX(0)}}
+  
+  @media (max-width:768px){
+    .fastsell-container{padding:12px}
+    .scan-panel{padding:20px}
+  }
+</style>
+
+<div class="fastsell-container">
+  <div class="fastsell-hero">
+    <h1><i class="bi bi-lightning-charge-fill"></i> Fast Sell Accessories</h1>
+    <p>Scan barcode or search to sell instantly</p>
+  </div>
+
+  <!-- Scan/Search Panel -->
+  <div class="scan-panel">
+    <h2 style="margin:0 0 20px;font-weight:900;color:#0f172a">
+      <i class="bi bi-upc-scan" style="color:#10b981"></i> Scan or Search
+    </h2>
+    <input 
+      type="text" 
+      id="scanInput" 
+      class="scan-input" 
+      placeholder="Scan barcode or type product name..." 
+      autofocus
+    >
+    <div style="display:flex;gap:12px;flex-wrap:wrap">
+      <button class="btn-sell primary" onclick="startBarcodeScanner()">
+        <i class="bi bi-camera"></i> Scan Barcode
+      </button>
+      <button class="btn-sell primary" onclick="lookupProduct()">
+        <i class="bi bi-search"></i> Search
+      </button>
+      <button class="btn-sell secondary" onclick="clearSearch()">
+        <i class="bi bi-x-circle"></i> Clear
+      </button>
+    </div>
+  </div>
+
+  <!-- Barcode Scanner Modal -->
+  <div id="scannerModal" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.9);z-index:9999;padding:20px">
+    <div style="max-width:640px;margin:0 auto;height:100%;display:flex;flex-direction:column">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px">
+        <h2 style="color:#fff;margin:0;font-size:1.5rem">Scan Barcode</h2>
+        <button class="btn-sell secondary" onclick="stopBarcodeScanner()">
+          <i class="bi bi-x-lg"></i> Stop
+        </button>
+      </div>
+      <div style="flex:1;position:relative;background:#000;border-radius:16px;overflow:hidden">
+        <video id="scannerVideo" style="width:100%;height:100%;object-fit:cover"></video>
+        <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:80%;height:2px;background:#10b981;box-shadow:0 0 20px rgba(16,185,129,0.8)"></div>
+        <div id="scannerStatus" style="position:absolute;bottom:20px;left:20px;right:20px;background:rgba(16,185,129,0.9);color:#fff;padding:16px;border-radius:12px;text-align:center;font-weight:700;display:none"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Product Card (hidden until lookup) -->
+  <div class="product-card" id="productCard">
+    <h3 id="productName"></h3>
+    <div class="info-row">
+      <strong>Category:</strong>
+      <span id="productCategory"></span>
+    </div>
+    <div class="info-row">
+      <strong>Stock:</strong>
+      <span id="productStock"></span>
+    </div>
+    <div class="info-row">
+      <strong>Price:</strong>
+      <span id="productPrice"></span>
+    </div>
+    <div style="margin-top:20px">
+      <label for="sellQuantity" style="display:block;font-weight:700;margin-bottom:8px">Quantity:</label>
+      <input type="number" id="sellQuantity" value="1" min="1" style="width:120px;padding:10px;border:2px solid #e2e8f0;border-radius:8px;font-size:1rem;margin-right:12px">
+      <button class="btn-sell primary" onclick="sellProduct()">
+        <i class="bi bi-cart-check"></i> Sell Now
+      </button>
+    </div>
+  </div>
+
+  <!-- Recent Sales -->
+  <div class="recent-sales">
+    <h2><i class="bi bi-clock-history"></i> Recent Sales</h2>
+    {% if recent_sales %}
+      {% for sale in recent_sales %}
+      <div class="sale-item">
+        <div style="flex:1">
+          <strong style="display:block;font-weight:700;color:#0f172a">{{ sale.product.name|default:"Unknown Product" }}</strong>
+          <span style="font-size:0.85rem;color:#64748b">{{ sale.created_at|date:"M d, H:i" }}</span>
+        </div>
+        <div style="text-align:right">
+          {% widthratio sale.quantity -1 1 as abs_qty %}
+          <strong style="display:block;font-weight:700;color:#10b981">{{ abs_qty }} unit{{ abs_qty|pluralize }}</strong>
+          <span style="font-size:0.85rem;color:#64748b">by {{ sale.by_user.username|default:"System" }}</span>
+        </div>
+      </div>
+      {% endfor %}
+    {% else %}
+      <p style="text-align:center;color:#64748b;padding:40px 0">No recent sales</p>
+    {% endif %}
+  </div>
+</div>
+
+<!-- Toast Notification -->
+<div class="toast" id="toast">
+  <strong id="toastTitle"></strong>
+  <p id="toastMessage" style="margin:6px 0 0;font-size:0.9rem;opacity:0.9"></p>
+</div>
+
+<script>
+let currentProduct = null;
+let barcodeStream = null;
+let barcodeScanner = null;
+
+// =====================================================
+// BARCODE SCANNER (Rear Camera)
+// =====================================================
+
+async function startBarcodeScanner() {
+  try {
+    const modal = document.getElementById('scannerModal');
+    const video = document.getElementById('scannerVideo');
+    const status = document.getElementById('scannerStatus');
+    
+    modal.style.display = 'block';
+    status.style.display = 'none';
+    
+    // Request rear camera (facingMode: environment)
+    barcodeStream = await navigator.mediaDevices.getUserMedia({
+      video: {
+        facingMode: { ideal: 'environment' },  // Rear camera
+        width: { ideal: 1280 },
+        height: { ideal: 720 }
+      }
+    });
+    
+    video.srcObject = barcodeStream;
+    video.play();
+    
+    // Use BarcodeDetector API if available
+    if ('BarcodeDetector' in window) {
+      barcodeScanner = new BarcodeDetector({ formats: ['ean_13', 'ean_8', 'upc_a', 'upc_e', 'code_128', 'code_39'] });
+      scanBarcode();
+    } else {
+      // Fallback: show manual entry option
+      status.textContent = 'Barcode scanner not supported. Please enter barcode manually.';
+      status.style.background = 'rgba(245,158,11,0.9)';
+      status.style.display = 'block';
+      setTimeout(stopBarcodeScanner, 3000);
+    }
+  } catch (error) {
+    console.error('Scanner error:', error);
+    showToast('Camera Error', 'Failed to access camera: ' + error.message, true);
+    stopBarcodeScanner();
+  }
+}
+
+async function scanBarcode() {
+  if (!barcodeStream || !barcodeScanner) return;
+  
+  const video = document.getElementById('scannerVideo');
+  const status = document.getElementById('scannerStatus');
+  
+  try {
+    const barcodes = await barcodeScanner.detect(video);
+    
+    if (barcodes.length > 0) {
+      const barcode = barcodes[0].rawValue;
+      status.textContent = `Scanned: ${barcode}`;
+      status.style.background = 'rgba(16,185,129,0.9)';
+      status.style.display = 'block';
+      
+      // Auto-fill search and lookup
+      document.getElementById('scanInput').value = barcode;
+      
+      // Stop scanner
+      stopBarcodeScanner();
+      
+      // Lookup product
+      await lookupProductByBarcode(barcode);
+      return;
+    }
+  } catch (error) {
+    console.error('Detection error:', error);
+  }
+  
+  // Continue scanning
+  requestAnimationFrame(scanBarcode);
+}
+
+function stopBarcodeScanner() {
+  if (barcodeStream) {
+    barcodeStream.getTracks().forEach(track => track.stop());
+    barcodeStream = null;
+  }
+  barcodeScanner = null;
+  
+  const modal = document.getElementById('scannerModal');
+  const video = document.getElementById('scannerVideo');
+  video.srcObject = null;
+  modal.style.display = 'none';
+}
+
+async function lookupProductByBarcode(barcode) {
+  try {
+    const response = await fetch(`{% url "verticals:phones_accessories_lookup_api" %}?barcode=${encodeURIComponent(barcode)}`);
+    const data = await response.json();
+    
+    if (data.success && data.product) {
+      currentProduct = data.product;
+      displayProduct(data.product);
+    } else {
+      // Barcode not linked - show "store barcode" option
+      showStoreBarcodeOption(barcode);
+    }
+  } catch (error) {
+    showToast('Error', 'Failed to lookup barcode: ' + error.message, true);
+  }
+}
+
+function showStoreBarcodeOption(barcode) {
+  const message = `Barcode "${barcode}" is not linked to any product. Would you like to link it now?`;
+  
+  if (confirm(message)) {
+    // Redirect to stock-in page with barcode pre-filled
+    window.location.href = `{% url "verticals:phones_accessories_stock_in" %}?barcode=${encodeURIComponent(barcode)}`;
+  }
+}
+
+// =====================================================
+// PRODUCT LOOKUP & SALE
+// =====================================================
+
+async function lookupProduct() {
+  const input = document.getElementById('scanInput').value.trim();
+  if (!input) {
+    showToast('Error', 'Please enter a barcode or product name', true);
+    return;
+  }
+  
+  try {
+    const response = await fetch(`{% url "verticals:phones_accessories_lookup_api" %}?search=${encodeURIComponent(input)}`);
+    const data = await response.json();
+    
+    if (data.success && data.product) {
+      currentProduct = data.product;
+      displayProduct(data.product);
+    } else {
+      showToast('Error', data.error || 'Product not found', true);
+      hideProduct();
+    }
+  } catch (error) {
+    showToast('Error', 'Failed to lookup product: ' + error.message, true);
+  }
+}
+
+function displayProduct(product) {
+  document.getElementById('productName').textContent = product.name;
+  document.getElementById('productCategory').textContent = product.category;
+  document.getElementById('productStock').textContent = `${product.stock_qty} units`;
+  document.getElementById('productPrice').textContent = `MK ${parseFloat(product.default_selling_price).toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
+  document.getElementById('sellQuantity').max = product.stock_qty;
+  document.getElementById('productCard').classList.add('show');
+}
+
+function hideProduct() {
+  document.getElementById('productCard').classList.remove('show');
+  currentProduct = null;
+}
+
+async function sellProduct() {
+  if (!currentProduct) {
+    showToast('Error', 'No product selected', true);
+    return;
+  }
+  
+  const quantity = parseInt(document.getElementById('sellQuantity').value);
+  if (!quantity || quantity < 1) {
+    showToast('Error', 'Invalid quantity', true);
+    return;
+  }
+  
+  if (quantity > currentProduct.stock_qty) {
+    showToast('Error', `Insufficient stock: only ${currentProduct.stock_qty} available`, true);
+    return;
+  }
+  
+  const formData = new FormData();
+  formData.append('product_id', currentProduct.id);
+  formData.append('quantity', quantity);
+  formData.append('payment_method', 'CASH');  // Default to cash
+  
+  try {
+    const response = await fetch('{% url "verticals:phones_accessories_sell_api" %}', {
+      method: 'POST',
+      headers: {
+        'X-CSRFToken': '{{ csrf_token }}'
+      },
+      body: formData
+    });
+    
+    const data = await response.json();
+    
+    if (data.success) {
+      showToast('Success!', data.message, false);
+      // Update stock display
+      currentProduct.stock_qty = data.product.stock_remaining;
+      displayProduct(currentProduct);
+      // Reset quantity
+      document.getElementById('sellQuantity').value = 1;
+      // Clear search input
+      document.getElementById('scanInput').value = '';
+      // Reload page after 2 seconds to show updated recent sales
+      setTimeout(() => window.location.reload(), 2000);
+    } else {
+      showToast('Error', data.error || 'Failed to complete sale', true);
+    }
+  } catch (error) {
+    showToast('Error', 'Failed to sell product: ' + error.message, true);
+  }
+}
+
+function clearSearch() {
+  document.getElementById('scanInput').value = '';
+  hideProduct();
+  document.getElementById('scanInput').focus();
+}
+
+function showToast(title, message, isError) {
+  const toast = document.getElementById('toast');
+  const toastTitle = document.getElementById('toastTitle');
+  const toastMessage = document.getElementById('toastMessage');
+  
+  toastTitle.textContent = title;
+  toastMessage.textContent = message;
+  
+  if (isError) {
+    toast.classList.add('error');
+  } else {
+    toast.classList.remove('error');
+  }
+  
+  toast.classList.add('show');
+  
+  setTimeout(() => {
+    toast.classList.remove('show');
+  }, 4000);
+}
+
+// Enable Enter key to trigger search
+document.getElementById('scanInput').addEventListener('keypress', (e) => {
+  if (e.key === 'Enter') {
+    lookupProduct();
+  }
+});
+</script>
+
+{% endblock %}
+

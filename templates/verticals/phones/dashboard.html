@@ -285,6 +285,39 @@
       </div>
     </section>
     
+    <!-- ACCESSORIES QUICK STATS (if available) -->
+    {% if accessories_kpis %}
+    <section class="recent-block" style="background:linear-gradient(135deg,#fef3c7,#fed7aa);border:2px solid #f59e0b">
+      <h2 class="section-title" style="color:#92400e">
+        <i class="bi bi-box-seam"></i> Accessories
+        <span style="font-size:.85rem;font-weight:600;color:#92400e;margin-left:8px">({{ dashboard_kpis.range_label }})</span>
+      </h2>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:16px">
+        <div>
+          <div style="font-size:.8rem;color:#92400e;font-weight:600;text-transform:uppercase;letter-spacing:0.05em">Revenue</div>
+          <div style="font-size:1.5rem;font-weight:900;color:#92400e;margin-top:4px">MK {{ accessories_kpis.revenue|floatformat:0|intcomma }}</div>
+        </div>
+        <div>
+          <div style="font-size:.8rem;color:#92400e;font-weight:600;text-transform:uppercase;letter-spacing:0.05em">Profit</div>
+          <div style="font-size:1.5rem;font-weight:900;color:#92400e;margin-top:4px">MK {{ accessories_kpis.profit|floatformat:0|intcomma }}</div>
+        </div>
+        <div>
+          <div style="font-size:.8rem;color:#92400e;font-weight:600;text-transform:uppercase;letter-spacing:0.05em">Stock Value</div>
+          <div style="font-size:1.5rem;font-weight:900;color:#92400e;margin-top:4px">MK {{ accessories_kpis.stock_value|floatformat:0|intcomma }}</div>
+        </div>
+        <div>
+          <div style="font-size:.8rem;color:#92400e;font-weight:600;text-transform:uppercase;letter-spacing:0.05em">Units Sold</div>
+          <div style="font-size:1.5rem;font-weight:900;color:#92400e;margin-top:4px">{{ accessories_kpis.units_sold|intcomma }}</div>
+        </div>
+      </div>
+      <div style="margin-top:16px;text-align:center">
+        <a href="{% url 'verticals:phones_accessories_dashboard' %}" style="display:inline-flex;align-items:center;gap:8px;padding:10px 20px;background:#f59e0b;color:#fff;border-radius:999px;text-decoration:none;font-weight:700;transition:all 0.2s">
+          <i class="bi bi-box-seam"></i> View Accessories Dashboard
+        </a>
+      </div>
+    </section>
+    {% endif %}
+
     <!-- FAST MOVING MODELS -->
     <section class="recent-block">
       <h2 class="section-title">

@@ -236,12 +236,18 @@ def test_agent_detail_page_loads(client_as_manager, biz_a):
     if Membership is None:
         pytest.skip("Membership model not available")
     
+    # Create a location for the agent (required by validation)
+    location = None
+    if Location is not None:
+        location = Location.objects.create(name="Test Location", business=biz_a)
+    
     agent_user = User.objects.create_user("agent1", password="x")
     Membership.objects.create(
         user=agent_user,
         business=biz_a,
         role="AGENT",
-        status="ACTIVE"
+        status="ACTIVE",
+        location=location
     )
     
     try:

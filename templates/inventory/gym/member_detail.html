@@ -131,6 +131,26 @@
                 </div>
                 {% endif %}
             </div>
+            
+            <!-- QR Code Card -->
+            <div class="glass-card p-4 mt-3">
+                <h5 class="mb-3 text-center">Member QR Code</h5>
+                <div class="text-center">
+                    {% if member.member_code %}
+                        <img src="{{ member.get_qr_code_data_url }}" 
+                             alt="QR Code for {{ member.name }}" 
+                             style="max-width: 200px; width: 100%; height: auto; border: 2px solid #e5e7eb; border-radius: 8px; padding: 8px; background: white;">
+                        <div class="mt-2 small text-muted">{{ member.member_code }}</div>
+                        <div class="mt-3">
+                            <button class="btn btn-sm btn-outline-primary" onclick="printQR()">
+                                <i class="bi bi-printer"></i> Print QR Code
+                            </button>
+                        </div>
+                    {% else %}
+                        <div class="text-muted small">No QR code generated yet</div>
+                    {% endif %}
+                </div>
+            </div>
         </div>
 
         <!-- Payment History -->
@@ -206,5 +226,56 @@
         </div>
     </div>
 </div>
+
+{% block extra_js %}
+<script>
+function printQR() {
+    // Create a print-friendly window with just the QR code
+    const qrImg = document.querySelector('.glass-card img[alt*="QR Code"]');
+    const memberCode = '{{ member.member_code }}';
+    const memberName = '{{ member.name }}';
+    
+    if (!qrImg) return;
+    
+    const printWindow = window.open('', '_blank');
+    printWindow.document.write(`
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <title>QR Code - ${memberName}</title>
+            <style>
+                body {
+                    font-family: Arial, sans-serif;
+                    text-align: center;
+                    padding: 2rem;
+                }
+                img {
+                    max-width: 300px;
+                    border: 2px solid #000;
+                    padding: 1rem;
+                    background: white;
+                }
+                h2 { margin-top: 1rem; }
+                p { font-size: 1.2rem; font-weight: bold; }
+                @media print {
+                    body { padding: 1rem; }
+                }
+            </style>
+        </head>
+        <body>
+            <h2>${memberName}</h2>
+            <img src="${qrImg.src}" alt="QR Code">
+            <p>${memberCode}</p>
+            <script>
+                window.onload = function() {
+                    window.print();
+                };
+            <\/script>
+        </body>
+        </html>
+    `);
+    printWindow.document.close();
+}
+</script>
 {% endblock %}
 

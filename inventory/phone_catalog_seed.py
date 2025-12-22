@@ -17,31 +17,38 @@ from django.db import transaction
 from tenants.models import Business
 
 
-# Flagship phone definitions - 7 BRANDS (Latest models + Malawi common)
+# Flagship phone definitions - 7 BRANDS (Latest models + Malawi common + Wholesale 12/08)
+# Updated with wholesale list from "wholesale 12 08 (2).xlsx"
+# Includes Tecno, Itel, Samsung, Redmi models commonly sold in Malawi
 FLAGSHIP_PHONES = [
-    # ========== TECNO (Latest 2024-2025 + Malawi common) ==========
-    # CAMON 40 Series (Latest)
-    {"brand": "TECNO", "model": "CAMON 40", "ram": 8, "rom": 256},
-    {"brand": "TECNO", "model": "CAMON 40 Pro", "ram": 8, "rom": 256},
+    # ========== TECNO (Latest 2024-2025 + Malawi common + WHOLESALE LIST) ==========
+    # CAMON 40 Series (Latest + Wholesale)
+    {"brand": "TECNO", "model": "CAMON 40", "ram": 8, "rom": 256},  # Wholesale
+    {"brand": "TECNO", "model": "CAMON 40 Pro", "ram": 8, "rom": 256},  # Wholesale
     {"brand": "TECNO", "model": "CAMON 40 Pro 5G", "ram": 8, "rom": 256},
     {"brand": "TECNO", "model": "CAMON 40 Premier 5G", "ram": 8, "rom": 256},
     
-    # SPARK 40 Series (Latest)
-    {"brand": "TECNO", "model": "SPARK 40", "ram": 4, "rom": 128},
-    {"brand": "TECNO", "model": "SPARK 40 Pro", "ram": 8, "rom": 128},
-    {"brand": "TECNO", "model": "SPARK 40 Pro+", "ram": 8, "rom": 256},
+    # SPARK 40 Series (Latest + Wholesale)
+    {"brand": "TECNO", "model": "SPARK 40", "ram": 4, "rom": 128},  # Wholesale
+    {"brand": "TECNO", "model": "SPARK 40 Pro", "ram": 8, "rom": 256},  # Wholesale
+    {"brand": "TECNO", "model": "SPARK 40 Pro+", "ram": 8, "rom": 256},  # Wholesale (SPARK40 PRO+)
     {"brand": "TECNO", "model": "SPARK 40 5G", "ram": 8, "rom": 256},
+    
+    # SPARK 30 Series (Wholesale)
+    {"brand": "TECNO", "model": "SPARK 30", "ram": 4, "rom": 128},  # Wholesale
+    {"brand": "TECNO", "model": "SPARK 30", "ram": 8, "rom": 256},  # Wholesale (2nd variant)
     
     # POVA 7 Series (Latest)
     {"brand": "TECNO", "model": "POVA 7", "ram": 8, "rom": 128},
     {"brand": "TECNO", "model": "POVA 7 Pro 5G", "ram": 8, "rom": 256},
     
-    # Malawi Common (budget-friendly)
-    {"brand": "TECNO", "model": "POP 10", "ram": 2, "rom": 64},
-    {"brand": "TECNO", "model": "POP 10C", "ram": 3, "rom": 64},
+    # POP Series (Malawi Common + Wholesale)
+    {"brand": "TECNO", "model": "POP 10", "ram": 4, "rom": 128},  # Wholesale
+    {"brand": "TECNO", "model": "POP 10C", "ram": 4, "rom": 128},  # Wholesale (POP 10C 128+4)
+    {"brand": "TECNO", "model": "POP 10", "ram": 2, "rom": 64},  # Legacy
     {"brand": "TECNO", "model": "POVA Neo 6", "ram": 8, "rom": 128},
     
-    # ========== ITEL (Latest 2 years + Malawi common) ==========
+    # ========== ITEL (Latest 2 years + Malawi common + WHOLESALE LIST) ==========
     # S Series (Latest)
     {"brand": "ITEL", "model": "S25 Ultra", "ram": 8, "rom": 256},
     {"brand": "ITEL", "model": "S25", "ram": 4, "rom": 128},
@@ -50,20 +57,29 @@ FLAGSHIP_PHONES = [
     {"brand": "ITEL", "model": "S23+", "ram": 8, "rom": 128},
     {"brand": "ITEL", "model": "S23", "ram": 4, "rom": 128},
     
-    # P Series (Latest)
+    # P Series (Latest + Wholesale)
     {"brand": "ITEL", "model": "Power 70", "ram": 8, "rom": 256},
+    {"brand": "ITEL", "model": "P65C", "ram": 4, "rom": 128},  # Wholesale
     {"brand": "ITEL", "model": "P65", "ram": 4, "rom": 128},
     {"brand": "ITEL", "model": "P55 5G", "ram": 8, "rom": 128},
     
-    # A Series (Latest)
+    # A Series (Latest + Wholesale)
+    {"brand": "ITEL", "model": "A100C", "ram": 2, "rom": 64},  # Wholesale
+    {"brand": "ITEL", "model": "A100C", "ram": 3, "rom": 64},  # Legacy
+    {"brand": "ITEL", "model": "A90", "ram": 3, "rom": 64},  # Wholesale
+    {"brand": "ITEL", "model": "A90", "ram": 3, "rom": 128},  # Wholesale (2nd variant)
     {"brand": "ITEL", "model": "A80", "ram": 3, "rom": 128},
+    
+    # V Series (Wholesale - non-standard specs handled as custom/other)
+    {"brand": "ITEL", "model": "V40", "ram": 4, "rom": 64},  # Wholesale V40S 64+4 (promoted to standard)
+    # NOTE: V40 32+2 and V40S 32+3 excluded from primary list (non-standard specs)
+    # Will be available via "Custom/Other spec" option in wizard
     
     # Malawi Common (budget-friendly)
     {"brand": "ITEL", "model": "A50", "ram": 2, "rom": 64},
     {"brand": "ITEL", "model": "City 100", "ram": 4, "rom": 128},
-    {"brand": "ITEL", "model": "A100C", "ram": 3, "rom": 64},
     
-    # ========== SAMSUNG (Latest 2 years) ==========
+    # ========== SAMSUNG (Latest 2 years + WHOLESALE LIST) ==========
     # Galaxy S25 Series (Latest 2025)
     {"brand": "SAMSUNG", "model": "Galaxy S25 Ultra", "ram": 12, "rom": 256},
     {"brand": "SAMSUNG", "model": "Galaxy S25+", "ram": 8, "rom": 256},
@@ -78,9 +94,20 @@ FLAGSHIP_PHONES = [
     {"brand": "SAMSUNG", "model": "Galaxy Z Fold6", "ram": 12, "rom": 256},
     {"brand": "SAMSUNG", "model": "Galaxy Z Flip6", "ram": 8, "rom": 256},
     
-    # Galaxy A Series (Mid-range)
+    # Galaxy A Series (Mid-range + Wholesale)
+    {"brand": "SAMSUNG", "model": "Galaxy A56", "ram": 8, "rom": 256},  # Wholesale
     {"brand": "SAMSUNG", "model": "Galaxy A55 5G", "ram": 8, "rom": 128},
+    {"brand": "SAMSUNG", "model": "Galaxy A36", "ram": 8, "rom": 256},  # Wholesale
     {"brand": "SAMSUNG", "model": "Galaxy A35 5G", "ram": 8, "rom": 128},
+    {"brand": "SAMSUNG", "model": "Galaxy A16", "ram": 4, "rom": 128},  # Wholesale
+    {"brand": "SAMSUNG", "model": "Galaxy A15", "ram": 4, "rom": 128},  # Wholesale
+    {"brand": "SAMSUNG", "model": "Galaxy A06", "ram": 4, "rom": 128},  # Wholesale
+    {"brand": "SAMSUNG", "model": "Galaxy A05", "ram": 4, "rom": 64},  # Wholesale
+    # NOTE: A03 32+2 excluded from primary list (non-standard) - available via Custom/Other
+    
+    # Galaxy M/F Series (Wholesale)
+    {"brand": "SAMSUNG", "model": "Galaxy M05", "ram": 4, "rom": 64},  # Wholesale
+    {"brand": "SAMSUNG", "model": "Galaxy F05", "ram": 4, "rom": 64},  # Wholesale
     
     # ========== IPHONE (Latest 2 years) ==========
     # iPhone 16 Series (Latest 2024)
@@ -112,22 +139,36 @@ FLAGSHIP_PHONES = [
     {"brand": "HUAWEI", "model": "Mate XT Ultimate Design", "ram": 16, "rom": 256},
     {"brand": "HUAWEI", "model": "Mate X5", "ram": 12, "rom": 256},
     
-    # ========== REDMI/Xiaomi (Latest 2 years) ==========
-    # Redmi Note 14 Series (Latest 2024-2025)
+    # ========== REDMI/Xiaomi (Latest 2 years + WHOLESALE LIST) ==========
+    # Redmi Note 14 Series (Latest 2024-2025 + Wholesale)
     {"brand": "REDMI", "model": "Redmi Note 14 Pro+ 5G", "ram": 8, "rom": 256},
     {"brand": "REDMI", "model": "Redmi Note 14 Pro 5G", "ram": 8, "rom": 256},
     {"brand": "REDMI", "model": "Redmi Note 14 5G", "ram": 8, "rom": 128},
     {"brand": "REDMI", "model": "Redmi Note 14 (4G)", "ram": 8, "rom": 128},
+    {"brand": "REDMI", "model": "NOTE 14", "ram": 8, "rom": 256},  # Wholesale (simplified name)
     
     # Redmi Note 13 Series (2023-2024)
     {"brand": "REDMI", "model": "Redmi Note 13 Pro+ 5G", "ram": 8, "rom": 256},
     {"brand": "REDMI", "model": "Redmi Note 13 Pro 5G", "ram": 8, "rom": 256},
     {"brand": "REDMI", "model": "Redmi Note 13", "ram": 8, "rom": 128},
     
-    # Redmi Numbered Series (Latest)
-    {"brand": "REDMI", "model": "Redmi 14C", "ram": 4, "rom": 128},
-    {"brand": "REDMI", "model": "Redmi 13", "ram": 8, "rom": 128},
-    {"brand": "REDMI", "model": "Redmi 13C", "ram": 4, "rom": 128},
+    # Redmi Numbered Series (Latest + Wholesale)
+    {"brand": "REDMI", "model": "15C", "ram": 4, "rom": 128},  # Wholesale
+    {"brand": "REDMI", "model": "15C", "ram": 8, "rom": 256},  # Wholesale (2nd variant)
+    {"brand": "REDMI", "model": "14C", "ram": 4, "rom": 128},
+    {"brand": "REDMI", "model": "13", "ram": 8, "rom": 128},
+    {"brand": "REDMI", "model": "13C", "ram": 4, "rom": 128},
+    
+    # Redmi A Series (Wholesale)
+    {"brand": "REDMI", "model": "A3", "ram": 3, "rom": 64},  # Wholesale
+    {"brand": "REDMI", "model": "A3", "ram": 4, "rom": 128},  # Wholesale (2nd variant)
+    {"brand": "REDMI", "model": "A3X", "ram": 4, "rom": 128},  # Wholesale
+    {"brand": "REDMI", "model": "A4 5G", "ram": 4, "rom": 128},  # Wholesale
+    {"brand": "REDMI", "model": "A5", "ram": 3, "rom": 64},  # Wholesale
+    {"brand": "REDMI", "model": "A5", "ram": 4, "rom": 128},  # Wholesale (2nd variant)
+    
+    # Redmi PAD (Wholesale)
+    {"brand": "REDMI", "model": "PAD 2", "ram": 8, "rom": 256},  # Wholesale
     
     # ========== GOOGLE PIXEL (Latest 2 years) ==========
     # Pixel 10 Series (Latest 2025 - projected)

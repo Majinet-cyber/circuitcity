@@ -52,6 +52,29 @@ except Exception:
     StockActivityLog = None  # safe fallback
     StockAction = None
 
+# Re-export PharmacyBatch for cross-module references
+try:
+    from .models_pharmacy import PharmacyBatch  # noqa: F401
+except Exception:
+    PharmacyBatch = None  # safe fallback
+
+# Re-export BarcodeRegistry for barcode management
+try:
+    from .models_barcodes import BarcodeRegistry  # noqa: F401
+except Exception:
+    BarcodeRegistry = None  # safe fallback
+
+# Re-export Accessory models for phone accessories system
+try:
+    from .models_accessories import (
+        AccessoryProduct, AccessoryStock, AccessoryStockLog, AccessoryCategory  # noqa: F401
+    )
+except Exception:
+    AccessoryProduct = None  # safe fallback
+    AccessoryStock = None
+    AccessoryStockLog = None
+    AccessoryCategory = None
+
 
 # ==========================================================
 # SINGLE SOURCE OF TRUTH: IMEI normalization (15 digits)
@@ -324,7 +347,12 @@ class MerchProduct(models.Model):
         return 0
     
     def get_cost_for_unit(self, unit_type: str):
-        """Get cost price based on unit type (bottle, shot, or glass)"""
+        """
+        Get cost price based on unit type (bottle, shot, glass, or crate).
+        
+        CRITICAL FIX: For liquor, cost is stored PER BOTTLE (even when ordered by crate).
+        Crate cost is computed from: cost_per_bottle * bottles_per_crate
+        """
         from decimal import Decimal
         if unit_type == "bottle":
             return self.cost_per_bottle or Decimal("0.00")
@@ -332,6 +360,11 @@ class MerchProduct(models.Model):
             return self.cost_per_shot or Decimal("0.00")
         elif unit_type == "glass":
             return self.cost_per_glass or Decimal("0.00")
+        elif unit_type == "crate":
+            # NEW: Crate cost = cost_per_bottle * bottles_per_crate
+            if self.cost_per_bottle and self.bottles_per_crate:
+                return self.cost_per_bottle * Decimal(self.bottles_per_crate)
+            return Decimal("0.00")
         return Decimal("0.00")
     
     def get_price_for_unit(self, unit_type: str):

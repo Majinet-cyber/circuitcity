@@ -21,8 +21,54 @@ from billing import views_admin as billing_admin_views  # HQ Subscriptions view
 # ======================================================================================
 # Helpers
 # ======================================================================================
-def robots_txt(_request):
-    return HttpResponse("User-agent: *\nDisallow: /", content_type="text/plain")
+def robots_txt(request):
+    """
+    robots.txt with public pages allowed and private routes disallowed.
+    References the sitemap for search engines.
+    """
+    protocol = 'https' if request.is_secure() else 'http'
+    domain = request.get_host()
+    sitemap_url = f"{protocol}://{domain}/sitemap.xml"
+    
+    robots_content = f"""User-agent: *
+
+# Allow public pages
+Allow: /
+Allow: /landing/
+Allow: /landing/pricing/
+Allow: /landing/about/
+Allow: /landing/contact/
+Allow: /landing/simulator/
+Allow: /landing/join/
+Allow: /landing/privacy/
+Allow: /landing/terms/
+Allow: /landing/data-deletion/
+
+# Disallow auth and private routes
+Disallow: /login/
+Disallow: /logout/
+Disallow: /accounts/
+Disallow: /password/
+Disallow: /dashboard/
+Disallow: /inventory/
+Disallow: /sales/
+Disallow: /reports/
+Disallow: /admin/
+Disallow: /hq/
+Disallow: /tenants/
+Disallow: /wallet/
+Disallow: /billing/
+Disallow: /simulator/
+Disallow: /gym/
+Disallow: /liquor/
+Disallow: /pharmacy/
+Disallow: /api/
+Disallow: /verticals/
+
+# Sitemap
+Sitemap: {sitemap_url}
+"""
+    return HttpResponse(robots_content, content_type="text/plain")
 
 
 def _try_import(modpath: str):
@@ -334,10 +380,14 @@ if admin_path != "admin/":
 from core import views_debug
 from core import views_well_known
 
+# Import sitemap view
+_sitemap_view = _try_from("staticpages.views", "sitemap_xml")
+
 urlpatterns += [
     path("healthz", core_views.healthz, name="healthz_noslash"),
     path("healthz/", core_views.healthz, name="healthz"),
     path("robots.txt", robots_txt, name="robots_txt"),
+    path("sitemap.xml", _sitemap_view if _sitemap_view else lambda r: HttpResponse("Sitemap unavailable", status=404), name="sitemap_xml"),
     path("favicon.ico", RedirectView.as_view(url=f"{settings.STATIC_URL}favicon.ico", permanent=False)),
     path("temporary/", core_views.temporary_ok, name="temporary_ok"),
     path("api/version/", views_debug.app_version_view, name="api_version"),

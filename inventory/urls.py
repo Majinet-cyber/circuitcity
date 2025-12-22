@@ -939,10 +939,20 @@ try:
 except Exception:
     _fast_sell_api = SimpleNamespace()
 
+# Barcode lookup API (instant scan-to-sell)
+try:
+    from . import api_barcode_lookup as _barcode_api
+except Exception:
+    _barcode_api = SimpleNamespace()
+
 urlpatterns += [
     path("api/fast-sell/lookup/", _need_biz(getattr(_fast_sell_api, "fast_sell_lookup", _stub("fast_sell_lookup not found"))), name="api_fast_sell_lookup"),
     path("api/fast-sell/sell/", _need_biz(getattr(_fast_sell_api, "fast_sell_sell", _stub("fast_sell_sell not found"))), name="api_fast_sell_sell"),
     path("api/fast-sell/kpis/", _need_biz(getattr(_fast_sell_api, "fast_sell_kpis", _stub("fast_sell_kpis not found"))), name="api_fast_sell_kpis"),
+    
+    # Barcode lookup & quick create (for instant scan-to-sell)
+    path("api/barcode/lookup/", _need_biz(getattr(_barcode_api, "barcode_lookup_api", _stub("barcode_lookup_api not found"))), name="api_barcode_lookup"),
+    path("api/barcode/quick-create/", _need_biz(getattr(_barcode_api, "barcode_quick_create_api", _stub("barcode_quick_create_api not found"))), name="api_barcode_quick_create"),
 ]
 
 urlpatterns += [

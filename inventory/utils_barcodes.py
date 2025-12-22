@@ -245,3 +245,201 @@ def normalize_barcode(barcode: str) -> str:
     
     return str(barcode).strip().upper()
 
+
+def normalize_barcode_enhanced(barcode: str) -> str:
+    """
+    Enhanced barcode normalization for robust matching.
+    
+    Rules:
+    1. Trim whitespace
+    2. Remove spaces and hyphens
+    3. Uppercase
+    4. Keep only alphanumeric characters
+    5. For numeric-only codes (EAN/UPC), keep digits only
+    6. Handle leading zeros consistently
+    
+    Args:
+        barcode: Raw barcode string
+        
+    Returns:
+        Normalized barcode string (empty string if invalid/empty)
+    """
+    if not barcode:
+        return ""
+    
+    # Step 1: Convert to string and trim
+    code = str(barcode).strip()
+    
+    if not code:
+        return ""
+    
+    # Step 2: Remove common separators
+    code = code.replace(" ", "").replace("-", "").replace("_", "")
+    
+    # Step 3: Uppercase
+    code = code.upper()
+    
+    # Step 4: For numeric-only codes (EAN, UPC), keep digits only
+    if code.isdigit():
+        # Keep digits only - preserves leading zeros
+        return code
+    
+    # Step 5: For alphanumeric codes (Code128, QR, etc.), keep alphanumeric only
+    import re
+    code = re.sub(r'[^A-Z0-9]', '', code)
+    
+    return code if code else ""
+
+
+def is_valid_barcode_format(barcode: str) -> bool:
+    """
+    Check if a barcode string has a valid format.
+    
+    Args:
+        barcode: Barcode string to check
+        
+    Returns:
+        True if valid format, False otherwise
+    """
+    if not barcode or not isinstance(barcode, str):
+        return False
+    
+    # Min 3 chars, max 100 chars
+    if len(barcode) < 3 or len(barcode) > 100:
+        return False
+    
+    # Must contain at least one alphanumeric character
+    import re
+    if not re.search(r'[A-Za-z0-9]', barcode):
+        return False
+    
+    return True
+
+
+def register_barcode(
+    business,
+    raw_code: str,
+    product=None,
+    batch=None,
+    created_by=None
+):
+    """
+    Register a barcode in the barcode registry.
+    
+    Args:
+        business: Business instance
+        raw_code: Raw barcode string
+        product: MerchProduct instance (optional)
+        batch: PharmacyBatch instance (optional)
+        created_by: User instance (optional)
+        
+    Returns:
+        BarcodeRegistry instance or None if failed
+    """
+    if not business or not raw_code:
+        return None
+    
+    try:
+        from inventory.models_barcodes import BarcodeRegistry
+        
+        normalized = normalize_barcode_enhanced(raw_code)
+        if not normalized:
+            return None
+        
+        # Check if barcode already exists for this business
+        existing = BarcodeRegistry.objects.filter(
+            business=business,
+            normalized_code=normalized,
+            is_active=True
+        ).first()
+        
+        if existing:
+            # Update existing entry
+            if product:
+                existing.product = product
+            if batch:
+                existing.batch = batch
+            existing.raw_code = raw_code  # Update to latest raw format
+            existing.save()
+            return existing
+        
+        # Create new entry
+        return BarcodeRegistry.objects.create(
+            business=business,
+            raw_code=raw_code,
+            normalized_code=normalized,
+            product=product,
+            batch=batch,
+            created_by=created_by,
+            is_active=True
+        )
+    except Exception as e:
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.exception(f"Failed to register barcode: {e}")
+        return None
+
+
+def lookup_barcode(business, raw_code: str):
+    """
+    Look up a barcode in the registry.
+    
+    Args:
+        business: Business instance
+        raw_code: Raw barcode string
+        
+    Returns:
+        Dict with:
+            - found: bool
+            - product: MerchProduct instance or None
+            - batch: PharmacyBatch instance or None
+            - registry_entry: BarcodeRegistry instance or None
+    """
+    if not business or not raw_code:
+        return {"found": False, "product": None, "batch": None, "registry_entry": None}
+    
+    try:
+        from inventory.models_barcodes import BarcodeRegistry
+        
+        normalized = normalize_barcode_enhanced(raw_code)
+        if not normalized:
+            return {"found": False, "product": None, "batch": None, "registry_entry": None}
+        
+        # Try exact normalized match first
+        entry = BarcodeRegistry.objects.filter(
+            business=business,
+            normalized_code=normalized,
+            is_active=True
+        ).select_related("product", "batch").first()
+        
+        if entry:
+            return {
+                "found": True,
+                "product": entry.product,
+                "batch": entry.batch,
+                "registry_entry": entry
+            }
+        
+        # Fallback: Try legacy barcode field on MerchProduct
+        from inventory.models import MerchProduct
+        legacy_product = MerchProduct.objects.filter(
+            business=business,
+            barcode=raw_code,
+            is_active=True
+        ).first()
+        
+        if legacy_product:
+            return {
+                "found": True,
+                "product": legacy_product,
+                "batch": None,
+                "registry_entry": None
+            }
+        
+        return {"found": False, "product": None, "batch": None, "registry_entry": None}
+    
+    except Exception as e:
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.exception(f"Failed to lookup barcode: {e}")
+        return {"found": False, "product": None, "batch": None, "registry_entry": None}

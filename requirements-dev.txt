@@ -1,0 +1,18 @@
+# Development and Testing Dependencies
+# Install with: pip install -r requirements.txt -r requirements-dev.txt
+
+# Base requirements
+-r requirements.txt
+
+# Testing frameworks
+pytest==8.3.2
+pytest-django==4.8.0
+pytest-cov==5.0.0
+
+# Playwright for E2E tests
+playwright==1.48.0
+
+# Additional test utilities
+factory-boy==3.3.0  # If we want to add factories later
+faker==26.0.0  # For generating test data
+

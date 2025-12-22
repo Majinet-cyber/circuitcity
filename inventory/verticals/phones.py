@@ -2,6 +2,8 @@
 """
 Premium PHONES dashboard - the crown jewel of CircuitCity verticals.
 
+Also includes accessories system (quantity-based, separate from IMEI phones).
+
 Mirrors the premium Liquor dashboard patterns:
 - Comprehensive KPIs with custom date range filtering
 - Fast-moving models and top agents tracking  
@@ -512,7 +514,67 @@ def dashboard(request):
         })
     
     # ==========================================================================
-    # C) CONTEXT ASSEMBLY
+    # C) ACCESSORIES KPIs (OPTIONAL - separate system)
+    # ==========================================================================
+    # Fetch accessories KPIs for the same date range to show in dashboard
+    accessories_kpis = None
+    try:
+        from inventory.models_accessories import AccessoryStockLog
+        
+        # Query accessories sales logs for the selected range
+        acc_sale_logs = AccessoryStockLog.objects.filter(
+            business=business,
+            action='SALE',
+            created_at__gte=start_date,
+            created_at__lt=end_date
+        )
+        
+        if location:
+            acc_sale_logs = acc_sale_logs.filter(location=location)
+        
+        # Calculate accessories metrics
+        acc_revenue = Decimal('0.00')
+        acc_cost = Decimal('0.00')
+        acc_units = 0
+        
+        for log in acc_sale_logs:
+            qty = abs(log.quantity)
+            acc_units += qty
+            unit_cost = log.unit_cost or (log.product.default_order_price if log.product else Decimal('0.00'))
+            unit_price = log.product.default_selling_price if log.product else Decimal('0.00')
+            acc_cost += Decimal(qty) * unit_cost
+            acc_revenue += Decimal(qty) * unit_price
+        
+        acc_profit = acc_revenue - acc_cost
+        
+        # Get accessories stock value
+        from inventory.models_accessories import AccessoryStock
+        acc_stock_qs = AccessoryStock.objects.filter(
+            business=business,
+            product__is_active=True
+        )
+        if location:
+            acc_stock_qs = acc_stock_qs.filter(location=location)
+        
+        acc_stock_value = Decimal('0.00')
+        for stock in acc_stock_qs.filter(qty_on_hand__gt=0):
+            acc_stock_value += stock.stock_value
+        
+        accessories_kpis = {
+            'revenue': acc_revenue,
+            'profit': acc_profit,
+            'stock_value': acc_stock_value,
+            'units_sold': acc_units,
+        }
+    except Exception as e:
+        # Gracefully degrade if accessories system not available
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.debug(f"Accessories KPIs not available: {e}")
+        accessories_kpis = None
+    
+    # ==========================================================================
+    # D) CONTEXT ASSEMBLY
     # ==========================================================================
     
     # Serialize data for JavaScript charts
@@ -525,6 +587,9 @@ def dashboard(request):
         
         # NEW: Premium dashboard KPIs with date filtering
         "dashboard_kpis": dashboard_kpis,
+        
+        # Accessories KPIs (optional, separate system)
+        "accessories_kpis": accessories_kpis,
         
         # Charts and trends (30-day window for visualization)
         "sales_trend_30d": sales_trend_30d,
@@ -875,3 +940,25 @@ def reports(request):
     })
     
     return render(request, "verticals/phones/reports_empty.html", ctx)
+
+
+# ==============================================================================
+# ACCESSORIES SYSTEM (quantity-based, separate from IMEI phones)
+# ==============================================================================
+# Import accessories views from separate module
+from .phones_accessories import (
+    accessories_dashboard,
+    accessories_stock_in,
+    accessories_fast_sell,
+    accessories_normal_sell,  # NEW: Manual sell page
+    accessories_lookup_api,
+    accessories_stock_in_api,
+    accessories_sell_api,
+)
+
+# Export accessories views for URL routing
+__all__ = [
+    'dashboard', 'sales_history', 'sales_export_csv', 'sales_trend_json', 'reports',
+    'accessories_dashboard', 'accessories_stock_in', 'accessories_fast_sell',
+    'accessories_normal_sell', 'accessories_lookup_api', 'accessories_stock_in_api', 'accessories_sell_api',
+]

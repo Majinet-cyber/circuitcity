@@ -1009,6 +1009,55 @@ def gym_dashboard(request):
     except Exception:
         mrr = Decimal("0.00")
     
+    # New members this month
+    new_members_this_month = GymMember.objects.filter(
+        business=business,
+        is_archived=False,
+        joined_at__gte=month_start_dt,
+        joined_at__lte=month_end_dt
+    ).count()
+    
+    # Members per trainer (top 5)
+    trainer_stats = []
+    trainers = GymTrainer.objects.filter(business=business, is_active=True)
+    for trainer in trainers:
+        active_members_count = GymMember.objects.filter(
+            business=business,
+            trainer=trainer,
+            is_archived=False,
+            is_active=True
+        ).count()
+        
+        # Get fees earned this month
+        fees_this_month = GymPayment.objects.filter(
+            member__business=business,
+            member__trainer=trainer,
+            trainer_fee__gt=0,
+            paid_at__gte=month_start_dt,
+            paid_at__lte=month_end_dt,
+            is_active=True
+        ).aggregate(total=Sum("trainer_fee"))["total"] or Decimal("0.00")
+        
+        # Count payments this month
+        payments_this_month = GymPayment.objects.filter(
+            member__business=business,
+            member__trainer=trainer,
+            paid_at__gte=month_start_dt,
+            paid_at__lte=month_end_dt,
+            is_active=True
+        ).count()
+        
+        trainer_stats.append({
+            "trainer": trainer,
+            "active_members": active_members_count,
+            "fees_earned": fees_this_month,
+            "payments_count": payments_this_month,
+        })
+    
+    # Sort by active members (descending) and take top 5
+    trainer_stats.sort(key=lambda x: x["active_members"], reverse=True)
+    top_trainers = trainer_stats[:5]
+    
     return render(request, "inventory/gym/dashboard.html", {
         "business": business,
         
@@ -1052,6 +1101,10 @@ def gym_dashboard(request):
         # Trainer stats
         "trainer_stats": trainer_stats,
         "trainer_ranking": trainer_ranking,  # Sorted by fees earned
+        "top_trainers": top_trainers,  # Top 5 trainers by active members
+        
+        # New members this month
+        "new_members_this_month": new_members_this_month,
         
         # Financial metrics (costs, revenue, profit)
         "costs_today": costs_today,
@@ -1256,3 +1309,112 @@ def trainer_deactivate(request, trainer_id):
     messages.success(request, f"Trainer '{trainer.name}' deactivated.")
     return redirect("gym:trainers_list")
 
+
+# ==============================================================================
+# GYM MEMBER SCANNING (BARCODE/QR)
+# ==============================================================================
+
+@login_required
+@require_business
+@require_business_kind(BusinessKind.GYM)
+def gym_scan_page(request):
+    """
+    Gym member barcode/QR scanner page.
+    Uses rear camera to scan member codes.
+    """
+    business = get_active_business(request)
+    
+    return render(request, "inventory/gym/scan_member.html", {
+        "active_tab": "scan",
+        "business": business,
+    })
+
+
+@login_required
+@require_business
+@require_business_kind(BusinessKind.GYM)
+def gym_scan_lookup(request):
+    """
+    API endpoint to lookup member by scanned code.
+    Returns member details, status, days remaining, etc.
+    """
+    from django.http import JsonResponse
+    
+    business = get_active_business(request)
+    
+    if request.method != "POST":
+        return JsonResponse({"ok": False, "error": "POST required"}, status=405)
+    
+    # Get scanned code from request
+    import json
+    try:
+        body = json.loads(request.body)
+        member_code = body.get("code", "").strip()
+    except (json.JSONDecodeError, ValueError):
+        member_code = request.POST.get("code", "").strip()
+    
+    if not member_code:
+        return JsonResponse({"ok": False, "error": "No code provided"}, status=400)
+    
+    # Lookup member by code (tenant-safe)
+    try:
+        member = GymMember.objects.get(
+            business=business,
+            member_code=member_code,
+            is_archived=False
+        )
+    except GymMember.DoesNotExist:
+        return JsonResponse({
+            "ok": False,
+            "error": f"Member not found: {member_code}",
+            "code": member_code
+        }, status=404)
+    
+    # Calculate status and days remaining
+    today = timezone.now().date()
+    days_left = member.days_left
+    is_overdue = False
+    is_active = False
+    
+    if member.membership_end:
+        if member.membership_end >= today:
+            is_active = True
+        else:
+            is_overdue = True
+    else:
+        is_overdue = True  # No membership at all
+    
+    # Determine status color
+    if is_active:
+        status_color = "success"  # Green
+        status_label = "Active"
+    elif is_overdue:
+        status_color = "danger"  # Red
+        status_label = "Expired"
+    else:
+        status_color = "warning"  # Yellow
+        status_label = "Pending Payment"
+    
+    # Build response
+    return JsonResponse({
+        "ok": True,
+        "member": {
+            "id": member.id,
+            "name": member.name,
+            "phone": member.phone,
+            "email": member.email,
+            "member_code": member.member_code,
+            "trainer": member.trainer.name if member.trainer else None,
+            "days_left": days_left,
+            "membership_start": member.membership_start.isoformat() if member.membership_start else None,
+            "membership_end": member.membership_end.isoformat() if member.membership_end else None,
+            "last_payment_date": member.last_payment_date.isoformat() if member.last_payment_date else None,
+            "status": member.status,
+            "status_label": status_label,
+            "status_color": status_color,
+            "is_active": is_active,
+            "is_overdue": is_overdue,
+            "membership_fee": float(member.membership_fee) if member.membership_fee else 0,
+            "trainer_fee": float(member.trainer_fee) if member.trainer_fee else 0,
+        }
+    })

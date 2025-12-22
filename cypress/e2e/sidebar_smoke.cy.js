@@ -19,6 +19,8 @@ describe("Sidebar smoke: visit all nav items + add cost", () => {
     "Products",
     "Scan IN",
     "Scan & Sell",
+    "Accessories",
+    "Stock In Accessories",
     "Time Logs",
     "My Wallet",
     "Admin Wallet",
@@ -99,6 +101,13 @@ describe("Sidebar smoke: visit all nav items + add cost", () => {
     cy.log("🔐 Logging in as EMPIRE manager");
     cy.loginAsOwner();
     cy.url().should("include", "/inventory");
+
+    // ----------------------------------------------------------
+    // VERIFICATION: Accessories items appear in Phones sidebar
+    // ----------------------------------------------------------
+    cy.log("🔍 Verifying Accessories items in sidebar");
+    cy.get('[data-testid="nav-phones-accessories"]').should("exist").should("be.visible");
+    cy.get('[data-testid="nav-phones-accessories-stockin"]').should("exist").should("be.visible");
 
     // ----------------------------------------------------------
     // STEP 2: Visit each sidebar item BEFORE Costs

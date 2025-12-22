@@ -1,0 +1,225 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Select Trainer - {{ business.name }}{% endblock %}
+
+{% block extra_css %}
+<style>
+.wizard-container {
+    max-width: 700px;
+    margin: 0 auto;
+    padding: 1rem;
+}
+
+.progress-bar {
+    height: 8px;
+    background: #e5e7eb;
+    border-radius: 4px;
+    margin-bottom: 2rem;
+    overflow: hidden;
+}
+
+.progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #3b82f6, #10b981);
+    transition: width 0.3s ease;
+}
+
+.wizard-card {
+    background: rgba(255, 255, 255, 0.98);
+    border-radius: 24px;
+    padding: 2.5rem 2rem;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.12);
+}
+
+.step-badge {
+    display: inline-block;
+    background: #3b82f6;
+    color: white;
+    padding: 0.5rem 1rem;
+    border-radius: 20px;
+    font-size: 0.875rem;
+    font-weight: 600;
+    margin-bottom: 1rem;
+}
+
+.wizard-title {
+    font-size: 1.75rem;
+    font-weight: bold;
+    margin-bottom: 0.5rem;
+    color: #1e293b;
+}
+
+.wizard-subtitle {
+    color: #64748b;
+    margin-bottom: 2rem;
+}
+
+.trainer-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 1rem;
+    margin-bottom: 2rem;
+}
+
+.trainer-card {
+    background: white;
+    border: 3px solid #e5e7eb;
+    border-radius: 16px;
+    padding: 1.5rem;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.trainer-card:hover {
+    border-color: #3b82f6;
+    transform: translateY(-4px);
+    box-shadow: 0 10px 20px rgba(59, 130, 246, 0.2);
+}
+
+.trainer-card.selected {
+    border-color: #10b981;
+    background: #d1fae5;
+}
+
+.trainer-card input[type="radio"] {
+    position: absolute;
+    opacity: 0;
+}
+
+.trainer-icon {
+    font-size: 2.5rem;
+    margin-bottom: 0.75rem;
+}
+
+.trainer-name {
+    font-weight: 600;
+    color: #1e293b;
+    margin-bottom: 0.25rem;
+}
+
+.trainer-phone {
+    font-size: 0.875rem;
+    color: #64748b;
+}
+
+.no-trainer-card {
+    background: #f8fafc;
+    border-color: #cbd5e1;
+}
+
+.no-trainer-card:hover {
+    border-color: #94a3b8;
+}
+
+.no-trainer-card.selected {
+    background: #e0e7ff;
+    border-color: #6366f1;
+}
+
+.wizard-actions {
+    display: flex;
+    gap: 1rem;
+    margin-top: 2rem;
+    flex-wrap: wrap;
+}
+
+.wizard-btn {
+    flex: 1;
+    padding: 0.875rem 2rem;
+    border-radius: 12px;
+    font-weight: 600;
+    font-size: 1.1rem;
+    transition: all 0.3s ease;
+}
+
+.wizard-btn:hover {
+    transform: translateY(-2px);
+}
+
+@media (max-width: 576px) {
+    .wizard-card {
+        padding: 2rem 1.5rem;
+    }
+    
+    .trainer-grid {
+        grid-template-columns: 1fr;
+    }
+    
+    .wizard-actions {
+        flex-direction: column;
+    }
+    
+    .wizard-btn {
+        width: 100%;
+    }
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="wizard-container">
+    <!-- Progress Bar -->
+    <div class="progress-bar">
+        <div class="progress-fill" style="width: 66%;"></div>
+    </div>
+    
+    <div class="wizard-card">
+        <div class="step-badge">Step 2 of {{ total_steps }}</div>
+        <h1 class="wizard-title">Select Trainer</h1>
+        <p class="wizard-subtitle">Assign a trainer or continue without one</p>
+        
+        <form method="post" id="trainerForm">
+            {% csrf_token %}
+            
+            <div class="trainer-grid">
+                <!-- No Trainer Option -->
+                <label class="trainer-card no-trainer-card {% if not selected_trainer_id %}selected{% endif %}">
+                    <input type="radio" name="trainer_id" value="none" {% if not selected_trainer_id %}checked{% endif %}>
+                    <div class="trainer-icon">🚫</div>
+                    <div class="trainer-name">No Trainer</div>
+                    <div class="trainer-phone">Member without trainer</div>
+                </label>
+                
+                <!-- Trainer Options -->
+                {% for trainer in trainers %}
+                <label class="trainer-card {% if selected_trainer_id == trainer.id %}selected{% endif %}">
+                    <input type="radio" name="trainer_id" value="{{ trainer.id }}" {% if selected_trainer_id == trainer.id %}checked{% endif %}>
+                    <div class="trainer-icon">💪</div>
+                    <div class="trainer-name">{{ trainer.name }}</div>
+                    <div class="trainer-phone">{{ trainer.phone|default:"—" }}</div>
+                </label>
+                {% endfor %}
+            </div>
+            
+            {% if not trainers %}
+            <div class="alert alert-info">
+                <i class="bi bi-info-circle"></i>
+                No trainers available yet. You can add trainers from the Trainers page.
+            </div>
+            {% endif %}
+            
+            <div class="wizard-actions">
+                <a href="?step=1" class="btn btn-outline-secondary wizard-btn">
+                    <i class="bi bi-arrow-left"></i> Back
+                </a>
+                <button type="submit" class="btn btn-primary wizard-btn">
+                    Continue <i class="bi bi-arrow-right"></i>
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+// Auto-select on click and update UI
+document.querySelectorAll('.trainer-card').forEach(card => {
+    card.addEventListener('click', function() {
+        document.querySelectorAll('.trainer-card').forEach(c => c.classList.remove('selected'));
+        this.classList.add('selected');
+    });
+});
+</script>
+{% endblock %}
+

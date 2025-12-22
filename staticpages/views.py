@@ -4,6 +4,7 @@ from decimal import Decimal
 from django.http import HttpResponse
 from django.contrib import messages
 from django.shortcuts import redirect
+from django.urls import reverse
 
 
 def get_cfo_message(total_profit):
@@ -514,3 +515,45 @@ def hq_onboarding_pdf(request):
         logger.error(f"PDF generation failed: {e}", exc_info=True)
         messages.error(request, "Unable to generate PDF at this time. Please try again later.")
         return redirect('staticpages:onboarding_hq')
+
+
+def sitemap_xml(request):
+    """
+    Generate sitemap.xml with public, indexable pages only.
+    Excludes auth, dashboard, and private routes.
+    """
+    from django.conf import settings
+    
+    # Get the domain from request
+    protocol = 'https' if request.is_secure() else 'http'
+    domain = request.get_host()
+    base_url = f"{protocol}://{domain}"
+    
+    # Define public pages with their priorities and change frequencies
+    public_pages = [
+        {'loc': '/', 'priority': '1.0', 'changefreq': 'daily'},
+        {'loc': '/landing/', 'priority': '1.0', 'changefreq': 'daily'},
+        {'loc': '/landing/pricing/', 'priority': '0.9', 'changefreq': 'weekly'},
+        {'loc': '/landing/about/', 'priority': '0.8', 'changefreq': 'monthly'},
+        {'loc': '/landing/contact/', 'priority': '0.8', 'changefreq': 'monthly'},
+        {'loc': '/landing/simulator/', 'priority': '0.7', 'changefreq': 'monthly'},
+        {'loc': '/landing/join/', 'priority': '0.7', 'changefreq': 'monthly'},
+        {'loc': '/landing/privacy/', 'priority': '0.5', 'changefreq': 'monthly'},
+        {'loc': '/landing/terms/', 'priority': '0.5', 'changefreq': 'monthly'},
+        {'loc': '/landing/data-deletion/', 'priority': '0.5', 'changefreq': 'monthly'},
+    ]
+    
+    # Build XML
+    xml_content = ['<?xml version="1.0" encoding="UTF-8"?>']
+    xml_content.append('<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">')
+    
+    for page in public_pages:
+        xml_content.append('  <url>')
+        xml_content.append(f'    <loc>{base_url}{page["loc"]}</loc>')
+        xml_content.append(f'    <changefreq>{page["changefreq"]}</changefreq>')
+        xml_content.append(f'    <priority>{page["priority"]}</priority>')
+        xml_content.append('  </url>')
+    
+    xml_content.append('</urlset>')
+    
+    return HttpResponse('\n'.join(xml_content), content_type='application/xml')

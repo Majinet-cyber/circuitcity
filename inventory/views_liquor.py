@@ -130,6 +130,7 @@ def sell_liquor(request):
         try:
             product_id = int(request.POST.get("product_id", 0))
             quantity = int(request.POST.get("quantity", 1))
+            # CRITICAL: Default mode is "bottle" (NOT crate) - bottle-first selling
             mode = request.POST.get("mode", "bottle")  # "bottle", "shot", or "glass"
             sale_type = request.POST.get("sale_type", "cash")  # "cash" or "credit"
             customer_name = request.POST.get("customer_name", "").strip()
@@ -195,6 +196,8 @@ def sell_liquor(request):
             
             with transaction.atomic():
                 # Calculate cost for profit tracking
+                # CRITICAL: get_cost_for_unit returns cost_per_bottle for bottle sales
+                # Profit = (selling_price_per_bottle - cost_per_bottle) * bottles_sold
                 unit_cost = product.get_cost_for_unit(unit)
                 total_cost = Decimal(quantity) * unit_cost
                 

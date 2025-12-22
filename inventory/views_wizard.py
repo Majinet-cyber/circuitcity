@@ -103,10 +103,25 @@ def liquor_wizard_submit(request):
         # Parse pricing
         try:
             price_per_bottle = Decimal(data.get('price_per_bottle', 0)) if selling_mode in ['bottle', 'both'] else None
-            cost_per_bottle = Decimal(data.get('cost_per_bottle', 0)) if data.get('cost_per_bottle') else None
             price_per_shot = Decimal(data.get('price_per_shot', 0)) if selling_mode in ['shot', 'both'] else None
             shots_per_bottle = int(data.get('shots_per_bottle', 0)) if selling_mode in ['shot', 'both'] else None
             barman_reserved = int(data.get('barman_reserved', 2)) if selling_mode in ['shot', 'both'] else 2
+            
+            # CRITICAL FIX: Handle crate pricing
+            # If user provides crate pricing, compute cost_per_bottle from it
+            bottles_per_crate = int(data.get('bottles_per_crate', 20))  # Default 20 for Malawi beers
+            is_crate_product = data.get('is_crate_product', False)
+            crate_order_price = data.get('crate_order_price')
+            
+            if is_crate_product and crate_order_price:
+                # User is ordering by crate - compute cost per bottle
+                crate_price = Decimal(crate_order_price)
+                cost_per_bottle = crate_price / Decimal(bottles_per_crate)
+            elif data.get('cost_per_bottle'):
+                # Direct cost per bottle provided
+                cost_per_bottle = Decimal(data.get('cost_per_bottle'))
+            else:
+                cost_per_bottle = None
         except (ValueError, InvalidOperation) as e:
             return JsonResponse({'success': False, 'error': f'Invalid pricing: {str(e)}'}, status=400)
         
@@ -121,8 +136,9 @@ def liquor_wizard_submit(request):
                 shots_per_bottle=shots_per_bottle,
                 barman_shots_reserved=barman_reserved,
                 price_per_bottle=price_per_bottle,
-                cost_per_bottle=cost_per_bottle,
+                cost_per_bottle=cost_per_bottle,  # Now correctly computed from crate price if applicable
                 price_per_shot=price_per_shot,
+                bottles_per_crate=bottles_per_crate,  # Store crate size
                 is_active=True
             )
             

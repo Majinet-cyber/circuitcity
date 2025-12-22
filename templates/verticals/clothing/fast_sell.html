@@ -5,6 +5,7 @@
 
 {% block extra_css %}
 <link rel="stylesheet" href="{% static 'css/unified-scanner.css' %}">
+<link rel="stylesheet" href="{% static 'css/instant_scan_sell.css' %}">
 <style>
 .fast-sell-container {
     max-width: 1000px;
@@ -375,53 +376,61 @@
     <!-- Page Header -->
     <div class="page-header">
         <h1>⚡ Fast Sell</h1>
-        <p>Scan. Select payment. Sell. Done.</p>
+        <p>Instant scan-to-sell. Faster than writing in a book.</p>
     </div>
     
-    <!-- Scanner Trigger Button -->
-    <button class="scanner-trigger-btn" id="scannerTriggerBtn">
-        <i class="bi bi-upc-scan"></i>
-        <span>Open Barcode Scanner</span>
-    </button>
-    
-    <!-- Product Card (hidden until product found) -->
-    <div class="product-card hidden" id="productCard">
-        <h3 id="productName">Product Name</h3>
-        
-        <div class="product-info">
-            <div class="info-item">
-                <div class="info-label">In Stock</div>
-                <div class="info-value" id="stockQty">0</div>
-            </div>
-            <div class="info-item">
-                <div class="info-label">Price (MWK)</div>
-                <div class="info-value" id="sellingPrice">0.00</div>
-            </div>
-            <div class="info-item">
-                <div class="info-label">Category</div>
-                <div class="info-value" id="category">-</div>
+    <!-- Instant Scan Container -->
+    <div class="instant-scan-container">
+        <!-- Scanner Video -->
+        <div class="scanner-video-wrapper">
+            <video id="scannerVideo" playsinline></video>
+            <div class="scanner-overlay">
+                <div class="scanner-target"></div>
             </div>
         </div>
         
-        <!-- Quantity Controls -->
-        <div class="qty-controls">
-            <button class="qty-btn" id="qtyDecrease">−</button>
-            <div class="qty-display" id="qtyDisplay">1</div>
-            <button class="qty-btn" id="qtyIncrease">+</button>
+        <!-- Scanner Status -->
+        <div class="scanner-status" id="scannerStatus">
+            Ready to scan. Click "Start Scanner" below.
         </div>
         
-        <!-- Payment Mix Bar -->
-        {% include "payments/_payment_mix_bar.html" with total_amount=0 %}
+        <!-- Scanner Controls -->
+        <div class="scanner-controls">
+            <button class="btn btn-primary" id="btnStartScan">
+                <i class="bi bi-camera-fill"></i> Start Scanner
+            </button>
+            <button class="btn btn-secondary" id="btnStopScan" disabled>
+                <i class="bi bi-stop-circle"></i> Stop
+            </button>
+        </div>
         
-        <!-- Complete Sale Button -->
-        <button class="sell-btn" id="completeSaleBtn">
-            <i class="bi bi-check-circle-fill"></i>
-            <span>Complete Sale</span>
+        <!-- Manual Entry (Last Resort) -->
+        <button class="btn-manual" id="btnManualEntry">
+            📝 Manual Entry (last resort)
         </button>
     </div>
     
-    <!-- Recent Fast Sales -->
-    <div class="recent-sales-panel hidden" id="recentSalesPanel">
+    <!-- Toast Container -->
+    <div class="toast-container" id="toastContainer"></div>
+    
+    <!-- KPI Dashboard -->
+    <div class="kpi-grid">
+        <div class="kpi-card">
+            <div class="kpi-label">Sold Today</div>
+            <div class="kpi-value" id="kpiSoldToday">0</div>
+        </div>
+        <div class="kpi-card">
+            <div class="kpi-label">Revenue Today</div>
+            <div class="kpi-value" id="kpiRevenueToday">MK 0.00</div>
+        </div>
+        <div class="kpi-card">
+            <div class="kpi-label">Profit Today</div>
+            <div class="kpi-value" id="kpiProfitToday">MK 0.00</div>
+        </div>
+    </div>
+    
+    <!-- Instructions -->
+    <div class="recent-sales-panel" id="instructionsPanel">
         <h3>
             <i class="bi bi-receipt"></i>
             Recent Fast Sales
@@ -447,25 +456,49 @@
 </div>
 
 <script src="{% static 'js/unified-scanner.js' %}"></script>
+<script src="{% static 'js/instant_scan_sell.js' %}"></script>
 <script>
-let currentProduct = null;
-let currentQty = 1;
-let barcodeScanner = null;
-let recentSales = [];
-
-// Initialize scanner
-document.getElementById('scannerTriggerBtn').addEventListener('click', () => {
-    if (!barcodeScanner) {
-        barcodeScanner = new UnifiedScanner({
-            mode: 'barcode',
-            onSelect: handleBarcodeScan,
-            onError: (error) => {
-                console.error('Scanner error:', error);
-            }
+// Instant Scan-to-Sell for Clothing
+(() => {
+    'use strict';
+    
+    // Initialize instant scan engine
+    document.addEventListener('DOMContentLoaded', () => {
+        InstantScanSell.init({
+            vertical: 'clothing',
+            business: {{ business.id }},
+            videoId: 'scannerVideo',
+            statusId: 'scannerStatus',
+            startBtnId: 'btnStartScan',
+            stopBtnId: 'btnStopScan',
+            manualBtnId: 'btnManualEntry',
+            toastContainerId: 'toastContainer'
         });
+        
+        // Load KPIs on page load
+        refreshKPIs();
+    });
+    
+    // KPI refresh function
+    async function refreshKPIs() {
+        try {
+            const resp = await fetch('/verticals/clothing/api/fast-sell/kpis/?range=today');
+            const data = await resp.json();
+            
+            if (data.ok) {
+                document.getElementById('kpiSoldToday').textContent = data.sold_today || 0;
+                document.getElementById('kpiRevenueToday').textContent = `MK ${(data.revenue_today || 0).toFixed(2)}`;
+                document.getElementById('kpiProfitToday').textContent = `MK ${(data.profit_today || 0).toFixed(2)}`;
+            }
+        } catch (err) {
+            console.error('KPI refresh error:', err);
+        }
     }
-    barcodeScanner.open();
-});
+    
+    // Make refresh function available globally for instant_scan_sell.js
+    window.updateFastSellKPIs = refreshKPIs;
+    
+})();
 
 // Handle barcode scan
 async function handleBarcodeScan(barcode) {

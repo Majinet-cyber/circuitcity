@@ -13,7 +13,10 @@
                     <h2>Gym Dashboard</h2>
                     <p class="text-muted mb-0">{{ business.name }}</p>
                 </div>
-                <div class="d-flex gap-2">
+                <div class="d-flex gap-2 flex-wrap">
+                    <a href="{% url 'gym:scan_member' %}" class="btn btn-success">
+                        <i class="bi bi-qr-code-scan"></i> Scan Member
+                    </a>
                     <a href="{% url 'gym:checkin_page' %}" class="btn btn-outline-success">
                         <i class="bi bi-box-arrow-in-right"></i> Check-In
                     </a>
@@ -21,7 +24,7 @@
                         <i class="bi bi-person-badge"></i> Trainers
                     </a>
                     <a href="{% url 'gym:members_list' %}" class="btn btn-outline-primary">
-                        <i class="bi bi-people"></i> All Members
+                        <i class="bi bi-people"></i> Members
                     </a>
                     <a href="{% url 'gym:member_add' %}" class="btn btn-primary">
                         <i class="bi bi-person-plus"></i> Add Member
@@ -87,6 +90,69 @@
                     </div>
                     <div class="text-danger" style="font-size: 2rem; opacity: 0.3;">
                         <i class="bi bi-exclamation-triangle"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Additional KPIs -->
+    <div class="row g-3 mb-4">
+        <div class="col-12 col-md-3">
+            <div class="glass-card p-4">
+                <div class="d-flex justify-content-between align-items-start">
+                    <div>
+                        <p class="text-muted mb-1 small text-uppercase">New This Month</p>
+                        <h3 class="mb-0 text-info">{{ new_members_this_month|default:0 }}</h3>
+                        <small class="text-muted">New members joined</small>
+                    </div>
+                    <div class="text-info" style="font-size: 2rem; opacity: 0.3;">
+                        <i class="bi bi-person-plus-fill"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-12 col-md-3">
+            <div class="glass-card p-4">
+                <div class="d-flex justify-content-between align-items-start">
+                    <div>
+                        <p class="text-muted mb-1 small text-uppercase">Expiring Soon</p>
+                        <h3 class="mb-0 text-warning">{{ expiring_soon|default:0 }}</h3>
+                        <small class="text-muted">Next 7 days</small>
+                    </div>
+                    <div class="text-warning" style="font-size: 2rem; opacity: 0.3;">
+                        <i class="bi bi-hourglass-split"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-12 col-md-3">
+            <div class="glass-card p-4">
+                <div class="d-flex justify-content-between align-items-start">
+                    <div>
+                        <p class="text-muted mb-1 small text-uppercase">Revenue (Month)</p>
+                        <h3 class="mb-0 text-success">{{ revenue_this_month|floatformat:0|default:0 }}</h3>
+                        <small class="text-muted">MWK</small>
+                    </div>
+                    <div class="text-success" style="font-size: 2rem; opacity: 0.3;">
+                        <i class="bi bi-currency-exchange"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-12 col-md-3">
+            <div class="glass-card p-4">
+                <div class="d-flex justify-content-between align-items-start">
+                    <div>
+                        <p class="text-muted mb-1 small text-uppercase">MRR</p>
+                        <h3 class="mb-0 text-primary">{{ mrr|floatformat:0|default:0 }}</h3>
+                        <small class="text-muted">Monthly Recurring</small>
+                    </div>
+                    <div class="text-primary" style="font-size: 2rem; opacity: 0.3;">
+                        <i class="bi bi-arrow-repeat"></i>
                     </div>
                 </div>
             </div>

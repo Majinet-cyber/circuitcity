@@ -348,6 +348,11 @@ def get_vertical_sidebar_items(business_kind: str) -> list[dict]:
             {"section": "MAIN", "key": "scan_in", "url": "inventory:scan_in", "label": "Scan IN", "icon": "bi-upc-scan", "active_prefix": "/inventory/scan", "active_pattern": "/inventory/scan", "require_manager": False, "is_menu": False, "is_header": False},
             {"section": "MAIN", "key": "sell", "url": "inventory:phone_sale_wizard", "label": "Scan & Sell", "icon": "bi-bag-check", "active_prefix": "/inventory/phone-sale-wizard/", "active_pattern": "/inventory/phone-sale-wizard/", "require_manager": False, "is_menu": False, "is_header": False},
             
+            # ACCESSORIES section (phones accessories - quantity-based, separate from IMEI phones)
+            {"section": "MAIN", "key": "accessories", "url": "verticals:phones_accessories_dashboard", "label": "Accessories", "icon": "bi-box-seam", "active_prefix": "/verticals/phones/accessories/", "active_pattern": "/verticals/phones/accessories/", "require_manager": False, "is_menu": False, "is_header": False, "testid": "nav-phones-accessories"},
+            {"section": "MAIN", "key": "accessories_stock_in", "url": "verticals:phones_accessories_stock_in", "label": "Stock In Accessories", "icon": "bi-box-arrow-in-down", "active_prefix": "/verticals/phones/accessories/stock-in/", "active_pattern": "/verticals/phones/accessories/stock-in/", "require_manager": False, "is_menu": False, "is_header": False, "testid": "nav-phones-accessories-stockin"},
+            {"section": "MAIN", "key": "accessories_sell", "url": "verticals:phones_accessories_sell", "label": "Sell Accessories", "icon": "bi-cart-check", "active_prefix": "/verticals/phones/accessories/sell/", "active_pattern": "/verticals/phones/accessories/sell/", "require_manager": False, "is_menu": False, "is_header": False, "testid": "nav-phones-accessories-sell"},
+            
             # LAYBY section (phones specific)
             {"section": "LAYBY", "key": "layby", "url": "layby:dashboard", "label": "Layby", "icon": "bi-journal-check", "active_prefix": "/layby/", "active_pattern": "/layby/", "require_manager": False, "is_menu": False, "is_header": False},
             
