@@ -21,7 +21,7 @@ from inventory.business_kinds import BusinessKind
 from inventory.helpers import get_active_business
 from inventory.models_verticals import (
     GymMember, GymPayment, GymMemberLog, GymSettings, GymWalletEntry,
-    GymMemberAction, GymCheckIn, GymMemberStatus, GymTrainer
+    GymMemberAction, GymCheckIn, GymMemberStatus, GymTrainer, TrainerFee
 )
 from tenants.utils import require_business
 
@@ -236,7 +236,6 @@ def member_detail(request, member_id):
         gym_settings = None
     
     # Check for missing trainer fee
-    from inventory.models_verticals import TrainerFee
     trainer_fee_missing = False
     if member.trainer and membership_status["status_code"] == "active":
         # Check if there's a trainer fee for current period

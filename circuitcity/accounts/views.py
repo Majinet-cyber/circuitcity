@@ -1093,7 +1093,7 @@ def _seed_defaults_for_business(biz) -> None:
     """
     Create minimal per-tenant objects so new managers see a ready UI.
     Tries inventory.Store and inventory.Warehouse if present.
-    For phone businesses, also seeds default phone products.
+    For phone businesses, also seeds default phone products and accessories.
     """
     try:
         Store = apps.get_model("inventory", "Store")
@@ -1117,7 +1117,7 @@ def _seed_defaults_for_business(biz) -> None:
             wh_kwargs["is_default"] = True
         Warehouse.objects.create(**wh_kwargs)
 
-    # Seed phone products for phone businesses
+    # Seed phone products and accessories for phone businesses
     business_kind = getattr(biz, "business_kind", "").lower()
     if business_kind in ("phones", "phone", "electronics", "mobile", "mobiles"):
         try:
@@ -1125,6 +1125,13 @@ def _seed_defaults_for_business(biz) -> None:
             call_command("seed_default_phone_products", business_id=biz.id, verbosity=0)
         except Exception as e:
             log.warning(f"Failed to seed phone products for {biz.name}: {e}")
+        
+        # Also seed accessories for phone businesses
+        try:
+            from django.core.management import call_command
+            call_command("seed_accessories", business=biz.id, verbosity=0)
+        except Exception as e:
+            log.warning(f"Failed to seed accessories for {biz.name}: {e}")
 
 
 # =========================================
