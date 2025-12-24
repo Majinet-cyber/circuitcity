@@ -192,28 +192,84 @@
             <small class="text-muted d-block mt-1">Required when Has Barcode = Yes</small>
           </div>
 
+          <!-- Shot Sales Section (for Spirits/Whiskey) -->
           <div class="col-12">
             <div class="form-check mb-3">
               {{ form.has_shots }}
               <label class="form-check-label fw-semibold" for="{{ form.has_shots.id_for_label }}">
-                Enable shot sales
+                Enable shot sales (for spirits/whiskey)
               </label>
             </div>
           </div>
 
-          <div class="col-12 col-md-4">
-            <label class="form-label fw-semibold">Price per Shot <span class="text-muted">(if shots enabled)</span></label>
-            {{ form.price_shot }}
+          <div id="shot-fields" style="display: none;" class="col-12">
+            <div class="row g-3">
+              <div class="col-12 col-md-4">
+                <label class="form-label fw-semibold">Shots per Bottle <span class="text-danger">*</span></label>
+                {{ form.shots_per_bottle }}
+                <small class="text-muted d-block mt-1">Total shots per bottle</small>
+              </div>
+
+              <div class="col-12 col-md-4">
+                <label class="form-label fw-semibold">Barman Reserved <span class="text-muted">(typically 2)</span></label>
+                {{ form.barman_shots_reserved }}
+                <small class="text-muted d-block mt-1">Reserved for complimentary drinks</small>
+              </div>
+
+              <div class="col-12 col-md-4">
+                <label class="form-label fw-semibold">Price per Shot <span class="text-danger">*</span></label>
+                {{ form.price_shot }}
+                <small class="text-muted d-block mt-1">Selling price per shot</small>
+              </div>
+
+              <div class="col-12">
+                <div class="alert alert-info py-2 border-0" style="background: rgba(59, 130, 246, 0.08); border-left: 3px solid #3b82f6 !important; border-radius: 8px; font-size: 0.875rem;">
+                  <i class="bi bi-info-circle me-1"></i>
+                  <strong>Cost per shot</strong> will be auto-calculated from the bottle cost divided by sellable shots (excluding barman reserved)
+                </div>
+              </div>
+            </div>
           </div>
 
-          <div class="col-12 col-md-4">
-            <label class="form-label fw-semibold">Shots per Bottle <span class="text-muted">(if shots enabled)</span></label>
-            {{ form.shots_per_bottle }}
+          <!-- Glass Sales Section (for Wine) -->
+          <div class="col-12">
+            <div class="form-check mb-3">
+              {{ form.has_glasses }}
+              <label class="form-check-label fw-semibold" for="{{ form.has_glasses.id_for_label }}">
+                {{ form.has_glasses.label }}
+              </label>
+            </div>
           </div>
 
-          <div class="col-12 col-md-4">
-            <label class="form-label fw-semibold">Barman Reserved <span class="text-muted">(typically 2)</span></label>
-            {{ form.barman_shots_reserved }}
+          <div id="glass-fields" style="display: none;" class="col-12">
+            <div class="row g-3">
+              <div class="col-12 col-md-4">
+                <label class="form-label fw-semibold">Glasses per Bottle <span class="text-danger">*</span></label>
+                {{ form.glasses_per_bottle }}
+                <small class="text-muted d-block mt-1">Typically 5 for wine</small>
+              </div>
+
+              <div class="col-12 col-md-4">
+                <label class="form-label fw-semibold">Price per Glass <span class="text-danger">*</span></label>
+                {{ form.price_glass }}
+                <small class="text-muted d-block mt-1">Selling price per glass</small>
+              </div>
+
+              <div class="col-12 col-md-4">
+                <label class="form-label fw-semibold">
+                  Cost per Glass <span class="text-muted">(auto-calculated)</span>
+                </label>
+                {{ form.cost_per_glass }}
+                <small class="text-muted d-block mt-1">Leave empty for auto-calc</small>
+              </div>
+
+              <div class="col-12">
+                <div class="alert alert-success py-2 border-0" style="background: rgba(34, 197, 94, 0.08); border-left: 3px solid #22c55e !important; border-radius: 8px; font-size: 0.875rem;">
+                  <i class="bi bi-calculator me-1"></i>
+                  <strong>Auto-calculation:</strong> Cost per glass = Total bottle cost ÷ Glasses per bottle
+                </div>
+              </div>
+            </div>
           </div>
         </div>
 
@@ -298,7 +354,7 @@
             <div class="premium-price-row">
               {% if p.cost_per_bottle %}
               <div class="premium-price-item">
-                <span class="premium-price-label">Cost</span>
+                <span class="premium-price-label">Cost (Bottle)</span>
                 <span class="premium-price-value cost" title="MK {{ p.cost_per_bottle|floatformat:0 }}">
                   MK {{ p.cost_per_bottle|floatformat:0 }}
                 </span>
@@ -318,13 +374,39 @@
                 </span>
               </div>
               {% endif %}
+              {% if p.has_glasses and p.price_per_glass %}
+              <div class="premium-price-item">
+                <span class="premium-price-label">Glass</span>
+                <span class="premium-price-value" title="MK {{ p.price_per_glass|floatformat:0 }}">
+                  MK {{ p.price_per_glass|floatformat:0 }}
+                </span>
+              </div>
+              {% endif %}
             </div>
 
             {% if p.has_shots and p.sellable_shots_per_bottle %}
             <div style="margin: 12px 0;">
               <span class="premium-badge" style="background: #dcfce7; color: #166534; border-color: #bbf7d0;">
-                🥃 {{ p.sellable_shots_per_bottle }} shots/bottle
+                🥃 {{ p.sellable_shots_per_bottle }} sellable shots/bottle
               </span>
+              {% if p.cost_per_shot %}
+              <span class="premium-badge" style="background: #fff7ed; color: #9a3412; border-color: #fed7aa; margin-left: 6px;">
+                💰 MK {{ p.cost_per_shot|floatformat:0 }} cost/shot
+              </span>
+              {% endif %}
+            </div>
+            {% endif %}
+            
+            {% if p.has_glasses and p.glasses_per_bottle %}
+            <div style="margin: 12px 0;">
+              <span class="premium-badge" style="background: #fce7f3; color: #831843; border-color: #fbcfe8;">
+                🍷 {{ p.glasses_per_bottle }} glasses/bottle
+              </span>
+              {% if p.cost_per_glass %}
+              <span class="premium-badge" style="background: #fff7ed; color: #9a3412; border-color: #fed7aa; margin-left: 6px;">
+                💰 MK {{ p.cost_per_glass|floatformat:0 }} cost/glass
+              </span>
+              {% endif %}
             </div>
             {% endif %}
 
@@ -390,18 +472,55 @@ function toggleBarcodeField() {
   }
 }
 
-// Initialize barcode workflow on page load and bfcache restore
+// Shot sales workflow: show/hide shot fields when checkbox is toggled
+function toggleShotFields() {
+  const hasShotsCheckbox = document.getElementById('id_has_shots');
+  const shotFields = document.getElementById('shot-fields');
+  
+  if (hasShotsCheckbox && shotFields) {
+    shotFields.style.display = hasShotsCheckbox.checked ? 'block' : 'none';
+  }
+}
+
+// Glass sales workflow: show/hide glass fields when checkbox is toggled
+function toggleGlassFields() {
+  const hasGlassesCheckbox = document.getElementById('id_has_glasses');
+  const glassFields = document.getElementById('glass-fields');
+  
+  if (hasGlassesCheckbox && glassFields) {
+    glassFields.style.display = hasGlassesCheckbox.checked ? 'block' : 'none';
+  }
+}
+
+// Initialize all workflows on page load and bfcache restore
 document.addEventListener('DOMContentLoaded', function() {
+  // Barcode workflow
   const barcodeRadios = document.querySelectorAll('input[name="has_barcode"]');
   barcodeRadios.forEach(radio => {
     radio.addEventListener('change', toggleBarcodeField);
   });
   toggleBarcodeField();
+  
+  // Shot sales workflow
+  const hasShotsCheckbox = document.getElementById('id_has_shots');
+  if (hasShotsCheckbox) {
+    hasShotsCheckbox.addEventListener('change', toggleShotFields);
+    toggleShotFields();
+  }
+  
+  // Glass sales workflow
+  const hasGlassesCheckbox = document.getElementById('id_has_glasses');
+  if (hasGlassesCheckbox) {
+    hasGlassesCheckbox.addEventListener('change', toggleGlassFields);
+    toggleGlassFields();
+  }
 });
 
 window.addEventListener('pageshow', function(event) {
   if (event.persisted) {
     toggleBarcodeField();
+    toggleShotFields();
+    toggleGlassFields();
   }
 });
 </script>

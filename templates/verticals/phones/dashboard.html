@@ -416,10 +416,13 @@
                 {% endif %}
               </strong>
               <div class="cc-ellipsis" style="font-size:.85rem;color:#64748b">
-                {{ agent.units }} units sold
+                {{ agent.units }} sales
               </div>
             </div>
-            <div class="leaderboard-value cc-amount cc-minw-0" title="MK {{ agent.revenue|floatformat:0|intcomma }}">MK {{ agent.revenue|floatformat:0|intcomma }}</div>
+            <div class="leaderboard-value cc-amount cc-minw-0" title="Commission: MK {{ agent.commission|floatformat:0|intcomma }}">
+              <div style="font-size:.75rem;color:#64748b;font-weight:500;text-transform:uppercase;letter-spacing:0.02em">Commission</div>
+              <div style="color:#10b981;font-weight:700">MK {{ agent.commission|floatformat:0|intcomma }}</div>
+            </div>
           </div>
         {% endfor %}
       </div>

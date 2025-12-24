@@ -98,15 +98,21 @@ def rollback_search(request: HttpRequest) -> JsonResponse:
 def rollback_confirm(request: HttpRequest, sale_id: int) -> HttpResponse:
     """
     Confirm rollback page - show sale details and rollback form.
+    
+    NO HTTP 500s - all errors are caught and displayed as messages.
     """
     business = request.business
     user = request.user
     
-    sale = get_object_or_404(
-        Sale.objects.select_related("item", "item__product", "agent", "location"),
-        pk=sale_id,
-        item__business=business
-    )
+    try:
+        sale = get_object_or_404(
+            Sale.objects.select_related("item", "item__product", "agent", "location"),
+            pk=sale_id,
+            item__business=business
+        )
+    except Exception as e:
+        messages.error(request, f"Sale not found or inaccessible: {str(e)}")
+        return redirect("sales:rollback_home")
     
     # Check if user can rollback
     can_rollback, error_msg = RollbackService.can_rollback(sale, user, business)
@@ -114,9 +120,16 @@ def rollback_confirm(request: HttpRequest, sale_id: int) -> HttpResponse:
     if request.method == "POST" and can_rollback:
         reason = request.POST.get("reason", "").upper()
         refunded = request.POST.get("refunded") == "yes"
-        refunded_amount = Decimal(request.POST.get("refunded_amount", "0") or "0")
         return_to_stock = request.POST.get("return_to_stock") == "yes"
         notes = request.POST.get("notes", "").strip()
+        
+        # Parse refunded amount safely
+        try:
+            refunded_amount_str = request.POST.get("refunded_amount", "0").replace(",", "").strip()
+            refunded_amount = Decimal(refunded_amount_str) if refunded_amount_str else Decimal("0")
+        except (ValueError, Exception) as e:
+            messages.error(request, f"Invalid refund amount: {str(e)}")
+            refunded_amount = Decimal("0")
         
         try:
             rollback = RollbackService.rollback_sale(
@@ -132,21 +145,32 @@ def rollback_confirm(request: HttpRequest, sale_id: int) -> HttpResponse:
             
             messages.success(
                 request,
-                f"Sale #{sale.pk} has been rolled back successfully. "
+                f"✅ Sale #{sale.pk} rolled back successfully! "
                 f"Rollback ID: {rollback.pk}"
             )
             return redirect("sales:rollback_home")
             
         except RollbackError as e:
-            messages.error(request, f"Rollback failed: {str(e)}")
+            messages.error(request, f"❌ Rollback failed: {str(e)}")
         except Exception as e:
-            messages.error(request, f"Unexpected error during rollback: {str(e)}")
+            messages.error(request, f"❌ Unexpected error during rollback: {str(e)}")
+            # Log for debugging but don't expose internal errors
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.error(f"Rollback error for sale {sale_id}: {e}", exc_info=True)
+    
+    # Format sale price for display
+    try:
+        sale_price_formatted = f"MK {sale.price:,.2f}"
+    except Exception:
+        sale_price_formatted = f"MK {sale.price}"
     
     context = {
         "sale": sale,
         "can_rollback": can_rollback,
         "error_msg": error_msg,
         "rollback_reasons": RollbackReason.choices,
+        "sale_price_formatted": sale_price_formatted,
     }
     
     return render(request, "sales/rollback_confirm.html", context)

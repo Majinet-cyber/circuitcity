@@ -540,17 +540,31 @@ def phone_scan_sell(request: HttpRequest) -> HttpResponse:
         return redirect("inventory:phone_scan_sell")
     
     # Parse selling price
+    from inventory.utils_pricing import parse_currency_input, validate_selling_price
+    
     try:
-        selling_price = Decimal(selling_price_raw)
+        selling_price = parse_currency_input(selling_price_raw)
         if selling_price <= 0:
             raise ValueError("Selling price must be positive")
     except (ValueError, Decimal.InvalidOperation):
         messages.error(request, f"Invalid selling price: {selling_price_raw}")
         return redirect("inventory:phone_scan_sell")
     
-    # Calculate profit
+    # Calculate profit and validate pricing intelligence
     cost = item.order_price or Decimal("0.00")
     profit = selling_price - cost
+    
+    # PRICING INTELLIGENCE: Validate and warn
+    validation = validate_selling_price(
+        selling_price=selling_price,
+        cost_price=cost,
+        product_name=item.product.name if item.product else "Phone"
+    )
+    
+    # Log warnings but don't block (assistive, not policing)
+    if validation["warnings"]:
+        for warning in validation["warnings"]:
+            messages.warning(request, warning)
     
     # Mark as sold and track who sold it (for commission attribution)
     try:

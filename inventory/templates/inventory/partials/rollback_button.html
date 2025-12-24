@@ -1,0 +1,37 @@
+{% comment %}
+Rollback Button Partial
+=======================
+Reusable rollback button with proper permissions and styling.
+
+Usage:
+    {% load rollback_helpers %}
+    {% rollback_button sale request.user business "phones" %}
+{% endcomment %}
+
+{% if already_rolled_back %}
+    <span class="badge badge-secondary" title="This sale has already been rolled back">
+        <i class="fas fa-undo-alt"></i> Already Rolled Back
+    </span>
+    {% if sale.rolled_back_at %}
+        <small class="text-muted d-block">
+            Rolled back {{ sale.rolled_back_at|timesince }} ago
+            {% if sale.rolled_back_by %}
+                by {{ sale.rolled_back_by.get_full_name|default:sale.rolled_back_by.username }}
+            {% endif %}
+        </small>
+    {% endif %}
+{% elif can_rollback %}
+    <a href="{% url rollback_url sale.id %}" 
+       class="btn {{ button_class }} btn-sm"
+       onclick="return confirm('Are you sure you want to rollback this sale? This action will restore inventory and reverse commissions.')">
+        <i class="fas fa-undo-alt"></i> {{ button_label }}
+    </a>
+    <small class="text-muted d-block mt-1">
+        <i class="fas fa-info-circle"></i> Rollback will restore inventory and reverse commissions
+    </small>
+{% else %}
+    <span class="badge badge-light" title="You don't have permission to rollback this sale">
+        <i class="fas fa-lock"></i> Rollback Restricted
+    </span>
+{% endif %}
+

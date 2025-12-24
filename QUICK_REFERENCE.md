@@ -1,293 +1,361 @@
-# Quick Reference: Mobile Table Slider & Commission Settings
+# Quick Reference: Rollback & Pricing System
 
 ## 🚀 Quick Start
 
-### Deployment (3 Steps)
-```bash
-# 1. Run migration
-python manage.py migrate sales 1000
+### Rollback a Phone Sale
+```python
+from sales.services.rollback import RollbackService, RollbackError
 
-# 2. Verify (all businesses get default settings)
-python manage.py shell
->>> from sales.models import CommissionConfig
->>> from tenants.models import Business
->>> for biz in Business.objects.all():
-...     config = CommissionConfig.ensure_config(biz)
-...     print(f"{biz.name}: enabled={config.commissions_enabled}, mode={config.commission_mode}")
+try:
+    rollback = RollbackService.rollback_sale(
+        sale=sale,
+        user=request.user,
+        business=business,
+        reason="RETURNED",
+        refunded=True,
+        refunded_amount=Decimal("1500000"),
+        return_to_stock=True,
+        notes="Customer returned phone"
+    )
+    print(f"✅ Rolled back: {rollback.pk}")
+except RollbackError as e:
+    print(f"❌ Failed: {e}")
+```
 
-# 3. Test
-python manage.py test tests.test_table_slider_and_commissions
+### Rollback a Liquor Sale
+```python
+from sales.services.rollback_verticals import LiquorRollbackService
+
+result = LiquorRollbackService.rollback_liquor_sale(
+    sale_id=123,
+    user=request.user,
+    business=business,
+    reason="DAMAGED",
+    return_to_stock=True
+)
+```
+
+### Validate Selling Price
+```python
+from inventory.utils_pricing import validate_selling_price
+
+validation = validate_selling_price(
+    selling_price=Decimal("1500000"),
+    cost_price=Decimal("1200000"),
+    suggested_price=Decimal("1600000")
+)
+
+if not validation['valid']:
+    print("❌ Price blocked")
+for warning in validation['warnings']:
+    print(f"⚠️ {warning}")
+if validation['feedback']:
+    print(f"✅ {validation['feedback']}")
+```
+
+### Format Currency
+```python
+from inventory.utils_pricing import format_currency, parse_currency_input
+
+# Display
+formatted = format_currency(Decimal("2000000"))  # "MK 2,000,000.00"
+
+# Parse user input
+amount = parse_currency_input("MK 2,000,000")  # Decimal("2000000")
 ```
 
 ---
 
-## 📱 Feature 1: Mobile Table Slider
+## 📋 Common Tasks
 
-### What It Does
-- Makes stock table horizontally scrollable on mobile
-- Shows "Swipe to see more →" hint when table overflows
-- Opens actions in modal (no clipped dropdowns)
-
-### Where to See It
-1. Login as manager
-2. Go to `/inventory/list/?view=all`
-3. View on mobile device (<992px width)
-4. Swipe left/right to see all columns
-
-### Testing
+### Check if User Can Rollback
 ```python
-# Test that slider exists
-self.assertContains(response, 'data-cc-table-slider')
-self.assertContains(response, 'cc-table-slider-container')
+from sales.services.rollback import RollbackService
+
+can_rollback, error_msg = RollbackService.can_rollback(
+    sale=sale,
+    user=request.user,
+    business=business
+)
+
+if can_rollback:
+    # Show rollback button
+else:
+    # Show error: error_msg
+```
+
+### Get Rollback History
+```python
+from sales.services.rollback import RollbackService
+
+rollbacks = RollbackService.get_rollback_history(
+    business=business,
+    limit=30
+)
+
+for rb in rollbacks:
+    print(f"Sale #{rb.sale_id} - {rb.get_reason_display()}")
+```
+
+### Get Rollback Stats
+```python
+from sales.services.rollback import RollbackService
+
+stats = RollbackService.get_rollback_stats(
+    business=business,
+    days=30
+)
+
+print(f"Total rollbacks: {stats['total_rollbacks']}")
+print(f"Total refunded: MK {stats['total_refunded']:,.2f}")
 ```
 
 ---
 
-## 💰 Feature 2: Commission Settings
+## 🎨 Template Usage
 
-### What It Does
-- Managers can choose: **Percentage** or **Fixed Amount** per sale
-- Managers can toggle commissions **ON/OFF**
-- Agents see "Commissions Disabled" when OFF
+### Add Rollback Button
+```django
+{% load rollback_helpers %}
 
-### Where to Configure
-1. Login as manager
-2. Go to **Agents** tab
-3. Click **Configure** in "Commission Settings" card
-4. Toggle ON/OFF, select mode, enter value
-5. Click **Save Settings**
+<!-- Simple -->
+{% rollback_button sale request.user business "phones" %}
 
-### Defaults (Auto-Applied to All Businesses)
-- ✅ Enabled: `True`
-- 📊 Mode: `PERCENT`
-- 💵 Rate: `12.00%`
-- 🔢 Fixed: `MWK 2,000`
-
-### Commission Calculation
-
-**Mode: PERCENT**
-```python
-commission = sale_price × (base_commission_pct / 100)
-# Example: 600,000 × 0.12 = 72,000 MWK
+<!-- Manual -->
+{% can_rollback_sale sale request.user business as can_rollback %}
+{% if can_rollback %}
+    <a href="{% url 'sales:rollback_confirm' sale.id %}" class="btn btn-danger">
+        Rollback Sale
+    </a>
+{% endif %}
 ```
 
-**Mode: FIXED**
-```python
-commission = fixed_commission_amount
-# Example: 2,000 MWK (regardless of sale price)
-```
+### Format Currency in Template
+```django
+{% load rollback_helpers %}
 
-**Disabled:**
-```python
-commission = 0  # No wallet transaction created
-```
+<!-- Price with commas -->
+{{ sale.price|format_currency }}  <!-- MK 2,000,000.00 -->
 
----
-
-## 🧪 Testing
-
-### Run All Tests
-```bash
-python manage.py test tests.test_table_slider_and_commissions -v 2
-```
-
-### Run Specific Test
-```bash
-python manage.py test tests.test_table_slider_and_commissions.CommissionSettingsTests.test_percent_commission_calculation
-```
-
-### Expected Results
-```
-14 tests, 0 failures, 0 errors
-✅ All tests passing
+<!-- Number with commas -->
+{{ quantity|format_number }}  <!-- 1,500 -->
 ```
 
 ---
 
 ## 🔧 Configuration
 
-### Get Commission Config (Python)
+### Rollback Reasons
 ```python
-from sales.models import CommissionConfig
+from sales.models import RollbackReason
 
-# For a business
-config = CommissionConfig.get_active(business)
-
-if config and config.commissions_enabled:
-    if config.commission_mode == 'FIXED':
-        commission = config.fixed_commission_amount
-    else:
-        commission = sale_price * (config.base_commission_pct / 100)
+REASONS = [
+    ("DAMAGED", "Damaged Product"),
+    ("RETURNED", "Customer Return"),
+    ("ERROR", "Data Entry Error"),
+    ("OTHER", "Other Reason"),
+]
 ```
 
-### Update Settings (Shell)
+### Permission Roles
+```python
+MANAGER_ROLES = ["MANAGER", "OWNER", "ADMIN"]
+AGENT_ROLLBACK_WINDOW = timedelta(minutes=10)
+```
+
+---
+
+## 🐛 Debugging
+
+### Check if Sale is Rolled Back
+```python
+if sale.is_rolled_back:
+    print(f"Rolled back at: {sale.rolled_back_at}")
+    print(f"Rolled back by: {sale.rolled_back_by}")
+    print(f"Reason: {sale.rollback_reason}")
+```
+
+### View Logs
 ```bash
-python manage.py shell
->>> from sales.models import CommissionConfig
->>> from tenants.models import Business
->>> biz = Business.objects.get(slug='my-shop')
->>> config = CommissionConfig.ensure_config(biz)
->>> config.commissions_enabled = False
->>> config.save()
+# Watch rollback activity
+tail -f /var/log/circuitcity/app.log | grep -i rollback
+
+# Watch errors
+tail -f /var/log/circuitcity/app.log | grep -i error
+```
+
+### Database Queries
+```sql
+-- Recent rollbacks
+SELECT * FROM sales_sale_rollback 
+ORDER BY created_at DESC 
+LIMIT 10;
+
+-- Rollback stats by reason
+SELECT 
+    rollback_reason,
+    COUNT(*) as count,
+    SUM(refunded_amount) as total_refunded
+FROM inventory_liquorsale
+WHERE is_rolled_back = TRUE
+GROUP BY rollback_reason;
 ```
 
 ---
 
-## 🐛 Troubleshooting
+## ⚠️ Common Errors
 
-### Issue: Swipe hint stuck
-```bash
-# Clear browser cache
-# Force refresh: Ctrl+Shift+R (Windows) / Cmd+Shift+R (Mac)
-```
+### "Sale has already been rolled back"
+**Cause:** Trying to rollback a sale that's already rolled back.
+**Solution:** This is normal (idempotent). Just inform user it's already done.
 
-### Issue: Modal not opening
-```javascript
-// Check Bootstrap loaded
-console.log(typeof bootstrap); // Should log "object"
+### "Agents can only rollback their own sales"
+**Cause:** Agent trying to rollback another agent's sale.
+**Solution:** Only managers can rollback other people's sales.
 
-// Check function exists
-console.log(typeof showMobileActionsModal); // Should log "function"
-```
+### "Agents can only rollback sales within 10 minutes"
+**Cause:** Agent trying to rollback old sale.
+**Solution:** Ask manager to rollback.
 
-### Issue: Commission still created when disabled
+### "Refunded amount cannot exceed sale price"
+**Cause:** Refund amount > sale price.
+**Solution:** Validate refund amount in form.
+
+---
+
+## 📊 Testing
+
+### Test Rollback Idempotency
 ```python
-# Verify setting
->>> config = CommissionConfig.get_active(business)
->>> print(config.commissions_enabled)  # Should be False
+# First rollback
+rollback1 = RollbackService.rollback_sale(sale, user, business, "RETURNED")
 
-# Check recent sales
->>> from wallet.models import WalletTransaction, TxnType
->>> txns = WalletTransaction.objects.filter(
-...     type=TxnType.COMMISSION,
-...     business=business
-... ).order_by('-created_at')[:5]
->>> for t in txns: print(t.amount, t.created_at)
+# Second rollback (should return same record)
+rollback2 = RollbackService.rollback_sale(sale, user, business, "RETURNED")
+
+assert rollback1.pk == rollback2.pk  # Same rollback record
 ```
 
-### Issue: Agent sees commissions when disabled
-```bash
-# Clear Django cache
-python manage.py clearcache
+### Test Price Validation
+```python
+# Below cost
+validation = validate_selling_price(
+    selling_price=Decimal("1000"),
+    cost_price=Decimal("1500")
+)
+assert len(validation['warnings']) > 0
+assert "below cost" in validation['warnings'][0].lower()
 
-# Clear template cache
->>> from django.core.cache import cache
->>> cache.clear()
+# Good margin
+validation = validate_selling_price(
+    selling_price=Decimal("1500"),
+    cost_price=Decimal("1000")
+)
+assert validation['profit_margin_pct'] == Decimal("50.00")
+assert "Great profit margin" in validation['feedback']
 ```
 
 ---
 
-## 📊 Key Metrics to Monitor
+## 🔐 Security
 
-### Commission Settings Changes
+### Permission Checks (Server-Side)
 ```python
-# Track in admin or custom report
-from sales.models import CommissionConfig
-configs = CommissionConfig.objects.filter(
-    updated_at__gte=timezone.now() - timedelta(days=7)
-).select_related('business')
+# ALWAYS check permissions server-side
+from tenants.models import Membership
+
+membership = Membership.objects.get(user=user, business=business)
+role = membership.role.upper()
+
+if role not in ["MANAGER", "OWNER", "ADMIN"]:
+    raise PermissionDenied("Only managers can rollback")
 ```
 
-### Sales Without Commission (When Disabled)
+### Audit Trail
 ```python
-from sales.models import Sale
-from wallet.models import WalletTransaction, TxnType
-
-sales_without_commission = Sale.objects.exclude(
-    id__in=WalletTransaction.objects.filter(
-        type=TxnType.COMMISSION
-    ).values_list('meta__sale_id', flat=True)
-).filter(created_at__gte=timezone.now() - timedelta(days=1))
-```
-
----
-
-## 🔒 Security & Permissions
-
-### Manager-Only Actions
-- ✅ View commission settings
-- ✅ Update commission settings
-- ✅ Toggle commissions ON/OFF
-
-### Agent Actions
-- ✅ View own earnings (if enabled)
-- ❌ View commission settings
-- ❌ Modify commission settings
-
-### Multi-Tenant Isolation
-```python
-# Each business has independent settings
->>> biz1_config = CommissionConfig.get_active(business1)
->>> biz2_config = CommissionConfig.get_active(business2)
->>> biz1_config.commissions_enabled = False
->>> biz1_config.save()
->>> # business2 settings remain unchanged
+# Every rollback is logged
+rollback = SaleRollback.objects.get(pk=123)
+print(f"Who: {rollback.created_by}")
+print(f"When: {rollback.created_at}")
+print(f"Why: {rollback.get_reason_display()}")
+print(f"What: Sale #{rollback.sale_id}")
+print(f"Refunded: MK {rollback.refunded_amount:,.2f}")
 ```
 
 ---
 
-## 📝 Cheat Sheet
+## 💡 Best Practices
 
-### Commission Modes
+### 1. Always Use Services (Not Direct DB)
+```python
+# ❌ BAD
+sale.is_rolled_back = True
+sale.save()
 
-| Mode | Calculation | Example |
-|------|-------------|---------|
-| **PERCENT** | `sale × rate / 100` | 600k × 12% = 72k |
-| **FIXED** | `fixed_amount` | 2,000 per sale |
-| **DISABLED** | `0` | No commission |
+# ✅ GOOD
+RollbackService.rollback_sale(sale, user, business, reason)
+```
 
-### Mobile Table Slider
+### 2. Always Catch Specific Exceptions
+```python
+# ❌ BAD
+try:
+    rollback_sale(...)
+except Exception:
+    pass  # Silent failure
 
-| Device | Behavior |
-|--------|----------|
-| **Desktop (≥992px)** | Normal table, no changes |
-| **Tablet/Phone (<992px)** | Horizontal scroll, swipe hint, modal actions |
+# ✅ GOOD
+try:
+    rollback_sale(...)
+except RollbackError as e:
+    messages.error(request, f"❌ {e}")
+    logger.error(f"Rollback failed: {e}", exc_info=True)
+```
 
-### Default Settings
+### 3. Always Format Numbers for Display
+```python
+# ❌ BAD
+f"Price: {price}"  # "Price: 2000000"
 
-| Field | Default Value |
-|-------|---------------|
-| `commissions_enabled` | `True` ✅ |
-| `commission_mode` | `'PERCENT'` |
-| `base_commission_pct` | `12.00` |
-| `fixed_commission_amount` | `2000.00` |
+# ✅ GOOD
+format_currency(price)  # "MK 2,000,000.00"
+```
+
+### 4. Always Validate Prices
+```python
+# ❌ BAD
+if selling_price > 0:
+    create_sale(...)
+
+# ✅ GOOD
+validation = validate_selling_price(selling_price, cost_price)
+if not validation['valid']:
+    return error
+for warning in validation['warnings']:
+    show_warning(warning)
+create_sale(...)
+```
 
 ---
 
 ## 📞 Support
 
-### Quick Fixes
-1. **Clear cache:** `python manage.py clearcache`
-2. **Restart server:** `Ctrl+C`, then `python manage.py runserver`
-3. **Hard refresh browser:** `Ctrl+Shift+R` (Windows) / `Cmd+Shift+R` (Mac)
-
-### Still Having Issues?
-1. Check logs: `tail -f logs/django.log`
-2. Run tests: `python manage.py test tests.test_table_slider_and_commissions`
-3. Verify migration: `python manage.py showmigrations sales`
+- **Documentation:** ROLLBACK_PRICING_UX_IMPLEMENTATION.md
+- **Deployment:** DEPLOYMENT_CHECKLIST.md
+- **Architecture:** ARCHITECTURE_DIAGRAM.md
+- **Tests:** test_rollback_implementation.py
 
 ---
 
-## ✅ Acceptance Checklist
+## 🎯 Key Takeaways
 
-### Before Deployment
-- [ ] Run all tests (14/14 passing)
-- [ ] Test on actual mobile device
-- [ ] Verify manager can update settings
-- [ ] Verify agent sees "disabled" message
-- [ ] Check desktop layout unchanged
-- [ ] Backup database
-
-### After Deployment
-- [ ] Verify migration applied: `python manage.py showmigrations sales`
-- [ ] Check all businesses have config: `CommissionConfig.objects.count() == Business.objects.count()`
-- [ ] Test creating sale with commissions ON
-- [ ] Test creating sale with commissions OFF
-- [ ] Verify mobile table scrolls properly
-- [ ] Monitor error logs for 24 hours
+1. **Idempotent** - Safe to retry operations
+2. **Transactional** - All-or-nothing
+3. **Auditable** - Full trail for compliance
+4. **User-Friendly** - Clear messages and feedback
+5. **Secure** - Permission checks enforced
+6. **Zero HTTP 500s** - All errors handled gracefully
 
 ---
 
-**Last Updated:** December 16, 2025  
-**Status:** ✅ Production Ready
-
+*Last Updated: December 24, 2025*

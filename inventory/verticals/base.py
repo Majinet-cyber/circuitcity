@@ -638,7 +638,8 @@ def phone_sales_metrics(
             'revenue': item['revenue'],
         })
     
-    # Top Agents (by revenue in selected period)
+    # Top Agents (by number of sales, not revenue)
+    # Calculate commission earned instead of revenue
     top_agents = (
         sold_items.filter(assigned_agent__isnull=False)
         .values('assigned_agent__id', 'assigned_agent__first_name', 'assigned_agent__last_name', 'assigned_agent__username')
@@ -646,8 +647,38 @@ def phone_sales_metrics(
             units=Count('id'),
             revenue=Coalesce(Sum('selling_price'), Decimal('0.00'), output_field=DecimalField())
         )
-        .order_by('-revenue')[:5]
+        .order_by('-units', '-revenue')[:5]
     )
+    
+    # Calculate commissions for top agents efficiently
+    # Import Sale model to get commission data
+    try:
+        from sales.models import Sale
+        from django.contrib.auth import get_user_model
+        User = get_user_model()
+        
+        # Build filter for sales in the same period
+        sale_filters = {
+            'location__business': business
+        }
+        if start_date:
+            sale_filters['sold_at__gte'] = start_date
+        if end_date:
+            sale_filters['sold_at__lt'] = end_date
+        
+        # Get commission totals per agent
+        agent_commissions = (
+            Sale.objects.filter(**sale_filters)
+            .values('agent_id')
+            .annotate(total_commission=Coalesce(Sum('commission_amount'), Decimal('0.00'), output_field=DecimalField()))
+        )
+        
+        # Create lookup dict for quick access
+        commission_by_agent = {item['agent_id']: item['total_commission'] for item in agent_commissions}
+        
+    except (ImportError, Exception):
+        # Fallback if Sale model doesn't exist or error occurs
+        commission_by_agent = {}
     
     top_agents_list = []
     for item in top_agents:
@@ -655,11 +686,16 @@ def phone_sales_metrics(
         last_name = item['assigned_agent__last_name'] or ""
         username = item['assigned_agent__username'] or "Unknown"
         agent_name = f"{first_name} {last_name}".strip() or username
+        agent_id = item['assigned_agent__id']
+        
+        # Get commission from lookup, or estimate as 3% of revenue
+        commission_total = commission_by_agent.get(agent_id, item['revenue'] * Decimal('0.03'))
         
         top_agents_list.append({
+            'agent_id': agent_id,
             'agent_name': agent_name,
             'units': item['units'],
-            'revenue': item['revenue'],
+            'commission': commission_total,  # Changed from 'revenue' to 'commission'
         })
     
     return {

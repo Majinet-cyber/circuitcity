@@ -26,7 +26,7 @@ def compute_agent_ranking(
     agent_user=None,
 ) -> Dict:
     """
-    Compute agent ranking by total sales amount within a business.
+    Compute agent ranking by NUMBER OF SALES (not revenue) within a business.
     
     Args:
         business: Business instance to scope the ranking
@@ -54,13 +54,14 @@ def compute_agent_ranking(
         period = "all-time"
     
     # Aggregate by agent
+    # Rank by sales count (primary), then total_sales as tie-breaker (secondary)
     agent_totals = (
         sales_qs.values("agent_id", "agent__first_name", "agent__last_name", "agent__username")
         .annotate(
             total_sales=Sum("price"),
             sales_count=Count("id"),
         )
-        .order_by("-total_sales")
+        .order_by("-sales_count", "-total_sales")
     )
     
     rankings = []

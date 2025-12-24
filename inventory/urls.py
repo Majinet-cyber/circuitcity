@@ -562,12 +562,14 @@ _api_stock_delete = _get_any(
 
 # NEW: Phone catalog API endpoints (from views_scan.py)
 try:
-    from .views_scan import api_phone_brands, api_phone_models
+    from .views_scan import api_phone_brands, api_phone_models, api_phone_cost_by_imei
     _phone_brands_api = api_phone_brands
     _phone_models_api = api_phone_models
+    _phone_cost_by_imei_api = api_phone_cost_by_imei
 except ImportError:
     _phone_brands_api = _stub("api_phone_brands not available")
     _phone_models_api = _stub("api_phone_models not available")
+    _phone_cost_by_imei_api = _stub("api_phone_cost_by_imei not available")
 
 
 # ---------------------------------------------------------------------
@@ -973,6 +975,7 @@ urlpatterns += [
     # Phone catalog API endpoints (Brand → Model filtering)
     path("api/phone-brands/", _phone_brands_api, name="api_phone_brands"),
     path("api/phone-models/", _phone_models_api, name="api_phone_models"),
+    path("api/phone-cost-by-imei/", _phone_cost_by_imei_api, name="api_phone_cost_by_imei"),
     
     # IMEI lookup endpoint for smart scanner
     path("api/imei-lookup/", _api_imei_lookup, name="api_imei_lookup"),

@@ -239,9 +239,16 @@
                                             <td class="text-end">
                                                 {% if snapshot.status == 'success' %}
                                                     <a href="{% url 'backups:download' snapshot.id %}" 
-                                                       class="btn btn-sm btn-success me-2">
+                                                       class="btn btn-sm btn-success me-2"
+                                                       title="Download ZIP file">
                                                         <i class="bi bi-download me-1"></i>
-                                                        Download
+                                                        ZIP
+                                                    </a>
+                                                    <a href="{% url 'backups:export_pdf' snapshot.id %}" 
+                                                       class="btn btn-sm btn-primary me-2"
+                                                       title="Download backup summary as PDF">
+                                                        <i class="bi bi-file-pdf me-1"></i>
+                                                        PDF
                                                     </a>
                                                     <form method="post" 
                                                           action="{% url 'backups:delete' snapshot.id %}" 

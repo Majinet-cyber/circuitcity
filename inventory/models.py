@@ -384,6 +384,24 @@ class MerchProduct(models.Model):
                 raise ValidationError({"shots_per_bottle": "Required when 'has shots' is enabled."})
             # force atomic to SHOT
             self.base_unit = BaseUnit.SHOT
+    
+    def save(self, *args, **kwargs):
+        """Auto-calculate unit costs when manager sets total bottle cost"""
+        # Auto-calculate cost_per_glass for wines if total bottle cost is provided
+        if self.has_glasses and self.glasses_per_bottle and self.cost_per_bottle:
+            # Only auto-calc if cost_per_glass is not manually set
+            if not self.cost_per_glass or self.cost_per_glass == Decimal("0.00"):
+                self.cost_per_glass = (self.cost_per_bottle / Decimal(str(self.glasses_per_bottle))).quantize(Decimal("0.01"))
+        
+        # Auto-calculate cost_per_shot for spirits/whiskey if total bottle cost is provided
+        if self.has_shots and self.shots_per_bottle and self.cost_per_bottle:
+            # Only auto-calc if cost_per_shot is not manually set
+            if not self.cost_per_shot or self.cost_per_shot == Decimal("0.00"):
+                # Calculate based on sellable shots (excluding barman reserved)
+                sellable_shots = max(1, self.shots_per_bottle - self.barman_shots_reserved)
+                self.cost_per_shot = (self.cost_per_bottle / Decimal(str(sellable_shots))).quantize(Decimal("0.01"))
+        
+        super().save(*args, **kwargs)
 
 
 class MerchUnitPrice(models.Model):

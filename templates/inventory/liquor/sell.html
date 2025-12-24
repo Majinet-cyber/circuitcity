@@ -247,6 +247,9 @@
                          data-bottle-price="{{ p.price_per_bottle }}"
                          data-shot-price="{{ p.price_per_shot|default:'0' }}"
                          data-glass-price="{{ p.price_per_glass|default:'0' }}"
+                         data-bottle-cost="{{ p.cost_per_bottle|default:'0' }}"
+                         data-shot-cost="{{ p.cost_per_shot|default:'0' }}"
+                         data-glass-cost="{{ p.cost_per_glass|default:'0' }}"
                          data-stock="{{ p.current_stock }}"
                          data-in-stock="{{ p.is_in_stock|yesno:'true,false' }}"
                          data-category="{{ cat }}">
@@ -268,15 +271,23 @@
                                     {% if p.has_shots and p.price_per_shot %}
                                         <span class="ms-2">Shot: MK {{ p.price_per_shot|floatformat:0 }}</span>
                                     {% endif %}
+                                    {% if p.has_glasses and p.price_per_glass %}
+                                        <span class="ms-2">Glass: MK {{ p.price_per_glass|floatformat:0 }}</span>
+                                    {% endif %}
                                 </div>
                             </div>
-                            {% if p.has_shots %}
-                            <div>
+                            <div class="d-flex flex-column align-items-end gap-1">
+                                {% if p.has_shots %}
                                 <span class="badge-shots">
                                     <i class="bi bi-stars"></i> Shots available
                                 </span>
+                                {% endif %}
+                                {% if p.has_glasses %}
+                                <span class="badge" style="background: #fce7f3; color: #831843; padding: 0.25rem 0.75rem; border-radius: 12px; font-size: 0.75rem; font-weight: 600;">
+                                    <i class="bi bi-cup"></i> Glasses available
+                                </span>
+                                {% endif %}
                             </div>
-                            {% endif %}
                         </div>
                     </div>
                     {% endfor %}
@@ -412,11 +423,19 @@
                                   placeholder="Location, table number, etc."></textarea>
                     </div>
                     
-                    <!-- Estimated Total -->
+                    <!-- Estimated Total with Pricing Intelligence -->
                     <div class="mb-4">
                         <label class="form-label">Estimated Total</label>
                         <div style="font-size: 2rem; font-weight: 700;">
                             MK <span id="estimated-total">0</span>
+                        </div>
+                        <div id="pricing-intelligence" class="mt-2" style="display: none;">
+                            <div class="alert py-2 px-3 mb-0" id="pricing-alert" style="border-radius: 8px; font-size: 0.875rem;">
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <span id="pricing-text"></span>
+                                    <strong id="pricing-margin"></strong>
+                                </div>
+                            </div>
                         </div>
                     </div>
                     
@@ -554,6 +573,9 @@
                 bottlePrice: parseFloat(this.dataset.bottlePrice),
                 shotPrice: parseFloat(this.dataset.shotPrice || 0),
                 glassPrice: parseFloat(this.dataset.glassPrice || 0),
+                bottleCost: parseFloat(this.dataset.bottleCost || 0),
+                shotCost: parseFloat(this.dataset.shotCost || 0),
+                glassCost: parseFloat(this.dataset.glassCost || 0),
                 stock: stock
             };
             
@@ -751,21 +773,74 @@
             alert(`⚠️ Only ${currentProduct.stock} bottles available in stock!`);
         }
         
-        // Get price based on mode
-        let price;
+        // Get price and cost based on mode
+        let price, cost;
         if (mode === 'shot') {
             price = currentProduct.shotPrice;
+            cost = currentProduct.shotCost;
         } else if (mode === 'glass') {
             price = currentProduct.glassPrice;
+            cost = currentProduct.glassCost;
         } else {
             price = currentProduct.bottlePrice;
+            cost = currentProduct.bottleCost;
         }
         
         const total = quantity * price;
+        const totalCost = quantity * cost;
         estimatedTotal.textContent = total.toFixed(0);
+        
+        // Update pricing intelligence
+        updatePricingIntelligence(price, cost, total, totalCost);
         
         // Update payment mix when total changes
         updatePaymentMix();
+    }
+    
+    function updatePricingIntelligence(unitPrice, unitCost, total, totalCost) {
+        const pricingIntelligence = document.getElementById('pricing-intelligence');
+        const pricingAlert = document.getElementById('pricing-alert');
+        const pricingText = document.getElementById('pricing-text');
+        const pricingMargin = document.getElementById('pricing-margin');
+        
+        if (!pricingIntelligence || !unitCost || unitCost === 0) {
+            // Hide if no cost data
+            if (pricingIntelligence) pricingIntelligence.style.display = 'none';
+            return;
+        }
+        
+        const profit = total - totalCost;
+        const marginPercent = ((profit / total) * 100).toFixed(1);
+        
+        // Show pricing intelligence
+        pricingIntelligence.style.display = 'block';
+        
+        // Determine status and styling
+        if (unitPrice < unitCost) {
+            // Selling below cost - RED ALERT
+            pricingAlert.style.background = 'rgba(239, 68, 68, 0.1)';
+            pricingAlert.style.borderLeft = '3px solid #ef4444';
+            pricingAlert.style.color = '#991b1b';
+            pricingText.innerHTML = '<i class="bi bi-exclamation-triangle-fill me-1"></i> <strong>Below Cost!</strong> Loss per unit: MK ' + Math.abs(unitPrice - unitCost).toFixed(0);
+            pricingMargin.textContent = '-' + Math.abs(marginPercent) + '%';
+            pricingMargin.style.color = '#dc2626';
+        } else if (unitPrice === unitCost) {
+            // Break-even - YELLOW WARNING
+            pricingAlert.style.background = 'rgba(245, 158, 11, 0.1)';
+            pricingAlert.style.borderLeft = '3px solid #f59e0b';
+            pricingAlert.style.color = '#92400e';
+            pricingText.innerHTML = '<i class="bi bi-dash-circle me-1"></i> <strong>Break-even</strong> No profit on this sale';
+            pricingMargin.textContent = '0%';
+            pricingMargin.style.color = '#d97706';
+        } else {
+            // Above cost - GREEN SUCCESS
+            pricingAlert.style.background = 'rgba(34, 197, 94, 0.1)';
+            pricingAlert.style.borderLeft = '3px solid #22c55e';
+            pricingAlert.style.color = '#14532d';
+            pricingText.innerHTML = '<i class="bi bi-check-circle-fill me-1"></i> <strong>Profitable</strong> Profit: MK ' + profit.toFixed(0);
+            pricingMargin.textContent = '+' + marginPercent + '%';
+            pricingMargin.style.color = '#16a34a';
+        }
     }
     
     function updatePaymentMix() {

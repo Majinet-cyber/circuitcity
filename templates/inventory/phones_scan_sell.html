@@ -254,6 +254,7 @@
 </style>
 
 <link rel="stylesheet" href="{% static 'css/imei-scanner-modal.css' %}?v={{ BUILD_ID|default:STATIC_VERSION|default:'1' }}">
+<link rel="stylesheet" href="{% static 'css/pricing-intelligence.css' %}?v={{ BUILD_ID|default:STATIC_VERSION|default:'1' }}">
 {% endblock %}
 
 {% block content %}
@@ -326,6 +327,9 @@
       </div>
     </div>
 
+    <!-- Pricing Intelligence Feedback -->
+    <div id="price-feedback" class="pricing-feedback" style="display:none;"></div>
+
     <button type="submit" class="btn btn-primary" id="submit-button" style="width:100%;" disabled>
       💰 Complete Sale
     </button>
@@ -388,17 +392,44 @@
     }
   });
 
-  // Selling price: format with commas on blur
-  const priceInput = document.getElementById('selling-price-input');
-  priceInput.addEventListener('blur', function(e) {
-    const value = parseFloat(e.target.value);
-    if (!isNaN(value)) {
-      e.target.value = value.toFixed(2);
+  // ========== PRICING INTELLIGENCE ==========
+  let pricingValidator = null;
+  let currentItemCost = null;
+
+  // Fetch cost price when IMEI is entered (for intelligent pricing)
+  imeiInput.addEventListener('input', function(e) {
+    const imeiValue = e.target.value;
+    
+    if (imeiValue.length === 15) {
+      // Fetch cost price for this IMEI
+      fetch(`/inventory/api/phone-cost-by-imei/?imei=${imeiValue}`)
+        .then(response => response.json())
+        .then(data => {
+          if (data.ok && data.cost_price) {
+            currentItemCost = parseFloat(data.cost_price);
+            
+            // Initialize or update pricing validator
+            if (!pricingValidator) {
+              pricingValidator = new PricingIntelligence({
+                sellingPriceInput: '#selling-price-input',
+                costPrice: currentItemCost,
+                feedbackContainer: '#price-feedback',
+                currency: 'MWK'
+              });
+            } else {
+              pricingValidator.updateCostPrice(currentItemCost);
+            }
+          }
+        })
+        .catch(err => {
+          console.error('Failed to fetch cost price:', err);
+        });
     }
   });
 </script>
 
 <link rel="stylesheet" href="{% static 'css/imei-scanner-modal.css' %}?v={{ BUILD_ID|default:STATIC_VERSION|default:'1' }}">
 <script src="{% static 'js/phones-imei-scanner.js' %}?v={{ BUILD_ID|default:STATIC_VERSION|default:'1' %}"></script>
+<script src="{% static 'js/pricing-intelligence.js' %}?v={{ BUILD_ID|default:STATIC_VERSION|default:'1' }}"></script>
 {% endblock %}
 

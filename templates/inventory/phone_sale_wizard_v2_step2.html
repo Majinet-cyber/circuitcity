@@ -203,6 +203,7 @@
     }
   }
 </style>
+<link rel="stylesheet" href="{% static 'css/pricing-intelligence.css' %}?v={{ BUILD_ID|default:STATIC_VERSION|default:'1' }}">
 {% endblock %}
 
 {% block content %}
@@ -267,9 +268,15 @@
           value="{{ wizard_data.suggested_price|default:'' }}"
           placeholder="Enter selling price..."
         >
+        {% if cost_price_formatted %}
+        <div class="form-text">Order cost: {{ cost_price_formatted }}</div>
+        {% endif %}
         {% if wizard_data.suggested_price %}
         <div class="form-text">Suggested: MWK {{ wizard_data.suggested_price|floatformat:0 }}</div>
         {% endif %}
+        
+        <!-- Real-time pricing intelligence feedback -->
+        <div id="price-feedback" class="pricing-feedback" style="display:none;"></div>
       </div>
 
       <div class="d-flex gap-2">
@@ -283,4 +290,20 @@
     </form>
   </div>
 </div>
+
+<script src="{% static 'js/pricing-intelligence.js' %}?v={{ BUILD_ID|default:STATIC_VERSION|default:'1' }}"></script>
+<script>
+  // Initialize pricing intelligence
+  {% if cost_price %}
+  const pricingValidator = new PricingIntelligence({
+    sellingPriceInput: '#selling-price-input',
+    costPrice: {{ cost_price }},
+    {% if wizard_data.suggested_price %}
+    suggestedPrice: {{ wizard_data.suggested_price }},
+    {% endif %}
+    feedbackContainer: '#price-feedback',
+    currency: 'MWK'
+  });
+  {% endif %}
+</script>
 {% endblock %}

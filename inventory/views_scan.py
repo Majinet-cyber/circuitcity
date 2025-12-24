@@ -578,6 +578,56 @@ def api_phone_brands(request: HttpRequest) -> JsonResponse:
 # ---------------------------------------------------------------------
 @never_cache
 @login_required
+def api_phone_cost_by_imei(request: HttpRequest) -> JsonResponse:
+    """
+    API endpoint: Get cost price for a phone by IMEI.
+    Used by pricing intelligence to provide real-time validation.
+    
+    Query params:
+        imei: 15-digit IMEI
+    
+    Returns:
+        {
+            "ok": true,
+            "imei": "...",
+            "cost_price": 31500.00,
+            "product_name": "Tecno Spark 20"
+        }
+    """
+    business = get_active_business(request)
+    if not business:
+        return JsonResponse({"ok": False, "error": "No active business"}, status=400)
+    
+    imei = request.GET.get("imei", "").strip()
+    if not imei or len(imei) != 15:
+        return JsonResponse({"ok": False, "error": "Invalid IMEI (must be 15 digits)"}, status=400)
+    
+    try:
+        from inventory.models import InventoryItem
+        
+        item = InventoryItem.objects.filter(
+            business=business,
+            imei=imei,
+            is_active=True
+        ).select_related('product').first()
+        
+        if not item:
+            return JsonResponse({"ok": False, "error": "IMEI not found in inventory"}, status=404)
+        
+        cost_price = item.order_price or (item.product.cost_price if item.product else Decimal("0.00"))
+        product_name = item.product.name if item.product else "Unknown Phone"
+        
+        return JsonResponse({
+            "ok": True,
+            "imei": imei,
+            "cost_price": float(cost_price),
+            "product_name": product_name,
+        })
+    
+    except Exception as e:
+        return JsonResponse({"ok": False, "error": str(e)}, status=500)
+
+
 def api_phone_models(request: HttpRequest) -> JsonResponse:
     """
     API endpoint to get phone models for a specific brand.

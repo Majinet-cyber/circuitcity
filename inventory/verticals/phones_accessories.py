@@ -391,17 +391,30 @@ def accessories_stock_in_api(request):
     
     try:
         # Parse input
+        from inventory.utils_pricing import parse_currency_input, validate_selling_price
+        
         product_id = request.POST.get('product_id', '').strip()
         name = request.POST.get('name', '').strip()
         category = request.POST.get('category', '').strip()
         brand = request.POST.get('brand', '').strip()
         barcode = request.POST.get('barcode', '').strip()
-        order_price = Decimal(request.POST.get('order_price', '0'))
-        selling_price = Decimal(request.POST.get('selling_price', '0'))
+        order_price = parse_currency_input(request.POST.get('order_price', '0'))
+        selling_price = parse_currency_input(request.POST.get('selling_price', '0'))
         quantity = int(request.POST.get('quantity', '0'))
         
         if quantity <= 0:
             return JsonResponse({'error': 'Quantity must be positive'}, status=400)
+        
+        # PRICING INTELLIGENCE: Validate selling price
+        validation = validate_selling_price(
+            selling_price=selling_price,
+            cost_price=order_price,
+            product_name=name or "Accessory"
+        )
+        
+        # Return warnings (non-blocking) for client-side display
+        warnings = validation.get('warnings', [])
+        feedback = validation.get('feedback', '')
         
         with transaction.atomic():
             # Get or create product
@@ -447,7 +460,9 @@ def accessories_stock_in_api(request):
                 'id': product.id,
                 'name': product.name,
                 'stock_qty': stock.qty_on_hand,
-            }
+            },
+            'pricing_warnings': warnings,
+            'pricing_feedback': feedback,
         })
     
     except Exception as e:
