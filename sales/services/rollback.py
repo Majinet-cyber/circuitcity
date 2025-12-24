@@ -70,30 +70,35 @@ class RollbackService:
             # Check user permissions
             from tenants.models import Membership
             
-            try:
-                membership = Membership.objects.get(user=user, business=business)
-                role = membership.role.upper()
+            # Get ACTIVE membership - use filter().first() to handle multiple memberships gracefully
+            membership = Membership.objects.filter(
+                user=user, 
+                business=business,
+                status='ACTIVE'
+            ).first()
+            
+            if not membership:
+                return False, "User is not an active member of this business"
+            
+            role = membership.role.upper()
+            
+            # CRITICAL: Managers, Owners, and HQ Admins can rollback ANY sale IMMEDIATELY
+            # No time restrictions, no ownership checks - full operational control
+            if role in ["MANAGER", "OWNER", "ADMIN", "HQ_ADMIN"]:
+                return True, ""
+            
+            # Agents can only rollback their own sales within 10 minutes
+            if role == "AGENT":
+                if sale.agent != user:
+                    return False, "Agents can only rollback their own sales"
                 
-                # CRITICAL: Managers, Owners, and HQ Admins can rollback ANY sale IMMEDIATELY
-                # No time restrictions, no ownership checks - full operational control
-                if role in ["MANAGER", "OWNER", "ADMIN", "HQ_ADMIN"]:
-                    return True, ""
+                time_since_sale = timezone.now() - sale.created_at
+                if time_since_sale > timedelta(minutes=10):
+                    return False, "Agents can only rollback sales within 10 minutes"
                 
-                # Agents can only rollback their own sales within 10 minutes
-                if role == "AGENT":
-                    if sale.agent != user:
-                        return False, "Agents can only rollback their own sales"
-                    
-                    time_since_sale = timezone.now() - sale.created_at
-                    if time_since_sale > timedelta(minutes=10):
-                        return False, "Agents can only rollback sales within 10 minutes"
-                    
-                    return True, ""
-                
-                return False, "Insufficient permissions to rollback sales"
-                
-            except Membership.DoesNotExist:
-                return False, "User is not a member of this business"
+                return True, ""
+            
+            return False, "Insufficient permissions to rollback sales"
         
         except Exception as e:
             logger.error(f"Error checking rollback permissions for sale {sale.pk}: {e}", exc_info=True)
@@ -262,7 +267,8 @@ class RollbackService:
                     item.sold_at = None
                     item.sold_by = None
                     item.selling_price = None
-                    item.payment_method = None
+                    # payment_method field has blank=True but NOT null=True, so set to empty string
+                    item.payment_method = ""
                     item.save(update_fields=["status", "sold_at", "sold_by", "selling_price", "payment_method"])
                     logger.info(f"Phone item {item.pk} restored to IN_STOCK")
                 else:
