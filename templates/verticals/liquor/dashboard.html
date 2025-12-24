@@ -35,11 +35,25 @@
   .vertical-hero{
     background:linear-gradient(120deg,#a855f7,#ec4899);
     padding:clamp(20px,4vw,32px);
-    border-radius:20px;
+    border-radius:24px;
     color:#fff;
     display:flex;
     flex-direction:column;
     gap:20px;
+    box-shadow:0 16px 40px rgba(168,85,247,0.25);
+    position:relative;
+    overflow:hidden;
+  }
+  
+  .vertical-hero::before{
+    content:'';
+    position:absolute;
+    top:-50%;
+    right:-50%;
+    width:200%;
+    height:200%;
+    background:radial-gradient(circle,rgba(255,255,255,0.15) 0%,transparent 70%);
+    pointer-events:none;
   }
   
   .vertical-hero h1{
@@ -79,16 +93,36 @@
   
   .metric-card{
     background:#fff;
-    border-radius:18px;
-    padding:20px;
+    border-radius:20px;
+    padding:24px;
     box-shadow:0 4px 20px rgba(15,23,42,.08);
     min-width:0;
-    transition:all 0.3s;
+    transition:all 0.3s cubic-bezier(0.4,0,0.2,1);
+    border:1px solid rgba(226,232,240,0.5);
+    position:relative;
+    overflow:hidden;
+  }
+  
+  .metric-card::before{
+    content:'';
+    position:absolute;
+    top:0;
+    left:0;
+    right:0;
+    height:4px;
+    background:linear-gradient(90deg,transparent,rgba(168,85,247,0.4),transparent);
+    opacity:0;
+    transition:opacity 0.3s;
+  }
+  
+  .metric-card:hover::before{
+    opacity:1;
   }
   
   .metric-card:hover{
-    transform:translateY(-4px);
-    box-shadow:0 8px 30px rgba(15,23,42,.12);
+    transform:translateY(-6px);
+    box-shadow:0 12px 40px rgba(15,23,42,.12);
+    border-color:rgba(168,85,247,0.2);
   }
   
   .metric-card h3{

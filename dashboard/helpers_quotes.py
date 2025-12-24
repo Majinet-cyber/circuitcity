@@ -1,15 +1,16 @@
 """
-Inspirational quotes for dashboard - rotated daily per user.
+Inspirational quotes for dashboard - rotated hourly per user.
 
 This module provides a curated list of 100+ short, motivational quotes
-from great minds. Each day, users see a different set of quotes based
-on their user ID and the current date (deterministic rotation).
+from great minds. Each hour, users see a different set of quotes based
+on their user ID and the current date + hour (deterministic rotation).
 """
 from __future__ import annotations
 
 import hashlib
-from datetime import date
+from datetime import datetime
 from typing import Dict, List, Any
+from django.utils import timezone
 
 
 # Curated list of 120+ short quotes (no copyright-sensitive long passages)
@@ -143,19 +144,20 @@ QUOTES = [
 ]
 
 
-def _hash_seed(user_id: int, today: date) -> int:
-    """Create a deterministic seed from user ID and date."""
-    seed_str = f"{user_id}-{today.isoformat()}"
+def _hash_seed(user_id: int, now: datetime) -> int:
+    """Create a deterministic seed from user ID, date, and hour."""
+    # Include hour for hourly rotation
+    seed_str = f"{user_id}-{now.date().isoformat()}-{now.hour}"
     hash_obj = hashlib.md5(seed_str.encode())
     return int(hash_obj.hexdigest()[:8], 16)
 
 
 def get_todays_quotes(user, count: int = 10) -> Dict[str, Any]:
     """
-    Get today's quotes for a user.
+    Get this hour's quotes for a user.
     
-    Uses the user's ID and today's date to deterministically select
-    10 quotes for the day. The quotes are spread into "slots" so
+    Uses the user's ID, current date, and current hour to deterministically select
+    quotes that rotate every hour. The quotes are spread into "slots" so
     templates can pick which ones to show.
     
     Args:
@@ -164,9 +166,10 @@ def get_todays_quotes(user, count: int = 10) -> Dict[str, Any]:
     
     Returns:
         Dict with:
-        - quotes: List of all selected quotes for today
+        - quotes: List of all selected quotes for this hour
         - slot_1, slot_2, ..., slot_10: Individual quote slots
         - date: Today's date
+        - hour: Current hour (for debugging)
     """
     if user is None:
         # Fallback for anonymous users
@@ -174,10 +177,11 @@ def get_todays_quotes(user, count: int = 10) -> Dict[str, Any]:
     else:
         user_id = getattr(user, 'id', None) or getattr(user, 'pk', 0)
     
-    today = date.today()
-    seed = _hash_seed(user_id, today)
+    # Get current time in local timezone (hourly rotation)
+    now = timezone.localtime()
+    seed = _hash_seed(user_id, now)
     
-    # Use seed to select quotes (reproducible for same user + date)
+    # Use seed to select quotes (reproducible for same user + date + hour)
     import random
     rng = random.Random(seed)
     
@@ -191,7 +195,8 @@ def get_todays_quotes(user, count: int = 10) -> Dict[str, Any]:
     # Build result with slots
     result = {
         "quotes": [{"text": text, "author": author} for text, author in selected],
-        "date": today,
+        "date": now.date(),
+        "hour": now.hour,
         "count": len(selected),
     }
     

@@ -155,6 +155,7 @@
             <th>Type</th>
             <th>Payment</th>
             <th>Cashier</th>
+            <th>Actions</th>
           </tr>
         </thead>
         <tbody>
@@ -203,6 +204,15 @@
               {% endif %}
             </td>
             <td>{{ sale.sold_by.username|default:"System" }}</td>
+            <td>
+              {% if IS_MANAGER %}
+              <button class="btn btn-sm btn-outline-danger" onclick="rollbackSale({{ sale.id }})" title="Rollback sale and restore inventory">
+                <i class="bi bi-arrow-counterclockwise"></i>
+              </button>
+              {% else %}
+              <span class="text-muted small">—</span>
+              {% endif %}
+            </td>
           </tr>
           {% endfor %}
         </tbody>
@@ -256,6 +266,35 @@
   });
 </script>
 {% endif %}
+
+{% comment %}Rollback sale functionality{% endcomment %}
+<script>
+function rollbackSale(saleId) {
+  if (!confirm('⚠️ Rollback this sale?\n\nThis will:\n• Cancel the sale\n• Restore inventory\n• Cannot be undone\n\nAre you sure?')) {
+    return;
+  }
+  
+  fetch(`/verticals/liquor/sales/${saleId}/rollback/`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-CSRFToken': '{{ csrf_token }}'
+    }
+  })
+  .then(response => response.json())
+  .then(data => {
+    if (data.ok) {
+      alert('✅ ' + data.message);
+      location.reload();
+    } else {
+      alert('❌ Error: ' + (data.error || 'Failed to rollback sale'));
+    }
+  })
+  .catch(error => {
+    alert('❌ Network error: ' + error.message);
+  });
+}
+</script>
 
 {% endblock %}
 

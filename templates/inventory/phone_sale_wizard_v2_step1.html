@@ -89,9 +89,14 @@
   .phone-wizard-card {
     background: var(--wizard-panel);
     border: 1px solid var(--wizard-border);
-    border-radius: 14px;
+    border-radius: 16px;
     padding: 2rem;
-    box-shadow: var(--wizard-shadow);
+    box-shadow: 0 8px 28px rgba(15, 23, 42, 0.1);
+    transition: all 0.3s ease;
+  }
+  
+  .phone-wizard-card:hover {
+    box-shadow: 0 12px 36px rgba(15, 23, 42, 0.12);
   }
 
   .wizard-title {
@@ -178,6 +183,10 @@
 
     .form-control {
       font-size: 16px; /* Prevents zoom on iOS */
+    }
+    
+    .wizard-step-label {
+      font-size: 0.75rem;
     }
   }
 </style>

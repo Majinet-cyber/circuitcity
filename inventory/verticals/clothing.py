@@ -110,6 +110,42 @@ def dashboard(request):
             'total_quantity': item['total_quantity'] or 0
         })
 
+    # ===== NEW: Personalized dashboard enhancements (quotes & greetings) =====
+    ctx_enhancements = {}
+    try:
+        from dashboard.helpers_greetings import get_personalized_greeting
+        from dashboard.helpers_quotes import get_todays_quotes
+        import json as json_lib
+        
+        # Personalized greeting (changes 3x daily: morning, afternoon, evening)
+        greeting_ctx = get_personalized_greeting(request.user, business)
+        
+        # Brand header context
+        brand_logo_url = None
+        if business and hasattr(business, 'logo') and business.logo:
+            brand_logo_url = business.logo.url
+        
+        # Hourly quotes (rotates every hour)
+        daily_quotes = get_todays_quotes(request.user, count=10)
+        
+        # Extract quote texts for JavaScript rotation
+        quote_texts = [q.get("text", "") for q in daily_quotes.get("quotes", []) if q.get("text")]
+        quotes_json_data = json_lib.dumps(quote_texts)
+        
+        ctx_enhancements.update({
+            "DASHBOARD_GREETING": greeting_ctx.get("greeting"),
+            "DASHBOARD_USER_NAME": greeting_ctx.get("user_name"),
+            "DASHBOARD_SHOW_WELCOME": greeting_ctx.get("show_welcome"),
+            "DASHBOARD_MILESTONE_MESSAGE": greeting_ctx.get("milestone"),
+            "DASHBOARD_BRAND_LOGO_URL": brand_logo_url,
+            "DASHBOARD_BRAND_TITLE": business.name if business else "Clothing Dashboard",
+            "DASHBOARD_QUOTES": daily_quotes,
+            "quotes_json": quotes_json_data,
+        })
+    except Exception:
+        # Gracefully degrade if helpers not available
+        pass
+
     ctx.update(
         {
             "hero_title": "Clothing & Fashion",
@@ -148,6 +184,8 @@ def dashboard(request):
             "active_range": range_param,
             "selected_date": selected_date,
             "date_param": date_param,
+            
+            **ctx_enhancements,  # Merge dashboard enhancements
         }
     )
     
@@ -431,6 +469,9 @@ def scan_in(request):
             # Create product name from category, size, and color
             product_name = f"{data['category'].title()} - {data['size']} - {data['color']}"
             
+            # Prepare barcode value (None if not provided or if "no barcode" selected)
+            final_barcode = barcode_value if (has_barcode == "yes" and barcode_value) else None
+            
             with transaction.atomic():
                 # Check if product exists
                 product, created = MerchProduct.objects.get_or_create(
@@ -450,9 +491,9 @@ def scan_in(request):
                 )
                 
                 # NEW: Store barcode if provided
-                if has_barcode == "yes" and barcode_value:
+                if final_barcode:
                     from inventory.utils_barcodes import set_barcode
-                    set_barcode(product, barcode_value)
+                    set_barcode(product, final_barcode)
                 
                 if not created:
                     # Update existing product stock
@@ -461,9 +502,14 @@ def scan_in(request):
                     if data.get('selling_price'):
                         product.selling_price = data['selling_price']
                     product.save(update_fields=['quantity_in_stock', 'cost_price', 'selling_price'])
+                    
+                    # Update barcode if provided for existing product
+                    if final_barcode:
+                        from inventory.utils_barcodes import set_barcode
+                        set_barcode(product, final_barcode)
                 else:
-                    # Save barcode for newly created product
-                    if has_barcode == "yes" and barcode_value:
+                    # Save newly created product (barcode already set above)
+                    if final_barcode:
                         product.save()
                 
                 # Log the stock-in action
@@ -484,6 +530,9 @@ def scan_in(request):
                 f"✅ Stock added: {data['quantity']} × {product_name} (K {data['cost_price']} each)"
             )
             return redirect('verticals:clothing_scan_in')
+        else:
+            # Form validation failed - show errors
+            messages.error(request, "Please correct the errors below.")
     else:
         form = ClothingStockInForm()
     
@@ -1057,3 +1106,72 @@ def sales_trend_json(request):
         'end_date': (end_date - timedelta(days=1)).isoformat(),
         'timestamp': timezone.now().isoformat(),
     })
+
+
+@login_required
+@require_business
+@require_business_kind(BusinessKind.CLOTHING)
+def rollback_sale(request, sale_id):
+    """
+    Rollback/cancel a clothing sale and restore product inventory.
+    Manager-only feature for correcting mistakes.
+    """
+    from django.http import JsonResponse
+    from django.contrib import messages
+    from django.shortcuts import redirect
+    from django.db import transaction
+    from core.context import _extract_roles_for
+    
+    ctx = base.base_context(request)
+    business = ctx.get("business")
+    
+    # Check if user is manager
+    roles = _extract_roles_for(request.user, business)
+    if not roles.is_manager:
+        if request.method == "POST":
+            return JsonResponse({"ok": False, "error": "Only managers can rollback sales"}, status=403)
+        messages.error(request, "Only managers can rollback sales")
+        return redirect("verticals:clothing_sales_history")
+    
+    # Get the sale
+    try:
+        sale = ClothingSale.objects.get(id=sale_id, business=business)
+    except ClothingSale.DoesNotExist:
+        if request.method == "POST":
+            return JsonResponse({"ok": False, "error": "Sale not found"}, status=404)
+        messages.error(request, "Sale not found")
+        return redirect("verticals:clothing_sales_history")
+    
+    # Check if already cancelled (if field exists)
+    if hasattr(sale, 'is_cancelled') and sale.is_cancelled:
+        if request.method == "POST":
+            return JsonResponse({"ok": False, "error": "Sale already cancelled"}, status=400)
+        messages.error(request, "Sale already cancelled")
+        return redirect("verticals:clothing_sales_history")
+    
+    if request.method == "POST":
+        with transaction.atomic():
+            # Restore product inventory
+            product = sale.product
+            product.quantity_in_stock += sale.quantity
+            product.save(update_fields=['quantity_in_stock'])
+            
+            # Mark sale as cancelled (if field exists) or add note
+            if hasattr(sale, 'is_cancelled'):
+                sale.is_cancelled = True
+                sale.cancelled_at = timezone.now()
+                sale.cancelled_by = request.user
+                sale.save(update_fields=['is_cancelled', 'cancelled_at', 'cancelled_by'])
+            else:
+                # Fallback: soft delete by adding notes
+                sale.notes = f"[CANCELLED by {request.user.username} on {timezone.now()}] {sale.notes}"
+                sale.save(update_fields=['notes'])
+        
+        return JsonResponse({
+            "ok": True,
+            "message": f"Sale #{sale_id} rolled back successfully. Inventory restored."
+        })
+    
+    # GET request: show confirmation
+    messages.error(request, "Invalid request method")
+    return redirect("verticals:clothing_sales_history")

@@ -442,3 +442,67 @@ def sales_trend_json(request):
         'end_date': end_date.isoformat(),
         'timestamp': django_tz.now().isoformat(),
     })
+
+
+@login_required
+@require_business
+@require_business_kind(BusinessKind.PHARMACY)
+def rollback_sale(request, sale_id):
+    """
+    Rollback/cancel a pharmacy sale and restore batch inventory.
+    Manager-only feature for correcting mistakes.
+    """
+    from django.http import JsonResponse
+    from django.contrib import messages
+    from django.shortcuts import redirect
+    from django.db import transaction
+    from inventory.models_pharmacy import PharmacySale
+    from inventory.utils_scope import get_visible_actor
+    
+    business: Business = request.business
+    
+    # Check if user is manager
+    is_manager, is_agent, actor_user = get_visible_actor(request)
+    if not is_manager:
+        if request.method == "POST":
+            return JsonResponse({"ok": False, "error": "Only managers can rollback sales"}, status=403)
+        messages.error(request, "Only managers can rollback sales")
+        return redirect("verticals:pharmacy_sales_history")
+    
+    # Get the sale
+    try:
+        sale = PharmacySale.objects.get(id=sale_id, business=business)
+    except PharmacySale.DoesNotExist:
+        if request.method == "POST":
+            return JsonResponse({"ok": False, "error": "Sale not found"}, status=404)
+        messages.error(request, "Sale not found")
+        return redirect("verticals:pharmacy_sales_history")
+    
+    # Check if already deleted
+    if sale.is_deleted:
+        if request.method == "POST":
+            return JsonResponse({"ok": False, "error": "Sale already cancelled"}, status=400)
+        messages.error(request, "Sale already cancelled")
+        return redirect("verticals:pharmacy_sales_history")
+    
+    if request.method == "POST":
+        with transaction.atomic():
+            # Restore batch inventory
+            batch = sale.batch
+            batch.quantity_remaining += sale.quantity
+            batch.save(update_fields=['quantity_remaining'])
+            
+            # Mark sale as deleted
+            sale.is_deleted = True
+            sale.deleted_at = timezone.now()
+            sale.deleted_by = request.user
+            sale.save(update_fields=['is_deleted', 'deleted_at', 'deleted_by'])
+        
+        return JsonResponse({
+            "ok": True,
+            "message": f"Sale #{sale_id} rolled back successfully. Batch inventory restored."
+        })
+    
+    # GET request: show confirmation
+    messages.error(request, "Invalid request method")
+    return redirect("verticals:pharmacy_sales_history")

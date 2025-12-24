@@ -41,10 +41,16 @@
                         <label for="{{ form.membership_amount.id_for_label }}" class="form-label">
                             Membership Amount (MWK) <span class="text-danger">*</span>
                         </label>
-                        {{ form.membership_amount }}
+                        <div class="input-group">
+                            <span class="input-group-text">MWK</span>
+                            {{ form.membership_amount }}
+                        </div>
                         <small class="form-text text-muted d-block mt-1">
-                            Base membership fee (MWK 55,000 = 30 days). Days are calculated from this amount only.
+                            💡 Base membership fee (MWK 55,000 = 30 days). Days are calculated from this amount only.
                         </small>
+                        <div id="days-preview" class="mt-2 p-2 bg-light rounded small" style="display:none;">
+                            <strong>Days granted:</strong> <span id="days-count">0</span> days
+                        </div>
                         {% if form.membership_amount.errors %}
                             <div class="text-danger small mt-1">{{ form.membership_amount.errors }}</div>
                         {% endif %}
@@ -64,9 +70,12 @@
                         <label for="{{ form.trainer_fee.id_for_label }}" class="form-label">
                             Trainer Fee (MWK)
                         </label>
-                        {{ form.trainer_fee }}
+                        <div class="input-group">
+                            <span class="input-group-text">MWK</span>
+                            {{ form.trainer_fee }}
+                        </div>
                         <small class="form-text text-muted d-block mt-1">
-                            Additional fee for trainer service (does not add extra membership days).
+                            ℹ️ Additional fee for trainer service (does not add extra membership days).
                         </small>
                         {% if form.trainer_fee.errors %}
                             <div class="text-danger small mt-1">{{ form.trainer_fee.errors }}</div>
@@ -107,15 +116,43 @@
                     </div>
 
                     <div class="d-flex gap-2">
-                        <button type="submit" class="btn btn-primary" data-cy="gym-payment-submit">
-                            <i class="bi bi-check-circle"></i> Mark as Paid
+                        <button type="submit" class="btn btn-primary btn-lg" data-cy="gym-payment-submit">
+                            <i class="bi bi-check-circle"></i> Record Payment
                         </button>
-                        <a href="{% url 'gym:members_list' %}" class="btn btn-outline-secondary">
-                            Cancel
+                        <a href="{% url 'gym:members_list' %}" class="btn btn-outline-secondary btn-lg">
+                            <i class="bi bi-x-circle"></i> Cancel
                         </a>
                     </div>
                 </form>
             </div>
+            
+            <script>
+            // Real-time days calculation preview
+            document.addEventListener('DOMContentLoaded', function() {
+                const amountInput = document.querySelector('input[name="membership_amount"]');
+                const daysPreview = document.getElementById('days-preview');
+                const daysCount = document.getElementById('days-count');
+                
+                if (amountInput) {
+                    amountInput.addEventListener('input', function() {
+                        const amount = parseFloat(this.value) || 0;
+                        if (amount > 0) {
+                            // Calculate days: 55000 = 30 days, so daily rate = 1833.33
+                            const days = Math.floor(amount / 1833.33);
+                            daysCount.textContent = days;
+                            daysPreview.style.display = 'block';
+                        } else {
+                            daysPreview.style.display = 'none';
+                        }
+                    });
+                    
+                    // Trigger on page load if value exists
+                    if (amountInput.value) {
+                        amountInput.dispatchEvent(new Event('input'));
+                    }
+                }
+            });
+            </script>
 
             <!-- Recent Payments -->
             {% if recent_payments %}

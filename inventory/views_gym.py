@@ -501,12 +501,13 @@ class GymPaymentForm(forms.Form):
         max_digits=10,
         decimal_places=2,
         min_value=Decimal("0.01"),
-        initial=Decimal("55000.00"),
+        required=True,
         label="Membership Amount (MWK)",
         help_text="Base membership fee (days calculated from this only)",
         widget=forms.NumberInput(attrs={
             "class": "form-control", 
             "step": "0.01",
+            "placeholder": "Enter amount (e.g., 55000.00)",
             "data-cy": "gym-payment-membership-amount"
         })
     )
@@ -520,13 +521,13 @@ class GymPaymentForm(forms.Form):
         max_digits=10,
         decimal_places=2,
         min_value=Decimal("0.00"),
-        initial=Decimal("0.00"),
         required=False,
         label="Trainer Fee (MWK)",
         help_text="Additional trainer fee (does not add membership days)",
         widget=forms.NumberInput(attrs={
             "class": "form-control", 
             "step": "0.01",
+            "placeholder": "Enter trainer fee (optional)",
             "data-cy": "gym-payment-trainer-fee"
         })
     )

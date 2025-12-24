@@ -981,6 +981,46 @@ class GymMember(models.Model):
         self.archived_at = timezone.now()
         self.archived_by = by_user
         self.save(update_fields=["is_archived", "is_active", "archived_at", "archived_by"])
+    
+    def get_qr_code_data_url(self):
+        """
+        Generate a QR code as a data URL for this member.
+        Returns base64 encoded PNG image that can be used directly in <img src="">
+        """
+        if not self.member_code:
+            return None
+        
+        try:
+            import qrcode
+            import io
+            import base64
+            
+            # Create QR code with member code
+            qr = qrcode.QRCode(
+                version=1,
+                error_correction=qrcode.constants.ERROR_CORRECT_L,
+                box_size=10,
+                border=4,
+            )
+            qr.add_data(self.member_code)
+            qr.make(fit=True)
+            
+            # Generate image
+            img = qr.make_image(fill_color="black", back_color="white")
+            
+            # Convert to base64 data URL
+            buffer = io.BytesIO()
+            img.save(buffer, format='PNG')
+            buffer.seek(0)
+            img_str = base64.b64encode(buffer.getvalue()).decode()
+            
+            return f"data:image/png;base64,{img_str}"
+        except ImportError:
+            # qrcode library not installed
+            return None
+        except Exception:
+            # Any other error in QR generation
+            return None
 
 
 class GymPayment(models.Model):

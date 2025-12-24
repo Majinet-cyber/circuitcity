@@ -135,8 +135,10 @@ def dashboard(request):
     profit = revenue - costs
     
     # Payment mix (counts and amounts) - including credit sales
+    # NEW: Beautiful format matching clothing dashboard
     total_revenue = revenue  # for percentage calculation
     payment_mix = []
+    payment_mix_old = []  # Keep old format for backward compatibility
     credit_sales_amount = Decimal("0.00")
     
     # Cash and other payment methods
@@ -146,7 +148,16 @@ def dashboard(request):
         amount = method_sales.aggregate(total=Sum("total_price"))["total"] or Decimal("0.00")
         if count > 0:
             pct = int((amount / total_revenue * 100).quantize(Decimal("1"))) if total_revenue else 0
+            # New format for beautiful UI
             payment_mix.append({
+                "method": method_label,
+                "method_code": method_code.lower(),
+                "count": count,
+                "amount": float(amount),
+                "percentage": pct,
+            })
+            # Old format for backward compatibility
+            payment_mix_old.append({
                 "method": method_label,
                 "count": count,
                 "amount": amount,
@@ -159,7 +170,16 @@ def dashboard(request):
     credit_sales_amount = credit_sales.aggregate(total=Sum("total_price"))["total"] or Decimal("0.00")
     if credit_count > 0:
         credit_pct = int((credit_sales_amount / total_revenue * 100).quantize(Decimal("1"))) if total_revenue else 0
+        # New format
         payment_mix.append({
+            "method": "Credit",
+            "method_code": "credit",
+            "count": credit_count,
+            "amount": float(credit_sales_amount),
+            "percentage": credit_pct,
+        })
+        # Old format
+        payment_mix_old.append({
             "method": "Credit",
             "count": credit_count,
             "amount": credit_sales_amount,
@@ -310,6 +330,41 @@ def dashboard(request):
 
     # Prepare context for normalization (will be applied at the end)
     ctx_enhancements = {}
+    
+    # ===== NEW: Personalized dashboard enhancements (quotes & greetings) =====
+    try:
+        from dashboard.helpers_greetings import get_personalized_greeting
+        from dashboard.helpers_quotes import get_todays_quotes
+        import json as json_lib
+        
+        # Personalized greeting (changes 3x daily: morning, afternoon, evening)
+        greeting_ctx = get_personalized_greeting(request.user, business)
+        
+        # Brand header context
+        brand_logo_url = None
+        if business and hasattr(business, 'logo') and business.logo:
+            brand_logo_url = business.logo.url
+        
+        # Hourly quotes (rotates every hour)
+        daily_quotes = get_todays_quotes(request.user, count=10)
+        
+        # Extract quote texts for JavaScript rotation
+        quote_texts = [q.get("text", "") for q in daily_quotes.get("quotes", []) if q.get("text")]
+        quotes_json = json_lib.dumps(quote_texts)
+        
+        ctx_enhancements.update({
+            "DASHBOARD_GREETING": greeting_ctx.get("greeting"),
+            "DASHBOARD_USER_NAME": greeting_ctx.get("user_name"),
+            "DASHBOARD_SHOW_WELCOME": greeting_ctx.get("show_welcome"),
+            "DASHBOARD_MILESTONE_MESSAGE": greeting_ctx.get("milestone"),
+            "DASHBOARD_BRAND_LOGO_URL": brand_logo_url,
+            "DASHBOARD_BRAND_TITLE": business.name if business else "Liquor Dashboard",
+            "DASHBOARD_QUOTES": daily_quotes,
+            "quotes_json": quotes_json,
+        })
+    except Exception:
+        # Gracefully degrade if helpers not available
+        pass
     
     # ========== Rotating Dashboard Insights (Goal 3) ==========
     # Compute fast-moving products, locations, agents, and payment mix for chart rotation
@@ -482,6 +537,7 @@ def dashboard(request):
             "total_costs": total_costs,  # New: inventory + admin
             "net_profit": net_profit,  # New: revenue - total costs
             "payment_mix": payment_mix,
+            "payment_mix_period": f"Last {days_back} days" if days_back > 1 else "Today",
             "credit_ratio": credit_ratio,
             "credit_warning": credit_warning,
             
@@ -1126,3 +1182,71 @@ def sales_trend_json(request):
         'end_date': (end_date - timedelta(days=1)).isoformat(),
         'timestamp': timezone.now().isoformat(),
     })
+
+
+@login_required
+@require_business
+@require_business_kind(BusinessKind.LIQUOR)
+def rollback_sale(request, sale_id):
+    """
+    Rollback/cancel a liquor sale and restore inventory.
+    Manager-only feature for correcting mistakes.
+    """
+    from django.http import JsonResponse
+    from django.contrib import messages
+    from django.db import transaction
+    from core.context import _extract_roles_for
+    
+    business = base.base_context(request).get("business")
+    
+    # Check if user is manager
+    roles = _extract_roles_for(request.user, business)
+    if not roles.is_manager:
+        if request.method == "POST":
+            return JsonResponse({"ok": False, "error": "Only managers can rollback sales"}, status=403)
+        messages.error(request, "Only managers can rollback sales")
+        return redirect("verticals:liquor_sales_history")
+    
+    # Get the sale
+    try:
+        sale = LiquorSale.objects.get(id=sale_id, business=business)
+    except LiquorSale.DoesNotExist:
+        if request.method == "POST":
+            return JsonResponse({"ok": False, "error": "Sale not found"}, status=404)
+        messages.error(request, "Sale not found")
+        return redirect("verticals:liquor_sales_history")
+    
+    # Check if already cancelled (if field exists)
+    if hasattr(sale, 'is_cancelled') and sale.is_cancelled:
+        if request.method == "POST":
+            return JsonResponse({"ok": False, "error": "Sale already cancelled"}, status=400)
+        messages.error(request, "Sale already cancelled")
+        return redirect("verticals:liquor_sales_history")
+    
+    if request.method == "POST":
+        with transaction.atomic():
+            # Restore inventory if product tracks inventory
+            product = sale.product
+            if product.track_inventory:
+                product.quantity_in_stock += sale.quantity
+                product.save(update_fields=['quantity_in_stock'])
+            
+            # Mark sale as cancelled (if field exists) or delete
+            if hasattr(sale, 'is_cancelled'):
+                sale.is_cancelled = True
+                sale.cancelled_at = timezone.now()
+                sale.cancelled_by = request.user
+                sale.save(update_fields=['is_cancelled', 'cancelled_at', 'cancelled_by'])
+            else:
+                # Fallback: soft delete by adding notes
+                sale.notes = f"[CANCELLED by {request.user.username} on {timezone.now()}] {sale.notes}"
+                sale.save(update_fields=['notes'])
+        
+        return JsonResponse({
+            "ok": True,
+            "message": f"Sale #{sale_id} rolled back successfully. Inventory restored."
+        })
+    
+    # GET request: show confirmation
+    messages.error(request, "Invalid request method")
+    return redirect("verticals:liquor_sales_history")
