@@ -5,8 +5,8 @@
 
 {% block extra_head %}
 <style>
-/* Glassmorphic cards */
-.glass-card {
+/* Glassmorphic cards - Liquor specific */
+.liquor-glass-card {
     background: rgba(255, 255, 255, 0.9);
     backdrop-filter: blur(10px);
     border-radius: 12px;
@@ -179,7 +179,7 @@
         <!-- Main Sell Area -->
         <div class="col-lg-8">
             <!-- Step 1: Category Tiles -->
-            <div id="category-tiles-container" class="glass-card p-4 mb-4">
+            <div id="category-tiles-container" class="liquor-glass-card p-4 mb-4">
                 <h5 class="mb-4">Select Category</h5>
                 
                 {% if categories %}
@@ -228,7 +228,7 @@
 
             <!-- Step 2: Product List (hidden by default) -->
             {% for cat, products in products_by_category.items %}
-            <div id="products-list-{{ cat }}" class="glass-card p-4 mb-4 hidden" data-category-list="{{ cat }}">
+            <div id="products-list-{{ cat }}" class="liquor-glass-card p-4 mb-4 hidden" data-category-list="{{ cat }}">
                 <div class="d-flex align-items-center justify-content-between mb-4">
                     <h5 class="mb-0 text-capitalize">{{ cat }}</h5>
                     <button class="btn btn-sm btn-outline-secondary back-btn" data-back-to-tiles>
@@ -447,7 +447,7 @@
             </div>
 
             <!-- Recent Sales -->
-            <div class="glass-card p-3 mt-4">
+            <div class="liquor-glass-card p-3 mt-4">
                 <h6 class="mb-3">Recent Sales</h6>
                 
                 {% if recent_sales %}

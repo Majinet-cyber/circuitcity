@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from datetime import timedelta
+from decimal import Decimal
 from typing import Optional
 import json
 import secrets

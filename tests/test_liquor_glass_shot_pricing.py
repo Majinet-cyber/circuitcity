@@ -19,8 +19,7 @@ class TestLiquorGlassShotPricing:
     def business(self):
         """Create a test business"""
         return Business.objects.create(
-            name="Test Liquor Store",
-            kind=BusinessKind.LIQUOR
+            name="Test Liquor Store"
         )
     
     @pytest.fixture
