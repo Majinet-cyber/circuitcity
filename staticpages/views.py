@@ -39,8 +39,24 @@ def home(request):
     """
     Public home page with hero section and marketing copy.
     """
+    # Get live platform metrics for display
+    try:
+        from tenants.models import Business, Membership
+        # Count all businesses (no is_active field exists)
+        total_merchants = Business.objects.count()
+        # Count distinct users with agent role (case-insensitive)
+        total_agents = Membership.objects.filter(role__icontains='agent').values('user').distinct().count()
+    except Exception as e:
+        # Graceful degradation if models not available
+        import logging
+        logging.error(f"Error fetching platform stats: {e}")
+        total_merchants = 0
+        total_agents = 0
+    
     return render(request, 'staticpages/home.html', {
         'hide_nav': True,  # Don't show internal navigation
+        'total_merchants': total_merchants,
+        'total_agents': total_agents,
     })
 
 
@@ -515,6 +531,61 @@ def hq_onboarding_pdf(request):
         logger.error(f"PDF generation failed: {e}", exc_info=True)
         messages.error(request, "Unable to generate PDF at this time. Please try again later.")
         return redirect('staticpages:onboarding_hq')
+
+
+def platform_stats_api(request):
+    """
+    Public API endpoint for live platform growth metrics.
+    Returns JSON with total merchants and agents.
+    
+    Used by homepage to display real-time growth numbers.
+    Cached for 60 seconds to prevent database overload.
+    """
+    from django.core.cache import cache
+    from django.http import JsonResponse
+    
+    # Try to get from cache first (60 second TTL)
+    cache_key = 'platform_stats_public'
+    cached_stats = cache.get(cache_key)
+    
+    if cached_stats:
+        return JsonResponse(cached_stats)
+    
+    # Calculate fresh stats
+    try:
+        from tenants.models import Business, Membership
+        
+        # Total merchants (businesses) - no is_active field exists
+        total_merchants = Business.objects.count()
+        
+        # Total registered agents across all businesses (case-insensitive, distinct users)
+        total_agents = Membership.objects.filter(
+            role__icontains='agent'
+        ).values('user').distinct().count()
+        
+        stats = {
+            'total_merchants': total_merchants,
+            'total_agents': total_agents,
+            'status': 'success',
+        }
+        
+        # Cache for 60 seconds
+        cache.set(cache_key, stats, 60)
+        
+        return JsonResponse(stats)
+    
+    except Exception as e:
+        # Graceful error handling - never crash the public page
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.error(f"Error fetching platform stats: {e}", exc_info=True)
+        
+        return JsonResponse({
+            'total_merchants': 0,
+            'total_agents': 0,
+            'status': 'error',
+            'message': 'Unable to fetch stats at this time'
+        })
 
 
 def sitemap_xml(request):

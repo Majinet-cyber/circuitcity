@@ -4505,6 +4505,51 @@ def _can_edit_inventory(user):
 
     return False
 
+def _is_agent_user(user):
+    """
+    Check if a user can hold stock (is an agent or manager).
+    
+    CRITICAL: Managers are operational supervisors and CAN hold stock.
+    They do NOT need AgentProfile.
+    
+    Returns True if:
+    - User has AgentProfile (field agent)
+    - User is a Manager (operational supervisor)
+    - User is HQ Admin/Staff (for testing/emergency)
+    
+    Returns False for regular users without agent or manager status.
+    """
+    if not user or not user.is_authenticated:
+        return False
+    
+    # HQ Admins can do anything (for testing/emergency)
+    if getattr(user, "is_superuser", False) or getattr(user, "is_staff", False):
+        return True
+    
+    # Check if user is a manager (managers can hold stock without AgentProfile)
+    try:
+        from tenants.utils_roles import is_manager
+        from tenants.utils import get_active_business
+        # Try to get business context
+        business = None
+        try:
+            from django.contrib.auth.models import AnonymousUser
+            if hasattr(user, '_request'):
+                business = get_active_business(user._request)
+        except Exception:
+            pass
+        
+        if business and is_manager(user, business):
+            return True
+    except Exception:
+        pass
+    
+    # Check if user has AgentProfile (field agent)
+    if hasattr(user, "agent_profile"):
+        return True
+    
+    return False
+
 # ---------------------------------------------------------------------------
 # STOCK LIST (HTML + CSV + JSON)
 # ---------------------------------------------------------------------------
@@ -5211,10 +5256,11 @@ def update_stock(request, pk):
     if request.method == "POST":
         form = InventoryItemForm(request.POST, instance=item, user=request.user)
         if form.is_valid():
-            # Enforce: only agents (non-staff/superuser with AgentProfile) can *hold* stock
+            # Enforce: only agents or managers can hold stock
+            # Managers are operational supervisors and do NOT need AgentProfile
             new_holder = form.cleaned_data.get("assigned_agent")
             if new_holder and not _is_agent_user(new_holder):
-                messages.error(request, "Only agent accounts can hold stock. Choose a non-admin user with an AgentProfile.")
+                messages.error(request, "Only agents or managers can hold stock.")
                 return render(request, "inventory/edit_stock.html", {"form": form, "item": item})
 
             changed_fields = list(form.changed_data)
@@ -6526,10 +6572,11 @@ def update_stock(request, pk):
             messages.error(request, "Please correct the errors below.")
             return render(request, "inventory/edit_stock.html", {"form": form, "item": item})
 
-        # Enforce: only agent accounts can hold stock
+        # Enforce: only agents or managers can hold stock
+        # Managers are operational supervisors and do NOT need AgentProfile
         new_holder = form.cleaned_data.get("assigned_agent")
         if new_holder and not _is_agent_user(new_holder):
-            msg = "Only agent accounts can hold stock. Choose a non-admin user with an AgentProfile."
+            msg = "Only agents or managers can hold stock."
             if _wants_json(request):
                 return JsonResponse({"ok": False, "error": msg}, status=400)
             messages.error(request, msg)

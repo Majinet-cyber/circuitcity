@@ -1272,6 +1272,46 @@
         padding: 0 2rem;
       }
     }
+    
+    /* ============================================
+       PLATFORM GROWTH METRICS ANIMATIONS
+       ============================================ */
+    @keyframes pulse {
+      0%, 100% {
+        opacity: 1;
+        transform: scale(1);
+      }
+      50% {
+        opacity: 0.5;
+        transform: scale(1.2);
+      }
+    }
+    
+    .platform-growth-metrics {
+      animation: fadeInUp 0.8s ease-out;
+    }
+    
+    @keyframes fadeInUp {
+      from {
+        opacity: 0;
+        transform: translateY(20px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+    
+    /* Responsive adjustments for growth metrics */
+    @media (max-width: 768px) {
+      .platform-growth-metrics {
+        padding: 1rem !important;
+      }
+      
+      .growth-metric div:first-child {
+        font-size: 2rem !important;
+      }
+    }
   </style>
 </head>
 <body>
@@ -1327,6 +1367,24 @@
           Track inventory, sales, performance, and adverts—one digital platform.<br>
           Built in Malawi for African businesses.
         </p>
+        
+        <!-- Live Platform Growth Metrics -->
+        <div class="platform-growth-metrics" style="margin-top: 2rem; padding: 1.5rem; background: rgba(79, 70, 229, 0.05); border-radius: 16px; border: 1px solid rgba(79, 70, 229, 0.1);">
+          <div style="display: flex; gap: 2rem; justify-content: center; flex-wrap: wrap;">
+            <div class="growth-metric" style="text-align: center;">
+              <div style="font-size: 2.5rem; font-weight: 800; color: var(--primary);" id="totalMerchants" data-target="{{ total_merchants|default:0 }}">0</div>
+              <div style="font-size: 0.9rem; color: var(--text-secondary); margin-top: 0.25rem;">Active Merchants</div>
+            </div>
+            <div class="growth-metric" style="text-align: center;">
+              <div style="font-size: 2.5rem; font-weight: 800; color: var(--secondary);" id="totalAgents" data-target="{{ total_agents|default:0 }}">0</div>
+              <div style="font-size: 0.9rem; color: var(--text-secondary); margin-top: 0.25rem;">Registered Agents</div>
+            </div>
+          </div>
+          <div style="text-align: center; margin-top: 1rem; font-size: 0.75rem; color: var(--text-secondary);">
+            <span style="display: inline-block; width: 8px; height: 8px; background: var(--secondary); border-radius: 50%; margin-right: 0.5rem; animation: pulse 2s infinite;"></span>
+            Live platform metrics
+          </div>
+        </div>
       </div>
       <div class="hero-image">
         <img src="{% static 'img/majn.png' %}" alt="Emajinet" class="hero-logo">
@@ -1965,6 +2023,83 @@
     } else {
       // DOM already loaded
       initBusinessSimulator();
+    }
+
+    // ============================================
+    // LIVE PLATFORM GROWTH METRICS
+    // ============================================
+    function initPlatformMetrics() {
+      const merchantsEl = document.getElementById('totalMerchants');
+      const agentsEl = document.getElementById('totalAgents');
+      
+      if (!merchantsEl || !agentsEl) return;
+      
+      // Get initial targets from data attributes
+      let merchantsTarget = parseInt(merchantsEl.dataset.target) || 0;
+      let agentsTarget = parseInt(agentsEl.dataset.target) || 0;
+      
+      // Animate numbers on load
+      function animateValue(element, start, end, duration) {
+        if (start === end) {
+          element.textContent = end;
+          return;
+        }
+        
+        const range = end - start;
+        const increment = range / (duration / 16); // 60fps
+        let current = start;
+        
+        const timer = setInterval(() => {
+          current += increment;
+          if ((increment > 0 && current >= end) || (increment < 0 && current <= end)) {
+            element.textContent = Math.round(end);
+            clearInterval(timer);
+          } else {
+            element.textContent = Math.round(current);
+          }
+        }, 16);
+      }
+      
+      // Initial animation
+      animateValue(merchantsEl, 0, merchantsTarget, 2000);
+      animateValue(agentsEl, 0, agentsTarget, 2000);
+      
+      // Fetch live updates every 60 seconds
+      function fetchLiveMetrics() {
+        fetch('{% url "staticpages:platform_stats_api" %}')
+          .then(response => response.json())
+          .then(data => {
+            if (data.status === 'success') {
+              const newMerchants = data.total_merchants || 0;
+              const newAgents = data.total_agents || 0;
+              
+              // Only animate if values changed
+              if (newMerchants !== merchantsTarget) {
+                animateValue(merchantsEl, merchantsTarget, newMerchants, 1000);
+                merchantsTarget = newMerchants;
+              }
+              
+              if (newAgents !== agentsTarget) {
+                animateValue(agentsEl, agentsTarget, newAgents, 1000);
+                agentsTarget = newAgents;
+              }
+            }
+          })
+          .catch(error => {
+            console.log('Failed to fetch live metrics:', error);
+            // Fail silently - don't disrupt user experience
+          });
+      }
+      
+      // Update every 60 seconds
+      setInterval(fetchLiveMetrics, 60000);
+    }
+    
+    // Initialize metrics when DOM is ready
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', initPlatformMetrics);
+    } else {
+      initPlatformMetrics();
     }
 
     // Mobile menu toggle

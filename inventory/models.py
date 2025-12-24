@@ -934,10 +934,21 @@ class InventoryItem(models.Model):
                     errors["imei"] = "This IMEI already exists in the system and cannot be used again."
 
         if self.assigned_agent_id:
+            # HQ Admins (superuser/staff) should never hold stock
             if getattr(self.assigned_agent, "is_staff", False) or getattr(self.assigned_agent, "is_superuser", False):
                 errors["assigned_agent"] = "Stock cannot be assigned to admin/staff accounts. Assign to an agent."
-            if not hasattr(self.assigned_agent, "agent_profile"):
-                errors["assigned_agent"] = "Assigned user must be an agent (has AgentProfile)."
+            # Managers don't need AgentProfile - they're operational supervisors
+            # Only enforce AgentProfile for actual field agents
+            elif not hasattr(self.assigned_agent, "agent_profile"):
+                # Check if user is a manager - managers can hold stock without AgentProfile
+                try:
+                    from tenants.utils_roles import is_manager
+                    user_is_manager = is_manager(self.assigned_agent, business=self.business)
+                    if not user_is_manager:
+                        errors["assigned_agent"] = "Assigned user must be an agent (has AgentProfile) or a manager."
+                except Exception:
+                    # If we can't check manager status, require AgentProfile
+                    errors["assigned_agent"] = "Assigned user must be an agent (has AgentProfile)."
 
         if errors:
             raise ValidationError(errors)

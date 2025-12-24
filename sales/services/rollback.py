@@ -74,8 +74,9 @@ class RollbackService:
                 membership = Membership.objects.get(user=user, business=business)
                 role = membership.role.upper()
                 
-                # Managers and Owners can rollback any sale
-                if role in ["MANAGER", "OWNER", "ADMIN"]:
+                # CRITICAL: Managers, Owners, and HQ Admins can rollback ANY sale IMMEDIATELY
+                # No time restrictions, no ownership checks - full operational control
+                if role in ["MANAGER", "OWNER", "ADMIN", "HQ_ADMIN"]:
                     return True, ""
                 
                 # Agents can only rollback their own sales within 10 minutes
