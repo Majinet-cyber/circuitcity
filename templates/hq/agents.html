@@ -68,7 +68,7 @@
         </td>
 
         <td class="text-nowrap">
-          {{ a.location.name|default:"—" }}
+          {% if a.location %}{{ a.location.name }}{% else %}—{% endif %}
         </td>
 
         <td class="text-nowrap">

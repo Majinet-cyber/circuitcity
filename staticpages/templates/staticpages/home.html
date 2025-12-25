@@ -6,6 +6,11 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Emajinet – Malawian Business Management SaaS for African Businesses</title>
   <meta name="description" content="Emajinet is a Malawian SaaS platform built for African businesses to manage inventory, track stock, and replace manual ledgers with AI-driven insights. From phone shops to pharmacies, digitize your business operations with ease.">
+  
+  <!-- SEO: Canonical URL (fixes "Duplicate without user-selected canonical" in Search Console) -->
+  <!-- Build canonical URL from request path WITHOUT query string -->
+  <link rel="canonical" href="{{ request.scheme }}://{{ request.get_host }}{{ request.path }}">
+  
   <meta name="theme-color" content="#0b1220">
   <link rel="icon" href="{% static 'favicon.ico' %}">
   <link rel="manifest" href="{% static 'manifest.webmanifest' %}">

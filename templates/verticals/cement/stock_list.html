@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+{% load humanize %}
+
+{% block title %}Stock List · Cement · {{ business.name }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+  <div class="row mb-4">
+    <div class="col">
+      <h1 class="h3 mb-0">📋 Building Materials & Hardware</h1>
+      <p class="text-muted">{{ business.name }}</p>
+    </div>
+    <div class="col-auto">
+      <a href="{% url 'cement:stock_in' %}" class="btn btn-primary">
+        <i class="bi bi-plus-circle"></i> Add Stock
+      </a>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-body">
+      {% if products %}
+      <div class="table-responsive">
+        <table class="table table-hover">
+          <thead>
+            <tr>
+              <th>Product Name</th>
+              <th>Category</th>
+              <th>Unit</th>
+              <th class="text-end">Cost Price</th>
+              <th class="text-end">Selling Price</th>
+              <th class="text-end">Stock</th>
+              <th class="text-end">Value</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for product in products %}
+            <tr>
+              <td><strong>{{ product.name }}</strong></td>
+              <td>{{ product.category|title }}</td>
+              <td>{{ product.base_unit|upper }}</td>
+              <td class="text-end">MK {{ product.cost_price|floatformat:2|intcomma }}</td>
+              <td class="text-end">MK {{ product.selling_price|floatformat:2|intcomma }}</td>
+              <td class="text-end">
+                {% if product.quantity_in_stock < 5 %}
+                <span class="badge bg-warning">{{ product.quantity_in_stock }}</span>
+                {% else %}
+                {{ product.quantity_in_stock }}
+                {% endif %}
+              </td>
+              <td class="text-end">MK {{ product.quantity_in_stock|mul:product.cost_price|floatformat:2|intcomma }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}
+      <div class="text-center py-5">
+        <p class="text-muted mb-3">No products yet</p>
+        <a href="{% url 'cement:stock_in' %}" class="btn btn-primary">Add Your First Product</a>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+{% endblock %}
+

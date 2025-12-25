@@ -34,8 +34,9 @@ def can_rollback_sale(sale, user, business):
             membership = Membership.objects.get(user=user, business=business)
             role = membership.role.upper()
             
-            # Managers can rollback anytime
-            if role in ["MANAGER", "OWNER", "ADMIN"]:
+            # CRITICAL: Managers, Owners, and Admins can rollback ANY sale IMMEDIATELY
+            # No time restrictions, no ownership checks - full operational control
+            if role in ["MANAGER", "OWNER", "ADMIN", "HQ_ADMIN"]:
                 return True
             
             # Agents can only rollback their own sales within 10 minutes

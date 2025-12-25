@@ -23,8 +23,14 @@ from billing import views_admin as billing_admin_views  # HQ Subscriptions view
 # ======================================================================================
 def robots_txt(request):
     """
-    robots.txt with public pages allowed and private routes disallowed.
-    References the sitemap for search engines.
+    robots.txt strategy (2025-12-25):
+    - Allow public marketing pages
+    - Allow private UI pages (so Google can crawl them and see X-Robots-Tag: noindex)
+    - Block only truly sensitive endpoints (admin, api, static, media)
+    
+    Why allow private UI pages?
+    Google needs to crawl them to see the noindex directive (from SEONoIndexMiddleware).
+    If we block in robots.txt, Google can't see noindex and may keep them indexed.
     """
     protocol = 'https' if request.is_secure() else 'http'
     domain = request.get_host()
@@ -34,36 +40,16 @@ def robots_txt(request):
 
 # Allow public pages
 Allow: /
-Allow: /landing/
-Allow: /landing/pricing/
-Allow: /landing/about/
-Allow: /landing/contact/
-Allow: /landing/simulator/
-Allow: /landing/join/
-Allow: /landing/privacy/
-Allow: /landing/terms/
-Allow: /landing/data-deletion/
 
-# Disallow auth and private routes
-Disallow: /login/
-Disallow: /logout/
-Disallow: /accounts/
-Disallow: /password/
-Disallow: /dashboard/
-Disallow: /inventory/
-Disallow: /sales/
-Disallow: /reports/
+# Disallow sensitive endpoints only (do NOT crawl or index)
 Disallow: /admin/
-Disallow: /hq/
-Disallow: /tenants/
-Disallow: /wallet/
-Disallow: /billing/
-Disallow: /simulator/
-Disallow: /gym/
-Disallow: /liquor/
-Disallow: /pharmacy/
 Disallow: /api/
-Disallow: /verticals/
+Disallow: /static/
+Disallow: /media/
+
+# NOTE: We intentionally DO NOT block private UI pages here (inventory, dashboard, etc.)
+# They are protected by X-Robots-Tag: noindex headers via SEONoIndexMiddleware.
+# Google must be able to crawl them to see the noindex directive, then drop them.
 
 # Sitemap
 Sitemap: {sitemap_url}
@@ -637,6 +623,8 @@ urlpatterns += [
     path("gym/", include_or_raise("inventory.urls_gym", "gym")),
     path("liquor/", include_or_raise("inventory.urls_liquor", "liquor")),
     path("pharmacy/", include_or_raise("inventory.urls_pharmacy", "pharmacy")),
+    path("groceries/", include_or_raise("inventory.urls_groceries", "groceries")),
+    path("cement/", include_or_raise("inventory.urls_cement", "cement")),
 
     # App router for cross-vertical features (analytics, etc.)
     path("app/", include(("core.urls_app_router", "app_router"), namespace="app_router")),

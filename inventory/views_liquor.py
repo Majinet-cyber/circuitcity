@@ -198,7 +198,7 @@ def sell_liquor(request):
                 # Calculate cost for profit tracking
                 # CRITICAL: get_cost_for_unit returns cost_per_bottle for bottle sales
                 # Profit = (selling_price_per_bottle - cost_per_bottle) * bottles_sold
-                unit_cost = product.get_cost_for_unit(unit)
+                unit_cost = product.get_cost_for_unit(unit) or Decimal("0.00")
                 total_cost = Decimal(quantity) * unit_cost
                 
                 # Calculate total price
@@ -216,6 +216,12 @@ def sell_liquor(request):
                 # Determine sale type
                 is_credit = sale_type == "credit"
                 liquor_sale_type = LiquorSaleType.CREDIT if is_credit else LiquorSaleType.SALE
+                
+                # For credit sales, ensure payment mix is zero (no payment yet)
+                if is_credit:
+                    cash_amount = Decimal("0.00")
+                    bank_amount = Decimal("0.00")
+                    mobile_money_amount = Decimal("0.00")
                 
                 # Create sale with payment mix
                 sale = LiquorSale.objects.create(
@@ -261,21 +267,35 @@ def sell_liquor(request):
                         f"✅ Credit sale recorded: {quantity} × {product.name} ({mode}) for {customer_name}"
                     )
                 else:
-                    # Create wallet entry for cash sale only
-                    LiquorWalletEntry.objects.create(
-                        business=business,
-                        amount=total,
-                        description=f"Sale: {product.name} ({quantity} {unit})",
-                        entry_type="income",
-                        related_sale=sale,
-                        created_by=request.user
-                    )
+                    # Create wallet entry for cash sale only (not for credit)
+                    try:
+                        LiquorWalletEntry.objects.create(
+                            business=business,
+                            amount=total,
+                            description=f"Sale: {product.name} ({quantity} {unit})",
+                            entry_type="income",
+                            related_sale=sale,
+                            created_by=request.user
+                        )
+                    except Exception as wallet_err:
+                        # Don't block sale if wallet entry fails - log and continue
+                        import logging
+                        logger = logging.getLogger(__name__)
+                        logger.warning(f"Failed to create wallet entry for sale #{sale.id}: {wallet_err}")
+                    
                     messages.success(request, f"✅ Sold {quantity} × {product.name} ({mode})")
             
             return redirect("liquor:sell")
             
         except (ValueError, MerchProduct.DoesNotExist, KeyError) as e:
-            messages.error(request, f"Sale failed: {e}")
+            messages.error(request, f"❌ Sale failed: {e}")
+            return redirect("liquor:sell")
+        except Exception as e:
+            # Catch any unexpected errors to prevent 500
+            messages.error(request, f"❌ Sale failed: {str(e)}")
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.error(f"Unexpected error in liquor sell: {e}", exc_info=True)
             return redirect("liquor:sell")
     
     # GET: Build category-grouped products

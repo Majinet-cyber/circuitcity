@@ -244,6 +244,12 @@ MIDDLEWARE = [
     # Blocks ALL users (agents + managers) when subscription is expired/canceled
     # Shows role-specific messaging
     "billing.middleware_subscription_gate.SubscriptionGateMiddleware",
+    # ✅ SEO: noindex headers for private pages (Search Console indexing fix)
+    "cc.middleware_seo.SEONoIndexMiddleware",
+    # ✅ SEO: canonical domain enforcement (www → non-www redirect)
+    "cc.middleware_seo.CanonicalURLMiddleware",
+    # ✅ SEO: UTM tracking parameter cleanup (2025-12-25)
+    "cc.middleware_seo.PublicQueryCleanupMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
 ]

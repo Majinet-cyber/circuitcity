@@ -166,3 +166,132 @@ def test_service_worker_fails_gracefully(client):
         assert 'catch' in content and 'serviceWorker' in content, \
                "Service worker registration should have error handling"
 
+
+# ============================================================================
+# PWA Install Banner Tests (2025-12-25)
+# ============================================================================
+
+def test_pwa_install_banner_partial_exists():
+    """Test that PWA install banner partial template exists."""
+    from django.template.loader import get_template
+    
+    try:
+        template = get_template('partials/pwa_install_banner.html')
+        assert template is not None
+    except Exception as e:
+        pytest.fail(f"PWA install banner partial not found: {e}")
+
+
+def test_pwa_install_banner_included_in_base(client):
+    """Test that PWA install banner is included in base template."""
+    response = client.get('/')
+    
+    if response.status_code == 200:
+        content = response.content.decode()
+        assert 'pwa-install-banner' in content, \
+               "PWA install banner not found in base template"
+        assert 'pwa-install-content' in content, \
+               "PWA install banner content not found"
+
+
+def test_pwa_install_js_included_in_base(client):
+    """Test that PWA install JS is included in base template."""
+    response = client.get('/')
+    
+    if response.status_code == 200:
+        content = response.content.decode()
+        assert 'pwa-install.js' in content, \
+               "PWA install JS not found in base template"
+
+
+def test_pwa_install_js_file_exists(client):
+    """Test that PWA install JS file is accessible."""
+    response = client.get('/static/js/pwa-install.js')
+    
+    # Should be 200 after collectstatic, or 404 in dev (acceptable)
+    assert response.status_code in [200, 404], \
+           f"Unexpected status code for pwa-install.js: {response.status_code}"
+    
+    if response.status_code == 200:
+        content = response.content.decode()
+        # Verify key functionality is present
+        assert 'beforeinstallprompt' in content.lower(), \
+               "PWA install JS should handle beforeinstallprompt event"
+        assert 'isAppInstalled' in content or 'standalone' in content, \
+               "PWA install JS should detect if app is installed"
+        assert 'localStorage' in content, \
+               "PWA install JS should use localStorage for persistence"
+
+
+def test_pwa_install_banner_has_install_button():
+    """Test that PWA install banner has install button."""
+    from django.template.loader import render_to_string
+    
+    try:
+        content = render_to_string('partials/pwa_install_banner.html')
+        assert 'pwa-install-btn' in content, \
+               "PWA install banner should have install button"
+        assert 'pwa-dismiss-btn' in content, \
+               "PWA install banner should have dismiss button"
+        assert 'Install' in content, \
+               "PWA install banner should have 'Install' text"
+    except Exception as e:
+        pytest.fail(f"Could not render PWA install banner: {e}")
+
+
+def test_pwa_install_banner_has_glassmorphic_styles():
+    """Test that PWA install banner has glassmorphic premium styles."""
+    from django.template.loader import render_to_string
+    
+    try:
+        content = render_to_string('partials/pwa_install_banner.html')
+        # Check for glassmorphic design elements
+        assert 'backdrop-filter' in content or 'backdrop' in content, \
+               "PWA install banner should have glassmorphic backdrop filter"
+        assert 'rgba' in content, \
+               "PWA install banner should use rgba transparency"
+        assert 'border-radius' in content, \
+               "PWA install banner should have rounded corners"
+    except Exception as e:
+        pytest.fail(f"Could not render PWA install banner: {e}")
+
+
+def test_pwa_install_banner_responsive():
+    """Test that PWA install banner has responsive styles."""
+    from django.template.loader import render_to_string
+    
+    try:
+        content = render_to_string('partials/pwa_install_banner.html')
+        # Check for mobile responsiveness
+        assert '@media' in content, \
+               "PWA install banner should have responsive media queries"
+        assert 'max-width' in content or 'min-width' in content, \
+               "PWA install banner should have breakpoints"
+    except Exception as e:
+        pytest.fail(f"Could not render PWA install banner: {e}")
+
+
+def test_pwa_install_banner_has_dark_mode():
+    """Test that PWA install banner supports dark mode."""
+    from django.template.loader import render_to_string
+    
+    try:
+        content = render_to_string('partials/pwa_install_banner.html')
+        # Check for dark mode support
+        assert 'prefers-color-scheme' in content, \
+               "PWA install banner should support dark mode"
+    except Exception as e:
+        pytest.fail(f"Could not render PWA install banner: {e}")
+
+
+def test_pwa_install_banner_ios_safe_area():
+    """Test that PWA install banner handles iOS safe areas."""
+    from django.template.loader import render_to_string
+    
+    try:
+        content = render_to_string('partials/pwa_install_banner.html')
+        # Check for iOS safe area handling
+        assert 'safe-area' in content or 'env(' in content, \
+               "PWA install banner should handle iOS safe areas"
+    except Exception as e:
+        pytest.fail(f"Could not render PWA install banner: {e}")

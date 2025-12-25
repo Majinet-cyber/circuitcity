@@ -591,28 +591,42 @@ def product_create_liquor_v2(request):
         
         form = LiquorProductForm(request.POST)
         if form.is_valid():
-            p = Product()
-            if hasattr(Product, "business_id"):
+            # Use MerchProduct instead of Product for liquor
+            from inventory.models import MerchProduct
+            p = MerchProduct()
+            p.kind = BusinessKind.LIQUOR
+            
+            if hasattr(MerchProduct, "business_id"):
                 biz = get_active_business(request)
                 if biz is not None:
                     setattr(p, "business_id", getattr(biz, "id", biz))
-            _inflate_liquor(p, form.cleaned_data)
             
-            # NEW: Store barcode if provided
+            # Set barcode to None or empty if not provided (critical for nullable field)
             if has_barcode == "yes" and barcode_value:
-                from inventory.utils_barcodes import set_barcode
-                set_barcode(p, barcode_value)
+                p.barcode = barcode_value
+            else:
+                # Explicitly set to None (not empty string) for proper nullable handling
+                p.barcode = None
+            
+            _inflate_liquor(p, form.cleaned_data)
             
             try:
                 p.save()
-                messages.success(request, "Liquor item saved.")
+                messages.success(request, "✅ Liquor product saved successfully.")
                 return redirect(URL_NAME_LIQUOR)
-            except IntegrityError:
-                messages.error(
-                    request, 
-                    "A liquor product with this name already exists for your business. "
-                    "Please use a different name or modify the existing product."
-                )
+            except IntegrityError as e:
+                if 'barcode' in str(e).lower():
+                    messages.error(request, "❌ A product with this barcode already exists. Barcodes must be unique.")
+                elif 'name' in str(e).lower() or 'unique' in str(e).lower():
+                    messages.error(
+                        request, 
+                        "❌ A liquor product with this name already exists for your business. "
+                        "Please use a different name or modify the existing product."
+                    )
+                else:
+                    messages.error(request, f"❌ Could not save product: {str(e)}")
+            except Exception as e:
+                messages.error(request, f"❌ Error saving product: {str(e)}")
     else:
         form = LiquorProductForm()
 

@@ -487,13 +487,14 @@ def scan_in(request):
                         'quantity_in_stock': data['quantity'],
                         'is_active': True,
                         'track_inventory': True,
+                        'barcode': final_barcode,  # CRITICAL: Explicitly set barcode (None if not provided)
                     }
                 )
                 
                 # NEW: Store barcode if provided
-                if final_barcode:
-                    from inventory.utils_barcodes import set_barcode
-                    set_barcode(product, final_barcode)
+                if final_barcode and created:
+                    # Barcode already set in defaults, no need to set again
+                    pass
                 
                 if not created:
                     # Update existing product stock
@@ -501,16 +502,12 @@ def scan_in(request):
                     product.cost_price = data['cost_price']
                     if data.get('selling_price'):
                         product.selling_price = data['selling_price']
-                    product.save(update_fields=['quantity_in_stock', 'cost_price', 'selling_price'])
                     
                     # Update barcode if provided for existing product
                     if final_barcode:
-                        from inventory.utils_barcodes import set_barcode
-                        set_barcode(product, final_barcode)
-                else:
-                    # Save newly created product (barcode already set above)
-                    if final_barcode:
-                        product.save()
+                        product.barcode = final_barcode
+                    
+                    product.save(update_fields=['quantity_in_stock', 'cost_price', 'selling_price', 'barcode'])
                 
                 # Log the stock-in action
                 from inventory.models_verticals import ClothingProductLog, ClothingProductAction

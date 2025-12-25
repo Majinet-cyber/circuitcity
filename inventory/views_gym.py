@@ -215,38 +215,69 @@ def member_edit(request, member_id):
 @require_business_kind(BusinessKind.GYM)
 def member_detail(request, member_id):
     """View member details with payment history and logs"""
-    from inventory.utils_gym import get_membership_status, GYM_MEMBERSHIP_DAYS
+    try:
+        from inventory.utils_gym import get_membership_status, GYM_MEMBERSHIP_DAYS
+    except ImportError:
+        # Fallback if utils_gym not available
+        def get_membership_status(member):
+            return {"status_code": "unknown", "status_label": "Unknown"}
+        GYM_MEMBERSHIP_DAYS = 30
     
     business = get_active_business(request)
-    member = get_object_or_404(GymMember, pk=member_id, business=business)
     
-    # Get accurate membership status
-    membership_status = get_membership_status(member)
+    # Safely get member with proper error handling
+    try:
+        member = get_object_or_404(GymMember, pk=member_id, business=business)
+    except Exception as e:
+        messages.error(request, f"Member not found or inaccessible: {str(e)}")
+        return redirect("gym:members_list")
     
-    # Get payment history
-    payments = member.payments.select_related("paid_by").order_by("-paid_at")
+    # Get accurate membership status with fallback
+    try:
+        membership_status = get_membership_status(member)
+        if not membership_status or not isinstance(membership_status, dict):
+            membership_status = {"status_code": "unknown", "status_label": "Unknown"}
+    except Exception as e:
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.error(f"Error getting membership status for member {member_id}: {e}", exc_info=True)
+        membership_status = {"status_code": "error", "status_label": "Error loading status"}
     
-    # Get logs
-    logs = member.logs.select_related("performed_by").order_by("-created_at")
+    # Get payment history safely
+    try:
+        payments = member.payments.select_related("paid_by").order_by("-paid_at")
+    except Exception:
+        payments = []
+    
+    # Get logs safely
+    try:
+        logs = member.logs.select_related("performed_by").order_by("-created_at")
+    except Exception:
+        logs = []
     
     # Get gym settings for contact info
     try:
         gym_settings = GymSettings.objects.get(business=business)
     except GymSettings.DoesNotExist:
         gym_settings = None
+    except Exception:
+        gym_settings = None
     
     # Check for missing trainer fee
     trainer_fee_missing = False
-    if member.trainer and membership_status["status_code"] == "active":
+    if getattr(member, 'trainer', None) and membership_status.get("status_code") == "active":
         # Check if there's a trainer fee for current period
         try:
-            trainer_fee_missing = not TrainerFee.objects.filter(
-                member=member,
-                period_start=membership_status["start_date"],
-                period_end=membership_status["end_date"]
-            ).exists()
+            start_date = membership_status.get("start_date")
+            end_date = membership_status.get("end_date")
+            if start_date and end_date:
+                trainer_fee_missing = not TrainerFee.objects.filter(
+                    member=member,
+                    period_start=start_date,
+                    period_end=end_date
+                ).exists()
         except Exception:
-            # TrainerFee table may not exist yet
+            # TrainerFee table may not exist yet or other error
             trainer_fee_missing = False
     
     return render(request, "inventory/gym/member_detail.html", {
