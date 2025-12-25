@@ -370,14 +370,23 @@
                 <i class="bi bi-person"></i> View Profile
             </a>
             ${!member.is_active ? `
-                <a href="/gym/member/${member.id}/set-paid/" class="btn btn-success">
-                    <i class="bi bi-cash-coin"></i> Collect Payment
-                </a>
+                <form method="post" action="/gym/member/${member.id}/set-paid/" style="display: inline;">
+                    <input type="hidden" name="csrfmiddlewaretoken" value="${getCsrfToken()}">
+                    <button type="submit" class="btn btn-success">
+                        <i class="bi bi-cash-coin"></i> Collect Payment
+                    </button>
+                </form>
             ` : ''}
             <button onclick="location.reload()" class="btn btn-outline-secondary">
                 <i class="bi bi-arrow-clockwise"></i> Scan Another
             </button>
         `;
+        
+        // Helper function to get CSRF token
+        function getCsrfToken() {
+            const csrfCookie = document.cookie.split('; ').find(row => row.startsWith('csrftoken='));
+            return csrfCookie ? csrfCookie.split('=')[1] : '';
+        }
         
         resultCard.style.display = 'block';
     }

@@ -998,7 +998,7 @@ def agents(request):
     
     q = (request.GET.get("q") or "").strip()
     # Include both AGENT and MANAGER roles for HQ reporting
-    rows = Membership.objects.filter(Q(role="AGENT") | Q(role="MANAGER")).select_related("business", "user")
+    rows = Membership.objects.filter(Q(role="AGENT") | Q(role="MANAGER")).select_related("business", "user", "location")
     if q:
         rows = rows.filter(Q(user__username__icontains=q) | Q(business__name__icontains=q))
     rows = rows.order_by("-created_at") if _field(Membership, "created_at") else rows.order_by("-id")

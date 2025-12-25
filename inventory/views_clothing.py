@@ -179,29 +179,58 @@ class ClothingSellForm(forms.Form):
 @require_business
 @require_business_kind(BusinessKind.CLOTHING)
 def sell_clothing(request):
-    """Record a clothing sale"""
+    """Record a clothing sale - STRICT STOCK VALIDATION"""
     business = get_active_business(request)
     
     if request.method == "POST":
         form = ClothingSellForm(business, request.POST)
         if form.is_valid():
             data = form.cleaned_data
+            product = data["product"]
+            quantity = data["quantity"]
+            
+            # CRITICAL: Enforce stock validation - NEVER allow selling more than available
+            current_stock = product.quantity_in_stock or 0
+            if current_stock < quantity:
+                messages.error(
+                    request, 
+                    f"❌ Insufficient stock! Available: {current_stock}, Requested: {quantity}. Cannot complete sale."
+                )
+                return redirect("inventory:clothing_sales_list")
             
             # Calculate total
-            total = Decimal(data["quantity"]) * data["unit_price"]
+            total = Decimal(quantity) * data["unit_price"]
             
-            # Create sale
-            sale = ClothingSale.objects.create(
-                business=business,
-                product=data["product"],
-                quantity=data["quantity"],
-                unit_price=data["unit_price"],
-                total_price=total,
-                sold_by=request.user,
-                notes=data.get("notes", "")
-            )
+            with transaction.atomic():
+                # Reduce stock (guaranteed to not go negative due to validation above)
+                product.quantity_in_stock = current_stock - quantity
+                product.save(update_fields=["quantity_in_stock"])
+                
+                # Create sale
+                sale = ClothingSale.objects.create(
+                    business=business,
+                    product=product,
+                    quantity=quantity,
+                    unit_price=data["unit_price"],
+                    total_price=total,
+                    sold_by=request.user,
+                    notes=data.get("notes", "")
+                )
+                
+                # Log the sale
+                ClothingProductLog.objects.create(
+                    product=product,
+                    action=ClothingProductAction.SOLD,
+                    changes={
+                        "quantity_sold": quantity,
+                        "stock_after_sale": product.quantity_in_stock,
+                        "stock_validated": True
+                    },
+                    performed_by=request.user
+                )
+                
+                messages.success(request, f"✅ Sale recorded: {quantity} × {product.name} (Stock remaining: {product.quantity_in_stock})")
             
-            messages.success(request, f"Sale recorded: {data['quantity']} × {data['product'].name}")
             return redirect("inventory:clothing_sales_list")
     else:
         form = ClothingSellForm(business)

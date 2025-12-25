@@ -607,7 +607,7 @@ def sell(request):
         def __init__(self, business=None, *args, **kwargs):
             super().__init__(*args, **kwargs)
             if business:
-                # Only show clothing products with stock
+                # Show only clothing products with available stock
                 self.fields['product'].queryset = MerchProduct.objects.filter(
                     business=business,
                     kind=BusinessKind.CLOTHING,
@@ -623,61 +623,64 @@ def sell(request):
             product = data['product']
             quantity = data['quantity']
             
-            # Check stock availability
-            if product.quantity_in_stock < quantity:
+            # CRITICAL: Enforce stock validation - NEVER allow negative stock
+            current_stock = product.quantity_in_stock or 0
+            if current_stock < quantity:
                 messages.error(
                     request,
-                    f"❌ Insufficient stock! Only {product.quantity_in_stock} available."
+                    f"❌ Insufficient stock! Only {current_stock} available. Cannot sell {quantity} units."
                 )
-            else:
-                with transaction.atomic():
-                    # Reduce stock
-                    product.quantity_in_stock -= quantity
-                    product.save(update_fields=['quantity_in_stock'])
-                    
-                    # Create sale
-                    unit_price = data['selling_price']
-                    total_price = Decimal(quantity) * unit_price
-                    unit_cost = product.cost_price or Decimal('0.00')
-                    total_cost = Decimal(quantity) * unit_cost
-                    
-                    sale = ClothingSale.objects.create(
-                        business=business,
-                        product=product,
-                        quantity=quantity,
-                        unit_price=unit_price,
-                        total_price=total_price,
-                        unit_cost=unit_cost,
-                        total_cost=total_cost,
-                        payment_method=data['payment_method'],
-                        sold_by=request.user,
-                        notes=data.get('notes', '')
-                    )
-                    
-                    # Log the sale
-                    from inventory.models_verticals import ClothingProductLog, ClothingProductAction
-                    ClothingProductLog.objects.create(
-                        product=product,
-                        action=ClothingProductAction.SOLD,
-                        changes={
-                            'quantity_sold': quantity,
-                            'selling_price': str(unit_price),
-                            'total_revenue': str(total_price),
-                            'remaining_stock': product.quantity_in_stock
-                        },
-                        performed_by=request.user
-                    )
-                    
-                    profit = total_price - total_cost
-                    # Gamified success message
-                    messages.success(
-                        request,
-                        f"🟢 Sale recorded 🎉\n"
-                        f"Stock updated · Revenue added · Well done!\n"
-                        f"{quantity} × {product.name} | Revenue: K {total_price:,.2f} | Profit: K {profit:,.2f}"
-                    )
-                    # FIXED: Redirect to clothing dashboard (not sell page)
-                    return redirect('verticals:clothing_dashboard')
+                return redirect('verticals:clothing_sell')
+            
+            with transaction.atomic():
+                # Reduce stock (will never go negative due to validation above)
+                product.quantity_in_stock = current_stock - quantity
+                product.save(update_fields=['quantity_in_stock'])
+                
+                # Create sale
+                unit_price = data['selling_price']
+                total_price = Decimal(quantity) * unit_price
+                unit_cost = product.cost_price or Decimal('0.00')
+                total_cost = Decimal(quantity) * unit_cost
+                
+                sale = ClothingSale.objects.create(
+                    business=business,
+                    product=product,
+                    quantity=quantity,
+                    unit_price=unit_price,
+                    total_price=total_price,
+                    unit_cost=unit_cost,
+                    total_cost=total_cost,
+                    payment_method=data['payment_method'],
+                    sold_by=request.user,
+                    notes=data.get('notes', '')
+                )
+                
+                # Log the sale
+                from inventory.models_verticals import ClothingProductLog, ClothingProductAction
+                ClothingProductLog.objects.create(
+                    product=product,
+                    action=ClothingProductAction.SOLD,
+                    changes={
+                        'quantity_sold': quantity,
+                        'selling_price': str(unit_price),
+                        'total_revenue': str(total_price),
+                        'remaining_stock': product.quantity_in_stock
+                    },
+                    performed_by=request.user
+                )
+                
+                profit = total_price - total_cost
+                # Gamified success message
+                messages.success(
+                    request,
+                    f"🟢 Sale recorded 🎉\n"
+                    f"Stock updated · Revenue added · Well done!\n"
+                    f"{quantity} × {product.name} | Revenue: K {total_price:,.2f} | Profit: K {profit:,.2f}\n"
+                    f"Remaining stock: {product.quantity_in_stock}"
+                )
+                # FIXED: Redirect to clothing dashboard (not sell page)
+                return redirect('verticals:clothing_dashboard')
         else:
             messages.error(request, "Please correct the errors below.")
     else:

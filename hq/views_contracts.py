@@ -37,7 +37,10 @@ def contract_template(request: HttpRequest) -> HttpResponse:
     """
     Show the contract template page with download link.
     """
-    return render(request, 'hq/contract_template.html')
+    return render(request, 'hq/contract_template.html', {
+        'contracts_enabled': True,
+        'active_tab': 'contracts',
+    })
 
 
 @login_required
@@ -90,6 +93,8 @@ def contracts_list(request: HttpRequest) -> HttpResponse:
         'businesses_with_status': businesses_with_status,
         'status_filter': status_filter,
         'search_query': search_query,
+        'contracts_enabled': True,  # Always True since we're in the contracts module
+        'active_tab': 'contracts',
     })
 
 
@@ -170,6 +175,8 @@ def contracts_detail(request: HttpRequest, business_id: int) -> HttpResponse:
     return render(request, 'hq/contracts_detail.html', {
         'business': business,
         'contract': contract,
+        'contracts_enabled': True,
+        'active_tab': 'contracts',
     })
 
 
@@ -262,7 +269,10 @@ def staff_tour_guide(request: HttpRequest) -> HttpResponse:
     """
     Show the HQ staff tour guide page with PDF download link.
     """
-    return render(request, 'hq/staff_tour_guide.html')
+    return render(request, 'hq/staff_tour_guide.html', {
+        'contracts_enabled': True,
+        'active_tab': 'staff_guide',
+    })
 
 
 @login_required
