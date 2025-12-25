@@ -69,13 +69,24 @@ class RollbackService:
             
             # Check user permissions
             from tenants.models import Membership
+            from django.db.models import Case, When, Value, IntegerField
             
-            # Get ACTIVE membership - use filter().first() to handle multiple memberships gracefully
+            # Get ACTIVE membership - prioritize MANAGER > AGENT
+            # This handles users with multiple memberships by checking manager role first
             membership = Membership.objects.filter(
                 user=user, 
                 business=business,
                 status='ACTIVE'
-            ).first()
+            ).annotate(
+                role_priority=Case(
+                    When(role='MANAGER', then=Value(1)),
+                    When(role='OWNER', then=Value(1)),
+                    When(role='ADMIN', then=Value(1)),
+                    When(role='AGENT', then=Value(2)),
+                    default=Value(3),
+                    output_field=IntegerField()
+                )
+            ).order_by('role_priority').first()
             
             if not membership:
                 return False, "User is not an active member of this business"
