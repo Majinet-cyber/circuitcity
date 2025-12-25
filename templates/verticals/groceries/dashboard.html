@@ -3,100 +3,146 @@
 
 {% block title %}Groceries Dashboard · {{ business.name }}{% endblock %}
 
+{% block extra_css %}
+<style>
+  .vertical-page{display:flex;flex-direction:column;gap:20px;padding:12px;max-width:1400px;margin:0 auto}
+  .vertical-hero{background:linear-gradient(135deg,#f59e0b 0%,#d97706 50%,#b45309 100%);padding:28px;border-radius:24px;color:#fff;display:flex;flex-wrap:wrap;gap:20px;align-items:center;justify-content:space-between;box-shadow:0 20px 60px rgba(245,158,11,0.2);position:relative;overflow:hidden}
+  .vertical-hero::before{content:'';position:absolute;top:-50%;right:-50%;width:200%;height:200%;background:radial-gradient(circle,rgba(255,255,255,0.1) 0%,transparent 70%);pointer-events:none}
+  .vertical-hero .eyebrow{opacity:.9;text-transform:uppercase;font-size:.8rem;letter-spacing:.15em;margin:0;font-weight:600}
+  .vertical-hero h1{margin:6px 0;font-size:clamp(26px,4vw,36px);font-weight:800;text-shadow:0 2px 10px rgba(0,0,0,0.1)}
+  .vertical-hero p{margin:0;opacity:.95;font-size:1rem}
+  .hero-actions{display:flex;gap:12px;flex-wrap:wrap;z-index:1;position:relative}
+  .hero-actions a{border-radius:30px;padding:12px 20px;font-weight:700;text-decoration:none;transition:all 0.3s cubic-bezier(0.4,0,0.2,1);box-shadow:0 4px 12px rgba(0,0,0,0.15)}
+  .hero-actions .primary{background:#fff;color:#0f172a}
+  .hero-actions .primary:hover{transform:translateY(-2px);box-shadow:0 6px 20px rgba(0,0,0,0.2);background:#f8fafc}
+  .hero-actions .ghost{border:2px solid rgba(255,255,255,.9);color:#fff;background:rgba(255,255,255,0.1);backdrop-filter:blur(10px)}
+  .hero-actions .ghost:hover{background:rgba(255,255,255,0.2);transform:translateY(-2px);box-shadow:0 6px 20px rgba(255,255,255,0.2)}
+  .metric-card{background:#fff;border-radius:20px;padding:24px;box-shadow:0 4px 20px rgba(15,23,42,.08);transition:all 0.3s cubic-bezier(0.4,0,0.2,1);position:relative;overflow:hidden;border:1px solid rgba(226,232,240,0.5);min-width:0}
+  .metric-card::before{content:'';position:absolute;top:0;left:0;right:0;height:4px;background:linear-gradient(90deg,transparent,rgba(59,130,246,0.4),transparent);opacity:0;transition:opacity 0.3s}
+  .metric-card:hover::before{opacity:1}
+  .metric-card:hover{transform:translateY(-6px);box-shadow:0 12px 40px rgba(15,23,42,.12);border-color:rgba(59,130,246,0.2)}
+  .metric-card h3{margin:0 0 10px;font-size:.85rem;text-transform:uppercase;color:#64748b;letter-spacing:.12em;font-weight:600;display:flex;align-items:center;gap:8px}
+  .metric-card p{margin:0;font-size:2.25rem;font-weight:800;color:#0f172a;line-height:1.1;letter-spacing:-0.02em;min-width:0}
+  .metric-card small{display:block;margin-top:8px;font-size:0.75rem;color:#94a3b8;line-height:1.5;opacity:0.9}
+  .recent-block{background:#fff;border-radius:20px;padding:24px;box-shadow:0 4px 20px rgba(15,23,42,.08);border:1px solid rgba(226,232,240,0.5);transition:all 0.3s}
+  .recent-block:hover{box-shadow:0 8px 30px rgba(15,23,42,.1)}
+  .recent-block h2{margin:0 0 18px;font-size:1.15rem;font-weight:700;color:#0f172a;display:flex;align-items:center;gap:8px}
+  .mode-toggle-block{background:#fff;border-radius:20px;padding:20px;box-shadow:0 4px 20px rgba(15,23,42,.08);border:1px solid rgba(226,232,240,0.5);margin-bottom:20px}
+  .mode-toggle-block .mode-label{font-weight:700;font-size:.9rem;color:#64748b;margin-bottom:12px}
+  .mode-pills{display:flex;gap:8px;flex-wrap:wrap}
+  .mode-pill{padding:8px 16px;border-radius:20px;border:2px solid #e2e8f0;background:#fff;color:#64748b;font-weight:600;text-decoration:none;transition:all 0.3s cubic-bezier(0.4,0,0.2,1);font-size:.9rem}
+  .mode-pill:hover{border-color:#f59e0b;color:#f59e0b;background:#fffbeb;transform:translateY(-2px)}
+  .mode-pill.active{border-color:#f59e0b;background:linear-gradient(135deg,#f59e0b,#d97706);color:#fff;box-shadow:0 4px 12px rgba(245,158,11,0.3)}
+  .list-group-item{background:transparent;border-bottom:1px solid #e2e8f0;padding:12px 0}
+  .list-group-item:last-child{border-bottom:0}
+  @keyframes fadeIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
+  .metric-card{animation:fadeIn 0.4s ease-out}
+  .recent-block{animation:fadeIn 0.5s ease-out}
+  @media (max-width:768px){.vertical-page{padding:8px;gap:16px}.hero-actions{width:100%}.hero-actions a{flex:1;text-align:center;min-width:120px}}
+</style>
+{% endblock %}
+
 {% block content %}
-<div class="container-fluid py-4">
-  <div class="row mb-4">
-    <div class="col">
-      <h1 class="h3 mb-0">🛒 Groceries Dashboard</h1>
-      <p class="text-muted">{{ business.name }}</p>
+<div class="vertical-page">
+  <header class="vertical-hero">
+    <div>
+      <p class="eyebrow">{{ business.name }}</p>
+      <h1>🛒 Groceries Dashboard</h1>
+      <p>Track inventory, sales, and profits for your grocery store</p>
     </div>
-  </div>
+    <div class="hero-actions">
+      <a class="primary" href="{% url 'groceries:stock_in' %}">Add Stock</a>
+      <a class="ghost" href="{% url 'groceries:sell' %}">Make Sale</a>
+      <a class="ghost" href="{% url 'groceries:stock_list' %}">View Products</a>
+    </div>
+  </header>
+
+  <!-- Wholesale/Retail Toggle -->
+  <section class="mode-toggle-block">
+    <div class="mode-label">Sale Mode Filter</div>
+    <div class="mode-pills">
+      <a href="?mode=retail" class="mode-pill {% if active_mode == 'retail' %}active{% endif %}">
+        Retail
+      </a>
+      <a href="?mode=wholesale" class="mode-pill {% if active_mode == 'wholesale' %}active{% endif %}">
+        Wholesale
+      </a>
+      <a href="?mode=both" class="mode-pill {% if active_mode == 'both' %}active{% endif %}">
+        Both
+      </a>
+    </div>
+    <small style="display:block;margin-top:8px;color:#94a3b8;font-size:.85rem">
+      {% if active_mode == 'retail' %}
+        Showing retail sales only (Today)
+      {% elif active_mode == 'wholesale' %}
+        Showing wholesale sales only (Today)
+      {% else %}
+        Showing all sales - retail + wholesale (Today)
+      {% endif %}
+    </small>
+  </section>
 
   <!-- KPI Cards -->
-  <div class="row g-3 mb-4">
-    <div class="col-md-3">
-      <div class="card">
-        <div class="card-body">
-          <h6 class="card-subtitle mb-2 text-muted">Total Revenue</h6>
-          <h3 class="card-title mb-0">MK {{ total_revenue|floatformat:2|intcomma }}</h3>
-        </div>
-      </div>
-    </div>
-    <div class="col-md-3">
-      <div class="card">
-        <div class="card-body">
-          <h6 class="card-subtitle mb-2 text-muted">Total Profit</h6>
-          <h3 class="card-title mb-0">MK {{ total_profit|floatformat:2|intcomma }}</h3>
-        </div>
-      </div>
-    </div>
-    <div class="col-md-3">
-      <div class="card">
-        <div class="card-body">
-          <h6 class="card-subtitle mb-2 text-muted">Stock Value</h6>
-          <h3 class="card-title mb-0">MK {{ stock_value|floatformat:2|intcomma }}</h3>
-        </div>
-      </div>
-    </div>
-    <div class="col-md-3">
-      <div class="card">
-        <div class="card-body">
-          <h6 class="card-subtitle mb-2 text-muted">Items In Stock</h6>
-          <h3 class="card-title mb-0">{{ items_in_stock|intcomma }}</h3>
-        </div>
-      </div>
-    </div>
-  </div>
+  <section class="cc-kpi-grid">
+    <article class="metric-card" style="background:linear-gradient(135deg,#3b82f6,#2563eb);color:#fff">
+      <h3 style="color:rgba(255,255,255,.9)">💰 Total Revenue (Today)</h3>
+      <p style="color:#fff;font-size:2rem;font-weight:800">K {{ total_revenue|floatformat:0|default:"0"|intcomma }}</p>
+    </article>
+    <article class="metric-card" style="background:linear-gradient(135deg,#10b981,#059669);color:#fff">
+      <h3 style="color:rgba(255,255,255,.9)">📈 Total Profit (Today)</h3>
+      <p style="color:#fff;font-size:2rem;font-weight:800">K {{ total_profit|floatformat:0|default:"0"|intcomma }}</p>
+    </article>
+    <article class="metric-card" style="background:linear-gradient(135deg,#eab308,#ca8a04);color:#fff">
+      <h3 style="color:rgba(255,255,255,.9)">📦 Stock Value (Current)</h3>
+      <p style="color:#fff;font-size:2rem;font-weight:800">K {{ stock_value|floatformat:0|default:"0"|intcomma }}</p>
+      <small style="color:rgba(255,255,255,.8);font-size:0.7rem;display:block;margin-top:6px">Current inventory value</small>
+    </article>
+    <article class="metric-card" style="background:linear-gradient(135deg,#8b5cf6,#7c3aed);color:#fff">
+      <h3 style="color:rgba(255,255,255,.9)">📊 Items In Stock</h3>
+      <p style="color:#fff;font-size:2rem;font-weight:800">{{ items_in_stock|intcomma }}</p>
+      <small style="color:rgba(255,255,255,.8);font-size:0.7rem;display:block;margin-top:6px">Total units available</small>
+    </article>
+  </section>
 
-  <div class="row g-3">
+  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:20px">
     <!-- Low Stock Items -->
-    <div class="col-md-6">
-      <div class="card">
-        <div class="card-header">
-          <h5 class="mb-0">⚠️ Low Stock Items</h5>
-        </div>
-        <div class="card-body">
-          {% if low_stock_items %}
-          <div class="list-group list-group-flush">
-            {% for product in low_stock_items %}
-            <div class="list-group-item d-flex justify-content-between align-items-center">
-              <div>
-                <strong>{{ product.name }}</strong>
-                <br>
-                <small class="text-muted">{{ product.category|title }}</small>
-              </div>
-              <span class="badge bg-warning">{{ product.quantity_in_stock }} {{ product.base_unit }}</span>
-            </div>
-            {% endfor %}
+    <section class="recent-block">
+      <h2>⚠️ Low Stock Items</h2>
+      {% if low_stock_items %}
+      <div class="list-group" style="list-style:none;margin:0;padding:0">
+        {% for product in low_stock_items %}
+        <div class="list-group-item" style="display:flex;justify-content:space-between;align-items:center;gap:12px">
+          <div>
+            <strong style="display:block;font-size:1rem;font-weight:600;color:#0f172a">{{ product.name }}</strong>
+            <small style="color:#64748b;font-size:.85rem">{{ product.category|title }}</small>
           </div>
-          {% else %}
-          <p class="text-muted mb-0">No low stock items</p>
-          {% endif %}
+          <span style="background:linear-gradient(135deg,#fef3c7,#fde68a);color:#92400e;padding:6px 12px;border-radius:16px;font-weight:700;font-size:.85rem">{{ product.quantity_in_stock }} {{ product.base_unit }}</span>
         </div>
+        {% endfor %}
       </div>
-    </div>
+      {% else %}
+      <p style="color:#94a3b8;margin:0">No low stock items</p>
+      {% endif %}
+    </section>
 
     <!-- Quick Actions -->
-    <div class="col-md-6">
-      <div class="card">
-        <div class="card-header">
-          <h5 class="mb-0">Quick Actions</h5>
-        </div>
-        <div class="card-body">
-          <div class="d-grid gap-2">
-            <a href="{% url 'groceries:stock_in' %}" class="btn btn-primary">
-              <i class="bi bi-box-seam"></i> Add Stock
-            </a>
-            <a href="{% url 'groceries:sell' %}" class="btn btn-success">
-              <i class="bi bi-cart-check"></i> Make Sale
-            </a>
-            <a href="{% url 'groceries:stock_list' %}" class="btn btn-outline-secondary">
-              <i class="bi bi-list-ul"></i> View All Products
-            </a>
-          </div>
-        </div>
+    <section class="recent-block">
+      <h2>⚡ Quick Actions</h2>
+      <div style="display:flex;flex-direction:column;gap:12px">
+        <a href="{% url 'groceries:product_add' %}" style="padding:14px 20px;background:linear-gradient(135deg,#3b82f6,#2563eb);color:#fff;border-radius:16px;font-weight:700;text-decoration:none;transition:all 0.3s;box-shadow:0 4px 12px rgba(59,130,246,0.3);text-align:center">
+          <i class="bi bi-plus-circle"></i> Add Product
+        </a>
+        <a href="{% url 'groceries:stock_in' %}" style="padding:14px 20px;background:#fff;color:#3b82f6;border:2px solid #3b82f6;border-radius:16px;font-weight:700;text-decoration:none;transition:all 0.3s;text-align:center">
+          <i class="bi bi-box-seam"></i> Add Stock
+        </a>
+        <a href="{% url 'groceries:sell' %}" style="padding:14px 20px;background:linear-gradient(135deg,#10b981,#059669);color:#fff;border-radius:16px;font-weight:700;text-decoration:none;transition:all 0.3s;box-shadow:0 4px 12px rgba(16,185,129,0.3);text-align:center">
+          <i class="bi bi-cart-check"></i> Make Sale
+        </a>
+        <a href="{% url 'groceries:stock_list' %}" style="padding:14px 20px;background:#f8fafc;color:#64748b;border:2px solid #e2e8f0;border-radius:16px;font-weight:700;text-decoration:none;transition:all 0.3s;text-align:center">
+          <i class="bi bi-list-ul"></i> View All Products
+        </a>
       </div>
-    </div>
+    </section>
   </div>
 </div>
 {% endblock %}

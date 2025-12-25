@@ -1,0 +1,539 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Add Product · Groceries · {{ business.name }}{% endblock %}
+
+{% block extra_head %}
+<link rel="stylesheet" href="{% static 'css/pricing-intelligence.css' %}">
+{% endblock %}
+
+{% block content %}
+<style>
+  .wizard-container {
+    max-width: 900px;
+    margin: 0 auto;
+    padding: 20px;
+  }
+  
+  .wizard-header {
+    text-align: center;
+    margin-bottom: 40px;
+  }
+  
+  .wizard-header h1 {
+    font-size: 2rem;
+    font-weight: 800;
+    color: #0f172a;
+    margin-bottom: 8px;
+  }
+  
+  .wizard-header p {
+    color: #64748b;
+    font-size: 1rem;
+  }
+  
+  .wizard-step {
+    background: #fff;
+    border-radius: 20px;
+    padding: 32px;
+    box-shadow: 0 4px 20px rgba(15,23,42,.08);
+    border: 1px solid rgba(226,232,240,0.5);
+    margin-bottom: 24px;
+  }
+  
+  .step-title {
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: #0f172a;
+    margin-bottom: 20px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  
+  .step-number {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    background: linear-gradient(135deg, #10b981, #059669);
+    color: #fff;
+    border-radius: 50%;
+    font-size: 0.9rem;
+    font-weight: 700;
+  }
+  
+  .category-grid, .item-grid, .variant-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+    gap: 12px;
+    margin-top: 16px;
+  }
+  
+  @media (max-width: 640px) {
+    .category-grid, .item-grid, .variant-grid {
+      grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+      gap: 10px;
+    }
+  }
+  
+  .wizard-card {
+    padding: 20px 16px;
+    background: linear-gradient(135deg, #f8fafc, #f1f5f9);
+    border: 2px solid #e2e8f0;
+    border-radius: 14px;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.2s;
+    position: relative;
+    text-decoration: none;
+    color: inherit;
+    display: block;
+  }
+  
+  .wizard-card:hover {
+    transform: translateY(-4px);
+    border-color: #10b981;
+    background: linear-gradient(135deg, #ecfdf5, #d1fae5);
+    box-shadow: 0 8px 24px rgba(16,185,129,0.15);
+    text-decoration: none;
+    color: inherit;
+  }
+  
+  .wizard-card.selected {
+    border-color: #10b981;
+    background: linear-gradient(135deg, #10b981, #059669);
+    color: #fff;
+    box-shadow: 0 8px 24px rgba(16,185,129,0.3);
+  }
+  
+  .wizard-card.selected .card-icon {
+    filter: brightness(0) invert(1);
+  }
+  
+  .card-icon {
+    font-size: 2rem;
+    margin-bottom: 8px;
+  }
+  
+  .card-label {
+    font-weight: 600;
+    font-size: 0.95rem;
+  }
+  
+  .search-box {
+    margin-bottom: 20px;
+  }
+  
+  .search-input {
+    width: 100%;
+    padding: 12px 16px;
+    border: 2px solid #e2e8f0;
+    border-radius: 12px;
+    font-size: 1rem;
+    transition: all 0.2s;
+  }
+  
+  .search-input:focus {
+    outline: none;
+    border-color: #10b981;
+    box-shadow: 0 0 0 3px rgba(16,185,129,0.1);
+  }
+  
+  .form-group {
+    margin-bottom: 20px;
+  }
+  
+  .form-label {
+    display: block;
+    font-weight: 600;
+    color: #0f172a;
+    margin-bottom: 8px;
+    font-size: 0.95rem;
+  }
+  
+  .form-input {
+    width: 100%;
+    padding: 12px 16px;
+    border: 2px solid #e2e8f0;
+    border-radius: 12px;
+    font-size: 1rem;
+    transition: all 0.2s;
+  }
+  
+  .form-input:focus {
+    outline: none;
+    border-color: #10b981;
+    box-shadow: 0 0 0 3px rgba(16,185,129,0.1);
+  }
+  
+  .wizard-actions {
+    display: flex;
+    gap: 12px;
+    justify-content: space-between;
+    margin-top: 32px;
+  }
+  
+  .btn-wizard {
+    padding: 12px 24px;
+    border-radius: 12px;
+    font-weight: 700;
+    font-size: 0.95rem;
+    cursor: pointer;
+    transition: all 0.2s;
+    border: none;
+    text-decoration: none;
+    display: inline-block;
+  }
+  
+  .btn-primary {
+    background: linear-gradient(135deg, #10b981, #059669);
+    color: #fff;
+    box-shadow: 0 4px 12px rgba(16,185,129,0.3);
+  }
+  
+  .btn-primary:hover:not(:disabled) {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(16,185,129,0.4);
+    color: #fff;
+    text-decoration: none;
+  }
+  
+  .btn-primary:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+  
+  .btn-secondary {
+    background: #fff;
+    color: #10b981;
+    border: 2px solid #10b981;
+  }
+  
+  .btn-secondary:hover {
+    background: #ecfdf5;
+    color: #10b981;
+    text-decoration: none;
+  }
+  
+  .hidden {
+    display: none;
+  }
+  
+  .custom-product-card {
+    margin-top: 16px;
+    padding-top: 16px;
+    border-top: 1px solid #e2e8f0;
+  }
+  
+  @media (max-width: 768px) {
+    .wizard-step {
+      padding: 20px;
+    }
+    
+    .wizard-container {
+      padding: 10px;
+    }
+  }
+  
+  .unit-info {
+    font-size: 0.85rem;
+    color: #64748b;
+    margin-top: 4px;
+  }
+</style>
+
+<div class="wizard-container">
+  <div class="wizard-header">
+    <h1>🛒 Add Grocery Product</h1>
+    <p>Follow the steps to add a new product to your catalog</p>
+  </div>
+  
+  <!-- Step 1: Choose Category -->
+  {% if step == 1 %}
+  <div class="wizard-step">
+    <h2 class="step-title">
+      <span class="step-number">1</span>
+      Choose Category
+    </h2>
+    
+    <div class="search-box">
+      <input type="text" class="search-input" id="categorySearch" placeholder="🔍 Search categories..." onkeyup="filterCategories()">
+    </div>
+    
+    <div class="category-grid" id="categoryGrid">
+      {% for category in categories %}
+      <a href="{% url 'groceries:product_add' %}?step=2&category={{ category.key }}" class="wizard-card category-card" data-name="{{ category.name|lower }}">
+        <div class="card-icon">{{ category.icon }}</div>
+        <div class="card-label">{{ category.name }}</div>
+      </a>
+      {% endfor %}
+      
+      <!-- Custom Product Option -->
+      <a href="{% url 'groceries:product_add' %}?step=4&custom=true" class="wizard-card category-card custom-card" data-name="custom">
+        <div class="card-icon">➕</div>
+        <div class="card-label">Custom Product</div>
+      </a>
+    </div>
+  </div>
+  {% endif %}
+  
+  <!-- Step 2: Choose Item -->
+  {% if step == 2 %}
+  <div class="wizard-step">
+    <h2 class="step-title">
+      <span class="step-number">2</span>
+      Choose Item
+    </h2>
+    <p style="color: #64748b; margin-bottom: 20px;">Category: <strong>{{ category.name }}</strong></p>
+    
+    <div class="search-box">
+      <input type="text" class="search-input" id="itemSearch" placeholder="🔍 Search products..." onkeyup="filterItems()">
+    </div>
+    
+    <div class="item-grid" id="itemGrid">
+      {% for item in items %}
+      <a href="{% url 'groceries:product_add' %}?step=3&category={{ category_key }}&item={{ item.name|urlencode }}" class="wizard-card item-card" data-name="{{ item.name|lower }}">
+        <div class="card-icon">{{ category.icon }}</div>
+        <div class="card-label">{{ item.name }}</div>
+      </a>
+      {% endfor %}
+      
+      <!-- Custom Item Option -->
+      <a href="{% url 'groceries:product_add' %}?step=4&custom=true&category={{ category_key }}" class="wizard-card item-card custom-card" data-name="custom">
+        <div class="card-icon">➕</div>
+        <div class="card-label">Custom</div>
+      </a>
+    </div>
+    
+    <div class="wizard-actions">
+      <a href="{% url 'groceries:product_add' %}" class="btn-wizard btn-secondary">
+        ← Back
+      </a>
+    </div>
+  </div>
+  {% endif %}
+  
+  <!-- Step 3: Choose Variant -->
+  {% if step == 3 %}
+  <div class="wizard-step">
+    <h2 class="step-title">
+      <span class="step-number">3</span>
+      Choose Variant / Unit
+    </h2>
+    <p style="color: #64748b; margin-bottom: 20px;">{{ item_name }}</p>
+    
+    <div class="variant-grid">
+      {% for variant in item.variants %}
+      <a href="{% url 'groceries:product_add' %}?step=4&seed_key={{ category_key }}::{{ item_name|urlencode }}::{{ variant.label|urlencode }}" class="wizard-card variant-card">
+        <div class="card-icon">
+          {% if variant.unit_type == 'pcs' %}📦
+          {% elif variant.unit_type == 'kg' %}⚖️
+          {% elif variant.unit_type == 'litre' %}💧
+          {% elif variant.unit_type == 'tray' %}🥚
+          {% else %}📦{% endif %}
+        </div>
+        <div class="card-label">{{ variant.label }}</div>
+        <div class="unit-info">
+          {% if variant.unit_type == 'pcs' %}pieces
+          {% elif variant.unit_type == 'kg' %}kilograms
+          {% elif variant.unit_type == 'litre' %}litres
+          {% elif variant.unit_type == 'tray' %}tray
+          {% else %}{{ variant.unit_type }}{% endif %}
+        </div>
+      </a>
+      {% endfor %}
+    </div>
+    
+    <div class="wizard-actions">
+      <a href="{% url 'groceries:product_add' %}?step=2&category={{ category_key }}" class="btn-wizard btn-secondary">
+        ← Back
+      </a>
+    </div>
+  </div>
+  {% endif %}
+  
+  <!-- Step 4: Pricing + Stock -->
+  {% if step == 4 %}
+  <form method="post" id="productForm">
+    {% csrf_token %}
+    
+    {% if is_custom %}
+    <input type="hidden" name="is_custom" value="true">
+    <div class="wizard-step">
+      <h2 class="step-title">
+        <span class="step-number">4</span>
+        Custom Product Details
+      </h2>
+      
+      <div class="form-group">
+        <label class="form-label">Product Name *</label>
+        <input type="text" class="form-input" name="product_name" required placeholder="e.g., Custom Item">
+      </div>
+      
+      <div class="form-group">
+        <label class="form-label">Unit Type *</label>
+        <select class="form-input" name="unit_type" required>
+          <option value="pcs">Pieces (pcs)</option>
+          <option value="kg">Kilograms (kg)</option>
+          <option value="l">Litres (l)</option>
+          <option value="tray">Tray</option>
+        </select>
+      </div>
+      
+      <div class="form-group">
+        <label class="form-label">Category</label>
+        <select class="form-input" name="category">
+          <option value="other">Other</option>
+          <option value="food">Food Items</option>
+          <option value="beverages">Beverages</option>
+          <option value="household">Household Items</option>
+          <option value="snacks">Snacks</option>
+          <option value="dairy">Dairy Products</option>
+        </select>
+      </div>
+    </div>
+    {% else %}
+    <input type="hidden" name="seed_key" value="{{ seed_key }}">
+    <input type="hidden" name="is_custom" value="false">
+    <div class="wizard-step">
+      <h2 class="step-title">
+        <span class="step-number">4</span>
+        Pricing & Stock
+      </h2>
+      <p style="color: #64748b; margin-bottom: 20px;">
+        <strong>{{ item_name }} {{ variant_label }}</strong>
+      </p>
+    </div>
+    {% endif %}
+    
+    <div class="wizard-step">
+      <h3 style="font-size: 1.1rem; margin-bottom: 20px; color: #0f172a;">Pricing</h3>
+      
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+        <div class="form-group">
+          <label class="form-label">Cost Price (MK)</label>
+          <input type="number" class="form-input" id="cost_price" name="cost_price" min="0" step="0.01" placeholder="0.00">
+          <small style="color: #64748b; font-size: 0.85rem;">What you paid for it</small>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Selling Price (MK) *</label>
+          <input type="number" class="form-input" id="selling_price" name="selling_price" min="0" step="0.01" placeholder="0.00" required>
+          <small style="color: #64748b; font-size: 0.85rem;">What customers pay</small>
+          <!-- Pricing intelligence feedback -->
+          <div id="price-feedback" class="pricing-feedback" style="display:none; margin-top: 8px;"></div>
+        </div>
+      </div>
+      
+      <div class="form-group" style="margin-top: 20px;">
+        <label class="form-label">Initial Stock Quantity</label>
+        <input type="number" class="form-input" name="initial_stock" min="0" step="0.01" placeholder="0" value="0">
+        <small style="color: #64748b; font-size: 0.85rem;">
+          {% if variant %}
+            {% if variant.unit_type == 'pcs' %}Enter number of pieces
+            {% elif variant.unit_type == 'kg' %}Enter weight in kilograms (decimals allowed)
+            {% elif variant.unit_type == 'litre' %}Enter volume in litres (decimals allowed)
+            {% elif variant.unit_type == 'tray' %}Enter number of trays
+            {% else %}Enter quantity{% endif %}
+          {% else %}Enter initial stock quantity{% endif %}
+        </small>
+      </div>
+    </div>
+    
+    <div class="wizard-actions">
+      {% if not is_custom %}
+      <a href="{% url 'groceries:product_add' %}?step=3&category={{ category_key }}&item={{ item_name|urlencode }}" class="btn-wizard btn-secondary">
+        ← Back
+      </a>
+      {% else %}
+      <a href="{% url 'groceries:product_add' %}" class="btn-wizard btn-secondary">
+        ← Back
+      </a>
+      {% endif %}
+      <div style="flex: 1;"></div>
+      <a href="{% url 'groceries:stock_list' %}" class="btn-wizard btn-secondary">
+        Cancel
+      </a>
+      <button type="submit" class="btn-wizard btn-primary">
+        Save Product ✓
+      </button>
+    </div>
+  </form>
+  {% endif %}
+</div>
+
+<script>
+// Filter categories
+function filterCategories() {
+  const input = document.getElementById('categorySearch');
+  const filter = input.value.toLowerCase();
+  const cards = document.querySelectorAll('.category-card');
+  
+  cards.forEach(card => {
+    const name = card.getAttribute('data-name');
+    if (name.includes(filter)) {
+      card.style.display = 'block';
+    } else {
+      card.style.display = 'none';
+    }
+  });
+}
+
+// Filter items
+function filterItems() {
+  const input = document.getElementById('itemSearch');
+  const filter = input.value.toLowerCase();
+  const cards = document.querySelectorAll('.item-card');
+  
+  cards.forEach(card => {
+    const name = card.getAttribute('data-name');
+    if (name.includes(filter)) {
+      card.style.display = 'block';
+    } else {
+      card.style.display = 'none';
+    }
+  });
+}
+</script>
+
+<!-- Pricing Intelligence JavaScript -->
+<script src="{% static 'js/pricing-intelligence.js' %}"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  const costPriceInput = document.getElementById('cost_price');
+  const sellingPriceInput = document.getElementById('selling_price');
+  
+  if (costPriceInput && sellingPriceInput) {
+    let pricingValidator = null;
+    
+    function initializePricingIntelligence() {
+      const costPrice = parseFloat(costPriceInput.value) || 0;
+      
+      if (costPrice > 0) {
+        // Calculate suggested price (15% markup as default for groceries)
+        const suggestedPrice = costPrice * 1.15;
+        
+        if (pricingValidator) {
+          pricingValidator.updateCostPrice(costPrice);
+          pricingValidator.updateSuggestedPrice(suggestedPrice);
+        } else {
+          pricingValidator = new PricingIntelligence({
+            sellingPriceInput: '#selling_price',
+            costPrice: costPrice,
+            suggestedPrice: suggestedPrice,
+            feedbackContainer: '#price-feedback',
+            currency: 'MK'
+          });
+        }
+      }
+    }
+    
+    costPriceInput.addEventListener('input', initializePricingIntelligence);
+    costPriceInput.addEventListener('blur', initializePricingIntelligence);
+  }
+});
+</script>
+
+{% endblock %}
+

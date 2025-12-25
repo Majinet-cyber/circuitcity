@@ -350,6 +350,9 @@ def _post_login_url(request=None) -> str:
                     'pharmacy': "inventory_verticals:pharmacy_dashboard",
                     BusinessKind.GYM: "inventory_verticals:gym_dashboard",
                     'gym': "inventory_verticals:gym_dashboard",
+                    BusinessKind.GROCERY: "groceries:dashboard",
+                    'grocery': "groceries:dashboard",
+                    'groceries': "groceries:dashboard",
                 }
                 
                 route = vertical_routes.get(business_kind)
@@ -1292,7 +1295,11 @@ def signup_manager(request):
                     return _complete_manager_wizard_signup(request, wizard_data)
                 except Exception as e:
                     log.error("Manager wizard signup failed: %s", e, exc_info=True)
-                    messages.error(request, f"Something went wrong: {str(e)}. Please try again or contact support.")
+                    # Don't expose raw database errors to users
+                    if "NOT NULL constraint" in str(e) or "IntegrityError" in str(type(e).__name__):
+                        messages.error(request, "Could not create store. Please try again or contact support.")
+                    else:
+                        messages.error(request, f"Something went wrong: {str(e)}. Please try again or contact support.")
 
         # Prepare summary data for review
         summary = {
@@ -1390,6 +1397,17 @@ def _complete_manager_wizard_signup(request, wizard_data):
                 bkwargs["status"] = "ACTIVE"
             if hasattr(Business, "business_kind"):
                 bkwargs["business_kind"] = business_kind
+            
+            # Add section flags based on vertical (prevents NOT NULL constraint errors)
+            try:
+                from tenants.section_defaults import build_section_defaults
+                section_flags = build_section_defaults(business_kind)
+                # Only include flags that exist on the model (defensive)
+                for key, value in section_flags.items():
+                    if hasattr(Business, key):
+                        bkwargs[key] = value
+            except Exception as e:
+                log.warning("Failed to set section defaults: %s", e)
 
             biz = Business.objects.create(**bkwargs)
 
@@ -1662,6 +1680,17 @@ def _complete_wizard_signup(request, wizard_data):
                 bkwargs["status"] = "ACTIVE"
             if hasattr(Business, "business_kind"):
                 bkwargs["business_kind"] = business_kind
+            
+            # Add section flags based on vertical (prevents NOT NULL constraint errors)
+            try:
+                from tenants.section_defaults import build_section_defaults
+                section_flags = build_section_defaults(business_kind)
+                # Only include flags that exist on the model (defensive)
+                for key, value in section_flags.items():
+                    if hasattr(Business, key):
+                        bkwargs[key] = value
+            except Exception as e:
+                log.warning("Failed to set section defaults: %s", e)
             
             biz = Business.objects.create(**bkwargs)
             

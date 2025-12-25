@@ -1030,11 +1030,13 @@ def _handle_wizard_save(request: HttpRequest, business: Business) -> HttpRespons
                 )
             else:
                 # Create new batch
+                # Set barcode to empty string if not provided (CharField with blank=True uses empty string)
+                final_barcode = barcode_value if (has_barcode == "yes" and barcode_value) else ""
                 PharmacyBatch.objects.create(
                     business=business,
                     merch_product=product,
                     batch_number=batch_number,
-                    barcode=barcode_value if has_barcode == "yes" else "",
+                    barcode=final_barcode,
                     expiry_date=expiry_date,
                     quantity=qty,
                     cost_price=cost,

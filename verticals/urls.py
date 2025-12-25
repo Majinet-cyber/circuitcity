@@ -39,6 +39,7 @@ urlpatterns = [
     path("clothing/api/sales-trend/", clothing.sales_trend_json, name="clothing_sales_trend_json"),
     path("clothing/api/fast-sell/lookup/", clothing.fast_sell_lookup_api, name="clothing_fast_sell_lookup_api"),
     path("clothing/api/fast-sell/sell/", clothing.fast_sell_create_api, name="clothing_fast_sell_create_api"),
+    path("clothing/api/fast-sell/create-product/", clothing.fast_sell_create_product_api, name="clothing_fast_sell_create_product_api"),
     path("clothing/api/fast-sell/kpis/", clothing.fast_sell_kpis_api, name="clothing_fast_sell_kpis_api"),
     
     # Liquor vertical

@@ -503,11 +503,15 @@ def scan_in(request):
                     if data.get('selling_price'):
                         product.selling_price = data['selling_price']
                     
-                    # Update barcode if provided for existing product
-                    if final_barcode:
+                    # Update barcode if provided for existing product (only if has_barcode is yes)
+                    if has_barcode == "yes" and final_barcode:
                         product.barcode = final_barcode
+                    # If has_barcode is "no", don't change existing barcode (may have been set before)
                     
-                    product.save(update_fields=['quantity_in_stock', 'cost_price', 'selling_price', 'barcode'])
+                    update_fields = ['quantity_in_stock', 'cost_price', 'selling_price']
+                    if has_barcode == "yes" and final_barcode:
+                        update_fields.append('barcode')
+                    product.save(update_fields=update_fields)
                 
                 # Log the stock-in action
                 from inventory.models_verticals import ClothingProductLog, ClothingProductAction
@@ -999,6 +1003,98 @@ def fast_sell_create_api(request):
     )
     
     return JsonResponse(result)
+
+
+@login_required
+@require_business
+@require_business_kind(BusinessKind.CLOTHING)
+def fast_sell_create_product_api(request):
+    """API: Create a product from fast sell (when barcode not found)"""
+    from django.http import JsonResponse
+    from inventory.services.products import create_or_update_clothing_product
+    from django.core.exceptions import ValidationError
+    import json
+    
+    if request.method != "POST":
+        return JsonResponse({"ok": False, "error": "POST required"}, status=405)
+    
+    business = base.base_context(request).get("business")
+    
+    try:
+        data = json.loads(request.body)
+    except json.JSONDecodeError:
+        return JsonResponse({"ok": False, "error": "Invalid JSON"}, status=400)
+    
+    # Extract product data
+    name = data.get("name", "").strip()
+    barcode = data.get("barcode", "").strip() or None  # None if empty
+    category = data.get("category", "").strip() or None
+    size = data.get("size", "").strip() or None
+    color = data.get("color", "").strip() or None
+    cost_price_str = data.get("cost_price", "")
+    selling_price_str = data.get("selling_price", "")
+    quantity = int(data.get("quantity", 1))
+    
+    # Validation
+    if not name:
+        return JsonResponse({"ok": False, "error": "Product name is required"}, status=400)
+    
+    if not selling_price_str:
+        return JsonResponse({"ok": False, "error": "Selling price is required"}, status=400)
+    
+    # Parse prices
+    try:
+        selling_price = Decimal(str(selling_price_str))
+        if selling_price <= 0:
+            return JsonResponse({"ok": False, "error": "Selling price must be greater than 0"}, status=400)
+    except (ValueError, TypeError):
+        return JsonResponse({"ok": False, "error": "Invalid selling price"}, status=400)
+    
+    cost_price = None
+    if cost_price_str:
+        try:
+            cost_price = Decimal(str(cost_price_str))
+            if cost_price < 0:
+                return JsonResponse({"ok": False, "error": "Cost price cannot be negative"}, status=400)
+        except (ValueError, TypeError):
+            return JsonResponse({"ok": False, "error": "Invalid cost price"}, status=400)
+    
+    # Create product
+    try:
+        product = create_or_update_clothing_product(
+            business=business,
+            name=name,
+            barcode=barcode,  # None if not provided (allows products without barcode)
+            category=category,
+            size=size,
+            color=color,
+            cost_price=cost_price,
+            selling_price=selling_price,
+            quantity=quantity,
+        )
+        
+        return JsonResponse({
+            "ok": True,
+            "product": {
+                "id": product.id,
+                "name": product.name,
+                "barcode": product.barcode or "",
+                "category": product.category or "",
+                "size": getattr(product, "size", "") or "",
+                "color": getattr(product, "color", "") or "",
+            },
+            "stock_qty": product.quantity_in_stock or 0,
+            "selling_price": float(selling_price),
+            "message": f"Product '{name}' created successfully"
+        })
+    
+    except ValidationError as e:
+        return JsonResponse({"ok": False, "error": str(e)}, status=400)
+    except Exception as e:
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.exception(f"Error creating product in fast sell: {e}")
+        return JsonResponse({"ok": False, "error": f"Error creating product: {str(e)}"}, status=500)
 
 
 @login_required

@@ -11,7 +11,7 @@ from typing import Optional
 from django import forms
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
-from django.db import IntegrityError
+from django.db import IntegrityError, transaction
 from django.db.models.deletion import ProtectedError
 from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_POST
@@ -602,22 +602,26 @@ def product_create_liquor_v2(request):
                     setattr(p, "business_id", getattr(biz, "id", biz))
             
             # Set barcode to None or empty if not provided (critical for nullable field)
+            # Barcode is OPTIONAL - only set if user explicitly provides it
             if has_barcode == "yes" and barcode_value:
                 p.barcode = barcode_value
             else:
                 # Explicitly set to None (not empty string) for proper nullable handling
+                # This ensures database constraint allows NULL barcodes
                 p.barcode = None
             
             _inflate_liquor(p, form.cleaned_data)
             
             try:
-                p.save()
-                messages.success(request, "✅ Liquor product saved successfully.")
-                return redirect(URL_NAME_LIQUOR)
+                with transaction.atomic():
+                    p.save()
+                    messages.success(request, "✅ Liquor product saved successfully.")
+                    return redirect(URL_NAME_LIQUOR)
             except IntegrityError as e:
-                if 'barcode' in str(e).lower():
+                error_msg = str(e).lower()
+                if 'barcode' in error_msg:
                     messages.error(request, "❌ A product with this barcode already exists. Barcodes must be unique.")
-                elif 'name' in str(e).lower() or 'unique' in str(e).lower():
+                elif 'name' in error_msg or 'unique' in error_msg:
                     messages.error(
                         request, 
                         "❌ A liquor product with this name already exists for your business. "
@@ -625,8 +629,70 @@ def product_create_liquor_v2(request):
                     )
                 else:
                     messages.error(request, f"❌ Could not save product: {str(e)}")
+                # Re-render form with errors
+                from inventory.models import LiquorProduct
+                products = LiquorProduct.objects.filter(
+                    business=business,
+                    is_archived=False,
+                ).order_by("category", "name")
+                try:
+                    from core.decorators import _is_manager
+                    is_manager = _is_manager(request.user)
+                except (ImportError, AttributeError):
+                    is_manager = request.user.is_staff or request.user.is_superuser
+                return render(request, "inventory/products/liquor_v2.html", {
+                    "form": form,
+                    "products": products,
+                    "vertical": "liquor",
+                    "active_tab": "liquor_products",
+                    "IS_MANAGER": is_manager,
+                })
             except Exception as e:
+                import logging
+                logger = logging.getLogger(__name__)
+                logger.error(f"Error saving liquor product: {e}", exc_info=True)
                 messages.error(request, f"❌ Error saving product: {str(e)}")
+                # Re-render form with errors
+                from inventory.models import LiquorProduct
+                products = LiquorProduct.objects.filter(
+                    business=business,
+                    is_archived=False,
+                ).order_by("category", "name")
+                try:
+                    from core.decorators import _is_manager
+                    is_manager = _is_manager(request.user)
+                except (ImportError, AttributeError):
+                    is_manager = request.user.is_staff or request.user.is_superuser
+                return render(request, "inventory/products/liquor_v2.html", {
+                    "form": form,
+                    "products": products,
+                    "vertical": "liquor",
+                    "active_tab": "liquor_products",
+                    "IS_MANAGER": is_manager,
+                })
+        else:
+            # Form validation failed - show errors
+            from inventory.models import LiquorProduct
+            products = LiquorProduct.objects.filter(
+                business=business,
+                is_archived=False,
+            ).order_by("category", "name")
+            try:
+                from core.decorators import _is_manager
+                is_manager = _is_manager(request.user)
+            except (ImportError, AttributeError):
+                is_manager = request.user.is_staff or request.user.is_superuser
+            # Show form errors
+            for field, errors in form.errors.items():
+                for error in errors:
+                    messages.error(request, f"❌ {field}: {error}")
+            return render(request, "inventory/products/liquor_v2.html", {
+                "form": form,
+                "products": products,
+                "vertical": "liquor",
+                "active_tab": "liquor_products",
+                "IS_MANAGER": is_manager,
+            })
     else:
         form = LiquorProductForm()
 
@@ -834,17 +900,25 @@ def product_create_clothing_v2(request):
                 unique_name = base_name
             
             # Use update_or_create for idempotent save
-            obj, created = MerchProduct.objects.update_or_create(
-                business=business,
-                name=unique_name,
-                defaults={
-                    "kind": BusinessKind.CLOTHING,
-                    "size": size,
-                    "selling_price": data.get("price"),
-                    "is_active": True,
-                    "track_inventory": True,
-                }
-            )
+            # CRITICAL: Explicitly set barcode to None (not empty string) for nullable field
+            with transaction.atomic():
+                obj, created = MerchProduct.objects.update_or_create(
+                    business=business,
+                    name=unique_name,
+                    defaults={
+                        "kind": BusinessKind.CLOTHING,
+                        "size": size,
+                        "selling_price": data.get("price"),
+                        "is_active": True,
+                        "track_inventory": True,
+                        "barcode": None,  # Explicitly set to None - barcode is optional
+                    }
+                )
+                
+                # Ensure barcode is None if not explicitly provided
+                if obj.barcode == "":
+                    obj.barcode = None
+                    obj.save(update_fields=['barcode'])
             
             if created:
                 messages.success(request, f"✅ Clothing product created: {unique_name}")

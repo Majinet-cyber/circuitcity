@@ -100,9 +100,15 @@ class RollbackService:
             
             # Agents can only rollback their own sales within 10 minutes
             if role == "AGENT":
-                if sale.agent != user:
+                # Safety check: sale must have an agent
+                if not hasattr(sale, 'agent') or sale.agent is None:
+                    return False, "Sale does not have an assigned agent"
+                
+                # Agents can only rollback their own sales
+                if sale.agent.id != user.id:
                     return False, "Agents can only rollback their own sales"
                 
+                # Time restriction: agents have 10 minutes to rollback
                 time_since_sale = timezone.now() - sale.created_at
                 if time_since_sale > timedelta(minutes=10):
                     return False, "Agents can only rollback sales within 10 minutes"

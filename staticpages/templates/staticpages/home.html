@@ -274,6 +274,12 @@
       overflow: hidden;
     }
 
+    @media (max-width: 480px) {
+      .hero {
+        padding: 6rem 14px 3rem;
+      }
+    }
+
     .hero::before {
       content: '';
       position: absolute;
@@ -351,6 +357,12 @@
       background: var(--white);
     }
 
+    @media (max-width: 480px) {
+      .how-it-works {
+        padding: 4rem 14px;
+      }
+    }
+
     .section-title {
       text-align: center;
       font-size: 2.5rem;
@@ -421,6 +433,12 @@
     .features {
       padding: 5rem 2rem;
       background: var(--bg-light);
+    }
+
+    @media (max-width: 480px) {
+      .features {
+        padding: 4rem 14px;
+      }
     }
 
     .features-grid {
@@ -599,7 +617,7 @@
 
     @media (max-width: 430px) {
       .navbar-content {
-        padding: 1rem;
+        padding: 1rem 14px;
       }
 
       .logo {
@@ -621,28 +639,17 @@
         line-height: 1.5;
       }
 
-      .hero {
-        padding: 6rem 1rem 3rem;
-      }
-
       /* Ensure cards don't overflow on small screens */
       .card, .feature-card, .step-card {
         width: 100%;
         margin: 0 auto;
-        padding: 1.5rem 1rem;
-      }
-
-      /* Make all sections full-width with consistent padding */
-      section {
-        padding-left: 1rem !important;
-        padding-right: 1rem !important;
-        overflow-x: hidden;
+        padding: 1.5rem 14px;
       }
 
       /* Prevent simulator and CAC calculator from overflowing */
       .simulator-container, .cac-container {
         width: 100%;
-        padding: 1rem;
+        padding: 1rem 14px;
         overflow-x: hidden;
       }
 
@@ -671,6 +678,12 @@
       position: relative;
       overflow: hidden;
       max-width: 100%;
+    }
+
+    @media (max-width: 480px) {
+      .reality-stats-section {
+        padding: 3rem 14px;
+      }
     }
 
     .reality-stats-container {
@@ -1317,6 +1330,239 @@
         font-size: 2rem !important;
       }
     }
+
+    /* ============================================
+       LANDING PAGE PREMIUM SPACING & CONSISTENCY
+       ============================================ */
+    
+    /* Reusable landing container for consistent spacing */
+    .landing-container {
+      max-width: 1280px;
+      margin: 0 auto;
+      padding-left: 2rem;
+      padding-right: 2rem;
+    }
+
+    @media (max-width: 480px) {
+      .landing-container {
+        padding-left: 14px;
+        padding-right: 14px;
+      }
+    }
+
+    /* Consistent spacing applied via landing-container class and section-specific rules */
+
+    /* Live Metrics - Stable Layout with Plus Sign */
+    .growth-metric {
+      min-width: 120px; /* Prevent layout shift */
+    }
+
+    .growth-metric-value {
+      font-variant-numeric: tabular-nums; /* Stable width numbers */
+      font-feature-settings: "tnum";
+      display: inline-block;
+      min-width: 80px; /* Reserve space for number + plus */
+    }
+
+    .growth-metric-value::after {
+      content: '+';
+      font-weight: 600;
+      margin-left: 2px;
+      display: inline-block;
+    }
+
+    /* KPI Cards Typography Hierarchy */
+    .kpi-card-main-value {
+      font-size: 2.5rem;
+      font-weight: 800;
+      line-height: 1.1;
+      margin: 0.5rem 0;
+    }
+
+    .kpi-card-currency {
+      font-size: 1.25rem;
+      font-weight: 500;
+      opacity: 0.85;
+      vertical-align: baseline;
+    }
+
+    .kpi-card-number {
+      font-size: 2.5rem;
+      font-weight: 800;
+    }
+
+    .kpi-card-label {
+      font-size: 0.9rem;
+      font-weight: 500;
+      opacity: 0.9;
+      margin-bottom: 0.5rem;
+    }
+
+    /* Mobile Sticky CTA Bar */
+    .mobile-cta-bar {
+      display: none;
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      background: rgba(255, 255, 255, 0.98);
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+      box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.1);
+      padding: 1rem;
+      z-index: 999;
+      border-top: 1px solid rgba(79, 70, 229, 0.1);
+    }
+
+    @media (max-width: 768px) {
+      .mobile-cta-bar {
+        display: flex;
+        gap: 0.75rem;
+        align-items: center;
+        justify-content: center;
+      }
+
+      /* Add bottom padding to body to prevent content overlap */
+      body {
+        padding-bottom: 80px;
+      }
+    }
+
+    .mobile-cta-bar .btn-primary {
+      flex: 1;
+      max-width: 200px;
+    }
+
+    .mobile-cta-bar .btn-text {
+      font-size: 0.9rem;
+      padding: 0.5rem 1rem;
+    }
+
+    /* Team Section Avatars */
+    .team-avatar {
+      width: 48px;
+      height: 48px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
+      color: var(--white);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 700;
+      font-size: 1.1rem;
+      flex-shrink: 0;
+      margin-right: 0.75rem;
+    }
+
+    .team-card-header {
+      display: flex;
+      align-items: center;
+      margin-bottom: 1rem;
+    }
+
+    /* Education List with Show More */
+    .education-list {
+      list-style: none;
+      padding: 0;
+      margin: 0 0 1rem 0;
+      color: var(--text-secondary);
+      font-size: 0.9rem;
+      line-height: 1.6;
+    }
+
+    .education-list li {
+      display: flex;
+      align-items: flex-start;
+      margin-bottom: 0.5rem;
+      min-width: 0;
+    }
+
+    .education-list li.show-more-hidden {
+      display: none;
+    }
+
+    .show-more-toggle {
+      background: transparent;
+      border: none;
+      color: var(--primary);
+      font-size: 0.85rem;
+      font-weight: 600;
+      cursor: pointer;
+      padding: 0.5rem 0;
+      margin-top: 0.5rem;
+      text-decoration: underline;
+    }
+
+    .show-more-toggle:hover {
+      color: var(--primary-dark);
+    }
+
+    /* Hero CTA Buttons */
+    .hero-cta-buttons {
+      display: flex;
+      gap: 1rem;
+      flex-wrap: wrap;
+      margin-top: 2rem;
+    }
+
+    /* Section CTA after stats */
+    .section-cta {
+      text-align: center;
+      padding: 3rem 2rem;
+      background: linear-gradient(135deg, rgba(79, 70, 229, 0.05) 0%, rgba(16, 185, 129, 0.05) 100%);
+      border-radius: 20px;
+      margin: 3rem auto;
+      max-width: 600px;
+    }
+
+    @media (max-width: 480px) {
+      .section-cta {
+        padding: 2.5rem 14px;
+        margin: 2rem auto;
+      }
+    }
+
+    .section-cta h3 {
+      font-size: 1.75rem;
+      font-weight: 700;
+      color: var(--text-primary);
+      margin-bottom: 1rem;
+    }
+
+    .section-cta p {
+      font-size: 1.125rem;
+      color: var(--text-secondary);
+      margin-bottom: 2rem;
+    }
+
+    /* Button consistency */
+    .btn {
+      height: 44px; /* Consistent button height */
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    /* Icon alignment */
+    .feature-icon,
+    .step-number {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    /* Prevent horizontal scroll */
+    @media (max-width: 480px) {
+      body {
+        overflow-x: hidden;
+      }
+      
+      /* Team section mobile padding */
+      section.landing-container {
+        padding-left: 14px;
+        padding-right: 14px;
+      }
+    }
   </style>
 </head>
 <body>
@@ -1373,15 +1619,21 @@
           Built in Malawi for African businesses.
         </p>
         
+        <!-- Hero CTA Buttons -->
+        <div class="hero-cta-buttons">
+          <a href="{% url 'login' %}" class="btn btn-primary">Create Account</a>
+          <a href="{% url 'login' %}" class="btn btn-outline">Login</a>
+        </div>
+        
         <!-- Live Platform Growth Metrics -->
         <div class="platform-growth-metrics" style="margin-top: 2rem; padding: 1.5rem; background: rgba(79, 70, 229, 0.05); border-radius: 16px; border: 1px solid rgba(79, 70, 229, 0.1);">
           <div style="display: flex; gap: 2rem; justify-content: center; flex-wrap: wrap;">
             <div class="growth-metric" style="text-align: center;">
-              <div style="font-size: 2.5rem; font-weight: 800; color: var(--primary);" id="totalMerchants" data-target="{{ total_merchants|default:0 }}">0</div>
+              <div class="growth-metric-value" style="font-size: 2.5rem; font-weight: 800; color: var(--primary);" id="totalMerchants" data-target="{{ total_merchants|default:0 }}">0</div>
               <div style="font-size: 0.9rem; color: var(--text-secondary); margin-top: 0.25rem;">Active Merchants</div>
             </div>
             <div class="growth-metric" style="text-align: center;">
-              <div style="font-size: 2.5rem; font-weight: 800; color: var(--secondary);" id="totalAgents" data-target="{{ total_agents|default:0 }}">0</div>
+              <div class="growth-metric-value" style="font-size: 2.5rem; font-weight: 800; color: var(--secondary);" id="totalAgents" data-target="{{ total_agents|default:0 }}">0</div>
               <div style="font-size: 0.9rem; color: var(--text-secondary); margin-top: 0.25rem;">Registered Agents</div>
             </div>
           </div>
@@ -1394,6 +1646,16 @@
       <div class="hero-image">
         <img src="{% static 'img/majn.png' %}" alt="Emajinet" class="hero-logo">
       </div>
+    </div>
+  </section>
+
+  <!-- Section CTA after Stats -->
+  <section class="section-cta landing-container">
+    <h3>Ready to get started?</h3>
+    <p>Join businesses already using Emajinet to manage their operations</p>
+    <div style="display: flex; gap: 1rem; justify-content: center; flex-wrap: wrap;">
+      <a href="{% url 'login' %}" class="btn btn-primary">Create Account</a>
+      <a href="{% url 'login' %}" class="btn btn-outline">Login</a>
     </div>
   </section>
 
@@ -1521,7 +1783,7 @@
   </section>
 
   <!-- Mission Statement Section -->
-  <section style="padding: 4rem 2rem; background: var(--white); text-align: center;">
+  <section class="landing-container" style="padding: 4rem 0; background: var(--white); text-align: center;">
     <div style="max-width: 800px; margin: 0 auto;">
       <h2 class="section-title" style="margin-bottom: 1.5rem;">Our Mission</h2>
       <p style="font-size: 1.25rem; line-height: 1.8; color: var(--text-secondary); margin-bottom: 0;">
@@ -1621,7 +1883,7 @@
   </section>
 
   <!-- Team Section -->
-  <section style="padding: 5rem 2rem; background: var(--white);">
+  <section class="landing-container" style="padding: 5rem 0; background: var(--white);">
     <h2 class="section-title">Team</h2>
     <p class="section-subtitle">
       Built in Malawi, for Africa — combining engineering, operations, and analytics.
@@ -1630,30 +1892,29 @@
     <div style="max-width: 1280px; margin: 0 auto; display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 2rem; margin-bottom: 3rem;">
       <!-- Paul Chris Mwale -->
       <div style="background: var(--white); border-radius: 20px; padding: 2rem; box-shadow: var(--shadow); border: 2px solid rgba(79, 70, 229, 0.1); transition: transform 0.3s ease; min-width: 0;">
-        <div style="display: flex; align-items: center; gap: 0.75rem; margin-bottom: 1rem;">
-          <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="var(--primary)" viewBox="0 0 16 16" style="flex-shrink: 0;">
-            <path d="M12.5 16a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7Zm.5-5v1h1a.5.5 0 0 1 0 1h-1v1a.5.5 0 0 1-1 0v-1h-1a.5.5 0 0 1 0-1h1v-1a.5.5 0 0 1 1 0Zm-2-6a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z"/>
-            <path d="M2 13c0 1 1 1 1 1h5.256A4.493 4.493 0 0 1 8 12.5a4.49 4.49 0 0 1 1.544-3.393C9.077 9.038 8.564 9 8 9c-5 0-6 3-6 4Z"/>
-          </svg>
-          <h3 style="font-size: 1.25rem; font-weight: 700; color: var(--text-primary); margin: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">Paul Chris Mwale</h3>
+        <div class="team-card-header">
+          <div class="team-avatar">PCM</div>
+          <div style="flex: 1; min-width: 0;">
+            <h3 style="font-size: 1.25rem; font-weight: 700; color: var(--text-primary); margin: 0 0 0.25rem 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">Paul Chris Mwale</h3>
+            <p style="font-size: 0.95rem; font-weight: 600; color: var(--primary); margin: 0;">CEO & Co-founder</p>
+          </div>
         </div>
-        <p style="font-size: 0.95rem; font-weight: 600; color: var(--primary); margin-bottom: 1rem;">CEO & Co-founder</p>
-        <ul style="list-style: none; padding: 0; margin: 0 0 1rem 0; color: var(--text-secondary); font-size: 0.9rem; line-height: 1.6;">
-          <li style="display: flex; align-items: flex-start; margin-bottom: 0.5rem; min-width: 0;">
+        <ul class="education-list" data-team-member="pcm">
+          <li>
             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="var(--secondary)" viewBox="0 0 16 16" style="flex-shrink: 0; margin-top: 0.2rem; margin-right: 0.5rem;">
               <path d="M8.211 2.047a.5.5 0 0 0-.422 0l-7.5 3.5a.5.5 0 0 0 .025.917l7.5 3a.5.5 0 0 0 .372 0L14 7.14V13a1 1 0 0 0-1 1v2h3v-2a1 1 0 0 0-1-1V6.739l.686-.275a.5.5 0 0 0 .025-.917l-7.5-3.5Z"/>
               <path d="M4.176 9.032a.5.5 0 0 0-.656.327l-.5 1.7a.5.5 0 0 0 .294.605l4.5 1.8a.5.5 0 0 0 .372 0l4.5-1.8a.5.5 0 0 0 .294-.605l-.5-1.7a.5.5 0 0 0-.656-.327L8 10.466 4.176 9.032Z"/>
             </svg>
             <span style="overflow: hidden; text-overflow: ellipsis;">Master of Software Engineering — Quantic</span>
           </li>
-          <li style="display: flex; align-items: flex-start; margin-bottom: 0.5rem; min-width: 0;">
+          <li>
             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="var(--secondary)" viewBox="0 0 16 16" style="flex-shrink: 0; margin-top: 0.2rem; margin-right: 0.5rem;">
               <path d="M8.211 2.047a.5.5 0 0 0-.422 0l-7.5 3.5a.5.5 0 0 0 .025.917l7.5 3a.5.5 0 0 0 .372 0L14 7.14V13a1 1 0 0 0-1 1v2h3v-2a1 1 0 0 0-1-1V6.739l.686-.275a.5.5 0 0 0 .025-.917l-7.5-3.5Z"/>
               <path d="M4.176 9.032a.5.5 0 0 0-.656.327l-.5 1.7a.5.5 0 0 0 .294.605l4.5 1.8a.5.5 0 0 0 .372 0l4.5-1.8a.5.5 0 0 0 .294-.605l-.5-1.7a.5.5 0 0 0-.656-.327L8 10.466 4.176 9.032Z"/>
             </svg>
             <span style="overflow: hidden; text-overflow: ellipsis;">Master of Business Administration — Quantic</span>
           </li>
-          <li style="display: flex; align-items: flex-start; min-width: 0;">
+          <li>
             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="var(--secondary)" viewBox="0 0 16 16" style="flex-shrink: 0; margin-top: 0.2rem; margin-right: 0.5rem;">
               <path d="M8.211 2.047a.5.5 0 0 0-.422 0l-7.5 3.5a.5.5 0 0 0 .025.917l7.5 3a.5.5 0 0 0 .372 0L14 7.14V13a1 1 0 0 0-1 1v2h3v-2a1 1 0 0 0-1-1V6.739l.686-.275a.5.5 0 0 0 .025-.917l-7.5-3.5Z"/>
               <path d="M4.176 9.032a.5.5 0 0 0-.656.327l-.5 1.7a.5.5 0 0 0 .294.605l4.5 1.8a.5.5 0 0 0 .372 0l4.5-1.8a.5.5 0 0 0 .294-.605l-.5-1.7a.5.5 0 0 0-.656-.327L8 10.466 4.176 9.032Z"/>
@@ -1666,23 +1927,22 @@
 
       <!-- Josephy Miamba -->
       <div style="background: var(--white); border-radius: 20px; padding: 2rem; box-shadow: var(--shadow); border: 2px solid rgba(79, 70, 229, 0.1); transition: transform 0.3s ease; min-width: 0;">
-        <div style="display: flex; align-items: center; gap: 0.75rem; margin-bottom: 1rem;">
-          <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="var(--primary)" viewBox="0 0 16 16" style="flex-shrink: 0;">
-            <path d="M12.5 16a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7Zm.5-5v1h1a.5.5 0 0 1 0 1h-1v1a.5.5 0 0 1-1 0v-1h-1a.5.5 0 0 1 0-1h1v-1a.5.5 0 0 1 1 0Zm-2-6a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z"/>
-            <path d="M2 13c0 1 1 1 1 1h5.256A4.493 4.493 0 0 1 8 12.5a4.49 4.49 0 0 1 1.544-3.393C9.077 9.038 8.564 9 8 9c-5 0-6 3-6 4Z"/>
-          </svg>
-          <h3 style="font-size: 1.25rem; font-weight: 700; color: var(--text-primary); margin: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">Josephy Miamba</h3>
+        <div class="team-card-header">
+          <div class="team-avatar">JM</div>
+          <div style="flex: 1; min-width: 0;">
+            <h3 style="font-size: 1.25rem; font-weight: 700; color: var(--text-primary); margin: 0 0 0.25rem 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">Josephy Miamba</h3>
+            <p style="font-size: 0.95rem; font-weight: 600; color: var(--primary); margin: 0;">Director of Operations</p>
+          </div>
         </div>
-        <p style="font-size: 0.95rem; font-weight: 600; color: var(--primary); margin-bottom: 1rem;">Director of Operations</p>
-        <ul style="list-style: none; padding: 0; margin: 0 0 1rem 0; color: var(--text-secondary); font-size: 0.9rem; line-height: 1.6;">
-          <li style="display: flex; align-items: flex-start; margin-bottom: 0.5rem; min-width: 0;">
+        <ul class="education-list" data-team-member="jm">
+          <li>
             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="var(--secondary)" viewBox="0 0 16 16" style="flex-shrink: 0; margin-top: 0.2rem; margin-right: 0.5rem;">
               <path d="M8.211 2.047a.5.5 0 0 0-.422 0l-7.5 3.5a.5.5 0 0 0 .025.917l7.5 3a.5.5 0 0 0 .372 0L14 7.14V13a1 1 0 0 0-1 1v2h3v-2a1 1 0 0 0-1-1V6.739l.686-.275a.5.5 0 0 0 .025-.917l-7.5-3.5Z"/>
               <path d="M4.176 9.032a.5.5 0 0 0-.656.327l-.5 1.7a.5.5 0 0 0 .294.605l4.5 1.8a.5.5 0 0 0 .372 0l4.5-1.8a.5.5 0 0 0 .294-.605l-.5-1.7a.5.5 0 0 0-.656-.327L8 10.466 4.176 9.032Z"/>
             </svg>
             <span style="overflow: hidden; text-overflow: ellipsis;">Master of Business Administration — Amity University</span>
           </li>
-          <li style="display: flex; align-items: flex-start; min-width: 0;">
+          <li>
             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="var(--secondary)" viewBox="0 0 16 16" style="flex-shrink: 0; margin-top: 0.2rem; margin-right: 0.5rem;">
               <path d="M8.211 2.047a.5.5 0 0 0-.422 0l-7.5 3.5a.5.5 0 0 0 .025.917l7.5 3a.5.5 0 0 0 .372 0L14 7.14V13a1 1 0 0 0-1 1v2h3v-2a1 1 0 0 0-1-1V6.739l.686-.275a.5.5 0 0 0 .025-.917l-7.5-3.5Z"/>
               <path d="M4.176 9.032a.5.5 0 0 0-.656.327l-.5 1.7a.5.5 0 0 0 .294.605l4.5 1.8a.5.5 0 0 0 .372 0l4.5-1.8a.5.5 0 0 0 .294-.605l-.5-1.7a.5.5 0 0 0-.656-.327L8 10.466 4.176 9.032Z"/>
@@ -1694,23 +1954,22 @@
 
       <!-- Lloyd Chunga -->
       <div style="background: var(--white); border-radius: 20px; padding: 2rem; box-shadow: var(--shadow); border: 2px solid rgba(79, 70, 229, 0.1); transition: transform 0.3s ease; min-width: 0;">
-        <div style="display: flex; align-items: center; gap: 0.75rem; margin-bottom: 1rem;">
-          <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="var(--primary)" viewBox="0 0 16 16" style="flex-shrink: 0;">
-            <path d="M12.5 16a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7Zm.5-5v1h1a.5.5 0 0 1 0 1h-1v1a.5.5 0 0 1-1 0v-1h-1a.5.5 0 0 1 0-1h1v-1a.5.5 0 0 1 1 0Zm-2-6a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z"/>
-            <path d="M2 13c0 1 1 1 1 1h5.256A4.493 4.493 0 0 1 8 12.5a4.49 4.49 0 0 1 1.544-3.393C9.077 9.038 8.564 9 8 9c-5 0-6 3-6 4Z"/>
-          </svg>
-          <h3 style="font-size: 1.25rem; font-weight: 700; color: var(--text-primary); margin: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">Lloyd Chunga</h3>
+        <div class="team-card-header">
+          <div class="team-avatar">LC</div>
+          <div style="flex: 1; min-width: 0;">
+            <h3 style="font-size: 1.25rem; font-weight: 700; color: var(--text-primary); margin: 0 0 0.25rem 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">Lloyd Chunga</h3>
+            <p style="font-size: 0.95rem; font-weight: 600; color: var(--primary); margin: 0;">CTO</p>
+          </div>
         </div>
-        <p style="font-size: 0.95rem; font-weight: 600; color: var(--primary); margin-bottom: 1rem;">CTO</p>
-        <ul style="list-style: none; padding: 0; margin: 0 0 1rem 0; color: var(--text-secondary); font-size: 0.9rem; line-height: 1.6;">
-          <li style="display: flex; align-items: flex-start; margin-bottom: 0.5rem; min-width: 0;">
+        <ul class="education-list" data-team-member="lc">
+          <li>
             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="var(--secondary)" viewBox="0 0 16 16" style="flex-shrink: 0; margin-top: 0.2rem; margin-right: 0.5rem;">
               <path d="M8.211 2.047a.5.5 0 0 0-.422 0l-7.5 3.5a.5.5 0 0 0 .025.917l7.5 3a.5.5 0 0 0 .372 0L14 7.14V13a1 1 0 0 0-1 1v2h3v-2a1 1 0 0 0-1-1V6.739l.686-.275a.5.5 0 0 0 .025-.917l-7.5-3.5Z"/>
               <path d="M4.176 9.032a.5.5 0 0 0-.656.327l-.5 1.7a.5.5 0 0 0 .294.605l4.5 1.8a.5.5 0 0 0 .372 0l4.5-1.8a.5.5 0 0 0 .294-.605l-.5-1.7a.5.5 0 0 0-.656-.327L8 10.466 4.176 9.032Z"/>
             </svg>
             <span style="overflow: hidden; text-overflow: ellipsis;">Master of Business Analytics — University of Delaware</span>
           </li>
-          <li style="display: flex; align-items: flex-start; min-width: 0;">
+          <li>
             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="var(--secondary)" viewBox="0 0 16 16" style="flex-shrink: 0; margin-top: 0.2rem; margin-right: 0.5rem;">
               <path d="M8.211 2.047a.5.5 0 0 0-.422 0l-7.5 3.5a.5.5 0 0 0 .025.917l7.5 3a.5.5 0 0 0 .372 0L14 7.14V13a1 1 0 0 0-1 1v2h3v-2a1 1 0 0 0-1-1V6.739l.686-.275a.5.5 0 0 0 .025-.917l-7.5-3.5Z"/>
               <path d="M4.176 9.032a.5.5 0 0 0-.656.327l-.5 1.7a.5.5 0 0 0 .294.605l4.5 1.8a.5.5 0 0 0 .372 0l4.5-1.8a.5.5 0 0 0 .294-.605l-.5-1.7a.5.5 0 0 0-.656-.327L8 10.466 4.176 9.032Z"/>
@@ -1735,7 +1994,7 @@
   </section>
 
   <!-- Motto Section (T.S. Eliot) -->
-  <section style="padding: 5rem 2rem; background: linear-gradient(135deg, #f9fafb 0%, #e0e7ff 100%); position: relative; overflow: hidden;">
+  <section class="landing-container" style="padding: 5rem 0; background: linear-gradient(135deg, #f9fafb 0%, #e0e7ff 100%); position: relative; overflow: hidden;">
     <div style="max-width: 900px; margin: 0 auto; position: relative; z-index: 1;">
       <div style="background: rgba(255, 255, 255, 0.9); backdrop-filter: blur(10px); border-radius: 24px; padding: 3rem 2.5rem; box-shadow: 0 20px 60px rgba(79, 70, 229, 0.15); border: 1px solid rgba(79, 70, 229, 0.1);">
         <div style="text-align: center; margin-bottom: 2rem;">
@@ -1757,7 +2016,7 @@
   </section>
 
   <!-- Business Simulator Section -->
-  <section id="business-simulator" style="padding: 5rem 2rem; background: linear-gradient(135deg, #f9fafb 0%, #e0e7ff 100%);">
+  <section id="business-simulator" class="landing-container" style="padding: 5rem 0; background: linear-gradient(135deg, #f9fafb 0%, #e0e7ff 100%);">
     <div style="max-width: 1100px; margin: 0 auto;">
       <h2 class="section-title">📊 Business Simulator</h2>
       <p class="section-subtitle" style="margin-bottom: 3rem;">
@@ -1831,31 +2090,31 @@
           
           <!-- Revenue Card -->
           <div style="background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%); border-radius: 20px; padding: 2rem; text-align: center; color: var(--white); box-shadow: 0 10px 30px rgba(79, 70, 229, 0.3);">
-            <div style="font-size: 0.9rem; opacity: 0.9; margin-bottom: 0.5rem; font-weight: 500;">
+            <div class="kpi-card-label" style="opacity: 0.9;">
               Estimated monthly revenue
             </div>
-            <div id="sim-revenue" style="font-size: 2.25rem; font-weight: 800; letter-spacing: -0.02em;">
-              MWK 1,000,000
+            <div id="sim-revenue" class="kpi-card-main-value" style="letter-spacing: -0.02em;">
+              <span class="kpi-card-number">1,000,000</span><span class="kpi-card-currency"> MWK</span>
             </div>
           </div>
 
           <!-- Costs Card -->
           <div style="background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%); border-radius: 20px; padding: 2rem; text-align: center; color: var(--white); box-shadow: 0 10px 30px rgba(239, 68, 68, 0.3);">
-            <div style="font-size: 0.9rem; opacity: 0.9; margin-bottom: 0.5rem; font-weight: 500;">
+            <div class="kpi-card-label" style="opacity: 0.9;">
               Estimated monthly costs
             </div>
-            <div id="sim-costs" style="font-size: 2.25rem; font-weight: 800; letter-spacing: -0.02em;">
-              MWK 400,000
+            <div id="sim-costs" class="kpi-card-main-value" style="letter-spacing: -0.02em;">
+              <span class="kpi-card-number">400,000</span><span class="kpi-card-currency"> MWK</span>
             </div>
           </div>
 
           <!-- Profit Card -->
           <div style="background: linear-gradient(135deg, #10b981 0%, #059669 100%); border-radius: 20px; padding: 2rem; text-align: center; color: var(--white); box-shadow: 0 10px 30px rgba(16, 185, 129, 0.3);">
-            <div style="font-size: 0.9rem; opacity: 0.9; margin-bottom: 0.5rem; font-weight: 500;">
+            <div class="kpi-card-label" style="opacity: 0.9;">
               Estimated monthly profit
             </div>
-            <div id="sim-profit" style="font-size: 2.25rem; font-weight: 800; letter-spacing: -0.02em;">
-              MWK 600,000
+            <div id="sim-profit" class="kpi-card-main-value" style="letter-spacing: -0.02em;">
+              <span class="kpi-card-number">600,000</span><span class="kpi-card-currency"> MWK</span>
             </div>
           </div>
         </div>
@@ -1886,6 +2145,12 @@
     <p class="cta-subtitle">Join thousands of merchants already using Emajinet</p>
     <a href="{% url 'login' %}" class="btn btn-light">Get Started Today</a>
   </section>
+
+  <!-- Mobile Sticky CTA Bar -->
+  <div class="mobile-cta-bar" id="mobileCtaBar">
+    <a href="{% url 'login' %}" class="btn btn-primary">Create Account</a>
+    <a href="{% url 'login' %}" class="btn btn-text">Login</a>
+  </div>
 
   <!-- Footer -->
   <footer class="footer">
@@ -1952,8 +2217,12 @@
 
       /**
        * Format money with MWK currency and thousands separators
+       * Returns object with number and currency for proper typography hierarchy
        */
       function formatMoney(amount) {
+        const rounded = Math.round(amount);
+        let formatted;
+        
         // Use Intl.NumberFormat if available
         if (typeof Intl !== 'undefined' && Intl.NumberFormat) {
           try {
@@ -1962,17 +2231,21 @@
               minimumFractionDigits: 0,
               maximumFractionDigits: 0,
             });
-            return 'MWK ' + formatter.format(Math.round(amount));
+            formatted = formatter.format(rounded);
           } catch (e) {
             // Fallback if locale not supported
+            const parts = rounded.toString().split('.');
+            parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+            formatted = parts.join('.');
           }
+        } else {
+          // Fallback: manual thousands separator
+          const parts = rounded.toString().split('.');
+          parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+          formatted = parts.join('.');
         }
         
-        // Fallback: manual thousands separator
-        const rounded = Math.round(amount);
-        const parts = rounded.toString().split('.');
-        parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ',');
-        return 'MWK ' + parts.join('.');
+        return formatted;
       }
 
       /**
@@ -2001,10 +2274,14 @@
         const costs = revenue * (costPct / 100);
         const profit = revenue - costs;
 
-        // Update displays
-        revenueDisplay.textContent = formatMoney(revenue);
-        costsDisplay.textContent = formatMoney(costs);
-        profitDisplay.textContent = formatMoney(profit);
+        // Update displays with proper typography hierarchy
+        const revenueFormatted = formatMoney(revenue);
+        const costsFormatted = formatMoney(costs);
+        const profitFormatted = formatMoney(profit);
+        
+        revenueDisplay.innerHTML = '<span class="kpi-card-number">' + revenueFormatted + '</span><span class="kpi-card-currency"> MWK</span>';
+        costsDisplay.innerHTML = '<span class="kpi-card-number">' + costsFormatted + '</span><span class="kpi-card-currency"> MWK</span>';
+        profitDisplay.innerHTML = '<span class="kpi-card-number">' + profitFormatted + '</span><span class="kpi-card-currency"> MWK</span>';
       }
 
       // Attach event listeners to all inputs
@@ -2068,6 +2345,8 @@
       // Initial animation
       animateValue(merchantsEl, 0, merchantsTarget, 2000);
       animateValue(agentsEl, 0, agentsTarget, 2000);
+      
+      // Note: The "+" is added via CSS ::after pseudo-element
       
       // Fetch live updates every 60 seconds
       function fetchLiveMetrics() {
@@ -2560,6 +2839,69 @@
       } else {
         initStatsCarousel();
       }
+    })();
+
+    // ============================================
+    // TEAM SECTION - SHOW MORE TOGGLE
+    // ============================================
+    (function() {
+      function initTeamShowMore() {
+        const educationLists = document.querySelectorAll('.education-list');
+        
+        educationLists.forEach(list => {
+          const items = list.querySelectorAll('li');
+          if (items.length <= 2) return; // No need for toggle if 2 or fewer items
+          
+          // Hide items beyond the first 2
+          items.forEach((item, index) => {
+            if (index >= 2) {
+              item.classList.add('show-more-hidden');
+            }
+          });
+          
+          // Create toggle button
+          const toggle = document.createElement('button');
+          toggle.className = 'show-more-toggle';
+          toggle.textContent = 'Show more';
+          toggle.setAttribute('aria-expanded', 'false');
+          
+          toggle.addEventListener('click', function() {
+            const isExpanded = this.getAttribute('aria-expanded') === 'true';
+            
+            items.forEach((item, index) => {
+              if (index >= 2) {
+                if (isExpanded) {
+                  item.classList.add('show-more-hidden');
+                } else {
+                  item.classList.remove('show-more-hidden');
+                }
+              }
+            });
+            
+            this.textContent = isExpanded ? 'Show more' : 'Show less';
+            this.setAttribute('aria-expanded', !isExpanded);
+          });
+          
+          list.parentNode.insertBefore(toggle, list.nextSibling);
+        });
+      }
+      
+      // Initialize on DOM ready
+      if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', initTeamShowMore);
+      } else {
+        initTeamShowMore();
+      }
+    })();
+
+    // ============================================
+    // HIDE MOBILE CTA BAR FOR AUTHENTICATED USERS
+    // ============================================
+    (function() {
+      // Check if user is authenticated (you may need to adjust this based on your auth system)
+      // For now, we'll show it on landing page only (which is the public homepage)
+      // If you have a way to detect auth, hide the bar here
+      // Example: if (window.userAuthenticated) { document.getElementById('mobileCtaBar').style.display = 'none'; }
     })();
   </script>
 </body>

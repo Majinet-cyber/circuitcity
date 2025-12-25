@@ -154,6 +154,7 @@
           {% elif summary.business_kind == 'liquor' %}Liquor / Bar
           {% elif summary.business_kind == 'pharmacy' %}Cosmetics & Pharmacy
           {% elif summary.business_kind == 'grocery' %}Grocery / General
+          {% elif summary.business_kind == 'cement' %}Cement / Hardware
           {% elif summary.business_kind == 'gym' %}Gym / Fitness
           {% else %}—{% endif %}
         </span>
@@ -177,17 +178,28 @@
       <input type="hidden" name="step" value="4">
 
       <!-- Agreement checkbox -->
-      {% with has_err=form.errors.agree %}
-      <div class="checkbox-field{% if has_err %} is-error{% endif %}">
-        <input type="checkbox" name="agree" id="id_agree" required {% if form.agree.value %}checked{% endif %}>
-        <label for="id_agree">
-          I agree to the <a href="{% url 'staticpages:terms' %}" target="_blank">Terms of Service</a> and 
-          <a href="{% url 'staticpages:privacy' %}" target="_blank">Privacy Policy</a>, 
-          and confirm that I'm creating a store for my business.
-        </label>
-      </div>
-      {% if has_err %}<div class="err">{{ form.errors.agree|striptags }}</div>{% endif %}
-      {% endwith %}
+      {% if form.agree %}
+        {% with has_err=form.agree.errors %}
+        <div class="checkbox-field{% if has_err %} is-error{% endif %}">
+          <input type="checkbox" name="agree" id="id_agree" required {% if form.agree.value %}checked{% endif %}>
+          <label for="id_agree">
+            I agree to the <a href="{% url 'staticpages:terms' %}" target="_blank">Terms of Service</a> and 
+            <a href="{% url 'staticpages:privacy' %}" target="_blank">Privacy Policy</a>, 
+            and confirm that I'm creating a store for my business.
+          </label>
+        </div>
+        {% if has_err %}<div class="err">{{ form.agree.errors|striptags }}</div>{% endif %}
+        {% endwith %}
+      {% else %}
+        <div class="checkbox-field">
+          <input type="checkbox" name="agree" id="id_agree" required>
+          <label for="id_agree">
+            I agree to the <a href="{% url 'staticpages:terms' %}" target="_blank">Terms of Service</a> and 
+            <a href="{% url 'staticpages:privacy' %}" target="_blank">Privacy Policy</a>, 
+            and confirm that I'm creating a store for my business.
+          </label>
+        </div>
+      {% endif %}
 
       <div class="actions">
         <button class="btn secondary" type="submit" name="action" value="back">← Back</button>

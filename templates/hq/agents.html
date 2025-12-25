@@ -46,11 +46,15 @@
         <td>
           <div class="d-flex align-items-center gap-2">
             <div style="width:28px;height:28px;border-radius:999px;background:#e9f2ff;display:grid;place-items:center;font-weight:900;color:#2757d8">
-              {% if a.name %}{{ a.name|first|upper }}{% elif a.user %}{{ a.user.username|first|upper }}{% else %}—{% endif %}
+              {% if a.user %}
+                {% if a.user.first_name %}{{ a.user.first_name|first|upper }}{% elif a.user.username %}{{ a.user.username|first|upper }}{% else %}—{% endif %}
+              {% else %}—{% endif %}
             </div>
             <div>
               <div class="fw-bold">
-                {% if a.name %}{{ a.name }}{% elif a.user %}{{ a.user.username }}{% else %}—{% endif %}
+                {% if a.user %}
+                  {% if a.user.get_full_name %}{{ a.user.get_full_name }}{% elif a.user.first_name %}{{ a.user.first_name }}{% elif a.user.username %}{{ a.user.username }}{% else %}—{% endif %}
+                {% else %}—{% endif %}
               </div>
               <div class="small text-muted">
                 {% if a.user and a.user.email %}{{ a.user.email }}{% endif %}
@@ -60,7 +64,7 @@
         </td>
 
         <td class="text-nowrap">
-          {% if a.business_id %}
+          {% if a.business_id and a.business %}
             <a href="{% url 'hq:business_detail' a.business_id %}">{{ a.business.name|default:"(unknown)" }}</a>
           {% else %}
             —
@@ -68,11 +72,11 @@
         </td>
 
         <td class="text-nowrap">
-          {% if a.location %}{{ a.location.name }}{% else %}—{% endif %}
+          {% if a.location and a.location.name %}{{ a.location.name }}{% else %}—{% endif %}
         </td>
 
         <td class="text-nowrap">
-          {{ a.created_at|date:"Y-m-d" }}
+          {% if a.created_at %}{{ a.created_at|date:"Y-m-d" }}{% else %}—{% endif %}
         </td>
       </tr>
     {% empty %}

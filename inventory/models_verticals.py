@@ -1386,6 +1386,190 @@ class ClothingSale(models.Model):
         return self.total_price - self.total_cost
 
 
+class CementSale(models.Model):
+    """
+    Records a sale of cement/hardware product.
+    """
+    business = models.ForeignKey(Business, on_delete=models.CASCADE, related_name="cement_sales", db_index=True)
+    product = models.ForeignKey("inventory.MerchProduct", on_delete=models.PROTECT, related_name="cement_sales")
+    
+    # Sale details
+    quantity = models.PositiveIntegerField(default=1)
+    unit_price = models.DecimalField(max_digits=10, decimal_places=2, validators=[MinValueValidator(Decimal("0.01"))])
+    total_price = models.DecimalField(max_digits=12, decimal_places=2)
+    
+    # Cost tracking (for profit calculation)
+    unit_cost = models.DecimalField(
+        max_digits=10, 
+        decimal_places=2, 
+        default=Decimal("0.00"),
+        help_text="Cost per unit sold (for profit calculation)"
+    )
+    total_cost = models.DecimalField(
+        max_digits=12, 
+        decimal_places=2, 
+        default=Decimal("0.00"),
+        help_text="Total cost of goods sold"
+    )
+    
+    # Payment method
+    payment_method = models.CharField(
+        max_length=20,
+        choices=PaymentMethod.choices,
+        default=PaymentMethod.CASH,
+        db_index=True,
+        help_text="Payment method used for this sale"
+    )
+    
+    # Metadata
+    sold_by = models.ForeignKey(User, null=True, blank=True, on_delete=models.SET_NULL, related_name="cement_sales_made")
+    sold_at = models.DateTimeField(default=timezone.now, db_index=True)
+    notes = models.TextField(blank=True, default="")
+    
+    class Meta:
+        ordering = ["-sold_at"]
+        indexes = [
+            models.Index(fields=["business", "-sold_at"]),
+            models.Index(fields=["business", "payment_method", "-sold_at"]),
+        ]
+    
+    def __str__(self):
+        return f"{self.product.name} x {self.quantity} - {self.total_price}"
+    
+    def save(self, *args, **kwargs):
+        # Auto-calculate totals if not set
+        if not self.total_price:
+            self.total_price = Decimal(self.quantity) * self.unit_price
+        if not self.total_cost:
+            self.total_cost = Decimal(self.quantity) * self.unit_cost
+        super().save(*args, **kwargs)
+    
+    @property
+    def profit(self):
+        """Calculate profit for this sale"""
+        return self.total_price - self.total_cost
+
+
+class GrocerySale(models.Model):
+    """
+    Records a sale of grocery product.
+    Supports both retail and wholesale modes.
+    """
+    business = models.ForeignKey(Business, on_delete=models.CASCADE, related_name="grocery_sales", db_index=True)
+    product = models.ForeignKey("inventory.MerchProduct", on_delete=models.PROTECT, related_name="grocery_sales")
+    
+    # Sale details
+    quantity = models.PositiveIntegerField(default=1)
+    unit_price = models.DecimalField(max_digits=10, decimal_places=2, validators=[MinValueValidator(Decimal("0.01"))])
+    total_price = models.DecimalField(max_digits=12, decimal_places=2)
+    
+    # Sale mode (retail or wholesale)
+    sale_mode = models.CharField(
+        max_length=20,
+        choices=[
+            ("retail", "Retail"),
+            ("wholesale", "Wholesale"),
+        ],
+        default="retail",
+        db_index=True,
+        help_text="Whether this was a retail or wholesale sale"
+    )
+    
+    # Cost tracking (for profit calculation)
+    unit_cost = models.DecimalField(
+        max_digits=10, 
+        decimal_places=2, 
+        default=Decimal("0.00"),
+        help_text="Cost per unit sold (for profit calculation)"
+    )
+    total_cost = models.DecimalField(
+        max_digits=12, 
+        decimal_places=2, 
+        default=Decimal("0.00"),
+        help_text="Total cost of goods sold"
+    )
+    
+    # Payment method
+    payment_method = models.CharField(
+        max_length=20,
+        choices=PaymentMethod.choices,
+        default=PaymentMethod.CASH,
+        db_index=True,
+        help_text="Payment method used for this sale"
+    )
+    
+    # Metadata
+    sold_by = models.ForeignKey(User, null=True, blank=True, on_delete=models.SET_NULL, related_name="grocery_sales_made")
+    sold_at = models.DateTimeField(default=timezone.now, db_index=True)
+    notes = models.TextField(blank=True, default="")
+    
+    class Meta:
+        ordering = ["-sold_at"]
+        indexes = [
+            models.Index(fields=["business", "-sold_at"]),
+            models.Index(fields=["business", "payment_method", "-sold_at"]),
+            models.Index(fields=["business", "sale_mode", "-sold_at"]),
+        ]
+    
+    def __str__(self):
+        return f"{self.product.name} x {self.quantity} ({self.sale_mode}) - {self.total_price}"
+    
+    def save(self, *args, **kwargs):
+        # Auto-calculate totals if not set
+        if not self.total_price:
+            self.total_price = Decimal(self.quantity) * self.unit_price
+        if not self.total_cost:
+            self.total_cost = Decimal(self.quantity) * self.unit_cost
+        super().save(*args, **kwargs)
+    
+    @property
+    def profit(self):
+        """Calculate profit for this sale"""
+        return self.total_price - self.total_cost
+
+
+class CementCost(models.Model):
+    """
+    Tracks costs/expenses for cement business (transport, labor, rent, utilities, etc.)
+    """
+    business = models.ForeignKey(Business, on_delete=models.CASCADE, related_name="cement_costs", db_index=True)
+    location = models.ForeignKey("inventory.Location", null=True, blank=True, on_delete=models.SET_NULL, related_name="cement_costs")
+    
+    # Cost details
+    amount = models.DecimalField(max_digits=12, decimal_places=2, validators=[MinValueValidator(Decimal("0.01"))])
+    category = models.CharField(
+        max_length=50,
+        choices=[
+            ("transport", "Transport"),
+            ("labor", "Labor"),
+            ("rent", "Rent"),
+            ("utilities", "Utilities"),
+            ("other", "Other"),
+        ],
+        default="other",
+        db_index=True
+    )
+    description = models.CharField(max_length=255)
+    notes = models.TextField(blank=True, default="")
+    
+    # Date tracking
+    cost_date = models.DateField(default=timezone.now, db_index=True, help_text="Date when cost was incurred")
+    
+    # Metadata
+    created_by = models.ForeignKey(User, null=True, blank=True, on_delete=models.SET_NULL, related_name="cement_costs_created")
+    created_at = models.DateTimeField(default=timezone.now, db_index=True)
+    
+    class Meta:
+        ordering = ["-cost_date", "-created_at"]
+        indexes = [
+            models.Index(fields=["business", "-cost_date"]),
+            models.Index(fields=["business", "category", "-cost_date"]),
+        ]
+    
+    def __str__(self):
+        return f"{self.get_category_display()} - {self.amount} ({self.cost_date})"
+
+
 # ==============================================================================
 # ADDITIONAL LIQUOR & GROCERY (if needed for future)
 # ==============================================================================

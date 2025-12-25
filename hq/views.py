@@ -992,16 +992,44 @@ def invoices(request):
 # -------------------------------------------------------------------
 @hq_admin_required
 def agents(request):
-    # Log HQ access to agents list
-    from audit.utils import log_hq_action
-    log_hq_action(request, action="VIEW_PAGE", entity_type="AGENT_LIST", message="Accessed agents list")
+    """HQ Agents list page - shows all agents and managers across all businesses"""
+    # Log HQ access to agents list (optional, don't fail if audit not available)
+    try:
+        from audit.utils import log_hq_action
+        log_hq_action(request, action="VIEW_PAGE", entity_type="AGENT_LIST", message="Accessed agents list")
+    except Exception:
+        pass  # Audit logging is optional
     
     q = (request.GET.get("q") or "").strip()
     # Include both AGENT and MANAGER roles for HQ reporting
-    rows = Membership.objects.filter(Q(role="AGENT") | Q(role="MANAGER")).select_related("business", "user", "location")
+    # Use safe select_related - location is nullable
+    try:
+        rows = Membership.objects.filter(Q(role="AGENT") | Q(role="MANAGER")).select_related("business", "user")
+        # Location might be nullable, so prefetch it separately to avoid issues
+        rows = rows.prefetch_related("location")
+    except Exception as e:
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.error(f"Error querying memberships: {e}", exc_info=True)
+        rows = Membership.objects.none()
+    
+    # Apply search filter if provided
     if q:
-        rows = rows.filter(Q(user__username__icontains=q) | Q(business__name__icontains=q))
-    rows = rows.order_by("-created_at") if _field(Membership, "created_at") else rows.order_by("-id")
+        try:
+            rows = rows.filter(Q(user__username__icontains=q) | Q(business__name__icontains=q))
+        except Exception as e:
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.warning(f"Error applying search filter: {e}")
+    
+    # Safe ordering - created_at exists on Membership model
+    try:
+        rows = rows.order_by("-created_at")
+    except Exception as e:
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.warning(f"Error ordering rows: {e}")
+        rows = rows.order_by("-id")
 
     # Limits per business to enable UI nudges (e.g., â€œUpgrade to add more agentsâ€)
     biz_limits = {}

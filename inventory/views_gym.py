@@ -265,9 +265,9 @@ def member_detail(request, member_id):
     
     # Check for missing trainer fee
     trainer_fee_missing = False
-    if getattr(member, 'trainer', None) and membership_status.get("status_code") == "active":
-        # Check if there's a trainer fee for current period
-        try:
+    try:
+        if getattr(member, 'trainer', None) and membership_status.get("status_code") == "active":
+            # Check if there's a trainer fee for current period
             start_date = membership_status.get("start_date")
             end_date = membership_status.get("end_date")
             if start_date and end_date:
@@ -276,9 +276,70 @@ def member_detail(request, member_id):
                     period_start=start_date,
                     period_end=end_date
                 ).exists()
-        except Exception:
-            # TrainerFee table may not exist yet or other error
-            trainer_fee_missing = False
+    except Exception:
+        # TrainerFee table may not exist yet or other error
+        trainer_fee_missing = False
+    
+    # Safely get member properties with fallbacks
+    try:
+        member_joined_at = member.joined_at if hasattr(member, 'joined_at') and member.joined_at else None
+    except Exception:
+        member_joined_at = None
+    
+    try:
+        member_membership_end = member.membership_end if hasattr(member, 'membership_end') and member.membership_end else None
+    except Exception:
+        member_membership_end = None
+    
+    try:
+        member_days_left = getattr(member, 'days_left', None)
+        if member_days_left is None:
+            member_days_left = 0
+    except Exception:
+        member_days_left = 0
+    
+    try:
+        member_duration_days = getattr(member, 'duration_days', GYM_MEMBERSHIP_DAYS)
+        if member_duration_days is None:
+            member_duration_days = GYM_MEMBERSHIP_DAYS
+    except Exception:
+        member_duration_days = GYM_MEMBERSHIP_DAYS
+    
+    try:
+        member_next_payment_date = getattr(member, 'next_payment_date_property', None)
+    except Exception:
+        member_next_payment_date = None
+    
+    try:
+        member_is_active = getattr(member, 'is_active_membership', False)
+    except Exception:
+        member_is_active = False
+    
+    try:
+        member_days_attended = getattr(member, 'days_attended', 0)
+        if member_days_attended is None:
+            member_days_attended = 0
+    except Exception:
+        member_days_attended = 0
+    
+    try:
+        member_code = getattr(member, 'member_code', None)
+    except Exception:
+        member_code = None
+    
+    try:
+        member_qr_code = getattr(member, 'get_qr_code_data_url', None)
+        if callable(member_qr_code):
+            member_qr_code = member_qr_code()
+        if not member_qr_code:
+            member_qr_code = None
+    except Exception:
+        member_qr_code = None
+    
+    try:
+        member_trainer = getattr(member, 'trainer', None)
+    except Exception:
+        member_trainer = None
     
     return render(request, "inventory/gym/member_detail.html", {
         "member": member,
@@ -289,6 +350,17 @@ def member_detail(request, member_id):
         "business": business,
         "trainer_fee_missing": trainer_fee_missing,
         "total_days": GYM_MEMBERSHIP_DAYS,
+        # Safe member properties
+        "member_joined_at": member_joined_at,
+        "member_membership_end": member_membership_end,
+        "member_days_left": member_days_left,
+        "member_duration_days": member_duration_days,
+        "member_next_payment_date": member_next_payment_date,
+        "member_is_active": member_is_active,
+        "member_days_attended": member_days_attended,
+        "member_code": member_code,
+        "member_qr_code": member_qr_code,
+        "member_trainer": member_trainer,
     })
 
 

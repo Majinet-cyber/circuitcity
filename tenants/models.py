@@ -114,6 +114,21 @@ class Business(models.Model):
         blank=True,
         help_text="Business logo. Best fit: square or 3:1 ratio (e.g., 300x300 or 600x200). PNG with transparent background recommended.",
     )
+    
+    # Section flags (feature toggles per vertical)
+    # All default to False to prevent NOT NULL constraint errors
+    has_cosmetics_section = models.BooleanField(
+        default=False,
+        help_text="Enable cosmetics section for pharmacy businesses",
+    )
+    has_groceries_section = models.BooleanField(
+        default=False,
+        help_text="Enable groceries section",
+    )
+    has_cement_section = models.BooleanField(
+        default=False,
+        help_text="Enable cement/hardware section",
+    )
 
     class Meta:
         ordering = ["name"]

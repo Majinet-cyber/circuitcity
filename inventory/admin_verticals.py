@@ -16,6 +16,10 @@ try:
         GymMember, GymPayment, GymMemberLog, GymSettings, GymWalletEntry, GymTrainer, GymCheckIn,
         # Clothing
         ClothingSale, ClothingProductLog,
+        # Cement
+        CementSale, CementCost,
+        # Groceries
+        GrocerySale,
     )
 except ImportError:
     # Models not yet migrated
@@ -23,6 +27,8 @@ except ImportError:
     LiquorExpense = LiquorWalletEntry = LiquorShift = LiquorShiftStock = None
     GymMember = GymPayment = GymMemberLog = GymSettings = GymWalletEntry = GymTrainer = GymCheckIn = None
     ClothingSale = ClothingProductLog = None
+    CementSale = CementCost = None
+    GrocerySale = None
 
 
 # ==============================================================================
@@ -301,4 +307,53 @@ if ClothingProductLog:
         def has_add_permission(self, request):
             # Logs are created automatically, not manually
             return False
+
+
+# ==============================================================================
+# CEMENT ADMINS
+# ==============================================================================
+
+if CementSale:
+    @admin.register(CementSale)
+    class CementSaleAdmin(admin.ModelAdmin):
+        list_display = ("product", "quantity", "unit_price", "total_price", "profit", "payment_method", "sold_at", "sold_by")
+        list_filter = ("payment_method", "sold_at")
+        search_fields = ("product__name", "sold_by__username", "notes")
+        date_hierarchy = "sold_at"
+        ordering = ("-sold_at",)
+        list_select_related = ("product", "sold_by", "business")
+        raw_id_fields = ("product", "sold_by")
+        readonly_fields = ("profit",)
+        list_per_page = 50
+
+
+if CementCost:
+    @admin.register(CementCost)
+    class CementCostAdmin(admin.ModelAdmin):
+        list_display = ("description", "category", "amount", "cost_date", "business", "created_by", "created_at")
+        list_filter = ("category", "cost_date", "created_at")
+        search_fields = ("description", "notes", "business__name")
+        date_hierarchy = "cost_date"
+        ordering = ("-cost_date", "-created_at")
+        list_select_related = ("business", "location", "created_by")
+        raw_id_fields = ("business", "location", "created_by")
+        list_per_page = 50
+
+
+# ==============================================================================
+# GROCERIES ADMINS
+# ==============================================================================
+
+if GrocerySale:
+    @admin.register(GrocerySale)
+    class GrocerySaleAdmin(admin.ModelAdmin):
+        list_display = ("product", "quantity", "sale_mode", "unit_price", "total_price", "profit", "payment_method", "sold_at", "sold_by")
+        list_filter = ("sale_mode", "payment_method", "sold_at")
+        search_fields = ("product__name", "sold_by__username", "notes")
+        date_hierarchy = "sold_at"
+        ordering = ("-sold_at",)
+        list_select_related = ("product", "sold_by", "business")
+        raw_id_fields = ("product", "sold_by")
+        readonly_fields = ("profit",)
+        list_per_page = 50
 

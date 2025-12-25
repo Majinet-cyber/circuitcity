@@ -64,8 +64,8 @@ def get_vertical_dashboard_url(vertical_kind: str) -> Optional[str]:
         "pharmacy": "verticals:pharmacy_hub",
         "clothing": "verticals:clothing_dashboard",
         "liquor": "verticals:liquor_dashboard",
+        "grocery": "groceries:dashboard",
         # "phones" uses the default dashboard at /inventory/dashboard/
-        # "grocery" uses default dashboard (for now)
     }
     return vertical_dashboard_map.get(vertical_kind)
 
@@ -335,6 +335,43 @@ def get_vertical_sidebar_items(business_kind: str) -> list[dict]:
             {"section": "MORE", "key": "agents", "url": "tenants:manager_review_agents", "label": "Agents", "icon": "bi-people", "active_prefix": "/tenants/manager/agents/", "active_pattern": "/tenants/manager/agents/", "require_manager": True, "is_menu": False, "is_header": False, "group": "more"},
             {"section": "MORE", "key": "locations", "url": "tenants:manager_locations", "label": "Locations", "icon": "bi-geo", "active_prefix": "/tenants/manager/locations/", "active_pattern": "/tenants/manager/locations/", "require_manager": True, "is_menu": False, "is_header": False, "group": "more"},
             {"section": "MORE", "key": "backups", "url": "backups:manager_list", "label": "Data Backup", "icon": "bi-cloud-download", "active_prefix": "/backups/", "active_pattern": "/backups/", "require_manager": True, "is_menu": False, "is_header": False, "group": "more"},
+            {"section": "MORE", "key": "billing", "url": "billing:plans", "label": "Choose Plan", "icon": "bi-credit-card-2-front", "active_prefix": "/billing/plans", "active_pattern": "/billing/plans", "require_manager": True, "is_menu": False, "is_header": False, "group": "more"},
+        ]
+    
+    elif business_kind == "grocery":
+        return [
+            # MAIN section - Groceries vertical
+            {"section": "MAIN", "key": "dashboard", "url": "groceries:dashboard", "label": "Dashboard", "icon": "bi-speedometer2", "active_prefix": "/groceries/dashboard", "active_pattern": "/groceries/dashboard", "require_manager": False, "is_menu": False, "is_header": False},
+            {"section": "MAIN", "key": "analytics", "url": "groceries:analytics", "label": "Analytics", "icon": "bi-graph-up", "active_prefix": "/groceries/analytics", "active_pattern": "/groceries/analytics", "require_manager": False, "is_menu": False, "is_header": False},
+            {"section": "MAIN", "key": "stock", "url": "groceries:stock_list", "label": "Stock", "icon": "bi-box-seam", "active_prefix": "/groceries/stock", "active_pattern": "/groceries/stock", "require_manager": False, "is_menu": False, "is_header": False},
+            {"section": "MAIN", "key": "stock_in", "url": "groceries:stock_in", "label": "Stock In", "icon": "bi-box-arrow-in-down", "active_prefix": "/groceries/stock-in", "active_pattern": "/groceries/stock-in", "require_manager": False, "is_menu": False, "is_header": False},
+            {"section": "MAIN", "key": "sell", "url": "groceries:sell", "label": "Sell", "icon": "bi-bag-check", "active_prefix": "/groceries/sell", "active_pattern": "/groceries/sell", "require_manager": False, "is_menu": False, "is_header": False},
+            
+            # MORE section
+            {"section": "MORE", "key": "wallet", "url": "wallet:agent_wallet", "label": "Wallet", "icon": "bi-wallet2", "active_prefix": "/wallet/", "active_pattern": "/wallet/", "require_manager": False, "is_menu": False, "is_header": False, "group": "more"},
+            {"section": "MORE", "key": "time_logs", "url": "inventory:time_logs", "label": "Time Logs", "icon": "bi-journal-text", "active_prefix": "/inventory/time/logs", "active_pattern": "/inventory/time/logs", "require_manager": False, "is_menu": False, "is_header": False, "group": "more"},
+            {"section": "MORE", "key": "admin_wallet", "url": "wallet:admin_home", "label": "Admin Wallet", "icon": "bi-briefcase", "active_prefix": "/wallet/admin/", "active_pattern": "/wallet/admin/", "require_manager": True, "is_menu": False, "is_header": False, "group": "more"},
+            {"section": "MORE", "key": "agents", "url": "tenants:manager_review_agents", "label": "Agents", "icon": "bi-people", "active_prefix": "/tenants/manager/agents/", "active_pattern": "/tenants/manager/agents/", "require_manager": True, "is_menu": False, "is_header": False, "group": "more"},
+            {"section": "MORE", "key": "locations", "url": "tenants:manager_locations", "label": "Locations", "icon": "bi-geo", "active_prefix": "/tenants/manager/locations/", "active_pattern": "/tenants/manager/locations/", "require_manager": True, "is_menu": False, "is_header": False, "group": "more"},
+            {"section": "MORE", "key": "billing", "url": "billing:plans", "label": "Choose Plan", "icon": "bi-credit-card-2-front", "active_prefix": "/billing/plans", "active_pattern": "/billing/plans", "require_manager": True, "is_menu": False, "is_header": False, "group": "more"},
+        ]
+    
+    elif business_kind == "cement":
+        return [
+            # MAIN section - Cement vertical
+            {"section": "MAIN", "key": "dashboard", "url": "cement:dashboard", "label": "Dashboard", "icon": "bi-speedometer2", "active_prefix": "/cement/dashboard", "active_pattern": "/cement/dashboard", "require_manager": False, "is_menu": False, "is_header": False},
+            {"section": "MAIN", "key": "analytics", "url": "cement:analytics", "label": "Analytics", "icon": "bi-graph-up", "active_prefix": "/cement/analytics", "active_pattern": "/cement/analytics", "require_manager": False, "is_menu": False, "is_header": False},
+            {"section": "MAIN", "key": "stock", "url": "cement:stock_list", "label": "Stock", "icon": "bi-box-seam", "active_prefix": "/cement/stock", "active_pattern": "/cement/stock", "require_manager": False, "is_menu": False, "is_header": False},
+            {"section": "MAIN", "key": "stock_in", "url": "cement:stock_in", "label": "Stock In", "icon": "bi-box-arrow-in-down", "active_prefix": "/cement/stock-in", "active_pattern": "/cement/stock-in", "require_manager": False, "is_menu": False, "is_header": False},
+            {"section": "MAIN", "key": "sell", "url": "cement:sell", "label": "Sell", "icon": "bi-bag-check", "active_prefix": "/cement/sell", "active_pattern": "/cement/sell", "require_manager": False, "is_menu": False, "is_header": False},
+            {"section": "MAIN", "key": "costs", "url": "cement:costs", "label": "Costs", "icon": "bi-cash-stack", "active_prefix": "/cement/costs", "active_pattern": "/cement/costs", "require_manager": False, "is_menu": False, "is_header": False},
+            
+            # MORE section
+            {"section": "MORE", "key": "wallet", "url": "wallet:agent_wallet", "label": "Wallet", "icon": "bi-wallet2", "active_prefix": "/wallet/", "active_pattern": "/wallet/", "require_manager": False, "is_menu": False, "is_header": False, "group": "more"},
+            {"section": "MORE", "key": "time_logs", "url": "inventory:time_logs", "label": "Time Logs", "icon": "bi-journal-text", "active_prefix": "/inventory/time/logs", "active_pattern": "/inventory/time/logs", "require_manager": False, "is_menu": False, "is_header": False, "group": "more"},
+            {"section": "MORE", "key": "admin_wallet", "url": "wallet:admin_home", "label": "Admin Wallet", "icon": "bi-briefcase", "active_prefix": "/wallet/admin/", "active_pattern": "/wallet/admin/", "require_manager": True, "is_menu": False, "is_header": False, "group": "more"},
+            {"section": "MORE", "key": "agents", "url": "tenants:manager_review_agents", "label": "Agents", "icon": "bi-people", "active_prefix": "/tenants/manager/agents/", "active_pattern": "/tenants/manager/agents/", "require_manager": True, "is_menu": False, "is_header": False, "group": "more"},
+            {"section": "MORE", "key": "locations", "url": "tenants:manager_locations", "label": "Locations", "icon": "bi-geo", "active_prefix": "/tenants/manager/locations/", "active_pattern": "/tenants/manager/locations/", "require_manager": True, "is_menu": False, "is_header": False, "group": "more"},
             {"section": "MORE", "key": "billing", "url": "billing:plans", "label": "Choose Plan", "icon": "bi-credit-card-2-front", "active_prefix": "/billing/plans", "active_pattern": "/billing/plans", "require_manager": True, "is_menu": False, "is_header": False, "group": "more"},
         ]
     

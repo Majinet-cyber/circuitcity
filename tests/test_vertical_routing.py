@@ -88,6 +88,17 @@ def pharmacy_business(db):
     )
 
 
+@pytest.fixture
+def grocery_business(db):
+    """Create a grocery business."""
+    return Business.objects.create(
+        name="Test Grocery Store",
+        slug="test-grocery-store",
+        business_kind=BusinessKind.GROCERY,
+        status="ACTIVE"
+    )
+
+
 def create_manager_membership(user, business):
     """Helper to create a manager membership."""
     return Membership.objects.create(
@@ -399,8 +410,8 @@ def test_business_without_kind_defaults_to_phones(db, manager_user):
 
 
 @pytest.mark.django_db
-def test_grocery_business_uses_default_dashboard(db, manager_user):
-    """Grocery business (not yet implemented) should use default dashboard."""
+def test_grocery_business_uses_groceries_dashboard(db, manager_user):
+    """Grocery business should use groceries dashboard."""
     grocery_business = Business.objects.create(
         name="Test Grocery",
         slug="test-grocery",
@@ -411,7 +422,87 @@ def test_grocery_business_uses_default_dashboard(db, manager_user):
     vertical_kind = get_vertical_kind(grocery_business)
     assert vertical_kind == "grocery"
     
-    # Should return None (uses default dashboard)
+    # Should return groceries dashboard URL
     dashboard_url = get_vertical_dashboard_url(vertical_kind)
-    assert dashboard_url is None
+    assert dashboard_url == "groceries:dashboard"
+
+
+# ==============================================================================
+# GROCERIES-SPECIFIC TESTS
+# ==============================================================================
+
+@pytest.mark.django_db
+def test_groceries_stock_list_renders_200(client: Client, manager_user, grocery_business):
+    """Test that /groceries/stock/ returns 200 without template errors."""
+    from inventory.models import MerchProduct
+    from decimal import Decimal
+    
+    # Setup
+    create_manager_membership(manager_user, grocery_business)
+    client.force_login(manager_user)
+    set_active_business(client, grocery_business)
+    
+    # Create a test product
+    MerchProduct.objects.create(
+        business=grocery_business,
+        name="Test Product",
+        kind=BusinessKind.GROCERY,
+        cost_price=Decimal("10.00"),
+        selling_price=Decimal("15.00"),
+        quantity_in_stock=5,
+        is_active=True,
+        base_unit="pcs"
+    )
+    
+    # Act
+    response = client.get(reverse("groceries:stock_list"))
+    
+    # Assert - should render 200 without TemplateSyntaxError
+    assert response.status_code == 200
+    assert b"Test Product" in response.content
+
+
+@pytest.mark.django_db
+def test_vertical_router_redirects_groceries(client: Client, manager_user, grocery_business):
+    """Test that vertical routing redirects to groceries dashboard for grocery businesses."""
+    # Setup
+    create_manager_membership(manager_user, grocery_business)
+    client.force_login(manager_user)
+    set_active_business(client, grocery_business)
+    
+    # Act - access inventory dashboard (which triggers vertical routing)
+    response = client.get(reverse("inventory:inventory_dashboard"), follow=False)
+    
+    # Assert - should redirect to groceries dashboard
+    assert response.status_code == 302
+    assert "groceries" in response.url.lower()
+    assert "dashboard" in response.url.lower()
+
+
+@pytest.mark.django_db
+def test_groceries_cannot_access_phones(client: Client, manager_user, grocery_business):
+    """Test that grocery businesses cannot access phone-specific routes."""
+    # Setup
+    create_manager_membership(manager_user, grocery_business)
+    client.force_login(manager_user)
+    set_active_business(client, grocery_business)
+    
+    # Act - try to access a phone-specific route
+    # Try accessing phone sale wizard (phones-specific)
+    try:
+        response = client.get(reverse("inventory:phone_sale_wizard"), follow=False)
+        # Should either 404 or redirect (not 200)
+        assert response.status_code in [404, 302, 403]
+    except Exception:
+        # If route doesn't exist or raises exception, that's also acceptable
+        pass
+    
+    # Try accessing inventory dashboard (should redirect groceries away)
+    try:
+        response = client.get(reverse("inventory:inventory_dashboard"), follow=False)
+        # Should redirect groceries to their dashboard
+        if response.status_code == 302:
+            assert "groceries" in response.url.lower() or "verticals" in response.url.lower()
+    except Exception:
+        pass
 

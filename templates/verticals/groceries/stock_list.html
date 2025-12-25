@@ -11,9 +11,14 @@
       <p class="text-muted">{{ business.name }}</p>
     </div>
     <div class="col-auto">
-      <a href="{% url 'groceries:stock_in' %}" class="btn btn-primary">
-        <i class="bi bi-plus-circle"></i> Add Stock
-      </a>
+      <div class="btn-group">
+        <a href="{% url 'groceries:product_add' %}" class="btn btn-primary">
+          <i class="bi bi-plus-circle"></i> Add Product
+        </a>
+        <a href="{% url 'groceries:stock_in' %}" class="btn btn-outline-primary">
+          <i class="bi bi-box-seam"></i> Add Stock
+        </a>
+      </div>
     </div>
   </div>
 
@@ -34,7 +39,8 @@
             </tr>
           </thead>
           <tbody>
-            {% for product in products %}
+            {% for item in products_with_values %}
+            {% with product=item.product %}
             <tr>
               <td><strong>{{ product.name }}</strong></td>
               <td>{{ product.category|title }}</td>
@@ -48,8 +54,9 @@
                 {{ product.quantity_in_stock }}
                 {% endif %}
               </td>
-              <td class="text-end">MK {{ product.quantity_in_stock|mul:product.cost_price|floatformat:2|intcomma }}</td>
+              <td class="text-end">MK {{ item.stock_value|floatformat:2|intcomma }}</td>
             </tr>
+            {% endwith %}
             {% endfor %}
           </tbody>
         </table>
@@ -57,7 +64,7 @@
       {% else %}
       <div class="text-center py-5">
         <p class="text-muted mb-3">No products yet</p>
-        <a href="{% url 'groceries:stock_in' %}" class="btn btn-primary">Add Your First Product</a>
+        <a href="{% url 'groceries:product_add' %}" class="btn btn-primary">Add Your First Product</a>
       </div>
       {% endif %}
     </div>

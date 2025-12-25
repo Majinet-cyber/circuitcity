@@ -1,59 +1,372 @@
 {% extends "base.html" %}
-{% load humanize %}
+{% load static humanize %}
 
 {% block title %}Sell · Cement · {{ business.name }}{% endblock %}
 
-{% block content %}
-<div class="container-fluid py-4">
-  <div class="row mb-4">
-    <div class="col">
-      <h1 class="h3 mb-0">🏗️ Sell Building Materials</h1>
-      <p class="text-muted">{{ business.name }}</p>
-    </div>
-  </div>
+{% block extra_css %}
+<style>
+  :root {
+    --cement-bg: #ffffff;
+    --cement-text: #0f172a;
+    --cement-muted: #64748b;
+    --cement-panel: #ffffff;
+    --cement-border: #e2e8f0;
+    --cement-accent: #2563eb;
+    --cement-success: #16a34a;
+    --cement-shadow: 0 4px 14px rgba(2, 6, 23, .08);
+  }
 
-  <div class="row">
-    <div class="col-md-8 mx-auto">
-      <div class="card">
-        <div class="card-body">
-          <form method="post">
-            {% csrf_token %}
-            
-            <div class="mb-3">
-              <label for="product_id" class="form-label">Select Product *</label>
-              <select class="form-select" id="product_id" name="product_id" required>
-                <option value="">Choose a product...</option>
-                {% for product in products %}
-                <option value="{{ product.id }}">
-                  {{ product.name }} - MK {{ product.selling_price|floatformat:2 }} 
-                  (Stock: {{ product.quantity_in_stock }} {{ product.base_unit }})
-                </option>
-                {% endfor %}
-              </select>
-            </div>
+  .cement-container {
+    max-width: 800px;
+    margin: 2rem auto;
+    padding: 1.5rem;
+  }
 
-            <div class="mb-3">
-              <label for="quantity" class="form-label">Quantity *</label>
-              <input type="number" class="form-control" id="quantity" name="quantity" required min="1" value="1">
-            </div>
+  .step-indicator {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 2rem;
+    position: relative;
+  }
 
-            <div class="d-flex gap-2">
-              <button type="submit" class="btn btn-success">
-                <i class="bi bi-cart-check"></i> Complete Sale
-              </button>
-              <a href="{% url 'cement:dashboard' %}" class="btn btn-outline-secondary">Cancel</a>
-            </div>
-          </form>
-        </div>
-      </div>
+  .step-indicator::before {
+    content: '';
+    position: absolute;
+    top: 20px;
+    left: 0;
+    right: 0;
+    height: 2px;
+    background: var(--cement-border);
+    z-index: 0;
+  }
 
-      {% if products.count == 0 %}
-      <div class="alert alert-info mt-3">
-        <i class="bi bi-info-circle"></i> No products in stock. Please <a href="{% url 'cement:stock_in' %}">add stock</a> first.
-      </div>
-      {% endif %}
-    </div>
-  </div>
-</div>
+  .step-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    position: relative;
+    z-index: 1;
+    flex: 1;
+  }
+
+  .step-circle {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background: var(--cement-panel);
+    border: 2px solid var(--cement-border);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    margin-bottom: 0.5rem;
+  }
+
+  .step-item.active .step-circle {
+    background: var(--cement-accent);
+    color: white;
+    border-color: var(--cement-accent);
+  }
+
+  .step-item.completed .step-circle {
+    background: var(--cement-success);
+    color: white;
+    border-color: var(--cement-success);
+  }
+
+  .premium-card {
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.95), rgba(248, 250, 252, 0.9));
+    backdrop-filter: blur(10px);
+    border: 2px solid rgba(226, 232, 240, 0.8);
+    border-radius: 20px;
+    padding: 2rem;
+    box-shadow: var(--cement-shadow);
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    cursor: pointer;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .premium-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 3px;
+    background: linear-gradient(90deg, var(--cement-accent), #06b6d4);
+    opacity: 0;
+    transition: opacity 0.3s;
+  }
+
+  .premium-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 12px 28px rgba(59, 130, 246, 0.2);
+    border-color: var(--cement-accent);
+  }
+
+  .premium-card:hover::before {
+    opacity: 1;
+  }
+
+  .premium-card.selected {
+    border-color: var(--cement-accent);
+    background: linear-gradient(135deg, rgba(219, 234, 254, 0.5), rgba(224, 231, 255, 0.3));
+    box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.15), 0 8px 24px rgba(59, 130, 246, 0.2);
+  }
+
+  .premium-card.selected::before {
+    opacity: 1;
+  }
+
+  .brand-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 1.5rem;
+    margin: 2rem 0;
+  }
+
+  .product-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+    gap: 1rem;
+    margin: 2rem 0;
+  }
+
+  .brand-card {
+    text-align: center;
+    min-height: 180px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+  }
+
+  .brand-icon {
+    font-size: 3rem;
+    margin-bottom: 1rem;
+  }
+
+  .brand-name {
+    font-size: 1.5rem;
+    font-weight: 800;
+    color: var(--cement-text);
+    margin-bottom: 0.5rem;
+  }
+
+  .product-card {
+    text-align: left;
+    min-height: 140px;
+  }
+
+  .product-name {
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: var(--cement-text);
+    margin-bottom: 0.5rem;
+  }
+
+  .product-info {
+    font-size: 0.9rem;
+    color: var(--cement-muted);
+    margin-bottom: 0.5rem;
+  }
+
+  .product-price {
+    font-size: 1.2rem;
+    font-weight: 800;
+    color: var(--cement-success);
+  }
+
+  .form-section {
+    background: var(--cement-panel);
+    border: 1px solid var(--cement-border);
+    border-radius: 16px;
+    padding: 2rem;
+    box-shadow: var(--cement-shadow);
+  }
+
+  .form-control {
+    padding: 0.75rem 1rem;
+    border-radius: 8px;
+    border: 1px solid var(--cement-border);
+    font-size: 1rem;
+    width: 100%;
+  }
+
+  .btn {
+    padding: 0.75rem 1.5rem;
+    border-radius: 8px;
+    font-weight: 600;
+    transition: all 0.2s;
+    border: none;
+    cursor: pointer;
+  }
+
+  .btn-primary {
+    background: var(--cement-accent);
+    color: white;
+  }
+
+  .btn-success {
+    background: var(--cement-success);
+    color: white;
+  }
+
+  @media (max-width: 640px) {
+    .brand-grid,
+    .product-grid {
+      grid-template-columns: 1fr;
+    }
+  }
+</style>
 {% endblock %}
 
+{% block content %}
+<div class="cement-container">
+  <!-- Step Indicator -->
+  <div class="step-indicator">
+    <div class="step-item {% if step == '1' %}active{% elif step|add:'0' > 1 %}completed{% endif %}">
+      <div class="step-circle">{% if step|add:'0' > 1 %}✓{% else %}1{% endif %}</div>
+      <div class="step-label">Brand</div>
+    </div>
+    <div class="step-item {% if step == '2' %}active{% elif step|add:'0' > 2 %}completed{% endif %}">
+      <div class="step-circle">{% if step|add:'0' > 2 %}✓{% elif step|add:'0' >= 2 %}2{% else %}2{% endif %}</div>
+      <div class="step-label">Product</div>
+    </div>
+    <div class="step-item {% if step == '3' %}active{% endif %}">
+      <div class="step-circle">3</div>
+      <div class="step-label">Quantity & Payment</div>
+    </div>
+  </div>
+
+  <!-- Step 1: Brand Selection -->
+  {% if step == '1' %}
+  <div class="form-section">
+    <h2 class="mb-4" style="font-weight: 800;">Step 1: Select Brand</h2>
+    <p class="text-muted mb-4">Choose a cement brand</p>
+    
+    <form method="post">
+      {% csrf_token %}
+      <input type="hidden" name="step" value="1">
+      
+      <div class="brand-grid">
+        {% for brand in brands %}
+        <div class="premium-card brand-card" onclick="selectBrand('{{ brand.key }}')">
+          <div class="brand-icon">{{ brand.icon }}</div>
+          <div class="brand-name">{{ brand.name }}</div>
+          <input type="radio" name="brand" value="{{ brand.key }}" id="brand_{{ brand.key }}" style="display: none;">
+        </div>
+        {% endfor %}
+      </div>
+      
+      <div class="d-flex gap-2 mt-4">
+        <button type="submit" class="btn btn-primary" id="continue-btn" disabled>Continue →</button>
+        <a href="{% url 'cement:dashboard' %}" class="btn btn-outline-secondary">Cancel</a>
+      </div>
+    </form>
+  </div>
+  {% endif %}
+
+  <!-- Step 2: Product Selection -->
+  {% if step == '2' %}
+  <div class="form-section">
+    <h2 class="mb-4" style="font-weight: 800;">Step 2: Select Product</h2>
+    <p class="text-muted mb-4">Brand: <strong>{{ selected_brand }}</strong></p>
+    
+    <form method="post">
+      {% csrf_token %}
+      <input type="hidden" name="step" value="2">
+      <input type="hidden" name="brand" value="{{ selected_brand }}">
+      
+      {% if products %}
+      <div class="product-grid">
+        {% for product in products %}
+        <div class="premium-card product-card" onclick="selectProduct({{ product.id }})">
+          <div class="product-name">{{ product.name }}</div>
+          <div class="product-info">Stock: {{ product.quantity_in_stock }} {{ product.base_unit|default:"bags" }}</div>
+          <div class="product-price">MK {{ product.selling_price|floatformat:0|intcomma }}</div>
+          <input type="radio" name="product_id" value="{{ product.id }}" id="product_{{ product.id }}" style="display: none;">
+        </div>
+        {% endfor %}
+      </div>
+      {% else %}
+      <div class="alert alert-info">
+        No products in stock for this brand. <a href="{% url 'cement:stock_in' %}">Add stock</a> first.
+      </div>
+      {% endif %}
+      
+      <div class="d-flex gap-2 mt-4">
+        <button type="submit" class="btn btn-primary" id="continue-btn" {% if not products %}disabled{% endif %}>Continue →</button>
+        <a href="{% url 'cement:sell' %}?step=1" class="btn btn-outline-secondary">← Back</a>
+      </div>
+    </form>
+  </div>
+  {% endif %}
+
+  <!-- Step 3: Quantity & Payment -->
+  {% if step == '3' %}
+  <div class="form-section">
+    <h2 class="mb-4" style="font-weight: 800;">Step 3: Quantity & Payment</h2>
+    
+    {% if selected_product %}
+    <div class="mb-4 p-3" style="background: #f8fafc; border-radius: 12px;">
+      <div><strong>Product:</strong> {{ selected_product.name }}</div>
+      <div><strong>Price:</strong> MK {{ selected_product.selling_price|floatformat:0|intcomma }} per {{ selected_product.base_unit|default:"bag" }}</div>
+      <div><strong>Available Stock:</strong> {{ selected_product.quantity_in_stock }} {{ selected_product.base_unit|default:"bags" }}</div>
+    </div>
+    {% endif %}
+    
+    <form method="post">
+      {% csrf_token %}
+      <input type="hidden" name="step" value="3">
+      
+      <div class="mb-3">
+        <label class="form-label">Quantity *</label>
+        <input type="number" class="form-control" name="quantity" required min="1" max="{{ selected_product.quantity_in_stock }}" value="1">
+        <small class="text-muted">Max: {{ selected_product.quantity_in_stock }} {{ selected_product.base_unit|default:"bags" }}</small>
+      </div>
+      
+      <div class="mb-3">
+        <label class="form-label">Payment Method *</label>
+        <select class="form-control" name="payment_method" required>
+          <option value="CASH">Cash</option>
+          <option value="MOBILE_MONEY">Mobile Money</option>
+          <option value="BANK">Bank Transfer</option>
+        </select>
+      </div>
+      
+      <div class="mb-3">
+        <label class="form-label">Notes (optional)</label>
+        <textarea class="form-control" name="notes" rows="2"></textarea>
+      </div>
+      
+      <div class="d-flex gap-2 mt-4">
+        <button type="submit" class="btn btn-success">✅ Complete Sale</button>
+        <a href="{% url 'cement:sell' %}?step=2" class="btn btn-outline-secondary">← Back</a>
+      </div>
+    </form>
+  </div>
+  {% endif %}
+</div>
+
+<script>
+  function selectBrand(brandKey) {
+    document.querySelectorAll('.brand-card').forEach(card => {
+      card.classList.remove('selected');
+    });
+    event.currentTarget.classList.add('selected');
+    document.getElementById('brand_' + brandKey).checked = true;
+    document.getElementById('continue-btn').disabled = false;
+  }
+
+  function selectProduct(productId) {
+    document.querySelectorAll('.product-card').forEach(card => {
+      card.classList.remove('selected');
+    });
+    event.currentTarget.classList.add('selected');
+    document.getElementById('product_' + productId).checked = true;
+    document.getElementById('continue-btn').disabled = false;
+  }
+</script>
+{% endblock %}

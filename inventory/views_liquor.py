@@ -4,7 +4,7 @@ Views for liquor store operations: sales, credits, payments, stock edit requests
 """
 from __future__ import annotations
 
-from decimal import Decimal
+from decimal import Decimal, InvalidOperation
 from typing import Optional, Any
 
 from django import forms
@@ -128,8 +128,33 @@ def sell_liquor(request):
         # POST logic remains intact - handle sale recording
         # Extract POST data directly (no form validation for speed)
         try:
-            product_id = int(request.POST.get("product_id", 0))
-            quantity = int(request.POST.get("quantity", 1))
+            # Validate and extract product_id
+            product_id_str = request.POST.get("product_id", "").strip()
+            if not product_id_str:
+                messages.error(request, "❌ Please select a product.")
+                return redirect("liquor:sell")
+            
+            try:
+                product_id = int(product_id_str)
+            except (ValueError, TypeError):
+                messages.error(request, "❌ Invalid product selected.")
+                return redirect("liquor:sell")
+            
+            if product_id <= 0:
+                messages.error(request, "❌ Please select a valid product.")
+                return redirect("liquor:sell")
+            
+            # Validate and extract quantity
+            quantity_str = request.POST.get("quantity", "1").strip()
+            try:
+                quantity = int(quantity_str)
+            except (ValueError, TypeError):
+                quantity = 1
+            
+            if quantity <= 0:
+                messages.error(request, "❌ Quantity must be at least 1.")
+                return redirect("liquor:sell")
+            
             # CRITICAL: Default mode is "bottle" (NOT crate) - bottle-first selling
             mode = request.POST.get("mode", "bottle")  # "bottle", "shot", or "glass"
             sale_type = request.POST.get("sale_type", "cash")  # "cash" or "credit"
@@ -137,17 +162,33 @@ def sell_liquor(request):
             customer_phone = request.POST.get("customer_phone", "").strip()
             notes = request.POST.get("notes", "").strip()
             
-            # Payment mix amounts (if provided)
-            cash_amount = Decimal(request.POST.get("cash_amount", "0") or "0")
-            bank_amount = Decimal(request.POST.get("bank_amount", "0") or "0")
-            mobile_money_amount = Decimal(request.POST.get("mobile_money_amount", "0") or "0")
+            # Payment mix amounts (if provided) - safe Decimal conversion
+            try:
+                cash_amount = Decimal(str(request.POST.get("cash_amount", "0") or "0"))
+            except (ValueError, TypeError, InvalidOperation):
+                cash_amount = Decimal("0.00")
             
-            product = MerchProduct.objects.get(
-                pk=product_id,
-                business=business,
-                kind=BusinessKind.LIQUOR,
-                is_active=True
-            )
+            try:
+                bank_amount = Decimal(str(request.POST.get("bank_amount", "0") or "0"))
+            except (ValueError, TypeError, InvalidOperation):
+                bank_amount = Decimal("0.00")
+            
+            try:
+                mobile_money_amount = Decimal(str(request.POST.get("mobile_money_amount", "0") or "0"))
+            except (ValueError, TypeError, InvalidOperation):
+                mobile_money_amount = Decimal("0.00")
+            
+            # Get product with proper error handling
+            try:
+                product = MerchProduct.objects.select_for_update().get(
+                    pk=product_id,
+                    business=business,
+                    kind=BusinessKind.LIQUOR,
+                    is_active=True
+                )
+            except MerchProduct.DoesNotExist:
+                messages.error(request, "❌ Product not found or not available.")
+                return redirect("liquor:sell")
             
             # Validate credit sale requires customer name
             if sale_type == "credit" and not customer_name:
@@ -164,12 +205,12 @@ def sell_liquor(request):
             
             # Validate shot sales
             if mode == "shot" and not product.has_shots:
-                messages.error(request, f"{product.name} does not support shot sales.")
+                messages.error(request, f"❌ {product.name} does not support shot sales.")
                 return redirect("liquor:sell")
             
             # Validate glass sales
             if mode == "glass" and not product.has_glasses:
-                messages.error(request, f"{product.name} does not support glass sales.")
+                messages.error(request, f"❌ {product.name} does not support glass sales.")
                 return redirect("liquor:sell")
             
             # CRITICAL: Check stock availability before allowing sale
@@ -186,23 +227,37 @@ def sell_liquor(request):
                 )
                 return redirect("liquor:sell")
             
-            # Get price based on mode
+            # Get price based on mode - handle None values safely
             if mode == "shot":
-                unit_price = product.price_per_shot
+                unit_price = product.price_per_shot or Decimal("0.00")
+                if unit_price == Decimal("0.00"):
+                    messages.error(request, f"❌ {product.name} does not have a price per shot set.")
+                    return redirect("liquor:sell")
             elif mode == "glass":
-                unit_price = product.price_per_glass
+                unit_price = product.price_per_glass or Decimal("0.00")
+                if unit_price == Decimal("0.00"):
+                    messages.error(request, f"❌ {product.name} does not have a price per glass set.")
+                    return redirect("liquor:sell")
             else:
-                unit_price = product.price_per_bottle
+                unit_price = product.price_per_bottle or Decimal("0.00")
+                if unit_price == Decimal("0.00"):
+                    messages.error(request, f"❌ {product.name} does not have a price per bottle set.")
+                    return redirect("liquor:sell")
             
             with transaction.atomic():
                 # Calculate cost for profit tracking
-                # CRITICAL: get_cost_for_unit returns cost_per_bottle for bottle sales
-                # Profit = (selling_price_per_bottle - cost_per_bottle) * bottles_sold
-                unit_cost = product.get_cost_for_unit(unit) or Decimal("0.00")
+                # CRITICAL: get_cost_for_unit expects string unit type, not enum
+                unit_type_str = unit  # LiquorUnitType enum values are strings
+                unit_cost = product.get_cost_for_unit(unit_type_str) or Decimal("0.00")
                 total_cost = Decimal(quantity) * unit_cost
                 
                 # Calculate total price
                 total = Decimal(quantity) * unit_price
+                
+                # Validate total is positive
+                if total <= 0:
+                    messages.error(request, "❌ Sale total must be greater than zero.")
+                    return redirect("liquor:sell")
                 
                 # Validate payment mix (if used)
                 payment_mix_total = cash_amount + bank_amount + mobile_money_amount
@@ -243,11 +298,15 @@ def sell_liquor(request):
                     mobile_money_amount=mobile_money_amount
                 )
                 
-                # CRITICAL: Reduce stock after sale (bottle sales only, even for credit)
+                # CRITICAL: Reduce stock after sale (even for credit sales)
                 # Credit sales still remove product from inventory
+                # For now, we only track bottle-level stock in quantity_in_stock
+                # Shot/glass sales will be handled in a future update with stock_units tracking
                 if mode == "bottle":
-                    product.quantity_in_stock = max(0, (product.quantity_in_stock or 0) - quantity)
+                    new_stock = max(0, (product.quantity_in_stock or 0) - quantity)
+                    product.quantity_in_stock = new_stock
                     product.save(update_fields=['quantity_in_stock'])
+                # TODO: Implement stock_units tracking for shot/glass sales (task #3)
                 
                 if is_credit:
                     # Create credit record

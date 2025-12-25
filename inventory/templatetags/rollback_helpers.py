@@ -15,6 +15,7 @@ register = template.Library()
 def can_rollback_sale(sale, user, business):
     """
     Check if user can rollback a sale.
+    Uses RollbackService for consistent permission checking.
     
     Usage in template:
         {% can_rollback_sale sale request.user business as can_rollback %}
@@ -23,44 +24,83 @@ def can_rollback_sale(sale, user, business):
         {% endif %}
     """
     try:
-        # Check if already rolled back
-        if hasattr(sale, 'is_rolled_back') and sale.is_rolled_back:
-            return False
+        # For vertical-specific sales (ClothingSale, PharmacySale, etc.), use Sale model if available
+        # Otherwise check directly on the sale object
+        from sales.services.rollback import RollbackService
+        from sales.models import Sale
         
-        # Check user membership
-        from tenants.models import Membership
-        
-        try:
-            membership = Membership.objects.get(user=user, business=business)
+        # Try to convert to Sale object if it's a vertical-specific sale
+        if hasattr(sale, 'pk') and not isinstance(sale, Sale):
+            # For vertical sales, check permissions using membership check
+            # Managers can always rollback
+            from tenants.models import Membership
+            from django.db.models import Case, When, Value, IntegerField
+            
+            # Get ACTIVE membership - prioritize MANAGER > AGENT
+            membership = Membership.objects.filter(
+                user=user, 
+                business=business,
+                status='ACTIVE'
+            ).annotate(
+                role_priority=Case(
+                    When(role='MANAGER', then=Value(1)),
+                    When(role='OWNER', then=Value(1)),
+                    When(role='ADMIN', then=Value(1)),
+                    When(role='AGENT', then=Value(2)),
+                    default=Value(3),
+                    output_field=IntegerField()
+                )
+            ).order_by('role_priority').first()
+            
+            if not membership:
+                return False
+            
             role = membership.role.upper()
             
             # CRITICAL: Managers, Owners, and Admins can rollback ANY sale IMMEDIATELY
-            # No time restrictions, no ownership checks - full operational control
             if role in ["MANAGER", "OWNER", "ADMIN", "HQ_ADMIN"]:
+                # Check if already rolled back
+                if hasattr(sale, 'is_rolled_back') and sale.is_rolled_back:
+                    return False
                 return True
             
             # Agents can only rollback their own sales within 10 minutes
             if role == "AGENT":
+                if hasattr(sale, 'is_rolled_back') and sale.is_rolled_back:
+                    return False
                 # Check if it's their sale
                 sale_agent = getattr(sale, 'agent', None) or getattr(sale, 'sold_by', None)
                 if sale_agent != user:
                     return False
-                
                 # Check timing
                 sale_time = getattr(sale, 'created_at', None) or getattr(sale, 'sold_at', None)
                 if sale_time:
                     time_since_sale = timezone.now() - sale_time
                     if time_since_sale > timedelta(minutes=10):
                         return False
-                
                 return True
             
             return False
-        
-        except Membership.DoesNotExist:
-            return False
+        else:
+            # Use RollbackService for Sale objects
+            can_rollback, error_msg = RollbackService.can_rollback(sale, user, business)
+            return can_rollback
     
-    except Exception:
+    except Exception as e:
+        # Fallback: basic check for managers
+        try:
+            from tenants.models import Membership
+            membership = Membership.objects.filter(
+                user=user, 
+                business=business,
+                status='ACTIVE'
+            ).first()
+            if membership and membership.role.upper() in ["MANAGER", "OWNER", "ADMIN", "HQ_ADMIN"]:
+                if hasattr(sale, 'is_rolled_back') and sale.is_rolled_back:
+                    return False
+                return True
+        except:
+            pass
         return False
 
 
@@ -155,8 +195,11 @@ def rollback_button(sale, user, business, vertical="phones"):
     # Determine URLs based on vertical
     url_map = {
         "phones": "sales:rollback_confirm",
-        "liquor": "liquor:rollback_confirm",
-        "clothing": "clothing:rollback_confirm",
+        "liquor": "verticals:liquor_rollback_sale",  # Direct rollback endpoint
+        "clothing": "verticals:clothing_rollback_sale",  # Direct rollback endpoint (needs to be created)
+        "pharmacy": "verticals:pharmacy_rollback_sale",
+        "cosmetics": "verticals:pharmacy_rollback_sale",  # Cosmetics uses pharmacy rollback
+        "groceries": "groceries:rollback_sale",  # Groceries-specific rollback
     }
     
     return {
