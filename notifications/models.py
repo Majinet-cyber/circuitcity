@@ -225,6 +225,8 @@ class NotificationEvent(models.Model):
         ("WELCOME_MANAGER", "Welcome Manager"),
         ("WELCOME_AGENT", "Welcome Agent"),
         ("OTP_CODE", "OTP Code"),
+        ("OTP_RESET", "OTP Reset"),
+        ("OTP_VERIFY", "OTP Verify"),
         ("SALE_INSTANT", "Sale Instant"),
         ("SALE_BATCH", "Sale Batch"),
         ("DAILY_SUMMARY", "Daily Summary"),
@@ -236,6 +238,7 @@ class NotificationEvent(models.Model):
         ("PENDING", "Pending"),
         ("SENT", "Sent"),
         ("FAILED", "Failed"),
+        ("SKIPPED", "Skipped"),  # Skipped due to user preference
     ]
     
     event_type = models.CharField(max_length=20, choices=EVENT_TYPE_CHOICES, db_index=True)

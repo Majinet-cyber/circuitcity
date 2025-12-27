@@ -63,6 +63,7 @@ def _send_otp_email(email: str, code: str, purpose: str, otp_id: int) -> None:
     """Send OTP code via email using notification system."""
     from notifications.services import emit_event
     from django.contrib.auth import get_user_model
+    from django.db import transaction
     User = get_user_model()
     
     try:
@@ -73,20 +74,33 @@ def _send_otp_email(email: str, code: str, purpose: str, otp_id: int) -> None:
         except User.DoesNotExist:
             pass
         
-        # Map purpose to event type (use OTP_CODE for all)
-        # Send email via notification system
-        emit_event(
-            event_type="OTP_CODE",
-            recipients=[email],
-            dedupe_key=f"OTP:{email}:{otp_id}",
-            payload={
-                "code": code,
-                "purpose": purpose,
-                "expires_minutes": OTP_TTL_MINUTES,
-            },
-            business=None,  # OTP not business-specific
+        # Map purpose to event type
+        event_type_map = {
+            "reset": "OTP_RESET",
+            "verify": "OTP_VERIFY",
+            "signup": "OTP_CODE",
+            "login": "OTP_CODE",
+            "2fa": "OTP_CODE",
+        }
+        event_type = event_type_map.get(purpose, "OTP_CODE")
+        
+        # Send email via notification system with transaction.on_commit
+        # This ensures email is sent after DB commit (OTP record is already saved)
+        transaction.on_commit(
+            lambda: emit_event(
+                event_type=event_type,
+                recipients=[email],
+                dedupe_key=f"OTP:{purpose}:{email}:{otp_id}",
+                payload={
+                    "code": code,
+                    "purpose": purpose,
+                    "expires_minutes": OTP_TTL_MINUTES,
+                },
+                business=None,  # OTP not business-specific
+                user=user,  # Pass user for preference checking (though transactional emails bypass preferences)
+            )
         )
-        log.info(f"OTP email queued for {email} for purpose={purpose}")
+        log.info(f"OTP email queued for {email} for purpose={purpose} (event_type={event_type})")
     except Exception as e:
         log.error(f"Failed to queue OTP email to {email}: {e}", exc_info=True)
         raise

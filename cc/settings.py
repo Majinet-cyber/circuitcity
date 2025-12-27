@@ -7,6 +7,7 @@ import os
 import sys
 import importlib
 import mimetypes
+from django.core.exceptions import ImproperlyConfigured
 
 # Register .webmanifest MIME type for PWA installability
 mimetypes.add_type("application/manifest+json", ".webmanifest")
@@ -77,10 +78,16 @@ SECRET_KEY = os.environ.get(
 )
 
 IS_RUNSERVER = any(arg in sys.argv for arg in ("runserver", "runserver_plus"))
-DEBUG = env_bool("DEBUG", IS_RUNSERVER)
 _argv = " ".join(sys.argv).lower()
 TESTING = any(token in _argv for token in (" test", "pytest", "py.test")) or os.environ.get("PYTEST_CURRENT_TEST") is not None
-ON_RENDER = env_bool("RENDER", False) or ("RENDER" in os.environ)
+
+# Reliable Render detection (check multiple indicators)
+IS_RENDER = bool(os.getenv("RENDER")) or bool(os.getenv("RENDER_SERVICE_ID")) or bool(os.getenv("RENDER_EXTERNAL_URL"))
+ON_RENDER = IS_RENDER  # Keep alias for backwards compatibility
+
+# DEBUG default: True for local dev, False for Render production
+# Allow explicit override via DEBUG env var
+DEBUG = env_bool("DEBUG", default=not IS_RENDER)
 
 # Allow from env first, else sane defaults (Render host, localhost, etc.)
 # NOTE: include staging host by default.
@@ -356,7 +363,7 @@ elif DATABASE_URL:
     try:
         import dj_database_url  # type: ignore
     except Exception as e:
-        raise RuntimeError("dj-database-url must be installed") from e
+        raise ImproperlyConfigured("dj-database-url must be installed") from e
 
     cfg = dj_database_url.parse(
         DATABASE_URL,
@@ -410,7 +417,6 @@ if default_db.get("ENGINE") == "django.db.backends.sqlite3":
 # ===== RENDER GUARD: Prevent SQLite in production =====
 # On Render, we must use PostgreSQL. Fail fast if misconfigured.
 if os.getenv("RENDER") and DATABASES.get("default", {}).get("ENGINE", "").endswith("sqlite3"):
-    from django.core.exceptions import ImproperlyConfigured
     raise ImproperlyConfigured(
         "SQLite is not allowed on Render. Please set DATABASE_URL to a valid PostgreSQL connection string."
     )
@@ -499,33 +505,84 @@ LOGOUT_REDIRECT_URL = "/accounts/login/"
 ADMINS = [("Ops", os.environ.get("ADMIN_EMAIL", "ops@example.com"))]
 EMAIL_SUBJECT_PREFIX = "[CC] "
 
-# Email backend switching: USE_CONSOLE_EMAIL=1 (default safe) or USE_CONSOLE_EMAIL=0 (real sending)
-# Default to console backend (safe) if not explicitly set to 0
-USE_CONSOLE_EMAIL = env_bool("USE_CONSOLE_EMAIL", default=True)
+# ==============================================================================
+# Email backend selection (deterministic)
+# ==============================================================================
+# Rule:
+# 1. If USE_CONSOLE_EMAIL is explicitly true (1/true/yes) => use console backend
+# 2. Else if SENDGRID_API_KEY exists => use anymail SendGrid backend
+# 3. Else => use console backend (safe fallback)
+# ==============================================================================
+
+# Safe env parsing for USE_CONSOLE_EMAIL
+USE_CONSOLE_EMAIL_RAW = os.getenv("USE_CONSOLE_EMAIL", "").strip()
+USE_CONSOLE_EMAIL = USE_CONSOLE_EMAIL_RAW in ("1", "true", "True", "yes", "YES", "on", "ON")
 
 # SendGrid configuration
-SENDGRID_API_KEY = os.environ.get("SENDGRID_API_KEY", "").strip()
+SENDGRID_API_KEY = os.getenv("SENDGRID_API_KEY", "").strip()
+HAS_SENDGRID_KEY = bool(SENDGRID_API_KEY)
+
 DEFAULT_FROM_EMAIL = os.environ.get("DEFAULT_FROM_EMAIL", "Emajinet <no-reply@emajinet.africa>")
 SERVER_EMAIL = DEFAULT_FROM_EMAIL
+
+# Configure email backend based on deterministic rule
+if USE_CONSOLE_EMAIL:
+    EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"
+    ANYMAIL = {}
+elif HAS_SENDGRID_KEY:
+    EMAIL_BACKEND = "anymail.backends.sendgrid.EmailBackend"
+    ANYMAIL = {
+        "SENDGRID_API_KEY": SENDGRID_API_KEY,
+    }
+else:
+    # Fallback: console backend (safe default)
+    EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"
+    ANYMAIL = {}
+
+# Print startup configuration
+print(
+    f"[cc.settings] EMAIL_BACKEND={EMAIL_BACKEND} "
+    f"USE_CONSOLE_EMAIL={USE_CONSOLE_EMAIL} "
+    f"HAS_SENDGRID_KEY={HAS_SENDGRID_KEY}"
+)
 
 # ==============================================================================
 # PRODUCTION SAFETY: Prevent console backend in production
 # ==============================================================================
-if not DEBUG and USE_CONSOLE_EMAIL:
-    from django.core.exceptions import RuntimeError
-    raise RuntimeError(
-        "CRITICAL: USE_CONSOLE_EMAIL=True is not allowed in production (DEBUG=False). "
-        "Set USE_CONSOLE_EMAIL=0 and SENDGRID_API_KEY in production environment."
-    )
+# Only enforce production email guard on REAL production (Render + DEBUG=False)
+# Local dev should never block startup even if DEBUG accidentally false
+if IS_RENDER and not DEBUG:
+    if USE_CONSOLE_EMAIL:
+        raise ImproperlyConfigured(
+            "CRITICAL: USE_CONSOLE_EMAIL=True is not allowed in production (Render + DEBUG=False). "
+            "Set USE_CONSOLE_EMAIL=0 and SENDGRID_API_KEY in production environment."
+        )
+    if not SENDGRID_API_KEY:
+        raise ImproperlyConfigured(
+            "CRITICAL: SENDGRID_API_KEY is required in production (Render + DEBUG=False). "
+            "Set SENDGRID_API_KEY in your Render environment variables."
+        )
 
 # ==============================================================================
-# SendGrid configuration validation
+# SendGrid configuration validation (for non-console backend)
 # ==============================================================================
-if not USE_CONSOLE_EMAIL:
-    if not SENDGRID_API_KEY:
-        from django.core.exceptions import ImproperlyConfigured
+# Only validate if explicitly using SendGrid (not console backend)
+if not USE_CONSOLE_EMAIL and HAS_SENDGRID_KEY:
+    # SendGrid backend is configured, no validation needed
+    pass
+elif not USE_CONSOLE_EMAIL and not HAS_SENDGRID_KEY:
+    # Trying to use SendGrid but no key - warn or fail
+    if not IS_RENDER:
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.warning(
+            "USE_CONSOLE_EMAIL is not set but SENDGRID_API_KEY not found. "
+            "Falling back to console backend. Set SENDGRID_API_KEY for real email sending."
+        )
+    else:
+        # On Render, require SendGrid key if not using console
         raise ImproperlyConfigured(
-            "USE_CONSOLE_EMAIL=0 requires SENDGRID_API_KEY to be set. "
+            "SENDGRID_API_KEY is required in production (Render + DEBUG=False). "
             "Either set USE_CONSOLE_EMAIL=1 to use console backend, "
             "or set SENDGRID_API_KEY in your environment variables."
         )
@@ -561,18 +618,6 @@ if _from_email_domain and _from_email_domain != "emajinet.africa":
         f"DEFAULT_FROM_EMAIL domain ({_from_email_domain}) is not emajinet.africa. "
         f"This may affect email deliverability. Ensure the domain is verified in SendGrid."
     )
-
-# Configure email backend based on USE_CONSOLE_EMAIL flag
-if USE_CONSOLE_EMAIL:
-    # Safe default: console backend (emails print to terminal)
-    EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"
-else:
-    # Real sending: SendGrid via Anymail
-    # Ensure anymail is in INSTALLED_APPS (already present)
-    EMAIL_BACKEND = "anymail.backends.sendgrid.EmailBackend"
-    ANYMAIL = {
-        "SENDGRID_API_KEY": SENDGRID_API_KEY,
-    }
 
 # --------------------------- billing ---------------------------
 BILLING = {

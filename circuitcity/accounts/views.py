@@ -22,6 +22,7 @@ from django.contrib.auth import (
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.models import Group
 from django.contrib.sessions.models import Session
+from django.core.exceptions import ValidationError
 from django.core.mail import send_mail
 from django.http import HttpResponse, HttpResponseForbidden, JsonResponse
 from django.shortcuts import redirect, render
@@ -193,11 +194,12 @@ def _generate_otp(n: int = 6) -> str:
     return f"{random.randint(0, 10**n - 1):0{n}d}"
 
 
-def _create_email_otp(email: str, *, purpose: str, requester_ip: str | None) -> str | None:
+def _create_email_otp(email: str, *, purpose: str, requester_ip: str | None, user_agent: str | None = None) -> str | None:
     if not email:
         return None
     now = timezone.now()
-    window_start = now - timedelta(minutes=45)
+    # Rate limit: max 3 OTP requests per email per 10 minutes
+    window_start = now - timedelta(minutes=10)
     recent_count = EmailOTP.objects.filter(
         email__iexact=email, purpose=purpose, created_at__gte=window_start
     ).count()
@@ -206,34 +208,65 @@ def _create_email_otp(email: str, *, purpose: str, requester_ip: str | None) -> 
 
     raw = _generate_otp(6)
     otp = EmailOTP(
-        email=email.strip(),
+        email=email.strip().lower(),
         purpose=purpose,
         expires_at=now + timedelta(minutes=5),
         requester_ip=requester_ip,
-        meta={"ua": "web"},
+        user_agent=user_agent or "web",
     )
     otp.set_raw_code(raw)
     otp.save()
     return raw
 
 
-def _send_email_otp(email: str, code: str, *, purpose: str) -> None:
+def _send_email_otp(email: str, code: str, *, purpose: str, otp_id: int | None = None) -> None:
+    """
+    Send OTP email via notifications emailer and create NotificationEvent.
+    Uses transaction.on_commit to ensure email is sent after DB commit.
+    """
+    from django.db import transaction
+    from notifications.services import emit_event
+    
     subject = {
         "reset": "Your password reset code",
         "login": "Your login verification code",
         "verify": "Your verification code",
     }.get(purpose, "Your verification code")
 
-    msg_lines = [
-        "Use the one-time code below:",
-        "",
-        f"    {code}",
-        "",
-        "This code will expire in 5 minutes.",
-        "If you didn’t request this, you can ignore this email.",
-    ]
-    from_email = getattr(settings, "DEFAULT_FROM_EMAIL", "no-reply@localhost")
-    send_mail(subject, "\n".join(msg_lines), from_email, [email], fail_silently=True)
+    # Create NotificationEvent and send email after commit
+    def _send_after_commit():
+        try:
+            emit_event(
+                event_type="OTP_CODE",
+                recipients=[email],
+                dedupe_key=f"OTP:{purpose}:{email}:{otp_id}" if otp_id else f"OTP:{purpose}:{email}",
+                payload={
+                    "code": code,
+                    "purpose": purpose,
+                    "expires_in_minutes": 5,
+                },
+                business=None,
+            )
+        except Exception as e:
+            # Log error but don't crash - email sending failures should be handled gracefully
+            log.error(f"Failed to send OTP email via NotificationEvent: {e}", exc_info=True)
+            # Fallback to direct send_mail if NotificationEvent fails
+            try:
+                from django.core.mail import send_mail
+                from_email = getattr(settings, "DEFAULT_FROM_EMAIL", "no-reply@localhost")
+                msg_lines = [
+                    "Use the one-time code below:",
+                    "",
+                    f"    {code}",
+                    "",
+                    "This code will expire in 5 minutes.",
+                    "If you didn't request this, you can ignore this email.",
+                ]
+                send_mail(subject, "\n".join(msg_lines), from_email, [email], fail_silently=True)
+            except Exception as fallback_error:
+                log.error(f"Fallback email send also failed: {fallback_error}", exc_info=True)
+    
+    transaction.on_commit(_send_after_commit)
 
 
 def _verify_email_otp(email: str, code: str, *, purpose: str) -> bool:
@@ -599,13 +632,22 @@ def otp_challenge(request):
             if not request.user.email:
                 messages.error(request, "Your account has no email address; contact an admin.")
             else:
+                ip = _client_ip(request)
+                user_agent = request.META.get("HTTP_USER_AGENT", "web")[:500]
                 code = _create_email_otp(
                     request.user.email,
                     purpose="verify",
-                    requester_ip=_client_ip(request),
+                    requester_ip=ip,
+                    user_agent=user_agent,
                 )
                 if code:
-                    _send_email_otp(request.user.email, code, purpose="verify")
+                    # Get the OTP record ID for NotificationEvent dedupe_key
+                    otp_record = EmailOTP.objects.filter(
+                        email__iexact=request.user.email,
+                        purpose="verify"
+                    ).order_by("-created_at").first()
+                    otp_id = otp_record.id if otp_record else None
+                    _send_email_otp(request.user.email, code, purpose="verify", otp_id=otp_id)
                     ctx["sent"] = True
                     messages.success(request, "We sent a verification code to your email.")
                 else:
@@ -766,18 +808,54 @@ def upload_agent_avatar(request, agent_id: int):
 def forgot_password_request_view(request):
     """
     Step 1: Ask for identifier (email/username). Email a code *if* user exists.
+    Transaction-safe: OTP creation and email sending happen after DB commit.
     """
+    from django.db import transaction
+    from notifications.services import emit_event
+    
     form = ForgotPasswordRequestForm(request.POST or None)
     if request.method == "POST" and form.is_valid():
-        user = _get_user_by_identifier(form.cleaned_data["identifier"])
-        if user and user.email:
-            ip = _client_ip(request)
-            code = _create_email_otp(user.email, purpose="reset", requester_ip=ip)
-            if code:
-                _send_email_otp(user.email, code, purpose="reset")
+        try:
+            user = _get_user_by_identifier(form.cleaned_data["identifier"])
+            if user and user.email:
+                ip = _client_ip(request)
+                user_agent = request.META.get("HTTP_USER_AGENT", "web")[:500]  # Limit length
+                code = _create_email_otp(
+                    user.email, 
+                    purpose="reset", 
+                    requester_ip=ip,
+                    user_agent=user_agent
+                )
+                if code:
+                    # Get the OTP record ID for NotificationEvent dedupe_key
+                    otp_record = EmailOTP.objects.filter(
+                        email__iexact=user.email,
+                        purpose="reset"
+                    ).order_by("-created_at").first()
+                    otp_id = otp_record.id if otp_record else None
+                    
+                    # Send OTP via emit_event with transaction.on_commit
+                    # This ensures NotificationEvent is created and email is sent after DB commit
+                    transaction.on_commit(
+                        lambda: emit_event(
+                            event_type="OTP_RESET",
+                            recipients=[user.email],
+                            dedupe_key=f"OTP_RESET:{user.email}:{otp_id}" if otp_id else f"OTP_RESET:{user.email}",
+                            payload={
+                                "code": code,
+                                "purpose": "reset",
+                                "expires_in_minutes": 5,
+                            },
+                            business=None,
+                            user=user,
+                        )
+                    )
+        except Exception as e:
+            # Log error but show generic success message (don't reveal if user exists)
+            log.error(f"Error in forgot password request: {e}", exc_info=True)
 
-        # Do not leak whether the account exists
-        messages.success(request, "If an account exists, we’ve emailed a reset code.")
+        # Do not leak whether the account exists - always show success
+        messages.success(request, "If an account exists, we've emailed a reset code.")
         try:
             return redirect("accounts:forgot_password_reset")
         except NoReverseMatch:
@@ -1482,8 +1560,14 @@ def _complete_manager_wizard_signup(request, wizard_data):
                     "manager_name": user.get_full_name() or user.username,
                     "business_name": biz.name if biz else "",
                     "login_url": request.build_absolute_uri("/dashboard/"),
+                    "support_url": "https://emajinet.africa/support" or request.build_absolute_uri("/support/"),
+                    "next_steps": [
+                        "Scan In - Add products to your inventory",
+                        "Scan & Sell - Process sales quickly",
+                    ],
                 },
                 business=biz,
+                user=user,  # Pass user for preference checking (though transactional emails bypass preferences)
             )
         )
 
@@ -1803,6 +1887,28 @@ def _complete_wizard_signup(request, wizard_data):
         
         # Clear wizard data
         _clear_wizard_data(request)
+        
+        # Send welcome email after transaction commit
+        from notifications.services import emit_event
+        transaction.on_commit(
+            lambda: emit_event(
+                event_type="WELCOME_MANAGER",
+                recipients=[user.email] if user.email else [],
+                dedupe_key=f"WELCOME_MANAGER:{user.id}",
+                payload={
+                    "manager_name": user.get_full_name() or user.username,
+                    "business_name": biz.name if biz else "",
+                    "login_url": request.build_absolute_uri("/inventory/dashboard/"),
+                    "support_url": "https://emajinet.africa/support" or request.build_absolute_uri("/support/"),
+                    "next_steps": [
+                        "Scan In - Add products to your inventory",
+                        "Scan & Sell - Process sales quickly",
+                    ],
+                },
+                business=biz,
+                user=user,  # Pass user for preference checking (though transactional emails bypass preferences)
+            )
+        )
         
         # Redirect to dashboard
         return redirect(_safe_redirect("inventory:inventory_dashboard", default="/inventory/dashboard/"))

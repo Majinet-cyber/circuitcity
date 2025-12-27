@@ -19,6 +19,16 @@ from tenants.models import Membership, Business
 
 logger = logging.getLogger(__name__)
 
+# Transactional events that should NEVER be blocked by preferences
+# These are critical system emails that users must receive
+TRANSACTIONAL_EVENTS = {
+    "OTP_RESET",
+    "OTP_VERIFY", 
+    "OTP_CODE",  # All OTP emails are transactional
+    "WELCOME_MANAGER",
+    "WELCOME_AGENT",
+}
+
 
 def emit_event(
     event_type: str,
@@ -26,10 +36,13 @@ def emit_event(
     dedupe_key: str,
     payload: Dict[str, Any],
     business: Optional[Any] = None,
+    user: Optional[Any] = None,  # Optional user for preference checking
 ) -> List[int]:
     """
     Emit email notification events for recipients.
-    Creates NotificationEvent records and enqueues sending after DB commit.
+    ALWAYS creates NotificationEvent rows first (status=PENDING).
+    Transactional events bypass preference checks and always send.
+    Non-transactional events respect preferences and may be marked SKIPPED.
     
     Implements rate limiting for SALE_* events to prevent spam:
     - Max 30 emails per recipient per hour for SALE_INSTANT and SALE_BATCH
@@ -41,11 +54,13 @@ def emit_event(
         dedupe_key: Deduplication key (must be unique per event_type + recipient)
         payload: Template context data for email
         business: Optional business instance
+        user: Optional user instance (for preference checking)
     
     Returns:
         List of created NotificationEvent IDs
     """
     created_ids = []
+    is_transactional = event_type in TRANSACTIONAL_EVENTS
     
     # Rate limiting for SALE_* events (max 30 per recipient per hour)
     SALE_RATE_LIMIT = 30  # emails per hour per recipient
@@ -76,7 +91,8 @@ def emit_event(
                 # For now, skip to prevent spam
                 continue
         
-        # Create or get event (deduplication)
+        # ALWAYS create NotificationEvent first (status=PENDING)
+        # This ensures we have a record even if sending is skipped
         event, created = NotificationEvent.objects.get_or_create(
             event_type=event_type,
             recipient_email=normalized_email,
@@ -88,20 +104,58 @@ def emit_event(
             },
         )
         
-        if created:
-            created_ids.append(event.id)
-            # Enqueue sending after transaction commit
-            transaction.on_commit(
-                lambda eid=event.id: _enqueue_dispatch(eid)
-            )
-        else:
+        if not created:
             # Event already exists (deduplication working)
             logger.debug(
                 f"Email event already exists: {event_type} -> {normalized_email} "
                 f"(dedupe_key={dedupe_key})"
             )
+            continue
+        
+        created_ids.append(event.id)
+        
+        # Check preferences for non-transactional events
+        if not is_transactional:
+            # Get user for preference checking (try from parameter or lookup by email)
+            pref_user = user
+            if not pref_user:
+                try:
+                    from django.contrib.auth import get_user_model
+                    User = get_user_model()
+                    pref_user = User.objects.filter(email__iexact=normalized_email).first()
+                except Exception:
+                    pref_user = None
+            
+            # Check if preference disables this event
+            if pref_user and not _should_send_email(pref_user, event_type):
+                event.status = "SKIPPED"
+                event.last_error = "Disabled by preference"
+                event.save(update_fields=["status", "last_error"])
+                logger.debug(
+                    f"Email event skipped due to preference: {event_type} -> {normalized_email}"
+                )
+                continue
+        
+        # Enqueue sending after transaction commit (transactional or preference allows)
+        transaction.on_commit(
+            lambda eid=event.id: _enqueue_dispatch(eid)
+        )
     
     return created_ids
+
+
+def _should_send_email(user, event_type: str) -> bool:
+    """
+    Check if user should receive email based on their preferences.
+    Returns True if should send, False if disabled by preference.
+    """
+    try:
+        from notifications.selectors import _should_send_email as selector_check
+        # Use the selector helper which already handles preference checking
+        return selector_check(user, event_type)
+    except Exception:
+        # If preference check fails, default to True (send)
+        return True
 
 
 def _enqueue_dispatch(event_id: int):
@@ -154,6 +208,14 @@ def dispatch_event(event_id: int):
             "business": event.business,
         })
         
+        # Runtime verification: log backend being used
+        from django.conf import settings
+        backend_name = getattr(settings, "EMAIL_BACKEND", "unknown")
+        logger.info(
+            f"[notifications] sending via backend={backend_name} "
+            f"event={event.event_type} to={event.recipient_email}"
+        )
+        
         # Send email
         success = send_email(
             recipient_email=event.recipient_email,
@@ -181,7 +243,7 @@ def _get_template_config(event_type: str) -> Optional[Dict[str, Any]]:
     """Get template configuration for event type."""
     configs = {
         "WELCOME_MANAGER": {
-            "subject": "Congratulations for joining Emajinet",
+            "subject": "Welcome to Emajinet 🎉 Your store is ready",
             "html_template": "notifications/emails/welcome_manager.html",
             "text_template": "notifications/emails/welcome_manager.txt",
         },
@@ -193,6 +255,16 @@ def _get_template_config(event_type: str) -> Optional[Dict[str, Any]]:
         "OTP_CODE": {
             "subject": "Your Emajinet Verification Code",
             "html_template": "notifications/emails/otp_code.html",
+            "text_template": "notifications/emails/otp_code.txt",
+        },
+        "OTP_RESET": {
+            "subject": "Your Password Reset Code",
+            "html_template": "notifications/emails/otp_code.html",  # Reuse OTP template
+            "text_template": "notifications/emails/otp_code.txt",
+        },
+        "OTP_VERIFY": {
+            "subject": "Your Verification Code",
+            "html_template": "notifications/emails/otp_code.html",  # Reuse OTP template
             "text_template": "notifications/emails/otp_code.txt",
         },
         "SALE_INSTANT": {
