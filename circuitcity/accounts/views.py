@@ -207,10 +207,11 @@ def _create_email_otp(email: str, *, purpose: str, requester_ip: str | None, use
         return None
 
     raw = _generate_otp(6)
+    otp_ttl_minutes = int(getattr(settings, "EMAIL_OTP_TTL_MINUTES", 10))
     otp = EmailOTP(
         email=email.strip().lower(),
         purpose=purpose,
-        expires_at=now + timedelta(minutes=5),
+        expires_at=now + timedelta(minutes=otp_ttl_minutes),
         requester_ip=requester_ip,
         user_agent=user_agent or "web",
     )
@@ -235,6 +236,7 @@ def _send_email_otp(email: str, code: str, *, purpose: str, otp_id: int | None =
 
     # Create NotificationEvent and send email after commit
     def _send_after_commit():
+        otp_ttl_minutes = int(getattr(settings, "EMAIL_OTP_TTL_MINUTES", 10))
         try:
             emit_event(
                 event_type="OTP_CODE",
@@ -243,7 +245,7 @@ def _send_email_otp(email: str, code: str, *, purpose: str, otp_id: int | None =
                 payload={
                     "code": code,
                     "purpose": purpose,
-                    "expires_in_minutes": 5,
+                    "expires_in_minutes": otp_ttl_minutes,
                 },
                 business=None,
             )
@@ -259,7 +261,7 @@ def _send_email_otp(email: str, code: str, *, purpose: str, otp_id: int | None =
                     "",
                     f"    {code}",
                     "",
-                    "This code will expire in 5 minutes.",
+                    f"This code will expire in {otp_ttl_minutes} minutes.",
                     "If you didn't request this, you can ignore this email.",
                 ]
                 send_mail(subject, "\n".join(msg_lines), from_email, [email], fail_silently=True)
@@ -836,6 +838,7 @@ def forgot_password_request_view(request):
                     
                     # Send OTP via emit_event with transaction.on_commit
                     # This ensures NotificationEvent is created and email is sent after DB commit
+                    otp_ttl_minutes = int(getattr(settings, "EMAIL_OTP_TTL_MINUTES", 10))
                     transaction.on_commit(
                         lambda: emit_event(
                             event_type="OTP_RESET",
@@ -844,7 +847,7 @@ def forgot_password_request_view(request):
                             payload={
                                 "code": code,
                                 "purpose": "reset",
-                                "expires_in_minutes": 5,
+                                "expires_in_minutes": otp_ttl_minutes,
                             },
                             business=None,
                             user=user,
@@ -916,6 +919,14 @@ def forgot_password_verify_view(request):
                 return redirect("/accounts/password/reset/")
 
         new_password = form.cleaned_data["new_password1"]
+        # Prevent reusing the same password
+        if user.check_password(new_password):
+            messages.error(request, "New password cannot be the same as your old password.")
+            try:
+                return redirect("accounts:forgot_password_reset")
+            except NoReverseMatch:
+                return redirect("/accounts/password/reset/")
+        
         user.set_password(new_password)
         user.save()
 

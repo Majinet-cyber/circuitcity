@@ -21,7 +21,7 @@ User = get_user_model()
 log = logging.getLogger(__name__)
 
 # Configuration (read from env with safe defaults)
-OTP_TTL_MINUTES = int(getattr(settings, "OTP_TTL_MINUTES", 10))
+OTP_TTL_MINUTES = int(getattr(settings, "EMAIL_OTP_TTL_MINUTES", 10))
 OTP_MAX_ATTEMPTS = int(getattr(settings, "OTP_MAX_ATTEMPTS", 5))
 OTP_RATE_LIMIT_PER_MINUTE = int(getattr(settings, "OTP_RATE_LIMIT_PER_MINUTE", 3))
 

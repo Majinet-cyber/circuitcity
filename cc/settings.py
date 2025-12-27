@@ -735,6 +735,9 @@ BETA_FEEDBACK_MAILTO = os.environ.get(
     "BETA_FEEDBACK_MAILTO", "beta@emajinet.africa"
 )
 
+# --------------------------- OTP / password reset ---------------------------
+EMAIL_OTP_TTL_MINUTES = env_int("EMAIL_OTP_TTL_MINUTES", 10)
+
 # --------------------------- safety toggles ---------------------------
 DISABLE_SALES_AUTOCREATE = env_bool("DISABLE_SALES_AUTOCREATE", True)
 
