@@ -59,38 +59,36 @@ def _generate_otp_code() -> str:
     return f"{secrets.randbelow(1_000_000):06d}"
 
 
-def _send_otp_email(email: str, code: str, purpose: str) -> None:
-    """Send OTP code via email."""
-    purpose_subjects = {
-        "signup": "Verify your email address",
-        "login": "Your login verification code",
-        "reset": "Your password reset code",
-        "2fa": "Your two-factor authentication code",
-    }
-    
-    subject = purpose_subjects.get(purpose, "Your verification code")
-    
-    message_lines = [
-        f"Your verification code is: {code}",
-        "",
-        f"This code will expire in {OTP_TTL_MINUTES} minutes.",
-        "",
-        "If you didn't request this code, you can safely ignore this email.",
-    ]
-    
-    from_email = getattr(settings, "DEFAULT_FROM_EMAIL", "Emajinet <noreply@emajinet.africa>")
+def _send_otp_email(email: str, code: str, purpose: str, otp_id: int) -> None:
+    """Send OTP code via email using notification system."""
+    from notifications.services import emit_event
+    from django.contrib.auth import get_user_model
+    User = get_user_model()
     
     try:
-        send_mail(
-            subject,
-            "\n".join(message_lines),
-            from_email,
-            [email],
-            fail_silently=False,
+        # Get user if exists
+        user = None
+        try:
+            user = User.objects.get(email__iexact=email)
+        except User.DoesNotExist:
+            pass
+        
+        # Map purpose to event type (use OTP_CODE for all)
+        # Send email via notification system
+        emit_event(
+            event_type="OTP_CODE",
+            recipients=[email],
+            dedupe_key=f"OTP:{email}:{otp_id}",
+            payload={
+                "code": code,
+                "purpose": purpose,
+                "expires_minutes": OTP_TTL_MINUTES,
+            },
+            business=None,  # OTP not business-specific
         )
-        log.info(f"OTP email sent to {email} for purpose={purpose}")
+        log.info(f"OTP email queued for {email} for purpose={purpose}")
     except Exception as e:
-        log.error(f"Failed to send OTP email to {email}: {e}", exc_info=True)
+        log.error(f"Failed to queue OTP email to {email}: {e}", exc_info=True)
         raise
 
 
@@ -151,8 +149,8 @@ def request_email_otp(
     otp.set_raw_code(code)
     otp.save()
     
-    # Send email
-    _send_otp_email(normalized_email, code, purpose)
+    # Send email via notification system
+    _send_otp_email(normalized_email, code, purpose, otp.id)
 
 
 def verify_email_otp(email: str, purpose: str, code: str) -> bool:

@@ -1150,6 +1150,7 @@ urlpatterns += [
     path("phone-products/<int:product_id>/edit/", manager_required(_need_biz(getattr(_phone_prods, "phone_product_edit", _stub("phone_product_edit not found")))), name="phone_product_edit"),
     path("phone-products/<int:product_id>/delete/", manager_required(_need_biz(getattr(_phone_prods, "phone_product_delete", _stub("phone_product_delete not found")))), name="phone_product_delete"),
     path("phone-products/<int:product_id>/remove/", manager_required(_need_biz(getattr(_phone_prods, "remove_phone_product", _stub("remove_phone_product not found")))), name="phone_product_remove"),
+    path("phone-products/<int:product_id>/update-prices/", manager_required(_need_biz(getattr(_phone_prods, "update_phone_product_prices", _stub("update_phone_product_prices not found")))), name="phone_product_update_prices"),
     path("api/phone-products/models/", _need_biz(getattr(_phone_prods, "phone_products_api_models", _stub("phone_products_api_models not found"))), name="api_phone_products_models"),
     
     # Gamified phone sale wizard (original 5-step)

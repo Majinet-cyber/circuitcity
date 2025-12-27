@@ -326,6 +326,210 @@ class TestPhoneProductsViews(TestCase):
     
     def test_phone_product_edit_success(self):
         """Test editing an existing phone product"""
+        # Test implementation would go here
+        pass
+    
+    def test_update_phone_product_prices_manager_success(self):
+        """Test manager can update product prices"""
+        # Create a product
+        product = PhoneProductCatalog.objects.create(
+            business=self.business,
+            brand="TECNO",
+            model_name="Spark 40",
+            ram_gb=4,
+            rom_gb=128,
+            variant_label="4+128",
+            default_cost_price=Decimal("350000.00"),
+            default_selling_price=Decimal("450000.00"),
+            is_active=True
+        )
+        
+        self.client.login(username="manager@test.com", password="testpass123")
+        session = self.client.session
+        session['active_business_id'] = self.business.id
+        session.save()
+        
+        # Update prices
+        response = self.client.post(
+            reverse('inventory:phone_product_update_prices', args=[product.id]),
+            {
+                'order_price': '360000',
+                'selling_price': '460000'
+            }
+        )
+        
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertTrue(data['ok'])
+        
+        # Verify prices updated
+        product.refresh_from_db()
+        self.assertEqual(product.default_cost_price, Decimal("360000.00"))
+        self.assertEqual(product.default_selling_price, Decimal("460000.00"))
+    
+    def test_update_phone_product_prices_non_manager_forbidden(self):
+        """Test non-manager cannot update prices (403)"""
+        # Create agent user
+        agent = User.objects.create_user(
+            username="agent@test.com",
+            email="agent@test.com",
+            password="testpass123"
+        )
+        Membership.objects.create(
+            user=agent,
+            business=self.business,
+            role="agent"
+        )
+        
+        # Create a product
+        product = PhoneProductCatalog.objects.create(
+            business=self.business,
+            brand="TECNO",
+            model_name="Spark 40",
+            ram_gb=4,
+            rom_gb=128,
+            variant_label="4+128",
+            default_cost_price=Decimal("350000.00"),
+            default_selling_price=Decimal("450000.00"),
+            is_active=True
+        )
+        
+        self.client.login(username="agent@test.com", password="testpass123")
+        session = self.client.session
+        session['active_business_id'] = self.business.id
+        session.save()
+        
+        # Try to update prices
+        response = self.client.post(
+            reverse('inventory:phone_product_update_prices', args=[product.id]),
+            {
+                'order_price': '360000',
+                'selling_price': '460000'
+            }
+        )
+        
+        self.assertEqual(response.status_code, 403)
+        data = response.json()
+        self.assertFalse(data['ok'])
+        self.assertIn('Manager access required', data['error'])
+        
+        # Verify prices NOT updated
+        product.refresh_from_db()
+        self.assertEqual(product.default_cost_price, Decimal("350000.00"))
+        self.assertEqual(product.default_selling_price, Decimal("450000.00"))
+    
+    def test_update_phone_product_prices_parses_commas(self):
+        """Test price parsing handles commas and spaces"""
+        product = PhoneProductCatalog.objects.create(
+            business=self.business,
+            brand="TECNO",
+            model_name="Spark 40",
+            ram_gb=4,
+            rom_gb=128,
+            variant_label="4+128",
+            default_cost_price=Decimal("350000.00"),
+            default_selling_price=Decimal("450000.00"),
+            is_active=True
+        )
+        
+        self.client.login(username="manager@test.com", password="testpass123")
+        session = self.client.session
+        session['active_business_id'] = self.business.id
+        session.save()
+        
+        # Update with comma-separated price
+        response = self.client.post(
+            reverse('inventory:phone_product_update_prices', args=[product.id]),
+            {
+                'order_price': '3,500',
+                'selling_price': '4,500'
+            }
+        )
+        
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertTrue(data['ok'])
+        
+        # Verify prices parsed correctly
+        product.refresh_from_db()
+        self.assertEqual(product.default_cost_price, Decimal("3500.00"))
+        self.assertEqual(product.default_selling_price, Decimal("4500.00"))
+    
+    def test_update_phone_product_prices_rejects_negative(self):
+        """Test negative prices are rejected"""
+        product = PhoneProductCatalog.objects.create(
+            business=self.business,
+            brand="TECNO",
+            model_name="Spark 40",
+            ram_gb=4,
+            rom_gb=128,
+            variant_label="4+128",
+            default_cost_price=Decimal("350000.00"),
+            default_selling_price=Decimal("450000.00"),
+            is_active=True
+        )
+        
+        self.client.login(username="manager@test.com", password="testpass123")
+        session = self.client.session
+        session['active_business_id'] = self.business.id
+        session.save()
+        
+        # Try to update with negative price
+        response = self.client.post(
+            reverse('inventory:phone_product_update_prices', args=[product.id]),
+            {
+                'order_price': '-1000',
+                'selling_price': '450000'
+            }
+        )
+        
+        self.assertEqual(response.status_code, 400)
+        data = response.json()
+        self.assertFalse(data['ok'])
+        self.assertIn('negative', data['error'].lower())
+        
+        # Verify prices NOT updated
+        product.refresh_from_db()
+        self.assertEqual(product.default_cost_price, Decimal("350000.00"))
+        self.assertEqual(product.default_selling_price, Decimal("450000.00"))
+    
+    def test_update_phone_product_prices_allows_below_cost(self):
+        """Test selling price below order price is allowed (with warning)"""
+        product = PhoneProductCatalog.objects.create(
+            business=self.business,
+            brand="TECNO",
+            model_name="Spark 40",
+            ram_gb=4,
+            rom_gb=128,
+            variant_label="4+128",
+            default_cost_price=Decimal("350000.00"),
+            default_selling_price=Decimal("450000.00"),
+            is_active=True
+        )
+        
+        self.client.login(username="manager@test.com", password="testpass123")
+        session = self.client.session
+        session['active_business_id'] = self.business.id
+        session.save()
+        
+        # Update with selling price below cost (clearance sale)
+        response = self.client.post(
+            reverse('inventory:phone_product_update_prices', args=[product.id]),
+            {
+                'order_price': '350000',
+                'selling_price': '300000'  # Below cost
+            }
+        )
+        
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertTrue(data['ok'])
+        self.assertIn('warning', data)  # Should have warning
+        
+        # Verify prices updated (even though selling < cost)
+        product.refresh_from_db()
+        self.assertEqual(product.default_cost_price, Decimal("350000.00"))
+        self.assertEqual(product.default_selling_price, Decimal("300000.00"))
         # Create product
         product = PhoneProductCatalog.objects.create(
             business=self.business,

@@ -1,0 +1,15 @@
+✅ Sale Completed - {{ business_name }}
+
+New Sale at {{ business_name }}
+
+Sale Reference: #{{ sale_ref }}
+Total Amount: MK {{ total|floatformat:2 }}
+{% if items_summary %}Items: {{ items_summary }}{% endif %}
+Cashier/Agent: {{ cashier_name }}
+Time: {{ time|date:"F d, Y H:i" }}
+
+You're receiving this notification because you're a manager for {{ business_name }}.
+
+---
+This is an automated email. Please do not reply directly to this message.
+

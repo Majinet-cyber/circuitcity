@@ -1,0 +1,22 @@
+Congratulations for joining Emajinet!
+
+Hi {{ manager_name }},
+
+Congratulations on joining Emajinet! Your account has been successfully created and your business {{ business_name }} is now ready to use.
+
+You can now:
+- Manage your inventory
+- Track sales and commissions
+- Invite agents to your team
+- View detailed reports and analytics
+
+Login to your dashboard: {{ login_url }}
+
+If you have any questions or need assistance, please don't hesitate to contact our support team.
+
+Best regards,
+The Emajinet Team
+
+---
+This is an automated email. Please do not reply directly to this message.
+

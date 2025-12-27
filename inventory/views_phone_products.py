@@ -21,6 +21,7 @@ from django.urls import reverse
 from django.views.decorators.http import require_http_methods
 
 from tenants.utils import get_active_business, require_business
+from tenants.utils_roles import is_manager
 from inventory.models_phone_products import PhoneProductCatalog
 from inventory.business_kinds import BusinessKind
 from inventory.authz import require_business_kind
@@ -453,3 +454,151 @@ def remove_phone_product(request: HttpRequest, product_id: int) -> HttpResponse:
     
     # Redirect back to products page
     return redirect("inventory:phone_products")
+
+
+# =============================================================================
+# MANAGER ONLY: Update Product Prices (Order Price & Selling Price)
+# =============================================================================
+def _parse_price_input(price_str: str) -> Decimal:
+    """
+    Parse price input, handling commas, spaces, and various formats.
+    
+    Examples:
+    - "3,500" -> Decimal("3500")
+    - "3 500" -> Decimal("3500")
+    - "3500" -> Decimal("3500")
+    - "45,000.50" -> Decimal("45000.50")
+    
+    Raises ValueError if invalid.
+    """
+    if not price_str:
+        raise ValueError("Price cannot be empty")
+    
+    # Strip whitespace and remove commas/spaces
+    cleaned = price_str.strip().replace(",", "").replace(" ", "")
+    
+    if not cleaned:
+        raise ValueError("Price cannot be empty")
+    
+    try:
+        price = Decimal(cleaned)
+        if price < 0:
+            raise ValueError("Price cannot be negative")
+        return price
+    except (ValueError, Exception) as e:
+        if isinstance(e, ValueError) and "negative" in str(e):
+            raise
+        raise ValueError(f"Invalid price format: {price_str}")
+
+
+@login_required
+@require_business
+@require_http_methods(["POST"])
+def update_phone_product_prices(request: HttpRequest, product_id: int) -> JsonResponse:
+    """
+    Update order price (cost) and selling price for a phone product.
+    
+    MANAGER-ONLY: Server-side permission check enforced.
+    
+    Security:
+    - Manager-only (server-side check)
+    - Business-scoped (product must belong to active business)
+    - Validates price inputs (handles commas/spaces)
+    - Rejects negative values
+    - Warns (but allows) if selling_price < order_price (clearance sales)
+    
+    Returns JSON response:
+    - Success: {"ok": true, "order_price": "...", "selling_price": "...", "message": "..."}
+    - Error: {"ok": false, "error": "..."}
+    """
+    business = get_active_business(request)
+    if not business:
+        return JsonResponse({"ok": False, "error": "No active business selected"}, status=400)
+    
+    # SERVER-SIDE PERMISSION CHECK (not just template hiding)
+    if not is_manager(request.user, business):
+        return JsonResponse({"ok": False, "error": "Manager access required"}, status=403)
+    
+    # Get product (must belong to business)
+    try:
+        product = PhoneProductCatalog.objects.get(
+            id=product_id,
+            business=business
+        )
+    except PhoneProductCatalog.DoesNotExist:
+        return JsonResponse({"ok": False, "error": "Product not found or does not belong to your business"}, status=404)
+    
+    # Parse and validate prices
+    order_price_str = request.POST.get("order_price", "").strip()
+    selling_price_str = request.POST.get("selling_price", "").strip()
+    
+    errors = []
+    order_price = None
+    selling_price = None
+    
+    # Parse order price
+    if order_price_str:
+        try:
+            order_price = _parse_price_input(order_price_str)
+        except ValueError as e:
+            errors.append(f"Order price: {str(e)}")
+    
+    # Parse selling price
+    if selling_price_str:
+        try:
+            selling_price = _parse_price_input(selling_price_str)
+        except ValueError as e:
+            errors.append(f"Selling price: {str(e)}")
+    
+    if errors:
+        return JsonResponse({"ok": False, "error": "; ".join(errors)}, status=400)
+    
+    # At least one price must be provided
+    if order_price is None and selling_price is None:
+        return JsonResponse({"ok": False, "error": "At least one price must be provided"}, status=400)
+    
+    # Warn if selling_price < order_price (but allow it for clearance sales)
+    warning = None
+    if order_price is not None and selling_price is not None:
+        if selling_price < order_price:
+            warning = "Selling price is below order price. This may be intentional for clearance sales."
+    
+    # Update product atomically
+    try:
+        with transaction.atomic():
+            old_order_price = product.default_cost_price
+            old_selling_price = product.default_selling_price
+            
+            if order_price is not None:
+                product.default_cost_price = order_price
+            if selling_price is not None:
+                product.default_selling_price = selling_price
+            
+            product.save(update_fields=["default_cost_price", "default_selling_price", "updated_at"])
+            
+            # TODO: If audit log system exists, log the change here
+            # Example:
+            # audit_log_price_change(
+            #     product=product,
+            #     user=request.user,
+            #     business=business,
+            #     old_order_price=old_order_price,
+            #     new_order_price=product.default_cost_price,
+            #     old_selling_price=old_selling_price,
+            #     new_selling_price=product.default_selling_price,
+            # )
+            
+            response_data = {
+                "ok": True,
+                "order_price": str(product.default_cost_price) if product.default_cost_price else None,
+                "selling_price": str(product.default_selling_price) if product.default_selling_price else None,
+                "message": "Prices updated successfully"
+            }
+            
+            if warning:
+                response_data["warning"] = warning
+            
+            return JsonResponse(response_data)
+            
+    except Exception as e:
+        return JsonResponse({"ok": False, "error": f"Error updating prices: {str(e)}"}, status=500)

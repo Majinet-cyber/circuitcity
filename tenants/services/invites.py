@@ -363,8 +363,57 @@ def accept_invite_by_token(
                 profile.save(update_fields=["force_password_change"])
         except Exception:
             pass
+    
+    # Send welcome email after commit (if this is a new membership)
+    from django.db import transaction
+    from notifications.services import emit_event
+    from notifications.selectors import get_business_manager_emails
+    
+    if _created and mem.role == "AGENT":
+        transaction.on_commit(
+            lambda: _send_agent_welcome_emails(inv, mem, user)
+        )
 
     return inv, mem
+
+
+def _send_agent_welcome_emails(invite, membership, user):
+    """Send welcome emails to agent and optionally notify managers."""
+    from notifications.services import emit_event
+    
+    # Send welcome email to agent
+    if user.email:
+        emit_event(
+            event_type="WELCOME_AGENT",
+            recipients=[user.email],
+            dedupe_key=f"WELCOME_AGENT:{user.id}",
+            payload={
+                "agent_name": user.get_full_name() or user.username,
+                "business_name": membership.business.name if membership.business else "",
+                "support_contact": "support@emajinet.africa",  # Can be made configurable
+            },
+            business=membership.business,
+        )
+    
+    # Optionally notify managers (if enabled)
+    from notifications.selectors import get_business_manager_emails
+    manager_emails = get_business_manager_emails(
+        membership.business,
+        include_owner=True,
+        event_type="IMPORTANT_ALERT",
+    )
+    if manager_emails:
+        emit_event(
+            event_type="IMPORTANT_ALERT",
+            recipients=manager_emails,
+            dedupe_key=f"AGENT_JOINED:{user.id}",
+            payload={
+                "subject": f"New agent joined: {user.get_full_name() or user.username}",
+                "message": f"A new agent ({user.get_full_name() or user.username}) has joined {membership.business.name if membership.business else 'your business'}.",
+                "business_name": membership.business.name if membership.business else "",
+            },
+            business=membership.business,
+        )
 
 
 @transaction.atomic

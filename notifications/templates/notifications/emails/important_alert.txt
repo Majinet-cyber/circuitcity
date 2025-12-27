@@ -1,0 +1,9 @@
+⚠️ Important Alert: {{ subject }}
+
+{{ message }}
+
+{% if business_name %}Business: {{ business_name }}{% endif %}
+
+---
+This is an automated email. Please do not reply directly to this message.
+

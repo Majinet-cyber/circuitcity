@@ -1469,6 +1469,23 @@ def _complete_manager_wizard_signup(request, wizard_data):
 
         # Clear wizard data
         _clear_manager_wizard_data(request)
+        
+        # Send welcome email after transaction commit
+        from django.db import transaction
+        from notifications.services import emit_event
+        transaction.on_commit(
+            lambda: emit_event(
+                event_type="WELCOME_MANAGER",
+                recipients=[user.email] if user.email else [],
+                dedupe_key=f"WELCOME_MANAGER:{user.id}",
+                payload={
+                    "manager_name": user.get_full_name() or user.username,
+                    "business_name": biz.name if biz else "",
+                    "login_url": request.build_absolute_uri("/dashboard/"),
+                },
+                business=biz,
+            )
+        )
 
         # Redirect to main dashboard (manager dashboard, not inventory dashboard)
         return redirect(_safe_redirect("dashboard:home", default="/dashboard/"))

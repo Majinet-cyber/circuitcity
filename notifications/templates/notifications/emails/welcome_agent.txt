@@ -1,0 +1,24 @@
+Welcome to {{ business_name }}!
+
+Hi {{ agent_name }},
+
+We're excited to have you join the team at {{ business_name }}!
+
+Your agent account has been activated. You can now:
+- Record sales and process transactions
+- View your commissions and earnings
+- Access inventory and product information
+- Track your performance
+
+If you need any help getting started or have questions about using the system, please reach out to:
+
+Support Contact: {{ support_contact }}
+
+Welcome aboard!
+
+Best regards,
+The {{ business_name }} Team
+
+---
+This is an automated email. Please do not reply directly to this message.
+

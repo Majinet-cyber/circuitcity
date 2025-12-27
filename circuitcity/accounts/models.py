@@ -361,6 +361,85 @@ class OnboardingProfile(models.Model):
         return goals
 
 
+# -----------------------------
+# Email OTP (for login, password reset, email verification)
+# -----------------------------
+class EmailOTP(models.Model):
+    """
+    Email-based OTP codes for authentication and verification.
+    Supports rate limiting and expiry.
+    """
+    PURPOSE_CHOICES = [
+        ("signup", "Signup"),
+        ("login", "Login"),
+        ("reset", "Password Reset"),
+        ("2fa", "Two-Factor Authentication"),
+        ("verify_email", "Verify Email"),
+    ]
+    
+    email = models.EmailField(db_index=True, help_text="Email address (normalized lowercase)")
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        null=True,
+        blank=True,
+        on_delete=models.CASCADE,
+        related_name="email_otps",
+        help_text="User if account exists (null for signup)"
+    )
+    purpose = models.CharField(max_length=20, choices=PURPOSE_CHOICES, db_index=True)
+    code_hash = models.CharField(max_length=256)  # Hashed OTP code
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+    expires_at = models.DateTimeField(db_index=True)
+    consumed_at = models.DateTimeField(null=True, blank=True, help_text="When OTP was successfully used")
+    attempts = models.PositiveIntegerField(default=0, help_text="Number of verification attempts")
+    requester_ip = models.GenericIPAddressField(null=True, blank=True)
+    user_agent = models.CharField(max_length=500, blank=True, default="")
+    
+    class Meta:
+        db_table = "accounts_email_otp"
+        indexes = [
+            models.Index(fields=["email", "purpose", "created_at"]),
+            models.Index(fields=["user", "purpose", "created_at"]),
+            models.Index(fields=["expires_at", "consumed_at"]),
+        ]
+        ordering = ["-created_at"]
+    
+    def __str__(self):
+        return f"OTP for {self.email} ({self.purpose})"
+    
+    def set_raw_code(self, code: str):
+        """Store hashed OTP code."""
+        self.code_hash = make_password(code)
+    
+    def matches(self, code: str) -> bool:
+        """Check if provided code matches stored hash."""
+        return check_password(code, self.code_hash)
+    
+    @classmethod
+    def create_for_user(cls, user, purpose: str, code: str, expiry_minutes: int = 10) -> "EmailOTP":
+        """Create a new OTP for a user."""
+        otp = cls(
+            user=user,
+            email=user.email.lower() if user and user.email else "",
+            purpose=purpose,
+            expires_at=timezone.now() + timedelta(minutes=expiry_minutes),
+        )
+        otp.set_raw_code(code)
+        otp.save()
+        return otp
+
+        goals = []
+        if self.goal_stop_theft:
+            goals.append("Stop theft and missing stock")
+        if self.goal_see_profit:
+            goals.append("See profit and losses clearly")
+        if self.goal_track_performance:
+            goals.append("Track agent performance and rankings")
+        if self.goal_move_off_notebooks:
+            goals.append("Move off hardcover notebooks")
+        return goals
+
+
 # ---------------------------------------------------
 # Signals: auto-provision Profile & LoginSecurity
 # ---------------------------------------------------

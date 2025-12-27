@@ -22,8 +22,7 @@ matplotlib==3.10.3
 statsmodels==0.14.5
 
 # --- Email (SendGrid via Anymail) ---
-django-anymail==11.1
-sendgrid==6.11.0
+django-anymail[sendgrid]==14.0
 
 # --- Support libraries ---
 asgiref==3.9.1

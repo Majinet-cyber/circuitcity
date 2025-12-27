@@ -77,6 +77,13 @@ def notify_new_sale(sender, instance, created, **kwargs):
                         'imei': imei,
                     }
                 )
+        
+        # Send email notification via notification system (after DB commit)
+        # This ensures email is sent only after sale is successfully committed
+        from django.db import transaction
+        from notifications.services import notify_sale_completion
+        transaction.on_commit(lambda: notify_sale_completion(instance))
+        
     except Exception as e:
         import logging
         logger = logging.getLogger(__name__)
@@ -248,3 +255,12 @@ def notify_sales_milestone(sender, business, current_total, previous_total, **kw
 # Import timezone for date comparisons
 from django.utils import timezone
 from datetime import timedelta
+
+from .models import NotificationPreference
+
+
+@receiver(post_save, sender=User)
+def create_notification_preference(sender, instance, created, **kwargs):
+    """Auto-create NotificationPreference when a user is created."""
+    if created:
+        NotificationPreference.get_or_create_default(instance)

@@ -226,6 +226,8 @@ INSTALLED_APPS = [
     "audit",        # audit logs UI
     "staticpages",  # Public home page with hero section
     "backups",      # data backup & export system
+    # Email backend
+    "anymail",      # SendGrid email backend via django-anymail
 ]
 
 # Optional dev/helper apps
@@ -449,6 +451,8 @@ LANGUAGE_CODE = "en-us"
 TIME_ZONE = "Africa/Blantyre"
 USE_I18N = True
 USE_TZ = True
+# Celery timezone
+CELERY_TIMEZONE = "Africa/Blantyre"
 
 # --------------------------- static / media ---------------------------
 STATIC_URL = "/static/"
@@ -494,51 +498,81 @@ LOGOUT_REDIRECT_URL = "/accounts/login/"
 # --------------------------- email ---------------------------
 ADMINS = [("Ops", os.environ.get("ADMIN_EMAIL", "ops@example.com"))]
 EMAIL_SUBJECT_PREFIX = "[CC] "
-USE_SMTP_IN_DEBUG = os.environ.get("FORCE_SMTP_IN_DEBUG") == "1"
 
-# SendGrid via Anymail (production) or console (local dev)
+# Email backend switching: USE_CONSOLE_EMAIL=1 (default safe) or USE_CONSOLE_EMAIL=0 (real sending)
+# Default to console backend (safe) if not explicitly set to 0
+USE_CONSOLE_EMAIL = env_bool("USE_CONSOLE_EMAIL", default=True)
+
+# SendGrid configuration
 SENDGRID_API_KEY = os.environ.get("SENDGRID_API_KEY", "").strip()
-DEFAULT_FROM_EMAIL = os.environ.get("DEFAULT_FROM_EMAIL", "Emajinet <noreply@emajinet.africa>")
+DEFAULT_FROM_EMAIL = os.environ.get("DEFAULT_FROM_EMAIL", "Emajinet <no-reply@emajinet.africa>")
+SERVER_EMAIL = DEFAULT_FROM_EMAIL
 
-# Use SendGrid if API key is provided, otherwise fall back to console/SMTP
-if SENDGRID_API_KEY and (not DEBUG or USE_SMTP_IN_DEBUG):
-    try:
-        import anymail  # noqa: F401
-        EMAIL_BACKEND = "anymail.backends.sendgrid.EmailBackend"
-        ANYMAIL = {
-            "SENDGRID_API_KEY": SENDGRID_API_KEY,
-        }
-        # Warn if missing in production
-        if not DEBUG and not SENDGRID_API_KEY:
-            import logging
-            logging.getLogger(__name__).warning(
-                "SENDGRID_API_KEY is missing in production (DEBUG=0). "
-                "Email sending may fail. Set SENDGRID_API_KEY environment variable."
-            )
-    except ImportError:
-        # Fallback if anymail not installed
-        EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"
-        if not DEBUG:
-            import logging
-            logging.getLogger(__name__).warning(
-                "django-anymail not installed. Using console backend. "
-                "Install django-anymail for SendGrid support."
-            )
-elif DEBUG and not USE_SMTP_IN_DEBUG:
+# ==============================================================================
+# PRODUCTION SAFETY: Prevent console backend in production
+# ==============================================================================
+if not DEBUG and USE_CONSOLE_EMAIL:
+    from django.core.exceptions import RuntimeError
+    raise RuntimeError(
+        "CRITICAL: USE_CONSOLE_EMAIL=True is not allowed in production (DEBUG=False). "
+        "Set USE_CONSOLE_EMAIL=0 and SENDGRID_API_KEY in production environment."
+    )
+
+# ==============================================================================
+# SendGrid configuration validation
+# ==============================================================================
+if not USE_CONSOLE_EMAIL:
+    if not SENDGRID_API_KEY:
+        from django.core.exceptions import ImproperlyConfigured
+        raise ImproperlyConfigured(
+            "USE_CONSOLE_EMAIL=0 requires SENDGRID_API_KEY to be set. "
+            "Either set USE_CONSOLE_EMAIL=1 to use console backend, "
+            "or set SENDGRID_API_KEY in your environment variables."
+        )
+
+# ==============================================================================
+# DEFAULT_FROM_EMAIL validation and warning
+# ==============================================================================
+if not DEFAULT_FROM_EMAIL or "@" not in DEFAULT_FROM_EMAIL:
+    import logging
+    logger = logging.getLogger(__name__)
+    logger.warning(
+        "DEFAULT_FROM_EMAIL is not properly configured. "
+        "Falling back to safe default."
+    )
+    DEFAULT_FROM_EMAIL = "Emajinet <no-reply@emajinet.africa>"
+    SERVER_EMAIL = DEFAULT_FROM_EMAIL
+
+# Extract email domain for validation
+_from_email_domain = ""
+try:
+    # Extract domain from "Name <email@domain.com>" or "email@domain.com"
+    email_part = DEFAULT_FROM_EMAIL.split("<")[-1].split(">")[0].strip()
+    if "@" in email_part:
+        _from_email_domain = email_part.split("@")[1].lower()
+except Exception:
+    pass
+
+# Warn if from-email domain is not emajinet.africa (deliverability concern)
+if _from_email_domain and _from_email_domain != "emajinet.africa":
+    import logging
+    logger = logging.getLogger(__name__)
+    logger.warning(
+        f"DEFAULT_FROM_EMAIL domain ({_from_email_domain}) is not emajinet.africa. "
+        f"This may affect email deliverability. Ensure the domain is verified in SendGrid."
+    )
+
+# Configure email backend based on USE_CONSOLE_EMAIL flag
+if USE_CONSOLE_EMAIL:
+    # Safe default: console backend (emails print to terminal)
     EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"
 else:
-    # Fallback to SMTP
-    EMAIL_BACKEND = os.environ.get(
-        "EMAIL_BACKEND", "django.core.mail.backends.smtp.EmailBackend"
-    )
-    EMAIL_HOST = os.environ.get("EMAIL_HOST", "smtp.gmail.com")
-    EMAIL_PORT = env_int("EMAIL_PORT", 587)
-    EMAIL_USE_TLS = env_bool("EMAIL_USE_TLS", True)
-    EMAIL_HOST_USER = os.environ.get("EMAIL_HOST_USER", "")
-    EMAIL_HOST_PASSWORD = os.environ.get("EMAIL_HOST_PASSWORD", "")
-    if not DEFAULT_FROM_EMAIL:
-        DEFAULT_FROM_EMAIL = EMAIL_HOST_USER or "noreply@example.com"
-    EMAIL_TIMEOUT = env_int("EMAIL_TIMEOUT", 10)
+    # Real sending: SendGrid via Anymail
+    # Ensure anymail is in INSTALLED_APPS (already present)
+    EMAIL_BACKEND = "anymail.backends.sendgrid.EmailBackend"
+    ANYMAIL = {
+        "SENDGRID_API_KEY": SENDGRID_API_KEY,
+    }
 
 # --------------------------- billing ---------------------------
 BILLING = {

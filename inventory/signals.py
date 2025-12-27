@@ -293,6 +293,33 @@ if Sale is not None:
             return
 
         if created:
+            # Send email notification after commit
+            from django.db import transaction
+            from notifications.services import notify_sale_completion, send_important_alert
+            from django.conf import settings
+            
+            transaction.on_commit(
+                lambda sale=instance: notify_sale_completion(sale)
+            )
+            
+            # Check for important sale threshold
+            important_threshold = getattr(settings, 'IMPORTANT_SALE_THRESHOLD', 500000)
+            if hasattr(instance, 'price') and instance.price and float(instance.price) >= important_threshold:
+                business = None
+                if hasattr(instance, 'business'):
+                    business = instance.business
+                elif hasattr(instance, 'location') and instance.location:
+                    business = getattr(instance.location, 'business', None)
+                
+                if business:
+                    transaction.on_commit(
+                        lambda: send_important_alert(
+                            business=business,
+                            subject=f"Big sale completed: MK {instance.price:,.0f}",
+                            message=f"A large sale has been completed with a total of MK {instance.price:,.0f}.",
+                        )
+                    )
+            
             updates: list[str] = []
             try:
                 # Status to SOLD (uppercase to normalize)

@@ -1,0 +1,14 @@
+📊 Sales Summary - {{ business_name }}
+
+Multiple Sales Completed
+
+{{ count }} sales were completed in the last 2 minutes.
+
+Total Revenue: MK {{ total_revenue|floatformat:2 }}
+Time Period: {{ time_period }}
+
+Due to high volume, we're sending a batch summary instead of individual notifications.
+
+---
+This is an automated email. Please do not reply directly to this message.
+

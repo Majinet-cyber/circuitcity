@@ -1,0 +1,11 @@
+🔥 High Sales Day! - {{ business_name }}
+
+High sales day today: you sold {{ count }} {{ product_name }}
+
+{% if avg_last_7_days %}This is {{ trending_text }} your 7-day average of {{ avg_last_7_days|floatformat:1 }}.{% endif %}
+
+Keep up the excellent work!
+
+---
+This is an automated email. Please do not reply directly to this message.
+
