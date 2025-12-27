@@ -6,10 +6,15 @@ from django.db import migrations, models
 def safely_add_section_flag_fields(apps, schema_editor):
     """
     Safely add section flag fields only if they don't already exist.
-    Uses 3-step pattern for PostgreSQL: add column -> backfill -> set default+NOT NULL
+    Uses separate cursor.execute() calls to avoid "pending trigger events" error.
+    Pattern: add column -> backfill -> set default -> set NOT NULL (each as separate statement)
     """
     connection = schema_editor.connection
     db_vendor = connection.vendor
+    
+    # Get the actual db_table name dynamically
+    Business = apps.get_model('tenants', 'Business')
+    table_name = Business._meta.db_table
     
     fields_to_add = [
         'has_cosmetics_section',
@@ -20,77 +25,91 @@ def safely_add_section_flag_fields(apps, schema_editor):
     print("Creating default section flags...")
     
     if db_vendor == 'postgresql':
+        # Get quoted identifiers for safe SQL construction
+        quoted_table = connection.ops.quote_name(table_name)
+        
         with connection.cursor() as cursor:
             for field_name in fields_to_add:
-                # Step 1: Add column if it doesn't exist (nullable first)
-                # Use format() for safe string interpolation in DO block
+                print(f"Processing column: {field_name}")
+                quoted_field = connection.ops.quote_name(field_name)
+                
+                # Step A: Check if column exists, if not add it (nullable first)
+                cursor.execute("""
+                    SELECT EXISTS (
+                        SELECT 1 FROM information_schema.columns
+                        WHERE table_name = %s
+                          AND column_name = %s
+                    )
+                """, [table_name, field_name])
+                column_exists = cursor.fetchone()[0]
+                
+                if not column_exists:
+                    print(f"  Adding column {field_name}...")
+                    # Separate statement for ADD COLUMN
+                    cursor.execute(f"""
+                        ALTER TABLE {quoted_table}
+                        ADD COLUMN {quoted_field} BOOLEAN
+                    """)
+                else:
+                    print(f"  Column {field_name} already exists, skipping add")
+                
+                # Step B: Backfill NULL values with FALSE (separate statement)
                 cursor.execute(f"""
-                    DO $$
-                    BEGIN
-                        IF NOT EXISTS (
-                            SELECT 1 FROM information_schema.columns
-                            WHERE table_name = 'tenants_business'
-                              AND column_name = '{field_name}'
-                        ) THEN
-                            ALTER TABLE tenants_business
-                            ADD COLUMN {field_name} BOOLEAN;
-                        END IF;
-                    END $$;
+                    UPDATE {quoted_table}
+                    SET {quoted_field} = FALSE
+                    WHERE {quoted_field} IS NULL
                 """)
                 
-                # Step 2: Backfill NULL values with FALSE
+                # Step C: Set default (separate statement, idempotent - safe to re-run)
                 cursor.execute(f"""
-                    UPDATE tenants_business
-                    SET {field_name} = FALSE
-                    WHERE {field_name} IS NULL;
+                    ALTER TABLE {quoted_table}
+                    ALTER COLUMN {quoted_field} SET DEFAULT FALSE
                 """)
                 
-                # Step 3: Set default and NOT NULL constraint (idempotent)
-                cursor.execute(f"""
-                    DO $$
-                    BEGIN
-                        -- Set default (idempotent)
-                        ALTER TABLE tenants_business
-                        ALTER COLUMN {field_name} SET DEFAULT FALSE;
-                        
-                        -- Set NOT NULL only if not already set
-                        IF EXISTS (
-                            SELECT 1 FROM information_schema.columns
-                            WHERE table_name = 'tenants_business'
-                              AND column_name = '{field_name}'
-                              AND is_nullable = 'YES'
-                        ) THEN
-                            ALTER TABLE tenants_business
-                            ALTER COLUMN {field_name} SET NOT NULL;
-                        END IF;
-                    END $$;
-                """)
+                # Step D: Check if column is nullable, then set NOT NULL (separate statement)
+                cursor.execute("""
+                    SELECT is_nullable
+                    FROM information_schema.columns
+                    WHERE table_name = %s
+                      AND column_name = %s
+                """, [table_name, field_name])
+                result = cursor.fetchone()
+                if result and result[0] == 'YES':
+                    print(f"  Setting NOT NULL constraint on {field_name}...")
+                    cursor.execute(f"""
+                        ALTER TABLE {quoted_table}
+                        ALTER COLUMN {quoted_field} SET NOT NULL
+                    """)
+                else:
+                    print(f"  Column {field_name} already NOT NULL, skipping constraint")
     
     elif db_vendor == 'sqlite':
+        quoted_table = connection.ops.quote_name(table_name)
         with connection.cursor() as cursor:
             # Check existing columns
-            cursor.execute("PRAGMA table_info(tenants_business)")
+            cursor.execute(f"PRAGMA table_info({quoted_table})")
             existing_columns = {row[1] for row in cursor.fetchall()}
             
             for field_name in fields_to_add:
+                quoted_field = connection.ops.quote_name(field_name)
                 if field_name not in existing_columns:
                     # SQLite: Add column with DEFAULT and NOT NULL in one step
                     cursor.execute(f"""
-                        ALTER TABLE tenants_business
-                        ADD COLUMN {field_name} BOOLEAN NOT NULL DEFAULT 0;
+                        ALTER TABLE {quoted_table}
+                        ADD COLUMN {quoted_field} BOOLEAN NOT NULL DEFAULT 0
                     """)
                 else:
                     # Column exists, just normalize any NULLs
                     cursor.execute(f"""
-                        UPDATE tenants_business
-                        SET {field_name} = 0
-                        WHERE {field_name} IS NULL;
+                        UPDATE {quoted_table}
+                        SET {quoted_field} = 0
+                        WHERE {quoted_field} IS NULL
                     """)
     else:
         # For other databases, fall back to standard AddField (will be handled below)
         pass
     
-    print("Done")
+    print("Done creating section flags.")
 
 
 def reverse_normalize(apps, schema_editor):
