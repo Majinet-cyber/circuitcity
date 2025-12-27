@@ -168,6 +168,12 @@ if IS_RUNSERVER:
     SECURE_PROXY_SSL_HEADER = None
     USE_X_FORWARDED_HOST = False
 
+# --------------------------- canonical host (SEO) ---------------------------
+# Canonical host for production: www.emajinet.africa
+# This is used by CanonicalURLMiddleware to enforce one canonical domain.
+# Only set in production to avoid redirects in development/staging.
+CANONICAL_HOST = "www.emajinet.africa" if not DEBUG else ""
+
 # --------------------------- app version ---------------------------
 APP_VERSION = os.environ.get("APP_VERSION", "1.1.0")
 

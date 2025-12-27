@@ -101,37 +101,59 @@ class SEONoIndexMiddleware(MiddlewareMixin):
 
 class CanonicalURLMiddleware(MiddlewareMixin):
     """
-    Enforce canonical domain and HTTPS for public pages.
+    Enforce canonical domain: redirect apex -> www (one-way only).
     
-    This solves the "Duplicate without user-selected canonical" issue by:
-    1. Redirecting http → https (handled by Django's SECURE_SSL_REDIRECT)
-    2. Redirecting www.emajinet.africa → emajinet.africa
-    3. Normalizing trailing slashes (handled by Django's APPEND_SLASH)
+    CRITICAL: Render's primary domain is www.emajinet.africa, so Render redirects apex -> www.
+    We MUST NOT redirect www -> apex, or we create an infinite redirect loop.
     
-    The canonical tag in templates will handle query string variations.
+    This middleware:
+    1. Only redirects apex (emajinet.africa) -> www (www.emajinet.africa) when CANONICAL_HOST is set
+    2. Never redirects www -> apex (to avoid fighting with Render)
+    3. Never redirects .onrender.com hosts (staging/dev environments)
+    
+    The canonical <link> tag generation in templates handles SEO canonical URLs.
+    This middleware only handles host-level redirects to match Render's behavior.
     
     IMPORTANT: This middleware runs AFTER SecurityMiddleware, so request.is_secure()
     will correctly detect HTTPS when SECURE_PROXY_SSL_HEADER is configured.
-    We do NOT manually force http/https - that's SecurityMiddleware's job.
     """
     
     def process_request(self, request: HttpRequest):
         """
-        Redirect www subdomain to non-www canonical domain.
+        Redirect apex domain to www canonical domain (one-way only).
+        
+        Only redirects if:
+        - CANONICAL_HOST is configured (production only)
+        - Request host is apex domain (e.g., emajinet.africa)
+        - Request host is NOT already the canonical host (www.emajinet.africa)
+        - Request host does NOT end with .onrender.com (staging/dev)
         
         This middleware does NOT handle http → https redirects.
         That's handled by Django's SecurityMiddleware (SECURE_SSL_REDIRECT).
-        We only handle www → non-www redirects.
         """
         try:
-            # Get the host
-            host = request.get_host().lower()
+            from django.conf import settings
+            from django.http import HttpResponsePermanentRedirect
             
-            # If request is to www subdomain, redirect to non-www
-            if host.startswith('www.'):
-                # Build the canonical URL without www
-                canonical_host = host[4:]  # Remove 'www.'
-                
+            # Only redirect if CANONICAL_HOST is set (production only)
+            canonical_host = getattr(settings, 'CANONICAL_HOST', '')
+            if not canonical_host:
+                return None  # No canonical host configured, skip redirects
+            
+            # Get the host (remove port if present)
+            host = request.get_host().split(':')[0].lower()
+            canonical_host_lower = canonical_host.lower()
+            
+            # Never redirect .onrender.com hosts (staging/dev environments)
+            if host.endswith('.onrender.com'):
+                return None
+            
+            # Only redirect apex -> www (one-way)
+            # List of apex domains that should redirect to canonical www
+            apex_domains = ('emajinet.africa',)
+            
+            # Check if current host is an apex domain that should redirect to canonical
+            if host in apex_domains and host != canonical_host_lower:
                 # Use request.is_secure() which will work correctly after SECURE_PROXY_SSL_HEADER
                 # is set in production. Do NOT manually force http/https - let SecurityMiddleware
                 # handle that to avoid redirect loops.
@@ -139,11 +161,13 @@ class CanonicalURLMiddleware(MiddlewareMixin):
                 
                 # Build full URL with path and query string
                 path = request.get_full_path()
-                canonical_url = f"{protocol}://{canonical_host}{path}"
+                canonical_url = f"{protocol}://{canonical_host_lower}{path}"
                 
                 # 301 permanent redirect
-                from django.http import HttpResponsePermanentRedirect
                 return HttpResponsePermanentRedirect(canonical_url)
+            
+            # No redirect needed
+            return None
         except Exception:
             # Never break requests if something goes wrong
             pass
