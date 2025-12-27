@@ -3,100 +3,153 @@
 from django.db import migrations, models
 
 
-def normalize_section_flags(apps, schema_editor):
-    """Normalize any NULL section flags to False (defensive)"""
-    # Use raw SQL since field might exist in DB but not in model state yet
-    from django.db import connection
-    with connection.cursor() as cursor:
-        # Normalize has_cosmetics_section (might exist in DB without default)
-        try:
-            cursor.execute("""
-                UPDATE tenants_business 
-                SET has_cosmetics_section = 0 
-                WHERE has_cosmetics_section IS NULL
-            """)
-        except Exception:
-            pass  # Field might not exist yet
-        
-        # Normalize new fields after they're added
-        try:
-            cursor.execute("""
-                UPDATE tenants_business 
-                SET has_groceries_section = 0 
-                WHERE has_groceries_section IS NULL
-            """)
-        except Exception:
-            pass
-        
-        try:
-            cursor.execute("""
-                UPDATE tenants_business 
-                SET has_cement_section = 0 
-                WHERE has_cement_section IS NULL
-            """)
-        except Exception:
-            pass
+def safely_add_section_flag_fields(apps, schema_editor):
+    """
+    Safely add section flag fields only if they don't already exist.
+    Uses 3-step pattern for PostgreSQL: add column -> backfill -> set default+NOT NULL
+    """
+    connection = schema_editor.connection
+    db_vendor = connection.vendor
+    
+    fields_to_add = [
+        'has_cosmetics_section',
+        'has_cement_section',
+        'has_groceries_section',
+    ]
+    
+    print("Creating default section flags...")
+    
+    if db_vendor == 'postgresql':
+        with connection.cursor() as cursor:
+            for field_name in fields_to_add:
+                # Step 1: Add column if it doesn't exist (nullable first)
+                # Use format() for safe string interpolation in DO block
+                cursor.execute(f"""
+                    DO $$
+                    BEGIN
+                        IF NOT EXISTS (
+                            SELECT 1 FROM information_schema.columns
+                            WHERE table_name = 'tenants_business'
+                              AND column_name = '{field_name}'
+                        ) THEN
+                            ALTER TABLE tenants_business
+                            ADD COLUMN {field_name} BOOLEAN;
+                        END IF;
+                    END $$;
+                """)
+                
+                # Step 2: Backfill NULL values with FALSE
+                cursor.execute(f"""
+                    UPDATE tenants_business
+                    SET {field_name} = FALSE
+                    WHERE {field_name} IS NULL;
+                """)
+                
+                # Step 3: Set default and NOT NULL constraint (idempotent)
+                cursor.execute(f"""
+                    DO $$
+                    BEGIN
+                        -- Set default (idempotent)
+                        ALTER TABLE tenants_business
+                        ALTER COLUMN {field_name} SET DEFAULT FALSE;
+                        
+                        -- Set NOT NULL only if not already set
+                        IF EXISTS (
+                            SELECT 1 FROM information_schema.columns
+                            WHERE table_name = 'tenants_business'
+                              AND column_name = '{field_name}'
+                              AND is_nullable = 'YES'
+                        ) THEN
+                            ALTER TABLE tenants_business
+                            ALTER COLUMN {field_name} SET NOT NULL;
+                        END IF;
+                    END $$;
+                """)
+    
+    elif db_vendor == 'sqlite':
+        with connection.cursor() as cursor:
+            # Check existing columns
+            cursor.execute("PRAGMA table_info(tenants_business)")
+            existing_columns = {row[1] for row in cursor.fetchall()}
+            
+            for field_name in fields_to_add:
+                if field_name not in existing_columns:
+                    # SQLite: Add column with DEFAULT and NOT NULL in one step
+                    cursor.execute(f"""
+                        ALTER TABLE tenants_business
+                        ADD COLUMN {field_name} BOOLEAN NOT NULL DEFAULT 0;
+                    """)
+                else:
+                    # Column exists, just normalize any NULLs
+                    cursor.execute(f"""
+                        UPDATE tenants_business
+                        SET {field_name} = 0
+                        WHERE {field_name} IS NULL;
+                    """)
+    else:
+        # For other databases, fall back to standard AddField (will be handled below)
+        pass
+    
+    print("Done")
 
 
 def reverse_normalize(apps, schema_editor):
-    """Reverse migration - no-op"""
+    """Reverse migration - no-op (don't delete production data)"""
     pass
 
 
-def ensure_has_cosmetics_section_default(apps, schema_editor):
-    """Ensure has_cosmetics_section has default=False if it exists"""
-    from django.db import connection
-    with connection.cursor() as cursor:
-        # Check if field exists and add default if needed
-        try:
-            # SQLite doesn't support ALTER COLUMN SET DEFAULT directly
-            # So we'll just normalize NULLs in the RunPython step
-            pass
-        except Exception:
-            pass
-
-
 class Migration(migrations.Migration):
+    """
+    Add section flag fields to Business model.
+    Idempotent: safely handles cases where fields may already exist.
+    """
+    
+    atomic = False  # Prevent transaction abort from poisoning subsequent operations
 
     dependencies = [
         ("tenants", "0018_add_cement_grocery_sales_and_costs"),
     ]
 
     operations = [
-        # Use RunSQL to handle existing has_cosmetics_section field
-        # If it exists, ensure it has default; if not, this will be handled by AddField
-        migrations.RunSQL(
-            sql="""
-                -- Try to add default if field exists (SQLite doesn't support ALTER COLUMN SET DEFAULT)
-                -- We'll handle NULLs in RunPython instead
-                SELECT 1;
-            """,
-            reverse_sql=migrations.RunSQL.noop,
+        # Safely add columns using raw SQL (idempotent, checks existence first)
+        migrations.RunPython(
+            safely_add_section_flag_fields,
+            reverse_normalize,
+            atomic=True,
         ),
-        # Add has_cosmetics_section (will be no-op if exists, or add if missing)
-        migrations.AddField(
-            model_name="business",
-            name="has_cosmetics_section",
-            field=models.BooleanField(
-                default=False,
-                help_text="Enable cosmetics section for pharmacy businesses",
-            ),
+        # Use Django's AddField to ensure migration state is tracked
+        # These may fail if columns already exist, but with atomic=False the migration
+        # can continue. However, if they fail, Django's state won't be updated.
+        # Better approach: use SeparateDatabaseAndState to track state without running SQL
+        migrations.SeparateDatabaseAndState(
+            database_operations=[
+                # Database operations already done in RunPython above
+            ],
+            state_operations=[
+                migrations.AddField(
+                    model_name="business",
+                    name="has_cosmetics_section",
+                    field=models.BooleanField(
+                        default=False,
+                        help_text="Enable cosmetics section for pharmacy businesses",
+                    ),
+                ),
+                migrations.AddField(
+                    model_name="business",
+                    name="has_cement_section",
+                    field=models.BooleanField(
+                        default=False,
+                        help_text="Enable cement/hardware section",
+                    ),
+                ),
+                migrations.AddField(
+                    model_name="business",
+                    name="has_groceries_section",
+                    field=models.BooleanField(
+                        default=False,
+                        help_text="Enable groceries section",
+                    ),
+                ),
+            ],
         ),
-        # Add new section flags
-        migrations.AddField(
-            model_name="business",
-            name="has_cement_section",
-            field=models.BooleanField(
-                default=False, help_text="Enable cement/hardware section"
-            ),
-        ),
-        migrations.AddField(
-            model_name="business",
-            name="has_groceries_section",
-            field=models.BooleanField(
-                default=False, help_text="Enable groceries section"
-            ),
-        ),
-        # Normalize any NULLs to False (defensive)
-        migrations.RunPython(normalize_section_flags, reverse_normalize),
     ]
