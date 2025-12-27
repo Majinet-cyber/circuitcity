@@ -5,8 +5,8 @@ from django.db import migrations, models
 
 def safely_add_section_flag_fields(apps, schema_editor):
     """
-    Safely add section flag fields only if they don't already exist.
-    Uses separate cursor.execute() calls to avoid "pending trigger events" error.
+    Safely add section flag fields using idempotent SQL operations.
+    Uses ADD COLUMN IF NOT EXISTS and separate statements to avoid "pending trigger events" error.
     Pattern: add column -> backfill -> set default -> set NOT NULL (each as separate statement)
     """
     connection = schema_editor.connection
@@ -16,7 +16,7 @@ def safely_add_section_flag_fields(apps, schema_editor):
     Business = apps.get_model('tenants', 'Business')
     table_name = Business._meta.db_table
     
-    fields_to_add = [
+    SECTION_FLAGS = [
         'has_cosmetics_section',
         'has_cement_section',
         'has_groceries_section',
@@ -29,59 +29,21 @@ def safely_add_section_flag_fields(apps, schema_editor):
         quoted_table = connection.ops.quote_name(table_name)
         
         with connection.cursor() as cursor:
-            for field_name in fields_to_add:
-                print(f"Processing column: {field_name}")
-                quoted_field = connection.ops.quote_name(field_name)
+            for col in SECTION_FLAGS:
+                print(f"Processing column: {col}")
+                qcol = connection.ops.quote_name(col)
                 
-                # Step A: Check if column exists, if not add it (nullable first)
-                cursor.execute("""
-                    SELECT EXISTS (
-                        SELECT 1 FROM information_schema.columns
-                        WHERE table_name = %s
-                          AND column_name = %s
-                    )
-                """, [table_name, field_name])
-                column_exists = cursor.fetchone()[0]
+                # 1) Add column if missing (nullable first) - idempotent
+                cursor.execute(f"ALTER TABLE {quoted_table} ADD COLUMN IF NOT EXISTS {qcol} boolean;")
                 
-                if not column_exists:
-                    print(f"  Adding column {field_name}...")
-                    # Separate statement for ADD COLUMN
-                    cursor.execute(f"""
-                        ALTER TABLE {quoted_table}
-                        ADD COLUMN {quoted_field} BOOLEAN
-                    """)
-                else:
-                    print(f"  Column {field_name} already exists, skipping add")
+                # 2) Backfill any NULLs - idempotent
+                cursor.execute(f"UPDATE {quoted_table} SET {qcol} = FALSE WHERE {qcol} IS NULL;")
                 
-                # Step B: Backfill NULL values with FALSE (separate statement)
-                cursor.execute(f"""
-                    UPDATE {quoted_table}
-                    SET {quoted_field} = FALSE
-                    WHERE {quoted_field} IS NULL
-                """)
+                # 3) Set DB default - idempotent
+                cursor.execute(f"ALTER TABLE {quoted_table} ALTER COLUMN {qcol} SET DEFAULT FALSE;")
                 
-                # Step C: Set default (separate statement, idempotent - safe to re-run)
-                cursor.execute(f"""
-                    ALTER TABLE {quoted_table}
-                    ALTER COLUMN {quoted_field} SET DEFAULT FALSE
-                """)
-                
-                # Step D: Check if column is nullable, then set NOT NULL (separate statement)
-                cursor.execute("""
-                    SELECT is_nullable
-                    FROM information_schema.columns
-                    WHERE table_name = %s
-                      AND column_name = %s
-                """, [table_name, field_name])
-                result = cursor.fetchone()
-                if result and result[0] == 'YES':
-                    print(f"  Setting NOT NULL constraint on {field_name}...")
-                    cursor.execute(f"""
-                        ALTER TABLE {quoted_table}
-                        ALTER COLUMN {quoted_field} SET NOT NULL
-                    """)
-                else:
-                    print(f"  Column {field_name} already NOT NULL, skipping constraint")
+                # 4) Enforce not-null - idempotent (safe to re-run if already NOT NULL)
+                cursor.execute(f"ALTER TABLE {quoted_table} ALTER COLUMN {qcol} SET NOT NULL;")
     
     elif db_vendor == 'sqlite':
         quoted_table = connection.ops.quote_name(table_name)
@@ -90,7 +52,7 @@ def safely_add_section_flag_fields(apps, schema_editor):
             cursor.execute(f"PRAGMA table_info({quoted_table})")
             existing_columns = {row[1] for row in cursor.fetchall()}
             
-            for field_name in fields_to_add:
+            for field_name in SECTION_FLAGS:
                 quoted_field = connection.ops.quote_name(field_name)
                 if field_name not in existing_columns:
                     # SQLite: Add column with DEFAULT and NOT NULL in one step
@@ -121,20 +83,24 @@ class Migration(migrations.Migration):
     """
     Add section flag fields to Business model.
     Idempotent: safely handles cases where fields may already exist.
+    
+    atomic = False is required because Postgres defers constraint triggers until commit,
+    then blocks later ALTER TABLE operations in the same transaction with "pending trigger events" error.
+    By making the migration non-atomic, each ALTER TABLE statement commits immediately.
     """
     
-    atomic = False  # Prevent transaction abort from poisoning subsequent operations
+    atomic = False  # Required: Postgres pending trigger events block ALTER TABLE in same transaction
 
     dependencies = [
         ("tenants", "0018_add_cement_grocery_sales_and_costs"),
     ]
 
     operations = [
-        # Safely add columns using raw SQL (idempotent, checks existence first)
+        # Safely add columns using raw SQL (idempotent, uses ADD COLUMN IF NOT EXISTS)
         migrations.RunPython(
             safely_add_section_flag_fields,
             reverse_normalize,
-            atomic=True,
+            atomic=False,  # Must match Migration.atomic=False to avoid pending trigger events
         ),
         # Use Django's AddField to ensure migration state is tracked
         # These may fail if columns already exist, but with atomic=False the migration
