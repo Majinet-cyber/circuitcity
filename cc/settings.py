@@ -136,9 +136,18 @@ SECURE_HSTS_SECONDS = 0 if DEBUG else env_int("SECURE_HSTS_SECONDS", 31536000)
 SECURE_HSTS_INCLUDE_SUBDOMAINS = not DEBUG and env_bool("SECURE_HSTS_INCLUDE_SUBDOMAINS", True)
 SECURE_HSTS_PRELOAD = not DEBUG and env_bool("SECURE_HSTS_PRELOAD", True)
 
-# Behind a proxy (Render/NGINX)
-SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
-USE_X_FORWARDED_HOST = True
+# Behind a proxy (Render/NGINX) - only in production
+# These settings tell Django to trust the X-Forwarded-Proto header from the proxy
+# Without this, Django doesn't detect HTTPS behind the proxy, causing redirect loops
+# In production (DEBUG=False), we're behind Render's proxy, so we need these settings
+# In development (DEBUG=True), we're not behind a proxy, so we don't use these settings
+if not DEBUG:
+    SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+    USE_X_FORWARDED_HOST = True
+else:
+    # In development, don't use proxy headers (we're not behind a proxy)
+    SECURE_PROXY_SSL_HEADER = None
+    USE_X_FORWARDED_HOST = False
 
 # Extra hardening
 SECURE_CONTENT_TYPE_NOSNIFF = True
@@ -155,6 +164,9 @@ if IS_RUNSERVER:
     SECURE_HSTS_SECONDS = 0
     SECURE_HSTS_INCLUDE_SUBDOMAINS = False
     SECURE_HSTS_PRELOAD = False
+    # Also disable proxy headers in runserver
+    SECURE_PROXY_SSL_HEADER = None
+    USE_X_FORWARDED_HOST = False
 
 # --------------------------- app version ---------------------------
 APP_VERSION = os.environ.get("APP_VERSION", "1.1.0")
@@ -260,6 +272,8 @@ print(
     f"SECURE_SSL_REDIRECT={SECURE_SSL_REDIRECT} "
     f"SESSION_COOKIE_SECURE={SESSION_COOKIE_SECURE} CSRF_COOKIE_SECURE={CSRF_COOKIE_SECURE}"
 )
+print("[cc.settings] SECURE_PROXY_SSL_HEADER ->", SECURE_PROXY_SSL_HEADER)
+print("[cc.settings] USE_X_FORWARDED_HOST ->", USE_X_FORWARDED_HOST)
 print("[cc.settings] ALLOWED_HOSTS ->", ALLOWED_HOSTS)
 print("[cc.settings] CSRF_TRUSTED_ORIGINS ->", CSRF_TRUSTED_ORIGINS)
 

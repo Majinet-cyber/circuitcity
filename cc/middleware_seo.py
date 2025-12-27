@@ -109,11 +109,19 @@ class CanonicalURLMiddleware(MiddlewareMixin):
     3. Normalizing trailing slashes (handled by Django's APPEND_SLASH)
     
     The canonical tag in templates will handle query string variations.
+    
+    IMPORTANT: This middleware runs AFTER SecurityMiddleware, so request.is_secure()
+    will correctly detect HTTPS when SECURE_PROXY_SSL_HEADER is configured.
+    We do NOT manually force http/https - that's SecurityMiddleware's job.
     """
     
     def process_request(self, request: HttpRequest):
         """
         Redirect www subdomain to non-www canonical domain.
+        
+        This middleware does NOT handle http → https redirects.
+        That's handled by Django's SecurityMiddleware (SECURE_SSL_REDIRECT).
+        We only handle www → non-www redirects.
         """
         try:
             # Get the host
@@ -124,7 +132,9 @@ class CanonicalURLMiddleware(MiddlewareMixin):
                 # Build the canonical URL without www
                 canonical_host = host[4:]  # Remove 'www.'
                 
-                # Preserve the protocol (HTTPS redirect is handled by Django's SECURE_SSL_REDIRECT)
+                # Use request.is_secure() which will work correctly after SECURE_PROXY_SSL_HEADER
+                # is set in production. Do NOT manually force http/https - let SecurityMiddleware
+                # handle that to avoid redirect loops.
                 protocol = 'https' if request.is_secure() else 'http'
                 
                 # Build full URL with path and query string
@@ -204,6 +214,8 @@ class PublicQueryCleanupMiddleware(MiddlewareMixin):
             # Check if ALL query params are tracking params
             if query_params.issubset(TRACKING_PARAMS):
                 # All params are tracking params - redirect to clean URL
+                # Use request.is_secure() which will work correctly after SECURE_PROXY_SSL_HEADER
+                # is set in production. Do NOT manually force http/https.
                 protocol = 'https' if request.is_secure() else 'http'
                 host = request.get_host()
                 clean_url = f"{protocol}://{host}{path}"
