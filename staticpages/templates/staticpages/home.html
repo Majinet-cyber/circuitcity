@@ -1446,11 +1446,6 @@
         align-items: center;
         justify-content: center;
       }
-
-      /* Add bottom padding to body to prevent content overlap */
-      body {
-        padding-bottom: 80px;
-      }
     }
 
     .mobile-cta-bar .btn-primary {
@@ -1652,8 +1647,6 @@
         <a href="#how-it-works" class="btn btn-text">How It Works</a>
         <a href="{% url 'staticpages:about' %}" class="btn btn-text">About</a>
         <a href="{% url 'staticpages:pricing' %}" class="btn btn-text">Pricing</a>
-        <a href="{% url 'login' %}" class="btn btn-text">Login</a>
-        <a href="{% url 'login' %}" class="btn btn-primary">Get Started</a>
       </div>
 
       <!-- Mobile Menu Toggle -->
@@ -1673,8 +1666,8 @@
         <a href="#how-it-works" class="btn btn-text">How It Works</a>
         <a href="{% url 'staticpages:about' %}" class="btn btn-text">About</a>
         <a href="{% url 'staticpages:pricing' %}" class="btn btn-text">Pricing</a>
-        <a href="{% url 'login' %}" class="btn btn-text">Login</a>
-        <a href="{% url 'login' %}" class="btn btn-primary">Get Started</a>
+        <a href="{% url 'accounts:signup_manager' %}" class="btn btn-primary">Get Started</a>
+        <a href="{% url 'login' %}" class="btn btn-text" style="font-size: 0.875rem; padding: 0.5rem 1rem; margin-top: 0.5rem;">Login</a>
       </div>
     </div>
   </nav>
@@ -1691,12 +1684,6 @@
           Track inventory, sales, performance, and adverts—one digital platform.<br>
           Built in Malawi for African businesses.
         </p>
-        
-        <!-- Hero CTA Buttons -->
-        <div class="hero-cta-buttons">
-          <a href="{% url 'login' %}" class="btn btn-primary">Create Account</a>
-          <a href="{% url 'login' %}" class="btn btn-outline">Login</a>
-        </div>
         
         <!-- Live Platform Growth Metrics -->
         <div class="platform-growth-metrics" style="margin-top: 2rem; padding: 1.5rem; background: rgba(79, 70, 229, 0.05); border-radius: 16px; border: 1px solid rgba(79, 70, 229, 0.1);">
@@ -1726,10 +1713,6 @@
   <section class="section-cta landing-container">
     <h3>Ready to get started?</h3>
     <p>Join businesses already using Emajinet to manage their operations</p>
-    <div style="display: flex; gap: 1rem; justify-content: center; flex-wrap: wrap;">
-      <a href="{% url 'login' %}" class="btn btn-primary">Create Account</a>
-      <a href="{% url 'login' %}" class="btn btn-outline">Login</a>
-    </div>
   </section>
 
   <!-- Reality → Solution Stats Section -->
@@ -2216,14 +2199,7 @@
   <section class="cta-section">
     <h2 class="cta-title">Ready to Transform Your Business?</h2>
     <p class="cta-subtitle">Join thousands of merchants already using Emajinet</p>
-    <a href="{% url 'login' %}" class="btn btn-light">Get Started Today</a>
   </section>
-
-  <!-- Mobile Sticky CTA Bar -->
-  <div class="mobile-cta-bar" id="mobileCtaBar">
-    <a href="{% url 'login' %}" class="btn btn-primary">Create Account</a>
-    <a href="{% url 'login' %}" class="btn btn-text">Login</a>
-  </div>
 
   <!-- Footer -->
   <footer class="footer">
@@ -2971,15 +2947,6 @@
       }
     })();
 
-    // ============================================
-    // HIDE MOBILE CTA BAR FOR AUTHENTICATED USERS
-    // ============================================
-    (function() {
-      // Check if user is authenticated (you may need to adjust this based on your auth system)
-      // For now, we'll show it on landing page only (which is the public homepage)
-      // If you have a way to detect auth, hide the bar here
-      // Example: if (window.userAuthenticated) { document.getElementById('mobileCtaBar').style.display = 'none'; }
-    })();
   </script>
 </body>
 </html>
