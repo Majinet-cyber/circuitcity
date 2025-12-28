@@ -8,8 +8,9 @@ Used by ALL verticals (Phones, Liquor, Pharmacy, etc.) for consistent pricing in
 from __future__ import annotations
 
 from decimal import Decimal
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, Tuple
 import re
+from django.conf import settings
 
 
 def detect_magnitude_error(selling_price: Decimal, order_price: Decimal) -> Optional[Dict[str, Any]]:
@@ -48,6 +49,47 @@ def detect_magnitude_error(selling_price: Decimal, order_price: Decimal) -> Opti
             }
     
     return None
+
+
+def validate_phone_selling_price(
+    selling_price: Decimal,
+    is_blocking: bool = True
+) -> Tuple[bool, Optional[str], Optional[Decimal]]:
+    """
+    Validate phone selling price against MIN_PHONE_SELLING_PRICE_MK threshold.
+    
+    Returns:
+        (is_valid, error_message, suggested_price)
+        - is_valid: True if price >= threshold
+        - error_message: Friendly error message if invalid (None if valid)
+        - suggested_price: Price × 1000 if it would be >= threshold (None if not applicable)
+    
+    Args:
+        selling_price: The selling price to validate
+        is_blocking: If True, returns error for prices below threshold. If False, returns warning.
+    """
+    from django.conf import settings
+    
+    min_price = Decimal(str(getattr(settings, 'MIN_PHONE_SELLING_PRICE_MK', 10000)))
+    
+    if selling_price < min_price:
+        suggested_price = selling_price * 1000
+        suggested_valid = suggested_price >= min_price
+        
+        if is_blocking:
+            msg = (
+                f"That looks too low (MK {selling_price:,.0f}). "
+                f"Did you mean {selling_price * 1000:,.0f}? Please enter the full amount in MK."
+            )
+            return False, msg, suggested_price if suggested_valid else None
+        else:
+            msg = (
+                f"That looks too low (MK {selling_price:,.0f}). "
+                f"Did you mean {selling_price * 1000:,.0f}?"
+            )
+            return False, msg, suggested_price if suggested_valid else None
+    
+    return True, None, None
 
 
 def validate_selling_price(
@@ -244,53 +286,4 @@ def get_pricing_intelligence_json(
         "profit_margin": float(validation["profit_margin"]) if validation["profit_margin"] else None,
         "profit_margin_pct": float(validation["profit_margin_pct"]) if validation["profit_margin_pct"] else None,
     }
-
-
-def format_currency(amount: Decimal, currency: str = "MK") -> str:
-    """
-    Format currency with thousands separators.
-    
-    Examples:
-        2000000 -> "MK 2,000,000"
-        1500.50 -> "MK 1,500.50"
-    """
-    try:
-        return f"{currency} {amount:,.2f}"
-    except Exception:
-        return f"{currency} {amount}"
-
-
-def format_number(number: int) -> str:
-    """
-    Format number with thousands separators.
-    
-    Examples:
-        2000000 -> "2,000,000"
-        1500 -> "1,500"
-    """
-    try:
-        return f"{number:,}"
-    except Exception:
-        return str(number)
-
-
-def parse_currency_input(input_str: str) -> Decimal:
-    """
-    Parse currency input, removing commas and currency symbols.
-    
-    Examples:
-        "MK 2,000,000" -> Decimal("2000000")
-        "1,500.50" -> Decimal("1500.50")
-        "2000000" -> Decimal("2000000")
-    """
-    if not input_str:
-        return Decimal("0")
-    
-    # Remove common currency symbols and commas
-    cleaned = input_str.replace(",", "").replace("MK", "").replace("K", "").strip()
-    
-    try:
-        return Decimal(cleaned)
-    except Exception:
-        return Decimal("0")
 

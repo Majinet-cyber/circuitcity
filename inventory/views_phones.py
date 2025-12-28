@@ -540,7 +540,7 @@ def phone_scan_sell(request: HttpRequest) -> HttpResponse:
         return redirect("inventory:phone_scan_sell")
     
     # Parse selling price
-    from inventory.utils_pricing import parse_currency_input, validate_selling_price
+    from inventory.utils_pricing import parse_currency_input, validate_selling_price, validate_phone_selling_price
     
     try:
         selling_price = parse_currency_input(selling_price_raw)
@@ -548,6 +548,15 @@ def phone_scan_sell(request: HttpRequest) -> HttpResponse:
             raise ValueError("Selling price must be positive")
     except (ValueError, Decimal.InvalidOperation):
         messages.error(request, f"Invalid selling price: {selling_price_raw}")
+        return redirect("inventory:phone_scan_sell")
+    
+    # PHONE PRICE VALIDATION: Block suspiciously low prices
+    is_valid, error_msg, suggested_price = validate_phone_selling_price(selling_price, is_blocking=True)
+    if not is_valid:
+        messages.error(request, error_msg)
+        if suggested_price:
+            # Store suggestion in session for potential UI enhancement
+            request.session['price_suggestion'] = float(suggested_price)
         return redirect("inventory:phone_scan_sell")
     
     # Calculate profit and validate pricing intelligence

@@ -293,6 +293,11 @@
     <span class="kpi-pill" id="kpiSold" title="Total items sold">Sold: <b data-target="{{ sold_count|default:0 }}" data-type="count">0</b></span>
     <span class="kpi-pill" id="kpiOrder" title="Total order/cost price">Sum order: <b data-target="{{ sum_order|default:0|floatformat:0 }}" data-type="money">0</b></span>
     <span class="kpi-pill" id="kpiSelling" title="Total selling price">Sum selling: <b data-target="{{ sum_selling|default:0|floatformat:0 }}" data-type="money">0</b></span>
+    {% if IS_MANAGER and suspicious_count > 0 %}
+      <a href="{% url 'inventory:phones_suspicious_prices' %}" class="kpi-pill tap" style="background:#fee2e2;border-color:#fca5a5;color:#991b1b" onclick="window.buzz&&buzz(8)" title="Review suspicious phone prices">
+        <i class="bi bi-exclamation-triangle"></i> Suspicious prices <span class="badge" style="background:#dc2626;color:white;padding:0.15rem 0.4rem;border-radius:0.25rem;margin-left:0.25rem">{{ suspicious_count }}</span>
+      </a>
+    {% endif %}
     {% if IS_MANAGER and trial_banner.show %}
       <a href="{% url 'billing:plans' %}" class="kpi-pill tap" style="background:linear-gradient(135deg,#fef3c7,#fde68a);border-color:#fbbf24;color:#92400e" onclick="window.buzz&&buzz(8)" title="Upgrade to unlock premium features">
         <i class="bi bi-rocket-takeoff"></i> Upgrade

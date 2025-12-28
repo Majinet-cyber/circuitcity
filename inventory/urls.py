@@ -1176,6 +1176,17 @@ urlpatterns += [
     path("phones/available-imeis/<int:product_id>/", login_required(getattr(_phones_views, "phone_available_imeis", _stub("phone_available_imeis not found"))), name="phones_available_imeis"),
 ]
 
+# Suspicious prices manager tool
+try:
+    from . import views_suspicious_prices as _suspicious_prices
+except Exception:
+    _suspicious_prices = SimpleNamespace()
+
+urlpatterns += [
+    path("phones/suspicious-prices/", manager_required(_need_biz(getattr(_suspicious_prices, "phones_suspicious_prices", _stub("phones_suspicious_prices not found")))), name="phones_suspicious_prices"),
+    path("api/phones/suspicious-prices/<int:item_id>/fix/", manager_required(_need_biz(getattr(_suspicious_prices, "fix_suspicious_price", _stub("fix_suspicious_price not found")))), name="api_fix_suspicious_price"),
+]
+
 # ---------------------------------------------------------------------
 # Agent Performance (manager-only view for agent metrics)
 # ---------------------------------------------------------------------

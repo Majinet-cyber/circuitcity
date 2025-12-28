@@ -1455,6 +1455,87 @@ def _has_field(model, name: str) -> bool:
 @csrf_exempt
 @require_POST
 @transaction.atomic
+def api_stock_update_instock(request: HttpRequest, pk: int) -> JsonResponse:
+    """
+    Manager-only API endpoint to update IN_STOCK item (IMEI and/or selling_price).
+    
+    POST params:
+        - imei: (optional) New IMEI (15 digits)
+        - selling_price: (optional) New selling price
+        
+    Only works for IN_STOCK items. For phones, validates selling_price against MIN_PHONE_SELLING_PRICE_MK.
+    """
+    biz = _get_active_business(request)
+    if not biz:
+        return _err("No active business", status=400)
+    
+    if not _is_manager_for_business(request.user, getattr(biz, "id", None)):
+        return _err("Forbidden: manager only", status=403)
+    
+    # Get the stock item
+    try:
+        item = InventoryItem.objects.get(pk=pk, business=biz)
+    except InventoryItem.DoesNotExist:
+        return _err("Item not found", status=404)
+    
+    # Only allow editing IN_STOCK items
+    if item.status != "IN_STOCK" or not item.is_active:
+        return _err("Only IN_STOCK items can be edited", status=400)
+    
+    # Parse request data (JSON body or POST)
+    try:
+        import json
+        if request.content_type and 'json' in request.content_type.lower():
+            body = json.loads(request.body.decode('utf-8'))
+        else:
+            body = request.POST.dict()
+    except Exception:
+        body = request.POST.dict()
+    
+    new_imei = body.get("imei", "").strip() or None
+    new_price_raw = body.get("selling_price") or body.get("price")
+    
+    # Validate phone selling price if provided
+    if new_price_raw is not None:
+        try:
+            from decimal import Decimal
+            from inventory.utils_pricing import validate_phone_selling_price
+            new_price = Decimal(str(new_price_raw))
+            
+            # Check if this is a phone business
+            from tenants.models import Business
+            from inventory.business_kinds import BusinessKind
+            if hasattr(biz, 'business_kind') and biz.business_kind == BusinessKind.PHONES:
+                # Apply phone price validation
+                is_valid, error_msg, suggested_price = validate_phone_selling_price(new_price, is_blocking=True)
+                if not is_valid:
+                    return _err(error_msg, status=400, suggested_price=float(suggested_price) if suggested_price else None)
+        except (ValueError, Exception) as e:
+            return _err(f"Invalid price: {e}", status=400)
+    else:
+        new_price = None
+    
+    # Use the model's apply_instock_update method (handles validation and audit)
+    try:
+        item.apply_instock_update(
+            new_imei=new_imei,
+            new_price=float(new_price) if new_price is not None else None,
+            by_user=request.user
+        )
+    except Exception as e:
+        return _err(str(e), status=400)
+    
+    return _ok({
+        "item_id": item.id,
+        "imei": item.imei,
+        "selling_price": float(item.selling_price) if item.selling_price else None,
+    }, message="Stock updated successfully")
+
+
+@login_required
+@csrf_exempt
+@require_POST
+@transaction.atomic
 def api_inventory_update_price(request: HttpRequest) -> JsonResponse:
     bid = _biz_id(request)
     if not _is_manager_for_business(request.user, bid):

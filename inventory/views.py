@@ -1591,6 +1591,26 @@ def stock_list(request: HttpRequest, *args, **kwargs) -> HttpResponse:
     except Exception:
         pass
     
+    # Get suspicious prices count for phones businesses (manager-only)
+    suspicious_count = 0
+    if user_is_manager:
+        try:
+            from inventory.business_kinds import BusinessKind
+            from django.conf import settings
+            from decimal import Decimal
+            if getattr(biz, 'business_kind', None) == BusinessKind.PHONES:
+                min_price = Decimal(str(getattr(settings, 'MIN_PHONE_SELLING_PRICE_MK', 10000)))
+                suspicious_count = InventoryItem.objects.filter(
+                    business=biz,
+                    status="IN_STOCK",
+                    is_active=True,
+                    selling_price__isnull=False,
+                    selling_price__gt=0,
+                    selling_price__lt=min_price
+                ).count()
+        except Exception:
+            pass
+    
     ctx = {
         "items": items,
         "rows": items,
@@ -1616,6 +1636,7 @@ def stock_list(request: HttpRequest, *args, **kwargs) -> HttpResponse:
         "view_mode": view_mode,  # Safe view mode from request.GET
         "show_search": False,  # Stock list has its own search, don't show global search
         "membership": membership,  # Safe membership object
+        "suspicious_count": suspicious_count,  # Count of suspicious prices (phones only)
         **badge_aliases,
     }
     return render(request, template, ctx)

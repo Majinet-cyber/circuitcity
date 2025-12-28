@@ -765,3 +765,6 @@ LOGGING = {
 # --------------------------- feature flags for templates (optional) ---------------------------
 CC_SHOW_ADMIN_TIP = env_bool("CC_SHOW_ADMIN_TIP", False)
 CC_PUBLIC_ERROR_PAGE = env_bool("CC_PUBLIC_ERROR_PAGE", True)
+
+# --------------------------- phone pricing guardrails ---------------------------
+MIN_PHONE_SELLING_PRICE_MK = env_int("MIN_PHONE_SELLING_PRICE_MK", 10000)

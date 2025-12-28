@@ -176,12 +176,26 @@ def _step2_price(request, business, wizard_data):
         
         try:
             # Parse price (handle commas)
-            from inventory.utils_pricing import parse_currency_input, validate_selling_price, format_currency
+            from inventory.utils_pricing import parse_currency_input, validate_selling_price, format_currency, validate_phone_selling_price
             
             selling_price = parse_currency_input(selling_price_str)
             
             if selling_price <= 0:
                 messages.error(request, "❌ Price must be greater than zero")
+                return render(request, 'inventory/phone_sale_wizard_v2_step2.html', {
+                    'step': 2,
+                    'business': business,
+                    'wizard_data': wizard_data,
+                    'cost_price': cost_price,
+                    'cost_price_formatted': format_currency(cost_price) if cost_price else None,
+                })
+            
+            # PHONE PRICE VALIDATION: Block suspiciously low prices
+            is_valid, error_msg, suggested_price = validate_phone_selling_price(selling_price, is_blocking=True)
+            if not is_valid:
+                messages.error(request, error_msg)
+                if suggested_price:
+                    wizard_data['suggested_price'] = float(suggested_price)
                 return render(request, 'inventory/phone_sale_wizard_v2_step2.html', {
                     'step': 2,
                     'business': business,
@@ -363,6 +377,12 @@ def _complete_sale(request, business, wizard_data, payment_method):
                 f"This phone is no longer available (status: {stock_item.status}). "
                 f"It may have been sold by another agent."
             )
+        
+        # PHONE PRICE VALIDATION: Final guard before sale completion
+        from inventory.utils_pricing import validate_phone_selling_price
+        is_valid, error_msg, suggested_price = validate_phone_selling_price(selling_price, is_blocking=True)
+        if not is_valid:
+            raise ValueError(error_msg)
         
         # Get agent's location from membership
         try:
