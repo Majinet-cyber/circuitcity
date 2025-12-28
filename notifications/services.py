@@ -416,44 +416,44 @@ def notify_sale_completion(sale):
         
         if recent_sales_count > 10:
             # Use batching - check if batch event already exists for this 2-minute bucket
-        now = timezone.now()
-        bucket_minutes = (now.minute // 2) * 2
-        bucket_time = now.replace(minute=bucket_minutes, second=0, microsecond=0)
-        bucket_key = bucket_time.strftime("%Y%m%d%H%M")
+            now = timezone.now()
+            bucket_minutes = (now.minute // 2) * 2
+            bucket_time = now.replace(minute=bucket_minutes, second=0, microsecond=0)
+            bucket_key = bucket_time.strftime("%Y%m%d%H%M")
         
-        dedupe_key = f"SALE_BATCH:{business.id}:{bucket_key}"
+            dedupe_key = f"SALE_BATCH:{business.id}:{bucket_key}"
         
-        # Check if batch event already exists
-        existing = NotificationEvent.objects.filter(
+            # Check if batch event already exists
+            existing = NotificationEvent.objects.filter(
             event_type="SALE_BATCH",
             dedupe_key=dedupe_key,
             business=business,
-        ).first()
+            ).first()
         
-        if existing:
-            # Update payload with latest counts
-            from django.db.models import Sum, Count
-            bucket_start = bucket_time - timedelta(minutes=2)
-            sales_in_bucket = Sale.objects.filter(
+            if existing:
+                # Update payload with latest counts
+                from django.db.models import Sum, Count
+                bucket_start = bucket_time - timedelta(minutes=2)
+                sales_in_bucket = Sale.objects.filter(
                 location__business=business,
                 created_at__gte=bucket_start,
                 created_at__lt=bucket_time + timedelta(minutes=2),
-            )
-            count = sales_in_bucket.count()
-            total_revenue = sales_in_bucket.aggregate(
+                )
+                count = sales_in_bucket.count()
+                total_revenue = sales_in_bucket.aggregate(
                 total=Sum('price')
-            )['total'] or Decimal('0')
+                )['total'] or Decimal('0')
             
-            existing.payload = {
+                existing.payload = {
                 "count": count,
                 "total_revenue": str(total_revenue),
                 "time_period": bucket_time.strftime("%Y-%m-%d %H:%M"),
                 "business_name": business.name,
-            }
-            existing.save(update_fields=['payload'])
-        else:
-            # Create new batch event
-            bucket_start = bucket_time - timedelta(minutes=2)
+                }
+                existing.save(update_fields=['payload'])
+            else:
+                # Create new batch event
+                bucket_start = bucket_time - timedelta(minutes=2)
             sales_in_bucket = Sale.objects.filter(
                 location__business=business,
                 created_at__gte=bucket_start,
@@ -483,31 +483,31 @@ def notify_sale_completion(sale):
                     },
                     business=business,
                 )
-    else:
-        # Normal volume: send instant notification
-        recipients = get_business_manager_emails(
+        else:
+            # Normal volume: send instant notification
+            recipients = get_business_manager_emails(
             business,
             include_owner=True,
             event_type="SALE_INSTANT",
-        )
+            )
         
-        if recipients:
-            # Get sale details with enhanced information
-            agent_name = ""
-            if hasattr(sale, 'agent') and sale.agent:
-                agent_name = sale.agent.get_full_name() or sale.agent.username
-            elif hasattr(sale, 'seller') and sale.seller:
-                agent_name = sale.seller.get_full_name() or sale.seller.username
+            if recipients:
+                # Get sale details with enhanced information
+                agent_name = ""
+                if hasattr(sale, 'agent') and sale.agent:
+                    agent_name = sale.agent.get_full_name() or sale.agent.username
+                elif hasattr(sale, 'seller') and sale.seller:
+                    agent_name = sale.seller.get_full_name() or sale.seller.username
             
-            product_name = ""
-            imei = ""
-            cost = None
-            profit = None
-            quantity = 1
-            location_name = ""
+                product_name = ""
+                imei = ""
+                cost = None
+                profit = None
+                quantity = 1
+                location_name = ""
             
-            if hasattr(sale, 'item') and sale.item:
-                item = sale.item
+                if hasattr(sale, 'item') and sale.item:
+                    item = sale.item
                 # Product name
                 if hasattr(item, 'product') and item.product:
                     product = item.product
@@ -530,14 +530,14 @@ def notify_sale_completion(sale):
                 # Quantity
                 quantity = getattr(item, 'quantity', 1) or 1
             
-            # Location
-            if hasattr(sale, 'location') and sale.location:
-                location_name = getattr(sale.location, 'name', '') or str(sale.location)
+                # Location
+                if hasattr(sale, 'location') and sale.location:
+                    location_name = getattr(sale.location, 'name', '') or str(sale.location)
             
-            # Payment method
-            payment_method_display = ""
-            if hasattr(sale, 'payment_method'):
-                payment_method = sale.payment_method
+                # Payment method
+                payment_method_display = ""
+                if hasattr(sale, 'payment_method'):
+                    payment_method = sale.payment_method
                 if payment_method:
                     # Get display name from choices
                     choices = getattr(sale._meta.get_field('payment_method'), 'choices', [])
@@ -564,9 +564,9 @@ def notify_sale_completion(sale):
                     "business_name": business.name,
                 },
                 business=business,
-            )
+                )
     
-        # Check for high sales alert (never block)
+            # Check for high sales alert (never block)
         try:
             _check_high_sales_alert(sale, business)
         except Exception as e:
