@@ -28,7 +28,8 @@ def _get_vertical_dashboard_url(vertical: str) -> str:
         elif vertical == GYM:
             return reverse("verticals:gym_dashboard")
         elif vertical == PHONES:
-            return reverse("inventory:inventory_dashboard")
+            # Use phones vertical dashboard instead of generic inventory dashboard
+            return reverse("inventory_verticals:phones_dashboard")
         else:
             # Default fallback
             return reverse("inventory:inventory_dashboard")

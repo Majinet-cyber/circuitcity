@@ -2,69 +2,74 @@
 <html>
 <head>
     <meta charset="utf-8">
-    <title>New Sale Completed</title>
+    <title>Sale Completed</title>
 </head>
 <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
     <div style="background-color: #4CAF50; color: white; padding: 20px; text-align: center; border-radius: 5px 5px 0 0;">
-        <h1 style="margin: 0;">✅ Sale Completed</h1>
+        <h1 style="margin: 0;">🎉 Sale recorded</h1>
     </div>
     
     <div style="background-color: #f9f9f9; padding: 30px; border: 1px solid #ddd; border-top: none; border-radius: 0 0 5px 5px;">
-        <h2 style="color: #4CAF50;">New Sale at {{ business_name }}</h2>
-        
         <div style="background-color: white; padding: 20px; border-radius: 5px; margin: 20px 0;">
-            <p style="font-size: 18px; font-weight: bold; color: #333; margin-bottom: 15px;">
-                {% if product_name %}{{ product_name }}{% else %}{{ items_summary|default:"Product" }}{% endif %}
-                {% if imei %} <span style="color: #666; font-size: 14px;">(IMEI: {{ imei }})</span>{% endif %}
+            <p style="font-size: 18px; font-weight: bold; color: #333; margin-bottom: 20px;">
+                {% if product_name %}{{ product_name }}{% else %}Product{% endif %}
             </p>
             
             <table style="width: 100%; border-collapse: collapse; margin: 15px 0;">
+                {% if sku or imei %}
                 <tr>
-                    <td style="padding: 8px 0; border-bottom: 1px solid #eee;"><strong>Selling Price:</strong></td>
-                    <td style="padding: 8px 0; border-bottom: 1px solid #eee; text-align: right;"><strong>MK {{ total|floatformat:0|intcomma }}</strong></td>
+                    <td style="padding: 8px 0; border-bottom: 1px solid #eee; color: #666;">Identifier:</td>
+                    <td style="padding: 8px 0; border-bottom: 1px solid #eee; text-align: right; font-family: monospace;">
+                        {% if sku %}{{ sku }}{% elif imei %}IMEI {{ imei }}{% endif %}
+                    </td>
                 </tr>
-                {% if cost %}
+                {% endif %}
+                <tr>
+                    <td style="padding: 8px 0; border-bottom: 1px solid #eee;"><strong>Revenue:</strong></td>
+                    <td style="padding: 8px 0; border-bottom: 1px solid #eee; text-align: right;"><strong>MK {{ revenue|default:total|floatformat:0|intcomma }}</strong></td>
+                </tr>
                 <tr>
                     <td style="padding: 8px 0; border-bottom: 1px solid #eee;">Cost:</td>
-                    <td style="padding: 8px 0; border-bottom: 1px solid #eee; text-align: right;">MK {{ cost|floatformat:0|intcomma }}</td>
+                    <td style="padding: 8px 0; border-bottom: 1px solid #eee; text-align: right;">
+                        {% if cost %}MK {{ cost|floatformat:0|intcomma }}{% else %}—{% endif %}
+                    </td>
                 </tr>
-                {% endif %}
-                {% if profit %}
                 <tr>
-                    <td style="padding: 8px 0; border-bottom: 1px solid #eee;"><strong>Estimated Profit:</strong></td>
-                    <td style="padding: 8px 0; border-bottom: 1px solid #eee; text-align: right; color: #4CAF50;"><strong>MK {{ profit|floatformat:0|intcomma }}</strong></td>
+                    <td style="padding: 8px 0; border-bottom: 1px solid #eee;"><strong>Profit:</strong></td>
+                    <td style="padding: 8px 0; border-bottom: 1px solid #eee; text-align: right; color: #4CAF50;">
+                        <strong>{% if profit %}MK {{ profit|floatformat:0|intcomma }}{% else %}—{% endif %}</strong>
+                    </td>
                 </tr>
-                {% endif %}
-                {% if quantity and quantity > 1 %}
                 <tr>
                     <td style="padding: 8px 0; border-bottom: 1px solid #eee;">Quantity:</td>
-                    <td style="padding: 8px 0; border-bottom: 1px solid #eee; text-align: right;">{{ quantity }}</td>
+                    <td style="padding: 8px 0; border-bottom: 1px solid #eee; text-align: right;">{{ quantity|default:1 }}</td>
                 </tr>
-                {% endif %}
                 {% if payment_method %}
                 <tr>
-                    <td style="padding: 8px 0; border-bottom: 1px solid #eee;">Payment Method:</td>
+                    <td style="padding: 8px 0; border-bottom: 1px solid #eee;">Payment:</td>
                     <td style="padding: 8px 0; border-bottom: 1px solid #eee; text-align: right;">{{ payment_method }}</td>
                 </tr>
                 {% endif %}
                 <tr>
-                    <td style="padding: 8px 0; border-bottom: 1px solid #eee;">Sold By:</td>
-                    <td style="padding: 8px 0; border-bottom: 1px solid #eee; text-align: right;">{{ cashier_name|default:"Unknown" }}</td>
+                    <td style="padding: 8px 0; border-bottom: 1px solid #eee;">Sold by:</td>
+                    <td style="padding: 8px 0; border-bottom: 1px solid #eee; text-align: right;">{{ agent_name|default:cashier_name|default:"Unknown" }}</td>
                 </tr>
+                {% if location or location_name %}
                 <tr>
-                    <td style="padding: 8px 0;">Time:</td>
-                    <td style="padding: 8px 0; text-align: right;">{{ time|date:"F d, Y H:i" }}</td>
+                    <td style="padding: 8px 0; border-bottom: 1px solid #eee;">Location:</td>
+                    <td style="padding: 8px 0; border-bottom: 1px solid #eee; text-align: right;">{{ location|default:location_name }}</td>
                 </tr>
+                {% endif %}
+                {% if business_name %}
+                <tr>
+                    <td style="padding: 8px 0;">Business:</td>
+                    <td style="padding: 8px 0; text-align: right;">{{ business_name }}</td>
+                </tr>
+                {% endif %}
             </table>
-            
-            {% if location %}
-            <p style="color: #666; font-size: 14px; margin-top: 15px;">
-                <strong>Location:</strong> {{ location }}
-            </p>
-            {% endif %}
         </div>
         
-        <p style="color: #666; font-size: 14px;">You're receiving this notification because you're a manager for {{ business_name }}.</p>
+        <p style="color: #666; font-size: 14px;">You're receiving this notification because you're a manager for {{ business_name|default:"this business" }}.</p>
     </div>
     
     <div style="text-align: center; margin-top: 20px; color: #666; font-size: 12px;">
@@ -72,4 +77,3 @@
     </div>
 </body>
 </html>
-

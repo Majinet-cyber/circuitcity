@@ -426,17 +426,27 @@
         </div>
       </div>
       
+      {% if is_custom %}
       <div class="form-group" style="margin-top: 20px;">
-        <label class="form-label">Initial Stock Quantity</label>
-        <input type="number" class="form-input" name="initial_stock" min="0" step="0.01" placeholder="0" value="0">
+        <label class="form-label">Specification (Size/Weight/Volume)</label>
+        <input type="text" class="form-input" name="spec_label" placeholder="e.g., 5L, 10L, 9kg" maxlength="50">
+        <small style="color: #64748b; font-size: 0.85rem;">
+          Optional: Product specification like size, weight, or volume (e.g., "5L", "10L", "9kg"). This is separate from stock quantity.
+        </small>
+      </div>
+      {% endif %}
+      
+      <div class="form-group" style="margin-top: 20px;">
+        <label class="form-label">Initial Stock Quantity *</label>
+        <input type="number" class="form-input" name="initial_stock" min="0" step="1" placeholder="0" value="0" required>
         <small style="color: #64748b; font-size: 0.85rem;">
           {% if variant %}
-            {% if variant.unit_type == 'pcs' %}Enter number of pieces
-            {% elif variant.unit_type == 'kg' %}Enter weight in kilograms (decimals allowed)
-            {% elif variant.unit_type == 'litre' %}Enter volume in litres (decimals allowed)
-            {% elif variant.unit_type == 'tray' %}Enter number of trays
-            {% else %}Enter quantity{% endif %}
-          {% else %}Enter initial stock quantity{% endif %}
+            {% if variant.unit_type == 'pcs' %}Enter number of units/pieces in stock
+            {% elif variant.unit_type == 'kg' %}Enter number of units in stock (each unit is {{ variant_label }})
+            {% elif variant.unit_type == 'litre' %}Enter number of units in stock (each unit is {{ variant_label }})
+            {% elif variant.unit_type == 'tray' %}Enter number of trays in stock
+            {% else %}Enter number of units in stock{% endif %}
+          {% else %}Enter the count of units currently in stock (this is NOT the size/weight - that's the spec above){% endif %}
         </small>
       </div>
     </div>

@@ -7,6 +7,7 @@ from __future__ import annotations
 import logging
 from typing import List, Optional, Dict, Any
 from datetime import date
+from decimal import Decimal
 
 from django.db import transaction
 from django.utils import timezone
@@ -240,6 +241,13 @@ def dispatch_event(event_id: int):
             "business": event.business,
         })
         
+        # Get subject (can be string template or callable)
+        subject_template = template_config["subject"]
+        if callable(subject_template):
+            subject = subject_template(context)
+        else:
+            subject = subject_template.format(**context)
+        
         # Runtime verification: log backend being used
         from django.conf import settings
         backend_name = getattr(settings, "EMAIL_BACKEND", "unknown")
@@ -251,7 +259,7 @@ def dispatch_event(event_id: int):
         # Send email
         success = send_email(
             recipient_email=event.recipient_email,
-            subject=template_config["subject"].format(**context),
+            subject=subject,
             html_template_path=template_config.get("html_template"),
             text_template_path=template_config.get("text_template"),
             context=context,
@@ -280,6 +288,42 @@ def dispatch_event(event_id: int):
             f"event_type={event.event_type} error={error_msg} exception={type(e).__name__}",
             exc_info=True
         )
+
+
+def _get_sale_instant_subject(context: Dict[str, Any]) -> str:
+    """
+    Generate a friendly, informative subject line for sale instant emails.
+    Format: "Sold: Product Name (Spec) — MK Revenue | Profit MK Profit"
+    """
+    product_name = context.get("product_name", "Product")
+    revenue = context.get("revenue") or context.get("total", "0")
+    profit = context.get("profit")
+    
+    # Format revenue
+    try:
+        revenue_decimal = Decimal(str(revenue))
+        revenue_formatted = f"MK {revenue_decimal:,.0f}"
+    except (ValueError, TypeError):
+        revenue_formatted = f"MK {revenue}"
+    
+    # Build subject
+    subject_parts = [f"Sold: {product_name}"]
+    
+    # Add profit if available
+    if profit:
+        try:
+            profit_decimal = Decimal(str(profit))
+            if profit_decimal > 0:
+                profit_formatted = f"MK {profit_decimal:,.0f}"
+                subject_parts.append(f"— {revenue_formatted} | Profit {profit_formatted}")
+            else:
+                subject_parts.append(f"— {revenue_formatted}")
+        except (ValueError, TypeError):
+            subject_parts.append(f"— {revenue_formatted}")
+    else:
+        subject_parts.append(f"— {revenue_formatted}")
+    
+    return " ".join(subject_parts)
 
 
 def _get_template_config(event_type: str) -> Optional[Dict[str, Any]]:
@@ -311,7 +355,7 @@ def _get_template_config(event_type: str) -> Optional[Dict[str, Any]]:
             "text_template": "notifications/emails/otp_code.txt",
         },
         "SALE_INSTANT": {
-            "subject": "New Sale Completed - {business_name}",
+            "subject": _get_sale_instant_subject,
             "html_template": "notifications/emails/sale_instant.html",
             "text_template": "notifications/emails/sale_instant.txt",
         },
@@ -420,153 +464,235 @@ def notify_sale_completion(sale):
             bucket_minutes = (now.minute // 2) * 2
             bucket_time = now.replace(minute=bucket_minutes, second=0, microsecond=0)
             bucket_key = bucket_time.strftime("%Y%m%d%H%M")
-        
+            
             dedupe_key = f"SALE_BATCH:{business.id}:{bucket_key}"
-        
+            
             # Check if batch event already exists
             existing = NotificationEvent.objects.filter(
-            event_type="SALE_BATCH",
-            dedupe_key=dedupe_key,
-            business=business,
+                event_type="SALE_BATCH",
+                dedupe_key=dedupe_key,
+                business=business,
             ).first()
-        
+            
             if existing:
                 # Update payload with latest counts
                 from django.db.models import Sum, Count
                 bucket_start = bucket_time - timedelta(minutes=2)
                 sales_in_bucket = Sale.objects.filter(
-                location__business=business,
-                created_at__gte=bucket_start,
-                created_at__lt=bucket_time + timedelta(minutes=2),
+                    location__business=business,
+                    created_at__gte=bucket_start,
+                    created_at__lt=bucket_time + timedelta(minutes=2),
                 )
                 count = sales_in_bucket.count()
                 total_revenue = sales_in_bucket.aggregate(
-                total=Sum('price')
+                    total=Sum('price')
                 )['total'] or Decimal('0')
-            
+                
                 existing.payload = {
-                "count": count,
-                "total_revenue": str(total_revenue),
-                "time_period": bucket_time.strftime("%Y-%m-%d %H:%M"),
-                "business_name": business.name,
+                    "count": count,
+                    "total_revenue": str(total_revenue),
+                    "time_period": bucket_time.strftime("%Y-%m-%d %H:%M"),
+                    "business_name": business.name,
                 }
                 existing.save(update_fields=['payload'])
             else:
                 # Create new batch event
                 bucket_start = bucket_time - timedelta(minutes=2)
-            sales_in_bucket = Sale.objects.filter(
-                location__business=business,
-                created_at__gte=bucket_start,
-                created_at__lt=bucket_time + timedelta(minutes=2),
-            )
-            count = sales_in_bucket.count()
-            total_revenue = sales_in_bucket.aggregate(
-                total=Sum('price')
-            )['total'] or Decimal('0')
-            
-            recipients = get_business_manager_emails(
-                business,
-                include_owner=True,
-                event_type="SALE_BATCH",
-            )
-            
-            if recipients:
-                emit_event(
-                    event_type="SALE_BATCH",
-                    recipients=recipients,
-                    dedupe_key=dedupe_key,
-                    payload={
-                        "count": count,
-                        "total_revenue": str(total_revenue),
-                        "time_period": bucket_time.strftime("%Y-%m-%d %H:%M"),
-                        "business_name": business.name,
-                    },
-                    business=business,
+                sales_in_bucket = Sale.objects.filter(
+                    location__business=business,
+                    created_at__gte=bucket_start,
+                    created_at__lt=bucket_time + timedelta(minutes=2),
                 )
+                count = sales_in_bucket.count()
+                total_revenue = sales_in_bucket.aggregate(
+                    total=Sum('price')
+                )['total'] or Decimal('0')
+                
+                recipients = get_business_manager_emails(
+                    business,
+                    include_owner=True,
+                    event_type="SALE_BATCH",
+                )
+                
+                if recipients:
+                    emit_event(
+                        event_type="SALE_BATCH",
+                        recipients=recipients,
+                        dedupe_key=dedupe_key,
+                        payload={
+                            "count": count,
+                            "total_revenue": str(total_revenue),
+                            "time_period": bucket_time.strftime("%Y-%m-%d %H:%M"),
+                            "business_name": business.name,
+                        },
+                        business=business,
+                    )
         else:
             # Normal volume: send instant notification
             recipients = get_business_manager_emails(
-            business,
-            include_owner=True,
-            event_type="SALE_INSTANT",
+                business,
+                include_owner=True,
+                event_type="SALE_INSTANT",
             )
-        
+            
             if recipients:
                 # Get sale details with enhanced information
                 agent_name = ""
+                agent_role = "Agent"
                 if hasattr(sale, 'agent') and sale.agent:
                     agent_name = sale.agent.get_full_name() or sale.agent.username
                 elif hasattr(sale, 'seller') and sale.seller:
                     agent_name = sale.seller.get_full_name() or sale.seller.username
-            
+                elif hasattr(sale, 'sold_by') and sale.sold_by:
+                    agent_name = sale.sold_by.get_full_name() or sale.sold_by.username
+                
                 product_name = ""
-                imei = ""
+                product_model_spec = ""
+                sku_imei = ""
                 cost = None
                 profit = None
                 quantity = 1
                 location_name = ""
-            
+                
                 if hasattr(sale, 'item') and sale.item:
                     item = sale.item
-                # Product name
-                if hasattr(item, 'product') and item.product:
-                    product = item.product
-                    if hasattr(product, 'brand') and hasattr(product, 'model'):
-                        product_name = f"{product.brand} {product.model}".strip()
+                    # Product name and model/spec
+                    if hasattr(item, 'product') and item.product:
+                        product = item.product
+                        if hasattr(product, 'brand') and hasattr(product, 'model'):
+                            product_name = product.brand or ""
+                            product_model_spec = product.model or ""
+                            # Combine for display: "Brand Model" or just "Brand" if no model
+                            if product_name and product_model_spec:
+                                full_product_display = f"{product_name} {product_model_spec}".strip()
+                            elif product_name:
+                                full_product_display = product_name
+                            else:
+                                full_product_display = str(product)
+                        else:
+                            full_product_display = str(product)
+                            product_name = str(product)
+                    elif hasattr(item, 'name'):
+                        full_product_display = item.name
+                        product_name = item.name
                     else:
-                        product_name = str(product)
-                elif hasattr(item, 'name'):
-                    product_name = item.name
+                        full_product_display = "Product"
+                    
+                    # SKU/IMEI/Serial
+                    sku_imei = (
+                        getattr(item, 'imei', '') or 
+                        getattr(item, 'serial', '') or 
+                        getattr(item, 'sku', '') or 
+                        getattr(item, 'code', '') or 
+                        ''
+                    )
+                    
+                    # Cost and profit
+                    cost_price = (
+                        getattr(item, 'order_price', None) or 
+                        getattr(item, 'cost_price', None) or 
+                        getattr(item, 'cost', None)
+                    )
+                    if cost_price:
+                        try:
+                            cost = Decimal(str(cost_price))
+                            profit = sale.price - cost
+                        except (ValueError, TypeError):
+                            cost = None
+                            profit = None
+                    
+                    # Quantity
+                    quantity = getattr(item, 'quantity', 1) or 1
+                    try:
+                        quantity = int(quantity)
+                    except (ValueError, TypeError):
+                        quantity = 1
                 
-                # IMEI
-                imei = getattr(item, 'imei', '') or getattr(item, 'serial', '') or ''
+                # Handle groceries/pharmacy/other verticals (MerchProduct sales)
+                elif hasattr(sale, 'product') and sale.product:
+                    product = sale.product
+                    if hasattr(product, 'name'):
+                        product_name = product.name
+                        full_product_display = product.name
+                        # Check for spec_label (groceries)
+                        if hasattr(product, 'spec_label') and product.spec_label:
+                            product_model_spec = product.spec_label
+                            full_product_display = f"{product_name} {product.spec_label}".strip()
+                    
+                    # SKU
+                    sku_imei = getattr(product, 'sku', '') or getattr(product, 'barcode', '') or ''
+                    
+                    # Cost and profit
+                    cost_price = getattr(product, 'cost_price', None)
+                    if cost_price:
+                        try:
+                            cost = Decimal(str(cost_price))
+                            profit = sale.price - cost
+                        except (ValueError, TypeError):
+                            cost = None
+                            profit = None
+                    
+                    # Quantity
+                    quantity = getattr(sale, 'quantity', 1) or 1
+                    try:
+                        quantity = int(quantity)
+                    except (ValueError, TypeError):
+                        quantity = 1
                 
-                # Cost and profit
-                cost_price = getattr(item, 'order_price', None) or getattr(item, 'cost_price', None) or getattr(item, 'cost', None)
-                if cost_price:
-                    cost = cost_price
-                    profit = sale.price - cost_price
-                
-                # Quantity
-                quantity = getattr(item, 'quantity', 1) or 1
-            
                 # Location
                 if hasattr(sale, 'location') and sale.location:
                     location_name = getattr(sale.location, 'name', '') or str(sale.location)
-            
+                
                 # Payment method
                 payment_method_display = ""
                 if hasattr(sale, 'payment_method'):
                     payment_method = sale.payment_method
-                if payment_method:
-                    # Get display name from choices
-                    choices = getattr(sale._meta.get_field('payment_method'), 'choices', [])
-                    choice_dict = dict(choices) if choices else {}
-                    payment_method_display = choice_dict.get(payment_method, payment_method.replace('_', ' ').title())
-            
-            emit_event(
-                event_type="SALE_INSTANT",
-                recipients=recipients,
-                dedupe_key=f"SALE:{sale.id}",
-                payload={
-                    "sale_ref": f"#{sale.id}",
-                    "total": str(sale.price),
-                    "product_name": product_name,
-                    "items_summary": product_name or "Product",
-                    "imei": imei,
-                    "cost": str(cost) if cost else None,
-                    "profit": str(profit) if profit else None,
-                    "quantity": quantity,
-                    "payment_method": payment_method_display,
-                    "cashier_name": agent_name or "Unknown",
-                    "location": location_name,
-                    "time": sale.created_at if hasattr(sale, 'created_at') else timezone.now(),
-                    "business_name": business.name,
-                },
-                business=business,
+                    if payment_method:
+                        # Get display name from choices
+                        try:
+                            choices = getattr(sale._meta.get_field('payment_method'), 'choices', [])
+                            choice_dict = dict(choices) if choices else {}
+                            payment_method_display = choice_dict.get(payment_method, payment_method.replace('_', ' ').title())
+                        except Exception:
+                            payment_method_display = str(payment_method).replace('_', ' ').title()
+                
+                # Build product display name with spec if available
+                if product_model_spec and product_name:
+                    final_product_display = f"{product_name} ({product_model_spec})"
+                elif product_name:
+                    final_product_display = product_name
+                else:
+                    final_product_display = "Product"
+                
+                emit_event(
+                    event_type="SALE_INSTANT",
+                    recipients=recipients,
+                    dedupe_key=f"SALE:{sale.id}",
+                    payload={
+                        "sale_ref": f"#{sale.id}",
+                        "total": str(sale.price),
+                        "revenue": str(sale.price),  # Alias for clarity
+                        "product_name": final_product_display,
+                        "product_base_name": product_name or "Product",
+                        "product_model_spec": product_model_spec or "",
+                        "items_summary": final_product_display,
+                        "imei": sku_imei,  # Keep for backward compatibility
+                        "sku": sku_imei,
+                        "cost": str(cost) if cost is not None else None,
+                        "profit": str(profit) if profit is not None else None,
+                        "quantity": quantity,
+                        "payment_method": payment_method_display,
+                        "cashier_name": agent_name or "Unknown",
+                        "agent_name": agent_name or "Unknown",
+                        "location": location_name,
+                        "location_name": location_name,
+                        "time": sale.created_at if hasattr(sale, 'created_at') else timezone.now(),
+                        "business_name": business.name,
+                    },
+                    business=business,
                 )
-    
-            # Check for high sales alert (never block)
+        
+        # Check for high sales alert (never block)
         try:
             _check_high_sales_alert(sale, business)
         except Exception as e:

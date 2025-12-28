@@ -496,27 +496,32 @@ def product_add(request):
                     messages.error(request, f"Invalid selling price: {e}")
                     return redirect(f'groceries:product_add?step=4&{"custom=true&" if is_custom else ""}seed_key={seed_key}')
             
-            # Get initial stock
+            # Get initial stock (must be integer >= 0)
             initial_stock = 0
             if initial_stock_str:
                 try:
-                    initial_stock_float = float(initial_stock_str)
-                    if initial_stock_float < 0:
+                    initial_stock_int = int(float(initial_stock_str))  # Allow "24.0" -> 24
+                    if initial_stock_int < 0:
                         raise ValueError("Stock quantity must be non-negative")
-                    # Convert to int for PositiveIntegerField (round for decimals)
-                    initial_stock = int(round(initial_stock_float))
-                except (ValueError, Exception) as e:
-                    messages.error(request, f"Invalid stock quantity: {e}")
+                    initial_stock = initial_stock_int
+                except (ValueError, TypeError) as e:
+                    messages.error(request, f"Invalid stock quantity: must be a whole number >= 0. {e}")
                     return redirect(f'groceries:product_add?step=4&{"custom=true&" if is_custom else ""}seed_key={seed_key}')
+            
+            # Get spec_label (size/weight/volume specification)
+            spec_label = ""
+            if seed_key and not is_custom:
+                # For seed products, variant_label contains the spec (e.g., "5L", "10L", "9kg")
+                spec_label = variant_label or ""
+                # Extract base product name (remove variant label if it's in the name)
+                full_name = product_name
+            else:
+                # For custom products, get spec_label from form field
+                spec_label = request.POST.get('spec_label', '').strip()
+                full_name = product_name
             
             # Create product
             with transaction.atomic():
-                # Use variant label in name if seed product
-                if seed_key and not is_custom:
-                    full_name = product_name
-                else:
-                    full_name = product_name
-                
                 # Get category
                 if seed_key and not is_custom:
                     category = category_key
@@ -533,6 +538,7 @@ def product_add(request):
                         'selling_price': selling_price,
                         'quantity_in_stock': initial_stock,
                         'base_unit': base_unit,
+                        'spec_label': spec_label,
                         'is_active': True,
                         'track_inventory': True,
                     }
@@ -545,7 +551,10 @@ def product_add(request):
                     if selling_price is not None:
                         product.selling_price = selling_price
                     product.quantity_in_stock += initial_stock
-                    product.save(update_fields=['cost_price', 'selling_price', 'quantity_in_stock'])
+                    # Update spec_label if provided
+                    if spec_label:
+                        product.spec_label = spec_label
+                    product.save(update_fields=['cost_price', 'selling_price', 'quantity_in_stock', 'spec_label'])
                     messages.info(request, f"📝 Updated {full_name} (added {initial_stock} to stock)")
                 else:
                     messages.success(request, f"✅ Product saved: {full_name}")

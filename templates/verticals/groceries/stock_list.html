@@ -29,12 +29,12 @@
         <table class="table table-hover">
           <thead>
             <tr>
-              <th>Product Name</th>
+              <th>Product</th>
               <th>Category</th>
               <th>Unit</th>
               <th class="text-end">Cost Price</th>
               <th class="text-end">Selling Price</th>
-              <th class="text-end">Stock</th>
+              <th class="text-end">Quantity</th>
               <th class="text-end">Value</th>
             </tr>
           </thead>
@@ -42,16 +42,23 @@
             {% for item in products_with_values %}
             {% with product=item.product %}
             <tr>
-              <td><strong>{{ product.name }}</strong></td>
+              <td>
+                <strong>
+                  {% if product.spec_label %}{{ product.name }} {{ product.spec_label }}{% else %}{{ product.name }}{% endif %}
+                </strong>
+                {% if product.spec_label %}
+                <br><small class="text-muted">Spec: {{ product.spec_label }}</small>
+                {% endif %}
+              </td>
               <td>{{ product.category|title }}</td>
               <td>{{ product.base_unit|upper }}</td>
               <td class="text-end">MK {{ product.cost_price|floatformat:2|intcomma }}</td>
               <td class="text-end">MK {{ product.selling_price|floatformat:2|intcomma }}</td>
               <td class="text-end">
                 {% if product.quantity_in_stock < 10 %}
-                <span class="badge bg-warning">{{ product.quantity_in_stock }}</span>
+                <span class="badge bg-warning">{{ product.quantity_in_stock }} units</span>
                 {% else %}
-                {{ product.quantity_in_stock }}
+                {{ product.quantity_in_stock }} units
                 {% endif %}
               </td>
               <td class="text-end">MK {{ item.stock_value|floatformat:2|intcomma }}</td>

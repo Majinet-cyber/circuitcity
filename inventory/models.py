@@ -291,6 +291,7 @@ class MerchProduct(models.Model):
     # Clothing and general merchandise fields
     size = models.CharField(max_length=20, blank=True, default='', help_text="Size for clothing items (e.g., S, M, L, XL, or numeric)")
     color = models.CharField(max_length=50, blank=True, default='', help_text="Color for clothing items")
+    spec_label = models.CharField(max_length=50, blank=True, default='', help_text="Product specification/size label (e.g., '5L', '10L', '9kg') - for groceries and other verticals where spec is separate from quantity")
     quantity_in_stock = models.PositiveIntegerField(default=0, help_text="Current quantity in stock (for clothing and other inventory-tracked items)")
     cost_price = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True, help_text="Cost price per unit (for non-liquor items)")
     selling_price = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True, help_text="Selling price per unit (for non-liquor items)")

@@ -1,20 +1,18 @@
-✅ Sale Completed - {{ business_name }}
+Sale recorded 🎉
 
-New Sale at {{ business_name }}
+{% if product_name %}{{ product_name }}{% else %}Product{% endif %}
 
-{% if product_name %}{{ product_name }}{% else %}{{ items_summary|default:"Product" }}{% endif %}{% if imei %} (IMEI: {{ imei }}){% endif %}
-
-Selling Price: MK {{ total|floatformat:0|intcomma }}
-{% if cost %}Cost: MK {{ cost|floatformat:0|intcomma }}{% endif %}
-{% if profit %}Estimated Profit: MK {{ profit|floatformat:0|intcomma }}{% endif %}
-{% if quantity and quantity > 1 %}Quantity: {{ quantity }}{% endif %}
-{% if payment_method %}Payment Method: {{ payment_method }}{% endif %}
-Sold By: {{ cashier_name|default:"Unknown" }}
-Time: {{ time|date:"F d, Y H:i" }}
-{% if location %}Location: {{ location }}{% endif %}
-
-You're receiving this notification because you're a manager for {{ business_name }}.
+{% if sku or imei %}Identifier: {% if sku %}{{ sku }}{% elif imei %}IMEI {{ imei }}{% endif %}
+{% endif %}Revenue: MK {{ revenue|default:total|floatformat:0|intcomma }}
+Cost: {% if cost %}MK {{ cost|floatformat:0|intcomma }}{% else %}—{% endif %}
+Profit: {% if profit %}MK {{ profit|floatformat:0|intcomma }}{% else %}—{% endif %}
+Quantity: {{ quantity|default:1 }}
+{% if payment_method %}Payment: {{ payment_method }}
+{% endif %}Sold by: {{ agent_name|default:cashier_name|default:"Unknown" }}
+{% if location or location_name %}Location: {{ location|default:location_name }}
+{% endif %}{% if business_name %}Business: {{ business_name }}
+{% endif %}
+You're receiving this notification because you're a manager for {{ business_name|default:"this business" }}.
 
 ---
 This is an automated email. Please do not reply directly to this message.
-

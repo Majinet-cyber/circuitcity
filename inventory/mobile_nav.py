@@ -66,8 +66,8 @@ def get_mobile_nav_items(request: HttpRequest) -> List[Dict[str, Any]]:
                 "key": "home",
                 "label": "Home",
                 "icon_class": "bi-speedometer2",
-                "url": _safe_reverse("app_router:home", "/inventory/dashboard/"),
-                "active_prefix": "/inventory/dashboard",
+                "url": _safe_reverse("inventory_verticals:phones_dashboard", "/inventory/verticals/phones/"),
+                "active_prefix": "/inventory/verticals/phones",
                 "is_menu": False,
             },
             {
