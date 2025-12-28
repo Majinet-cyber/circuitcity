@@ -62,83 +62,90 @@ def emit_event(
     created_ids = []
     is_transactional = event_type in TRANSACTIONAL_EVENTS
     
-    # Rate limiting for SALE_* events (max 30 per recipient per hour)
-    SALE_RATE_LIMIT = 30  # emails per hour per recipient
-    rate_limit_applies = event_type in ("SALE_INSTANT", "SALE_BATCH")
-    
-    for recipient_email in recipients:
-        if not recipient_email or "@" not in recipient_email:
-            continue
+    try:
+        # Rate limiting for SALE_* events (max 30 per recipient per hour)
+        SALE_RATE_LIMIT = 30  # emails per hour per recipient
+        rate_limit_applies = event_type in ("SALE_INSTANT", "SALE_BATCH")
         
-        normalized_email = recipient_email.lower().strip()
+        for recipient_email in recipients:
+            if not recipient_email or "@" not in recipient_email:
+                continue
+            
+            normalized_email = recipient_email.lower().strip()
         
-        # Check rate limit for SALE_* events
-        if rate_limit_applies:
-            one_hour_ago = timezone.now() - timedelta(hours=1)
-            recent_count = NotificationEvent.objects.filter(
-                event_type__in=("SALE_INSTANT", "SALE_BATCH"),
+            # Check rate limit for SALE_* events
+            if rate_limit_applies:
+                one_hour_ago = timezone.now() - timedelta(hours=1)
+                recent_count = NotificationEvent.objects.filter(
+                    event_type__in=("SALE_INSTANT", "SALE_BATCH"),
+                    recipient_email=normalized_email,
+                    created_at__gte=one_hour_ago,
+                    status__in=("PENDING", "SENT"),  # Count both pending and sent
+                ).count()
+                
+                if recent_count >= SALE_RATE_LIMIT:
+                    logger.warning(
+                        f"Rate limit exceeded for {normalized_email}: {recent_count} SALE_* emails "
+                        f"in last hour (limit: {SALE_RATE_LIMIT}). Skipping instant notification."
+                    )
+                    # Still create event but it will be batched later
+                    # For now, skip to prevent spam
+                    continue
+            
+            # ALWAYS create NotificationEvent first (status=PENDING)
+            # This ensures we have a record even if sending is skipped
+            event, created = NotificationEvent.objects.get_or_create(
+                event_type=event_type,
                 recipient_email=normalized_email,
-                created_at__gte=one_hour_ago,
-                status__in=("PENDING", "SENT"),  # Count both pending and sent
-            ).count()
-            
-            if recent_count >= SALE_RATE_LIMIT:
-                logger.warning(
-                    f"Rate limit exceeded for {normalized_email}: {recent_count} SALE_* emails "
-                    f"in last hour (limit: {SALE_RATE_LIMIT}). Skipping instant notification."
-                )
-                # Still create event but it will be batched later
-                # For now, skip to prevent spam
-                continue
-        
-        # ALWAYS create NotificationEvent first (status=PENDING)
-        # This ensures we have a record even if sending is skipped
-        event, created = NotificationEvent.objects.get_or_create(
-            event_type=event_type,
-            recipient_email=normalized_email,
-            dedupe_key=dedupe_key,
-            defaults={
-                "business": business,
-                "payload": payload,
-                "status": "PENDING",
-            },
-        )
-        
-        if not created:
-            # Event already exists (deduplication working)
-            logger.debug(
-                f"Email event already exists: {event_type} -> {normalized_email} "
-                f"(dedupe_key={dedupe_key})"
+                dedupe_key=dedupe_key,
+                defaults={
+                    "business": business,
+                    "payload": payload,
+                    "status": "PENDING",
+                },
             )
-            continue
-        
-        created_ids.append(event.id)
-        
-        # Check preferences for non-transactional events
-        if not is_transactional:
-            # Get user for preference checking (try from parameter or lookup by email)
-            pref_user = user
-            if not pref_user:
-                try:
-                    from django.contrib.auth import get_user_model
-                    User = get_user_model()
-                    pref_user = User.objects.filter(email__iexact=normalized_email).first()
-                except Exception:
-                    pref_user = None
             
-            # Check if preference disables this event
-            if pref_user and not _should_send_email(pref_user, event_type):
-                event.status = "SKIPPED"
-                event.last_error = "Disabled by preference"
-                event.save(update_fields=["status", "last_error"])
+            if not created:
+                # Event already exists (deduplication working)
                 logger.debug(
-                    f"Email event skipped due to preference: {event_type} -> {normalized_email}"
+                    f"Email event already exists: {event_type} -> {normalized_email} "
+                    f"(dedupe_key={dedupe_key})"
                 )
                 continue
-        
-        # Enqueue sending after transaction commit (transactional or preference allows)
-        transaction.on_commit(
-            lambda eid=event.id: _enqueue_dispatch(eid)
+            
+            created_ids.append(event.id)
+            
+            # Check preferences for non-transactional events
+            if not is_transactional:
+                # Get user for preference checking (try from parameter or lookup by email)
+                pref_user = user
+                if not pref_user:
+                    try:
+                        from django.contrib.auth import get_user_model
+                        User = get_user_model()
+                        pref_user = User.objects.filter(email__iexact=normalized_email).first()
+                    except Exception:
+                        pref_user = None
+                
+                # Check if preference disables this event
+                if pref_user and not _should_send_email(pref_user, event_type):
+                    event.status = "SKIPPED"
+                    event.last_error = "Disabled by preference"
+                    event.save(update_fields=["status", "last_error"])
+                    logger.debug(
+                        f"Email event skipped due to preference: {event_type} -> {normalized_email}"
+                    )
+                    continue
+            
+            # Enqueue sending after transaction commit (transactional or preference allows)
+            transaction.on_commit(
+                lambda eid=event.id: _enqueue_dispatch(eid)
+            )
+    
+    except Exception as e:
+        logger.error(
+            f"[SALE_EMAIL] Failed to emit event {event_type} with dedupe_key={dedupe_key}: {e}",
+            exc_info=True
         )
     
     return created_ids
@@ -161,25 +168,44 @@ def _should_send_email(user, event_type: str) -> bool:
 def _enqueue_dispatch(event_id: int):
     """
     Enqueue email dispatch (either via Celery or synchronous).
+    Checks CELERY_BROKER_URL - if not set, sends inline (best-effort).
     """
+    from django.conf import settings
+    
+    # Check if Celery broker is configured
+    broker_url = getattr(settings, "CELERY_BROKER_URL", None)
+    has_broker = broker_url and broker_url.strip()
+    
+    if has_broker:
+        # Try Celery first if broker is configured
+        try:
+            from notifications.tasks import dispatch_email_event
+            dispatch_email_event.delay(event_id)
+            logger.debug(f"Enqueued email event {event_id} via Celery")
+            return
+        except Exception as e:
+            # Celery task failed, fallback to inline
+            logger.warning(
+                f"Failed to enqueue email event {event_id} via Celery: {e}. "
+                f"Falling back to inline dispatch."
+            )
+    
+    # No broker or Celery failed: dispatch inline (best-effort)
     try:
-        # Try Celery first
-        from notifications.tasks import dispatch_email_event
-        dispatch_email_event.delay(event_id)
-    except ImportError:
-        # Celery not available, dispatch synchronously
-        logger.warning("Celery not available, dispatching email synchronously")
         dispatch_event(event_id)
     except Exception as e:
-        logger.error(f"Failed to enqueue email dispatch: {e}")
-        # Fallback to synchronous dispatch
-        dispatch_event(event_id)
+        # Log error but don't raise - never block the calling code
+        logger.error(
+            f"Failed to dispatch email event {event_id} inline: {e}",
+            exc_info=True
+        )
 
 
 def dispatch_event(event_id: int):
     """
     Dispatch a single email notification event.
     Loads NotificationEvent, renders templates, sends email, and marks as SENT/FAILED.
+    Never raises exceptions - always logs errors.
     
     Args:
         event_id: ID of NotificationEvent to process
@@ -187,19 +213,25 @@ def dispatch_event(event_id: int):
     try:
         event = NotificationEvent.objects.get(id=event_id)
     except NotificationEvent.DoesNotExist:
-        logger.error(f"NotificationEvent {event_id} not found")
+        logger.error(f"[SALE_EMAIL] NotificationEvent {event_id} not found")
+        return
+    except Exception as e:
+        logger.error(f"[SALE_EMAIL] Failed to load NotificationEvent {event_id}: {e}", exc_info=True)
         return
     
     # Skip if already processed
     if event.status != "PENDING":
-        logger.debug(f"Event {event_id} already processed (status={event.status})")
+        logger.debug(f"[SALE_EMAIL] Event {event_id} already processed (status={event.status})")
         return
     
     try:
         # Get template paths and subject based on event type
         template_config = _get_template_config(event.event_type)
         if not template_config:
-            raise ValueError(f"Unknown event type: {event.event_type}")
+            error_msg = f"Unknown event type: {event.event_type}"
+            event.mark_failed(error_msg)
+            logger.error(f"[SALE_EMAIL] Event {event_id}: {error_msg}")
+            return
         
         # Build context
         context = event.payload.copy()
@@ -212,8 +244,8 @@ def dispatch_event(event_id: int):
         from django.conf import settings
         backend_name = getattr(settings, "EMAIL_BACKEND", "unknown")
         logger.info(
-            f"[notifications] sending via backend={backend_name} "
-            f"event={event.event_type} to={event.recipient_email}"
+            f"[SALE_EMAIL] Sending event_id={event_id} event_type={event.event_type} "
+            f"to={event.recipient_email} backend={backend_name}"
         )
         
         # Send email
@@ -228,15 +260,26 @@ def dispatch_event(event_id: int):
         
         if success:
             event.mark_sent()
-            logger.info(f"Email sent successfully: {event}")
+            logger.info(
+                f"[SALE_EMAIL] SUCCESS: event_id={event_id} sent to {event.recipient_email} "
+                f"event_type={event.event_type}"
+            )
         else:
-            event.mark_failed("Email sending returned False")
-            logger.error(f"Email sending failed: {event}")
+            error_msg = "Email sending returned False"
+            event.mark_failed(error_msg)
+            logger.error(
+                f"[SALE_EMAIL] FAILED: event_id={event_id} to {event.recipient_email} "
+                f"event_type={event.event_type} error={error_msg}"
+            )
     
     except Exception as e:
         error_msg = str(e)[:1000]
         event.mark_failed(error_msg)
-        logger.exception(f"Failed to dispatch email event {event_id}: {e}")
+        logger.error(
+            f"[SALE_EMAIL] FAILED: event_id={event_id} to {event.recipient_email} "
+            f"event_type={event.event_type} error={error_msg} exception={type(e).__name__}",
+            exc_info=True
+        )
 
 
 def _get_template_config(event_type: str) -> Optional[Dict[str, Any]]:
@@ -322,35 +365,57 @@ def notify_sale_completion(sale):
     
     This function should be called after sale is committed to DB.
     Uses transaction.on_commit to ensure email is sent only after successful DB commit.
+    
+    NEVER blocks sale completion - all errors are logged only.
     """
     from sales.models import Sale  # noqa: F401
     from django.utils import timezone
     from decimal import Decimal
     
-    if not sale or not hasattr(sale, 'business'):
-        return
-    
-    business = getattr(sale, 'business', None)
-    if not business:
-        # Try to get from location
+    try:
+        if not sale:
+            logger.debug(f"[SALE_EMAIL] notify_sale_completion: sale is None")
+            return
+        
+        # Sale model doesn't have business directly - get from location or item
+        business = None
         if hasattr(sale, 'location') and sale.location:
             business = getattr(sale.location, 'business', None)
-    
-    if not business:
+        
+        if not business and hasattr(sale, 'item') and sale.item:
+            business = getattr(sale.item, 'business', None)
+        
+        # Fallback: try direct business attribute (for other Sale models that might have it)
+        if not business:
+            business = getattr(sale, 'business', None)
+        
+        if not business:
+            logger.warning(
+                f"[SALE_EMAIL] notify_sale_completion: sale {getattr(sale, 'id', 'unknown')} has no business "
+                f"(checked location.business, item.business, sale.business)"
+            )
+            return
+    except Exception as e:
+        logger.error(
+            f"[SALE_EMAIL] notify_sale_completion: Error getting business for sale {getattr(sale, 'id', 'unknown')}: {e}",
+            exc_info=True
+        )
         return
     
-    # Check if we should batch (more than 10 sales in last 5 minutes)
-    from django.utils import timezone
-    from datetime import timedelta
-    
-    five_min_ago = timezone.now() - timedelta(minutes=5)
-    recent_sales_count = Sale.objects.filter(
-        business=business,
-        created_at__gte=five_min_ago,
-    ).count()
-    
-    if recent_sales_count > 10:
-        # Use batching - check if batch event already exists for this 2-minute bucket
+    # Wrap the rest of the function in try-except to never block sale completion
+    try:
+        # Check if we should batch (more than 10 sales in last 5 minutes)
+        from django.utils import timezone
+        from datetime import timedelta
+        
+        five_min_ago = timezone.now() - timedelta(minutes=5)
+        recent_sales_count = Sale.objects.filter(
+            location__business=business,
+            created_at__gte=five_min_ago,
+        ).count()
+        
+        if recent_sales_count > 10:
+            # Use batching - check if batch event already exists for this 2-minute bucket
         now = timezone.now()
         bucket_minutes = (now.minute // 2) * 2
         bucket_time = now.replace(minute=bucket_minutes, second=0, microsecond=0)
@@ -370,7 +435,7 @@ def notify_sale_completion(sale):
             from django.db.models import Sum, Count
             bucket_start = bucket_time - timedelta(minutes=2)
             sales_in_bucket = Sale.objects.filter(
-                business=business,
+                location__business=business,
                 created_at__gte=bucket_start,
                 created_at__lt=bucket_time + timedelta(minutes=2),
             )
@@ -390,7 +455,7 @@ def notify_sale_completion(sale):
             # Create new batch event
             bucket_start = bucket_time - timedelta(minutes=2)
             sales_in_bucket = Sale.objects.filter(
-                business=business,
+                location__business=business,
                 created_at__gte=bucket_start,
                 created_at__lt=bucket_time + timedelta(minutes=2),
             )
@@ -501,12 +566,30 @@ def notify_sale_completion(sale):
                 business=business,
             )
     
-    # Check for high sales alert
-    _check_high_sales_alert(sale, business)
-    
-    # Send agent commission email if agent exists
-    if hasattr(sale, 'agent') and sale.agent:
-        _notify_agent_commission(sale, business)
+        # Check for high sales alert (never block)
+        try:
+            _check_high_sales_alert(sale, business)
+        except Exception as e:
+            logger.error(
+                f"[SALE_EMAIL] Failed to check high sales alert for sale {getattr(sale, 'id', 'unknown')}: {e}",
+                exc_info=True
+            )
+        
+        # Send agent commission email if agent exists (never block)
+        try:
+            if hasattr(sale, 'agent') and sale.agent:
+                _notify_agent_commission(sale, business)
+        except Exception as e:
+            logger.error(
+                f"[SALE_EMAIL] Failed to notify agent commission for sale {getattr(sale, 'id', 'unknown')}: {e}",
+                exc_info=True
+            )
+    except Exception as e:
+        # Catch-all for any other errors in notify_sale_completion
+        logger.error(
+            f"[SALE_EMAIL] Unexpected error in notify_sale_completion for sale {getattr(sale, 'id', 'unknown')}: {e}",
+            exc_info=True
+        )
 
 
 def _check_high_sales_alert(sale, business):
@@ -526,7 +609,7 @@ def _check_high_sales_alert(sale, business):
     # Count today's sales for this product
     today_start = timezone.now().replace(hour=0, minute=0, second=0, microsecond=0)
     today_count = Sale.objects.filter(
-        business=business,
+        location__business=business,
         item__product=product,
         created_at__gte=today_start,
     ).count()
@@ -546,7 +629,7 @@ def _check_high_sales_alert(sale, business):
             # Optional: compare with 7-day average
             seven_days_ago = today_start - timedelta(days=7)
             avg_last_7_days = Sale.objects.filter(
-                business=business,
+                location__business=business,
                 item__product=product,
                 created_at__gte=seven_days_ago,
                 created_at__lt=today_start,
@@ -554,7 +637,7 @@ def _check_high_sales_alert(sale, business):
             
             # Calculate 7-day average count
             seven_day_count = Sale.objects.filter(
-                business=business,
+                location__business=business,
                 item__product=product,
                 created_at__gte=seven_days_ago,
                 created_at__lt=today_start,

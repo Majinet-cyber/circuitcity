@@ -171,6 +171,12 @@ class NotificationPreference(models.Model):
         help_text="Receive instant email notifications for completed sales"
     )
     
+    # Sale emails enabled (alias for instant_sale_email, for consistency)
+    sale_emails_enabled = models.BooleanField(
+        default=True,
+        help_text="Receive sale completion emails (for managers: True, for agents: False by default)"
+    )
+    
     # Daily summary (for managers)
     daily_summary_email = models.BooleanField(
         default=True,
