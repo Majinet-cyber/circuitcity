@@ -21,6 +21,7 @@ from django.http import HttpResponse, JsonResponse
 from django.shortcuts import render, redirect
 from django.urls import reverse
 from django.utils import timezone
+from django.utils.text import slugify
 from django.views.decorators.csrf import ensure_csrf_cookie
 from django.views.decorators.http import require_http_methods
 
@@ -131,6 +132,53 @@ def _clear_wizard_session(request):
         request.session.pop(key, None)
 
 
+def _normalize_brand_item(b):
+    """
+    Normalize a brand item to a consistent dict format.
+    
+    Handles both string format (e.g., "Tecno") and dict format (e.g., {"key": "tecno", "name": "TECNO"}).
+    Always returns a dict with at least: key, label, slug.
+    
+    Args:
+        b: Brand item (str, dict, or other)
+    
+    Returns:
+        dict with keys: key, label, slug (and any other original keys if b was a dict)
+        Returns None if b is empty/None
+    """
+    if isinstance(b, dict):
+        # Make a copy to avoid mutating the original
+        result = dict(b)
+        # Ensure required keys exist - normalize common variations
+        if "key" not in result and "value" in result:
+            result["key"] = result["value"]
+        if "key" not in result and "name" in result:
+            result["key"] = result["name"]
+        if "label" not in result and "name" in result:
+            result["label"] = result["name"]
+        if "label" not in result and "key" in result:
+            result["label"] = result["key"]
+        if "slug" not in result and "key" in result:
+            result["slug"] = slugify(str(result["key"]))
+        # Ensure key exists (fallback to label or name)
+        if "key" not in result:
+            result["key"] = result.get("label") or result.get("name") or str(result)
+        # Ensure label exists
+        if "label" not in result:
+            result["label"] = result["key"]
+        return result
+    
+    # string / other primitive - convert to dict
+    s = str(b).strip()
+    if not s:  # Skip empty strings
+        return None
+    return {
+        "key": s.upper(),  # Store as uppercase for consistency with POST handler
+        "label": s,  # Preserve original case for display
+        "slug": slugify(s),
+    }
+
+
 def _wizard_step_brand(request, ctx, business):
     """Step 1: Brand selection"""
     if request.method == "POST":
@@ -143,23 +191,38 @@ def _wizard_step_brand(request, ctx, business):
             messages.error(request, "Please select a brand")
     
     # Get available brands
-    brands = get_brands_for_business(business)
+    # NOTE: get_brands_for_business() returns List[str], but brands may sometimes be List[dict]
+    # We normalize to ensure consistent dict format with key, label, slug
+    brands_raw = get_brands_for_business(business)
+    
+    # Normalize brands to consistent dict format (handles both string and dict formats)
+    brands = []
+    for b in brands_raw:
+        normalized = _normalize_brand_item(b)
+        if normalized:  # Skip None/empty items
+            brands.append(normalized)
     
     # AUTO-SKIP: If only one brand, auto-select it
-    if len(brands) == 1 and not request.session.get("sale_wizard_auto_skip_loop"):
-        request.session["sale_wizard_brand"] = brands[0]["key"]
-        request.session["sale_wizard_step"] = 2
-        request.session["sale_wizard_auto_skip_loop"] = True  # Prevent infinite loops
-        return _redirect_to_step(2)
+    # Only proceed if brands has at least 1 item AND the first item is a dict with key after normalization
+    if brands and len(brands) == 1 and not request.session.get("sale_wizard_auto_skip_loop"):
+        if isinstance(brands[0], dict) and "key" in brands[0]:
+            request.session["sale_wizard_brand"] = brands[0]["key"]
+            request.session["sale_wizard_step"] = 2
+            request.session["sale_wizard_auto_skip_loop"] = True  # Prevent infinite loops
+            return _redirect_to_step(2)
     
     # Clear loop flag if we actually render the page
     request.session.pop("sale_wizard_auto_skip_loop", None)
+    
+    # If no brands available, show friendly error message
+    if not brands:
+        ctx["brand_error"] = "No phone brands available yet. Add phone products first."
     
     ctx.update({
         "step": 1,
         "step_title": "Step 1: Choose Brand",
         "step_description": "Select the phone brand you're selling",
-        "brands": brands,
+        "brands": brands,  # Always a list of normalized dicts with key, label, slug
         "progress_pct": 20,
     })
     

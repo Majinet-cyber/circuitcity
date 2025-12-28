@@ -719,15 +719,25 @@
 
       <!-- STEP 1: BRAND SELECTION -->
       {% if step == 1 %}
+      {% if brand_error %}
+      <div class="alert alert-warning" style="padding: 20px; margin: 20px 0; background: #fff3cd; border: 1px solid #ffc107; border-radius: 8px;">
+        <strong>⚠️</strong> {{ brand_error }}
+      </div>
+      {% elif brands %}
       <div class="brand-grid">
         {% for brand in brands %}
         <div class="brand-card" data-cy="sale-brand-option" onclick="this.querySelector('input').checked=true; this.closest('form').submit();">
-          <input type="radio" name="brand" value="{{ brand }}" id="brand_{{ forloop.counter }}">
-          <div class="brand-logo">{{ brand|slice:":2" }}</div>
-          <div class="brand-name">{{ brand }}</div>
+          <input type="radio" name="brand" value="{{ brand.key }}" id="brand_{{ forloop.counter }}">
+          <div class="brand-logo">{{ brand.label|slice:":2" }}</div>
+          <div class="brand-name">{{ brand.label }}</div>
         </div>
         {% endfor %}
       </div>
+      {% else %}
+      <div class="alert alert-warning" style="padding: 20px; margin: 20px 0; background: #fff3cd; border: 1px solid #ffc107; border-radius: 8px;">
+        <strong>⚠️</strong> No phone brands available yet. Add phone products first.
+      </div>
+      {% endif %}
       {% endif %}
 
       <!-- STEP 2: MODEL SELECTION -->
