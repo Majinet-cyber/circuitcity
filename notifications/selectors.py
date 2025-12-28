@@ -95,6 +95,8 @@ def _should_send_email(user: User, event_type: str) -> bool:
         "DAILY_SUMMARY": "daily_summary_email",
         "HIGH_SALES_ALERT": "high_sales_alerts",
         "IMPORTANT_ALERT": "important_alerts_email",
+        "AGENT_COMMISSION": "commission_emails_enabled",
+        "WEEKLY_DIGEST": "weekly_digest_enabled",
     }
     
     preference_field = preference_map.get(event_type)

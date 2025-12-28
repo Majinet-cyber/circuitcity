@@ -189,6 +189,18 @@ class NotificationPreference(models.Model):
         help_text="Receive alerts when sales spike for specific products"
     )
     
+    # Commission emails (for agents)
+    commission_emails_enabled = models.BooleanField(
+        default=False,
+        help_text="Receive commission emails when completing sales (for agents)"
+    )
+    
+    # Weekly digest (for managers)
+    weekly_digest_enabled = models.BooleanField(
+        default=True,
+        help_text="Receive weekly sales summary emails every Friday (for managers)"
+    )
+    
     # Timestamps
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -232,6 +244,8 @@ class NotificationEvent(models.Model):
         ("DAILY_SUMMARY", "Daily Summary"),
         ("HIGH_SALES_ALERT", "High Sales Alert"),
         ("IMPORTANT_ALERT", "Important Alert"),
+        ("AGENT_COMMISSION", "Agent Commission"),
+        ("WEEKLY_DIGEST", "Weekly Digest"),
     ]
     
     STATUS_CHOICES = [

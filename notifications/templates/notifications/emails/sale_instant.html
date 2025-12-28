@@ -13,11 +13,55 @@
         <h2 style="color: #4CAF50;">New Sale at {{ business_name }}</h2>
         
         <div style="background-color: white; padding: 20px; border-radius: 5px; margin: 20px 0;">
-            <p><strong>Sale Reference:</strong> #{{ sale_ref }}</p>
-            <p><strong>Total Amount:</strong> MK {{ total|floatformat:2 }}</p>
-            {% if items_summary %}<p><strong>Items:</strong> {{ items_summary }}</p>{% endif %}
-            <p><strong>Cashier/Agent:</strong> {{ cashier_name }}</p>
-            <p><strong>Time:</strong> {{ time|date:"F d, Y H:i" }}</p>
+            <p style="font-size: 18px; font-weight: bold; color: #333; margin-bottom: 15px;">
+                {% if product_name %}{{ product_name }}{% else %}{{ items_summary|default:"Product" }}{% endif %}
+                {% if imei %} <span style="color: #666; font-size: 14px;">(IMEI: {{ imei }})</span>{% endif %}
+            </p>
+            
+            <table style="width: 100%; border-collapse: collapse; margin: 15px 0;">
+                <tr>
+                    <td style="padding: 8px 0; border-bottom: 1px solid #eee;"><strong>Selling Price:</strong></td>
+                    <td style="padding: 8px 0; border-bottom: 1px solid #eee; text-align: right;"><strong>MK {{ total|floatformat:0|intcomma }}</strong></td>
+                </tr>
+                {% if cost %}
+                <tr>
+                    <td style="padding: 8px 0; border-bottom: 1px solid #eee;">Cost:</td>
+                    <td style="padding: 8px 0; border-bottom: 1px solid #eee; text-align: right;">MK {{ cost|floatformat:0|intcomma }}</td>
+                </tr>
+                {% endif %}
+                {% if profit %}
+                <tr>
+                    <td style="padding: 8px 0; border-bottom: 1px solid #eee;"><strong>Estimated Profit:</strong></td>
+                    <td style="padding: 8px 0; border-bottom: 1px solid #eee; text-align: right; color: #4CAF50;"><strong>MK {{ profit|floatformat:0|intcomma }}</strong></td>
+                </tr>
+                {% endif %}
+                {% if quantity and quantity > 1 %}
+                <tr>
+                    <td style="padding: 8px 0; border-bottom: 1px solid #eee;">Quantity:</td>
+                    <td style="padding: 8px 0; border-bottom: 1px solid #eee; text-align: right;">{{ quantity }}</td>
+                </tr>
+                {% endif %}
+                {% if payment_method %}
+                <tr>
+                    <td style="padding: 8px 0; border-bottom: 1px solid #eee;">Payment Method:</td>
+                    <td style="padding: 8px 0; border-bottom: 1px solid #eee; text-align: right;">{{ payment_method }}</td>
+                </tr>
+                {% endif %}
+                <tr>
+                    <td style="padding: 8px 0; border-bottom: 1px solid #eee;">Sold By:</td>
+                    <td style="padding: 8px 0; border-bottom: 1px solid #eee; text-align: right;">{{ cashier_name|default:"Unknown" }}</td>
+                </tr>
+                <tr>
+                    <td style="padding: 8px 0;">Time:</td>
+                    <td style="padding: 8px 0; text-align: right;">{{ time|date:"F d, Y H:i" }}</td>
+                </tr>
+            </table>
+            
+            {% if location %}
+            <p style="color: #666; font-size: 14px; margin-top: 15px;">
+                <strong>Location:</strong> {{ location }}
+            </p>
+            {% endif %}
         </div>
         
         <p style="color: #666; font-size: 14px;">You're receiving this notification because you're a manager for {{ business_name }}.</p>

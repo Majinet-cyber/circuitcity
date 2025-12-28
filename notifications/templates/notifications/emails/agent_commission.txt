@@ -1,0 +1,24 @@
+💰 Commission Earned - {{ business_name }}
+
+Great job, {{ agent_name }}!
+
+You've completed a sale at {{ business_name }}.
+
+Sale Details
+------------
+{{ product_name }}{% if imei %} (IMEI: {{ imei }}){% endif %}
+Sale Amount: MK {{ sale_amount|floatformat:0|intcomma }}
+
+Commission from this sale: MK {{ commission_amount|floatformat:0|intcomma }}
+{% if commission_pct %}({{ commission_pct|floatformat:1 }}% commission rate){% endif %}
+{% if commission_note %}{{ commission_note }}{% endif %}
+
+Your total earnings this month: MK {{ total_earnings|floatformat:0|intcomma }}
+
+Sale completed: {{ sale_time|date:"F d, Y H:i" }}
+
+Keep up the great work! 🚀
+
+---
+This is an automated email. Please do not reply directly to this message.
+

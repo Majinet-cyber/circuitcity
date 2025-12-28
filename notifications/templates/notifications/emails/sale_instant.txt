@@ -2,11 +2,16 @@
 
 New Sale at {{ business_name }}
 
-Sale Reference: #{{ sale_ref }}
-Total Amount: MK {{ total|floatformat:2 }}
-{% if items_summary %}Items: {{ items_summary }}{% endif %}
-Cashier/Agent: {{ cashier_name }}
+{% if product_name %}{{ product_name }}{% else %}{{ items_summary|default:"Product" }}{% endif %}{% if imei %} (IMEI: {{ imei }}){% endif %}
+
+Selling Price: MK {{ total|floatformat:0|intcomma }}
+{% if cost %}Cost: MK {{ cost|floatformat:0|intcomma }}{% endif %}
+{% if profit %}Estimated Profit: MK {{ profit|floatformat:0|intcomma }}{% endif %}
+{% if quantity and quantity > 1 %}Quantity: {{ quantity }}{% endif %}
+{% if payment_method %}Payment Method: {{ payment_method }}{% endif %}
+Sold By: {{ cashier_name|default:"Unknown" }}
 Time: {{ time|date:"F d, Y H:i" }}
+{% if location %}Location: {{ location }}{% endif %}
 
 You're receiving this notification because you're a manager for {{ business_name }}.
 

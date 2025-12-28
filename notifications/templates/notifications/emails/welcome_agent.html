@@ -16,18 +16,20 @@
         
         <p>We're excited to have you join the team at <strong>{{ business_name }}</strong>!</p>
         
-        <p>Your agent account has been activated. You can now:</p>
-        <ul>
-            <li>Record sales and process transactions</li>
-            <li>View your commissions and earnings</li>
-            <li>Access inventory and product information</li>
-            <li>Track your performance</li>
+        <p>Your agent account has been activated. Here's what to do next:</p>
+        <ul style="line-height: 1.8;">
+            <li><strong>Set your location</strong> - Make sure your default location is set correctly</li>
+            <li><strong>Stock products</strong> - Scan in products to your inventory</li>
+            <li><strong>Record your first sale</strong> - Start selling and earning commissions!</li>
+            <li><strong>Track your earnings</strong> - View your commissions and wallet balance</li>
         </ul>
         
-        <p>If you need any help getting started or have questions about using the system, please reach out to:</p>
-        <p><strong>Support Contact:</strong> {{ support_contact }}</p>
+        {% if support_contact %}
+        <p>If you need any help getting started or have questions about using the system, please reach out:</p>
+        <p><strong>Support:</strong> <a href="mailto:{{ support_contact }}" style="color: #2196F3;">{{ support_contact }}</a></p>
+        {% endif %}
         
-        <p>Welcome aboard!</p>
+        <p>Welcome aboard and happy selling! 🚀</p>
         
         <p>Best regards,<br>The {{ business_name }} Team</p>
     </div>

@@ -33,3 +33,14 @@ def send_daily_sales_summary():
     command = Command()
     command.handle()
 
+
+@celery_app.task
+def send_weekly_sales_digest():
+    """
+    Celery task to send weekly sales digest emails to managers.
+    Should be scheduled every Friday at 17:00 Africa/Blantyre (15:00 UTC) via Celery Beat.
+    
+    Note: Malawi is UTC+2, so 17:00 Malawi = 15:00 UTC
+    """
+    from notifications.services import send_weekly_sales_digest as send_digest
+    return send_digest()

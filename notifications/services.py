@@ -292,6 +292,16 @@ def _get_template_config(event_type: str) -> Optional[Dict[str, Any]]:
             "html_template": "notifications/emails/important_alert.html",
             "text_template": "notifications/emails/important_alert.txt",
         },
+        "AGENT_COMMISSION": {
+            "subject": "Commission Earned - {business_name}",
+            "html_template": "notifications/emails/agent_commission.html",
+            "text_template": "notifications/emails/agent_commission.txt",
+        },
+        "WEEKLY_DIGEST": {
+            "subject": "Weekly Sales Summary - {business_name}",
+            "html_template": "notifications/emails/weekly_digest.html",
+            "text_template": "notifications/emails/weekly_digest.txt",
+        },
     }
     return configs.get(event_type)
 
@@ -417,20 +427,57 @@ def notify_sale_completion(sale):
         )
         
         if recipients:
-            # Get sale details
+            # Get sale details with enhanced information
             agent_name = ""
             if hasattr(sale, 'agent') and sale.agent:
                 agent_name = sale.agent.get_full_name() or sale.agent.username
             elif hasattr(sale, 'seller') and sale.seller:
                 agent_name = sale.seller.get_full_name() or sale.seller.username
             
-            items_summary = ""
+            product_name = ""
+            imei = ""
+            cost = None
+            profit = None
+            quantity = 1
+            location_name = ""
+            
             if hasattr(sale, 'item') and sale.item:
                 item = sale.item
+                # Product name
                 if hasattr(item, 'product') and item.product:
-                    items_summary = str(item.product)
+                    product = item.product
+                    if hasattr(product, 'brand') and hasattr(product, 'model'):
+                        product_name = f"{product.brand} {product.model}".strip()
+                    else:
+                        product_name = str(product)
                 elif hasattr(item, 'name'):
-                    items_summary = item.name
+                    product_name = item.name
+                
+                # IMEI
+                imei = getattr(item, 'imei', '') or getattr(item, 'serial', '') or ''
+                
+                # Cost and profit
+                cost_price = getattr(item, 'order_price', None) or getattr(item, 'cost_price', None) or getattr(item, 'cost', None)
+                if cost_price:
+                    cost = cost_price
+                    profit = sale.price - cost_price
+                
+                # Quantity
+                quantity = getattr(item, 'quantity', 1) or 1
+            
+            # Location
+            if hasattr(sale, 'location') and sale.location:
+                location_name = getattr(sale.location, 'name', '') or str(sale.location)
+            
+            # Payment method
+            payment_method_display = ""
+            if hasattr(sale, 'payment_method'):
+                payment_method = sale.payment_method
+                if payment_method:
+                    # Get display name from choices
+                    choices = getattr(sale._meta.get_field('payment_method'), 'choices', [])
+                    choice_dict = dict(choices) if choices else {}
+                    payment_method_display = choice_dict.get(payment_method, payment_method.replace('_', ' ').title())
             
             emit_event(
                 event_type="SALE_INSTANT",
@@ -439,8 +486,15 @@ def notify_sale_completion(sale):
                 payload={
                     "sale_ref": f"#{sale.id}",
                     "total": str(sale.price),
-                    "items_summary": items_summary,
+                    "product_name": product_name,
+                    "items_summary": product_name or "Product",
+                    "imei": imei,
+                    "cost": str(cost) if cost else None,
+                    "profit": str(profit) if profit else None,
+                    "quantity": quantity,
+                    "payment_method": payment_method_display,
                     "cashier_name": agent_name or "Unknown",
+                    "location": location_name,
                     "time": sale.created_at if hasattr(sale, 'created_at') else timezone.now(),
                     "business_name": business.name,
                 },
@@ -449,6 +503,10 @@ def notify_sale_completion(sale):
     
     # Check for high sales alert
     _check_high_sales_alert(sale, business)
+    
+    # Send agent commission email if agent exists
+    if hasattr(sale, 'agent') and sale.agent:
+        _notify_agent_commission(sale, business)
 
 
 def _check_high_sales_alert(sale, business):
@@ -533,6 +591,379 @@ def _check_high_sales_alert(sale, business):
                     },
                     business=business,
                 )
+
+
+def _notify_agent_commission(sale, business):
+    """
+    Send commission email to agent after sale completion.
+    Only sends if agent has commission emails enabled in preferences.
+    """
+    from sales.models import Sale
+    from decimal import Decimal
+    from django.utils import timezone
+    from datetime import timedelta
+    
+    agent = sale.agent
+    if not agent or not agent.email:
+        return
+    
+    # Check if agent has commission emails enabled
+    try:
+        pref = NotificationPreference.objects.get(user=agent)
+        if not pref.commission_emails_enabled:
+            return
+    except NotificationPreference.DoesNotExist:
+        # Default: don't send commission emails unless explicitly enabled
+        return
+    
+    # Calculate commission for this sale
+    commission_amount = Decimal("0.00")
+    commission_pct = Decimal("0.00")
+    commission_note = ""
+    
+    try:
+        # Try to get commission from SaleCommission if it exists
+        if hasattr(sale, 'commission_record') and sale.commission_record:
+            commission_record = sale.commission_record
+            commission_amount = commission_record.net_amount or commission_record.base_commission or Decimal("0.00")
+            if sale.price > 0:
+                commission_pct = (commission_amount / sale.price) * 100
+        else:
+            # Fallback: use sale's commission_pct if available
+            if hasattr(sale, 'commission_pct') and sale.commission_pct:
+                commission_pct = sale.commission_pct
+                commission_amount = (sale.price * commission_pct) / 100
+            else:
+                # Try to get from commission config
+                try:
+                    from sales.models import CommissionConfig
+                    config = CommissionConfig.get_active(business)
+                    if config:
+                        if config.commission_mode == 'FIXED':
+                            commission_amount = config.fixed_commission_amount or Decimal("0.00")
+                        else:
+                            commission_pct = config.base_commission_pct or Decimal("0.00")
+                            commission_amount = (sale.price * commission_pct) / 100
+                    else:
+                        commission_note = "Commission plan not set."
+                except Exception:
+                    commission_note = "Commission plan not set."
+    except Exception as e:
+        logger.warning(f"Failed to calculate commission for sale {sale.id}: {e}")
+        commission_note = "Commission calculation unavailable."
+    
+    # Calculate total earnings for current month
+    total_earnings = Decimal("0.00")
+    try:
+        now = timezone.now()
+        month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+        
+        # Get all sales by this agent this month
+        month_sales = Sale.objects.filter(
+            agent=agent,
+            location__business=business,
+            created_at__gte=month_start,
+        )
+        
+        # Calculate total commission from all sales
+        for s in month_sales:
+            try:
+                if hasattr(s, 'commission_record') and s.commission_record:
+                    total_earnings += s.commission_record.net_amount or s.commission_record.base_commission or Decimal("0.00")
+                elif hasattr(s, 'commission_pct') and s.commission_pct:
+                    total_earnings += (s.price * s.commission_pct) / 100
+            except Exception:
+                pass
+    except Exception as e:
+        logger.warning(f"Failed to calculate total earnings for agent {agent.id}: {e}")
+    
+    # Get product details
+    product_name = ""
+    imei = ""
+    if hasattr(sale, 'item') and sale.item:
+        item = sale.item
+        if hasattr(item, 'product') and item.product:
+            product = item.product
+            if hasattr(product, 'brand') and hasattr(product, 'model'):
+                product_name = f"{product.brand} {product.model}".strip()
+            else:
+                product_name = str(product)
+        elif hasattr(item, 'name'):
+            product_name = item.name
+        
+        imei = getattr(item, 'imei', '') or getattr(item, 'serial', '') or ''
+    
+    # Send email
+    emit_event(
+        event_type="AGENT_COMMISSION",
+        recipients=[agent.email],
+        dedupe_key=f"AGENT_COMMISSION:{sale.id}:{agent.id}",
+        payload={
+            "agent_name": agent.get_full_name() or agent.username,
+            "business_name": business.name,
+            "sale_id": sale.id,
+            "product_name": product_name or "Product",
+            "imei": imei,
+            "sale_amount": str(sale.price),
+            "commission_amount": str(commission_amount),
+            "commission_pct": str(commission_pct) if commission_pct > 0 else None,
+            "total_earnings": str(total_earnings),
+            "commission_note": commission_note,
+            "sale_time": sale.created_at if hasattr(sale, 'created_at') else timezone.now(),
+        },
+        business=business,
+        user=agent,
+    )
+
+
+# ==============================================================================
+# Weekly Sales Digest
+# ==============================================================================
+
+def send_weekly_sales_digest(business=None, week_ending_date=None):
+    """
+    Send weekly sales digest email to managers.
+    
+    Calculates last 7 days (Mon-Sun week ending on Friday) and sends summary:
+    - Total sales amount (revenue)
+    - Total profit
+    - Total number of sales
+    - Breakdown of products sold (top 10 by revenue and by quantity)
+    - Top agents (top 5 by revenue; include profit if possible)
+    - Highest selling day (date with highest revenue)
+    - Tips section (3 bullet tips based on data)
+    
+    Args:
+        business: Optional Business instance. If None, sends to all active businesses.
+        week_ending_date: Optional date for week ending (defaults to last Friday)
+    
+    Returns:
+        Number of emails sent
+    """
+    from sales.models import Sale
+    from decimal import Decimal
+    from django.db.models import Sum, Count, F, Q
+    from django.db.models.functions import TruncDate
+    from django.utils import timezone
+    from datetime import timedelta
+    import pytz
+    
+    # Get Malawi timezone
+    malawi_tz = pytz.timezone('Africa/Blantyre')
+    now_malawi = timezone.now().astimezone(malawi_tz)
+    
+    # Calculate week ending date (last Friday at 5pm Malawi time)
+    if week_ending_date:
+        week_end = week_ending_date
+    else:
+        # Find last Friday
+        days_since_friday = (now_malawi.weekday() - 4) % 7
+        if days_since_friday == 0 and now_malawi.hour < 17:
+            # Today is Friday but before 5pm, use previous Friday
+            days_since_friday = 7
+        week_end = (now_malawi - timedelta(days=days_since_friday)).date()
+    
+    # Week period: Monday to Sunday (ending on Friday)
+    week_start = week_end - timedelta(days=6)  # Last 7 days including Friday
+    
+    # Get businesses to process
+    if business:
+        businesses = [business]
+    else:
+        from tenants.models import Business
+        businesses = Business.objects.filter(status='ACTIVE')
+    
+    emails_sent = 0
+    
+    for biz in businesses:
+        try:
+            # Get sales for this week
+            sales_qs = Sale.objects.filter(
+                location__business=biz,
+                sold_at__gte=week_start,
+                sold_at__lte=week_end,
+            ).select_related('agent', 'item', 'location')
+            
+            if not sales_qs.exists():
+                continue  # Skip businesses with no sales this week
+            
+            # Calculate totals
+            total_revenue = sales_qs.aggregate(
+                total=Sum('price')
+            )['total'] or Decimal('0.00')
+            
+            total_sales_count = sales_qs.count()
+            
+            # Calculate profit (selling_price - order_price)
+            total_profit = Decimal('0.00')
+            try:
+                for sale in sales_qs:
+                    if hasattr(sale, 'item') and sale.item:
+                        cost = getattr(sale.item, 'order_price', None) or getattr(sale.item, 'cost_price', None) or Decimal('0.00')
+                        total_profit += sale.price - cost
+            except Exception:
+                pass  # Profit calculation is best-effort
+            
+            # Top products by revenue (top 10)
+            top_products_by_revenue = []
+            try:
+                product_revenue = sales_qs.values(
+                    'item__product__brand',
+                    'item__product__model',
+                    'item__product__name'
+                ).annotate(
+                    revenue=Sum('price'),
+                    quantity=Count('id')
+                ).order_by('-revenue')[:10]
+                
+                for p in product_revenue:
+                    name = ""
+                    if p.get('item__product__brand') and p.get('item__product__model'):
+                        name = f"{p['item__product__brand']} {p['item__product__model']}".strip()
+                    elif p.get('item__product__name'):
+                        name = p['item__product__name']
+                    else:
+                        name = "Unknown Product"
+                    
+                    top_products_by_revenue.append({
+                        'name': name,
+                        'revenue': float(p['revenue'] or 0),
+                        'quantity': p['quantity']
+                    })
+            except Exception:
+                pass
+            
+            # Top products by quantity (top 10)
+            top_products_by_quantity = []
+            try:
+                product_quantity = sales_qs.values(
+                    'item__product__brand',
+                    'item__product__model',
+                    'item__product__name'
+                ).annotate(
+                    quantity=Count('id'),
+                    revenue=Sum('price')
+                ).order_by('-quantity')[:10]
+                
+                for p in product_quantity:
+                    name = ""
+                    if p.get('item__product__brand') and p.get('item__product__model'):
+                        name = f"{p['item__product__brand']} {p['item__product__model']}".strip()
+                    elif p.get('item__product__name'):
+                        name = p['item__product__name']
+                    else:
+                        name = "Unknown Product"
+                    
+                    top_products_by_quantity.append({
+                        'name': name,
+                        'quantity': p['quantity'],
+                        'revenue': float(p['revenue'] or 0)
+                    })
+            except Exception:
+                pass
+            
+            # Top agents by revenue (top 5)
+            top_agents = []
+            try:
+                agent_stats = sales_qs.values(
+                    'agent_id',
+                    'agent__first_name',
+                    'agent__last_name',
+                    'agent__username'
+                ).annotate(
+                    revenue=Sum('price'),
+                    sales_count=Count('id')
+                ).order_by('-revenue')[:5]
+                
+                for a in agent_stats:
+                    name = f"{a.get('agent__first_name', '')} {a.get('agent__last_name', '')}".strip()
+                    if not name:
+                        name = a.get('agent__username', '') or f"Agent #{a['agent_id']}"
+                    
+                    top_agents.append({
+                        'name': name,
+                        'revenue': float(a['revenue'] or 0),
+                        'sales_count': a['sales_count']
+                    })
+            except Exception:
+                pass
+            
+            # Highest selling day
+            highest_day = None
+            highest_day_revenue = Decimal('0.00')
+            try:
+                daily_stats = sales_qs.annotate(
+                    sale_date=TruncDate('sold_at')
+                ).values('sale_date').annotate(
+                    revenue=Sum('price')
+                ).order_by('-revenue')[:1]
+                
+                if daily_stats:
+                    day_data = daily_stats[0]
+                    highest_day = day_data['sale_date']
+                    highest_day_revenue = day_data['revenue'] or Decimal('0.00')
+            except Exception:
+                pass
+            
+            # Generate tips
+            tips = []
+            try:
+                # Tip 1: Restock top products
+                if top_products_by_quantity:
+                    top_product = top_products_by_quantity[0]
+                    tips.append(f"Restock {top_product['name']} - it's your top seller with {top_product['quantity']} units this week.")
+                
+                # Tip 2: Upsell accessories or follow up on credit
+                if total_sales_count > 0:
+                    tips.append("Consider upselling accessories or following up on overdue credit payments to boost revenue.")
+                
+                # Tip 3: Recognize top agents
+                if top_agents:
+                    top_agent = top_agents[0]
+                    tips.append(f"Recognize {top_agent['name']} - they generated MK {top_agent['revenue']:,.0f} in sales this week!")
+            except Exception:
+                tips = [
+                    "Review your sales data regularly to identify trends.",
+                    "Keep your top-selling products well-stocked.",
+                    "Recognize and motivate your top-performing agents."
+                ]
+            
+            # Get managers with weekly digest enabled
+            recipients = get_business_manager_emails(
+                biz,
+                include_owner=True,
+                event_type="WEEKLY_DIGEST",
+            )
+            
+            if recipients:
+                # Week ending date string
+                week_end_str = week_end.strftime("%B %d, %Y")
+                
+                emit_event(
+                    event_type="WEEKLY_DIGEST",
+                    recipients=recipients,
+                    dedupe_key=f"WEEKLY_DIGEST:{biz.id}:{week_end}",
+                    payload={
+                        "business_name": biz.name,
+                        "week_start": week_start.strftime("%B %d, %Y"),
+                        "week_end": week_end_str,
+                        "total_revenue": str(total_revenue),
+                        "total_profit": str(total_profit),
+                        "total_sales_count": total_sales_count,
+                        "top_products_by_revenue": top_products_by_revenue[:10],
+                        "top_products_by_quantity": top_products_by_quantity[:10],
+                        "top_agents": top_agents[:5],
+                        "highest_day": highest_day.strftime("%B %d, %Y") if highest_day else None,
+                        "highest_day_revenue": str(highest_day_revenue) if highest_day_revenue else None,
+                        "tips": tips[:3],
+                    },
+                    business=biz,
+                )
+                emails_sent += len(recipients)
+        except Exception as e:
+            logger.error(f"Failed to send weekly digest for business {biz.id}: {e}")
+    
+    return emails_sent
 
 
 # ==============================================================================
