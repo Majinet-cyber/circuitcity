@@ -4,11 +4,22 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Pricing - Emajinet</title>
-  <meta name="description" content="Choose the perfect plan for your business. Start with a 30-day free trial, no commitment required.">
+  <title>Pricing Plans - Emajinet | Business Management SaaS</title>
+  <meta name="description" content="Choose the perfect plan for your business. Start with a 30-day free trial, no commitment required. All plans include 30-day money-back guarantee.">
+  
+  <!-- Open Graph / Social Media -->
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="Pricing Plans - Emajinet | Business Management SaaS">
+  <meta property="og:description" content="Choose the perfect plan for your business. Start with a 30-day free trial, no commitment required.">
+  <meta property="og:site_name" content="Emajinet">
+  
+  <!-- Twitter Card -->
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Pricing Plans - Emajinet">
+  <meta name="twitter:description" content="Choose the perfect plan for your business. Start with a 30-day free trial.">
   
   <!-- SEO: Canonical URL -->
-  <link rel="canonical" href="{{ request.scheme }}://{{ request.get_host }}{{ request.path }}">
+  <link rel="canonical" href="https://www.emajinet.africa{{ request.path }}">
   
   <meta name="theme-color" content="#0b1220">
   <link rel="icon" href="{% static 'favicon.ico' %}">
@@ -524,7 +535,8 @@
       </div>
       <h1 class="pricing-title">Choose the Perfect Plan for Your Business</h1>
       <p class="pricing-subtitle">
-        Start with a free trial, scale as you grow. All plans include 30-day money-back guarantee.
+        Start with a free trial, scale as you grow. All plans include 
+        <a href="{% url 'staticpages:terms' %}#refund-policy" style="color: var(--primary); text-decoration: underline;">30-day money-back guarantee</a>.
       </p>
     </div>
   </section>
@@ -570,13 +582,14 @@
 
   <!-- Footer -->
   <footer class="footer">
-    <p class="footer-text">&copy; {{ CURRENT_YEAR }} Emajinet. All rights reserved.</p>
+    <p class="footer-text">&copy; {% now "Y" %} Emajinet. All rights reserved.</p>
     <div style="margin-top: 1rem; display: flex; gap: 2rem; justify-content: center; flex-wrap: wrap;">
-      <a href="{% url 'staticpages:home' %}" style="color: rgba(255,255,255,0.7); text-decoration: none; font-size: 0.9rem;">Home</a>
+      <a href="{% url 'staticpages:pricing' %}" style="color: rgba(255,255,255,0.7); text-decoration: none; font-size: 0.9rem;">Pricing</a>
       <a href="{% url 'staticpages:about' %}" style="color: rgba(255,255,255,0.7); text-decoration: none; font-size: 0.9rem;">About</a>
-      <a href="{% url 'staticpages:privacy' %}" style="color: rgba(255,255,255,0.7); text-decoration: none; font-size: 0.9rem;">Privacy Policy</a>
-      <a href="{% url 'staticpages:terms' %}" style="color: rgba(255,255,255,0.7); text-decoration: none; font-size: 0.9rem;">Terms of Service</a>
-      <a href="{% url 'staticpages:data_deletion' %}" style="color: rgba(255,255,255,0.7); text-decoration: none; font-size: 0.9rem;">Data Deletion</a>
+      <a href="{% url 'staticpages:contact' %}" style="color: rgba(255,255,255,0.7); text-decoration: none; font-size: 0.9rem;">Contact</a>
+      <a href="{% url 'staticpages:terms' %}" style="color: rgba(255,255,255,0.7); text-decoration: none; font-size: 0.9rem;">Terms</a>
+      <a href="{% url 'staticpages:privacy' %}" style="color: rgba(255,255,255,0.7); text-decoration: none; font-size: 0.9rem;">Privacy</a>
+      <a href="{% url 'staticpages:terms' %}#refund-policy" style="color: rgba(255,255,255,0.7); text-decoration: none; font-size: 0.9rem;">Refund Policy</a>
     </div>
   </footer>
 

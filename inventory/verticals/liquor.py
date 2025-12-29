@@ -831,6 +831,62 @@ def fast_sell(request):
 
 
 @login_required
+def fast_sell_page(request):
+    """
+    Fast Sell page for liquor - gated by authentication, business, and vertical.
+    Uses login_required as outermost decorator so unauthenticated users get 302 redirect.
+    """
+    from django.http import HttpResponseForbidden
+    from django.shortcuts import redirect
+    from django.urls import reverse
+    from tenants.models import Business
+    
+    # 1) Must have active business (middleware OR session)
+    business = getattr(request, "active_business", None)
+    
+    if business is None:
+        bid = request.session.get("active_business_id")
+        if not bid:
+            return redirect(reverse("tenants:choose_business"))
+        business = Business.objects.filter(id=bid).first()
+        if business is None:
+            return redirect(reverse("tenants:choose_business"))
+    
+    # 2) Must be liquor vertical
+    if getattr(business, "business_kind", None) != BusinessKind.LIQUOR:
+        return HttpResponseForbidden("Wrong business vertical.")
+    
+    # Use base_context to provide required context for template
+    ctx = base.base_context(request)
+    
+    # Check if user is barman
+    is_barman = False
+    liquor_agents = []
+    from django.contrib.auth import get_user_model
+    User = get_user_model()
+    is_barman = request.user.groups.filter(name=f"biz:{business.pk}:LIQUOR_BARMAN").exists()
+    
+    # Get list of liquor agents (for barman to assign sales)
+    if is_barman:
+        agent_group_name = f"biz:{business.pk}:AGENT"
+        liquor_agents = User.objects.filter(
+            groups__name=agent_group_name
+        ).values("id", "first_name", "last_name", "username").distinct()
+    
+    ctx.update({
+        "page_title": "Fast Sell",
+        "vertical": "liquor",
+        "vertical_name": "Liquor",
+        "lookup_url_name": "verticals:liquor_fast_sell_lookup",
+        "sell_url_name": "verticals:liquor_fast_sell_sell",
+        "is_barman": is_barman,
+        "liquor_agents": list(liquor_agents),
+        "active_tab": "fast_sell",  # Template may use this
+    })
+    return render(request, "verticals/liquor/fast_sell.html", ctx)
+
+
+@login_required
 @require_business
 @require_business_kind(BusinessKind.LIQUOR)
 def barman_invite(request):
@@ -1024,27 +1080,60 @@ def fast_sell_create_api(request):
     from inventory.views_liquor import get_or_start_active_shift
     from django.core.exceptions import ValidationError
     from django.db import transaction
+    from tenants.models import Location
     import json
     import logging
     
     logger = logging.getLogger(__name__)
     
+    def _payload(request):
+        """Safe payload parser that handles both JSON and form POST"""
+        if request.content_type and "application/json" in request.content_type:
+            try:
+                return json.loads((request.body or b"{}").decode("utf-8"))
+            except json.JSONDecodeError:
+                return {}
+        return request.POST
+    
     if request.method != "POST":
         return JsonResponse({"ok": False, "error": "POST required"}, status=405)
     
     business = base.base_context(request).get("business")
-    location = getattr(request, "location", None)
     
-    try:
-        data = json.loads(request.body)
-    except json.JSONDecodeError:
-        return JsonResponse({"ok": False, "error": "Invalid JSON"}, status=400)
+    # Get location from request attribute, session, or first active location
+    location = getattr(request, "location", None)
+    if not location:
+        location_id = getattr(request, "active_location_id", None)
+        if not location_id:
+            location_id = request.session.get("active_location_id")
+        if location_id:
+            try:
+                location = Location.objects.get(pk=location_id, business=business)
+            except Location.DoesNotExist:
+                location = None
+    
+    data = _payload(request)
     
     barcode = data.get("barcode", "").strip()
-    quantity = int(data.get("quantity", 1))
+    quantity_str = data.get("quantity", "1")
+    try:
+        quantity = int(quantity_str)
+    except (ValueError, TypeError):
+        return JsonResponse({"ok": False, "error": "Invalid quantity"}, status=400)
+    
     unit = data.get("unit", "bottle")  # "bottle", "shot", or "glass"
     selling_price_str = data.get("selling_price")
+    
+    # Map payment_method to sale_type (for backward compatibility)
+    payment_method = data.get("payment_method", "cash")
     sale_type = data.get("sale_type", "cash")  # "cash" or "credit"
+    # If payment_method is provided but sale_type is not, use payment_method
+    if "payment_method" in data and "sale_type" not in data:
+        # payment_method values: "cash", "bank", "mobile_money"
+        # sale_type values: "cash", "credit"
+        # For fast sell, payment_method "cash" means cash sale
+        sale_type = "cash"  # Fast sell is always cash sales
+    
     customer_name = data.get("customer_name", "").strip()
     customer_phone = data.get("customer_phone", "").strip()
     notes = data.get("notes", "").strip()
@@ -1074,23 +1163,69 @@ def fast_sell_create_api(request):
         logger.warning(f"Failed to get/start shift for liquor sale: {e}")
         active_shift = None
     
+    # Parse agent_id from payload (supporting multiple aliases)
+    agent_id = None
+    for key in ["attributed_to_agent_id", "agent_id", "assigned_agent_id", "attributed_agent_id"]:
+        if key in data:
+            try:
+                agent_id = int(data[key])
+                break
+            except (ValueError, TypeError):
+                continue
+    
     try:
-        result = create_liquor_sale_by_barcode(
-            business=business,
-            user=request.user,
-            barcode=barcode,
-            quantity=quantity,
-            unit=unit,
-            unit_price=selling_price,
-            sale_type=sale_type,
-            customer_name=customer_name if customer_name else None,
-            customer_phone=customer_phone if customer_phone else None,
-            notes=notes if notes else None,
-            cash_amount=cash_amount,
-            bank_amount=bank_amount,
-            mobile_money_amount=mobile_money_amount,
-            shift=active_shift,
-        )
+        # Wrap sale creation and attribution in a single transaction
+        with transaction.atomic():
+            result = create_liquor_sale_by_barcode(
+                business=business,
+                user=request.user,
+                barcode=barcode,
+                quantity=quantity,
+                unit=unit,
+                unit_price=selling_price,
+                sale_type=sale_type,
+                customer_name=customer_name if customer_name else None,
+                customer_phone=customer_phone if customer_phone else None,
+                notes=notes if notes else None,
+                cash_amount=cash_amount,
+                bank_amount=bank_amount,
+                mobile_money_amount=mobile_money_amount,
+                payment_method=payment_method,
+                shift=active_shift,
+            )
+            
+            # Create attribution if agent_id is provided
+            if agent_id and result.get("ok") and result.get("sale_id"):
+                from sales.models import LiquorSaleAttribution
+                from django.contrib.auth import get_user_model
+                from inventory.models_verticals import LiquorSale
+                
+                User = get_user_model()
+                
+                try:
+                    # Verify agent exists
+                    agent = User.objects.get(pk=agent_id)
+                    
+                    # Get the sale to retrieve sale amount
+                    sale = LiquorSale.objects.get(pk=result["sale_id"])
+                    
+                    # Create or update attribution (idempotent)
+                    LiquorSaleAttribution.objects.update_or_create(
+                        liquor_sale_id=sale.id,
+                        defaults={
+                            "business": business,
+                            "attributed_by": request.user,
+                            "attributed_to": agent,
+                            "sale_amount": sale.total_price,
+                            "status": LiquorSaleAttribution.STATUS_PENDING,
+                        }
+                    )
+                except User.DoesNotExist:
+                    logger.warning(f"Agent with id {agent_id} not found for attribution")
+                    # Don't fail the sale if agent is not found, just log it
+                except LiquorSale.DoesNotExist:
+                    logger.warning(f"Sale with id {result['sale_id']} not found for attribution")
+                    # This shouldn't happen, but log it if it does
         
         return JsonResponse(result)
         

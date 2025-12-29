@@ -347,8 +347,8 @@ def register_barcode(
             return None
         
         # Check if barcode already exists for this business
-        existing = BarcodeRegistry.objects.filter(
-            business=business,
+        # Use for_business to explicitly scope the query (bypasses TenantManager's thread-local filtering)
+        existing = BarcodeRegistry.objects.for_business(business).filter(
             normalized_code=normalized,
             is_active=True
         ).first()
@@ -364,7 +364,8 @@ def register_barcode(
             return existing
         
         # Create new entry
-        return BarcodeRegistry.objects.create(
+        # Use for_business to explicitly scope (though create doesn't use the queryset, it's for consistency)
+        return BarcodeRegistry.objects.for_business(business).create(
             business=business,
             raw_code=raw_code,
             normalized_code=normalized,
@@ -380,13 +381,20 @@ def register_barcode(
         return None
 
 
-def lookup_barcode(business, raw_code: str):
+def lookup_barcode(business, raw_code: str, location=None):
     """
-    Look up a barcode in the registry.
+    Look up a barcode in the registry with fallback to real data and auto-registration.
+    
+    This function implements a resilient, self-healing barcode lookup:
+    1. Normalizes input barcode
+    2. Checks BarcodeRegistry first (business-scoped, location tolerant)
+    3. Falls back to MerchProduct.barcode with normalized comparison
+    4. Auto-registers found products in the registry for future fast lookups
     
     Args:
         business: Business instance
         raw_code: Raw barcode string
+        location: Optional location for filtering (not currently used in registry lookup)
         
     Returns:
         Dict with:
@@ -400,40 +408,70 @@ def lookup_barcode(business, raw_code: str):
     
     try:
         from inventory.models_barcodes import BarcodeRegistry
+        from django.db import transaction
         
+        # Normalize input barcode
         normalized = normalize_barcode_enhanced(raw_code)
         if not normalized:
             return {"found": False, "product": None, "batch": None, "registry_entry": None}
         
-        # Try exact normalized match first
-        entry = BarcodeRegistry.objects.filter(
-            business=business,
+        # 1) Registry first (location tolerant - location filtering not currently supported)
+        # Use for_business to explicitly scope the query (bypasses TenantManager's thread-local filtering)
+        reg = BarcodeRegistry.objects.for_business(business).filter(
             normalized_code=normalized,
             is_active=True
         ).select_related("product", "batch").first()
         
-        if entry:
+        if reg:
             return {
                 "found": True,
-                "product": entry.product,
-                "batch": entry.batch,
-                "registry_entry": entry
+                "product": reg.product,
+                "batch": reg.batch,
+                "registry_entry": reg
             }
         
-        # Fallback: Try legacy barcode field on MerchProduct
+        # 2) Fallback: MerchProduct by barcode (self-heal)
         from inventory.models import MerchProduct
-        legacy_product = MerchProduct.objects.filter(
-            business=business,
-            barcode=raw_code,
-            is_active=True
-        ).first()
         
-        if legacy_product:
+        # Get products with barcodes for this business
+        products = MerchProduct.objects.filter(
+            business=business,
+            is_active=True
+        ).exclude(barcode__isnull=True).exclude(barcode="")
+        
+        # Normalize and compare barcodes
+        mp = None
+        for product in products:
+            if product.barcode:
+                product_barcode_normalized = normalize_barcode_enhanced(product.barcode)
+                if product_barcode_normalized == normalized:
+                    mp = product
+                    break
+        
+        if mp:
+            # Auto-register: create/update BarcodeRegistry entry
+            # Use for_business to explicitly scope the query (bypasses TenantManager's thread-local filtering)
+            with transaction.atomic():
+                reg_entry, created = BarcodeRegistry.objects.for_business(business).update_or_create(
+                    normalized_code=normalized,
+                    is_active=True,
+                    defaults={
+                        "business": business,
+                        "raw_code": raw_code,
+                        "product": mp,
+                        "batch": None,
+                    }
+                )
+                # Ensure it's active (in case it was inactive)
+                if not reg_entry.is_active:
+                    reg_entry.is_active = True
+                    reg_entry.save()
+            
             return {
                 "found": True,
-                "product": legacy_product,
+                "product": mp,
                 "batch": None,
-                "registry_entry": None
+                "registry_entry": reg_entry
             }
         
         return {"found": False, "product": None, "batch": None, "registry_entry": None}

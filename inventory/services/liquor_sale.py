@@ -44,6 +44,7 @@ def create_liquor_sale(
     cash_amount: Decimal = Decimal("0.00"),
     bank_amount: Decimal = Decimal("0.00"),
     mobile_money_amount: Decimal = Decimal("0.00"),
+    payment_method: Optional[str] = None,  # "cash", "bank", "mobile_money"
     shift=None,
 ) -> Dict[str, Any]:
     """
@@ -130,18 +131,55 @@ def create_liquor_sale(
     unit_cost = product.get_cost_for_unit(unit) or Decimal("0.00")
     total_cost = Decimal(quantity) * unit_cost
     
-    # Validate payment mix
-    payment_mix_total = cash_amount + bank_amount + mobile_money_amount
-    if payment_mix_total > 0 and payment_mix_total != total:
-        raise ValidationError(
-            f"Payment mix total (K{payment_mix_total}) must equal sale total (K{total})"
-        )
-    
     # For credit sales, ensure payment mix is zero
     if is_credit:
         cash_amount = Decimal("0.00")
         bank_amount = Decimal("0.00")
         mobile_money_amount = Decimal("0.00")
+    
+    # Determine payment_method if not provided
+    payment_mix_total = cash_amount + bank_amount + mobile_money_amount
+    if payment_method is None:
+        if payment_mix_total > 0:
+            # Determine from payment amounts
+            if cash_amount > 0 and bank_amount == 0 and mobile_money_amount == 0:
+                payment_method = "cash"
+            elif bank_amount > 0 and cash_amount == 0 and mobile_money_amount == 0:
+                payment_method = "bank"
+            elif mobile_money_amount > 0 and cash_amount == 0 and bank_amount == 0:
+                payment_method = "mobile_money"
+            else:
+                payment_method = "cash"  # Default for mixed payments
+        else:
+            payment_method = "cash"  # Default
+    
+    # If payment_method is specified but all amounts are zero, set the appropriate amount
+    if payment_mix_total == 0 and not is_credit:
+        if payment_method.lower() == "cash":
+            cash_amount = total
+        elif payment_method.lower() == "bank":
+            bank_amount = total
+        elif payment_method.lower() in ("mobile_money", "mobile"):
+            mobile_money_amount = total
+        else:
+            cash_amount = total  # Default to cash
+        payment_mix_total = total
+    
+    # Validate payment mix
+    if payment_mix_total > 0 and payment_mix_total != total:
+        raise ValidationError(
+            f"Payment mix total (K{payment_mix_total}) must equal sale total (K{total})"
+        )
+    
+    # Normalize payment_method
+    from inventory.models_verticals import PaymentMethod
+    payment_method_map = {
+        "cash": PaymentMethod.CASH,
+        "bank": PaymentMethod.BANK,
+        "mobile_money": PaymentMethod.MOBILE_MONEY,
+        "mobile": PaymentMethod.MOBILE_MONEY,
+    }
+    payment_method_enum = payment_method_map.get(payment_method.lower(), PaymentMethod.CASH)
     
     # CRITICAL: Decrement stock atomically using conditional update
     # This prevents overselling even under high concurrency
@@ -177,7 +215,8 @@ def create_liquor_sale(
         sale_type=liquor_sale_type,
         is_credit=is_credit,
         sold_by=user,
-        notes=notes,
+        notes=notes or "",
+        payment_method=payment_method_enum,
         cash_amount=cash_amount,
         bank_amount=bank_amount,
         mobile_money_amount=mobile_money_amount
@@ -239,6 +278,7 @@ def create_liquor_sale_by_barcode(
     cash_amount: Decimal = Decimal("0.00"),
     bank_amount: Decimal = Decimal("0.00"),
     mobile_money_amount: Decimal = Decimal("0.00"),
+    payment_method: Optional[str] = None,  # "cash", "bank", "mobile_money"
     shift=None,
 ) -> Dict[str, Any]:
     """
@@ -324,10 +364,22 @@ def create_liquor_sale_by_barcode(
         elif unit == "glass":
             unit_price = product.price_per_glass or Decimal("0.00")
         else:
-            unit_price = product.price_per_bottle or Decimal("0.00")
+            # For bottle, try price_per_bottle first, then fall back to selling_price
+            unit_price = product.price_per_bottle or getattr(product, "selling_price", None) or Decimal("0.00")
         
         if unit_price == Decimal("0.00"):
             raise ValidationError(f"{product.name} does not have a price per {unit} set")
+    else:
+        # If unit_price is provided, update the product's price for this unit
+        if unit == "shot":
+            product.price_per_shot = unit_price
+        elif unit == "glass":
+            product.price_per_glass = unit_price
+        else:
+            product.price_per_bottle = unit_price
+        # Also update selling_price for backward compatibility
+        product.selling_price = unit_price
+        product.save(update_fields=["price_per_shot", "price_per_glass", "price_per_bottle", "selling_price"])
     
     # Use the main sale creation function
     return create_liquor_sale(
@@ -344,6 +396,7 @@ def create_liquor_sale_by_barcode(
         cash_amount=cash_amount,
         bank_amount=bank_amount,
         mobile_money_amount=mobile_money_amount,
+        payment_method=payment_method,
         shift=shift,
     )
 

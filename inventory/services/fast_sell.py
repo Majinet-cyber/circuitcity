@@ -25,8 +25,8 @@ def lookup_product_by_barcode(
     """
     Look up a product by barcode for Fast Sell.
     
-    ONLY supports pharmacy and clothing verticals.
-    Phones and liquor are NOT supported (they use dedicated flows).
+    Supports pharmacy, clothing, and liquor verticals.
+    Phones are NOT supported (they use dedicated flows).
     
     Returns dict with:
         - ok: bool
@@ -41,11 +41,11 @@ def lookup_product_by_barcode(
     from inventory.models_pharmacy import PharmacyBatch
     from inventory.utils_vertical_capabilities import vertical_supports_fast_sell
     
-    # CRITICAL: Capability check - Fast Sell ONLY for pharmacy + clothing
-    if not vertical_supports_fast_sell(vertical):
+    # Allow lookup for pharmacy, clothing, and liquor (even though liquor doesn't support full fast sell)
+    if vertical not in ("pharmacy", "clothing", "liquor"):
         return {
             "ok": False,
-            "error": f"Fast Sell is not enabled for {vertical}. Use the dedicated scan/sell flow instead."
+            "error": f"Fast Sell lookup is not enabled for {vertical}. Use the dedicated scan/sell flow instead."
         }
     
     try:
@@ -120,6 +120,38 @@ def lookup_product_by_barcode(
                     "category": product.category or "",
                     "size": getattr(product, "size", ""),
                     "color": getattr(product, "color", ""),
+                },
+                "stock_qty": stock_qty,
+                "selling_price": float(selling_price),
+                "needs_price": needs_price,
+            }
+        
+        elif vertical == "liquor":
+            # Liquor: Look up by barcode in MerchProduct (similar to clothing)
+            product = MerchProduct.objects.filter(
+                business=business,
+                kind="liquor",
+                is_active=True,
+                barcode=barcode
+            ).first()
+            
+            if not product:
+                return {"ok": True, "found": False, "error": "Product not found"}
+            
+            stock_qty = product.quantity_in_stock or 0
+            if stock_qty <= 0:
+                return {"ok": True, "found": False, "error": "Out of stock"}
+            
+            selling_price = product.selling_price or Decimal("0.00")
+            needs_price = selling_price == 0
+            
+            return {
+                "ok": True,
+                "found": True,
+                "product": {
+                    "id": product.id,
+                    "name": product.name,
+                    "category": product.category or "",
                 },
                 "stock_qty": stock_qty,
                 "selling_price": float(selling_price),

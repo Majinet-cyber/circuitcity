@@ -18,15 +18,19 @@ from django.core.signing import TimestampSigner, BadSignature, SignatureExpired
 from django.urls import reverse, NoReverseMatch
 
 try:
-    from inventory.business_kinds import BusinessKind
+    from tenants.constants import BusinessKind
 except Exception:  # pragma: no cover
-    class BusinessKind(models.TextChoices):  # type: ignore
-        PHONES = "phones", "Phones & Electronics"
-        LIQUOR = "liquor", "Liquor / Bar"
-        GROCERY = "grocery", "Grocery / General"
-        PHARMACY = "pharmacy", "Pharmacy"
-        CLOTHING = "clothing", "Clothing"
-        GYM = "gym", "Gym / Fitness"
+    # Fallback if constants can't be imported (shouldn't happen in normal operation)
+    try:
+        from inventory.business_kinds import BusinessKind
+    except Exception:
+        class BusinessKind(models.TextChoices):  # type: ignore
+            PHONES = "phones", "Phones & Electronics"
+            LIQUOR = "liquor", "Liquor / Bar"
+            GROCERY = "grocery", "Grocery / General"
+            PHARMACY = "pharmacy", "Pharmacy"
+            CLOTHING = "clothing", "Clothing"
+            GYM = "gym", "Gym / Fitness"
 
 User = settings.AUTH_USER_MODEL
 

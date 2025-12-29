@@ -6,9 +6,11 @@ Ensures the pharmacy fast sell page renders without template recursion errors.
 import pytest
 from django.test import Client
 from django.urls import reverse
-from django.contrib.auth import get_user_model
 
-User = get_user_model()
+from tenants.constants import BusinessKind
+from tests.helpers.tenant_setup import (
+    make_user, make_business, make_location, make_membership, login_with_active_scope
+)
 
 
 @pytest.mark.django_db
@@ -24,31 +26,23 @@ class TestPharmacyFastSellRegression:
         RecursionError: maximum recursion depth exceeded
         """
         # Create user and pharmacy business
-        user = User.objects.create_user(
-            username="pharmacist",
-            email="pharmacist@test.com",
-            password="testpass123"
+        user = make_user(email="pharmacist@test.com", username="pharmacist", password="testpass123")
+        business = make_business(
+            created_by=user,
+            kind=BusinessKind.PHARMACY,
+            name="Test Pharmacy"
         )
-        
-        from tenants.models import Business, Membership
-        business = Business.objects.create(
-            name="Test Pharmacy",
-            kind="pharmacy",
-            owner=user
-        )
-        
-        Membership.objects.create(
-            user=user,
+        location = make_location(business=business, name="Main Store")
+        make_membership(
             business=business,
-            role="manager",
-            is_active=True
+            user=user,
+            role="MANAGER",
+            location=None,  # Managers should not be tied to a specific location
+            status="ACTIVE"
         )
         
-        # Login and set active business
-        client.force_login(user)
-        session = client.session
-        session['active_business_id'] = business.id
-        session.save()
+        # Login and set active business and location
+        login_with_active_scope(client, user, business, location)
         
         # Access pharmacy fast sell page
         url = reverse('verticals:pharmacy_fast_sell')
@@ -72,31 +66,23 @@ class TestPharmacyFastSellRegression:
         - Circular chain of includes
         """
         # Create user and pharmacy business
-        user = User.objects.create_user(
-            username="pharmacist2",
-            email="pharmacist2@test.com",
-            password="testpass123"
+        user = make_user(email="pharmacist2@test.com", username="pharmacist2", password="testpass123")
+        business = make_business(
+            created_by=user,
+            kind=BusinessKind.PHARMACY,
+            name="Test Pharmacy 2"
         )
-        
-        from tenants.models import Business, Membership
-        business = Business.objects.create(
-            name="Test Pharmacy 2",
-            kind="pharmacy",
-            owner=user
-        )
-        
-        Membership.objects.create(
-            user=user,
+        location = make_location(business=business, name="Main Store")
+        make_membership(
             business=business,
-            role="owner",
-            is_active=True
+            user=user,
+            role="MANAGER",
+            location=None,  # Managers should not be tied to a specific location
+            status="ACTIVE"
         )
         
-        # Login and set active business
-        client.force_login(user)
-        session = client.session
-        session['active_business_id'] = business.id
-        session.save()
+        # Login and set active business and location
+        login_with_active_scope(client, user, business, location)
         
         # Access pharmacy fast sell page
         url = reverse('verticals:pharmacy_fast_sell')
@@ -119,31 +105,23 @@ class TestPharmacyFastSellRegression:
     def test_pharmacy_fast_sell_api_endpoints_work(self, client: Client):
         """Test that pharmacy fast sell API endpoints are accessible."""
         # Create user and pharmacy business
-        user = User.objects.create_user(
-            username="pharmacist3",
-            email="pharmacist3@test.com",
-            password="testpass123"
+        user = make_user(email="pharmacist3@test.com", username="pharmacist3", password="testpass123")
+        business = make_business(
+            created_by=user,
+            kind=BusinessKind.PHARMACY,
+            name="Test Pharmacy 3"
         )
-        
-        from tenants.models import Business, Membership
-        business = Business.objects.create(
-            name="Test Pharmacy 3",
-            kind="pharmacy",
-            owner=user
-        )
-        
-        Membership.objects.create(
-            user=user,
+        location = make_location(business=business, name="Main Store")
+        make_membership(
             business=business,
-            role="manager",
-            is_active=True
+            user=user,
+            role="MANAGER",
+            location=None,  # Managers should not be tied to a specific location
+            status="ACTIVE"
         )
         
-        # Login and set active business
-        client.force_login(user)
-        session = client.session
-        session['active_business_id'] = business.id
-        session.save()
+        # Login and set active business and location
+        login_with_active_scope(client, user, business, location)
         
         # Test lookup API
         lookup_url = reverse('verticals:pharmacy_fast_sell_lookup_api')

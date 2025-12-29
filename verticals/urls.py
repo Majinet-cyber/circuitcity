@@ -44,6 +44,7 @@ urlpatterns = [
     
     # Liquor vertical
     path("liquor/dashboard/", liquor.dashboard, name="liquor_dashboard"),
+    path("liquor/fast-sell/", liquor.fast_sell_page, name="liquor_fast_sell_page"),
     # Note: Fast Sell removed - liquor uses dedicated sell flow with barman attribution
     path("liquor/barman/invite/", liquor.barman_invite, name="liquor_barman_invite"),
     path("liquor/barman/reconciliation/", liquor.barman_reconciliation, name="liquor_barman_reconciliation"),
@@ -51,7 +52,8 @@ urlpatterns = [
     path("liquor/sales/export.csv", liquor.sales_export_csv, name="liquor_sales_export_csv"),
     path("liquor/sales/<int:sale_id>/rollback/", liquor.rollback_sale, name="liquor_rollback_sale"),
     path("liquor/api/sales-trend/", liquor.sales_trend_json, name="liquor_sales_trend_json"),
-    # Note: Fast Sell API routes removed - liquor doesn't support fast sell
+    path("liquor/api/fast-sell/lookup/", liquor.fast_sell_lookup_api, name="liquor_fast_sell_lookup"),
+    path("liquor/api/fast-sell/sell/", liquor.fast_sell_create_api, name="liquor_fast_sell_sell"),
     path("liquor/api/barman/agents/", liquor.barman_agents_api, name="liquor_barman_agents_api"),
     path("liquor/api/barman/reconciliation/toggle/", liquor.barman_reconciliation_toggle_api, name="liquor_barman_reconciliation_toggle_api"),
     
