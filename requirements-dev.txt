@@ -15,4 +15,5 @@ playwright==1.48.0
 # Additional test utilities
 factory-boy==3.3.0  # If we want to add factories later
 faker==26.0.0  # For generating test data
+freezegun  # For time mocking in tests
 
