@@ -1100,6 +1100,87 @@ def settings_sessions(request):
 
 
 @login_required
+@require_http_methods(["GET", "POST"])
+def settings_danger_zone(request):
+    """
+    Danger zone page for resetting business account.
+    Only accessible to business owners/managers.
+    """
+    from tenants.scope import get_active_business, get_membership
+    
+    business = get_active_business(request)
+    if not business:
+        messages.error(request, "No active business found.")
+        return redirect("accounts:settings_profile")
+    
+    # Check if user is manager/owner
+    membership = get_membership(request.user, business)
+    if not membership or membership.role != "MANAGER" or membership.status != "ACTIVE":
+        if not request.user.is_superuser:
+            messages.error(request, "Only business owners can reset account data.")
+            return redirect("accounts:settings_profile")
+    
+    if request.method == "POST":
+        # Validate confirmation inputs
+        reset_text = request.POST.get("reset_text", "").strip().upper()
+        business_name = request.POST.get("business_name", "").strip()
+        password = request.POST.get("password", "")
+        keep_catalog = request.POST.get("keep_catalog") == "on"
+        
+        # Validation
+        if reset_text != "RESET":
+            messages.error(request, "You must type 'RESET' to confirm.")
+            return render(request, "accounts/settings_danger_zone.html", {
+                "business": business,
+            })
+        
+        # Check business name (last 4 chars of business ID or full name)
+        business_id_last4 = str(business.id)[-4:]
+        if business_name != business.name and business_name != business_id_last4:
+            messages.error(request, f"Business name must match '{business.name}' or last 4 digits of ID: {business_id_last4}")
+            return render(request, "accounts/settings_danger_zone.html", {
+                "business": business,
+            })
+        
+        # Verify password
+        if not request.user.check_password(password):
+            messages.error(request, "Password is incorrect.")
+            return render(request, "accounts/settings_danger_zone.html", {
+                "business": business,
+            })
+        
+        # Perform reset
+        try:
+            from tenants.services.reset_business import reset_business_data
+            
+            deleted_counts = reset_business_data(
+                business,
+                initiated_by=request.user,
+                keep_catalog=keep_catalog,
+            )
+            
+            total_deleted = sum(deleted_counts.values())
+            messages.success(
+                request,
+                f"Business data reset successfully. Deleted {total_deleted} records across {len(deleted_counts)} models."
+            )
+            
+            # Redirect to dashboard or home
+            return redirect("dashboard:home")
+            
+        except PermissionError as e:
+            messages.error(request, str(e))
+        except Exception as e:
+            logger = logging.getLogger(__name__)
+            logger.exception(f"Failed to reset business {business.id}: {e}")
+            messages.error(request, "Reset failed. Nothing was deleted. Please contact support if this persists.")
+    
+    return render(request, "accounts/settings_danger_zone.html", {
+        "business": business,
+    })
+
+
+@login_required
 @require_POST
 def terminate_other_sessions(request):
     current_key = request.session.session_key

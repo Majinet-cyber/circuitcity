@@ -15,6 +15,7 @@ from django.views.generic import RedirectView
 from django.templatetags.static import static as static_build  # may raise with Manifest storage
 
 from cc import views as core_views
+from cc import views_health
 from billing import views_admin as billing_admin_views  # HQ Subscriptions view
 
 
@@ -370,6 +371,7 @@ from core import views_well_known
 _sitemap_view = _try_from("staticpages.views", "sitemap_xml")
 
 urlpatterns += [
+    path("health/", views_health.health, name="health"),
     path("healthz", core_views.healthz, name="healthz_noslash"),
     path("healthz/", core_views.healthz, name="healthz"),
     path("robots.txt", robots_txt, name="robots_txt"),

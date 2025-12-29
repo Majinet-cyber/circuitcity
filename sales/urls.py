@@ -17,6 +17,9 @@ urlpatterns = [
     path('rollback/<int:sale_id>/confirm/', views_rollback.rollback_confirm, name='rollback_confirm'),
     path('rollback/<int:rollback_id>/detail/', views_rollback.rollback_detail, name='rollback_detail'),
     
+    # Phone sale edit URL
+    path('phones/<int:sale_id>/edit/', views_rollback.edit_phone_sale, name='edit_phone_sale'),
+    
     # Commission URLs
     path('commission/settings/', views_commission.commission_settings, name='commission_settings'),
     path('commission/settings/json/', views_commission.commission_settings_json, name='commission_settings_json'),

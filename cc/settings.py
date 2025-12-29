@@ -81,6 +81,9 @@ IS_RUNSERVER = any(arg in sys.argv for arg in ("runserver", "runserver_plus"))
 _argv = " ".join(sys.argv).lower()
 TESTING = any(token in _argv for token in (" test", "pytest", "py.test")) or os.environ.get("PYTEST_CURRENT_TEST") is not None
 
+# CI detection (GitHub Actions, CI=true, etc.)
+CI = os.getenv("CI") == "true" or os.getenv("GITHUB_ACTIONS") == "true"
+
 # Reliable Render detection (check multiple indicators)
 IS_RENDER = bool(os.getenv("RENDER")) or bool(os.getenv("RENDER_SERVICE_ID")) or bool(os.getenv("RENDER_EXTERNAL_URL"))
 ON_RENDER = IS_RENDER  # Keep alias for backwards compatibility
@@ -451,7 +454,11 @@ AUTH_PASSWORD_VALIDATORS = [
     {"NAME": "django.contrib.auth.password_validation.CommonPasswordValidator"},
     {"NAME": "django.contrib.auth.password_validation.NumericPasswordValidator"},
 ]
-PASSWORD_HASHERS = ["django.contrib.auth.hashers.PBKDF2PasswordHasher"]
+# Use faster password hashing in CI for speed
+if CI:
+    PASSWORD_HASHERS = ["django.contrib.auth.hashers.MD5PasswordHasher"]
+else:
+    PASSWORD_HASHERS = ["django.contrib.auth.hashers.PBKDF2PasswordHasher"]
 AUTHENTICATION_BACKENDS = ["django.contrib.auth.backends.ModelBackend"]
 LANGUAGE_CODE = "en-us"
 TIME_ZONE = "Africa/Blantyre"
@@ -459,6 +466,10 @@ USE_I18N = True
 USE_TZ = True
 # Celery timezone
 CELERY_TIMEZONE = "Africa/Blantyre"
+# Celery eager mode in CI (no external broker needed)
+if CI:
+    CELERY_TASK_ALWAYS_EAGER = True
+    CELERY_TASK_EAGER_PROPAGATES = True
 
 # --------------------------- static / media ---------------------------
 STATIC_URL = "/static/"
@@ -526,7 +537,11 @@ DEFAULT_FROM_EMAIL = os.environ.get("DEFAULT_FROM_EMAIL", "Emajinet <no-reply@em
 SERVER_EMAIL = DEFAULT_FROM_EMAIL
 
 # Configure email backend based on deterministic rule
-if USE_CONSOLE_EMAIL:
+# In CI, always use in-memory backend (no external calls)
+if CI:
+    EMAIL_BACKEND = "django.core.mail.backends.locmem.EmailBackend"
+    ANYMAIL = {}
+elif USE_CONSOLE_EMAIL:
     EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"
     ANYMAIL = {}
 elif HAS_SENDGRID_KEY:
@@ -550,8 +565,8 @@ print(
 # PRODUCTION SAFETY: Prevent console backend in production
 # ==============================================================================
 # Only enforce production email guard on REAL production (Render + DEBUG=False)
-# Local dev should never block startup even if DEBUG accidentally false
-if IS_RENDER and not DEBUG:
+# Local dev and CI should never block startup even if DEBUG accidentally false
+if IS_RENDER and not DEBUG and not CI:
     if USE_CONSOLE_EMAIL:
         raise ImproperlyConfigured(
             "CRITICAL: USE_CONSOLE_EMAIL=True is not allowed in production (Render + DEBUG=False). "
@@ -572,7 +587,10 @@ if not USE_CONSOLE_EMAIL and HAS_SENDGRID_KEY:
     pass
 elif not USE_CONSOLE_EMAIL and not HAS_SENDGRID_KEY:
     # Trying to use SendGrid but no key - warn or fail
-    if not IS_RENDER:
+    # Skip validation in CI (uses locmem backend)
+    if CI:
+        pass  # CI uses locmem backend, no validation needed
+    elif not IS_RENDER:
         import logging
         logger = logging.getLogger(__name__)
         logger.warning(

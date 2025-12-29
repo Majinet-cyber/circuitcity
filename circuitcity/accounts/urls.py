@@ -98,6 +98,7 @@ urlpatterns = [
         views.terminate_other_sessions,
         name="terminate_other_sessions",
     ),
+    path("settings/danger-zone/", views.settings_danger_zone, name="settings_danger_zone"),
 ]
 
 # -------------------------------

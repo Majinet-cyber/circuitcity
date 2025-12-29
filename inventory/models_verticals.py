@@ -62,8 +62,8 @@ class LiquorShift(models.Model):
     location = models.ForeignKey("inventory.Location", null=True, blank=True, on_delete=models.SET_NULL, related_name="liquor_shifts")
     
     # Shift personnel
-    barman = models.ForeignKey(User, on_delete=models.PROTECT, related_name="liquor_shifts_worked")
-    created_by = models.ForeignKey(User, on_delete=models.PROTECT, related_name="liquor_shifts_created")
+    barman = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name="liquor_shifts_worked", help_text="Barman working this shift (null if user deleted)")
+    created_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name="liquor_shifts_created", help_text="User who created this shift (null if user deleted)")
     
     # Timing
     started_at = models.DateTimeField(default=timezone.now, db_index=True)

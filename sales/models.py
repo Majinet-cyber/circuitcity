@@ -30,7 +30,7 @@ class Sale(models.Model):
     Created when an InventoryItem is sold on credit.
     """
     item            = models.OneToOneField(InventoryItem, on_delete=models.PROTECT, related_name="sale")
-    agent           = models.ForeignKey(User, on_delete=models.PROTECT, related_name="sales")
+    agent           = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name="sales", help_text="Agent who made the sale (null if agent deleted)")
     location        = models.ForeignKey(Location, on_delete=models.PROTECT)
     sold_at         = models.DateField()
     price           = models.DecimalField(max_digits=12, decimal_places=2, validators=[MinValueValidator(0)])
