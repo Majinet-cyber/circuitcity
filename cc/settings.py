@@ -354,6 +354,10 @@ DB_CONN_HEALTH_CHECKS = env_bool("DB_CONN_HEALTH_CHECKS", True)
 # SQLite timeout (seconds) to reduce "database is locked" during dev/Cypress
 SQLITE_TIMEOUT = env_int("SQLITE_TIMEOUT", 20)
 
+# Detect CI and local DB to disable SSL (Postgres service containers don't support SSL)
+# CI variable is already defined above (line 85)
+IS_LOCAL_DB = any(h in (DATABASE_URL or "") for h in ["localhost", "127.0.0.1", "::1"])
+
 if TESTING:
     DATABASES["default"] = {
         "ENGINE": "django.db.backends.sqlite3",
@@ -368,14 +372,18 @@ elif DATABASE_URL:
     except Exception as e:
         raise ImproperlyConfigured("dj-database-url must be installed") from e
 
+    # Only require SSL when NOT CI and NOT local (production on Render)
     cfg = dj_database_url.parse(
         DATABASE_URL,
         conn_max_age=DB_CONN_MAX_AGE,
-        ssl_require=not DEBUG,
+        ssl_require=not (CI or IS_LOCAL_DB),
     )
     # OPTIONS & health checks
     opts = dict(cfg.get("OPTIONS") or {})
     opts.setdefault("connect_timeout", PGCONNECT_TIMEOUT)
+    # Force-disable SSL for CI/local to prevent psycopg2 "SSL required" failures
+    if CI or IS_LOCAL_DB:
+        opts["sslmode"] = "disable"
     cfg["OPTIONS"] = opts
     cfg["CONN_HEALTH_CHECKS"] = DB_CONN_HEALTH_CHECKS
     DATABASES["default"] = cfg
@@ -394,6 +402,8 @@ else:
     PASSWORD = os.environ.get("POSTGRES_PASSWORD") or os.environ.get("DB_PASSWORD", "")
     HOST = os.environ.get("POSTGRES_HOST") or os.environ.get("DB_HOST", "127.0.0.1")
     PORT = os.environ.get("POSTGRES_PORT") or os.environ.get("DB_PORT", "5432")
+    # Detect local DB for fallback config
+    IS_LOCAL_HOST = HOST in ("localhost", "127.0.0.1", "::1", "0.0.0.0")
     DATABASES["default"] = {
         "ENGINE": "django.db.backends.postgresql",
         "NAME": NAME,
@@ -405,7 +415,7 @@ else:
         "CONN_HEALTH_CHECKS": DB_CONN_HEALTH_CHECKS,
         "OPTIONS": {
             "connect_timeout": PGCONNECT_TIMEOUT,
-            **({"sslmode": "require"} if not DEBUG else {}),
+            **({"sslmode": "disable"} if (CI or IS_LOCAL_HOST) else {"sslmode": "require"}),
         },
     }
 

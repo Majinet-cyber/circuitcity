@@ -35,7 +35,7 @@ jobs:
       DJANGO_SECRET_KEY: ${{ secrets.DJANGO_SECRET_KEY_CI }}
 
       # If your app reads DATABASE_URL, use this:
-      DATABASE_URL: postgres://postgres:postgres@localhost:5432/cc_test
+      DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/cc_test?sslmode=disable
 
       # Helpful CI flags (adjust to match how your settings are written)
       DEBUG: "0"
@@ -73,7 +73,7 @@ jobs:
     env:
       DJANGO_SETTINGS_MODULE: cc.settings
       DJANGO_SECRET_KEY: ${{ secrets.DJANGO_SECRET_KEY_CI }}
-      DATABASE_URL: postgres://postgres:postgres@localhost:5432/cc_e2e
+      DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/cc_e2e?sslmode=disable
 
       # Cypress env (available via Cypress.env(...))
       CYPRESS_ADMIN_EMAIL: ${{ secrets.CYPRESS_ADMIN_EMAIL }}
