@@ -474,6 +474,11 @@ def scan_in(request):
             
             with transaction.atomic():
                 # Check if product exists
+                # CRITICAL FIX: Set spec_label for clothing (use size, prevents NULL constraint)
+                spec_label_value = data.get('size', '') or ""
+                if spec_label_value and not spec_label_value.startswith("Size "):
+                    spec_label_value = f"Size {spec_label_value}"
+                
                 product, created = MerchProduct.objects.get_or_create(
                     business=business,
                     name=product_name,
@@ -482,6 +487,7 @@ def scan_in(request):
                         'category': data['category'],
                         'size': data['size'],
                         'color': data['color'],
+                        'spec_label': spec_label_value,  # CRITICAL: Always set spec_label (prevents NULL constraint)
                         'cost_price': data['cost_price'],
                         'selling_price': data.get('selling_price'),
                         'quantity_in_stock': data['quantity'],

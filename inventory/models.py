@@ -404,6 +404,11 @@ class MerchProduct(models.Model):
     
     def save(self, *args, **kwargs):
         """Auto-calculate unit costs when manager sets total bottle cost"""
+        # CRITICAL FIX: Ensure spec_label is never None (defensive normalization)
+        # This prevents DB constraint violations from older code paths
+        if self.spec_label is None:
+            self.spec_label = ""
+        
         # Auto-calculate cost_per_glass for wines if total bottle cost is provided
         if self.has_glasses and self.glasses_per_bottle and self.cost_per_bottle:
             # Only auto-calc if cost_per_glass is not manually set

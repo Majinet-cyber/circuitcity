@@ -987,6 +987,7 @@ def _handle_wizard_save(request: HttpRequest, business: Business) -> HttpRespons
                 defaults={
                     "is_active": True,
                     "category": product_category,
+                    "spec_label": "",  # CRITICAL: Always set spec_label (prevents NULL constraint)
                     "cost_price": cost,
                     "selling_price": selling,
                 }
@@ -1196,6 +1197,7 @@ def pharmacy_stock_in(request: HttpRequest) -> HttpResponse:
                     "sku": sku,
                     "is_active": True,
                     "category": category,  # Use category field
+                    "spec_label": "",  # CRITICAL: Always set spec_label (prevents NULL constraint)
                     "cost_price": cost,
                     "selling_price": selling,
                 }

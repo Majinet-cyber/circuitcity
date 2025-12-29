@@ -229,6 +229,11 @@ def barcode_quick_create_api(request):
                 size = data.get("size", "").strip()
                 color = data.get("color", "").strip()
                 
+                # CRITICAL FIX: Set spec_label for clothing (use size, prevents NULL constraint)
+                spec_label_value = size if size else ""
+                if spec_label_value and not spec_label_value.startswith("Size "):
+                    spec_label_value = f"Size {spec_label_value}"
+                
                 product = MerchProduct.objects.create(
                     business=business,
                     name=product_name,
@@ -236,6 +241,7 @@ def barcode_quick_create_api(request):
                     category=category,
                     size=size,
                     color=color,
+                    spec_label=spec_label_value,  # CRITICAL: Always set spec_label (prevents NULL constraint)
                     barcode=barcode,  # Store on product too (legacy compatibility)
                     selling_price=selling_price,
                     cost_price=order_price,
@@ -298,6 +304,7 @@ def barcode_quick_create_api(request):
                     kind=BusinessKind.PHARMACY,
                     defaults={
                         "category": category,
+                        "spec_label": "",  # CRITICAL: Always set spec_label (prevents NULL constraint)
                         "barcode": barcode,
                         "is_active": True,
                         "track_inventory": True

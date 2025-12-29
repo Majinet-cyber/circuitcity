@@ -186,6 +186,7 @@ def stock_in(request):
                             kind=BusinessKind.CEMENT,
                             defaults={
                                 'category': 'cement',
+                                'spec_label': "",  # CRITICAL: Always set spec_label (prevents NULL constraint)
                                 'cost_price': cost_price,
                                 'selling_price': selling_price,
                                 'quantity_in_stock': quantity,

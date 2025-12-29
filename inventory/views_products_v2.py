@@ -512,82 +512,8 @@ def product_create_liquor_v2(request):
     qs = _product_base_qs(request)
 
     if request.method == "POST":
-        # NEW: Barcode workflow
-        has_barcode = request.POST.get("has_barcode", "no").strip()
-        barcode_value = request.POST.get("barcode", "").strip()
-        
-        # NEW: Barcode validation (conditional)
-        if has_barcode == "yes":
-            if not barcode_value:
-                messages.error(request, "Barcode is required when 'Has Barcode' is Yes.")
-                # Re-render form with error
-                form = LiquorProductForm(request.POST)
-                products = LiquorProduct.objects.filter(
-                    business=business,
-                    is_archived=False,
-                ).order_by("category", "name")
-                try:
-                    from core.decorators import _is_manager
-                    is_manager = _is_manager(request.user)
-                except (ImportError, AttributeError):
-                    is_manager = request.user.is_staff or request.user.is_superuser
-                return render(request, "inventory/products/liquor_v2.html", {
-                    "form": form,
-                    "products": products,
-                    "vertical": "liquor",
-                    "active_tab": "liquor_products",
-                    "IS_MANAGER": is_manager,
-                })
-            
-            from inventory.utils_barcodes import validate_barcode, normalize_barcode, find_by_barcode
-            is_valid, error_msg = validate_barcode(barcode_value)
-            if not is_valid:
-                messages.error(request, f"Invalid barcode: {error_msg}")
-                form = LiquorProductForm(request.POST)
-                products = LiquorProduct.objects.filter(
-                    business=business,
-                    is_archived=False,
-                ).order_by("category", "name")
-                try:
-                    from core.decorators import _is_manager
-                    is_manager = _is_manager(request.user)
-                except (ImportError, AttributeError):
-                    is_manager = request.user.is_staff or request.user.is_superuser
-                return render(request, "inventory/products/liquor_v2.html", {
-                    "form": form,
-                    "products": products,
-                    "vertical": "liquor",
-                    "active_tab": "liquor_products",
-                    "IS_MANAGER": is_manager,
-                })
-            
-            barcode_value = normalize_barcode(barcode_value)
-            
-            # Check for duplicate barcode in this business
-            existing_products = find_by_barcode(barcode_value, business=business)
-            if existing_products.exists():
-                messages.error(
-                    request,
-                    f"Barcode {barcode_value} is already used by another product in your business. "
-                    "Each barcode must be unique."
-                )
-                form = LiquorProductForm(request.POST)
-                products = LiquorProduct.objects.filter(
-                    business=business,
-                    is_archived=False,
-                ).order_by("category", "name")
-                try:
-                    from core.decorators import _is_manager
-                    is_manager = _is_manager(request.user)
-                except (ImportError, AttributeError):
-                    is_manager = request.user.is_staff or request.user.is_superuser
-                return render(request, "inventory/products/liquor_v2.html", {
-                    "form": form,
-                    "products": products,
-                    "vertical": "liquor",
-                    "active_tab": "liquor_products",
-                    "IS_MANAGER": is_manager,
-                })
+        # NOTE: Barcode workflow removed - liquor products do not require barcodes
+        # Products can be saved without barcodes
         
         form = LiquorProductForm(request.POST)
         if form.is_valid():
@@ -601,14 +527,12 @@ def product_create_liquor_v2(request):
                 if biz is not None:
                     setattr(p, "business_id", getattr(biz, "id", biz))
             
-            # Set barcode to None or empty if not provided (critical for nullable field)
-            # Barcode is OPTIONAL - only set if user explicitly provides it
-            if has_barcode == "yes" and barcode_value:
-                p.barcode = barcode_value
-            else:
-                # Explicitly set to None (not empty string) for proper nullable handling
-                # This ensures database constraint allows NULL barcodes
-                p.barcode = None
+            # NOTE: Barcode removed from liquor flow - products do not require barcodes
+            # Set barcode to None (not empty string) for proper nullable handling
+            p.barcode = None
+            
+            # CRITICAL FIX: Always set spec_label (prevents NULL constraint)
+            p.spec_label = ""
             
             _inflate_liquor(p, form.cleaned_data)
             
@@ -649,9 +573,28 @@ def product_create_liquor_v2(request):
                 })
             except Exception as e:
                 import logging
+                from django.db import IntegrityError
+                from django.core.exceptions import ValidationError
+                
                 logger = logging.getLogger(__name__)
-                logger.error(f"Error saving liquor product: {e}", exc_info=True)
-                messages.error(request, f"❌ Error saving product: {str(e)}")
+                logger.error(
+                    f"Error saving liquor product: {e}",
+                    extra={
+                        'business_id': getattr(business, 'id', None),
+                        'user_id': getattr(request.user, 'id', None),
+                        'vertical': 'liquor',
+                        'exception_type': type(e).__name__,
+                    },
+                    exc_info=True
+                )
+                
+                # Return friendly error message (never expose raw DB errors)
+                if isinstance(e, IntegrityError):
+                    messages.error(request, "❌ Could not save product. Please check required fields and try again.")
+                elif isinstance(e, ValidationError):
+                    messages.error(request, "❌ Invalid product data. Please check your inputs and try again.")
+                else:
+                    messages.error(request, "❌ Could not save product. Please try again.")
                 # Re-render form with errors
                 from inventory.models import LiquorProduct
                 products = LiquorProduct.objects.filter(
@@ -901,6 +844,11 @@ def product_create_clothing_v2(request):
             
             # Use update_or_create for idempotent save
             # CRITICAL: Explicitly set barcode to None (not empty string) for nullable field
+            # CRITICAL FIX: Set spec_label for clothing (use size, prevents NULL constraint)
+            spec_label_value = size if size else ""
+            if spec_label_value and not spec_label_value.startswith("Size "):
+                spec_label_value = f"Size {spec_label_value}"
+            
             with transaction.atomic():
                 obj, created = MerchProduct.objects.update_or_create(
                     business=business,
@@ -908,6 +856,7 @@ def product_create_clothing_v2(request):
                     defaults={
                         "kind": BusinessKind.CLOTHING,
                         "size": size,
+                        "spec_label": spec_label_value,  # CRITICAL: Always set spec_label (prevents NULL constraint)
                         "selling_price": data.get("price"),
                         "is_active": True,
                         "track_inventory": True,

@@ -129,11 +129,13 @@ def liquor_wizard_submit(request):
         
         # Create product
         with transaction.atomic():
+            # CRITICAL FIX: Always set spec_label (empty string for liquor, prevents NULL constraint)
             product = MerchProduct.objects.create(
                 business=business,
                 name=product_name,
                 kind=BK.LIQUOR,
                 category=category,
+                spec_label="",  # CRITICAL: Always set spec_label (prevents NULL constraint)
                 has_shots=(selling_mode in ['shot', 'both']),
                 shots_per_bottle=shots_per_bottle,
                 barman_shots_reserved=barman_reserved,
@@ -144,11 +146,8 @@ def liquor_wizard_submit(request):
                 is_active=True
             )
             
-            # Handle barcode if provided
-            if data.get('has_barcode') == 'yes' and data.get('barcode'):
-                product.sku = data.get('barcode')
-                product.scan_required = True
-                product.save(update_fields=['sku', 'scan_required'])
+            # NOTE: Barcode handling removed - liquor products do not require barcodes
+            # If barcode is provided in the future, it should be optional and never block saving
         
         return JsonResponse({
             'success': True,
@@ -157,7 +156,40 @@ def liquor_wizard_submit(request):
         })
         
     except Exception as e:
-        return JsonResponse({'success': False, 'error': str(e)}, status=500)
+        import logging
+        from django.db import IntegrityError
+        from django.core.exceptions import ValidationError
+        
+        logger = logging.getLogger(__name__)
+        
+        # Log the full error with context
+        logger.error(
+            f"Liquor wizard submission failed: {str(e)}",
+            extra={
+                'business_id': getattr(business, 'id', None) if 'business' in locals() else None,
+                'user_id': getattr(request.user, 'id', None),
+                'vertical': 'liquor',
+                'exception_type': type(e).__name__,
+            },
+            exc_info=True
+        )
+        
+        # Return friendly error message (never expose raw DB errors)
+        if isinstance(e, IntegrityError):
+            return JsonResponse({
+                'success': False,
+                'error': 'Could not save product. Please check required fields and try again.'
+            }, status=400)
+        elif isinstance(e, ValidationError):
+            return JsonResponse({
+                'success': False,
+                'error': 'Invalid product data. Please check your inputs and try again.'
+            }, status=400)
+        else:
+            return JsonResponse({
+                'success': False,
+                'error': 'Could not save product. Please try again.'
+            }, status=500)
 
 
 @login_required
@@ -224,7 +256,40 @@ def phones_wizard_submit(request):
         })
         
     except Exception as e:
-        return JsonResponse({'success': False, 'error': str(e)}, status=500)
+        import logging
+        from django.db import IntegrityError
+        from django.core.exceptions import ValidationError
+        
+        logger = logging.getLogger(__name__)
+        
+        # Log the full error with context
+        logger.error(
+            f"Phones wizard submission failed: {str(e)}",
+            extra={
+                'business_id': getattr(business, 'id', None) if 'business' in locals() else None,
+                'user_id': getattr(request.user, 'id', None),
+                'vertical': 'phones',
+                'exception_type': type(e).__name__,
+            },
+            exc_info=True
+        )
+        
+        # Return friendly error message (never expose raw DB errors)
+        if isinstance(e, IntegrityError):
+            return JsonResponse({
+                'success': False,
+                'error': 'Could not save product. Please check required fields and try again.'
+            }, status=400)
+        elif isinstance(e, ValidationError):
+            return JsonResponse({
+                'success': False,
+                'error': 'Invalid product data. Please check your inputs and try again.'
+            }, status=400)
+        else:
+            return JsonResponse({
+                'success': False,
+                'error': 'Could not save product. Please try again.'
+            }, status=500)
 
 
 @login_required
@@ -268,6 +333,7 @@ def pharmacy_wizard_submit(request):
                 name=full_name,
                 kind=BK.PHARMACY,
                 category=category,
+                spec_label="",  # CRITICAL: Always set spec_label (prevents NULL constraint)
                 selling_price=selling_price,
                 cost_price=cost_price,
                 quantity_in_stock=initial_stock,
@@ -288,7 +354,40 @@ def pharmacy_wizard_submit(request):
         })
         
     except Exception as e:
-        return JsonResponse({'success': False, 'error': str(e)}, status=500)
+        import logging
+        from django.db import IntegrityError
+        from django.core.exceptions import ValidationError
+        
+        logger = logging.getLogger(__name__)
+        
+        # Log the full error with context
+        logger.error(
+            f"Pharmacy wizard submission failed: {str(e)}",
+            extra={
+                'business_id': getattr(business, 'id', None) if 'business' in locals() else None,
+                'user_id': getattr(request.user, 'id', None),
+                'vertical': 'pharmacy',
+                'exception_type': type(e).__name__,
+            },
+            exc_info=True
+        )
+        
+        # Return friendly error message (never expose raw DB errors)
+        if isinstance(e, IntegrityError):
+            return JsonResponse({
+                'success': False,
+                'error': 'Could not save product. Please check required fields and try again.'
+            }, status=400)
+        elif isinstance(e, ValidationError):
+            return JsonResponse({
+                'success': False,
+                'error': 'Invalid product data. Please check your inputs and try again.'
+            }, status=400)
+        else:
+            return JsonResponse({
+                'success': False,
+                'error': 'Could not save product. Please try again.'
+            }, status=500)
 
 
 @login_required
@@ -402,6 +501,12 @@ def clothing_wizard_submit(request):
         with transaction.atomic():
             final_barcode = barcode_value if (has_barcode == 'yes' and barcode_value) else None
             
+            # CRITICAL FIX: Set spec_label for clothing (use size, e.g., "M", "L", "Size 42")
+            # This prevents NULL constraint violations
+            spec_label_value = size if size else ""
+            if spec_label_value and not spec_label_value.startswith("Size "):
+                spec_label_value = f"Size {spec_label_value}"
+            
             product = MerchProduct.objects.create(
                 business=business,
                 name=product_name,
@@ -409,6 +514,7 @@ def clothing_wizard_submit(request):
                 category=category,
                 size=size,
                 color=color if color else '',
+                spec_label=spec_label_value,  # CRITICAL: Always set spec_label (prevents NULL constraint)
                 selling_price=selling_price,
                 cost_price=cost_price,
                 quantity_in_stock=initial_stock,
@@ -464,10 +570,48 @@ def clothing_wizard_submit(request):
         })
         
     except Exception as e:
+        import logging
         import traceback
-        return JsonResponse({
-            'success': False, 
-            'error': f'Failed to create product: {str(e)}',
-            'debug': traceback.format_exc() if settings.DEBUG else None
-        }, status=500)
+        from django.db import IntegrityError
+        from django.core.exceptions import ValidationError
+        
+        logger = logging.getLogger(__name__)
+        
+        # Log the full error with context
+        logger.error(
+            f"Clothing wizard submission failed: {str(e)}",
+            extra={
+                'business_id': getattr(business, 'id', None),
+                'user_id': getattr(request.user, 'id', None),
+                'vertical': 'clothing',
+                'exception_type': type(e).__name__,
+            },
+            exc_info=True
+        )
+        
+        # Return friendly error message (never expose raw DB errors)
+        if isinstance(e, IntegrityError):
+            # Check if it's the spec_label constraint
+            error_msg = str(e)
+            if 'spec_label' in error_msg.lower() and 'null' in error_msg.lower():
+                return JsonResponse({
+                    'success': False,
+                    'error': 'Could not save product. Please ensure all required fields are filled.'
+                }, status=400)
+            return JsonResponse({
+                'success': False,
+                'error': 'Could not save product. Please check required fields and try again.'
+            }, status=400)
+        elif isinstance(e, ValidationError):
+            return JsonResponse({
+                'success': False,
+                'error': 'Invalid product data. Please check your inputs and try again.'
+            }, status=400)
+        else:
+            # Only show debug info in DEBUG mode
+            return JsonResponse({
+                'success': False,
+                'error': 'Could not save product. Please try again.',
+                'debug': traceback.format_exc() if settings.DEBUG else None
+            }, status=500)
 

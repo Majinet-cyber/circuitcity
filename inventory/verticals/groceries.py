@@ -221,6 +221,7 @@ def stock_in(request):
                     kind=BusinessKind.GROCERY,
                     defaults={
                         'category': category,
+                        'spec_label': "",  # CRITICAL: Always set spec_label (prevents NULL constraint)
                         'cost_price': cost_price,
                         'selling_price': selling_price,
                         'quantity_in_stock': quantity,

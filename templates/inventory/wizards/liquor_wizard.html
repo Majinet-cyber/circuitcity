@@ -57,11 +57,7 @@
     { value: 'both', label: 'Both', icon: '🎯', description: 'Bottle & shot sales', featured: true }
   ];
 
-  // Barcode options
-  const barcodeOptions = [
-    { value: 'yes', label: 'Yes, has barcode', icon: '📱' },
-    { value: 'no', label: 'No barcode', icon: '✋' }
-  ];
+  // NOTE: Barcode options removed - liquor products do not require barcodes
 
   // Wizard configuration
   wizard = new WizardEngine('wizard-container', {
@@ -128,29 +124,10 @@
           
           return fields;
         }
-      },
-      
-      // Step 5: Barcode
-      {
-        type: 'cards',
-        key: 'has_barcode',
-        title: 'Barcode',
-        subtitle: 'Does this product have a barcode?',
-        options: barcodeOptions,
-        columns: 'two-col'
-      },
-      
-      // Step 6: Barcode Entry (conditional)
-      {
-        type: 'input',
-        key: 'barcode',
-        title: 'Scan or Enter Barcode',
-        subtitle: 'Use camera to scan or type manually',
-        inputType: 'text',
-        placeholder: 'Barcode number',
-        required: true,
-        skip: (data) => data.has_barcode !== 'yes'
       }
+      
+      // NOTE: Barcode steps removed - liquor products do not require barcodes
+      // The flow is now: Category → Product Name → Selling Mode → Pricing → Done
     ],
     
     onComplete: async (data) => {

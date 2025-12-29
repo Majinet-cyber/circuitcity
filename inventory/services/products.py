@@ -55,6 +55,11 @@ def create_or_update_clothing_product(
     final_barcode = barcode.strip() if barcode and barcode.strip() else None
     
     # Get or create product
+    # CRITICAL FIX: Set spec_label for clothing (use size, prevents NULL constraint)
+    spec_label_value = size if size else ""
+    if spec_label_value and not spec_label_value.startswith("Size "):
+        spec_label_value = f"Size {spec_label_value}"
+    
     product, created = MerchProduct.objects.get_or_create(
         business=business,
         name=name.strip(),
@@ -63,6 +68,7 @@ def create_or_update_clothing_product(
             'category': category,
             'size': size,
             'color': color,
+            'spec_label': spec_label_value,  # CRITICAL: Always set spec_label (prevents NULL constraint)
             'cost_price': cost_price,
             'selling_price': selling_price,
             'quantity_in_stock': quantity,
@@ -135,8 +141,11 @@ def create_or_update_generic_product(
     final_barcode = barcode.strip() if barcode and barcode.strip() else None
     
     # Build defaults dict
+    # CRITICAL FIX: Ensure spec_label is always set (prevents NULL constraint)
+    # If not provided in kwargs, default to empty string
     defaults = {
         'category': category,
+        'spec_label': kwargs.pop('spec_label', ""),  # CRITICAL: Always set spec_label (prevents NULL constraint)
         'cost_price': cost_price,
         'selling_price': selling_price,
         'quantity_in_stock': quantity,
