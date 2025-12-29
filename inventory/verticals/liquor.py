@@ -1018,15 +1018,22 @@ def fast_sell_lookup_api(request):
 @require_business
 @require_business_kind(BusinessKind.LIQUOR)
 def fast_sell_create_api(request):
-    """API: Create a fast sale (with optional agent attribution for barman)"""
+    """API: Create a fast sale (Quick Sell) for liquor by barcode"""
     from django.http import JsonResponse
-    from inventory.services.fast_sell import create_fast_sell
+    from inventory.services.liquor_sale import create_liquor_sale_by_barcode, OutOfStockError
+    from inventory.views_liquor import get_or_start_active_shift
+    from django.core.exceptions import ValidationError
+    from django.db import transaction
     import json
+    import logging
+    
+    logger = logging.getLogger(__name__)
     
     if request.method != "POST":
         return JsonResponse({"ok": False, "error": "POST required"}, status=405)
     
     business = base.base_context(request).get("business")
+    location = getattr(request, "location", None)
     
     try:
         data = json.loads(request.body)
@@ -1035,29 +1042,84 @@ def fast_sell_create_api(request):
     
     barcode = data.get("barcode", "").strip()
     quantity = int(data.get("quantity", 1))
-    payment_method = data.get("payment_method", "cash")
+    unit = data.get("unit", "bottle")  # "bottle", "shot", or "glass"
     selling_price_str = data.get("selling_price")
-    attributed_to_agent_id = data.get("attributed_to_agent_id")  # For barman attribution
+    sale_type = data.get("sale_type", "cash")  # "cash" or "credit"
+    customer_name = data.get("customer_name", "").strip()
+    customer_phone = data.get("customer_phone", "").strip()
+    notes = data.get("notes", "").strip()
+    
+    # Payment mix (optional)
+    cash_amount = Decimal(str(data.get("cash_amount", "0") or "0"))
+    bank_amount = Decimal(str(data.get("bank_amount", "0") or "0"))
+    mobile_money_amount = Decimal(str(data.get("mobile_money_amount", "0") or "0"))
+    
+    if not barcode:
+        return JsonResponse({"ok": False, "error": "Barcode is required"}, status=400)
+    
+    if quantity < 1:
+        return JsonResponse({"ok": False, "error": "Quantity must be at least 1"}, status=400)
     
     selling_price = None
     if selling_price_str:
         try:
             selling_price = Decimal(str(selling_price_str))
-        except:
+        except (ValueError, TypeError):
             return JsonResponse({"ok": False, "error": "Invalid price"}, status=400)
     
-    result = create_fast_sell(
-        business=business,
-        vertical="liquor",
-        user=request.user,
-        barcode=barcode,
-        quantity=quantity,
-        payment_method=payment_method,
-        selling_price=selling_price,
-        attributed_to_agent_id=attributed_to_agent_id,
-    )
+    # Get or auto-start active shift
+    try:
+        active_shift = get_or_start_active_shift(request.user, business, location)
+    except Exception as e:
+        logger.warning(f"Failed to get/start shift for liquor sale: {e}")
+        active_shift = None
     
-    return JsonResponse(result)
+    try:
+        result = create_liquor_sale_by_barcode(
+            business=business,
+            user=request.user,
+            barcode=barcode,
+            quantity=quantity,
+            unit=unit,
+            unit_price=selling_price,
+            sale_type=sale_type,
+            customer_name=customer_name if customer_name else None,
+            customer_phone=customer_phone if customer_phone else None,
+            notes=notes if notes else None,
+            cash_amount=cash_amount,
+            bank_amount=bank_amount,
+            mobile_money_amount=mobile_money_amount,
+            shift=active_shift,
+        )
+        
+        return JsonResponse(result)
+        
+    except OutOfStockError as e:
+        return JsonResponse({"ok": False, "error": str(e)}, status=400)
+    except ValidationError as e:
+        return JsonResponse({"ok": False, "error": str(e)}, status=400)
+    except Exception as e:
+        # Catch TransactionManagementError and other DB errors
+        logger.error(
+            f"Error in liquor fast sell: {e}",
+            exc_info=True,
+            extra={
+                "business_id": business.id if business else None,
+                "barcode": barcode,
+                "quantity": quantity,
+                "user_id": request.user.id if request.user.is_authenticated else None,
+            }
+        )
+        # Never show raw DB errors to users
+        if "select_for_update" in str(e).lower() or "transaction" in str(e).lower():
+            return JsonResponse(
+                {"ok": False, "error": "Sale failed: Database error. Please try again."},
+                status=500
+            )
+        return JsonResponse(
+            {"ok": False, "error": f"Sale failed: {str(e)}"},
+            status=500
+        )
 
 
 @login_required

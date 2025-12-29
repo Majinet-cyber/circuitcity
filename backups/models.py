@@ -115,6 +115,35 @@ class BackupSnapshot(models.Model):
         return 0
     
     @property
+    def size_display(self):
+        """
+        Human-readable file size display.
+        
+        Returns:
+            - "xxx B" if < 1024 bytes
+            - "xxx KB" if < 1 MB
+            - "x.x MB" if >= 1 MB
+            - "—" if file_size is None or 0
+        """
+        if not self.file_size or self.file_size == 0:
+            return "—"
+        
+        bytes_val = self.file_size
+        
+        # Less than 1 KB
+        if bytes_val < 1024:
+            return f"{bytes_val} B"
+        
+        # Less than 1 MB
+        if bytes_val < 1024 * 1024:
+            kb = bytes_val / 1024
+            return f"{kb:.1f} KB"
+        
+        # 1 MB or more
+        mb = bytes_val / (1024 * 1024)
+        return f"{mb:.1f} MB"
+    
+    @property
     def is_complete(self):
         """Whether this backup is finished (success or failed)."""
         return self.status in (BackupStatus.SUCCESS, BackupStatus.FAILED)

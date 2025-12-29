@@ -208,7 +208,7 @@
                                             <td>
                                                 {% if snapshot.file_size %}
                                                     <span class="badge bg-light text-dark">
-                                                        {{ snapshot.file_size_mb }} MB
+                                                        {{ snapshot.size_display }}
                                                     </span>
                                                 {% else %}
                                                     <span class="text-muted">—</span>
@@ -250,6 +250,16 @@
                                                         <i class="bi bi-file-pdf me-1"></i>
                                                         PDF
                                                     </a>
+                                                    <form method="post" 
+                                                          action="{% url 'backups:resend_pdf' snapshot.id %}" 
+                                                          class="d-inline me-2"
+                                                          title="Resend PDF report via email">
+                                                        {% csrf_token %}
+                                                        <button type="submit" class="btn btn-sm btn-outline-primary">
+                                                            <i class="bi bi-envelope me-1"></i>
+                                                            Resend PDF
+                                                        </button>
+                                                    </form>
                                                     <form method="post" 
                                                           action="{% url 'backups:delete' snapshot.id %}" 
                                                           class="d-inline"

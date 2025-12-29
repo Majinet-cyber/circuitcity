@@ -396,3 +396,143 @@ Cypress.Commands.add("verifyError", (message) => {
     else cy.get(hit).should("be.visible");
   });
 });
+
+/**
+ * Create a manager account, business, and location via signup wizard (UI-based).
+ * @param {Object} options - { email, password, fullName, businessName, businessKind, locationName, city }
+ */
+Cypress.Commands.add("createBusinessAndLocation", (options = {}) => {
+  const timestamp = Date.now();
+  const email = options.email || `test-manager-${timestamp}@e2e.test`;
+  const password = options.password || "TestPassword123!@#";
+  const fullName = options.fullName || `Test Manager ${timestamp}`;
+  const businessName = options.businessName || `Test Business ${timestamp}`;
+  const businessKind = options.businessKind || "phones";
+  const locationName = options.locationName || "Test Location";
+  const city = options.city || "Test City";
+
+  cy.visit("/accounts/signup/");
+
+  // Step 0: Welcome screen - click Get Started
+  cy.get('button[type="submit"]').contains(/get started/i).click();
+
+  // Step 1: Account details
+  cy.get('input[name="full_name"], #id_full_name').clear().type(fullName);
+  cy.get('input[name="email"], #id_email').clear().type(email);
+  cy.get('input[name="password1"], #id_password1').clear().type(password);
+  cy.get('input[name="password2"], #id_password2').clear().type(password);
+  cy.get('button[type="submit"]').contains(/continue/i).click();
+
+  // Step 2: Business details
+  cy.get('input[name="business_name"], #id_business_name').clear().type(businessName);
+  cy.get('select[name="business_kind"], #id_business_kind').select(businessKind);
+  cy.get('button[type="submit"]').contains(/continue/i).click();
+
+  // Step 3: Location
+  cy.get('input[name="location_name"], #id_location_name').clear().type(locationName);
+  cy.get('input[name="city"], #id_city').clear().type(city);
+  cy.get('button[type="submit"]').contains(/continue/i).click();
+
+  // Step 4: Goals (optional - just continue)
+  cy.get('button[type="submit"]').contains(/finish|complete/i).click();
+
+  // Handle OTP if present
+  cy.url().then((url) => {
+    if (url.includes("/signup/verify-email")) {
+      // Use E2E OTP bypass
+      cy.request({
+        method: "GET",
+        url: `/accounts/__e2e__/latest-otp/?email=${encodeURIComponent(email)}`,
+        failOnStatusCode: false,
+      }).then((resp) => {
+        if (resp.status === 200 && resp.body.ok) {
+          const otpCode = resp.body.code || "000000";
+          cy.get('input[name="code"], input[type="text"][placeholder*="code" i]').type(otpCode);
+          cy.get('button[type="submit"]').contains(/verify|submit/i).click();
+        } else {
+          // Fallback: try fixed OTP
+          cy.get('input[name="code"], input[type="text"][placeholder*="code" i]').type("000000");
+          cy.get('button[type="submit"]').contains(/verify|submit/i).click();
+        }
+      });
+    }
+  });
+
+  // Wait for dashboard
+  cy.waitForAppShell();
+
+  return cy.wrap({ email, password, businessName, businessKind });
+});
+
+/**
+ * Switch to a different vertical (changes business kind).
+ * Note: This may require creating a new business or switching context.
+ * @param {string} vertical - phones|clothing|liquor|pharmacy|gym|grocery
+ */
+Cypress.Commands.add("switchVertical", (vertical = "phones") => {
+  const v = String(vertical).toLowerCase();
+  
+  // For now, we'll visit the vertical dashboard directly
+  // In a real scenario, you might need to create a new business or switch context
+  const verticalUrls = {
+    phones: "/inventory/verticals/phones/",
+    clothing: "/inventory/verticals/clothing/",
+    liquor: "/inventory/verticals/liquor/",
+    pharmacy: "/verticals/pharmacy/dashboard/",
+    gym: "/inventory/verticals/gym/",
+    grocery: "/inventory/dashboard/",
+  };
+
+  const url = verticalUrls[v] || verticalUrls.phones;
+  cy.visit(url, { failOnStatusCode: false });
+  cy.waitForAppShell();
+});
+
+/**
+ * Click all sidebar navigation items and verify they load (smoke test).
+ * Skips logout and external links.
+ */
+Cypress.Commands.add("sidebarSmokeClickAll", () => {
+  cy.get('[data-cy="sidebar"]').should("be.visible");
+
+  // Collect all sidebar links
+  cy.get('[data-cy="sidebar"] a[href]').then(($links) => {
+    const links = Array.from($links)
+      .map((link) => ({
+        href: link.getAttribute("href"),
+        text: link.textContent.trim(),
+        dataCy: link.getAttribute("data-cy"),
+      }))
+      .filter((link) => {
+        // Skip logout, external links, empty hrefs
+        if (!link.href || link.href === "#") return false;
+        if (link.href.includes("/logout")) return false;
+        if (link.href.startsWith("http") && !link.href.includes(Cypress.config().baseUrl)) return false;
+        return link.href.startsWith("/");
+      });
+
+    // Click each link and verify page loads
+    links.forEach((link, index) => {
+      cy.log(`Clicking sidebar item ${index + 1}/${links.length}: ${link.text || link.dataCy || link.href}`);
+      
+      cy.get(`[data-cy="${link.dataCy}"], a[href="${link.href}"]`).first().click();
+      
+      // Wait for navigation
+      cy.url({ timeout: 10000 }).should("include", link.href.split("?")[0]);
+      
+      // Verify no server errors
+      cy.assertNoServerError();
+      
+      // Verify page has content (not a blank page)
+      cy.get("body").should("not.be.empty");
+      
+      // Go back to sidebar (if we navigated away)
+      cy.get("body").then(($body) => {
+        if (!$body.find('[data-cy="sidebar"]').length) {
+          cy.go("back");
+          cy.waitForAppShell();
+        }
+      });
+    });
+  });
+});

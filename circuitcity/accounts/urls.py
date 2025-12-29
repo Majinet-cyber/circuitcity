@@ -116,4 +116,15 @@ if settings.DEBUG:
         path("login/_which/", views.login_template_probe, name="login_template_probe"),
     ]
 
+# -------------------------------
+# E2E Testing Endpoints (DEBUG or E2E_TESTING only)
+# -------------------------------
+if settings.DEBUG or getattr(settings, "E2E_TESTING", False):
+    from . import views_e2e
+    urlpatterns += [
+        path("__e2e__/latest-otp/", views_e2e.e2e_latest_otp, name="e2e_latest_otp"),
+        path("__e2e__/verify-otp-bypass/", views_e2e.e2e_verify_otp_bypass, name="e2e_verify_otp_bypass"),
+        path("__e2e__/seed-business/", views_e2e.e2e_seed_business, name="e2e_seed_business"),
+    ]
+
 

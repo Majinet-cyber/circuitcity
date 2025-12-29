@@ -178,9 +178,9 @@ def sell_liquor(request):
             except (ValueError, TypeError, InvalidOperation):
                 mobile_money_amount = Decimal("0.00")
             
-            # Get product with proper error handling
+            # Get price based on mode - validate product exists first (no locking yet)
             try:
-                product = MerchProduct.objects.select_for_update().get(
+                product = MerchProduct.objects.get(
                     pk=product_id,
                     business=business,
                     kind=BusinessKind.LIQUOR,
@@ -197,62 +197,11 @@ def sell_liquor(request):
             
             # Map mode to unit
             if mode == "shot":
-                unit = LiquorUnitType.SHOT
+                unit = "shot"
             elif mode == "glass":
-                unit = LiquorUnitType.GLASS
+                unit = "glass"
             else:
-                unit = LiquorUnitType.BOTTLE
-            
-            # ENFORCE SERVING UNIT RULES BY CATEGORY
-            category = product.category.lower() if product.category else ""
-            if category == "beer" or category == "cider":
-                # Beers and Ciders must be sold by bottle only
-                if mode != "bottle":
-                    messages.error(
-                        request, 
-                        f"❌ {product.name} ({category.title()}) must be sold by bottle only."
-                    )
-                    return redirect("liquor:sell")
-            elif category == "wine":
-                # Wine must be sold by glass only
-                if mode != "glass":
-                    messages.error(
-                        request,
-                        f"❌ {product.name} (Wine) must be sold by glass only."
-                    )
-                    return redirect("liquor:sell")
-            elif category == "spirits" or category == "whiskey":
-                # Spirits and Whiskey must be sold by shot only
-                if mode != "shot":
-                    messages.error(
-                        request,
-                        f"❌ {product.name} ({category.title()}) must be sold by shot only."
-                    )
-                    return redirect("liquor:sell")
-            
-            # Validate shot sales (product capability check)
-            if mode == "shot" and not product.has_shots:
-                messages.error(request, f"❌ {product.name} does not support shot sales.")
-                return redirect("liquor:sell")
-            
-            # Validate glass sales (product capability check)
-            if mode == "glass" and not product.has_glasses:
-                messages.error(request, f"❌ {product.name} does not support glass sales.")
-                return redirect("liquor:sell")
-            
-            # CRITICAL: Check stock availability before allowing sale
-            current_stock = product.quantity_in_stock or 0
-            if current_stock <= 0:
-                messages.error(request, f"❌ Out of stock: {product.name}. Please scan in stock first.")
-                return redirect("liquor:sell")
-            
-            # For bottle sales, check if enough bottles available
-            if mode == "bottle" and quantity > current_stock:
-                messages.error(
-                    request, 
-                    f"❌ Insufficient stock: {product.name}. Available: {current_stock}, Requested: {quantity}"
-                )
-                return redirect("liquor:sell")
+                unit = "bottle"
             
             # Get price based on mode - handle None values safely
             if mode == "shot":
@@ -271,117 +220,78 @@ def sell_liquor(request):
                     messages.error(request, f"❌ {product.name} does not have a price per bottle set.")
                     return redirect("liquor:sell")
             
-            with transaction.atomic():
-                # Calculate cost for profit tracking
-                # CRITICAL: get_cost_for_unit expects string unit type, not enum
-                unit_type_str = unit  # LiquorUnitType enum values are strings
-                unit_cost = product.get_cost_for_unit(unit_type_str) or Decimal("0.00")
-                total_cost = Decimal(quantity) * unit_cost
-                
-                # Calculate total price
-                total = Decimal(quantity) * unit_price
-                
-                # Validate total is positive
-                if total <= 0:
-                    messages.error(request, "❌ Sale total must be greater than zero.")
-                    return redirect("liquor:sell")
-                
-                # Validate payment mix (if used)
-                payment_mix_total = cash_amount + bank_amount + mobile_money_amount
-                if payment_mix_total > 0 and payment_mix_total != total:
-                    messages.error(
-                        request,
-                        f"❌ Payment mix total (K{payment_mix_total}) must equal sale total (K{total})"
-                    )
-                    return redirect("liquor:sell")
-                
-                # Determine sale type
-                is_credit = sale_type == "credit"
-                liquor_sale_type = LiquorSaleType.CREDIT if is_credit else LiquorSaleType.SALE
-                
-                # For credit sales, ensure payment mix is zero (no payment yet)
-                if is_credit:
-                    cash_amount = Decimal("0.00")
-                    bank_amount = Decimal("0.00")
-                    mobile_money_amount = Decimal("0.00")
-                
-                # Create sale with payment mix
-                sale = LiquorSale.objects.create(
+            # Use the centralized liquor sale service (handles all transaction logic)
+            from inventory.services.liquor_sale import create_liquor_sale, OutOfStockError
+            
+            try:
+                result = create_liquor_sale(
                     business=business,
-                    product=product,
-                    shift=active_shift,
-                    unit=unit,
+                    product_id=product_id,
+                    user=request.user,
                     quantity=quantity,
+                    unit=unit,
                     unit_price=unit_price,
-                    total_price=total,
-                    unit_cost=unit_cost,
-                    total_cost=total_cost,
-                    sale_type=liquor_sale_type,
-                    is_credit=is_credit,
-                    sold_by=request.user,
+                    sale_type=sale_type,
+                    customer_name=customer_name,
+                    customer_phone=customer_phone,
                     notes=notes,
                     cash_amount=cash_amount,
                     bank_amount=bank_amount,
-                    mobile_money_amount=mobile_money_amount
+                    mobile_money_amount=mobile_money_amount,
+                    shift=active_shift,
                 )
                 
-                # CRITICAL: Reduce stock after sale (even for credit sales)
-                # Credit sales still remove product from inventory
-                # For now, we only track bottle-level stock in quantity_in_stock
-                # Shot/glass sales will be handled in a future update with stock_units tracking
-                if mode == "bottle":
-                    new_stock = max(0, (product.quantity_in_stock or 0) - quantity)
-                    product.quantity_in_stock = new_stock
-                    product.save(update_fields=['quantity_in_stock'])
-                # TODO: Implement stock_units tracking for shot/glass sales (task #3)
-                
-                if is_credit:
-                    # Create credit record
-                    LiquorCredit.objects.create(
-                        business=business,
-                        customer_name=customer_name,
-                        customer_phone=customer_phone,
-                        amount=total,
-                        amount_paid=Decimal("0.00"),
-                        status=LiquorCreditStatus.OPEN,
-                        notes=notes or f"{product.name} - {quantity} {unit}",
-                        related_sale=sale,
-                        created_by=request.user
-                    )
-                    messages.success(
-                        request, 
-                        f"✅ Credit sale recorded: {quantity} × {product.name} ({mode}) for {customer_name}"
-                    )
+                if result["ok"]:
+                    messages.success(request, f"✅ {result['message']}")
                 else:
-                    # Create wallet entry for cash sale only (not for credit)
-                    try:
-                        LiquorWalletEntry.objects.create(
-                            business=business,
-                            amount=total,
-                            description=f"Sale: {product.name} ({quantity} {unit})",
-                            entry_type="income",
-                            related_sale=sale,
-                            created_by=request.user
-                        )
-                    except Exception as wallet_err:
-                        # Don't block sale if wallet entry fails - log and continue
-                        import logging
-                        logger = logging.getLogger(__name__)
-                        logger.warning(f"Failed to create wallet entry for sale #{sale.id}: {wallet_err}")
+                    messages.error(request, f"❌ {result.get('error', 'Sale failed')}")
                     
-                    messages.success(request, f"✅ Sold {quantity} × {product.name} ({mode})")
+            except OutOfStockError as e:
+                messages.error(request, f"❌ {str(e)}")
+            except ValidationError as e:
+                messages.error(request, f"❌ {str(e)}")
+            except Exception as e:
+                # Catch any unexpected errors including TransactionManagementError
+                import logging
+                logger = logging.getLogger(__name__)
+                logger.error(
+                    f"Unexpected error in liquor sell: {e}",
+                    exc_info=True,
+                    extra={
+                        "business_id": business.id if business else None,
+                        "product_id": product_id,
+                        "quantity": quantity,
+                        "user_id": request.user.id if request.user.is_authenticated else None,
+                    }
+                )
+                # Never show raw DB errors to users
+                if "select_for_update" in str(e).lower() or "transaction" in str(e).lower():
+                    messages.error(request, "❌ Sale failed: Database error. Please try again.")
+                else:
+                    messages.error(request, f"❌ Sale failed: {str(e)}")
             
             return redirect("liquor:sell")
             
-        except (ValueError, MerchProduct.DoesNotExist, KeyError) as e:
-            messages.error(request, f"❌ Sale failed: {e}")
+        except (ValueError, KeyError) as e:
+            messages.error(request, f"❌ Sale failed: Invalid input. {str(e)}")
             return redirect("liquor:sell")
         except Exception as e:
             # Catch any unexpected errors to prevent 500
-            messages.error(request, f"❌ Sale failed: {str(e)}")
             import logging
             logger = logging.getLogger(__name__)
-            logger.error(f"Unexpected error in liquor sell: {e}", exc_info=True)
+            logger.error(
+                f"Unexpected error in liquor sell: {e}",
+                exc_info=True,
+                extra={
+                    "business_id": getattr(business, "id", None) if business else None,
+                    "user_id": request.user.id if request.user.is_authenticated else None,
+                }
+            )
+            # Never show raw DB errors to users
+            if "select_for_update" in str(e).lower() or "transaction" in str(e).lower():
+                messages.error(request, "❌ Sale failed: Database error. Please try again.")
+            else:
+                messages.error(request, "❌ Sale failed: An unexpected error occurred. Please try again.")
             return redirect("liquor:sell")
     
     # GET: Build category-grouped products
