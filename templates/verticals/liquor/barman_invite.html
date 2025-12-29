@@ -1,10 +1,10 @@
 {% extends "base.html" %}
 
-{% block title %}Invite Barman{% endblock %}
+{% block title %}Invite Team Member{% endblock %}
 
 {% block content %}
 <div class="container mx-auto px-4 py-8 max-w-2xl">
-    <h1 class="text-3xl font-bold mb-6">👨‍🍳 Invite Barman</h1>
+    <h1 class="text-3xl font-bold mb-6">👥 Invite Team Member</h1>
     
     <div class="bg-white rounded-lg shadow-md p-6">
         <form method="post">
@@ -37,9 +37,20 @@
                 <p class="text-sm text-gray-500 mt-1">Minimum 6 characters</p>
             </div>
             
+            <div class="mb-6">
+                <label class="block text-gray-700 font-semibold mb-2">Role *</label>
+                <select name="role" required class="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500">
+                    <option value="AGENT">Bartender/Agent</option>
+                    <option value="BAR_MANAGER">Bar Manager</option>
+                </select>
+                <p class="text-sm text-gray-500 mt-1">
+                    <strong>Bar Manager:</strong> Can manage bartenders, oversee sales/stock, edit prices. Cannot delete/archive.
+                </p>
+            </div>
+            
             <div class="flex gap-4">
                 <button type="submit" class="bg-purple-600 hover:bg-purple-700 text-white font-semibold py-3 px-6 rounded-lg transition">
-                    Invite Barman
+                    Invite Team Member
                 </button>
                 <a href="{% url 'verticals:liquor_dashboard' %}" class="bg-gray-200 hover:bg-gray-300 text-gray-700 font-semibold py-3 px-6 rounded-lg transition">
                     Cancel

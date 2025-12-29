@@ -3,8 +3,22 @@
 URL patterns for liquor store operations.
 """
 from django.urls import path
+from django.http import JsonResponse
 from . import views_liquor
 from . import views_liquor_inventory
+
+# Price edit views (manager-only)
+try:
+    from . import views_liquor_price_edit
+except Exception:
+    views_liquor_price_edit = None
+    
+    # Fallback views if module not available
+    def _stub_edit_price(request, product_id):
+        return JsonResponse({"error": "Price editing not available"}, status=501)
+    
+    def _stub_api_edit_price(request, product_id):
+        return JsonResponse({"error": "Price editing not available"}, status=501)
 
 app_name = "liquor"
 
@@ -30,6 +44,10 @@ urlpatterns = [
     path("sell/", views_liquor.sell_liquor, name="sell"),
     path("sales/", views_liquor.sales_list, name="sales_list"),
     path("api/product/<int:product_id>/pricing/", views_liquor.get_product_pricing, name="product_pricing"),
+    
+    # Price editing (manager-only)
+    path("product/<int:product_id>/edit-price/", views_liquor_price_edit.edit_liquor_price if views_liquor_price_edit else _stub_edit_price, name="edit_price"),
+    path("api/product/<int:product_id>/edit-price/", views_liquor_price_edit.api_edit_liquor_price if views_liquor_price_edit else _stub_api_edit_price, name="api_edit_price"),
     
     # Credits
     path("credits/", views_liquor.credits_list, name="credits_list"),

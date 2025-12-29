@@ -101,6 +101,18 @@ try:
 except Exception:
     _stock_controls = SimpleNamespace()
 
+# Archive flow views (premium 4-step archive process)
+try:
+    from . import views_archive as _archive_views
+except Exception:
+    _archive_views = SimpleNamespace()
+
+# Laptop views
+try:
+    from . import views_laptops as _laptop_views
+except Exception:
+    _laptop_views = SimpleNamespace()
+
 from .views_dispatch import product_new_entry as product_new_entry_view, vertical_dispatcher
 
 # ---------------------------------------------------------------------
@@ -917,6 +929,12 @@ urlpatterns = [
     path("stock/<int:pk>/edit-imei/", _need_biz(getattr(_stock_controls, "edit_imei", lambda r, pk: JsonResponse({"error": "Not implemented"}, status=501))), name="edit_imei"),
     path("stock/<int:pk>/archive/", _need_biz(getattr(_stock_controls, "archive_stock", lambda r, pk: JsonResponse({"error": "Not implemented"}, status=501))), name="archive_stock"),
     path("stock/<int:pk>/restore/", _need_biz(getattr(_stock_controls, "restore_stock", lambda r, pk: JsonResponse({"error": "Not implemented"}, status=501))), name="restore_stock"),
+    
+    # Premium Archive Flow (4-step safety process)
+    path("archive/start/", _need_biz(getattr(_archive_views, "archive_flow_start", lambda r: JsonResponse({"error": "Not implemented"}, status=501))), name="archive_flow_start"),
+    path("archive/summary/", _need_biz(getattr(_archive_views, "archive_flow_summary", lambda r: JsonResponse({"error": "Not implemented"}, status=501))), name="archive_flow_summary"),
+    path("archive/confirm/", _need_biz(getattr(_archive_views, "archive_flow_confirm", lambda r: JsonResponse({"error": "Not implemented"}, status=501))), name="archive_flow_confirm"),
+    path("archive/execute/", _need_biz(getattr(_archive_views, "archive_flow_execute", lambda r: JsonResponse({"error": "Not implemented"}, status=501))), name="archive_flow_execute"),
 
     # Scanning — pages
     # Main scan-in now uses gamified phone view (with fallback to legacy for non-phone businesses)
@@ -1092,6 +1110,12 @@ urlpatterns += [
 
     # Product creation - NOW POINTS TO WIZARDS WHERE AVAILABLE
     path("phones/products/new/",   manager_required(_need_biz(getattr(_wizard_views, "phones_wizard", getattr(_phone_products_views, "add_phone_products", _product_create_for_mode_factory("phones"))))),   name="product_create_phones"),
+    
+    # Laptop management (for phones/electronics businesses)
+    path("laptops/stock-in/", manager_required(_need_biz(getattr(_laptop_views, "laptop_stock_in", lambda r: JsonResponse({"error": "Not implemented"}, status=501)))), name="laptop_stock_in"),
+    path("laptops/sell/", _need_biz(getattr(_laptop_views, "laptop_sell", lambda r: JsonResponse({"error": "Not implemented"}, status=501))), name="laptop_sell"),
+    path("laptops/products/", manager_required(_need_biz(getattr(_laptop_views, "laptop_products_list", lambda r: JsonResponse({"error": "Not implemented"}, status=501)))), name="laptop_products_list"),
+    
     path("pharmacy/products/new/", manager_required(_need_biz(getattr(_wizard_views, "pharmacy_wizard", _product_create_for_mode_factory("pharmacy")))), name="product_create_pharmacy"),
     path("liquor/products/new/",   manager_required(_need_biz(getattr(_wizard_views, "liquor_wizard", _product_create_for_mode_factory("liquor")))),   name="product_create_liquor"),
     path("grocery/products/new/",  manager_required(_need_biz(_product_create_for_mode_factory("grocery"))),  name="product_create_grocery"),

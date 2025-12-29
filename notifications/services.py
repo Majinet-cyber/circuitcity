@@ -241,12 +241,19 @@ def dispatch_event(event_id: int):
             "business": event.business,
         })
         
-        # Get subject (can be string template or callable)
-        subject_template = template_config["subject"]
-        if callable(subject_template):
-            subject = subject_template(context)
-        else:
-            subject = subject_template.format(**context)
+        # Get subject from template config
+        subject_template = template_config.get("subject", "")
+        try:
+            if callable(subject_template):
+                subject = subject_template(context)
+            else:
+                subject = subject_template.format(**context)
+        except Exception as e:
+            # Fallback to simple subject if generation fails
+            logger.warning(
+                f"[SALE_EMAIL] Failed to generate subject for event {event_id}: {e}. Using fallback."
+            )
+            subject = f"Sale Completed - {context.get('business_name', 'Business')}"
         
         # Runtime verification: log backend being used
         from django.conf import settings
@@ -294,36 +301,60 @@ def _get_sale_instant_subject(context: Dict[str, Any]) -> str:
     """
     Generate a friendly, informative subject line for sale instant emails.
     Format: "Sold: Product Name (Spec) — MK Revenue | Profit MK Profit"
+    Falls back to simple format if any error occurs.
+    Always returns a non-empty string.
     """
-    product_name = context.get("product_name", "Product")
-    revenue = context.get("revenue") or context.get("total", "0")
-    profit = context.get("profit")
-    
-    # Format revenue
     try:
-        revenue_decimal = Decimal(str(revenue))
-        revenue_formatted = f"MK {revenue_decimal:,.0f}"
-    except (ValueError, TypeError):
-        revenue_formatted = f"MK {revenue}"
-    
-    # Build subject
-    subject_parts = [f"Sold: {product_name}"]
-    
-    # Add profit if available
-    if profit:
+        if not context:
+            return "Sale Completed"
+        
+        product_name = context.get("product_name") or context.get("items_summary") or "Product"
+        revenue = context.get("revenue") or context.get("total") or "0"
+        profit = context.get("profit")
+        
+        # Format revenue - ensure it's always a string
         try:
-            profit_decimal = Decimal(str(profit))
-            if profit_decimal > 0:
-                profit_formatted = f"MK {profit_decimal:,.0f}"
-                subject_parts.append(f"— {revenue_formatted} | Profit {profit_formatted}")
+            if revenue:
+                revenue_decimal = Decimal(str(revenue))
+                revenue_formatted = f"MK {revenue_decimal:,.0f}"
             else:
+                revenue_formatted = "MK 0"
+        except (ValueError, TypeError, AttributeError, Exception):
+            revenue_formatted = f"MK {revenue}" if revenue else "MK 0"
+        
+        # Build subject
+        subject_parts = [f"Sold: {product_name}"]
+        
+        # Add profit if available
+        if profit:
+            try:
+                profit_decimal = Decimal(str(profit))
+                if profit_decimal > 0:
+                    profit_formatted = f"MK {profit_decimal:,.0f}"
+                    subject_parts.append(f"— {revenue_formatted} | Profit {profit_formatted}")
+                else:
+                    subject_parts.append(f"— {revenue_formatted}")
+            except (ValueError, TypeError, AttributeError, Exception):
                 subject_parts.append(f"— {revenue_formatted}")
-        except (ValueError, TypeError):
+        else:
             subject_parts.append(f"— {revenue_formatted}")
-    else:
-        subject_parts.append(f"— {revenue_formatted}")
-    
-    return " ".join(subject_parts)
+        
+        result = " ".join(subject_parts)
+        # Ensure we always return a non-empty string
+        if not result or len(result.strip()) == 0:
+            raise ValueError("Generated empty subject")
+        return result
+    except Exception as e:
+        # Fallback to simple subject on any error - always return something
+        try:
+            business_name = context.get("business_name") if context else None
+            if business_name:
+                return f"Sale Completed - {business_name}"
+            else:
+                return "Sale Completed"
+        except Exception:
+            # Ultimate fallback
+            return "Sale Completed"
 
 
 def _get_template_config(event_type: str) -> Optional[Dict[str, Any]]:
@@ -355,7 +386,7 @@ def _get_template_config(event_type: str) -> Optional[Dict[str, Any]]:
             "text_template": "notifications/emails/otp_code.txt",
         },
         "SALE_INSTANT": {
-            "subject": _get_sale_instant_subject,
+            "subject": "New Sale Completed - {business_name}",
             "html_template": "notifications/emails/sale_instant.html",
             "text_template": "notifications/emails/sale_instant.txt",
         },

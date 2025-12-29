@@ -203,12 +203,39 @@ def sell_liquor(request):
             else:
                 unit = LiquorUnitType.BOTTLE
             
-            # Validate shot sales
+            # ENFORCE SERVING UNIT RULES BY CATEGORY
+            category = product.category.lower() if product.category else ""
+            if category == "beer" or category == "cider":
+                # Beers and Ciders must be sold by bottle only
+                if mode != "bottle":
+                    messages.error(
+                        request, 
+                        f"❌ {product.name} ({category.title()}) must be sold by bottle only."
+                    )
+                    return redirect("liquor:sell")
+            elif category == "wine":
+                # Wine must be sold by glass only
+                if mode != "glass":
+                    messages.error(
+                        request,
+                        f"❌ {product.name} (Wine) must be sold by glass only."
+                    )
+                    return redirect("liquor:sell")
+            elif category == "spirits" or category == "whiskey":
+                # Spirits and Whiskey must be sold by shot only
+                if mode != "shot":
+                    messages.error(
+                        request,
+                        f"❌ {product.name} ({category.title()}) must be sold by shot only."
+                    )
+                    return redirect("liquor:sell")
+            
+            # Validate shot sales (product capability check)
             if mode == "shot" and not product.has_shots:
                 messages.error(request, f"❌ {product.name} does not support shot sales.")
                 return redirect("liquor:sell")
             
-            # Validate glass sales
+            # Validate glass sales (product capability check)
             if mode == "glass" and not product.has_glasses:
                 messages.error(request, f"❌ {product.name} does not support glass sales.")
                 return redirect("liquor:sell")

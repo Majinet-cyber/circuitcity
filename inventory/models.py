@@ -76,6 +76,21 @@ except Exception:
     AccessoryStockLog = None
     AccessoryCategory = None
 
+# Re-export InventoryBarcode and ArchiveBatch for stock barcode tracking
+try:
+    from .models_stock_barcodes import InventoryBarcode, ArchiveBatch  # noqa: F401
+except Exception:
+    InventoryBarcode = None  # safe fallback
+    ArchiveBatch = None
+
+# Re-export Laptop models for laptop/electronics vertical
+try:
+    from .models_laptops import LaptopProduct, LaptopSerial, LaptopBrand  # noqa: F401
+except Exception:
+    LaptopProduct = None  # safe fallback
+    LaptopSerial = None
+    LaptopBrand = None
+
 
 # ==========================================================
 # SINGLE SOURCE OF TRUTH: IMEI normalization (15 digits)

@@ -291,31 +291,104 @@
       skipable: true,
       columns: 'two-col'
     },
-    // Barcode Entry (conditional - only if has_barcode === 'yes')
+    // Smart Barcode Collection (conditional - only if has_barcode === 'yes')
     {
       type: 'custom',
-      key: 'barcode',
-      title: 'Scan or Enter Barcode',
-      subtitle: 'Use camera to scan or type manually',
+      key: 'barcodes',
+      title: 'Scan Barcodes',
+      subtitle: (data) => {
+        const qty = parseInt(data.quantity || data.initial_stock || 1);
+        return `Scan ${qty} unique barcode${qty > 1 ? 's' : ''} for this product`;
+      },
       skip: (data) => data.has_barcode !== 'yes',
       render: (data) => {
+        const qty = parseInt(data.quantity || data.initial_stock || 1);
+        const scannedCount = (data.scanned_barcodes || []).length;
+        const scannedBarcodes = data.scanned_barcodes || [];
+        const isComplete = scannedCount >= qty;
+        
         return `
-          <div class="wizard-input-group">
-            <label class="wizard-label">Barcode</label>
-            <input 
-              type="text" 
-              class="wizard-input"
-              id="input-barcode"
-              placeholder="Scan or type barcode..."
-              autocomplete="off"
-              required
-            >
-            <button class="wizard-btn wizard-btn-outline mt-2 w-100" onclick="openBarcodeScanner()">
-              <i class="bi bi-upc-scan me-2"></i>Scan Barcode with Camera
-            </button>
-            <button class="wizard-btn wizard-btn-primary mt-3" id="barcode-continue-btn" onclick="wizard.submitBarcodeInput()" disabled>
-              Continue <i class="bi bi-arrow-right ms-1"></i>
-            </button>
+          <div class="wizard-barcode-collection" id="wizard-barcode-collection">
+            <!-- Progress Indicator -->
+            <div class="wizard-barcode-progress mb-3">
+              <div class="d-flex justify-content-between align-items-center mb-2">
+                <span class="wizard-label">Progress</span>
+                <span class="badge ${isComplete ? 'bg-success' : 'bg-primary'}">
+                  Scanned ${scannedCount} / ${qty}
+                </span>
+              </div>
+              <div class="progress" style="height: 8px;">
+                <div class="progress-bar ${isComplete ? 'bg-success' : 'bg-primary'}" 
+                     role="progressbar" 
+                     style="width: ${Math.min(100, (scannedCount / qty) * 100)}%"
+                     aria-valuenow="${scannedCount}" 
+                     aria-valuemin="0" 
+                     aria-valuemax="${qty}">
+                </div>
+              </div>
+            </div>
+            
+            <!-- Scanned Barcodes List -->
+            <div class="wizard-barcode-list mb-3" id="scanned-barcodes-list">
+              ${scannedBarcodes.length > 0 ? `
+                <label class="wizard-label mb-2">Scanned Barcodes:</label>
+                <div class="list-group">
+                  ${scannedBarcodes.map((code, idx) => `
+                    <div class="list-group-item d-flex justify-content-between align-items-center">
+                      <code>${code}</code>
+                      <button type="button" 
+                              class="btn btn-sm btn-outline-danger" 
+                              onclick="removeBarcode(${idx})"
+                              title="Remove this barcode">
+                        <i class="bi bi-x-lg"></i>
+                      </button>
+                    </div>
+                  `).join('')}
+                </div>
+              ` : `
+                <div class="text-muted text-center py-3">
+                  <i class="bi bi-upc-scan" style="font-size: 2rem;"></i>
+                  <p class="mt-2">No barcodes scanned yet</p>
+                </div>
+              `}
+            </div>
+            
+            <!-- Scanner Controls -->
+            <div class="wizard-barcode-controls">
+              <button type="button" 
+                      class="wizard-btn wizard-btn-primary w-100 mb-2" 
+                      id="btn-scan-barcode"
+                      onclick="openSmartBarcodeScanner()">
+                <i class="bi bi-upc-scan me-2"></i>Scan Barcode
+              </button>
+              
+              <!-- Manual Entry -->
+              <div class="input-group mb-2">
+                <input type="text" 
+                       class="form-control" 
+                       id="manual-barcode-input"
+                       placeholder="Or type barcode manually..."
+                       autocomplete="off">
+                <button class="btn btn-outline-primary" 
+                        type="button"
+                        id="btn-add-manual-barcode"
+                        onclick="addManualBarcode()">
+                  <i class="bi bi-plus-lg"></i> Add
+                </button>
+              </div>
+              
+              <!-- Error Message -->
+              <div class="alert alert-danger d-none" id="barcode-error" role="alert"></div>
+              
+              <!-- Continue Button (only enabled when complete) -->
+              <button type="button" 
+                      class="wizard-btn wizard-btn-success w-100 mt-3" 
+                      id="barcode-continue-btn" 
+                      onclick="wizard.next()"
+                      ${isComplete ? '' : 'disabled'}>
+                ${isComplete ? 'Continue <i class="bi bi-arrow-right ms-1"></i>' : `Scan ${qty - scannedCount} more barcode${qty - scannedCount > 1 ? 's' : ''} to continue`}
+              </button>
+            </div>
           </div>
         `;
       }
@@ -534,7 +607,7 @@
     }
   };
   
-  // Add submitBarcodeInput method to wizard
+  // Add submitBarcodeInput method to wizard (legacy, for single barcode)
   wizard.submitBarcodeInput = function() {
     const barcodeInput = document.getElementById('input-barcode');
     if (barcodeInput && barcodeInput.value.trim()) {
@@ -544,6 +617,164 @@
       alert('Please enter or scan a barcode to continue.');
     }
   };
+  
+  // =====================================================
+  // SMART BARCODE COLLECTION (Quantity-based)
+  // =====================================================
+  
+  // Initialize scanned barcodes array if not exists
+  if (!wizard.data.scanned_barcodes) {
+    wizard.data.scanned_barcodes = [];
+  }
+  
+  // Open smart barcode scanner
+  function openSmartBarcodeScanner() {
+    // Check if RearCameraBarcodeScanner is available
+    if (typeof RearCameraBarcodeScanner !== 'undefined') {
+      const scanner = new RearCameraBarcodeScanner({
+        onScan: (barcode) => {
+          addBarcode(barcode);
+        },
+        onError: (error) => {
+          showBarcodeError('Scanner error: ' + error);
+        }
+      });
+      scanner.open();
+    } else {
+      // Fallback: use manual input
+      const input = document.getElementById('manual-barcode-input');
+      if (input) {
+        input.focus();
+        showBarcodeError('Scanner not available. Please enter barcode manually.');
+      }
+    }
+  }
+  
+  // Add barcode (from scanner or manual input)
+  function addBarcode(barcode) {
+    if (!barcode || !barcode.trim()) {
+      showBarcodeError('Barcode cannot be empty');
+      return;
+    }
+    
+    barcode = barcode.trim();
+    const scannedBarcodes = wizard.data.scanned_barcodes || [];
+    const qty = parseInt(wizard.data.quantity || wizard.data.initial_stock || 1);
+    
+    // Check if already scanned
+    if (scannedBarcodes.includes(barcode)) {
+      showBarcodeError(`Barcode ${barcode} has already been scanned. Please scan a different barcode.`);
+      return;
+    }
+    
+    // Check if we've reached the limit
+    if (scannedBarcodes.length >= qty) {
+      showBarcodeError(`You have already scanned ${qty} barcodes. Remove one to add another.`);
+      return;
+    }
+    
+    // Validate barcode format (basic check)
+    if (barcode.length < 3) {
+      showBarcodeError('Barcode must be at least 3 characters long');
+      return;
+    }
+    
+    // Add to array
+    scannedBarcodes.push(barcode);
+    wizard.data.scanned_barcodes = scannedBarcodes;
+    
+    // Clear manual input
+    const manualInput = document.getElementById('manual-barcode-input');
+    if (manualInput) {
+      manualInput.value = '';
+    }
+    
+    // Re-render the step to update UI
+    wizard.render();
+    
+    // Clear any errors
+    clearBarcodeError();
+  }
+  
+  // Add manual barcode
+  function addManualBarcode() {
+    const input = document.getElementById('manual-barcode-input');
+    if (input && input.value.trim()) {
+      addBarcode(input.value.trim());
+    } else {
+      showBarcodeError('Please enter a barcode');
+    }
+  }
+  
+  // Remove barcode
+  function removeBarcode(index) {
+    const scannedBarcodes = wizard.data.scanned_barcodes || [];
+    if (index >= 0 && index < scannedBarcodes.length) {
+      scannedBarcodes.splice(index, 1);
+      wizard.data.scanned_barcodes = scannedBarcodes;
+      wizard.render();
+      clearBarcodeError();
+    }
+  }
+  
+  // Show barcode error
+  function showBarcodeError(message) {
+    const errorDiv = document.getElementById('barcode-error');
+    if (errorDiv) {
+      errorDiv.textContent = message;
+      errorDiv.classList.remove('d-none');
+      // Auto-hide after 5 seconds
+      setTimeout(() => {
+        clearBarcodeError();
+      }, 5000);
+    }
+  }
+  
+  // Clear barcode error
+  function clearBarcodeError() {
+    const errorDiv = document.getElementById('barcode-error');
+    if (errorDiv) {
+      errorDiv.classList.add('d-none');
+      errorDiv.textContent = '';
+    }
+  }
+  
+  // Override wizard.onComplete to include barcodes in submission
+  const originalOnComplete = wizard.config.onComplete;
+  wizard.config.onComplete = async function(data) {
+    // If barcodes were collected, include them in the data
+    if (data.has_barcode === 'yes' && data.scanned_barcodes) {
+      // For single barcode, use the first one
+      if (data.scanned_barcodes.length === 1) {
+        data.barcode = data.scanned_barcodes[0];
+      } else {
+        // For multiple barcodes, store as array
+        data.barcodes = data.scanned_barcodes;
+        data.barcode = data.scanned_barcodes[0]; // Also set first for backward compatibility
+      }
+    }
+    
+    // Call original onComplete
+    if (originalOnComplete) {
+      return originalOnComplete(data);
+    }
+  };
+  
+  // Allow Enter key in manual input
+  document.addEventListener('DOMContentLoaded', function() {
+    // This will be called when the barcode step is rendered
+    setTimeout(() => {
+      const manualInput = document.getElementById('manual-barcode-input');
+      if (manualInput) {
+        manualInput.addEventListener('keypress', function(e) {
+          if (e.key === 'Enter') {
+            e.preventDefault();
+            addManualBarcode();
+          }
+        });
+      }
+    }, 100);
+  });
 })();
 </script>
 {% endblock %}

@@ -835,7 +835,7 @@ def fast_sell(request):
 @require_business_kind(BusinessKind.LIQUOR)
 def barman_invite(request):
     """
-    Invite a new barman to the liquor business.
+    Invite a new barman (bartender/agent) or bar manager to the liquor business.
     Manager-only feature.
     """
     from django.contrib import messages
@@ -843,15 +843,17 @@ def barman_invite(request):
     from django.contrib.auth import get_user_model
     from django import forms
     from tenants.utils_people import attach_user_to_business
+    from tenants.services.invites import create_agent_invite
     from core.context import _extract_roles_for
     
     ctx = base.base_context(request)
     business = ctx.get("business")
     
-    # Check if user is manager
+    # Check if user is manager (full manager, not bar manager)
     roles = _extract_roles_for(request.user, business)
-    if not roles.is_manager:
-        messages.error(request, "Only managers can invite barmen")
+    if not roles.is_manager or roles.is_bar_manager:
+        # Bar managers cannot invite - only full managers
+        messages.error(request, "Only full managers can invite team members")
         return redirect("verticals:liquor_dashboard")
     
     class BarmanInviteForm(forms.Form):
@@ -860,11 +862,20 @@ def barman_invite(request):
         first_name = forms.CharField(max_length=150, required=False)
         last_name = forms.CharField(max_length=150, required=False)
         password = forms.CharField(widget=forms.PasswordInput, min_length=6)
+        role = forms.ChoiceField(
+            choices=[
+                ("AGENT", "Bartender/Agent"),
+                ("BAR_MANAGER", "Bar Manager"),
+            ],
+            initial="AGENT",
+            help_text="Bar Manager can manage bartenders and oversee operations, but cannot delete/archive"
+        )
     
     if request.method == "POST":
         form = BarmanInviteForm(request.POST)
         if form.is_valid():
             data = form.cleaned_data
+            role = data.get("role", "AGENT")
             User = get_user_model()
             
             # Check if username already exists
@@ -881,20 +892,24 @@ def barman_invite(request):
                         last_name=data.get("last_name", ""),
                     )
                     
-                    # Attach to business with LIQUOR_BARMAN role
-                    attach_user_to_business(user, business, "LIQUOR_BARMAN")
+                    # Attach to business with appropriate role
+                    if role == "BAR_MANAGER":
+                        attach_user_to_business(user, business, "BAR_MANAGER")
+                        messages.success(request, f"Bar Manager '{user.username}' invited successfully!")
+                    else:
+                        attach_user_to_business(user, business, "LIQUOR_BARMAN")
+                        messages.success(request, f"Bartender '{user.username}' invited successfully!")
                     
-                    messages.success(request, f"Barman '{user.username}' invited successfully!")
                     return redirect("verticals:liquor_dashboard")
                 except Exception as e:
-                    messages.error(request, f"Failed to create barman: {e}")
+                    messages.error(request, f"Failed to create user: {e}")
         else:
             messages.error(request, "Please correct the errors below")
     else:
         form = BarmanInviteForm()
     
     ctx.update({
-        "page_title": "Invite Barman",
+        "page_title": "Invite Team Member",
         "form": form,
     })
     

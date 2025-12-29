@@ -11,6 +11,8 @@ from django.http import JsonResponse
 from django.views.decorators.http import require_http_methods
 from django.shortcuts import render
 from django.db import transaction
+from django.conf import settings
+from django.core.exceptions import ValidationError
 
 from core.decorators import manager_required
 from tenants.decorators import require_business_access as require_business
@@ -294,7 +296,7 @@ def pharmacy_wizard_submit(request):
 @require_business
 @require_http_methods(["POST"])
 def clothing_wizard_submit(request):
-    """Handle clothing wizard submission"""
+    """Handle clothing wizard submission - Simplified flow"""
     try:
         data = json.loads(request.body)
         business = get_active_business(request)
@@ -302,98 +304,170 @@ def clothing_wizard_submit(request):
         if not business:
             return JsonResponse({'success': False, 'error': 'No active business'}, status=400)
         
-        # Extract data
-        category = data.get('category', '')
-        size = data.get('size', '')
-        gender = data.get('gender', '')
-        color = data.get('color', '')
+        # Extract data - simplified flow
+        category = data.get('category', '').strip()
+        brand = data.get('brand', '').strip()  # Optional for all categories
+        color = data.get('color', '').strip()
+        product_name_input = data.get('product_name', '').strip()  # Direct name input
+        size = data.get('size', '').strip()
         
-        # Build product name from hierarchy
-        name_parts = [category.capitalize()]
+        # For shoes: extract subtype
+        shoe_subtype = data.get('shoe_subtype', '').strip() if category == 'shoes' else ''
         
-        # Add category-specific details
+        # Build product name - simplified logic
         if category == 'shoes':
-            subtype = data.get('shoe_subtype', '')
-            brand = data.get('brand', '')
-            model = data.get('model', '')
-            if subtype:
-                name_parts.append(subtype.capitalize())
+            # Shoes: subtype + brand (optional) + name + size
+            name_parts = []
+            if shoe_subtype:
+                name_parts.append(shoe_subtype.capitalize())
             if brand:
                 name_parts.append(brand)
-            if model:
-                name_parts.append(model)
-        elif category == 'suits':
-            subtype = data.get('suit_subtype', '')
-            fit = data.get('fit', '')
-            if subtype:
-                name_parts.append(subtype.capitalize())
-            if fit:
-                name_parts.append(fit.capitalize())
-        elif category == 'jeans':
-            jeans_type = data.get('jeans_type', '')
-            if jeans_type:
-                name_parts.append(jeans_type.capitalize())
+            if product_name_input:
+                name_parts.append(product_name_input)
+            elif brand:
+                name_parts.append(brand)  # Use brand as name if no name provided
+            if size:
+                name_parts.append(f"Size {size}")
+            product_name = ' - '.join(name_parts) if name_parts else 'Shoe'
+        else:
+            # Other clothing: category + brand (optional) + name + color + size
+            name_parts = [category.capitalize()] if category else []
+            if brand:
+                name_parts.append(brand)
+            if product_name_input:
+                name_parts.append(product_name_input)
+            if color:
+                name_parts.append(color.capitalize())
+            if size:
+                name_parts.append(f"Size {size}")
+            product_name = ' - '.join(name_parts) if name_parts else 'Clothing Item'
         
-        # Add size and color if provided
-        if size:
-            name_parts.append(f"Size {size}")
-        if color:
-            name_parts.append(color.capitalize())
-        
-        product_name = ' - '.join(name_parts)
+        # Validate required fields
+        if not category:
+            return JsonResponse({'success': False, 'error': 'Product type is required'}, status=400)
+        if not product_name_input and category != 'shoes':
+            return JsonResponse({'success': False, 'error': 'Product name is required'}, status=400)
+        if not size:
+            return JsonResponse({'success': False, 'error': 'Size is required'}, status=400)
         
         # Parse pricing
         try:
             selling_price = Decimal(data.get('selling_price', 0))
+            if selling_price <= 0:
+                return JsonResponse({'success': False, 'error': 'Selling price must be greater than zero'}, status=400)
             cost_price = Decimal(data.get('cost_price', 0)) if data.get('cost_price') else None
-            initial_stock = int(data.get('initial_stock', 0))
+            if cost_price is not None and cost_price < 0:
+                return JsonResponse({'success': False, 'error': 'Cost price cannot be negative'}, status=400)
+            initial_stock = int(data.get('quantity', data.get('initial_stock', 0)))
+            if initial_stock < 0:
+                return JsonResponse({'success': False, 'error': 'Quantity cannot be negative'}, status=400)
         except (ValueError, InvalidOperation) as e:
-            return JsonResponse({'success': False, 'error': f'Invalid data: {str(e)}'}, status=400)
+            return JsonResponse({'success': False, 'error': f'Invalid pricing data: {str(e)}'}, status=400)
         
-        # Validate barcode requirement
-        has_barcode = data.get('has_barcode', 'no')
-        barcode_value = data.get('barcode', '').strip()
+        # Handle barcode - CRITICAL: "No barcode" must work smoothly
+        has_barcode = data.get('has_barcode', 'no').strip().lower()
+        barcode_value = data.get('barcode', '').strip() if has_barcode == 'yes' else ''
+        barcodes_list = data.get('barcodes', [])  # List of barcodes for quantity > 1
         
-        # If user selected "yes" for barcode, barcode value is required
-        if has_barcode == 'yes' and not barcode_value:
-            return JsonResponse({
-                'success': False,
-                'error': 'Barcode is required when "Has Barcode" is selected.'
-            }, status=400)
+        # Only validate barcode if user explicitly selected "yes"
+        if has_barcode == 'yes':
+            # If quantity > 1, we need multiple barcodes
+            if initial_stock > 1:
+                if not barcodes_list or len(barcodes_list) != initial_stock:
+                    return JsonResponse({
+                        'success': False,
+                        'error': f'You must scan exactly {initial_stock} unique barcodes. Currently scanned: {len(barcodes_list) if barcodes_list else 0}'
+                    }, status=400)
+                
+                # Validate all barcodes are unique
+                if len(barcodes_list) != len(set(barcodes_list)):
+                    return JsonResponse({
+                        'success': False,
+                        'error': 'Duplicate barcodes detected. Each barcode must be unique.'
+                    }, status=400)
+                
+                # Use first barcode for product-level barcode field
+                barcode_value = barcodes_list[0] if barcodes_list else ''
+            else:
+                # Single barcode
+                if not barcode_value:
+                    return JsonResponse({
+                        'success': False,
+                        'error': 'Barcode is required when "With barcode" is selected. Please scan or enter a barcode.'
+                    }, status=400)
         
-        # Create product
+        # If "no" or not provided, barcode_value is empty string, which we'll set to None
+        
+        # Create product - ensure barcode is None when "no barcode"
         with transaction.atomic():
+            final_barcode = barcode_value if (has_barcode == 'yes' and barcode_value) else None
+            
             product = MerchProduct.objects.create(
                 business=business,
                 name=product_name,
                 kind=BK.CLOTHING,
                 category=category,
                 size=size,
-                color=color,
+                color=color if color else '',
                 selling_price=selling_price,
                 cost_price=cost_price,
                 quantity_in_stock=initial_stock,
-                is_active=True
+                barcode=final_barcode,  # None if no barcode, value if yes (first barcode for multi-barcode)
+                scan_required=(has_barcode == 'yes' and final_barcode is not None),
+                is_active=True,
+                track_inventory=True
             )
             
-            # Handle barcode if provided
-            if has_barcode == 'yes' and barcode_value:
-                product.barcode = barcode_value
-                product.scan_required = True
-                product.save(update_fields=['barcode', 'scan_required'])
-            else:
-                # Explicitly set barcode to None and scan_required to False
-                product.barcode = None
-                product.scan_required = False
-                product.save(update_fields=['barcode', 'scan_required'])
+            # Create InventoryBarcode records if barcodes provided
+            if has_barcode == 'yes' and (barcodes_list or barcode_value):
+                from inventory.services_barcodes import create_barcodes
+                from inventory.models import Location
+                from tenants.scope import resolve_location_for_user
+                
+                # Get location (optional)
+                location = None
+                try:
+                    location_id = resolve_location_for_user(request)
+                    if location_id:
+                        location = Location.objects.get(pk=location_id, business=business)
+                    else:
+                        # Fallback to default location
+                        location = Location.objects.filter(business=business, is_default=True).first()
+                        if not location:
+                            location = Location.objects.filter(business=business).first()
+                except Exception:
+                    pass
+                
+                # Prepare barcodes list
+                codes_to_create = barcodes_list if barcodes_list else ([barcode_value] if barcode_value else [])
+                
+                if codes_to_create:
+                    try:
+                        create_barcodes(
+                            product=product,
+                            codes=codes_to_create,
+                            business=business,
+                            location=location,
+                            user=request.user
+                        )
+                    except ValidationError as e:
+                        return JsonResponse({
+                            'success': False,
+                            'error': f'Barcode validation failed: {str(e)}'
+                        }, status=400)
         
         return JsonResponse({
             'success': True,
             'product_id': product.id,
             'redirect': '/verticals/clothing/dashboard/',
-            'message': f'Product "{product_name}" created successfully!'
+            'message': f'✅ Product "{product_name}" created successfully!'
         })
         
     except Exception as e:
-        return JsonResponse({'success': False, 'error': str(e)}, status=500)
+        import traceback
+        return JsonResponse({
+            'success': False, 
+            'error': f'Failed to create product: {str(e)}',
+            'debug': traceback.format_exc() if settings.DEBUG else None
+        }, status=500)
 
