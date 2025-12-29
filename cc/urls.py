@@ -648,6 +648,20 @@ urlpatterns += [
     path("debug/",     include_or_raise("core.urls_debug", "debug")),
 ]
 
+# Global aliases for barcode APIs (stable names for reverse lookup)
+# This allows reverse('api_barcode_lookup') and reverse('api_barcode_quick_create') to work without the inventory namespace
+# Matches the exact pattern used in inventory/urls.py for consistency
+try:
+    from inventory import api_barcode_lookup as _barcode_api
+    from tenants.utils import require_business
+    _need_biz = require_business
+    urlpatterns += [
+        path("inventory/api/barcode/lookup/", _need_biz(getattr(_barcode_api, "barcode_lookup_api", lambda r: JsonResponse({"error": "barcode_lookup_api not found"}, status=501))), name="api_barcode_lookup"),
+        path("inventory/api/barcode/quick-create/", _need_biz(getattr(_barcode_api, "barcode_quick_create_api", lambda r: JsonResponse({"error": "barcode_quick_create_api not found"}, status=501))), name="api_barcode_quick_create"),
+    ]
+except Exception:
+    pass  # Silently fail if module not available
+
 # >>> Simulator (namespaced; defensive import)
 _sim_urls_mod = _try_import("simulator.urls") or _try_import("circuitcity.simulator.urls")
 if _sim_urls_mod and hasattr(_sim_urls_mod, "urlpatterns"):

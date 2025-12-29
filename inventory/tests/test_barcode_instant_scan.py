@@ -19,6 +19,7 @@ from django.urls import reverse
 import json
 
 from tenants.models import Business
+from tenants.constants import BusinessKind
 from inventory.models import MerchProduct, BarcodeRegistry
 from inventory.models_pharmacy import PharmacyBatch
 from inventory.models_verticals import ClothingSale
@@ -28,7 +29,7 @@ from inventory.utils_barcodes import (
     lookup_barcode,
     is_valid_barcode_format
 )
-from inventory.business_kinds import BusinessKind
+from tests.helpers.tenant_setup import make_user, make_business, make_location, make_membership
 
 User = get_user_model()
 
@@ -71,10 +72,12 @@ class BarcodeRegistryTestCase(TestCase):
     """Test BarcodeRegistry model and operations"""
     
     def setUp(self):
-        self.user = User.objects.create_user(username="testuser", password="testpass")
-        self.business = Business.objects.create(
+        self.user = make_user(username="testuser", password="testpass", is_staff=False)
+        self.business = make_business(
+            created_by=self.user,
+            kind=BusinessKind.CLOTHING,
             name="Test Business",
-            business_kind=BusinessKind.CLOTHING
+            slug="test-business"
         )
         self.product = MerchProduct.objects.create(
             business=self.business,
@@ -155,9 +158,11 @@ class BarcodeRegistryTestCase(TestCase):
     
     def test_multi_tenant_isolation(self):
         """Test that barcodes are isolated per business"""
-        business2 = Business.objects.create(
+        business2 = make_business(
+            created_by=self.user,
+            kind=BusinessKind.CLOTHING,
             name="Other Business",
-            kind=BusinessKind.CLOTHING
+            slug="other-business"
         )
         
         register_barcode(
@@ -176,13 +181,18 @@ class BarcodeLookupAPITestCase(TestCase):
     
     def setUp(self):
         self.client = Client()
-        self.user = User.objects.create_user(username="testuser", password="testpass")
-        self.business = Business.objects.create(
+        self.user = make_user(username="testuser", password="testpass", is_staff=False)
+        self.business = make_business(
+            created_by=self.user,
+            kind=BusinessKind.CLOTHING,
             name="Test Business",
-            business_kind=BusinessKind.CLOTHING
+            slug="test-business"
         )
         self.user.profile.business = self.business
         self.user.profile.save()
+        
+        # Create membership so require_business can auto-select the business
+        make_membership(user=self.user, business=self.business, role="MANAGER", status="ACTIVE")
         
         self.product = MerchProduct.objects.create(
             business=self.business,
@@ -264,13 +274,18 @@ class QuickCreateAPITestCase(TestCase):
     
     def setUp(self):
         self.client = Client()
-        self.user = User.objects.create_user(username="testuser", password="testpass")
-        self.business = Business.objects.create(
+        self.user = make_user(username="testuser", password="testpass", is_staff=False)
+        self.business = make_business(
+            created_by=self.user,
+            kind=BusinessKind.CLOTHING,
             name="Test Business",
-            business_kind=BusinessKind.CLOTHING
+            slug="test-business"
         )
         self.user.profile.business = self.business
         self.user.profile.save()
+        
+        # Create membership so require_business can auto-select the business
+        make_membership(user=self.user, business=self.business, role="MANAGER", status="ACTIVE")
         
         self.client.login(username="testuser", password="testpass")
     
@@ -341,23 +356,30 @@ class InstantSaleWorkflowTestCase(TestCase):
     
     def setUp(self):
         self.client = Client()
-        self.user = User.objects.create_user(username="testuser", password="testpass")
-        self.business = Business.objects.create(
+        self.user = make_user(username="testuser", password="testpass", is_staff=False)
+        self.business = make_business(
+            created_by=self.user,
+            kind=BusinessKind.CLOTHING,
             name="Test Business",
-            business_kind=BusinessKind.CLOTHING
+            slug="test-business"
         )
         self.user.profile.business = self.business
         self.user.profile.save()
+        
+        # Create membership so require_business can auto-select the business
+        make_membership(user=self.user, business=self.business, role="MANAGER", status="ACTIVE")
         
         self.product = MerchProduct.objects.create(
             business=self.business,
             name="Test Product",
             kind=BusinessKind.CLOTHING,
+            barcode="INSTANT-SALE-123",  # Set barcode on product for fast_sell lookup
             selling_price=Decimal("50.00"),
             cost_price=Decimal("30.00"),
             quantity_in_stock=10
         )
         
+        # Also register in BarcodeRegistry for barcode lookup API
         register_barcode(
             business=self.business,
             raw_code="INSTANT-SALE-123",
@@ -449,13 +471,18 @@ class MultiTenantIsolationTestCase(TestCase):
     """Test multi-tenant isolation for barcode system"""
     
     def setUp(self):
-        self.business1 = Business.objects.create(
+        self.user = make_user(username="testuser", password="testpass", is_staff=False)
+        self.business1 = make_business(
+            created_by=self.user,
+            kind=BusinessKind.CLOTHING,
             name="Business 1",
-            kind=BusinessKind.CLOTHING
+            slug="business-1"
         )
-        self.business2 = Business.objects.create(
+        self.business2 = make_business(
+            created_by=self.user,
+            kind=BusinessKind.CLOTHING,
             name="Business 2",
-            kind=BusinessKind.CLOTHING
+            slug="business-2"
         )
         
         self.product1 = MerchProduct.objects.create(

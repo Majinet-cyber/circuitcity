@@ -113,8 +113,9 @@ class TestPhonesBarcode:
             business=phones_business,
             brand="TECNO",
             model_name="Spark 10",
+            ram_gb=4,
+            rom_gb=128,
             variant_label="4GB/128GB",
-            display_name="TECNO Spark 10 (4GB/128GB)",
             default_cost_price=Decimal("500.00"),
             is_active=True,
         )
@@ -149,8 +150,9 @@ class TestPhonesBarcode:
             business=phones_business,
             brand="TECNO",
             model_name="Spark 10",
+            ram_gb=4,
+            rom_gb=128,
             variant_label="4GB/128GB",
-            display_name="TECNO Spark 10 (4GB/128GB)",
             default_cost_price=Decimal("500.00"),
             is_active=True,
         )
@@ -185,8 +187,9 @@ class TestPhonesBarcode:
             business=phones_business,
             brand="TECNO",
             model_name="Spark 10",
+            ram_gb=4,
+            rom_gb=128,
             variant_label="4GB/128GB",
-            display_name="TECNO Spark 10 (4GB/128GB)",
             default_cost_price=Decimal("500.00"),
             is_active=True,
         )
@@ -231,8 +234,9 @@ class TestPhonesBarcode:
             business=phones_business,
             brand="TECNO",
             model_name="Spark 20",
+            ram_gb=6,
+            rom_gb=128,
             variant_label="6GB/128GB",
-            display_name="TECNO Spark 20 (6GB/128GB)",
             default_cost_price=Decimal("600.00"),
             is_active=True,
         )
