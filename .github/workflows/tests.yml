@@ -1,13 +1,10 @@
 name: Tests
 
 on:
-  pull_request:
-    branches:
-      - "*"
   push:
-    branches:
-      - main
-      - master
+    branches: ["mobile-layout-v1"]
+  pull_request:
+    branches: ["mobile-layout-v1"]
 
 jobs:
   Tests:
