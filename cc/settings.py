@@ -340,6 +340,102 @@ SILENCED_SYSTEM_CHECKS = ["templates.E003"]
 WSGI_APPLICATION = "cc.wsgi.application"
 
 # --------------------------- database ---------------------------
+def _is_ci_environment() -> bool:
+    """
+    Robust CI detection: CI=true OR GITHUB_ACTIONS=true should be treated as CI.
+    """
+    return os.getenv("CI") == "true" or os.getenv("GITHUB_ACTIONS") == "true"
+
+
+def _is_local_db_host(host: str) -> bool:
+    """Check if a host is a local database host."""
+    return host and host.lower() in ("localhost", "127.0.0.1", "::1", "0.0.0.0")
+
+
+def _detect_local_db_from_config(db_dict: dict, database_url: str = None) -> bool:
+    """
+    Robust local-db detection:
+    - Check if DATABASE_URL contains localhost, 127.0.0.1, or ::1
+    - OR if DATABASES["default"]["HOST"] equals one of those (covers non-URL config)
+    
+    Args:
+        db_dict: The database configuration dictionary
+        database_url: Optional DATABASE_URL string (defaults to os.environ)
+    """
+    if database_url is None:
+        database_url = os.environ.get("DATABASE_URL", "").strip()
+    
+    if database_url and any(h in database_url for h in ["localhost", "127.0.0.1", "::1"]):
+        return True
+    
+    host = db_dict.get("HOST", "")
+    return _is_local_db_host(host)
+
+
+def _force_db_sslmode(db_dict: dict, mode: str) -> None:
+    """
+    Force SSL mode in database OPTIONS. This is a final override that cannot be bypassed.
+    
+    Args:
+        db_dict: The database configuration dictionary (DATABASES["default"])
+        mode: Either "disable" or "require"
+    
+    This function:
+    - Ensures db_dict["OPTIONS"] exists
+    - Sets OPTIONS["sslmode"] = mode
+    - Removes any cert keys that can force SSL behavior (sslrootcert, sslcert, sslkey)
+    """
+    if "OPTIONS" not in db_dict:
+        db_dict["OPTIONS"] = {}
+    
+    opts = db_dict["OPTIONS"]
+    opts["sslmode"] = mode
+    
+    # Remove any cert keys that can force SSL behavior
+    for key in ("sslrootcert", "sslcert", "sslkey", "sslmode"):
+        # Keep sslmode, remove others
+        if key != "sslmode" and key in opts:
+            del opts[key]
+
+
+def _apply_final_ssl_override(databases: dict, database_url: str = None) -> tuple[str | None, bool, bool]:
+    """
+    Apply final SSL mode override to database configuration.
+    
+    This function enforces SSL mode rules regardless of what was set earlier:
+    - CI + local DB → sslmode=disable
+    - Production → sslmode=require
+    
+    Args:
+        databases: The DATABASES dictionary (will be modified in place)
+        database_url: Optional DATABASE_URL string for detection (defaults to os.environ)
+    
+    Returns:
+        Tuple of (final_sslmode, ci_detected, local_db_detected)
+    """
+    if database_url is None:
+        database_url = os.environ.get("DATABASE_URL", "").strip()
+    
+    ci_detected = _is_ci_environment()
+    default_db = databases.get("default", {})
+    local_db_detected = _detect_local_db_from_config(default_db, database_url)
+    
+    # Only apply SSL rules to PostgreSQL (skip SQLite)
+    if default_db.get("ENGINE", "").endswith("postgresql"):
+        if ci_detected or local_db_detected:
+            _force_db_sslmode(default_db, "disable")
+            final_sslmode = "disable"
+        else:
+            _force_db_sslmode(default_db, "require")
+            final_sslmode = "require"
+        
+        databases["default"] = default_db
+        return (final_sslmode, ci_detected, local_db_detected)
+    
+    # Not PostgreSQL, return None to indicate no SSL mode was set
+    return (None, ci_detected, local_db_detected)
+
+
 DATABASES: dict = {}
 DATABASE_URL = os.environ.get("DATABASE_URL", "").strip()
 
@@ -426,6 +522,18 @@ if default_db.get("ENGINE") == "django.db.backends.sqlite3":
     opts.setdefault("timeout", SQLITE_TIMEOUT)
     default_db["OPTIONS"] = opts
     DATABASES["default"] = default_db
+
+# ===== FINAL SSL MODE OVERRIDE (cannot be bypassed) =====
+# This runs AFTER all database configuration (including dj_database_url.parse)
+# and enforces SSL mode rules regardless of what was set earlier.
+# This ensures CI/local DBs always use sslmode=disable, and production uses sslmode=require.
+_final_sslmode, _ci_detected, _local_db_detected = _apply_final_ssl_override(DATABASES, DATABASE_URL)
+if _final_sslmode:
+    # Log the final decision (redact DATABASE_URL to avoid printing secrets)
+    print(
+        f"[cc.settings] DB sslmode -> {_final_sslmode} "
+        f"(CI={_ci_detected} IS_LOCAL_DB={_local_db_detected})"
+    )
 
 # ===== RENDER GUARD: Prevent SQLite in production =====
 # On Render, we must use PostgreSQL. Fail fast if misconfigured.

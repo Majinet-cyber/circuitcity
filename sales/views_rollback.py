@@ -10,6 +10,7 @@ from decimal import Decimal
 
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
+from django.core.exceptions import ValidationError
 from django.db.models import Q
 from django.http import HttpRequest, HttpResponse, JsonResponse
 from django.shortcuts import render, redirect, get_object_or_404
@@ -170,6 +171,18 @@ def rollback_confirm(request: HttpRequest, sale_id: int) -> HttpResponse:
             )
             return redirect("sales:rollback_home")
             
+        except ValidationError as e:
+            # Sale already rolled back - return HTTP 409 Conflict
+            error_message = str(e)
+            if "already rolled back" in error_message.lower():
+                messages.error(request, f"❌ {error_message}")
+                # Return 409 Conflict for API clients, but for form POST we redirect with error
+                if request.headers.get('Content-Type', '').startswith('application/json'):
+                    return JsonResponse({"error": error_message}, status=409)
+                # For form POST, redirect back with error message (already set above)
+                return redirect("sales:rollback_confirm", sale_id=sale_id)
+            else:
+                messages.error(request, f"❌ Validation error: {error_message}")
         except RollbackError as e:
             messages.error(request, f"❌ Rollback failed: {str(e)}")
         except Exception as e:

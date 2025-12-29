@@ -18,13 +18,13 @@ from __future__ import annotations
 
 import logging
 from decimal import Decimal
-from typing import Optional, Dict, Any, Tuple
 from datetime import timedelta
+from typing import Optional, Dict, Any, Tuple
 
 from django.db import transaction
 from django.utils import timezone
 from django.contrib.auth import get_user_model
-from django.core.exceptions import ObjectDoesNotExist
+from django.core.exceptions import ObjectDoesNotExist, ValidationError
 
 from sales.models import Sale, SaleRollback, RollbackReason, SaleCommission
 from inventory.models import InventoryItem
@@ -45,9 +45,37 @@ class RollbackService:
     """
     
     @staticmethod
+    def is_already_rolled_back(sale: Sale) -> bool:
+        """
+        Check if a sale has already been rolled back.
+        
+        This is the source of truth for rollback status.
+        
+        Args:
+            sale: Sale instance to check
+            
+        Returns:
+            bool: True if sale is already rolled back, False otherwise
+        """
+        # Check the is_rolled_back flag (primary source of truth)
+        if sale.is_rolled_back:
+            return True
+        
+        # Also check rolled_back_at timestamp as secondary check
+        if hasattr(sale, 'rolled_back_at') and sale.rolled_back_at is not None:
+            return True
+        
+        return False
+    
+    @staticmethod
     def can_rollback(sale: Sale, user: User, business: Business) -> Tuple[bool, str]:
         """
         Check if a sale can be rolled back by the given user.
+        
+        Rules:
+        - Only Managers (and HQ/Superuser) can roll back sales
+        - Managers can roll back ANY sale in their business (no agent restriction)
+        - Agents cannot roll back (even their own sales)
         
         Returns:
             (can_rollback: bool, reason: str)
@@ -55,9 +83,9 @@ class RollbackService:
         This is safe to call multiple times (idempotent check).
         """
         try:
-            # Idempotent: Already rolled back?
-            if sale.is_rolled_back:
-                return False, "Sale has already been rolled back"
+            # Check if already rolled back (one-time only)
+            if RollbackService.is_already_rolled_back(sale):
+                return False, "Sale has already been rolled back."
             
             # Check business ownership (safely)
             try:
@@ -67,55 +95,23 @@ class RollbackService:
             except (AttributeError, ObjectDoesNotExist):
                 return False, "Unable to verify sale ownership"
             
-            # Check user permissions
-            from tenants.models import Membership
-            from django.db.models import Case, When, Value, IntegerField
+            # Check user permissions using centralized role system
+            from tenants.utils_roles import is_manager, is_agent
             
-            # Get ACTIVE membership - prioritize MANAGER > AGENT
-            # This handles users with multiple memberships by checking manager role first
-            membership = Membership.objects.filter(
-                user=user, 
-                business=business,
-                status='ACTIVE'
-            ).annotate(
-                role_priority=Case(
-                    When(role='MANAGER', then=Value(1)),
-                    When(role='OWNER', then=Value(1)),
-                    When(role='ADMIN', then=Value(1)),
-                    When(role='AGENT', then=Value(2)),
-                    default=Value(3),
-                    output_field=IntegerField()
-                )
-            ).order_by('role_priority').first()
-            
-            if not membership:
-                return False, "User is not an active member of this business"
-            
-            role = membership.role.upper()
-            
-            # CRITICAL: Managers, Owners, and HQ Admins can rollback ANY sale IMMEDIATELY
-            # No time restrictions, no ownership checks - full operational control
-            if role in ["MANAGER", "OWNER", "ADMIN", "HQ_ADMIN"]:
+            # Superuser/HQ can always rollback
+            if user.is_superuser or user.is_staff:
                 return True, ""
             
-            # Agents can only rollback their own sales within 10 minutes
-            if role == "AGENT":
-                # Safety check: sale must have an agent
-                if not hasattr(sale, 'agent') or sale.agent is None:
-                    return False, "Sale does not have an assigned agent"
-                
-                # Agents can only rollback their own sales
-                if sale.agent.id != user.id:
-                    return False, "Agents can only rollback their own sales"
-                
-                # Time restriction: agents have 10 minutes to rollback
-                time_since_sale = timezone.now() - sale.created_at
-                if time_since_sale > timedelta(minutes=10):
-                    return False, "Agents can only rollback sales within 10 minutes"
-                
+            # Managers can rollback any sale in their business
+            if is_manager(user, business):
                 return True, ""
             
-            return False, "Insufficient permissions to rollback sales"
+            # Agents cannot rollback (even their own sales)
+            if is_agent(user, business):
+                return False, "Only managers can roll back sales."
+            
+            # No role found
+            return False, "Only managers can roll back sales."
         
         except Exception as e:
             logger.error(f"Error checking rollback permissions for sale {sale.pk}: {e}", exc_info=True)
@@ -134,10 +130,9 @@ class RollbackService:
         notes: str = ""
     ) -> SaleRollback:
         """
-        Rollback a sale atomically and idempotently.
+        Rollback a sale atomically. ONE-TIME ONLY.
         
-        This function is IDEMPOTENT - safe to call multiple times.
-        If the sale is already rolled back, it returns the existing rollback record.
+        This function is NOT idempotent - second rollback attempt will raise ValidationError.
         
         Args:
             sale: The sale to rollback
@@ -153,26 +148,11 @@ class RollbackService:
             SaleRollback instance
         
         Raises:
+            ValidationError: If sale is already rolled back (HTTP 409)
             RollbackError: If rollback fails validation or execution (never HTTP 500)
         """
         try:
-            # IDEMPOTENT: Check if already rolled back
-            if sale.is_rolled_back:
-                # Return existing rollback record
-                existing_rollback = SaleRollback.objects.filter(sale=sale).first()
-                if existing_rollback:
-                    logger.info(f"Sale {sale.pk} already rolled back (idempotent)")
-                    return existing_rollback
-                else:
-                    # Sale marked as rolled back but no record exists - fix it
-                    logger.warning(f"Sale {sale.pk} marked rolled back but no rollback record exists")
-            
-            # Validate permissions
-            can_rollback, error_msg = RollbackService.can_rollback(sale, user, business)
-            if not can_rollback:
-                raise RollbackError(error_msg)
-            
-            # Validate reason
+            # Validate reason first (before any DB operations)
             valid_reasons = dict(RollbackReason.choices)
             if reason not in valid_reasons:
                 raise RollbackError(f"Invalid rollback reason: {reason}. Valid: {list(valid_reasons.keys())}")
@@ -190,11 +170,14 @@ class RollbackService:
             # Acquire lock on sale to prevent concurrent rollbacks
             sale = Sale.objects.select_for_update().get(pk=sale.pk)
             
-            # Double-check after lock (race condition protection)
-            if sale.is_rolled_back:
-                existing_rollback = SaleRollback.objects.filter(sale=sale).first()
-                if existing_rollback:
-                    return existing_rollback
+            # ONE-TIME ONLY: Check if already rolled back (after acquiring lock)
+            if RollbackService.is_already_rolled_back(sale):
+                raise ValidationError("Sale already rolled back.")
+            
+            # Validate permissions (after checking if already rolled back)
+            can_rollback, error_msg = RollbackService.can_rollback(sale, user, business)
+            if not can_rollback:
+                raise RollbackError(error_msg)
             
             # Mark sale as rolled back
             sale.is_rolled_back = True
@@ -245,6 +228,9 @@ class RollbackService:
             
             return rollback
         
+        except ValidationError:
+            # Re-raise validation errors as-is (for HTTP 409)
+            raise
         except RollbackError:
             # Re-raise business rule errors as-is
             raise
