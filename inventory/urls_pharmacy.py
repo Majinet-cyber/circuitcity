@@ -36,7 +36,15 @@ urlpatterns = [
     path("expired/", views_pharmacy.expired_list, name="expired"),
     path("low-stock/", views_pharmacy.low_stock_list, name="low_stock"),
     
+    # Simple UI (NEW)
+    path("stock-in/simple/", views_pharmacy.pharmacy_stock_in_simple, name="stock_in_simple"),
+    path("sell/simple/", views_pharmacy.pharmacy_sell_simple, name="sell_simple"),
+    path("fast-sell/", views_pharmacy.pharmacy_sell_simple, name="fast_sell"),  # Alias
+    
     # API endpoints
     path("api/batch/<int:batch_id>/", views_pharmacy.api_batch_info, name="api_batch_info"),
+    path("api/products/search/", views_pharmacy.api_product_search, name="api_product_search"),
+    path("api/stock-in/", views_pharmacy.api_stock_in, name="api_stock_in"),
+    path("api/sell/", views_pharmacy.api_sell, name="api_sell"),
 ]
 

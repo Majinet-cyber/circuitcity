@@ -310,6 +310,23 @@ class MerchProduct(models.Model):
     auto_adjust_enabled = models.BooleanField(default=True, help_text="Enable smart auto-adjust based on sales demand")
     auto_adjust_pct = models.PositiveIntegerField(default=20, help_text="Increase target by this % over observed peak demand")
 
+    # Pharmacy: Packaging fields (optional, for tablets/capsules)
+    strip_size = models.PositiveIntegerField(
+        null=True,
+        blank=True,
+        help_text="Number of tablets/capsules per strip (optional)"
+    )
+    box_size = models.PositiveIntegerField(
+        null=True,
+        blank=True,
+        help_text="Number of strips per box (optional)"
+    )
+    tablets_per_box = models.PositiveIntegerField(
+        null=True,
+        blank=True,
+        help_text="Direct tablets per box (alternative to box_size, optional)"
+    )
+    
     # Clothing and general merchandise fields
     size = models.CharField(max_length=20, blank=True, default='', help_text="Size for clothing items (e.g., S, M, L, XL, or numeric)")
     color = models.CharField(max_length=50, blank=True, default='', help_text="Color for clothing items")
@@ -415,6 +432,15 @@ class MerchProduct(models.Model):
         # This prevents DB constraint violations from older code paths
         if self.spec_label is None:
             self.spec_label = ""
+        
+        # NEW RULE: Cider pack_size must be exactly 6 (6-pack only, no crates)
+        if self.kind == BusinessKind.LIQUOR and self.category and self.category.lower() == "cider":
+            if self.bottles_per_crate is not None and self.bottles_per_crate != 6:
+                from django.core.exceptions import ValidationError
+                raise ValidationError(
+                    f"Cider pack size must be exactly 6 (6-pack). Got: {self.bottles_per_crate}. "
+                    f"Cider does not use crates."
+                )
         
         # Auto-calculate cost_per_glass for wines if total bottle cost is provided
         if self.has_glasses and self.glasses_per_bottle and self.cost_per_bottle:

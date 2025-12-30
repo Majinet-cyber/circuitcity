@@ -160,6 +160,50 @@ class LiquorShiftStock(models.Model):
         return (self.bottles_count * sellable_per_bottle) + self.shots_count
 
 
+class LiquorStockAdjustment(models.Model):
+    """
+    Records stock adjustments for liquor products.
+    Used for tracking barman shots, spillage, breakage, and other non-sale stock changes.
+    """
+    business = models.ForeignKey(Business, on_delete=models.CASCADE, related_name="liquor_stock_adjustments", db_index=True)
+    product = models.ForeignKey("inventory.MerchProduct", on_delete=models.CASCADE, related_name="liquor_stock_adjustments")
+    location = models.ForeignKey("inventory.Location", null=True, blank=True, on_delete=models.SET_NULL, related_name="liquor_stock_adjustments")
+    
+    # Adjustment details
+    quantity_change = models.IntegerField(help_text="Quantity change (positive for additions, negative for deductions)")
+    reason = models.CharField(
+        max_length=50,
+        choices=[
+            ("BARMAN_SHOTS", "Barman Shots (Staff Consumption)"),
+            ("SPILLAGE", "Spillage"),
+            ("BREAKAGE", "Breakage"),
+            ("EXPIRED", "Expired"),
+            ("THEFT", "Theft"),
+            ("CORRECTION", "Stock Correction"),
+            ("OTHER", "Other"),
+        ],
+        default="OTHER",
+        db_index=True
+    )
+    notes = models.TextField(blank=True, default="")
+    
+    # Metadata
+    adjusted_by = models.ForeignKey(User, null=True, blank=True, on_delete=models.SET_NULL, related_name="liquor_adjustments_made")
+    adjusted_at = models.DateTimeField(default=timezone.now, db_index=True)
+    
+    class Meta:
+        ordering = ["-adjusted_at"]
+        indexes = [
+            models.Index(fields=["business", "-adjusted_at"]),
+            models.Index(fields=["business", "reason", "-adjusted_at"]),
+            models.Index(fields=["product", "-adjusted_at"]),
+        ]
+    
+    def __str__(self):
+        sign = "+" if self.quantity_change >= 0 else ""
+        return f"{self.product.name}: {sign}{self.quantity_change} ({self.get_reason_display()})"
+
+
 class PaymentMethod(models.TextChoices):
     """Payment methods for sales"""
     CASH = "cash", "Cash"
@@ -1385,6 +1429,120 @@ class ClothingSale(models.Model):
         """Calculate profit for this sale"""
         return self.total_price - self.total_cost
 
+
+# ==============================================================================
+# CLOTHING VARIANT MODEL (for size/color combinations)
+# ==============================================================================
+
+class ClothingVariant(models.Model):
+    """
+    Optional variant model for clothing products with size/color combinations.
+    Only used when product.has_sizes or product.has_colors is True.
+    """
+    product = models.ForeignKey(
+        "inventory.MerchProduct",
+        on_delete=models.CASCADE,
+        related_name="clothing_variants",
+        help_text="Parent product"
+    )
+    
+    # Variant attributes
+    size = models.CharField(
+        max_length=20,
+        blank=True,
+        default='',
+        help_text="Size for this variant (e.g., M, 42)"
+    )
+    color = models.CharField(
+        max_length=50,
+        blank=True,
+        default='',
+        help_text="Color for this variant"
+    )
+    
+    # Auto-generated variant SKU
+    variant_sku = models.CharField(
+        max_length=100,
+        blank=True,
+        default='',
+        help_text="Auto-generated variant SKU"
+    )
+    
+    # Stock tracking per variant
+    quantity_in_stock = models.PositiveIntegerField(
+        default=0,
+        help_text="Stock quantity for this variant"
+    )
+    
+    # Optional price overrides
+    selling_price_override = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        help_text="Override selling price for this variant (optional)"
+    )
+    cost_price_override = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        help_text="Override cost price for this variant (optional)"
+    )
+    
+    # Metadata
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    class Meta:
+        ordering = ['size', 'color']
+        indexes = [
+            models.Index(fields=['product', 'is_active'], name='clothvar_prod_active_idx'),
+            models.Index(fields=['product', 'size', 'color'], name='clothvar_prod_sz_col_idx'),
+        ]
+        constraints = [
+            models.UniqueConstraint(
+                fields=['product', 'size', 'color'],
+                name='unique_product_size_color'
+            ),
+        ]
+    
+    def __str__(self):
+        parts = [self.product.name]
+        if self.size:
+            parts.append(f"Size {self.size}")
+        if self.color:
+            parts.append(self.color)
+        return " - ".join(parts)
+    
+    def get_selling_price(self):
+        """Get effective selling price (override or parent)"""
+        if self.selling_price_override is not None:
+            return self.selling_price_override
+        return self.product.selling_price or Decimal("0.00")
+    
+    def get_cost_price(self):
+        """Get effective cost price (override or parent)"""
+        if self.cost_price_override is not None:
+            return self.cost_price_override
+        return self.product.cost_price or Decimal("0.00")
+    
+    def save(self, *args, **kwargs):
+        # Auto-generate variant SKU if not set
+        if not self.variant_sku and self.product.internal_sku:
+            from inventory.clothing_config import generate_variant_sku
+            self.variant_sku = generate_variant_sku(
+                self.product.internal_sku,
+                size=self.size,
+                color=self.color
+            )
+        super().save(*args, **kwargs)
+
+
+# ==============================================================================
+# CEMENT MODELS
+# ==============================================================================
 
 class CementSale(models.Model):
     """

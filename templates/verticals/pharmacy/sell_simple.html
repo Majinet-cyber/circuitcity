@@ -1,0 +1,658 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Fast Sell · Pharmacy{% endblock %}
+
+{% block content %}
+
+<style>
+.sell-container {
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 20px;
+  padding-bottom: 120px; /* Space for sticky cart bar */
+}
+
+.page-header {
+  background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%);
+  color: white;
+  padding: 24px 28px;
+  border-radius: 20px;
+  margin-bottom: 32px;
+  box-shadow: 0 12px 40px rgba(139, 92, 246, 0.25);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+
+.page-header h1 {
+  margin: 0;
+  font-size: clamp(1.6rem, 4vw, 2.2rem);
+  font-weight: 800;
+}
+
+.page-header p {
+  margin: 4px 0 0;
+  opacity: 0.95;
+  font-size: 1rem;
+}
+
+.back-btn {
+  background: rgba(255, 255, 255, 0.2);
+  color: white;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  padding: 10px 20px;
+  border-radius: 12px;
+  text-decoration: none;
+  font-weight: 700;
+  transition: all 0.2s;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.back-btn:hover {
+  background: rgba(255, 255, 255, 0.3);
+  color: white;
+  border-color: rgba(255, 255, 255, 0.5);
+}
+
+.search-results {
+  margin-bottom: 24px;
+}
+
+.results-header {
+  font-size: 1rem;
+  font-weight: 700;
+  color: #64748b;
+  margin-bottom: 12px;
+  padding-left: 4px;
+}
+
+/* Sticky Cart Bar */
+.cart-bar {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+  color: white;
+  padding: 16px 20px;
+  box-shadow: 0 -8px 32px rgba(16, 185, 129, 0.3);
+  z-index: 1000;
+  display: none; /* Hidden when cart is empty */
+}
+
+.cart-bar.active {
+  display: block;
+}
+
+.cart-bar-content {
+  max-width: 900px;
+  margin: 0 auto;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.cart-info {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+}
+
+.cart-count {
+  background: rgba(255, 255, 255, 0.2);
+  padding: 8px 16px;
+  border-radius: 12px;
+  font-weight: 700;
+  font-size: 1rem;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.cart-total {
+  font-size: 1.4rem;
+  font-weight: 800;
+}
+
+.cart-actions {
+  display: flex;
+  gap: 12px;
+}
+
+.cart-btn {
+  padding: 12px 24px;
+  border-radius: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s;
+  border: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 1rem;
+}
+
+.view-cart-btn {
+  background: rgba(255, 255, 255, 0.2);
+  color: white;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+}
+
+.view-cart-btn:hover {
+  background: rgba(255, 255, 255, 0.3);
+}
+
+.checkout-btn {
+  background: white;
+  color: #10b981;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+}
+
+.checkout-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.2);
+}
+
+@media (max-width: 480px) {
+  .sell-container {
+    padding: 16px;
+    padding-bottom: 140px;
+  }
+  
+  .page-header {
+    padding: 20px;
+    margin-bottom: 24px;
+  }
+  
+  .cart-bar {
+    padding: 14px 16px;
+  }
+  
+  .cart-bar-content {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  
+  .cart-info {
+    justify-content: space-between;
+  }
+  
+  .cart-actions {
+    width: 100%;
+  }
+  
+  .cart-btn {
+    flex: 1;
+  }
+}
+</style>
+
+<div class="sell-container">
+  <!-- Header -->
+  <div class="page-header">
+    <div>
+      <h1>⚡ Fast Sell</h1>
+      <p>Quick checkout for your customers</p>
+    </div>
+    <a href="{% url 'pharmacy:dashboard' %}" class="back-btn">
+      <i class="fas fa-arrow-left"></i> Back
+    </a>
+  </div>
+  
+  <!-- Search Bar -->
+  {% include "verticals/pharmacy/partials/_search_bar.html" with placeholder="Search products to sell..." autofocus=True input_id="sell-search" %}
+  
+  <!-- Top Items Grid -->
+  {% if top_products %}
+    {% include "verticals/pharmacy/partials/_top_items_grid.html" with products=top_products action="sell" %}
+  {% endif %}
+  
+  <!-- Search Results -->
+  <div class="search-results" id="search-results">
+    <!-- Populated by JS search -->
+  </div>
+</div>
+
+<!-- Sticky Cart Bar -->
+<div class="cart-bar" id="cart-bar">
+  <div class="cart-bar-content">
+    <div class="cart-info">
+      <div class="cart-count">
+        <i class="fas fa-shopping-cart"></i>
+        <span id="cart-count">0</span> items
+      </div>
+      <div class="cart-total">
+        MWK <span id="cart-total">0</span>
+      </div>
+    </div>
+    <div class="cart-actions">
+      <button type="button" class="cart-btn view-cart-btn" onclick="openCartModal()">
+        <i class="fas fa-list"></i> View Cart
+      </button>
+      <button type="button" class="cart-btn checkout-btn" onclick="proceedToCheckout()">
+        <i class="fas fa-check-circle"></i> Checkout
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- Cart Modal -->
+<div class="modal fade" id="cartModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered modal-lg">
+    <div class="modal-content">
+      <div class="modal-header" style="background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: white; border-radius: 20px 20px 0 0;">
+        <h5 class="modal-title" style="font-weight: 800;">🛒 Shopping Cart</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close" style="filter: brightness(0) invert(1);"></button>
+      </div>
+      <div class="modal-body" id="cart-items-container">
+        <!-- Cart items populated by JS -->
+      </div>
+      <div class="modal-footer" style="border-top: 2px solid #e2e8f0;">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Continue Shopping</button>
+        <button type="button" class="btn btn-success" onclick="proceedToCheckout()" style="font-weight: 700;">
+          <i class="fas fa-check-circle"></i> Checkout
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Checkout Modal -->
+<div class="modal fade" id="checkoutModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header" style="background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%); color: white; border-radius: 20px 20px 0 0;">
+        <h5 class="modal-title" style="font-weight: 800;">💳 Checkout</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close" style="filter: brightness(0) invert(1);"></button>
+      </div>
+      <div class="modal-body">
+        <h6 style="font-weight: 700; margin-bottom: 16px;">Select Payment Method</h6>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+          <button type="button" class="payment-method-btn" data-method="cash" onclick="selectPaymentMethod('cash')">
+            <i class="fas fa-money-bill-wave"></i> Cash
+          </button>
+          <button type="button" class="payment-method-btn" data-method="airtel" onclick="selectPaymentMethod('airtel')">
+            <i class="fas fa-mobile-alt"></i> Airtel Money
+          </button>
+          <button type="button" class="payment-method-btn" data-method="tnm" onclick="selectPaymentMethod('tnm')">
+            <i class="fas fa-mobile-alt"></i> TNM Mpamba
+          </button>
+          <button type="button" class="payment-method-btn" data-method="bank" onclick="selectPaymentMethod('bank')">
+            <i class="fas fa-university"></i> Bank
+          </button>
+        </div>
+        
+        <div id="checkout-summary" style="margin-top: 24px; padding-top: 24px; border-top: 2px solid #e2e8f0; display: none;">
+          <div style="display: flex; justify-content: space-between; margin-bottom: 12px;">
+            <span style="font-weight: 600;">Total Items:</span>
+            <span id="checkout-items">0</span>
+          </div>
+          <div style="display: flex; justify-content: space-between; font-size: 1.3rem; font-weight: 800; color: #10b981;">
+            <span>Total:</span>
+            <span>MWK <span id="checkout-total">0</span></span>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer" style="border-top: 2px solid #e2e8f0;">
+        <button type="button" class="btn btn-secondary" onclick="backToCart()">Back</button>
+        <button type="button" class="btn btn-success" id="confirm-sale-btn" onclick="confirmSale()" disabled style="font-weight: 700;">
+          <i class="fas fa-check"></i> Confirm Sale
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Toast Notifications -->
+{% include "verticals/pharmacy/partials/_toast.html" %}
+
+<style>
+.payment-method-btn {
+  background: #f8fafc;
+  border: 2px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 20px 16px;
+  cursor: pointer;
+  transition: all 0.2s;
+  font-weight: 700;
+  color: #475569;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+
+.payment-method-btn:hover {
+  border-color: #cbd5e1;
+  background: #f1f5f9;
+}
+
+.payment-method-btn.selected {
+  border-color: #10b981;
+  background: #dcfce7;
+  color: #166534;
+}
+
+.payment-method-btn i {
+  font-size: 2rem;
+}
+</style>
+
+<script>
+// Shopping cart state
+let cart = [];
+let selectedPaymentMethod = null;
+
+// Add product to cart (instant add for top items)
+function addToCart(productData, quantity = 1, unit = null) {
+  const baseUnit = unit || productData.baseUnit || 'piece';
+  
+  // Check if product already in cart
+  const existingIndex = cart.findIndex(item => 
+    item.productId === productData.productId && item.unit === baseUnit
+  );
+  
+  if (existingIndex >= 0) {
+    cart[existingIndex].quantity += quantity;
+  } else {
+    cart.push({
+      productId: productData.productId,
+      productName: productData.productName,
+      quantity: quantity,
+      unit: baseUnit,
+      price: parseFloat(productData.price) || 0,
+      stock: parseInt(productData.stock) || 0
+    });
+  }
+  
+  updateCartUI();
+  showPharmacyToast(`Added ${productData.productName} to cart`, 'success');
+}
+
+// Update cart UI
+function updateCartUI() {
+  const cartBar = document.getElementById('cart-bar');
+  const cartCount = document.getElementById('cart-count');
+  const cartTotal = document.getElementById('cart-total');
+  
+  const totalItems = cart.reduce((sum, item) => sum + item.quantity, 0);
+  const totalPrice = cart.reduce((sum, item) => sum + (item.quantity * item.price), 0);
+  
+  cartCount.textContent = totalItems;
+  cartTotal.textContent = totalPrice.toLocaleString();
+  
+  if (cart.length > 0) {
+    cartBar.classList.add('active');
+  } else {
+    cartBar.classList.remove('active');
+  }
+}
+
+// Open cart modal
+function openCartModal() {
+  const container = document.getElementById('cart-items-container');
+  
+  if (cart.length === 0) {
+    container.innerHTML = '<p style="text-align: center; color: #64748b; padding: 40px;">Your cart is empty</p>';
+  } else {
+    let html = '<div style="display: flex; flex-direction: column; gap: 12px;">';
+    
+    cart.forEach((item, index) => {
+      html += `
+        <div style="background: #f8fafc; border-radius: 12px; padding: 16px; display: flex; justify-content: space-between; align-items: center; gap: 12px;">
+          <div style="flex: 1;">
+            <div style="font-weight: 700; color: #0f172a; margin-bottom: 4px;">${item.productName}</div>
+            <div style="font-size: 0.9rem; color: #64748b;">MWK ${item.price.toLocaleString()} × ${item.quantity} ${item.unit}</div>
+          </div>
+          <div style="display: flex; align-items: center; gap: 12px;">
+            <div style="font-weight: 800; color: #10b981; font-size: 1.1rem;">MWK ${(item.price * item.quantity).toLocaleString()}</div>
+            <button onclick="removeFromCart(${index})" style="background: #fee2e2; color: #dc2626; border: none; border-radius: 8px; padding: 6px 10px; cursor: pointer;">
+              <i class="fas fa-trash"></i>
+            </button>
+          </div>
+        </div>
+      `;
+    });
+    
+    html += '</div>';
+    container.innerHTML = html;
+  }
+  
+  const modal = new bootstrap.Modal(document.getElementById('cartModal'));
+  modal.show();
+}
+
+// Remove from cart
+function removeFromCart(index) {
+  cart.splice(index, 1);
+  updateCartUI();
+  openCartModal(); // Refresh modal
+}
+
+// Proceed to checkout
+function proceedToCheckout() {
+  if (cart.length === 0) {
+    showPharmacyToast('Your cart is empty', 'warning');
+    return;
+  }
+  
+  // Close cart modal if open
+  const cartModal = bootstrap.Modal.getInstance(document.getElementById('cartModal'));
+  if (cartModal) cartModal.hide();
+  
+  // Update checkout summary
+  const totalItems = cart.reduce((sum, item) => sum + item.quantity, 0);
+  const totalPrice = cart.reduce((sum, item) => sum + (item.quantity * item.price), 0);
+  
+  document.getElementById('checkout-items').textContent = totalItems;
+  document.getElementById('checkout-total').textContent = totalPrice.toLocaleString();
+  document.getElementById('checkout-summary').style.display = 'block';
+  
+  // Reset payment method
+  selectedPaymentMethod = null;
+  document.querySelectorAll('.payment-method-btn').forEach(btn => btn.classList.remove('selected'));
+  document.getElementById('confirm-sale-btn').disabled = true;
+  
+  // Show checkout modal
+  const modal = new bootstrap.Modal(document.getElementById('checkoutModal'));
+  modal.show();
+}
+
+// Select payment method
+function selectPaymentMethod(method) {
+  selectedPaymentMethod = method;
+  
+  document.querySelectorAll('.payment-method-btn').forEach(btn => {
+    btn.classList.remove('selected');
+  });
+  
+  document.querySelector(`[data-method="${method}"]`).classList.add('selected');
+  document.getElementById('confirm-sale-btn').disabled = false;
+}
+
+// Back to cart
+function backToCart() {
+  const checkoutModal = bootstrap.Modal.getInstance(document.getElementById('checkoutModal'));
+  checkoutModal.hide();
+  
+  setTimeout(() => openCartModal(), 300);
+}
+
+// Confirm sale
+function confirmSale() {
+  if (!selectedPaymentMethod) {
+    showPharmacyToast('Please select a payment method', 'warning');
+    return;
+  }
+  
+  const btn = document.getElementById('confirm-sale-btn');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Processing...';
+  
+  // Submit sale to backend
+  fetch('{% url "pharmacy:api_sell" %}', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-CSRFToken': '{{ csrf_token }}'
+    },
+    body: JSON.stringify({
+      items: cart,
+      payment_method: selectedPaymentMethod
+    })
+  })
+  .then(response => response.json())
+  .then(data => {
+    if (data.success) {
+      showPharmacyToast('Sale completed successfully! ✅', 'success');
+      
+      // Clear cart
+      cart = [];
+      updateCartUI();
+      
+      // Close modal
+      const modal = bootstrap.Modal.getInstance(document.getElementById('checkoutModal'));
+      modal.hide();
+      
+      // Reset button
+      btn.disabled = false;
+      btn.innerHTML = '<i class="fas fa-check"></i> Confirm Sale';
+    } else {
+      showPharmacyToast(data.error || 'Sale failed', 'error');
+      btn.disabled = false;
+      btn.innerHTML = '<i class="fas fa-check"></i> Confirm Sale';
+    }
+  })
+  .catch(error => {
+    console.error('Sale error:', error);
+    showPharmacyToast('Sale failed. Please try again.', 'error');
+    btn.disabled = false;
+    btn.innerHTML = '<i class="fas fa-check"></i> Confirm Sale';
+  });
+}
+
+// Override handleTopItemClick for sell action (instant add)
+function handleTopItemClick(element, action) {
+  if (action === 'sell') {
+    addToCart(element.dataset, 1);
+  } else {
+    openQtyModal(element.dataset, action);
+  }
+}
+
+// Override handleProductRowClick for sell action (instant add)
+function handleProductRowClick(button, action) {
+  const row = button.closest('.product-row');
+  if (action === 'sell') {
+    addToCart(row.dataset, 1);
+  } else {
+    openQtyModal(row.dataset, action);
+  }
+}
+
+// Live search for sell page
+(function() {
+  const searchInput = document.getElementById('sell-search');
+  const searchResults = document.getElementById('search-results');
+  let searchTimeout;
+  
+  if (searchInput) {
+    searchInput.addEventListener('input', function() {
+      clearTimeout(searchTimeout);
+      const query = this.value.trim();
+      
+      if (query.length < 2) {
+        searchResults.innerHTML = '';
+        return;
+      }
+      
+      searchTimeout = setTimeout(() => {
+        performSearch(query);
+      }, 300);
+    });
+  }
+  
+  function performSearch(query) {
+    searchResults.innerHTML = '<div class="results-header">Searching...</div>';
+    
+    fetch(`{% url 'pharmacy:api_product_search' %}?q=${encodeURIComponent(query)}`)
+      .then(response => response.json())
+      .then(data => {
+        if (data.products && data.products.length > 0) {
+          let html = `<div class="results-header">Found ${data.products.length} product${data.products.length !== 1 ? 's' : ''}</div>`;
+          
+          data.products.forEach(product => {
+            html += renderProductRow(product);
+          });
+          
+          searchResults.innerHTML = html;
+        } else {
+          searchResults.innerHTML = `
+            <div style="background: #f8fafc; border: 2px dashed #cbd5e1; border-radius: 16px; padding: 40px 24px; text-align: center; color: #64748b;">
+              <i class="fas fa-search" style="font-size: 3rem; margin-bottom: 16px; opacity: 0.5;"></i>
+              <h3 style="font-size: 1.2rem; font-weight: 700; color: #475569; margin: 0 0 8px;">No products found</h3>
+              <p style="margin: 0;">Try a different search</p>
+            </div>
+          `;
+        }
+      })
+      .catch(error => {
+        console.error('Search error:', error);
+        searchResults.innerHTML = '<div class="results-header" style="color: #ef4444;">Search failed. Please try again.</div>';
+      });
+  }
+  
+  function renderProductRow(product) {
+    const icon = getCategoryIcon(product.category);
+    const baseUnit = product.base_unit_label || product.unit || 'piece';
+    const stock = product.quantity_in_stock || 0;
+    const stockClass = stock < 10 ? 'low' : '';
+    
+    let metaBadges = `<span class="meta-badge">${baseUnit}</span>`;
+    metaBadges += `<span class="meta-stock ${stockClass}">Stock: ${stock}</span>`;
+    
+    return `
+      <div class="product-row" 
+           data-product-id="${product.id}"
+           data-product-name="${product.name}"
+           data-base-unit="${baseUnit}"
+           data-has-strip="${product.strip_size ? 'true' : 'false'}"
+           data-has-box="${product.box_size || product.tablets_per_box ? 'true' : 'false'}"
+           data-strip-size="${product.strip_size || ''}"
+           data-box-size="${product.box_size || product.tablets_per_box || ''}"
+           data-stock="${stock}"
+           data-price="${product.price || 0}">
+        <div class="product-row-icon">${icon}</div>
+        <div class="product-row-info">
+          <div class="product-row-name">${product.name}</div>
+          <div class="product-row-meta">${metaBadges}</div>
+        </div>
+        <button type="button" class="product-row-action-btn" onclick="handleProductRowClick(this, 'sell')">
+          <i class="fas fa-plus"></i> Add
+        </button>
+      </div>
+    `;
+  }
+  
+  function getCategoryIcon(category) {
+    const icons = {
+      'TABLETS_CAPSULES': '💊',
+      'SYRUPS': '🧪',
+      'OINTMENTS_CREAMS': '🧴',
+      'DROPS': '💧',
+      'COSMETICS': '💄'
+    };
+    return icons[category] || '📦';
+  }
+})();
+</script>
+
+{% endblock %}
+

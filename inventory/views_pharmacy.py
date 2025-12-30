@@ -856,7 +856,10 @@ def pharmacy_stock_in_wizard(request: HttpRequest) -> HttpResponse:
 
 
 def _handle_wizard_save(request: HttpRequest, business: Business) -> HttpResponse:
-    """Handle the final save step of the pharmacy wizard with defensive error handling."""
+    """
+    Handle the final save step of the pharmacy wizard.
+    NOW USES SERVICE LAYER for clean, atomic operations.
+    """
     try:
         # Extract form data
         product_name = request.POST.get("product_name", "").strip()
@@ -878,64 +881,56 @@ def _handle_wizard_save(request: HttpRequest, business: Business) -> HttpRespons
         # Determine if this is cosmetics
         is_cosmetics = (wizard_mode == "cosmetics" or selected_category == "cosmetics")
         
-        # Determine the correct product category for the database
-        product_category = "medicine"  # Default
+        # Map wizard subcategory to pharmacy_config category
+        # This maps the wizard UI categories to the service layer categories
+        from inventory.pharmacy_config import PharmacyCategory as ConfigCategory
+        
+        wizard_to_config_map = {
+            "skin_care": ConfigCategory.COSMETICS,
+            "hair_care": ConfigCategory.COSMETICS,
+            "body_care": ConfigCategory.COSMETICS,
+            "perfumes": ConfigCategory.COSMETICS,
+            "mens_grooming": ConfigCategory.COSMETICS,
+            "makeup": ConfigCategory.COSMETICS,
+            "other_cosmetics": ConfigCategory.OTHER,
+            # Medicine categories
+            "medicines": ConfigCategory.TABLETS_CAPSULES,  # Default for medicines
+            "tablets": ConfigCategory.TABLETS_CAPSULES,
+            "syrup": ConfigCategory.SYRUP,
+            "ointment": ConfigCategory.OINTMENT,
+            "drops": ConfigCategory.DROPS,
+        }
+        
+        # Determine service layer category
+        if wizard_mode == "cosmetics":
+            service_category = wizard_to_config_map.get(selected_subcategory, ConfigCategory.COSMETICS)
+        else:
+            service_category = wizard_to_config_map.get(selected_category, ConfigCategory.OTHER)
+        
+        # Also map to PharmacyCategory enum for backward compatibility
+        wizard_to_model_map = {
+            "skin_care": PharmacyCategory.SKIN_CARE,
+            "hair_care": PharmacyCategory.HAIR_CARE,
+            "body_care": PharmacyCategory.PERSONAL_CARE,
+            "perfumes": PharmacyCategory.BEAUTY_MAKEUP,
+            "mens_grooming": PharmacyCategory.PERSONAL_CARE,
+            "makeup": PharmacyCategory.BEAUTY_MAKEUP,
+            "other_cosmetics": PharmacyCategory.OTHER,
+        }
         
         if wizard_mode == "cosmetics" and selected_subcategory:
-            # Map wizard subcategory to PharmacyCategory enum value
-            wizard_to_model_map = {
-                "skin_care": PharmacyCategory.SKIN_CARE,
-                "hair_care": PharmacyCategory.HAIR_CARE,
-                "body_care": PharmacyCategory.PERSONAL_CARE,
-                "perfumes": PharmacyCategory.BEAUTY_MAKEUP,
-                "mens_grooming": PharmacyCategory.PERSONAL_CARE,
-                "makeup": PharmacyCategory.BEAUTY_MAKEUP,
-                "other_cosmetics": PharmacyCategory.OTHER,
-            }
             product_category = wizard_to_model_map.get(selected_subcategory, PharmacyCategory.OTHER)
         elif wizard_mode == "cosmetics" and selected_category:
-            # Fallback: map category directly
-            wizard_to_model_map = {
-                "skin_care": PharmacyCategory.SKIN_CARE,
-                "hair_care": PharmacyCategory.HAIR_CARE,
-                "body_care": PharmacyCategory.PERSONAL_CARE,
-                "perfumes": PharmacyCategory.BEAUTY_MAKEUP,
-                "mens_grooming": PharmacyCategory.PERSONAL_CARE,
-                "makeup": PharmacyCategory.BEAUTY_MAKEUP,
-                "other_cosmetics": PharmacyCategory.OTHER,
-            }
             product_category = wizard_to_model_map.get(selected_category, PharmacyCategory.OTHER)
+        else:
+            product_category = "medicine"  # Default
         
-        # Is this an "Other" product?
-        is_other_product = selected_item and ("Other" in selected_item or "Custom" in selected_item or "other" in selected_item.lower())
-        
-        # Validation
+        # Basic validation
         errors = []
         if not product_name:
             errors.append("Product name is required.")
         
-        # Batch number is now OPTIONAL (not required)
-        # Auto-generate if missing
-        if not batch_number:
-            import uuid
-            batch_number = f"BATCH-{uuid.uuid4().hex[:8].upper()}"
-        
-        # Expiry date validation: REQUIRED for Medicines, OPTIONAL for Cosmetics
-        if not is_cosmetics and not expiry_date_str:
-            errors.append("Expiry date is required for medicines.")
-        
-        # Barcode validation
-        if has_barcode == "yes":
-            if not barcode_value:
-                errors.append("Barcode is required when 'Has Barcode' is Yes.")
-            else:
-                from inventory.utils_barcodes import validate_barcode, normalize_barcode
-                is_valid, error_msg = validate_barcode(barcode_value)
-                if not is_valid:
-                    errors.append(f"Invalid barcode: {error_msg}")
-                else:
-                    barcode_value = normalize_barcode(barcode_value)
-        
+        # Parse and validate quantity
         try:
             qty = int(quantity)
             if qty <= 0:
@@ -944,6 +939,7 @@ def _handle_wizard_save(request: HttpRequest, business: Business) -> HttpRespons
             errors.append("Invalid quantity.")
             qty = 0
         
+        # Parse and validate prices
         try:
             cost = Decimal(cost_price)
             if cost < 0:
@@ -960,101 +956,71 @@ def _handle_wizard_save(request: HttpRequest, business: Business) -> HttpRespons
             errors.append("Invalid selling price.")
             selling = Decimal("0.00")
         
-        # Parse expiry date (optional for cosmetics, required for medicines)
+        # Parse expiry date (optional)
         expiry_date = None
         if expiry_date_str:
             try:
                 expiry_date = timezone.datetime.strptime(expiry_date_str, "%Y-%m-%d").date()
             except (ValueError, TypeError):
                 errors.append("Invalid expiry date format.")
-                expiry_date = None
         
-        # For medicines, expiry date must be parsed successfully
-        if not is_cosmetics and not expiry_date:
-            errors.append("Valid expiry date is required for medicines.")
+        # For medicines, expiry date is recommended but NOT enforced (service layer handles it)
+        # Let the service layer handle the validation
+        
+        # Normalize barcode if provided
+        final_barcode = None
+        if has_barcode == "yes" and barcode_value:
+            from inventory.utils_barcodes import validate_barcode, normalize_barcode
+            is_valid, error_msg = validate_barcode(barcode_value)
+            if not is_valid:
+                errors.append(f"Invalid barcode: {error_msg}")
+            else:
+                final_barcode = normalize_barcode(barcode_value)
         
         if errors:
             for error in errors:
                 messages.error(request, error)
             return redirect("pharmacy:stock_in_wizard")
         
-        # Create or get product
-        with transaction.atomic():
-            product, created = MerchProduct.objects.get_or_create(
+        # USE SERVICE LAYER for atomic, clean stock-in operation
+        from inventory.services.pharmacy_sale import stock_in_pharmacy
+        
+        try:
+            result = stock_in_pharmacy(
                 business=business,
-                name=product_name,
-                kind="pharmacy",
-                defaults={
-                    "is_active": True,
-                    "category": product_category,
-                    "spec_label": "",  # CRITICAL: Always set spec_label (prevents NULL constraint)
-                    "cost_price": cost,
-                    "selling_price": selling,
-                }
+                product_name=product_name,
+                category=service_category,
+                user=request.user,
+                quantity=qty,
+                unit="piece",  # Wizard uses base units by default
+                cost_price=cost,
+                selling_price=selling,
+                batch_number=batch_number or None,  # Auto-generated if empty
+                expiry_date=expiry_date,
+                barcode=final_barcode,
+                supplier=supplier or None,
+                location=getattr(request, 'location', None),
+                notes=None,
             )
             
-            if not created:
-                # Update if prices changed
-                if product.cost_price != cost or product.selling_price != selling:
-                    product.cost_price = cost
-                    product.selling_price = selling
-                    product.save()
-            
-            # Store barcode if provided
-            if has_barcode == "yes" and barcode_value:
-                from inventory.utils_barcodes import set_barcode
-                set_barcode(product, barcode_value)
-                product.save()
-            
-            # Check for duplicate batch
-            existing_batch = PharmacyBatch.objects.filter(
-                business=business,
-                merch_product=product,
-                batch_number=batch_number,
-                expiry_date=expiry_date
-            ).first()
-            
-            if existing_batch:
-                # Update existing batch quantity
-                existing_batch.quantity += qty
-                existing_batch.cost_price = cost
-                existing_batch.selling_price = selling
-                if supplier:
-                    existing_batch.supplier = supplier
-                # Update barcode if provided
-                if has_barcode == "yes" and barcode_value:
-                    existing_batch.barcode = barcode_value
-                existing_batch.save()
-                messages.success(
-                    request,
-                    f"✅ Stock updated! Added {qty} units to existing batch. Total: {existing_batch.quantity}"
-                )
+            if result["ok"]:
+                messages.success(request, result["message"])
             else:
-                # Create new batch
-                # Set barcode to empty string if not provided (CharField with blank=True uses empty string)
-                final_barcode = barcode_value if (has_barcode == "yes" and barcode_value) else ""
-                PharmacyBatch.objects.create(
-                    business=business,
-                    merch_product=product,
-                    batch_number=batch_number,
-                    barcode=final_barcode,
-                    expiry_date=expiry_date,
-                    quantity=qty,
-                    cost_price=cost,
-                    selling_price=selling,
-                    supplier=supplier,
-                    received_date=timezone.now().date(),
-                    reorder_level=10,
-                )
-                messages.success(
-                    request,
-                    f"🎉 Stock added successfully! {product_name} - {qty} units (Batch: {batch_number})"
-                )
+                messages.error(request, result.get("error", "Stock-in failed"))
+                return redirect("pharmacy:stock_in_wizard")
+        
+        except ValidationError as e:
+            messages.error(request, str(e))
+            return redirect("pharmacy:stock_in_wizard")
+        except Exception as e:
+            logger.error(f"Wizard stock-in error: {e}", exc_info=True)
+            messages.error(request, f"❌ Error: {str(e)}")
+            return redirect("pharmacy:stock_in_wizard")
             
-            # Store success flag in session
-            request.session["pharmacy_wizard_success"] = True
-            request.session["last_product_name"] = product_name
-            request.session["last_quantity"] = qty
+        # Store success flag in session
+        request.session["pharmacy_wizard_success"] = True
+        request.session["last_product_name"] = product_name
+        request.session["last_quantity"] = qty
         
         return redirect("pharmacy:stock_in_wizard")
     
@@ -2288,4 +2254,274 @@ def sale_undo(request: HttpRequest, sale_id: int) -> HttpResponse:
         f"Sale #{sale.id} reversed successfully. Stock restored and transactions reversed."
     )
     return redirect("pharmacy:sale_list")
+
+
+# ==============================================================================
+# SIMPLE UI VIEWS (NEW)
+# ==============================================================================
+
+@login_required
+@require_business
+def pharmacy_stock_in_simple(request: HttpRequest) -> HttpResponse:
+    """
+    Simple stock-in page with search and top items.
+    Mobile-first, uses partials and service layer.
+    """
+    business: Business = request.business
+    
+    # Get top products (most stocked in last 30 days)
+    from datetime import timedelta
+    thirty_days_ago = timezone.now() - timedelta(days=30)
+    
+    top_products = (
+        MerchProduct.objects.filter(
+            business=business,
+            kind="pharmacy",
+            is_active=True
+        )
+        .annotate(
+            recent_stock_count=Count(
+                'pharmacybatch',
+                filter=Q(pharmacybatch__created_at__gte=thirty_days_ago)
+            )
+        )
+        .filter(recent_stock_count__gt=0)
+        .order_by('-recent_stock_count')[:8]
+    )
+    
+    # Handle search
+    search_query = request.GET.get('q', '').strip()
+    products = []
+    
+    if search_query:
+        products = MerchProduct.objects.filter(
+            business=business,
+            kind="pharmacy",
+            is_active=True,
+            name__icontains=search_query
+        ).order_by('name')[:20]
+    
+    ctx = {
+        'active_business': business,
+        'active_location': getattr(request, 'location', None),
+        'top_products': top_products,
+        'products': products,
+        'search_query': search_query,
+    }
+    
+    return render(request, 'verticals/pharmacy/stock_in_simple.html', ctx)
+
+
+@login_required
+@require_business
+def pharmacy_sell_simple(request: HttpRequest) -> HttpResponse:
+    """
+    Simple fast sell page with search and top items.
+    Mobile-first, uses partials and service layer.
+    """
+    business: Business = request.business
+    
+    # Get top products (most sold in last 30 days)
+    from datetime import timedelta
+    thirty_days_ago = timezone.now() - timedelta(days=30)
+    
+    top_products = (
+        MerchProduct.objects.filter(
+            business=business,
+            kind="pharmacy",
+            is_active=True
+        )
+        .annotate(
+            recent_sales_count=Count(
+                'pharmacysale',
+                filter=Q(pharmacysale__sale_date__gte=thirty_days_ago)
+            )
+        )
+        .filter(recent_sales_count__gt=0)
+        .order_by('-recent_sales_count')[:8]
+    )
+    
+    ctx = {
+        'active_business': business,
+        'active_location': getattr(request, 'location', None),
+        'top_products': top_products,
+    }
+    
+    return render(request, 'verticals/pharmacy/sell_simple.html', ctx)
+
+
+# ==============================================================================
+# API ENDPOINTS (NEW)
+# ==============================================================================
+
+@login_required
+@require_business
+def api_product_search(request: HttpRequest) -> JsonResponse:
+    """
+    API endpoint for product search (used by live search).
+    Returns JSON with product data including packaging info.
+    """
+    business: Business = request.business
+    query = request.GET.get('q', '').strip()
+    
+    if not query or len(query) < 2:
+        return JsonResponse({'products': []})
+    
+    products = MerchProduct.objects.filter(
+        business=business,
+        kind="pharmacy",
+        is_active=True,
+        name__icontains=query
+    ).order_by('name')[:20]
+    
+    products_data = []
+    for p in products:
+        products_data.append({
+            'id': p.id,
+            'name': p.name,
+            'category': getattr(p, 'category', None),
+            'base_unit_label': getattr(p, 'base_unit_label', None) or p.unit or 'piece',
+            'unit': p.unit,
+            'strip_size': getattr(p, 'strip_size', None),
+            'box_size': getattr(p, 'box_size', None),
+            'tablets_per_box': getattr(p, 'tablets_per_box', None),
+            'quantity_in_stock': p.quantity_in_stock,
+            'price': float(p.price) if p.price else 0,
+        })
+    
+    return JsonResponse({'products': products_data})
+
+
+@login_required
+@require_business
+@require_POST
+def api_stock_in(request: HttpRequest) -> JsonResponse:
+    """
+    API endpoint for stock-in via the simple UI.
+    Uses the service layer (pharmacy_sale.stock_in_pharmacy).
+    """
+    import json
+    from inventory.services.pharmacy_sale import stock_in_pharmacy
+    from inventory import pharmacy_config
+    
+    business: Business = request.business
+    location = getattr(request, 'location', None)
+    
+    try:
+        data = json.loads(request.body)
+        product_id = data.get('product_id')
+        quantity = int(data.get('quantity', 1))
+        unit = data.get('unit', 'piece')
+        expiry_date_str = data.get('expiry_date')
+        batch_number = data.get('batch_number')
+        
+        if not product_id:
+            return JsonResponse({'success': False, 'error': 'Product ID required'}, status=400)
+        
+        product = get_object_or_404(
+            MerchProduct,
+            id=product_id,
+            business=business,
+            kind="pharmacy"
+        )
+        
+        # Parse expiry date if provided
+        expiry_date = None
+        if expiry_date_str:
+            from datetime import datetime
+            try:
+                expiry_date = datetime.strptime(expiry_date_str, '%Y-%m-%d').date()
+            except ValueError:
+                pass
+        
+        # Call service layer
+        batch = stock_in_pharmacy(
+            business=business,
+            location=location,
+            product=product,
+            quantity=quantity,
+            unit_label=unit,
+            expiry_date=expiry_date,
+            batch_number=batch_number or f"BATCH-{timezone.now().strftime('%Y%m%d%H%M%S')}"
+        )
+        
+        return JsonResponse({
+            'success': True,
+            'batch_id': batch.id,
+            'new_stock': product.quantity_in_stock
+        })
+        
+    except ValueError as e:
+        return JsonResponse({'success': False, 'error': str(e)}, status=400)
+    except Exception as e:
+        logger.error(f"Stock-in API error: {e}", exc_info=True)
+        return JsonResponse({'success': False, 'error': 'Stock-in failed'}, status=500)
+
+
+@login_required
+@require_business
+@require_POST
+def api_sell(request: HttpRequest) -> JsonResponse:
+    """
+    API endpoint for selling via the simple UI.
+    Uses the service layer (pharmacy_sale.sell_pharmacy).
+    """
+    import json
+    from inventory.services.pharmacy_sale import sell_pharmacy, OutOfStockError
+    
+    business: Business = request.business
+    location = getattr(request, 'location', None)
+    
+    try:
+        data = json.loads(request.body)
+        items = data.get('items', [])
+        payment_method = data.get('payment_method', 'cash')
+        
+        if not items:
+            return JsonResponse({'success': False, 'error': 'No items in cart'}, status=400)
+        
+        # Process each item
+        sales = []
+        for item in items:
+            product_id = item.get('productId')
+            quantity = int(item.get('quantity', 1))
+            unit = item.get('unit', 'piece')
+            
+            product = get_object_or_404(
+                MerchProduct,
+                id=product_id,
+                business=business,
+                kind="pharmacy"
+            )
+            
+            # Call service layer
+            sale = sell_pharmacy(
+                business=business,
+                location=location,
+                product=product,
+                quantity=quantity,
+                unit_label=unit,
+                payment_method=payment_method
+            )
+            
+            sales.append({
+                'sale_id': sale.id,
+                'product': product.name,
+                'quantity': quantity,
+                'unit': unit
+            })
+        
+        return JsonResponse({
+            'success': True,
+            'sales': sales,
+            'total_items': len(sales)
+        })
+        
+    except OutOfStockError as e:
+        return JsonResponse({'success': False, 'error': str(e)}, status=400)
+    except ValueError as e:
+        return JsonResponse({'success': False, 'error': str(e)}, status=400)
+    except Exception as e:
+        logger.error(f"Sell API error: {e}", exc_info=True)
+        return JsonResponse({'success': False, 'error': 'Sale failed'}, status=500)
 

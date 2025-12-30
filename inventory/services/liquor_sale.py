@@ -2,6 +2,11 @@
 """
 Liquor Sale Service - centralized business logic for all liquor sales.
 Ensures all sales are atomic and safe against race conditions.
+
+SIMPLIFICATION RULES:
+- NO BARCODE required for liquor (barcode is optional)
+- Enforce real-world unit rules (beer=bottle/crate, cider=bottle/6-pack, etc.)
+- Use shared conversion helper from liquor_config
 """
 from __future__ import annotations
 
@@ -19,6 +24,14 @@ from inventory.models_verticals import (
     LiquorUnitType, LiquorSaleType, LiquorCreditStatus
 )
 from inventory.business_kinds import BusinessKind
+from inventory.liquor_config import (
+    to_base_units,
+    validate_unit_for_kind,
+    get_base_unit_default,
+    LiquorKind,
+    DEFAULT_SHOTS_PER_BOTTLE,
+    DEFAULT_BARMAN_SHOTS_PER_BOTTLE,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -26,6 +39,145 @@ logger = logging.getLogger(__name__)
 class OutOfStockError(Exception):
     """Raised when there's insufficient stock for a sale"""
     pass
+
+
+@transaction.atomic
+def stock_in_liquor(
+    *,
+    business,
+    product_id: int,
+    user,
+    quantity: int,
+    unit: str,  # "bottle" only for spirits/whisky
+    cost_per_unit: Decimal,
+    location=None,
+    notes: Optional[str] = None,
+) -> Dict[str, Any]:
+    """
+    Stock in liquor products with automatic barman shots accounting.
+    
+    NEW RULES (Spirits/Whisky):
+    - Stock-in is BOTTLE-ONLY (no case, no crate, no pack)
+    - When stocking spirits/whisky bottles for shot-selling:
+      * Add sellable shots_per_bottle to inventory (default 24)
+      * Automatically record 2 barman shots per bottle as staff consumption (non-sellable)
+      * These 2 shots are tracked separately and do not appear in sellable stock
+    
+    Args:
+        business: Business instance
+        product_id: ID of the MerchProduct to stock in
+        user: User performing the stock-in
+        quantity: Quantity to add
+        unit: Unit type ("bottle" for spirits/whisky, "bottle"/"crate"/"6-pack" for others)
+        cost_per_unit: Cost per unit
+        location: Location instance (optional)
+        notes: Stock-in notes (optional)
+    
+    Returns:
+        Dict with:
+            - ok: bool
+            - message: str
+            - sellable_added: int (base units added to sellable stock)
+            - barman_shots_recorded: int (staff shots recorded, if applicable)
+            - error: str (if not ok)
+    
+    Raises:
+        ValidationError: If validation fails
+    """
+    # Lock and fetch product
+    try:
+        product = MerchProduct.objects.select_for_update().get(
+            pk=product_id,
+            business=business,
+            kind=BusinessKind.LIQUOR,
+            is_active=True
+        )
+    except MerchProduct.DoesNotExist:
+        raise ValidationError("Product not found or not available")
+    
+    # Get liquor kind
+    liquor_kind = (product.category or "").lower()
+    
+    # Validate unit is allowed for stock-in
+    pack_enabled = (product.pack_label is not None and product.bottles_per_crate is not None)
+    validate_unit_for_kind(liquor_kind, unit, pack_enabled=pack_enabled, for_stock_in=True)
+    
+    # Convert to base units
+    try:
+        qty_base_units = to_base_units(quantity, unit, product)
+    except ValidationError as e:
+        raise ValidationError(f"Cannot stock in {product.name}: {str(e)}")
+    
+    # Initialize tracking variables
+    sellable_added = qty_base_units
+    barman_shots_recorded = 0
+    
+    # BARMAN SHOTS LOGIC: For spirits/whisky with shot-selling enabled
+    if liquor_kind in (LiquorKind.SPIRITS, LiquorKind.WHISKY):
+        # Check if product is configured for shot-selling
+        base_unit = get_base_unit_default(liquor_kind)
+        if base_unit == "shot" and unit.lower() == "bottle":
+            # Calculate barman shots (2 per bottle)
+            barman_shots_recorded = quantity * DEFAULT_BARMAN_SHOTS_PER_BOTTLE
+            
+            # Deduct barman shots from sellable stock
+            # Sellable stock = (bottles * shots_per_bottle) - barman_shots
+            sellable_added = qty_base_units - barman_shots_recorded
+            
+            # Create a stock adjustment record for barman shots (expense/usage)
+            try:
+                from inventory.models_verticals import LiquorStockAdjustment
+                LiquorStockAdjustment.objects.create(
+                    business=business,
+                    product=product,
+                    quantity_change=-barman_shots_recorded,  # Negative = consumed
+                    reason="BARMAN_SHOTS",
+                    notes=f"Automatic barman shots deduction: {quantity} bottle(s) × {DEFAULT_BARMAN_SHOTS_PER_BOTTLE} shots/bottle = {barman_shots_recorded} staff shots",
+                    adjusted_by=user,
+                    location=location
+                )
+            except Exception as e:
+                # If LiquorStockAdjustment model doesn't exist, log it
+                logger.warning(
+                    f"Could not create barman shots adjustment record: {e}. "
+                    f"Barman shots ({barman_shots_recorded}) still deducted from sellable stock."
+                )
+    
+    # Update product stock (add sellable quantity only)
+    product.quantity_in_stock = (product.quantity_in_stock or 0) + sellable_added
+    
+    # Update cost per base unit if provided
+    if cost_per_unit > 0:
+        # Calculate cost per base unit
+        if unit.lower() == "bottle":
+            if liquor_kind in (LiquorKind.SPIRITS, LiquorKind.WHISKY):
+                # For spirits/whisky, cost_per_unit is per bottle
+                # Convert to cost per shot
+                shots_per_bottle = product.shots_per_bottle or DEFAULT_SHOTS_PER_BOTTLE
+                product.cost_per_shot = cost_per_unit / Decimal(shots_per_bottle)
+            else:
+                # For beer/cider/wine, cost_per_unit is per bottle
+                product.cost_per_bottle = cost_per_unit
+        else:
+            # For pack/crate, calculate cost per bottle
+            pack_size = product.bottles_per_crate or 1
+            product.cost_per_bottle = cost_per_unit / Decimal(pack_size)
+    
+    product.save()
+    
+    # Build success message
+    base_unit = get_base_unit_default(liquor_kind)
+    message = f"✅ Stocked in: {quantity} {unit}(s) = {sellable_added} sellable {base_unit}(s) — {product.name}"
+    
+    if barman_shots_recorded > 0:
+        message += f" (Barman shots: {barman_shots_recorded} automatically recorded)"
+    
+    return {
+        "ok": True,
+        "message": message,
+        "sellable_added": sellable_added,
+        "barman_shots_recorded": barman_shots_recorded,
+    }
 
 
 @transaction.atomic
@@ -113,14 +265,10 @@ def create_liquor_sale(
     if unit == "glass" and not product.has_glasses:
         raise ValidationError(f"{product.name} does not support glass sales")
     
-    # Validate category-specific unit rules
-    category = (product.category or "").lower()
-    if category in ("beer", "cider") and unit != "bottle":
-        raise ValidationError(f"{product.name} ({category.title()}) must be sold by bottle only")
-    if category == "wine" and unit != "glass":
-        raise ValidationError(f"{product.name} (Wine) must be sold by glass only")
-    if category in ("spirits", "whiskey") and unit != "shot":
-        raise ValidationError(f"{product.name} ({category.title()}) must be sold by shot only")
+    # Validate unit is allowed for this liquor kind
+    liquor_kind = (product.category or "").lower()
+    pack_enabled = (product.pack_label is not None and product.bottles_per_crate is not None)
+    validate_unit_for_kind(liquor_kind, unit, pack_enabled=pack_enabled)
     
     # Calculate totals
     total = Decimal(quantity) * unit_price
@@ -130,6 +278,13 @@ def create_liquor_sale(
     # Get cost for profit tracking
     unit_cost = product.get_cost_for_unit(unit) or Decimal("0.00")
     total_cost = Decimal(quantity) * unit_cost
+    
+    # Convert to base units for stock tracking
+    try:
+        qty_base_units = to_base_units(quantity, unit, product)
+    except ValidationError as e:
+        # Re-raise with product context
+        raise ValidationError(f"Cannot sell {product.name}: {str(e)}")
     
     # For credit sales, ensure payment mix is zero
     if is_credit:
@@ -183,21 +338,25 @@ def create_liquor_sale(
     
     # CRITICAL: Decrement stock atomically using conditional update
     # This prevents overselling even under high concurrency
-    if unit == "bottle":
-        # Use F() expression for atomic decrement
+    # Stock is tracked in base units (bottles/cans/glasses/shots)
+    if product.track_inventory:
+        # Use F() expression for atomic decrement in BASE UNITS
         updated = MerchProduct.objects.filter(
             pk=product.pk,
-            quantity_in_stock__gte=quantity
+            quantity_in_stock__gte=qty_base_units
         ).update(
-            quantity_in_stock=F('quantity_in_stock') - quantity
+            quantity_in_stock=F('quantity_in_stock') - qty_base_units
         )
         
         if updated == 0:
             # Re-fetch to get current stock for error message
             product.refresh_from_db()
             current_stock = product.quantity_in_stock or 0
+            base_unit = get_base_unit_default(liquor_kind)
             raise OutOfStockError(
-                f"Insufficient stock: {product.name}. Available: {current_stock}, Requested: {quantity}"
+                f"Insufficient stock: {product.name}. "
+                f"Available: {current_stock} {base_unit}(s), "
+                f"Requested: {qty_base_units} {base_unit}(s) ({quantity} {unit})"
             )
     
     # Create sale record
