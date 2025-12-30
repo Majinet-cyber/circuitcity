@@ -5,6 +5,7 @@ from django.views.generic import RedirectView
 from . import views as v
 from . import views_admin as va  # Keep import in case you still use parts of it.
 from . import views_providers as vp  # Stripe + Pesapal
+from . import views_paychangu as vpc  # PayChangu
 
 app_name = "billing"
 
@@ -37,6 +38,15 @@ urlpatterns = [
     path("pesapal/checkout/", vp.pesapal_checkout, name="pesapal_checkout"),
     path("pesapal/callback/", vp.pesapal_callback, name="pesapal_callback"),
     path("pesapal/ipn/", vp.pesapal_ipn, name="pesapal_ipn"),
+
+    # ------------------------------------------------------------------
+    # PayChangu checkout, webhook & return
+    # ------------------------------------------------------------------
+    path("paychangu/initiate/", vpc.paychangu_initiate, name="paychangu_initiate"),
+    path("paychangu/webhook/", vpc.paychangu_webhook, name="paychangu_webhook"),
+    path("paychangu/return/", vpc.paychangu_return, name="paychangu_return"),
+    path("paychangu/callback/", vpc.paychangu_callback, name="paychangu_callback"),
+    path("api/payment-status/", vpc.paychangu_payment_status, name="paychangu_payment_status"),
 
     # Invoice utilities (inline preview/actions)
     path("invoice/<uuid:pk>/send/",     v.invoice_send,     name="invoice_send"),

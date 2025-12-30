@@ -1,6 +1,8 @@
 ﻿# billing/views.py
 from __future__ import annotations
 
+import logging
+import uuid
 from datetime import date, timedelta
 from decimal import Decimal
 from io import BytesIO
@@ -27,7 +29,11 @@ from .models import (
     Invoice,
     InvoiceItem,
     Payment,
+    PaymentTransaction,
 )
+from . import paychangu_service
+
+logger = logging.getLogger(__name__)
 
 # Optional (guarded) import to avoid hard dependency during bootstrap
 try:
@@ -281,12 +287,12 @@ def plan_detail(request: HttpRequest, slug: str) -> HttpResponse:
 def checkout(request: HttpRequest) -> HttpResponse:
     """
     Interactive checkout with tabs:
-    - Airtel Money (prompt)
-    - Standard Bank (proof/reference)
-    - Card (number/exp/cvv) – stubbed tokenization for now
-    Shows invoice preview on the side.
+    - Airtel Money (PayChangu Mobile Money)
+    - Standard Bank (PayChangu Bank Transfer)
+    - Card (PayChangu Card Payment)
     
-    Payment provider errors are handled here with friendly messages.
+    ALL payment methods now use PayChangu as the provider.
+    Shows invoice preview on the side.
     """
     biz: Business = request.business
     inv_id = request.session.get("billing_invoice_id")
@@ -303,92 +309,216 @@ def checkout(request: HttpRequest) -> HttpResponse:
     if request.method == "POST":
         method = (request.POST.get("method") or "").lower()
 
-        # Wrap payment processing in try/except for friendly error handling
-        try:
-            # ---------------- Airtel Money ----------------
-            if method == "airtel":
-                airtel_form = AirtelForm(request.POST, prefix="airtel")
-                if airtel_form.is_valid():
-                    msisdn = airtel_form.cleaned_data["msisdn"]
-                    Payment.objects.create(
-                        business=biz,
-                        invoice=invoice,
-                        provider=Payment.Provider.AIRTEL,
-                        amount=invoice.total,
-                        currency=invoice.currency,
-                        status=Payment.Status.PENDING,
-                        raw_payload={"msisdn": msisdn},
-                    )
-                    messages.success(
-                        request,
-                        "Airtel Money prompt initiated. Please approve on your phone. We'll activate once confirmed.",
-                    )
-                    return redirect("billing:success")
-
-            # ---------------- Standard Bank (manual) -----
-            elif method == "standard_bank":
-                bank_form = BankProofForm(request.POST, prefix="bank")
-                if bank_form.is_valid():
-                    ref = bank_form.cleaned_data["reference"]
-                    Payment.objects.create(
-                        business=biz,
-                        invoice=invoice,
-                        provider=Payment.Provider.STANDARD_BANK,
-                        amount=invoice.total,
-                        currency=invoice.currency,
-                        status=Payment.Status.PENDING,
-                        reference=ref,
-                    )
-                    messages.info(request, "Payment proof submitted. We'll verify and activate shortly.")
-                    return redirect("billing:success")
-
-            # ---------------- Card (stub success) --------
-            elif method == "card":
-                card_form = CardForm(request.POST, prefix="card")
-                if card_form.is_valid():
-                    # In real flow: tokenize card→charge→webhook. For now, mark success.
-                    Payment.objects.create(
-                        business=biz,
-                        invoice=invoice,
-                        provider=Payment.Provider.CARD,
-                        amount=invoice.total,
-                        currency=invoice.currency,
-                        status=Payment.Status.SUCCEEDED,
-                        external_id="TEST-OK",
-                    )
-                    invoice.mark_paid()
-
-                    sub = _ensure_trial_subscription(biz)
-                    if not sub.plan_id:
-                        sub.plan = SubscriptionPlan.objects.filter(is_active=True).order_by("amount").first()
-                    sub.status = BusinessSubscription.Status.ACTIVE
-                    sub.last_payment_at = timezone.now()
-                    sub.advance_period()
-                    sub.save(update_fields=["plan", "status", "last_payment_at", "updated_at"])
-
-                    # Notify & mark sent
-                    _send_invoice_email(invoice)
-                    _send_invoice_whatsapp(invoice)
-                    invoice.mark_sent()
-
-                    messages.success(request, "Payment successful and subscription activated!")
-                    return redirect("billing:success")
-
-            messages.error(request, "Please check your payment details and try again.")
-            
-        except Exception as e:
-            # Log the real error for debugging
-            import logging
-            logger = logging.getLogger(__name__)
-            logger.error(f"Payment processing error: {e}", exc_info=True)
-            
-            # Show friendly error to user
+        # Check if PayChangu is configured
+        if not paychangu_service.is_paychangu_configured():
+            logger.error("PayChangu not configured, cannot process payment")
             messages.error(
                 request,
-                "Payment processing is temporarily unavailable. Please try another payment method or contact support."
+                "Payment system is not configured. Please contact support."
+            )
+            return render(
+                request,
+                "billing/checkout.html",
+                {
+                    "invoice": invoice,
+                    "airtel_form": airtel_form,
+                    "bank_form": bank_form,
+                    "card_form": card_form,
+                    "sub_badge": _sub_badge(_ensure_trial_subscription(biz)),
+                },
             )
 
-    # Sidebar badge
+        # Map method names to PayChangu payment methods
+        method_map = {
+            "airtel": "AIRTEL_MONEY",
+            "standard_bank": "BANK",
+            "card": "CARD",
+        }
+        paychangu_method = method_map.get(method, "CARD")
+
+        try:
+            # Validate form for the selected method
+            if method == "airtel":
+                airtel_form = AirtelForm(request.POST, prefix="airtel")
+                if not airtel_form.is_valid():
+                    messages.error(request, "Please provide a valid Airtel Money number.")
+                    return render(
+                        request,
+                        "billing/checkout.html",
+                        {
+                            "invoice": invoice,
+                            "airtel_form": airtel_form,
+                            "bank_form": bank_form,
+                            "card_form": card_form,
+                            "sub_badge": _sub_badge(_ensure_trial_subscription(biz)),
+                        },
+                    )
+                msisdn = airtel_form.cleaned_data["msisdn"]
+
+            elif method == "standard_bank":
+                bank_form = BankProofForm(request.POST, prefix="bank")
+                if not bank_form.is_valid():
+                    messages.error(request, "Please provide a valid bank reference.")
+                    return render(
+                        request,
+                        "billing/checkout.html",
+                        {
+                            "invoice": invoice,
+                            "airtel_form": airtel_form,
+                            "bank_form": bank_form,
+                            "card_form": card_form,
+                            "sub_badge": _sub_badge(_ensure_trial_subscription(biz)),
+                        },
+                    )
+                bank_ref = bank_form.cleaned_data["reference"]
+
+            elif method == "card":
+                card_form = CardForm(request.POST, prefix="card")
+                if not card_form.is_valid():
+                    messages.error(request, "Please provide valid card details.")
+                    return render(
+                        request,
+                        "billing/checkout.html",
+                        {
+                            "invoice": invoice,
+                            "airtel_form": airtel_form,
+                            "bank_form": bank_form,
+                            "card_form": card_form,
+                            "sub_badge": _sub_badge(_ensure_trial_subscription(biz)),
+                        },
+                    )
+
+            # Generate unique transaction reference
+            tx_ref = f"billing-{biz.id}-{uuid.uuid4().hex[:12]}"
+            
+            # Get location (first location if available, otherwise None)
+            location = None
+            if hasattr(biz, "locations"):
+                location = biz.locations.first()
+
+            # Get subscription plan for metadata
+            sub = _ensure_trial_subscription(biz)
+            plan_code = sub.plan.code if sub.plan else "unknown"
+
+            logger.info(
+                f"Initiating PayChangu payment: business={biz.id}, "
+                f"invoice={invoice.id}, tx_ref={tx_ref}, method={paychangu_method}, "
+                f"amount={invoice.total}"
+            )
+
+            # Create PaymentTransaction record (PENDING)
+            transaction = PaymentTransaction.objects.create(
+                business=biz,
+                location=location,
+                created_by=request.user,
+                provider="PAYCHANGU",
+                tx_ref=tx_ref,
+                amount=invoice.total,
+                currency=invoice.currency,
+                status=PaymentTransaction.Status.PENDING,
+            )
+
+            # Store invoice reference in session for webhook processing
+            request.session[f"paychangu_tx_{tx_ref}"] = {
+                "invoice_id": str(invoice.id),
+                "method": paychangu_method,
+            }
+
+            # Build callback URLs
+            return_url = request.build_absolute_uri(reverse("billing:paychangu_return"))
+            callback_url = request.build_absolute_uri(reverse("billing:paychangu_webhook"))
+
+            # Prepare metadata
+            meta = {
+                "plan_code": plan_code,
+                "invoice_id": str(invoice.id),
+                "payment_method": paychangu_method,
+                "user_id": str(request.user.id),
+                "user_email": request.user.email,
+            }
+
+            # Call PayChangu API to create checkout
+            result = paychangu_service.create_checkout(
+                business=biz,
+                location=location,
+                amount=invoice.total,
+                currency=invoice.currency,
+                tx_ref=tx_ref,
+                return_url=return_url,
+                callback_url=callback_url,
+                meta=meta,
+                user_email=request.user.email,
+                user_phone=getattr(request.user, "phone", None),
+                description=f"{invoice.number} - {sub.plan.name if sub.plan else 'Subscription'}",
+            )
+
+            if result.get("status") != "success":
+                error_msg = result.get("message", "Failed to initiate payment")
+                logger.error(
+                    f"PayChangu checkout failed: business={biz.id}, "
+                    f"tx_ref={tx_ref}, error={error_msg}"
+                )
+                transaction.mark_failed(result.get("raw_response", {}))
+                messages.error(
+                    request,
+                    f"Payment initiation failed: {error_msg}. Please try again or contact support."
+                )
+                return render(
+                    request,
+                    "billing/checkout.html",
+                    {
+                        "invoice": invoice,
+                        "airtel_form": airtel_form,
+                        "bank_form": bank_form,
+                        "card_form": card_form,
+                        "sub_badge": _sub_badge(sub),
+                    },
+                )
+
+            # Update transaction with checkout details
+            transaction.checkout_url = result.get("checkout_url", "")
+            transaction.raw_init_payload = result.get("raw_response", {})
+            transaction.save(update_fields=["checkout_url", "raw_init_payload", "updated_at"])
+
+            logger.info(
+                f"PayChangu checkout created: tx_ref={tx_ref}, "
+                f"checkout_url={transaction.checkout_url}"
+            )
+
+            # Store tx_ref in session for return page
+            request.session["billing_tx_ref"] = tx_ref
+
+            # Redirect to PayChangu checkout page
+            checkout_url = result.get("checkout_url")
+            if checkout_url:
+                return redirect(checkout_url)
+            else:
+                # Fallback: show pending message (for push-based payments)
+                messages.info(
+                    request,
+                    f"Payment initiated for {paychangu_method}. Please complete the payment and we'll activate your subscription."
+                )
+                return redirect(f"{reverse('billing:paychangu_return')}?tx_ref={tx_ref}")
+
+        except Exception as e:
+            logger.error(f"Payment processing error: {e}", exc_info=True)
+            messages.error(
+                request,
+                "Payment processing failed. Please try again or contact support."
+            )
+            return render(
+                request,
+                "billing/checkout.html",
+                {
+                    "invoice": invoice,
+                    "airtel_form": airtel_form,
+                    "bank_form": bank_form,
+                    "card_form": card_form,
+                    "sub_badge": _sub_badge(_ensure_trial_subscription(biz)),
+                },
+            )
+
+    # GET request: show checkout form
     sub = _ensure_trial_subscription(biz)
     return render(
         request,

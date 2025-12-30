@@ -835,6 +835,23 @@ PESAPAL_BASE_URL = os.environ.get(
 )  # sandbox default
 PESAPAL_IPN_ID = os.environ.get("PESAPAL_IPN_ID", "")
 
+# --------------------------- PayChangu (Mobile Money for Malawi) ---------------------------
+PAYCHANGU_MODE = os.environ.get("PAYCHANGU_MODE", "test").strip().lower()
+PAYCHANGU_PUBLIC_KEY = os.environ.get("PAYCHANGU_PUBLIC_KEY", "")
+PAYCHANGU_SECRET_KEY = os.environ.get("PAYCHANGU_SECRET_KEY", "")
+PAYCHANGU_WEBHOOK_SECRET = os.environ.get("PAYCHANGU_WEBHOOK_SECRET", "")
+PAYCHANGU_WEBHOOK_DEBUG = env_bool("PAYCHANGU_WEBHOOK_DEBUG", False)
+PAYCHANGU_API_BASE = os.environ.get(
+    "PAYCHANGU_API_BASE", "https://api.paychangu.com"
+)
+
+# Production guard: prevent test mode in production
+if not DEBUG and PAYCHANGU_MODE == "test":
+    raise ImproperlyConfigured(
+        "PAYCHANGU_MODE cannot be 'test' when DEBUG=False. "
+        "Set PAYCHANGU_MODE=live in production or enable DEBUG for local testing."
+    )
+
 # --------------------------- whatsapp notifications ---------------------------
 WHATSAPP_API_BASE_URL = os.environ.get(
     "WHATSAPP_API_BASE_URL", "https://graph.facebook.com/v21.0/"
@@ -904,3 +921,11 @@ CC_PUBLIC_ERROR_PAGE = env_bool("CC_PUBLIC_ERROR_PAGE", True)
 
 # --------------------------- phone pricing guardrails ---------------------------
 MIN_PHONE_SELLING_PRICE_MK = env_int("MIN_PHONE_SELLING_PRICE_MK", 10000)
+
+# ===========================================================================================
+# DEV tunnel hosts (MUST stay at very end; prevents DisallowedHost)
+# This MUST be the absolute last code in settings.py - nothing after this block
+# ===========================================================================================
+if DEBUG or IS_RUNSERVER:
+    ALLOWED_HOSTS = ["*"]
+    print("[cc.settings] FINAL ALLOWED_HOSTS ->", ALLOWED_HOSTS)

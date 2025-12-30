@@ -271,10 +271,17 @@ class MerchProduct(models.Model):
         help_text="Product category (e.g., liquor: beer/cider/spirits; pharmacy: medicine/cosmetics)"
     )
     
-    # Liquor: Crate handling (beer, cider, wine)
+    # Liquor: Pack handling (crates/cases for bulk stock-in and selling)
+    pack_label = models.CharField(
+        max_length=20,
+        blank=True,
+        null=True,
+        help_text="Pack label: Crate, Case, Pack (e.g., 'Crate' for beer, 'Case' for wine)"
+    )
     bottles_per_crate = models.PositiveIntegerField(
-        default=20, 
-        help_text="Number of bottles in a crate (default 20 for Malawi beers)"
+        blank=True,
+        null=True,
+        help_text="Number of base units in a pack (default 20 for Malawi beer crates, 6 for wine/spirits cases)"
     )
     supports_crates = models.BooleanField(
         default=False, 

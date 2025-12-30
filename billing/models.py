@@ -484,6 +484,13 @@ class Invoice(models.Model):
         except Exception:
             return ""
 
+    @property
+    def tax_total(self) -> Decimal:
+        """
+        Alias for tax_amount to maintain template compatibility.
+        """
+        return self.tax_amount
+
     # -------- Money -----------------------------------------------------
     def recalc_totals(self, *, save: bool = False):
         agg = self.items.aggregate(subtotal=Sum(F("qty") * F("unit_price")))
@@ -549,6 +556,7 @@ class Payment(models.Model):
         CARD = "card", "Card (VISA/Mastercard)"
         STRIPE = "stripe", "Stripe"
         PESAPAL = "pesapal", "Pesapal"
+        PAYCHANGU = "paychangu", "PayChangu"
 
     class Status(models.TextChoices):
         PENDING = "pending", "Pending"
@@ -697,6 +705,95 @@ try:
 except Exception:
     # No tenants model yet (e.g., during first migration)
     pass
+
+
+# ======================================================================
+# PayChangu Transaction Tracking (Idempotent)
+# ======================================================================
+class PaymentTransaction(models.Model):
+    """
+    Provider-specific transaction records for PayChangu (and extensible to others).
+    Tracks checkout initiation, webhook payloads, and verification results.
+    Ensures no cross-tenant leakage via business + location FKs.
+    """
+    class Status(models.TextChoices):
+        PENDING = "pending", "Pending"
+        SUCCESS = "success", "Success"
+        FAILED = "failed", "Failed"
+
+    # Tenant isolation
+    business = models.ForeignKey(
+        "tenants.Business",
+        on_delete=models.CASCADE,
+        related_name="payment_transactions",
+        db_index=True,
+    )
+    location = models.ForeignKey(
+        "inventory.Location",
+        on_delete=models.CASCADE,
+        related_name="payment_transactions",
+        null=True,
+        blank=True,
+        db_index=True,
+    )
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="payment_transactions_created",
+    )
+
+    # Provider and transaction details
+    provider = models.CharField(max_length=20, default="paychangu", db_index=True)
+    tx_ref = models.CharField(max_length=128, unique=True, db_index=True)
+    amount = models.DecimalField(max_digits=14, decimal_places=2, validators=[MinValueValidator(0)])
+    currency = models.CharField(max_length=8, default=CURRENCY_DEFAULT)
+    status = models.CharField(max_length=20, choices=Status.choices, default=Status.PENDING)
+
+    # Checkout URL and payloads
+    checkout_url = models.URLField(max_length=512, blank=True, default="")
+    raw_init_payload = models.JSONField(default=dict, blank=True, help_text="Response from initiate API")
+    raw_webhook_payload = models.JSONField(default=dict, blank=True, help_text="Webhook notification payload")
+    raw_verify_payload = models.JSONField(default=dict, blank=True, help_text="Response from verify API")
+
+    # Timestamps
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+        indexes = [
+            models.Index(fields=["business", "created_at"]),
+            models.Index(fields=["provider", "status"]),
+            models.Index(fields=["tx_ref"]),
+        ]
+
+    def __str__(self):
+        return f"{self.provider} {self.tx_ref} - {self.get_status_display()}"
+
+    def mark_success(self, verify_payload: dict = None):
+        """
+        Idempotently mark transaction as successful.
+        Only updates if not already SUCCESS.
+        """
+        if self.status == self.Status.SUCCESS:
+            return  # Already successful, no-op
+        
+        self.status = self.Status.SUCCESS
+        if verify_payload:
+            self.raw_verify_payload = verify_payload
+        self.save(update_fields=["status", "raw_verify_payload", "updated_at"])
+
+    def mark_failed(self, verify_payload: dict = None):
+        """Mark transaction as failed."""
+        if self.status == self.Status.SUCCESS:
+            return  # Don't downgrade success to failure
+        
+        self.status = self.Status.FAILED
+        if verify_payload:
+            self.raw_verify_payload = verify_payload
+        self.save(update_fields=["status", "raw_verify_payload", "updated_at"])
 
 
 # ======================================================================
