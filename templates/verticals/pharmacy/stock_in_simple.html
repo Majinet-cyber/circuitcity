@@ -293,12 +293,81 @@
   }
 })();
 
-// Update qty modal form action based on context
+// Update qty modal form action and add AJAX submission
 document.addEventListener('DOMContentLoaded', function() {
   const qtyForm = document.getElementById('qtyForm');
   if (qtyForm) {
     // Set form action to stock-in endpoint
     qtyForm.action = '{% url "pharmacy:api_stock_in" %}';
+    
+    // Override form submission with AJAX
+    qtyForm.addEventListener('submit', function(e) {
+      e.preventDefault();
+      
+      const submitBtn = document.getElementById('modal-submit-btn');
+      const submitText = document.getElementById('modal-submit-text');
+      const spinner = document.getElementById('modal-spinner');
+      const errorDiv = document.getElementById('modal-error');
+      
+      // Show loading state
+      submitBtn.disabled = true;
+      submitText.style.display = 'none';
+      spinner.style.display = 'inline-block';
+      errorDiv.style.display = 'none';
+      
+      // Gather form data
+      const formData = {
+        product_id: document.getElementById('modal-product-id').value,
+        quantity: parseInt(document.getElementById('modal-quantity').value),
+        unit: document.getElementById('modal-unit').value,
+        expiry_date: document.getElementById('modal-expiry').value || null,
+        batch_number: document.getElementById('modal-batch').value || null,
+      };
+      
+      // Submit via AJAX
+      fetch('{% url "pharmacy:api_stock_in" %}', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-CSRFToken': '{{ csrf_token }}'
+        },
+        body: JSON.stringify(formData)
+      })
+      .then(response => response.json())
+      .then(data => {
+        if (data.success) {
+          // Close modal
+          const modal = bootstrap.Modal.getInstance(document.getElementById('qtyModal'));
+          modal.hide();
+          
+          // Show success toast
+          showPharmacyToast(data.message || 'Stock added successfully!', 'success');
+          
+          // Reset form
+          qtyForm.reset();
+          
+          // Refocus search
+          setTimeout(() => {
+            document.getElementById('product-search').focus();
+          }, 300);
+        } else {
+          // Show error in modal
+          errorDiv.textContent = data.error || 'Stock-in failed';
+          errorDiv.style.display = 'block';
+        }
+      })
+      .catch(error => {
+        console.error('Stock-in error:', error);
+        errorDiv.textContent = 'Network error. Please try again.';
+        errorDiv.style.display = 'block';
+      })
+      .finally(() => {
+        // Reset loading state
+        submitBtn.disabled = false;
+        submitText.style.display = 'inline';
+        spinner.style.display = 'none';
+      });
+    });
   }
 });
 </script>

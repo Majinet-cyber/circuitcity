@@ -2281,8 +2281,8 @@ def pharmacy_stock_in_simple(request: HttpRequest) -> HttpResponse:
         )
         .annotate(
             recent_stock_count=Count(
-                'pharmacybatch',
-                filter=Q(pharmacybatch__created_at__gte=thirty_days_ago)
+                'pharmacy_batches',
+                filter=Q(pharmacy_batches__created_at__gte=thirty_days_ago)
             )
         )
         .filter(recent_stock_count__gt=0)
@@ -2333,8 +2333,8 @@ def pharmacy_sell_simple(request: HttpRequest) -> HttpResponse:
         )
         .annotate(
             recent_sales_count=Count(
-                'pharmacysale',
-                filter=Q(pharmacysale__sale_date__gte=thirty_days_ago)
+                'pharmacy_batches__sales',
+                filter=Q(pharmacy_batches__sales__sold_at__gte=thirty_days_ago)
             )
         )
         .filter(recent_sales_count__gt=0)
@@ -2414,6 +2414,8 @@ def api_stock_in(request: HttpRequest) -> JsonResponse:
         unit = data.get('unit', 'piece')
         expiry_date_str = data.get('expiry_date')
         batch_number = data.get('batch_number')
+        cost_price = data.get('cost_price')
+        selling_price = data.get('selling_price')
         
         if not product_id:
             return JsonResponse({'success': False, 'error': 'Product ID required'}, status=400)
@@ -2434,21 +2436,43 @@ def api_stock_in(request: HttpRequest) -> JsonResponse:
             except ValueError:
                 pass
         
-        # Call service layer
-        batch = stock_in_pharmacy(
+        # Use product's existing prices if not provided
+        if not cost_price:
+            cost_price = product.cost_price or Decimal('0')
+        else:
+            cost_price = Decimal(cost_price)
+        
+        if not selling_price:
+            selling_price = product.selling_price or Decimal('0')
+        else:
+            selling_price = Decimal(selling_price)
+        
+        # Call service layer with correct signature
+        result = stock_in_pharmacy(
             business=business,
-            location=location,
-            product=product,
+            product_name=product.name,
+            category=product.category or "other",
+            user=request.user,
             quantity=quantity,
-            unit_label=unit,
+            unit=unit,
+            cost_price=cost_price,
+            selling_price=selling_price,
             expiry_date=expiry_date,
-            batch_number=batch_number or f"BATCH-{timezone.now().strftime('%Y%m%d%H%M%S')}"
+            batch_number=batch_number,
+            strip_size=product.strip_size,
+            box_size=product.box_size,
+            tablets_per_box=product.tablets_per_box,
+            location=location,
         )
+        
+        # Refresh product to get updated stock
+        product.refresh_from_db()
         
         return JsonResponse({
             'success': True,
-            'batch_id': batch.id,
-            'new_stock': product.quantity_in_stock
+            'batch_id': result['batch_id'],
+            'new_stock': result['current_batch_stock_base_units'],
+            'message': result['message']
         })
         
     except ValueError as e:
@@ -2494,21 +2518,21 @@ def api_sell(request: HttpRequest) -> JsonResponse:
                 kind="pharmacy"
             )
             
-            # Call service layer
-            sale = sell_pharmacy(
+            # Call service layer with correct signature
+            result = sell_pharmacy(
                 business=business,
-                location=location,
-                product=product,
+                product_id=product.id,
+                user=request.user,
                 quantity=quantity,
-                unit_label=unit,
-                payment_method=payment_method
+                unit=unit,
+                payment_method=payment_method.upper(),
             )
             
             sales.append({
-                'sale_id': sale.id,
                 'product': product.name,
                 'quantity': quantity,
-                'unit': unit
+                'unit': unit,
+                'sold_from_batches': result['sold_from_batches']
             })
         
         return JsonResponse({

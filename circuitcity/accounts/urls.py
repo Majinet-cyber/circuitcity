@@ -39,6 +39,20 @@ urlpatterns = [
     path("auth/otp/verify/", views.otp_verify_api, name="otp_verify_api"),
 
     # -------------------------------
+    # Two-Factor Authentication (SMS OTP)
+    # -------------------------------
+    # Challenge screen (after password login)
+    path("2fa/challenge/", views.twofa_challenge, name="twofa_challenge"),
+    
+    # Enable SMS 2FA flow
+    path("2fa/sms/enable/start/", views.twofa_sms_enable_start, name="twofa_sms_enable_start"),
+    path("2fa/sms/enable/verify/", views.twofa_sms_enable_verify, name="twofa_sms_enable_verify"),
+    
+    # Disable SMS 2FA flow
+    path("2fa/sms/disable/start/", views.twofa_sms_disable_start, name="twofa_sms_disable_start"),
+    path("2fa/sms/disable/verify/", views.twofa_sms_disable_verify, name="twofa_sms_disable_verify"),
+
+    # -------------------------------
     # Password Management
     # -------------------------------
     # Step 1: enter identifier (email/username) â†’ email a code (if user exists)

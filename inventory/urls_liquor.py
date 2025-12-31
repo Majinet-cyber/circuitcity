@@ -29,6 +29,9 @@ urlpatterns = [
     # Scan In
     path("scan-in/", views_liquor_inventory.liquor_scan_in, name="scan_in"),
     
+    # Stock List (detailed inventory with category filtering)
+    path("stock/list/", views_liquor_inventory.liquor_stock_list, name="stock_list"),
+    
     # Stock Overview
     path("stock/", views_liquor.stock_overview, name="stock_overview"),
     path("stock/settings/", views_liquor.stock_settings, name="stock_settings"),

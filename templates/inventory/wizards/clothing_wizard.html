@@ -276,6 +276,7 @@
       title: 'Pricing & Stock',
       subtitle: 'Set prices and initial stock',
       fields: [
+        { key: 'product_name', label: 'Product Name (Optional)', type: 'text', placeholder: 'e.g., Air Jordan 1, Summer Dress', required: false },
         { key: 'selling_price', label: 'Selling Price (MWK)', type: 'number', min: 0, step: '0.01', required: true },
         { key: 'cost_price', label: 'Cost Price/Order Price (MWK)', type: 'number', min: 0, step: '0.01' },
         { key: 'initial_stock', label: 'Initial Stock Quantity', type: 'number', min: 0, value: 0, required: true }

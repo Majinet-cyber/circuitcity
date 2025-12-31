@@ -258,6 +258,13 @@ class MerchProduct(models.Model):
     name = models.CharField(max_length=160)
     kind = models.CharField(max_length=20, choices=BusinessKind.choices, default=BusinessKind.GROCERY)
     sku = models.CharField(max_length=64, blank=True, null=True)
+    internal_sku = models.CharField(
+        max_length=64,
+        blank=True,
+        default='',
+        db_index=True,
+        help_text="Auto-generated internal SKU (business-scoped unique)"
+    )
     barcode = models.CharField(max_length=100, blank=True, null=True, default='', db_index=True, help_text="Product barcode (EAN, UPC, QR, etc.)")
     scan_required = models.BooleanField(default=False)  # set True if you want barcode scanning for some items
     base_unit = models.CharField(max_length=10, choices=BaseUnit.choices, default=BaseUnit.UNIT)
@@ -276,16 +283,39 @@ class MerchProduct(models.Model):
         max_length=20,
         blank=True,
         null=True,
-        help_text="Pack label: Crate, Case, Pack (e.g., 'Crate' for beer, 'Case' for wine)"
+        help_text="Pack label: Crate, Case, Pack, Carton, Bale, Bundle (e.g., 'Crate' for beer, 'Carton' for groceries)"
     )
     bottles_per_crate = models.PositiveIntegerField(
         blank=True,
         null=True,
-        help_text="Number of base units in a pack (default 20 for Malawi beer crates, 6 for wine/spirits cases)"
+        help_text="Number of base units in a pack (default 20 for Malawi beer crates, 6 for wine/spirits cases, 24 for grocery cartons)"
     )
     supports_crates = models.BooleanField(
         default=False, 
         help_text="True for beer/cider/wine; False for spirits"
+    )
+    
+    # Groceries: Wholesale pricing (optional)
+    wholesale_price_per_pack = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        help_text="Wholesale price per pack (carton/bale/bundle). If null, derived from retail price * pack_size"
+    )
+    
+    # Groceries: Expiry tracking (optional)
+    track_expiry = models.BooleanField(
+        default=False,
+        help_text="Track expiry dates for this product (optional for groceries)"
+    )
+    
+    # Groceries: Category group for UI tiles
+    category_group = models.CharField(
+        max_length=30,
+        blank=True,
+        default='',
+        help_text="Category group for groceries UI tiles (drinks, water, snacks, etc.)"
     )
     
     # Liquor: Shot handling (spirits, whiskey)
@@ -310,6 +340,28 @@ class MerchProduct(models.Model):
     auto_adjust_enabled = models.BooleanField(default=True, help_text="Enable smart auto-adjust based on sales demand")
     auto_adjust_pct = models.PositiveIntegerField(default=20, help_text="Increase target by this % over observed peak demand")
 
+    # Clothing: Premium fields (optional, for premium clothing items)
+    brand = models.CharField(
+        max_length=100,
+        blank=True,
+        default='',
+        help_text="Brand name (optional, for premium items)"
+    )
+    item_type = models.CharField(
+        max_length=20,
+        blank=True,
+        default='',
+        help_text="Item type: apparel, footwear, accessory, fragrance, other"
+    )
+    has_sizes = models.BooleanField(
+        default=False,
+        help_text="Enable size variants for this product"
+    )
+    has_colors = models.BooleanField(
+        default=False,
+        help_text="Enable color variants for this product"
+    )
+    
     # Pharmacy: Packaging fields (optional, for tablets/capsules)
     strip_size = models.PositiveIntegerField(
         null=True,
@@ -369,6 +421,16 @@ class MerchProduct(models.Model):
         else:
             return self.category
 
+    @property
+    def pack_size(self):
+        """Alias for bottles_per_crate (more generic name for all verticals)"""
+        return self.bottles_per_crate
+    
+    @pack_size.setter
+    def pack_size(self, value):
+        """Allow setting pack_size (updates bottles_per_crate)"""
+        self.bottles_per_crate = value
+    
     @property
     def sellable_shots_per_bottle(self):
         """Calculate sellable shots (total - reserved for barman)"""
@@ -432,6 +494,16 @@ class MerchProduct(models.Model):
         # This prevents DB constraint violations from older code paths
         if self.spec_label is None:
             self.spec_label = ""
+        
+        # CRITICAL FIX: Auto-generate internal_sku if missing (NOT NULL constraint)
+        # This ensures every product has a SKU regardless of entry path
+        if not self.internal_sku or not self.internal_sku.strip():
+            from inventory.utils_sku import generate_sku
+            self.internal_sku = generate_sku(
+                business_id=self.business_id,
+                name=self.name,
+                existing_sku=self.internal_sku
+            )
         
         # NEW RULE: Cider pack_size must be exactly 6 (6-pack only, no crates)
         if self.kind == BusinessKind.LIQUOR and self.category and self.category.lower() == "cider":

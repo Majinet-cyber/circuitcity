@@ -279,15 +279,30 @@ class PharmacyBatch(models.Model):
         return self.expiry_date < timezone.now().date()
     
     @property
-    def days_to_expiry(self) -> int:
-        """Days until expiry (negative if already expired)."""
+    def days_to_expiry(self) -> int | None:
+        """
+        Days until expiry (negative if already expired).
+        Returns None if expiry_date is not set (e.g., cosmetics, non-expiry items).
+        """
+        if not self.expiry_date:
+            return None
         delta = self.expiry_date - timezone.now().date()
         return delta.days
     
     @property
+    def is_expired(self) -> bool:
+        """Check if batch has expired. Returns False if no expiry date set."""
+        if not self.expiry_date:
+            return False
+        return self.expiry_date < timezone.now().date()
+    
+    @property
     def is_near_expiry(self, days: int = 30) -> bool:
         """Check if batch expires within the next N days."""
-        return 0 <= self.days_to_expiry <= days
+        days_left = self.days_to_expiry
+        if days_left is None:
+            return False
+        return 0 <= days_left <= days
     
     @property
     def is_low_stock(self) -> bool:

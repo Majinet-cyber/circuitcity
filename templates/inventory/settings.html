@@ -41,24 +41,8 @@
           </div>
         </div>
 
-        <!-- Two-Factor Authentication -->
-        <div class="panel-soft pad-sm round" style="margin-left:auto; min-width:min(420px, 100%);">
-          <div class="hstack" style="justify-content:space-between;">
-            <div>
-              <div style="font-weight:900; font-size:var(--fs-18);">Two-Factor Authentication</div>
-              <div class="text-muted">Status: {{ twofa_status }}</div>
-            </div>
-            <div class="hstack" style="gap:8px;">
-              {% if twofa_manage_url %}
-                <a href="{{ twofa_manage_url }}" class="btn {% if not twofa_enabled %}btn-primary{% endif %}">
-                  {% if twofa_enabled %}Manage 2FA{% else %}Set up 2FA{% endif %}
-                </a>
-              {% else %}
-                <button class="btn" disabled title="Two-factor app not installed">Unavailable</button>
-              {% endif %}
-            </div>
-          </div>
-        </div>
+        <!-- Two-Factor Authentication (SMS OTP) -->
+        {% include "accounts/_twofa_sms_card.html" %}
       </div>
     </div>
 

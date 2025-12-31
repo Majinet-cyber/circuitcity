@@ -81,7 +81,9 @@ def _get_vertical_stock_url(vertical: str) -> str:
         if vertical == CLOTHING:
             return reverse("inventory:stock_list")
         elif vertical == LIQUOR:
-            return reverse("liquor:stock_overview")
+            # CRITICAL FIX: Liquor must use liquor:stock_list (detailed inventory)
+            # NOT liquor:stock_overview (battery view) or inventory:stock_list (phones)
+            return reverse("liquor:stock_list")
         elif vertical == PHARMACY:
             return reverse("inventory:stock_list")  # Pharmacy uses default
         elif vertical == GYM:

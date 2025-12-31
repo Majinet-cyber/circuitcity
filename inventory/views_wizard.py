@@ -444,8 +444,8 @@ def clothing_wizard_submit(request):
         # Validate required fields
         if not category:
             return JsonResponse({'success': False, 'error': 'Product type is required'}, status=400)
-        if not product_name_input and category != 'shoes':
-            return JsonResponse({'success': False, 'error': 'Product name is required'}, status=400)
+        # CRITICAL FIX: product_name is optional - we build it from category/brand/color/size
+        # Only require it if we can't build a meaningful name from other fields
         if not size:
             return JsonResponse({'success': False, 'error': 'Size is required'}, status=400)
         

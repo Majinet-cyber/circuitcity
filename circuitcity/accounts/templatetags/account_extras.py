@@ -91,3 +91,17 @@ def render_errors(field):
     return mark_safe(html)
 
 
+# ----------------------------------------
+# Mask phone number for display
+# ----------------------------------------
+@register.filter
+def mask_phone(phone_e164):
+    """
+    Mask a phone number for display: +265******456
+    Shows country code + first digit + last 3 digits.
+    Usage: {{ phone|mask_phone }}
+    """
+    from circuitcity.accounts.models import mask_phone as _mask_phone
+    return _mask_phone(phone_e164) if phone_e164 else "—"
+
+

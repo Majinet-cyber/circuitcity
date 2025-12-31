@@ -309,6 +309,7 @@ def hub(request):
     ctx.update({
         'product_panels': product_panels,
         'page_title': 'Clothing Hub',
+        'active_tab': 'hub',  # Fix template variable error
     })
     
     return render(request, "verticals/clothing/hub.html", ctx)

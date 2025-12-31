@@ -1180,6 +1180,9 @@ def stock_list(request: HttpRequest, *args, **kwargs) -> HttpResponse:
     • Default table hides SOLD; use status=sold to view sold rows.
     • Badges are computed business-wide.
     • Hardened query parsing so bad params never 500.
+    
+    VERTICAL GATE: This view is for phones/pharmacy/clothing/gym.
+    Liquor businesses must use liquor:stock_list instead.
     """
     # ---------- tiny helpers (safe param parsing) ----------
     def _int(key, default, min_=1, max_=200):
@@ -1202,6 +1205,27 @@ def stock_list(request: HttpRequest, *args, **kwargs) -> HttpResponse:
             return redirect("tenants:activate_mine")
         except Exception:
             return redirect("/tenants/activate-mine/")
+    
+    # ---------- VERTICAL GATE: Prevent liquor businesses from accessing phone stock list ----------
+    from .helpers_core import business_vertical, LIQUOR
+    vertical = business_vertical(request)
+    
+    if vertical == LIQUOR:
+        # Liquor businesses MUST use their own stock list
+        # Redirect to liquor stock list with same query params
+        from django.urls import reverse
+        from django.http import QueryDict
+        
+        try:
+            liquor_url = reverse("liquor:stock_list")
+            # Preserve query params (category, search, etc.)
+            if request.GET:
+                liquor_url += f"?{request.GET.urlencode()}"
+            return redirect(liquor_url)
+        except Exception:
+            # Fallback: return 404 to prevent leakage
+            from django.http import Http404
+            raise Http404("This feature is not available for your business type")
 
     # ---------- canonical model ----------
     Model = None
@@ -4709,25 +4733,24 @@ def _two_factor_status(user) -> dict:
         "manage_url": getattr(settings, "TWO_FACTOR_MANAGE_URL", "/account/two-factor/"),
     }
 
-@login_required
-def settings_home(request):
-    user = request.user
-    profile = getattr(user, "profile", None)  # ok if you donâ€™t have a Profile model
-    avatar_url = getattr(profile, "avatar_url", None) or _gravatar(user.email, 160)
-
-    twofa = _two_factor_status(user)
-
-    context = {
-        "title": "Settings",
-        "avatar_url": avatar_url,
-        "user_full_name": (user.get_full_name() or user.username),
-        "user_username": user.username,
-        "user_email": user.email,
-        "last_login": user.last_login,
-        "twofa": twofa,
-        # existing notification toggles can be wired later; showing as UI only
-    }
-    return render(request, "inventory/settings.html", context)
+# NOTE: This function is OVERRIDDEN by a later definition at line ~5759.
+# Kept here for reference but not used. See the active version below.
+# @login_required
+# def settings_home(request):
+#     user = request.user
+#     profile = getattr(user, "profile", None)
+#     avatar_url = getattr(profile, "avatar_url", None) or _gravatar(user.email, 160)
+#     twofa = _two_factor_status(user)
+#     context = {
+#         "title": "Settings",
+#         "avatar_url": avatar_url,
+#         "user_full_name": (user.get_full_name() or user.username),
+#         "user_username": user.username,
+#         "user_email": user.email,
+#         "last_login": user.last_login,
+#         "twofa": twofa,
+#     }
+#     return render(request, "inventory/settings.html", context)
 
 @login_required
 def settings_redirect(request):
@@ -5737,16 +5760,27 @@ def settings_home(request):
     profile = getattr(user, "profile", None)  # ok if you donâ€™t have a Profile model
     avatar_url = getattr(profile, "avatar_url", None) or _gravatar(user.email, 160)
 
-    twofa = _two_factor_status(user)
+    # SMS 2FA context (replaces old TOTP-based twofa dict)
+    from circuitcity.accounts.models import UserTwoFactor, mask_phone
+    
+    twofa_available = bool(getattr(settings, "TWILIO_VERIFY_ENABLED", False))
+    tf, _ = UserTwoFactor.objects.get_or_create(user=user)
+    twofa_sms_enabled = bool(tf.sms_enabled)
+    twofa_phone_masked = mask_phone(tf.phone_e164) if tf.phone_e164 else ""
 
     context = {
         "title": "Settings",
-        "avatar_url": avatar_url,
+        "avatar_img_url": avatar_url,  # Template uses avatar_img_url
+        "upload_avatar_url": reverse("accounts:upload_my_avatar") if user.is_authenticated else None,
+        "change_password_url": reverse("accounts:settings_security") if user.is_authenticated else None,
         "user_full_name": (user.get_full_name() or user.username),
         "user_username": user.username,
         "user_email": user.email,
         "last_login": user.last_login,
-        "twofa": twofa,
+        # SMS 2FA context for the new partial
+        "twofa_available": twofa_available,
+        "twofa_sms_enabled": twofa_sms_enabled,
+        "twofa_phone_masked": twofa_phone_masked,
     }
     return render(request, "inventory/settings.html", context)
 

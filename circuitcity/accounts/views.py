@@ -516,6 +516,20 @@ def login_view(request):
                 # Pick an active business for the session if possible
                 _select_active_business_for_user(request, auth_user)
 
+                # Check if SMS 2FA is enabled for this user
+                from .models import is_twofa_enabled
+                if is_twofa_enabled(auth_user):
+                    # Set session flags for 2FA challenge
+                    request.session["twofa_required"] = True
+                    request.session["twofa_passed"] = False
+                    
+                    # Redirect to 2FA challenge page
+                    from django.urls import reverse
+                    challenge_url = reverse("accounts:twofa_challenge")
+                    if next_url:
+                        challenge_url += f"?next={next_url}"
+                    return redirect(challenge_url)
+
                 return redirect(next_url or _post_login_url(request))
 
             if user:
@@ -1065,26 +1079,118 @@ def settings_currency(request):
     return redirect(request.META.get("HTTP_REFERER", "/"))
 
 
+def _inject_sms_twofa_context(request, context):
+    """
+    Inject SMS 2FA context variables for the _twofa_sms_card.html partial.
+    Safe to call even if imports fail - will set twofa_available=False.
+    
+    Adds to context:
+    - twofa_available (bool): Whether Twilio Verify is enabled
+    - twofa_sms_enabled (bool): Whether user has SMS 2FA enabled
+    - twofa_phone_masked (str): Masked phone number or empty string
+    - twofa_enable_pending (bool): Whether enable OTP verification is pending
+    - twofa_disable_pending (bool): Whether disable OTP verification is pending
+    - twofa_pending_phone_masked (str): Masked pending phone during enable flow
+    """
+    try:
+        from django.conf import settings as dj_settings
+        from .models import UserTwoFactor
+        
+        # Try to import mask_phone from templatetags, fallback to models
+        try:
+            from .templatetags.account_extras import mask_phone
+        except Exception:
+            try:
+                from .models import mask_phone
+            except Exception:
+                # Fallback mask_phone implementation
+                def mask_phone(phone_e164):
+                    if not phone_e164 or len(phone_e164) < 7:
+                        return phone_e164
+                    if phone_e164.startswith("+"):
+                        visible_start = phone_e164[:5] if len(phone_e164) > 8 else phone_e164[:4]
+                        visible_end = phone_e164[-3:]
+                        masked_middle = "*" * (len(phone_e164) - len(visible_start) - len(visible_end))
+                        return f"{visible_start}{masked_middle}{visible_end}"
+                    return phone_e164
+        
+        tf, _ = UserTwoFactor.objects.get_or_create(user=request.user)
+        context["twofa_available"] = bool(getattr(dj_settings, "TWILIO_VERIFY_ENABLED", False))
+        context["twofa_sms_enabled"] = bool(tf.sms_enabled)
+        context["twofa_phone_masked"] = mask_phone(tf.phone_e164) if tf.phone_e164 else ""
+        
+        # Session flags for pending enable/disable flows
+        context["twofa_enable_pending"] = bool(request.session.get("twofa_enable_flow"))
+        context["twofa_disable_pending"] = bool(request.session.get("twofa_disable_flow"))
+        
+        # Masked pending phone for enable flow
+        pending_phone = request.session.get("twofa_pending_phone", "")
+        context["twofa_pending_phone_masked"] = mask_phone(pending_phone) if pending_phone else ""
+        
+    except Exception as e:
+        # Fail safe: set unavailable
+        logger.warning(f"Failed to inject SMS 2FA context: {e}")
+        context["twofa_available"] = False
+        context["twofa_sms_enabled"] = False
+        context["twofa_phone_masked"] = ""
+        context["twofa_enable_pending"] = False
+        context["twofa_disable_pending"] = False
+        context["twofa_pending_phone_masked"] = ""
+    
+    return context
+
+
 @login_required
 @require_http_methods(["GET", "POST"])
 def settings_security(request):
+    """
+    Security settings page: password change and 2FA management.
+    Password change requires recent 2FA if enabled.
+    """
+    from .models import get_or_create_twofactor, is_twofa_enabled
+    from django.conf import settings as django_settings
+    
+    # Get user's 2FA settings
+    tf = get_or_create_twofactor(request.user)
+    
     if request.method == "POST":
-        form = PasswordChangeSimpleForm(request.POST, user=request.user)
-        if form.is_valid():
-            old = form.cleaned_data["old_password"]
-            new1 = form.cleaned_data["new_password1"]
-            if not request.user.check_password(old):
-                messages.error(request, "Current password is incorrect.")
-            else:
-                request.user.set_password(new1)
-                request.user.save()
-                update_session_auth_hash(request, request.user)
-                messages.success(request, "Password changed.")
-                return redirect("accounts:settings_security")
+        # Check if this is a password change request (requires recent 2FA)
+        if 'old_password' in request.POST:
+            # Apply step-up auth for password changes
+            if is_twofa_enabled(request.user):
+                from .models import is_twofa_recent
+                if not is_twofa_recent(request, max_age_seconds=1800):
+                    # Redirect to 2FA challenge
+                    from django.urls import reverse
+                    challenge_url = reverse("accounts:twofa_challenge")
+                    next_url = request.get_full_path()
+                    return redirect(f"{challenge_url}?next={next_url}")
+            
+            form = PasswordChangeSimpleForm(request.POST, user=request.user)
+            if form.is_valid():
+                old = form.cleaned_data["old_password"]
+                new1 = form.cleaned_data["new_password1"]
+                if not request.user.check_password(old):
+                    messages.error(request, "Current password is incorrect.")
+                else:
+                    request.user.set_password(new1)
+                    request.user.save()
+                    update_session_auth_hash(request, request.user)
+                    messages.success(request, "Password changed.")
+                    return redirect("accounts:settings_security")
     else:
         form = PasswordChangeSimpleForm(user=request.user)
 
-    return render(request, "accounts/settings_security.html", {"form": form})
+    context = {
+        "form": form,
+        "twofactor": tf,
+        "settings": django_settings,
+    }
+    
+    # Inject SMS 2FA context for _twofa_sms_card.html partial
+    context = _inject_sms_twofa_context(request, context)
+    
+    return render(request, "accounts/settings_security.html", context)
 
 
 @login_required
@@ -1250,6 +1356,9 @@ def settings_unified(request):
         "change_password_url": change_pw_url,
         "upload_avatar_url": upload_avatar_url,
     }
+    
+    # Inject SMS 2FA context for _twofa_sms_card.html partial
+    ctx = _inject_sms_twofa_context(request, ctx)
 
     try:
         return render(request, "inventory/settings.html", ctx)
@@ -2203,3 +2312,367 @@ def _debug_template_origin(tpl_name: str) -> str | None:
         print(msg)
         log.error(msg)
         return None
+
+
+# ============================================================================
+# Two-Factor Authentication (SMS OTP) Views
+# ============================================================================
+
+def _check_2fa_rate_limit(user, action: str) -> tuple[bool, str | None]:
+    """
+    Check rate limits for 2FA actions.
+    
+    Args:
+        user: User object
+        action: "send" or "verify"
+    
+    Returns:
+        (allowed: bool, error_message: str | None)
+    """
+    from django.core.cache import cache
+    import time
+    
+    user_id = user.id
+    now = time.time()
+    
+    if action == "send":
+        # Check cooldown (60 seconds between sends)
+        last_send_key = f"twofa:sms:last_send_at:{user_id}"
+        last_send = cache.get(last_send_key)
+        
+        if last_send:
+            elapsed = now - last_send
+            if elapsed < 60:
+                wait_seconds = int(60 - elapsed)
+                return False, f"Please wait {wait_seconds} seconds before requesting a new code."
+        
+        # Check max sends (3 per 10 minutes)
+        send_count_key = f"twofa:sms:send_count:{user_id}"
+        send_count = cache.get(send_count_key, 0)
+        
+        if send_count >= 3:
+            return False, "Too many attempts. Contact your admin."
+        
+        # Update counters
+        cache.set(last_send_key, now, 60)  # 60 second TTL
+        cache.set(send_count_key, send_count + 1, 600)  # 10 minute TTL
+        
+        return True, None
+    
+    elif action == "verify":
+        # Check max verify attempts (8 per 10 minutes)
+        verify_count_key = f"twofa:sms:verify_count:{user_id}"
+        verify_count = cache.get(verify_count_key, 0)
+        
+        if verify_count >= 8:
+            return False, "Too many attempts. Contact your admin."
+        
+        # Update counter
+        cache.set(verify_count_key, verify_count + 1, 600)  # 10 minute TTL
+        
+        return True, None
+    
+    return False, "Invalid action"
+
+
+@login_required
+@require_http_methods(["POST"])
+def twofa_sms_enable_start(request):
+    """
+    Step 1 of enabling SMS 2FA: validate phone number and send OTP.
+    Stores pending_phone in session for verification.
+    Supports resend: if phone not provided, uses session phone.
+    """
+    from .models import get_or_create_twofactor
+    from .services.twilio_verify import send_otp
+    from django.conf import settings
+    
+    # Check if Twilio is configured
+    if not getattr(settings, 'TWILIO_VERIFY_ENABLED', False):
+        messages.error(request, "SMS verification is not available. Please contact your administrator.")
+        return redirect("accounts:settings_security")
+    
+    phone = request.POST.get("phone", "").strip()
+    
+    # Support resend: if no phone provided, try session (for resend button)
+    if not phone:
+        phone = request.session.get("twofa_pending_phone", "")
+        if not phone:
+            messages.error(request, "Phone number is required.")
+            return redirect("accounts:settings_security")
+    
+    # Basic phone validation (E.164 format)
+    if not phone.startswith("+"):
+        messages.error(request, "Phone number must be in international format (e.g. +265991234567)")
+        return redirect("accounts:settings_security")
+    
+    if len(phone) < 8 or len(phone) > 20:
+        messages.error(request, "Invalid phone number length.")
+        return redirect("accounts:settings_security")
+    
+    # Check rate limits
+    allowed, error_msg = _check_2fa_rate_limit(request.user, "send")
+    if not allowed:
+        messages.error(request, error_msg)
+        return redirect("accounts:settings_security")
+    
+    # Send OTP
+    success, error_msg = send_otp(phone)
+    
+    if not success:
+        messages.error(request, error_msg or "Failed to send verification code.")
+        return redirect("accounts:settings_security")
+    
+    # Store pending phone in session
+    request.session["twofa_pending_phone"] = phone
+    request.session["twofa_enable_flow"] = True
+    
+    messages.success(request, f"Verification code sent to {phone}")
+    return redirect("accounts:settings_security")
+
+
+@login_required
+@require_http_methods(["POST"])
+def twofa_sms_enable_verify(request):
+    """
+    Step 2 of enabling SMS 2FA: verify OTP and enable 2FA.
+    """
+    from .models import get_or_create_twofactor
+    from .services.twilio_verify import check_otp
+    from django.utils import timezone
+    
+    code = request.POST.get("code", "").strip()
+    pending_phone = request.session.get("twofa_pending_phone")
+    
+    if not pending_phone:
+        messages.error(request, "No pending verification. Please start the process again.")
+        return redirect("accounts:settings_security")
+    
+    if not code:
+        messages.error(request, "Verification code is required.")
+        return redirect("accounts:settings_security")
+    
+    # Check rate limits
+    allowed, error_msg = _check_2fa_rate_limit(request.user, "verify")
+    if not allowed:
+        messages.error(request, error_msg)
+        return redirect("accounts:settings_security")
+    
+    # Verify OTP
+    approved, error_msg = check_otp(pending_phone, code)
+    
+    if not approved:
+        messages.error(request, error_msg or "Invalid verification code.")
+        return redirect("accounts:settings_security")
+    
+    # Enable 2FA
+    tf = get_or_create_twofactor(request.user)
+    tf.sms_enabled = True
+    tf.phone_e164 = pending_phone
+    tf.phone_verified_at = timezone.now()
+    tf.save(update_fields=["sms_enabled", "phone_e164", "phone_verified_at", "updated_at"])
+    
+    # Clear session
+    request.session.pop("twofa_pending_phone", None)
+    request.session.pop("twofa_enable_flow", None)
+    
+    messages.success(request, "Two-factor authentication enabled successfully.")
+    return redirect("accounts:settings_security")
+
+
+@login_required
+@require_http_methods(["POST"])
+def twofa_sms_disable_start(request):
+    """
+    Step 1 of disabling SMS 2FA: send OTP to verify identity.
+    """
+    from .models import get_or_create_twofactor
+    from .services.twilio_verify import send_otp
+    
+    tf = get_or_create_twofactor(request.user)
+    
+    if not tf.sms_enabled:
+        messages.error(request, "Two-factor authentication is not enabled.")
+        return redirect("accounts:settings_security")
+    
+    # Check rate limits
+    allowed, error_msg = _check_2fa_rate_limit(request.user, "send")
+    if not allowed:
+        messages.error(request, error_msg)
+        return redirect("accounts:settings_security")
+    
+    # Send OTP to stored phone
+    success, error_msg = send_otp(tf.phone_e164)
+    
+    if not success:
+        messages.error(request, error_msg or "Failed to send verification code.")
+        return redirect("accounts:settings_security")
+    
+    # Mark disable flow in session
+    request.session["twofa_disable_flow"] = True
+    
+    from .models import mask_phone
+    messages.success(request, f"Verification code sent to {mask_phone(tf.phone_e164)}")
+    return redirect("accounts:settings_security")
+
+
+@login_required
+@require_http_methods(["POST"])
+def twofa_sms_disable_verify(request):
+    """
+    Step 2 of disabling SMS 2FA: verify OTP and disable 2FA.
+    """
+    from .models import get_or_create_twofactor
+    from .services.twilio_verify import check_otp
+    
+    code = request.POST.get("code", "").strip()
+    disable_flow = request.session.get("twofa_disable_flow")
+    
+    if not disable_flow:
+        messages.error(request, "No pending verification. Please start the process again.")
+        return redirect("accounts:settings_security")
+    
+    if not code:
+        messages.error(request, "Verification code is required.")
+        return redirect("accounts:settings_security")
+    
+    tf = get_or_create_twofactor(request.user)
+    
+    if not tf.sms_enabled:
+        messages.error(request, "Two-factor authentication is not enabled.")
+        return redirect("accounts:settings_security")
+    
+    # Check rate limits
+    allowed, error_msg = _check_2fa_rate_limit(request.user, "verify")
+    if not allowed:
+        messages.error(request, error_msg)
+        return redirect("accounts:settings_security")
+    
+    # Verify OTP
+    approved, error_msg = check_otp(tf.phone_e164, code)
+    
+    if not approved:
+        messages.error(request, error_msg or "Invalid verification code.")
+        return redirect("accounts:settings_security")
+    
+    # Disable 2FA
+    tf.sms_enabled = False
+    tf.save(update_fields=["sms_enabled", "updated_at"])
+    
+    # Clear session
+    request.session.pop("twofa_disable_flow", None)
+    
+    messages.success(request, "Two-factor authentication disabled.")
+    return redirect("accounts:settings_security")
+
+
+@require_http_methods(["GET", "POST"])
+def twofa_challenge(request):
+    """
+    2FA challenge screen after password login.
+    User must enter OTP sent to their phone to complete login.
+    """
+    from .models import get_or_create_twofactor, is_twofa_enabled, mask_phone
+    from .services.twilio_verify import send_otp, check_otp
+    from django.utils import timezone
+    import time
+    
+    # Must be authenticated to see this page
+    if not request.user.is_authenticated:
+        return redirect("accounts:login")
+    
+    # Check if user has 2FA enabled
+    if not is_twofa_enabled(request.user):
+        # No 2FA required, redirect to intended destination
+        next_url = request.GET.get("next") or request.POST.get("next") or "/"
+        return redirect(next_url)
+    
+    # Get user's 2FA settings
+    tf = get_or_create_twofactor(request.user)
+    masked_phone = mask_phone(tf.phone_e164)
+    
+    # On first GET, send OTP automatically (if rate limits allow)
+    if request.method == "GET":
+        # Check if we already sent recently (from session)
+        challenge_otp_sent = request.session.get("twofa_challenge_otp_sent")
+        
+        if not challenge_otp_sent:
+            # Try to send OTP
+            allowed, error_msg = _check_2fa_rate_limit(request.user, "send")
+            
+            if allowed:
+                success, error_msg = send_otp(tf.phone_e164)
+                if success:
+                    request.session["twofa_challenge_otp_sent"] = True
+                else:
+                    messages.error(request, error_msg or "Failed to send verification code.")
+            else:
+                # Rate limit hit - show error but still show form
+                messages.error(request, error_msg)
+    
+    # Handle POST (verify code)
+    if request.method == "POST":
+        action = request.POST.get("action")
+        
+        if action == "resend":
+            # Resend OTP
+            allowed, error_msg = _check_2fa_rate_limit(request.user, "send")
+            
+            if not allowed:
+                messages.error(request, error_msg)
+            else:
+                success, error_msg = send_otp(tf.phone_e164)
+                
+                if success:
+                    request.session["twofa_challenge_otp_sent"] = True
+                    messages.success(request, "New verification code sent.")
+                else:
+                    messages.error(request, error_msg or "Failed to send verification code.")
+            
+            return redirect(f"{request.path}?next={request.POST.get('next', '/')}")
+        
+        elif action == "verify":
+            code = request.POST.get("code", "").strip()
+            
+            if not code:
+                messages.error(request, "Verification code is required.")
+                return redirect(f"{request.path}?next={request.POST.get('next', '/')}")
+            
+            # Check rate limits
+            allowed, error_msg = _check_2fa_rate_limit(request.user, "verify")
+            if not allowed:
+                messages.error(request, error_msg)
+                return redirect(f"{request.path}?next={request.POST.get('next', '/')}")
+            
+            # Verify OTP
+            approved, error_msg = check_otp(tf.phone_e164, code)
+            
+            if not approved:
+                messages.error(request, error_msg or "Invalid verification code.")
+                return redirect(f"{request.path}?next={request.POST.get('next', '/')}")
+            
+            # Success! Mark 2FA as passed
+            request.session["twofa_passed"] = True
+            request.session["twofa_passed_at"] = time.time()
+            request.session.pop("twofa_required", None)
+            request.session.pop("twofa_challenge_otp_sent", None)
+            
+            # Redirect to intended destination
+            next_url = request.POST.get("next") or request.GET.get("next") or "/"
+            
+            # Sanitize next URL to prevent open redirect
+            from django.utils.http import url_has_allowed_host_and_scheme
+            if not url_has_allowed_host_and_scheme(next_url, allowed_hosts={request.get_host()}, require_https=request.is_secure()):
+                next_url = "/"
+            
+            return redirect(next_url)
+    
+    # Render challenge page
+    next_url = request.GET.get("next") or request.POST.get("next") or "/"
+    
+    context = {
+        "masked_phone": masked_phone,
+        "next": next_url,
+    }
+    
+    return render(request, "accounts/2fa_challenge.html", context)

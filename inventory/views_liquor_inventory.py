@@ -309,3 +309,113 @@ def liquor_scan_in(request):
         "business": business,
         "active_tab": "scan_in",
     })
+
+
+@login_required
+@require_business
+@require_business_kind(BusinessKind.LIQUOR)
+def liquor_stock_list(request):
+    """
+    Liquor Stock List - Detailed view of liquor inventory.
+    
+    CRITICAL: This view is LIQUOR-ONLY. Phone businesses must NEVER access this.
+    Supports filtering by category via ?category= param.
+    """
+    business = get_active_business(request)
+    
+    # Base queryset: liquor products for this business only
+    products = MerchProduct.objects.filter(
+        business=business,
+        kind=BusinessKind.LIQUOR,
+        is_active=True
+    ).select_related('business')
+    
+    # Category filter (if provided)
+    category = request.GET.get('category', '').strip().lower()
+    selected_category = None
+    if category:
+        products = products.filter(category__iexact=category)
+        selected_category = category
+    
+    # Search filter (by name, SKU, barcode)
+    search_query = request.GET.get('q', '').strip()
+    if search_query:
+        from django.db.models import Q
+        products = products.filter(
+            Q(name__icontains=search_query) |
+            Q(sku__icontains=search_query) |
+            Q(barcode__icontains=search_query) |
+            Q(internal_sku__icontains=search_query)
+        )
+    
+    # Sort by name
+    products = products.order_by('category', 'name')
+    
+    # Calculate aggregates
+    total_products = products.count()
+    total_quantity = sum(p.quantity_in_stock or 0 for p in products)
+    
+    # Cost and retail calculations
+    total_cost_value = Decimal('0.00')
+    total_retail_value = Decimal('0.00')
+    
+    for p in products:
+        qty = p.quantity_in_stock or 0
+        cost = p.cost_per_bottle or Decimal('0.00')
+        price = p.price_per_bottle or Decimal('0.00')
+        
+        total_cost_value += (qty * cost)
+        total_retail_value += (qty * price)
+    
+    expected_profit = total_retail_value - total_cost_value
+    
+    # Low stock and out of stock counts
+    low_stock_threshold = 10
+    low_stock_count = sum(1 for p in products if 0 < (p.quantity_in_stock or 0) <= low_stock_threshold)
+    out_of_stock_count = sum(1 for p in products if (p.quantity_in_stock or 0) == 0)
+    
+    # Get all categories for filter dropdown
+    all_categories = MerchProduct.objects.filter(
+        business=business,
+        kind=BusinessKind.LIQUOR,
+        is_active=True
+    ).values_list('category', flat=True).distinct().order_by('category')
+    
+    # Category display names
+    category_display_map = {
+        'beer': 'Beer',
+        'cider': 'Cider',
+        'wine': 'Wine',
+        'spirits': 'Spirits',
+        'whiskey': 'Whiskey',
+        'soft_drinks': 'Soft Drinks',
+        'water': 'Water',
+        'other': 'Other',
+    }
+    
+    categories_list = [
+        {
+            'key': cat,
+            'display': category_display_map.get(cat, cat.title()) if cat else 'Other'
+        }
+        for cat in all_categories if cat
+    ]
+    
+    context = {
+        'business': business,
+        'products': products,
+        'total_products': total_products,
+        'total_quantity': total_quantity,
+        'total_cost_value': total_cost_value,
+        'total_retail_value': total_retail_value,
+        'expected_profit': expected_profit,
+        'low_stock_count': low_stock_count,
+        'out_of_stock_count': out_of_stock_count,
+        'categories': categories_list,
+        'selected_category': selected_category,
+        'search_query': search_query,
+        'low_stock_threshold': low_stock_threshold,
+        'active_tab': 'stock',
+    }
+    
+    return render(request, 'verticals/liquor/stock_list.html', context)

@@ -55,7 +55,7 @@ def base_context(request) -> Dict[str, Any]:
     # Vertical-aware URL overrides (Task 1A: Fix liquor stock/sell/hub URLs)
     if vertical == "liquor":
         url_home = reverse("verticals:liquor_dashboard")
-        url_stock = reverse("liquor:stock_overview")
+        url_stock = reverse("liquor:stock_list")  # FIXED: Use stock_list not stock_overview
         url_sell = reverse("liquor:sell")
         url_scan_in = reverse("liquor:inventory_dashboard")  # Liquor Hub
     elif vertical == "gym":

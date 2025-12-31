@@ -7,7 +7,7 @@ from decimal import Decimal
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('inventory', '0099_auto_20250101_0000'),  # Replace with your latest migration
+        ('inventory', '1011_pharmacy_packaging_fields'),
     ]
 
     operations = [

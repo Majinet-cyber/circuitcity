@@ -280,6 +280,8 @@ MIDDLEWARE = [
     "cc.middleware_seo.CanonicalURLMiddleware",
     # ✅ SEO: UTM tracking parameter cleanup (2025-12-25)
     "cc.middleware_seo.PublicQueryCleanupMiddleware",
+    # ✅ Two-Factor Authentication enforcement (after auth)
+    "cc.middleware_twofa.TwoFactorAuthMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
 ]
@@ -754,6 +756,25 @@ if _from_email_domain and _from_email_domain != "emajinet.africa":
         f"DEFAULT_FROM_EMAIL domain ({_from_email_domain}) is not emajinet.africa. "
         f"This may affect email deliverability. Ensure the domain is verified in SendGrid."
     )
+
+# --------------------------- twilio (2FA SMS OTP) ---------------------------
+# Twilio Verify API for SMS-based Two-Factor Authentication
+# All credentials must be in environment variables (never in git)
+TWILIO_ACCOUNT_SID = os.environ.get("TWILIO_ACCOUNT_SID", "")
+TWILIO_AUTH_TOKEN = os.environ.get("TWILIO_AUTH_TOKEN", "")
+TWILIO_VERIFY_SERVICE_SID = os.environ.get("TWILIO_VERIFY_SERVICE_SID", "")
+
+# Enable Twilio Verify only if all required credentials are present
+TWILIO_VERIFY_ENABLED = bool(
+    TWILIO_ACCOUNT_SID 
+    and TWILIO_AUTH_TOKEN 
+    and TWILIO_VERIFY_SERVICE_SID
+)
+
+if TWILIO_VERIFY_ENABLED:
+    print("[cc.settings] Twilio Verify enabled for SMS 2FA")
+else:
+    print("[cc.settings] Twilio Verify disabled (missing credentials)")
 
 # --------------------------- billing ---------------------------
 BILLING = {

@@ -1,0 +1,189 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Verify Your Identity{% endblock %}
+{% block header_title %}Two-Factor Authentication{% endblock %}
+
+{# Hide header actions on 2FA challenge #}
+{% block extra_head %}
+<style>
+  .cc-header .cc-actions { display: none !important; }
+  .challenge-container {
+    max-width: 500px;
+    margin: 3rem auto;
+  }
+  .challenge-card {
+    background: #fff;
+    border-radius: 16px;
+    box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1), 0 2px 4px -1px rgba(0,0,0,0.06);
+    padding: 2rem;
+  }
+  .challenge-icon {
+    width: 64px;
+    height: 64px;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto 1.5rem;
+    color: white;
+    font-size: 2rem;
+  }
+  .code-input {
+    font-size: 1.5rem;
+    letter-spacing: 0.5rem;
+    text-align: center;
+    font-family: 'Courier New', monospace;
+    padding: 1rem;
+    border: 2px solid #e2e8f0;
+    border-radius: 12px;
+  }
+  .code-input:focus {
+    border-color: #667eea;
+    outline: none;
+    box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+  }
+  .resend-timer {
+    color: #64748b;
+    font-size: 0.875rem;
+  }
+  .resend-link {
+    color: #667eea;
+    text-decoration: none;
+    font-weight: 600;
+  }
+  .resend-link:hover {
+    text-decoration: underline;
+  }
+  .resend-link.disabled {
+    color: #cbd5e1;
+    pointer-events: none;
+    cursor: not-allowed;
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container">
+  <div class="challenge-container">
+    <div class="challenge-card">
+      <div class="challenge-icon">
+        <i class="bi bi-shield-lock"></i>
+      </div>
+
+      <h2 class="text-center fw-bold mb-2">Verify Your Identity</h2>
+      <p class="text-center text-muted mb-4">
+        We sent a verification code to<br>
+        <strong>{{ masked_phone }}</strong>
+      </p>
+
+      {% if messages %}
+        {% for message in messages %}
+          <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+            {{ message }}
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+          </div>
+        {% endfor %}
+      {% endif %}
+
+      {# Verify form #}
+      <form method="post" action="{% url 'accounts:twofa_challenge' %}">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="verify">
+        <input type="hidden" name="next" value="{{ next }}">
+
+        <div class="mb-4">
+          <label class="form-label fw-semibold" for="id_code">Verification Code</label>
+          <input 
+            type="text" 
+            name="code" 
+            id="id_code"
+            class="form-control code-input" 
+            placeholder="000000" 
+            maxlength="6" 
+            pattern="[0-9]{6}" 
+            inputmode="numeric"
+            autocomplete="one-time-code"
+            required 
+            autofocus
+          >
+          <div class="form-text text-center mt-2">
+            Enter the 6-digit code from your phone
+          </div>
+        </div>
+
+        <button type="submit" class="btn btn-primary w-100 py-2 mb-3">
+          <i class="bi bi-check-circle me-1"></i> Verify & Continue
+        </button>
+      </form>
+
+      {# Resend form #}
+      <div class="text-center">
+        <form method="post" action="{% url 'accounts:twofa_challenge' %}" id="resendForm" style="display: inline;">
+          {% csrf_token %}
+          <input type="hidden" name="action" value="resend">
+          <input type="hidden" name="next" value="{{ next }}">
+          
+          <span class="resend-timer">Didn't receive a code?</span>
+          <button 
+            type="submit" 
+            id="resendBtn"
+            class="btn btn-link resend-link p-0"
+            disabled
+          >
+            Resend code (<span id="countdown">60</span>s)
+          </button>
+        </form>
+      </div>
+
+      <hr class="my-4">
+
+      <div class="text-center small text-muted">
+        <i class="bi bi-info-circle me-1"></i>
+        Having trouble? Contact your administrator for help.
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  // Countdown timer for resend button (60 seconds)
+  (function() {
+    const resendBtn = document.getElementById('resendBtn');
+    const countdownSpan = document.getElementById('countdown');
+    let countdown = 60;
+
+    // Start countdown
+    const timer = setInterval(function() {
+      countdown--;
+      countdownSpan.textContent = countdown;
+
+      if (countdown <= 0) {
+        clearInterval(timer);
+        resendBtn.disabled = false;
+        resendBtn.innerHTML = 'Resend code';
+        resendBtn.classList.remove('disabled');
+      }
+    }, 1000);
+
+    // Auto-focus code input
+    const codeInput = document.getElementById('id_code');
+    if (codeInput) {
+      codeInput.focus();
+    }
+
+    // Auto-submit when 6 digits entered
+    codeInput.addEventListener('input', function(e) {
+      const value = e.target.value.replace(/\D/g, '');
+      e.target.value = value;
+      
+      if (value.length === 6) {
+        // Optional: auto-submit
+        // e.target.form.submit();
+      }
+    });
+  })();
+</script>
+{% endblock %}
+
