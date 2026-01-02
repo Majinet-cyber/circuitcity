@@ -9,7 +9,7 @@ def drop_emailotp_index_database(apps, schema_editor):
     """Drop emailotp index using idempotent SQL. Safe to run even if index doesn't exist."""
     vendor = schema_editor.connection.vendor
     with schema_editor.connection.cursor() as cursor:
-        if vendor in ('postgresql', 'sqlite'):
+        if vendor in ("postgresql", "sqlite"):
             cursor.execute("DROP INDEX IF EXISTS accounts_em_email_d5111a_idx")
 
 
@@ -19,7 +19,6 @@ def reverse_drop_emailotp_index_database(apps, schema_editor):
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         ("accounts", "0008_onboardingprofile"),
         migrations.swappable_dependency(settings.AUTH_USER_MODEL),
@@ -55,9 +54,7 @@ class Migration(migrations.Migration):
         migrations.AddField(
             model_name="emailotp",
             name="user_agent",
-            field=models.TextField(
-                blank=True, help_text="User agent string", null=True
-            ),
+            field=models.TextField(blank=True, help_text="User agent string", null=True),
         ),
         migrations.AddField(
             model_name="profile",
@@ -70,23 +67,17 @@ class Migration(migrations.Migration):
         migrations.AlterField(
             model_name="emailotp",
             name="attempts",
-            field=models.PositiveIntegerField(
-                default=0, help_text="Number of verification attempts"
-            ),
+            field=models.PositiveIntegerField(default=0, help_text="Number of verification attempts"),
         ),
         migrations.AlterField(
             model_name="emailotp",
             name="code_hash",
-            field=models.CharField(
-                help_text="Hashed OTP code (never store plaintext)", max_length=256
-            ),
+            field=models.CharField(help_text="Hashed OTP code (never store plaintext)", max_length=256),
         ),
         migrations.AlterField(
             model_name="emailotp",
             name="email",
-            field=models.EmailField(
-                db_index=True, help_text="Normalized lowercase email", max_length=254
-            ),
+            field=models.EmailField(db_index=True, help_text="Normalized lowercase email", max_length=254),
         ),
         migrations.AlterField(
             model_name="emailotp",
@@ -107,9 +98,7 @@ class Migration(migrations.Migration):
         migrations.AlterField(
             model_name="emailotp",
             name="requester_ip",
-            field=models.GenericIPAddressField(
-                blank=True, help_text="IP address of requester", null=True
-            ),
+            field=models.GenericIPAddressField(blank=True, help_text="IP address of requester", null=True),
         ),
         migrations.AddIndex(
             model_name="emailotp",

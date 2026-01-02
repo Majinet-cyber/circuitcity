@@ -5,15 +5,20 @@ import django.db.models.deletion
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
-        ('inventory', '0008_auditlog_alter_inventoryaudit_action'),
+        ("inventory", "0008_auditlog_alter_inventoryaudit_action"),
     ]
 
     operations = [
         migrations.AlterField(
-            model_name='inventoryaudit',
-            name='item',
-            field=models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.CASCADE, related_name='audits', to='inventory.inventoryitem'),
+            model_name="inventoryaudit",
+            name="item",
+            field=models.ForeignKey(
+                blank=True,
+                null=True,
+                on_delete=django.db.models.deletion.CASCADE,
+                related_name="audits",
+                to="inventory.inventoryitem",
+            ),
         ),
     ]

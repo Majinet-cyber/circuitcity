@@ -7,7 +7,6 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         ("billing", "0005_businesssubscription_pesapal_merchant_reference_and_more"),
         ("inventory", "1008_alter_archivebatch_counts_snapshot"),
@@ -78,9 +77,7 @@ class Migration(migrations.Migration):
                 ),
                 (
                     "raw_init_payload",
-                    models.JSONField(
-                        blank=True, default=dict, help_text="Response from initiate API"
-                    ),
+                    models.JSONField(blank=True, default=dict, help_text="Response from initiate API"),
                 ),
                 (
                     "raw_webhook_payload",
@@ -92,9 +89,7 @@ class Migration(migrations.Migration):
                 ),
                 (
                     "raw_verify_payload",
-                    models.JSONField(
-                        blank=True, default=dict, help_text="Response from verify API"
-                    ),
+                    models.JSONField(blank=True, default=dict, help_text="Response from verify API"),
                 ),
                 ("created_at", models.DateTimeField(auto_now_add=True, db_index=True)),
                 ("updated_at", models.DateTimeField(auto_now=True)),
@@ -138,9 +133,7 @@ class Migration(migrations.Migration):
                         fields=["provider", "status"],
                         name="billing_pay_provide_5211d9_idx",
                     ),
-                    models.Index(
-                        fields=["tx_ref"], name="billing_pay_tx_ref_825c74_idx"
-                    ),
+                    models.Index(fields=["tx_ref"], name="billing_pay_tx_ref_825c74_idx"),
                 ],
             },
         ),

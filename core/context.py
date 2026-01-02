@@ -39,10 +39,7 @@ def _extract_roles_for(user, business) -> SimpleNamespace:
         )
 
     prefix = f"biz:{business.pk}:"
-    names = (
-        user.groups.filter(name__startswith=prefix)
-        .values_list("name", flat=True)
-    )
+    names = user.groups.filter(name__startswith=prefix).values_list("name", flat=True)
 
     found = []
     for name in names:
@@ -58,7 +55,7 @@ def _extract_roles_for(user, business) -> SimpleNamespace:
     is_manager = is_owner or ("MANAGER" in roles)  # OWNER implies manager privileges
     is_auditor = "AUDITOR" in roles
     is_bar_manager = "BAR_MANAGER" in roles  # NEW: Bar manager role for liquor stores
-    
+
     # CRITICAL FIX: Managers are NEVER agents, even if they have AGENT group
     # Agent flag is only true if user has AGENT role AND is not a manager
     is_agent = ("AGENT" in roles) and not is_manager
@@ -115,7 +112,7 @@ def _features_for(request: HttpRequest, business) -> SimpleNamespace:
 def flags(request: HttpRequest) -> dict:
     """
     Context processor: adds role flags, features, and app name to all templates.
-    
+
     CRITICAL: Now uses AUTHORITATIVE role flags from middleware (request.cc_*).
     This ensures consistent role detection across the entire application.
 
@@ -136,7 +133,7 @@ def flags(request: HttpRequest) -> dict:
         is_agent = getattr(request, "cc_is_agent", False)
         is_owner = getattr(request, "cc_is_owner", False)
         cc_role = getattr(request, "cc_role", "NONE")
-        
+
         # Extract individual role flags from cc_role for backward compatibility
         roles_list = []
         if cc_role in ("MANAGER", "OWNER"):
@@ -145,9 +142,10 @@ def flags(request: HttpRequest) -> dict:
             roles_list.append("AGENT")
         elif cc_role in ("AUDITOR", "BAR_MANAGER"):
             roles_list.append(cc_role)
-        
+
         # Create SimpleNamespace for backward compatibility
         from types import SimpleNamespace
+
         roles = SimpleNamespace(
             is_owner=is_owner,
             is_manager=is_manager,
@@ -167,10 +165,8 @@ def flags(request: HttpRequest) -> dict:
     return {
         # App/brand
         "APP_NAME": app_name,
-
         # Tenant context (useful if templates want to show/hide by tenant presence)
         "BUSINESS": business,
-
         # Roles (what your sidebar checks)
         # CRITICAL: These now come from middleware's authoritative determination
         "IS_OWNER": roles.is_owner,
@@ -178,12 +174,8 @@ def flags(request: HttpRequest) -> dict:
         "IS_AGENT": roles.is_agent,
         "IS_AUDITOR": roles.is_auditor,
         "ROLES": roles.roles,  # ['OWNER', 'MANAGER', ...] for debugging/visibility
-
         # Feature flags (safe even if missing in settings or business)
         "FEATURES": features,
-
         # Convenience booleans you might like
         "DEBUG": getattr(settings, "DEBUG", False),
     }
-
-

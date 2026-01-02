@@ -24,8 +24,10 @@ V2_LOADED = True
 try:
     from core.decorators import manager_required  # type: ignore
 except Exception:  # pragma: no cover
+
     def manager_required(fn):
         return fn
+
 
 from .models import Product, InventoryItem, MerchProduct
 
@@ -33,12 +35,15 @@ from .models import Product, InventoryItem, MerchProduct
 try:
     from tenants.utils import get_active_business  # type: ignore
 except Exception:  # pragma: no cover
+
     def get_active_business(_request):
         return getattr(_request, "business", None)
+
 
 try:
     from .forms import _is_phone_business, get_product_qs_for_business  # type: ignore
 except Exception:  # fallback
+
     def _is_phone_business(_biz) -> bool:  # type: ignore
         name = (getattr(_biz, "vertical", None) or getattr(_biz, "category", None) or "").strip().lower()
         return name not in {"clothing", "fashion", "apparel", "liquor", "bar", "pub"}
@@ -46,9 +51,11 @@ except Exception:  # fallback
     def get_product_qs_for_business(_biz):  # type: ignore
         return Product.objects.all()
 
-URL_NAME_PHONES   = "inventory:merch_product_new"
-URL_NAME_LIQUOR   = "inventory:liquor_product_new_v2"
+
+URL_NAME_PHONES = "inventory:merch_product_new"
+URL_NAME_LIQUOR = "inventory:liquor_product_new_v2"
 URL_NAME_CLOTHING = "inventory:clothing_product_new_v2"
+
 
 # -------------------------- vertical helpers ------------------------
 def _vertical_key(value: Optional[str]) -> str:
@@ -58,6 +65,7 @@ def _vertical_key(value: Optional[str]) -> str:
     if v in {"liquor", "bar", "pub"}:
         return "liquor"
     return "phones"
+
 
 def _infer_vertical(request) -> str:
     """
@@ -91,12 +99,14 @@ def _infer_vertical(request) -> str:
 
     return "phones"
 
+
 def _redirect_for_vertical(vertical: str):
     if vertical == "clothing":
         return URL_NAME_CLOTHING
     if vertical == "liquor":
         return URL_NAME_LIQUOR
     return URL_NAME_PHONES
+
 
 # -------------------------- queryset scoping ------------------------
 def _product_base_qs(request):
@@ -107,9 +117,11 @@ def _product_base_qs(request):
         return Product.objects.filter(business_id=getattr(biz, "id", biz))
     return get_product_qs_for_business(biz)
 
+
 def _assign_if_has(obj, field: str, value):
     if hasattr(obj, field):
         setattr(obj, field, value)
+
 
 # ========================= PHONES v2 ===============================
 BRAND_CHOICES: list[tuple[str, str]] = [
@@ -121,6 +133,7 @@ BRAND_CHOICES: list[tuple[str, str]] = [
     ("Other", "Otherâ€¦"),
 ]
 SPEC_SUGGESTIONS = ["64+2", "64+3", "128+4", "128+8", "256+8"]
+
 
 def _inflate_phone(instance: Product, data: dict):
     brand = data.get("brand") or ""
@@ -149,6 +162,7 @@ def _inflate_phone(instance: Product, data: dict):
             if hasattr(instance, f):
                 setattr(instance, f, price)
                 break
+
 
 def _initial_from_phone(p: Product) -> dict:
     def _get(*names: str, default: str = "") -> str:
@@ -184,26 +198,30 @@ def _initial_from_phone(p: Product) -> dict:
         "price": price_val,
     }
 
+
 class PhoneProductForm(forms.Form):
     brand = forms.ChoiceField(
-        choices=BRAND_CHOICES,
-        widget=forms.Select(attrs={"id": "id_brand_select", "class": "form-select input"})
+        choices=BRAND_CHOICES, widget=forms.Select(attrs={"id": "id_brand_select", "class": "form-select input"})
     )
     model_number = forms.CharField(
-        max_length=80, required=False,
-        widget=forms.TextInput(attrs={"class": "form-control input", "placeholder": "e.g. A56, SM-A146B"})
+        max_length=80,
+        required=False,
+        widget=forms.TextInput(attrs={"class": "form-control input", "placeholder": "e.g. A56, SM-A146B"}),
     )
     specs = forms.CharField(
         required=True,
-        widget=forms.TextInput(attrs={"class": "form-control input", "list": "specs-list", "placeholder": "e.g. 128+4"})
+        widget=forms.TextInput(
+            attrs={"class": "form-control input", "list": "specs-list", "placeholder": "e.g. 128+4"}
+        ),
     )
     phone_name = forms.CharField(
         max_length=120,
-        widget=forms.TextInput(attrs={"class": "form-control input", "placeholder": "e.g. Spark Go 2024"})
+        widget=forms.TextInput(attrs={"class": "form-control input", "placeholder": "e.g. Spark Go 2024"}),
     )
     price = forms.DecimalField(
-        max_digits=12, decimal_places=2,
-        widget=forms.NumberInput(attrs={"class": "form-control input", "step": "0.01", "min": "0"})
+        max_digits=12,
+        decimal_places=2,
+        widget=forms.NumberInput(attrs={"class": "form-control input", "step": "0.01", "min": "0"}),
     )
 
     def clean(self):
@@ -214,38 +232,39 @@ class PhoneProductForm(forms.Form):
                 self.add_error("brand", "Type a brand name for 'Other'.")
             else:
                 cleaned["brand"] = other
-        
+
         # Check for duplicate brand+model+specs combination
         brand = cleaned.get("brand", "").strip()
         model_number = cleaned.get("model_number", "").strip()
         specs = cleaned.get("specs", "").strip()
-        
+
         if brand and model_number and specs:
             # Check if this combination already exists
             from inventory.models import Product
             from tenants.utils import get_active_business
-            
+
             biz = None
-            if hasattr(self, 'request'):
+            if hasattr(self, "request"):
                 biz = get_active_business(self.request)
-            
+
             qs = Product.objects.filter(
                 brand__iexact=brand,
                 model__iexact=model_number,
                 variant__iexact=specs,
             )
-            
-            if biz and hasattr(Product, 'business'):
+
+            if biz and hasattr(Product, "business"):
                 qs = qs.filter(business=biz)
-            
+
             if qs.exists():
                 existing = qs.first()
                 raise forms.ValidationError(
                     f"A product with this combination already exists: {existing}. "
                     f"Please use a different brand, model, or specs combination."
                 )
-        
+
         return cleaned
+
 
 @login_required
 @manager_required
@@ -269,9 +288,10 @@ def product_create_v2(request):
                 return redirect(URL_NAME_PHONES)
             except IntegrityError as e:
                 # Catch any remaining IntegrityErrors (e.g., from unique 'code' field)
-                if 'unique' in str(e).lower() or 'duplicate' in str(e).lower():
-                    messages.error(request, 
-                        "This product already exists. Please check the brand, model, and specs combination.")
+                if "unique" in str(e).lower() or "duplicate" in str(e).lower():
+                    messages.error(
+                        request, "This product already exists. Please check the brand, model, and specs combination."
+                    )
                 else:
                     messages.error(request, f"Could not save product: {str(e)}")
     else:
@@ -280,6 +300,7 @@ def product_create_v2(request):
     products = qs.order_by("-id")[:50]
     ctx = {"form": form, "products": products, "specs_suggestions": SPEC_SUGGESTIONS, "vertical": "phones"}
     return render(request, "inventory/products/new_v2.html", ctx)
+
 
 @login_required
 @manager_required
@@ -305,6 +326,7 @@ def product_edit_v2(request, pk: int):
     ctx = {"form": form, "products": products, "specs_suggestions": SPEC_SUGGESTIONS, "vertical": "phones"}
     return render(request, "inventory/products/new_v2.html", ctx)
 
+
 # ========================= DELETE (shared) =======================
 @login_required
 @manager_required
@@ -329,106 +351,147 @@ def product_delete_v2(request, pk: int):
 
     return redirect(redirect_name)
 
+
 # ========================= LIQUOR v2 =============================
 class LiquorProductForm(forms.Form):
     liquor_name = forms.CharField(
         max_length=120,
-        widget=forms.TextInput(attrs={"class": "form-control input", "placeholder": "e.g. Hunter's Gold"})
+        widget=forms.TextInput(attrs={"class": "form-control input", "placeholder": "e.g. Hunter's Gold"}),
     )
     category = forms.ChoiceField(
-        choices=[("", "Select category")] + [("beer", "Beer"), ("cider", "Cider"), ("spirits", "Spirits"), ("wine", "Wine"), ("whiskey", "Whiskey"), ("other", "Other")],
+        choices=[("", "Select category")]
+        + [
+            ("beer", "Beer"),
+            ("cider", "Cider"),
+            ("spirits", "Spirits"),
+            ("wine", "Wine"),
+            ("whiskey", "Whiskey"),
+            ("other", "Other"),
+        ],
         required=False,
-        widget=forms.Select(attrs={"class": "form-control"})
+        widget=forms.Select(attrs={"class": "form-control"}),
     )
     has_shots = forms.BooleanField(
-        required=False,
-        widget=forms.CheckboxInput(attrs={"class": "form-check-input", "id": "id_has_shots"})
+        required=False, widget=forms.CheckboxInput(attrs={"class": "form-check-input", "id": "id_has_shots"})
     )
     shots_per_bottle = forms.IntegerField(
-        min_value=1, required=False,
-        widget=forms.NumberInput(attrs={"class": "form-control input", "placeholder": "e.g. 25", "min": "1"})
+        min_value=1,
+        required=False,
+        widget=forms.NumberInput(attrs={"class": "form-control input", "placeholder": "e.g. 25", "min": "1"}),
     )
     barman_shots_reserved = forms.IntegerField(
-        min_value=0, required=False, initial=2,
-        widget=forms.NumberInput(attrs={"class": "form-control input", "placeholder": "2", "min": "0"})
+        min_value=0,
+        required=False,
+        initial=2,
+        widget=forms.NumberInput(attrs={"class": "form-control input", "placeholder": "2", "min": "0"}),
     )
     price_bottle = forms.DecimalField(
-        max_digits=12, decimal_places=2,
-        widget=forms.NumberInput(attrs={"class": "form-control input", "step": "0.01", "min": "0", "placeholder": "0.00"})
+        max_digits=12,
+        decimal_places=2,
+        widget=forms.NumberInput(
+            attrs={"class": "form-control input", "step": "0.01", "min": "0", "placeholder": "0.00"}
+        ),
     )
     cost_per_bottle = forms.DecimalField(
-        max_digits=12, decimal_places=2, required=False,
-        widget=forms.NumberInput(attrs={"class": "form-control input", "step": "0.01", "min": "0", "placeholder": "0.00"})
+        max_digits=12,
+        decimal_places=2,
+        required=False,
+        widget=forms.NumberInput(
+            attrs={"class": "form-control input", "step": "0.01", "min": "0", "placeholder": "0.00"}
+        ),
     )
     price_shot = forms.DecimalField(
-        max_digits=12, decimal_places=2, required=False,
-        widget=forms.NumberInput(attrs={"class": "form-control input", "step": "0.01", "min": "0", "placeholder": "0.00"})
+        max_digits=12,
+        decimal_places=2,
+        required=False,
+        widget=forms.NumberInput(
+            attrs={"class": "form-control input", "step": "0.01", "min": "0", "placeholder": "0.00"}
+        ),
     )
-    
+
     # Wine glass pricing
     has_glasses = forms.BooleanField(
         required=False,
         widget=forms.CheckboxInput(attrs={"class": "form-check-input", "id": "id_has_glasses"}),
-        label="Sell by glass (wine)"
+        label="Sell by glass (wine)",
     )
     glasses_per_bottle = forms.IntegerField(
-        min_value=1, required=False,
-        widget=forms.NumberInput(attrs={"class": "form-control input", "placeholder": "e.g. 5", "min": "1"})
+        min_value=1,
+        required=False,
+        widget=forms.NumberInput(attrs={"class": "form-control input", "placeholder": "e.g. 5", "min": "1"}),
     )
     price_glass = forms.DecimalField(
-        max_digits=12, decimal_places=2, required=False,
-        widget=forms.NumberInput(attrs={"class": "form-control input", "step": "0.01", "min": "0", "placeholder": "0.00"})
+        max_digits=12,
+        decimal_places=2,
+        required=False,
+        widget=forms.NumberInput(
+            attrs={"class": "form-control input", "step": "0.01", "min": "0", "placeholder": "0.00"}
+        ),
     )
     cost_per_glass = forms.DecimalField(
-        max_digits=12, decimal_places=2, required=False,
-        widget=forms.NumberInput(attrs={"class": "form-control input", "step": "0.01", "min": "0", "placeholder": "0.00"})
+        max_digits=12,
+        decimal_places=2,
+        required=False,
+        widget=forms.NumberInput(
+            attrs={"class": "form-control input", "step": "0.01", "min": "0", "placeholder": "0.00"}
+        ),
     )
-    
+
     qty_bottles = forms.IntegerField(
-        min_value=0, required=False,
-        widget=forms.NumberInput(attrs={"class": "form-control input", "min": "0", "placeholder": "0"})
+        min_value=0,
+        required=False,
+        widget=forms.NumberInput(attrs={"class": "form-control input", "min": "0", "placeholder": "0"}),
     )
-    
+
     # Smart stock target fields
     target_bottles = forms.IntegerField(
-        min_value=0, required=False, initial=0,
-        widget=forms.NumberInput(attrs={"class": "form-control input", "min": "0", "placeholder": "0", "title": "Target stock level"})
+        min_value=0,
+        required=False,
+        initial=0,
+        widget=forms.NumberInput(
+            attrs={"class": "form-control input", "min": "0", "placeholder": "0", "title": "Target stock level"}
+        ),
     )
     auto_adjust_enabled = forms.BooleanField(
-        required=False, initial=True,
+        required=False,
+        initial=True,
         widget=forms.CheckboxInput(attrs={"class": "form-check-input"}),
-        label="Enable smart auto-adjust"
+        label="Enable smart auto-adjust",
     )
     auto_adjust_pct = forms.IntegerField(
-        min_value=0, max_value=200, required=False, initial=20,
-        widget=forms.NumberInput(attrs={"class": "form-control input", "min": "0", "max": "200", "placeholder": "20"})
+        min_value=0,
+        max_value=200,
+        required=False,
+        initial=20,
+        widget=forms.NumberInput(attrs={"class": "form-control input", "min": "0", "max": "200", "placeholder": "20"}),
     )
-    
+
     def clean(self):
         cleaned_data = super().clean()
         has_shots = cleaned_data.get("has_shots")
         shots_per_bottle = cleaned_data.get("shots_per_bottle")
         price_shot = cleaned_data.get("price_shot")
-        
+
         has_glasses = cleaned_data.get("has_glasses")
         glasses_per_bottle = cleaned_data.get("glasses_per_bottle")
         price_glass = cleaned_data.get("price_glass")
-        
+
         # If has_shots is enabled, require shots_per_bottle and price_shot
         if has_shots:
             if not shots_per_bottle:
                 raise forms.ValidationError("Shots per bottle is required when shot sales are enabled.")
             if not price_shot:
                 raise forms.ValidationError("Price per shot is required when shot sales are enabled.")
-        
+
         # If has_glasses is enabled, require glasses_per_bottle and price_glass
         if has_glasses:
             if not glasses_per_bottle:
                 raise forms.ValidationError("Glasses per bottle is required when glass sales are enabled.")
             if not price_glass:
                 raise forms.ValidationError("Price per glass is required when glass sales are enabled.")
-        
+
         return cleaned_data
+
 
 def _inflate_liquor(instance: Product, data: dict):
     """Map form data to MerchProduct/LiquorProduct instance"""
@@ -447,51 +510,52 @@ def _inflate_liquor(instance: Product, data: dict):
     _assign_if_has(instance, "has_shots", data.get("has_shots") or False)
     _assign_if_has(instance, "shots_per_bottle", data.get("shots_per_bottle"))
     _assign_if_has(instance, "barman_shots_reserved", data.get("barman_shots_reserved") or 2)
-    
+
     # Prices - map to both possible field names
     price_bottle = data.get("price_bottle")
     if price_bottle is not None:
         _assign_if_has(instance, "price_per_bottle", price_bottle)
         _assign_if_has(instance, "price_bottle", price_bottle)
-    
+
     price_shot = data.get("price_shot")
     if price_shot is not None:
         _assign_if_has(instance, "price_per_shot", price_shot)
         _assign_if_has(instance, "price_shot", price_shot)
-    
+
     # Wine glass configuration and pricing
     _assign_if_has(instance, "has_glasses", data.get("has_glasses") or False)
     _assign_if_has(instance, "glasses_per_bottle", data.get("glasses_per_bottle"))
-    
+
     price_glass = data.get("price_glass")
     if price_glass is not None:
         _assign_if_has(instance, "price_per_glass", price_glass)
         _assign_if_has(instance, "price_glass", price_glass)
-    
+
     # Cost prices for profit tracking
     cost_per_bottle = data.get("cost_per_bottle")
     if cost_per_bottle is not None:
         _assign_if_has(instance, "cost_per_bottle", cost_per_bottle)
-    
+
     cost_per_glass = data.get("cost_per_glass")
     if cost_per_glass is not None:
         _assign_if_has(instance, "cost_per_glass", cost_per_glass)
-    
+
     # Smart stock targets
     target_bottles = data.get("target_bottles")
     if target_bottles is not None:
         _assign_if_has(instance, "target_bottles", target_bottles)
-    
+
     auto_adjust_enabled = data.get("auto_adjust_enabled")
     if auto_adjust_enabled is not None:
         _assign_if_has(instance, "auto_adjust_enabled", auto_adjust_enabled)
-    
+
     auto_adjust_pct = data.get("auto_adjust_pct")
     if auto_adjust_pct is not None:
         _assign_if_has(instance, "auto_adjust_pct", auto_adjust_pct)
-    
+
     # Initial stock quantity (not a model field, handle separately if needed)
     # qty_bottles is not saved to the model directly in this flow
+
 
 @login_required
 @manager_required
@@ -499,43 +563,45 @@ def _inflate_liquor(instance: Product, data: dict):
 def product_create_liquor_v2(request):
     # Get active business
     business = get_active_business(request)
-    
+
     # Try to seed liquor products if business has none yet
     try:
         from inventory.liquor_seed import should_seed_liquor_products, create_default_liquor_catalog
+
         if business and should_seed_liquor_products(business):
             create_default_liquor_catalog(business)
     except Exception:
         # Fail silently – we never want seeding to break the page
         pass
-    
+
     qs = _product_base_qs(request)
 
     if request.method == "POST":
         # NOTE: Barcode workflow removed - liquor products do not require barcodes
         # Products can be saved without barcodes
-        
+
         form = LiquorProductForm(request.POST)
         if form.is_valid():
             # Use MerchProduct instead of Product for liquor
             from inventory.models import MerchProduct
+
             p = MerchProduct()
             p.kind = BusinessKind.LIQUOR
-            
+
             if hasattr(MerchProduct, "business_id"):
                 biz = get_active_business(request)
                 if biz is not None:
                     setattr(p, "business_id", getattr(biz, "id", biz))
-            
+
             # NOTE: Barcode removed from liquor flow - products do not require barcodes
             # Set barcode to None (not empty string) for proper nullable handling
             p.barcode = None
-            
+
             # CRITICAL FIX: Always set spec_label (prevents NULL constraint)
             p.spec_label = ""
-            
+
             _inflate_liquor(p, form.cleaned_data)
-            
+
             try:
                 with transaction.atomic():
                     p.save()
@@ -543,51 +609,57 @@ def product_create_liquor_v2(request):
                     return redirect(URL_NAME_LIQUOR)
             except IntegrityError as e:
                 error_msg = str(e).lower()
-                if 'barcode' in error_msg:
+                if "barcode" in error_msg:
                     messages.error(request, "❌ A product with this barcode already exists. Barcodes must be unique.")
-                elif 'name' in error_msg or 'unique' in error_msg:
+                elif "name" in error_msg or "unique" in error_msg:
                     messages.error(
-                        request, 
+                        request,
                         "❌ A liquor product with this name already exists for your business. "
-                        "Please use a different name or modify the existing product."
+                        "Please use a different name or modify the existing product.",
                     )
                 else:
                     messages.error(request, f"❌ Could not save product: {str(e)}")
                 # Re-render form with errors
                 from inventory.models import LiquorProduct
+
                 products = LiquorProduct.objects.filter(
                     business=business,
                     is_archived=False,
                 ).order_by("category", "name")
                 try:
                     from core.decorators import _is_manager
+
                     is_manager = _is_manager(request.user)
                 except (ImportError, AttributeError):
                     is_manager = request.user.is_staff or request.user.is_superuser
-                return render(request, "inventory/products/liquor_v2.html", {
-                    "form": form,
-                    "products": products,
-                    "vertical": "liquor",
-                    "active_tab": "liquor_products",
-                    "IS_MANAGER": is_manager,
-                })
+                return render(
+                    request,
+                    "inventory/products/liquor_v2.html",
+                    {
+                        "form": form,
+                        "products": products,
+                        "vertical": "liquor",
+                        "active_tab": "liquor_products",
+                        "IS_MANAGER": is_manager,
+                    },
+                )
             except Exception as e:
                 import logging
                 from django.db import IntegrityError
                 from django.core.exceptions import ValidationError
-                
+
                 logger = logging.getLogger(__name__)
                 logger.error(
                     f"Error saving liquor product: {e}",
                     extra={
-                        'business_id': getattr(business, 'id', None),
-                        'user_id': getattr(request.user, 'id', None),
-                        'vertical': 'liquor',
-                        'exception_type': type(e).__name__,
+                        "business_id": getattr(business, "id", None),
+                        "user_id": getattr(request.user, "id", None),
+                        "vertical": "liquor",
+                        "exception_type": type(e).__name__,
                     },
-                    exc_info=True
+                    exc_info=True,
                 )
-                
+
                 # Return friendly error message (never expose raw DB errors)
                 if isinstance(e, IntegrityError):
                     messages.error(request, "❌ Could not save product. Please check required fields and try again.")
@@ -597,31 +669,39 @@ def product_create_liquor_v2(request):
                     messages.error(request, "❌ Could not save product. Please try again.")
                 # Re-render form with errors
                 from inventory.models import LiquorProduct
+
                 products = LiquorProduct.objects.filter(
                     business=business,
                     is_archived=False,
                 ).order_by("category", "name")
                 try:
                     from core.decorators import _is_manager
+
                     is_manager = _is_manager(request.user)
                 except (ImportError, AttributeError):
                     is_manager = request.user.is_staff or request.user.is_superuser
-                return render(request, "inventory/products/liquor_v2.html", {
-                    "form": form,
-                    "products": products,
-                    "vertical": "liquor",
-                    "active_tab": "liquor_products",
-                    "IS_MANAGER": is_manager,
-                })
+                return render(
+                    request,
+                    "inventory/products/liquor_v2.html",
+                    {
+                        "form": form,
+                        "products": products,
+                        "vertical": "liquor",
+                        "active_tab": "liquor_products",
+                        "IS_MANAGER": is_manager,
+                    },
+                )
         else:
             # Form validation failed - show errors
             from inventory.models import LiquorProduct
+
             products = LiquorProduct.objects.filter(
                 business=business,
                 is_archived=False,
             ).order_by("category", "name")
             try:
                 from core.decorators import _is_manager
+
                 is_manager = _is_manager(request.user)
             except (ImportError, AttributeError):
                 is_manager = request.user.is_staff or request.user.is_superuser
@@ -629,37 +709,48 @@ def product_create_liquor_v2(request):
             for field, errors in form.errors.items():
                 for error in errors:
                     messages.error(request, f"❌ {field}: {error}")
-            return render(request, "inventory/products/liquor_v2.html", {
-                "form": form,
-                "products": products,
-                "vertical": "liquor",
-                "active_tab": "liquor_products",
-                "IS_MANAGER": is_manager,
-            })
+            return render(
+                request,
+                "inventory/products/liquor_v2.html",
+                {
+                    "form": form,
+                    "products": products,
+                    "vertical": "liquor",
+                    "active_tab": "liquor_products",
+                    "IS_MANAGER": is_manager,
+                },
+            )
     else:
         form = LiquorProductForm()
 
     # Query all liquor products for the business (non-archived)
     from inventory.models import LiquorProduct
+
     products = LiquorProduct.objects.filter(
         business=business,
         is_archived=False,
     ).order_by("category", "name")
-    
+
     # Check if user is a manager
     try:
         from core.decorators import _is_manager
+
         is_manager = _is_manager(request.user)
     except (ImportError, AttributeError):
         is_manager = request.user.is_staff or request.user.is_superuser
-    
-    return render(request, "inventory/products/liquor_v2.html", {
-        "form": form,
-        "products": products,
-        "vertical": "liquor",
-        "active_tab": "liquor_products",
-        "IS_MANAGER": is_manager,
-    })
+
+    return render(
+        request,
+        "inventory/products/liquor_v2.html",
+        {
+            "form": form,
+            "products": products,
+            "vertical": "liquor",
+            "active_tab": "liquor_products",
+            "IS_MANAGER": is_manager,
+        },
+    )
+
 
 @login_required
 @manager_required
@@ -667,9 +758,10 @@ def product_create_liquor_v2(request):
 def product_edit_liquor_v2(request, pk: int):
     """Edit an existing liquor product"""
     business = get_active_business(request)
-    
+
     # Get the product, ensuring it belongs to this business
     from inventory.models import LiquorProduct
+
     obj = get_object_or_404(LiquorProduct, pk=pk, business=business)
 
     if request.method == "POST":
@@ -681,11 +773,12 @@ def product_edit_liquor_v2(request, pk: int):
                 messages.success(request, f"Updated {obj.name}.")
                 return redirect(URL_NAME_LIQUOR)
             except IntegrityError as e:
-                if 'unique' in str(e).lower():
+                if "unique" in str(e).lower():
                     messages.error(request, "A product with this name already exists for your business.")
                 else:
                     messages.error(request, "Could not update product due to a database constraint.")
     else:
+
         def g(*names, default=None):
             """Get first non-empty value from object attributes"""
             for n in names:
@@ -716,62 +809,71 @@ def product_edit_liquor_v2(request, pk: int):
         business=business,
         is_archived=False,
     ).order_by("category", "name")
-    
+
     # Check if user is a manager
     try:
         from core.decorators import _is_manager
+
         is_manager = _is_manager(request.user)
     except (ImportError, AttributeError):
         is_manager = request.user.is_staff or request.user.is_superuser
-    
-    return render(request, "inventory/products/liquor_v2.html", {
-        "form": form,
-        "products": products,
-        "vertical": "liquor",
-        "active_tab": "liquor_products",
-        "IS_MANAGER": is_manager,
-        "editing": obj,
-    })
+
+    return render(
+        request,
+        "inventory/products/liquor_v2.html",
+        {
+            "form": form,
+            "products": products,
+            "vertical": "liquor",
+            "active_tab": "liquor_products",
+            "IS_MANAGER": is_manager,
+            "editing": obj,
+        },
+    )
+
 
 # ========================= CLOTHING v2 ===========================
 class ClothingProductForm(forms.Form):
     product_name = forms.CharField(
         max_length=120,
-        widget=forms.TextInput(attrs={"class": "form-control input", "placeholder": "e.g. Denim Jacket"})
+        widget=forms.TextInput(attrs={"class": "form-control input", "placeholder": "e.g. Denim Jacket"}),
     )
     size = forms.CharField(
-        max_length=32, required=False,
-        widget=forms.TextInput(attrs={"class": "form-control input", "placeholder": "e.g. M, 42, 32x30"})
+        max_length=32,
+        required=False,
+        widget=forms.TextInput(attrs={"class": "form-control input", "placeholder": "e.g. M, 42, 32x30"}),
     )
     price = forms.DecimalField(
-        max_digits=12, decimal_places=2,
-        widget=forms.NumberInput(attrs={"class": "form-control input", "step": "0.01", "min": "0"})
+        max_digits=12,
+        decimal_places=2,
+        widget=forms.NumberInput(attrs={"class": "form-control input", "step": "0.01", "min": "0"}),
     )
     confirm_high_price = forms.BooleanField(
         required=False,
         widget=forms.CheckboxInput(attrs={"class": "form-check-input"}),
         label="I am sure about this high price",
-        help_text="Check this if the price is intentionally high (above MK 1,000,000)"
+        help_text="Check this if the price is intentionally high (above MK 1,000,000)",
     )
-    
+
     def clean_price(self):
         """Validate that price is reasonable."""
         from decimal import Decimal
-        
-        price = self.cleaned_data.get('price')
-        confirm = self.cleaned_data.get('confirm_high_price', False)
-        
+
+        price = self.cleaned_data.get("price")
+        confirm = self.cleaned_data.get("confirm_high_price", False)
+
         # Define maximum reasonable price for clothing
-        MAX_REASONABLE_PRICE = Decimal('1000000.00')  # MK 1 million
-        
+        MAX_REASONABLE_PRICE = Decimal("1000000.00")  # MK 1 million
+
         if price and price > MAX_REASONABLE_PRICE and not confirm:
             raise forms.ValidationError(
                 f"This price (MK {price:,.0f}) looks unusually high for clothing. "
                 f"Typical max is MK {MAX_REASONABLE_PRICE:,.0f}. "
                 "If correct, tick 'I am sure about this high price' and submit again."
             )
-        
+
         return price
+
 
 def _inflate_clothing(instance: Product, data: dict):
     name = data.get("product_name") or ""
@@ -790,6 +892,7 @@ def _inflate_clothing(instance: Product, data: dict):
             if hasattr(instance, f):
                 setattr(instance, f, price)
                 break
+
 
 def _initial_from_clothing(p: Product) -> dict:
     def g(*names, default=""):
@@ -814,41 +917,40 @@ def _initial_from_clothing(p: Product) -> dict:
         "price": price_val,
     }
 
+
 @login_required
 @manager_required
 @require_business_kind(BusinessKind.CLOTHING)
 def product_create_clothing_v2(request):
     business = get_active_business(request)
-    
+
     # Build queryset for display
-    products = MerchProduct.objects.filter(
-        business=business,
-        kind=BusinessKind.CLOTHING,
-        is_archived=False
-    ).order_by("-id")[:50]
+    products = MerchProduct.objects.filter(business=business, kind=BusinessKind.CLOTHING, is_archived=False).order_by(
+        "-id"
+    )[:50]
 
     if request.method == "POST":
         form = ClothingProductForm(request.POST)
         if form.is_valid():
             data = form.cleaned_data
-            
+
             # Construct unique product name from product_name + size
             # This ensures each size variant gets a unique name
             base_name = data.get("product_name", "").strip()
             size = data.get("size", "").strip()
-            
+
             if size:
                 unique_name = f"{base_name} - {size}"
             else:
                 unique_name = base_name
-            
+
             # Use update_or_create for idempotent save
             # CRITICAL: Explicitly set barcode to None (not empty string) for nullable field
             # CRITICAL FIX: Set spec_label for clothing (use size, prevents NULL constraint)
             spec_label_value = size if size else ""
             if spec_label_value and not spec_label_value.startswith("Size "):
                 spec_label_value = f"Size {spec_label_value}"
-            
+
             with transaction.atomic():
                 obj, created = MerchProduct.objects.update_or_create(
                     business=business,
@@ -861,75 +963,71 @@ def product_create_clothing_v2(request):
                         "is_active": True,
                         "track_inventory": True,
                         "barcode": None,  # Explicitly set to None - barcode is optional
-                    }
+                    },
                 )
-                
+
                 # Ensure barcode is None if not explicitly provided
                 if obj.barcode == "":
                     obj.barcode = None
-                    obj.save(update_fields=['barcode'])
-            
+                    obj.save(update_fields=["barcode"])
+
             if created:
                 messages.success(request, f"✅ Clothing product created: {unique_name}")
             else:
                 messages.success(request, f"✅ Product already existed, details updated: {unique_name}")
-            
+
             return redirect(URL_NAME_CLOTHING)
     else:
         form = ClothingProductForm()
 
-    return render(request, "inventory/add_product_clothing.html",
-                  {"form": form, "products": products, "vertical": "clothing", "active_tab": "clothing_add_product"})
+    return render(
+        request,
+        "inventory/add_product_clothing.html",
+        {"form": form, "products": products, "vertical": "clothing", "active_tab": "clothing_add_product"},
+    )
+
 
 @login_required
 @manager_required
 @require_business_kind(BusinessKind.CLOTHING)
 def product_edit_clothing_v2(request, pk: int):
     business = get_active_business(request)
-    
+
     # Get the specific product being edited
-    obj = get_object_or_404(
-        MerchProduct.objects.filter(business=business, kind=BusinessKind.CLOTHING),
-        pk=pk
-    )
-    
+    obj = get_object_or_404(MerchProduct.objects.filter(business=business, kind=BusinessKind.CLOTHING), pk=pk)
+
     # Build queryset for display
-    products = MerchProduct.objects.filter(
-        business=business,
-        kind=BusinessKind.CLOTHING,
-        is_archived=False
-    ).order_by("-id")[:50]
+    products = MerchProduct.objects.filter(business=business, kind=BusinessKind.CLOTHING, is_archived=False).order_by(
+        "-id"
+    )[:50]
 
     if request.method == "POST":
         form = ClothingProductForm(request.POST)
         if form.is_valid():
             data = form.cleaned_data
-            
+
             # Update the existing product
             obj.size = data.get("size", "").strip()
             obj.selling_price = data.get("price")
-            
+
             # Update name if product_name or size changed
             base_name = data.get("product_name", "").strip()
             size = obj.size
-            
+
             if size:
                 new_name = f"{base_name} - {size}"
             else:
                 new_name = base_name
-            
+
             # Check if name change would conflict
             if obj.name != new_name:
-                existing = MerchProduct.objects.filter(
-                    business=business,
-                    name=new_name
-                ).exclude(pk=obj.pk).first()
-                
+                existing = MerchProduct.objects.filter(business=business, name=new_name).exclude(pk=obj.pk).first()
+
                 if existing:
                     messages.error(
                         request,
                         f"A product with name '{new_name}' already exists. "
-                        "Please use a different product name or size."
+                        "Please use a different product name or size.",
                     )
                 else:
                     obj.name = new_name
@@ -944,20 +1042,33 @@ def product_edit_clothing_v2(request, pk: int):
         # Extract base name (remove size suffix if present)
         current_name = obj.name
         size = obj.size or ""
-        
+
         if size and current_name.endswith(f" - {size}"):
-            base_name = current_name[:-len(f" - {size}")]
+            base_name = current_name[: -len(f" - {size}")]
         else:
             base_name = current_name
-        
-        form = ClothingProductForm(initial={
-            "product_name": base_name,
-            "size": size,
-            "price": obj.selling_price,
-        })
 
-    return render(request, "inventory/add_product_clothing.html",
-                  {"form": form, "products": products, "vertical": "clothing", "active_tab": "clothing_edit_product", "editing": True, "product_id": pk})
+        form = ClothingProductForm(
+            initial={
+                "product_name": base_name,
+                "size": size,
+                "price": obj.selling_price,
+            }
+        )
+
+    return render(
+        request,
+        "inventory/add_product_clothing.html",
+        {
+            "form": form,
+            "products": products,
+            "vertical": "clothing",
+            "active_tab": "clothing_edit_product",
+            "editing": True,
+            "product_id": pk,
+        },
+    )
+
 
 # ========================= ROUTER ================================
 # DO NOT DECORATE THIS (keeps it pure and avoids redirect loops)
@@ -987,5 +1098,3 @@ def scan_in_guarded_view(request, *args, **kwargs):
         return redirect("inventory:inventory_dashboard")
     # If you already have a Scan-IN page view elsewhere, call it here:
     return render(request, "inventory/scan_in.html", {})
-
-

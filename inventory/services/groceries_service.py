@@ -38,17 +38,17 @@ from tenants.models import Business, Location
 # VALIDATION HELPERS
 # ==============================================================================
 
+
 def _validate_business_vertical(business: Business) -> None:
     """Ensure business is groceries vertical."""
     if not business:
         raise ValidationError("Business is required")
-    
+
     # Check business kind
-    kind = getattr(business, 'business_kind', None)
+    kind = getattr(business, "business_kind", None)
     if kind != BusinessKind.GROCERY:
         raise PermissionDenied(
-            f"This operation is only available for groceries businesses. "
-            f"Your business type is: {kind}"
+            f"This operation is only available for groceries businesses. " f"Your business type is: {kind}"
         )
 
 
@@ -56,10 +56,10 @@ def _validate_location(business: Business, location: Optional[Location]) -> Loca
     """Validate location belongs to business."""
     if not location:
         raise ValidationError("Location is required")
-    
+
     if location.business_id != business.id:
         raise PermissionDenied("Location does not belong to this business")
-    
+
     return location
 
 
@@ -67,15 +67,13 @@ def _validate_product(business: Business, product: MerchProduct) -> None:
     """Validate product belongs to business and is groceries."""
     if not product:
         raise ValidationError("Product is required")
-    
+
     if product.business_id != business.id:
         raise PermissionDenied("Product does not belong to this business")
-    
+
     if product.kind != BusinessKind.GROCERY:
-        raise ValidationError(
-            f"Product '{product.name}' is not a groceries product (kind={product.kind})"
-        )
-    
+        raise ValidationError(f"Product '{product.name}' is not a groceries product (kind={product.kind})")
+
     if not product.is_active:
         raise ValidationError(f"Product '{product.name}' is archived or inactive")
 
@@ -83,6 +81,7 @@ def _validate_product(business: Business, product: MerchProduct) -> None:
 # ==============================================================================
 # STOCK-IN SERVICE
 # ==============================================================================
+
 
 @transaction.atomic
 def stock_in_groceries(
@@ -97,11 +96,11 @@ def stock_in_groceries(
     user,
     expiry_date: Optional[datetime] = None,
     batch_number: Optional[str] = None,
-    notes: str = '',
+    notes: str = "",
 ) -> Dict[str, Any]:
     """
     Stock-in groceries products atomically.
-    
+
     Args:
         business: Business instance
         location: Location instance
@@ -114,7 +113,7 @@ def stock_in_groceries(
         expiry_date: Optional expiry date (if track_expiry is enabled)
         batch_number: Optional batch number
         notes: Optional notes
-    
+
     Returns:
         dict: {
             'success': True,
@@ -124,7 +123,7 @@ def stock_in_groceries(
             'new_stock_level': int,
             'unit_label': str,
         }
-    
+
     Raises:
         ValidationError: If validation fails
         PermissionDenied: If vertical/tenant mismatch
@@ -132,55 +131,56 @@ def stock_in_groceries(
     # Validate vertical gating
     _validate_business_vertical(business)
     _validate_location(business, location)
-    
+
     # Lock product row for update (prevent race conditions)
     product = MerchProduct.objects.select_for_update().get(pk=product.pk)
     _validate_product(business, product)
-    
+
     # Convert qty to base units
     try:
         qty_base_units = to_base_units(qty, unit_label, product)
     except ValidationError as e:
         raise ValidationError(f"Invalid quantity/unit: {e}")
-    
+
     if qty_base_units <= 0:
         raise ValidationError("Quantity must be greater than zero")
-    
+
     # Update product prices if provided
     if cost_price_per_base_unit is not None:
         if cost_price_per_base_unit < 0:
             raise ValidationError("Cost price cannot be negative")
         product.cost_price = cost_price_per_base_unit
-    
+
     if selling_price_per_base_unit is not None:
         if selling_price_per_base_unit < 0:
             raise ValidationError("Selling price cannot be negative")
         product.selling_price = selling_price_per_base_unit
-    
+
     # Update stock
     old_stock = product.quantity_in_stock or 0
     product.quantity_in_stock = old_stock + qty_base_units
-    
+
     # Save product
-    product.save(update_fields=['quantity_in_stock', 'cost_price', 'selling_price'])
-    
+    product.save(update_fields=["quantity_in_stock", "cost_price", "selling_price"])
+
     # TODO: If expiry tracking is enabled, create PharmacyBatch-like records
     # For V1, we skip expiry tracking (can be added in Phase 2)
-    
+
     return {
-        'success': True,
-        'product_id': product.id,
-        'product_name': product.name,
-        'qty_added_base_units': qty_base_units,
-        'qty_added_display': f"{qty} {unit_label}",
-        'new_stock_level': product.quantity_in_stock,
-        'unit_label': product.base_unit,
+        "success": True,
+        "product_id": product.id,
+        "product_name": product.name,
+        "qty_added_base_units": qty_base_units,
+        "qty_added_display": f"{qty} {unit_label}",
+        "new_stock_level": product.quantity_in_stock,
+        "unit_label": product.base_unit,
     }
 
 
 # ==============================================================================
 # SELL SERVICE
 # ==============================================================================
+
 
 @transaction.atomic
 def sell_groceries(
@@ -189,15 +189,15 @@ def sell_groceries(
     location: Location,
     cart_lines: List[Dict[str, Any]],
     sale_mode: str = SALE_MODE_RETAIL,
-    payment_method: str = 'CASH',
+    payment_method: str = "CASH",
     user,
-    customer_name: str = '',
-    notes: str = '',
+    customer_name: str = "",
+    notes: str = "",
     allow_price_override: bool = True,
 ) -> Dict[str, Any]:
     """
     Sell groceries products atomically (cart-based).
-    
+
     Args:
         business: Business instance
         location: Location instance
@@ -214,7 +214,7 @@ def sell_groceries(
         customer_name: Optional customer name
         notes: Optional notes
         allow_price_override: Allow price overrides (important for wholesale negotiations)
-    
+
     Returns:
         dict: {
             'success': True,
@@ -224,7 +224,7 @@ def sell_groceries(
             'total_profit': Decimal,
             'items_sold': int,
         }
-    
+
     Raises:
         ValidationError: If validation fails or insufficient stock
         PermissionDenied: If vertical/tenant mismatch
@@ -232,15 +232,15 @@ def sell_groceries(
     # Validate vertical gating
     _validate_business_vertical(business)
     _validate_location(business, location)
-    
+
     if not cart_lines:
         raise ValidationError("Cart is empty")
-    
+
     if sale_mode not in [SALE_MODE_RETAIL, SALE_MODE_WHOLESALE]:
         raise ValidationError(f"Invalid sale mode: {sale_mode}")
-    
+
     # Lock all products in cart (prevent race conditions)
-    product_ids = [line['product_id'] for line in cart_lines]
+    product_ids = [line["product_id"] for line in cart_lines]
     products = {
         p.id: p
         for p in MerchProduct.objects.select_for_update().filter(
@@ -250,38 +250,34 @@ def sell_groceries(
             is_active=True,
         )
     }
-    
+
     # Validate all products exist and belong to business
     for line in cart_lines:
-        product_id = line['product_id']
+        product_id = line["product_id"]
         if product_id not in products:
-            raise ValidationError(
-                f"Product ID {product_id} not found or not available for sale"
-            )
-    
+            raise ValidationError(f"Product ID {product_id} not found or not available for sale")
+
     # Process each cart line
     sale_records = []
-    total_revenue = Decimal('0')
-    total_cost = Decimal('0')
+    total_revenue = Decimal("0")
+    total_cost = Decimal("0")
     items_sold_count = 0
-    
+
     for line in cart_lines:
-        product = products[line['product_id']]
-        qty = line['qty']
-        unit_label = line.get('unit_label', 'base')
-        price_override = line.get('price_override')
-        
+        product = products[line["product_id"]]
+        qty = line["qty"]
+        unit_label = line.get("unit_label", "base")
+        price_override = line.get("price_override")
+
         # Convert qty to base units
         try:
             qty_base_units = to_base_units(qty, unit_label, product)
         except ValidationError as e:
-            raise ValidationError(
-                f"Invalid quantity/unit for '{product.name}': {e}"
-            )
-        
+            raise ValidationError(f"Invalid quantity/unit for '{product.name}': {e}")
+
         if qty_base_units <= 0:
             raise ValidationError(f"Quantity must be > 0 for '{product.name}'")
-        
+
         # Check stock availability
         available_stock = product.quantity_in_stock or 0
         if available_stock < qty_base_units:
@@ -290,12 +286,12 @@ def sell_groceries(
                 f"Available: {available_stock} {product.base_unit}, "
                 f"Requested: {qty_base_units} {product.base_unit}"
             )
-        
+
         # Calculate pricing
         if price_override and allow_price_override:
             # Price override is per unit in the given unit_label
             # Convert to per-base-unit
-            if unit_label == 'base' or unit_label == product.base_unit:
+            if unit_label == "base" or unit_label == product.base_unit:
                 unit_price_base = price_override
             else:
                 # Price override is for pack, convert to base
@@ -303,19 +299,19 @@ def sell_groceries(
                 unit_price_base = price_override / Decimal(str(pack_size))
         else:
             # Use standard pricing
-            unit_price_base = get_unit_price(product, 'base', sale_mode)
-        
-        unit_cost_base = get_cost_price(product, 'base')
-        
+            unit_price_base = get_unit_price(product, "base", sale_mode)
+
+        unit_cost_base = get_cost_price(product, "base")
+
         # Calculate totals for this line
         line_revenue = unit_price_base * Decimal(str(qty_base_units))
         line_cost = unit_cost_base * Decimal(str(qty_base_units))
         line_profit = line_revenue - line_cost
-        
+
         # Deduct stock
         product.quantity_in_stock -= qty_base_units
-        product.save(update_fields=['quantity_in_stock'])
-        
+        product.save(update_fields=["quantity_in_stock"])
+
         # Create sale record
         sale = GrocerySale.objects.create(
             business=business,
@@ -330,29 +326,30 @@ def sell_groceries(
             sold_by=user,
             notes=f"{customer_name}: {notes}" if customer_name else notes,
         )
-        
+
         sale_records.append(sale)
         total_revenue += line_revenue
         total_cost += line_cost
         items_sold_count += qty_base_units
-    
+
     total_profit = total_revenue - total_cost
-    
+
     return {
-        'success': True,
-        'sale_ids': [s.id for s in sale_records],
-        'total_revenue': total_revenue,
-        'total_cost': total_cost,
-        'total_profit': total_profit,
-        'items_sold': items_sold_count,
-        'sale_mode': sale_mode,
-        'payment_method': payment_method,
+        "success": True,
+        "sale_ids": [s.id for s in sale_records],
+        "total_revenue": total_revenue,
+        "total_cost": total_cost,
+        "total_profit": total_profit,
+        "items_sold": items_sold_count,
+        "sale_mode": sale_mode,
+        "payment_method": payment_method,
     }
 
 
 # ==============================================================================
 # STOCK ADJUSTMENT SERVICE
 # ==============================================================================
+
 
 @transaction.atomic
 def adjust_groceries_stock(
@@ -363,11 +360,11 @@ def adjust_groceries_stock(
     qty_base_units_delta: int,
     reason: str,
     user,
-    notes: str = '',
+    notes: str = "",
 ) -> Dict[str, Any]:
     """
     Adjust stock level for a groceries product (manager-only).
-    
+
     Args:
         business: Business instance
         location: Location instance
@@ -376,7 +373,7 @@ def adjust_groceries_stock(
         reason: Reason for adjustment ('damaged', 'expired', 'found', 'correction', etc.)
         user: User performing the adjustment
         notes: Optional notes
-    
+
     Returns:
         dict: {
             'success': True,
@@ -385,7 +382,7 @@ def adjust_groceries_stock(
             'new_stock': int,
             'delta': int,
         }
-    
+
     Raises:
         ValidationError: If validation fails or would result in negative stock
         PermissionDenied: If vertical/tenant mismatch
@@ -393,45 +390,46 @@ def adjust_groceries_stock(
     # Validate vertical gating
     _validate_business_vertical(business)
     _validate_location(business, location)
-    
+
     # Lock product row
     product = MerchProduct.objects.select_for_update().get(pk=product.pk)
     _validate_product(business, product)
-    
+
     if qty_base_units_delta == 0:
         raise ValidationError("Stock delta cannot be zero")
-    
+
     old_stock = product.quantity_in_stock or 0
     new_stock = old_stock + qty_base_units_delta
-    
+
     if new_stock < 0:
         raise ValidationError(
             f"Stock adjustment would result in negative stock. "
             f"Current: {old_stock}, Delta: {qty_base_units_delta}, "
             f"Result: {new_stock}"
         )
-    
+
     # Update stock
     product.quantity_in_stock = new_stock
-    product.save(update_fields=['quantity_in_stock'])
-    
+    product.save(update_fields=["quantity_in_stock"])
+
     # TODO: Create audit log entry (StockAdjustment model)
     # For V1, we rely on Django admin history
-    
+
     return {
-        'success': True,
-        'product_id': product.id,
-        'product_name': product.name,
-        'old_stock': old_stock,
-        'new_stock': new_stock,
-        'delta': qty_base_units_delta,
-        'reason': reason,
+        "success": True,
+        "product_id": product.id,
+        "product_name": product.name,
+        "old_stock": old_stock,
+        "new_stock": new_stock,
+        "delta": qty_base_units_delta,
+        "reason": reason,
     }
 
 
 # ==============================================================================
 # BARCODE LOOKUP (OPTIONAL)
 # ==============================================================================
+
 
 def lookup_product_by_barcode(
     *,
@@ -440,19 +438,19 @@ def lookup_product_by_barcode(
 ) -> Optional[MerchProduct]:
     """
     Look up a groceries product by barcode (optional, business-scoped).
-    
+
     Args:
         business: Business instance
         barcode: Barcode string
-    
+
     Returns:
         MerchProduct or None
     """
     if not barcode or not barcode.strip():
         return None
-    
+
     barcode = barcode.strip()
-    
+
     try:
         product = MerchProduct.objects.get(
             business=business,
@@ -477,6 +475,7 @@ def lookup_product_by_barcode(
 # HELPER: Get product by ID (with validation)
 # ==============================================================================
 
+
 def get_groceries_product(
     *,
     business: Business,
@@ -484,7 +483,7 @@ def get_groceries_product(
 ) -> MerchProduct:
     """
     Get a groceries product by ID with validation.
-    
+
     Raises:
         ValidationError: If product not found or validation fails
     """
@@ -498,5 +497,3 @@ def get_groceries_product(
         return product
     except MerchProduct.DoesNotExist:
         raise ValidationError(f"Product ID {product_id} not found")
-
-

@@ -12,6 +12,7 @@ from typing import Optional
 @dataclass(frozen=True)
 class PlanConfig:
     """Plan configuration with pricing and limits."""
+
     code: str
     name: str
     amount: Decimal  # Monthly price in MWK
@@ -42,7 +43,7 @@ PLANS = {
             "Sales reports & analytics",
             "Mobile app access",
             "Email support",
-        ]
+        ],
     ),
     "growth": PlanConfig(
         code="growth",
@@ -62,7 +63,7 @@ PLANS = {
             "Layby / installment payments",
             "Priority email support",
             "WhatsApp notifications",
-        ]
+        ],
     ),
     "pro": PlanConfig(
         code="pro",
@@ -83,7 +84,7 @@ PLANS = {
             "Custom integrations",
             "Dedicated account manager",
             "24/7 priority support",
-        ]
+        ],
     ),
 }
 
@@ -109,4 +110,3 @@ def format_price(amount: Decimal, currency: str = "MWK") -> str:
     if currency == "MWK":
         return f"MWK {amount:,.0f}"
     return f"{currency} {amount:,.2f}"
-

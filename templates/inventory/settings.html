@@ -13,9 +13,19 @@
   <div class="vstack">
     <div class="card pad">
       <div class="hstack" style="align-items:flex-start;">
-        <!-- Avatar image (actual image URL) -->
-        <img src="{{ avatar_img_url }}" alt="Avatar" width="96" height="96"
-             style="border-radius:16px; box-shadow:var(--shadow-sm); object-fit:cover;">
+        <!-- Avatar: uploaded image OR initials placeholder (PHASE 2: no gravatar) -->
+        {% if avatar_img_url %}
+          <img src="{{ avatar_img_url }}" alt="Avatar" width="96" height="96"
+               style="border-radius:16px; box-shadow:var(--shadow-sm); object-fit:cover;">
+        {% else %}
+          <div style="width:96px; height:96px; border-radius:16px; box-shadow:var(--shadow-sm);
+                      background:linear-gradient(135deg, var(--cc-accent), var(--cc-accent-2));
+                      color:#fff; display:flex; align-items:center; justify-content:center;
+                      font-size:2.5rem; font-weight:800;">
+            {% load account_extras %}
+            {{ user|initials }}
+          </div>
+        {% endif %}
 
         <!-- User Info -->
         <div class="vstack" style="gap:6px; min-width:260px;">
@@ -46,45 +56,54 @@
       </div>
     </div>
 
-    <!-- Notifications (placeholder switches) -->
+    <!-- Notifications (PHASE 2: wired to NotificationPreference model, default-checked) -->
     <div class="card pad">
-      <h2 style="font-size:var(--fs-24); font-weight:900; margin-bottom:var(--sp-4);">Notifications</h2>
+      <h2 style="font-size:var(--fs-24); font-weight:900; margin-bottom:var(--sp-4);">Notification Preferences</h2>
 
-      <div class="hstack" style="align-items:flex-start;">
-        <div class="panel-soft pad round" style="flex:1; min-width:280px;">
-          <div style="font-weight:800; margin-bottom:6px;">Dashboard notifications</div>
-          <label class="hstack" style="gap:8px; margin-bottom:8px;">
-            <input type="checkbox" class="input-compact"> Payments
-          </label>
-          <label class="hstack" style="gap:8px;">
-            <input type="checkbox" class="input-compact"> Wallet events
-          </label>
-          <p class="text-muted" style="margin-top:8px;">
-            General business notifications (e.g., payments, wallet top-ups/deductions).
-          </p>
+      <form method="post">
+        {% csrf_token %}
+        <input type="hidden" name="save_notifications" value="1">
+
+        <div class="vstack" style="gap:var(--sp-4);">
+          <div class="panel-soft pad round">
+            <div style="font-weight:800; margin-bottom:12px;">Email Notifications</div>
+            
+            <label class="hstack" style="gap:10px; margin-bottom:10px; cursor:pointer;">
+              <input type="checkbox" name="instant_sale_email" {% if notif_pref.instant_sale_email %}checked{% endif %}>
+              <span>Instant sale alerts</span>
+            </label>
+
+            <label class="hstack" style="gap:10px; margin-bottom:10px; cursor:pointer;">
+              <input type="checkbox" name="daily_summary_email" {% if notif_pref.daily_summary_email %}checked{% endif %}>
+              <span>Daily sales summary</span>
+            </label>
+
+            <label class="hstack" style="gap:10px; margin-bottom:10px; cursor:pointer;">
+              <input type="checkbox" name="weekly_digest_enabled" {% if notif_pref.weekly_digest_enabled %}checked{% endif %}>
+              <span>Weekly digest (every Friday)</span>
+            </label>
+
+            <label class="hstack" style="gap:10px; margin-bottom:10px; cursor:pointer;">
+              <input type="checkbox" name="high_sales_alerts" {% if notif_pref.high_sales_alerts %}checked{% endif %}>
+              <span>High sales spike alerts</span>
+            </label>
+
+            <label class="hstack" style="gap:10px; cursor:pointer;">
+              <input type="checkbox" name="important_alerts_email" {% if notif_pref.important_alerts_email %}checked{% endif %}>
+              <span>Important system alerts</span>
+            </label>
+
+            <p class="text-muted" style="margin-top:12px; font-size:var(--fs-14);">
+              All notifications default to ON for new users. Uncheck to disable.
+            </p>
+          </div>
         </div>
 
-        <div class="panel-soft pad round" style="flex:1; min-width:280px;">
-          <div style="font-weight:800; margin-bottom:6px;">Inventory notifications</div>
-          <label class="hstack" style="gap:8px; margin-bottom:8px;">
-            <input type="checkbox" class="input-compact"> Stock IN
-          </label>
-          <label class="hstack" style="gap:8px; margin-bottom:8px;">
-            <input type="checkbox" class="input-compact"> Sold
-          </label>
-          <label class="hstack" style="gap:8px;">
-            <input type="checkbox" class="input-compact"> Low stock
-          </label>
-          <p class="text-muted" style="margin-top:8px;">
-            These show on Inventory pages; the dashboard shows broader alerts.
-          </p>
+        <div class="hstack" style="justify-content:flex-start; margin-top:var(--sp-5); gap:var(--sp-3);">
+          <button type="submit" class="btn btn-primary">Save notification settings</button>
+          <a href="{% url 'inventory:inventory_dashboard' %}" class="btn btn-ghost">Back to dashboard</a>
         </div>
-      </div>
-
-      <div class="hstack" style="justify-content:flex-start; margin-top:var(--sp-5);">
-        <button class="btn btn-primary">Save settings</button>
-        <a href="{% url 'inventory:inventory_dashboard' %}" class="btn btn-muted">Back to dashboard</a>
-      </div>
+      </form>
     </div>
   </div>
 </div>

@@ -15,16 +15,16 @@ class Scenario(models.Model):
     name = models.CharField(max_length=120)
 
     # --- Core business knobs (match forms & logic.py) ---
-    baseline_monthly_units = models.PositiveIntegerField(default=0)   # demand per month
-    avg_unit_price = models.FloatField(default=0.0)                   # price per unit (MWK)
-    variable_cost_pct = models.FloatField(default=0.0)                # % of price (0..100)
-    monthly_fixed_costs = models.FloatField(default=0.0)              # fixed opex per month (MWK)
-    monthly_growth_pct = models.FloatField(default=0.0)               # % demand growth per month (0..100)
-    months = models.PositiveIntegerField(default=12)                  # months to simulate (1..60 rec.)
+    baseline_monthly_units = models.PositiveIntegerField(default=0)  # demand per month
+    avg_unit_price = models.FloatField(default=0.0)  # price per unit (MWK)
+    variable_cost_pct = models.FloatField(default=0.0)  # % of price (0..100)
+    monthly_fixed_costs = models.FloatField(default=0.0)  # fixed opex per month (MWK)
+    monthly_growth_pct = models.FloatField(default=0.0)  # % demand growth per month (0..100)
+    months = models.PositiveIntegerField(default=12)  # months to simulate (1..60 rec.)
 
     # --- Optional finance knobs (used by logic.py if present) ---
-    tax_rate_pct = models.FloatField(default=0.0)                     # % of positive operating profit
-    opening_cash = models.FloatField(default=0.0)                     # starting cash balance (MWK)
+    tax_rate_pct = models.FloatField(default=0.0)  # % of positive operating profit
+    opening_cash = models.FloatField(default=0.0)  # starting cash balance (MWK)
 
     created_at = models.DateTimeField(default=timezone.now)
 
@@ -61,5 +61,3 @@ class SimulationRun(models.Model):
 
     def __str__(self) -> str:
         return f"Run #{self.id} â€” {self.scenario.name}"
-
-

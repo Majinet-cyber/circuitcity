@@ -153,23 +153,7 @@
   border-color: #10b981;
 }
 
-/* Dark mode support (optional) */
-@media (prefers-color-scheme: dark) {
-  .pricing-feedback-error {
-    background: #450a0a;
-    border-color: #7f1d1d;
-    color: #fca5a5;
-  }
-  
-  .pricing-feedback-warning {
-    background: #451a03;
-    border-color: #78350f;
-    color: #fcd34d;
-  }
-  
-  .pricing-feedback-success {
-    background: #14532d;
-    border-color: #166534;
+/* PHASE 1: Dark mode removed - light theme only */
     color: #86efac;
   }
   

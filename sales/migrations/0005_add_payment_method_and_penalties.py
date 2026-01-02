@@ -99,20 +99,11 @@ def create_indexes_safe(apps, schema_editor):
     and run each CREATE INDEX separately.
     """
     statements = [
-        "CREATE INDEX IF NOT EXISTS sales_sale_payment_method_idx "
-        "ON sales_sale (payment_method)",
-
-        "CREATE INDEX IF NOT EXISTS sale_created_at_idx "
-        "ON sales_sale (created_at)",
-
-        "CREATE INDEX IF NOT EXISTS sale_sold_at_idx "
-        "ON sales_sale (sold_at)",
-
-        "CREATE INDEX IF NOT EXISTS sale_loc_created_idx "
-        "ON sales_sale (location_id, created_at)",
-
-        "CREATE INDEX IF NOT EXISTS sale_agent_created_idx "
-        "ON sales_sale (agent_id, created_at)",
+        "CREATE INDEX IF NOT EXISTS sales_sale_payment_method_idx " "ON sales_sale (payment_method)",
+        "CREATE INDEX IF NOT EXISTS sale_created_at_idx " "ON sales_sale (created_at)",
+        "CREATE INDEX IF NOT EXISTS sale_sold_at_idx " "ON sales_sale (sold_at)",
+        "CREATE INDEX IF NOT EXISTS sale_loc_created_idx " "ON sales_sale (location_id, created_at)",
+        "CREATE INDEX IF NOT EXISTS sale_agent_created_idx " "ON sales_sale (agent_id, created_at)",
     ]
 
     for sql in statements:
@@ -147,7 +138,6 @@ def drop_indexes_safe(apps, schema_editor):
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         ("sales", "0004_commissionconfig_salecommission"),
     ]
@@ -158,7 +148,6 @@ class Migration(migrations.Migration):
             drop_indexes_safe,
             migrations.RunPython.noop,
         ),
-
         # Then use SeparateDatabaseAndState for the field addition
         migrations.SeparateDatabaseAndState(
             database_operations=[
@@ -185,7 +174,6 @@ class Migration(migrations.Migration):
                 ),
             ],
         ),
-
         # Finally, create all indexes (idempotent)
         migrations.RunPython(
             create_indexes_safe,

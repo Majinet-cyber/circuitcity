@@ -19,33 +19,33 @@ import pytz
 
 
 class Command(BaseCommand):
-    help = 'Send weekly sales digest emails to managers (runs Friday 5pm Malawi time)'
-    
+    help = "Send weekly sales digest emails to managers (runs Friday 5pm Malawi time)"
+
     def add_arguments(self, parser):
         parser.add_argument(
-            '--business-id',
+            "--business-id",
             type=int,
-            help='Send digest for specific business only (for testing)',
+            help="Send digest for specific business only (for testing)",
         )
         parser.add_argument(
-            '--week-ending',
+            "--week-ending",
             type=str,
-            help='Force a specific week ending date (YYYY-MM-DD) for testing',
+            help="Force a specific week ending date (YYYY-MM-DD) for testing",
         )
         parser.add_argument(
-            '--dry-run',
-            action='store_true',
-            help='Show what would be sent without actually sending emails',
+            "--dry-run",
+            action="store_true",
+            help="Show what would be sent without actually sending emails",
         )
-    
+
     def handle(self, *args, **options):
         from notifications.services import send_weekly_sales_digest
         from tenants.models import Business
-        
-        business_id = options.get('business_id')
-        week_ending_str = options.get('week_ending')
-        dry_run = options.get('dry_run', False)
-        
+
+        business_id = options.get("business_id")
+        week_ending_str = options.get("week_ending")
+        dry_run = options.get("dry_run", False)
+
         # Get business if specified
         business = None
         if business_id:
@@ -55,7 +55,7 @@ class Command(BaseCommand):
             except Business.DoesNotExist:
                 self.stderr.write(self.style.ERROR(f"Business with ID {business_id} not found"))
                 return
-        
+
         # Parse week ending date if provided
         week_ending_date = None
         if week_ending_str:
@@ -65,54 +65,52 @@ class Command(BaseCommand):
             except ValueError:
                 self.stderr.write(self.style.ERROR(f"Invalid date format: {week_ending_str}. Use YYYY-MM-DD."))
                 return
-        
+
         # Check if it's Friday (Malawi time)
-        malawi_tz = pytz.timezone('Africa/Blantyre')
+        malawi_tz = pytz.timezone("Africa/Blantyre")
         now_malawi = timezone.now().astimezone(malawi_tz)
-        
+
         if not week_ending_date and not business_id:
             # Only check day of week if not forcing date and not testing specific business
             if now_malawi.weekday() != 4:  # 4 = Friday
-                self.stdout.write(self.style.WARNING(
-                    f"Today is {now_malawi.strftime('%A')}, not Friday. "
-                    f"Digest is typically sent on Fridays at 5pm Malawi time."
-                ))
+                self.stdout.write(
+                    self.style.WARNING(
+                        f"Today is {now_malawi.strftime('%A')}, not Friday. "
+                        f"Digest is typically sent on Fridays at 5pm Malawi time."
+                    )
+                )
                 if not dry_run:
                     self.stdout.write("Use --week-ending to force a specific date for testing.")
                     return
-            
+
             # Check if it's after 5pm
             if now_malawi.hour < 17:
-                self.stdout.write(self.style.WARNING(
-                    f"Current time is {now_malawi.strftime('%H:%M')} Malawi time. "
-                    f"Digest is typically sent at 17:00 (5pm)."
-                ))
+                self.stdout.write(
+                    self.style.WARNING(
+                        f"Current time is {now_malawi.strftime('%H:%M')} Malawi time. "
+                        f"Digest is typically sent at 17:00 (5pm)."
+                    )
+                )
                 if not dry_run:
                     self.stdout.write("Use --week-ending to force a specific date for testing.")
                     return
-        
+
         if dry_run:
             self.stdout.write(self.style.WARNING("DRY RUN MODE - No emails will be sent"))
             # TODO: Implement dry-run preview if needed
             return
-        
+
         # Send digests
         try:
-            emails_sent = send_weekly_sales_digest(
-                business=business,
-                week_ending_date=week_ending_date
-            )
-            
+            emails_sent = send_weekly_sales_digest(business=business, week_ending_date=week_ending_date)
+
             if emails_sent > 0:
-                self.stdout.write(self.style.SUCCESS(
-                    f"✓ Successfully sent {emails_sent} weekly digest email(s)"
-                ))
+                self.stdout.write(self.style.SUCCESS(f"✓ Successfully sent {emails_sent} weekly digest email(s)"))
             else:
-                self.stdout.write(self.style.WARNING(
-                    "No emails sent (no businesses with sales or no managers with digest enabled)"
-                ))
-        
+                self.stdout.write(
+                    self.style.WARNING("No emails sent (no businesses with sales or no managers with digest enabled)")
+                )
+
         except Exception as e:
             self.stderr.write(self.style.ERROR(f"Error sending weekly digests: {e}"))
             raise
-

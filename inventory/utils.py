@@ -19,6 +19,7 @@ except Exception:
     # very defensive fallback; if constants.py isn't available for any reason
     def SOLD_Q():  # type: ignore
         return Q(status="SOLD") | Q(sold_at__isnull=False) | Q(is_sold=True)
+
     def IN_STOCK_Q():  # type: ignore
         return ~SOLD_Q() & (Q(in_stock=True) | Q(available=True) | Q(availability=True))
 
@@ -47,13 +48,16 @@ def require_groups(*group_names: str) -> Callable:
         @require_groups(ADMIN, AUDITOR)
         def my_view(request): ...
     """
+
     def deco(view_func: Callable):
         @wraps(view_func)
         def _wrapped(request: HttpRequest, *args, **kwargs):
             if not any(user_in_group(request.user, g) for g in group_names):
                 raise PermissionDenied("You do not have access to this resource.")
             return view_func(request, *args, **kwargs)
+
         return _wrapped
+
     return deco
 
 
@@ -214,6 +218,7 @@ def user_home_location(user):
     if not loc_id:
         return None
     from .models import Location  # local import to avoid circulars
+
     try:
         return Location.objects.get(id=loc_id)
     except Location.DoesNotExist:

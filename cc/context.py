@@ -65,12 +65,7 @@ def _is_agent(user) -> bool:
     """
     Agent = authenticated user who is NOT a manager and NOT staff.
     """
-    return bool(
-        user
-        and user.is_authenticated
-        and not _is_manager(user)
-        and not _safe_getattr(user, "is_staff", False)
-    )
+    return bool(user and user.is_authenticated and not _is_manager(user) and not _safe_getattr(user, "is_staff", False))
 
 
 def role_flags(request) -> Dict[str, Any]:
@@ -84,5 +79,3 @@ def role_flags(request) -> Dict[str, Any]:
         "IS_MANAGER": _is_manager(u),
         "IS_AGENT": _is_agent(u),
     }
-
-

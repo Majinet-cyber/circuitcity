@@ -23,7 +23,9 @@ class ScenarioForm(forms.ModelForm):
             "name": forms.TextInput(attrs={"class": "form-control", "placeholder": "Scenario name"}),
             "baseline_monthly_units": forms.NumberInput(attrs={"class": "form-control", "step": "1", "min": "0"}),
             "avg_unit_price": forms.NumberInput(attrs={"class": "form-control", "step": "0.01", "min": "0"}),
-            "variable_cost_pct": forms.NumberInput(attrs={"class": "form-control", "step": "0.01", "min": "0", "max": "100"}),
+            "variable_cost_pct": forms.NumberInput(
+                attrs={"class": "form-control", "step": "0.01", "min": "0", "max": "100"}
+            ),
             "monthly_fixed_costs": forms.NumberInput(attrs={"class": "form-control", "step": "0.01", "min": "0"}),
             "monthly_growth_pct": forms.NumberInput(attrs={"class": "form-control", "step": "0.01", "min": "0"}),
             "months": forms.NumberInput(attrs={"class": "form-control", "step": "1", "min": "1", "max": "60"}),
@@ -53,5 +55,3 @@ class ScenarioForm(forms.ModelForm):
         if not m or m <= 0:
             raise forms.ValidationError("Months must be at least 1.")
         return m
-
-

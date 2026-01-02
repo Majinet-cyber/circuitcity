@@ -24,6 +24,7 @@ class LaybyOrderAdmin(admin.ModelAdmin):
     term_months, total_price, deposit_amount, status, created_by, created_at/updated_at).
     Includes computed amount_paid and balance, and inline payments.
     """
+
     list_display = (
         "ref",
         "customer_name",
@@ -48,11 +49,26 @@ class LaybyOrderAdmin(admin.ModelAdmin):
 
     fieldsets = (
         ("Identifiers", {"fields": ("ref", "status", "created_by")}),
-        ("Customer", {"fields": ("customer_name", "customer_phone", "id_number", "id_photo",
-                                 "kin1_name", "kin1_phone", "kin2_name", "kin2_phone")}),
+        (
+            "Customer",
+            {
+                "fields": (
+                    "customer_name",
+                    "customer_phone",
+                    "id_number",
+                    "id_photo",
+                    "kin1_name",
+                    "kin1_phone",
+                    "kin2_name",
+                    "kin2_phone",
+                )
+            },
+        ),
         ("Product", {"fields": ("item_name", "sku")}),
-        ("Terms & Pricing", {"fields": ("term_months", "total_price", "deposit_amount",
-                                        "amount_paid_admin", "balance_admin")}),
+        (
+            "Terms & Pricing",
+            {"fields": ("term_months", "total_price", "deposit_amount", "amount_paid_admin", "balance_admin")},
+        ),
         ("Timestamps", {"fields": ("created_at", "updated_at")}),
     )
 
@@ -73,5 +89,3 @@ class LaybyPaymentAdmin(admin.ModelAdmin):
     search_fields = ("order__ref", "tx_ref")
     ordering = ("-id",)
     readonly_fields = ("received_at",)
-
-

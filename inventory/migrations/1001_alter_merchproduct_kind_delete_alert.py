@@ -4,7 +4,6 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         ("inventory", "1000_merge_0054_add_gym_trainer_fees_0999_alert_model"),
     ]

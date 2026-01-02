@@ -13,6 +13,7 @@ class SafeRemoveConstraint(RemoveConstraint):
     """
     Prevents ValueError if constraint is missing from migration state.
     """
+
     def state_forwards(self, app_label, state):
         try:
             super().state_forwards(app_label, state)
@@ -24,6 +25,7 @@ class SafeRemoveIndex(RemoveIndex):
     """
     Prevents ValueError if index is missing from migration state.
     """
+
     def state_forwards(self, app_label, state):
         try:
             super().state_forwards(app_label, state)
@@ -34,20 +36,22 @@ class SafeRemoveIndex(RemoveIndex):
 def drop_constraint_and_index_database(apps, schema_editor):
     """Drop constraint and index using idempotent SQL. Safe to run even if they don't exist."""
     vendor = schema_editor.connection.vendor
-    
-    GymMember = apps.get_model('inventory', 'GymMember')
+
+    GymMember = apps.get_model("inventory", "GymMember")
     gym_table = GymMember._meta.db_table
-    
+
     with schema_editor.connection.cursor() as cursor:
-        if vendor == 'postgresql':
+        if vendor == "postgresql":
             # Drop constraint if exists (PostgreSQL)
-            cursor.execute(f"""
+            cursor.execute(
+                f"""
                 ALTER TABLE {gym_table} 
                 DROP CONSTRAINT IF EXISTS unique_gym_member_phone
-            """)
+            """
+            )
             # Drop index if exists
             cursor.execute("DROP INDEX IF EXISTS inv_wty_stat_exp_idx")
-        elif vendor == 'sqlite':
+        elif vendor == "sqlite":
             # SQLite: Drop index if exists (SQLite may have created constraint as index)
             cursor.execute("DROP INDEX IF EXISTS unique_gym_member_phone")
             cursor.execute("DROP INDEX IF EXISTS inv_wty_stat_exp_idx")
@@ -60,7 +64,6 @@ def reverse_drop_constraint_and_index_database(apps, schema_editor):
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         ("inventory", "0030_merge_20251202_0148"),
         ("tenants", "0011_agentinvite_temp_password_hash_and_more"),
@@ -82,9 +85,7 @@ class Migration(migrations.Migration):
                 ),
                 (
                     "started_at",
-                    models.DateTimeField(
-                        db_index=True, default=django.utils.timezone.now
-                    ),
+                    models.DateTimeField(db_index=True, default=django.utils.timezone.now),
                 ),
                 ("ended_at", models.DateTimeField(blank=True, null=True)),
                 (
@@ -98,39 +99,27 @@ class Migration(migrations.Migration):
                 ),
                 (
                     "total_sales_amount",
-                    models.DecimalField(
-                        decimal_places=2, default=Decimal("0.00"), max_digits=12
-                    ),
+                    models.DecimalField(decimal_places=2, default=Decimal("0.00"), max_digits=12),
                 ),
                 (
                     "total_cost_amount",
-                    models.DecimalField(
-                        decimal_places=2, default=Decimal("0.00"), max_digits=12
-                    ),
+                    models.DecimalField(decimal_places=2, default=Decimal("0.00"), max_digits=12),
                 ),
                 (
                     "total_profit_amount",
-                    models.DecimalField(
-                        decimal_places=2, default=Decimal("0.00"), max_digits=12
-                    ),
+                    models.DecimalField(decimal_places=2, default=Decimal("0.00"), max_digits=12),
                 ),
                 (
                     "total_credit_amount",
-                    models.DecimalField(
-                        decimal_places=2, default=Decimal("0.00"), max_digits=12
-                    ),
+                    models.DecimalField(decimal_places=2, default=Decimal("0.00"), max_digits=12),
                 ),
                 (
                     "total_free_amount",
-                    models.DecimalField(
-                        decimal_places=2, default=Decimal("0.00"), max_digits=12
-                    ),
+                    models.DecimalField(decimal_places=2, default=Decimal("0.00"), max_digits=12),
                 ),
                 (
                     "missing_stock_value",
-                    models.DecimalField(
-                        decimal_places=2, default=Decimal("0.00"), max_digits=12
-                    ),
+                    models.DecimalField(decimal_places=2, default=Decimal("0.00"), max_digits=12),
                 ),
                 ("opening_notes", models.TextField(blank=True, default="")),
                 ("closing_notes", models.TextField(blank=True, default="")),
@@ -362,9 +351,7 @@ class Migration(migrations.Migration):
         migrations.AddField(
             model_name="liquorsale",
             name="total_cost",
-            field=models.DecimalField(
-                decimal_places=2, default=Decimal("0.00"), max_digits=12
-            ),
+            field=models.DecimalField(decimal_places=2, default=Decimal("0.00"), max_digits=12),
         ),
         migrations.AddField(
             model_name="liquorsale",
@@ -476,9 +463,7 @@ class Migration(migrations.Migration):
         ),
         migrations.AddIndex(
             model_name="liquorsale",
-            index=models.Index(
-                fields=["shift", "-sold_at"], name="inventory_l_shift_i_082bc9_idx"
-            ),
+            index=models.Index(fields=["shift", "-sold_at"], name="inventory_l_shift_i_082bc9_idx"),
         ),
         migrations.AddIndex(
             model_name="liquorsale",
@@ -524,9 +509,7 @@ class Migration(migrations.Migration):
         ),
         migrations.AddIndex(
             model_name="liquorshift",
-            index=models.Index(
-                fields=["barman", "-started_at"], name="inventory_l_barman__d2b32d_idx"
-            ),
+            index=models.Index(fields=["barman", "-started_at"], name="inventory_l_barman__d2b32d_idx"),
         ),
         migrations.AddIndex(
             model_name="liquorshift",
@@ -537,15 +520,11 @@ class Migration(migrations.Migration):
         ),
         migrations.AddIndex(
             model_name="liquorshiftstock",
-            index=models.Index(
-                fields=["shift", "snapshot_type"], name="inventory_l_shift_i_e4a052_idx"
-            ),
+            index=models.Index(fields=["shift", "snapshot_type"], name="inventory_l_shift_i_e4a052_idx"),
         ),
         migrations.AddIndex(
             model_name="liquorshiftstock",
-            index=models.Index(
-                fields=["product", "shift"], name="inventory_l_product_925b0d_idx"
-            ),
+            index=models.Index(fields=["product", "shift"], name="inventory_l_product_925b0d_idx"),
         ),
         migrations.AlterUniqueTogether(
             name="liquorshiftstock",

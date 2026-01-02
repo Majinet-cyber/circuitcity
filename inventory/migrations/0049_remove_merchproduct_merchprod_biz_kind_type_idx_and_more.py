@@ -8,6 +8,7 @@ class SafeRemoveIndex(RemoveIndex):
     """
     Prevents ValueError if index is missing from migration state.
     """
+
     def state_forwards(self, app_label, state):
         try:
             super().state_forwards(app_label, state)
@@ -19,7 +20,7 @@ def drop_merchproduct_index_database(apps, schema_editor):
     """Drop merchproduct index using idempotent SQL. Safe to run even if index doesn't exist."""
     vendor = schema_editor.connection.vendor
     with schema_editor.connection.cursor() as cursor:
-        if vendor in ('postgresql', 'sqlite'):
+        if vendor in ("postgresql", "sqlite"):
             cursor.execute("DROP INDEX IF EXISTS merchprod_biz_kind_type_idx")
 
 
@@ -29,7 +30,6 @@ def reverse_drop_merchproduct_index_database(apps, schema_editor):
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         ("inventory", "0048_merge_20251207_1007"),
     ]

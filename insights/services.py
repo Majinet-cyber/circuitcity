@@ -10,6 +10,7 @@ from django.utils import timezone
 # Optional: statsmodels (fallback to EMA if not installed / too little data)
 try:
     from statsmodels.tsa.holtwinters import ExponentialSmoothing  # type: ignore
+
     _HAS_STATSMODELS = True
 except Exception:  # pragma: no cover
     ExponentialSmoothing = None  # type: ignore
@@ -17,10 +18,13 @@ except Exception:  # pragma: no cover
 
 # Models
 from .models import (
-    Forecast,              # legacy/simple table (product, date, predicted_units, predicted_revenue)
-    DailyKPI, ForecastRun, ForecastItem,
+    Forecast,  # legacy/simple table (product, date, predicted_units, predicted_revenue)
+    DailyKPI,
+    ForecastRun,
+    ForecastItem,
     ReorderAdvice,
 )
+
 # Adjust imports to your schema
 from inventory.models import Sale, Product, Stock  # If names differ, keep string FKs in models and adjust here.
 
@@ -29,14 +33,17 @@ from inventory.models import Sale, Product, Stock  # If names differ, keep strin
 # Field resolution helpers (robust across slightly different schemas)
 # ============================================================
 
+
 def _field_exists(model, field_name: str) -> bool:
     return any(f.name == field_name for f in model._meta.get_fields())
+
 
 def _pick_field(model, candidates: List[str]) -> Optional[str]:
     for c in candidates:
         if _field_exists(model, c):
             return c
     return None
+
 
 def _product_price(product: Optional[Product]) -> float:
     if not product:
@@ -54,6 +61,7 @@ def _product_price(product: Optional[Product]) -> float:
 # Basic time helpers
 # ============================================================
 
+
 def week_start(dt) -> date:
     d = timezone.localdate() if hasattr(dt, "tzinfo") else date.today()
     # If dt is a datetime, prefer its date in local tz
@@ -61,12 +69,13 @@ def week_start(dt) -> date:
         d = timezone.localdate(dt)
     except Exception:
         pass
-    return (d - timedelta(days=d.weekday()))
+    return d - timedelta(days=d.weekday())
 
 
 # ============================================================
 # Lightweight EMA utilities (fallback when statsmodels not used)
 # ============================================================
+
 
 def ema(series: List[float], alpha: float = 0.30) -> float:
     if not series:
@@ -75,6 +84,7 @@ def ema(series: List[float], alpha: float = 0.30) -> float:
     for y in series[1:]:
         f = alpha * float(y) + (1.0 - alpha) * f
     return f
+
 
 def ema_with_weekday(series_by_day: List[Tuple[int, float]], alpha: float = 0.30) -> float:
     """
@@ -95,13 +105,16 @@ def ema_with_weekday(series_by_day: List[Tuple[int, float]], alpha: float = 0.30
     next_dow = (date.today().weekday() + 1) % 7
     return base * mult[next_dow]
 
+
 def percentile_bounds(series: List[float], lo=0.2, hi=0.8) -> Tuple[float, float]:
     if not series:
         return (0.0, 0.0)
     s = sorted(series)
+
     def pick(p):
         i = max(0, min(len(s) - 1, int(p * (len(s) - 1))))
         return float(s[i])
+
     return (pick(lo), pick(hi))
 
 
@@ -109,17 +122,22 @@ def percentile_bounds(series: List[float], lo=0.2, hi=0.8) -> Tuple[float, float
 # Data access helpers
 # ============================================================
 
+
 def _sale_date_field() -> str:
     return _pick_field(Sale, ["sold_at", "created_at", "timestamp", "date"]) or "created_at"
+
 
 def _sale_qty_field() -> str:
     return _pick_field(Sale, ["quantity", "qty", "units", "count"]) or "quantity"
 
+
 def _sale_amount_field() -> Optional[str]:
     return _pick_field(Sale, ["amount", "total_amount", "sale_price", "total", "price"])
 
+
 def _stock_qty_field() -> str:
     return _pick_field(Stock, ["quantity_on_hand", "qty_on_hand", "on_hand", "quantity", "qty", "stock"]) or "quantity"
+
 
 def _stock_store_field() -> Optional[str]:
     return _pick_field(Stock, ["store", "location", "branch"])
@@ -128,6 +146,7 @@ def _stock_store_field() -> Optional[str]:
 # ============================================================
 # Public: Daily sales DataFrame (date, units, revenue)
 # ============================================================
+
 
 def daily_sales_qs(product: Optional[Product] = None) -> pd.DataFrame:
     """
@@ -147,10 +166,7 @@ def daily_sales_qs(product: Optional[Product] = None) -> pd.DataFrame:
     else:
         ann["revenue"] = Value(0, output_field=DecimalField(max_digits=12, decimal_places=2))
 
-    agg = (qs.annotate(**{"d": ann["d"]})
-             .values("d")
-             .annotate(units=ann["units"], revenue=ann["revenue"])
-             .order_by("d"))
+    agg = qs.annotate(**{"d": ann["d"]}).values("d").annotate(units=ann["units"], revenue=ann["revenue"]).order_by("d")
 
     df = pd.DataFrame(list(agg))
     if df.empty:
@@ -162,6 +178,7 @@ def daily_sales_qs(product: Optional[Product] = None) -> pd.DataFrame:
 # ============================================================
 # Forecasting (per product) â€” statsmodels (if available) else EMA
 # ============================================================
+
 
 def _forecast_series(units_series: pd.Series, horizon_days: int) -> List[float]:
     # Use Holt-Winters if available and data sufficient; else EMA flat
@@ -214,9 +231,7 @@ def compute_and_store_all(horizon_days: int = 7, top_n: int = 50) -> int:
     - Also writes an 'overall' (product=None) series
     """
     qfield = _sale_qty_field()
-    top_ids_qs = (Sale.objects.values("product_id")
-                  .annotate(u=Sum(F(qfield)))
-                  .order_by("-u"))[:top_n]
+    top_ids_qs = (Sale.objects.values("product_id").annotate(u=Sum(F(qfield))).order_by("-u"))[:top_n]
     product_ids = [r["product_id"] for r in top_ids_qs if r["product_id"]]
     products = list(Product.objects.filter(id__in=product_ids))
     products.append(None)  # overall
@@ -226,7 +241,8 @@ def compute_and_store_all(horizon_days: int = 7, top_n: int = 50) -> int:
         rows = forecast_product(prod, horizon_days=horizon_days)
         for r in rows:
             Forecast.objects.update_or_create(
-                product=prod, date=r["date"],
+                product=prod,
+                date=r["date"],
                 defaults={
                     "predicted_units": r["predicted_units"],
                     "predicted_revenue": r["predicted_revenue"],
@@ -240,15 +256,16 @@ def compute_and_store_all(horizon_days: int = 7, top_n: int = 50) -> int:
 # Stockout and restock suggestion (legacy/simple)
 # ============================================================
 
+
 def _on_hand_for_product(product: Product) -> int:
     qty_field = _stock_qty_field()
     # Sum across all stock rows for this product (handles multi-store schemas)
-    agg = (Stock.objects.filter(product=product)
-           .aggregate(q=Coalesce(Sum(F(qty_field)), Value(0))))
+    agg = Stock.objects.filter(product=product).aggregate(q=Coalesce(Sum(F(qty_field)), Value(0)))
     try:
         return int(agg["q"] or 0)
     except Exception:
         return 0
+
 
 def stockout_and_restock(product: Product, horizon_days: int = 7, lead_days: int = 3) -> Dict:
     """Compute naive stockout date and restock qty using Forecast + current stock."""
@@ -256,9 +273,7 @@ def stockout_and_restock(product: Product, horizon_days: int = 7, lead_days: int
 
     today = timezone.localdate()
     fut = list(
-        Forecast.objects.filter(
-            product=product, date__gte=today, date__lte=today + timedelta(days=horizon_days)
-        )
+        Forecast.objects.filter(product=product, date__gte=today, date__lte=today + timedelta(days=horizon_days))
         .order_by("date")
         .values("date", "predicted_units")
     )
@@ -272,8 +287,8 @@ def stockout_and_restock(product: Product, horizon_days: int = 7, lead_days: int
             break
 
     fut_sum = sum(int(r["predicted_units"] or 0) for r in fut)
-    needed = max(0, -remaining)          # if negative remaining, we ran out within horizon
-    safety = int(0.2 * fut_sum)          # 20% safety
+    needed = max(0, -remaining)  # if negative remaining, we ran out within horizon
+    safety = int(0.2 * fut_sum)  # 20% safety
     suggested = needed + safety
 
     urgent = bool(stockout_date and stockout_date <= (today + timedelta(days=lead_days)))
@@ -289,13 +304,16 @@ def stockout_and_restock(product: Product, horizon_days: int = 7, lead_days: int
 # Premium path: generate ForecastRun/ForecastItem + ReorderAdvice
 # ============================================================
 
+
 def _series_by_day_from_dailykpi(store_id: int, product_id: int, days_back: int = 60) -> List[Tuple[int, float]]:
     start_d = timezone.localdate() - timedelta(days=days_back)
-    rows = (DailyKPI.objects
-            .filter(store_id=store_id, product_id=product_id, d__gte=start_d)
-            .order_by("d")
-            .values_list("d", "units"))
+    rows = (
+        DailyKPI.objects.filter(store_id=store_id, product_id=product_id, d__gte=start_d)
+        .order_by("d")
+        .values_list("d", "units")
+    )
     return [(d.weekday(), float(u or 0.0)) for d, u in rows]
+
 
 def _current_on_hand(store_id: int, product_id: int) -> int:
     qty_field = _stock_qty_field()
@@ -309,6 +327,7 @@ def _current_on_hand(store_id: int, product_id: int) -> int:
     except Exception:
         return 0
 
+
 def compute_premium_run(horizon_days: int = 14, days_back: int = 60, alpha: float = 0.30) -> Dict:
     """
     Premium path: writes into ForecastRun/ForecastItem and ReorderAdvice
@@ -318,10 +337,11 @@ def compute_premium_run(horizon_days: int = 14, days_back: int = 60, alpha: floa
     today = timezone.localdate()
 
     # Distinct (store, product) pairs that have DailyKPI in the window
-    pairs = (DailyKPI.objects
-             .filter(d__gte=today - timedelta(days=days_back))
-             .values_list("store_id", "product_id")
-             .distinct())
+    pairs = (
+        DailyKPI.objects.filter(d__gte=today - timedelta(days=days_back))
+        .values_list("store_id", "product_id")
+        .distinct()
+    )
 
     n_items = 0
     n_advice = 0
@@ -340,7 +360,10 @@ def compute_premium_run(horizon_days: int = 14, days_back: int = 60, alpha: floa
         for i in range(1, horizon_days + 1):
             the_date = today + timedelta(days=i)
             ForecastItem.objects.update_or_create(
-                run=run, store_id=store_id, product_id=product_id, date=the_date,
+                run=run,
+                store_id=store_id,
+                product_id=product_id,
+                date=the_date,
                 defaults={"yhat": float(yhat_next), "ylo": float(lo), "yhi": float(hi), "mape": None},
             )
             n_items += 1
@@ -351,7 +374,7 @@ def compute_premium_run(horizon_days: int = 14, days_back: int = 60, alpha: floa
         lead = 7.0
         z = 1.28  # ~90% service level
         sigma = max(0.0, (hi - lo) / 2.0)
-        rop = mu * lead + z * sigma * (lead ** 0.5)
+        rop = mu * lead + z * sigma * (lead**0.5)
         recommend = max(0.0, mu * (lead + 7.0) - on_hand)
 
         ReorderAdvice.objects.update_or_create(
@@ -362,5 +385,3 @@ def compute_premium_run(horizon_days: int = 14, days_back: int = 60, alpha: floa
         n_advice += 1
 
     return {"run_id": run.id, "items_saved": n_items, "advice_saved": n_advice}
-
-

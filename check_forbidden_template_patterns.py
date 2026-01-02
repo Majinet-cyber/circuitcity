@@ -6,11 +6,12 @@ FORBIDDEN = [
     r"request\.POST",
 ]
 
+
 def main():
     root = pathlib.Path(__file__).resolve().parents[1]
     bad = []
     for p in root.rglob("templates/**/*.html"):
-        if not p.is_file(): 
+        if not p.is_file():
             continue
         txt = p.read_text(encoding="utf-8", errors="ignore")
         for pat in FORBIDDEN:
@@ -21,6 +22,7 @@ def main():
             print(f"Forbidden pattern '{pat}' in {p}")
         sys.exit(1)
     print("OK: templates clean")
+
 
 if __name__ == "__main__":
     main()

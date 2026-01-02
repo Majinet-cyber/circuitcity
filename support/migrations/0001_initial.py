@@ -6,7 +6,6 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     initial = True
 
     dependencies = [
@@ -29,9 +28,7 @@ class Migration(migrations.Migration):
                 ),
                 (
                     "reference",
-                    models.CharField(
-                        db_index=True, editable=False, max_length=50, unique=True
-                    ),
+                    models.CharField(db_index=True, editable=False, max_length=50, unique=True),
                 ),
                 ("subject", models.CharField(max_length=200)),
                 ("description", models.TextField()),
@@ -151,20 +148,14 @@ class Migration(migrations.Migration):
         ),
         migrations.AddIndex(
             model_name="ticket",
-            index=models.Index(
-                fields=["business", "status"], name="support_tic_busines_81abe0_idx"
-            ),
+            index=models.Index(fields=["business", "status"], name="support_tic_busines_81abe0_idx"),
         ),
         migrations.AddIndex(
             model_name="ticket",
-            index=models.Index(
-                fields=["status", "created_at"], name="support_tic_status_d0b46e_idx"
-            ),
+            index=models.Index(fields=["status", "created_at"], name="support_tic_status_d0b46e_idx"),
         ),
         migrations.AddIndex(
             model_name="ticket",
-            index=models.Index(
-                fields=["reference"], name="support_tic_referen_b294cb_idx"
-            ),
+            index=models.Index(fields=["reference"], name="support_tic_referen_b294cb_idx"),
         ),
     ]

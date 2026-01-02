@@ -12,4 +12,3 @@ class BusinessKind(models.TextChoices):
 
 
 __all__ = ["BusinessKind"]
-

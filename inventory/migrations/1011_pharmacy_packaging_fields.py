@@ -4,7 +4,6 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         ("inventory", "1010_add_liquor_stock_adjustment_model"),
     ]
@@ -13,9 +12,7 @@ class Migration(migrations.Migration):
         migrations.AddField(
             model_name="merchproduct",
             name="box_size",
-            field=models.PositiveIntegerField(
-                blank=True, help_text="Number of strips per box (optional)", null=True
-            ),
+            field=models.PositiveIntegerField(blank=True, help_text="Number of strips per box (optional)", null=True),
         ),
         migrations.AddField(
             model_name="merchproduct",

@@ -1,19 +1,37 @@
-# Development and Testing Dependencies
-# Install with: pip install -r requirements.txt -r requirements-dev.txt
+# Development and Security Tools
+# Install: pip install -r requirements-dev.txt
 
-# Base requirements
--r requirements.txt
+# Code Quality
+black==23.12.1  # Code formatter
+isort==5.13.2  # Import sorter
+flake8==7.0.0  # Linter
+flake8-bandit==4.1.1  # Security linting for flake8
+flake8-bugbear==23.12.2  # Additional bug detection for flake8
 
-# Testing frameworks
-pytest==8.3.2
-pytest-django==4.8.0
-pytest-cov==5.0.0
+# Static Analysis Security Testing (SAST)
+bandit[toml]==1.7.6  # Python security scanner
+semgrep==1.52.0  # Multi-language SAST tool
 
-# Playwright for E2E tests
-playwright==1.48.0
+# Dependency Vulnerability Scanning
+pip-audit==2.6.3  # Audit Python dependencies for known vulnerabilities
+safety==3.0.1  # Check dependencies against safety-db
 
-# Additional test utilities
-factory-boy==3.3.0  # If we want to add factories later
-faker==26.0.0  # For generating test data
-freezegun  # For time mocking in tests
+# Type Checking
+mypy==1.8.0  # Static type checker
+django-stubs==4.2.7  # Type stubs for Django
 
+# Testing
+pytest==7.4.4  # Test framework
+pytest-django==4.7.0  # Django plugin for pytest
+pytest-cov==4.1.0  # Coverage plugin
+coverage==7.4.0  # Code coverage measurement
+
+# Pre-commit Hooks
+pre-commit==3.6.0  # Git hooks framework
+
+# Security Testing
+owasp-zap-scanner==0.1.0  # OWASP ZAP integration (optional)
+
+# Documentation
+sphinx==7.2.6  # Documentation generator
+sphinx-rtd-theme==2.0.0  # Read the Docs theme

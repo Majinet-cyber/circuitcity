@@ -4,14 +4,14 @@ import os
 import sys
 import django
 
-os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'cc.settings')
+os.environ.setdefault("DJANGO_SETTINGS_MODULE", "cc.settings")
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 django.setup()
 
 from inventory.utils_verticals import get_vertical_sidebar_items
 
-items = get_vertical_sidebar_items('phones')
-acc_items = [i for i in items if 'accessories' in i.get('key', '')]
+items = get_vertical_sidebar_items("phones")
+acc_items = [i for i in items if "accessories" in i.get("key", "")]
 
 print("=" * 60)
 print("ACCESSORIES ITEMS IN PHONES SIDEBAR:")
@@ -33,4 +33,3 @@ if len(acc_items) == 2:
 else:
     print(f"\n❌ ERROR: Expected 2 items, found {len(acc_items)}")
     sys.exit(1)
-

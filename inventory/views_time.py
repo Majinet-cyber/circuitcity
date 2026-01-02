@@ -31,33 +31,32 @@ User = get_user_model()
 # Helpers
 # ---------------------------------------------------------------------
 
+
 def _active_biz_id(request: HttpRequest) -> Optional[int]:
     """Get the active business ID from request."""
     biz = get_active_business(request)
     return biz.id if biz else None
 
+
 def _wants_json(request: HttpRequest) -> bool:
     h = request.headers
     if h.get("X-Requested-With") == "XMLHttpRequest":
         return True
-    ct = (h.get("Content-Type") or "")
-    accept = (h.get("Accept") or "")
+    ct = h.get("Content-Type") or ""
+    accept = h.get("Accept") or ""
     return "application/json" in ct or "application/json" in accept
+
 
 def _agent_default_location(request: HttpRequest) -> Optional[Location]:
     biz_id = _active_biz_id(request)
     if not biz_id:
         return None
-    mem = (
-        Membership.objects
-        .filter(user=request.user, business_id=biz_id)
-        .select_related("location")
-        .first()
-    )
+    mem = Membership.objects.filter(user=request.user, business_id=biz_id).select_related("location").first()
     if mem and getattr(mem, "location_id", None):
         return mem.location
     qs = Location.objects.filter(business_id=biz_id).order_by("id")
     return qs.filter(name__icontains="store").first() or qs.first()
+
 
 def _parse_local_date(s: str | None) -> Optional[datetime]:
     if not s:
@@ -71,12 +70,14 @@ def _parse_local_date(s: str | None) -> Optional[datetime]:
     except Exception:
         return None
 
+
 def _day_bounds(now=None) -> Tuple[timezone.datetime, timezone.datetime]:
     """Start/end for 'today' in local tz."""
     now = now or timezone.localtime()
     start = now.replace(hour=0, minute=0, second=0, microsecond=0)
     end = start + timedelta(days=1)
     return start, end
+
 
 def _range_bounds(request: HttpRequest) -> Tuple[timezone.datetime, timezone.datetime]:
     """
@@ -95,10 +96,11 @@ def _range_bounds(request: HttpRequest) -> Tuple[timezone.datetime, timezone.dat
     to_d = _parse_local_date(request.GET.get("to"))
     if from_d and to_d:
         start = from_d.replace(hour=0, minute=0, second=0, microsecond=0)
-        end = (to_d.replace(hour=0, minute=0, second=0, microsecond=0) + timedelta(days=1))
+        end = to_d.replace(hour=0, minute=0, second=0, microsecond=0) + timedelta(days=1)
         return start, end
 
     return _day_bounds()
+
 
 def _serialize_log(row: TimeLog) -> Dict[str, object]:
     u = getattr(row, "user", None)
@@ -107,7 +109,9 @@ def _serialize_log(row: TimeLog) -> Dict[str, object]:
         "id": getattr(row, "id", None),
         "ts": timezone.localtime(getattr(row, "ts")).isoformat() if getattr(row, "ts", None) else None,
         "kind": getattr(row, "kind", None),
-        "user": (getattr(u, "get_full_name", lambda: "")() or getattr(u, "username", None) or getattr(u, "email", None)),
+        "user": (
+            getattr(u, "get_full_name", lambda: "")() or getattr(u, "username", None) or getattr(u, "email", None)
+        ),
         "user_id": getattr(u, "id", None),
         "location": getattr(loc, "name", None),
         "lat": getattr(row, "lat", None),
@@ -118,9 +122,11 @@ def _serialize_log(row: TimeLog) -> Dict[str, object]:
         "note": getattr(row, "note", None),
     }
 
+
 # ---------------------------------------------------------------------
 # Agent check-in page (session flags drive client clocks)
 # ---------------------------------------------------------------------
+
 
 @login_required
 @ensure_csrf_cookie
@@ -149,6 +155,7 @@ def time_checkin(request: HttpRequest) -> HttpResponse:
     if (request.headers.get("Content-Type") or "").startswith("application/json"):
         try:
             import json
+
             payload = json.loads((request.body or b"").decode("utf-8") or "{}")
         except Exception:
             if _wants_json(request):
@@ -204,29 +211,31 @@ def time_checkin(request: HttpRequest) -> HttpResponse:
     net = outcome.net_adjustment or 0
 
     if _wants_json(request):
-        return JsonResponse({
-            "ok": True,
-            "log": {
-                "id": tl.id,
-                "ts": timezone.localtime(tl.ts).isoformat(),
-                "kind": tl.kind,
-                "location": getattr(location, "name", None),
-                "lat": tl.lat,
-                "lon": tl.lon,
-            },
-            "adjustment": {
-                "bonus": (getattr(outcome, "early_bonus", 0) or 0) + (getattr(outcome, "weekend_bonus", 0) or 0),
-                "deduction": getattr(outcome, "late_deduction", 0) or 0,
-                "net": net,
-            },
-            "shift_on": bool(request.session.get("shift_on", False)),
-            "shift_started_at": request.session.get("shift_started_at"),
-            "message": (
-                f"+MWK {net:,} attendance bonus applied."
-                if net > 0 else
-                (f"-MWK {abs(net):,} late deduction applied." if net < 0 else "Recorded.")
-            ),
-        })
+        return JsonResponse(
+            {
+                "ok": True,
+                "log": {
+                    "id": tl.id,
+                    "ts": timezone.localtime(tl.ts).isoformat(),
+                    "kind": tl.kind,
+                    "location": getattr(location, "name", None),
+                    "lat": tl.lat,
+                    "lon": tl.lon,
+                },
+                "adjustment": {
+                    "bonus": (getattr(outcome, "early_bonus", 0) or 0) + (getattr(outcome, "weekend_bonus", 0) or 0),
+                    "deduction": getattr(outcome, "late_deduction", 0) or 0,
+                    "net": net,
+                },
+                "shift_on": bool(request.session.get("shift_on", False)),
+                "shift_started_at": request.session.get("shift_started_at"),
+                "message": (
+                    f"+MWK {net:,} attendance bonus applied."
+                    if net > 0
+                    else (f"-MWK {abs(net):,} late deduction applied." if net < 0 else "Recorded.")
+                ),
+            }
+        )
 
     if net > 0:
         messages.success(request, f"+MWK {net:,} attendance bonus applied.")
@@ -234,6 +243,7 @@ def time_checkin(request: HttpRequest) -> HttpResponse:
         messages.warning(request, f"-MWK {abs(net):,} late deduction applied.")
     messages.info(request, f"{kind.title()} recorded.")
     return redirect("inventory:my_time_logs")
+
 
 @login_required
 def my_time_logs(request: HttpRequest) -> HttpResponse:
@@ -243,16 +253,15 @@ def my_time_logs(request: HttpRequest) -> HttpResponse:
 
     biz_id = _active_biz_id(request)
     logs = (
-        TimeLog.objects
-        .filter(business_id=biz_id, user=request.user)
-        .select_related("location")
-        .order_by("-ts")[:200]
+        TimeLog.objects.filter(business_id=biz_id, user=request.user).select_related("location").order_by("-ts")[:200]
     )
     return render(request, "inventory/time_logs.html", {"logs": logs})
+
 
 # ---------------------------------------------------------------------
 # Manager view: collect per-agent work/idle + latest log
 # ---------------------------------------------------------------------
+
 
 def _pair_work_seconds(events: List[TimeLog], now_local) -> Tuple[int, bool, Optional[str]]:
     """
@@ -282,7 +291,10 @@ def _pair_work_seconds(events: List[TimeLog], now_local) -> Tuple[int, bool, Opt
 
     return max(work, 0), on_shift, last_ts_iso
 
-def _collect_manager_overview(biz_id: int, start: timezone.datetime, end: timezone.datetime, expected_shift_seconds: int) -> Dict[str, object]:
+
+def _collect_manager_overview(
+    biz_id: int, start: timezone.datetime, end: timezone.datetime, expected_shift_seconds: int
+) -> Dict[str, object]:
     """
     Build a per-agent summary for the window [start, end), with a 'battery'.
     Also include the latest event details per user for convenience.
@@ -291,15 +303,10 @@ def _collect_manager_overview(biz_id: int, start: timezone.datetime, end: timezo
     horizon_seconds = int((min(now_local, end) - start).total_seconds())
     horizon_seconds = max(horizon_seconds, 0)
 
-    members = (
-        Membership.objects
-        .filter(business_id=biz_id)
-        .select_related("user", "location")
-    )
+    members = Membership.objects.filter(business_id=biz_id).select_related("user", "location")
 
     events = (
-        TimeLog.objects
-        .filter(business_id=biz_id, ts__gte=start, ts__lt=end)
+        TimeLog.objects.filter(business_id=biz_id, ts__gte=start, ts__lt=end)
         .select_related("user", "location")
         .order_by("user_id", "ts")
     )
@@ -318,8 +325,8 @@ def _collect_manager_overview(biz_id: int, start: timezone.datetime, end: timezo
         work_secs, on_shift, last_ts_iso = _pair_work_seconds(u_events, now_local)
         idle_secs = max(horizon_seconds - work_secs, 0)
 
-        pct_of_expected = 0 if expected_shift_seconds <= 0 else min(
-            int(round((work_secs / expected_shift_seconds) * 100)), 100
+        pct_of_expected = (
+            0 if expected_shift_seconds <= 0 else min(int(round((work_secs / expected_shift_seconds) * 100)), 100)
         )
 
         if pct_of_expected >= 80:
@@ -334,31 +341,33 @@ def _collect_manager_overview(biz_id: int, start: timezone.datetime, end: timezo
         ev = last_event.get(u.id)
         loc_name = getattr(getattr(ev, "location", None), "name", None) if ev else None
 
-        agents.append({
-            "user_id": u.id,
-            "name": (u.get_full_name() or u.username or u.email or f"User {u.id}"),
-            "email": u.email,
-            "location": getattr(m.location, "name", None),
-
-            # battery + status
-            "work_secs": work_secs,
-            "idle_secs": idle_secs,
-            "on_shift": on_shift,
-            "last_ts": last_ts_iso,
-            "pct": pct_of_expected,
-            "color": color,
-
-            # latest event details
-            "latest_kind": getattr(ev, "kind", None),
-            "latest_ts": timezone.localtime(ev.ts).isoformat() if ev else None,
-            "latest_location": loc_name,
-            "latest_lat": getattr(ev, "lat", None) if ev else None,
-            "latest_lon": getattr(ev, "lon", None) if ev else None,
-            "latest_accuracy_m": getattr(ev, "accuracy_m", None) if ev else None,
-            "latest_distance_m": getattr(ev, "distance_m", None) if ev else None,
-            "latest_geofence": getattr(ev, "geofence_status", None) or getattr(ev, "geo_status", None) if ev else None,
-            "latest_note": getattr(ev, "note", None) if ev else None,
-        })
+        agents.append(
+            {
+                "user_id": u.id,
+                "name": (u.get_full_name() or u.username or u.email or f"User {u.id}"),
+                "email": u.email,
+                "location": getattr(m.location, "name", None),
+                # battery + status
+                "work_secs": work_secs,
+                "idle_secs": idle_secs,
+                "on_shift": on_shift,
+                "last_ts": last_ts_iso,
+                "pct": pct_of_expected,
+                "color": color,
+                # latest event details
+                "latest_kind": getattr(ev, "kind", None),
+                "latest_ts": timezone.localtime(ev.ts).isoformat() if ev else None,
+                "latest_location": loc_name,
+                "latest_lat": getattr(ev, "lat", None) if ev else None,
+                "latest_lon": getattr(ev, "lon", None) if ev else None,
+                "latest_accuracy_m": getattr(ev, "accuracy_m", None) if ev else None,
+                "latest_distance_m": getattr(ev, "distance_m", None) if ev else None,
+                "latest_geofence": getattr(ev, "geofence_status", None) or getattr(ev, "geo_status", None)
+                if ev
+                else None,
+                "latest_note": getattr(ev, "note", None) if ev else None,
+            }
+        )
 
     agents.sort(key=lambda a: (not a["on_shift"], a["pct"], a["name"]))
 
@@ -370,9 +379,11 @@ def _collect_manager_overview(biz_id: int, start: timezone.datetime, end: timezo
         "agents": agents,
     }
 
+
 # ---------------------------------------------------------------------
 # Pages
 # ---------------------------------------------------------------------
+
 
 @login_required
 @require_http_methods(["GET"])
@@ -384,13 +395,10 @@ def time_logs_page(request: HttpRequest) -> HttpResponse:
     bid = _active_biz_id(request)
     if not bid:
         # Fallback: render empty page if no business context
-        return render(request, "inventory/time_logs.html", {
-            "active_tab": "time_logs",
-            "logs": [],
-            "agents": [],
-            "batteries": []
-        })
-    
+        return render(
+            request, "inventory/time_logs.html", {"active_tab": "time_logs", "logs": [], "agents": [], "batteries": []}
+        )
+
     start, end = _range_bounds(request)
     shift_h = int(request.GET.get("shift_hours", "8") or 8)
     expected = max(0, shift_h) * 3600
@@ -403,15 +411,17 @@ def time_logs_page(request: HttpRequest) -> HttpResponse:
             "window_start": start.isoformat(),
             "window_end": end.isoformat(),
             "expected_shift_seconds": expected,
-            "agents": []
+            "agents": [],
         }
-    
+
     data["active_tab"] = "time_logs"  # ✅ For sidebar nav highlighting
     return render(request, "inventory/time_logs.html", data)
+
 
 # ---------------------------------------------------------------------
 # JSON APIs
 # ---------------------------------------------------------------------
+
 
 @login_required
 @require_http_methods(["GET"])
@@ -424,14 +434,13 @@ def time_logs_api(request: HttpRequest) -> JsonResponse:
     bid = _active_biz_id(request)
     if not bid:
         return JsonResponse({"ok": False, "error": "no_active_business"}, status=400)
-    
+
     start, end = _range_bounds(request)
 
     user_id = request.GET.get("user_id")
     if user_id:
         qs = (
-            TimeLog.objects
-            .filter(business_id=bid, user_id=user_id, ts__gte=start, ts__lt=end)
+            TimeLog.objects.filter(business_id=bid, user_id=user_id, ts__gte=start, ts__lt=end)
             .select_related("user", "location")
             .order_by("-ts")[:30]
         )
@@ -441,6 +450,7 @@ def time_logs_api(request: HttpRequest) -> JsonResponse:
     expected = max(0, shift_h) * 3600
     data = _collect_manager_overview(bid, start, end, expected)
     return JsonResponse({"ok": True, **data})
+
 
 @login_required
 @require_http_methods(["GET"])
@@ -454,6 +464,7 @@ def manager_time_overview_page(request: HttpRequest) -> HttpResponse:
     data = _collect_manager_overview(biz_id, start, end, expected)
     return render(request, "inventory/time_overview.html", data)
 
+
 @login_required
 @require_http_methods(["GET"])
 def manager_time_overview_api(request: HttpRequest) -> JsonResponse:
@@ -465,9 +476,11 @@ def manager_time_overview_api(request: HttpRequest) -> JsonResponse:
     expected = max(0, shift_h) * 3600
     return JsonResponse({"ok": True, **_collect_manager_overview(biz_id, start, end, expected)})
 
+
 # ---------------------------------------------------------------------
 # CSV Export
 # ---------------------------------------------------------------------
+
 
 @login_required
 @require_http_methods(["GET"])
@@ -482,8 +495,7 @@ def time_logs_export_csv(request: HttpRequest) -> HttpResponse:
     start, end = _range_bounds(request)
 
     rows = (
-        TimeLog.objects
-        .filter(business_id=bid, ts__gte=start, ts__lt=end)
+        TimeLog.objects.filter(business_id=bid, ts__gte=start, ts__lt=end)
         .select_related("user", "location")
         .order_by("-ts")
     )
@@ -512,6 +524,7 @@ def time_logs_export_csv(request: HttpRequest) -> HttpResponse:
     filename = f"time_logs_{start.date()}_{(end - timedelta(days=1)).date()}.csv"
     resp["Content-Disposition"] = f'attachment; filename="{filename}"'
     return resp
+
 
 # ---------------------------------------------------------------------
 # Export underscore aliases expected by urls.py (no calls here!)

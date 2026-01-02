@@ -9,6 +9,7 @@ from django.dispatch import receiver
 from django.utils import timezone
 
 from .models import InventoryItem
+
 try:
     from .models import InventoryAudit  # optional in some setups
 except Exception:  # pragma: no cover
@@ -38,16 +39,23 @@ except Exception:  # pragma: no cover
 try:
     from asgiref.local import Local
 except Exception:  # pragma: no cover
+
     class Local:  # fall-back stub
-        def __init__(self): self.value = None
+        def __init__(self):
+            self.value = None
+
 
 _request_local = Local()
+
 
 def get_current_request():
     return getattr(_request_local, "value", None)
 
+
 class RequestMiddleware:
-    def __init__(self, get_response): self.get_response = get_response
+    def __init__(self, get_response):
+        self.get_response = get_response
+
     def __call__(self, request):
         _request_local.value = request
         try:
@@ -55,12 +63,15 @@ class RequestMiddleware:
         finally:
             _request_local.value = None
 
+
 # Optional: dashboard cache version bump
 try:
     from .cache_utils import bump_dashboard_cache_version as _bump_cache
 except Exception:  # pragma: no cover
+
     def _bump_cache() -> None:
         pass
+
 
 # ---------------------------------------------------------------------
 # InventoryItem change snapshot + audit trail
@@ -80,10 +91,20 @@ def _invitem_snap(sender, instance: InventoryItem, **kwargs):
     try:
         qs = sender.objects
         instance._before = qs.only(
-            "id", "status", "location_id", "current_location_id",
-            "assigned_agent_id", "agent_id",
-            "selling_price", "price", "order_price", "cost",
-            "sold_at", "received_at", "is_active", "active",
+            "id",
+            "status",
+            "location_id",
+            "current_location_id",
+            "assigned_agent_id",
+            "agent_id",
+            "selling_price",
+            "price",
+            "order_price",
+            "cost",
+            "sold_at",
+            "received_at",
+            "is_active",
+            "active",
         ).get(pk=pk)
     except sender.DoesNotExist:
         instance._before = None
@@ -151,8 +172,8 @@ def _invitem_audit(sender, instance: InventoryItem, created: bool, **kwargs):
                     "location_id": getattr(instance, "location_id", None),
                     "current_location_id": getattr(instance, "current_location_id", None),
                     "selling_price": getattr(instance, "selling_price", None)
-                        if hasattr(instance, "selling_price")
-                        else getattr(instance, "price", None),
+                    if hasattr(instance, "selling_price")
+                    else getattr(instance, "price", None),
                 }
                 log_audit(
                     actor=getattr(request, "user", None),
@@ -219,9 +240,11 @@ def _invitem_deleted(sender, instance: InventoryItem, **kwargs):
 
     _bump_cache()
 
+
 # ---------------------------------------------------------------------
 # Sale hooks (guarded if sales app not present)
 # ---------------------------------------------------------------------
+
 
 def _wallet_fields() -> Dict[str, Optional[str]]:
     """
@@ -246,7 +269,9 @@ def _wallet_fields() -> Dict[str, Optional[str]]:
     reason_key = "reason" if "reason" in field_names else ("kind" if "kind" in field_names else None)
     memo_key = "memo" if "memo" in field_names else ("note" if "note" in field_names else None)
     ref_key = "ref" if "ref" in field_names else None
-    when_key = "happened_at" if "happened_at" in field_names else ("created_at" if "created_at" in field_names else None)
+    when_key = (
+        "happened_at" if "happened_at" in field_names else ("created_at" if "created_at" in field_names else None)
+    )
     kind_credit_value = "CREDIT"
     return {
         "agent_key": agent_key,
@@ -274,6 +299,7 @@ def _compute_commission_amount(sale: Any):
 
 
 if Sale is not None:
+
     @receiver(post_save, sender=Sale)
     def _sale_finalize(sender, instance: Any, created: bool, **kwargs):
         """
@@ -297,20 +323,18 @@ if Sale is not None:
             from django.db import transaction
             from notifications.services import notify_sale_completion, send_important_alert
             from django.conf import settings
-            
-            transaction.on_commit(
-                lambda sale=instance: notify_sale_completion(sale)
-            )
-            
+
+            transaction.on_commit(lambda sale=instance: notify_sale_completion(sale))
+
             # Check for important sale threshold
-            important_threshold = getattr(settings, 'IMPORTANT_SALE_THRESHOLD', 500000)
-            if hasattr(instance, 'price') and instance.price and float(instance.price) >= important_threshold:
+            important_threshold = getattr(settings, "IMPORTANT_SALE_THRESHOLD", 500000)
+            if hasattr(instance, "price") and instance.price and float(instance.price) >= important_threshold:
                 business = None
-                if hasattr(instance, 'business'):
+                if hasattr(instance, "business"):
                     business = instance.business
-                elif hasattr(instance, 'location') and instance.location:
-                    business = getattr(instance.location, 'business', None)
-                
+                elif hasattr(instance, "location") and instance.location:
+                    business = getattr(instance.location, "business", None)
+
                 if business:
                     transaction.on_commit(
                         lambda: send_important_alert(
@@ -319,12 +343,13 @@ if Sale is not None:
                             message=f"A large sale has been completed with a total of MK {instance.price:,.0f}.",
                         )
                     )
-            
+
             updates: list[str] = []
             try:
                 # Status to SOLD (uppercase to normalize)
                 if getattr(item, "status", None) != "SOLD":
-                    item.status = "SOLD"; updates.append("status=SOLD")
+                    item.status = "SOLD"
+                    updates.append("status=SOLD")
 
                 # sold_at from sale timestamp if not already set
                 if not getattr(item, "sold_at", None):
@@ -335,34 +360,42 @@ if Sale is not None:
                 sale_price = getattr(instance, "price", None)
                 if hasattr(item, "selling_price"):
                     if not getattr(item, "selling_price", None) and sale_price is not None:
-                        item.selling_price = sale_price; updates.append("selling_price from sale")
+                        item.selling_price = sale_price
+                        updates.append("selling_price from sale")
                 elif hasattr(item, "price"):
                     if not getattr(item, "price", None) and sale_price is not None:
-                        item.price = sale_price; updates.append("price from sale")
+                        item.price = sale_price
+                        updates.append("price from sale")
 
                 # location coherence (prefer current_location_id)
                 sale_loc_id = getattr(instance, "location_id", None)
                 if sale_loc_id:
                     if hasattr(item, "current_location_id"):
                         if getattr(item, "current_location_id", None) != sale_loc_id:
-                            item.current_location_id = sale_loc_id; updates.append("location from sale")
+                            item.current_location_id = sale_loc_id
+                            updates.append("location from sale")
                     elif hasattr(item, "location_id"):
                         if getattr(item, "location_id", None) != sale_loc_id:
-                            item.location_id = sale_loc_id; updates.append("location from sale")
+                            item.location_id = sale_loc_id
+                            updates.append("location from sale")
 
                 # optional flags that represent availability (do not touch is_active)
                 if hasattr(item, "is_sold"):
                     if not getattr(item, "is_sold", False):
-                        item.is_sold = True; updates.append("is_sold=True")
+                        item.is_sold = True
+                        updates.append("is_sold=True")
                 if hasattr(item, "in_stock"):
                     if getattr(item, "in_stock", True):
-                        item.in_stock = False; updates.append("in_stock=False")
+                        item.in_stock = False
+                        updates.append("in_stock=False")
                 if hasattr(item, "available"):
                     if getattr(item, "available", True):
-                        item.available = False; updates.append("available=False")
+                        item.available = False
+                        updates.append("available=False")
                 if hasattr(item, "availability"):
                     if getattr(item, "availability", True):
-                        item.availability = False; updates.append("availability=False")
+                        item.availability = False
+                        updates.append("availability=False")
 
                 # save without triggering _invitem_snap re-fetch (allowed audit)
                 item._actor = getattr(instance, "agent", None)
@@ -417,9 +450,12 @@ if Sale is not None:
             # Wallet credit (optional)
             try:
                 fields = _wallet_fields()
-                agent_key = fields["agent_key"]; reason_key = fields["reason_key"]
-                memo_key = fields["memo_key"]; ref_key = fields["ref_key"]
-                when_key = fields["when_key"]; credit_value = fields["kind_credit_value"]
+                agent_key = fields["agent_key"]
+                reason_key = fields["reason_key"]
+                memo_key = fields["memo_key"]
+                ref_key = fields["ref_key"]
+                when_key = fields["when_key"]
+                credit_value = fields["kind_credit_value"]
 
                 if WalletTxn is not None and agent_key and memo_key:
                     memo = f"Commission Sale #{getattr(instance, 'pk', None)}"
@@ -431,10 +467,9 @@ if Sale is not None:
                         if ref_key:
                             exists = tx_qs.filter(**{ref_key: ref_val}).exists()
                         else:
-                            exists = tx_qs.filter(**{
-                                agent_key: getattr(instance, "agent", None),
-                                memo_key: memo
-                            }).exists()
+                            exists = tx_qs.filter(
+                                **{agent_key: getattr(instance, "agent", None), memo_key: memo}
+                            ).exists()
                     except Exception:
                         exists = False
 
@@ -461,6 +496,7 @@ if Sale is not None:
 
 
 if Sale is not None:
+
     @receiver(post_delete, sender=Sale)
     def _sale_deleted(sender, instance: Any, **kwargs):
         if _AUDIT_ENABLED and log_audit:

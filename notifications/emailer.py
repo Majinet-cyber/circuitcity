@@ -30,7 +30,7 @@ def send_email(
 ) -> bool:
     """
     Send an email with both HTML and plain text versions.
-    
+
     Args:
         recipient_email: Email address to send to
         subject: Email subject line
@@ -41,23 +41,23 @@ def send_email(
         text_content: Raw plain text content (alternative to template)
         from_email: From email address (defaults to settings.DEFAULT_FROM_EMAIL)
         fail_silently: If True, log errors but don't raise exceptions
-    
+
     Returns:
         True if email was sent successfully, False otherwise
     """
     if context is None:
         context = {}
-    
+
     # Add CANONICAL_HOST to context for email links (if not already present)
-    if 'CANONICAL_HOST' not in context:
-        context['CANONICAL_HOST'] = getattr(settings, 'CANONICAL_HOST', '')
+    if "CANONICAL_HOST" not in context:
+        context["CANONICAL_HOST"] = getattr(settings, "CANONICAL_HOST", "")
         # If no canonical host, try to construct from request or use default
-        if not context['CANONICAL_HOST']:
+        if not context["CANONICAL_HOST"]:
             # Fallback: use www.emajinet.africa in production, empty in dev
-            context['CANONICAL_HOST'] = 'www.emajinet.africa' if not settings.DEBUG else ''
-    
+            context["CANONICAL_HOST"] = "www.emajinet.africa" if not settings.DEBUG else ""
+
     from_email = from_email or settings.DEFAULT_FROM_EMAIL
-    
+
     # Render templates if provided
     if html_template_path:
         try:
@@ -67,7 +67,7 @@ def send_email(
             if not fail_silently:
                 raise
             html_content = None
-    
+
     if text_template_path:
         try:
             text_content = render_to_string(text_template_path, context)
@@ -76,18 +76,18 @@ def send_email(
             if not fail_silently:
                 raise
             text_content = None
-    
+
     # If we have HTML but no text, strip HTML tags
     if html_content and not text_content:
         text_content = strip_tags(html_content)
-    
+
     # Ensure we have at least text content
     if not text_content and not html_content:
         logger.error("No content to send in email")
         if not fail_silently:
             raise ValueError("Email must have either HTML or text content")
         return False
-    
+
     try:
         # Create email message
         msg = EmailMultiAlternatives(
@@ -96,19 +96,18 @@ def send_email(
             from_email=from_email,
             to=[recipient_email],
         )
-        
+
         # Attach HTML alternative if available
         if html_content:
             msg.attach_alternative(html_content, "text/html")
-        
+
         # Send email
         msg.send()
         logger.info(f"Email sent successfully to {recipient_email}: {subject}")
         return True
-    
+
     except Exception as e:
         logger.exception(f"Failed to send email to {recipient_email}: {e}")
         if not fail_silently:
             raise
         return False
-

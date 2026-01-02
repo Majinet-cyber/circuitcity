@@ -54,10 +54,11 @@ def _is_manager_plus(request) -> bool:
     # First check request flags (set by middleware)
     if hasattr(request, "is_manager_plus"):
         return bool(request.is_manager_plus)
-    
+
     # Fallback to canonical role determination
     try:
         from tenants.utils_roles import is_manager
+
         user = _get_user(request)
         business = _get_business(request)
         return is_manager(user, business)
@@ -73,10 +74,11 @@ def _is_agent_only(request) -> bool:
     # First check request flags (set by middleware)
     if hasattr(request, "is_agent_only"):
         return bool(request.is_agent_only)
-    
+
     # Fallback to canonical role determination
     try:
         from tenants.utils_roles import is_agent
+
         user = _get_user(request)
         business = _get_business(request)
         return is_agent(user, business)
@@ -89,9 +91,10 @@ def _get_agent_profile(request) -> Optional[object]:
     user = _get_user(request)
     if not user:
         return None
-    
+
     try:
         from accounts.models import AgentProfile
+
         return AgentProfile.objects.filter(user=user).first()
     except Exception:
         return None
@@ -102,21 +105,21 @@ def _get_primary_location(request) -> Optional[object]:
     profile = _get_agent_profile(request)
     if not profile:
         return None
-    
+
     return getattr(profile, "primary_location", None)
 
 
 def get_sales_qs_for_dashboard(request: "HttpRequest", business) -> "QuerySet":
     """
     Get sales queryset scoped for dashboard display.
-    
+
     - Managers: ALL business sales (all locations, all agents)
     - Agents: Only their own sales
-    
+
     Args:
         request: HttpRequest with role flags attached
         business: Business instance
-    
+
     Returns:
         QuerySet of Sale objects
     """
@@ -126,18 +129,19 @@ def get_sales_qs_for_dashboard(request: "HttpRequest", business) -> "QuerySet":
         # Return empty queryset-like object
         from django.db.models import QuerySet
         from django.db.models import Model as DummyModel
+
         return QuerySet(model=DummyModel).none()
-    
+
     if not business:
         return Sale.objects.none()
-    
+
     # Base queryset: all sales for this business
     qs = Sale.objects.filter(business=business)
-    
+
     # CRITICAL: Managers see ALL business sales
     if _is_manager_plus(request):
         return qs
-    
+
     # Agents see only their own sales
     if _is_agent_only(request):
         user = _get_user(request)
@@ -154,9 +158,9 @@ def get_sales_qs_for_dashboard(request: "HttpRequest", business) -> "QuerySet":
                 location = _get_primary_location(request)
                 if location and hasattr(Sale, "location"):
                     qs = qs.filter(location=location)
-        
+
         return qs
-    
+
     # Default: no sales (shouldn't reach here normally)
     return Sale.objects.none()
 
@@ -164,14 +168,14 @@ def get_sales_qs_for_dashboard(request: "HttpRequest", business) -> "QuerySet":
 def get_stock_qs_for_dashboard(request: "HttpRequest", business) -> "QuerySet":
     """
     Get stock/inventory queryset scoped for dashboard display.
-    
+
     - Managers: ALL business stock (all locations)
     - Agents: Only their location's stock
-    
+
     Args:
         request: HttpRequest with role flags attached
         business: Business instance
-    
+
     Returns:
         QuerySet of InventoryItem objects
     """
@@ -180,18 +184,19 @@ def get_stock_qs_for_dashboard(request: "HttpRequest", business) -> "QuerySet":
     except Exception:
         from django.db.models import QuerySet
         from django.db.models import Model as DummyModel
+
         return QuerySet(model=DummyModel).none()
-    
+
     if not business:
         return InventoryItem.objects.none()
-    
+
     # Base queryset: all stock for this business
     qs = InventoryItem.objects.filter(business=business)
-    
+
     # CRITICAL: Managers see ALL business stock
     if _is_manager_plus(request):
         return qs
-    
+
     # Agents see only their location's stock
     if _is_agent_only(request):
         location = _get_primary_location(request)
@@ -200,9 +205,9 @@ def get_stock_qs_for_dashboard(request: "HttpRequest", business) -> "QuerySet":
         else:
             # If no location, agent sees nothing
             return InventoryItem.objects.none()
-        
+
         return qs
-    
+
     # Default: no stock
     return InventoryItem.objects.none()
 
@@ -210,14 +215,14 @@ def get_stock_qs_for_dashboard(request: "HttpRequest", business) -> "QuerySet":
 def get_agents_for_dashboard(request: "HttpRequest", business) -> "QuerySet":
     """
     Get list of agents to display on dashboard.
-    
+
     - Managers: ALL business agents (clickable links)
     - Agents: Empty list (don't show other agents)
-    
+
     Args:
         request: HttpRequest with role flags attached
         business: Business instance
-    
+
     Returns:
         QuerySet of AgentProfile objects
     """
@@ -226,36 +231,37 @@ def get_agents_for_dashboard(request: "HttpRequest", business) -> "QuerySet":
     except Exception:
         from django.db.models import QuerySet
         from django.db.models import Model as DummyModel
+
         return QuerySet(model=DummyModel).none()
-    
+
     if not business:
         return AgentProfile.objects.none()
-    
+
     # CRITICAL: Only managers see agent list
     if not _is_manager_plus(request):
         return AgentProfile.objects.none()
-    
+
     # Managers see all agents in the business
     # Note: AgentProfile doesn't have direct business FK,
     # so we need to filter via user memberships
     try:
         from tenants.models import Membership
-        
+
         # Get all active memberships for this business
         memberships = Membership.objects.filter(
             business=business,
         )
-        
+
         # Filter to ACTIVE status if field exists
         if hasattr(Membership, "status"):
             memberships = memberships.filter(status__iexact="ACTIVE")
-        
+
         # Get user IDs
         user_ids = memberships.values_list("user_id", flat=True)
-        
+
         # Get agent profiles for these users
         agents = AgentProfile.objects.filter(user_id__in=user_ids).select_related("user")
-        
+
         return agents
     except Exception:
         return AgentProfile.objects.none()
@@ -264,13 +270,13 @@ def get_agents_for_dashboard(request: "HttpRequest", business) -> "QuerySet":
 def should_show_agents_section(request: "HttpRequest") -> bool:
     """
     Determine if agents section should be visible on dashboard.
-    
+
     - Managers: Yes (with clickable agent names)
     - Agents: No
-    
+
     Args:
         request: HttpRequest with role flags attached
-    
+
     Returns:
         bool: True if agents section should be shown
     """
@@ -280,29 +286,29 @@ def should_show_agents_section(request: "HttpRequest") -> bool:
 def get_agent_detail_url(agent_profile) -> Optional[str]:
     """
     Get URL for agent detail/drilldown page.
-    
+
     Args:
         agent_profile: AgentProfile instance
-    
+
     Returns:
         str: URL path or None
     """
     try:
         from django.urls import reverse
-        
+
         # Try multiple possible URL patterns
         patterns = [
             ("dashboard:admin_agent_detail", {"pk": agent_profile.pk}),
             ("timelogs:agent_detail", {"agent_id": agent_profile.user_id}),
             ("dashboard:agent_detail", {"pk": agent_profile.pk}),
         ]
-        
+
         for pattern_name, kwargs in patterns:
             try:
                 return reverse(pattern_name, kwargs=kwargs)
             except Exception:
                 continue
-        
+
         # Fallback: construct URL manually
         return f"/dashboard/agents/{agent_profile.pk}/"
     except Exception:
@@ -316,4 +322,3 @@ __all__ = [
     "should_show_agents_section",
     "get_agent_detail_url",
 ]
-

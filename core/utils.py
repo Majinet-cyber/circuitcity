@@ -141,10 +141,11 @@ def flatten_patterns(patterns):
     """
     Flatten URL patterns to only include URLPattern items, not URLResolver.
     This prevents template errors when accessing .name on URLResolver objects.
-    
+
     Returns a list of URLPattern objects only.
     """
     from django.urls.resolvers import URLPattern, URLResolver
+
     out = []
     for p in patterns:
         if isinstance(p, URLPattern):
@@ -164,6 +165,7 @@ def push_notification(user: User, title: str, message: str, *, kind: str = "INFO
     """
     try:
         from notifications.models import Notification  # type: ignore
+
         # Map kind to level and set audience based on user
         level_map = {
             "INFO": "info",
@@ -182,5 +184,3 @@ def push_notification(user: User, title: str, message: str, *, kind: str = "INFO
         )
     except Exception:
         pass
-
-

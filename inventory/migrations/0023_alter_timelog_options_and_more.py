@@ -10,6 +10,7 @@ class SafeRemoveIndex(RemoveIndex):
     """
     Prevents ValueError if index is missing from migration state.
     """
+
     def state_forwards(self, app_label, state):
         try:
             super().state_forwards(app_label, state)
@@ -21,7 +22,7 @@ def drop_timelog_indexes_database(apps, schema_editor):
     """Drop timelog indexes using idempotent SQL. Safe to run even if indexes don't exist."""
     vendor = schema_editor.connection.vendor
     with schema_editor.connection.cursor() as cursor:
-        if vendor in ('postgresql', 'sqlite'):
+        if vendor in ("postgresql", "sqlite"):
             cursor.execute("DROP INDEX IF EXISTS timelog_user_logged_idx")
             cursor.execute("DROP INDEX IF EXISTS timelog_location_logged_idx")
             cursor.execute("DROP INDEX IF EXISTS timelog_event_logged_idx")
@@ -33,16 +34,15 @@ def reverse_drop_timelog_indexes_database(apps, schema_editor):
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
-        ('tenants', '0006_agentinvite_location_membership_location'),
-        ('inventory', '0022_doc_docitem_doc_inventory_d_type_b2a3e3_idx_and_more'),
+        ("tenants", "0006_agentinvite_location_membership_location"),
+        ("inventory", "0022_doc_docitem_doc_inventory_d_type_b2a3e3_idx_and_more"),
     ]
 
     operations = [
         migrations.AlterModelOptions(
-            name='timelog',
-            options={'ordering': ('-ts',)},
+            name="timelog",
+            options={"ordering": ("-ts",)},
         ),
         migrations.SeparateDatabaseAndState(
             database_operations=[
@@ -53,91 +53,108 @@ class Migration(migrations.Migration):
             ],
             state_operations=[
                 SafeRemoveIndex(
-                    model_name='timelog',
-                    name='timelog_user_logged_idx',
+                    model_name="timelog",
+                    name="timelog_user_logged_idx",
                 ),
                 SafeRemoveIndex(
-                    model_name='timelog',
-                    name='timelog_location_logged_idx',
+                    model_name="timelog",
+                    name="timelog_location_logged_idx",
                 ),
                 SafeRemoveIndex(
-                    model_name='timelog',
-                    name='timelog_event_logged_idx',
+                    model_name="timelog",
+                    name="timelog_event_logged_idx",
                 ),
             ],
         ),
         migrations.RenameField(
-            model_name='timelog',
-            old_name='latitude',
-            new_name='lat',
+            model_name="timelog",
+            old_name="latitude",
+            new_name="lat",
         ),
         migrations.RenameField(
-            model_name='timelog',
-            old_name='longitude',
-            new_name='lon',
+            model_name="timelog",
+            old_name="longitude",
+            new_name="lon",
         ),
         migrations.RemoveField(
-            model_name='timelog',
-            name='accuracy_m',
+            model_name="timelog",
+            name="accuracy_m",
         ),
         migrations.RemoveField(
-            model_name='timelog',
-            name='checkin_type',
+            model_name="timelog",
+            name="checkin_type",
         ),
         migrations.RemoveField(
-            model_name='timelog',
-            name='distance_m',
+            model_name="timelog",
+            name="distance_m",
         ),
         migrations.RemoveField(
-            model_name='timelog',
-            name='event',
+            model_name="timelog",
+            name="event",
         ),
         migrations.RemoveField(
-            model_name='timelog',
-            name='geofence',
+            model_name="timelog",
+            name="geofence",
         ),
         migrations.RemoveField(
-            model_name='timelog',
-            name='logged_at',
+            model_name="timelog",
+            name="logged_at",
         ),
         migrations.RemoveField(
-            model_name='timelog',
-            name='note',
+            model_name="timelog",
+            name="note",
         ),
         migrations.RemoveField(
-            model_name='timelog',
-            name='within_geofence',
+            model_name="timelog",
+            name="within_geofence",
         ),
         migrations.AddField(
-            model_name='timelog',
-            name='business',
-            field=models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.CASCADE, related_name='time_logs', to='tenants.business'),
+            model_name="timelog",
+            name="business",
+            field=models.ForeignKey(
+                blank=True,
+                null=True,
+                on_delete=django.db.models.deletion.CASCADE,
+                related_name="time_logs",
+                to="tenants.business",
+            ),
         ),
         migrations.AddField(
-            model_name='timelog',
-            name='kind',
-            field=models.CharField(choices=[('ARRIVAL', 'Arrival'), ('DEPARTURE', 'Departure')], db_index=True, default='ARRIVAL', max_length=10),
+            model_name="timelog",
+            name="kind",
+            field=models.CharField(
+                choices=[("ARRIVAL", "Arrival"), ("DEPARTURE", "Departure")],
+                db_index=True,
+                default="ARRIVAL",
+                max_length=10,
+            ),
         ),
         migrations.AddField(
-            model_name='timelog',
-            name='ts',
+            model_name="timelog",
+            name="ts",
             field=models.DateTimeField(db_index=True, default=django.utils.timezone.now),
         ),
         migrations.AlterField(
-            model_name='timelog',
-            name='location',
-            field=models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='time_logs', to='inventory.location'),
+            model_name="timelog",
+            name="location",
+            field=models.ForeignKey(
+                blank=True,
+                null=True,
+                on_delete=django.db.models.deletion.SET_NULL,
+                related_name="time_logs",
+                to="inventory.location",
+            ),
         ),
         migrations.AddIndex(
-            model_name='timelog',
-            index=models.Index(fields=['business', 'ts'], name='timelog_biz_ts_idx'),
+            model_name="timelog",
+            index=models.Index(fields=["business", "ts"], name="timelog_biz_ts_idx"),
         ),
         migrations.AddIndex(
-            model_name='timelog',
-            index=models.Index(fields=['user', 'ts'], name='timelog_user_ts_idx'),
+            model_name="timelog",
+            index=models.Index(fields=["user", "ts"], name="timelog_user_ts_idx"),
         ),
         migrations.AddIndex(
-            model_name='timelog',
-            index=models.Index(fields=['location', 'ts'], name='timelog_loc_ts_idx'),
+            model_name="timelog",
+            index=models.Index(fields=["location", "ts"], name="timelog_loc_ts_idx"),
         ),
     ]

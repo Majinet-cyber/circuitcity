@@ -106,9 +106,7 @@ class LaybyOrder(models.Model):
     @property
     def amount_paid(self) -> Decimal:
         extra = (
-            self.payments.aggregate(s=models.Sum("amount")).get("s")
-            if hasattr(self, "payments")
-            else None
+            self.payments.aggregate(s=models.Sum("amount")).get("s") if hasattr(self, "payments") else None
         ) or Decimal("0.00")
         return (self.deposit_amount or Decimal("0.00")) + extra
 
@@ -124,6 +122,7 @@ class LaybyPayment(models.Model):
     """
     Payments against a layby order.
     """
+
     order = models.ForeignKey(LaybyOrder, on_delete=models.CASCADE, related_name="payments")
     amount = models.DecimalField(max_digits=12, decimal_places=2)
     method = models.CharField(max_length=24, default="cash")
@@ -145,5 +144,3 @@ class LaybyPayment(models.Model):
 
     def __str__(self) -> str:  # pragma: no cover
         return f"{self.order.ref} Â· {self.amount}"
-
-

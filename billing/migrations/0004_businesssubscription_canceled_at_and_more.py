@@ -6,21 +6,26 @@ import django.db.models.deletion
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         migrations.swappable_dependency(settings.AUTH_USER_MODEL),
-        ('billing', '0003_alter_businesssubscription_options_and_more'),
+        ("billing", "0003_alter_businesssubscription_options_and_more"),
     ]
 
     operations = [
         migrations.AddField(
-            model_name='businesssubscription',
-            name='canceled_at',
+            model_name="businesssubscription",
+            name="canceled_at",
             field=models.DateTimeField(blank=True, null=True),
         ),
         migrations.AddField(
-            model_name='businesssubscription',
-            name='canceled_by',
-            field=models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='+', to=settings.AUTH_USER_MODEL),
+            model_name="businesssubscription",
+            name="canceled_by",
+            field=models.ForeignKey(
+                blank=True,
+                null=True,
+                on_delete=django.db.models.deletion.SET_NULL,
+                related_name="+",
+                to=settings.AUTH_USER_MODEL,
+            ),
         ),
     ]

@@ -18,7 +18,7 @@ def remind_trials_ending_soon():
     Runs daily via Celery Beat.
     """
     now = timezone.now()
-    start = now + timedelta(hours=12)   # pick a window ~tomorrow
+    start = now + timedelta(hours=12)  # pick a window ~tomorrow
     end = now + timedelta(hours=36)
 
     qs = BusinessSubscription.objects.select_related("business").filter(
@@ -43,5 +43,3 @@ def remind_trials_ending_soon():
         fanout(business=biz, title=title, body=body, ntype="trial_notice")
         count += 1
     return {"reminded": count}
-
-

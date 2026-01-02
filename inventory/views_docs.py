@@ -15,6 +15,18 @@ from django.utils import timezone
 
 from .models_docs import Customer, Doc, DocLine
 
+# ✅ SECURITY: Import tenant isolation helpers
+try:
+    from tenants.utils import get_active_business, require_business
+except ImportError:
+    # Fallback for development
+    def get_active_business(request):
+        return getattr(request, "business", None) or getattr(request, "active_business", None)
+
+    def require_business(fn):
+        return fn
+
+
 # -------- Helpers ----------
 def _next_number(prefix: str) -> str:
     y = timezone.now().year
@@ -28,11 +40,12 @@ def _next_number(prefix: str) -> str:
             pass
     return f"{base}{next_seq:05d}"
 
+
 def _parse_lines(data) -> List[dict]:
     # Expect [{description, quantity, unit_price}]
     lines = []
-    for row in (data or []):
-        if not row: 
+    for row in data or []:
+        if not row:
             continue
         desc = (row.get("description") or row.get("name") or "").strip()
         if not desc:
@@ -42,11 +55,16 @@ def _parse_lines(data) -> List[dict]:
         lines.append({"description": desc, "quantity": qty, "unit_price": price})
     return lines
 
+
 # -------- Pages ----------
 @login_required
+@require_business  # ✅ SECURITY: Require active business
 @require_GET
 def docs_list(request: HttpRequest):
-    qs = Doc.objects.select_related("customer")
+    # ✅ SECURITY: Scope to active business only
+    business = get_active_business(request)
+    qs = Doc.objects.filter(business=business).select_related("customer")
+
     q = (request.GET.get("q") or "").strip()
     dt_from = request.GET.get("from")
     dt_to = request.GET.get("to")
@@ -58,17 +76,25 @@ def docs_list(request: HttpRequest):
         qs = qs.filter(created_at__date__lte=dt_to)
     return render(request, "inventory/docs_list.html", {"docs": qs[:200], "q": q, "from": dt_from, "to": dt_to})
 
+
 @login_required
+@require_business  # ✅ SECURITY: Require active business
 @require_http_methods(["GET", "POST"])
 def doc_new(request: HttpRequest, kind: str):
     if kind not in (Doc.DOC_INVOICE, Doc.DOC_QUOTE):
         raise Http404()
+
+    # ✅ SECURITY: Get active business
+    business = get_active_business(request)
+
     if request.method == "GET":
         return render(request, "inventory/doc_edit.html", {"kind": kind})
+
     # POST (JSON or form)
     data = request.POST or request.body
     if request.content_type and "json" in request.content_type:
         import json
+
         payload = json.loads(request.body.decode("utf-8") or "{}")
     else:
         # form-encoded quick add
@@ -80,53 +106,88 @@ def doc_new(request: HttpRequest, kind: str):
                 "address": request.POST.get("customer_address"),
             },
             "tax_rate_pct": request.POST.get("tax_rate_pct") or 0,
-            "lines": [{
-                "description": request.POST.get("description"),
-                "quantity": request.POST.get("quantity") or 1,
-                "unit_price": request.POST.get("unit_price") or 0,
-            }],
+            "lines": [
+                {
+                    "description": request.POST.get("description"),
+                    "quantity": request.POST.get("quantity") or 1,
+                    "unit_price": request.POST.get("unit_price") or 0,
+                }
+            ],
         }
 
     cust_data = payload.get("customer") or {}
     customer, _ = Customer.objects.get_or_create(
         name=(cust_data.get("name") or "Walk-in").strip()[:160],
-        defaults={"email": cust_data.get("email", ""), "phone": cust_data.get("phone", ""), "address": cust_data.get("address", "")}
+        defaults={
+            "email": cust_data.get("email", ""),
+            "phone": cust_data.get("phone", ""),
+            "address": cust_data.get("address", ""),
+        },
     )
     number = _next_number("INV" if kind == Doc.DOC_INVOICE else "QUO")
+
+    # ✅ SECURITY: Associate document with business
     doc = Doc.objects.create(
-        doc_type=kind, number=number, customer=customer, created_by=request.user,
-        tax_rate_pct=Decimal(str(payload.get("tax_rate_pct") or 0))
+        doc_type=kind,
+        number=number,
+        customer=customer,
+        created_by=request.user,
+        business=business,  # ✅ CRITICAL: Set business ownership
+        tax_rate_pct=Decimal(str(payload.get("tax_rate_pct") or 0)),
     )
     for row in _parse_lines(payload.get("lines")):
         DocLine.objects.create(doc=doc, **row)
     doc.recalc(commit=True)
-    return JsonResponse({"ok": True, "id": doc.id, "number": doc.number, "detail_url": reverse("inventory:doc_detail", args=[doc.id])})
+    return JsonResponse(
+        {"ok": True, "id": doc.id, "number": doc.number, "detail_url": reverse("inventory:doc_detail", args=[doc.id])}
+    )
+
 
 @login_required
+@require_business  # ✅ SECURITY: Require active business
 @require_GET
 def doc_detail(request: HttpRequest, pk: int):
-    doc = get_object_or_404(Doc.objects.select_related("customer").prefetch_related("lines"), pk=pk)
+    # ✅ SECURITY: Scope to active business to prevent IDOR
+    business = get_active_business(request)
+    doc = get_object_or_404(
+        Doc.objects.filter(business=business).select_related("customer").prefetch_related("lines"), pk=pk
+    )
     return render(request, "inventory/doc_detail.html", {"doc": doc})
+
 
 # -------- Downloads ----------
 @login_required
+@require_business  # ✅ SECURITY: Require active business
 @require_GET
 def doc_pdf(request: HttpRequest, pk: int):
-    doc = get_object_or_404(Doc.objects.select_related("customer").prefetch_related("lines"), pk=pk)
+    # ✅ SECURITY: Scope to active business to prevent IDOR
+    business = get_active_business(request)
+    doc = get_object_or_404(
+        Doc.objects.filter(business=business).select_related("customer").prefetch_related("lines"), pk=pk
+    )
     html = render_to_string("inventory/doc_print.html", {"doc": doc, "as_pdf": True})
     # Try WeasyPrint -> PDF. If missing, return HTML nicely.
     try:
         from weasyprint import HTML
+
         pdf = HTML(string=html, base_url=request.build_absolute_uri("/")).write_pdf()
         filename = f"{doc.number}.pdf"
-        return HttpResponse(pdf, content_type="application/pdf", headers={"Content-Disposition": f'attachment; filename="{filename}"'})
+        return HttpResponse(
+            pdf, content_type="application/pdf", headers={"Content-Disposition": f'attachment; filename="{filename}"'}
+        )
     except Exception:
         return HttpResponse(html)  # graceful fallback
 
+
 @login_required
+@require_business  # ✅ SECURITY: Require active business
 @require_GET
 def doc_excel(request: HttpRequest, pk: int):
-    doc = get_object_or_404(Doc.objects.select_related("customer").prefetch_related("lines"), pk=pk)
+    # ✅ SECURITY: Scope to active business to prevent IDOR
+    business = get_active_business(request)
+    doc = get_object_or_404(
+        Doc.objects.filter(business=business).select_related("customer").prefetch_related("lines"), pk=pk
+    )
     # Generate a simple CSV (universally openable in Excel). No external deps.
     buf = io.StringIO()
     w = csv.writer(buf)
@@ -142,11 +203,15 @@ def doc_excel(request: HttpRequest, pk: int):
     resp["Content-Disposition"] = f'attachment; filename="{doc.number}.csv"'
     return resp
 
+
 # -------- Send (Email / WhatsApp) ----------
 @login_required
+@require_business  # ✅ SECURITY: Require active business
 @require_POST
 def doc_email(request: HttpRequest, pk: int):
-    doc = get_object_or_404(Doc, pk=pk)
+    # ✅ SECURITY: Scope to active business to prevent IDOR
+    business = get_active_business(request)
+    doc = get_object_or_404(Doc.objects.filter(business=business), pk=pk)
     to = request.POST.get("to") or getattr(doc.customer, "email", "")
     if not to:
         return JsonResponse({"ok": False, "error": "No recipient email"})
@@ -157,6 +222,7 @@ def doc_email(request: HttpRequest, pk: int):
     mimetype = "application/pdf"
     try:
         from weasyprint import HTML
+
         content = HTML(string=html, base_url=request.build_absolute_uri("/")).write_pdf()
     except Exception:
         content = html.encode("utf-8")
@@ -167,9 +233,11 @@ def doc_email(request: HttpRequest, pk: int):
     msg.attach(filename, content, mimetype)
     sent = msg.send(fail_silently=True)
     if sent:
-        doc.status = "sent"; doc.save(update_fields=["status"])
+        doc.status = "sent"
+        doc.save(update_fields=["status"])
         return JsonResponse({"ok": True, "message": "Email sent"})
     return JsonResponse({"ok": False, "error": "Email failed"})
+
 
 @login_required
 @require_GET
@@ -183,5 +251,3 @@ def doc_whatsapp(request: HttpRequest, pk: int):
     # Open WhatsApp prefilled (works on mobile/desktop web)
     url = f"https://wa.me/{phone}?text=" + __import__("urllib.parse").parse.quote(text)
     return redirect(url)
-
-

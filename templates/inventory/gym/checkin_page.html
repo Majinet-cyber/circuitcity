@@ -37,6 +37,7 @@
                             <th>Membership Status</th>
                             <th>Days Left</th>
                             <th>Days Attended</th>
+                            <th>Streak & Badge</th>
                             <th>Next Payment</th>
                             <th>Today</th>
                             <th>Actions</th>
@@ -74,6 +75,24 @@
                                 <span class="badge bg-primary-subtle text-primary">
                                     {{ data.days_attended }} / {{ data.total_days }}
                                 </span>
+                            </td>
+                            <td>
+                                <!-- Gamification: Streak & Badge -->
+                                <div class="d-flex flex-column gap-1">
+                                    {% if data.streak_days > 0 %}
+                                        <span class="badge bg-warning-subtle text-warning">
+                                            🔥 {{ data.streak_days }}-day streak
+                                        </span>
+                                    {% endif %}
+                                    {% if data.badge_display.icon %}
+                                        <span class="badge bg-{{ data.badge_display.color }}-subtle text-{{ data.badge_display.color }}">
+                                            {{ data.badge_display.icon }} {{ data.badge_display.label }}
+                                        </span>
+                                    {% endif %}
+                                    {% if not data.streak_days and not data.badge_display.icon %}
+                                        <span class="text-muted small">No streak yet</span>
+                                    {% endif %}
+                                </div>
                             </td>
                             <td>
                                 {% if data.next_payment %}

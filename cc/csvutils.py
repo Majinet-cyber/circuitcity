@@ -2,8 +2,11 @@
 import csv
 from django.http import StreamingHttpResponse
 
+
 class Echo:
-    def write(self, value): return value
+    def write(self, value):
+        return value
+
 
 def stream_csv(rows_iterable, filename: str):
     """
@@ -17,5 +20,3 @@ def stream_csv(rows_iterable, filename: str):
     )
     resp["Content-Disposition"] = f'attachment; filename="{filename}"'
     return resp
-
-

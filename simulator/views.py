@@ -102,11 +102,7 @@ def sim_home(request: HttpRequest) -> HttpResponse:
     """
     Scenarios list for the current user (latest first).
     """
-    scenarios = (
-        Scenario.objects.filter(owner=request.user)
-        .order_by("-created_at", "-id")
-        .prefetch_related("runs")
-    )
+    scenarios = Scenario.objects.filter(owner=request.user).order_by("-created_at", "-id").prefetch_related("runs")
     return render(request, "simulator/home.html", {"scenarios": scenarios})
 
 
@@ -272,7 +268,7 @@ def business_simulator(request: HttpRequest) -> HttpResponse:
     """
     Business simulator for managers - uses real business data as snapshot
     + allows scenario modeling with simple inputs.
-    
+
     Only accessible to managers of an active business.
     """
     # Get active business
@@ -280,10 +276,11 @@ def business_simulator(request: HttpRequest) -> HttpResponse:
     if not business:
         messages.error(request, "No active business selected")
         return redirect("dashboard:home")
-    
+
     # Check if user is manager
     try:
         from core.decorators import _is_manager
+
         if not _is_manager(request.user, business):
             messages.error(request, "Manager access required")
             return redirect("dashboard:home")
@@ -292,11 +289,9 @@ def business_simulator(request: HttpRequest) -> HttpResponse:
         if not (request.user.is_staff or request.user.is_superuser):
             try:
                 from tenants.models import Membership
+
                 is_manager = Membership.objects.filter(
-                    user=request.user,
-                    business=business,
-                    role="MANAGER",
-                    status="ACTIVE"
+                    user=request.user, business=business, role="MANAGER", status="ACTIVE"
                 ).exists()
                 if not is_manager:
                     messages.error(request, "Manager access required")
@@ -304,47 +299,44 @@ def business_simulator(request: HttpRequest) -> HttpResponse:
             except Exception:
                 messages.error(request, "Manager access required")
                 return redirect("dashboard:home")
-    
+
     # Calculate snapshot from real data (last 30 days)
     today = timezone.localdate()
     month_start = today - timedelta(days=30)
-    
+
     # Get revenue from sales
     try:
         from inventory.models import InventoryItem
+
         sales_qs = InventoryItem.objects.filter(
-            business=business,
-            status="SOLD",
-            sold_at__gte=month_start,
-            sold_at__lte=today
+            business=business, status="SOLD", sold_at__gte=month_start, sold_at__lte=today
         )
-        
-        actual_revenue = sales_qs.aggregate(
-            total=Sum("selling_price")
-        )["total"] or Decimal("0.00")
-        
+
+        actual_revenue = sales_qs.aggregate(total=Sum("selling_price"))["total"] or Decimal("0.00")
+
         actual_customers = sales_qs.values("assigned_agent").distinct().count() or 1
         actual_sales_count = sales_qs.count() or 0
-        
+
         avg_sale = actual_revenue / actual_sales_count if actual_sales_count > 0 else Decimal("10000.00")
     except Exception:
         actual_revenue = Decimal("0.00")
         actual_customers = 0
         actual_sales_count = 0
         avg_sale = Decimal("10000.00")
-    
+
     # Get costs from wallet
     try:
         from wallet.services_costs import get_business_costs_for_period
+
         cost_summary = get_business_costs_for_period(business, period="month")
         actual_costs = cost_summary.get("overall_costs_total", Decimal("0.00"))
     except Exception:
         actual_costs = Decimal("0.00")
-    
+
     # Calculate derived metrics
     actual_profit = actual_revenue - actual_costs
     cost_pct = (actual_costs / actual_revenue * 100) if actual_revenue > 0 else Decimal("40.00")
-    
+
     # Prepare snapshot context
     snapshot = {
         "revenue": float(actual_revenue),
@@ -354,7 +346,7 @@ def business_simulator(request: HttpRequest) -> HttpResponse:
         "avg_sale": float(avg_sale),
         "customers": actual_customers or 100,  # Default to 100 if no data
     }
-    
+
     # Prepare defaults for simulator (editable)
     defaults = {
         "customers": actual_customers or 100,
@@ -362,14 +354,12 @@ def business_simulator(request: HttpRequest) -> HttpResponse:
         "cost_pct": float(cost_pct) if cost_pct > 0 else 40.0,
         "growth_pct": 0.0,  # No growth by default
     }
-    
+
     context = {
         "business": business,
         "snapshot": snapshot,
         "defaults": defaults,
         "period_label": "Last 30 Days",
     }
-    
+
     return render(request, "simulator/business_simulator.html", context)
-
-

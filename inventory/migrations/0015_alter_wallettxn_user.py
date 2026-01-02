@@ -6,16 +6,19 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
-        ('inventory', '0014_alter_product_code'),
+        ("inventory", "0014_alter_product_code"),
         migrations.swappable_dependency(settings.AUTH_USER_MODEL),
     ]
 
     operations = [
         migrations.AlterField(
-            model_name='wallettxn',
-            name='user',
-            field=models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='inventory_wallet_txns', to=settings.AUTH_USER_MODEL),
+            model_name="wallettxn",
+            name="user",
+            field=models.ForeignKey(
+                on_delete=django.db.models.deletion.CASCADE,
+                related_name="inventory_wallet_txns",
+                to=settings.AUTH_USER_MODEL,
+            ),
         ),
     ]

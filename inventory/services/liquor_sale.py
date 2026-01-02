@@ -20,8 +20,12 @@ from django.core.exceptions import ValidationError
 
 from inventory.models import MerchProduct
 from inventory.models_verticals import (
-    LiquorSale, LiquorCredit, LiquorWalletEntry,
-    LiquorUnitType, LiquorSaleType, LiquorCreditStatus
+    LiquorSale,
+    LiquorCredit,
+    LiquorWalletEntry,
+    LiquorUnitType,
+    LiquorSaleType,
+    LiquorCreditStatus,
 )
 from inventory.business_kinds import BusinessKind
 from inventory.liquor_config import (
@@ -38,6 +42,7 @@ logger = logging.getLogger(__name__)
 
 class OutOfStockError(Exception):
     """Raised when there's insufficient stock for a sale"""
+
     pass
 
 
@@ -55,14 +60,14 @@ def stock_in_liquor(
 ) -> Dict[str, Any]:
     """
     Stock in liquor products with automatic barman shots accounting.
-    
+
     NEW RULES (Spirits/Whisky):
     - Stock-in is BOTTLE-ONLY (no case, no crate, no pack)
     - When stocking spirits/whisky bottles for shot-selling:
       * Add sellable shots_per_bottle to inventory (default 24)
       * Automatically record 2 barman shots per bottle as staff consumption (non-sellable)
       * These 2 shots are tracked separately and do not appear in sellable stock
-    
+
     Args:
         business: Business instance
         product_id: ID of the MerchProduct to stock in
@@ -72,7 +77,7 @@ def stock_in_liquor(
         cost_per_unit: Cost per unit
         location: Location instance (optional)
         notes: Stock-in notes (optional)
-    
+
     Returns:
         Dict with:
             - ok: bool
@@ -80,38 +85,35 @@ def stock_in_liquor(
             - sellable_added: int (base units added to sellable stock)
             - barman_shots_recorded: int (staff shots recorded, if applicable)
             - error: str (if not ok)
-    
+
     Raises:
         ValidationError: If validation fails
     """
     # Lock and fetch product
     try:
         product = MerchProduct.objects.select_for_update().get(
-            pk=product_id,
-            business=business,
-            kind=BusinessKind.LIQUOR,
-            is_active=True
+            pk=product_id, business=business, kind=BusinessKind.LIQUOR, is_active=True
         )
     except MerchProduct.DoesNotExist:
         raise ValidationError("Product not found or not available")
-    
+
     # Get liquor kind
     liquor_kind = (product.category or "").lower()
-    
+
     # Validate unit is allowed for stock-in
-    pack_enabled = (product.pack_label is not None and product.bottles_per_crate is not None)
+    pack_enabled = product.pack_label is not None and product.bottles_per_crate is not None
     validate_unit_for_kind(liquor_kind, unit, pack_enabled=pack_enabled, for_stock_in=True)
-    
+
     # Convert to base units
     try:
         qty_base_units = to_base_units(quantity, unit, product)
     except ValidationError as e:
         raise ValidationError(f"Cannot stock in {product.name}: {str(e)}")
-    
+
     # Initialize tracking variables
     sellable_added = qty_base_units
     barman_shots_recorded = 0
-    
+
     # BARMAN SHOTS LOGIC: For spirits/whisky with shot-selling enabled
     if liquor_kind in (LiquorKind.SPIRITS, LiquorKind.WHISKY):
         # Check if product is configured for shot-selling
@@ -119,14 +121,15 @@ def stock_in_liquor(
         if base_unit == "shot" and unit.lower() == "bottle":
             # Calculate barman shots (2 per bottle)
             barman_shots_recorded = quantity * DEFAULT_BARMAN_SHOTS_PER_BOTTLE
-            
+
             # Deduct barman shots from sellable stock
             # Sellable stock = (bottles * shots_per_bottle) - barman_shots
             sellable_added = qty_base_units - barman_shots_recorded
-            
+
             # Create a stock adjustment record for barman shots (expense/usage)
             try:
                 from inventory.models_verticals import LiquorStockAdjustment
+
                 LiquorStockAdjustment.objects.create(
                     business=business,
                     product=product,
@@ -134,7 +137,7 @@ def stock_in_liquor(
                     reason="BARMAN_SHOTS",
                     notes=f"Automatic barman shots deduction: {quantity} bottle(s) × {DEFAULT_BARMAN_SHOTS_PER_BOTTLE} shots/bottle = {barman_shots_recorded} staff shots",
                     adjusted_by=user,
-                    location=location
+                    location=location,
                 )
             except Exception as e:
                 # If LiquorStockAdjustment model doesn't exist, log it
@@ -142,10 +145,10 @@ def stock_in_liquor(
                     f"Could not create barman shots adjustment record: {e}. "
                     f"Barman shots ({barman_shots_recorded}) still deducted from sellable stock."
                 )
-    
+
     # Update product stock (add sellable quantity only)
     product.quantity_in_stock = (product.quantity_in_stock or 0) + sellable_added
-    
+
     # Update cost per base unit if provided
     if cost_per_unit > 0:
         # Calculate cost per base unit
@@ -162,16 +165,16 @@ def stock_in_liquor(
             # For pack/crate, calculate cost per bottle
             pack_size = product.bottles_per_crate or 1
             product.cost_per_bottle = cost_per_unit / Decimal(pack_size)
-    
+
     product.save()
-    
+
     # Build success message
     base_unit = get_base_unit_default(liquor_kind)
     message = f"✅ Stocked in: {quantity} {unit}(s) = {sellable_added} sellable {base_unit}(s) — {product.name}"
-    
+
     if barman_shots_recorded > 0:
         message += f" (Barman shots: {barman_shots_recorded} automatically recorded)"
-    
+
     return {
         "ok": True,
         "message": message,
@@ -201,13 +204,13 @@ def create_liquor_sale(
 ) -> Dict[str, Any]:
     """
     Create a liquor sale atomically.
-    
+
     This function ensures:
     - All database operations happen in a single transaction
     - Stock is locked and decremented safely
     - No race conditions can cause overselling
     - All related records (sale, credit, wallet) are created consistently
-    
+
     Args:
         business: Business instance
         product_id: ID of the MerchProduct to sell
@@ -223,14 +226,14 @@ def create_liquor_sale(
         bank_amount: Bank payment amount
         mobile_money_amount: Mobile money payment amount
         shift: LiquorShift instance (optional)
-    
+
     Returns:
         Dict with:
             - ok: bool
             - sale_id: int (if ok)
             - message: str
             - error: str (if not ok)
-    
+
     Raises:
         OutOfStockError: If insufficient stock
         ValidationError: If validation fails
@@ -238,19 +241,16 @@ def create_liquor_sale(
     # Lock and fetch product within transaction
     try:
         product = MerchProduct.objects.select_for_update().get(
-            pk=product_id,
-            business=business,
-            kind=BusinessKind.LIQUOR,
-            is_active=True
+            pk=product_id, business=business, kind=BusinessKind.LIQUOR, is_active=True
         )
     except MerchProduct.DoesNotExist:
         raise ValidationError("Product not found or not available")
-    
+
     # Validate sale type
     is_credit = sale_type == "credit"
     if is_credit and not customer_name:
         raise ValidationError("Customer name is required for credit sales")
-    
+
     # Map unit string to enum
     if unit == "shot":
         unit_enum = LiquorUnitType.SHOT
@@ -258,40 +258,40 @@ def create_liquor_sale(
         unit_enum = LiquorUnitType.GLASS
     else:
         unit_enum = LiquorUnitType.BOTTLE
-    
+
     # Validate unit capabilities
     if unit == "shot" and not product.has_shots:
         raise ValidationError(f"{product.name} does not support shot sales")
     if unit == "glass" and not product.has_glasses:
         raise ValidationError(f"{product.name} does not support glass sales")
-    
+
     # Validate unit is allowed for this liquor kind
     liquor_kind = (product.category or "").lower()
-    pack_enabled = (product.pack_label is not None and product.bottles_per_crate is not None)
+    pack_enabled = product.pack_label is not None and product.bottles_per_crate is not None
     validate_unit_for_kind(liquor_kind, unit, pack_enabled=pack_enabled)
-    
+
     # Calculate totals
     total = Decimal(quantity) * unit_price
     if total <= 0:
         raise ValidationError("Sale total must be greater than zero")
-    
+
     # Get cost for profit tracking
     unit_cost = product.get_cost_for_unit(unit) or Decimal("0.00")
     total_cost = Decimal(quantity) * unit_cost
-    
+
     # Convert to base units for stock tracking
     try:
         qty_base_units = to_base_units(quantity, unit, product)
     except ValidationError as e:
         # Re-raise with product context
         raise ValidationError(f"Cannot sell {product.name}: {str(e)}")
-    
+
     # For credit sales, ensure payment mix is zero
     if is_credit:
         cash_amount = Decimal("0.00")
         bank_amount = Decimal("0.00")
         mobile_money_amount = Decimal("0.00")
-    
+
     # Determine payment_method if not provided
     payment_mix_total = cash_amount + bank_amount + mobile_money_amount
     if payment_method is None:
@@ -307,7 +307,7 @@ def create_liquor_sale(
                 payment_method = "cash"  # Default for mixed payments
         else:
             payment_method = "cash"  # Default
-    
+
     # If payment_method is specified but all amounts are zero, set the appropriate amount
     if payment_mix_total == 0 and not is_credit:
         if payment_method.lower() == "cash":
@@ -319,15 +319,14 @@ def create_liquor_sale(
         else:
             cash_amount = total  # Default to cash
         payment_mix_total = total
-    
+
     # Validate payment mix
     if payment_mix_total > 0 and payment_mix_total != total:
-        raise ValidationError(
-            f"Payment mix total (K{payment_mix_total}) must equal sale total (K{total})"
-        )
-    
+        raise ValidationError(f"Payment mix total (K{payment_mix_total}) must equal sale total (K{total})")
+
     # Normalize payment_method
     from inventory.models_verticals import PaymentMethod
+
     payment_method_map = {
         "cash": PaymentMethod.CASH,
         "bank": PaymentMethod.BANK,
@@ -335,19 +334,16 @@ def create_liquor_sale(
         "mobile": PaymentMethod.MOBILE_MONEY,
     }
     payment_method_enum = payment_method_map.get(payment_method.lower(), PaymentMethod.CASH)
-    
+
     # CRITICAL: Decrement stock atomically using conditional update
     # This prevents overselling even under high concurrency
     # Stock is tracked in base units (bottles/cans/glasses/shots)
     if product.track_inventory:
         # Use F() expression for atomic decrement in BASE UNITS
-        updated = MerchProduct.objects.filter(
-            pk=product.pk,
-            quantity_in_stock__gte=qty_base_units
-        ).update(
-            quantity_in_stock=F('quantity_in_stock') - qty_base_units
+        updated = MerchProduct.objects.filter(pk=product.pk, quantity_in_stock__gte=qty_base_units).update(
+            quantity_in_stock=F("quantity_in_stock") - qty_base_units
         )
-        
+
         if updated == 0:
             # Re-fetch to get current stock for error message
             product.refresh_from_db()
@@ -358,7 +354,7 @@ def create_liquor_sale(
                 f"Available: {current_stock} {base_unit}(s), "
                 f"Requested: {qty_base_units} {base_unit}(s) ({quantity} {unit})"
             )
-    
+
     # Create sale record
     liquor_sale_type = LiquorSaleType.CREDIT if is_credit else LiquorSaleType.SALE
     sale = LiquorSale.objects.create(
@@ -378,9 +374,9 @@ def create_liquor_sale(
         payment_method=payment_method_enum,
         cash_amount=cash_amount,
         bank_amount=bank_amount,
-        mobile_money_amount=mobile_money_amount
+        mobile_money_amount=mobile_money_amount,
     )
-    
+
     # Create credit record if needed
     credit = None
     if is_credit:
@@ -393,7 +389,7 @@ def create_liquor_sale(
             status=LiquorCreditStatus.OPEN,
             notes=notes or f"{product.name} - {quantity} {unit}",
             related_sale=sale,
-            created_by=user
+            created_by=user,
         )
     else:
         # Create wallet entry for cash sale
@@ -404,20 +400,19 @@ def create_liquor_sale(
                 description=f"Sale: {product.name} ({quantity} {unit})",
                 entry_type="income",
                 related_sale=sale,
-                created_by=user
+                created_by=user,
             )
         except Exception as wallet_err:
             # Don't block sale if wallet entry fails - log and continue
-            logger.warning(
-                f"Failed to create wallet entry for sale #{sale.id}: {wallet_err}",
-                exc_info=True
-            )
-    
+            logger.warning(f"Failed to create wallet entry for sale #{sale.id}: {wallet_err}", exc_info=True)
+
     return {
         "ok": True,
         "sale_id": sale.id,
         "credit_id": credit.id if credit else None,
-        "message": f"Sold {quantity} × {product.name} ({unit})" if not is_credit else f"Credit sale recorded: {quantity} × {product.name} ({unit}) for {customer_name}",
+        "message": f"Sold {quantity} × {product.name} ({unit})"
+        if not is_credit
+        else f"Credit sale recorded: {quantity} × {product.name} ({unit}) for {customer_name}",
     }
 
 
@@ -442,12 +437,12 @@ def create_liquor_sale_by_barcode(
 ) -> Dict[str, Any]:
     """
     Create a liquor sale by barcode (for Quick Sell / Fast Sell).
-    
+
     This function:
     - Looks up product by barcode
     - Determines appropriate unit and price
     - Creates sale atomically
-    
+
     Args:
         business: Business instance
         user: User making the sale
@@ -463,46 +458,42 @@ def create_liquor_sale_by_barcode(
         bank_amount: Bank payment amount
         mobile_money_amount: Mobile money payment amount
         shift: LiquorShift instance (optional)
-    
+
     Returns:
         Dict with:
             - ok: bool
             - sale_id: int (if ok)
             - message: str
             - error: str (if not ok)
-    
+
     Raises:
         OutOfStockError: If insufficient stock
         ValidationError: If validation fails
     """
     from inventory.utils_barcodes import normalize_barcode
-    
+
     # Normalize barcode
     barcode = normalize_barcode(barcode)
     if not barcode:
         raise ValidationError("Invalid barcode")
-    
+
     # Find product by barcode
     try:
         product = MerchProduct.objects.select_for_update().get(
-            business=business,
-            kind=BusinessKind.LIQUOR,
-            is_active=True,
-            barcode=barcode
+            business=business, kind=BusinessKind.LIQUOR, is_active=True, barcode=barcode
         )
     except MerchProduct.DoesNotExist:
         raise ValidationError(f"Product with barcode '{barcode}' not found")
     except MerchProduct.MultipleObjectsReturned:
         # If multiple products have same barcode, get first one
-        product = MerchProduct.objects.select_for_update().filter(
-            business=business,
-            kind=BusinessKind.LIQUOR,
-            is_active=True,
-            barcode=barcode
-        ).first()
+        product = (
+            MerchProduct.objects.select_for_update()
+            .filter(business=business, kind=BusinessKind.LIQUOR, is_active=True, barcode=barcode)
+            .first()
+        )
         if not product:
             raise ValidationError(f"Product with barcode '{barcode}' not found")
-    
+
     # Determine unit if not provided (default to bottle)
     if not unit or unit not in ("bottle", "shot", "glass"):
         # Auto-detect based on category
@@ -515,7 +506,7 @@ def create_liquor_sale_by_barcode(
             unit = "shot"
         else:
             unit = "bottle"  # Default
-    
+
     # Determine price if not provided
     if unit_price is None:
         if unit == "shot":
@@ -525,7 +516,7 @@ def create_liquor_sale_by_barcode(
         else:
             # For bottle, try price_per_bottle first, then fall back to selling_price
             unit_price = product.price_per_bottle or getattr(product, "selling_price", None) or Decimal("0.00")
-        
+
         if unit_price == Decimal("0.00"):
             raise ValidationError(f"{product.name} does not have a price per {unit} set")
     else:
@@ -539,7 +530,7 @@ def create_liquor_sale_by_barcode(
         # Also update selling_price for backward compatibility
         product.selling_price = unit_price
         product.save(update_fields=["price_per_shot", "price_per_glass", "price_per_bottle", "selling_price"])
-    
+
     # Use the main sale creation function
     return create_liquor_sale(
         business=business,
@@ -558,4 +549,3 @@ def create_liquor_sale_by_barcode(
         payment_method=payment_method,
         shift=shift,
     )
-

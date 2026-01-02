@@ -10,4 +10,3 @@ def health(request: HttpRequest) -> JsonResponse:
     Returns {"ok": true} for Render parity CI checks.
     """
     return JsonResponse({"ok": True})
-

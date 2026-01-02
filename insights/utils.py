@@ -3,10 +3,12 @@ from django.utils import timezone
 from billing.models import Invoice
 from sales.models import Sale  # your app; adjust
 
+
 def kpi_insights_for(user):
     """Return a list of short strings."""
     biz = getattr(getattr(user, "profile", None), "active_business", None)
-    if not biz: return []
+    if not biz:
+        return []
     now = timezone.now()
     start_m = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
     start_prev = (start_m - timezone.timedelta(days=1)).replace(day=1)
@@ -19,5 +21,3 @@ def kpi_insights_for(user):
     if profit and profit >= 4_000_000:
         msgs.append("Did you know? Youâ€™ve made MWK 4,000,000+ in profit this month ðŸŽ‰")
     return msgs[:2]
-
-

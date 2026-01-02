@@ -38,19 +38,19 @@ def _safe_reverse(name: str, default: str) -> str:
 def vertical_dispatcher(request):
     """
     Route users to the correct dashboard for their business vertical.
-    
+
     PHONES businesses now redirect to Analytics (replaces inventory dashboard).
     Other verticals redirect to their specialized dashboards.
     Falls back to a generic prompt if the vertical is unknown.
     """
     vertical = business_vertical(request)
-    
+
     # PHONES: redirect to analytics (replaces inventory dashboard)
     if vertical == PHONES:
         # Redirect to analytics router endpoint with fallback
         analytics_url = _safe_reverse("app_router:analytics", "/app/analytics/")
         return redirect(analytics_url)
-    
+
     # Other verticals: redirect to their specialized dashboards
     target = _VERTICAL_ROUTES.get(vertical, _DEFAULT_ROUTE)
     return redirect(target)

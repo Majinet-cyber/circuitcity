@@ -14,12 +14,14 @@ from inventory.utils_barcodes import (
 
 class MockProduct:
     """Mock product for testing."""
+
     def __init__(self, barcode=None):
         self.barcode = barcode
 
 
 class MockItem:
     """Mock inventory item for testing."""
+
     def __init__(self, barcode=None, product=None):
         self.barcode = barcode
         self.product = product
@@ -115,4 +117,3 @@ class TestBarcodeUtils:
         """Should return empty string for None/empty input."""
         assert normalize_barcode(None) == ""
         assert normalize_barcode("") == ""
-

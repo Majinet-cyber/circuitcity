@@ -6,7 +6,6 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         ("inventory", "0052_add_trainer_fee_model"),
         migrations.swappable_dependency(settings.AUTH_USER_MODEL),

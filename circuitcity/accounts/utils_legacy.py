@@ -7,8 +7,10 @@ from django.utils import timezone
 from django.conf import settings
 from .models import PasswordResetOTP
 
+
 def generate_otp() -> str:
     return f"{secrets.randbelow(10**6):06d}"
+
 
 def can_send_otp(user) -> tuple[bool, str | None]:
     window_start = timezone.now() - timedelta(minutes=45)
@@ -17,6 +19,7 @@ def can_send_otp(user) -> tuple[bool, str | None]:
         next_try = PasswordResetOTP.objects.filter(user=user).latest("created_at").created_at + timedelta(minutes=45)
         return False, f"Too many codes sent. Try again after {next_try.strftime('%H:%M')}."
     return True, None
+
 
 def create_and_email_otp(user):
     ok, msg = can_send_otp(user)
@@ -34,5 +37,3 @@ def create_and_email_otp(user):
     )
     send_mail(subject, body, getattr(settings, "DEFAULT_FROM_EMAIL", None), [user.email], fail_silently=False)
     return True, "If that email exists, a code has been sent."
-
-

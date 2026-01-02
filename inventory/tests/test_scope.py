@@ -20,6 +20,7 @@ def _rand(n=8) -> str:
 
 # ----------------------------- Introspection helpers -----------------------------
 
+
 def _try_import_inventory_models():
     """
     Returns (InventoryItem, Location or None).
@@ -81,6 +82,7 @@ def _maybe_field(model: Type[models.Model], names: Iterable[str]) -> Optional[st
 
 
 # ----------------------------- Builders (tolerant) -----------------------------
+
 
 def _create_business(name: str):
     Business, _Membership = _try_import_tenant_models()
@@ -212,6 +214,7 @@ def _try_reverse_api_stock_status() -> str | None:
 
 
 # -------------------------------------- Tests --------------------------------------
+
 
 class ScopeTests(TestCase):
     @classmethod

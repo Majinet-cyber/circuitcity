@@ -6,8 +6,7 @@ def _int(request, key, default, min_=1, max_=200):
     except (TypeError, ValueError):
         return default
 
+
 def _choice(request, key, allowed, default):
     v = (request.GET.get(key) or "").lower()
     return v if v in allowed else default
-
-

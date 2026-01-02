@@ -38,34 +38,35 @@
           <table class="table align-middle">
             <thead>
               <tr>
-                <th scope="col">Session Key</th>
-                <th scope="col">Device / Info</th>
-                <th scope="col">Expires</th>
+                <th scope="col">Device</th>
+                <th scope="col">IP Address</th>
+                <th scope="col">Login Time</th>
                 <th scope="col">Status</th>
               </tr>
             </thead>
             <tbody>
               {% for session in sessions %}
-                {% with session.get_decoded as data %}
-                  <tr>
-                    <td class="small text-muted">{{ session.session_key|truncatechars:12 }}</td>
-                    <td>
-                      {% if data.user_agent %}
-                        {{ data.user_agent }}
-                      {% else %}
-                        <span class="text-muted">Unknown Device</span>
-                      {% endif %}
-                    </td>
-                    <td>{{ session.expire_date|date:"M d, Y H:i" }}</td>
-                    <td>
-                      {% if session.session_key == request.session.session_key %}
-                        <span class="badge bg-success">Current Session</span>
-                      {% else %}
-                        <span class="badge bg-secondary">Active</span>
-                      {% endif %}
-                    </td>
-                  </tr>
-                {% endwith %}
+                <tr>
+                  <td>
+                    <div class="fw-semibold">{{ session.metadata.device_info }}</div>
+                    <div class="small text-muted">Session: {{ session.session_key|truncatechars:12 }}</div>
+                  </td>
+                  <td class="text-muted">{{ session.metadata.ip_address }}</td>
+                  <td>
+                    {% if session.metadata.login_time %}
+                      {{ session.metadata.login_time|date:"M d, Y H:i" }}
+                    {% else %}
+                      <span class="text-muted">Unknown</span>
+                    {% endif %}
+                  </td>
+                  <td>
+                    {% if session.session_key == request.session.session_key %}
+                      <span class="badge bg-success">Current Session</span>
+                    {% else %}
+                      <span class="badge bg-secondary">Active</span>
+                    {% endif %}
+                  </td>
+                </tr>
               {% endfor %}
             </tbody>
           </table>

@@ -15,6 +15,7 @@ except Exception:
 
 User = get_user_model()
 
+
 class SellingFlowTests(TestCase):
     def setUp(self):
         self.agent = User.objects.create_user("agent", password="pass12345")
@@ -51,7 +52,3 @@ class SellingFlowTests(TestCase):
             self.skipTest("Sale not available")
         if not hasattr(Sale, "commission_amount"):
             self.skipTest("Sale.commission_amount not implemented")
-
-
-
-

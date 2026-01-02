@@ -349,7 +349,14 @@ function completeSale() {
       cart = [];
       updateCartBar();
       closeCheckout();
-      setTimeout(() => location.reload(), 1500);
+      
+      // PHASE 5: Show celebration modal if gamification data present
+      if (data.gamification && data.gamification.show_celebration) {
+        setTimeout(() => showCelebrationModal(data.gamification), 500);
+        // Reload after modal is closed (manually by user)
+      } else {
+        setTimeout(() => location.reload(), 1500);
+      }
     } else {
       showToast(data.error || 'Sale failed', 'error');
       btn.disabled = false;
@@ -390,6 +397,16 @@ document.getElementById('search_input').addEventListener('input', function(e) {
     window.location.href = url.toString();
   }, 500);
 });
+
+// PHASE 5: Reload page after celebration modal is closed
+function closeCelebrationModal() {
+  document.getElementById('celebrationModal').classList.remove('show');
+  setTimeout(() => location.reload(), 500);
+}
 </script>
+
+<!-- PHASE 5: Include celebration modal -->
+{% include 'components/celebration_modal.html' %}
+
 {% endblock %}
 

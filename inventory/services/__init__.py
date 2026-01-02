@@ -2,4 +2,3 @@
 """
 Services package for inventory app.
 """
-

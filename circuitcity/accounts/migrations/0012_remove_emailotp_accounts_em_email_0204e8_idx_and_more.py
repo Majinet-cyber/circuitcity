@@ -6,7 +6,6 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         ("accounts", "0011_alter_profile_display_currency"),
         migrations.swappable_dependency(settings.AUTH_USER_MODEL),
@@ -37,9 +36,7 @@ class Migration(migrations.Migration):
         migrations.AlterField(
             model_name="emailotp",
             name="consumed_at",
-            field=models.DateTimeField(
-                blank=True, help_text="When OTP was successfully used", null=True
-            ),
+            field=models.DateTimeField(blank=True, help_text="When OTP was successfully used", null=True),
         ),
         migrations.AlterField(
             model_name="emailotp",

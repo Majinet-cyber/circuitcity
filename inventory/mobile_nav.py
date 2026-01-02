@@ -24,11 +24,11 @@ def _safe_reverse_any(url_names: List[str], fallback: str = "#") -> str:
     """
     Try multiple URL names in order, returning the first successful reverse.
     Falls back to the provided fallback if all fail.
-    
+
     Args:
         url_names: List of URL names to try in order
         fallback: Fallback URL if all reverse attempts fail
-        
+
     Returns:
         Resolved URL string
     """
@@ -43,7 +43,7 @@ def _safe_reverse_any(url_names: List[str], fallback: str = "#") -> str:
 def get_mobile_nav_items(request: HttpRequest) -> List[Dict[str, Any]]:
     """
     Get mobile navigation items for the current business vertical.
-    
+
     Each item is a dict with:
         - key: str - Unique identifier for the tab (e.g., 'home', 'scan')
         - label: str - Display label (e.g., 'Home', 'Scan')
@@ -51,15 +51,15 @@ def get_mobile_nav_items(request: HttpRequest) -> List[Dict[str, Any]]:
         - url: str - Resolved URL or href
         - active_prefix: Optional[str] - URL prefix to match for active state
         - is_menu: bool - If True, opens drawer instead of navigating
-    
+
     Args:
         request: HttpRequest with BUSINESS_VERTICAL in context
-        
+
     Returns:
         List of nav item dicts, empty list if vertical unknown
     """
     vertical = business_vertical(request)
-    
+
     if vertical == PHONES:
         return [
             {
@@ -103,7 +103,7 @@ def get_mobile_nav_items(request: HttpRequest) -> List[Dict[str, Any]]:
                 "is_menu": True,
             },
         ]
-    
+
     elif vertical == CLOTHING:
         return [
             {
@@ -147,7 +147,7 @@ def get_mobile_nav_items(request: HttpRequest) -> List[Dict[str, Any]]:
                 "is_menu": True,
             },
         ]
-    
+
     elif vertical == PHARMACY:
         return [
             {
@@ -191,7 +191,7 @@ def get_mobile_nav_items(request: HttpRequest) -> List[Dict[str, Any]]:
                 "is_menu": True,
             },
         ]
-    
+
     elif vertical == LIQUOR:
         return [
             {
@@ -235,7 +235,7 @@ def get_mobile_nav_items(request: HttpRequest) -> List[Dict[str, Any]]:
                 "is_menu": True,
             },
         ]
-    
+
     elif vertical == GYM:
         return [
             {
@@ -279,7 +279,7 @@ def get_mobile_nav_items(request: HttpRequest) -> List[Dict[str, Any]]:
                 "is_menu": True,
             },
         ]
-    
+
     else:
         # Generic/unknown vertical - default to phones nav
         return [
@@ -327,4 +327,3 @@ def get_mobile_nav_items(request: HttpRequest) -> List[Dict[str, Any]]:
 
 
 __all__ = ["get_mobile_nav_items"]
-

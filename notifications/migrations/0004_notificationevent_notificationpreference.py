@@ -6,7 +6,6 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         ("notifications", "0003_add_category_and_business"),
         ("tenants", "0019_add_section_flags_with_defaults"),
@@ -47,9 +46,7 @@ class Migration(migrations.Migration):
                 ("dedupe_key", models.CharField(db_index=True, max_length=255)),
                 (
                     "payload",
-                    models.JSONField(
-                        default=dict, help_text="Email template context data"
-                    ),
+                    models.JSONField(default=dict, help_text="Email template context data"),
                 ),
                 (
                     "status",
@@ -68,9 +65,7 @@ class Migration(migrations.Migration):
                 ("sent_at", models.DateTimeField(blank=True, null=True)),
                 (
                     "last_error",
-                    models.TextField(
-                        blank=True, help_text="Error message if failed", null=True
-                    ),
+                    models.TextField(blank=True, help_text="Error message if failed", null=True),
                 ),
                 (
                     "business",
@@ -100,9 +95,7 @@ class Migration(migrations.Migration):
                         fields=["recipient_email", "created_at"],
                         name="notificatio_recipie_c42c76_idx",
                     ),
-                    models.Index(
-                        fields=["dedupe_key"], name="notificatio_dedupe__a1e111_idx"
-                    ),
+                    models.Index(fields=["dedupe_key"], name="notificatio_dedupe__a1e111_idx"),
                 ],
                 "constraints": [
                     models.UniqueConstraint(
@@ -126,9 +119,7 @@ class Migration(migrations.Migration):
                 ),
                 (
                     "welcome_emails",
-                    models.BooleanField(
-                        default=True, help_text="Receive welcome emails"
-                    ),
+                    models.BooleanField(default=True, help_text="Receive welcome emails"),
                 ),
                 (
                     "instant_sale_email",
@@ -139,9 +130,7 @@ class Migration(migrations.Migration):
                 ),
                 (
                     "daily_summary_email",
-                    models.BooleanField(
-                        default=True, help_text="Receive daily sales summary emails"
-                    ),
+                    models.BooleanField(default=True, help_text="Receive daily sales summary emails"),
                 ),
                 (
                     "important_alerts_email",
@@ -171,9 +160,7 @@ class Migration(migrations.Migration):
             options={
                 "verbose_name": "Email Notification Preference",
                 "verbose_name_plural": "Email Notification Preferences",
-                "indexes": [
-                    models.Index(fields=["user"], name="notificatio_user_id_0299fd_idx")
-                ],
+                "indexes": [models.Index(fields=["user"], name="notificatio_user_id_0299fd_idx")],
             },
         ),
     ]

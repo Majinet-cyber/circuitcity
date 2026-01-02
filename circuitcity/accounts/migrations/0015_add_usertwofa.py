@@ -6,7 +6,6 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         ("accounts", "0014_fix_emailotp_table_name_variants"),
         migrations.swappable_dependency(settings.AUTH_USER_MODEL),
@@ -63,12 +62,8 @@ class Migration(migrations.Migration):
             options={
                 "db_table": "accounts_usertwofa",
                 "indexes": [
-                    models.Index(
-                        fields=["user"], name="accounts_us_user_id_551f65_idx"
-                    ),
-                    models.Index(
-                        fields=["sms_enabled"], name="accounts_us_sms_ena_076d28_idx"
-                    ),
+                    models.Index(fields=["user"], name="accounts_us_user_id_551f65_idx"),
+                    models.Index(fields=["sms_enabled"], name="accounts_us_sms_ena_076d28_idx"),
                 ],
             },
         ),

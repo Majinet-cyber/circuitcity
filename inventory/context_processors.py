@@ -38,7 +38,6 @@ def resolve_active_context(request: HttpRequest) -> Tuple[object | None, Dict[st
         "ACTIVE_BUSINESS": biz,
         "ACTIVE_BUSINESS_ID": getattr(biz, "id", None) if biz else None,
         "BUSINESS_VERTICAL": vertical,
-
         # One canonical target for all â€œAdd Productâ€ buttons
         "ADD_PRODUCT_URL": add_product_url,
     }
@@ -61,5 +60,3 @@ def active_scope_ctx(request: HttpRequest) -> Dict[str, Any]:
             "BUSINESS_VERTICAL": "phones",
             "ADD_PRODUCT_URL": "/inventory/products/new/generic/",
         }
-
-

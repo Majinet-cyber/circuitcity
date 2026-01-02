@@ -6,7 +6,6 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     initial = True
 
     dependencies = [
@@ -15,48 +14,74 @@ class Migration(migrations.Migration):
 
     operations = [
         migrations.CreateModel(
-            name='Location',
+            name="Location",
             fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('name', models.CharField(max_length=80, unique=True)),
-                ('city', models.CharField(blank=True, max_length=80)),
+                ("id", models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name="ID")),
+                ("name", models.CharField(max_length=80, unique=True)),
+                ("city", models.CharField(blank=True, max_length=80)),
             ],
         ),
         migrations.CreateModel(
-            name='AgentProfile',
+            name="AgentProfile",
             fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('user', models.OneToOneField(on_delete=django.db.models.deletion.CASCADE, related_name='agent_profile', to=settings.AUTH_USER_MODEL)),
-                ('location', models.ForeignKey(on_delete=django.db.models.deletion.PROTECT, to='inventory.location')),
+                ("id", models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name="ID")),
+                (
+                    "user",
+                    models.OneToOneField(
+                        on_delete=django.db.models.deletion.CASCADE,
+                        related_name="agent_profile",
+                        to=settings.AUTH_USER_MODEL,
+                    ),
+                ),
+                ("location", models.ForeignKey(on_delete=django.db.models.deletion.PROTECT, to="inventory.location")),
             ],
         ),
         migrations.CreateModel(
-            name='Product',
+            name="Product",
             fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('brand', models.CharField(blank=True, max_length=50)),
-                ('model', models.CharField(max_length=80)),
-                ('variant', models.CharField(blank=True, max_length=80)),
+                ("id", models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name="ID")),
+                ("brand", models.CharField(blank=True, max_length=50)),
+                ("model", models.CharField(max_length=80)),
+                ("variant", models.CharField(blank=True, max_length=80)),
             ],
             options={
-                'unique_together': {('model', 'variant', 'brand')},
+                "unique_together": {("model", "variant", "brand")},
             },
         ),
         migrations.CreateModel(
-            name='InventoryItem',
+            name="InventoryItem",
             fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('imei', models.CharField(blank=True, max_length=30, null=True, unique=True)),
-                ('received_at', models.DateField()),
-                ('order_price', models.DecimalField(decimal_places=2, max_digits=12)),
-                ('selling_price', models.DecimalField(blank=True, decimal_places=2, max_digits=12, null=True)),
-                ('status', models.CharField(choices=[('IN_STOCK', 'In stock'), ('SOLD', 'Sold')], default='IN_STOCK', max_length=10)),
-                ('assigned_agent', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='assigned_items', to=settings.AUTH_USER_MODEL)),
-                ('current_location', models.ForeignKey(on_delete=django.db.models.deletion.PROTECT, to='inventory.location')),
-                ('product', models.ForeignKey(on_delete=django.db.models.deletion.PROTECT, to='inventory.product')),
+                ("id", models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name="ID")),
+                ("imei", models.CharField(blank=True, max_length=30, null=True, unique=True)),
+                ("received_at", models.DateField()),
+                ("order_price", models.DecimalField(decimal_places=2, max_digits=12)),
+                ("selling_price", models.DecimalField(blank=True, decimal_places=2, max_digits=12, null=True)),
+                (
+                    "status",
+                    models.CharField(
+                        choices=[("IN_STOCK", "In stock"), ("SOLD", "Sold")], default="IN_STOCK", max_length=10
+                    ),
+                ),
+                (
+                    "assigned_agent",
+                    models.ForeignKey(
+                        blank=True,
+                        null=True,
+                        on_delete=django.db.models.deletion.SET_NULL,
+                        related_name="assigned_items",
+                        to=settings.AUTH_USER_MODEL,
+                    ),
+                ),
+                (
+                    "current_location",
+                    models.ForeignKey(on_delete=django.db.models.deletion.PROTECT, to="inventory.location"),
+                ),
+                ("product", models.ForeignKey(on_delete=django.db.models.deletion.PROTECT, to="inventory.product")),
             ],
             options={
-                'indexes': [models.Index(fields=['status', 'current_location', 'product'], name='inventory_i_status_214241_idx')],
+                "indexes": [
+                    models.Index(fields=["status", "current_location", "product"], name="inventory_i_status_214241_idx")
+                ],
             },
         ),
     ]

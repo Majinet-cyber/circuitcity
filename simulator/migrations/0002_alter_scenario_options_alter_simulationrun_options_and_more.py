@@ -4,110 +4,109 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
-        ('simulator', '0001_initial'),
+        ("simulator", "0001_initial"),
     ]
 
     operations = [
         migrations.AlterModelOptions(
-            name='scenario',
-            options={'ordering': ('-created_at', '-id')},
+            name="scenario",
+            options={"ordering": ("-created_at", "-id")},
         ),
         migrations.AlterModelOptions(
-            name='simulationrun',
-            options={'ordering': ('-created_at', '-id')},
+            name="simulationrun",
+            options={"ordering": ("-created_at", "-id")},
         ),
         migrations.RemoveField(
-            model_name='scenario',
-            name='ap_days',
+            model_name="scenario",
+            name="ap_days",
         ),
         migrations.RemoveField(
-            model_name='scenario',
-            name='ar_days',
+            model_name="scenario",
+            name="ar_days",
         ),
         migrations.RemoveField(
-            model_name='scenario',
-            name='base_price',
+            model_name="scenario",
+            name="base_price",
         ),
         migrations.RemoveField(
-            model_name='scenario',
-            name='demand_growth_pct',
+            model_name="scenario",
+            name="demand_growth_pct",
         ),
         migrations.RemoveField(
-            model_name='scenario',
-            name='horizon_days',
+            model_name="scenario",
+            name="horizon_days",
         ),
         migrations.RemoveField(
-            model_name='scenario',
-            name='initial_stock',
+            model_name="scenario",
+            name="initial_stock",
         ),
         migrations.RemoveField(
-            model_name='scenario',
-            name='lead_time_days',
+            model_name="scenario",
+            name="lead_time_days",
         ),
         migrations.RemoveField(
-            model_name='scenario',
-            name='op_ex_pct_of_revenue',
+            model_name="scenario",
+            name="op_ex_pct_of_revenue",
         ),
         migrations.RemoveField(
-            model_name='scenario',
-            name='price_change_pct',
+            model_name="scenario",
+            name="price_change_pct",
         ),
         migrations.RemoveField(
-            model_name='scenario',
-            name='reorder_point',
+            model_name="scenario",
+            name="reorder_point",
         ),
         migrations.RemoveField(
-            model_name='scenario',
-            name='unit_cost',
+            model_name="scenario",
+            name="unit_cost",
         ),
         migrations.AddField(
-            model_name='scenario',
-            name='avg_unit_price',
+            model_name="scenario",
+            name="avg_unit_price",
             field=models.FloatField(default=0.0),
         ),
         migrations.AddField(
-            model_name='scenario',
-            name='baseline_monthly_units',
+            model_name="scenario",
+            name="baseline_monthly_units",
             field=models.PositiveIntegerField(default=0),
         ),
         migrations.AddField(
-            model_name='scenario',
-            name='monthly_fixed_costs',
+            model_name="scenario",
+            name="monthly_fixed_costs",
             field=models.FloatField(default=0.0),
         ),
         migrations.AddField(
-            model_name='scenario',
-            name='monthly_growth_pct',
+            model_name="scenario",
+            name="monthly_growth_pct",
             field=models.FloatField(default=0.0),
         ),
         migrations.AddField(
-            model_name='scenario',
-            name='months',
+            model_name="scenario",
+            name="months",
             field=models.PositiveIntegerField(default=12),
         ),
         migrations.AddField(
-            model_name='scenario',
-            name='variable_cost_pct',
+            model_name="scenario",
+            name="variable_cost_pct",
             field=models.FloatField(default=0.0),
         ),
         migrations.AddField(
-            model_name='simulationrun',
-            name='results_json',
+            model_name="simulationrun",
+            name="results_json",
             field=models.JSONField(blank=True, default=dict, null=True),
         ),
         migrations.AlterField(
-            model_name='scenario',
-            name='tax_rate_pct',
+            model_name="scenario",
+            name="tax_rate_pct",
             field=models.FloatField(default=0.0),
         ),
         migrations.AddIndex(
-            model_name='scenario',
-            index=models.Index(fields=['owner', '-created_at'], name='simulator_s_owner_i_b8679f_idx'),
+            model_name="scenario",
+            index=models.Index(fields=["owner", "-created_at"], name="simulator_s_owner_i_b8679f_idx"),
         ),
         migrations.AddIndex(
-            model_name='simulationrun',
-            index=models.Index(fields=['scenario', '-created_at'], name='simulator_s_scenari_0a9d5c_idx'),
+            model_name="simulationrun",
+            index=models.Index(fields=["scenario", "-created_at"], name="simulator_s_scenari_0a9d5c_idx"),
         ),
     ]

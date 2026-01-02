@@ -22,8 +22,10 @@ CHECKIN_TYPES = (
     ("DEPARTURE", "Departure"),
 )
 
+
 def _mwk(n: int) -> Decimal:
     return Decimal(n)
+
 
 # ---------------------------------------------------------------------
 # TimeLog — canonical attendance event
@@ -34,12 +36,14 @@ class TimeLog(models.Model):
     Keep 'business' nullable initially to avoid one-off default prompts;
     you can backfill from location.business then tighten later.
     """
+
     business = models.ForeignKey(
         Business,
         on_delete=models.CASCADE,
         related_name="time_logs",
         db_index=True,
-        null=True, blank=True,   # <-- keep nullable for smooth migration
+        null=True,
+        blank=True,  # <-- keep nullable for smooth migration
     )
     user = models.ForeignKey(
         User,
@@ -77,13 +81,15 @@ class TimeLog(models.Model):
     def __str__(self):
         return f"{self.ts:%Y-%m-%d %H:%M} {self.user} {self.kind}"
 
+
 # ---------------------------------------------------------------------
 # Attendance policy (defaults)
 # ---------------------------------------------------------------------
 DEFAULT_OPENING_HOUR = time(8, 0, 0)  # 08:00
-LATE_DEDUCT_PER_30  = _mwk(3000)
-EARLY_BONUS_PER_30  = _mwk(5000)
-WEEKEND_BONUS       = _mwk(10000)
+LATE_DEDUCT_PER_30 = _mwk(3000)
+EARLY_BONUS_PER_30 = _mwk(5000)
+WEEKEND_BONUS = _mwk(10000)
+
 
 @dataclass
 class AttendanceOutcome:
@@ -96,6 +102,7 @@ class AttendanceOutcome:
     @property
     def net_adjustment(self) -> Decimal:
         return self.early_bonus + self.weekend_bonus - self.late_deduction
+
 
 def compute_attendance_outcome(at_ts: datetime, kind: str) -> AttendanceOutcome:
     """
@@ -124,8 +131,8 @@ def compute_attendance_outcome(at_ts: datetime, kind: str) -> AttendanceOutcome:
     delta = local - opening
     if delta.total_seconds() > 0:
         # Late: charge per started 30-min block
-        mins = int((delta.total_seconds() + 59) // 60)     # ceil to minute
-        blocks = (mins + 29) // 30                         # ceil to 30-min blocks
+        mins = int((delta.total_seconds() + 59) // 60)  # ceil to minute
+        blocks = (mins + 29) // 30  # ceil to 30-min blocks
         outcome.minutes_late = mins
         outcome.late_deduction = LATE_DEDUCT_PER_30 * blocks
     else:

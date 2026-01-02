@@ -98,32 +98,32 @@ def drop_constraint_if_exists(apps, schema_editor, constraint_name):
 
 
 def add_price_constraint(apps, schema_editor):
-    add_constraint_if_not_exists(apps, schema_editor, 'sale_price_nonneg', 'price >= 0')
+    add_constraint_if_not_exists(apps, schema_editor, "sale_price_nonneg", "price >= 0")
 
 
 def add_commission_constraint(apps, schema_editor):
-    add_constraint_if_not_exists(apps, schema_editor, 'sale_commission_pct_0_100', 
-                                 'commission_pct >= 0 AND commission_pct <= 100')
+    add_constraint_if_not_exists(
+        apps, schema_editor, "sale_commission_pct_0_100", "commission_pct >= 0 AND commission_pct <= 100"
+    )
 
 
 def drop_price_constraint(apps, schema_editor):
-    drop_constraint_if_exists(apps, schema_editor, 'sale_price_nonneg')
+    drop_constraint_if_exists(apps, schema_editor, "sale_price_nonneg")
 
 
 def drop_commission_constraint(apps, schema_editor):
-    drop_constraint_if_exists(apps, schema_editor, 'sale_commission_pct_0_100')
+    drop_constraint_if_exists(apps, schema_editor, "sale_commission_pct_0_100")
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
-        ('sales', '0001_initial'),
+        ("sales", "0001_initial"),
     ]
 
     operations = [
         migrations.AlterModelOptions(
-            name='sale',
-            options={'ordering': ['-created_at']},
+            name="sale",
+            options={"ordering": ["-created_at"]},
         ),
         migrations.SeparateDatabaseAndState(
             database_operations=[
@@ -131,21 +131,28 @@ class Migration(migrations.Migration):
             ],
             state_operations=[
                 migrations.AddField(
-                    model_name='sale',
-                    name='created_at',
+                    model_name="sale",
+                    name="created_at",
                     field=models.DateTimeField(default=django.utils.timezone.now, editable=False),
                 ),
             ],
         ),
         migrations.AlterField(
-            model_name='sale',
-            name='commission_pct',
-            field=models.DecimalField(decimal_places=2, default=0, max_digits=5, validators=[django.core.validators.MinValueValidator(0), django.core.validators.MaxValueValidator(100)]),
+            model_name="sale",
+            name="commission_pct",
+            field=models.DecimalField(
+                decimal_places=2,
+                default=0,
+                max_digits=5,
+                validators=[django.core.validators.MinValueValidator(0), django.core.validators.MaxValueValidator(100)],
+            ),
         ),
         migrations.AlterField(
-            model_name='sale',
-            name='price',
-            field=models.DecimalField(decimal_places=2, max_digits=12, validators=[django.core.validators.MinValueValidator(0)]),
+            model_name="sale",
+            name="price",
+            field=models.DecimalField(
+                decimal_places=2, max_digits=12, validators=[django.core.validators.MinValueValidator(0)]
+            ),
         ),
         # Indexes already exist from 0001_initial - no need to add them again
         migrations.RunPython(drop_sale_price_nonneg_if_exists, migrations.RunPython.noop),
@@ -155,8 +162,8 @@ class Migration(migrations.Migration):
             ],
             state_operations=[
                 migrations.AddConstraint(
-                    model_name='sale',
-                    constraint=models.CheckConstraint(check=models.Q(('price__gte', 0)), name='sale_price_nonneg'),
+                    model_name="sale",
+                    constraint=models.CheckConstraint(check=models.Q(("price__gte", 0)), name="sale_price_nonneg"),
                 ),
             ],
         ),
@@ -166,8 +173,11 @@ class Migration(migrations.Migration):
             ],
             state_operations=[
                 migrations.AddConstraint(
-                    model_name='sale',
-                    constraint=models.CheckConstraint(check=models.Q(('commission_pct__gte', 0), ('commission_pct__lte', 100)), name='sale_commission_pct_0_100'),
+                    model_name="sale",
+                    constraint=models.CheckConstraint(
+                        check=models.Q(("commission_pct__gte", 0), ("commission_pct__lte", 100)),
+                        name="sale_commission_pct_0_100",
+                    ),
                 ),
             ],
         ),

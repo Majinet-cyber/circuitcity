@@ -70,22 +70,7 @@ html, body {
   --nav-drawer-w: clamp(260px, 30vw, 420px);
 }
 
-/* Dark mode */
-@media (prefers-color-scheme: dark) {
-  :root {
-    --cc-bg: #0f1115;
-    --cc-card: #141924;
-    --cc-text: #e5e7eb;
-    --cc-heading: #f8fafc;
-    --cc-border: #223049;
-    --cc-row-hover: #182131;
-    --cc-shadow-sm: 0 6px 16px rgb(0 0 0 / 40%);
-    --cc-shadow-md: 0 18px 44px rgb(0 0 0 / 55%);
-    --cc-badge-ink: #e5edff;
-    --cc-badge-bg: #10203b;
-    --cc-badge-br: #1e3356;
-  }
-}
+/* PHASE 1: Dark mode removed - light theme only for consistency */
 body.dark {
   --cc-bg: #0f1115;
   --cc-card: #141924;

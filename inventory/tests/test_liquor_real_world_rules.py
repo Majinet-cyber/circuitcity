@@ -48,10 +48,10 @@ class LiquorRealWorldRulesTest(TestCase):
             name="Test Bar",
             business_kind=BusinessKind.LIQUOR,
         )
-        
+
         # Get or create default location for business
         self.location = Location.ensure_default_for_business(self.business)
-        
+
         # Create user
         self.user = User.objects.create_user(
             username="bartender",
@@ -154,17 +154,17 @@ class TestBeerRules(LiquorRealWorldRulesTest):
     def test_beer_stock_in_crates(self):
         """Stock in beer by crates (converts to bottles)"""
         beer = self._create_beer(stock=0)
-        
+
         # Stock in 5 crates = 100 bottles
         beer.quantity_in_stock = to_base_units(5, "crate", beer)
         beer.save()
-        
+
         self.assertEqual(beer.quantity_in_stock, 100)
 
     def test_beer_sell_by_crate(self):
         """Sell beer by crate (decrements bottles correctly)"""
         beer = self._create_beer(stock=60)  # 3 crates
-        
+
         result = create_liquor_sale(
             business=self.business,
             product_id=beer.id,
@@ -173,7 +173,7 @@ class TestBeerRules(LiquorRealWorldRulesTest):
             unit="crate",
             unit_price=Decimal("15000.00"),  # price per crate
         )
-        
+
         self.assertTrue(result["ok"])
         beer.refresh_from_db()
         self.assertEqual(beer.quantity_in_stock, 20)  # 60 - 40 = 20
@@ -206,17 +206,17 @@ class TestCiderRules(LiquorRealWorldRulesTest):
     def test_cider_stock_in_6packs(self):
         """Stock in cider by 6-packs (converts to bottles)"""
         cider = self._create_cider(stock=0)
-        
+
         # Stock in 10 6-packs = 60 bottles
         cider.quantity_in_stock = to_base_units(10, "6-pack", cider)
         cider.save()
-        
+
         self.assertEqual(cider.quantity_in_stock, 60)
 
     def test_cider_cannot_stock_by_crate(self):
         """Cider cannot be stocked by crate"""
         cider = self._create_cider()
-        
+
         with self.assertRaises(ValidationError) as cm:
             to_base_units(2, "crate", cider)
         self.assertIn("6-pack", str(cm.exception).lower())
@@ -260,17 +260,17 @@ class TestWineRules(LiquorRealWorldRulesTest):
     def test_wine_stock_in_bottles_convert_to_glasses(self):
         """Stock in wine bottles (converts to glasses)"""
         wine = self._create_wine(stock=0)
-        
+
         # Stock in 10 bottles = 50 glasses
         wine.quantity_in_stock = to_base_units(10, "bottle", wine)
         wine.save()
-        
+
         self.assertEqual(wine.quantity_in_stock, 50)
 
     def test_wine_sell_by_glass(self):
         """Sell wine by glass (decrements glasses correctly)"""
         wine = self._create_wine(stock=25)  # 5 bottles = 25 glasses
-        
+
         result = create_liquor_sale(
             business=self.business,
             product_id=wine.id,
@@ -279,7 +279,7 @@ class TestWineRules(LiquorRealWorldRulesTest):
             unit="glass",
             unit_price=Decimal("500.00"),
         )
-        
+
         self.assertTrue(result["ok"])
         wine.refresh_from_db()
         self.assertEqual(wine.quantity_in_stock, 23)  # 25 - 2 = 23
@@ -323,17 +323,17 @@ class TestSpiritsWhiskyRules(LiquorRealWorldRulesTest):
     def test_spirits_stock_in_bottles_convert_to_shots(self):
         """Stock in spirits bottles (converts to shots)"""
         spirits = self._create_spirits(stock=0)
-        
+
         # Stock in 6 bottles = 144 shots (24 shots per bottle)
         spirits.quantity_in_stock = to_base_units(6, "bottle", spirits)
         spirits.save()
-        
+
         self.assertEqual(spirits.quantity_in_stock, 144)
 
     def test_spirits_sell_by_shot(self):
         """Sell spirits by shot (decrements shots correctly)"""
         spirits = self._create_spirits(stock=144)  # 6 bottles = 144 shots
-        
+
         result = create_liquor_sale(
             business=self.business,
             product_id=spirits.id,
@@ -342,7 +342,7 @@ class TestSpiritsWhiskyRules(LiquorRealWorldRulesTest):
             unit="shot",
             unit_price=Decimal("300.00"),
         )
-        
+
         self.assertTrue(result["ok"])
         spirits.refresh_from_db()
         self.assertEqual(spirits.quantity_in_stock, 141)  # 144 - 3 = 141
@@ -360,7 +360,7 @@ class TestCrossCategoryIsolation(LiquorRealWorldRulesTest):
     def test_beer_cannot_use_shot(self):
         """Beer products must reject shot sales"""
         beer = self._create_beer()
-        
+
         with self.assertRaises(ValidationError) as cm:
             create_liquor_sale(
                 business=self.business,
@@ -374,13 +374,13 @@ class TestCrossCategoryIsolation(LiquorRealWorldRulesTest):
         error_msg = str(cm.exception).lower()
         self.assertTrue(
             "shot" in error_msg and ("invalid" in error_msg or "not support" in error_msg),
-            f"Expected shot rejection error, got: {cm.exception}"
+            f"Expected shot rejection error, got: {cm.exception}",
         )
 
     def test_wine_cannot_use_shot(self):
         """Wine products must reject shot sales"""
         wine = self._create_wine()
-        
+
         with self.assertRaises(ValidationError) as cm:
             create_liquor_sale(
                 business=self.business,
@@ -394,13 +394,13 @@ class TestCrossCategoryIsolation(LiquorRealWorldRulesTest):
         error_msg = str(cm.exception).lower()
         self.assertTrue(
             "shot" in error_msg and ("invalid" in error_msg or "not support" in error_msg),
-            f"Expected shot rejection error, got: {cm.exception}"
+            f"Expected shot rejection error, got: {cm.exception}",
         )
 
     def test_spirits_cannot_use_glass(self):
         """Spirits products must reject glass sales"""
         spirits = self._create_spirits()
-        
+
         # Set up as if trying to sell by glass
         with self.assertRaises(ValidationError) as cm:
             validate_unit_for_kind(LiquorKind.SPIRITS, "glass")
@@ -413,7 +413,7 @@ class TestStockSafety(LiquorRealWorldRulesTest):
     def test_insufficient_stock_blocks_sale(self):
         """Cannot sell more than available stock"""
         beer = self._create_beer(stock=10)  # Only 10 bottles
-        
+
         with self.assertRaises(OutOfStockError) as cm:
             create_liquor_sale(
                 business=self.business,
@@ -428,7 +428,7 @@ class TestStockSafety(LiquorRealWorldRulesTest):
     def test_insufficient_stock_by_pack_blocks_sale(self):
         """Cannot sell more packs than available (in base units)"""
         cider = self._create_cider(stock=10)  # Only 10 bottles (< 2 six-packs)
-        
+
         with self.assertRaises(OutOfStockError) as cm:
             create_liquor_sale(
                 business=self.business,
@@ -443,7 +443,7 @@ class TestStockSafety(LiquorRealWorldRulesTest):
     def test_open_bottle_tracking_wine(self):
         """Open wine bottles are tracked automatically via glasses"""
         wine = self._create_wine(stock=25)  # 5 bottles = 25 glasses
-        
+
         # Sell 7 glasses (opens 2 bottles, 3 glasses left in 2nd bottle)
         result = create_liquor_sale(
             business=self.business,
@@ -453,7 +453,7 @@ class TestStockSafety(LiquorRealWorldRulesTest):
             unit="glass",
             unit_price=Decimal("500.00"),
         )
-        
+
         self.assertTrue(result["ok"])
         wine.refresh_from_db()
         self.assertEqual(wine.quantity_in_stock, 18)  # 25 - 7 = 18 glasses
@@ -461,7 +461,7 @@ class TestStockSafety(LiquorRealWorldRulesTest):
     def test_open_bottle_tracking_spirits(self):
         """Open spirits bottles are tracked automatically via shots"""
         spirits = self._create_spirits(stock=60)  # 2 bottles = 60 shots
-        
+
         # Sell 35 shots (opens both bottles, 25 shots left)
         result = create_liquor_sale(
             business=self.business,
@@ -471,7 +471,7 @@ class TestStockSafety(LiquorRealWorldRulesTest):
             unit="shot",
             unit_price=Decimal("300.00"),
         )
-        
+
         self.assertTrue(result["ok"])
         spirits.refresh_from_db()
         self.assertEqual(spirits.quantity_in_stock, 25)  # 60 - 35 = 25
@@ -484,17 +484,18 @@ class TestBusinessIsolation(LiquorRealWorldRulesTest):
         """Cannot create sale for product from different business"""
         # Create second business with unique slug
         import uuid
+
         unique_suffix = str(uuid.uuid4())[:8]
-        
+
         # Use get_or_create to handle --keepdb case
         other_business, _ = Business.objects.get_or_create(
             slug=f"other-bar-{unique_suffix}",
             defaults={
                 "name": f"Other Bar {unique_suffix}",
                 "business_kind": BusinessKind.LIQUOR,
-            }
+            },
         )
-        
+
         # Create product in other business
         other_beer = MerchProduct.objects.create(
             business=other_business,
@@ -503,7 +504,7 @@ class TestBusinessIsolation(LiquorRealWorldRulesTest):
             category=LiquorKind.BEER,
             quantity_in_stock=100,
         )
-        
+
         # Try to sell it using our business - should fail
         with self.assertRaises(ValidationError):
             create_liquor_sale(
@@ -522,7 +523,7 @@ class TestNewRules2024(LiquorRealWorldRulesTest):
     def test_spirits_default_shots_is_24(self):
         """Spirits default shots_per_bottle is 24 (changed from 30)"""
         self.assertEqual(DEFAULT_SHOTS_PER_BOTTLE, 24)
-    
+
     def test_spirits_with_missing_shots_per_bottle_defaults_to_24(self):
         """Spirits product without shots_per_bottle should default to 24"""
         spirits = MerchProduct.objects.create(
@@ -537,15 +538,15 @@ class TestNewRules2024(LiquorRealWorldRulesTest):
             quantity_in_stock=0,
             track_inventory=True,
         )
-        
+
         # to_base_units should use default (24) when shots_per_bottle is None
         qty = to_base_units(1, "bottle", spirits)
         self.assertEqual(qty, 24, "Should default to 24 shots per bottle")
-    
+
     def test_barman_shots_accounting(self):
         """Stock-in spirits bottles should deduct 2 barman shots per bottle"""
         from inventory.services.liquor_sale import stock_in_liquor
-        
+
         spirits = MerchProduct.objects.create(
             business=self.business,
             name="Test Whisky",
@@ -558,7 +559,7 @@ class TestNewRules2024(LiquorRealWorldRulesTest):
             quantity_in_stock=0,
             track_inventory=True,
         )
-        
+
         # Stock in 1 bottle
         result = stock_in_liquor(
             business=self.business,
@@ -568,21 +569,22 @@ class TestNewRules2024(LiquorRealWorldRulesTest):
             unit="bottle",
             cost_per_unit=Decimal("6000.00"),
         )
-        
+
         self.assertTrue(result["ok"])
         self.assertEqual(result["barman_shots_recorded"], 2, "Should record 2 barman shots")
         self.assertEqual(result["sellable_added"], 22, "Should add 22 sellable shots (24 - 2)")
-        
+
         # Verify stock
         spirits.refresh_from_db()
         self.assertEqual(spirits.quantity_in_stock, 22, "Stock should be 22 sellable shots")
-    
+
     def test_spirits_stock_in_bottle_only(self):
         """Spirits/Whisky stock-in must be BOTTLE-ONLY (no case/crate/pack)"""
         spirits = self._create_spirits(stock=0)
-        
+
         # Try to stock in by "case" - should fail
         from inventory.services.liquor_sale import stock_in_liquor
+
         with self.assertRaises(ValidationError) as cm:
             stock_in_liquor(
                 business=self.business,
@@ -593,7 +595,7 @@ class TestNewRules2024(LiquorRealWorldRulesTest):
                 cost_per_unit=Decimal("30000.00"),
             )
         self.assertIn("stock-in must be by BOTTLE only", str(cm.exception))
-    
+
     def test_cider_pack_size_must_be_6(self):
         """Cider pack_size must be exactly 6 (cannot be changed)"""
         # Try to create cider with pack_size != 6
@@ -611,7 +613,7 @@ class TestNewRules2024(LiquorRealWorldRulesTest):
                 track_inventory=True,
             )
         self.assertIn("Cider pack size must be exactly 6", str(cm.exception))
-    
+
     def test_cider_pack_size_6_is_allowed(self):
         """Cider with pack_size=6 should be allowed"""
         cider = MerchProduct.objects.create(
@@ -627,14 +629,14 @@ class TestNewRules2024(LiquorRealWorldRulesTest):
             track_inventory=True,
         )
         self.assertEqual(cider.bottles_per_crate, 6)
-    
+
     def test_spirits_selling_units_shot_or_bottle(self):
         """Spirits can be sold by shot or bottle (not case for selling)"""
         allowed_selling = get_allowed_units(LiquorKind.SPIRITS, pack_enabled=True, for_stock_in=False)
         self.assertIn("shot", allowed_selling)
         self.assertIn("bottle", allowed_selling)
         self.assertNotIn("case", allowed_selling, "Case not allowed for selling")
-    
+
     def test_spirits_stock_in_units_bottle_only(self):
         """Spirits stock-in units must be bottle only"""
         allowed_stock_in = get_allowed_units(LiquorKind.SPIRITS, pack_enabled=True, for_stock_in=True)
@@ -645,15 +647,15 @@ class TestNewRules2024(LiquorRealWorldRulesTest):
 
 class TestConcurrencySafety(LiquorRealWorldRulesTest):
     """Test concurrency safety (atomic operations, select_for_update)"""
-    
+
     def test_sale_uses_select_for_update(self):
         """Verify that create_liquor_sale uses select_for_update for row locking"""
         beer = self._create_beer(stock=10)
-        
+
         # The create_liquor_sale function should use select_for_update()
         # We can verify this by checking the service code uses it
         # (This is more of a code review test, but we can verify behavior)
-        
+
         # Sell 5 bottles
         result = create_liquor_sale(
             business=self.business,
@@ -663,15 +665,15 @@ class TestConcurrencySafety(LiquorRealWorldRulesTest):
             unit="bottle",
             unit_price=Decimal("800.00"),
         )
-        
+
         self.assertTrue(result["ok"])
         beer.refresh_from_db()
         self.assertEqual(beer.quantity_in_stock, 5)
-    
+
     def test_atomic_stock_decrement_prevents_overselling(self):
         """Atomic stock decrement should prevent overselling"""
         beer = self._create_beer(stock=5)
-        
+
         # Try to sell 10 bottles (more than available)
         with self.assertRaises(OutOfStockError) as cm:
             create_liquor_sale(
@@ -682,17 +684,17 @@ class TestConcurrencySafety(LiquorRealWorldRulesTest):
                 unit="bottle",
                 unit_price=Decimal("800.00"),
             )
-        
+
         self.assertIn("Insufficient stock", str(cm.exception))
-        
+
         # Stock should remain unchanged
         beer.refresh_from_db()
         self.assertEqual(beer.quantity_in_stock, 5, "Stock should not change on failed sale")
-    
+
     def test_transaction_rollback_on_error(self):
         """If sale fails, stock should not be decremented (transaction rollback)"""
         beer = self._create_beer(stock=10)
-        
+
         # Try to create a credit sale without customer_name (should fail)
         with self.assertRaises(ValidationError):
             create_liquor_sale(
@@ -705,8 +707,7 @@ class TestConcurrencySafety(LiquorRealWorldRulesTest):
                 sale_type="credit",
                 customer_name=None,  # Missing! Should fail
             )
-        
+
         # Stock should remain unchanged
         beer.refresh_from_db()
         self.assertEqual(beer.quantity_in_stock, 10, "Stock should not change on failed sale")
-

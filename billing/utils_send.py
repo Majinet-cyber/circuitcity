@@ -24,7 +24,9 @@ def send_invoice_email(*, to_email: str, subject: str, html_body: str, text_body
     if not to_email:
         return SendResult(False, "email", "Missing recipient email")
     from_email = getattr(settings, "DEFAULT_FROM_EMAIL", "noreply@example.com")
-    msg = EmailMultiAlternatives(subject=subject, body=text_body or "See HTML version.", from_email=from_email, to=[to_email])
+    msg = EmailMultiAlternatives(
+        subject=subject, body=text_body or "See HTML version.", from_email=from_email, to=[to_email]
+    )
     msg.attach_alternative(html_body, "text/html")
     msg.send(fail_silently=False)
     return SendResult(True, "email", f"Sent to {to_email}")
@@ -42,5 +44,3 @@ def send_invoice_whatsapp(*, to_number: str, text: str) -> SendResult:
     # Minimal console fallback
     print(f"[WhatsApp:FALLBACK] -> {to_number}\n{text}")
     return SendResult(True, "whatsapp", "Console fallback")
-
-

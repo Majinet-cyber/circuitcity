@@ -50,7 +50,7 @@ def _relaxed_test_settings(settings):
 def unique_slug(name="test-biz"):
     """
     Generate a unique slug for test Business objects.
-    
+
     Usage:
         Business.objects.create(name="Test Biz", slug=unique_slug("Test Biz"), ...)
     """

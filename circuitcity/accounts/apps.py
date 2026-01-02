@@ -60,6 +60,7 @@ class AccountsConfig(AppConfig):
                 # Canonical key (settings.TENANT_SESSION_KEY) may differ
                 try:
                     from django.conf import settings
+
                     key = getattr(settings, "TENANT_SESSION_KEY", "active_business_id")
                     try:
                         request.session.pop(key, None)
@@ -70,6 +71,7 @@ class AccountsConfig(AppConfig):
                 # Mirror to thread-local (if available)
                 try:
                     from circuitcity.tenants.models import set_current_business_id  # type: ignore
+
                     set_current_business_id(None)
                 except Exception:
                     pass

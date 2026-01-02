@@ -16,6 +16,7 @@ try:
     from reportlab.lib import colors
     from reportlab.graphics.barcode import qr
     from reportlab.graphics import renderPDF
+
     REPORTLAB_AVAILABLE = True
 except ImportError:
     REPORTLAB_AVAILABLE = False
@@ -27,12 +28,14 @@ from inventory.clothing_config import sign_product_qr_data
 # LABEL TEMPLATES
 # ============================================================================
 
+
 class LabelSize:
     """Standard label sizes (width x height in mm)"""
-    SMALL = (50, 30)      # Small price tag
-    MEDIUM = (70, 40)     # Standard product tag
-    LARGE = (100, 60)     # Shelf label with large QR
-    CUSTOM = None         # Custom size
+
+    SMALL = (50, 30)  # Small price tag
+    MEDIUM = (70, 40)  # Standard product tag
+    LARGE = (100, 60)  # Shelf label with large QR
+    CUSTOM = None  # Custom size
 
 
 def generate_label_pdf(
@@ -46,7 +49,7 @@ def generate_label_pdf(
 ) -> BytesIO:
     """
     Generate a PDF with product labels.
-    
+
     Args:
         product: MerchProduct instance
         variant: ClothingVariant instance (optional)
@@ -54,17 +57,17 @@ def generate_label_pdf(
         show_price: Whether to show price on label
         label_size: "small", "medium", or "large"
         output: Optional output stream (if None, creates BytesIO)
-    
+
     Returns:
         BytesIO with PDF data
     """
     if not REPORTLAB_AVAILABLE:
         raise ImportError("ReportLab is required for label generation. Install with: pip install reportlab")
-    
+
     # Create output buffer
     if output is None:
         output = BytesIO()
-    
+
     # Get label dimensions
     if label_size == "small":
         label_width, label_height = LabelSize.SMALL
@@ -72,35 +75,35 @@ def generate_label_pdf(
         label_width, label_height = LabelSize.LARGE
     else:
         label_width, label_height = LabelSize.MEDIUM
-    
+
     # Convert mm to points (1mm = 2.834645669 points)
     label_width_pt = label_width * mm
     label_height_pt = label_height * mm
-    
+
     # Calculate grid layout on A4 page
     page_width, page_height = A4
     margin = 10 * mm
-    
+
     cols = int((page_width - 2 * margin) / label_width_pt)
     rows = int((page_height - 2 * margin) / label_height_pt)
-    
+
     labels_per_page = cols * rows
-    
+
     # Create PDF canvas
     c = canvas.Canvas(output, pagesize=A4)
-    
+
     # Generate labels
     labels_drawn = 0
     page_num = 1
-    
+
     for i in range(quantity):
         # Calculate position on grid
         col = (labels_drawn % labels_per_page) % cols
         row = (labels_drawn % labels_per_page) // cols
-        
+
         x = margin + col * label_width_pt
         y = page_height - margin - (row + 1) * label_height_pt
-        
+
         # Draw single label
         _draw_single_label(
             c,
@@ -113,20 +116,20 @@ def generate_label_pdf(
             show_price=show_price,
             label_size=label_size,
         )
-        
+
         labels_drawn += 1
-        
+
         # New page if needed
         if labels_drawn % labels_per_page == 0 and i < quantity - 1:
             c.showPage()
             page_num += 1
-    
+
     # Save PDF
     c.save()
-    
+
     # Reset buffer position
     output.seek(0)
-    
+
     return output
 
 
@@ -144,7 +147,7 @@ def _draw_single_label(
 ):
     """
     Draw a single label on the canvas.
-    
+
     Args:
         c: ReportLab canvas
         product: MerchProduct instance
@@ -157,20 +160,20 @@ def _draw_single_label(
     # Draw border (optional, for debugging)
     # c.setStrokeColor(colors.lightgrey)
     # c.rect(x, y, width, height)
-    
+
     # Padding
     padding = 2 * mm
     content_x = x + padding
     content_y = y + padding
     content_width = width - 2 * padding
     content_height = height - 2 * padding
-    
+
     # Get product details
     business = product.business
     product_name = product.name
-    brand = getattr(product, 'brand', '') or ''
-    internal_sku = getattr(product, 'internal_sku', '') or product.sku or ''
-    
+    brand = getattr(product, "brand", "") or ""
+    internal_sku = getattr(product, "internal_sku", "") or product.sku or ""
+
     if variant:
         variant_sku = variant.variant_sku
         selling_price = variant.get_selling_price()
@@ -179,36 +182,69 @@ def _draw_single_label(
     else:
         variant_sku = internal_sku
         selling_price = product.selling_price or Decimal("0.00")
-        size = getattr(product, 'size', '') or ''
-        color = getattr(product, 'color', '') or ''
-    
+        size = getattr(product, "size", "") or ""
+        color = getattr(product, "color", "") or ""
+
     # Generate QR code data
     qr_token = sign_product_qr_data(
         business_id=business.id,
         product_id=product.id,
         variant_id=variant.id if variant else None,
     )
-    
+
     # QR code URL (points to scan endpoint)
     from django.conf import settings
-    base_url = getattr(settings, 'SITE_URL', 'https://emajinet.com')
+
+    base_url = getattr(settings, "SITE_URL", "https://emajinet.com")
     qr_url = f"{base_url}/inventory/clothing/scan/{qr_token}/"
-    
+
     # Layout based on label size
     if label_size == "small":
         _draw_small_label(
-            c, content_x, content_y, content_width, content_height,
-            product_name, variant_sku, selling_price, qr_url, show_price
+            c,
+            content_x,
+            content_y,
+            content_width,
+            content_height,
+            product_name,
+            variant_sku,
+            selling_price,
+            qr_url,
+            show_price,
         )
     elif label_size == "large":
         _draw_large_label(
-            c, content_x, content_y, content_width, content_height,
-            business, product_name, brand, variant_sku, selling_price, size, color, qr_url, show_price
+            c,
+            content_x,
+            content_y,
+            content_width,
+            content_height,
+            business,
+            product_name,
+            brand,
+            variant_sku,
+            selling_price,
+            size,
+            color,
+            qr_url,
+            show_price,
         )
     else:
         _draw_medium_label(
-            c, content_x, content_y, content_width, content_height,
-            business, product_name, brand, variant_sku, selling_price, size, color, qr_url, show_price
+            c,
+            content_x,
+            content_y,
+            content_width,
+            content_height,
+            business,
+            product_name,
+            brand,
+            variant_sku,
+            selling_price,
+            size,
+            color,
+            qr_url,
+            show_price,
         )
 
 
@@ -218,28 +254,28 @@ def _draw_small_label(c, x, y, width, height, name, sku, price, qr_url, show_pri
     qr_size = min(height * 0.8, width * 0.3)
     qr_x = x + width - qr_size
     qr_y = y + (height - qr_size) / 2
-    
+
     qr_code = qr.QrCodeWidget(qr_url)
     bounds = qr_code.getBounds()
     qr_width = bounds[2] - bounds[0]
     qr_height = bounds[3] - bounds[1]
-    qr_drawing = qr.Drawing(qr_size, qr_size, transform=[qr_size/qr_width, 0, 0, qr_size/qr_height, 0, 0])
+    qr_drawing = qr.Drawing(qr_size, qr_size, transform=[qr_size / qr_width, 0, 0, qr_size / qr_height, 0, 0])
     qr_drawing.add(qr_code)
     renderPDF.draw(qr_drawing, c, qr_x, qr_y)
-    
+
     # Text (left side)
     text_width = width - qr_size - 2 * mm
     text_x = x
-    
+
     # Product name (truncated)
     c.setFont("Helvetica-Bold", 8)
     name_short = name[:20] + "..." if len(name) > 20 else name
     c.drawString(text_x, y + height - 8, name_short)
-    
+
     # SKU
     c.setFont("Helvetica", 6)
     c.drawString(text_x, y + height - 14, f"SKU: {sku}")
-    
+
     # Price (if enabled)
     if show_price:
         c.setFont("Helvetica-Bold", 10)
@@ -252,50 +288,50 @@ def _draw_medium_label(c, x, y, width, height, business, name, brand, sku, price
     qr_size = min(height * 0.7, width * 0.35)
     qr_x = x + width - qr_size
     qr_y = y + (height - qr_size) / 2
-    
+
     qr_code = qr.QrCodeWidget(qr_url)
     bounds = qr_code.getBounds()
     qr_width = bounds[2] - bounds[0]
     qr_height = bounds[3] - bounds[1]
-    qr_drawing = qr.Drawing(qr_size, qr_size, transform=[qr_size/qr_width, 0, 0, qr_size/qr_height, 0, 0])
+    qr_drawing = qr.Drawing(qr_size, qr_size, transform=[qr_size / qr_width, 0, 0, qr_size / qr_height, 0, 0])
     qr_drawing.add(qr_code)
     renderPDF.draw(qr_drawing, c, qr_x, qr_y)
-    
+
     # Text (left side)
     text_width = width - qr_size - 3 * mm
     text_x = x
     cursor_y = y + height - 6
-    
+
     # Business name (small, top)
     c.setFont("Helvetica", 6)
     business_name = business.name[:30]
     c.drawString(text_x, cursor_y, business_name)
     cursor_y -= 8
-    
+
     # Brand (if present)
     if brand:
         c.setFont("Helvetica-Bold", 8)
         c.drawString(text_x, cursor_y, brand[:20])
         cursor_y -= 8
-    
+
     # Product name
     c.setFont("Helvetica-Bold", 9)
     name_short = name[:25] + "..." if len(name) > 25 else name
     c.drawString(text_x, cursor_y, name_short)
     cursor_y -= 8
-    
+
     # Size/Color (if present)
     if size or color:
         c.setFont("Helvetica", 7)
         variant_text = " / ".join(filter(None, [size, color]))
         c.drawString(text_x, cursor_y, variant_text)
         cursor_y -= 7
-    
+
     # SKU
     c.setFont("Helvetica", 6)
     c.drawString(text_x, cursor_y, f"SKU: {sku}")
     cursor_y -= 8
-    
+
     # Price (if enabled)
     if show_price:
         c.setFont("Helvetica-Bold", 11)
@@ -308,50 +344,50 @@ def _draw_large_label(c, x, y, width, height, business, name, brand, sku, price,
     qr_size = min(height * 0.8, width * 0.4)
     qr_x = x + width - qr_size - 2 * mm
     qr_y = y + (height - qr_size) / 2
-    
+
     qr_code = qr.QrCodeWidget(qr_url)
     bounds = qr_code.getBounds()
     qr_width = bounds[2] - bounds[0]
     qr_height = bounds[3] - bounds[1]
-    qr_drawing = qr.Drawing(qr_size, qr_size, transform=[qr_size/qr_width, 0, 0, qr_size/qr_height, 0, 0])
+    qr_drawing = qr.Drawing(qr_size, qr_size, transform=[qr_size / qr_width, 0, 0, qr_size / qr_height, 0, 0])
     qr_drawing.add(qr_code)
     renderPDF.draw(qr_drawing, c, qr_x, qr_y)
-    
+
     # Text (left side, more spacious)
     text_width = width - qr_size - 5 * mm
     text_x = x + 1 * mm
     cursor_y = y + height - 8
-    
+
     # Business name
     c.setFont("Helvetica", 7)
     business_name = business.name[:35]
     c.drawString(text_x, cursor_y, business_name)
     cursor_y -= 10
-    
+
     # Brand (if present)
     if brand:
         c.setFont("Helvetica-Bold", 10)
         c.drawString(text_x, cursor_y, brand[:25])
         cursor_y -= 10
-    
+
     # Product name (larger font)
     c.setFont("Helvetica-Bold", 11)
     name_short = name[:30] + "..." if len(name) > 30 else name
     c.drawString(text_x, cursor_y, name_short)
     cursor_y -= 10
-    
+
     # Size/Color (if present)
     if size or color:
         c.setFont("Helvetica", 8)
         variant_text = " / ".join(filter(None, [size, color]))
         c.drawString(text_x, cursor_y, variant_text)
         cursor_y -= 9
-    
+
     # SKU
     c.setFont("Helvetica", 7)
     c.drawString(text_x, cursor_y, f"SKU: {sku}")
     cursor_y -= 10
-    
+
     # Price (if enabled, prominent)
     if show_price:
         c.setFont("Helvetica-Bold", 14)
@@ -362,6 +398,7 @@ def _draw_large_label(c, x, y, width, height, business, name, brand, sku, price,
 # CONVENIENCE FUNCTIONS
 # ============================================================================
 
+
 def generate_product_labels(
     product,
     quantity: int = 1,
@@ -370,7 +407,7 @@ def generate_product_labels(
 ) -> BytesIO:
     """
     Generate labels for a simple product (no variants).
-    
+
     Returns:
         BytesIO with PDF data
     """
@@ -391,7 +428,7 @@ def generate_variant_labels(
 ) -> BytesIO:
     """
     Generate labels for a product variant.
-    
+
     Returns:
         BytesIO with PDF data
     """
@@ -410,4 +447,3 @@ __all__ = [
     "generate_variant_labels",
     "LabelSize",
 ]
-

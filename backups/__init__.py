@@ -2,5 +2,4 @@
 """
 Backups app - Per-business data export and backup functionality.
 """
-default_app_config = 'backups.apps.BackupsConfig'
-
+default_app_config = "backups.apps.BackupsConfig"

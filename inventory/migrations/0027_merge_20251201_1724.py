@@ -4,7 +4,6 @@ from django.db import migrations
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         ("inventory", "0025a_preflight_drop_dupe_indexes"),
         ("inventory", "0026_remove_inventoryitem_uniq_imei_per_business_and_more"),

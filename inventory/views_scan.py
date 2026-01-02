@@ -14,6 +14,7 @@ from django.contrib.auth.decorators import login_required
 from django.views.generic import TemplateView
 from django.db import transaction, IntegrityError
 
+
 # ---------------------------------------------------------------------
 # Safe dynamic imports (works if your models live in different apps)
 # ---------------------------------------------------------------------
@@ -23,6 +24,7 @@ def _safe_import(*candidates: str):
     This lets us work even if your model is named Product vs CatalogProduct, etc.
     """
     import importlib
+
     for dotted in candidates:
         try:
             app_label, model_name = dotted.split(".", 1)
@@ -36,12 +38,16 @@ def _safe_import(*candidates: str):
 # Try common names from your codebase
 Product = _safe_import("inventory.Product", "inventory.ModelsProduct", "sales.Product", "core.Product")
 Location = _safe_import("inventory.Location", "tenants.Location", "tenants.Store", "tenants.Branch")
-InventoryItem = _safe_import("inventory.InventoryItem",)
+InventoryItem = _safe_import(
+    "inventory.InventoryItem",
+)
+
 
 # Optional tenant/business resolver
 def _get_active_business(request):
     try:
         from tenants.utils import get_active_business  # type: ignore
+
         return get_active_business(request)
     except Exception:
         # Fallback: some codebases attach .business on the request
@@ -113,9 +119,11 @@ def _business_default_location_id(request, locations: list[dict[str, Any]]) -> O
         if biz is None:
             return None
         if _model_has_field(Location, "is_default"):
-            loc = Location.objects.filter(is_default=True).filter(
-                **({ "business": biz } if _model_has_field(Location, "business") else {})
-            ).first()
+            loc = (
+                Location.objects.filter(is_default=True)
+                .filter(**({"business": biz} if _model_has_field(Location, "business") else {}))
+                .first()
+            )
             if loc:
                 return getattr(loc, "id", None)
     except Exception:
@@ -169,12 +177,15 @@ def _pick_default_location(request, locations: list[dict[str, Any]]) -> tuple[Op
 # ---------------------------------------------------------------------
 _IMEI_RX = re.compile(r"^\d{15}$")
 
+
 def _digits(s: str | None) -> str:
     return "".join(ch for ch in (s or "") if ch.isdigit())
+
 
 def _normalize_imei(raw: str | None) -> str:
     d = _digits(raw)
     return d[-15:] if len(d) >= 15 else d  # prefer last 15 for pasted long strings
+
 
 def _json_body(request: HttpRequest) -> dict:
     try:
@@ -320,14 +331,13 @@ class ScanInView(TemplateView):
         biz = _get_active_business(request)
 
         # expose both "default_location" (dict) AND the *_id/*_name fields to satisfy older templates
-        default_location_dict = (
-            {"id": default_loc_id, "name": default_loc_name} if default_loc_id else None
-        )
+        default_location_dict = {"id": default_loc_id, "name": default_loc_name} if default_loc_id else None
 
         # NEW: Get phone brands for Brand → Model filtering (PHONES businesses only)
         phone_brands = []
         try:
             from inventory.phone_catalog_seed import get_brands_for_business
+
             if biz:
                 phone_brands = get_brands_for_business(biz)
         except Exception:
@@ -336,21 +346,21 @@ class ScanInView(TemplateView):
         ctx.update(
             {
                 "post_url": reverse_lazy("inventory:api_scan_in"),
-                "products": products,                   # for Product select (list of dicts)
-                "locations": locations,                 # restricted to active business (list of dicts)
+                "products": products,  # for Product select (list of dicts)
+                "locations": locations,  # restricted to active business (list of dicts)
                 "default_location": default_location_dict,
                 "default_location_id": default_loc_id,  # for data-* attributes
                 "default_location_name": default_loc_name,
                 "active_business_name": getattr(biz, "name", None),
-                "lock_location": True,                  # UI hint: render disabled + hidden mirror input for agents
+                "lock_location": True,  # UI hint: render disabled + hidden mirror input for agents
                 "received_date_default": date.today(),  # default date "today"
-                "phone_brands": phone_brands,           # List of brands for PHONES businesses
+                "phone_brands": phone_brands,  # List of brands for PHONES businesses
                 "phone_brands_api_url": reverse_lazy("inventory:api_phone_brands"),  # Brand API endpoint
                 "phone_models_api_url": reverse_lazy("inventory:api_phone_models"),  # Model API endpoint (filtered)
                 "rules": {
                     "imei_length": 15,
                     "require_product": True,
-                    "order_price_autofill": True,        # template can use this to auto-fill from product
+                    "order_price_autofill": True,  # template can use this to auto-fill from product
                 },
             }
         )
@@ -369,20 +379,18 @@ class ScanSoldView(TemplateView):
         default_loc_id, default_loc_name = _pick_default_location(request, locations)
         biz = _get_active_business(request)
 
-        default_location_dict = (
-            {"id": default_loc_id, "name": default_loc_name} if default_loc_id else None
-        )
+        default_location_dict = {"id": default_loc_id, "name": default_loc_name} if default_loc_id else None
 
         ctx.update(
             {
                 "post_url": reverse_lazy("inventory:api_scan_sold"),
                 "products": products,
-                "locations": locations,                 # dropdown limited to active business
+                "locations": locations,  # dropdown limited to active business
                 "default_location": default_location_dict,
                 "default_location_id": default_loc_id,
                 "default_location_name": default_loc_name,
                 "active_business_name": getattr(biz, "name", None),
-                "lock_location": False,                 # allow managers to change on Sell
+                "lock_location": False,  # allow managers to change on Sell
                 "rules": {
                     "imei_length": 15,
                     "require_product": True,
@@ -422,18 +430,21 @@ def api_scan_in(request: HttpRequest) -> JsonResponse:
     # Check if this IMEI already exists for this business (regardless of status)
     existing_item = InventoryItem._base_manager.filter(business=biz, imei=imei15).first()
     if existing_item:
-        return JsonResponse({
-            "ok": False,
-            "error": "This IMEI already exists in your records. We never stock the same device twice.",
-            "existing_item_id": getattr(existing_item, "id", None),
-            "existing_status": getattr(existing_item, "status", None)
-        }, status=400)
+        return JsonResponse(
+            {
+                "ok": False,
+                "error": "This IMEI already exists in your records. We never stock the same device twice.",
+                "existing_item_id": getattr(existing_item, "id", None),
+                "existing_status": getattr(existing_item, "status", None),
+            },
+            status=400,
+        )
 
     # Resolve product_id (could be from generic Product or PhoneProductCatalog)
     product_id = None
     phone_catalog_id = None
     order_price_value = None
-    
+
     try:
         # Check if phone_catalog_id provided (preferred for phones vertical)
         phone_catalog_id = body.get("phone_catalog_id") or body.get("catalog_product_id")
@@ -442,6 +453,7 @@ def api_scan_in(request: HttpRequest) -> JsonResponse:
             # Fetch PhoneProductCatalog to get default cost price
             try:
                 from inventory.models_phone_products import PhoneProductCatalog
+
                 catalog_product = PhoneProductCatalog.objects.get(id=phone_catalog_id, business=biz)
                 if catalog_product.default_cost_price:
                     order_price_value = catalog_product.default_cost_price
@@ -449,7 +461,7 @@ def api_scan_in(request: HttpRequest) -> JsonResponse:
                 # (phones may not have a Product FK, only catalog reference)
             except Exception:
                 pass  # PhoneProductCatalog not found or import failed; continue
-        
+
         # Fallback: generic product_id
         if not phone_catalog_id:
             pid_raw = body.get("product_id") or body.get("product")
@@ -463,6 +475,7 @@ def api_scan_in(request: HttpRequest) -> JsonResponse:
         order_price_raw = body.get("order_price")
         if order_price_raw not in (None, "", "0"):
             from decimal import Decimal
+
             order_price_value = Decimal(str(order_price_raw))
     except Exception:
         pass  # Keep catalog default or 0
@@ -470,6 +483,7 @@ def api_scan_in(request: HttpRequest) -> JsonResponse:
     # Default to 0 if still None
     if order_price_value is None:
         from decimal import Decimal
+
         order_price_value = Decimal("0.00")
 
     # Gather business-scoped locations and pick default if none provided
@@ -496,11 +510,13 @@ def api_scan_in(request: HttpRequest) -> JsonResponse:
         received_raw = body.get("received_at")
         if received_raw:
             from datetime import datetime
+
             received_at_value = datetime.strptime(received_raw, "%Y-%m-%d").date()
     except Exception:
         pass
     if not received_at_value:
         from datetime import date
+
         received_at_value = date.today()
 
     # ===== CREATE NEW INVENTORY ITEM (no longer idempotent upsert) =====
@@ -517,17 +533,16 @@ def api_scan_in(request: HttpRequest) -> JsonResponse:
                 received_at=received_at_value,
                 sold_at=None,
             )
-            
+
             # Optional: Assign to requesting agent if checkbox checked
             if body.get("assigned_to_me") and not request.user.is_staff:
                 item.assigned_agent = request.user
                 item.save(update_fields=["assigned_agent"])
-            
+
     except Exception as e:
-        return JsonResponse({
-            "ok": False,
-            "error": f"Failed to create inventory item: {e.__class__.__name__}: {e}"
-        }, status=500)
+        return JsonResponse(
+            {"ok": False, "error": f"Failed to create inventory item: {e.__class__.__name__}: {e}"}, status=500
+        )
 
     payload = {
         "ok": True,
@@ -552,7 +567,7 @@ def api_phone_brands(request: HttpRequest) -> JsonResponse:
     """
     API endpoint to get available phone brands for the active business.
     Returns brands from PhoneProductCatalog.
-    
+
     Returns:
         JSON: {"brands": ["TECNO", "ITEL", "SAMSUNG", ...]}
     """
@@ -561,11 +576,11 @@ def api_phone_brands(request: HttpRequest) -> JsonResponse:
         from inventory.phone_catalog_seed import get_brands_for_business
     except ImportError:
         return JsonResponse({"error": "PhoneProductCatalog not available"}, status=500)
-    
+
     biz = _get_active_business(request)
     if not getattr(biz, "id", None):
         return JsonResponse({"error": "No active business selected"}, status=400)
-    
+
     try:
         brands = get_brands_for_business(biz)
         return JsonResponse({"brands": brands})
@@ -582,10 +597,10 @@ def api_phone_cost_by_imei(request: HttpRequest) -> JsonResponse:
     """
     API endpoint: Get cost price for a phone by IMEI.
     Used by pricing intelligence to provide real-time validation.
-    
+
     Query params:
         imei: 15-digit IMEI
-    
+
     Returns:
         {
             "ok": true,
@@ -597,33 +612,33 @@ def api_phone_cost_by_imei(request: HttpRequest) -> JsonResponse:
     business = get_active_business(request)
     if not business:
         return JsonResponse({"ok": False, "error": "No active business"}, status=400)
-    
+
     imei = request.GET.get("imei", "").strip()
     if not imei or len(imei) != 15:
         return JsonResponse({"ok": False, "error": "Invalid IMEI (must be 15 digits)"}, status=400)
-    
+
     try:
         from inventory.models import InventoryItem
-        
-        item = InventoryItem.objects.filter(
-            business=business,
-            imei=imei,
-            is_active=True
-        ).select_related('product').first()
-        
+
+        item = (
+            InventoryItem.objects.filter(business=business, imei=imei, is_active=True).select_related("product").first()
+        )
+
         if not item:
             return JsonResponse({"ok": False, "error": "IMEI not found in inventory"}, status=404)
-        
+
         cost_price = item.order_price or (item.product.cost_price if item.product else Decimal("0.00"))
         product_name = item.product.name if item.product else "Unknown Phone"
-        
-        return JsonResponse({
-            "ok": True,
-            "imei": imei,
-            "cost_price": float(cost_price),
-            "product_name": product_name,
-        })
-    
+
+        return JsonResponse(
+            {
+                "ok": True,
+                "imei": imei,
+                "cost_price": float(cost_price),
+                "product_name": product_name,
+            }
+        )
+
     except Exception as e:
         return JsonResponse({"ok": False, "error": str(e)}, status=500)
 
@@ -631,10 +646,10 @@ def api_phone_cost_by_imei(request: HttpRequest) -> JsonResponse:
 def api_phone_models(request: HttpRequest) -> JsonResponse:
     """
     API endpoint to get phone models for a specific brand.
-    
+
     Query params:
         brand: Brand name (e.g., "TECNO", "ITEL", "SAMSUNG")
-    
+
     Returns:
         JSON: {
             "models": [
@@ -657,25 +672,25 @@ def api_phone_models(request: HttpRequest) -> JsonResponse:
         from inventory.phone_catalog_seed import get_models_for_brand
     except ImportError:
         return JsonResponse({"error": "PhoneProductCatalog not available"}, status=500)
-    
+
     biz = _get_active_business(request)
     if not getattr(biz, "id", None):
         return JsonResponse({"error": "No active business selected"}, status=400)
-    
+
     brand = request.GET.get("brand", "").strip()
     if not brand:
         return JsonResponse({"error": "Brand parameter required"}, status=400)
-    
+
     try:
         models = get_models_for_brand(biz, brand)
-        
+
         # Convert Decimal to string for JSON serialization
         for model in models:
             if model.get("default_cost_price"):
                 model["default_cost_price"] = str(model["default_cost_price"])
             if model.get("default_selling_price"):
                 model["default_selling_price"] = str(model["default_selling_price"])
-        
+
         return JsonResponse({"models": models})
     except Exception as e:
         return JsonResponse({"error": f"Failed to fetch models: {e}"}, status=500)

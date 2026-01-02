@@ -43,28 +43,28 @@ class PharmacySimpleFlowsTest(TestCase):
     def setUp(self):
         """Set up test fixtures"""
         import uuid
-        
+
         # Generate unique identifiers
         unique_id1 = uuid.uuid4().hex[:8]
         unique_id2 = uuid.uuid4().hex[:8]
-        
+
         # Create business
         self.business = Business.objects.create(
             name=f"Test Pharmacy {unique_id1}",
             slug=f"test-pharmacy-{unique_id1}",
             business_kind=BusinessKind.PHARMACY,
         )
-        
+
         # Create second business for isolation tests
         self.business2 = Business.objects.create(
             name=f"Other Pharmacy {unique_id2}",
             slug=f"other-pharmacy-{unique_id2}",
             business_kind=BusinessKind.PHARMACY,
         )
-        
+
         # Get or create default location for business
         self.location = Location.ensure_default_for_business(self.business)
-        
+
         # Create user
         self.user = User.objects.create_user(
             username="pharmacist",
@@ -89,10 +89,10 @@ class TestNoBarcodeFlows(PharmacySimpleFlowsTest):
             selling_price=Decimal("20.00"),
             barcode=None,  # NO BARCODE
         )
-        
+
         self.assertTrue(result["ok"])
         self.assertIn("Stocked in", result["message"])
-        
+
         # Verify product created without barcode
         product = MerchProduct.objects.get(pk=result["product_id"])
         self.assertEqual(product.barcode, "")
@@ -112,9 +112,9 @@ class TestNoBarcodeFlows(PharmacySimpleFlowsTest):
             selling_price=Decimal("30.00"),
             barcode=None,  # NO BARCODE
         )
-        
+
         batch_id = stock_result["batch_id"]
-        
+
         # Sell by batch_id (no barcode needed)
         sell_result = sell_pharmacy(
             business=self.business,
@@ -123,10 +123,10 @@ class TestNoBarcodeFlows(PharmacySimpleFlowsTest):
             quantity=10,
             unit="tablet",
         )
-        
+
         self.assertTrue(sell_result["ok"])
         self.assertIn("Sold", sell_result["message"])
-        
+
         # Verify stock decremented
         batch = PharmacyBatch.objects.get(pk=batch_id)
         self.assertEqual(batch.quantity, 40)
@@ -145,9 +145,9 @@ class TestNoBarcodeFlows(PharmacySimpleFlowsTest):
             selling_price=Decimal("40.00"),
             barcode=None,  # NO BARCODE
         )
-        
+
         product_id = stock_result["product_id"]
-        
+
         # Sell by product_id (no barcode needed)
         sell_result = sell_pharmacy(
             business=self.business,
@@ -156,9 +156,9 @@ class TestNoBarcodeFlows(PharmacySimpleFlowsTest):
             quantity=20,
             unit="tablet",
         )
-        
+
         self.assertTrue(sell_result["ok"])
-        
+
         # Verify stock decremented
         product = MerchProduct.objects.get(pk=product_id)
         self.assertEqual(product.quantity_in_stock, 80)
@@ -180,10 +180,10 @@ class TestPackagingConversion(PharmacySimpleFlowsTest):
             selling_price=Decimal("150.00"),  # per strip
             strip_size=10,  # 10 tablets per strip
         )
-        
+
         self.assertTrue(result["ok"])
         self.assertEqual(result["qty_base_units"], 50)  # 5 strips * 10 tablets
-        
+
         # Verify product stock
         product = MerchProduct.objects.get(pk=result["product_id"])
         self.assertEqual(product.quantity_in_stock, 50)
@@ -203,10 +203,10 @@ class TestPackagingConversion(PharmacySimpleFlowsTest):
             strip_size=10,  # 10 tablets per strip
             box_size=10,  # 10 strips per box
         )
-        
+
         self.assertTrue(result["ok"])
         self.assertEqual(result["qty_base_units"], 200)  # 2 boxes * 10 strips * 10 tablets
-        
+
         # Verify product stock
         product = MerchProduct.objects.get(pk=result["product_id"])
         self.assertEqual(product.quantity_in_stock, 200)
@@ -225,9 +225,9 @@ class TestPackagingConversion(PharmacySimpleFlowsTest):
             selling_price=Decimal("20.00"),
             strip_size=10,
         )
-        
+
         batch_id = stock_result["batch_id"]
-        
+
         # Sell 3 strips
         sell_result = sell_pharmacy(
             business=self.business,
@@ -236,9 +236,9 @@ class TestPackagingConversion(PharmacySimpleFlowsTest):
             quantity=3,
             unit="strip",
         )
-        
+
         self.assertTrue(sell_result["ok"])
-        
+
         # Verify stock decremented by 30 tablets (3 strips * 10)
         batch = PharmacyBatch.objects.get(pk=batch_id)
         self.assertEqual(batch.quantity, 70)
@@ -257,10 +257,10 @@ class TestPackagingConversion(PharmacySimpleFlowsTest):
             selling_price=Decimal("100.00"),
             # NO strip_size or box_size
         )
-        
+
         self.assertTrue(result["ok"])
         self.assertEqual(result["qty_base_units"], 20)
-        
+
         # Verify product has no packaging
         product = MerchProduct.objects.get(pk=result["product_id"])
         self.assertIsNone(product.strip_size)
@@ -283,9 +283,9 @@ class TestMultiTenantIsolation(PharmacySimpleFlowsTest):
             cost_price=Decimal("10.00"),
             selling_price=Decimal("20.00"),
         )
-        
+
         batch_id = stock_result["batch_id"]
-        
+
         # Business 2 tries to sell from Business 1's batch
         with self.assertRaises(ValidationError) as cm:
             sell_pharmacy(
@@ -295,7 +295,7 @@ class TestMultiTenantIsolation(PharmacySimpleFlowsTest):
                 quantity=10,
                 unit="tablet",
             )
-        
+
         self.assertIn("not found", str(cm.exception).lower())
 
     def test_cannot_see_other_business_products(self):
@@ -311,9 +311,9 @@ class TestMultiTenantIsolation(PharmacySimpleFlowsTest):
             cost_price=Decimal("20.00"),
             selling_price=Decimal("40.00"),
         )
-        
+
         product_id = stock_result["product_id"]
-        
+
         # Business 2 tries to sell Business 1's product
         with self.assertRaises(OutOfStockError):
             sell_pharmacy(
@@ -337,7 +337,7 @@ class TestMultiTenantIsolation(PharmacySimpleFlowsTest):
             cost_price=Decimal("15.00"),
             selling_price=Decimal("30.00"),
         )
-        
+
         # Business 2 stocks in same product name (different product)
         stock_in_pharmacy(
             business=self.business2,
@@ -349,11 +349,11 @@ class TestMultiTenantIsolation(PharmacySimpleFlowsTest):
             cost_price=Decimal("15.00"),
             selling_price=Decimal("30.00"),
         )
-        
+
         # Verify separate products and stock
         biz1_products = MerchProduct.objects.filter(business=self.business)
         biz2_products = MerchProduct.objects.filter(business=self.business2)
-        
+
         self.assertEqual(biz1_products.count(), 1)
         self.assertEqual(biz2_products.count(), 1)
         self.assertEqual(biz1_products.first().quantity_in_stock, 100)
@@ -376,9 +376,9 @@ class TestConcurrencySafety(PharmacySimpleFlowsTest):
             cost_price=Decimal("10.00"),
             selling_price=Decimal("20.00"),
         )
-        
+
         batch_id = stock_result["batch_id"]
-        
+
         # First sale succeeds
         sell_result1 = sell_pharmacy(
             business=self.business,
@@ -388,7 +388,7 @@ class TestConcurrencySafety(PharmacySimpleFlowsTest):
             unit="tablet",
         )
         self.assertTrue(sell_result1["ok"])
-        
+
         # Second sale for remaining stock succeeds
         sell_result2 = sell_pharmacy(
             business=self.business,
@@ -398,12 +398,12 @@ class TestConcurrencySafety(PharmacySimpleFlowsTest):
             unit="tablet",
         )
         self.assertTrue(sell_result2["ok"])
-        
+
         # Verify batch is depleted and archived
         batch = PharmacyBatch.objects.get(pk=batch_id)
         self.assertEqual(batch.quantity, 0)
         self.assertTrue(batch.is_archived)
-        
+
         # Third sale should fail (batch archived, no stock)
         # Use product_id to trigger FIFO (which will find no available batches)
         product_id = stock_result["product_id"]
@@ -429,9 +429,9 @@ class TestConcurrencySafety(PharmacySimpleFlowsTest):
             cost_price=Decimal("20.00"),
             selling_price=Decimal("40.00"),
         )
-        
+
         batch_id = stock_result["batch_id"]
-        
+
         # Sell 60 tablets
         sell_pharmacy(
             business=self.business,
@@ -440,7 +440,7 @@ class TestConcurrencySafety(PharmacySimpleFlowsTest):
             quantity=60,
             unit="tablet",
         )
-        
+
         # Try to sell 50 more (should fail - only 40 left)
         with self.assertRaises(OutOfStockError) as cm:
             sell_pharmacy(
@@ -450,9 +450,9 @@ class TestConcurrencySafety(PharmacySimpleFlowsTest):
                 quantity=50,
                 unit="tablet",
             )
-        
+
         self.assertIn("Insufficient stock", str(cm.exception))
-        
+
         # Verify stock not decremented
         batch = PharmacyBatch.objects.get(pk=batch_id)
         self.assertEqual(batch.quantity, 40)
@@ -474,9 +474,9 @@ class TestExpiryOptional(PharmacySimpleFlowsTest):
             selling_price=Decimal("50.00"),
             expiry_date=None,  # NO EXPIRY
         )
-        
+
         self.assertTrue(result["ok"])
-        
+
         # Verify batch created without expiry
         batch = PharmacyBatch.objects.get(pk=result["batch_id"])
         self.assertIsNone(batch.expiry_date)
@@ -495,9 +495,9 @@ class TestExpiryOptional(PharmacySimpleFlowsTest):
             selling_price=Decimal("70.00"),
             expiry_date=None,  # NO EXPIRY
         )
-        
+
         batch_id = stock_result["batch_id"]
-        
+
         # Sell must succeed
         sell_result = sell_pharmacy(
             business=self.business,
@@ -506,7 +506,7 @@ class TestExpiryOptional(PharmacySimpleFlowsTest):
             quantity=10,
             unit="piece",
         )
-        
+
         self.assertTrue(sell_result["ok"])
 
 
@@ -516,7 +516,7 @@ class TestFIFO(PharmacySimpleFlowsTest):
     def test_fifo_sells_from_earliest_expiry_first(self):
         """FIFO: Sells from earliest expiring batch first"""
         from datetime import date, timedelta
-        
+
         # Stock in batch 1 (expires in 60 days)
         stock1 = stock_in_pharmacy(
             business=self.business,
@@ -530,7 +530,7 @@ class TestFIFO(PharmacySimpleFlowsTest):
             batch_number="BATCH001",
             expiry_date=date.today() + timedelta(days=60),
         )
-        
+
         # Stock in batch 2 (expires in 30 days - earlier!)
         stock2 = stock_in_pharmacy(
             business=self.business,
@@ -544,7 +544,7 @@ class TestFIFO(PharmacySimpleFlowsTest):
             batch_number="BATCH002",
             expiry_date=date.today() + timedelta(days=30),
         )
-        
+
         # Sell by product_id (should use FIFO - batch 2 first)
         sell_result = sell_pharmacy(
             business=self.business,
@@ -553,13 +553,13 @@ class TestFIFO(PharmacySimpleFlowsTest):
             quantity=20,
             unit="tablet",
         )
-        
+
         self.assertTrue(sell_result["ok"])
-        
+
         # Verify batch 2 was decremented (earlier expiry)
         batch2 = PharmacyBatch.objects.get(pk=stock2["batch_id"])
         self.assertEqual(batch2.quantity, 30)
-        
+
         # Verify batch 1 unchanged
         batch1 = PharmacyBatch.objects.get(pk=stock1["batch_id"])
         self.assertEqual(batch1.quantity, 50)
@@ -582,4 +582,3 @@ class TestVerticalGating(PharmacySimpleFlowsTest):
                 cost_price=Decimal("500.00"),
                 selling_price=Decimal("800.00"),
             )
-

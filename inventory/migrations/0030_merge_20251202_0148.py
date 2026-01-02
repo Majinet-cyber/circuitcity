@@ -4,11 +4,9 @@ from django.db import migrations
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
-        ('inventory', '0002_inventoryaudit'),
-        ('inventory', '0029_verticals_models'),
+        ("inventory", "0002_inventoryaudit"),
+        ("inventory", "0029_verticals_models"),
     ]
 
-    operations = [
-    ]
+    operations = []

@@ -31,6 +31,7 @@ except ImportError:
 # Check if contracts module is available
 try:
     from hq import views_contracts
+
     CONTRACTS_ENABLED = True
 except ImportError:
     CONTRACTS_ENABLED = False
@@ -46,113 +47,121 @@ def business_directory(request: HttpRequest) -> HttpResponse:
     # ===================================================================
     total_businesses = Business.objects.count()
     active_businesses = Business.objects.filter(status="ACTIVE").count()
-    
+
     subs = Subscription.objects.select_related("business")
     trial_count = subs.filter(status="trial").count()
     active_subs = subs.filter(status="active").count()
     suspended_count = subs.filter(status="canceled").count()
     expired_count = subs.filter(status="expired").count()
-    
+
     # Expiring soon (within 7 days)
     soon = timezone.now() + timedelta(days=7)
     expiring_soon = subs.filter(
-        status__in=["trial", "active"],
-        current_period_end__lte=soon,
-        current_period_end__gt=timezone.now()
+        status__in=["trial", "active"], current_period_end__lte=soon, current_period_end__gt=timezone.now()
     ).count()
-    
+
     # ===================================================================
     # Alerts
     # ===================================================================
     alerts = []
-    
+
     # Failed payments (last 7 days)
     week_ago = timezone.now() - timedelta(days=7)
-    failed_invoices = Invoice.objects.filter(
-        status__in=["FAILED", "DECLINED"],
-        created_at__gte=week_ago
-    ).values("business__name").distinct().count()
-    
+    failed_invoices = (
+        Invoice.objects.filter(status__in=["FAILED", "DECLINED"], created_at__gte=week_ago)
+        .values("business__name")
+        .distinct()
+        .count()
+    )
+
     if failed_invoices > 0:
-        alerts.append({
-            "type": "danger",
-            "icon": "💳",
-            "title": "Failed Payments",
-            "message": f"{failed_invoices} businesses with failed payment attempts in the last 7 days",
-            "count": failed_invoices
-        })
-    
+        alerts.append(
+            {
+                "type": "danger",
+                "icon": "💳",
+                "title": "Failed Payments",
+                "message": f"{failed_invoices} businesses with failed payment attempts in the last 7 days",
+                "count": failed_invoices,
+            }
+        )
+
     # Expiring soon
     if expiring_soon > 0:
-        alerts.append({
-            "type": "warning",
-            "icon": "⏰",
-            "title": "Expiring Soon",
-            "message": f"{expiring_soon} subscriptions expiring within 7 days",
-            "count": expiring_soon
-        })
-    
+        alerts.append(
+            {
+                "type": "warning",
+                "icon": "⏰",
+                "title": "Expiring Soon",
+                "message": f"{expiring_soon} subscriptions expiring within 7 days",
+                "count": expiring_soon,
+            }
+        )
+
     # Suspended businesses
     if suspended_count > 0:
-        alerts.append({
-            "type": "info",
-            "icon": "🚫",
-            "title": "Suspended",
-            "message": f"{suspended_count} businesses currently suspended",
-            "count": suspended_count
-        })
-    
+        alerts.append(
+            {
+                "type": "info",
+                "icon": "🚫",
+                "title": "Suspended",
+                "message": f"{suspended_count} businesses currently suspended",
+                "count": suspended_count,
+            }
+        )
+
     # Open support tickets (if model exists)
     if SupportTicket:
         open_tickets = SupportTicket.objects.filter(status__in=["open", "in_progress"]).count()
         if open_tickets > 0:
-            alerts.append({
-                "type": "info",
-                "icon": "🎫",
-                "title": "Open Tickets",
-                "message": f"{open_tickets} support tickets require attention",
-                "count": open_tickets
-            })
-    
+            alerts.append(
+                {
+                    "type": "info",
+                    "icon": "🎫",
+                    "title": "Open Tickets",
+                    "message": f"{open_tickets} support tickets require attention",
+                    "count": open_tickets,
+                }
+            )
+
     # ===================================================================
     # Business List with Filters & Search
     # ===================================================================
     businesses = Business.objects.select_related().prefetch_related("subscription")
-    
+
     # Search
     search_query = request.GET.get("q", "").strip()
     if search_query:
         businesses = businesses.filter(
-            Q(name__icontains=search_query) |
-            Q(slug__icontains=search_query) |
-            Q(created_by__email__icontains=search_query) |
-            Q(created_by__first_name__icontains=search_query) |
-            Q(created_by__last_name__icontains=search_query)
+            Q(name__icontains=search_query)
+            | Q(slug__icontains=search_query)
+            | Q(created_by__email__icontains=search_query)
+            | Q(created_by__first_name__icontains=search_query)
+            | Q(created_by__last_name__icontains=search_query)
         )
-    
+
     # Status filter
     status_filter = request.GET.get("status", "").upper()
     if status_filter in ["ACTIVE", "PENDING", "SUSPENDED"]:
         businesses = businesses.filter(status=status_filter)
-    
+
     # Subscription status filter
     sub_status_filter = request.GET.get("sub_status", "")
     if sub_status_filter:
         businesses = businesses.filter(subscription__status=sub_status_filter)
-    
+
     # Vertical filter
     vertical_filter = request.GET.get("vertical", "")
     if vertical_filter:
         businesses = businesses.filter(business_kind=vertical_filter)
-    
+
     # Expiring filter
     if request.GET.get("expiring") == "true":
         businesses = businesses.filter(
             subscription__status__in=["trial", "active"],
             subscription__current_period_end__lte=soon,
-            subscription__current_period_end__gt=timezone.now()
+            subscription__current_period_end__gt=timezone.now(),
         )
-    
+
     # Sort
     sort_by = request.GET.get("sort", "-created_at")
     valid_sorts = ["name", "-name", "created_at", "-created_at"]
@@ -160,12 +169,12 @@ def business_directory(request: HttpRequest) -> HttpResponse:
         businesses = businesses.order_by(sort_by)
     else:
         businesses = businesses.order_by("-created_at")
-    
+
     # Pagination
     paginator = Paginator(businesses, 25)
     page_number = request.GET.get("page", 1)
     page_obj = paginator.get_page(page_number)
-    
+
     # Enrich with subscription state - normalize to prevent template errors
     def normalize_sub_state(d):
         """Ensure all expected keys exist with safe defaults."""
@@ -184,7 +193,7 @@ def business_directory(request: HttpRequest) -> HttpResponse:
             "trial_ends_at": d.get("trial_ends_at") or None,
             "period_ends_at": d.get("period_ends_at") or None,
         }
-    
+
     for biz in page_obj:
         try:
             sub = biz.subscription
@@ -192,52 +201,41 @@ def business_directory(request: HttpRequest) -> HttpResponse:
         except Exception:
             # Ensure all keys are present for template safety
             biz.sub_state = normalize_sub_state({})
-    
+
     # ===================================================================
     # Chart Data Generation
     # ===================================================================
-    
+
     # Active businesses trend (last 30 days)
     thirty_days_ago = timezone.now() - timedelta(days=30)
-    active_trend = Business.objects.filter(
-        status="ACTIVE",
-        created_at__gte=thirty_days_ago
-    ).annotate(
-        date=TruncDate("created_at")
-    ).values("date").annotate(
-        count=Count("id")
-    ).order_by("date")
-    
+    active_trend = (
+        Business.objects.filter(status="ACTIVE", created_at__gte=thirty_days_ago)
+        .annotate(date=TruncDate("created_at"))
+        .values("date")
+        .annotate(count=Count("id"))
+        .order_by("date")
+    )
+
     trend_labels = []
     trend_data = []
     for item in active_trend:
         trend_labels.append(item["date"].strftime("%b %d"))
         trend_data.append(item["count"])
-    
+
     # Businesses by vertical
-    vertical_counts = Business.objects.values("business_kind").annotate(
-        count=Count("id")
-    ).order_by("-count")
-    
+    vertical_counts = Business.objects.values("business_kind").annotate(count=Count("id")).order_by("-count")
+
     businesses_by_vertical = {}
     for item in vertical_counts:
         vertical = item["business_kind"] or "General"
         businesses_by_vertical[vertical.replace("_", " ").title()] = item["count"]
-    
+
     # Days remaining distribution
     now = timezone.now()
-    all_subs = Subscription.objects.filter(
-        status__in=["trial", "active"]
-    ).select_related("business")
-    
-    days_distribution = {
-        "0-7": 0,
-        "8-30": 0,
-        "31-90": 0,
-        "91-180": 0,
-        "181+": 0
-    }
-    
+    all_subs = Subscription.objects.filter(status__in=["trial", "active"]).select_related("business")
+
+    days_distribution = {"0-7": 0, "8-30": 0, "31-90": 0, "91-180": 0, "181+": 0}
+
     for sub in all_subs:
         if sub.current_period_end:
             days_left = (sub.current_period_end - now).days
@@ -253,35 +251,32 @@ def business_directory(request: HttpRequest) -> HttpResponse:
                 days_distribution["91-180"] += 1
             else:
                 days_distribution["181+"] += 1
-    
+
     # Calculate support health score
     open_tickets_count = 0
     if SupportTicket:
         open_tickets_count = SupportTicket.objects.filter(status__in=["open", "in_progress"]).count()
-    
+
     # Simple weighted formula (higher is better)
     support_health_score = 100
     support_health_score -= min(open_tickets_count * 5, 30)  # Up to -30 for tickets
     support_health_score -= min(expiring_soon * 2, 20)  # Up to -20 for expiring
     support_health_score -= min(failed_invoices * 3, 20)  # Up to -20 for failed payments
     support_health_score = max(0, support_health_score)  # Floor at 0
-    
+
     # Chart data bundle
     chart_data = {
-        "active_businesses_trend": {
-            "labels": trend_labels or ["No data"],
-            "data": trend_data or [0]
-        },
+        "active_businesses_trend": {"labels": trend_labels or ["No data"], "data": trend_data or [0]},
         "businesses_by_vertical": businesses_by_vertical,
         "days_remaining_distribution": days_distribution,
         "subscription_status_distribution": {
             "Active": active_subs,
             "Trial": trial_count,
             "Suspended": suspended_count,
-            "Expired": expired_count
-        }
+            "Expired": expired_count,
+        },
     }
-    
+
     # ===================================================================
     # Context
     # ===================================================================
@@ -304,15 +299,15 @@ def business_directory(request: HttpRequest) -> HttpResponse:
         "sort_by": sort_by,
         "page_obj": page_obj,
         # Use real BusinessKind choices from database (no hardcoded fake verticals)
-        "verticals": [
-            (choice[0], choice[1]) for choice in Business._meta.get_field('business_kind').choices
-        ] if hasattr(Business._meta.get_field('business_kind'), 'choices') else [],
+        "verticals": [(choice[0], choice[1]) for choice in Business._meta.get_field("business_kind").choices]
+        if hasattr(Business._meta.get_field("business_kind"), "choices")
+        else [],
         "chart_data": json.dumps(chart_data),
         "support_health_score": support_health_score,
         "failed_payments_count": failed_invoices,
         "contracts_enabled": CONTRACTS_ENABLED,
     }
-    
+
     return render(request, "hq/business_directory.html", context)
 
 
@@ -326,15 +321,15 @@ def business_search_api(request: HttpRequest) -> JsonResponse:
     query = request.GET.get("q", "").strip()
     if len(query) < 2:
         return JsonResponse({"results": []})
-    
+
     businesses = Business.objects.filter(
-        Q(name__icontains=query) |
-        Q(slug__icontains=query) |
-        Q(created_by__email__icontains=query) |
-        Q(created_by__first_name__icontains=query) |
-        Q(created_by__last_name__icontains=query)
+        Q(name__icontains=query)
+        | Q(slug__icontains=query)
+        | Q(created_by__email__icontains=query)
+        | Q(created_by__first_name__icontains=query)
+        | Q(created_by__last_name__icontains=query)
     ).select_related("created_by", "subscription")[:10]
-    
+
     results = []
     for biz in businesses:
         try:
@@ -344,19 +339,21 @@ def business_search_api(request: HttpRequest) -> JsonResponse:
         except Exception:
             sub_status = "No Subscription"
             sub_color = "#6b7280"
-        
-        results.append({
-            "id": biz.id,
-            "name": biz.name,
-            "slug": biz.slug,
-            "status": biz.status,
-            "vertical": biz.business_kind or "general",
-            "owner_email": biz.created_by.email if biz.created_by else "",
-            "sub_status": sub_status,
-            "sub_color": sub_color,
-            "url": f"/hq/businesses/{biz.id}/"
-        })
-    
+
+        results.append(
+            {
+                "id": biz.id,
+                "name": biz.name,
+                "slug": biz.slug,
+                "status": biz.status,
+                "vertical": biz.business_kind or "general",
+                "owner_email": biz.created_by.email if biz.created_by else "",
+                "sub_status": sub_status,
+                "sub_color": sub_color,
+                "url": f"/hq/businesses/{biz.id}/",
+            }
+        )
+
     return JsonResponse({"results": results})
 
 
@@ -382,51 +379,40 @@ def quick_action(request: HttpRequest, business_id: int) -> HttpResponse:
     """
     business = get_object_or_404(Business, id=business_id)
     action = request.POST.get("action", "")
-    
+
     if action == "extend_30":
         try:
             from billing.models_extensions import extend_subscription_days
+
             sub = business.subscription
-            extend_subscription_days(
-                sub,
-                days=30,
-                reason="Quick extend from directory (HQ)",
-                actor=request.user
-            )
+            extend_subscription_days(sub, days=30, reason="Quick extend from directory (HQ)", actor=request.user)
             messages.success(request, f"Extended {business.name} by 30 days")
         except Exception as e:
             messages.error(request, f"Failed to extend: {e}")
-    
+
     elif action == "suspend":
         try:
             from billing.models_extensions import suspend_subscription
+
             sub = business.subscription
-            suspend_subscription(
-                sub,
-                reason="Quick suspend from directory (HQ)",
-                actor=request.user
-            )
+            suspend_subscription(sub, reason="Quick suspend from directory (HQ)", actor=request.user)
             messages.success(request, f"Suspended {business.name}")
         except Exception as e:
             messages.error(request, f"Failed to suspend: {e}")
-    
+
     elif action == "activate":
         try:
             from billing.models_extensions import activate_subscription
+
             sub = business.subscription
-            activate_subscription(
-                sub,
-                days=30,
-                reason="Quick activate from directory (HQ)",
-                actor=request.user
-            )
+            activate_subscription(sub, days=30, reason="Quick activate from directory (HQ)", actor=request.user)
             messages.success(request, f"Activated {business.name} for 30 days")
         except Exception as e:
             messages.error(request, f"Failed to activate: {e}")
-    
+
     else:
         messages.error(request, "Unknown action")
-    
+
     return redirect("hq:business_directory")
 
 
@@ -439,6 +425,7 @@ def business_detail(request: HttpRequest, pk: int) -> HttpResponse:
     # Import and call the command center view directly to avoid redirect
     try:
         from hq.views_business_detail import business_command_center
+
         return business_command_center(request, business_id=pk)
     except ImportError:
         # Fallback: show basic business info if command center not available
@@ -449,7 +436,7 @@ def business_detail(request: HttpRequest, pk: int) -> HttpResponse:
         except Exception:
             subscription = None
             sub_state = {"status": "none", "is_active": False}
-        
+
         context = {
             "business": business,
             "subscription": subscription,

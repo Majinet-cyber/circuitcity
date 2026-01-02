@@ -16,14 +16,10 @@ def add_payment_method_column(apps, schema_editor):
 
         field = models.CharField(
             max_length=20,
-            choices=[
-                ('cash', 'Cash'),
-                ('bank', 'Bank'),
-                ('mobile_money', 'Mobile Money')
-            ],
-            default='cash',
+            choices=[("cash", "Cash"), ("bank", "Bank"), ("mobile_money", "Mobile Money")],
+            default="cash",
             db_index=True,
-            help_text='Payment method used for this membership payment'
+            help_text="Payment method used for this membership payment",
         )
         field.set_attributes_from_name("payment_method")
         schema_editor.add_field(GymPayment, field)
@@ -36,7 +32,7 @@ def add_payment_method_column(apps, schema_editor):
         ADD COLUMN IF NOT EXISTS payment_method varchar(20) NOT NULL DEFAULT 'cash';
         """
     )
-    
+
     # Create index if it doesn't exist
     schema_editor.execute(
         """
@@ -47,27 +43,22 @@ def add_payment_method_column(apps, schema_editor):
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
-        ('inventory', '0040_seed_default_phone_products'),
+        ("inventory", "0040_seed_default_phone_products"),
     ]
 
     operations = [
         migrations.SeparateDatabaseAndState(
             state_operations=[
                 migrations.AddField(
-                    model_name='gympayment',
-                    name='payment_method',
+                    model_name="gympayment",
+                    name="payment_method",
                     field=models.CharField(
-                        choices=[
-                            ('cash', 'Cash'),
-                            ('bank', 'Bank'),
-                            ('mobile_money', 'Mobile Money')
-                        ],
-                        default='cash',
+                        choices=[("cash", "Cash"), ("bank", "Bank"), ("mobile_money", "Mobile Money")],
+                        default="cash",
                         max_length=20,
                         db_index=True,
-                        help_text='Payment method used for this membership payment'
+                        help_text="Payment method used for this membership payment",
                     ),
                 ),
             ],
@@ -76,4 +67,3 @@ class Migration(migrations.Migration):
             ],
         ),
     ]
-

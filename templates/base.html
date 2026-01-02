@@ -1,14 +1,14 @@
 {% load static %}
 <!doctype html>
-<html lang="en" data-theme="blue">
+<html lang="en" data-theme="light">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1, user-scalable=no">
   <meta name="format-detection" content="telephone=no">
   <title>{% block title %}Emajinet{% endblock %}</title>
   <meta name="description" content="{% block meta_description %}A digital record and AI driven MBA manager for every ledger and common person{% endblock %}">
-  <meta name="color-scheme" content="light dark" />
-  <meta name="theme-color" content="#0b1220" />
+  <meta name="color-scheme" content="light" />
+  <meta name="theme-color" content="#f5f8ff" />
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   
@@ -45,9 +45,10 @@
 
   <script>
     (function () {
+      // PHASE 1: Enforce light theme globally (no dark mode for now)
+      document.documentElement.setAttribute("data-theme", "light");
       try {
-        const saved = localStorage.getItem("cc-theme");
-        if (saved) document.documentElement.setAttribute("data-theme", saved);
+        localStorage.setItem("cc-theme", "light");
       } catch (_) {}
       
       // Base.html loaded
@@ -106,13 +107,13 @@
       --elevate: cubic-bezier(.2,.8,.2,1);
       --fast: 140ms;
 
-      /* Midnight Glass Sidebar */
-      --mid-bg:#0f172a;
-      --mid-ink:#cbd5e1;
-      --mid-ink-dim:#94a3b8;
-      --mid-sep: rgba(148,163,184,.15);
-      --mid-active: rgba(255,255,255,.08);
-      --mid-hover: rgba(255,255,255,.06);
+      /* Light Glass Sidebar (consistent with app) */
+      --mid-bg:#ffffff;
+      --mid-ink:#0f172a;
+      --mid-ink-dim:#64748b;
+      --mid-sep: rgba(148,163,184,.20);
+      --mid-active: rgba(37,99,235,.12);
+      --mid-hover: rgba(37,99,235,.06);
 
       /* Mobile dock */
       --safe-bottom: max(env(safe-area-inset-bottom), 0px);
@@ -149,25 +150,25 @@
       position:sticky; top:0; width:var(--sidebar-w); flex:0 0 var(--sidebar-w);
       height:100dvh; overflow:auto; z-index:2000; padding:16px;
       display:flex; flex-direction:column; gap:14px;
-      color: var(--mid-ink); color-scheme: dark;
+      color: var(--mid-ink); color-scheme: light;
       background:
-        radial-gradient(1200px 800px at -10% -10%, rgba(34,211,238,.08), transparent 40%),
-        radial-gradient(1000px 600px at 110% 110%, rgba(16,185,129,.06), transparent 45%),
+        radial-gradient(1200px 800px at -10% -10%, rgba(37,99,235,.05), transparent 40%),
+        radial-gradient(1000px 600px at 110% 110%, rgba(16,185,129,.04), transparent 45%),
         var(--mid-bg);
       border-right: 1px solid var(--mid-sep);
       -webkit-backdrop-filter: blur(14px) saturate(120%);
       backdrop-filter: blur(14px) saturate(120%);
-      box-shadow: inset 0 1px 0 rgba(255,255,255,.04);
+      box-shadow: 0 4px 16px rgba(15,23,42,.06), inset 0 1px 0 rgba(255,255,255,.6);
     }
     .navlist{ list-style:none; padding:0; margin:0; display:flex; flex-direction:column; gap:8px; }
     .navlink{
       display:flex; align-items:center; gap:.6rem;
-      padding:.58rem .72rem; border-radius:12px; font-weight:700; min-height:44px;
+      padding:.58rem .72rem; border-radius:12px; font-weight:600; min-height:44px;
       color: var(--mid-ink); background: transparent; border:1px solid transparent;
       transition:transform var(--fast) var(--elevate), box-shadow var(--fast) var(--elevate), background var(--fast) var(--elevate), border-color var(--fast) var(--elevate);
     }
-    .navlink:hover{ background: var(--mid-hover); border-color: rgba(34,211,238,.28); }
-    .navlink.active{ background: var(--mid-active); border-color: rgba(34,211,238,.35); color:#eaf2ff; }
+    .navlink:hover{ background: var(--mid-hover); border-color: rgba(37,99,235,.20); }
+    .navlink.active{ background: var(--mid-active); border-color: rgba(37,99,235,.30); color:#1e40af; font-weight:700; }
 
     .cc-main{ flex:1 1 auto; min-width:0; position:relative; z-index:0; background:var(--bg); color:var(--ink); }
     .cc-page{ max-width:1200px; margin:0 auto; padding:18px; }
@@ -197,11 +198,11 @@
         width: var(--nav-drawer-w) !important;
         max-width: 75vw !important;
 
-        /* Solid black, no transparency on mobile */
-        background: #0f1115 !important;
-        border-right: 1px solid #1f2937 !important;
-        -webkit-backdrop-filter: none !important;
-        backdrop-filter: none !important;
+        /* Light solid background on mobile for consistency */
+        background: rgba(255,255,255,0.98) !important;
+        border-right: 1px solid rgba(148,163,184,.3) !important;
+        -webkit-backdrop-filter: blur(8px) !important;
+        backdrop-filter: blur(8px) !important;
         
         /* Ensure it's scrollable if content overflows */
         overflow-y: auto;

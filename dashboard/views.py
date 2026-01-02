@@ -8,9 +8,7 @@ from importlib import import_module
 from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.contrib.auth.decorators import login_required, user_passes_test
-from django.db.models import (
-    Sum, F, DecimalField, CharField, ExpressionWrapper, Count, Case, When, QuerySet, Q, Value
-)
+from django.db.models import Sum, F, DecimalField, CharField, ExpressionWrapper, Count, Case, When, QuerySet, Q, Value
 from django.db.models.functions import TruncMonth
 from django.http import JsonResponse, HttpResponseRedirect
 from django.shortcuts import render, get_object_or_404, redirect
@@ -33,9 +31,10 @@ try:
         get_gamification_message,
         get_current_milestone,
         get_next_milestone,
-        check_and_award_milestones
+        check_and_award_milestones,
     )
     from hq.utils_dates import get_period_from_request
+
     GAMIFICATION_AVAILABLE = True
 except ImportError:
     GAMIFICATION_AVAILABLE = False
@@ -47,6 +46,7 @@ from inventory.queries import business_metrics, inventory_qs_for_user, inventory
 # Date range parsing for dashboard filters
 try:
     from inventory.verticals.base import parse_date_range_from_request
+
     DATE_FILTER_AVAILABLE = True
 except ImportError:
     DATE_FILTER_AVAILABLE = False
@@ -71,6 +71,7 @@ except Exception:
 try:
     from accounts.decorators import otp_required  # type: ignore
 except Exception:  # pragma: no cover
+
     def otp_required(view_func):
         return view_func
 
@@ -89,19 +90,20 @@ def _namespace_exists(namespace: str) -> bool:
     """
     try:
         from django.urls import get_resolver
+
         resolver = get_resolver()
         # Check namespace_dict if available
-        if hasattr(resolver, 'namespace_dict') and namespace in resolver.namespace_dict:
+        if hasattr(resolver, "namespace_dict") and namespace in resolver.namespace_dict:
             return True
         # Fallback: try to reverse a likely common pattern
         try:
-            reverse(f'{namespace}:home')
+            reverse(f"{namespace}:home")
             return True
         except NoReverseMatch:
             pass
         # Try index as fallback
         try:
-            reverse(f'{namespace}:index')
+            reverse(f"{namespace}:index")
             return True
         except NoReverseMatch:
             pass
@@ -383,7 +385,7 @@ def home(request):
     # ===== DATE FILTER PARAMS =====
     # Parse date range from request (default to MTD like clothing)
     date_range_ctx = {}
-    active_range = 'mtd'
+    active_range = "mtd"
     filter_start_date = None
     filter_end_date = None
     selected_date = None
@@ -392,11 +394,11 @@ def home(request):
     if DATE_FILTER_AVAILABLE:
         try:
             date_range_ctx = parse_date_range_from_request(request)
-            active_range = date_range_ctx.get('active_range', 'mtd')
-            filter_start_date = date_range_ctx.get('start_date')
-            filter_end_date = date_range_ctx.get('end_date')
-            selected_date = date_range_ctx.get('selected_date')
-            date_param = date_range_ctx.get('date_param')
+            active_range = date_range_ctx.get("active_range", "mtd")
+            filter_start_date = date_range_ctx.get("start_date")
+            filter_end_date = date_range_ctx.get("end_date")
+            selected_date = date_range_ctx.get("selected_date")
+            date_param = date_range_ctx.get("date_param")
         except Exception:
             # Fallback to MTD if parsing fails
             pass
@@ -413,7 +415,7 @@ def home(request):
     # IMPORTANT: sales scoped even if Sale lacks 'business' (handled in _scope_queryset)
     sales_qs = _scope_queryset(Sale.objects.select_related("item"), biz)
     sales_count = sales_qs.count()
-    first_run = (products_count == 0 and stock_count == 0 and sales_count == 0)
+    first_run = products_count == 0 and stock_count == 0 and sales_count == 0
 
     # Simple per-tenant KPIs (safe)
     tz = timezone.get_current_timezone()
@@ -440,10 +442,7 @@ def home(request):
     except Exception:
         kpis = {}
     if not kpis or (kpis.get("orders") in (0, None) and kpis.get("revenue") in (0, None)):
-        sold_items = (
-            _scope_queryset(InventoryItem.objects.all(), biz)
-            .filter(SOLD_Q())
-        )
+        sold_items = _scope_queryset(InventoryItem.objects.all(), biz).filter(SOLD_Q())
         period_qs = sold_items.filter(sold_at__gte=period_start, sold_at__lt=period_end)
         revenue = _inv_revenue_sum(period_qs)
         kpis = {"orders": period_qs.count(), "revenue": revenue, "scope": f"{biz.name}"}
@@ -467,7 +466,11 @@ def home(request):
     # Import helpers
     try:
         from dashboard.helpers_greetings import get_personalized_greeting
-        from dashboard.helpers_yesterday import get_yesterday_summary, should_show_yesterday_summary, mark_yesterday_summary_shown
+        from dashboard.helpers_yesterday import (
+            get_yesterday_summary,
+            should_show_yesterday_summary,
+            mark_yesterday_summary_shown,
+        )
         from dashboard.helpers_payments import get_payment_mix_for_dashboard
         from dashboard.helpers_quotes import get_todays_quotes
 
@@ -476,7 +479,7 @@ def home(request):
 
         # Brand header context
         brand_logo_url = None
-        if hasattr(biz, 'logo') and biz.logo:
+        if hasattr(biz, "logo") and biz.logo:
             brand_logo_url = biz.logo.url
 
         # Yesterday summary (show once per day)
@@ -519,8 +522,8 @@ def home(request):
         is_manager = (
             request.user.is_staff
             or request.user.is_superuser
-            or getattr(request.user, 'is_manager', False)
-            or getattr(getattr(request.user, 'profile', None), 'is_manager', False)
+            or getattr(request.user, "is_manager", False)
+            or getattr(getattr(request.user, "profile", None), "is_manager", False)
         )
 
     # Sales for the filtered period (respects date range selector)
@@ -532,7 +535,7 @@ def home(request):
 
     # For display purposes, map to "today" or "month" variables based on active range
     # This maintains backwards compatibility with templates
-    if active_range == 'today':
+    if active_range == "today":
         today_sales_count = period_sales_count
         today_sales_amount = period_sales_amount
         month_sales_count = period_sales_count
@@ -547,6 +550,7 @@ def home(request):
     # Locations and agents count
     try:
         from inventory.models import Location
+
         locations_count = Location.objects.filter(business=biz).count()
     except Exception:
         locations_count = 0
@@ -555,6 +559,7 @@ def home(request):
     try:
         # Count users who have agent_profile for this business
         from inventory.models import AgentProfile
+
         agents_count = AgentProfile.objects.filter(location__business=biz).count()
     except Exception:
         agents_count = 0
@@ -566,40 +571,41 @@ def home(request):
     if is_manager:
         try:
             from inventory.models import Location
+
             locations = Location.objects.filter(business=biz)
             for loc in locations:
-                loc_stock = _scope_queryset(InventoryItem.objects.all(), biz).filter(
-                    current_location=loc, status='IN_STOCK'
-                ).count()
+                loc_stock = (
+                    _scope_queryset(InventoryItem.objects.all(), biz)
+                    .filter(current_location=loc, status="IN_STOCK")
+                    .count()
+                )
                 loc_sales = _scope_queryset(InventoryItem.objects.all(), biz).filter(
-                    SOLD_Q(),
-                    current_location=loc,
-                    sold_at__gte=period_start, sold_at__lt=period_end
+                    SOLD_Q(), current_location=loc, sold_at__gte=period_start, sold_at__lt=period_end
                 )
                 loc_amount = _inv_revenue_sum(loc_sales)
 
-                location_performance.append({
-                    'name': loc.name,
-                    'stock_count': loc_stock,
-                    'sales_amount': loc_amount,
-                    'trend': 'up',  # TODO: Compare with last period
-                })
+                location_performance.append(
+                    {
+                        "name": loc.name,
+                        "stock_count": loc_stock,
+                        "sales_amount": loc_amount,
+                        "trend": "up",  # TODO: Compare with last period
+                    }
+                )
         except Exception:
             pass
 
         # Agent leaderboard (using new service with filtered period)
         try:
             from tenants.services.leaderboard import get_agent_leaderboard
+
             agent_leaderboard = get_agent_leaderboard(
-                business=biz,
-                start=period_start.date(),
-                end=period_end.date(),
-                limit=10
+                business=biz, start=period_start.date(), end=period_end.date(), limit=10
             )
             # Convert to match template expectations
             for agent in agent_leaderboard:
-                agent['amount'] = agent['total_sales_amount']
-                agent['units'] = agent['devices_sold']
+                agent["amount"] = agent["total_sales_amount"]
+                agent["units"] = agent["devices_sold"]
         except Exception as e:
             pass
 
@@ -616,9 +622,7 @@ def home(request):
         try:
             # Agent's own sales for the filtered period
             agent_period_sales = _scope_queryset(InventoryItem.objects.all(), biz).filter(
-                SOLD_Q(),
-                assigned_agent=request.user,
-                sold_at__gte=period_start, sold_at__lt=period_end
+                SOLD_Q(), assigned_agent=request.user, sold_at__gte=period_start, sold_at__lt=period_end
             )
             agent_period_count = agent_period_sales.count()
             agent_period_amount = _inv_revenue_sum(agent_period_sales)
@@ -631,17 +635,15 @@ def home(request):
 
             # Calculate rank using new service with filtered period
             from tenants.services.leaderboard import get_current_agent_rank
+
             rank_data = get_current_agent_rank(
-                business=biz,
-                user=request.user,
-                start=period_start.date(),
-                end=period_end.date()
+                business=biz, user=request.user, start=period_start.date(), end=period_end.date()
             )
-            agent_rank = rank_data.get('rank')
-            agent_gap = rank_data.get('gap_formatted')
+            agent_rank = rank_data.get("rank")
+            agent_gap = rank_data.get("gap_formatted")
 
             # Commission (simplified - assuming 5% of sales)
-            agent_commission = agent_month_amount * Decimal('0.05')
+            agent_commission = agent_month_amount * Decimal("0.05")
         except Exception:
             pass
 
@@ -652,12 +654,10 @@ def home(request):
     show_payslip_banner = False
     try:
         from notifications.models import Notification
+
         ten_days_ago = timezone.now() - timedelta(days=10)
         show_payslip_banner = Notification.objects.filter(
-            user=request.user,
-            category='payslip_reminder',
-            read_at__isnull=True,
-            created_at__gte=ten_days_ago
+            user=request.user, category="payslip_reminder", read_at__isnull=True, created_at__gte=ten_days_ago
         ).exists()
     except Exception:
         pass
@@ -673,20 +673,15 @@ def home(request):
             from wallet.utils import compute_revenue_costs_profit
 
             # Compute costs and profit for the selected period
-            period_start_date = period_start.date() if hasattr(period_start, 'date') else period_start
-            period_end_date = period_end.date() if hasattr(period_end, 'date') else period_end
+            period_start_date = period_start.date() if hasattr(period_start, "date") else period_start
+            period_end_date = period_end.date() if hasattr(period_end, "date") else period_end
 
-            metrics = compute_revenue_costs_profit(
-                biz,
-                period_sales_amount,
-                period_start_date,
-                period_end_date
-            )
+            metrics = compute_revenue_costs_profit(biz, period_sales_amount, period_start_date, period_end_date)
 
-            total_costs_period = metrics.get('costs', Decimal("0.00"))
-            net_profit = metrics.get('profit', period_sales_amount)
-            profit_margin = metrics.get('profit_margin', Decimal("100.00"))
-            costs_breakdown = metrics.get('costs_breakdown', {})
+            total_costs_period = metrics.get("costs", Decimal("0.00"))
+            net_profit = metrics.get("profit", period_sales_amount)
+            profit_margin = metrics.get("profit_margin", Decimal("100.00"))
+            costs_breakdown = metrics.get("costs_breakdown", {})
         except Exception:
             # Gracefully degrade if wallet app not available
             pass
@@ -740,16 +735,18 @@ def home(request):
     if is_manager:
         try:
             from dashboard.helpers_costs_commissions import get_month_to_date_costs_commissions
+
             costs_commissions_panel = get_month_to_date_costs_commissions(biz)
-            ctx['costs_commissions_panel'] = costs_commissions_panel
+            ctx["costs_commissions_panel"] = costs_commissions_panel
         except Exception:
             # Gracefully degrade if helper not available
             pass
 
     ctx.setdefault("latest_notifications", [])
-    
+
     # Inject dashboard enhancements and normalize context
     from core.dashboard_context import normalize_dashboard_context
+
     ctx = normalize_dashboard_context(request, ctx)
 
     return render(request, "dashboard/home.html", ctx)
@@ -803,19 +800,19 @@ def admin_dashboard(request):
         sold_items = stock_qs.filter(SOLD_Q())
         mtd_qs = sold_items.filter(sold_at__gte=month_start, sold_at__lt=month_end)
         revenue = _inv_revenue_sum(mtd_qs)
-        kpis = {"orders": mtd_qs.count(), "revenue": revenue,
-                "scope": (biz.name if (scope == "tenant" and biz) else "All businesses")}
+        kpis = {
+            "orders": mtd_qs.count(),
+            "revenue": revenue,
+            "scope": (biz.name if (scope == "tenant" and biz) else "All businesses"),
+        }
     else:
-        kpis["scope"] = (biz.name if (scope == "tenant" and biz) else "All businesses")
+        kpis["scope"] = biz.name if (scope == "tenant" and biz) else "All businesses"
 
     # In stock (canonical)
     in_stock_total = inv_kpis["count_instock"]
 
     # Sold (MTD) (canonical via InventoryItem)
-    sold_mtd_count = (
-        stock_qs.filter(SOLD_Q(), sold_at__gte=month_start, sold_at__lt=month_end)
-        .count()
-    )
+    sold_mtd_count = stock_qs.filter(SOLD_Q(), sold_at__gte=month_start, sold_at__lt=month_end).count()
 
     # Monthly profit (fallback to InventoryItem if Sale is empty)
     profit_expr = ExpressionWrapper(
@@ -825,9 +822,7 @@ def admin_dashboard(request):
     month_sales_qs = sales_qs.filter(sold_at__gte=month_start, sold_at__lt=month_end)
     monthly_profit = month_sales_qs.aggregate(p=Sum(profit_expr))["p"] or 0
     if monthly_profit == 0:
-        monthly_profit = _inv_profit_sum(
-            stock_qs.filter(SOLD_Q(), sold_at__gte=month_start, sold_at__lt=month_end)
-        )
+        monthly_profit = _inv_profit_sum(stock_qs.filter(SOLD_Q(), sold_at__gte=month_start, sold_at__lt=month_end))
 
     # Global/tenant stock battery (simple heuristic)
     battery_max = 100
@@ -845,9 +840,11 @@ def admin_dashboard(request):
     if scope == "tenant" and biz is not None:
         agent_ids = set(month_sales_qs.values_list("agent_id", flat=True))
         try:
-            assigned_ids = set(_scope_queryset(InventoryItem.objects.all(), biz)
-                               .exclude(assigned_agent__isnull=True)
-                               .values_list("assigned_agent_id", flat=True))
+            assigned_ids = set(
+                _scope_queryset(InventoryItem.objects.all(), biz)
+                .exclude(assigned_agent__isnull=True)
+                .values_list("assigned_agent_id", flat=True)
+            )
             agent_ids |= assigned_ids
         except Exception:
             pass
@@ -866,15 +863,17 @@ def admin_dashboard(request):
         a_mtd_count = a_mtd_qs.count()
         photo_url = getattr(getattr(a, "agent_profile", None), "photo_url", None)
         detail_url = _reverse_agent_detail(a.id)
-        agent_cards.append({
-            "id": a.id,
-            "name": a.get_username(),
-            "initials": _initials(a),
-            "photo_url": photo_url,
-            "mtd_amount": a_mtd_amount,
-            "mtd_count": a_mtd_count,
-            "url": detail_url,
-        })
+        agent_cards.append(
+            {
+                "id": a.id,
+                "name": a.get_username(),
+                "initials": _initials(a),
+                "photo_url": photo_url,
+                "mtd_amount": a_mtd_amount,
+                "mtd_count": a_mtd_count,
+                "url": detail_url,
+            }
+        )
 
     # ===== NEW: Personalized dashboard enhancements for staff =====
     try:
@@ -887,7 +886,7 @@ def admin_dashboard(request):
 
         # Brand header context
         brand_logo_url = None
-        if biz and hasattr(biz, 'logo') and biz.logo:
+        if biz and hasattr(biz, "logo") and biz.logo:
             brand_logo_url = biz.logo.url
 
         # Payment mix (business-wide, last 30 days)
@@ -915,8 +914,13 @@ def admin_dashboard(request):
         "in_stock_total": in_stock_total,
         "sold_mtd_count": sold_mtd_count,
         "monthly_profit": monthly_profit,
-        "battery": {"count": battery_count, "max": battery_max, "pct": battery_pct,
-                    "label": battery_label, "color": battery_color},
+        "battery": {
+            "count": battery_count,
+            "max": battery_max,
+            "pct": battery_pct,
+            "label": battery_label,
+            "color": battery_color,
+        },
         "agents": agent_cards,
         "staff_view": True,
         "scope": scope,
@@ -943,10 +947,7 @@ def agent_dashboard(request):
     except Exception:
         kpis = {}
     if not kpis:
-        sold_items = (
-            _scope_queryset(InventoryItem.objects.all(), biz)
-            .filter(SOLD_Q(), assigned_agent=request.user)
-        )
+        sold_items = _scope_queryset(InventoryItem.objects.all(), biz).filter(SOLD_Q(), assigned_agent=request.user)
         revenue = _inv_revenue_sum(sold_items)
         kpis = {"orders": sold_items.count(), "revenue": revenue, "scope": "My sales"}
     else:
@@ -976,7 +977,7 @@ def agent_dashboard(request):
             get_agent_rank_for_user,
             get_gamification_message,
             get_current_milestone,
-            get_next_milestone
+            get_next_milestone,
         )
         from hq.utils_dates import get_month_range
         from django.utils import timezone
@@ -988,11 +989,7 @@ def agent_dashboard(request):
 
             # Get agent's ranking
             rank = get_agent_rank_for_user(
-                user_id=request.user.id,
-                business=biz,
-                location=None,
-                start_date=month_start,
-                end_date=month_end
+                user_id=request.user.id, business=biz, location=None, start_date=month_start, end_date=month_end
             )
 
             if rank:
@@ -1031,13 +1028,18 @@ def agent_dashboard(request):
                     }
     except Exception as e:
         import logging
+
         log = logging.getLogger(__name__)
         log.exception("Failed to calculate agent ranking/milestones: %s", e)
 
     # ===== NEW: Personalized dashboard enhancements for agents =====
     try:
         from dashboard.helpers_greetings import get_personalized_greeting
-        from dashboard.helpers_yesterday import get_yesterday_summary, should_show_yesterday_summary, mark_yesterday_summary_shown
+        from dashboard.helpers_yesterday import (
+            get_yesterday_summary,
+            should_show_yesterday_summary,
+            mark_yesterday_summary_shown,
+        )
         from dashboard.helpers_payments import get_payment_mix_for_dashboard
         from dashboard.helpers_quotes import get_todays_quotes
 
@@ -1046,7 +1048,7 @@ def agent_dashboard(request):
 
         # Brand header context
         brand_logo_url = None
-        if biz and hasattr(biz, 'logo') and biz.logo:
+        if biz and hasattr(biz, "logo") and biz.logo:
             brand_logo_url = biz.logo.url
 
         # Yesterday summary (agent-scoped would be future enhancement)
@@ -1105,10 +1107,7 @@ def agent_detail(request, pk: int):
     except Exception:
         kpis = {}
     if not kpis:
-        sold_items = (
-            _scope_queryset(InventoryItem.objects.all(), biz)
-            .filter(SOLD_Q(), assigned_agent=agent)
-        )
+        sold_items = _scope_queryset(InventoryItem.objects.all(), biz).filter(SOLD_Q(), assigned_agent=agent)
         revenue = _inv_revenue_sum(sold_items)
         kpis = {"orders": sold_items.count(), "revenue": revenue, "scope": f"{agent.get_username()}'s sales"}
     else:
@@ -1190,25 +1189,31 @@ def profit_data(request):
     if group_by == "model":
         start = anchor
         end = _first_of_next_month(anchor)
-        qs = (base.filter(sold_at__date__gte=start, sold_at__date__lt=end)
-                  .values("item__product__brand", "item__product__model")
-                  .annotate(v=Sum(profit_expr))
-                  .order_by("-v"))[:20]
+        qs = (
+            base.filter(sold_at__date__gte=start, sold_at__date__lt=end)
+            .values("item__product__brand", "item__product__model")
+            .annotate(v=Sum(profit_expr))
+            .order_by("-v")
+        )[:20]
+
         def _label(r):
             brand = (r.get("item__product__brand") or "").strip()
             model = (r.get("item__product__model") or "").strip()
             s = f"{brand} {model}".strip()
             return s or "Unknown model"
+
         labels = [_label(r) for r in qs]
         data = [float(r["v"] or 0) for r in qs]
     else:
         end = _first_of_next_month(anchor)
-        start = (anchor.replace(day=1) - timedelta(days=365))
-        qs = (base.filter(sold_at__date__gte=start, sold_at__date__lt=end)
-                  .annotate(m=TruncMonth("sold_at"))
-                  .values("m")
-                  .annotate(v=Sum(profit_expr))
-                  .order_by("m"))
+        start = anchor.replace(day=1) - timedelta(days=365)
+        qs = (
+            base.filter(sold_at__date__gte=start, sold_at__date__lt=end)
+            .annotate(m=TruncMonth("sold_at"))
+            .values("m")
+            .annotate(v=Sum(profit_expr))
+            .order_by("m")
+        )
 
         def add_month(y, m, delta):
             total = y * 12 + (m - 1) + delta
@@ -1244,7 +1249,7 @@ def agent_trend_data(request):
     else:
         base = base.filter(agent=request.user)
 
-    start = (timezone.localdate().replace(day=1) - timedelta(days=31 * (months - 1)))
+    start = timezone.localdate().replace(day=1) - timedelta(days=31 * (months - 1))
     base = base.filter(sold_at__date__gte=start)
 
     if metric == "profit":
@@ -1252,15 +1257,9 @@ def agent_trend_data(request):
             F("price") - F("item__order_price"),
             output_field=DecimalField(max_digits=14, decimal_places=2),
         )
-        qs = (base.annotate(m=TruncMonth("sold_at"))
-                  .values("m")
-                  .annotate(v=Sum(value))
-                  .order_by("m"))
+        qs = base.annotate(m=TruncMonth("sold_at")).values("m").annotate(v=Sum(value)).order_by("m")
     else:
-        qs = (base.annotate(m=TruncMonth("sold_at"))
-                  .values("m")
-                  .annotate(v=Count("id"))
-                  .order_by("m"))
+        qs = base.annotate(m=TruncMonth("sold_at")).values("m").annotate(v=Count("id")).order_by("m")
 
     rows = list(qs)
     labels = [r["m"].strftime("%b %Y") for r in rows]
@@ -1272,8 +1271,9 @@ def agent_trend_data(request):
 # Append-only proxies (unchanged)
 # =========================
 
+
 def _inventory_dashboard_url() -> str:
-    candidates = ("inventory:inventory_dashboard","inventory_dashboard","inventory:dashboard","inventory:home")
+    candidates = ("inventory:inventory_dashboard", "inventory_dashboard", "inventory:dashboard", "inventory:home")
     for name in candidates:
         try:
             return reverse(name)
@@ -1334,29 +1334,27 @@ def v2_sales_trend_data_proxy(request):
         start_date = _start_of_day(today - timedelta(days=days - 1), tz)
 
         # Query sold items using InventoryItem (same as KPIs)
-        sold_items = (
-            _scope_queryset(InventoryItem.objects.all(), business)
-            .filter(SOLD_Q(), sold_at__gte=start_date, sold_at__lt=end_date)
+        sold_items = _scope_queryset(InventoryItem.objects.all(), business).filter(
+            SOLD_Q(), sold_at__gte=start_date, sold_at__lt=end_date
         )
 
         # Group by date
         from django.db.models.functions import TruncDate
+
         daily_sales = (
-            sold_items
-            .annotate(sale_date=TruncDate('sold_at'))
-            .values('sale_date')
+            sold_items.annotate(sale_date=TruncDate("sold_at"))
+            .values("sale_date")
             .annotate(
-                qty=Count('id'),
-                amount=Sum(F(_inv_price_field() or 'selling_price'), output_field=DecimalField(max_digits=14, decimal_places=2))
+                qty=Count("id"),
+                amount=Sum(
+                    F(_inv_price_field() or "selling_price"), output_field=DecimalField(max_digits=14, decimal_places=2)
+                ),
             )
-            .order_by('sale_date')
+            .order_by("sale_date")
         )
 
         # Build dict for quick lookup
-        sales_by_date = {
-            item['sale_date'].isoformat(): item
-            for item in daily_sales
-        }
+        sales_by_date = {item["sale_date"].isoformat(): item for item in daily_sales}
 
         # Fill all dates in range (including zeros)
         labels = []
@@ -1372,9 +1370,9 @@ def v2_sales_trend_data_proxy(request):
             if date_str in sales_by_date:
                 row = sales_by_date[date_str]
                 if metric in ("count", "qty"):
-                    values.append(int(row['qty'] or 0))
+                    values.append(int(row["qty"] or 0))
                 else:  # amount
-                    values.append(float(row['amount'] or 0))
+                    values.append(float(row["amount"] or 0))
             else:
                 values.append(0)
 
@@ -1384,6 +1382,7 @@ def v2_sales_trend_data_proxy(request):
 
     except Exception as e:
         import logging
+
         logging.exception("Error in v2_sales_trend_data_proxy")
         return JsonResponse({"labels": [], "values": []})
 
@@ -1419,42 +1418,39 @@ def v2_top_models_data_proxy(request):
         start_date = _start_of_day(today - timedelta(days=days - 1), tz)
 
         # Query sold items by product/model
-        sold_items = (
-            _scope_queryset(InventoryItem.objects.select_related('product'), business)
-            .filter(SOLD_Q(), sold_at__gte=start_date, sold_at__lt=end_date)
+        sold_items = _scope_queryset(InventoryItem.objects.select_related("product"), business).filter(
+            SOLD_Q(), sold_at__gte=start_date, sold_at__lt=end_date
         )
 
         # Group by product name
         from django.db.models.functions import Coalesce
+
         top_models = (
-            sold_items
-            .annotate(
-                model_name=Coalesce(
-                    F('product__name'),
-                    F('product__model'),
-                    Value('Unknown'),
-                    output_field=CharField()
-                )
+            sold_items.annotate(
+                model_name=Coalesce(F("product__name"), F("product__model"), Value("Unknown"), output_field=CharField())
             )
-            .values('model_name')
+            .values("model_name")
             .annotate(
-                qty=Count('id'),
-                amount=Sum(F(_inv_price_field() or 'selling_price'), output_field=DecimalField(max_digits=14, decimal_places=2))
+                qty=Count("id"),
+                amount=Sum(
+                    F(_inv_price_field() or "selling_price"), output_field=DecimalField(max_digits=14, decimal_places=2)
+                ),
             )
-            .order_by('-qty')[:5]  # Top 5
+            .order_by("-qty")[:5]  # Top 5
         )
 
         labels = []
         values = []
 
         for item in top_models:
-            labels.append(str(item['model_name'] or 'Unknown'))
-            values.append(int(item['qty'] or 0))
+            labels.append(str(item["model_name"] or "Unknown"))
+            values.append(int(item["qty"] or 0))
 
         return JsonResponse({"labels": labels, "values": values})
 
     except Exception as e:
         import logging
+
         logging.exception("Error in v2_top_models_data_proxy")
         return JsonResponse({"labels": [], "values": []})
 
@@ -1487,14 +1483,16 @@ def v2_cash_overview_proxy(request):
         return _call_inventory_view("api_cash_overview", request)
     except Exception:
         today = timezone.localdate()
-        return JsonResponse({
-            "ok": True,
-            "orders": 0,
-            "revenue": 0.0,
-            "paid_out": 0.0,
-            "expenses": 0.0,
-            "period_label": today.replace(day=1).strftime("%b %Y"),
-        })
+        return JsonResponse(
+            {
+                "ok": True,
+                "orders": 0,
+                "revenue": 0.0,
+                "paid_out": 0.0,
+                "expenses": 0.0,
+                "period_label": today.replace(day=1).strftime("%b %Y"),
+            }
+        )
 
 
 @never_cache
@@ -1515,12 +1513,17 @@ def v2_recommendations_proxy(request):
         pass
 
     today = timezone.localdate()
-    return JsonResponse({
-        "ok": True,
-        "overall": [{"date": (today + timedelta(days=i)).isoformat(),"predicted_units": 0,"predicted_revenue": 0.0} for i in range(1, 8)],
-        "risky": [],
-        "message": "recommendations stub",
-    })
+    return JsonResponse(
+        {
+            "ok": True,
+            "overall": [
+                {"date": (today + timedelta(days=i)).isoformat(), "predicted_units": 0, "predicted_revenue": 0.0}
+                for i in range(1, 8)
+            ],
+            "risky": [],
+            "message": "recommendations stub",
+        }
+    )
 
 
 @never_cache
@@ -1535,15 +1538,14 @@ def api_recommendations(request):
 
     try:
         my_in_stock = (
-            _scope_queryset(InventoryItem.objects.all(), biz)
-            .filter(assigned_agent=u)
-            .filter(IN_STOCK_Q())
-            .count()
+            _scope_queryset(InventoryItem.objects.all(), biz).filter(assigned_agent=u).filter(IN_STOCK_Q()).count()
         )
         if my_in_stock < 10:
-            items.append({"message": f"Your stock is low ({my_in_stock}/20). Request replenishment.","confidence": 0.90})
+            items.append(
+                {"message": f"Your stock is low ({my_in_stock}/20). Request replenishment.", "confidence": 0.90}
+            )
         elif my_in_stock < 12:
-            items.append({"message": f"Consider topping up: you have {my_in_stock}/20 units.","confidence": 0.65})
+            items.append({"message": f"Consider topping up: you have {my_in_stock}/20 units.", "confidence": 0.65})
     except Exception:
         pass
 
@@ -1562,7 +1564,12 @@ def api_recommendations(request):
         if stale_qs is not None:
             stale_count = stale_qs.count()
             if stale_count:
-                items.append({"message": f"{stale_count} items haven’t moved in 14+ days — consider promos/rotation.","confidence": 0.75})
+                items.append(
+                    {
+                        "message": f"{stale_count} items haven’t moved in 14+ days — consider promos/rotation.",
+                        "confidence": 0.75,
+                    }
+                )
     except Exception:
         pass
 
@@ -1570,38 +1577,44 @@ def api_recommendations(request):
         label_key = None
         top = []
         try:
-            top = (_scope_queryset(Sale.objects.all(), biz)
-                   .filter(sold_at__gte=last_30)
-                   .values("item__product__model")
-                   .annotate(n=Count("id"))
-                   .order_by("-n")[:3])
+            top = (
+                _scope_queryset(Sale.objects.all(), biz)
+                .filter(sold_at__gte=last_30)
+                .values("item__product__model")
+                .annotate(n=Count("id"))
+                .order_by("-n")[:3]
+            )
             label_key = "item__product__model"
         except Exception:
             pass
         if not top:
             try:
-                top = (_scope_queryset(Sale.objects.all(), biz)
-                       .filter(sold_at__gte=last_30)
-                       .values("item__model")
-                       .annotate(n=Count("id"))
-                       .order_by("-n")[:3])
+                top = (
+                    _scope_queryset(Sale.objects.all(), biz)
+                    .filter(sold_at__gte=last_30)
+                    .values("item__model")
+                    .annotate(n=Count("id"))
+                    .order_by("-n")[:3]
+                )
                 label_key = "item__model"
             except Exception:
                 pass
         if not top:
             try:
-                top = (_scope_queryset(Sale.objects.all(), biz)
-                       .filter(sold_at__gte=last_30)
-                       .values("model")
-                       .annotate(n=Count("id"))
-                       .order_by("-n")[:3])
+                top = (
+                    _scope_queryset(Sale.objects.all(), biz)
+                    .filter(sold_at__gte=last_30)
+                    .values("model")
+                    .annotate(n=Count("id"))
+                    .order_by("-n")[:3]
+                )
                 label_key = "model"
             except Exception:
                 pass
 
         for t in top:
-            label = (t.get(label_key) or "Popular model")
-            items.append({"message": f"Push {label}: {t['n']} sold in the last 30 days.","confidence": 0.60})
+            label = t.get(label_key) or "Popular model"
+            items.append({"message": f"Push {label}: {t['n']} sold in the last 30 days.", "confidence": 0.60})
     except Exception:
         pass
 
@@ -1612,11 +1625,14 @@ def api_recommendations(request):
 @require_GET
 def dashboard_healthz_proxy(request):
     return JsonResponse({"ok": True, "time": timezone.now().isoformat()})
+
+
 # ============================================================
 # SAFE DASHBOARD HOME ALIAS
 # ============================================================
 from django.contrib.auth.decorators import login_required
 from django.shortcuts import redirect
+
 
 @login_required
 def home(request):

@@ -18,11 +18,11 @@ def legacy_scan_in_shim(request):
     Legacy scan_in page - redirect to canonical scan-in URL.
     Old URL: /inventory/scan-in/ (using old template)
     New URL: /inventory/scan-in/ (using new gamified template)
-    
+
     This shim ensures if someone cached the old URL, they get the new flow.
     """
     # Redirect to the canonical scan-in page (now uses phones gamified scan)
-    return HttpResponsePermanentRedirect(reverse('inventory:scan_in'))
+    return HttpResponsePermanentRedirect(reverse("inventory:scan_in"))
 
 
 @never_cache
@@ -34,10 +34,10 @@ def legacy_scan_sold_shim(request):
     """
     # Redirect to new gamified phone sale wizard
     try:
-        return HttpResponsePermanentRedirect(reverse('inventory:phone_sale_wizard'))
+        return HttpResponsePermanentRedirect(reverse("inventory:phone_sale_wizard"))
     except:
         # Fallback to scan_sold if phone_sale_wizard not available
-        return HttpResponsePermanentRedirect(reverse('inventory:scan_sold'))
+        return HttpResponsePermanentRedirect(reverse("inventory:scan_sold"))
 
 
 @never_cache
@@ -46,20 +46,20 @@ def legacy_simulator_shim(request):
     Legacy public business simulator - return 410 Gone.
     Old URL: /simulator/ (public staticpage)
     New URL: /simulator/business/ (manager-only, uses real data)
-    
+
     The old public simulator page has been upgraded to a manager-only tool.
     """
     context = {
-        'title': 'Page Upgraded',
-        'message': 'The Business Simulator has been upgraded.',
-        'detail': (
-            'The public simulator has been replaced with a manager-only tool '
-            'that uses real business data. Please log in as a manager to access it.'
+        "title": "Page Upgraded",
+        "message": "The Business Simulator has been upgraded.",
+        "detail": (
+            "The public simulator has been replaced with a manager-only tool "
+            "that uses real business data. Please log in as a manager to access it."
         ),
-        'cta_text': 'Go to Dashboard',
-        'cta_url': '/',
+        "cta_text": "Go to Dashboard",
+        "cta_url": "/",
     }
-    return HttpResponseGone(render(request, 'legacy_gone.html', context).content)
+    return HttpResponseGone(render(request, "legacy_gone.html", context).content)
 
 
 def legacy_scan_in_fallback_view(request):
@@ -67,10 +67,14 @@ def legacy_scan_in_fallback_view(request):
     Fallback view for scan_in if somehow old template is still accessed.
     This auto-redirects to canonical page with JS + fallback button.
     """
-    return render(request, 'inventory/scan_in_redirect.html', {
-        'redirect_url': reverse('inventory:scan_in'),
-        'canonical_name': 'Scan IN',
-    })
+    return render(
+        request,
+        "inventory/scan_in_redirect.html",
+        {
+            "redirect_url": reverse("inventory:scan_in"),
+            "canonical_name": "Scan IN",
+        },
+    )
 
 
 def legacy_scan_sold_fallback_view(request):
@@ -79,12 +83,15 @@ def legacy_scan_sold_fallback_view(request):
     This auto-redirects to canonical page with JS + fallback button.
     """
     try:
-        redirect_url = reverse('inventory:phone_sale_wizard')
+        redirect_url = reverse("inventory:phone_sale_wizard")
     except:
-        redirect_url = reverse('inventory:scan_sold')
-    
-    return render(request, 'inventory/scan_sold_redirect.html', {
-        'redirect_url': redirect_url,
-        'canonical_name': 'Phone Sale Wizard',
-    })
+        redirect_url = reverse("inventory:scan_sold")
 
+    return render(
+        request,
+        "inventory/scan_sold_redirect.html",
+        {
+            "redirect_url": redirect_url,
+            "canonical_name": "Phone Sale Wizard",
+        },
+    )

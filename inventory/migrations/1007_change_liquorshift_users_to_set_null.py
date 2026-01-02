@@ -6,7 +6,6 @@ from django.conf import settings
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         ("inventory", "1006_fix_null_spec_label_values"),
         migrations.swappable_dependency(settings.AUTH_USER_MODEL),
@@ -38,4 +37,3 @@ class Migration(migrations.Migration):
             ),
         ),
     ]
-

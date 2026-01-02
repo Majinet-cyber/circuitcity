@@ -4,7 +4,6 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         ("inventory", "1008_alter_archivebatch_counts_snapshot"),
     ]
@@ -12,23 +11,23 @@ class Migration(migrations.Migration):
     operations = [
         # Add pack_label field (nullable) for "Crate", "Case", "Pack"
         migrations.AddField(
-            model_name='merchproduct',
-            name='pack_label',
+            model_name="merchproduct",
+            name="pack_label",
             field=models.CharField(
                 max_length=20,
                 blank=True,
                 null=True,
-                help_text="Pack label: Crate, Case, Pack (e.g., 'Crate' for beer, 'Case' for wine)"
+                help_text="Pack label: Crate, Case, Pack (e.g., 'Crate' for beer, 'Case' for wine)",
             ),
         ),
         # Make bottles_per_crate nullable (it becomes pack_size conceptually)
         migrations.AlterField(
-            model_name='merchproduct',
-            name='bottles_per_crate',
+            model_name="merchproduct",
+            name="bottles_per_crate",
             field=models.PositiveIntegerField(
                 blank=True,
                 null=True,
-                help_text="Number of base units in a pack (default 20 for Malawi beer crates, 6 for wine/spirits cases)"
+                help_text="Number of base units in a pack (default 20 for Malawi beer crates, 6 for wine/spirits cases)",
             ),
         ),
     ]

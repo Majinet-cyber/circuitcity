@@ -16,8 +16,8 @@ from django.utils import timezone
 # Config defaults (overridable in settings.py)
 # ----------------------------------------------------------------------
 CURRENCY_DEFAULT = getattr(settings, "REPORTS_DEFAULT_CURRENCY", "MWK")
-TRIAL_DAYS_DEFAULT = getattr(settings, "BILLING_TRIAL_DAYS", 30)   # default 30-day trial
-GRACE_DAYS_DEFAULT = getattr(settings, "BILLING_GRACE_DAYS", 30)   # default 30-day grace
+TRIAL_DAYS_DEFAULT = getattr(settings, "BILLING_TRIAL_DAYS", 30)  # default 30-day trial
+GRACE_DAYS_DEFAULT = getattr(settings, "BILLING_GRACE_DAYS", 30)  # default 30-day grace
 
 
 # ======================================================================
@@ -27,6 +27,7 @@ class SubscriptionPlan(models.Model):
     """
     Definition of a pricing plan. Attach feature limits here.
     """
+
     class Interval(models.TextChoices):
         MONTH = "month", "Monthly"
         YEAR = "year", "Yearly"
@@ -69,6 +70,7 @@ class BusinessSubscription(models.Model):
     """
     One subscription per Business (tenant), describing status + billing cycle.
     """
+
     class Status(models.TextChoices):
         TRIAL = "trial", "Trial"
         ACTIVE = "active", "Active"
@@ -107,10 +109,16 @@ class BusinessSubscription(models.Model):
     meta = models.JSONField(default=dict, blank=True)
 
     # Provider-specific identifiers
-    stripe_subscription_id = models.CharField(max_length=255, blank=True, default="", help_text="Stripe subscription ID")
+    stripe_subscription_id = models.CharField(
+        max_length=255, blank=True, default="", help_text="Stripe subscription ID"
+    )
     stripe_customer_id = models.CharField(max_length=255, blank=True, default="", help_text="Stripe customer ID")
-    pesapal_order_tracking_id = models.CharField(max_length=255, blank=True, default="", help_text="Pesapal order tracking ID")
-    pesapal_merchant_reference = models.CharField(max_length=255, blank=True, default="", help_text="Pesapal merchant reference")
+    pesapal_order_tracking_id = models.CharField(
+        max_length=255, blank=True, default="", help_text="Pesapal order tracking ID"
+    )
+    pesapal_merchant_reference = models.CharField(
+        max_length=255, blank=True, default="", help_text="Pesapal merchant reference"
+    )
 
     # Light audit when revoking/canceling via HQ
     canceled_at = models.DateTimeField(null=True, blank=True)
@@ -249,7 +257,12 @@ class BusinessSubscription(models.Model):
         self.current_period_end = new_end
 
         now = timezone.now()
-        if new_end > now and self.status in (self.Status.GRACE, self.Status.PAST_DUE, self.Status.EXPIRED, self.Status.CANCELED):
+        if new_end > now and self.status in (
+            self.Status.GRACE,
+            self.Status.PAST_DUE,
+            self.Status.EXPIRED,
+            self.Status.CANCELED,
+        ):
             # We extended back into the future â†’ make it an active trial
             self.status = self.Status.TRIAL
         elif new_end <= now and self.status == self.Status.TRIAL:
@@ -424,7 +437,9 @@ class Invoice(models.Model):
     number = models.CharField(max_length=64, unique=True, default=_next_invoice_number)
 
     # Who is being billed?
-    business = models.ForeignKey("tenants.Business", null=True, blank=True, on_delete=models.SET_NULL, related_name="invoices")
+    business = models.ForeignKey(
+        "tenants.Business", null=True, blank=True, on_delete=models.SET_NULL, related_name="invoices"
+    )
     created_by = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL)
 
     # Recipient overrides (fallback to business manager contact if blank)
@@ -531,7 +546,9 @@ class InvoiceItem(models.Model):
     description = models.CharField(max_length=255)
     qty = models.DecimalField(max_digits=10, decimal_places=2, default=Decimal("1"), validators=[MinValueValidator(0)])
     unit = models.CharField(max_length=16, default="ea")
-    unit_price = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal("0.00"), validators=[MinValueValidator(0)])
+    unit_price = models.DecimalField(
+        max_digits=12, decimal_places=2, default=Decimal("0.00"), validators=[MinValueValidator(0)]
+    )
 
     created_at = models.DateTimeField(auto_now_add=True)
 
@@ -626,6 +643,7 @@ class PaymentMethod(models.Model):
     Simple stored method pointer (e.g., default Airtel account label, masked card).
     Extend in the future as needed.
     """
+
     KIND_CHOICES = (
         ("airtel", "Airtel Money"),
         ("standard_bank", "Standard Bank"),
@@ -649,8 +667,9 @@ class WebhookEvent(models.Model):
     """
     Store raw webhook posts for auditing/idempotency.
     """
+
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    provider = models.CharField(max_length=32)       # e.g., 'airtel'
+    provider = models.CharField(max_length=32)  # e.g., 'airtel'
     event_type = models.CharField(max_length=64, blank=True, default="")
     external_id = models.CharField(max_length=128, blank=True, default="")
     payload = models.JSONField(default=dict, blank=True)
@@ -702,6 +721,7 @@ try:
             except Exception:
                 # Avoid crashing tenant creation path
                 pass
+
 except Exception:
     # No tenants model yet (e.g., during first migration)
     pass
@@ -716,6 +736,7 @@ class PaymentTransaction(models.Model):
     Tracks checkout initiation, webhook payloads, and verification results.
     Ensures no cross-tenant leakage via business + location FKs.
     """
+
     class Status(models.TextChoices):
         PENDING = "pending", "Pending"
         SUCCESS = "success", "Success"
@@ -779,7 +800,7 @@ class PaymentTransaction(models.Model):
         """
         if self.status == self.Status.SUCCESS:
             return  # Already successful, no-op
-        
+
         self.status = self.Status.SUCCESS
         if verify_payload:
             self.raw_verify_payload = verify_payload
@@ -789,7 +810,7 @@ class PaymentTransaction(models.Model):
         """Mark transaction as failed."""
         if self.status == self.Status.SUCCESS:
             return  # Don't downgrade success to failure
-        
+
         self.status = self.Status.FAILED
         if verify_payload:
             self.raw_verify_payload = verify_payload
@@ -801,5 +822,3 @@ class PaymentTransaction(models.Model):
 # ======================================================================
 Plan = SubscriptionPlan
 Subscription = BusinessSubscription
-
-

@@ -36,94 +36,95 @@ BYPASS_PREFIXES = [
 class SubscriptionGateMiddleware(MiddlewareMixin):
     """
     Middleware that enforces subscription access control.
-    
+
     Blocks access to app features for businesses with:
     - status = 'canceled' or 'expired'
     - current_period_end < now (for active/grace subscriptions)
-    
+
     Allows access to:
     - Login/logout pages
     - Billing/payment pages
     - HQ admin (for support staff)
     - Public/static resources
     """
-    
+
     def process_request(self, request):
         # Skip for non-authenticated users
         if not request.user.is_authenticated:
             return None
-        
+
         # Skip for HQ staff/superusers
         if getattr(request.user, "is_staff", False) or getattr(request.user, "is_superuser", False):
             return None
-        
+
         # Check if path should bypass gating
         path = request.path
         for prefix in BYPASS_PREFIXES:
             if path.startswith(prefix):
                 return None
-        
+
         for allowed_url in ALWAYS_ALLOWED_URLS:
             if path.startswith(allowed_url):
                 return None
-        
+
         # Get active business
         business = getattr(request, "business", None)
         if not business:
             try:
                 from tenants.utils import get_active_business
+
                 business = get_active_business(request)
             except Exception:
                 return None
-        
+
         if not business:
             return None
-        
+
         # Check subscription
         try:
             subscription = business.subscription
         except Exception:
             # No subscription - allow access (will be handled by other logic)
             return None
-        
+
         # Check if subscription allows access
         if not self._subscription_allows_access(subscription):
             # Subscription is revoked/expired - block access
             return self._render_subscription_blocked(request, business, subscription)
-        
+
         return None
-    
+
     def _subscription_allows_access(self, subscription) -> bool:
         """Check if subscription status allows access."""
         now = timezone.now()
         status = subscription.status
-        
+
         # Explicitly blocked statuses
         if status in ["canceled", "expired"]:
             return False
-        
+
         # Check if period has expired
         period_end = subscription.current_period_end
         if period_end and period_end < now:
             # Allow grace period if configured
             if status != "grace":
                 return False
-        
+
         # Check trial expiration
         if status == "trial":
             trial_end = subscription.trial_end
             if trial_end and trial_end < now:
                 return False
-        
+
         # Active, trial (not expired), or grace - allow access
         return True
-    
+
     def _render_subscription_blocked(self, request, business, subscription):
         """Render the subscription blocked page with role-specific messaging."""
         # Determine role-specific message
         is_agent = getattr(request, "is_agent_only", False)
         is_manager = getattr(request, "is_manager_plus", False)
-        
+
         if is_agent:
             message = "Account locked. Contact your manager."
             can_manage = False
@@ -134,19 +135,21 @@ class SubscriptionGateMiddleware(MiddlewareMixin):
             # Default for unauthenticated or unknown roles
             message = "Account locked. Please contact support."
             can_manage = False
-        
+
         context = {
             "business": business,
             "subscription": subscription,
             "status": subscription.status,
-            "billing_url": reverse("billing:subscribe") if self._has_url("billing:subscribe") else "/billing/subscribe/",
+            "billing_url": reverse("billing:subscribe")
+            if self._has_url("billing:subscribe")
+            else "/billing/subscribe/",
             "support_email": "support@circuitcity.com",
             "lockout_message": message,
             "is_agent": is_agent,
             "is_manager": is_manager,
             "can_manage_subscription": can_manage,
         }
-        
+
         try:
             return render(request, "billing/subscription_blocked.html", context, status=403)
         except Exception:
@@ -240,7 +243,7 @@ class SubscriptionGateMiddleware(MiddlewareMixin):
             </html>
             """
             return HttpResponse(html, status=403)
-    
+
     def _has_url(self, name: str) -> bool:
         """Check if a URL name exists."""
         try:
@@ -248,4 +251,3 @@ class SubscriptionGateMiddleware(MiddlewareMixin):
             return True
         except Exception:
             return False
-

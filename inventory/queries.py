@@ -3,9 +3,7 @@ from __future__ import annotations
 
 from typing import Iterable, Union, Dict, Any, Optional, Tuple, List
 from django.apps import apps
-from django.db.models import (
-    QuerySet, Manager, Sum, Value, DecimalField, IntegerField, F, Expression, Q
-)
+from django.db.models import QuerySet, Manager, Sum, Value, DecimalField, IntegerField, F, Expression, Q
 from django.db.models.functions import Coalesce
 
 from tenants.utils import scoped, user_is_agent
@@ -23,12 +21,14 @@ _AGENT_FIELD_CANDIDATES: Iterable[str] = (
     "checked_in_by",
 )
 
+
 def _model_has_field(model, name: str) -> bool:
     try:
         model._meta.get_field(name)
         return True
     except Exception:
         return False
+
 
 def limit_to_actor(qs: QuerySet, user) -> QuerySet:
     if not user_is_agent(user):
@@ -47,24 +47,35 @@ def limit_to_actor(qs: QuerySet, user) -> QuerySet:
                     continue
     return qs.none()
 
+
 def scoped_for_user(qs_or_manager: Union[QuerySet, Manager], request) -> QuerySet:
     qs = scoped(qs_or_manager, request)
     return limit_to_actor(qs, getattr(request, "user", None))
 
+
 # ---------------- Inventory helpers ---------------- #
+
 
 def inventory_qs_for_user(request) -> QuerySet:
     return scoped_for_user(InventoryItem.objects, request)
 
+
 def inventory_qs_tenant(request) -> QuerySet:
     return scoped(InventoryItem.objects, request)
+
 
 # ---------------- Sales discovery ---------------- #
 
 _AMOUNT_FIELD_CANDIDATES = (
-    "selling_price", "sold_price", "final_price",
-    "unit_price", "price", "amount",
-    "total_price", "line_total", "total",
+    "selling_price",
+    "sold_price",
+    "final_price",
+    "unit_price",
+    "price",
+    "amount",
+    "total_price",
+    "line_total",
+    "total",
 )
 _QTY_FIELD_CANDIDATES = ("quantity", "qty", "count", "units")
 _DATE_FIELD_CANDIDATES = ("sold_at", "date", "created_at", "created", "timestamp")
@@ -98,11 +109,13 @@ _EXPLICIT_MODELS = (
     ("inventory", "OrderItem"),
 )
 
+
 def _pick_field(model, names: Iterable[str]) -> Optional[str]:
     for n in names:
         if _model_has_field(model, n):
             return n
     return None
+
 
 def _amount_expr_for(model) -> Tuple[Optional[Expression], Optional[str]]:
     money = DecimalField(max_digits=14, decimal_places=2)
@@ -122,17 +135,21 @@ def _amount_expr_for(model) -> Tuple[Optional[Expression], Optional[str]]:
         ), None
     return None, None
 
+
 def _quantity_expr_for(model) -> Optional[Expression]:
     qf = _pick_field(model, _QTY_FIELD_CANDIDATES)
     if qf:
         return Coalesce(F(qf), Value(0, output_field=IntegerField()), output_field=IntegerField())
     return None
 
+
 def _is_probably_sales_line(model) -> bool:
     return model._meta.model_name.lower() in _LINE_MODEL_NAMES
 
+
 def _is_probably_sales_header(model) -> bool:
     return model._meta.model_name.lower() in _HEADER_MODEL_NAMES
+
 
 def _discover_sales_models() -> Tuple[Optional[type], Optional[type]]:
     line = None
@@ -147,6 +164,7 @@ def _discover_sales_models() -> Tuple[Optional[type], Optional[type]]:
             continue
     return line, header
 
+
 def _first_existing_model(candidates: Iterable[Tuple[str, str]]) -> Optional[type]:
     for app_label, model_name in candidates:
         try:
@@ -157,14 +175,19 @@ def _first_existing_model(candidates: Iterable[Tuple[str, str]]) -> Optional[typ
             continue
     return None
 
+
 def _best_sales_qs(request, include_actor: bool = True) -> Optional[QuerySet]:
     explicit_line = _first_existing_model([t for t in _EXPLICIT_MODELS if t[1].lower().endswith("item")])
     explicit_head = _first_existing_model([t for t in _EXPLICIT_MODELS if not t[1].lower().endswith("item")])
 
     if explicit_line:
-        return scoped_for_user(explicit_line.objects, request) if include_actor else scoped(explicit_line.objects, request)
+        return (
+            scoped_for_user(explicit_line.objects, request) if include_actor else scoped(explicit_line.objects, request)
+        )
     if explicit_head:
-        return scoped_for_user(explicit_head.objects, request) if include_actor else scoped(explicit_head.objects, request)
+        return (
+            scoped_for_user(explicit_head.objects, request) if include_actor else scoped(explicit_head.objects, request)
+        )
 
     line, head = _discover_sales_models()
     if line:
@@ -173,16 +196,21 @@ def _best_sales_qs(request, include_actor: bool = True) -> Optional[QuerySet]:
         return scoped_for_user(head.objects, request) if include_actor else scoped(head.objects, request)
     return None
 
+
 # ---------------- KPIs ---------------- #
+
 
 def business_metrics(request, *, include_agent_scope: bool = True) -> Dict[str, Any]:
     money = DecimalField(max_digits=14, decimal_places=2)
 
     base_inv = inventory_qs_for_user(request) if include_agent_scope else inventory_qs_tenant(request)
     qs_instock = base_inv.filter(IN_STOCK_Q())
-    sum_order = qs_instock.aggregate(
-        total=Coalesce(Sum("order_price"), Value(0, output_field=money), output_field=money)
-    )["total"] or 0
+    sum_order = (
+        qs_instock.aggregate(total=Coalesce(Sum("order_price"), Value(0, output_field=money), output_field=money))[
+            "total"
+        ]
+        or 0
+    )
 
     qs_sales = _best_sales_qs(request, include_agent_scope)
     if qs_sales is not None:
@@ -200,14 +228,20 @@ def business_metrics(request, *, include_agent_scope: bool = True) -> Dict[str, 
 
         sum_selling = 0
         if amt_expr is not None:
-            sum_selling = qs_sales.aggregate(
-                total=Coalesce(Sum(amt_expr), Value(0, output_field=money), output_field=money)
-            )["total"] or 0
+            sum_selling = (
+                qs_sales.aggregate(total=Coalesce(Sum(amt_expr), Value(0, output_field=money), output_field=money))[
+                    "total"
+                ]
+                or 0
+            )
 
         if qty_expr is not None:
-            count_sold = int(qs_sales.aggregate(
-                n=Coalesce(Sum(qty_expr), Value(0, output_field=IntegerField()), output_field=IntegerField())
-            )["n"] or 0)
+            count_sold = int(
+                qs_sales.aggregate(
+                    n=Coalesce(Sum(qty_expr), Value(0, output_field=IntegerField()), output_field=IntegerField())
+                )["n"]
+                or 0
+            )
         else:
             count_sold = qs_sales.count()
 
@@ -226,9 +260,12 @@ def business_metrics(request, *, include_agent_scope: bool = True) -> Dict[str, 
             break
 
     if inv_amount_field:
-        sum_selling = base_inv.filter(SOLD_Q()).aggregate(
-            total=Coalesce(Sum(inv_amount_field), Value(0, output_field=money), output_field=money)
-        )["total"] or 0
+        sum_selling = (
+            base_inv.filter(SOLD_Q()).aggregate(
+                total=Coalesce(Sum(inv_amount_field), Value(0, output_field=money), output_field=money)
+            )["total"]
+            or 0
+        )
     else:
         sum_selling = 0
 
@@ -239,7 +276,9 @@ def business_metrics(request, *, include_agent_scope: bool = True) -> Dict[str, 
         "sum_selling": float(sum_selling),
     }
 
+
 # ---------------- Top models (for charts/cards) ---------------- #
+
 
 def _first_usable_group_field(qs: QuerySet, candidates: Iterable[str]) -> Optional[str]:
     """
@@ -254,6 +293,7 @@ def _first_usable_group_field(qs: QuerySet, candidates: Iterable[str]) -> Option
         except Exception:
             continue
     return None
+
 
 def top_models(request, *, limit: int = 8, include_agent_scope: bool = True) -> List[Dict[str, Any]]:
     """
@@ -309,11 +349,7 @@ def top_models(request, *, limit: int = 8, include_agent_scope: bool = True) -> 
 
     if not label_candidates:
         # No recognizable label fields at all → count by id (will show Unknown)
-        rows = (
-            base_inv.values("id")
-            .annotate(units=Value(1, output_field=qty_int))
-            .order_by("-units")[:limit]
-        )
+        rows = base_inv.values("id").annotate(units=Value(1, output_field=qty_int)).order_by("-units")[:limit]
         return [{"label": "Unknown", "units": int(sum(r["units"] for r in rows))}]
 
     if label_candidates == ["brand", "model"]:

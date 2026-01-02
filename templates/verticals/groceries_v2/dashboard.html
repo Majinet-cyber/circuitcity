@@ -43,12 +43,40 @@
   .gv2-product-item .qty{background:linear-gradient(135deg,#fef3c7,#fde68a);color:#92400e;padding:6px 12px;border-radius:12px;font-weight:700;font-size:13px}
   .gv2-product-item .qty.low{background:linear-gradient(135deg,#fee2e2,#fecaca);color:#991b1b}
   
-  /* Gamification strip */
-  .gv2-streak{background:linear-gradient(135deg,#8b5cf6,#7c3aed);color:#fff;padding:16px;border-radius:16px;display:flex;align-items:center;justify-content:space-between;gap:12px;box-shadow:0 4px 12px rgba(139,92,246,0.2)}
-  .gv2-streak .icon{font-size:32px}
-  .gv2-streak .text{flex:1}
-  .gv2-streak .text strong{display:block;font-size:18px;font-weight:800}
-  .gv2-streak .text span{font-size:13px;opacity:0.9}
+  /* PHASE 5: Premium Gamification Strip */
+  .gv2-gamification-strip{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px}
+  .gv2-gami-card{background:#fff;border-radius:16px;padding:16px;display:flex;align-items:center;gap:12px;box-shadow:0 4px 12px rgba(15,23,42,0.08);border:2px solid #e2e8f0;transition:all 0.3s;position:relative;overflow:hidden}
+  .gv2-gami-card::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;opacity:0;transition:opacity 0.3s}
+  .gv2-gami-card:hover{transform:translateY(-2px);box-shadow:0 6px 20px rgba(15,23,42,0.12)}
+  .gv2-gami-card:hover::before{opacity:1}
+  
+  /* Level card */
+  .gv2-gami-level{border-color:#fbbf24}
+  .gv2-gami-level::before{background:linear-gradient(90deg,#f59e0b,#fbbf24)}
+  
+  /* Streak card */
+  .gv2-gami-streak{border-color:#f97316}
+  .gv2-gami-streak::before{background:linear-gradient(90deg,#ea580c,#f97316)}
+  
+  /* Rank card */
+  .gv2-gami-rank{border-color:#8b5cf6}
+  .gv2-gami-rank::before{background:linear-gradient(90deg,#7c3aed,#8b5cf6)}
+  
+  /* Badges card */
+  .gv2-gami-badges{border-color:#10b981}
+  .gv2-gami-badges::before{background:linear-gradient(90deg,#059669,#10b981)}
+  
+  .gv2-gami-icon{font-size:32px;flex-shrink:0}
+  .gv2-gami-content{flex:1;min-width:0}
+  .gv2-gami-label{font-weight:700;font-size:14px;color:#0f172a;margin-bottom:4px}
+  .gv2-gami-detail{font-size:11px;color:#64748b}
+  .gv2-gami-progress{height:6px;background:#e2e8f0;border-radius:3px;overflow:hidden;margin-top:6px}
+  .gv2-gami-progress-bar{height:100%;background:linear-gradient(90deg,#f59e0b,#fbbf24);transition:width 0.5s ease}
+  .gv2-gami-badge-icons{display:flex;gap:4px;font-size:14px;margin-top:4px}
+  
+  @media (max-width:640px){
+    .gv2-gamification-strip{grid-template-columns:1fr}
+  }
   
   /* Empty states */
   .gv2-empty{text-align:center;padding:32px 20px;color:#94a3b8}
@@ -87,16 +115,57 @@
     </a>
   </section>
   
-  <!-- Streak Gamification -->
-  {% if streak_days > 0 %}
-  <div class="gv2-streak">
-    <span class="icon">🔥</span>
-    <div class="text">
-      <strong>{{ streak_days }} Day Streak!</strong>
-      <span>Keep up the momentum</span>
+  <!-- PHASE 5: Premium Gamification Strip -->
+  <div class="gv2-gamification-strip">
+    <!-- XP & Level -->
+    <div class="gv2-gami-card gv2-gami-level">
+      <div class="gv2-gami-icon">⭐</div>
+      <div class="gv2-gami-content">
+        <div class="gv2-gami-label">Level {{ gamification.xp.level }}</div>
+        <div class="gv2-gami-progress">
+          <div class="gv2-gami-progress-bar" style="width:{{ gamification.xp.progress_percent }}%"></div>
+        </div>
+        <div class="gv2-gami-detail">{{ gamification.xp.total }} XP · +{{ gamification.xp.xp_today }} today</div>
+      </div>
     </div>
+    
+    <!-- Streak -->
+    {% if gamification.streak.current > 0 %}
+    <div class="gv2-gami-card gv2-gami-streak">
+      <div class="gv2-gami-icon">🔥</div>
+      <div class="gv2-gami-content">
+        <div class="gv2-gami-label">{{ gamification.streak.current }} Day Streak</div>
+        <div class="gv2-gami-detail">Best: {{ gamification.streak.longest }} days</div>
+      </div>
+    </div>
+    {% endif %}
+    
+    <!-- Rank (if available) -->
+    {% if gamification.rank_today %}
+    <div class="gv2-gami-card gv2-gami-rank">
+      <div class="gv2-gami-icon">🏆</div>
+      <div class="gv2-gami-content">
+        <div class="gv2-gami-label">Rank #{{ gamification.rank_today }}</div>
+        <div class="gv2-gami-detail">Today's leaderboard</div>
+      </div>
+    </div>
+    {% endif %}
+    
+    <!-- Badges -->
+    {% if gamification.badges %}
+    <div class="gv2-gami-card gv2-gami-badges">
+      <div class="gv2-gami-icon">🎖️</div>
+      <div class="gv2-gami-content">
+        <div class="gv2-gami-label">{{ gamification.badges|length }} Badge{{ gamification.badges|length|pluralize }}</div>
+        <div class="gv2-gami-badge-icons">
+          {% for badge in gamification.badges|slice:":5" %}
+          <span title="{{ badge.name }}">{{ badge.icon }}</span>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+    {% endif %}
   </div>
-  {% endif %}
   
   <!-- KPIs -->
   <section class="gv2-kpis">
@@ -160,6 +229,7 @@
   
   <!-- Quick Links -->
   <div style="display:flex;gap:12px;flex-wrap:wrap;justify-content:center">
+    <a href="{% url 'verticals:groceries_leaderboard_v2' %}" style="padding:10px 20px;background:linear-gradient(135deg,#8b5cf6,#7c3aed);color:#fff;border-radius:12px;font-weight:600;text-decoration:none;font-size:14px;box-shadow:0 4px 12px rgba(139,92,246,0.3)">🏆 View Leaderboard</a>
     <a href="{% url 'verticals:groceries_products_v2' %}" style="padding:10px 20px;background:#f8fafc;color:#64748b;border-radius:12px;font-weight:600;text-decoration:none;font-size:14px;border:1px solid #e2e8f0">View All Products</a>
     <a href="{% url 'verticals:groceries_dashboard' %}" style="padding:10px 20px;background:#f8fafc;color:#64748b;border-radius:12px;font-weight:600;text-decoration:none;font-size:14px;border:1px solid #e2e8f0">Old Dashboard</a>
   </div>

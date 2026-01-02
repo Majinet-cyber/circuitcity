@@ -7,7 +7,6 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         ("inventory", "0035_liquorstockthreshold"),
         ("tenants", "0011_agentinvite_temp_password_hash_and_more"),
@@ -96,9 +95,7 @@ class Migration(migrations.Migration):
                         name="inventory_m_busines_49c451_idx",
                     ),
                 ],
-                "unique_together": {
-                    ("business", "location", "vertical", "year", "month")
-                },
+                "unique_together": {("business", "location", "vertical", "year", "month")},
             },
         ),
     ]

@@ -42,110 +42,110 @@ User = get_user_model()
 
 class ClothingConfigTestCase(TestCase):
     """Test clothing configuration helpers"""
-    
+
     def test_generate_internal_sku(self):
         """Test SKU generation is business-scoped"""
         sku1 = generate_internal_sku(business_id=1, category="sneaker", sequence=1)
         sku2 = generate_internal_sku(business_id=2, category="sneaker", sequence=1)
-        
+
         self.assertIn("BIZ1", sku1)
         self.assertIn("BIZ2", sku2)
         self.assertNotEqual(sku1, sku2)
-    
+
     def test_qr_token_signing_and_verification(self):
         """Test QR token generation and verification"""
         token = sign_product_qr_data(business_id=1, product_id=123)
         data = verify_product_qr_token(token)
-        
+
         self.assertIsNotNone(data)
-        self.assertEqual(data['business_id'], 1)
-        self.assertEqual(data['product_id'], 123)
-    
+        self.assertEqual(data["business_id"], 1)
+        self.assertEqual(data["product_id"], 123)
+
     def test_qr_token_tampered_rejected(self):
         """Test tampered token is rejected"""
         token = sign_product_qr_data(business_id=1, product_id=123)
         tampered = token[:-5] + "XXXXX"
-        
+
         data = verify_product_qr_token(tampered)
         self.assertIsNone(data)
 
 
 class ClothingBasicFlowsTestCase(TestCase):
     """Test basic flows WITHOUT barcode"""
-    
+
     def setUp(self):
-        self.user = User.objects.create_user(username='testuser', password='testpass123')
-        self.business = Business.objects.create(name='Fashion Store', kind=BusinessKind.CLOTHING)
-        Membership.objects.create(user=self.user, business=self.business, role='manager')
-    
+        self.user = User.objects.create_user(username="testuser", password="testpass123")
+        self.business = Business.objects.create(name="Fashion Store", kind=BusinessKind.CLOTHING)
+        Membership.objects.create(user=self.user, business=self.business, role="manager")
+
     def test_create_product_without_barcode_succeeds(self):
         """Test creating product without barcode works"""
         result = stock_in_clothing(
             business=self.business,
             user=self.user,
-            category='sneaker',
-            name='Air Max 90',
+            category="sneaker",
+            name="Air Max 90",
             quantity=10,
-            cost_price=Decimal('50.00'),
-            selling_price=Decimal('100.00'),
+            cost_price=Decimal("50.00"),
+            selling_price=Decimal("100.00"),
         )
-        
-        self.assertTrue(result['ok'])
-        product = result['product']
+
+        self.assertTrue(result["ok"])
+        product = result["product"]
         self.assertEqual(product.quantity_in_stock, 10)
-        self.assertEqual(product.barcode, '')
+        self.assertEqual(product.barcode, "")
         self.assertIsNotNone(product.internal_sku)
-    
+
     def test_sell_without_barcode_works(self):
         """Test selling without barcode works"""
         result = stock_in_clothing(
             business=self.business,
             user=self.user,
-            category='sneaker',
-            name='Air Max 90',
+            category="sneaker",
+            name="Air Max 90",
             quantity=10,
-            cost_price=Decimal('50.00'),
-            selling_price=Decimal('100.00'),
+            cost_price=Decimal("50.00"),
+            selling_price=Decimal("100.00"),
         )
-        
-        product = result['product']
-        
+
+        product = result["product"]
+
         sale_result = sell_clothing(
             business=self.business,
             user=self.user,
             product_id=product.id,
             quantity=3,
         )
-        
-        self.assertTrue(sale_result['ok'])
+
+        self.assertTrue(sale_result["ok"])
         product.refresh_from_db()
         self.assertEqual(product.quantity_in_stock, 7)
 
 
 class ClothingMultiTenantTestCase(TestCase):
     """Test multi-tenant isolation"""
-    
+
     def setUp(self):
-        self.user = User.objects.create_user(username='testuser', password='testpass123')
-        self.biz1 = Business.objects.create(name='Store 1', kind=BusinessKind.CLOTHING)
-        self.biz2 = Business.objects.create(name='Store 2', kind=BusinessKind.CLOTHING)
-        Membership.objects.create(user=self.user, business=self.biz1, role='manager')
-        Membership.objects.create(user=self.user, business=self.biz2, role='manager')
-    
+        self.user = User.objects.create_user(username="testuser", password="testpass123")
+        self.biz1 = Business.objects.create(name="Store 1", kind=BusinessKind.CLOTHING)
+        self.biz2 = Business.objects.create(name="Store 2", kind=BusinessKind.CLOTHING)
+        Membership.objects.create(user=self.user, business=self.biz1, role="manager")
+        Membership.objects.create(user=self.user, business=self.biz2, role="manager")
+
     def test_cross_business_product_isolation(self):
         """Test products don't leak across businesses"""
         result = stock_in_clothing(
             business=self.biz1,
             user=self.user,
-            category='sneaker',
-            name='Unique Sneaker',
+            category="sneaker",
+            name="Unique Sneaker",
             quantity=10,
-            cost_price=Decimal('50.00'),
-            selling_price=Decimal('100.00'),
+            cost_price=Decimal("50.00"),
+            selling_price=Decimal("100.00"),
         )
-        
-        product = result['product']
-        
+
+        product = result["product"]
+
         with self.assertRaises(ValidationError):
             sell_clothing(
                 business=self.biz2,

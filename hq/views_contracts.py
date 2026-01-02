@@ -26,6 +26,7 @@ try:
     from reportlab.lib.units import inch
     from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, PageBreak
     from reportlab.lib.enums import TA_CENTER, TA_LEFT
+
     REPORTLAB_AVAILABLE = True
 except ImportError:
     REPORTLAB_AVAILABLE = False
@@ -37,10 +38,14 @@ def contract_template(request: HttpRequest) -> HttpResponse:
     """
     Show the contract template page with download link.
     """
-    return render(request, 'hq/contract_template.html', {
-        'contracts_enabled': True,
-        'active_tab': 'contracts',
-    })
+    return render(
+        request,
+        "hq/contract_template.html",
+        {
+            "contracts_enabled": True,
+            "active_tab": "contracts",
+        },
+    )
 
 
 @login_required
@@ -51,51 +56,54 @@ def contracts_list(request: HttpRequest) -> HttpResponse:
     Shows which businesses have signed contracts and which don't.
     """
     # Get filter params
-    status_filter = request.GET.get('status', 'all')  # all, signed, unsigned
-    search_query = request.GET.get('q', '').strip()
-    
+    status_filter = request.GET.get("status", "all")  # all, signed, unsigned
+    search_query = request.GET.get("q", "").strip()
+
     # Base queryset - use prefetch_related for ForeignKey relationship
-    businesses = Business.objects.all().prefetch_related('contracts').order_by('-created_at')
-    
+    businesses = Business.objects.all().prefetch_related("contracts").order_by("-created_at")
+
     # Apply filters (using contracts relationship)
-    if status_filter == 'signed':
+    if status_filter == "signed":
         businesses = businesses.filter(contracts__isnull=False).distinct()
-    elif status_filter == 'unsigned':
+    elif status_filter == "unsigned":
         businesses = businesses.filter(contracts__isnull=True)
-    
+
     # Apply search
     if search_query:
-        businesses = businesses.filter(
-            Q(name__icontains=search_query) |
-            Q(slug__icontains=search_query)
-        )
-    
+        businesses = businesses.filter(Q(name__icontains=search_query) | Q(slug__icontains=search_query))
+
     # Pagination
-    page_num = request.GET.get('page', 1)
+    page_num = request.GET.get("page", 1)
     paginator = Paginator(businesses, 25)
     page_obj = paginator.get_page(page_num)
-    
+
     # Build context with contract status
     businesses_with_status = []
     for biz in page_obj:
         # Get the most recent contract for this business (if any)
-        latest_contract = biz.contracts.first() if hasattr(biz, 'contracts') else None
+        latest_contract = biz.contracts.first() if hasattr(biz, "contracts") else None
         has_contract = latest_contract is not None
-        
-        businesses_with_status.append({
-            'business': biz,
-            'has_contract': has_contract,
-            'contract': latest_contract,
-        })
-    
-    return render(request, 'hq/contracts_list.html', {
-        'page_obj': page_obj,
-        'businesses_with_status': businesses_with_status,
-        'status_filter': status_filter,
-        'search_query': search_query,
-        'contracts_enabled': True,  # Always True since we're in the contracts module
-        'active_tab': 'contracts',
-    })
+
+        businesses_with_status.append(
+            {
+                "business": biz,
+                "has_contract": has_contract,
+                "contract": latest_contract,
+            }
+        )
+
+    return render(
+        request,
+        "hq/contracts_list.html",
+        {
+            "page_obj": page_obj,
+            "businesses_with_status": businesses_with_status,
+            "status_filter": status_filter,
+            "search_query": search_query,
+            "contracts_enabled": True,  # Always True since we're in the contracts module
+            "active_tab": "contracts",
+        },
+    )
 
 
 @login_required
@@ -106,29 +114,29 @@ def contracts_detail(request: HttpRequest, business_id: int) -> HttpResponse:
     Allows HQ to upload or replace a contract file.
     """
     business = get_object_or_404(Business, id=business_id)
-    
+
     # Get the most recent contract for this business
     contract = business.contracts.first() if business.contracts.exists() else None
-    
-    if request.method == 'POST':
+
+    if request.method == "POST":
         # Handle file upload
-        uploaded_file = request.FILES.get('contract_file')
-        notes = request.POST.get('notes', '').strip()
-        
+        uploaded_file = request.FILES.get("contract_file")
+        notes = request.POST.get("notes", "").strip()
+
         if not uploaded_file:
             messages.error(request, "Please select a file to upload.")
             return redirect(request.path)
-        
+
         # Validate file type
-        if not uploaded_file.name.endswith('.pdf'):
+        if not uploaded_file.name.endswith(".pdf"):
             messages.error(request, "Only PDF files are allowed.")
             return redirect(request.path)
-        
+
         # Validate file size (max 10MB)
         if uploaded_file.size > 10 * 1024 * 1024:
             messages.error(request, "File size must be less than 10MB.")
             return redirect(request.path)
-        
+
         # Create or update contract
         if contract:
             # Update existing contract
@@ -143,16 +151,14 @@ def contracts_detail(request: HttpRequest, business_id: int) -> HttpResponse:
         else:
             # Create new contract
             contract = MerchantContract.objects.create(
-                business=business,
-                file=uploaded_file,
-                notes=notes,
-                uploaded_by=request.user
+                business=business, file=uploaded_file, notes=notes, uploaded_by=request.user
             )
             messages.success(request, f"Contract uploaded for {business.name}.")
-        
+
         # Log in audit if available
         try:
             from audit.models import AuditLog
+
             AuditLog.objects.create(
                 business=business,
                 user=request.user,
@@ -160,24 +166,28 @@ def contracts_detail(request: HttpRequest, business_id: int) -> HttpResponse:
                 resource_type="MerchantContract",
                 resource_id=contract.id,
                 details={
-                    'business_id': business.id,
-                    'business_name': business.name,
-                    'file_name': uploaded_file.name,
-                    'notes': notes,
-                }
+                    "business_id": business.id,
+                    "business_name": business.name,
+                    "file_name": uploaded_file.name,
+                    "notes": notes,
+                },
             )
         except Exception:
             pass  # Audit logging is optional
-        
-        return redirect('hq:contracts_list')
-    
+
+        return redirect("hq:contracts_list")
+
     # GET: Show upload form
-    return render(request, 'hq/contracts_detail.html', {
-        'business': business,
-        'contract': contract,
-        'contracts_enabled': True,
-        'active_tab': 'contracts',
-    })
+    return render(
+        request,
+        "hq/contracts_detail.html",
+        {
+            "business": business,
+            "contract": contract,
+            "contracts_enabled": True,
+            "active_tab": "contracts",
+        },
+    )
 
 
 @login_required
@@ -187,20 +197,21 @@ def contract_download(request: HttpRequest, contract_id: int) -> HttpResponse:
     Download a contract file.
     """
     contract = get_object_or_404(MerchantContract, id=contract_id)
-    
+
     # Check if file exists
     if not contract.file:
         messages.error(request, "Contract file not found.")
-        return redirect('hq:contracts_list')
-    
+        return redirect("hq:contracts_list")
+
     try:
         # Return file as download
-        response = FileResponse(contract.file.open('rb'), content_type='application/pdf')
-        response['Content-Disposition'] = f'attachment; filename="{contract.business.slug}_contract.pdf"'
-        
+        response = FileResponse(contract.file.open("rb"), content_type="application/pdf")
+        response["Content-Disposition"] = f'attachment; filename="{contract.business.slug}_contract.pdf"'
+
         # Log download in audit
         try:
             from audit.models import AuditLog
+
             AuditLog.objects.create(
                 business=contract.business,
                 user=request.user,
@@ -208,17 +219,17 @@ def contract_download(request: HttpRequest, contract_id: int) -> HttpResponse:
                 resource_type="MerchantContract",
                 resource_id=contract.id,
                 details={
-                    'business_id': contract.business.id,
-                    'business_name': contract.business.name,
-                }
+                    "business_id": contract.business.id,
+                    "business_name": contract.business.name,
+                },
             )
         except Exception:
             pass
-        
+
         return response
     except Exception as e:
         messages.error(request, f"Error downloading contract: {str(e)}")
-        return redirect('hq:contracts_list')
+        return redirect("hq:contracts_list")
 
 
 @login_required
@@ -230,10 +241,11 @@ def contract_delete(request: HttpRequest, contract_id: int) -> HttpResponse:
     """
     contract = get_object_or_404(MerchantContract, id=contract_id)
     business = contract.business
-    
+
     # Log deletion before deleting
     try:
         from audit.models import AuditLog
+
         AuditLog.objects.create(
             business=business,
             user=request.user,
@@ -241,27 +253,28 @@ def contract_delete(request: HttpRequest, contract_id: int) -> HttpResponse:
             resource_type="MerchantContract",
             resource_id=contract.id,
             details={
-                'business_id': business.id,
-                'business_name': business.name,
-                'file_name': contract.file.name if contract.file else None,
-                'notes': contract.notes,
-            }
+                "business_id": business.id,
+                "business_name": business.name,
+                "file_name": contract.file.name if contract.file else None,
+                "notes": contract.notes,
+            },
         )
     except Exception:
         pass
-    
+
     # Delete file and contract record
     if contract.file:
         contract.file.delete(save=False)
     contract.delete()
-    
+
     messages.success(request, f"Contract for {business.name} has been deleted.")
-    return redirect('hq:contracts_list')
+    return redirect("hq:contracts_list")
 
 
 # ============================================================================
 # HQ Staff Tour Guide
 # ============================================================================
+
 
 @login_required
 @hq_admin_required
@@ -269,10 +282,14 @@ def staff_tour_guide(request: HttpRequest) -> HttpResponse:
     """
     Show the HQ staff tour guide page with PDF download link.
     """
-    return render(request, 'hq/staff_tour_guide.html', {
-        'contracts_enabled': True,
-        'active_tab': 'staff_guide',
-    })
+    return render(
+        request,
+        "hq/staff_tour_guide.html",
+        {
+            "contracts_enabled": True,
+            "active_tab": "staff_guide",
+        },
+    )
 
 
 @login_required
@@ -280,22 +297,20 @@ def staff_tour_guide(request: HttpRequest) -> HttpResponse:
 def staff_tour_guide_pdf(request: HttpRequest) -> HttpResponse:
     """
     Generate and download the HQ Staff Tour Guide as a PDF.
-    
+
     Returns:
         HttpResponse with PDF attachment or error message.
     """
     # Check if ReportLab is available
     if not REPORTLAB_AVAILABLE:
         return HttpResponse(
-            "PDF generation is not available. Please install reportlab.",
-            status=503,
-            content_type="text/plain"
+            "PDF generation is not available. Please install reportlab.", status=503, content_type="text/plain"
         )
-    
+
     try:
         # Create a BytesIO buffer for the PDF
         buffer = io.BytesIO()
-        
+
         # Create the PDF document
         doc = SimpleDocTemplate(
             buffer,
@@ -305,57 +320,57 @@ def staff_tour_guide_pdf(request: HttpRequest) -> HttpResponse:
             topMargin=72,
             bottomMargin=18,
         )
-        
+
         # Container for the 'Flowable' objects
         elements = []
-        
+
         # Define styles
         styles = getSampleStyleSheet()
-        
+
         # Custom styles
         title_style = ParagraphStyle(
-            'CustomTitle',
-            parent=styles['Heading1'],
+            "CustomTitle",
+            parent=styles["Heading1"],
             fontSize=24,
-            textColor=colors.HexColor('#1e40af'),
+            textColor=colors.HexColor("#1e40af"),
             spaceAfter=30,
             alignment=TA_CENTER,
-            fontName='Helvetica-Bold'
+            fontName="Helvetica-Bold",
         )
-        
+
         heading_style = ParagraphStyle(
-            'CustomHeading',
-            parent=styles['Heading2'],
+            "CustomHeading",
+            parent=styles["Heading2"],
             fontSize=16,
-            textColor=colors.HexColor('#1e40af'),
+            textColor=colors.HexColor("#1e40af"),
             spaceAfter=12,
             spaceBefore=12,
-            fontName='Helvetica-Bold'
+            fontName="Helvetica-Bold",
         )
-        
+
         subheading_style = ParagraphStyle(
-            'CustomSubHeading',
-            parent=styles['Heading3'],
+            "CustomSubHeading",
+            parent=styles["Heading3"],
             fontSize=14,
-            textColor=colors.HexColor('#374151'),
+            textColor=colors.HexColor("#374151"),
             spaceAfter=10,
             spaceBefore=10,
-            fontName='Helvetica-Bold'
+            fontName="Helvetica-Bold",
         )
-        
+
         body_style = ParagraphStyle(
-            'CustomBody',
-            parent=styles['BodyText'],
+            "CustomBody",
+            parent=styles["BodyText"],
             fontSize=11,
             leading=14,
             spaceAfter=10,
         )
-        
+
         # Add title
         elements.append(Paragraph("Emajinet / Circuit City", title_style))
         elements.append(Paragraph("HQ Staff Tour Guide", title_style))
         elements.append(Spacer(1, 0.3 * inch))
-        
+
         # Add introduction
         elements.append(Paragraph("Introduction", heading_style))
         intro_text = """
@@ -366,10 +381,10 @@ def staff_tour_guide_pdf(request: HttpRequest) -> HttpResponse:
         """
         elements.append(Paragraph(intro_text, body_style))
         elements.append(Spacer(1, 0.2 * inch))
-        
+
         # Section 1: HQ Dashboard Overview
         elements.append(Paragraph("1. HQ Dashboard Overview", heading_style))
-        
+
         elements.append(Paragraph("Key Metrics", subheading_style))
         dashboard_text = """
         The HQ Dashboard provides a real-time overview of platform activity:
@@ -384,10 +399,10 @@ def staff_tour_guide_pdf(request: HttpRequest) -> HttpResponse:
         """
         elements.append(Paragraph(dashboard_text, body_style))
         elements.append(Spacer(1, 0.2 * inch))
-        
+
         # Section 2: Business Management
         elements.append(Paragraph("2. Business Directory & Management", heading_style))
-        
+
         business_text = """
         Access the Business Directory to view and manage all merchant accounts. You can:
         <br/><br/>
@@ -399,10 +414,10 @@ def staff_tour_guide_pdf(request: HttpRequest) -> HttpResponse:
         """
         elements.append(Paragraph(business_text, body_style))
         elements.append(Spacer(1, 0.2 * inch))
-        
+
         # Section 3: Subscription Management
         elements.append(Paragraph("3. Subscription Management", heading_style))
-        
+
         elements.append(Paragraph("Trial Extensions", subheading_style))
         trial_text = """
         You can extend trial periods for businesses that need more evaluation time:
@@ -417,7 +432,7 @@ def staff_tour_guide_pdf(request: HttpRequest) -> HttpResponse:
         """
         elements.append(Paragraph(trial_text, body_style))
         elements.append(Spacer(1, 0.2 * inch))
-        
+
         elements.append(Paragraph("Plan Changes", subheading_style))
         plan_text = """
         HQ can change subscription plans for businesses:
@@ -430,7 +445,7 @@ def staff_tour_guide_pdf(request: HttpRequest) -> HttpResponse:
         """
         elements.append(Paragraph(plan_text, body_style))
         elements.append(Spacer(1, 0.2 * inch))
-        
+
         elements.append(Paragraph("Activation", subheading_style))
         activation_text = """
         To activate a trial subscription immediately (convert to paid):
@@ -441,13 +456,13 @@ def staff_tour_guide_pdf(request: HttpRequest) -> HttpResponse:
         • Next billing date is set automatically
         """
         elements.append(Paragraph(activation_text, body_style))
-        
+
         # Add page break
         elements.append(PageBreak())
-        
+
         # Section 4: Invoice Management
         elements.append(Paragraph("4. Invoice & Payment Tracking", heading_style))
-        
+
         invoice_text = """
         Monitor payment status and financial health through the Invoices section:
         <br/><br/>
@@ -465,10 +480,10 @@ def staff_tour_guide_pdf(request: HttpRequest) -> HttpResponse:
         """
         elements.append(Paragraph(invoice_text, body_style))
         elements.append(Spacer(1, 0.2 * inch))
-        
+
         # Section 5: Account Support
         elements.append(Paragraph("5. Account Support Tools", heading_style))
-        
+
         support_text = """
         HQ staff have access to powerful support tools for assisting merchants:
         <br/><br/>
@@ -493,10 +508,10 @@ def staff_tour_guide_pdf(request: HttpRequest) -> HttpResponse:
         """
         elements.append(Paragraph(support_text, body_style))
         elements.append(Spacer(1, 0.2 * inch))
-        
+
         # Section 6: Analytics
         elements.append(Paragraph("6. Analytics & Reporting", heading_style))
-        
+
         analytics_text = """
         The HQ Analytics page provides deep insights into platform performance:
         <br/><br/>
@@ -508,13 +523,13 @@ def staff_tour_guide_pdf(request: HttpRequest) -> HttpResponse:
         • <b>Inventory Insights:</b> Monitor stock turnover and sell-through rates
         """
         elements.append(Paragraph(analytics_text, body_style))
-        
+
         # Add page break
         elements.append(PageBreak())
-        
+
         # Section 7: Contract Management
         elements.append(Paragraph("7. Contract Management", heading_style))
-        
+
         contract_text = """
         Manage merchant service agreements through the Contracts section:
         <br/><br/>
@@ -527,10 +542,10 @@ def staff_tour_guide_pdf(request: HttpRequest) -> HttpResponse:
         """
         elements.append(Paragraph(contract_text, body_style))
         elements.append(Spacer(1, 0.2 * inch))
-        
+
         # Section 8: Troubleshooting
         elements.append(Paragraph("8. Common Troubleshooting", heading_style))
-        
+
         elements.append(Paragraph("Issue: Merchant can't log in", subheading_style))
         troubleshoot1 = """
         1. Check if account is locked (failed login attempts)<br/>
@@ -541,7 +556,7 @@ def staff_tour_guide_pdf(request: HttpRequest) -> HttpResponse:
         """
         elements.append(Paragraph(troubleshoot1, body_style))
         elements.append(Spacer(1, 0.15 * inch))
-        
+
         elements.append(Paragraph("Issue: Subscription not renewing", subheading_style))
         troubleshoot2 = """
         1. Check subscription status (should be ACTIVE)<br/>
@@ -552,7 +567,7 @@ def staff_tour_guide_pdf(request: HttpRequest) -> HttpResponse:
         """
         elements.append(Paragraph(troubleshoot2, body_style))
         elements.append(Spacer(1, 0.15 * inch))
-        
+
         elements.append(Paragraph("Issue: Agent limit reached", subheading_style))
         troubleshoot3 = """
         1. Check business's current plan (Starter = 0, Pro = 5, Pro Max = unlimited)<br/>
@@ -562,10 +577,10 @@ def staff_tour_guide_pdf(request: HttpRequest) -> HttpResponse:
         """
         elements.append(Paragraph(troubleshoot3, body_style))
         elements.append(Spacer(1, 0.2 * inch))
-        
+
         # Section 9: Security & Best Practices
         elements.append(Paragraph("9. Security & Best Practices", heading_style))
-        
+
         security_text = """
         As an HQ administrator, follow these guidelines:
         <br/><br/>
@@ -578,7 +593,7 @@ def staff_tour_guide_pdf(request: HttpRequest) -> HttpResponse:
         """
         elements.append(Paragraph(security_text, body_style))
         elements.append(Spacer(1, 0.3 * inch))
-        
+
         # Footer
         footer_text = """
         <br/><br/>
@@ -589,42 +604,43 @@ def staff_tour_guide_pdf(request: HttpRequest) -> HttpResponse:
         <b>Last Updated:</b> December 2025
         """
         elements.append(Paragraph(footer_text, body_style))
-        
+
         # Build PDF
         doc.build(elements)
-        
+
         # Get the PDF data from the buffer
         pdf_data = buffer.getvalue()
         buffer.close()
-        
+
         # Create the HTTP response with PDF
-        response = HttpResponse(content_type='application/pdf')
-        response['Content-Disposition'] = 'attachment; filename="hq_staff_tour_guide.pdf"'
+        response = HttpResponse(content_type="application/pdf")
+        response["Content-Disposition"] = 'attachment; filename="hq_staff_tour_guide.pdf"'
         response.write(pdf_data)
-        
+
         # Log download in audit if available
         try:
             from audit.utils import log_hq_action
+
             log_hq_action(
                 request,
                 action="DOWNLOAD_TOUR_GUIDE",
                 entity_type="HQ_DOCUMENTATION",
-                message="Downloaded HQ Staff Tour Guide PDF"
+                message="Downloaded HQ Staff Tour Guide PDF",
             )
         except Exception:
             pass  # Audit logging is optional
-        
+
         return response
-    
+
     except Exception as e:
         # Never 500 - return a friendly error
         import logging
+
         logger = logging.getLogger(__name__)
         logger.exception("Error generating HQ tour guide PDF")
-        
+
         return HttpResponse(
             f"Unable to generate PDF at this time. Please contact support. (Error: {str(e)})",
             status=500,
-            content_type="text/plain"
+            content_type="text/plain",
         )
-

@@ -27,7 +27,6 @@ def create_cement_grocery_tables_if_missing(apps, schema_editor):
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         ("inventory", "0061_make_barcode_nullable"),
         ("tenants", "0018_add_cement_grocery_sales_and_costs"),
@@ -55,9 +54,7 @@ class Migration(migrations.Migration):
                             models.DecimalField(
                                 decimal_places=2,
                                 max_digits=12,
-                                validators=[
-                                    django.core.validators.MinValueValidator(Decimal("0.01"))
-                                ],
+                                validators=[django.core.validators.MinValueValidator(Decimal("0.01"))],
                             ),
                         ),
                         (
@@ -87,9 +84,7 @@ class Migration(migrations.Migration):
                         ),
                         (
                             "created_at",
-                            models.DateTimeField(
-                                db_index=True, default=django.utils.timezone.now
-                            ),
+                            models.DateTimeField(db_index=True, default=django.utils.timezone.now),
                         ),
                         (
                             "business",
@@ -152,9 +147,7 @@ class Migration(migrations.Migration):
                             models.DecimalField(
                                 decimal_places=2,
                                 max_digits=10,
-                                validators=[
-                                    django.core.validators.MinValueValidator(Decimal("0.01"))
-                                ],
+                                validators=[django.core.validators.MinValueValidator(Decimal("0.01"))],
                             ),
                         ),
                         ("total_price", models.DecimalField(decimal_places=2, max_digits=12)),
@@ -192,9 +185,7 @@ class Migration(migrations.Migration):
                         ),
                         (
                             "sold_at",
-                            models.DateTimeField(
-                                db_index=True, default=django.utils.timezone.now
-                            ),
+                            models.DateTimeField(db_index=True, default=django.utils.timezone.now),
                         ),
                         ("notes", models.TextField(blank=True, default="")),
                         (
@@ -256,9 +247,7 @@ class Migration(migrations.Migration):
                             models.DecimalField(
                                 decimal_places=2,
                                 max_digits=10,
-                                validators=[
-                                    django.core.validators.MinValueValidator(Decimal("0.01"))
-                                ],
+                                validators=[django.core.validators.MinValueValidator(Decimal("0.01"))],
                             ),
                         ),
                         ("total_price", models.DecimalField(decimal_places=2, max_digits=12)),
@@ -306,9 +295,7 @@ class Migration(migrations.Migration):
                         ),
                         (
                             "sold_at",
-                            models.DateTimeField(
-                                db_index=True, default=django.utils.timezone.now
-                            ),
+                            models.DateTimeField(db_index=True, default=django.utils.timezone.now),
                         ),
                         ("notes", models.TextField(blank=True, default="")),
                         (
@@ -360,8 +347,5 @@ class Migration(migrations.Migration):
             database_operations=[],
         ),
         # Step B: Create tables in database (models are now in state)
-        migrations.RunPython(
-            create_cement_grocery_tables_if_missing,
-            reverse_code=migrations.RunPython.noop
-        ),
+        migrations.RunPython(create_cement_grocery_tables_if_missing, reverse_code=migrations.RunPython.noop),
     ]

@@ -19,4 +19,3 @@ def no_business(request):
         }
     )
     return render(request, "verticals/no_business.html", ctx)
-

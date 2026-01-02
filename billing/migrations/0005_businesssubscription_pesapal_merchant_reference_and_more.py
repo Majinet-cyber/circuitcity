@@ -5,7 +5,6 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         ("billing", "0004_businesssubscription_canceled_at_and_more"),
         ("tenants", "0011_agentinvite_temp_password_hash_and_more"),
@@ -36,9 +35,7 @@ class Migration(migrations.Migration):
         migrations.AddField(
             model_name="businesssubscription",
             name="stripe_customer_id",
-            field=models.CharField(
-                blank=True, default="", help_text="Stripe customer ID", max_length=255
-            ),
+            field=models.CharField(blank=True, default="", help_text="Stripe customer ID", max_length=255),
         ),
         migrations.AddField(
             model_name="businesssubscription",
@@ -96,9 +93,7 @@ class Migration(migrations.Migration):
         ),
         migrations.AddIndex(
             model_name="businesssubscription",
-            index=models.Index(
-                fields=["stripe_subscription_id"], name="billing_bus_stripe__8dd88f_idx"
-            ),
+            index=models.Index(fields=["stripe_subscription_id"], name="billing_bus_stripe__8dd88f_idx"),
         ),
         migrations.AddIndex(
             model_name="businesssubscription",

@@ -43,6 +43,7 @@ except Exception:  # pragma: no cover
 
 # ---------------- helpers ----------------
 
+
 def _agent_field_name() -> str | None:
     names = {f.name for f in LaybyOrder._meta.get_fields()}
     if "agent" in names:
@@ -96,12 +97,7 @@ def _serialize_order(o: LaybyOrder) -> dict[str, Any]:
     balance = max(total - amount_paid, Decimal("0.00"))
 
     # Product
-    product = (
-        getattr(o, "product_name", None)
-        or getattr(o, "item_name", None)
-        or getattr(o, "product", None)
-        or ""
-    )
+    product = getattr(o, "product_name", None) or getattr(o, "item_name", None) or getattr(o, "product", None) or ""
     sku = getattr(o, "product_sku", None) or getattr(o, "sku", None) or ""
     ref = getattr(o, "ref", None) or getattr(o, "reference", "") or ""
 
@@ -150,6 +146,7 @@ def _render_or_inline(
 
 
 # ---------- extra helpers for customer portal (history + messages) -----------
+
 
 def _dt_as_str(obj) -> str:
     """
@@ -228,6 +225,7 @@ def _collect_sms(order_obj):
 
 
 # ---------------- Agent views ----------------
+
 
 @login_required
 def agent_dashboard(request: HttpRequest) -> HttpResponse:
@@ -383,6 +381,7 @@ def agent_new(request: HttpRequest) -> HttpResponse:
 
 # ---------------- Admin dashboard (customers + alerts + colors) ----------------
 
+
 def _color_for(name: str) -> str:
     palette = ["#ffeb3b", "#03a9f4", "#8bc34a", "#e91e63", "#ff9800", "#9c27b0", "#00bcd4", "#cddc39"]
     if not name:
@@ -403,13 +402,20 @@ def admin_dashboard(request: HttpRequest) -> HttpResponse:
     paid_this_week = Decimal("0.00")
     try:
         from .models import LaybyPayment  # type: ignore
+
         week_ago = timezone.now() - timedelta(days=7)
         if hasattr(LaybyPayment, "created_at"):
-            paid_this_week = _money(LaybyPayment.objects.filter(created_at__gte=week_ago).aggregate(s=Sum("amount"))["s"])
+            paid_this_week = _money(
+                LaybyPayment.objects.filter(created_at__gte=week_ago).aggregate(s=Sum("amount"))["s"]
+            )
         elif hasattr(LaybyPayment, "timestamp"):
-            paid_this_week = _money(LaybyPayment.objects.filter(timestamp__gte=week_ago).aggregate(s=Sum("amount"))["s"])
+            paid_this_week = _money(
+                LaybyPayment.objects.filter(timestamp__gte=week_ago).aggregate(s=Sum("amount"))["s"]
+            )
         elif hasattr(LaybyPayment, "date"):
-            paid_this_week = _money(LaybyPayment.objects.filter(date__gte=week_ago.date()).aggregate(s=Sum("amount"))["s"])
+            paid_this_week = _money(
+                LaybyPayment.objects.filter(date__gte=week_ago.date()).aggregate(s=Sum("amount"))["s"]
+            )
         else:
             paid_this_week = _money(LaybyPayment.objects.aggregate(s=Sum("amount"))["s"])
     except Exception:
@@ -493,6 +499,7 @@ def admin_dashboard(request: HttpRequest) -> HttpResponse:
 
 
 # ---------------- Admin: customer detail ----------------
+
 
 @staff_member_required
 def admin_customer(request: HttpRequest) -> HttpResponse:
@@ -593,6 +600,7 @@ def admin_customer(request: HttpRequest) -> HttpResponse:
 
 # ---------------- Customer OTP flow ----------------
 
+
 def customer_login(request: HttpRequest) -> HttpResponse:
     return _render_or_inline(
         request,
@@ -682,6 +690,7 @@ def customer_portal(request: HttpRequest) -> HttpResponse:
 
 # ---------------- Pay Now (QR + deep link) ----------------
 
+
 @login_required
 def pay_now(request: HttpRequest, order_id: int) -> HttpResponse:
     order = get_object_or_404(LaybyOrder, pk=order_id)
@@ -752,6 +761,7 @@ def agent_add_payment(request: HttpRequest, order_id: int) -> HttpResponse:
 
 # ---------------- Manager views (primary sidebar entry point) ----------------
 
+
 @login_required
 def manager_dashboard(request: HttpRequest) -> HttpResponse:
     """
@@ -759,52 +769,52 @@ def manager_dashboard(request: HttpRequest) -> HttpResponse:
     Shows all layby orders for the business with payment status and progress.
     """
     from inventory.helpers import get_active_business, business_vertical
-    
+
     # Get business context
     try:
         business = get_active_business(request)
     except Exception:
         business = None
-    
+
     # Filter laybys by business if we can determine it
     qs = LaybyOrder.objects.all()
     field = _agent_field_name()
-    
+
     # If there's a business field on LaybyOrder, filter by it
     try:
-        if hasattr(LaybyOrder, 'business') and business:
+        if hasattr(LaybyOrder, "business") and business:
             qs = qs.filter(business=business)
-        elif hasattr(LaybyOrder, 'location') and hasattr(request.user, 'location'):
+        elif hasattr(LaybyOrder, "location") and hasattr(request.user, "location"):
             if request.user.location:
                 qs = qs.filter(location=request.user.location)
     except Exception:
         pass
-    
+
     qs = qs.order_by("-id")[:500]
-    
+
     # Serialize with computed fields
     orders = []
     for o in qs:
         ser = _serialize_order(o)
         # Calculate percentage paid
         try:
-            total = ser.get('total') or Decimal("0.00")
-            paid = ser.get('amount_paid') or Decimal("0.00")
+            total = ser.get("total") or Decimal("0.00")
+            paid = ser.get("amount_paid") or Decimal("0.00")
             if total > 0:
                 pct = (paid / total) * 100
             else:
                 pct = 0
-            ser['percentage_paid'] = min(pct, 100)
+            ser["percentage_paid"] = min(pct, 100)
         except Exception:
-            ser['percentage_paid'] = 0
+            ser["percentage_paid"] = 0
         orders.append(ser)
-    
+
     # Aggregates
     total_balance = sum((o.get("balance", Decimal("0.00")) for o in orders), Decimal("0"))
     count_active = sum(1 for o in orders if (o.get("status") or "").lower() == "active")
     total_value = sum((o.get("total", Decimal("0.00")) for o in orders), Decimal("0"))
     total_paid = sum((o.get("amount_paid", Decimal("0.00")) for o in orders), Decimal("0"))
-    
+
     return render(
         request,
         "layby/manager_dashboard.html",
@@ -827,22 +837,22 @@ def manager_detail(request: HttpRequest, pk: int) -> HttpResponse:
     """
     order = get_object_or_404(LaybyOrder, pk=pk)
     ser = _serialize_order(order)
-    
+
     # Calculate percentage
     try:
-        total = ser.get('total') or Decimal("0.00")
-        paid = ser.get('amount_paid') or Decimal("0.00")
+        total = ser.get("total") or Decimal("0.00")
+        paid = ser.get("amount_paid") or Decimal("0.00")
         if total > 0:
             pct = (paid / total) * 100
         else:
             pct = 0
-        ser['percentage_paid'] = min(pct, 100)
+        ser["percentage_paid"] = min(pct, 100)
     except Exception:
-        ser['percentage_paid'] = 0
-    
+        ser["percentage_paid"] = 0
+
     # Get payment history
     payments = _collect_payments(order)
-    
+
     # Handle payment submission
     if request.method == "POST" and "add_payment" in request.POST:
         form = LaybyPaymentForm(request.POST)
@@ -856,7 +866,7 @@ def manager_detail(request: HttpRequest, pk: int) -> HttpResponse:
             return redirect("layby:detail", pk=order.pk)
     else:
         form = LaybyPaymentForm()
-    
+
     return render(
         request,
         "layby/manager_detail.html",
@@ -884,7 +894,7 @@ def manager_new_sale(request: HttpRequest) -> HttpResponse:
             return redirect("layby:detail", pk=order.pk)
     else:
         form = LaybyOrderForm()
-    
+
     return render(
         request,
         "layby/manager_new.html",
@@ -894,5 +904,3 @@ def manager_new_sale(request: HttpRequest) -> HttpResponse:
             "active_nav": "layby",
         },
     )
-
-

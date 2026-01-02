@@ -1,6 +1,7 @@
 ﻿# layby/apps.py
 from django.apps import AppConfig
 
+
 class LaybyConfig(AppConfig):
     default_auto_field = "django.db.models.BigAutoField"
     # IMPORTANT: use top-level package name
@@ -13,5 +14,3 @@ class LaybyConfig(AppConfig):
             import layby.signals  # noqa: F401
         except Exception:
             pass
-
-

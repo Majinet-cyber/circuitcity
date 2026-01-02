@@ -5,11 +5,13 @@ from django.conf import settings
 # Phase 4 â€” Data & Forecasting
 # ============================
 
+
 class DailyKPI(models.Model):
     """
     Per (store_id, product, day) aggregates used as a lightweight feature store.
     store_id is kept as a plain integer to avoid coupling to a specific Store model.
     """
+
     store_id = models.IntegerField(db_index=True, null=True, blank=True)
     product = models.ForeignKey("inventory.Product", on_delete=models.CASCADE)
     d = models.DateField()
@@ -34,31 +36,37 @@ class ForecastRun(models.Model):
     """
     A run groups forecast items (e.g., one nightly run).
     """
+
     created_at = models.DateTimeField(auto_now_add=True)
     algo = models.CharField(max_length=30, default="ema_weekday")
     horizon_days = models.PositiveSmallIntegerField(default=14)
     notes = models.TextField(blank=True)
 
     def __str__(self):
-        return f"ForecastRun(id={self.id}, algo={self.algo}, horizon={self.horizon_days}, at={self.created_at:%Y-%m-%d})"
+        return (
+            f"ForecastRun(id={self.id}, algo={self.algo}, horizon={self.horizon_days}, at={self.created_at:%Y-%m-%d})"
+        )
 
 
 class ForecastItem(models.Model):
     """
     Per (store_id, product, date) forecast values for the coming horizon.
     """
+
     run = models.ForeignKey(ForecastRun, on_delete=models.CASCADE, related_name="items")
     store_id = models.IntegerField(db_index=True, null=True, blank=True)
     product = models.ForeignKey("inventory.Product", on_delete=models.CASCADE)
     date = models.DateField()
-    yhat = models.FloatField()               # point forecast (units)
-    ylo  = models.FloatField(null=True, blank=True)  # P20 (or similar) bound
-    yhi  = models.FloatField(null=True, blank=True)  # P80 (or similar) bound
+    yhat = models.FloatField()  # point forecast (units)
+    ylo = models.FloatField(null=True, blank=True)  # P20 (or similar) bound
+    yhi = models.FloatField(null=True, blank=True)  # P80 (or similar) bound
     mape = models.FloatField(null=True, blank=True)  # backtest quality if available
 
     class Meta:
         constraints = [
-            models.UniqueConstraint(fields=["run", "store_id", "product", "date"], name="uniq_forecastitem_run_scope_day")
+            models.UniqueConstraint(
+                fields=["run", "store_id", "product", "date"], name="uniq_forecastitem_run_scope_day"
+            )
         ]
         indexes = [
             models.Index(fields=["store_id", "product"]),
@@ -74,6 +82,7 @@ class InventoryPolicy(models.Model):
     """
     Policy parameters per (store_id, product) used to compute ROP, safety stock, etc.
     """
+
     store_id = models.IntegerField(db_index=True, null=True, blank=True)
     product = models.ForeignKey("inventory.Product", on_delete=models.CASCADE)
     lead_time_days = models.FloatField(default=7)
@@ -81,9 +90,7 @@ class InventoryPolicy(models.Model):
     safety_factor = models.FloatField(default=1.0)
 
     class Meta:
-        constraints = [
-            models.UniqueConstraint(fields=["store_id", "product"], name="uniq_invpolicy_storeid_product")
-        ]
+        constraints = [models.UniqueConstraint(fields=["store_id", "product"], name="uniq_invpolicy_storeid_product")]
         indexes = [
             models.Index(fields=["store_id", "product"]),
         ]
@@ -96,6 +103,7 @@ class ReorderAdvice(models.Model):
     """
     Snapshot advice row produced by the nightly forecast/policy engine.
     """
+
     store_id = models.IntegerField(db_index=True, null=True, blank=True)
     product = models.ForeignKey("inventory.Product", on_delete=models.CASCADE)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -110,18 +118,22 @@ class ReorderAdvice(models.Model):
         ]
 
     def __str__(self):
-        return (f"ReorderAdvice(store_id={self.store_id}, product={self.product_id}, "
-                f"ROP={self.reorder_point}, qty={self.recommend_qty})")
+        return (
+            f"ReorderAdvice(store_id={self.store_id}, product={self.product_id}, "
+            f"ROP={self.reorder_point}, qty={self.recommend_qty})"
+        )
 
 
 # ==================================
 # Phase 4.2 â€” Notifications & Emails
 # ==================================
 
+
 class Notification(models.Model):
     """
     In-app (and optionally emailed) notifications for users.
     """
+
     KIND_CHOICES = (
         ("low_stock", "Low Stock"),
         ("nudge", "Nudge"),
@@ -159,6 +171,7 @@ class EmailReportLog(models.Model):
     """
     Audit trail for weekly (or other) email reports.
     """
+
     report_key = models.CharField(max_length=40)  # e.g., "weekly-2025W35-store3"
     sent_to = models.EmailField()
     created_at = models.DateTimeField(auto_now_add=True)
@@ -179,10 +192,12 @@ class EmailReportLog(models.Model):
 # Phase 5 â€” Gamification
 # =======================
 
+
 class Badge(models.Model):
     """
     Static badge catalog (seeded via management command).
     """
+
     code = models.SlugField(primary_key=True)
     name = models.CharField(max_length=60)
     emoji = models.CharField(max_length=8, default="ðŸ…")
@@ -197,15 +212,14 @@ class AgentBadge(models.Model):
     """
     Awarded badges for an agent (map to your AUTH_USER instead of inventory.Agent).
     """
+
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
     badge = models.ForeignKey(Badge, on_delete=models.CASCADE)
     awarded_at = models.DateTimeField(auto_now_add=True)
     meta = models.JSONField(default=dict, blank=True)
 
     class Meta:
-        constraints = [
-            models.UniqueConstraint(fields=["user", "badge"], name="uniq_user_badge_once")
-        ]
+        constraints = [models.UniqueConstraint(fields=["user", "badge"], name="uniq_user_badge_once")]
         indexes = [
             models.Index(fields=["user", "-awarded_at"]),
         ]
@@ -219,8 +233,9 @@ class LeaderboardSnapshot(models.Model):
     """
     Snapshot of leaderboard standings for a period & metric.
     """
+
     period_start = models.DateField()
-    period_end   = models.DateField()
+    period_end = models.DateField()
     scope = models.CharField(max_length=12, choices=[("week", "week"), ("month", "month")])
     metric = models.CharField(max_length=12, choices=[("units", "units"), ("revenue", "revenue"), ("profit", "profit")])
     data = models.JSONField()  # [{user_id, name, units, revenue, profit, rank}]
@@ -241,11 +256,13 @@ class LeaderboardSnapshot(models.Model):
 # Legacy/Simple Forecast table (kept for compatibility)
 # ==================================================
 
+
 class Forecast(models.Model):
     """
     Simple flat forecast table you already had: one row per (product, date).
     Kept as-is for compatibility; new features use ForecastRun/ForecastItem.
     """
+
     product = models.ForeignKey("inventory.Product", on_delete=models.CASCADE, null=True, blank=True)
     date = models.DateField()
     predicted_units = models.IntegerField()
@@ -253,9 +270,7 @@ class Forecast(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
-        constraints = [
-            models.UniqueConstraint(fields=["product", "date"], name="uniq_forecast_product_date")
-        ]
+        constraints = [models.UniqueConstraint(fields=["product", "date"], name="uniq_forecast_product_date")]
         ordering = ["date"]
         indexes = [
             models.Index(fields=["product", "date"]),
@@ -269,6 +284,7 @@ class Forecast(models.Model):
 # Currency Setting (singleton) â€” for display & FX rates
 # =====================================================
 
+
 class CurrencySetting(models.Model):
     """
     Singleton for currency config and cached FX rates.
@@ -278,6 +294,7 @@ class CurrencySetting(models.Model):
     - rates: mapping where value is how many DISPLAY units one BASE unit buys, e.g.
              if base=MWK and display=USD, rates["USD"] = 0.00059
     """
+
     base_currency = models.CharField(max_length=8, default="MWK")
     display_currency = models.CharField(max_length=8, default="MWK")
     rates = models.JSONField(default=dict, blank=True)  # {"USD": 0.00059, "ZAR": 0.0103, ...}
@@ -294,5 +311,3 @@ class CurrencySetting(models.Model):
     def get(cls):
         obj, _ = cls.objects.get_or_create(pk=1)
         return obj
-
-

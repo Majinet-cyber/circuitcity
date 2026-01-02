@@ -16,10 +16,12 @@ except Exception:  # pragma: no cover
     def set_current_business_id(_):  # type: ignore
         return
 
+
 try:
     # Canonical helpers that also write legacy session keys in this project
     from tenants.utils import set_active_business, get_active_business  # type: ignore
 except Exception:  # pragma: no cover
+
     def set_active_business(_request, _biz):  # type: ignore
         return
 
@@ -30,6 +32,7 @@ except Exception:  # pragma: no cover
 # -------------------------------------------------------------------
 # Small helpers (safe if fields/models are missing)
 # -------------------------------------------------------------------
+
 
 def _has_field(model, field_name: str) -> bool:
     try:
@@ -119,6 +122,7 @@ def _clear_tenant_session(request) -> None:
         try:
             # Canonical key may be customized in settings
             from django.conf import settings
+
             key = getattr(settings, "TENANT_SESSION_KEY", "active_business_id")
             try:
                 request.session.pop(key, None)
@@ -176,13 +180,15 @@ def _activate_on_request(request, business) -> None:
 # Auth signal handlers (privacy-first; defense-in-depth)
 # -------------------------------------------------------------------
 
+
 @receiver(user_logged_in)
 def _set_default_business(sender, request, user, **kwargs):
     """
     After login (privacy-first):
       0) Cycle the session key to prevent session fixation.
+      0.5) PHASE 3: Capture session metadata (device, IP, login time)
       1) If a business is already active for this request/session, keep it.
-      2) Else pick the most recent ACTIVE membership’s business (and Business must be ACTIVE, if that field exists).
+      2) Else pick the most recent ACTIVE membership's business (and Business must be ACTIVE, if that field exists).
       3) Else pick an ACTIVE business the user owns/created.
       4) Else clear any stale tenant context.
 
@@ -195,6 +201,14 @@ def _set_default_business(sender, request, user, **kwargs):
             request.session.cycle_key()
     except Exception:
         pass
+
+    # 0.5) PHASE 3: Capture session metadata
+    try:
+        from .session_metadata import capture_session_metadata
+
+        capture_session_metadata(request)
+    except Exception:
+        pass  # Never break login flow
 
     # 1) Respect any previously chosen business for this session
     try:

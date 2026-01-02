@@ -7,7 +7,9 @@ DEBUG = False
 
 # Secrets / hosts
 SECRET_KEY = os.environ.get("SECRET_KEY", "unsafe-default-change-me")
-ALLOWED_HOSTS = [h.strip() for h in os.environ.get("ALLOWED_HOSTS", ".onrender.com,localhost,127.0.0.1").split(",") if h.strip()]
+ALLOWED_HOSTS = [
+    h.strip() for h in os.environ.get("ALLOWED_HOSTS", ".onrender.com,localhost,127.0.0.1").split(",") if h.strip()
+]
 
 # CSRF requires scheme; include your Render URL(s)
 # Example: https://your-service.onrender.com
@@ -17,9 +19,7 @@ _csrf_hosts.update({f"https://{h}" for h in ALLOWED_HOSTS if h and not h.startsw
 CSRF_TRUSTED_ORIGINS = sorted(_csrf_hosts | {"https://*.onrender.com"})
 
 # DB (Render gives DATABASE_URL); SSL & pooling
-DATABASES = {
-    "default": dj_database_url.config(conn_max_age=600, ssl_require=True)
-}
+DATABASES = {"default": dj_database_url.config(conn_max_age=600, ssl_require=True)}
 
 # Static files via WhiteNoise (no code changes needed)
 STATIC_URL = "/static/"
@@ -51,5 +51,3 @@ LOGGING = {
     "handlers": {"console": {"class": "logging.StreamHandler"}},
     "root": {"handlers": ["console"], "level": "INFO"},
 }
-
-

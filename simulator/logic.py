@@ -74,14 +74,14 @@ def run_deterministic(s: Dict[str, Any]) -> Dict[str, Any]:
     DAYS_PER_MONTH = Decimal(30)
     total_days = int(months * int(DAYS_PER_MONTH))
 
-    daily_units0 = (baseline_monthly_units / DAYS_PER_MONTH)
+    daily_units0 = baseline_monthly_units / DAYS_PER_MONTH
     # Compound conversion: (1+gm)^(1/30) - 1
     if monthly_growth > 0:
         daily_growth = Decimal(pow(float(Decimal(1) + monthly_growth), 1.0 / float(DAYS_PER_MONTH))) - Decimal(1)
     else:
         daily_growth = Decimal(0)
 
-    daily_fixed = (monthly_fixed / DAYS_PER_MONTH)
+    daily_fixed = monthly_fixed / DAYS_PER_MONTH
 
     unit_cost = _q2(price * var_pct)  # displayed KPI
     # running cumulatives
@@ -124,15 +124,17 @@ def run_deterministic(s: Dict[str, Any]) -> Dict[str, Any]:
         cash = _q2(cash + net_cash_flow)
 
         # Placeholder 'stock' metric (0.0) to satisfy UI; inventory can be added later
-        series.append({
-            "day": d,
-            "sold": float(sold),
-            "stock": 0.0,
-            "revenue_cum": float(cum_revenue),
-            "gross_profit_cum": float(cum_gp),
-            "op_profit_cum": float(cum_op),
-            "cash_cum": float(cash),
-        })
+        series.append(
+            {
+                "day": d,
+                "sold": float(sold),
+                "stock": 0.0,
+                "revenue_cum": float(cum_revenue),
+                "gross_profit_cum": float(cum_gp),
+                "op_profit_cum": float(cum_op),
+                "cash_cum": float(cash),
+            }
+        )
 
     # ---- KPIs (totals) ----
     kpis = {
@@ -147,5 +149,3 @@ def run_deterministic(s: Dict[str, Any]) -> Dict[str, Any]:
     }
 
     return {"series": series, "kpis": kpis}
-
-

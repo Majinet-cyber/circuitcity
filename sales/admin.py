@@ -7,8 +7,14 @@ from .models import Sale
 @admin.register(Sale)
 class SaleAdmin(admin.ModelAdmin):
     list_display = (
-        "id", "item", "agent", "location",
-        "sold_at", "price", "commission_pct", "commission",
+        "id",
+        "item",
+        "agent",
+        "location",
+        "sold_at",
+        "price",
+        "commission_pct",
+        "commission",
         "created_at",
     )
     list_filter = ("location", "agent", "sold_at", "created_at")
@@ -34,5 +40,3 @@ class SaleAdmin(admin.ModelAdmin):
     @admin.display(ordering="_commission", description="Commission")
     def commission(self, obj):
         return obj._commission
-
-

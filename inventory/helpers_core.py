@@ -7,36 +7,64 @@ from django.urls import reverse, NoReverseMatch
 # ------------------------------------------------------------------
 # Canonical vertical keys
 # ------------------------------------------------------------------
-PHONES   = "phones"
+PHONES = "phones"
 PHARMACY = "pharmacy"
 CLOTHING = "clothing"
-LIQUOR   = "liquor"
-GROCERY  = "grocery"
-GYM      = "gym"
-GENERIC  = "generic"
+LIQUOR = "liquor"
+GROCERY = "grocery"
+GYM = "gym"
+GENERIC = "generic"
 
 # Synonyms / legacy labels -> canonical keys
 _ALIASES: Dict[str, str] = {
     # phones / electronics
-    "phone": PHONES, "phones": PHONES, "mobile": PHONES, "mobiles": PHONES,
-    "electronics": PHONES, "phones & electronics": PHONES, "merch": PHONES,
+    "phone": PHONES,
+    "phones": PHONES,
+    "mobile": PHONES,
+    "mobiles": PHONES,
+    "electronics": PHONES,
+    "phones & electronics": PHONES,
+    "merch": PHONES,
     # pharmacy
-    "pharmacy": PHARMACY, "chemist": PHARMACY, "medicine": PHARMACY, "drugstore": PHARMACY,
+    "pharmacy": PHARMACY,
+    "chemist": PHARMACY,
+    "medicine": PHARMACY,
+    "drugstore": PHARMACY,
     # clothing / fashion
-    "clothing": CLOTHING, "clothes": CLOTHING, "apparel": CLOTHING,
-    "fashion": CLOTHING, "fashion & clothing": CLOTHING,
+    "clothing": CLOTHING,
+    "clothes": CLOTHING,
+    "apparel": CLOTHING,
+    "fashion": CLOTHING,
+    "fashion & clothing": CLOTHING,
     # liquor
-    "liquor": LIQUOR, "alcohol": LIQUOR, "bar": LIQUOR, "bottle-store": LIQUOR, "bottle store": LIQUOR,
+    "liquor": LIQUOR,
+    "alcohol": LIQUOR,
+    "bar": LIQUOR,
+    "bottle-store": LIQUOR,
+    "bottle store": LIQUOR,
     # grocery / retail
-    "grocery": GROCERY, "groceries": GROCERY, "supermarket": GROCERY, "retail": GROCERY,
+    "grocery": GROCERY,
+    "groceries": GROCERY,
+    "supermarket": GROCERY,
+    "retail": GROCERY,
     "supermarket & groceries": GROCERY,
     # gym / fitness
-    "gym": GYM, "fitness": GYM, "fit": GYM,
+    "gym": GYM,
+    "fitness": GYM,
+    "fit": GYM,
 }
 
 # Which fields on Business we will probe to determine vertical
 _BIZ_FIELDS: tuple[str, ...] = (
-    "template_key", "vertical", "category", "industry", "type", "kind", "sector", "business_kind", "business_type"
+    "template_key",
+    "vertical",
+    "category",
+    "industry",
+    "type",
+    "kind",
+    "sector",
+    "business_kind",
+    "business_type",
 )
 
 # Session keys that might carry a business id or a vertical override
@@ -55,6 +83,7 @@ def _norm_label(v: Optional[str]) -> str:
     """
     key = (v or "").strip().lower()
     return _ALIASES.get(key, PHONES)
+
 
 def _try_reverse(names: Iterable[str]) -> str:
     """
@@ -104,6 +133,7 @@ def get_active_business(request):
     if bid:
         try:
             from tenants.models import Business
+
             return Business.objects.filter(id=bid).first()
         except Exception:
             return None
@@ -194,16 +224,20 @@ def product_new_url_for_business(business) -> str:
         return _try_reverse(("inventory:pharmacy_product_new",))
 
     if mode == CLOTHING:
-        return _try_reverse((
-            "inventory:clothing_product_new_v2",  # v2 (preferred)
-            "inventory:clothing_product_new",     # legacy
-        ))
+        return _try_reverse(
+            (
+                "inventory:clothing_product_new_v2",  # v2 (preferred)
+                "inventory:clothing_product_new",  # legacy
+            )
+        )
 
     if mode == LIQUOR:
-        return _try_reverse((
-            "inventory:liquor_product_new_v2",    # v2 (preferred)
-            "inventory:liquor_product_new",       # legacy
-        ))
+        return _try_reverse(
+            (
+                "inventory:liquor_product_new_v2",  # v2 (preferred)
+                "inventory:liquor_product_new",  # legacy
+            )
+        )
 
     if mode == GROCERY:
         return _try_reverse(("inventory:product_create_grocery",))
@@ -238,5 +272,3 @@ def add_product_entry_url() -> str:
         return reverse("inventory:product_new_entry")
     except NoReverseMatch:
         return "/inventory/products/new/"
-
-

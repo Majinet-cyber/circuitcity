@@ -12,6 +12,7 @@ from django.core.exceptions import ImproperlyConfigured
 # Register .webmanifest MIME type for PWA installability
 mimetypes.add_type("application/manifest+json", ".webmanifest")
 
+
 # --------------------------- helpers ---------------------------
 def env_bool(key: str, default: bool = False) -> bool:
     v = os.environ.get(key)
@@ -79,7 +80,9 @@ SECRET_KEY = os.environ.get(
 
 IS_RUNSERVER = any(arg in sys.argv for arg in ("runserver", "runserver_plus"))
 _argv = " ".join(sys.argv).lower()
-TESTING = any(token in _argv for token in (" test", "pytest", "py.test")) or os.environ.get("PYTEST_CURRENT_TEST") is not None
+TESTING = (
+    any(token in _argv for token in (" test", "pytest", "py.test")) or os.environ.get("PYTEST_CURRENT_TEST") is not None
+)
 
 # CI detection (GitHub Actions, CI=true, etc.)
 CI = os.getenv("CI") == "true" or os.getenv("GITHUB_ACTIONS") == "true"
@@ -232,12 +235,12 @@ INSTALLED_APPS = [
     "hq",
     "reports",
     # NEW APPS
-    "support",      # ticket system
-    "audit",        # audit logs UI
+    "support",  # ticket system
+    "audit",  # audit logs UI
     "staticpages",  # Public home page with hero section
-    "backups",      # data backup & export system
+    "backups",  # data backup & export system
     # Email backend
-    "anymail",      # SendGrid email backend via django-anymail
+    "anymail",  # SendGrid email backend via django-anymail
 ]
 
 # Optional dev/helper apps
@@ -256,6 +259,10 @@ print("[cc.settings] Final INSTALLED_APPS:", INSTALLED_APPS)
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
     "whitenoise.middleware.WhiteNoiseMiddleware",  # must be right after SecurityMiddleware
+    # ✅ SECURITY: Remove framework fingerprints (Server, X-Powered-By headers)
+    "cc.middleware_security.RemoveServerHeaderMiddleware",
+    # ✅ SECURITY: Add strict security headers (CSP, Permissions-Policy, etc.)
+    "cc.middleware_security.SecurityHeadersMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "cc.middleware.RequestIDMiddleware",
     "cc.middleware.AccessLogMiddleware",
@@ -284,6 +291,9 @@ MIDDLEWARE = [
     "cc.middleware_twofa.TwoFactorAuthMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
+    # ✅ SECURITY: Safe error responses (no stack traces, generic messages)
+    # Must be LAST to catch all exceptions
+    "cc.middleware_security.SafeErrorResponseMiddleware",
 ]
 
 print("[cc.settings] Final MIDDLEWARE:", MIDDLEWARE)
@@ -341,6 +351,7 @@ SILENCED_SYSTEM_CHECKS = ["templates.E003"]
 
 WSGI_APPLICATION = "cc.wsgi.application"
 
+
 # --------------------------- database ---------------------------
 def _is_ci_environment() -> bool:
     """
@@ -359,17 +370,17 @@ def _detect_local_db_from_config(db_dict: dict, database_url: str = None) -> boo
     Robust local-db detection:
     - Check if DATABASE_URL contains localhost, 127.0.0.1, or ::1
     - OR if DATABASES["default"]["HOST"] equals one of those (covers non-URL config)
-    
+
     Args:
         db_dict: The database configuration dictionary
         database_url: Optional DATABASE_URL string (defaults to os.environ)
     """
     if database_url is None:
         database_url = os.environ.get("DATABASE_URL", "").strip()
-    
+
     if database_url and any(h in database_url for h in ["localhost", "127.0.0.1", "::1"]):
         return True
-    
+
     host = db_dict.get("HOST", "")
     return _is_local_db_host(host)
 
@@ -377,11 +388,11 @@ def _detect_local_db_from_config(db_dict: dict, database_url: str = None) -> boo
 def _force_db_sslmode(db_dict: dict, mode: str) -> None:
     """
     Force SSL mode in database OPTIONS. This is a final override that cannot be bypassed.
-    
+
     Args:
         db_dict: The database configuration dictionary (DATABASES["default"])
         mode: Either "disable" or "require"
-    
+
     This function:
     - Ensures db_dict["OPTIONS"] exists
     - Sets OPTIONS["sslmode"] = mode
@@ -389,10 +400,10 @@ def _force_db_sslmode(db_dict: dict, mode: str) -> None:
     """
     if "OPTIONS" not in db_dict:
         db_dict["OPTIONS"] = {}
-    
+
     opts = db_dict["OPTIONS"]
     opts["sslmode"] = mode
-    
+
     # Remove any cert keys that can force SSL behavior
     for key in ("sslrootcert", "sslcert", "sslkey", "sslmode"):
         # Keep sslmode, remove others
@@ -403,25 +414,25 @@ def _force_db_sslmode(db_dict: dict, mode: str) -> None:
 def _apply_final_ssl_override(databases: dict, database_url: str = None) -> tuple[str | None, bool, bool]:
     """
     Apply final SSL mode override to database configuration.
-    
+
     This function enforces SSL mode rules regardless of what was set earlier:
     - CI + local DB → sslmode=disable
     - Production → sslmode=require
-    
+
     Args:
         databases: The DATABASES dictionary (will be modified in place)
         database_url: Optional DATABASE_URL string for detection (defaults to os.environ)
-    
+
     Returns:
         Tuple of (final_sslmode, ci_detected, local_db_detected)
     """
     if database_url is None:
         database_url = os.environ.get("DATABASE_URL", "").strip()
-    
+
     ci_detected = _is_ci_environment()
     default_db = databases.get("default", {})
     local_db_detected = _detect_local_db_from_config(default_db, database_url)
-    
+
     # Only apply SSL rules to PostgreSQL (skip SQLite)
     if default_db.get("ENGINE", "").endswith("postgresql"):
         if ci_detected or local_db_detected:
@@ -430,10 +441,10 @@ def _apply_final_ssl_override(databases: dict, database_url: str = None) -> tupl
         else:
             _force_db_sslmode(default_db, "require")
             final_sslmode = "require"
-        
+
         databases["default"] = default_db
         return (final_sslmode, ci_detected, local_db_detected)
-    
+
     # Not PostgreSQL, return None to indicate no SSL mode was set
     return (None, ci_detected, local_db_detected)
 
@@ -532,10 +543,7 @@ if default_db.get("ENGINE") == "django.db.backends.sqlite3":
 _final_sslmode, _ci_detected, _local_db_detected = _apply_final_ssl_override(DATABASES, DATABASE_URL)
 if _final_sslmode:
     # Log the final decision (redact DATABASE_URL to avoid printing secrets)
-    print(
-        f"[cc.settings] DB sslmode -> {_final_sslmode} "
-        f"(CI={_ci_detected} IS_LOCAL_DB={_local_db_detected})"
-    )
+    print(f"[cc.settings] DB sslmode -> {_final_sslmode} " f"(CI={_ci_detected} IS_LOCAL_DB={_local_db_detected})")
 
 # ===== RENDER GUARD: Prevent SQLite in production =====
 # On Render, we must use PostgreSQL. Fail fast if misconfigured.
@@ -712,6 +720,7 @@ elif not USE_CONSOLE_EMAIL and not HAS_SENDGRID_KEY:
         pass  # CI uses locmem backend, no validation needed
     elif not IS_RENDER:
         import logging
+
         logger = logging.getLogger(__name__)
         logger.warning(
             "USE_CONSOLE_EMAIL is not set but SENDGRID_API_KEY not found. "
@@ -730,11 +739,9 @@ elif not USE_CONSOLE_EMAIL and not HAS_SENDGRID_KEY:
 # ==============================================================================
 if not DEFAULT_FROM_EMAIL or "@" not in DEFAULT_FROM_EMAIL:
     import logging
+
     logger = logging.getLogger(__name__)
-    logger.warning(
-        "DEFAULT_FROM_EMAIL is not properly configured. "
-        "Falling back to safe default."
-    )
+    logger.warning("DEFAULT_FROM_EMAIL is not properly configured. " "Falling back to safe default.")
     DEFAULT_FROM_EMAIL = "Emajinet <no-reply@emajinet.africa>"
     SERVER_EMAIL = DEFAULT_FROM_EMAIL
 
@@ -751,6 +758,7 @@ except Exception:
 # Warn if from-email domain is not emajinet.africa (deliverability concern)
 if _from_email_domain and _from_email_domain != "emajinet.africa":
     import logging
+
     logger = logging.getLogger(__name__)
     logger.warning(
         f"DEFAULT_FROM_EMAIL domain ({_from_email_domain}) is not emajinet.africa. "
@@ -765,11 +773,7 @@ TWILIO_AUTH_TOKEN = os.environ.get("TWILIO_AUTH_TOKEN", "")
 TWILIO_VERIFY_SERVICE_SID = os.environ.get("TWILIO_VERIFY_SERVICE_SID", "")
 
 # Enable Twilio Verify only if all required credentials are present
-TWILIO_VERIFY_ENABLED = bool(
-    TWILIO_ACCOUNT_SID 
-    and TWILIO_AUTH_TOKEN 
-    and TWILIO_VERIFY_SERVICE_SID
-)
+TWILIO_VERIFY_ENABLED = bool(TWILIO_ACCOUNT_SID and TWILIO_AUTH_TOKEN and TWILIO_VERIFY_SERVICE_SID)
 
 if TWILIO_VERIFY_ENABLED:
     print("[cc.settings] Twilio Verify enabled for SMS 2FA")
@@ -790,6 +794,7 @@ BILLING = {
 # Import centralized pricing configuration
 try:
     from billing.pricing import PLANS as BILLING_PLANS_CONFIG
+
     BILLING_PLANS = {
         code: {
             "code": plan.code,
@@ -851,9 +856,7 @@ if STRIPE_SECRET_KEY:
 # Pesapal (mobile money + cards for Africa)
 PESAPAL_CONSUMER_KEY = os.environ.get("PESAPAL_CONSUMER_KEY", "")
 PESAPAL_CONSUMER_SECRET = os.environ.get("PESAPAL_CONSUMER_SECRET", "")
-PESAPAL_BASE_URL = os.environ.get(
-    "PESAPAL_BASE_URL", "https://cybqa.pesapal.com/pesapalv3/api/"
-)  # sandbox default
+PESAPAL_BASE_URL = os.environ.get("PESAPAL_BASE_URL", "https://cybqa.pesapal.com/pesapalv3/api/")  # sandbox default
 PESAPAL_IPN_ID = os.environ.get("PESAPAL_IPN_ID", "")
 
 # --------------------------- PayChangu (Mobile Money for Malawi) ---------------------------
@@ -862,9 +865,7 @@ PAYCHANGU_PUBLIC_KEY = os.environ.get("PAYCHANGU_PUBLIC_KEY", "")
 PAYCHANGU_SECRET_KEY = os.environ.get("PAYCHANGU_SECRET_KEY", "")
 PAYCHANGU_WEBHOOK_SECRET = os.environ.get("PAYCHANGU_WEBHOOK_SECRET", "")
 PAYCHANGU_WEBHOOK_DEBUG = env_bool("PAYCHANGU_WEBHOOK_DEBUG", False)
-PAYCHANGU_API_BASE = os.environ.get(
-    "PAYCHANGU_API_BASE", "https://api.paychangu.com"
-)
+PAYCHANGU_API_BASE = os.environ.get("PAYCHANGU_API_BASE", "https://api.paychangu.com")
 
 # Production guard: prevent test mode in production
 if not DEBUG and PAYCHANGU_MODE == "test":
@@ -874,14 +875,10 @@ if not DEBUG and PAYCHANGU_MODE == "test":
     )
 
 # --------------------------- whatsapp notifications ---------------------------
-WHATSAPP_API_BASE_URL = os.environ.get(
-    "WHATSAPP_API_BASE_URL", "https://graph.facebook.com/v21.0/"
-)
+WHATSAPP_API_BASE_URL = os.environ.get("WHATSAPP_API_BASE_URL", "https://graph.facebook.com/v21.0/")
 WHATSAPP_PHONE_NUMBER_ID = os.environ.get("WHATSAPP_PHONE_NUMBER_ID", "")
 WHATSAPP_ACCESS_TOKEN = os.environ.get("WHATSAPP_ACCESS_TOKEN", "")
-WHATSAPP_DEFAULT_COUNTRY_CODE = os.environ.get(
-    "WHATSAPP_DEFAULT_COUNTRY_CODE", "+265"
-)  # Malawi
+WHATSAPP_DEFAULT_COUNTRY_CODE = os.environ.get("WHATSAPP_DEFAULT_COUNTRY_CODE", "+265")  # Malawi
 
 # --------------------------- global UI ---------------------------
 UI = {
@@ -905,9 +902,7 @@ WARRANTY_REQUEST_TIMEOUT = env_int("WARRANTY_REQUEST_TIMEOUT", 12)
 
 APP_NAME = os.environ.get("APP_NAME", "Emajinet")
 APP_ENV = os.environ.get("APP_ENV", "dev" if DEBUG else "beta")
-BETA_FEEDBACK_MAILTO = os.environ.get(
-    "BETA_FEEDBACK_MAILTO", "beta@emajinet.africa"
-)
+BETA_FEEDBACK_MAILTO = os.environ.get("BETA_FEEDBACK_MAILTO", "beta@emajinet.africa")
 
 # --------------------------- OTP / password reset ---------------------------
 EMAIL_OTP_TTL_MINUTES = env_int("EMAIL_OTP_TTL_MINUTES", 10)
@@ -917,9 +912,7 @@ DISABLE_SALES_AUTOCREATE = env_bool("DISABLE_SALES_AUTOCREATE", True)
 
 # Make template exceptions bubble loudly in dev
 DEBUG_PROPAGATE_EXCEPTIONS = DEBUG
-DEFAULT_EXCEPTION_REPORTER_FILTER = (
-    "django.views.debug.SafeExceptionReporterFilter"
-)
+DEFAULT_EXCEPTION_REPORTER_FILTER = "django.views.debug.SafeExceptionReporterFilter"
 
 # Minimal logging so template errors are obvious in console
 LOGGING = {

@@ -7,6 +7,7 @@ from .models import LaybyOrder, LaybyPayment, notify
 
 import json
 
+
 @login_required
 @require_GET
 def api_orders(request: HttpRequest):
@@ -19,19 +20,23 @@ def api_orders(request: HttpRequest):
     else:
         qs = LaybyOrder.objects.filter(agent=request.user).order_by("-created_at")
 
-    data = [{
-        "id": o.id,
-        "customer": {"name": o.customer_name, "phone": o.customer_phone},
-        "product": {"name": o.product_name, "sku": o.product_sku, "serial": o.product_serial, "qty": o.qty},
-        "price": str(o.unit_price),
-        "total": str(o.total_price),
-        "paid": str(o.amount_paid),
-        "balance": str(o.balance),
-        "status": o.status,
-        "target_date": o.target_date.isoformat() if o.target_date else None,
-        "created_at": o.created_at.isoformat(),
-    } for o in qs[:200]]
+    data = [
+        {
+            "id": o.id,
+            "customer": {"name": o.customer_name, "phone": o.customer_phone},
+            "product": {"name": o.product_name, "sku": o.product_sku, "serial": o.product_serial, "qty": o.qty},
+            "price": str(o.unit_price),
+            "total": str(o.total_price),
+            "paid": str(o.amount_paid),
+            "balance": str(o.balance),
+            "status": o.status,
+            "target_date": o.target_date.isoformat() if o.target_date else None,
+            "created_at": o.created_at.isoformat(),
+        }
+        for o in qs[:200]
+    ]
     return JsonResponse({"ok": True, "orders": data})
+
 
 @login_required
 @require_GET
@@ -43,15 +48,19 @@ def api_payments(request: HttpRequest, pk: int):
     if not (request.user.is_staff or o.agent_id == request.user.id):
         return HttpResponseBadRequest("Not allowed")
 
-    data = [{
-        "id": p.id,
-        "amount": str(p.amount),
-        "method": p.method,
-        "provider_ref": p.provider_ref,
-        "note": p.note,
-        "created_at": p.created_at.isoformat(),
-    } for p in o.payments.all().order_by("-created_at")]
+    data = [
+        {
+            "id": p.id,
+            "amount": str(p.amount),
+            "method": p.method,
+            "provider_ref": p.provider_ref,
+            "note": p.note,
+            "created_at": p.created_at.isoformat(),
+        }
+        for p in o.payments.all().order_by("-created_at")
+    ]
     return JsonResponse({"ok": True, "payments": data})
+
 
 # --- Webhook security helpers ---
 def _check_webhook_secret(request: HttpRequest) -> bool:
@@ -61,6 +70,7 @@ def _check_webhook_secret(request: HttpRequest) -> bool:
     expected = getattr(settings, "LAYBY_WEBHOOK_SECRET", "")
     got = request.META.get("HTTP_X_LAYBY_SIGNATURE", "")
     return bool(expected) and (got == expected)
+
 
 @require_POST
 def api_payment_webhook(request: HttpRequest):
@@ -83,14 +93,10 @@ def api_payment_webhook(request: HttpRequest):
     except LaybyOrder.DoesNotExist:
         return HttpResponseBadRequest("Unknown order")
 
-    p = LaybyPayment.objects.create(
-        order=o, amount=amount, method=method, provider_ref=provider_ref, note=note
-    )
+    p = LaybyPayment.objects.create(order=o, amount=amount, method=method, provider_ref=provider_ref, note=note)
     if o.balance <= 0 and o.status not in ["DELIVERED"]:
         o.status = "ACTIVE"  # ready for pickup; mark delivered via UI when collected
         o.save(update_fields=["status", "updated_at"])
 
     notify("layby.payment", f"Webhook payment {p.amount} for {o.customer_name}", audience="AGENT", user=o.agent)
     return JsonResponse({"ok": True})
-
-

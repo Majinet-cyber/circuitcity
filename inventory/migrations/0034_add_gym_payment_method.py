@@ -12,10 +12,11 @@ def add_gympayment_payment_method_safe(apps, schema_editor):
     Add payment_method to GymPayment in a Postgres-safe, idempotent way.
     """
     connection = schema_editor.connection
-    
-    if connection.vendor == 'postgresql':
+
+    if connection.vendor == "postgresql":
         # Postgres: Use IF NOT EXISTS
-        schema_editor.execute("""
+        schema_editor.execute(
+            """
             DO $$
             BEGIN
                 IF NOT EXISTS (
@@ -30,50 +31,60 @@ def add_gympayment_payment_method_safe(apps, schema_editor):
                     ON inventory_gympayment (payment_method);
                 END IF;
             END $$;
-        """)
+        """
+        )
     else:
         # SQLite: Check if column exists
         cursor = connection.cursor()
         cursor.execute("PRAGMA table_info(inventory_gympayment)")
         columns = [row[1] for row in cursor.fetchall()]
-        
-        if 'payment_method' not in columns:
-            schema_editor.execute("""
+
+        if "payment_method" not in columns:
+            schema_editor.execute(
+                """
                 ALTER TABLE inventory_gympayment
                 ADD COLUMN payment_method VARCHAR(20) DEFAULT 'cash' NOT NULL;
-            """)
-            schema_editor.execute("""
+            """
+            )
+            schema_editor.execute(
+                """
                 CREATE INDEX IF NOT EXISTS inventory_gympayment_payment_method_idx
                 ON inventory_gympayment (payment_method);
-            """)
+            """
+            )
 
 
 def remove_gympayment_payment_method(apps, schema_editor):
     """Remove payment_method column in reverse migration"""
     connection = schema_editor.connection
-    
-    if connection.vendor == 'postgresql':
-        schema_editor.execute("""
+
+    if connection.vendor == "postgresql":
+        schema_editor.execute(
+            """
             DROP INDEX IF EXISTS inventory_gympayment_payment_method_idx;
             ALTER TABLE inventory_gympayment DROP COLUMN IF EXISTS payment_method;
-        """)
+        """
+        )
     else:
-        schema_editor.execute("""
+        schema_editor.execute(
+            """
             DROP INDEX IF EXISTS inventory_gympayment_payment_method_idx;
-        """)
+        """
+        )
         # SQLite column drop is handled by Django if supported
         cursor = connection.cursor()
         cursor.execute("PRAGMA table_info(inventory_gympayment)")
         columns = [row[1] for row in cursor.fetchall()]
-        
-        if 'payment_method' in columns:
-            schema_editor.execute("""
+
+        if "payment_method" in columns:
+            schema_editor.execute(
+                """
                 ALTER TABLE inventory_gympayment DROP COLUMN payment_method;
-            """)
+            """
+            )
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         ("inventory", "0033_inventoryitem_payment_method_pharmacybatch_and_more"),
         ("tenants", "0011_agentinvite_temp_password_hash_and_more"),
@@ -177,9 +188,7 @@ class Migration(migrations.Migration):
                 ),
                 (
                     "payload",
-                    models.JSONField(
-                        help_text="Proposed changes as a dict of field: new_value"
-                    ),
+                    models.JSONField(help_text="Proposed changes as a dict of field: new_value"),
                 ),
                 (
                     "status",
@@ -204,15 +213,11 @@ class Migration(migrations.Migration):
                 ),
                 (
                     "reason",
-                    models.TextField(
-                        blank=True, help_text="Optional reason for rejection or notes"
-                    ),
+                    models.TextField(blank=True, help_text="Optional reason for rejection or notes"),
                 ),
                 (
                     "created_at",
-                    models.DateTimeField(
-                        db_index=True, default=django.utils.timezone.now
-                    ),
+                    models.DateTimeField(db_index=True, default=django.utils.timezone.now),
                 ),
                 ("updated_at", models.DateTimeField(auto_now=True)),
                 (

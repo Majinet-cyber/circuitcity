@@ -4,6 +4,7 @@ from decimal import Decimal
 
 from django.db import migrations
 
+
 def backfill_trials(apps, schema_editor):
     SubscriptionPlan = apps.get_model("billing", "SubscriptionPlan")
     BusinessSubscription = apps.get_model("billing", "BusinessSubscription")
@@ -12,9 +13,7 @@ def backfill_trials(apps, schema_editor):
     # Get a plan (cheapest active; or create a free starter if none)
     plan = SubscriptionPlan.objects.filter(is_active=True).order_by("amount").first()
     if not plan:
-        plan = SubscriptionPlan.objects.create(
-            code="starter", name="Starter", amount=Decimal("0.00"), is_active=True
-        )
+        plan = SubscriptionPlan.objects.create(code="starter", name="Starter", amount=Decimal("0.00"), is_active=True)
 
     # For each Business, ensure a subscription exists (trial)
     for biz in Business.objects.all():
@@ -29,6 +28,7 @@ def backfill_trials(apps, schema_editor):
             # If signals aren’t connected in migration, set sane defaults:
             from datetime import timedelta
             from django.utils import timezone
+
             now = timezone.now()
             trial_end = now + timedelta(days=30)
             sub.started_at = now
@@ -38,13 +38,15 @@ def backfill_trials(apps, schema_editor):
             sub.next_billing_date = trial_end
             sub.save()
 
+
 def noop(apps, schema_editor):
     pass
 
+
 class Migration(migrations.Migration):
     dependencies = [
-        ("billing", "0001_initial"),   # <— update if your last billing migration has a different number
-        ("tenants", "0001_initial"),   # <— update if needed
+        ("billing", "0001_initial"),  # <— update if your last billing migration has a different number
+        ("tenants", "0001_initial"),  # <— update if needed
     ]
 
     operations = [

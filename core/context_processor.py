@@ -155,5 +155,3 @@ def biz_context(request) -> Dict[str, Any]:
         "cc_require_imei": bool(getattr(rule, "require_imei", False)),
         "cc_business_types": BUSINESS_TYPES,
     }
-
-

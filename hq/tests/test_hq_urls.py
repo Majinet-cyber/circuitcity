@@ -51,4 +51,3 @@ class TestHQNamespace(TestCase):
         # Verify it's the actual view from hq.views_business_directory
         self.assertEqual(match.func.__module__, "hq.views_business_directory")
         self.assertEqual(match.func.__name__, "business_directory")
-

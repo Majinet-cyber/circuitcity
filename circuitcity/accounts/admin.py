@@ -16,12 +16,16 @@ class ProfileAdmin(admin.ModelAdmin):
 
     def user_email(self, obj):
         return obj.user.email
+
     user_email.short_description = "Email"
 
     def avatar_preview(self, obj):
         if obj.avatar:
-            return format_html('<img src="{}" style="height:40px;width:40px;object-fit:cover;border-radius:50%;">', obj.avatar.url)
+            return format_html(
+                '<img src="{}" style="height:40px;width:40px;object-fit:cover;border-radius:50%;">', obj.avatar.url
+            )
         return "â€”"
+
     avatar_preview.short_description = "Avatar"
 
 
@@ -48,6 +52,7 @@ class PasswordResetCodeAdmin(admin.ModelAdmin):
 
     def user_email(self, obj):
         return obj.user.email
+
     user_email.short_description = "Email"
 
     @admin.display(boolean=True, description="Expired")
@@ -87,6 +92,7 @@ class LoginSecurityAdmin(admin.ModelAdmin):
 
     def user_email(self, obj):
         return obj.user.email
+
     user_email.short_description = "Email"
 
     @admin.display(boolean=True, description="Locked now")
@@ -129,18 +135,19 @@ class UserTwoFactorAdmin(admin.ModelAdmin):
 
     def user_email(self, obj):
         return obj.user.email
+
     user_email.short_description = "Email"
 
     def phone_display(self, obj):
         if obj.phone_e164:
             from .models import mask_phone
+
             return mask_phone(obj.phone_e164)
         return "—"
+
     phone_display.short_description = "Phone"
 
     @admin.action(description="Disable 2FA for selected users")
     def disable_2fa_for_selected(self, request, queryset):
         updated = queryset.filter(sms_enabled=True).update(sms_enabled=False)
         self.message_user(request, f"Disabled 2FA for {updated} user(s).")
-
-

@@ -53,6 +53,28 @@ except Exception:
     StockActivityLog = None  # safe fallback
     StockAction = None
 
+# Re-export gamification models (Phase 5)
+try:
+    from .models_gamification import (  # noqa: F401
+        AgentStreak,
+        AgentXP,
+        Badge,
+        AgentBadge,
+        DailyLeaderboard,
+    )
+except Exception:
+    AgentStreak = AgentXP = Badge = AgentBadge = DailyLeaderboard = None  # safe fallback
+
+# Re-export liquor assignment models (Phase 6)
+try:
+    from .models_liquor_assignment import (  # noqa: F401
+        LiquorStockAssignment,
+        LiquorDailyReconciliation,
+        LiquorAgentTarget,
+    )
+except Exception:
+    LiquorStockAssignment = LiquorDailyReconciliation = LiquorAgentTarget = None  # safe fallback
+
 # Re-export PharmacyBatch for cross-module references
 try:
     from .models_pharmacy import PharmacyBatch  # noqa: F401
@@ -67,9 +89,7 @@ except Exception:
 
 # Re-export Accessory models for phone accessories system
 try:
-    from .models_accessories import (
-        AccessoryProduct, AccessoryStock, AccessoryStockLog, AccessoryCategory  # noqa: F401
-    )
+    from .models_accessories import AccessoryProduct, AccessoryStock, AccessoryStockLog, AccessoryCategory  # noqa: F401
 except Exception:
     AccessoryProduct = None  # safe fallback
     AccessoryStock = None
@@ -111,12 +131,13 @@ class Location(models.Model):
     """
     Store / warehouse, scoped to a tenant.
     """
+
     business = models.ForeignKey(
         Business,
         on_delete=models.CASCADE,
         related_name="locations",
         db_index=True,
-        null=True,   # keep nullable for smooth migration; backfill then set False if desired
+        null=True,  # keep nullable for smooth migration; backfill then set False if desired
         blank=True,
     )
     name = models.CharField(max_length=80)
@@ -126,14 +147,12 @@ class Location(models.Model):
     latitude = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)
     longitude = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)
     geofence_radius_m = models.PositiveIntegerField(
-        default=150,
-        help_text="Meters around (lat, lon) considered on-site."
+        default=150, help_text="Meters around (lat, lon) considered on-site."
     )
 
     # ---- business default toggle ----
     is_default = models.BooleanField(
-        default=False,
-        help_text="When true, this is the default store/location for this business."
+        default=False, help_text="When true, this is the default store/location for this business."
     )
 
     class Meta:
@@ -157,7 +176,7 @@ class Location(models.Model):
         if self.business_id:
             label = f"{label} · {getattr(self.business, 'name', self.business_id)}"
         return label
-    
+
     @property
     def display_name(self):
         """
@@ -165,7 +184,7 @@ class Location(models.Model):
         Example: "Spears · Spears Mchinji branch"
         """
         if self.business_id:
-            biz_name = getattr(self.business, 'name', 'Business')
+            biz_name = getattr(self.business, "name", "Business")
             return f"{biz_name} · {self.name}"
         return self.name
 
@@ -175,9 +194,9 @@ class Location(models.Model):
         """
         super().save(*args, **kwargs)
         if self.is_default and self.business_id:
-            Location.objects.filter(
-                business_id=self.business_id, is_default=True
-            ).exclude(pk=self.pk).update(is_default=False)
+            Location.objects.filter(business_id=self.business_id, is_default=True).exclude(pk=self.pk).update(
+                is_default=False
+            )
 
     @classmethod
     def default_for(cls, business_or_id):
@@ -216,6 +235,7 @@ class AgentProfile(models.Model):
     Per-user agent profile anchored to a home location.
     Managers may not have this.
     """
+
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name="agent_profile")
     location = models.ForeignKey("Location", on_delete=models.PROTECT)
     joined_on = models.DateField(null=True, blank=True)  # optional join date
@@ -243,10 +263,10 @@ class AgentProfile(models.Model):
 
 
 class BaseUnit(models.TextChoices):
-    UNIT = "unit", "Unit"     # atomic piece (bread, charger, pack, bottle if no shots)
-    SHOT = "shot", "Shot"     # atomic for bars selling shots
-    ML   = "ml",   "ml"       # reserved for future use
-    G    = "g",    "g"        # reserved for future use
+    UNIT = "unit", "Unit"  # atomic piece (bread, charger, pack, bottle if no shots)
+    SHOT = "shot", "Shot"  # atomic for bars selling shots
+    ML = "ml", "ml"  # reserved for future use
+    G = "g", "g"  # reserved for future use
 
 
 class MerchProduct(models.Model):
@@ -254,6 +274,7 @@ class MerchProduct(models.Model):
     Simple, non-IMEI product used by liquor/grocery/pharmacy/clothing, etc.
     Phones KEEP using the existing Product + InventoryItem models below.
     """
+
     business = models.ForeignKey(Business, on_delete=models.CASCADE, related_name="merch_products", db_index=True)
     name = models.CharField(max_length=160)
     kind = models.CharField(max_length=20, choices=BusinessKind.choices, default=BusinessKind.GROCERY)
@@ -261,136 +282,156 @@ class MerchProduct(models.Model):
     internal_sku = models.CharField(
         max_length=64,
         blank=True,
-        default='',
+        default="",
         db_index=True,
-        help_text="Auto-generated internal SKU (business-scoped unique)"
+        help_text="Auto-generated internal SKU (business-scoped unique)",
     )
-    barcode = models.CharField(max_length=100, blank=True, null=True, default='', db_index=True, help_text="Product barcode (EAN, UPC, QR, etc.)")
+    barcode = models.CharField(
+        max_length=100,
+        blank=True,
+        null=True,
+        default="",
+        db_index=True,
+        help_text="Product barcode (EAN, UPC, QR, etc.)",
+    )
     scan_required = models.BooleanField(default=False)  # set True if you want barcode scanning for some items
     base_unit = models.CharField(max_length=10, choices=BaseUnit.choices, default=BaseUnit.UNIT)
     track_inventory = models.BooleanField(default=True)
 
     # Category field (used by liquor, pharmacy, and other verticals)
     category = models.CharField(
-        max_length=30, 
-        blank=True, 
-        default="", 
-        help_text="Product category (e.g., liquor: beer/cider/spirits; pharmacy: medicine/cosmetics)"
+        max_length=30,
+        blank=True,
+        default="",
+        help_text="Product category (e.g., liquor: beer/cider/spirits; pharmacy: medicine/cosmetics)",
     )
-    
+
     # Liquor: Pack handling (crates/cases for bulk stock-in and selling)
     pack_label = models.CharField(
         max_length=20,
         blank=True,
         null=True,
-        help_text="Pack label: Crate, Case, Pack, Carton, Bale, Bundle (e.g., 'Crate' for beer, 'Carton' for groceries)"
+        help_text="Pack label: Crate, Case, Pack, Carton, Bale, Bundle (e.g., 'Crate' for beer, 'Carton' for groceries)",
     )
     bottles_per_crate = models.PositiveIntegerField(
         blank=True,
         null=True,
-        help_text="Number of base units in a pack (default 20 for Malawi beer crates, 6 for wine/spirits cases, 24 for grocery cartons)"
+        help_text="Number of base units in a pack (default 20 for Malawi beer crates, 6 for wine/spirits cases, 24 for grocery cartons)",
     )
-    supports_crates = models.BooleanField(
-        default=False, 
-        help_text="True for beer/cider/wine; False for spirits"
-    )
-    
+    supports_crates = models.BooleanField(default=False, help_text="True for beer/cider/wine; False for spirits")
+
     # Groceries: Wholesale pricing (optional)
     wholesale_price_per_pack = models.DecimalField(
         max_digits=10,
         decimal_places=2,
         null=True,
         blank=True,
-        help_text="Wholesale price per pack (carton/bale/bundle). If null, derived from retail price * pack_size"
+        help_text="Wholesale price per pack (carton/bale/bundle). If null, derived from retail price * pack_size",
     )
-    
+
     # Groceries: Expiry tracking (optional)
     track_expiry = models.BooleanField(
-        default=False,
-        help_text="Track expiry dates for this product (optional for groceries)"
+        default=False, help_text="Track expiry dates for this product (optional for groceries)"
     )
-    
+
     # Groceries: Category group for UI tiles
     category_group = models.CharField(
         max_length=30,
         blank=True,
-        default='',
-        help_text="Category group for groceries UI tiles (drinks, water, snacks, etc.)"
+        default="",
+        help_text="Category group for groceries UI tiles (drinks, water, snacks, etc.)",
     )
-    
+
     # Liquor: Shot handling (spirits, whiskey)
     has_shots = models.BooleanField(default=False)
     shots_per_bottle = models.PositiveIntegerField(null=True, blank=True)
-    barman_shots_reserved = models.PositiveIntegerField(default=2, help_text="Shots reserved for bartender (typically 2)")
-    price_per_bottle = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True, help_text="Price for a full bottle")
-    price_per_shot = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True, help_text="Price per individual shot")
-    
+    barman_shots_reserved = models.PositiveIntegerField(
+        default=2, help_text="Shots reserved for bartender (typically 2)"
+    )
+    price_per_bottle = models.DecimalField(
+        max_digits=10, decimal_places=2, null=True, blank=True, help_text="Price for a full bottle"
+    )
+    price_per_shot = models.DecimalField(
+        max_digits=10, decimal_places=2, null=True, blank=True, help_text="Price per individual shot"
+    )
+
     # Liquor: Glass handling (wine)
     has_glasses = models.BooleanField(default=False, help_text="True for wine products sold by glass")
-    glasses_per_bottle = models.PositiveIntegerField(null=True, blank=True, help_text="Number of glasses per bottle (typically 5 for wine)")
-    price_per_glass = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True, help_text="Price per individual glass (for wine)")
-    cost_per_glass = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True, help_text="Cost price per glass")
-    
+    glasses_per_bottle = models.PositiveIntegerField(
+        null=True, blank=True, help_text="Number of glasses per bottle (typically 5 for wine)"
+    )
+    price_per_glass = models.DecimalField(
+        max_digits=10, decimal_places=2, null=True, blank=True, help_text="Price per individual glass (for wine)"
+    )
+    cost_per_glass = models.DecimalField(
+        max_digits=10, decimal_places=2, null=True, blank=True, help_text="Cost price per glass"
+    )
+
     # Cost price for profit calculation (nullable for backwards compatibility)
-    cost_per_bottle = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True, help_text="Cost price for a full bottle")
-    cost_per_shot = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True, help_text="Cost price per shot")
+    cost_per_bottle = models.DecimalField(
+        max_digits=10, decimal_places=2, null=True, blank=True, help_text="Cost price for a full bottle"
+    )
+    cost_per_shot = models.DecimalField(
+        max_digits=10, decimal_places=2, null=True, blank=True, help_text="Cost price per shot"
+    )
 
     # Smart stock targets (per-product) - for liquor "battery" and auto-adjust
     target_bottles = models.PositiveIntegerField(default=0, help_text="Desired full stock for this product in bottles")
     auto_adjust_enabled = models.BooleanField(default=True, help_text="Enable smart auto-adjust based on sales demand")
-    auto_adjust_pct = models.PositiveIntegerField(default=20, help_text="Increase target by this % over observed peak demand")
+    auto_adjust_pct = models.PositiveIntegerField(
+        default=20, help_text="Increase target by this % over observed peak demand"
+    )
 
     # Clothing: Premium fields (optional, for premium clothing items)
     brand = models.CharField(
-        max_length=100,
-        blank=True,
-        default='',
-        help_text="Brand name (optional, for premium items)"
+        max_length=100, blank=True, default="", help_text="Brand name (optional, for premium items)"
     )
     item_type = models.CharField(
-        max_length=20,
-        blank=True,
-        default='',
-        help_text="Item type: apparel, footwear, accessory, fragrance, other"
+        max_length=20, blank=True, default="", help_text="Item type: apparel, footwear, accessory, fragrance, other"
     )
-    has_sizes = models.BooleanField(
-        default=False,
-        help_text="Enable size variants for this product"
-    )
-    has_colors = models.BooleanField(
-        default=False,
-        help_text="Enable color variants for this product"
-    )
-    
+    has_sizes = models.BooleanField(default=False, help_text="Enable size variants for this product")
+    has_colors = models.BooleanField(default=False, help_text="Enable color variants for this product")
+
     # Pharmacy: Packaging fields (optional, for tablets/capsules)
     strip_size = models.PositiveIntegerField(
-        null=True,
-        blank=True,
-        help_text="Number of tablets/capsules per strip (optional)"
+        null=True, blank=True, help_text="Number of tablets/capsules per strip (optional)"
     )
-    box_size = models.PositiveIntegerField(
-        null=True,
-        blank=True,
-        help_text="Number of strips per box (optional)"
-    )
+    box_size = models.PositiveIntegerField(null=True, blank=True, help_text="Number of strips per box (optional)")
     tablets_per_box = models.PositiveIntegerField(
+        null=True, blank=True, help_text="Direct tablets per box (alternative to box_size, optional)"
+    )
+
+    # Clothing and general merchandise fields
+    size = models.CharField(
+        max_length=20, blank=True, default="", help_text="Size for clothing items (e.g., S, M, L, XL, or numeric)"
+    )
+    color = models.CharField(max_length=50, blank=True, default="", help_text="Color for clothing items")
+    spec_label = models.CharField(
+        max_length=50,
+        blank=True,
+        default="",
+        help_text="Product specification/size label (e.g., '5L', '10L', '9kg') - for groceries and other verticals where spec is separate from quantity",
+    )
+    quantity_in_stock = models.PositiveIntegerField(
+        default=0, help_text="Current quantity in stock (for clothing and other inventory-tracked items)"
+    )
+    cost_price = models.DecimalField(
+        max_digits=10, decimal_places=2, null=True, blank=True, help_text="Cost price per unit (for non-liquor items)"
+    )
+    selling_price = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
         null=True,
         blank=True,
-        help_text="Direct tablets per box (alternative to box_size, optional)"
+        help_text="Selling price per unit (for non-liquor items)",
     )
-    
-    # Clothing and general merchandise fields
-    size = models.CharField(max_length=20, blank=True, default='', help_text="Size for clothing items (e.g., S, M, L, XL, or numeric)")
-    color = models.CharField(max_length=50, blank=True, default='', help_text="Color for clothing items")
-    spec_label = models.CharField(max_length=50, blank=True, default='', help_text="Product specification/size label (e.g., '5L', '10L', '9kg') - for groceries and other verticals where spec is separate from quantity")
-    quantity_in_stock = models.PositiveIntegerField(default=0, help_text="Current quantity in stock (for clothing and other inventory-tracked items)")
-    cost_price = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True, help_text="Cost price per unit (for non-liquor items)")
-    selling_price = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True, help_text="Selling price per unit (for non-liquor items)")
 
     # Archive helpers (for clothing and other verticals)
     is_archived = models.BooleanField(default=False, db_index=True)
     archived_at = models.DateTimeField(null=True, blank=True)
-    archived_by = models.ForeignKey("auth.User", null=True, blank=True, on_delete=models.SET_NULL, related_name="archived_merch_products")
+    archived_by = models.ForeignKey(
+        "auth.User", null=True, blank=True, on_delete=models.SET_NULL, related_name="archived_merch_products"
+    )
 
     is_active = models.BooleanField(default=True)
 
@@ -405,18 +446,20 @@ class MerchProduct(models.Model):
 
     def __str__(self):
         return self.name
-    
+
     def get_category_display(self):
         """Get human-readable category name based on product kind."""
         if not self.category:
             return ""
-        
+
         # Import here to avoid circular dependencies
         if self.kind == "pharmacy":
             from .models_pharmacy import PharmacyCategory
+
             return dict(PharmacyCategory.choices).get(self.category, self.category)
         elif self.kind == "liquor":
             from .models_verticals import LiquorCategory
+
             return dict(LiquorCategory.choices).get(self.category, self.category)
         else:
             return self.category
@@ -425,19 +468,19 @@ class MerchProduct(models.Model):
     def pack_size(self):
         """Alias for bottles_per_crate (more generic name for all verticals)"""
         return self.bottles_per_crate
-    
+
     @pack_size.setter
     def pack_size(self, value):
         """Allow setting pack_size (updates bottles_per_crate)"""
         self.bottles_per_crate = value
-    
+
     @property
     def sellable_shots_per_bottle(self):
         """Calculate sellable shots (total - reserved for barman)"""
         if not self.has_shots or not self.shots_per_bottle:
             return 0
         return max(0, self.shots_per_bottle - self.barman_shots_reserved)
-    
+
     @property
     def reorder_level(self):
         """
@@ -445,18 +488,19 @@ class MerchProduct(models.Model):
         Returns target_bottles if set (for liquor), otherwise 0.
         This prevents template crashes when accessing product.reorder_level.
         """
-        if hasattr(self, 'target_bottles') and self.target_bottles:
+        if hasattr(self, "target_bottles") and self.target_bottles:
             return self.target_bottles
         return 0
-    
+
     def get_cost_for_unit(self, unit_type: str):
         """
         Get cost price based on unit type (bottle, shot, glass, or crate).
-        
+
         CRITICAL FIX: For liquor, cost is stored PER BOTTLE (even when ordered by crate).
         Crate cost is computed from: cost_per_bottle * bottles_per_crate
         """
         from decimal import Decimal
+
         if unit_type == "bottle":
             return self.cost_per_bottle or Decimal("0.00")
         elif unit_type == "shot":
@@ -469,10 +513,11 @@ class MerchProduct(models.Model):
                 return self.cost_per_bottle * Decimal(self.bottles_per_crate)
             return Decimal("0.00")
         return Decimal("0.00")
-    
+
     def get_price_for_unit(self, unit_type: str):
         """Get selling price based on unit type (bottle, shot, or glass)"""
         from decimal import Decimal
+
         if unit_type == "bottle":
             return self.price_per_bottle or Decimal("0.00")
         elif unit_type == "shot":
@@ -487,39 +532,41 @@ class MerchProduct(models.Model):
                 raise ValidationError({"shots_per_bottle": "Required when 'has shots' is enabled."})
             # force atomic to SHOT
             self.base_unit = BaseUnit.SHOT
-    
+
     def save(self, *args, **kwargs):
         """Auto-calculate unit costs when manager sets total bottle cost"""
         # CRITICAL FIX: Ensure spec_label is never None (defensive normalization)
         # This prevents DB constraint violations from older code paths
         if self.spec_label is None:
             self.spec_label = ""
-        
+
         # CRITICAL FIX: Auto-generate internal_sku if missing (NOT NULL constraint)
         # This ensures every product has a SKU regardless of entry path
         if not self.internal_sku or not self.internal_sku.strip():
             from inventory.utils_sku import generate_sku
+
             self.internal_sku = generate_sku(
-                business_id=self.business_id,
-                name=self.name,
-                existing_sku=self.internal_sku
+                business_id=self.business_id, name=self.name, existing_sku=self.internal_sku
             )
-        
+
         # NEW RULE: Cider pack_size must be exactly 6 (6-pack only, no crates)
         if self.kind == BusinessKind.LIQUOR and self.category and self.category.lower() == "cider":
             if self.bottles_per_crate is not None and self.bottles_per_crate != 6:
                 from django.core.exceptions import ValidationError
+
                 raise ValidationError(
                     f"Cider pack size must be exactly 6 (6-pack). Got: {self.bottles_per_crate}. "
                     f"Cider does not use crates."
                 )
-        
+
         # Auto-calculate cost_per_glass for wines if total bottle cost is provided
         if self.has_glasses and self.glasses_per_bottle and self.cost_per_bottle:
             # Only auto-calc if cost_per_glass is not manually set
             if not self.cost_per_glass or self.cost_per_glass == Decimal("0.00"):
-                self.cost_per_glass = (self.cost_per_bottle / Decimal(str(self.glasses_per_bottle))).quantize(Decimal("0.01"))
-        
+                self.cost_per_glass = (self.cost_per_bottle / Decimal(str(self.glasses_per_bottle))).quantize(
+                    Decimal("0.01")
+                )
+
         # Auto-calculate cost_per_shot for spirits/whiskey if total bottle cost is provided
         if self.has_shots and self.shots_per_bottle and self.cost_per_bottle:
             # Only auto-calc if cost_per_shot is not manually set
@@ -527,7 +574,7 @@ class MerchProduct(models.Model):
                 # Calculate based on sellable shots (excluding barman reserved)
                 sellable_shots = max(1, self.shots_per_bottle - self.barman_shots_reserved)
                 self.cost_per_shot = (self.cost_per_bottle / Decimal(str(sellable_shots))).quantize(Decimal("0.01"))
-        
+
         super().save(*args, **kwargs)
 
 
@@ -539,19 +586,21 @@ class MerchUnitPrice(models.Model):
       - Liquor (shots): Shot (×1), Bottle (×shots_per_bottle)
       - Liquor (no shots): Bottle (×1), Crate (×24)
     """
+
     class Label(models.TextChoices):
-        UNIT   = "unit",   "Unit"
-        DOZEN  = "dozen",  "Dozen (12)"
-        BOX    = "box",    "Box"
-        CRATE  = "crate",  "Crate"
+        UNIT = "unit", "Unit"
+        DOZEN = "dozen", "Dozen (12)"
+        BOX = "box", "Box"
+        CRATE = "crate", "Crate"
         BOTTLE = "bottle", "Bottle"
-        SHOT   = "shot",   "Shot"
+        SHOT = "shot", "Shot"
 
     product = models.ForeignKey(MerchProduct, on_delete=models.CASCADE, related_name="unit_prices")
     label = models.CharField(max_length=20, choices=Label.choices)
     multiplier = models.DecimalField(
-        max_digits=10, decimal_places=3,
-        help_text="How many base units in this pack (e.g., 12 for dozen, 24 for bottle of 24 shots, 1 for unit)."
+        max_digits=10,
+        decimal_places=3,
+        help_text="How many base units in this pack (e.g., 12 for dozen, 24 for bottle of 24 shots, 1 for unit).",
     )
     price = models.DecimalField(max_digits=12, decimal_places=2)
 
@@ -600,12 +649,14 @@ class Product(models.Model):
     variant = models.CharField(max_length=80, blank=True)  # e.g., (4+128)
 
     cost_price = models.DecimalField(
-        max_digits=12, decimal_places=2, default=0,
-        validators=[MinValueValidator(0)], help_text="Default cost for this product"
+        max_digits=12,
+        decimal_places=2,
+        default=0,
+        validators=[MinValueValidator(0)],
+        help_text="Default cost for this product",
     )
     sale_price = models.DecimalField(
-        max_digits=12, decimal_places=2, default=0,
-        validators=[MinValueValidator(0)], help_text="Default selling price"
+        max_digits=12, decimal_places=2, default=0, validators=[MinValueValidator(0)], help_text="Default selling price"
     )
 
     # Per-product low-stock threshold (applied per location in the daily digest)
@@ -635,6 +686,7 @@ class OrderPrice(models.Model):
     Stores the active default *order* price for each product, with history.
     Exactly one active row per product (enforced by a partial unique constraint).
     """
+
     product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name="order_prices")
     default_order_price = models.DecimalField(max_digits=12, decimal_places=2, validators=[MinValueValidator(0)])
     active = models.BooleanField(default=True)
@@ -649,6 +701,7 @@ class OrderPrice(models.Model):
                 name="uniq_active_order_price_per_product",
             )
         ]
+
     indexes = [
         models.Index(fields=["product", "active"], name="ordprice_prod_active_idx"),
         models.Index(fields=["effective_from"], name="ordprice_effective_idx"),
@@ -660,8 +713,7 @@ class OrderPrice(models.Model):
     @staticmethod
     def get_active_price(product_id: int):
         return (
-            OrderPrice.objects
-            .filter(product_id=product_id, active=True)
+            OrderPrice.objects.filter(product_id=product_id, active=True)
             .values_list("default_order_price", flat=True)
             .first()
         )
@@ -693,12 +745,7 @@ class InventoryItemQuerySet(models.QuerySet):
         if len(imei) != 15:
             return None
         biz_id = business.id if isinstance(business, Business) else business
-        return (
-            self.in_stock()
-            .filter(business_id=biz_id, imei=imei)
-            .with_related()
-            .first()
-        )
+        return self.in_stock().filter(business_id=biz_id, imei=imei).with_related().first()
 
     # ---------- filters for analytics ----------
     def by_agent(self, user_or_id):
@@ -728,23 +775,14 @@ class InventoryItemQuerySet(models.QuerySet):
         Returns rows like: {'day': date, 'count': N}
         """
         qs = self.received_between(start, end)
-        return (
-            qs.values("received_at")
-              .order_by("received_at")
-              .annotate(count=Count("id"))
-        )
+        return qs.values("received_at").order_by("received_at").annotate(count=Count("id"))
 
     def daily_out(self, start, end):
         """
         Returns rows like: {'day': date, 'count': N}
         """
         qs = self.sold().sold_between(start, end)
-        return (
-            qs.annotate(day=TruncDate("sold_at"))
-              .values("day")
-              .order_by("day")
-              .annotate(count=Count("id"))
-        )
+        return qs.annotate(day=TruncDate("sold_at")).values("day").order_by("day").annotate(count=Count("id"))
 
     def totals_in(self, start=None, end=None):
         return self.received_between(start, end).count()
@@ -754,7 +792,7 @@ class InventoryItemQuerySet(models.QuerySet):
 
 
 # -------- Tenant-aware managers (scoped/global) --------
-TenantInventoryItemManager = TenantManager.from_queryset(InventoryItemQuerySet)      # scoped
+TenantInventoryItemManager = TenantManager.from_queryset(InventoryItemQuerySet)  # scoped
 UnscopedInventoryItemManager = UnscopedManager.from_queryset(InventoryItemQuerySet)  # global
 
 
@@ -768,6 +806,7 @@ class InventoryItem(models.Model):
     One physical phone. Use IMEI for scanning. If you ever need to,
     IMEI can be left blank and we still track the device.
     """
+
     STATUS = [("IN_STOCK", "In stock"), ("SOLD", "Sold")]
 
     # --- TENANCY ---
@@ -776,7 +815,7 @@ class InventoryItem(models.Model):
         on_delete=models.CASCADE,
         related_name="inventory_items",
         db_index=True,
-        null=True,   # keep nullable for migration/backfill; set not null once data is clean
+        null=True,  # keep nullable for migration/backfill; set not null once data is clean
         blank=True,
     )
 
@@ -794,21 +833,29 @@ class InventoryItem(models.Model):
 
     # give NOT NULL a safe default
     order_price = models.DecimalField(
-        max_digits=12, decimal_places=2,
+        max_digits=12,
+        decimal_places=2,
         default=0,
         validators=[MinValueValidator(0)],
         help_text="Must be zero or positive.",
     )
     selling_price = models.DecimalField(
-        max_digits=12, decimal_places=2, null=True, blank=True,
+        max_digits=12,
+        decimal_places=2,
+        null=True,
+        blank=True,
         validators=[MinValueValidator(0)],
         help_text="Must be zero or positive when provided.",
     )
     status = models.CharField(max_length=10, choices=STATUS, default="IN_STOCK", db_index=True)
     current_location = models.ForeignKey("Location", on_delete=models.PROTECT, db_index=True)
     assigned_agent = models.ForeignKey(
-        User, null=True, blank=True, on_delete=models.SET_NULL, related_name="assigned_items",
-        help_text="If set, this stock item belongs to a specific agent; otherwise to the manager/global pool."
+        User,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="assigned_items",
+        help_text="If set, this stock item belongs to a specific agent; otherwise to the manager/global pool.",
     )
     # Stock ownership role categorization
     ASSIGNMENT_ROLE_CHOICES = [
@@ -820,17 +867,17 @@ class InventoryItem(models.Model):
         choices=ASSIGNMENT_ROLE_CHOICES,
         default="MANAGER",
         db_index=True,
-        help_text="For reporting and filters. Indicates whether stock is manager-owned or agent-owned."
+        help_text="For reporting and filters. Indicates whether stock is manager-owned or agent-owned.",
     )
     # Soft-delete flag (archive instead of hard delete when needed)
     is_active = models.BooleanField(default=True, db_index=True)
-    
+
     # Archive tracking (enhanced soft-delete)
     archived_at = models.DateTimeField(
         null=True,
         blank=True,
         db_index=True,
-        help_text="When this item was archived (soft-deleted). NULL means not archived."
+        help_text="When this item was archived (soft-deleted). NULL means not archived.",
     )
     archived_by = models.ForeignKey(
         User,
@@ -838,9 +885,9 @@ class InventoryItem(models.Model):
         blank=True,
         on_delete=models.SET_NULL,
         related_name="archived_stock_items",
-        help_text="Manager/admin who archived this item."
+        help_text="Manager/admin who archived this item.",
     )
-    
+
     # Payment method (for phones sold)
     PAYMENT_METHOD_CHOICES = [
         ("CASH", "Cash"),
@@ -852,7 +899,7 @@ class InventoryItem(models.Model):
         choices=PAYMENT_METHOD_CHOICES,
         default="CASH",
         blank=True,
-        help_text="Payment method used when sold"
+        help_text="Payment method used when sold",
     )
 
     # ✅ Timestamps – use defaults to avoid interactive migration prompts
@@ -874,30 +921,18 @@ class InventoryItem(models.Model):
         max_length=20,
         choices=WARRANTY_CHOICES,
         default="unknown",
-        help_text="Carlcare warranty status for Tecno/Itel phones"
+        help_text="Carlcare warranty status for Tecno/Itel phones",
     )
     warranty_expiration = models.DateField(
-        null=True,
-        blank=True,
-        db_index=True,
-        help_text="Warranty expiration date if available"
+        null=True, blank=True, db_index=True, help_text="Warranty expiration date if available"
     )
     warranty_checked_at = models.DateTimeField(
-        null=True,
-        blank=True,
-        help_text="Last time warranty was checked with Carlcare"
+        null=True, blank=True, help_text="Last time warranty was checked with Carlcare"
     )
     warranty_source = models.CharField(
-        max_length=50,
-        default="carlcare",
-        blank=True,
-        help_text="Source of warranty information (e.g., carlcare)"
+        max_length=50, default="carlcare", blank=True, help_text="Source of warranty information (e.g., carlcare)"
     )
-    warranty_raw = models.JSONField(
-        null=True,
-        blank=True,
-        help_text="Raw warranty check response for auditing"
-    )
+    warranty_raw = models.JSONField(null=True, blank=True, help_text="Raw warranty check response for auditing")
 
     # Backward compatibility aliases (deprecated - remove after migration)
     @property
@@ -919,21 +954,21 @@ class InventoryItem(models.Model):
 
     # Marked when a sale is recorded (used by 15-minute theft alert)
     sold_at = models.DateTimeField(null=True, blank=True, db_index=True)  # fast recent-sold lookups
-    
+
     # Agent/user who sold this item (for commission attribution)
     sold_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         null=True,
         blank=True,
         on_delete=models.SET_NULL,
-        related_name='items_sold',
-        help_text='Agent/user who sold this item (for commission attribution)'
+        related_name="items_sold",
+        help_text="Agent/user who sold this item (for commission attribution)",
     )
     # ----------------------------------------------------------------
 
     # Tenant-aware managers
-    objects = TenantInventoryItemManager()        # scoped to active tenant (has QuerySet helpers)
-    active = TenantActiveItemManager()            # scoped + non-archived
+    objects = TenantInventoryItemManager()  # scoped to active tenant (has QuerySet helpers)
+    active = TenantActiveItemManager()  # scoped + non-archived
     all_objects = UnscopedInventoryItemManager()  # global/admin (use sparingly)
 
     class Meta:
@@ -1034,9 +1069,7 @@ class InventoryItem(models.Model):
             changed_imei = (old.imei or "") != (self.imei or "")
             changed_price = (old.selling_price or 0) != (self.selling_price or 0)
             if changed_imei or changed_price:
-                raise ValidationError(
-                    {"status": "Cannot edit IMEI or selling price for SOLD items."}
-                )
+                raise ValidationError({"status": "Cannot edit IMEI or selling price for SOLD items."})
 
     def clean(self):
         errors = {}
@@ -1069,6 +1102,7 @@ class InventoryItem(models.Model):
                 # Check if user is a manager - managers can hold stock without AgentProfile
                 try:
                     from tenants.utils_roles import is_manager
+
                     user_is_manager = is_manager(self.assigned_agent, business=self.business)
                     if not user_is_manager:
                         errors["assigned_agent"] = "Assigned user must be an agent (has AgentProfile) or a manager."
@@ -1139,9 +1173,9 @@ class InventoryItem(models.Model):
         """Allowed to edit/delete only when IN_STOCK and active."""
         return self.is_active and self.status == "IN_STOCK" and (self.sold_at is None)
 
-    def apply_instock_update(self, *, new_imei: Optional[str] = None,
-                             new_price: Optional[float] = None,
-                             by_user=None) -> None:
+    def apply_instock_update(
+        self, *, new_imei: Optional[str] = None, new_price: Optional[float] = None, by_user=None
+    ) -> None:
         """
         Update IMEI and/or selling_price ONLY for IN_STOCK items.
         Creates InventoryAudit rows; raises ValidationError on rule breaks.
@@ -1358,6 +1392,7 @@ class ShiftSession(models.Model):
     Open/closed work session for an agent, used to accumulate inside/outside seconds.
     Safe additive model: does not change TimeLog behavior; analytics read from here.
     """
+
     STATUS_CHOICES = [("inside", "Inside"), ("outside", "Outside")]
 
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="shift_sessions")
@@ -1392,6 +1427,7 @@ class ShiftSession(models.Model):
 
 class WalletTxn(models.Model):
     """Money going into/out of an agent wallet (bonuses, penalties, manual)."""
+
     REASON_CHOICES = [
         ("EARLY_BIRD", "Early-bird bonus"),
         ("LATE_PENALTY", "Late penalty"),
@@ -1431,9 +1467,12 @@ class WalletTxn(models.Model):
     def month_sum_for(user, year: int, month: int) -> float:
         start = timezone.datetime(year, month, 1, tzinfo=timezone.get_current_timezone())
         end = (start.replace(day=28) + timedelta(days=4)).replace(day=1)
-        val = WalletTxn.objects.filter(
-            user=user, created_at__gte=start, created_at__lt=end
-        ).aggregate(s=Sum("amount"))["s"] or 0
+        val = (
+            WalletTxn.objects.filter(user=user, created_at__gte=start, created_at__lt=end).aggregate(s=Sum("amount"))[
+                "s"
+            ]
+            or 0
+        )
         return float(val)
 
 
@@ -1450,9 +1489,11 @@ AgentStore = Location
 # CATEGORY-SPECIFIC PRODUCT PROXIES (to satisfy helpers & clean imports)
 # =====================================================================
 
+
 # ---- Managers that pin a MerchProduct proxy to a kind ----
 class _KindLockedManager(models.Manager):
     """Returns only rows that match the locked kind for the proxy."""
+
     KIND_VALUE: Optional[str] = None
 
     def get_queryset(self):
@@ -1529,21 +1570,42 @@ class PhoneProduct(Product):
 try:
     from .models_verticals import (
         # Liquor
-        LiquorSale, LiquorCredit, LiquorCreditPayment, LiquorStockEditRequest,
-        LiquorExpense, LiquorWalletEntry,
+        LiquorSale,
+        LiquorCredit,
+        LiquorCreditPayment,
+        LiquorStockEditRequest,
+        LiquorExpense,
+        LiquorWalletEntry,
         # Gym
-        GymMember, GymPayment, GymMemberLog, GymSettings, GymWalletEntry, TrainerFee,
+        GymMember,
+        GymPayment,
+        GymMemberLog,
+        GymSettings,
+        GymWalletEntry,
+        TrainerFee,
         # Clothing
-        ClothingSale, ClothingProductLog,
+        ClothingSale,
+        ClothingProductLog,
     )
+
     __all__ = [
         # Liquor
-        "LiquorSale", "LiquorCredit", "LiquorCreditPayment", "LiquorStockEditRequest",
-        "LiquorExpense", "LiquorWalletEntry",
+        "LiquorSale",
+        "LiquorCredit",
+        "LiquorCreditPayment",
+        "LiquorStockEditRequest",
+        "LiquorExpense",
+        "LiquorWalletEntry",
         # Gym
-        "GymMember", "GymPayment", "GymMemberLog", "GymSettings", "GymWalletEntry", "TrainerFee",
+        "GymMember",
+        "GymPayment",
+        "GymMemberLog",
+        "GymSettings",
+        "GymWalletEntry",
+        "TrainerFee",
         # Clothing
-        "ClothingSale", "ClothingProductLog",
+        "ClothingSale",
+        "ClothingProductLog",
     ]
 except ImportError:
     # Not yet migrated

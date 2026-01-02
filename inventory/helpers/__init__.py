@@ -35,6 +35,7 @@ __all__ = [
     "default_location_for_request",
 ]
 
+
 def default_location_for_request(request: HttpRequest):
     """
     Return the user's default store/location object or None.
@@ -42,6 +43,7 @@ def default_location_for_request(request: HttpRequest):
     """
     try:
         from inventory.models import Location  # type: ignore
+
         # Example: first location in the active business
         biz = getattr(request, "business", None)
         if biz:
@@ -50,6 +52,7 @@ def default_location_for_request(request: HttpRequest):
         return Location.objects.order_by("id").first()
     except Exception:
         return None
+
 
 def _attach_business_kwargs(model, business_id) -> Dict[str, object]:
     """Return kwargs to set the active business on creates."""
@@ -60,6 +63,7 @@ def _attach_business_kwargs(model, business_id) -> Dict[str, object]:
         pass
     return {}
 
+
 def _biz_filter_kwargs(model, business_id) -> Dict[str, object]:
     """Return kwargs to scope queries by business."""
     try:
@@ -68,6 +72,7 @@ def _biz_filter_kwargs(model, business_id) -> Dict[str, object]:
     except Exception:
         pass
     return {}
+
 
 def _limit_form_querysets(form, request: HttpRequest) -> None:
     """Clamp form querysets (Products, Locations) to active business."""
@@ -93,6 +98,7 @@ def _limit_form_querysets(form, request: HttpRequest) -> None:
     except Exception:
         pass
 
+
 def _obj_belongs_to_active_business(obj, request: HttpRequest) -> bool:
     """True if obj.business == active business (or model has no business field)."""
     try:
@@ -103,5 +109,3 @@ def _obj_belongs_to_active_business(obj, request: HttpRequest) -> bool:
         return (obiz is None) or (getattr(obiz, "id", None) == getattr(biz, "id", None))
     except Exception:
         return True
-
-

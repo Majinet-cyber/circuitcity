@@ -31,9 +31,9 @@ def _is_e2e_enabled() -> bool:
 def e2e_latest_otp(request):
     """
     Get the latest OTP code for an email address (E2E testing only).
-    
+
     Endpoint: GET /__e2e__/latest-otp?email=test@example.com
-    
+
     Returns:
         {
             "ok": true,
@@ -42,18 +42,18 @@ def e2e_latest_otp(request):
             "purpose": "signup",
             "created_at": "2024-01-01T12:00:00Z"
         }
-    
+
     Security:
         - Only enabled when DEBUG=True or E2E_TESTING=True
         - Returns 403 in production
     """
     if not _is_e2e_enabled():
         return HttpResponseForbidden("E2E endpoints disabled in production")
-    
+
     email = request.GET.get("email", "").strip().lower()
     if not email:
         return JsonResponse({"ok": False, "error": "email parameter required"}, status=400)
-    
+
     # Get latest unexpired OTP for this email
     otp = (
         EmailOTP.objects.filter(email=email, consumed_at__isnull=True)
@@ -61,23 +61,25 @@ def e2e_latest_otp(request):
         .order_by("-created_at")
         .first()
     )
-    
+
     if not otp:
         return JsonResponse({"ok": False, "error": "No active OTP found for this email"}, status=404)
-    
+
     # In E2E mode, we need to return the plain text code
     # Since we hash codes, we can't decrypt them. Instead, we'll use a fixed test code.
     # For E2E tests, we'll allow a fixed OTP "000000" to work if E2E_TESTING is enabled.
     test_code = getattr(settings, "E2E_OTP_CODE", "000000")
-    
-    return JsonResponse({
-        "ok": True,
-        "code": test_code,  # Fixed test code for E2E
-        "email": otp.email,
-        "purpose": otp.purpose,
-        "created_at": otp.created_at.isoformat(),
-        "expires_at": otp.expires_at.isoformat(),
-    })
+
+    return JsonResponse(
+        {
+            "ok": True,
+            "code": test_code,  # Fixed test code for E2E
+            "email": otp.email,
+            "purpose": otp.purpose,
+            "created_at": otp.created_at.isoformat(),
+            "expires_at": otp.expires_at.isoformat(),
+        }
+    )
 
 
 @csrf_exempt
@@ -85,32 +87,33 @@ def e2e_latest_otp(request):
 def e2e_verify_otp_bypass(request):
     """
     Verify OTP using test bypass (E2E testing only).
-    
+
     Endpoint: POST /__e2e__/verify-otp-bypass
     Body: {"email": "test@example.com", "code": "000000"}
-    
+
     Returns:
         {"ok": true, "verified": true}
-    
+
     Security:
         - Only enabled when DEBUG=True or E2E_TESTING=True
         - Accepts fixed test code "000000" or code from E2E_OTP_CODE setting
     """
     if not _is_e2e_enabled():
         return HttpResponseForbidden("E2E endpoints disabled in production")
-    
+
     import json
+
     try:
         data = json.loads(request.body)
     except json.JSONDecodeError:
         return JsonResponse({"ok": False, "error": "Invalid JSON"}, status=400)
-    
+
     email = data.get("email", "").strip().lower()
     code = data.get("code", "").strip()
-    
+
     if not email or not code:
         return JsonResponse({"ok": False, "error": "email and code required"}, status=400)
-    
+
     # Get latest unexpired OTP
     otp = (
         EmailOTP.objects.filter(email=email, consumed_at__isnull=True)
@@ -118,10 +121,10 @@ def e2e_verify_otp_bypass(request):
         .order_by("-created_at")
         .first()
     )
-    
+
     if not otp:
         return JsonResponse({"ok": False, "error": "No active OTP found"}, status=404)
-    
+
     # Check if code matches test bypass code
     test_code = getattr(settings, "E2E_OTP_CODE", "000000")
     if code == test_code:
@@ -129,9 +132,10 @@ def e2e_verify_otp_bypass(request):
         otp.consumed_at = timezone.now()
         otp.save(update_fields=["consumed_at"])
         return JsonResponse({"ok": True, "verified": True})
-    
+
     # Otherwise, use normal verification
     from .services.email_otp import verify_email_otp
+
     try:
         verified = verify_email_otp(email, code, otp.purpose)
         return JsonResponse({"ok": True, "verified": verified})
@@ -144,7 +148,7 @@ def e2e_verify_otp_bypass(request):
 def e2e_seed_business(request):
     """
     Seed a test business and location (E2E testing only).
-    
+
     Endpoint: POST /__e2e__/seed-business
     Body: {
         "email": "test@example.com",
@@ -153,7 +157,7 @@ def e2e_seed_business(request):
         "location_name": "Test Location",
         "city": "Test City"
     }
-    
+
     Returns:
         {
             "ok": true,
@@ -161,77 +165,73 @@ def e2e_seed_business(request):
             "location_id": 456,
             "user_id": 789
         }
-    
+
     Security:
         - Only enabled when DEBUG=True or E2E_TESTING=True
         - Creates or updates test data
     """
     if not _is_e2e_enabled():
         return HttpResponseForbidden("E2E endpoints disabled in production")
-    
+
     import json
+
     try:
         data = json.loads(request.body)
     except json.JSONDecodeError:
         return JsonResponse({"ok": False, "error": "Invalid JSON"}, status=400)
-    
+
     email = data.get("email", "").strip().lower()
     business_name = data.get("business_name", "Test Business").strip()
     business_kind = data.get("business_kind", "phones").strip().lower()
     location_name = data.get("location_name", "Test Location").strip()
     city = data.get("city", "Test City").strip()
-    
+
     if not email:
         return JsonResponse({"ok": False, "error": "email required"}, status=400)
-    
+
     with transaction.atomic():
         # Get or create user
-        user, created = User.objects.get_or_create(
-            username=email,
-            defaults={"email": email, "is_active": True}
-        )
-        
+        user, created = User.objects.get_or_create(username=email, defaults={"email": email, "is_active": True})
+
         # Get or create business
         from django.utils.text import slugify
+
         base_slug = slugify(business_name)[:40] or "test-business"
         unique_slug = base_slug
         i = 1
         while Business.objects.filter(slug=unique_slug).exists():
             unique_slug = f"{base_slug}-{i}"
             i += 1
-        
+
         business, biz_created = Business.objects.get_or_create(
             slug=unique_slug,
             defaults={
                 "name": business_name,
                 "business_kind": business_kind,
                 "status": "ACTIVE",
-            }
+            },
         )
-        
+
         # Ensure membership
         membership, _ = Membership.objects.get_or_create(
-            user=user,
-            business=business,
-            defaults={"role": "MANAGER", "status": "ACTIVE"}
+            user=user, business=business, defaults={"role": "MANAGER", "status": "ACTIVE"}
         )
-        
+
         # Get or create location
         location, loc_created = Location.objects.get_or_create(
-            business=business,
-            name=location_name,
-            defaults={"city": city, "is_default": True}
+            business=business, name=location_name, defaults={"city": city, "is_default": True}
         )
-    
-    return JsonResponse({
-        "ok": True,
-        "user_id": user.id,
-        "business_id": business.id,
-        "location_id": location.id,
-        "created": {
-            "user": created,
-            "business": biz_created,
-            "location": loc_created,
-        }
-    })
 
+    return JsonResponse(
+        {
+            "ok": True,
+            "user_id": user.id,
+            "business_id": business.id,
+            "location_id": location.id,
+            "created": {
+                "user": created,
+                "business": biz_created,
+                "location": loc_created,
+            },
+        }
+    )

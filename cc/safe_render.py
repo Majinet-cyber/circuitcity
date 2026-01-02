@@ -3,6 +3,7 @@ from django.http import HttpResponse
 from django.shortcuts import render
 from django.middleware.csrf import get_token
 
+
 def safe_render(request, template_name, ctx):
     try:
         return render(request, template_name, ctx)

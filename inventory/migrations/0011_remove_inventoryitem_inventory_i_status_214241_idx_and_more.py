@@ -8,6 +8,7 @@ class SafeRemoveIndex(RemoveIndex):
     """
     Prevents ValueError if index is missing from migration state.
     """
+
     def state_forwards(self, app_label, state):
         try:
             super().state_forwards(app_label, state)
@@ -19,7 +20,7 @@ def drop_inventory_indexes_database(apps, schema_editor):
     """Drop inventory indexes using idempotent SQL. Safe to run even if indexes don't exist."""
     vendor = schema_editor.connection.vendor
     with schema_editor.connection.cursor() as cursor:
-        if vendor in ('postgresql', 'sqlite'):
+        if vendor in ("postgresql", "sqlite"):
             cursor.execute("DROP INDEX IF EXISTS inventory_i_status_214241_idx")
             cursor.execute("DROP INDEX IF EXISTS inventory_i_imei_36d8dd_idx")
 
@@ -30,9 +31,8 @@ def reverse_drop_inventory_indexes_database(apps, schema_editor):
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
-        ('inventory', '0010_agentprofile_joined_on_location_geofence_radius_m_and_more'),
+        ("inventory", "0010_agentprofile_joined_on_location_geofence_radius_m_and_more"),
     ]
 
     operations = [
@@ -45,91 +45,95 @@ class Migration(migrations.Migration):
             ],
             state_operations=[
                 SafeRemoveIndex(
-                    model_name='inventoryitem',
-                    name='inventory_i_status_214241_idx',
+                    model_name="inventoryitem",
+                    name="inventory_i_status_214241_idx",
                 ),
                 SafeRemoveIndex(
-                    model_name='inventoryitem',
-                    name='inventory_i_imei_36d8dd_idx',
+                    model_name="inventoryitem",
+                    name="inventory_i_imei_36d8dd_idx",
                 ),
             ],
         ),
         migrations.RenameIndex(
-            model_name='agentpasswordreset',
-            new_name='agrs_user_code_used_exp_idx',
-            old_name='inventory_a_user_id_8b9df7_idx',
+            model_name="agentpasswordreset",
+            new_name="agrs_user_code_used_exp_idx",
+            old_name="inventory_a_user_id_8b9df7_idx",
         ),
         migrations.RenameIndex(
-            model_name='agentprofile',
-            new_name='agentprof_joined_on_idx',
-            old_name='inventory_a_joined__91d0d4_idx',
+            model_name="agentprofile",
+            new_name="agentprof_joined_on_idx",
+            old_name="inventory_a_joined__91d0d4_idx",
         ),
         migrations.RenameIndex(
-            model_name='agentprofile',
-            new_name='agentprof_location_idx',
-            old_name='inventory_a_locatio_dc6b09_idx',
+            model_name="agentprofile",
+            new_name="agentprof_location_idx",
+            old_name="inventory_a_locatio_dc6b09_idx",
         ),
         migrations.RenameIndex(
-            model_name='inventoryaudit',
-            new_name='invaudit_action_at_idx',
-            old_name='inventory_i_action_36072a_idx',
+            model_name="inventoryaudit",
+            new_name="invaudit_action_at_idx",
+            old_name="inventory_i_action_36072a_idx",
         ),
         migrations.RenameIndex(
-            model_name='inventoryitem',
-            new_name='invitem_active_status_idx',
-            old_name='inventory_i_is_acti_de80fa_idx',
+            model_name="inventoryitem",
+            new_name="invitem_active_status_idx",
+            old_name="inventory_i_is_acti_de80fa_idx",
         ),
         migrations.RenameIndex(
-            model_name='inventoryitem',
-            new_name='inv_wty_stat_exp_idx',
-            old_name='inventory_i_warrant_49f638_idx',
+            model_name="inventoryitem",
+            new_name="inv_wty_stat_exp_idx",
+            old_name="inventory_i_warrant_49f638_idx",
         ),
         migrations.RenameIndex(
-            model_name='location',
-            new_name='loc_city_idx',
-            old_name='inventory_l_city_472d8e_idx',
+            model_name="location",
+            new_name="loc_city_idx",
+            old_name="inventory_l_city_472d8e_idx",
         ),
         migrations.RenameIndex(
-            model_name='timelog',
-            new_name='timelog_user_logged_idx',
-            old_name='inventory_t_user_id_b2ec1f_idx',
+            model_name="timelog",
+            new_name="timelog_user_logged_idx",
+            old_name="inventory_t_user_id_b2ec1f_idx",
         ),
         migrations.RenameIndex(
-            model_name='timelog',
-            new_name='timelog_location_logged_idx',
-            old_name='inventory_t_locatio_f0c00b_idx',
+            model_name="timelog",
+            new_name="timelog_location_logged_idx",
+            old_name="inventory_t_locatio_f0c00b_idx",
         ),
         migrations.RenameIndex(
-            model_name='wallettxn',
-            new_name='wallettxn_user_created_idx',
-            old_name='inventory_w_user_id_28ba62_idx',
+            model_name="wallettxn",
+            new_name="wallettxn_user_created_idx",
+            old_name="inventory_w_user_id_28ba62_idx",
         ),
         migrations.RenameIndex(
-            model_name='wallettxn',
-            new_name='wallettxn_reason_created_idx',
-            old_name='inventory_w_reason_c4c694_idx',
+            model_name="wallettxn",
+            new_name="wallettxn_reason_created_idx",
+            old_name="inventory_w_reason_c4c694_idx",
         ),
         migrations.RenameIndex(
-            model_name='warrantychecklog',
-            new_name='warrantylog_imei_created_idx',
-            old_name='inventory_w_imei_c8f3df_idx',
+            model_name="warrantychecklog",
+            new_name="warrantylog_imei_created_idx",
+            old_name="inventory_w_imei_c8f3df_idx",
         ),
         migrations.RenameIndex(
-            model_name='warrantychecklog',
-            new_name='wlog_res_created_idx',
-            old_name='inventory_w_result_6c6fb7_idx',
+            model_name="warrantychecklog",
+            new_name="wlog_res_created_idx",
+            old_name="inventory_w_result_6c6fb7_idx",
         ),
         migrations.AlterField(
-            model_name='inventoryitem',
-            name='sold_at',
+            model_name="inventoryitem",
+            name="sold_at",
             field=models.DateTimeField(blank=True, db_index=True, null=True),
         ),
         migrations.AddIndex(
-            model_name='inventoryitem',
-            index=models.Index(condition=models.Q(('is_active', True)), fields=['product', 'current_location', 'status'], name='invitem_prod_loc_status_idx'),
+            model_name="inventoryitem",
+            index=models.Index(
+                condition=models.Q(("is_active", True)),
+                fields=["product", "current_location", "status"],
+                name="invitem_prod_loc_status_idx",
+            ),
         ),
         migrations.AddIndex(
-            model_name='inventoryitem',
-            index=models.Index(fields=['received_at'], name='invitem_received_at_idx'),
+            model_name="inventoryitem",
+            index=models.Index(fields=["received_at"], name="invitem_received_at_idx"),
         ),
     ]

@@ -9,7 +9,6 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         ("inventory", "0037_add_liquor_stock_targets"),
         ("tenants", "0012_add_business_logo"),
@@ -50,9 +49,7 @@ class Migration(migrations.Migration):
                 ),
                 (
                     "rom_gb",
-                    models.PositiveIntegerField(
-                        help_text="ROM/Storage in GB (e.g., 128, 256)"
-                    ),
+                    models.PositiveIntegerField(help_text="ROM/Storage in GB (e.g., 128, 256)"),
                 ),
                 (
                     "variant_label",
@@ -79,9 +76,7 @@ class Migration(migrations.Migration):
                         help_text="Default cost price (optional)",
                         max_digits=12,
                         null=True,
-                        validators=[
-                            django.core.validators.MinValueValidator(Decimal("0.00"))
-                        ],
+                        validators=[django.core.validators.MinValueValidator(Decimal("0.00"))],
                     ),
                 ),
                 (
@@ -92,9 +87,7 @@ class Migration(migrations.Migration):
                         help_text="Default selling price (optional)",
                         max_digits=12,
                         null=True,
-                        validators=[
-                            django.core.validators.MinValueValidator(Decimal("0.00"))
-                        ],
+                        validators=[django.core.validators.MinValueValidator(Decimal("0.00"))],
                     ),
                 ),
                 (
@@ -107,9 +100,7 @@ class Migration(migrations.Migration):
                 ),
                 (
                     "is_flagship",
-                    models.BooleanField(
-                        default=False, help_text="Mark as flagship/featured product"
-                    ),
+                    models.BooleanField(default=False, help_text="Mark as flagship/featured product"),
                 ),
                 ("created_at", models.DateTimeField(default=django.utils.timezone.now)),
                 ("updated_at", models.DateTimeField(auto_now=True)),
@@ -136,20 +127,14 @@ class Migration(migrations.Migration):
             options={
                 "ordering": ["brand", "model_name", "ram_gb", "rom_gb"],
                 "indexes": [
-                    models.Index(
-                        fields=["business", "brand"], name="phoneprod_biz_brand_idx"
-                    ),
+                    models.Index(fields=["business", "brand"], name="phoneprod_biz_brand_idx"),
                     models.Index(
                         fields=["business", "is_active"],
                         name="phoneprod_biz_active_idx",
                     ),
-                    models.Index(
-                        fields=["brand", "model_name"], name="phoneprod_brand_model_idx"
-                    ),
+                    models.Index(fields=["brand", "model_name"], name="phoneprod_brand_model_idx"),
                 ],
-                "unique_together": {
-                    ("business", "brand", "model_name", "ram_gb", "rom_gb")
-                },
+                "unique_together": {("business", "brand", "model_name", "ram_gb", "rom_gb")},
             },
         ),
     ]

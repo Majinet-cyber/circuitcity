@@ -332,4 +332,3 @@ HQ_ONBOARDING_CONTENT = [
         "text": "Contact the development team or senior HQ administrators if you have questions or encounter issues. Always document your actions for compliance and training purposes.",
     },
 ]
-

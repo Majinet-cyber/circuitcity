@@ -9,6 +9,7 @@ class SafeRemoveIndex(RemoveIndex):
     """
     Prevents ValueError if index is missing from migration state.
     """
+
     def state_forwards(self, app_label, state):
         try:
             super().state_forwards(app_label, state)
@@ -20,7 +21,7 @@ def drop_inventory_indexes_database(apps, schema_editor):
     """Drop inventory indexes using idempotent SQL. Safe to run even if indexes don't exist."""
     vendor = schema_editor.connection.vendor
     with schema_editor.connection.cursor() as cursor:
-        if vendor in ('postgresql', 'sqlite'):
+        if vendor in ("postgresql", "sqlite"):
             cursor.execute("DROP INDEX IF EXISTS invitem_active_status_idx")
             cursor.execute("DROP INDEX IF EXISTS invitem_prod_loc_status_idx")
 
@@ -31,10 +32,9 @@ def reverse_drop_inventory_indexes_database(apps, schema_editor):
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
-        ('tenants', '0003_alter_membership_role_and_more'),
-        ('inventory', '0016_orderprice'),
+        ("tenants", "0003_alter_membership_role_and_more"),
+        ("inventory", "0016_orderprice"),
     ]
 
     operations = [
@@ -47,31 +47,41 @@ class Migration(migrations.Migration):
             ],
             state_operations=[
                 SafeRemoveIndex(
-                    model_name='inventoryitem',
-                    name='invitem_active_status_idx',
+                    model_name="inventoryitem",
+                    name="invitem_active_status_idx",
                 ),
                 SafeRemoveIndex(
-                    model_name='inventoryitem',
-                    name='invitem_prod_loc_status_idx',
+                    model_name="inventoryitem",
+                    name="invitem_prod_loc_status_idx",
                 ),
             ],
         ),
         migrations.RenameIndex(
-            model_name='inventoryitem',
-            new_name='inv_received_idx',
-            old_name='invitem_received_at_idx',
+            model_name="inventoryitem",
+            new_name="inv_received_idx",
+            old_name="invitem_received_at_idx",
         ),
         migrations.AddField(
-            model_name='inventoryitem',
-            name='business',
-            field=models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.CASCADE, related_name='inventory_items', to='tenants.business'),
+            model_name="inventoryitem",
+            name="business",
+            field=models.ForeignKey(
+                blank=True,
+                null=True,
+                on_delete=django.db.models.deletion.CASCADE,
+                related_name="inventory_items",
+                to="tenants.business",
+            ),
         ),
         migrations.AddIndex(
-            model_name='inventoryitem',
-            index=models.Index(condition=models.Q(('is_active', True)), fields=['business', 'product', 'current_location', 'status'], name='inv_bpls_idx'),
+            model_name="inventoryitem",
+            index=models.Index(
+                condition=models.Q(("is_active", True)),
+                fields=["business", "product", "current_location", "status"],
+                name="inv_bpls_idx",
+            ),
         ),
         migrations.AddIndex(
-            model_name='inventoryitem',
-            index=models.Index(fields=['business', 'is_active', 'status'], name='inv_bis_idx'),
+            model_name="inventoryitem",
+            index=models.Index(fields=["business", "is_active", "status"], name="inv_bis_idx"),
         ),
     ]

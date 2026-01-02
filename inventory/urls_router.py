@@ -24,4 +24,3 @@ if views_router:
         path("sim/", views_router.app_sim, name="sim"),
         path("analytics/", views_router.app_analytics, name="analytics"),
     ]
-

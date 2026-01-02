@@ -6,16 +6,13 @@ from django.core.management.base import BaseCommand
 from django.db.models import Count
 from inventory.models import InventoryItem, Product, Location
 
+
 class Command(BaseCommand):
     help = "Send daily low-stock digest per product/location to admins."
 
     def handle(self, *args, **opts):
         # Count in-stock by Product+Location
-        counts = (
-            InventoryItem.active.in_stock()
-            .values("product_id", "current_location_id")
-            .annotate(qty=Count("id"))
-        )
+        counts = InventoryItem.active.in_stock().values("product_id", "current_location_id").annotate(qty=Count("id"))
 
         # Build a lookup: { (product_id, location_id) : qty }
         qty_map = {(c["product_id"], c["current_location_id"]): c["qty"] for c in counts}
@@ -55,6 +52,7 @@ class Command(BaseCommand):
         if not recips:
             # Fallback: all staff emails
             from django.contrib.auth import get_user_model
+
             User = get_user_model()
             recips = list(User.objects.filter(is_staff=True).exclude(email="").values_list("email", flat=True))
 
@@ -64,5 +62,3 @@ class Command(BaseCommand):
 
         send_mail(subject, body, from_email, recips, fail_silently=False)
         self.stdout.write(self.style.SUCCESS(f"Sent low-stock digest to {', '.join(recips)}"))
-
-

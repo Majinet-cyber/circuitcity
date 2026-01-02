@@ -1,4 +1,4 @@
-﻿#--- PART 1/3 START (inventory/views.py) ---# --- PART 1/3 â€” circuitcity/inventory/views.py ---
+﻿# --- PART 1/3 START (inventory/views.py) ---# --- PART 1/3 â€” circuitcity/inventory/views.py ---
 
 from __future__ import annotations
 from django.contrib import messages
@@ -16,6 +16,7 @@ import math
 
 logger = logging.getLogger(__name__)
 
+
 # ------------------------------
 # Helpers (keep above all views)
 # ------------------------------
@@ -24,6 +25,8 @@ def _wants_json(request):
     if request.GET.get("as") == "json":
         return True
     return request.headers.get("x-requested-with") == "XMLHttpRequest"
+
+
 from django.urls import reverse
 from .forms import MerchProductForm, MerchUnitPriceFormSet
 from .forms import MerchProductForm, MerchUnitPriceFormSet
@@ -33,8 +36,10 @@ from .api import predictions_summary as api_predictions
 from django.utils.translation import gettext as _
 from decimal import Decimal
 from datetime import datetime, timedelta, date, time  # NOTE: keep 'time' for wallet calc in Part 2
+
 # ORM bits for subqueries/annotations
 from django.db.models import Q, OuterRef, Subquery, Exists, Value, BooleanField
+
 # --- Safe, module-level binding so functions can read Sale without shadowing
 try:
     from sales.models import Sale as Sale  # noqa: F401
@@ -50,8 +55,8 @@ except Exception:
 # add near top of file
 from django.db import transaction
 from django.utils import timezone
-from .utils_status import mark_item_sold    # <— use your canonical updater
-from sales.models import Sale               # if not already imported
+from .utils_status import mark_item_sold  # <— use your canonical updater
+from sales.models import Sale  # if not already imported
 
 
 from datetime import datetime, timedelta, time as dtime
@@ -82,6 +87,7 @@ from django.views.decorators.http import require_GET, require_POST, require_http
 #  names avoid collisions. The decorator is defined here so it's available
 #  before it is used further down in the file.)
 from functools import wraps as _wraps_hotfix
+
 # --- add near the top of inventory/views.py (after imports) ---
 
 from django.views.decorators.http import require_http_methods
@@ -106,6 +112,7 @@ from django.db.models.functions import Coalesce
 # if not already imported:
 from .scope import stock_queryset_for_request, active_scope, get_inventory_model
 
+
 def _inventory_header_stats(request):
     """
     Returns dict with counters for the four header badges, computed
@@ -113,8 +120,7 @@ def _inventory_header_stats(request):
     """
     Model = get_inventory_model()
     if Model is None:
-        return {"in_stock_count": 0, "sold_count": 0,
-                "sum_order": Decimal("0.00"), "sum_selling": Decimal("0.00")}
+        return {"in_stock_count": 0, "sold_count": 0, "sum_order": Decimal("0.00"), "sum_selling": Decimal("0.00")}
 
     # 1) "In stock" and sums are from the canonical stock queryset
     qs = stock_queryset_for_request(request)
@@ -174,8 +180,11 @@ def _inventory_header_stats(request):
         "sum_order": sums["sum_order"] or Decimal("0.00"),
         "sum_selling": sums["sum_selling"] or Decimal("0.00"),
     }
+
+
 # --- Add if these imports are not already present ---
-  # TextChoices you added (PHARMACY, PHONES, LIQUOR, etc.)
+# TextChoices you added (PHARMACY, PHONES, LIQUOR, etc.)
+
 
 def _detect_kind(business: Business) -> str | None:
     """
@@ -189,6 +198,7 @@ def _detect_kind(business: Business) -> str | None:
         if val:
             return str(val)
     return None
+
 
 @login_required
 def merch_add_router(request):
@@ -205,11 +215,11 @@ def merch_add_router(request):
     # Map business kind â†’ template
     template_map = {
         BusinessKind.PHARMACY: "inventory/add_product_pharmacy.html",
-        BusinessKind.PHONES:   "inventory/add_product_phones.html",
-        BusinessKind.LIQUOR:   "inventory/add_product_liquor.html",
+        BusinessKind.PHONES: "inventory/add_product_phones.html",
+        BusinessKind.LIQUOR: "inventory/add_product_liquor.html",
         # If you have a separate TextChoice for clothing, add it; otherwise treat as 'grocery' fallback
-        "clothing":            "inventory/add_product_clothing.html",
-        BusinessKind.GROCERY:  "inventory/add_product_clothing.html",  # change if you have a dedicated grocery template
+        "clothing": "inventory/add_product_clothing.html",
+        BusinessKind.GROCERY: "inventory/add_product_clothing.html",  # change if you have a dedicated grocery template
     }
 
     template = template_map.get(kind) or "inventory/add_product_clothing.html"
@@ -220,6 +230,7 @@ def merch_add_router(request):
         "BUSINESS_KIND": kind,
     }
     return render(request, template, ctx)
+
 
 def _ensure_active_business_and_location(request):
     """
@@ -243,6 +254,7 @@ def _ensure_active_business_and_location(request):
     if not biz:
         try:
             from tenants.models import BusinessMembership, Business  # noqa
+
             qs = BusinessMembership.objects.filter(user=request.user)
             for f in ("is_active", "active", "accepted"):
                 if f in [fld.name for fld in BusinessMembership._meta.fields]:
@@ -281,6 +293,8 @@ def _ensure_active_business_and_location(request):
 from django.contrib import messages
 from django.shortcuts import redirect
 from django.utils import timezone
+
+
 def _resolve_default_location_id(request):
     """
     Returns a location id to use when nothing is chosen yet:
@@ -321,6 +335,7 @@ def _resolve_default_location_id(request):
 
 def with_active_location(view):
     """Decorator: sets request.active_location(_id) and persists to session."""
+
     @wraps(view)
     def _wrapped(request, *args, **kwargs):
         lid = _resolve_default_location_id(request)
@@ -329,7 +344,9 @@ def with_active_location(view):
         if lid:
             request.session["active_location_id"] = lid
         return view(request, *args, **kwargs)
+
     return _wrapped
+
 
 def _get_active_business(request):
     # 1) already attached by middleware or prior selection?
@@ -341,6 +358,7 @@ def _get_active_business(request):
     biz_id = request.session.get("active_business_id")
     if biz_id:
         from tenants.models import Business  # adjust path if different
+
         try:
             biz = Business.objects.get(pk=biz_id, is_active=True)
             request.business = biz
@@ -352,10 +370,12 @@ def _get_active_business(request):
     user = request.user
     if user.is_authenticated:
         from tenants.models import Business  # adjust path if different
-        biz = (Business.objects
-               .filter(is_active=True, managers=user)  # or owners=user depending on your schema
-               .order_by("name")
-               .first())
+
+        biz = (
+            Business.objects.filter(is_active=True, managers=user)  # or owners=user depending on your schema
+            .order_by("name")
+            .first()
+        )
         if biz:
             request.business = biz
             request.session["active_business_id"] = biz.id
@@ -363,9 +383,11 @@ def _get_active_business(request):
 
     return None
 
+
 from django.contrib.auth.decorators import login_required
 from django.shortcuts import render, redirect
 from .models import BusinessKind
+
 
 @login_required
 def merch_add_router(request):
@@ -386,11 +408,11 @@ def merch_add_router(request):
 
     template_map = {
         BusinessKind.PHARMACY: "inventory/add_product_pharmacy.html",
-        BusinessKind.PHONES:   "inventory/add_product_phones.html",
-        BusinessKind.LIQUOR:   "inventory/add_product_liquor.html",
+        BusinessKind.PHONES: "inventory/add_product_phones.html",
+        BusinessKind.LIQUOR: "inventory/add_product_liquor.html",
         # if you have a dedicated clothing TextChoice, add it; otherwise use clothing as grocery fallback
-        "clothing":            "inventory/add_product_clothing.html",
-        BusinessKind.GROCERY:  "inventory/add_product_clothing.html",
+        "clothing": "inventory/add_product_clothing.html",
+        BusinessKind.GROCERY: "inventory/add_product_clothing.html",
     }
     template = template_map.get(kind) or "inventory/add_product_clothing.html"
 
@@ -404,10 +426,11 @@ def merch_add_router(request):
     }
     return render(request, template, ctx)
 
+
 def _require_active_business(request):
     """
     Attach/choose a business for this request, or show error + redirect.
-    
+
     GUARD: To avoid redirect loops, redirect to choose-business page instead of dashboard:home
     when no active business is found.
     """
@@ -417,6 +440,7 @@ def _require_active_business(request):
         # Redirect to choose-business to avoid loops (dashboard:home also needs a business)
         try:
             from django.urls import reverse, NoReverseMatch
+
             try:
                 return redirect(reverse("tenants:choose_business"))
             except NoReverseMatch:
@@ -424,6 +448,7 @@ def _require_active_business(request):
         except Exception:
             return redirect("/tenants/choose/")
     return None  # OK
+
 
 def __active_business_id(request):
     """
@@ -444,9 +469,12 @@ def __active_business_id(request):
     if bid:
         request.session["active_business_id"] = bid
     return bid
+
+
 # Ensure Django views return HttpResponse, not tuples
 from functools import wraps
 from django.http import HttpResponseBase
+
 
 def __default_location_id(request):
     """
@@ -477,6 +505,7 @@ def __default_location_id(request):
         pass
     return None
 
+
 def __apply_scope(qs, request):
     """
     Apply business + location filters to any queryset, supporting either
@@ -503,15 +532,18 @@ def __apply_scope(qs, request):
 
     return qs
 
+
 # Define with_active_location early so decorators below can use it.
 try:
     with_active_location  # type: ignore[name-defined]
 except NameError:
+
     def with_active_location(view):
         """
         Decorator: sets request.active_location(_id) using the same rules
         as stock_list. Name matches your existing decorator to avoid template edits.
         """
+
         @_wraps_hotfix(view)
         def _wrapped(request, *args, **kwargs):
             lid = __default_location_id(request)
@@ -519,12 +551,16 @@ except NameError:
             try:
                 # Location may not yet be imported at this point; guard it.
                 from .models import Location as _LocModel
+
                 loc = _LocModel.objects.filter(id=lid).first() if (lid) else None
             except Exception:
                 loc = None
             request.active_location = loc
             return view(request, *args, **kwargs)
+
         return _wrapped
+
+
 # === END HOTFIX ===============================================================
 # inventory/views.py
 from decimal import Decimal
@@ -537,13 +573,16 @@ try:
 except Exception:
     Sale = None  # keep app import-safe
 
+
 def _json_ok(data, **extra):
     out = {"ok": True, "data": data}
     out.update(extra)
     return JsonResponse(out)
 
+
 def _json_err(msg, status=400):
     return JsonResponse({"ok": False, "error": msg}, status=status)
+
 
 def _to_decimal(x, default=Decimal("0")):
     try:
@@ -553,10 +592,12 @@ def _to_decimal(x, default=Decimal("0")):
     except Exception:
         return default
 
+
 # --- Role helper import (safe) ----------------------------------------
 try:
     from accounts.utils import user_is_manager  # type: ignore[attr-defined]
 except Exception:  # pragma: no cover
+
     def user_is_manager(user) -> bool:  # type: ignore[no-redef]
         if not getattr(user, "is_authenticated", False):
             return False
@@ -566,6 +607,7 @@ except Exception:  # pragma: no cover
             return user.groups.filter(name__in=["Manager", "Admin"]).exists()
         except Exception:
             return False
+
 
 # --- Optional Business model (safe) ----------------------------------
 try:
@@ -594,12 +636,20 @@ from .models import (
     TimeLog,
     Location,
 )
+
 # ---- Safe model imports (no booleans!) ----
 InventoryItem = Stock = Product = AuditLog = Location = Sale = None
 
 try:
     # adjust import paths to match your project
-    from .models import InventoryItem as _InventoryItem, Stock as _Stock, Product as _Product, AuditLog as _AuditLog, Location as _Location
+    from .models import (
+        InventoryItem as _InventoryItem,
+        Stock as _Stock,
+        Product as _Product,
+        AuditLog as _AuditLog,
+        Location as _Location,
+    )
+
     InventoryItem, Stock, Product, AuditLog, Location = _InventoryItem, _Stock, _Product, _AuditLog, _Location
 except Exception:
     pass
@@ -607,6 +657,7 @@ except Exception:
 try:
     # if Sale lives in a different app, fix the dotted path
     from sales.models import Sale as _Sale
+
     Sale = _Sale
 except Exception:
     pass
@@ -634,8 +685,10 @@ except Exception:  # pragma: no cover
 try:
     from .cache_utils import get_dashboard_cache_version
 except Exception:  # pragma: no cover
+
     def get_dashboard_cache_version() -> int:
         return 1
+
 
 User = get_user_model()
 
@@ -656,6 +709,8 @@ def is_manager_like(user) -> bool:
     except Exception:
         manager_group_names = {"Manager", "Admin"}
     return user.groups.filter(name__in=manager_group_names).exists()
+
+
 # ---- safe imports used by helpers ----
 try:
     from tenants.utils import (
@@ -664,9 +719,15 @@ try:
         user_is_admin as _utils_is_admin,
     )
 except Exception:
-    def default_location_for_request(_request): return None
-    def _utils_is_manager(_u): return False
-    def _utils_is_admin(_u): return False
+
+    def default_location_for_request(_request):
+        return None
+
+    def _utils_is_manager(_u):
+        return False
+
+    def _utils_is_admin(_u):
+        return False
 
 
 def _user_home_location(user):
@@ -679,7 +740,8 @@ def _user_home_location(user):
         """
         # Which FK does InventoryItem use for a location?
         loc_field = (
-            "current_location" if _model_has_field(InventoryItem, "current_location")
+            "current_location"
+            if _model_has_field(InventoryItem, "current_location")
             else ("location" if _model_has_field(InventoryItem, "location") else None)
         )
         if not loc_field:
@@ -809,8 +871,10 @@ def _is_manager_or_admin(user):
         pass
     return False
 
+
 # --- Permissions: safe imports + fallbacks -----------------------------------
 from django.contrib.auth.decorators import user_passes_test
+
 
 def _in_groups(user, names):
     if not getattr(user, "is_authenticated", False):
@@ -818,6 +882,7 @@ def _in_groups(user, names):
     if getattr(user, "is_superuser", False):
         return True
     return user.groups.filter(name__in=names).exists()
+
 
 try:
     # optional centralization if you created tenants/roles.py earlier
@@ -836,13 +901,16 @@ _is_auditor = user_passes_test(is_auditor)
 _is_manager_or_admin = user_passes_test(is_manager_or_admin)
 _is_store_clerk = user_passes_test(is_store_clerk)
 
+
 # NEW: who can view *all* time logs? (managers, finance, admins)
 def _pred_can_view_all(user):
     # allow Django permission too, if you've granted it in admin
     has_perm = user.has_perm("inventory.view_timelog") if user.is_authenticated else False
     return has_perm or _in_groups(user, ["Manager", "Finance", "Admin"])
 
+
 _can_view_all = user_passes_test(_pred_can_view_all)
+
 
 # -----------------------
 # JSON helpers / safe API wrapper
@@ -854,9 +922,12 @@ def json_ok(payload=None, **extra):
     if extra:
         data.update(extra)
     return JsonResponse(data)
+
+
 # ---- SAFE calendar window helper (no WSGIRequest usage) ----
 from datetime import datetime, timedelta, date, time as dtime
 from django.utils import timezone
+
 
 def _get_preset_window_safe(request, default_preset: str = "month"):
     """
@@ -879,26 +950,29 @@ def _get_preset_window_safe(request, default_preset: str = "month"):
         except Exception:
             day_obj = today
         start_dt = timezone.make_aware(datetime.combine(day_obj, dtime.min))
-        end_dt   = timezone.make_aware(datetime.combine(day_obj, dtime.max))
+        end_dt = timezone.make_aware(datetime.combine(day_obj, dtime.max))
 
     elif range_preset == "7d":
         start_dt = now - timedelta(days=7)
-        end_dt   = now
+        end_dt = now
 
     elif range_preset == "all":
         start_dt = None
-        end_dt   = None
+        end_dt = None
 
     else:  # default month
         month_start = today.replace(day=1)
         start_dt = timezone.make_aware(datetime.combine(month_start, dtime.min))
-        end_dt   = now
+        end_dt = now
         range_preset = "month"
 
     return range_preset, (day_str or None), start_dt, end_dt
+
+
 # ---- SAFE calendar window helper (no WSGIRequest usage) ----
 from datetime import datetime, timedelta, date, time as dtime
 from django.utils import timezone
+
 
 def _get_preset_window_safe(request, default_preset: str = "month"):
     """
@@ -919,20 +993,21 @@ def _get_preset_window_safe(request, default_preset: str = "month"):
         except Exception:
             day_obj = today
         start_dt = timezone.make_aware(datetime.combine(day_obj, dtime.min))
-        end_dt   = timezone.make_aware(datetime.combine(day_obj, dtime.max))
+        end_dt = timezone.make_aware(datetime.combine(day_obj, dtime.max))
     elif range_preset == "7d":
         start_dt = now - timedelta(days=7)
-        end_dt   = now
+        end_dt = now
     elif range_preset == "all":
         start_dt = None
-        end_dt   = None
+        end_dt = None
     else:  # default: month
         month_start = today.replace(day=1)
         start_dt = timezone.make_aware(datetime.combine(month_start, dtime.min))
-        end_dt   = now
+        end_dt = now
         range_preset = "month"
 
     return range_preset, (day_str or None), start_dt, end_dt
+
 
 # >>> HARD OVERRIDE any bad implementation imported earlier
 get_preset_window = _get_preset_window_safe
@@ -946,7 +1021,6 @@ def json_err(message, status=400, **extra):
     return JsonResponse(data, status=status)
 
 
-
 def safe_api(fn):
     @wraps(fn)
     def _wrap(request, *args, **kwargs):
@@ -958,10 +1032,13 @@ def safe_api(fn):
             return json_err(e, status=400)
         except Exception as e:
             return json_err(f"Unexpected error: {e}", status=500)
+
     return _wrap
+
 
 # --- Role helper import (safe fallbacks) -------------------------------------
 from django.contrib.auth.decorators import user_passes_test
+
 
 def _in_groups(user, names: list[str]) -> bool:
     if not getattr(user, "is_authenticated", False):
@@ -970,6 +1047,7 @@ def _in_groups(user, names: list[str]) -> bool:
     if getattr(user, "is_superuser", False):
         return True
     return user.groups.filter(name__in=names).exists()
+
 
 try:
     # If you have a central roles module, greatâ€”use it.
@@ -991,6 +1069,7 @@ except Exception:
     def _pred_is_store_clerk(user):
         return _in_groups(user, ["Clerk", "Seller", "Manager", "Admin"])
 
+
 # Expose decorators used throughout the file (these names were causing NameError)
 _is_auditor = user_passes_test(_pred_is_auditor)
 _is_manager_or_admin = user_passes_test(_pred_is_manager_or_admin)
@@ -1000,21 +1079,23 @@ try:
     from tenants.utils import user_is_admin, user_is_manager
 except Exception:
     # ultra-defensive fallbacks so the view never crashes if tenants.utils is unavailable
-    def user_is_admin(u):   return bool(getattr(u, "is_superuser", False) or getattr(u, "is_staff", False))
-    def user_is_manager(u): return user_is_admin(u)
+    def user_is_admin(u):
+        return bool(getattr(u, "is_superuser", False) or getattr(u, "is_staff", False))
+
+    def user_is_manager(u):
+        return user_is_admin(u)
+
 
 def _is_manager_or_admin(user):
     """Return True if user is a platform admin, manager, or superuser."""
     try:
         if not getattr(user, "is_authenticated", False):
             return False
-        return bool(
-            getattr(user, "is_superuser", False)
-            or user_is_admin(user)
-            or user_is_manager(user)
-        )
+        return bool(getattr(user, "is_superuser", False) or user_is_admin(user) or user_is_manager(user))
     except Exception:
         return False
+
+
 # ---- Safe imports used by helpers (place near other imports) ----
 try:
     from tenants.utils import default_location_for_request
@@ -1022,6 +1103,7 @@ except Exception:
     # ultra-defensive fallback: if tenants.utils isn't loaded yet
     def default_location_for_request(_request):
         return None
+
 
 # If you have a Location model, we don't need to import it here for this helper.
 # The view already falls back to default_location_for_request(request).
@@ -1031,6 +1113,7 @@ from django.views.decorators.cache import never_cache
 # ---- Guard: ensure Django views return HttpResponse, not tuples ----------
 from functools import wraps
 from django.http import HttpResponseBase
+
 
 def _enforce_http_response(viewfunc):
     @wraps(viewfunc)
@@ -1043,6 +1126,7 @@ def _enforce_http_response(viewfunc):
                 return first_http
             raise TypeError(f"{viewfunc.__name__} returned a tuple; Django views must return HttpResponse.")
         return rv
+
     return _inner
 
 
@@ -1082,8 +1166,10 @@ from django.template.loader import get_template
 try:
     from tenants.utils import get_active_business  # canonical tenant picker
 except Exception:  # pragma: no cover
+
     def get_active_business(_request):  # type: ignore
         return None
+
 
 try:
     from .models import InventoryItem, Product, Location  # type: ignore
@@ -1180,10 +1266,11 @@ def stock_list(request: HttpRequest, *args, **kwargs) -> HttpResponse:
     • Default table hides SOLD; use status=sold to view sold rows.
     • Badges are computed business-wide.
     • Hardened query parsing so bad params never 500.
-    
+
     VERTICAL GATE: This view is for phones/pharmacy/clothing/gym.
     Liquor businesses must use liquor:stock_list instead.
     """
+
     # ---------- tiny helpers (safe param parsing) ----------
     def _int(key, default, min_=1, max_=200):
         try:
@@ -1205,17 +1292,18 @@ def stock_list(request: HttpRequest, *args, **kwargs) -> HttpResponse:
             return redirect("tenants:activate_mine")
         except Exception:
             return redirect("/tenants/activate-mine/")
-    
+
     # ---------- VERTICAL GATE: Prevent liquor businesses from accessing phone stock list ----------
     from .helpers_core import business_vertical, LIQUOR
+
     vertical = business_vertical(request)
-    
+
     if vertical == LIQUOR:
         # Liquor businesses MUST use their own stock list
         # Redirect to liquor stock list with same query params
         from django.urls import reverse
         from django.http import QueryDict
-        
+
         try:
             liquor_url = reverse("liquor:stock_list")
             # Preserve query params (category, search, etc.)
@@ -1225,12 +1313,14 @@ def stock_list(request: HttpRequest, *args, **kwargs) -> HttpResponse:
         except Exception:
             # Fallback: return 404 to prevent leakage
             from django.http import Http404
+
             raise Http404("This feature is not available for your business type")
 
     # ---------- canonical model ----------
     Model = None
     try:
         from .models import InventoryItem as _InventoryItem
+
         Model = _InventoryItem
     except Exception:
         # very defensive fallback names
@@ -1306,34 +1396,29 @@ def stock_list(request: HttpRequest, *args, **kwargs) -> HttpResponse:
         else:
             # Fallback: if middleware hasn't set flag (shouldn't happen in normal flow)
             user_is_manager = (
-                request.user.is_staff 
+                request.user.is_staff
                 or request.user.is_superuser
-                or getattr(getattr(request.user, 'profile', None), 'is_manager', False)
+                or getattr(getattr(request.user, "profile", None), "is_manager", False)
             )
-            
+
             # Also check Membership role (fallback)
             if not user_is_manager and biz:
                 try:
                     from tenants.models import Membership
+
                     membership = Membership.objects.filter(
-                        user=request.user,
-                        business=biz,
-                        role='MANAGER',
-                        status='ACTIVE'
+                        user=request.user, business=biz, role="MANAGER", status="ACTIVE"
                     ).first()
                     if membership:
                         user_is_manager = True
                 except Exception:
                     pass
-        
+
         # If user is NOT a manager (i.e., they are an agent), filter stock to only what's assigned to them
         # CRITICAL: Manager precedence means managers see ALL stock even if they have agent indicators
         if not user_is_manager and _hasf(Model, "assigned_agent"):
             # Agents only see items where assigned_agent = them OR assigned_role = 'AGENT' and assigned_agent = them
-            qs = qs.filter(
-                Q(assigned_agent=request.user) 
-                | Q(assigned_role='AGENT', assigned_agent=request.user)
-            )
+            qs = qs.filter(Q(assigned_agent=request.user) | Q(assigned_role="AGENT", assigned_agent=request.user))
     except Exception:
         # On any error, default to safe behavior (show nothing for non-staff)
         if not (request.user.is_staff or request.user.is_superuser):
@@ -1356,11 +1441,16 @@ def stock_list(request: HttpRequest, *args, **kwargs) -> HttpResponse:
     # ---------- SOLD vs IN-STOCK predicates ----------
     def SOLD_Q() -> Q:
         q = Q()
-        if _hasf(Model, "status"):     q |= Q(status__iexact="SOLD") | Q(status__iexact="sold")
-        if _hasf(Model, "sold_at"):    q |= Q(sold_at__isnull=False)
-        if _hasf(Model, "in_stock"):   q |= Q(in_stock=False)
-        if _hasf(Model, "quantity"):   q |= Q(quantity=0)
-        if _hasf(Model, "qty"):        q |= Q(qty=0)
+        if _hasf(Model, "status"):
+            q |= Q(status__iexact="SOLD") | Q(status__iexact="sold")
+        if _hasf(Model, "sold_at"):
+            q |= Q(sold_at__isnull=False)
+        if _hasf(Model, "in_stock"):
+            q |= Q(in_stock=False)
+        if _hasf(Model, "quantity"):
+            q |= Q(quantity=0)
+        if _hasf(Model, "qty"):
+            q |= Q(qty=0)
         return q
 
     def INSTOCK_Q() -> Q:
@@ -1368,10 +1458,14 @@ def stock_list(request: HttpRequest, *args, **kwargs) -> HttpResponse:
         if _hasf(Model, "status"):
             # Prefer strict IN_STOCK if present; else "not SOLD"
             q |= Q(status__iexact="IN_STOCK") | ~Q(status__iexact="SOLD")
-        if _hasf(Model, "sold_at"):    q |= Q(sold_at__isnull=True)
-        if _hasf(Model, "in_stock"):   q |= Q(in_stock=True)
-        if _hasf(Model, "quantity"):   q |= Q(quantity__gt=0)
-        if _hasf(Model, "qty"):        q |= Q(qty__gt=0)
+        if _hasf(Model, "sold_at"):
+            q |= Q(sold_at__isnull=True)
+        if _hasf(Model, "in_stock"):
+            q |= Q(in_stock=True)
+        if _hasf(Model, "quantity"):
+            q |= Q(quantity__gt=0)
+        if _hasf(Model, "qty"):
+            q |= Q(qty__gt=0)
         return q
 
     # ---------- badge snapshot (business-wide) ----------
@@ -1391,8 +1485,8 @@ def stock_list(request: HttpRequest, *args, **kwargs) -> HttpResponse:
     except Exception:
         sold_count = 0
 
-    sum_order_amt   = _sum(instock_all, ("order_price", "order_cost", "cost_price"))
-    sum_selling_amt = _sum(sold_all,   ("selling_price", "sale_price", "price"))
+    sum_order_amt = _sum(instock_all, ("order_price", "order_cost", "cost_price"))
+    sum_selling_amt = _sum(sold_all, ("selling_price", "sale_price", "price"))
 
     # ---------- table filters (status + search) ----------
     status = _choice(
@@ -1449,7 +1543,7 @@ def stock_list(request: HttpRequest, *args, **kwargs) -> HttpResponse:
     )
 
     per_page = _int("page_size", default=50, min_=1, max_=200)
-    page     = _int("page", default=1, min_=1, max_=10_000)
+    page = _int("page", default=1, min_=1, max_=10_000)
 
     def _loc(o):
         loc = getattr(o, "current_location", None) or getattr(o, "location", None) or getattr(o, "store", None)
@@ -1550,25 +1644,26 @@ def stock_list(request: HttpRequest, *args, **kwargs) -> HttpResponse:
     try:
         from tenants.models import Membership
         from collections import defaultdict
-        if request.user.is_staff or getattr(request.user, 'is_manager', False) or hasattr(request, 'membership'):
+
+        if request.user.is_staff or getattr(request.user, "is_manager", False) or hasattr(request, "membership"):
             # Get active agent AND manager memberships for current business
-            memberships = Membership.objects.filter(
-                business=biz,
-                role__in=['AGENT', 'MANAGER'],
-                status='ACTIVE'
-            ).select_related('user', 'location').order_by('location__name', 'user__first_name', 'user__last_name')
-            
+            memberships = (
+                Membership.objects.filter(business=biz, role__in=["AGENT", "MANAGER"], status="ACTIVE")
+                .select_related("user", "location")
+                .order_by("location__name", "user__first_name", "user__last_name")
+            )
+
             # Keep manager_agents for backwards compatibility
-            manager_agents = [m for m in memberships if m.role == 'AGENT']
-            
+            manager_agents = [m for m in memberships if m.role == "AGENT"]
+
             # Group by location for transfer modal
             by_location = defaultdict(list)
             for m in memberships:
-                location_name = m.location.name if m.location else 'No Location'
+                location_name = m.location.name if m.location else "No Location"
                 by_location[location_name].append(m)
-            
+
             # Convert to sorted list of tuples: [(location_name, [memberships...]), ...]
-            transfer_agents_by_location = sorted(by_location.items(), key=lambda x: (x[0] == 'No Location', x[0]))
+            transfer_agents_by_location = sorted(by_location.items(), key=lambda x: (x[0] == "No Location", x[0]))
     except Exception:
         pass
 
@@ -1577,44 +1672,41 @@ def stock_list(request: HttpRequest, *args, **kwargs) -> HttpResponse:
         def __init__(self, count, per_page):
             self.num_pages = max(1, (count + per_page - 1) // per_page)
             self.per_page = per_page
-    
+
     class SimplePage:
         def __init__(self, object_list, number, paginator):
             self.object_list = object_list
             self.number = number
             self.paginator = paginator
-        
+
         def has_previous(self):
             return self.number > 1
-        
+
         def has_next(self):
             return self.number < self.paginator.num_pages
-        
+
         def previous_page_number(self):
             return self.number - 1
-        
+
         def next_page_number(self):
             return self.number + 1
-    
+
     paginator = SimplePaginator(total, per_page)
     page_obj = SimplePage(items, page, paginator)
 
     # Get view mode safely from request
     view_mode = request.GET.get("view", "table")
-    
+
     # Get membership safely (if available)
     membership = None
     try:
         if biz:
             from tenants.models import Membership
-            membership = Membership.objects.filter(
-                user=request.user,
-                business=biz,
-                status='ACTIVE'
-            ).first()
+
+            membership = Membership.objects.filter(user=request.user, business=biz, status="ACTIVE").first()
     except Exception:
         pass
-    
+
     # Get suspicious prices count for phones businesses (manager-only)
     suspicious_count = 0
     if user_is_manager:
@@ -1622,19 +1714,20 @@ def stock_list(request: HttpRequest, *args, **kwargs) -> HttpResponse:
             from inventory.business_kinds import BusinessKind
             from django.conf import settings
             from decimal import Decimal
-            if getattr(biz, 'business_kind', None) == BusinessKind.PHONES:
-                min_price = Decimal(str(getattr(settings, 'MIN_PHONE_SELLING_PRICE_MK', 10000)))
+
+            if getattr(biz, "business_kind", None) == BusinessKind.PHONES:
+                min_price = Decimal(str(getattr(settings, "MIN_PHONE_SELLING_PRICE_MK", 10000)))
                 suspicious_count = InventoryItem.objects.filter(
                     business=biz,
                     status="IN_STOCK",
                     is_active=True,
                     selling_price__isnull=False,
                     selling_price__gt=0,
-                    selling_price__lt=min_price
+                    selling_price__lt=min_price,
                 ).count()
         except Exception:
             pass
-    
+
     ctx = {
         "items": items,
         "rows": items,
@@ -1721,11 +1814,7 @@ def api_stock_status(request: HttpRequest) -> HttpResponse:
 
         # Prefer exact IMEI when 15 digits present
         if len(d) >= 15:
-            item = (
-                qs.filter(imei=d[-15:], status="IN_STOCK")
-                  .select_related("product", "current_location")
-                  .first()
-            )
+            item = qs.filter(imei=d[-15:], status="IN_STOCK").select_related("product", "current_location").first()
         # Else try partial IMEI icontains or product text match
         if item is None:
             or_q = Q()
@@ -1733,7 +1822,11 @@ def api_stock_status(request: HttpRequest) -> HttpResponse:
                 or_q |= Q(imei__icontains=d)
             # Product fields
             try:
-                or_q |= Q(product__name__icontains=code) | Q(product__brand__icontains=code) | Q(product__model__icontains=code)
+                or_q |= (
+                    Q(product__name__icontains=code)
+                    | Q(product__brand__icontains=code)
+                    | Q(product__model__icontains=code)
+                )
             except Exception:
                 pass
             item = qs.filter(or_q).select_related("product", "current_location").first()
@@ -1765,15 +1858,16 @@ def api_stock_status(request: HttpRequest) -> HttpResponse:
     }
     return JsonResponse(data, status=200)
 
+
 # Put near your other helpers in inventory/views.py
 
 # inventory/views.py  â€” REPLACE your existing get_preset_window with this
 
 
-
 # ---- REPLACE the whole get_preset_window with this safe version ----
 from datetime import datetime, timedelta, time as dtime
 from django.utils import timezone
+
 
 def get_preset_window(request, default_preset: str = "month"):
     """
@@ -1795,23 +1889,25 @@ def get_preset_window(request, default_preset: str = "month"):
         except Exception:
             day_obj = today
         start_dt = timezone.make_aware(datetime.combine(day_obj, dtime.min))
-        end_dt   = timezone.make_aware(datetime.combine(day_obj, dtime.max))
+        end_dt = timezone.make_aware(datetime.combine(day_obj, dtime.max))
 
     elif range_preset == "7d":
         start_dt = now - timedelta(days=7)
-        end_dt   = now
+        end_dt = now
 
     elif range_preset == "all":
         start_dt = None
-        end_dt   = None
+        end_dt = None
 
     else:  # default: month
         month_start = today.replace(day=1)
         start_dt = timezone.make_aware(datetime.combine(month_start, dtime.min))
-        end_dt   = now
+        end_dt = now
         range_preset = "month"
 
     return range_preset, (day_str or None), start_dt, end_dt
+
+
 # ---------------- End helpers ----------------
 # --- helpers to ensure default location & scoped form querysets ---
 
@@ -1840,6 +1936,7 @@ def _model_has_field(model, field_name: str) -> bool:
     except Exception:
         return False
 
+
 def _inv_location_model() -> Tuple[Optional[type], Optional[str]]:
     """
     Returns (LocationModel, field_name_on_InventoryItem) or (None, None).
@@ -1855,6 +1952,7 @@ def _inv_location_model() -> Tuple[Optional[type], Optional[str]]:
         except Exception:
             pass
     return None, None
+
 
 def _get_active_business(request):
     """
@@ -1886,6 +1984,7 @@ def default_location_for_request(request):
 
 
 # ------------------- SCAN SOLD -------------------
+
 
 # --- Inventory Â· Scan SOLD (paste over your current function) ---
 @never_cache
@@ -1956,8 +2055,10 @@ def scan_sold(request, *args, **kwargs):
     def _discover_inv_location_model():
         if not InventoryItem:
             return None, None
-        fname = "current_location" if _has_field(InventoryItem, "current_location") else (
-            "location" if _has_field(InventoryItem, "location") else None
+        fname = (
+            "current_location"
+            if _has_field(InventoryItem, "current_location")
+            else ("location" if _has_field(InventoryItem, "location") else None)
         )
         if not fname:
             return None, None
@@ -1991,6 +2092,7 @@ def scan_sold(request, *args, **kwargs):
 
     try:
         from inventory.validators import _active_business_code_from_request  # type: ignore
+
         try:
             biz_code = _active_business_code_from_request(request) or biz_code
         except Exception:
@@ -2000,6 +2102,7 @@ def scan_sold(request, *args, **kwargs):
 
     try:
         from core.business_rules import get_rule  # type: ignore
+
         r = get_rule(biz_code)
         rule_name = getattr(r, "name", rule_name) or rule_name
         min_len = int(getattr(r, "serial_min", min_len))
@@ -2098,17 +2201,14 @@ def scan_sold(request, *args, **kwargs):
         "active_business_name": getattr(biz, "display_name", None) or getattr(biz, "name", None),
         "active_business_code": biz_code,
         "business_rule_name": rule_name,
-
         # Locations (for custom select rendering)
-        "locations": locations,               # list[{'id','name'}]
-        "location_default": location_default, # id
-        "default_location": default_location, # object (template uses .id)
-        "lock_location": False,               # let the user change
-
+        "locations": locations,  # list[{'id','name'}]
+        "location_default": location_default,  # id
+        "default_location": default_location,  # object (template uses .id)
+        "lock_location": False,  # let the user change
         # Inventory location metadata
         "inventory_location_field": loc_field_name,
         "inventory_location_model": getattr(loc_model, "__name__", None),
-
         # Identifier metadata
         "identifier_field": identifier_field,
         "identifier_label": identifier_label,
@@ -2119,15 +2219,12 @@ def scan_sold(request, *args, **kwargs):
         "identifier_placeholder": identifier_placeholder,
         "identifier_hint": identifier_hint,
         "identifier_regex": identifier_pattern,
-
         # Defaults
         "sold_date_default": timezone.localdate().isoformat(),
         "commission_default": 0.0,
         "auto_submit_default": False,
-
         # Optional form for templates that expect {{ form }}
         "form": form,
-        
         # ✅ For sidebar nav highlighting
         "active_tab": "scan_sold",
     }
@@ -2174,6 +2271,7 @@ def _user_home_location(request):
     except Exception:
         pass
     return None
+
 
 def default_location_for_request(request):
     """
@@ -2225,8 +2323,10 @@ def default_location_for_request(request):
     except Exception:
         return None
 
+
 # A tiny paginator many views use
 from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger  # noqa: E402 (after Django import)
+
 
 def _paginate_qs(request, qs, per_page=25, page_param="page"):
     """
@@ -2251,7 +2351,9 @@ def _paginate_qs(request, qs, per_page=25, page_param="page"):
             has_next = False
             has_previous = False
             paginator = None
+
         return _Trivial(), 1
+
 
 def _location_field_name_for_item():
     """Return the InventoryItem location field name, or None."""
@@ -2329,8 +2431,8 @@ def _restrict_location_to_default_store(form, request, *, set_initial=True):
         else:
             form.fields[loc_field_form].queryset = form.fields[loc_field_form].queryset.none()
             form.fields[loc_field_form].help_text = (
-                (form.fields[loc_field_form].help_text or "") +
-                " No store found for your account. Ask an admin to set your store."
+                (form.fields[loc_field_form].help_text or "")
+                + " No store found for your account. Ask an admin to set your store."
             ).strip()
     except Exception:
         # If anything odd happens, don't crash the page
@@ -2365,6 +2467,8 @@ def _limit_form_querysets(form, request):
     except Exception:
         # never break the page on scoping issues
         pass
+
+
 # -----------------------
 # Scan pages (tenant-scoped)
 # -----------------------
@@ -2373,6 +2477,7 @@ from django.db import transaction, IntegrityError
 from django.core.exceptions import ValidationError
 from django.utils import timezone
 from decimal import Decimal
+
 # -------- Canonical location resolver (single source of truth) --------
 from functools import wraps
 
@@ -2383,11 +2488,13 @@ from functools import wraps
 
 from django.apps import apps
 
+
 def _get_model(app_label, model):
     try:
         return apps.get_model(app_label, model)
     except Exception:
         return None
+
 
 BusinessModel = _get_model("tenants", "Business")
 # Prefer your tenants util if present
@@ -2404,9 +2511,12 @@ def get_active_business_pair(request):
     """
     biz = _get_active_business(request)
     return biz, getattr(biz, "id", None)
+
+
 # =========================
 # Active business helpers
 # =========================
+
 
 def _set_active_business(request, biz):
     """Persist active business on the session and request object."""
@@ -2484,6 +2594,7 @@ def require_active_business(view):
 
     return _wrapped
 
+
 def _resolve_default_location_id(request):
     """
     Priority:
@@ -2539,8 +2650,10 @@ def _resolve_default_location_id(request):
             return first
     return None
 
+
 def with_active_location(view):
     """Decorator: sets request.active_location(_id) and persists to session."""
+
     @wraps(view)
     def _wrapped(request, *args, **kwargs):
         lid = _resolve_default_location_id(request)
@@ -2549,7 +2662,9 @@ def with_active_location(view):
         if lid:
             request.session["active_location_id"] = lid
         return view(request, *args, **kwargs)
+
     return _wrapped
+
 
 def filter_by_location_and_business(qs, request):
     """
@@ -2575,7 +2690,6 @@ def filter_by_location_and_business(qs, request):
     return qs
 
 
-
 # --- PART 1/3 ENDS ---
 # --- PART 2/3 â€” circuitcity/inventory/views.py (cleaned) ---
 
@@ -2595,7 +2709,12 @@ from django.core.exceptions import ValidationError
 from django.core.paginator import Paginator
 from django.db import IntegrityError, transaction
 from django.db.models import (
-    Q, Sum, Value, Exists, OuterRef, DecimalField,
+    Q,
+    Sum,
+    Value,
+    Exists,
+    OuterRef,
+    DecimalField,
 )
 from django.db.models.functions import Coalesce
 from django.http import HttpResponse, JsonResponse
@@ -2613,8 +2732,10 @@ except Exception:
     try:
         from django_otp.decorators import otp_required  # django-otp
     except Exception:
+
         def otp_required(view):
             return view
+
 
 # ---- optional / defensive imports for models & forms -----------------------
 try:
@@ -2659,6 +2780,7 @@ from django.contrib.auth import get_user_model
 
 from .models import WalletTxn  # make sure this import exists
 
+
 def wallet_page(request):
     """
     Simple read-only wallet page for a specific agent.
@@ -2675,10 +2797,7 @@ def wallet_page(request):
     target = get_object_or_404(User, pk=uid)
 
     # Balance (lifetime sum)
-    balance = (
-        WalletTxn.objects.filter(user=target)
-        .aggregate(s=Sum("amount"))["s"] or 0
-    )
+    balance = WalletTxn.objects.filter(user=target).aggregate(s=Sum("amount"))["s"] or 0
 
     # Monthly window (local time)
     today = timezone.localdate()
@@ -2686,17 +2805,21 @@ def wallet_page(request):
     next_month = (month_start.replace(day=28) + timezone.timedelta(days=4)).replace(day=1)
 
     monthly_total = (
-        WalletTxn.objects.filter(user=target, created_at__gte=month_start, created_at__lt=next_month)
-        .aggregate(s=Sum("amount"))["s"] or 0
+        WalletTxn.objects.filter(user=target, created_at__gte=month_start, created_at__lt=next_month).aggregate(
+            s=Sum("amount")
+        )["s"]
+        or 0
     )
 
     # Optional breakdowns (you used these in the template)
     monthly_adv = (
         WalletTxn.objects.filter(
             user=target,
-            created_at__gte=month_start, created_at__lt=next_month,
+            created_at__gte=month_start,
+            created_at__lt=next_month,
             reason="ADVANCE",
-        ).aggregate(s=Sum("amount"))["s"] or 0
+        ).aggregate(s=Sum("amount"))["s"]
+        or 0
     )
     lifetime_total = balance  # lifetime earnings == balance if no payouts are modeled separately
 
@@ -2724,9 +2847,11 @@ def wallet_page(request):
     }
     return render(request, "agents/wallet.html", ctx)
 
+
 # ---------------------------------------------------------------------------
 # SCAN WEB
 # ---------------------------------------------------------------------------
+
 
 @never_cache
 @login_required
@@ -2798,6 +2923,7 @@ def scan_web(request):
     html = html.replace("{CSRFTOKEN}", settings.CSRF_COOKIE_NAME)
     return HttpResponse(html, content_type="text/html")
 
+
 # ---------------------------------------------------------------------------
 # SCAN IN  (single, consolidated version)
 # ---------------------------------------------------------------------------
@@ -2813,6 +2939,7 @@ import logging
 
 # --- Inventory Â· Scan IN (paste over your current function) ---
 # put this tiny helper once near the top of views.py (outside the function)
+
 
 @never_cache
 @login_required
@@ -2930,6 +3057,7 @@ def scan_in(request):
 
     # Wants-JSON detection
     _wants_json_fn = globals().get("_wants_json")
+
     def _wants_json(req):
         if callable(_wants_json_fn):
             return _wants_json_fn(req)
@@ -2998,8 +3126,14 @@ def scan_in(request):
     def _restrict_location_to_user_store(form, set_initial=True):
         if not default_loc:
             return
-        fname = next((n for n in ("location", "current_location", "store", "branch")
-                      if n in form.fields and isinstance(form.fields[n], ModelChoiceField)), None)
+        fname = next(
+            (
+                n
+                for n in ("location", "current_location", "store", "branch")
+                if n in form.fields and isinstance(form.fields[n], ModelChoiceField)
+            ),
+            None,
+        )
         if not fname:
             return
         fld = form.fields[fname]
@@ -3082,13 +3216,17 @@ def scan_in(request):
             if _wants_json(request):
                 return JsonResponse({"ok": False, "errors": form.errors}, status=400)
             messages.error(request, "Please correct the errors below.")
-            return render(request, template_name, {
-                "form": form,
-                "default_location": default_loc,
-                "loc_is_required": loc_is_required,
-                "is_agent_user": True,
-                "today": today,
-            })
+            return render(
+                request,
+                template_name,
+                {
+                    "form": form,
+                    "default_location": default_loc,
+                    "loc_is_required": loc_is_required,
+                    "is_agent_user": True,
+                    "today": today,
+                },
+            )
 
         data = form.cleaned_data
 
@@ -3162,7 +3300,9 @@ def scan_in(request):
 
                 if cleaned_identifier and chosen_field_name and _model_has_field(InventoryItem, chosen_field_name):
                     if dup_qs.filter(**{chosen_field_name: cleaned_identifier}).exists():
-                        msg = f"Item with {chosen_field_name.upper()} {cleaned_identifier} already exists in your store."
+                        msg = (
+                            f"Item with {chosen_field_name.upper()} {cleaned_identifier} already exists in your store."
+                        )
                         if _wants_json(request):
                             return JsonResponse({"ok": False, "error": msg}, status=400)
                         messages.error(request, msg)
@@ -3208,25 +3348,23 @@ def scan_in(request):
                 # Agents get stock assigned to them; Managers get None unless explicitly set
                 if _model_has_field(InventoryItem, "assigned_agent"):
                     user_is_manager = (
-                        request.user.is_staff 
+                        request.user.is_staff
                         or request.user.is_superuser
-                        or getattr(getattr(request.user, 'profile', None), 'is_manager', False)
+                        or getattr(getattr(request.user, "profile", None), "is_manager", False)
                     )
                     # Also check Membership role
                     if not user_is_manager and biz_id:
                         try:
                             from tenants.models import Membership
+
                             membership = Membership.objects.filter(
-                                user=request.user,
-                                business_id=biz_id,
-                                role='MANAGER',
-                                status='ACTIVE'
+                                user=request.user, business_id=biz_id, role="MANAGER", status="ACTIVE"
                             ).first()
                             if membership:
                                 user_is_manager = True
                         except Exception:
                             pass
-                    
+
                     if user_is_manager:
                         # Manager: set to None (unless agent is selected in form - not implemented yet)
                         item.assigned_agent = None
@@ -3237,9 +3375,9 @@ def scan_in(request):
                         item.assigned_agent = request.user
                         if _model_has_field(InventoryItem, "assigned_role"):
                             item.assigned_role = "AGENT"
-                
+
                 # Set other audit fields
-                for name in ("created_by","added_by","received_by"):
+                for name in ("created_by", "added_by", "received_by"):
                     if _model_has_field(InventoryItem, name) and not getattr(item, name, None):
                         try:
                             setattr(item, name, request.user)
@@ -3262,7 +3400,9 @@ def scan_in(request):
             if getattr(settings, "DEBUG", False):
                 raise
             if _wants_json(request):
-                return JsonResponse({"ok": False, "error": "Unexpected error while saving this item. Please try again."}, status=500)
+                return JsonResponse(
+                    {"ok": False, "error": "Unexpected error while saving this item. Please try again."}, status=500
+                )
             messages.error(request, "Unexpected error while saving this item. Please try again.")
             return render(request, template_name, {"form": form})
 
@@ -3304,13 +3444,13 @@ def scan_in(request):
         "loc_is_required": loc_is_required,
         "today": today,
         "active_tab": "scan_in",  # ✅ For sidebar nav highlighting
-
         # For custom selects:
         "locations": locations,
         "location_default": location_default,
         "products": Product_qs if isinstance(Product_qs, (list, tuple)) else Product_qs,  # expose either way
     }
     return render(request, template_name, ctx)
+
 
 # inventory/views.py  (append)
 
@@ -3320,8 +3460,10 @@ from django.utils import timezone
 from django.shortcuts import get_object_or_404, redirect
 from django.db.models import Sum
 from .models import Location as Store
+
 # --- put near the top of inventory/views.py (with other helpers) ---
 from django.apps import apps
+
 
 def _get_inventory_model(*names):
     """
@@ -3330,21 +3472,24 @@ def _get_inventory_model(*names):
     """
     for name in names:
         try:
-            m = apps.get_model('inventory', name)
+            m = apps.get_model("inventory", name)
             if m:
                 return m
         except Exception:
             pass
     return None
 
+
 # Try old and new names in order of likelihood
-AgentStore = _get_inventory_model('AgentLocation', 'AgentStore', 'StoreLocation', 'Location')
+AgentStore = _get_inventory_model("AgentLocation", "AgentStore", "StoreLocation", "Location")
 
 import json
 from datetime import date
 
+
 def _is_manager(u):  # adjust to your own permission system
     return getattr(u, "is_staff", False) or u.groups.filter(name__iexact="Manager").exists()
+
 
 @login_required
 def api_geo_ping(request: HttpRequest) -> JsonResponse:
@@ -3382,12 +3527,18 @@ def api_geo_ping(request: HttpRequest) -> JsonResponse:
     now_in = res["in_range"]
     if now_in != was_in:
         TimeEvent.objects.create(
-            user=request.user, store=store,
+            user=request.user,
+            store=store,
             kind=(TimeEvent.ARRIVAL if now_in else TimeEvent.EXIT),
-            at=now, latitude=lat, longitude=lon, accuracy_m=acc, distance_m=res["distance_m"]
+            at=now,
+            latitude=lat,
+            longitude=lon,
+            accuracy_m=acc,
+            distance_m=res["distance_m"],
         )
 
     return JsonResponse({"ok": True, **res})
+
 
 @login_required
 @user_passes_test(_is_manager)
@@ -3406,11 +3557,17 @@ def api_timers(request: HttpRequest) -> JsonResponse:
     for st in stores:
         tms = WorkTimer.objects.filter(store=st, day=day).select_related("user")
         for t in tms:
-            data.append({
-                "store": st.name, "user": t.user.get_username(),
-                "in_range": t.in_range, "work_s": t.work_seconds, "away_s": t.away_seconds,
-            })
+            data.append(
+                {
+                    "store": st.name,
+                    "user": t.user.get_username(),
+                    "in_range": t.in_range,
+                    "work_s": t.work_seconds,
+                    "away_s": t.away_seconds,
+                }
+            )
     return JsonResponse({"ok": True, "items": data})
+
 
 @login_required
 @user_passes_test(_is_manager)
@@ -3452,18 +3609,22 @@ def api_month_summary(request: HttpRequest) -> JsonResponse:
     total_away = sum(i["away_s"] for i in items)
 
     return JsonResponse({"ok": True, "items": items, "totals": {"work_s": total_work, "away_s": total_away}})
+
+
 # inventory/views.py (optional simple form)
 from django import forms
 from django.shortcuts import render
 
+
 class StoreGeoForm(forms.ModelForm):
     class Meta:
         model = Store
-        fields = ("name","latitude","longitude","geofence_radius_m")
+        fields = ("name", "latitude", "longitude", "geofence_radius_m")
+
 
 @login_required
 @user_passes_test(_is_manager)
-def store_settings(request, pk:int):
+def store_settings(request, pk: int):
     store = get_object_or_404(Store, pk=pk, manager=request.user)
     if request.method == "POST":
         form = StoreGeoForm(request.POST, instance=store)
@@ -3473,6 +3634,7 @@ def store_settings(request, pk:int):
     else:
         form = StoreGeoForm(instance=store)
     return render(request, "inventory/store_settings.html", {"form": form, "store": store})
+
 
 @login_required
 @user_passes_test(_is_manager)
@@ -3519,9 +3681,7 @@ def merch_product_create(request):
     return render(request, "inventory/product_create.html", ctx)
 
 
-
 # inventory/views.py
-
 
 
 from django.contrib.auth.decorators import login_required
@@ -3597,14 +3757,14 @@ def orders_list(request: HttpRequest) -> HttpResponse:
 
     paginator = Paginator(qs, per_page)
     page_obj = paginator.get_page(request.GET.get("page"))
-    
+
     # Build context with safe defaults
     ctx = {
         "page_obj": page_obj,
         "orders": page_obj.object_list,
         "active_tab": request.GET.get("tab", "all"),  # Default to "all" if not specified
     }
-    
+
     return render(
         request,
         "inventory/orders_list.html",
@@ -3621,17 +3781,17 @@ def po_invoice(request: HttpRequest, po_id: int) -> HttpResponse:
     """
     if Order is None:
         return HttpResponse("Order model not available", status=501)
-    
+
     try:
         order = Order.objects.get(pk=po_id)
     except Order.DoesNotExist:
         return HttpResponse("Purchase order not found", status=404)
-    
+
     # Get order items if they exist
     items = []
-    if hasattr(order, 'items'):
+    if hasattr(order, "items"):
         items = list(order.items.all())
-    
+
     return render(
         request,
         "inventory/order_invoice.html",
@@ -3652,6 +3812,7 @@ from django.views.decorators.http import require_GET
 from django.contrib.auth.decorators import login_required
 from django.template.exceptions import TemplateDoesNotExist
 from django.http import HttpResponse, HttpResponseBase
+
 
 def _normalize_response(request, resp):
     """
@@ -3676,6 +3837,7 @@ def _normalize_response(request, resp):
         raise TypeError(f"Unexpected tuple return from view: {type(resp)} {resp!r}")
     return resp  # allow None for gates; caller should handle
 
+
 from django.contrib import messages
 from django.shortcuts import redirect, render
 from django.urls import reverse, NoReverseMatch
@@ -3685,11 +3847,13 @@ from django.contrib.auth.decorators import login_required
 from django.template.exceptions import TemplateDoesNotExist
 from django.http import HttpResponse, HttpResponseBase
 
+
 def _as_http_response(resp):
     """Return resp if it is a real HttpResponse, else None."""
     if isinstance(resp, (HttpResponse, HttpResponseBase)) or hasattr(resp, "has_header"):
         return resp
     return None
+
 
 @never_cache
 @login_required
@@ -3780,6 +3944,7 @@ import json
 # _biz_filter_kwargs, _attach_business_kwargs, _audit,
 # InventoryItem, Location, Sale
 
+
 def _parse_sold_date(val):
     """
     Accepts 'YYYY-MM-DD' or returns today's local date.
@@ -3792,6 +3957,7 @@ def _parse_sold_date(val):
     except Exception:
         return timezone.localdate()
 
+
 def _sold_choice_for(model):
     """
     If the model defines a SOLD constant/choice (e.g. STATUS_SOLD / SOLD),
@@ -3802,6 +3968,7 @@ def _sold_choice_for(model):
             return getattr(model, attr)
     # fall back to string
     return "SOLD"
+
 
 from django.http import JsonResponse
 from django.views.decorators.cache import never_cache
@@ -3822,6 +3989,7 @@ from django.utils import timezone
 # tiny local helpers (single source of truth)
 # ---------------------------
 
+
 def _model_has_field(model, name: str) -> bool:
     try:
         model._meta.get_field(name)
@@ -3829,10 +3997,12 @@ def _model_has_field(model, name: str) -> bool:
     except Exception:
         return False
 
+
 def _active_business_from_request(request):
     """Return (biz, biz_id) without relying on custom middleware."""
     biz = getattr(request, "business", None)
     return biz, getattr(biz, "id", None)
+
 
 def _biz_filter_kwargs(model, biz_id):
     """Map a business id onto the model using common FK names."""
@@ -3846,6 +4016,7 @@ def _biz_filter_kwargs(model, biz_id):
     if "business" in names:
         return {"business_id": biz_id}
     return {}
+
 
 def _sold_status_key(model):
     """
@@ -3868,6 +4039,7 @@ def _sold_status_key(model):
         pass
     return "SOLD"
 
+
 def _bool_field_set(obj, name, value):
     if _model_has_field(obj.__class__, name):
         try:
@@ -3876,6 +4048,7 @@ def _bool_field_set(obj, name, value):
         except Exception:
             pass
     return False
+
 
 def _parse_date(value):
     if not value:
@@ -3886,6 +4059,7 @@ def _parse_date(value):
         return dt.date()
     except Exception:
         return timezone.localdate()
+
 
 def _get_item_for_probe_or_update(InventoryItem, biz_id, code):
     """
@@ -3912,6 +4086,7 @@ def _get_item_for_probe_or_update(InventoryItem, biz_id, code):
     except InventoryItem.DoesNotExist:
         return None
 
+
 # ---------------------------
 # PROBE: what is this codeâ€™s stock status?
 # ---------------------------
@@ -3931,8 +4106,10 @@ from datetime import datetime
 
 # ---------- tiny helpers (kept local so these views are self-contained) ----------
 
+
 def _digits(s):
     return "".join(ch for ch in str(s or "") if ch.isdigit())
+
 
 def _normalize_code(s: str) -> str:
     """
@@ -3944,6 +4121,7 @@ def _normalize_code(s: str) -> str:
         return d[:15]
     return (s or "").strip()
 
+
 def _model_has_field(model, name: str) -> bool:
     try:
         model._meta.get_field(name)
@@ -3951,13 +4129,16 @@ def _model_has_field(model, name: str) -> bool:
     except Exception:
         return False
 
+
 def _bool_field_present(model, name: str) -> bool:
     return _model_has_field(model, name)
+
 
 def _active_business_from_request(request):
     """Best-effort (replace with your global helper if you have one)."""
     biz = getattr(request, "business", None)
     return biz, getattr(biz, "id", None)
+
 
 def _biz_filter_kwargs(model, biz_id):
     """Map business id onto common FK names the model may use."""
@@ -3974,6 +4155,7 @@ def _biz_filter_kwargs(model, biz_id):
     if "business" in names:
         return {"business_id": biz_id}
     return {}
+
 
 def _sold_status_key(model):
     """
@@ -3996,6 +4178,7 @@ def _sold_status_key(model):
         pass
     return "SOLD"
 
+
 def _parse_date(d):
     if not d:
         return timezone.localdate()
@@ -4011,6 +4194,7 @@ def _parse_date(d):
         return timezone.localdate()
     except Exception:
         return timezone.localdate()
+
 
 def _get_item_for_probe_or_update(InventoryItem, biz_id, raw_code):
     """
@@ -4044,6 +4228,7 @@ def _get_item_for_probe_or_update(InventoryItem, biz_id, raw_code):
     # Fallback to any match
     return qs.order_by("-id").first()
 
+
 def _stored_location_meta(item):
     """Return (location_id, location_name) from either current_location or location."""
     loc_id = None
@@ -4064,6 +4249,7 @@ def _stored_location_meta(item):
     except Exception:
         pass
     return loc_id, loc_name
+
 
 # -----------------------------------------------------------------------------
 
@@ -4103,7 +4289,14 @@ def api_stock_status(request):
     item = _get_item_for_probe_or_update(InventoryItem, biz_id, code_in)
     if not item:
         return JsonResponse(
-            {"ok": True, "found": False, "exists": False, "in_stock": False, "mismatch": False, "code": _normalize_code(code_in)},
+            {
+                "ok": True,
+                "found": False,
+                "exists": False,
+                "in_stock": False,
+                "mismatch": False,
+                "code": _normalize_code(code_in),
+            },
             status=200,
         )
 
@@ -4136,6 +4329,7 @@ def api_stock_status(request):
 # ---------------------------
 # SELL: mark item as SOLD
 # ---------------------------
+
 
 @never_cache
 @require_POST
@@ -4235,18 +4429,20 @@ def api_mark_sold(request):
         existing = scoped.only("id", "status", "sold_at", "selling_price", loc_fk or "id").get(**find_q)
         if str(getattr(existing, "status", "")) == str(sold_key):
             loc_id_now, _loc_name = _stored_location_meta(existing)
-            return JsonResponse({
-                "ok": True,
-                "already_sold": True,
-                "code": code,
-                "status": str(existing.status),
-                "is_sold": True,
-                "sold_at": existing.sold_at.isoformat() if getattr(existing, "sold_at", None) else None,
-                "selling_price": getattr(existing, "selling_price", None),
-                "location_id": loc_id_now,
-                "in_stock": False,
-                "is_active": bool(getattr(existing, "is_active", True)),
-            })
+            return JsonResponse(
+                {
+                    "ok": True,
+                    "already_sold": True,
+                    "code": code,
+                    "status": str(existing.status),
+                    "is_sold": True,
+                    "sold_at": existing.sold_at.isoformat() if getattr(existing, "sold_at", None) else None,
+                    "selling_price": getattr(existing, "selling_price", None),
+                    "location_id": loc_id_now,
+                    "in_stock": False,
+                    "is_active": bool(getattr(existing, "is_active", True)),
+                }
+            )
     except InventoryItem.DoesNotExist:
         return JsonResponse({"ok": False, "error": "Item not found in your store."}, status=404)
 
@@ -4280,11 +4476,16 @@ def api_mark_sold(request):
     # Best-effort Sale row
     try:
         from sales.models import Sale
+
         sale_kwargs = {
             "item": item if "item" in {f.name for f in Sale._meta.get_fields()} else None,
             "agent": request.user if "agent" in {f.name for f in Sale._meta.get_fields()} else None,
-            "price": getattr(item, "selling_price", None) or (price_val or 0) if "price" in {f.name for f in Sale._meta.get_fields()} else None,
-            "sold_at": getattr(item, "sold_at", None) or timezone.now() if "sold_at" in {f.name for f in Sale._meta.get_fields()} else None,
+            "price": getattr(item, "selling_price", None) or (price_val or 0)
+            if "price" in {f.name for f in Sale._meta.get_fields()}
+            else None,
+            "sold_at": getattr(item, "sold_at", None) or timezone.now()
+            if "sold_at" in {f.name for f in Sale._meta.get_fields()}
+            else None,
         }
         sale_names = {f.name for f in Sale._meta.get_fields()}
         if "business_id" in sale_names:
@@ -4314,6 +4515,8 @@ def api_mark_sold(request):
         "debug": {"rows_changed": rows_changed, "loc_fk": loc_fk, "biz_id": biz_id},
     }
     return JsonResponse(resp, status=200)
+
+
 # ---------------------------------------------------------------------------
 # SAFE DEFAULT LOCATION PICKER + UTILITIES
 # ---------------------------------------------------------------------------
@@ -4322,6 +4525,7 @@ import json
 from django.http import HttpResponse
 from django.shortcuts import render
 from django.template.exceptions import TemplateDoesNotExist
+
 
 def _render_dashboard_safe(request, context, today=None, mtd_count=0, all_time_count=0):
     """
@@ -4343,10 +4547,10 @@ def _render_dashboard_safe(request, context, today=None, mtd_count=0, all_time_c
     context.setdefault("total_units", context.get("window_count", 0) or context.get("today_count", 0))
     context.setdefault("revenue_total", context.get("window_revenue", 0.0) or context.get("today_total", 0.0))
     context.setdefault("total_revenue", context.get("window_revenue", 0.0) or context.get("today_total", 0.0))
-    context.setdefault("costs_total", 0)   # for now, business costs; we'll wire it from Costs later
+    context.setdefault("costs_total", 0)  # for now, business costs; we'll wire it from Costs later
     context.setdefault("profit_total", 0)  # for now, can later be revenue_total - costs_total
-    context.setdefault("low_items", 0)     # low/out of stock items count
-    
+    context.setdefault("low_items", 0)  # low/out of stock items count
+
     # Profit panel variables (used by partials/profit_panel.html)
     context.setdefault("revenue", context.get("window_revenue", 0.0) or context.get("today_total", 0.0))
     context.setdefault("costs", 0)
@@ -4373,8 +4577,10 @@ def _render_dashboard_safe(request, context, today=None, mtd_count=0, all_time_c
         """
         return HttpResponse(html)
 
+
 from django.db.models import QuerySet
 from django.apps import apps
+
 
 def _inv_base(qs: QuerySet, start_dt=None, end_dt=None, time_fields=("created_at",)):
     """
@@ -4389,6 +4595,7 @@ def _inv_base(qs: QuerySet, start_dt=None, end_dt=None, time_fields=("created_at
         qs = qs.filter(q)
     return qs
 
+
 def _pick_manager(*models):
     """Return the first available .objects manager from the given model classes."""
     for m in models:
@@ -4397,6 +4604,7 @@ def _pick_manager(*models):
             if mgr is not None:
                 return mgr
     return None
+
 
 def _maybe_model(*model_paths):
     """
@@ -4416,8 +4624,10 @@ def _maybe_model(*model_paths):
             continue
     return None
 
+
 def _has_field(model, name: str) -> bool:
     return any(getattr(f, "name", None) == name for f in model._meta.get_fields())
+
 
 def default_location_for_request(request):
     """
@@ -4425,10 +4635,10 @@ def default_location_for_request(request):
     Returns an instance or None. NEVER raises if the model doesn't exist.
     """
     LocationModel = _maybe_model(
-        "inventory.Location",        # common
-        "inventory.StockLocation",   # alt naming
-        "inventory.Branch",          # some projects
-        "core.Location"              # fallback if kept in core app
+        "inventory.Location",  # common
+        "inventory.StockLocation",  # alt naming
+        "inventory.Branch",  # some projects
+        "core.Location",  # fallback if kept in core app
     )
     if not LocationModel:
         return None
@@ -4452,9 +4662,11 @@ def default_location_for_request(request):
     # Otherwise, just take the first visible location for this tenant
     return qs.first()
 
+
 # ---------------------------------------------------------------------------
 # ROLE HELPERS (light wrappers)
 # ---------------------------------------------------------------------------
+
 
 def _truthy(obj, *names, default=False):
     """Safely read any of the provided attribute names as a boolean."""
@@ -4473,6 +4685,7 @@ def _truthy(obj, *names, default=False):
             pass
     return default
 
+
 def _user_roles(user):
     """
     Returns: (is_manager, is_auditor, can_stock_in)
@@ -4483,35 +4696,46 @@ def _user_roles(user):
     prof = getattr(user, "profile", None)
 
     # Manager heuristics
-    is_manager = any([
-        user.is_superuser,
-        user.is_staff,
-        user.groups.filter(name__in=["Manager", "Managers"]).exists(),
-        _truthy(prof, "is_manager", "manager"),
-        getattr(prof, "role", "").lower() == "manager",
-    ])
+    is_manager = any(
+        [
+            user.is_superuser,
+            user.is_staff,
+            user.groups.filter(name__in=["Manager", "Managers"]).exists(),
+            _truthy(prof, "is_manager", "manager"),
+            getattr(prof, "role", "").lower() == "manager",
+        ]
+    )
 
     # Auditor heuristics (only matters when *not* manager)
-    is_auditor = any([
-        user.groups.filter(name__in=["Auditor", "Auditors"]).exists(),
-        _truthy(prof, "is_auditor", "auditor"),
-        getattr(prof, "role", "").lower() == "auditor",
-    ]) and not is_manager
+    is_auditor = (
+        any(
+            [
+                user.groups.filter(name__in=["Auditor", "Auditors"]).exists(),
+                _truthy(prof, "is_auditor", "auditor"),
+                getattr(prof, "role", "").lower() == "auditor",
+            ]
+        )
+        and not is_manager
+    )
 
     # Explicit Django permissions also grant stock-in
-    can_stock_in = any([
-        is_manager,
-        user.has_perm("inventory.add_inventoryitem"),
-        user.has_perm("inventory.change_inventoryitem"),
-    ])
+    can_stock_in = any(
+        [
+            is_manager,
+            user.has_perm("inventory.add_inventoryitem"),
+            user.has_perm("inventory.change_inventoryitem"),
+        ]
+    )
 
     return (is_manager, is_auditor, can_stock_in)
+
 
 def _is_admin(user):
     """Return True if the user is considered an admin in this system."""
     if not user or not user.is_authenticated:
         return False
     return bool(getattr(user, "is_superuser", False) or getattr(user, "is_staff", False))
+
 
 def _can_edit_inventory(user):
     """
@@ -4541,59 +4765,61 @@ def _can_edit_inventory(user):
             pass
 
     try:
-        if user.groups.filter(name__in=[
-            "Managers", "Inventory Managers", "Admin", "Auditors"
-        ]).exists():
+        if user.groups.filter(name__in=["Managers", "Inventory Managers", "Admin", "Auditors"]).exists():
             return True
     except Exception:
         pass
 
     return False
+
 
 def _is_agent_user(user):
     """
     Check if a user can hold stock (is an agent or manager).
-    
+
     CRITICAL: Managers are operational supervisors and CAN hold stock.
     They do NOT need AgentProfile.
-    
+
     Returns True if:
     - User has AgentProfile (field agent)
     - User is a Manager (operational supervisor)
     - User is HQ Admin/Staff (for testing/emergency)
-    
+
     Returns False for regular users without agent or manager status.
     """
     if not user or not user.is_authenticated:
         return False
-    
+
     # HQ Admins can do anything (for testing/emergency)
     if getattr(user, "is_superuser", False) or getattr(user, "is_staff", False):
         return True
-    
+
     # Check if user is a manager (managers can hold stock without AgentProfile)
     try:
         from tenants.utils_roles import is_manager
         from tenants.utils import get_active_business
+
         # Try to get business context
         business = None
         try:
             from django.contrib.auth.models import AnonymousUser
-            if hasattr(user, '_request'):
+
+            if hasattr(user, "_request"):
                 business = get_active_business(user._request)
         except Exception:
             pass
-        
+
         if business and is_manager(user, business):
             return True
     except Exception:
         pass
-    
+
     # Check if user has AgentProfile (field agent)
     if hasattr(user, "agent_profile"):
         return True
-    
+
     return False
+
 
 # ---------------------------------------------------------------------------
 # STOCK LIST (HTML + CSV + JSON)
@@ -4602,7 +4828,6 @@ def _is_agent_user(user):
 # ---------------------------------------------------------------------------
 # SIMPLE HTML PAGE (separate from API list)
 # ---------------------------------------------------------------------------
-
 
 
 @never_cache
@@ -4674,6 +4899,7 @@ def export_csv(request):
 
     return response
 
+
 # -----------------------
 # Time logging & Wallet
 # -----------------------
@@ -4691,11 +4917,13 @@ def time_checkin_page(request):
         {"pref_loc_id": pref_loc.id if pref_loc else "", "pref_loc_name": pref_loc.name if pref_loc else ""},
     )
 
+
 def _gravatar(email: str, size: int = 160) -> str:
     if not email:
         email = "user@example.com"
     h = md5(email.strip().lower().encode("utf-8")).hexdigest()
     return f"https://www.gravatar.com/avatar/{h}?s={size}&d=identicon"
+
 
 def _two_factor_status(user) -> dict:
     """
@@ -4709,6 +4937,7 @@ def _two_factor_status(user) -> dict:
     try:
         # django-otp
         from django_otp import devices_for_user
+
         devs = list(devices_for_user(user))
         if devs:
             enabled = True
@@ -4720,7 +4949,9 @@ def _two_factor_status(user) -> dict:
         # two_factor default device API
         if hasattr(user, "staticdevice_set") or hasattr(user, "defaultdevice"):
             # If any static tokens or default device exists, assume enabled
-            if getattr(user, "defaultdevice", None) or (hasattr(user, "staticdevice_set") and user.staticdevice_set.exists()):
+            if getattr(user, "defaultdevice", None) or (
+                hasattr(user, "staticdevice_set") and user.staticdevice_set.exists()
+            ):
                 enabled = True
                 provider = provider or "TOTP"
     except Exception:
@@ -4732,6 +4963,7 @@ def _two_factor_status(user) -> dict:
         # Where to send user to manage 2FA if you have the app mounted; otherwise leave "#"
         "manage_url": getattr(settings, "TWO_FACTOR_MANAGE_URL", "/account/two-factor/"),
     }
+
 
 # NOTE: This function is OVERRIDDEN by a later definition at line ~5759.
 # Kept here for reference but not used. See the active version below.
@@ -4752,9 +4984,11 @@ def _two_factor_status(user) -> dict:
 #     }
 #     return render(request, "inventory/settings.html", context)
 
+
 @login_required
 def settings_redirect(request):
     return redirect("accounts:settings_unified")
+
 
 @never_cache
 @login_required
@@ -4860,6 +5094,8 @@ def api_time_checkin(request):
         },
         status=201,
     )
+
+
 # --- ADD (or keep) these imports at the top of inventory/views.py ---
 
 
@@ -4871,20 +5107,29 @@ from django.shortcuts import render
 from django.views.decorators.cache import never_cache
 from django.views.decorators.http import require_http_methods
 
+
 # Defensive, tenant-scoped helpers (use your project's if present)
 def _try_import(modpath: str, attr: str | None = None):
     import importlib
+
     try:
         mod = importlib.import_module(modpath)
         return getattr(mod, attr) if attr else mod
     except Exception:
         return None
 
-scoped = _try_import("circuitcity.tenants.utils", "scoped") or \
-         _try_import("tenants.utils", "scoped") or (lambda qs, _request: qs)
 
-get_active_business = _try_import("circuitcity.tenants.utils", "get_active_business") or \
-                      _try_import("tenants.utils", "get_active_business") or (lambda _r: None)
+scoped = (
+    _try_import("circuitcity.tenants.utils", "scoped")
+    or _try_import("tenants.utils", "scoped")
+    or (lambda qs, _request: qs)
+)
+
+get_active_business = (
+    _try_import("circuitcity.tenants.utils", "get_active_business")
+    or _try_import("tenants.utils", "get_active_business")
+    or (lambda _r: None)
+)
 
 # Models (import defensively)
 TimeLog = _try_import("inventory.models", "TimeLog") or _try_import("circuitcity.inventory.models", "TimeLog")
@@ -4959,9 +5204,11 @@ def time_logs(request):
 
     if needs_fallback:
         unscoped = TimeLog.objects.select_related("user", "location")
-        qs = unscoped.order_by("-logged_at") if _can_view_all(request.user) else unscoped.filter(
-            user=request.user
-        ).order_by("-logged_at")
+        qs = (
+            unscoped.order_by("-logged_at")
+            if _can_view_all(request.user)
+            else unscoped.filter(user=request.user).order_by("-logged_at")
+        )
 
     paginator = Paginator(qs, 50)
     page_obj = paginator.get_page(request.GET.get("page"))
@@ -4976,6 +5223,7 @@ def time_logs(request):
         "inventory/time_logs.html",
         {"logs": page_obj.object_list, "page_obj": page_obj, "url_for": url_for},
     )
+
 
 # ------------- small helpers -------------
 def _can_view_all(user) -> bool:
@@ -5086,10 +5334,15 @@ def time_checkin_page(request):
         except Exception:
             pass
 
-    return render(request, "inventory/time_checkin.html", {
-        "home_loc": home_loc,
-        "locations": locations,
-    })
+    return render(
+        request,
+        "inventory/time_checkin.html",
+        {
+            "home_loc": home_loc,
+            "locations": locations,
+        },
+    )
+
 
 @never_cache
 @login_required
@@ -5107,6 +5360,7 @@ def time_logs(request):
         request, "inventory/time_logs.html", {"logs": page_obj.object_list, "page_obj": page_obj, "url_for": url_for}
     )
 
+
 @never_cache
 @login_required
 @require_GET
@@ -5123,7 +5377,12 @@ def api_wallet_summary(request):
             return JsonResponse({"ok": False, "error": "Unknown user_id."}, status=400)
 
     if WalletTransaction is not None:
-        balance = _scoped(WalletTransaction.objects.filter(ledger="agent", agent=target), request).aggregate(s=Coalesce(Sum("amount"), Value(0)))["s"] or 0
+        balance = (
+            _scoped(WalletTransaction.objects.filter(ledger="agent", agent=target), request).aggregate(
+                s=Coalesce(Sum("amount"), Value(0))
+            )["s"]
+            or 0
+        )
     else:
         balance = 0
 
@@ -5133,17 +5392,24 @@ def api_wallet_summary(request):
     if year and month and WalletTransaction is not None:
         try:
             y, m = int(year), int(month)
-            data["month_sum"] = _scoped(
-                WalletTransaction.objects.filter(ledger="agent", agent=target, created_at__year=y, created_at__month=m),
-                request,
-            ).aggregate(s=Coalesce(Sum("amount"), Value(0)))["s"] or 0
+            data["month_sum"] = (
+                _scoped(
+                    WalletTransaction.objects.filter(
+                        ledger="agent", agent=target, created_at__year=y, created_at__month=m
+                    ),
+                    request,
+                ).aggregate(s=Coalesce(Sum("amount"), Value(0)))["s"]
+                or 0
+            )
             data["year"] = y
             data["month"] = m
         except Exception:
             data["month_sum"] = None
     return JsonResponse(data)
 
+
 api_wallet_balance = api_wallet_summary
+
 
 @never_cache
 @login_required
@@ -5185,7 +5451,14 @@ def api_wallet_add_txn(request):
     # Type (accept 'type' or legacy 'reason'); map to TxnType.* (lowercase)
     raw_type = (payload.get("type") or payload.get("reason") or "adjustment").strip().lower()
     allowed_types = {c[0] for c in (getattr(TxnType, "choices", []) or [])} or {
-        "commission", "bonus", "deduction", "advance", "penalty", "payslip", "adjustment", "budget"
+        "commission",
+        "bonus",
+        "deduction",
+        "advance",
+        "penalty",
+        "payslip",
+        "adjustment",
+        "budget",
     }
     if raw_type not in allowed_types:
         return JsonResponse({"ok": False, "error": f"Invalid type. Allowed: {sorted(list(allowed_types))}"}, status=400)
@@ -5205,10 +5478,17 @@ def api_wallet_add_txn(request):
     )
 
     # Return business-scoped balance
-    new_balance = _scoped(WalletTransaction.objects.filter(ledger="agent", agent=target), request).aggregate(s=Coalesce(Sum("amount"), Value(0)))["s"] or 0
+    new_balance = (
+        _scoped(WalletTransaction.objects.filter(ledger="agent", agent=target), request).aggregate(
+            s=Coalesce(Sum("amount"), Value(0))
+        )["s"]
+        or 0
+    )
     return JsonResponse({"ok": True, "txn_id": txn.id, "balance": float(new_balance or 0)})
 
+
 api_wallet_txn = api_wallet_add_txn
+
 
 @never_cache
 @login_required
@@ -5233,12 +5513,19 @@ def wallet_page(request):
     if WalletTransaction is not None:
         life_qs = _scoped(WalletTransaction.objects.filter(ledger="agent", agent=target), request)
         balance = life_qs.aggregate(s=Coalesce(Sum("amount"), Value(0)))["s"] or 0
-        month_sum = _scoped(
-            WalletTransaction.objects.filter(ledger="agent", agent=target, created_at__year=today.year, created_at__month=today.month),
-            request,
-        ).aggregate(s=Coalesce(Sum("amount"), Value(0)))["s"] or 0
+        month_sum = (
+            _scoped(
+                WalletTransaction.objects.filter(
+                    ledger="agent", agent=target, created_at__year=today.year, created_at__month=today.month
+                ),
+                request,
+            ).aggregate(s=Coalesce(Sum("amount"), Value(0)))["s"]
+            or 0
+        )
         recent_txns = _scoped(
-            WalletTransaction.objects.select_related("agent", "created_by").filter(ledger="agent", agent=target).order_by("-created_at")[:50],
+            WalletTransaction.objects.select_related("agent", "created_by")
+            .filter(ledger="agent", agent=target)
+            .order_by("-created_at")[:50],
             request,
         )
         type_choices = list(getattr(WalletTransaction._meta.get_field("type"), "choices", []))
@@ -5276,6 +5563,7 @@ def wallet_page(request):
         "today_month": today.month,
     }
     return render(request, "inventory/wallet.html", context)
+
 
 # -----------------------
 # Stock management
@@ -5325,7 +5613,9 @@ def update_stock(request, pk):
 
                 if bulk_updates:
                     base_mgr = (
-                        InventoryItem.active if hasattr(InventoryItem, "active") else InventoryItem.objects.filter(is_active=True)
+                        InventoryItem.active
+                        if hasattr(InventoryItem, "active")
+                        else InventoryItem.objects.filter(is_active=True)
                     )
                     # Apply bulk updates only within the same business
                     qs = _scoped(base_mgr, request).filter(product=saved_item.product).exclude(pk=saved_item.pk)
@@ -5338,7 +5628,8 @@ def update_stock(request, pk):
                             f"Updated {updated} items for product '{saved_item.product}'. Fields: {bulk_updates}",
                         )
                         messages.info(
-                            request, f"Applied {', '.join(bulk_updates.keys())} to {updated} other '{saved_item.product}' item(s)."
+                            request,
+                            f"Applied {', '.join(bulk_updates.keys())} to {updated} other '{saved_item.product}' item(s).",
                         )
 
             details = "Changed fields:\n" + (
@@ -5354,6 +5645,7 @@ def update_stock(request, pk):
         form = InventoryItemForm(instance=item, user=request.user)
 
     return render(request, "inventory/edit_stock.html", {"form": form, "item": item})
+
 
 @require_POST
 @never_cache
@@ -5393,6 +5685,7 @@ def delete_stock(request, pk):
             messages.error(request, "This item has related sales and cannot be deleted.")
     return redirect("inventory:stock_list")
 
+
 # -----------------------
 # (continueâ€¦)
 # -----------------------
@@ -5402,6 +5695,7 @@ from django.views.decorators.http import require_GET
 from django.views.decorators.cache import never_cache
 from django.contrib.auth.decorators import login_required
 import importlib
+
 
 def _try_call(module_path: str, attr: str, request):
     """Import module.attr and call it if callable; return response or None."""
@@ -5413,6 +5707,7 @@ def _try_call(module_path: str, attr: str, request):
     except Exception:
         pass
     return None
+
 
 @never_cache
 @login_required
@@ -5439,6 +5734,8 @@ def restock_heatmap_api(request):
 
     # Safe fallback payload (UI-ready)
     return JsonResponse({"points": [], "generated_at": "ok"}, status=200)
+
+
 # --- PART 2/3 end ---
 # --- PART 3/3 BEGINS ---
 
@@ -5450,7 +5747,6 @@ from hashlib import md5
 from datetime import datetime, timedelta, date, time as dtime
 
 
-
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth import get_user_model
@@ -5458,10 +5754,7 @@ from django.core.cache import cache
 from django.core.mail import mail_admins
 from django.core.paginator import Paginator
 from django.db import transaction
-from django.db.models import (
-    Q, Sum, Value, Exists, OuterRef, F, Count, Case, When,
-    DecimalField, ExpressionWrapper
-)
+from django.db.models import Q, Sum, Value, Exists, OuterRef, F, Count, Case, When, DecimalField, ExpressionWrapper
 from django.db.models.functions import Coalesce, Cast, TruncMonth
 from django.db.models.deletion import ProtectedError
 from django.http import HttpResponse, JsonResponse
@@ -5477,8 +5770,10 @@ except Exception:
     try:
         from django_otp.decorators import otp_required  # django-otp
     except Exception:
+
         def otp_required(view):
             return view
+
 
 User = get_user_model()
 
@@ -5530,6 +5825,7 @@ except Exception:
 # _is_admin, _scoped, _haversine_m, get_dashboard_cache_version,
 # get_preset_window, _time_q_for
 
+
 # -----------------------
 # CSV Export
 # -----------------------
@@ -5564,8 +5860,14 @@ def export_csv(request):
 
     def _owner_q(model, user):
         names = [
-            "assigned_agent", "assigned_to", "assignee",
-            "owner", "user", "agent", "created_by", "received_by",
+            "assigned_agent",
+            "assigned_to",
+            "assignee",
+            "owner",
+            "user",
+            "agent",
+            "created_by",
+            "received_by",
         ]
         q = Q(pk__in=[])  # false starter
         uid = getattr(user, "id", None)
@@ -5580,10 +5882,10 @@ def export_csv(request):
         return q
 
     # --- inputs (mirror stock_list) ---
-    qtext         = (request.GET.get("q") or "").strip()
+    qtext = (request.GET.get("q") or "").strip()
     show_archived = request.GET.get("archived") == "1"
-    raw_status    = (request.GET.get("status") or "").lower()
-    status        = raw_status if raw_status in {"sold", "all", "in", "in_stock"} else "in"
+    raw_status = (request.GET.get("status") or "").lower()
+    status = raw_status if raw_status in {"sold", "all", "in", "in_stock"} else "in"
 
     # --- base queryset (like stock_list) ---
     mdl = InventoryItem
@@ -5621,13 +5923,29 @@ def export_csv(request):
 
     # --- sold detection (same set as PART 2) ---
     sold_like = {
-        "SOLD","Sold","sold",
-        "DISPATCHED","Dispatched","dispatched",
-        "CHECKED_OUT","CHECKED-OUT","Checked_out","checked_out","checked-out",
-        "OUT","Out","out",
-        "DELIVERED","Delivered","delivered",
-        "ISSUED","Issued","issued",
-        "PAID","Paid","paid",
+        "SOLD",
+        "Sold",
+        "sold",
+        "DISPATCHED",
+        "Dispatched",
+        "dispatched",
+        "CHECKED_OUT",
+        "CHECKED-OUT",
+        "Checked_out",
+        "checked_out",
+        "checked-out",
+        "OUT",
+        "Out",
+        "out",
+        "DELIVERED",
+        "Delivered",
+        "delivered",
+        "ISSUED",
+        "Issued",
+        "issued",
+        "PAID",
+        "Paid",
+        "paid",
     }
     is_sold_q = Q(pk__in=[])
     if _has_field(mdl, "status"):
@@ -5672,9 +5990,8 @@ def export_csv(request):
 
     for it in qs.iterator(chunk_size=1000):
         # compute sold flag like stock_list row builder
-        sold_flag = (
-            ((_has_field(mdl, "status") and getattr(it, "status", None) in sold_like))
-            or (annotated_has_sales and getattr(it, "has_sales", False))
+        sold_flag = ((_has_field(mdl, "status") and getattr(it, "status", None) in sold_like)) or (
+            annotated_has_sales and getattr(it, "has_sales", False)
         )
         imei = getattr(it, "imei", "") or ""
         product = str(getattr(it, "product")) if getattr(it, "product_id", None) else ""
@@ -5686,9 +6003,15 @@ def export_csv(request):
         location = (
             getattr(getattr(it, "current_location", None), "name", "-")
             if getattr(it, "current_location_id", None)
-            else getattr(getattr(it, "location", None), "name", "-") if getattr(it, "location_id", None) else "-"
+            else getattr(getattr(it, "location", None), "name", "-")
+            if getattr(it, "location_id", None)
+            else "-"
         )
-        agent = getattr(getattr(it, "assigned_agent", None), "username", "-") if getattr(it, "assigned_agent_id", None) else "-"
+        agent = (
+            getattr(getattr(it, "assigned_agent", None), "username", "-")
+            if getattr(it, "assigned_agent_id", None)
+            else "-"
+        )
         writer.writerow([imei, product, status_text, order_price, selling_price, location, agent])
 
     return response
@@ -5731,6 +6054,7 @@ def _two_factor_status(user) -> dict:
     try:
         # django-otp
         from django_otp import devices_for_user
+
         devs = list(devices_for_user(user))
         if devs:
             enabled = True
@@ -5741,7 +6065,9 @@ def _two_factor_status(user) -> dict:
     try:
         # two_factor default device API
         if hasattr(user, "staticdevice_set") or hasattr(user, "defaultdevice"):
-            if getattr(user, "defaultdevice", None) or (hasattr(user, "staticdevice_set") and user.staticdevice_set.exists()):
+            if getattr(user, "defaultdevice", None) or (
+                hasattr(user, "staticdevice_set") and user.staticdevice_set.exists()
+            ):
                 enabled = True
                 provider = provider or "TOTP"
     except Exception:
@@ -5762,7 +6088,7 @@ def settings_home(request):
 
     # SMS 2FA context (replaces old TOTP-based twofa dict)
     from circuitcity.accounts.models import UserTwoFactor, mask_phone
-    
+
     twofa_available = bool(getattr(settings, "TWILIO_VERIFY_ENABLED", False))
     tf, _ = UserTwoFactor.objects.get_or_create(user=user)
     twofa_sms_enabled = bool(tf.sms_enabled)
@@ -5841,7 +6167,15 @@ def api_time_checkin(request):
 
     dist = None
     within = False
-    if loc and hasattr(loc, "latitude") and hasattr(loc, "longitude") and loc.latitude is not None and loc.longitude is not None and lat is not None and lon is not None:
+    if (
+        loc
+        and hasattr(loc, "latitude")
+        and hasattr(loc, "longitude")
+        and loc.latitude is not None
+        and loc.longitude is not None
+        and lat is not None
+        and lon is not None
+    ):
         dist = _haversine_m(lat, lon, float(loc.latitude), float(loc.longitude))
         radius = (getattr(loc, "geofence_radius_m", None) or 150) + (acc or 0)
         within = dist <= radius
@@ -5874,7 +6208,6 @@ def api_time_checkin(request):
 
 
 # inventory/views.py (add/replace this section)
-
 
 
 from django.contrib.auth.decorators import login_required
@@ -5952,6 +6285,7 @@ def time_logs(request):
         },
     )
 
+
 @never_cache
 @login_required
 @require_GET
@@ -5968,7 +6302,12 @@ def api_wallet_summary(request):
             return JsonResponse({"ok": False, "error": "Unknown user_id."}, status=400)
 
     if WalletTransaction is not None:
-        balance = _scoped(WalletTransaction.objects.filter(ledger="agent", agent=target), request).aggregate(s=Coalesce(Sum("amount"), Value(0)))["s"] or 0
+        balance = (
+            _scoped(WalletTransaction.objects.filter(ledger="agent", agent=target), request).aggregate(
+                s=Coalesce(Sum("amount"), Value(0))
+            )["s"]
+            or 0
+        )
     else:
         balance = 0
 
@@ -5978,10 +6317,15 @@ def api_wallet_summary(request):
     if year and month and WalletTransaction is not None:
         try:
             y, m = int(year), int(month)
-            data["month_sum"] = _scoped(
-                WalletTransaction.objects.filter(ledger="agent", agent=target, created_at__year=y, created_at__month=m),
-                request,
-            ).aggregate(s=Coalesce(Sum("amount"), Value(0)))["s"] or 0
+            data["month_sum"] = (
+                _scoped(
+                    WalletTransaction.objects.filter(
+                        ledger="agent", agent=target, created_at__year=y, created_at__month=m
+                    ),
+                    request,
+                ).aggregate(s=Coalesce(Sum("amount"), Value(0)))["s"]
+                or 0
+            )
             data["year"] = y
             data["month"] = m
         except Exception:
@@ -6032,7 +6376,14 @@ def api_wallet_add_txn(request):
     # Type (accept 'type' or legacy 'reason'); map to TxnType.* (lowercase)
     raw_type = (payload.get("type") or payload.get("reason") or "adjustment").strip().lower()
     allowed_types = {c[0] for c in (getattr(TxnType, "choices", []) or [])} or {
-        "commission", "bonus", "deduction", "advance", "penalty", "payslip", "adjustment", "budget"
+        "commission",
+        "bonus",
+        "deduction",
+        "advance",
+        "penalty",
+        "payslip",
+        "adjustment",
+        "budget",
     }
     if raw_type not in allowed_types:
         return JsonResponse({"ok": False, "error": f"Invalid type. Allowed: {sorted(list(allowed_types))}"}, status=400)
@@ -6053,7 +6404,12 @@ def api_wallet_add_txn(request):
     txn = WalletTransaction.objects.create(**txn_kwargs)
 
     # Return business-scoped balance
-    new_balance = _scoped(WalletTransaction.objects.filter(ledger="agent", agent=target), request).aggregate(s=Coalesce(Sum("amount"), Value(0)))["s"] or 0
+    new_balance = (
+        _scoped(WalletTransaction.objects.filter(ledger="agent", agent=target), request).aggregate(
+            s=Coalesce(Sum("amount"), Value(0))
+        )["s"]
+        or 0
+    )
     return JsonResponse({"ok": True, "txn_id": txn.id, "balance": float(new_balance or 0)})
 
 
@@ -6083,12 +6439,19 @@ def wallet_page(request):
     if WalletTransaction is not None:
         life_qs = _scoped(WalletTransaction.objects.filter(ledger="agent", agent=target), request)
         balance = life_qs.aggregate(s=Coalesce(Sum("amount"), Value(0)))["s"] or 0
-        month_sum = _scoped(
-            WalletTransaction.objects.filter(ledger="agent", agent=target, created_at__year=today.year, created_at__month=today.month),
-            request,
-        ).aggregate(s=Coalesce(Sum("amount"), Value(0)))["s"] or 0
+        month_sum = (
+            _scoped(
+                WalletTransaction.objects.filter(
+                    ledger="agent", agent=target, created_at__year=today.year, created_at__month=today.month
+                ),
+                request,
+            ).aggregate(s=Coalesce(Sum("amount"), Value(0)))["s"]
+            or 0
+        )
         recent_txns = _scoped(
-            WalletTransaction.objects.select_related("agent", "created_by").filter(ledger="agent", agent=target).order_by("-created_at")[:50],
+            WalletTransaction.objects.select_related("agent", "created_by")
+            .filter(ledger="agent", agent=target)
+            .order_by("-created_at")[:50],
             request,
         )
         try:
@@ -6138,7 +6501,6 @@ def wallet_page(request):
 # ----------------------------------------------------------------------------
 
 
-
 from django.contrib.auth.decorators import login_required
 from django.views.decorators.http import require_http_methods, require_POST
 from django.views.decorators.cache import never_cache
@@ -6156,8 +6518,10 @@ from inventory.utils import _normalize_code, get_instock_item_for_business
 def _ok(data, status=200):
     return JsonResponse({"ok": True, **data}, status=status)
 
+
 def _err(msg, status=400):
     return JsonResponse({"ok": False, "error": msg}, status=status)
+
 
 def _current_business_from_request(request: HttpRequest):
     """
@@ -6189,7 +6553,6 @@ import json
 from datetime import datetime
 
 
-
 import json
 from datetime import datetime
 
@@ -6202,6 +6565,7 @@ from django.views.decorators.http import require_http_methods
 # Uses your existing helpers if present:
 #   _ok, _err, _normalize_code, _current_business_from_request, get_instock_item_for_business
 # ------------------------------------------------------------------
+
 
 @login_required
 @require_http_methods(["POST"])
@@ -6383,6 +6747,7 @@ def scan_sold_submit(request: HttpRequest):
         # Fallback direct lookup, still business-scoped
         if not item and InventoryItem is not None:
             from django.db.models import Q
+
             q = InventoryItem.objects.all()
             if hasattr(InventoryItem, "business_id"):
                 q = q.filter(business_id=biz_id)
@@ -6465,12 +6830,15 @@ def scan_sold_submit(request: HttpRequest):
         when = sold_dt or timezone.now()
 
         if hasattr(item, "sold_at"):
-            item.sold_at = when; updates.add("sold_at")
+            item.sold_at = when
+            updates.add("sold_at")
         if hasattr(item, "sold_price"):
-            item.sold_price = price; updates.add("sold_price")
+            item.sold_price = price
+            updates.add("sold_price")
         if hasattr(item, "sold_by"):
             try:
-                item.sold_by = request.user; updates.add("sold_by")
+                item.sold_by = request.user
+                updates.add("sold_by")
             except Exception:
                 pass
 
@@ -6484,14 +6852,16 @@ def scan_sold_submit(request: HttpRequest):
         for f, v in (("in_stock", False), ("available", False), ("availability", False), ("is_sold", True)):
             if hasattr(item, f):
                 try:
-                    setattr(item, f, v); updates.add(f)
+                    setattr(item, f, v)
+                    updates.add(f)
                 except Exception:
                     pass
 
         for f in ("quantity", "qty"):
             if hasattr(item, f):
                 try:
-                    setattr(item, f, 0); updates.add(f)
+                    setattr(item, f, 0)
+                    updates.add(f)
                 except Exception:
                     pass
 
@@ -6507,9 +6877,12 @@ def scan_sold_submit(request: HttpRequest):
                 sale_kwargs = {}
 
                 # relationships
-                if hasattr(Sale, "business"): sale_kwargs["business"] = business
-                if hasattr(Sale, "item"):     sale_kwargs["item"] = item
-                if hasattr(Sale, "location") and sale_loc is not None: sale_kwargs["location"] = sale_loc
+                if hasattr(Sale, "business"):
+                    sale_kwargs["business"] = business
+                if hasattr(Sale, "item"):
+                    sale_kwargs["item"] = item
+                if hasattr(Sale, "location") and sale_loc is not None:
+                    sale_kwargs["location"] = sale_loc
 
                 # responsible user (whichever field exists)
                 for ufield in ("sold_by", "agent", "cashier"):
@@ -6518,7 +6891,9 @@ def scan_sold_submit(request: HttpRequest):
                         break
 
                 # identifier (code/imei/serial)
-                ident = getattr(item, "imei", None) or getattr(item, "serial", None) or getattr(item, "code", None) or code
+                ident = (
+                    getattr(item, "imei", None) or getattr(item, "serial", None) or getattr(item, "code", None) or code
+                )
                 for f in ("imei", "serial", "code"):
                     if hasattr(Sale, f):
                         sale_kwargs[f] = ident
@@ -6548,17 +6923,21 @@ def scan_sold_submit(request: HttpRequest):
                 # never block the sale
                 pass
 
-    return _ok({
-        "sold": True,
-        "code": code,
-        "price": price,
-        "sold_at": (sold_dt or timezone.now()).isoformat(),
-        "location_id": getattr(sale_loc, "id", None) if sale_loc is not None else None,
-    })
+    return _ok(
+        {
+            "sold": True,
+            "code": code,
+            "price": price,
+            "sold_at": (sold_dt or timezone.now()).isoformat(),
+            "location_id": getattr(sale_loc, "id", None) if sale_loc is not None else None,
+        }
+    )
+
 
 # ====================================================================
 # Your existing views (kept; minor safety imports added where needed)
 # ====================================================================
+
 
 @never_cache
 @login_required
@@ -6588,7 +6967,14 @@ def update_stock(request, pk):
         InventoryItemForm = None
 
     # External helpers expected in your codebase
-    from .views_helpers import _wants_json, _scoped, _can_edit_inventory, _audit, _is_agent_user, _is_admin  # adjust path if needed
+    from .views_helpers import (
+        _wants_json,
+        _scoped,
+        _can_edit_inventory,
+        _audit,
+        _is_agent_user,
+        _is_admin,
+    )  # adjust path if needed
 
     # Guards for missing models/forms
     if InventoryItem is None or InventoryItemForm is None:
@@ -6702,13 +7088,15 @@ def update_stock(request, pk):
                 "selling_price": getattr(saved_item, "selling_price", None),
                 "assigned_agent": getattr(getattr(saved_item, "assigned_agent", None), "id", None),
             }
-            return JsonResponse({
-                "ok": True,
-                "message": "Item updated.",
-                "changed_fields": changed_fields,
-                "bulk": bulk_result,
-                "item": payload_item,
-            })
+            return JsonResponse(
+                {
+                    "ok": True,
+                    "message": "Item updated.",
+                    "changed_fields": changed_fields,
+                    "bulk": bulk_result,
+                    "item": payload_item,
+                }
+            )
 
         messages.success(request, "Item updated.")
         return redirect("inventory:stock_list")
@@ -6725,14 +7113,16 @@ def update_stock(request, pk):
             "selling_price": getattr(item, "selling_price", None),
             "assigned_agent": getattr(getattr(item, "assigned_agent", None), "id", None),
         }
-        return JsonResponse({
-            "ok": True,
-            "data": {
-                "note": "update_stock ready",
-                "item": payload_item,
-                "can_edit_prices": bool(_is_admin(request.user)),
+        return JsonResponse(
+            {
+                "ok": True,
+                "data": {
+                    "note": "update_stock ready",
+                    "item": payload_item,
+                    "can_edit_prices": bool(_is_admin(request.user)),
+                },
             }
-        })
+        )
 
     return render(request, "inventory/edit_stock.html", {"form": form, "item": item})
 
@@ -6804,6 +7194,7 @@ def restock_heatmap_api(request):
     """
     try:
         from . import api as api_mod  # type: ignore
+
         if hasattr(api_mod, "restock_heatmap_api"):
             return api_mod.restock_heatmap_api(request)  # type: ignore[attr-defined]
         if hasattr(api_mod, "api_stock_health"):
@@ -6811,6 +7202,7 @@ def restock_heatmap_api(request):
     except Exception:
         pass
     return JsonResponse({"ok": True, "heatmap": []})
+
 
 # (INTENTIONALLY no duplicate api_mark_sold / stock_list / export_csv definitions here;
 # keep the versions you already pasted from PART 1 and PART 2.)
@@ -6821,6 +7213,7 @@ def restock_heatmap_api(request):
 # -----------------------
 # inventory/views.py (add near other small helpers)
 from django.db.models import Q
+
 
 def _time_q_for(model, start_dt, end_dt, fields=("created_at",)):
     """
@@ -6834,36 +7227,39 @@ def _time_q_for(model, start_dt, end_dt, fields=("created_at",)):
             q |= Q(**{f + "__gte": start_dt, f + "__lt": end_dt})
     return q if q.children else Q(pk__isnull=True)  # always-false fallback
 
+
 from django.http import HttpResponseBase  # make sure this import exists
+
 
 @login_required
 def inventory_dashboard(request):
     # Require/resolve active business exactly once
     gate = _require_active_business(request)
-    if isinstance(gate, HttpResponseBase):   # redirect/message case
+    if isinstance(gate, HttpResponseBase):  # redirect/message case
         return gate
     try:
-        biz, biz_id = gate                   # expected tuple
+        biz, biz_id = gate  # expected tuple
     except Exception:
         # Fallback: no active business tuple; be defensive
         biz, biz_id = (None, None)
-    
+
     # ============================================================================
     # VERTICAL ROUTING: Redirect non-phone businesses to their vertical dashboards
     # ============================================================================
     # This is the PHONES inventory dashboard - only phone businesses should see it
     try:
         from inventory.utils_verticals import get_vertical_kind, get_vertical_dashboard_url
-        
+
         # Try request.business first (set by middleware), then fall back to biz from gate
-        active_business = getattr(request, 'business', None) or biz
+        active_business = getattr(request, "business", None) or biz
         vertical_kind = get_vertical_kind(active_business)
-        
+
         # If not a phones business, redirect to the appropriate vertical dashboard
         if vertical_kind and vertical_kind != "phones":
             vertical_url_name = get_vertical_dashboard_url(vertical_kind)
             if vertical_url_name:
                 from django.urls import reverse, NoReverseMatch
+
                 try:
                     return redirect(reverse(vertical_url_name))
                 except NoReverseMatch:
@@ -6872,6 +7268,7 @@ def inventory_dashboard(request):
     except Exception as e:
         # If vertical utilities aren't available, continue to default dashboard
         import logging
+
         logging.getLogger(__name__).debug(f"Vertical routing failed: {e}")
         pass
 
@@ -6944,16 +7341,17 @@ def inventory_dashboard(request):
     # KPI: today + month + all-time (legacy)
     today_count = sales_qs_all.filter(sold_at__gte=today, sold_at__lt=tomorrow).count()
     dec2 = DecimalField(max_digits=14, decimal_places=2)
-    today_total = sales_qs_all.filter(sold_at__gte=today, sold_at__lt=tomorrow).aggregate(
-        s=Coalesce(Sum("price"), Value(0), output_field=dec2)
-    )["s"] or 0
+    today_total = (
+        sales_qs_all.filter(sold_at__gte=today, sold_at__lt=tomorrow).aggregate(
+            s=Coalesce(Sum("price"), Value(0), output_field=dec2)
+        )["s"]
+        or 0
+    )
     mtd_count = sales_qs_all.filter(sold_at__gte=month_start, sold_at__lt=tomorrow).count()
     all_time_count = sales_qs_all.count()
 
     # NEW: window KPIs (respecting calendar range)
-    window_totals = sales_qs_period.aggregate(
-        window_revenue=Coalesce(Sum("price"), Value(0), output_field=dec2)
-    )
+    window_totals = sales_qs_period.aggregate(window_revenue=Coalesce(Sum("price"), Value(0), output_field=dec2))
     window_count = sales_qs_period.count()
     window_revenue = float(window_totals.get("window_revenue") or 0)
 
@@ -6995,12 +7393,58 @@ def inventory_dashboard(request):
         today_dt = timezone.make_aware(datetime.combine(today, dtime.max))
         agent_wallet_rows = w.values("agent_id").annotate(
             balance=Coalesce(Sum("amount"), Value(0), output_field=dec2),
-            lifetime_commission=Coalesce(Sum(Case(When(type="commission", then="amount"), default=Value(0), output_field=dec2)), Value(0), output_field=dec2),
-            lifetime_advance=Coalesce(Sum(Case(When(type="advance", then="amount"), default=Value(0), output_field=dec2)), Value(0), output_field=dec2),
-            lifetime_adjustment=Coalesce(Sum(Case(When(type="adjustment", then="amount"), default=Value(0), output_field=dec2)), Value(0), output_field=dec2),
-            month_commission=Coalesce(Sum(Case(When(type="commission", created_at__gte=month_start_dt, created_at__lte=today_dt, then="amount"), default=Value(0), output_field=dec2)), Value(0), output_field=dec2),
-            month_advance=Coalesce(Sum(Case(When(type="advance", created_at__gte=month_start_dt, created_at__lte=today_dt, then="amount"), default=Value(0), output_field=dec2)), Value(0), output_field=dec2),
-            month_adjustment=Coalesce(Sum(Case(When(type="adjustment", created_at__gte=month_start_dt, created_at__lte=today_dt, then="amount"), default=Value(0), output_field=dec2)), Value(0), output_field=dec2),
+            lifetime_commission=Coalesce(
+                Sum(Case(When(type="commission", then="amount"), default=Value(0), output_field=dec2)),
+                Value(0),
+                output_field=dec2,
+            ),
+            lifetime_advance=Coalesce(
+                Sum(Case(When(type="advance", then="amount"), default=Value(0), output_field=dec2)),
+                Value(0),
+                output_field=dec2,
+            ),
+            lifetime_adjustment=Coalesce(
+                Sum(Case(When(type="adjustment", then="amount"), default=Value(0), output_field=dec2)),
+                Value(0),
+                output_field=dec2,
+            ),
+            month_commission=Coalesce(
+                Sum(
+                    Case(
+                        When(
+                            type="commission", created_at__gte=month_start_dt, created_at__lte=today_dt, then="amount"
+                        ),
+                        default=Value(0),
+                        output_field=dec2,
+                    )
+                ),
+                Value(0),
+                output_field=dec2,
+            ),
+            month_advance=Coalesce(
+                Sum(
+                    Case(
+                        When(type="advance", created_at__gte=month_start_dt, created_at__lte=today_dt, then="amount"),
+                        default=Value(0),
+                        output_field=dec2,
+                    )
+                ),
+                Value(0),
+                output_field=dec2,
+            ),
+            month_adjustment=Coalesce(
+                Sum(
+                    Case(
+                        When(
+                            type="adjustment", created_at__gte=month_start_dt, created_at__lte=today_dt, then="amount"
+                        ),
+                        default=Value(0),
+                        output_field=dec2,
+                    )
+                ),
+                Value(0),
+                output_field=dec2,
+            ),
         )
         for r in agent_wallet_rows:
             uid = r["agent_id"]
@@ -7116,7 +7560,7 @@ def inventory_dashboard(request):
 
     # ===== NEW: Use centralized KPI service (includes COGS + Admin Costs) =====
     from inventory.services.dashboard_metrics import get_inventory_kpis
-    
+
     # Determine period start/end for admin costs
     if start_dt and end_dt:
         period_start = start_dt
@@ -7131,7 +7575,7 @@ def inventory_dashboard(request):
         # "all" or unknown
         period_start = None
         period_end = None
-    
+
     # Get unified KPIs (revenue, costs including admin, profit, ratios, payment mix)
     kpis = get_inventory_kpis(
         business=biz,
@@ -7141,28 +7585,28 @@ def inventory_dashboard(request):
         end_date=period_end,
         model_filter=model_id,
     )
-    
+
     # Extract values for backward compatibility with existing template variables
     pie_revenue = float(kpis["total_revenue"])
     pie_cost = float(kpis["total_costs"])  # Now includes COGS + admin costs!
     pie_profit = float(kpis["total_profit"])
-    
+
     # Profit = revenue - total costs (cost of goods + business costs)
     # Defensive check: Ensure profit is ALWAYS revenue - costs, never just -costs
     pie_profit = pie_revenue - pie_cost
-    
+
     cash_total = float(kpis["payment_mix_cash_amount"])
     bank_total = float(kpis["payment_mix_bank_amount"])
     mobile_total = float(kpis["payment_mix_mobile_amount"])
     total_payment_revenue = float(kpis["payment_mix_total"])
-    
+
     cash_pct = kpis["payment_mix_cash_pct"]
     bank_pct = kpis["payment_mix_bank_pct"]
     mobile_pct = kpis["payment_mix_mobile_pct"]
-    
+
     revenue_pct = kpis["rev_vs_costs_pct_revenue"]
     costs_pct_of_total = kpis["rev_vs_costs_pct_costs"]
-    
+
     profit_pct = kpis["profit_vs_costs_pct_profit"]
     costs_pct_of_profit = kpis["profit_vs_costs_pct_costs"]
     low_margin_warning = kpis["profit_vs_costs_warning"]
@@ -7224,32 +7668,28 @@ def inventory_dashboard(request):
     # ===== Low / Out of Stock Items (by product, aggregated across all items) =====
     # Group by product and count items in stock
     from django.db.models import OuterRef, Subquery
-    
-    stock_by_product = (
-        in_stock_qs
-        .values('product_id')
-        .annotate(stock_count=Count('id'))
-    )
-    
+
+    stock_by_product = in_stock_qs.values("product_id").annotate(stock_count=Count("id"))
+
     # Convert to dict for easy lookup
-    stock_counts = {item['product_id']: item['stock_count'] for item in stock_by_product}
-    
+    stock_counts = {item["product_id"]: item["stock_count"] for item in stock_by_product}
+
     # Get all products and check their stock levels against thresholds
     if Product is not None:
-        all_products = _scoped(Product.objects.all(), request).values('id', 'low_stock_threshold')
+        all_products = _scoped(Product.objects.all(), request).values("id", "low_stock_threshold")
         low_items_list = []
         out_of_stock_list = []
-        
+
         for prod in all_products:
-            prod_id = prod['id']
-            threshold = prod.get('low_stock_threshold', 5) or 5
+            prod_id = prod["id"]
+            threshold = prod.get("low_stock_threshold", 5) or 5
             current_stock = stock_counts.get(prod_id, 0)
-            
+
             if current_stock == 0:
                 out_of_stock_list.append(prod_id)
             elif current_stock <= threshold:
                 low_items_list.append(prod_id)
-        
+
         low_items_count = len(low_items_list)
         out_of_stock_count = len(out_of_stock_list)
         total_low_out = low_items_count + out_of_stock_count
@@ -7321,7 +7761,12 @@ def inventory_dashboard(request):
         },
         # NEW: Full KPIs dict (for templates that want more detail)
         "kpis_detail": kpis,
-        "kpis": {"scope": scope_label, "today_count": today_count, "month_count": mtd_count, "all_count": all_time_count},
+        "kpis": {
+            "scope": scope_label,
+            "today_count": today_count,
+            "month_count": mtd_count,
+            "all_count": all_time_count,
+        },
         "wallet": {
             "balance": float(my_balance or 0),
             "month": {
@@ -7341,22 +7786,29 @@ def inventory_dashboard(request):
     }
 
     # --- Feature flags & slide config
-    context["PREDICTIVE_ENABLED"]   = bool(getattr(settings, "PREDICTIVE_ENABLED", True))
+    context["PREDICTIVE_ENABLED"] = bool(getattr(settings, "PREDICTIVE_ENABLED", True))
     context["THEME_ROTATE_ENABLED"] = False
-    context["THEME_ROTATE_MS"]      = int(getattr(settings, "THEME_ROTATE_MS", 10000))
-    context["THEME_DEFAULT"]        = str(getattr(settings, "THEME_DEFAULT", "style-1"))
-    context["ROTATOR_MODE"]         = "off"
+    context["THEME_ROTATE_MS"] = int(getattr(settings, "THEME_ROTATE_MS", 10000))
+    context["THEME_DEFAULT"] = str(getattr(settings, "THEME_DEFAULT", "style-1"))
+    context["ROTATOR_MODE"] = "off"
     context["DASHBOARD_SLIDES"] = [
-        {"key": "trends", "title": "Sales Trends",
-         "apis": ["/inventory/api_sales_trend/?period=7d&metric=count",
-                  "/inventory/api_profit_bar/",
-                  "/inventory/api_top_models/?period=today"]},
+        {
+            "key": "trends",
+            "title": "Sales Trends",
+            "apis": [
+                "/inventory/api_sales_trend/?period=7d&metric=count",
+                "/inventory/api_profit_bar/",
+                "/inventory/api_top_models/?period=today",
+            ],
+        },
         {"key": "cash", "title": "Cash Overview", "apis": ["/inventory/api_cash_overview/"]},
         {"key": "agents", "title": "Agent Performance", "apis": ["/inventory/api_agent_trend/?months=6&metric=sales"]},
     ]
 
     cache.set(cache_key, context, 60)
     return _render_dashboard_safe(request, context, today, mtd_count, all_time_count)
+
+
 # --- Wallet page (agent) ------------------------------------------------------
 def wallet_page(request):
     """
@@ -7372,10 +7824,7 @@ def wallet_page(request):
     target = get_object_or_404(User, pk=uid)
 
     # Lifetime balance
-    balance = (
-        WalletTxn.objects.filter(user=target)
-        .aggregate(s=Sum("amount"))["s"] or 0
-    )
+    balance = WalletTxn.objects.filter(user=target).aggregate(s=Sum("amount"))["s"] or 0
 
     # Monthly stats
     today = timezone.localdate()
@@ -7383,15 +7832,19 @@ def wallet_page(request):
     next_month = (month_start.replace(day=28) + timezone.timedelta(days=4)).replace(day=1)
 
     monthly_total = (
-        WalletTxn.objects.filter(user=target, created_at__gte=month_start, created_at__lt=next_month)
-        .aggregate(s=Sum("amount"))["s"] or 0
+        WalletTxn.objects.filter(user=target, created_at__gte=month_start, created_at__lt=next_month).aggregate(
+            s=Sum("amount")
+        )["s"]
+        or 0
     )
     monthly_adv = (
         WalletTxn.objects.filter(
             user=target,
-            created_at__gte=month_start, created_at__lt=next_month,
+            created_at__gte=month_start,
+            created_at__lt=next_month,
             reason="ADVANCE",
-        ).aggregate(s=Sum("amount"))["s"] or 0
+        ).aggregate(s=Sum("amount"))["s"]
+        or 0
     )
     lifetime_total = balance
 
@@ -7416,6 +7869,8 @@ def wallet_page(request):
         "url_for": url_for,
     }
     return render(request, "agents/wallet.html", ctx)
+
+
 @with_active_location
 def wallet_page(request):
     """
@@ -7434,6 +7889,7 @@ def wallet_page(request):
 
     def _sum(qs):
         from django.db.models import Sum
+
         return float(qs.aggregate(s=Sum("amount"))["s"] or 0)
 
     balance = _sum(txns_qs)
@@ -7463,13 +7919,5 @@ def wallet_page(request):
     }
     return render(request, "agents/wallet.html", ctx)
 
+
 # --- END PART 3/3 ---
-
-
-
-
-
-
-
-
-

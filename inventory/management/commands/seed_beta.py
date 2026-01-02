@@ -4,9 +4,11 @@ from django.contrib.auth.models import Group
 
 User = get_user_model()
 
+
 def ensure_group(name: str) -> Group:
     g, _ = Group.objects.get_or_create(name=name)
     return g
+
 
 class Command(BaseCommand):
     help = "Create initial admin and sample agent users for beta"
@@ -19,11 +21,14 @@ class Command(BaseCommand):
 
         # Admin (from env for safety)
         import os
+
         an = os.environ.get("ADMIN_USERNAME", "admin")
         ae = os.environ.get("ADMIN_EMAIL", "admin@example.com")
         ap = os.environ.get("ADMIN_PASSWORD", "changeme123")
 
-        admin, created = User.objects.get_or_create(username=an, defaults={"email": ae, "is_staff": True, "is_superuser": True})
+        admin, created = User.objects.get_or_create(
+            username=an, defaults={"email": ae, "is_staff": True, "is_superuser": True}
+        )
         if created:
             admin.set_password(ap)
             admin.save()
@@ -47,5 +52,3 @@ class Command(BaseCommand):
                 self.stdout.write(self.style.SUCCESS(f"Created agent {uname}"))
             else:
                 self.stdout.write(f"Agent {uname} exists")
-
-

@@ -6,10 +6,13 @@ from ..models import CashLedger, ForecastSnapshot
 SAFETY_INFLOW = Decimal("0.90")
 SAFETY_OUTFLOW = Decimal("1.10")
 
+
 def moving_average(values, window=14):
-    if not values: return Decimal("0")
+    if not values:
+        return Decimal("0")
     tail = values[-window:] if len(values) > window else values
     return sum(tail) / Decimal(len(tail))
+
 
 def compute_forecast(horizon_days=30, opening_balance=Decimal("0")):
     today = date.today()
@@ -35,8 +38,6 @@ def compute_forecast(horizon_days=30, opening_balance=Decimal("0")):
         projected_outflows=proj_out,
         projected_runway_days=max(runway_days, 0),
         method="moving_avg",
-        params={"window_days": 14, "safety_in": str(SAFETY_INFLOW), "safety_out": str(SAFETY_OUTFLOW)}
+        params={"window_days": 14, "safety_in": str(SAFETY_INFLOW), "safety_out": str(SAFETY_OUTFLOW)},
     )
     return snap
-
-

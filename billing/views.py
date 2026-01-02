@@ -82,9 +82,7 @@ def _compute_period_end(plan: SubscriptionPlan, start_dt: timezone.datetime) -> 
     if plan.interval == SubscriptionPlan.Interval.YEAR:
         return start_dt + timedelta(days=365)
     next_month = _first_of_next_month(start_dt.date())
-    return timezone.make_aware(
-        timezone.datetime.combine(next_month, timezone.datetime.min.time())
-    )
+    return timezone.make_aware(timezone.datetime.combine(next_month, timezone.datetime.min.time()))
 
 
 def _ensure_trial_subscription(biz: Business) -> BusinessSubscription:
@@ -156,6 +154,7 @@ def _send_invoice_email(inv: Invoice) -> None:
     """
     try:
         from billing.notifications import send_invoice_email  # our convenience wrapper
+
         send_invoice_email(inv)
     except Exception:
         # best-effort: no crash if email layer isn't ready
@@ -165,6 +164,7 @@ def _send_invoice_email(inv: Invoice) -> None:
 def _send_invoice_whatsapp(inv: Invoice) -> None:
     try:
         from billing.notifications import send_invoice_whatsapp
+
         send_invoice_whatsapp(inv)
     except Exception:
         pass
@@ -179,7 +179,7 @@ def subscribe(request: HttpRequest) -> HttpResponse:
     """
     Pick a plan (or show current); seed trial if missing; create the first invoice draft.
     This page now primarily serves GET (the one-click flow posts to select_plan).
-    
+
     NO payment provider errors are shown here - only on checkout page.
     """
     biz: Business = request.business
@@ -201,7 +201,7 @@ def subscribe(request: HttpRequest) -> HttpResponse:
             messages.error(request, "Please choose a valid plan.")
     else:
         form = ChoosePlanForm(initial={"plan": sub.plan_id} if sub.plan_id else None)
-    
+
     return render(
         request,
         "billing/subscribe.html",
@@ -290,7 +290,7 @@ def checkout(request: HttpRequest) -> HttpResponse:
     - Airtel Money (PayChangu Mobile Money)
     - Standard Bank (PayChangu Bank Transfer)
     - Card (PayChangu Card Payment)
-    
+
     ALL payment methods now use PayChangu as the provider.
     Shows invoice preview on the side.
     """
@@ -312,10 +312,7 @@ def checkout(request: HttpRequest) -> HttpResponse:
         # Check if PayChangu is configured
         if not paychangu_service.is_paychangu_configured():
             logger.error("PayChangu not configured, cannot process payment")
-            messages.error(
-                request,
-                "Payment system is not configured. Please contact support."
-            )
+            messages.error(request, "Payment system is not configured. Please contact support.")
             return render(
                 request,
                 "billing/checkout.html",
@@ -390,7 +387,7 @@ def checkout(request: HttpRequest) -> HttpResponse:
 
             # Generate unique transaction reference
             tx_ref = f"billing-{biz.id}-{uuid.uuid4().hex[:12]}"
-            
+
             # Get location (first location if available, otherwise None)
             location = None
             if hasattr(biz, "locations"):
@@ -454,15 +451,9 @@ def checkout(request: HttpRequest) -> HttpResponse:
 
             if result.get("status") != "success":
                 error_msg = result.get("message", "Failed to initiate payment")
-                logger.error(
-                    f"PayChangu checkout failed: business={biz.id}, "
-                    f"tx_ref={tx_ref}, error={error_msg}"
-                )
+                logger.error(f"PayChangu checkout failed: business={biz.id}, " f"tx_ref={tx_ref}, error={error_msg}")
                 transaction.mark_failed(result.get("raw_response", {}))
-                messages.error(
-                    request,
-                    f"Payment initiation failed: {error_msg}. Please try again or contact support."
-                )
+                messages.error(request, f"Payment initiation failed: {error_msg}. Please try again or contact support.")
                 return render(
                     request,
                     "billing/checkout.html",
@@ -480,10 +471,7 @@ def checkout(request: HttpRequest) -> HttpResponse:
             transaction.raw_init_payload = result.get("raw_response", {})
             transaction.save(update_fields=["checkout_url", "raw_init_payload", "updated_at"])
 
-            logger.info(
-                f"PayChangu checkout created: tx_ref={tx_ref}, "
-                f"checkout_url={transaction.checkout_url}"
-            )
+            logger.info(f"PayChangu checkout created: tx_ref={tx_ref}, " f"checkout_url={transaction.checkout_url}")
 
             # Store tx_ref in session for return page
             request.session["billing_tx_ref"] = tx_ref
@@ -496,16 +484,13 @@ def checkout(request: HttpRequest) -> HttpResponse:
                 # Fallback: show pending message (for push-based payments)
                 messages.info(
                     request,
-                    f"Payment initiated for {paychangu_method}. Please complete the payment and we'll activate your subscription."
+                    f"Payment initiated for {paychangu_method}. Please complete the payment and we'll activate your subscription.",
                 )
                 return redirect(f"{reverse('billing:paychangu_return')}?tx_ref={tx_ref}")
 
         except Exception as e:
             logger.error(f"Payment processing error: {e}", exc_info=True)
-            messages.error(
-                request,
-                "Payment processing failed. Please try again or contact support."
-            )
+            messages.error(request, "Payment processing failed. Please try again or contact support.")
             return render(
                 request,
                 "billing/checkout.html",
@@ -592,13 +577,25 @@ def _plain_text_to_minimal_pdf(text: str) -> bytes:
 
     xref = []
     out = BytesIO()
-    def w(s): out.write(s if isinstance(s, bytes) else s.encode("latin-1"))
+
+    def w(s):
+        out.write(s if isinstance(s, bytes) else s.encode("latin-1"))
+
     w("%PDF-1.4\n")
-    xref.append(out.tell()); w("1 0 obj <</Type /Catalog /Pages 2 0 R>> endobj\n")
-    xref.append(out.tell()); w("2 0 obj <</Type /Pages /Kids [3 0 R] /Count 1>> endobj\n")
-    xref.append(out.tell()); w("3 0 obj <</Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 4 0 R /Resources <</Font <</F1 5 0 R>>>>>> endobj\n")
-    xref.append(out.tell()); w(f"4 0 obj <</Length {len(content_body)}>> stream\n"); out.write(content_body); w("\nendstream endobj\n")
-    xref.append(out.tell()); w("5 0 obj <</Type /Font /Subtype /Type1 /BaseFont /Courier>> endobj\n")
+    xref.append(out.tell())
+    w("1 0 obj <</Type /Catalog /Pages 2 0 R>> endobj\n")
+    xref.append(out.tell())
+    w("2 0 obj <</Type /Pages /Kids [3 0 R] /Count 1>> endobj\n")
+    xref.append(out.tell())
+    w(
+        "3 0 obj <</Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 4 0 R /Resources <</Font <</F1 5 0 R>>>>>> endobj\n"
+    )
+    xref.append(out.tell())
+    w(f"4 0 obj <</Length {len(content_body)}>> stream\n")
+    out.write(content_body)
+    w("\nendstream endobj\n")
+    xref.append(out.tell())
+    w("5 0 obj <</Type /Font /Subtype /Type1 /BaseFont /Courier>> endobj\n")
     xref_pos = out.tell()
     w("xref\n0 6\n0000000000 65535 f \n")
     for pos in xref:
@@ -624,7 +621,7 @@ def webhook(request: HttpRequest) -> JsonResponse:
             # Store headers inside payload for auditing; model has no separate headers field
             payload = {
                 "raw": raw,
-                "headers": {k: v for k, v in request.headers.items() },
+                "headers": {k: v for k, v in request.headers.items()},
                 "query": dict(request.GET),
             }
 
@@ -651,12 +648,12 @@ def trial_expired(request: HttpRequest) -> HttpResponse:
     """
     biz = getattr(request, "business", None)
     sub = None
-    
+
     if biz:
         sub = getattr(biz, "subscription", None)
-    
+
     reason = request.GET.get("reason", "expired")
-    
+
     return render(
         request,
         "billing/trial_expired.html",
@@ -688,7 +685,7 @@ def invoice_list(request: HttpRequest) -> HttpResponse:
     Minimal placeholder view that returns 200.
     """
     biz: Business = request.business
-    invoices = Invoice.objects.filter(business=biz).order_by('-created_at')[:50]
+    invoices = Invoice.objects.filter(business=biz).order_by("-created_at")[:50]
     return render(
         request,
         "billing/invoices_list.html",
@@ -719,10 +716,7 @@ def hq_subscriptions(request: HttpRequest) -> HttpResponse:
     """
     Admin list to view/enforce. Reachable at /hq/subscriptions (see urls.py).
     """
-    items = (
-        BusinessSubscription.objects.select_related("business", "plan")
-        .order_by("-started_at")
-    )
+    items = BusinessSubscription.objects.select_related("business", "plan").order_by("-started_at")
     return render(request, "billing/hq_subscriptions.html", {"items": items})
 
 
@@ -759,23 +753,23 @@ def trial_expired(request: HttpRequest) -> HttpResponse:
     User can only access billing pages, logout, or contact admin.
     """
     # Get business from request (set by TenantResolutionMiddleware)
-    business = getattr(request, 'business', None)
-    
+    business = getattr(request, "business", None)
+
     # If no business, redirect to tenant chooser
     if not business:
-        return redirect('/accounts/login/')
-    
+        return redirect("/accounts/login/")
+
     # Check subscription status
-    sub = getattr(business, 'subscription', None)
-    
+    sub = getattr(business, "subscription", None)
+
     # If subscription is actually active, redirect to dashboard
     if sub and sub.is_active_now():
-        return redirect('/app/home/')
-    
+        return redirect("/app/home/")
+
     context = {
-        'business': business,
-        'subscription': sub,
-        'reason': request.GET.get('reason', 'expired'),
+        "business": business,
+        "subscription": sub,
+        "reason": request.GET.get("reason", "expired"),
     }
-    
-    return render(request, 'billing/trial_expired.html', context)
+
+    return render(request, "billing/trial_expired.html", context)

@@ -16,11 +16,11 @@ from .models import BusinessSubscription, SubscriptionPlan
 
 # Paths we never block (prefix match). Keep short, stable prefixes only.
 SAFE_PREFIXES: tuple[str, ...] = (
-    "/admin/",                 # let superusers fix billing if needed
-    "/healthz",                # health probes
+    "/admin/",  # let superusers fix billing if needed
+    "/healthz",  # health probes
     "/robots.txt",
     "/favicon.ico",
-    "/static/",                # assets
+    "/static/",  # assets
     settings.STATIC_URL or "/static/",
     settings.MEDIA_URL or "/media/",
     # Auth + account management
@@ -31,9 +31,9 @@ SAFE_PREFIXES: tuple[str, ...] = (
     "/tenants/choose/",
     "/tenants/create/",
     # Billing flows
-    "/billing/",               # all billing pages allowed
+    "/billing/",  # all billing pages allowed
     # Public/landing pages
-    "/",                       # root/landing page
+    "/",  # root/landing page
     "/about/",
     "/pricing/",
     "/contact/",
@@ -75,11 +75,7 @@ class SubscriptionGateMiddleware:
         Create a trial subscription for a new Business.
         Picks the cheapest active plan (or creates a basic one).
         """
-        plan = (
-            SubscriptionPlan.objects.filter(is_active=True)
-            .order_by("amount", "sort_order")
-            .first()
-        )
+        plan = SubscriptionPlan.objects.filter(is_active=True).order_by("amount", "sort_order").first()
         if not plan:
             plan = SubscriptionPlan.objects.create(
                 code="starter",
@@ -147,25 +143,33 @@ class SubscriptionGateMiddleware:
                 sub.save(update_fields=["status", "updated_at"])
 
         # For AJAX/API/HTMX requests, return JSON error instead of redirect
-        if request.headers.get('X-Requested-With') == 'XMLHttpRequest' or request.headers.get('HX-Request'):
+        if request.headers.get("X-Requested-With") == "XMLHttpRequest" or request.headers.get("HX-Request"):
             from django.http import JsonResponse
-            return JsonResponse({
-                'ok': False,
-                'locked': True,
-                'error': 'Trial expired - subscription required',
-                'redirect_url': '/billing/trial-expired/',
-            }, status=402)
-        
+
+            return JsonResponse(
+                {
+                    "ok": False,
+                    "locked": True,
+                    "error": "Trial expired - subscription required",
+                    "redirect_url": "/billing/trial-expired/",
+                },
+                status=402,
+            )
+
         # For API paths, return JSON
-        if path.startswith('/api/') or path.startswith('/app/api/'):
+        if path.startswith("/api/") or path.startswith("/app/api/"):
             from django.http import JsonResponse
-            return JsonResponse({
-                'ok': False,
-                'locked': True,
-                'error': 'Trial expired - subscription required',
-                'redirect_url': '/billing/trial-expired/',
-            }, status=402)
-        
+
+            return JsonResponse(
+                {
+                    "ok": False,
+                    "locked": True,
+                    "error": "Trial expired - subscription required",
+                    "redirect_url": "/billing/trial-expired/",
+                },
+                status=402,
+            )
+
         # Redirect to trial expired page for better UX
         try:
             expired_url = reverse("billing:trial_expired")
@@ -173,5 +177,3 @@ class SubscriptionGateMiddleware:
             expired_url = "/billing/trial-expired/"
         reason = "expired" if sub.is_expired() else "inactive"
         return redirect(f"{expired_url}?reason={reason}")
-
-

@@ -5,9 +5,10 @@ from django.utils import timezone
 from .models import CurrencySetting
 
 API_URLS = [
-    "https://api.exchangerate.host/latest",         # no key
-    "https://open.er-api.com/v6/latest/{base}",     # no key
+    "https://api.exchangerate.host/latest",  # no key
+    "https://open.er-api.com/v6/latest/{base}",  # no key
 ]
+
 
 def update_rates(base: str | None = None) -> dict:
     cfg = CurrencySetting.get()
@@ -38,5 +39,3 @@ def update_rates(base: str | None = None) -> dict:
         cfg.rates = rates
         cfg.save(update_fields=["base_currency", "rates", "updated_at"])
     return rates
-
-

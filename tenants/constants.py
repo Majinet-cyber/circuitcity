@@ -7,4 +7,3 @@ tenant-related constants. All code should import from here.
 from inventory.business_kinds import BusinessKind
 
 __all__ = ["BusinessKind"]
-

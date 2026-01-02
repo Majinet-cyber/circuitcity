@@ -18,6 +18,7 @@ from .models_audit import AuditLog
 
 # ---------- Helpers ----------
 
+
 def _digest(prev_hash: str, data: Dict) -> str:
     """Compute the row digest in the exact shape used when appending to the chain."""
     packed = json.dumps(data, sort_keys=True).encode()
@@ -55,6 +56,7 @@ def _is_staff(user) -> bool:
 
 
 # ---------- Views ----------
+
 
 @login_required
 def verify_chain(request: HttpRequest):
@@ -195,7 +197,7 @@ def audit_detail(request: HttpRequest, pk: int):
     # Recompute this row's digest given its prev_hash
     payload = _row_payload_for_hash(row.prev_hash or "", row)
     recomputed = _digest(row.prev_hash or "", payload)
-    valid = (recomputed == row.hash)
+    valid = recomputed == row.hash
 
     # Neighbor peek (for template convenience)
     prev_row = AuditLog.objects.filter(id__lt=row.id).order_by("-id").first()
@@ -309,5 +311,3 @@ def audit_export_csv(request: HttpRequest) -> HttpResponse:
         count += 1
 
     return response
-
-

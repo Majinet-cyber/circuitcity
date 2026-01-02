@@ -102,6 +102,5 @@ def mask_phone(phone_e164):
     Usage: {{ phone|mask_phone }}
     """
     from circuitcity.accounts.models import mask_phone as _mask_phone
+
     return _mask_phone(phone_e164) if phone_e164 else "—"
-
-

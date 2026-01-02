@@ -7,7 +7,6 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         ("inventory", "1009_add_liquor_simple_pack_fields"),
         ("tenants", "0019_add_section_flags_with_defaults"),
@@ -29,9 +28,7 @@ class Migration(migrations.Migration):
                 ),
                 (
                     "quantity_change",
-                    models.IntegerField(
-                        help_text="Quantity change (positive for additions, negative for deductions)"
-                    ),
+                    models.IntegerField(help_text="Quantity change (positive for additions, negative for deductions)"),
                 ),
                 (
                     "reason",
@@ -53,9 +50,7 @@ class Migration(migrations.Migration):
                 ("notes", models.TextField(blank=True, default="")),
                 (
                     "adjusted_at",
-                    models.DateTimeField(
-                        db_index=True, default=django.utils.timezone.now
-                    ),
+                    models.DateTimeField(db_index=True, default=django.utils.timezone.now),
                 ),
                 (
                     "adjusted_by",

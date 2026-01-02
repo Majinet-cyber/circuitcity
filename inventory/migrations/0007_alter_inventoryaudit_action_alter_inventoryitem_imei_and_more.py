@@ -6,97 +6,96 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
-        ('inventory', '0006_warrantychecklog_and_more'),
+        ("inventory", "0006_warrantychecklog_and_more"),
         migrations.swappable_dependency(settings.AUTH_USER_MODEL),
     ]
 
     operations = [
         migrations.AlterField(
-            model_name='inventoryaudit',
-            name='action',
+            model_name="inventoryaudit",
+            name="action",
             field=models.CharField(
                 choices=[
-                    ('CREATE', 'Create'),
-                    ('UPDATE', 'Update'),
-                    ('EDIT', 'Edit'),
-                    ('SOLD', 'Sold'),
-                    ('SOLD_API', 'Sold via API'),
-                    ('SOLD_API_DUP', 'Sold via API (duplicate)'),
-                    ('DELETE', 'Delete'),
-                    ('DELETE_DENIED', 'Delete denied'),
-                    ('DELETE_BLOCKED', 'Delete blocked (FK protect)'),
-                    ('ARCHIVE_FALLBACK', 'Archived instead of delete'),
-                    ('RESTORE', 'Restore'),
+                    ("CREATE", "Create"),
+                    ("UPDATE", "Update"),
+                    ("EDIT", "Edit"),
+                    ("SOLD", "Sold"),
+                    ("SOLD_API", "Sold via API"),
+                    ("SOLD_API_DUP", "Sold via API (duplicate)"),
+                    ("DELETE", "Delete"),
+                    ("DELETE_DENIED", "Delete denied"),
+                    ("DELETE_BLOCKED", "Delete blocked (FK protect)"),
+                    ("ARCHIVE_FALLBACK", "Archived instead of delete"),
+                    ("RESTORE", "Restore"),
                 ],
                 max_length=32,
             ),
         ),
         migrations.AlterField(
-            model_name='inventoryitem',
-            name='imei',
+            model_name="inventoryitem",
+            name="imei",
             field=models.CharField(
                 blank=True,
                 null=True,
                 unique=True,
                 max_length=30,
-                help_text='15-digit IMEI. Leave blank only when the device truly has no IMEI.',
-                validators=[django.core.validators.RegexValidator(r'^\d{15}$', 'IMEI must be exactly 15 digits.')],
+                help_text="15-digit IMEI. Leave blank only when the device truly has no IMEI.",
+                validators=[django.core.validators.RegexValidator(r"^\d{15}$", "IMEI must be exactly 15 digits.")],
             ),
         ),
         migrations.AlterField(
-            model_name='inventoryitem',
-            name='order_price',
+            model_name="inventoryitem",
+            name="order_price",
             field=models.DecimalField(
                 max_digits=12,
                 decimal_places=2,
-                help_text='Must be zero or positive.',
+                help_text="Must be zero or positive.",
                 validators=[django.core.validators.MinValueValidator(0)],
             ),
         ),
         migrations.AlterField(
-            model_name='inventoryitem',
-            name='selling_price',
+            model_name="inventoryitem",
+            name="selling_price",
             field=models.DecimalField(
                 max_digits=12,
                 decimal_places=2,
                 blank=True,
                 null=True,
-                help_text='Must be zero or positive when provided.',
+                help_text="Must be zero or positive when provided.",
                 validators=[django.core.validators.MinValueValidator(0)],
             ),
         ),
         migrations.AddIndex(
-            model_name='inventoryaudit',
-            index=models.Index(fields=['action', 'at'], name='inventory_i_action_36072a_idx'),
+            model_name="inventoryaudit",
+            index=models.Index(fields=["action", "at"], name="inventory_i_action_36072a_idx"),
         ),
         migrations.AddConstraint(
-            model_name='inventoryitem',
+            model_name="inventoryitem",
             constraint=models.CheckConstraint(
                 check=models.Q(order_price__gte=0),
-                name='inv_order_price_nonneg',
+                name="inv_order_price_nonneg",
             ),
         ),
         migrations.AddConstraint(
-            model_name='inventoryitem',
+            model_name="inventoryitem",
             constraint=models.CheckConstraint(
                 check=(models.Q(selling_price__gte=0) | models.Q(selling_price__isnull=True)),
-                name='inv_selling_price_nonneg',
+                name="inv_selling_price_nonneg",
             ),
         ),
         migrations.AddConstraint(
-            model_name='inventoryitem',
+            model_name="inventoryitem",
             constraint=models.CheckConstraint(
-                check=models.Q(status__in=['IN_STOCK', 'SOLD']),
-                name='inv_status_allowed',
+                check=models.Q(status__in=["IN_STOCK", "SOLD"]),
+                name="inv_status_allowed",
             ),
         ),
         migrations.AddConstraint(
-            model_name='inventoryitem',
+            model_name="inventoryitem",
             constraint=models.CheckConstraint(
                 check=(models.Q(product__isnull=False) & models.Q(current_location__isnull=False)),
-                name='inv_requires_product_and_location',
+                name="inv_requires_product_and_location",
             ),
         ),
     ]

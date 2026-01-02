@@ -13,12 +13,7 @@ def build_meta(_request) -> Dict[str, Any]:
     - STATIC_VERSION defaults to BUILD_ID (used as a cache-buster in base.html).
     - Also passes APP_NAME/APP_ENV for convenience in layouts.
     """
-    build_id = (
-        os.getenv("RENDER_GIT_COMMIT")
-        or os.getenv("GIT_COMMIT")
-        or os.getenv("APP_VERSION")
-        or "dev"
-    )
+    build_id = os.getenv("RENDER_GIT_COMMIT") or os.getenv("GIT_COMMIT") or os.getenv("APP_VERSION") or "dev"
     static_version = os.getenv("STATIC_VERSION") or build_id
 
     return {
@@ -90,10 +85,10 @@ def role_flags(request) -> Dict[str, Any]:
     # ✅ PRIMARY: Use middleware-set role flags (set by RoleResolutionMiddleware)
     # These flags are computed using the centralized tenants.utils_roles logic
     # which implements proper manager precedence
-    if hasattr(request, 'is_manager_plus') and hasattr(request, 'is_agent_only'):
+    if hasattr(request, "is_manager_plus") and hasattr(request, "is_agent_only"):
         is_manager = _safe_bool(request.is_manager_plus)
         is_agent = _safe_bool(request.is_agent_only)
-        
+
         # Safety check: manager cannot be agent (middleware should prevent this)
         if is_manager and is_agent:
             is_agent = False
@@ -128,13 +123,10 @@ def role_flags(request) -> Dict[str, Any]:
         if not is_manager and is_auth:
             try:
                 from tenants.models import Membership
+
                 biz = getattr(request, "business", None)
                 if biz:
-                    membership_qs = Membership.objects.filter(
-                        user=user,
-                        business=biz,
-                        role__iexact="MANAGER"
-                    )
+                    membership_qs = Membership.objects.filter(user=user, business=biz, role__iexact="MANAGER")
                     # Filter by status if field exists
                     if hasattr(Membership, "status"):
                         membership_qs = membership_qs.filter(status__iexact="ACTIVE")
@@ -165,6 +157,7 @@ def app_version(request) -> Dict[str, Any]:
     Expose APP_VERSION to all templates for version display and update checking.
     """
     from django.conf import settings
+
     return {"APP_VERSION": getattr(settings, "APP_VERSION", "1.1.0")}
 
 
@@ -175,21 +168,22 @@ def currency_config(request) -> Dict[str, Any]:
     """
     display_currency = "MWK"
     mwk_per_usd = None
-    
+
     try:
         user = getattr(request, "user", None)
         if user and hasattr(user, "is_authenticated") and user.is_authenticated:
             if hasattr(user, "profile") and hasattr(user.profile, "display_currency"):
                 display_currency = user.profile.display_currency or "MWK"
-        
+
         # Always get exchange rate (needed for JS conversion even if user prefers MWK)
         from core.models import ExchangeRate
+
         rate_value = ExchangeRate.get_rate_value()
         if rate_value:
             mwk_per_usd = float(rate_value)
     except Exception:
         pass  # Fail gracefully - never crash on 404 pages or missing context
-    
+
     return {
         "DISPLAY_CURRENCY": display_currency,
         "MWK_PER_USD": mwk_per_usd,
@@ -199,14 +193,15 @@ def currency_config(request) -> Dict[str, Any]:
 def current_year(request) -> Dict[str, Any]:
     """
     Expose the current year to all templates for dynamic copyright notices.
-    
+
     Returns:
         dict: Contains CURRENT_YEAR key with the current year as an integer.
-    
+
     Example usage in templates:
         © {{ CURRENT_YEAR }} Emajinet
     """
     from django.utils import timezone
+
     return {
         "CURRENT_YEAR": timezone.now().year,
     }

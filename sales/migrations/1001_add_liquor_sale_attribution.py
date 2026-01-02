@@ -7,7 +7,6 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         ("sales", "1000_add_commission_toggle_and_mode"),
         ("tenants", "0016_add_unique_active_membership_constraint"),
@@ -111,9 +110,7 @@ class Migration(migrations.Migration):
                         fields=["attributed_by", "-created_at"],
                         name="sales_liquo_attribu_184f64_idx",
                     ),
-                    models.Index(
-                        fields=["liquor_sale_id"], name="sales_liquo_liquor__c393e1_idx"
-                    ),
+                    models.Index(fields=["liquor_sale_id"], name="sales_liquo_liquor__c393e1_idx"),
                 ],
             },
         ),

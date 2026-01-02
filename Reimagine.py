@@ -9,7 +9,7 @@ import os
 
 def generate_hypothetical_dashboard():
     # Generate sample sales data
-    dates = pd.date_range(start="2024-01-01", periods=90, freq='D')
+    dates = pd.date_range(start="2024-01-01", periods=90, freq="D")
     locations = ["Lilongwe", "Blantyre", "Mzuzu", "Zomba", "Mangochi", "Kasungu"]
     agents = ["Agent A", "Agent B", "Agent C", "Agent D", "Agent E"]
 
@@ -17,7 +17,7 @@ def generate_hypothetical_dashboard():
         "Date": dates.repeat(len(locations)),
         "Location": np.tile(locations, len(dates)),
         "Sales": np.random.randint(10, 100, len(dates) * len(locations)),
-        "Agent": np.random.choice(agents, len(dates) * len(locations))
+        "Agent": np.random.choice(agents, len(dates) * len(locations)),
     }
     df = pd.DataFrame(sales_data)
 
@@ -40,28 +40,28 @@ def generate_hypothetical_dashboard():
 
     # Map of Malawi Sales by District
     location_coords = {
-        "Lilongwe": [-13.9833, 33.7833], "Blantyre": [-15.7861, 35.0058], "Mzuzu": [-11.4500, 34.0333],
-        "Zomba": [-15.385, 35.318], "Mangochi": [-14.4781, 35.2645], "Kasungu": [-13.0333, 33.4833]
+        "Lilongwe": [-13.9833, 33.7833],
+        "Blantyre": [-15.7861, 35.0058],
+        "Mzuzu": [-11.4500, 34.0333],
+        "Zomba": [-15.385, 35.318],
+        "Mangochi": [-14.4781, 35.2645],
+        "Kasungu": [-13.0333, 33.4833],
     }
 
     sales_map = folium.Map(location=[-13.5, 34], zoom_start=6)
     for location, coord in location_coords.items():
         total_sales = df[df["Location"] == location]["Sales"].sum()
-        folium.Marker(
-            coord,
-            popup=f"{location}: {total_sales} sales",
-            tooltip=location
-        ).add_to(sales_map)
+        folium.Marker(coord, popup=f"{location}: {total_sales} sales", tooltip=location).add_to(sales_map)
 
     sales_map.save("malawi_sales_map.html")
 
     # Save dashboard
     output_path = "hypothetical_sales_dashboard.html"
     with open(output_path, "w") as f:
-        f.write(pio.to_html(fig1, full_html=False, include_plotlyjs='cdn'))
-        f.write(pio.to_html(fig2, full_html=False, include_plotlyjs='cdn'))
-        f.write(pio.to_html(fig3, full_html=False, include_plotlyjs='cdn'))
-        f.write(pio.to_html(fig4, full_html=False, include_plotlyjs='cdn'))
+        f.write(pio.to_html(fig1, full_html=False, include_plotlyjs="cdn"))
+        f.write(pio.to_html(fig2, full_html=False, include_plotlyjs="cdn"))
+        f.write(pio.to_html(fig3, full_html=False, include_plotlyjs="cdn"))
+        f.write(pio.to_html(fig4, full_html=False, include_plotlyjs="cdn"))
 
     print(f"Dashboard saved as {output_path}")
     print("Malawi sales map saved as malawi_sales_map.html")
@@ -69,5 +69,3 @@ def generate_hypothetical_dashboard():
 
 if __name__ == "__main__":
     generate_hypothetical_dashboard()
-
-
