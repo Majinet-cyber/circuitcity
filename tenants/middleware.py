@@ -1,7 +1,8 @@
 ﻿# circuitcity/tenants/middleware.py
 from __future__ import annotations
 
-from typing import Optional, Iterable
+from typing import Iterable, Optional
+
 from django.utils.deprecation import MiddlewareMixin
 from django.utils.functional import cached_property
 
@@ -9,8 +10,10 @@ from django.utils.functional import cached_property
 try:
     from django.conf import settings
 except Exception:  # pragma: no cover
+
     class _S:  # minimal shim
         TENANT_SESSION_KEY = "active_business_id"
+
     settings = _S()  # type: ignore
 
 try:
@@ -22,31 +25,34 @@ except Exception:  # pragma: no cover
     def set_current_business_id(_):  # type: ignore
         return
 
+
 try:
     # Use the SAME utils your views use to store/read active biz
     from tenants.utils import get_active_business, set_active_business
 except Exception:  # pragma: no cover
+
     def get_active_business(_request):  # type: ignore
         return None
 
     def set_active_business(_request, _biz):  # type: ignore
         return
 
+
 # Optional: scope helpers (location resolution). All guarded.
 try:
-    from tenants.scope import (
-        resolve_location_for_user,
-        serialize_scope_for_ui,
-        set_scope_in_session,
-        get_active_business as scope_get_active_business,  # same behavior as utils-based
-    )
+    from tenants.scope import get_active_business as scope_get_active_business  # same behavior as utils-based
+    from tenants.scope import resolve_location_for_user, serialize_scope_for_ui, set_scope_in_session
 except Exception:  # pragma: no cover
+
     def resolve_location_for_user(_request):  # type: ignore
         return None
+
     def serialize_scope_for_ui(_request):  # type: ignore
         return {}
+
     def set_scope_in_session(_request, *, business_id=None, location_id=None):  # type: ignore
         return
+
     scope_get_active_business = get_active_business  # type: ignore
 
 LOCAL_HOSTS = {"127.0.0.1", "localhost"}
@@ -55,7 +61,7 @@ LOCAL_HOSTS = {"127.0.0.1", "localhost"}
 CANONICAL_SESSION_KEY = getattr(settings, "TENANT_SESSION_KEY", "active_business_id")
 LEGACY_SESSION_KEYS: Iterable[str] = (CANONICAL_SESSION_KEY, "active_business_id", "biz_id")
 
-PRODUCT_MODE_SESSION_KEY = "product_mode"          # single source of truth for UI mode
+PRODUCT_MODE_SESSION_KEY = "product_mode"  # single source of truth for UI mode
 
 # ── product/vertical normalization (aliases) ────────────────────────────────────
 VERTICAL_ALIASES = {
@@ -66,13 +72,11 @@ VERTICAL_ALIASES = {
     "phones": "phones",
     "mobile": "phones",
     "mobiles": "phones",
-
     # Pharmacy
     "pharmacy": "pharmacy",
     "chemist": "pharmacy",
     "medicine": "pharmacy",
     "drugstore": "pharmacy",
-
     # Liquor
     "liquor": "liquor",
     "bar": "liquor",
@@ -80,7 +84,6 @@ VERTICAL_ALIASES = {
     "pub": "liquor",
     "bottle-store": "liquor",
     "bottle store": "liquor",
-
     # Grocery / Supermarket / Retail
     "grocery": "grocery",
     "groceries": "grocery",
@@ -230,11 +233,7 @@ def _pick_active_membership_business_for_user(user) -> Optional[object]:
     if Membership is None or user is None:
         return None
     try:
-        mem_qs = (
-            Membership.objects.filter(user=user)
-            .select_related("business")
-            .order_by("-created_at", "-id")
-        )
+        mem_qs = Membership.objects.filter(user=user).select_related("business").order_by("-created_at", "-id")
         for mem in mem_qs:
             biz = getattr(mem, "business", None)
             if not biz:
@@ -335,18 +334,19 @@ def _attach_role_to_request(request) -> None:
     """
     AUTHORITATIVE role attachment: compute role using centralized logic and store on request.
     This is the single source of truth for role determination used by views, templates, etc.
-    
+
     Attaches:
         - request.cc_business: Business object
         - request.cc_role: Role string ("MANAGER", "AGENT", "OWNER", "AUDITOR", "BAR_MANAGER", "NONE")
         - request.cc_is_manager: Boolean (True for managers, owners, staff, superusers)
         - request.cc_is_agent: Boolean (True ONLY if agent and NOT manager)
         - request.cc_is_owner: Boolean (True if business owner)
-    
+
     CRITICAL: This implements manager precedence - managers are NEVER agents.
     """
     try:
         from tenants.utils_roles import attach_role_to_request
+
         attach_role_to_request(request)
     except Exception:
         # Fallback: set safe defaults if utils_roles isn't available
@@ -384,8 +384,11 @@ class TenantResolutionMiddleware(MiddlewareMixin):
 
     def __call__(self, request):
         # CRITICAL: Bypass HQ paths at the very top to prevent redirect loops
-        path = (request.path_info or request.path or "/")
+        path = request.path_info or request.path or "/"
         if path.startswith("/hq/"):
+            return self.get_response(request)
+        # CRITICAL: Bypass public gym QR code endpoints (no tenant resolution required)
+        if path.startswith("/gym/qr/"):
             return self.get_response(request)
         return super().__call__(request)
 
@@ -410,6 +413,10 @@ class TenantResolutionMiddleware(MiddlewareMixin):
         # CRITICAL: Bypass HQ paths entirely to prevent redirect loops
         path = getattr(request, "path", "")
         if path.startswith("/hq/"):
+            _set_product_mode_on_request(request, None)
+            return
+        # CRITICAL: Bypass public gym QR code endpoints (no tenant resolution required)
+        if path.startswith("/gym/qr/"):
             _set_product_mode_on_request(request, None)
             return
 
@@ -485,7 +492,11 @@ class TenantResolutionMiddleware(MiddlewareMixin):
                 b = _filter_active_business(Business.objects).filter(subdomain__iexact=sub).first()
                 if b:
                     # Allow anonymous or superusers; require membership for authed users
-                    if (not getattr(user, "is_authenticated", False)) or getattr(user, "is_superuser", False) or _user_has_active_membership(user, b):
+                    if (
+                        (not getattr(user, "is_authenticated", False))
+                        or getattr(user, "is_superuser", False)
+                        or _user_has_active_membership(user, b)
+                    ):
                         _activate(request, b)
                         _set_product_mode_on_request(request, b)
                         _attach_location_scope(request)
@@ -537,4 +548,5 @@ class ActiveBusinessMiddleware(TenantResolutionMiddleware):
     Backwards-compatible alias for setups that list `ActiveBusinessMiddleware`
     in MIDDLEWARE. Inherits full behavior from TenantResolutionMiddleware.
     """
+
     pass

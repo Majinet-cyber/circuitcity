@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import timedelta
+from datetime import datetime, timedelta
 from decimal import Decimal
 
 from django.contrib.auth.decorators import login_required
@@ -69,19 +69,26 @@ def dashboard(request):
     members_in_arrears = in_arrears
 
     # ============================================================================
-    # FINANCIAL KPIs: Revenue, Costs, Profit, MRR
-    # Use consistent date filtering and Coalesce for safe aggregation
+    # DATE RANGE FILTER: Parse querystring (today/last7/mtd)
     # ============================================================================
+    range_param = request.GET.get("range", "mtd").lower()
     now = timezone.now()
-    today = timezone.localdate()  # Use localdate for date-only comparisons
+    today = timezone.localdate()
     yesterday = today - timedelta(days=1)
 
-    # Calculate month start/end using year+month (avoids timezone edge cases)
-    month_start_date = today.replace(day=1)
-    if today.month == 12:
-        month_end_date = today.replace(day=31)
-    else:
-        month_end_date = today.replace(day=1, month=today.month + 1) - timedelta(days=1)
+    # Determine date range based on filter
+    if range_param == "today":
+        start_date = today
+        end_date = today
+        range_label = "Today"
+    elif range_param == "last7":
+        start_date = today - timedelta(days=6)  # Last 7 days including today
+        end_date = today
+        range_label = "Last 7 Days"
+    else:  # mtd (default)
+        start_date = today.replace(day=1)
+        end_date = today
+        range_label = "Month to Date"
 
     # Date ranges for metrics (datetime-aware for paid_at filtering)
     month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
@@ -91,44 +98,28 @@ def dashboard(request):
     yesterday_start = (now - timedelta(days=1)).replace(hour=0, minute=0, second=0, microsecond=0)
     yesterday_end = (now - timedelta(days=1)).replace(hour=23, minute=59, second=59, microsecond=999999)
 
-    # Use a single canonical queryset for this month's payments
-    # CRITICAL: Filter by is_active=True to exclude cancelled/refunded payments
-    current_month_payments = GymPayment.objects.filter(
-        member__business=business,
-        is_active=True,
-        paid_at__year=today.year,
-        paid_at__month=today.month,
-    )
+    # Calculate datetime boundaries for selected range
+    range_start_dt = timezone.make_aware(datetime.combine(start_date, datetime.min.time()))
+    range_end_dt = timezone.make_aware(datetime.combine(end_date, datetime.max.time()))
 
-    # Use Coalesce to ensure we get Decimal("0.00") instead of None
-    mrr = current_month_payments.aggregate(
-        total=Coalesce(Sum("amount"), Value(0), output_field=DecimalField(max_digits=12, decimal_places=2))
-    )["total"]
-    payment_count = current_month_payments.count()
+    # ============================================================================
+    # FINANCIAL KPIs: Revenue, Costs, Profit, MRR
+    # Use consistent date filtering and Coalesce for safe aggregation
+    # ============================================================================
 
-    # Payment mix (handle cases where payment_method might be NULL)
-    from inventory.models_verticals import PaymentMethod
+    # Use unified metrics service for selected date range
+    from inventory.services.gym_metrics import get_gym_dashboard_metrics
 
-    payment_mix = []
-    try:
-        for method_code, method_label in PaymentMethod.choices:
-            method_payments = current_month_payments.filter(payment_method=method_code)
-            count = method_payments.count()
-            amount = method_payments.aggregate(
-                total=Coalesce(Sum("amount"), Value(0), output_field=DecimalField(max_digits=12, decimal_places=2))
-            )["total"]
-            if count > 0:
-                payment_mix.append(
-                    {
-                        "method": method_label,
-                        "count": count,
-                        "amount": amount,
-                    }
-                )
-    except Exception as e:
-        # If payment_method column doesn't exist or has issues, gracefully handle it
-        # This ensures dashboard doesn't crash before migrations are applied
-        payment_mix = []
+    range_metrics = get_gym_dashboard_metrics(business, start_date, end_date)
+    revenue = range_metrics["revenue"]
+    payment_count = range_metrics["payments_count"]
+    payment_mix = range_metrics.get("payment_mix", [])
+
+    # Also get month metrics for MRR and legacy compatibility
+    from inventory.services.gym_metrics import get_this_month_metrics
+
+    month_metrics = get_this_month_metrics(business)
+    mrr = month_metrics["revenue"]
 
     # ============================================================================
     # COSTS: Use admin wallet costs (same source as /wallet/admin/costs/)
@@ -162,8 +153,8 @@ def dashboard(request):
         "total"
     ]
 
-    # Use the same queryset for consistency (year+month filtering)
-    revenue_this_month = mrr  # Same as MRR for gym (all active payments this month)
+    # Use revenue from unified metrics service
+    revenue_this_month = month_metrics["revenue"]
 
     # ============================================================================
     # PROFIT: Calculate profit = revenue - costs for each period
@@ -193,18 +184,37 @@ def dashboard(request):
         trainer_earnings = Decimal("0.00")
 
     # Check-ins / sessions
-    today = now.replace(hour=0, minute=0, second=0, microsecond=0)
-    week_start = today - timedelta(days=today.weekday())
+    today_dt = now.replace(hour=0, minute=0, second=0, microsecond=0)
+    week_start = today_dt - timedelta(days=today_dt.weekday())
 
     # Safely query TimeLog (may not exist in all environments)
     try:
-        sessions_today = TimeLog.objects.filter(business=business, kind="ARRIVAL", ts__gte=today).count()
+        sessions_today = TimeLog.objects.filter(business=business, kind="ARRIVAL", ts__gte=today_dt).count()
 
         sessions_this_week = TimeLog.objects.filter(business=business, kind="ARRIVAL", ts__gte=week_start).count()
     except Exception:
         # TimeLog table doesn't exist or is not configured
         sessions_today = 0
         sessions_this_week = 0
+
+    # Gamification KPIs: Today's check-ins and Top streak
+    from inventory.models_verticals import GymCheckIn
+
+    try:
+        checkins_today_count = GymCheckIn.objects.filter(business=business, timestamp__gte=today_dt).count()
+
+        # Top streak member
+        top_streak_member = (
+            GymMember.objects.filter(business=business, is_active=True, is_archived=False, streak_days__gt=0)
+            .order_by("-streak_days")
+            .first()
+        )
+        top_streak_name = top_streak_member.name if top_streak_member else None
+        top_streak_days = top_streak_member.streak_days if top_streak_member else 0
+    except Exception:
+        checkins_today_count = 0
+        top_streak_name = None
+        top_streak_days = 0
 
     # ===== NEW: Personalized dashboard enhancements (quotes & greetings) =====
     ctx_enhancements = {}
@@ -276,6 +286,9 @@ def dashboard(request):
             "profit": profit,  # Defaults to this month
             "payment_mix": payment_mix,
             "trainer_earnings": trainer_earnings,
+            # Date range filter
+            "range_key": range_param,
+            "range_label": range_label,
             # Recent payments
             "recent_payments": GymPayment.objects.filter(member__business=business)
             .select_related("member", "paid_by")
@@ -283,6 +296,10 @@ def dashboard(request):
             # Session KPIs
             "sessions_today": sessions_today,
             "sessions_this_week": sessions_this_week,
+            # Gamification KPIs
+            "checkins_today": checkins_today_count,
+            "top_streak_name": top_streak_name,
+            "top_streak_days": top_streak_days,
             # Billing/subscription safe defaults (gym doesn't use subscriptions)
             "membership": None,
             "subscription": None,

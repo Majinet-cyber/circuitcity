@@ -450,8 +450,46 @@ class BusinessSubscription(models.Model):
 # Invoices
 # ======================================================================
 def _next_invoice_number() -> str:
-    today = timezone.localdate().strftime("%Y%m%d")
-    return f"INV-{today}-{uuid.uuid4().hex[:6].upper()}"
+    """
+    Generate atomic, year-based invoice number: INV-YYYY-000123
+    Uses database-level locking to ensure uniqueness and sequential numbering.
+    """
+    from django.db import transaction
+
+    year = timezone.now().year
+
+    with transaction.atomic():
+        # Use select_for_update to lock the row during increment
+        # Find the highest invoice number for this year
+        last_invoice = (
+            Invoice.objects.filter(number__startswith=f"INV-{year}-").order_by("-number").select_for_update().first()
+        )
+
+        if last_invoice:
+            # Extract the sequence number from last invoice
+            try:
+                # Format: INV-YYYY-000123
+                parts = last_invoice.number.split("-")
+                if len(parts) == 3 and parts[0] == "INV" and parts[1] == str(year):
+                    sequence = int(parts[2])
+                    next_sequence = sequence + 1
+                else:
+                    next_sequence = 1
+            except (ValueError, IndexError):
+                next_sequence = 1
+        else:
+            next_sequence = 1
+
+        # Format with 6-digit zero-padded sequence
+        invoice_number = f"INV-{year}-{next_sequence:06d}"
+
+        # Double-check uniqueness (race condition protection)
+        if Invoice.objects.filter(number=invoice_number).exists():
+            # If collision, try next number
+            next_sequence += 1
+            invoice_number = f"INV-{year}-{next_sequence:06d}"
+
+        return invoice_number
 
 
 class Invoice(models.Model):
@@ -678,6 +716,11 @@ class Payment(models.Model):
     external_id = models.CharField(max_length=128, blank=True, default="")
     raw_payload = models.JSONField(default=dict, blank=True)
 
+    # Payment failure details
+    failure_reason = models.TextField(
+        blank=True, null=True, help_text="Reason for payment failure (if status is FAILED)"
+    )
+
     created_at = models.DateTimeField(auto_now_add=True)
     processed_at = models.DateTimeField(null=True, blank=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -716,6 +759,20 @@ class Payment(models.Model):
         except Exception:
             # Donâ€™t blow up payment flow if subscription update fails
             pass
+
+    def mark_failed(self, failure_reason: str = "", save: bool = True):
+        """
+        Mark payment as failed with optional failure reason.
+
+        Args:
+            failure_reason: Reason for failure (e.g., "Insufficient funds", "Card declined")
+            save: Whether to save the model (default True)
+        """
+        self.status = self.Status.FAILED
+        if failure_reason:
+            self.failure_reason = failure_reason
+        if save:
+            self.save(update_fields=["status", "failure_reason", "updated_at"])
 
 
 # ======================================================================

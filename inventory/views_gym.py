@@ -228,6 +228,12 @@ def member_add(request):
                     performed_by=request.user,
                 )
 
+                # Send QR code PDF email if member has email (after transaction commit)
+                if member.email:
+                    from inventory.services.gym_qr_email import send_member_qr_email
+
+                    transaction.on_commit(lambda: send_member_qr_email(member, request))
+
             return redirect("gym:member_detail", member_id=member.id)
     else:
         form = GymMemberForm(business, initial=initial_data)
@@ -405,6 +411,10 @@ def member_detail(request, member_id):
 
     try:
         member_code = getattr(member, "member_code", None)
+        # Ensure qr_uuid exists (will be auto-generated on save if missing)
+        if not member.qr_uuid:
+            member.save(update_fields=["qr_uuid"])  # This will trigger auto-generation in save()
+            member.refresh_from_db()
     except Exception:
         member_code = None
 
@@ -1103,11 +1113,25 @@ def gym_dashboard(request):
     from django.db.models import Count, Sum
 
     from inventory.models_verticals import PaymentMethod
+    from inventory.services.gym_metrics import get_gym_dashboard_metrics
 
     start_dt = timezone.make_aware(datetime.combine(start_date, datetime.min.time()))
     end_dt = timezone.make_aware(datetime.combine(end_date, datetime.max.time()))
 
-    payments_in_range = GymPayment.objects.filter(member__business=business, paid_at__gte=start_dt, paid_at__lte=end_dt)
+    # CRITICAL FIX: Use unified metrics service for this month to ensure consistency
+    # This ensures is_active=True filter is applied and all calculations use same queryset
+    today = timezone.now().date()
+    month_start = today.replace(day=1)
+    month_metrics = get_gym_dashboard_metrics(business, month_start, today)
+
+    # For the date range (which might be different from "this month"), calculate separately
+    # but still filter by is_active=True
+    payments_in_range = GymPayment.objects.filter(
+        member__business=business,
+        is_active=True,  # CRITICAL: Only count active payments
+        paid_at__gte=start_dt,
+        paid_at__lte=end_dt,
+    )
 
     payment_mix = (
         payments_in_range.values("payment_method").annotate(count=Count("id"), total=Sum("amount")).order_by("-total")
@@ -1141,7 +1165,12 @@ def gym_dashboard(request):
 
     # Helper function to get payment method totals
     def get_payment_method_totals(start, end):
-        payments = GymPayment.objects.filter(member__business=business, paid_at__gte=start, paid_at__lte=end)
+        payments = GymPayment.objects.filter(
+            member__business=business,
+            is_active=True,  # CRITICAL: Only count active payments
+            paid_at__gte=start,
+            paid_at__lte=end,
+        )
 
         totals = {}
         for method_code, method_label in PaymentMethod.choices:
@@ -1235,19 +1264,15 @@ def gym_dashboard(request):
         member__business=business, is_active=True, paid_at__gte=yesterday_start, paid_at__lte=yesterday_end
     ).aggregate(total=Sum("amount"))["total"] or Decimal("0.00")
 
-    revenue_this_month = GymPayment.objects.filter(
-        member__business=business, is_active=True, paid_at__gte=month_start_dt, paid_at__lte=month_end_dt
-    ).aggregate(total=Sum("amount"))["total"] or Decimal("0.00")
+    # Use unified metrics service for this month to ensure consistency
+    # This ensures revenue and payment_count match exactly
+    revenue_this_month = month_metrics["revenue"]
+    payment_count_month = month_metrics["payments_count"]
 
     # Calculate profit = revenue - costs
     profit_today = revenue_today - costs_today
     profit_yesterday = revenue_yesterday - costs_yesterday
     profit_this_month = revenue_this_month - costs_this_month
-
-    # Count of payments this month
-    payment_count_month = GymPayment.objects.filter(
-        member__business=business, is_active=True, paid_at__gte=month_start_dt, paid_at__lte=month_end_dt
-    ).count()
 
     # Calculate MRR (Monthly Recurring Revenue)
     # MRR = sum of active members' monthly fees (those with valid memberships)
@@ -1339,9 +1364,9 @@ def gym_dashboard(request):
             "conversion_percentage": round(conversion_percentage, 1),
             "active_session_members": active_session_members,
             "recent_checkins": recent_checkins,
-            # Payment mix
-            "payment_mix": payment_mix_list,
-            "total_revenue": total_revenue,
+            # Payment mix - use unified metrics for "this month" to ensure consistency
+            "payment_mix": month_metrics["payment_mix"],  # Use unified metrics for this month
+            "total_revenue": revenue_this_month,  # Use unified revenue for this month
             # Payment by method (today, yesterday, this month)
             "payments_by_method_today": payments_by_method_today,
             "payments_by_method_yesterday": payments_by_method_yesterday,

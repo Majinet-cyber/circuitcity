@@ -74,12 +74,39 @@
     </article>
   </section>
 
+  <!-- Date Range Filter -->
+  <section class="recent-block" style="margin-bottom: 18px;">
+    <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
+      <h2 style="margin:0;font-size:1.1rem">Filter</h2>
+      <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+        <a href="?range=today"
+           class="btn {% if range_key == 'today' %}btn-primary{% else %}btn-outline-secondary{% endif %}"
+           style="border-radius: 20px; padding: 8px 16px; font-size: 0.9rem; text-decoration: none;">
+          Today
+        </a>
+        <a href="?range=last7"
+           class="btn {% if range_key == 'last7' %}btn-primary{% else %}btn-outline-secondary{% endif %}"
+           style="border-radius: 20px; padding: 8px 16px; font-size: 0.9rem; text-decoration: none;">
+          Last 7 Days
+        </a>
+        <a href="?range=mtd"
+           class="btn {% if range_key == 'mtd' %}btn-primary{% else %}btn-outline-secondary{% endif %}"
+           style="border-radius: 20px; padding: 8px 16px; font-size: 0.9rem; text-decoration: none;">
+          MTD
+        </a>
+      </div>
+    </div>
+    <div style="margin-top: 8px; color: #64748b; font-size: 0.9rem;">
+      Showing: <strong>{{ range_label }}</strong>
+    </div>
+  </section>
+
   <!-- Financial KPIs -->
   <section class="recent-block">
-    <h2 style="margin:0 0 10px;font-size:1.1rem">Financial Performance (This Month)</h2>
+    <h2 style="margin:0 0 10px;font-size:1.1rem">Financial Performance ({{ range_label }})</h2>
     <div class="metrics-grid">
       <article class="metric-card">
-        <h3>Monthly Revenue</h3>
+        <h3>Revenue</h3>
         <p>{{ revenue|default:0|floatformat:2|intcomma|money }}</p>
         <small>{{ payment_count|default:"0"|intcomma }} payment{{ payment_count|pluralize }}</small>
       </article>
@@ -104,7 +131,7 @@
   <!-- Payment Mix -->
   {% if payment_mix %}
   <section class="recent-block">
-    <h2 style="margin:0 0 10px;font-size:1.1rem">Payment Mix (This Month)</h2>
+    <h2 style="margin:0 0 10px;font-size:1.1rem">Payment Mix ({{ range_label }})</h2>
     <div class="metrics-grid">
       {% for pm in payment_mix %}
       <article class="metric-card">
@@ -147,6 +174,18 @@
         <p>{{ sessions_this_week|default:"0"|intcomma }}</p>
         <small>check-ins</small>
       </article>
+      <article class="metric-card">
+        <h3>Today's Check-ins</h3>
+        <p style="color:#10b981">{{ checkins_today|default:"0"|intcomma }}</p>
+        <small>gym check-ins</small>
+      </article>
+      {% if top_streak_name %}
+      <article class="metric-card">
+        <h3>Top Streak</h3>
+        <p style="color:#f59e0b">{{ top_streak_days|default:"0"|intcomma }}</p>
+        <small>{{ top_streak_name|truncatewords:3 }}</small>
+      </article>
+      {% endif %}
     </div>
   </section>
 

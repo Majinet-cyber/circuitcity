@@ -1,7 +1,7 @@
 // cypress/e2e/phone_manager_flow.cy.js
 /**
  * E2E Flow 1 – Manager basic journey (phones)
- * 
+ *
  * Tests:
  * - Login as manager and select phone business
  * - Add new phone stock (TECNO Pop 10, 4+128)
@@ -47,11 +47,11 @@ describe('Phone Manager Flow - Stock to Sale with Payment Methods', () => {
     // 2. Add new phone to inventory
     // ==========================================
     cy.log('📦 Adding new phone to inventory...');
-    
+
     // Visit inventory scan-in page
     cy.visit('/inventory/scan-in/');
     cy.url().should('include', '/inventory/scan-in/');
-    
+
     // Wait for page to load
     cy.get('body').should('be.visible');
     cy.wait(500);
@@ -171,14 +171,14 @@ describe('Phone Manager Flow - Stock to Sale with Payment Methods', () => {
     // 3. Verify stock appears in inventory list
     // ==========================================
     cy.log('📋 Verifying stock in inventory list...');
-    
+
     cy.visit('/inventory/list/');
     cy.url().should('include', '/inventory/');
     cy.wait(1000);
 
     // Search for our IMEI or model
     cy.get('body').should('contain', testPhone.imei);
-    
+
     // Verify quantity is at least 1
     cy.get('body').then(($body) => {
       // Look for quantity indicator
@@ -191,7 +191,7 @@ describe('Phone Manager Flow - Stock to Sale with Payment Methods', () => {
     // 4. Perform sale using phone sale wizard
     // ==========================================
     cy.log('💰 Performing sale with payment method selection...');
-    
+
     // Visit the phone sale wizard
     cy.visit('/inventory/phone-sale-wizard/');
     cy.url().should('include', 'wizard');
@@ -224,7 +224,7 @@ describe('Phone Manager Flow - Stock to Sale with Payment Methods', () => {
 
       // Try clicking variant card, fallback to radio if not found
       const hasVariantCards = $body.find("[data-cy='sale-variant-option'], .variant-card").length > 0;
-      
+
       if (hasVariantCards) {
         cy.get('[data-cy="sale-variant-option"], .variant-card').first().click({ force: true });
         cy.wait(500);
@@ -280,16 +280,16 @@ describe('Phone Manager Flow - Stock to Sale with Payment Methods', () => {
     // ==========================================
     // 5. Assertions after sale
     // ==========================================
-    
+
     // A) Verify we're on confirmation page or redirected to success
     cy.url().then((url) => {
       cy.log(`After sale URL: ${url}`);
-      
+
       // The wizard should NOT lead to wrong product
       // Verify the confirmation shows correct product
       cy.get('body').then(($body) => {
         const bodyText = $body.text();
-        
+
         // Assert correct model is shown (NO Spark 40 if we selected Pop 10!)
         if (bodyText.includes(testPhone.model)) {
           cy.log(`✓ Confirmation shows correct model: ${testPhone.model}`);
@@ -299,7 +299,7 @@ describe('Phone Manager Flow - Stock to Sale with Payment Methods', () => {
             throw new Error('BUG DETECTED: Selected Pop 10 but confirmation shows Spark 40!');
           }
         }
-        
+
         // Verify variant is correct
         if (bodyText.includes(testPhone.variant)) {
           cy.log(`✓ Confirmation shows correct variant: ${testPhone.variant}`);
@@ -311,7 +311,7 @@ describe('Phone Manager Flow - Stock to Sale with Payment Methods', () => {
     cy.log('📉 Verifying inventory quantity reduced...');
     cy.visit('/inventory/list/');
     cy.wait(1000);
-    
+
     cy.get('body').then(($body) => {
       // The IMEI should either be gone or marked as SOLD
       const bodyText = $body.text().toLowerCase();
@@ -325,7 +325,7 @@ describe('Phone Manager Flow - Stock to Sale with Payment Methods', () => {
     // ==========================================
     // 6. Check wallet & commissions
     // ==========================================
-    
+
     // C) Visit agent wallet
     cy.log('💼 Checking agent wallet for commission...');
     cy.visit('/wallet/');
@@ -336,7 +336,7 @@ describe('Phone Manager Flow - Stock to Sale with Payment Methods', () => {
       if ($body.text().includes('commission') || $body.text().includes('Commission')) {
         cy.log('✓ Wallet page shows commission data');
       }
-      
+
       // Check for balance > 0 (assuming fresh account)
       if ($body.text().match(/balance.*\d+/i)) {
         cy.log('✓ Agent wallet shows positive balance');
@@ -351,7 +351,7 @@ describe('Phone Manager Flow - Stock to Sale with Payment Methods', () => {
     // Verify page loads without error
     cy.get('body').should('not.contain', '500 Internal Server Error');
     cy.get('body').should('not.contain', 'Failed to load chart');
-    
+
     // Check for canvas element (chart rendered)
     cy.get('body').then(($body) => {
       if ($body.find('canvas').length > 0) {
@@ -364,4 +364,3 @@ describe('Phone Manager Flow - Stock to Sale with Payment Methods', () => {
     cy.log('✅ Phone manager flow completed successfully!');
   });
 });
-

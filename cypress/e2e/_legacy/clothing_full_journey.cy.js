@@ -1,7 +1,7 @@
 // cypress/e2e/clothing_full_journey.cy.js
 /**
  * End-to-end test for Clothing vertical
- * 
+ *
  * Tests:
  * - Login and navigate to clothing dashboard
  * - Add clothing item with sizes
@@ -176,4 +176,3 @@ describe('Clothing Full Journey', () => {
     });
   });
 });
-

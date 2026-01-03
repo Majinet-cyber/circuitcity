@@ -205,6 +205,8 @@
                             <th>Phone</th>
                             <th>Trainer</th>
                             <th>Status</th>
+                            <th>Streak</th>
+                            <th>Level</th>
                             <th>Days Left</th>
                             <th>Next Payment</th>
                             <th>Actions</th>
@@ -253,6 +255,22 @@
                                         <i class="bi bi-clock-history"></i> Pending Payment
                                     </span>
                                 {% endif %}
+                            </td>
+                            <td>
+                                {% if member.streak_days > 0 %}
+                                    <span style="color: #f59e0b; font-weight: 600;">
+                                        <i class="bi bi-fire"></i> {{ member.streak_days }}
+                                    </span>
+                                {% else %}
+                                    <span class="text-muted">-</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% with level=member.get_level_display %}
+                                    <span class="badge bg-{{ level.color }}" title="{{ level.name }} Level">
+                                        {{ level.icon }} {{ level.name }}
+                                    </span>
+                                {% endwith %}
                             </td>
                             <td>
                                 {% if member.is_archived %}

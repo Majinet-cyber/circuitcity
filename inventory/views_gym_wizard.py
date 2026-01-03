@@ -5,7 +5,7 @@ Gamified wizard flow for adding gym members.
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.db import transaction
-from django.shortcuts import render, redirect
+from django.shortcuts import redirect, render
 from django.utils import timezone
 
 from inventory.authz import require_business_kind
@@ -13,14 +13,13 @@ from inventory.business_kinds import BusinessKind
 from inventory.helpers import get_active_business
 from inventory.models_verticals import (
     GymMember,
+    GymMemberAction,
+    GymMemberLog,
+    GymMemberStatus,
     GymSettings,
     GymTrainer,
-    GymMemberLog,
-    GymMemberAction,
-    GymMemberStatus,
 )
 from tenants.utils import require_business
-
 
 # Session keys
 WIZARD_SESSION_KEY = "gym_member_wizard"
@@ -269,6 +268,12 @@ def _wizard_step_confirm(request, business, gym_settings):
             wizard_data["member_id"] = member.id
             wizard_data["marked_as_paid"] = mark_as_paid
             _set_wizard_data(request, wizard_data)
+
+            # Send QR code PDF email if member has email (after transaction commit)
+            if member.email:
+                from inventory.services.gym_qr_email import send_member_qr_email
+
+                transaction.on_commit(lambda: send_member_qr_email(member, request))
 
         return redirect(f"{request.path}?step=4")
 

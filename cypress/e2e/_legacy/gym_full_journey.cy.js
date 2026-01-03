@@ -1,7 +1,7 @@
 // cypress/e2e/gym_full_journey.cy.js
 /**
  * End-to-end test for Gym vertical
- * 
+ *
  * Tests:
  * - Login and navigate to gym dashboard
  * - Register new member
@@ -165,4 +165,3 @@ describe('Gym Full Journey', () => {
     });
   });
 });
-

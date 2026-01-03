@@ -4,9 +4,11 @@ from django.views.generic import RedirectView
 
 from . import views as v
 from . import views_admin as va  # Keep import in case you still use parts of it.
+from . import views_billing_hub as vbh  # Premium billing hub
 from . import views_invoice as vi  # Invoice management
 from . import views_paychangu as vpc  # PayChangu
 from . import views_providers as vp  # Stripe + Pesapal
+from . import views_receipt as vreceipt  # Receipt PDFs
 from . import views_reconciliation as vr  # Reconciliation (staff-only)
 
 app_name = "billing"
@@ -17,7 +19,8 @@ urlpatterns = [
     # ------------------------------------------------------------------
     path("plans/", v.subscribe, name="plans"),  # Alias for sidebar navigation
     path("subscribe/", v.subscribe, name="subscribe"),
-    path("manage/", v.manage, name="manage"),  # Manage subscription
+    path("manage/", v.manage, name="manage"),  # Manage subscription (legacy)
+    path("hub/", vbh.billing_hub, name="billing_hub"),  # Premium billing hub
     path("checkout/", v.checkout, name="checkout"),
     path("success/", v.success, name="success"),
     path("webhook/", v.webhook, name="webhook"),
@@ -52,6 +55,13 @@ urlpatterns = [
     # Invoice utilities (inline preview/actions)
     path("invoice/<uuid:pk>/send/", vi.invoice_send, name="invoice_send"),
     path("invoice/<uuid:pk>/download/", vi.invoice_download, name="invoice_download"),
+    # Receipt PDFs
+    path("payments/<uuid:payment_id>/receipt/pdf/", vreceipt.payment_receipt_pdf, name="payment_receipt_pdf"),
+    path(
+        "transactions/<uuid:transaction_id>/receipt/pdf/",
+        vreceipt.transaction_receipt_pdf,
+        name="transaction_receipt_pdf",
+    ),
     # Compatibility for projects that used INT primary keys on invoices
     path("invoice/<int:pk>/send/", vi.invoice_send, name="invoice_send_int"),
     path("invoice/<int:pk>/download/", vi.invoice_download, name="invoice_download_int"),

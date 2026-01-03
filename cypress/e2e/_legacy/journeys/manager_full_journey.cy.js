@@ -1,13 +1,13 @@
 // cypress/e2e/journeys/manager_full_journey.cy.js
 /**
  * Full Manager Journey E2E Test
- * 
+ *
  * Tests a complete user journey:
  * 1. Create manager account via signup wizard
  * 2. For each vertical: add product, stock in, make sale, add costs
  * 3. Click every sidebar button
  * 4. Verify success toasts and KPI updates
- * 
+ *
  * Verticals tested:
  * - Phones (includes accessories)
  * - Electronics (phones)
@@ -96,7 +96,7 @@ describe("Manager Full Journey - All Verticals", () => {
     cy.login(testEmail, testPassword);
     cy.visit("/verticals/phones/accessories/");
     cy.waitForAppShell();
-    
+
     // Test accessories flow
     testAccessoriesFlow();
   });
@@ -311,7 +311,7 @@ describe("Manager Full Journey - All Verticals", () => {
     cy.get('a:contains("Add"), [data-cy="btn-add-cost"]').then(($btn) => {
       if ($btn.length) {
         cy.wrap($btn).first().click();
-        
+
         // Fill cost form
         cy.get('input[name="amount"], [data-cy="cost-amount"]').type("10000");
         cy.get('input[name="description"], [data-cy="cost-description"]').type("Test Rent");
@@ -332,4 +332,3 @@ describe("Manager Full Journey - All Verticals", () => {
     });
   }
 });
-

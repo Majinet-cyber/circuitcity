@@ -6,24 +6,30 @@ These endpoints are for Cypress E2E tests only and should NEVER be enabled in pr
 """
 from __future__ import annotations
 
-from django.conf import settings
-from django.contrib.auth import get_user_model
-from django.http import JsonResponse, HttpResponseForbidden
-from django.views.decorators.http import require_http_methods
-from django.views.decorators.csrf import csrf_exempt
-from django.utils import timezone
-from django.db import transaction
+import os
 
-from .models import EmailOTP
-from tenants.models import Business, Membership
+from django.conf import settings
+from django.contrib.auth import authenticate, get_user_model, login
+from django.db import transaction
+from django.http import HttpResponseForbidden, JsonResponse
+from django.utils import timezone
+from django.views.decorators.csrf import csrf_exempt
+from django.views.decorators.http import require_http_methods
+
 from inventory.models import Location
+from tenants.models import Business, Membership
+
+from .models import EmailOTP, get_or_create_twofactor
 
 User = get_user_model()
 
 
 def _is_e2e_enabled() -> bool:
     """Check if E2E testing endpoints are enabled."""
-    return getattr(settings, "DEBUG", False) or getattr(settings, "E2E_TESTING", False)
+    # Must have DEBUG or E2E_TESTING enabled AND ALLOW_TEST_LOGIN env var set
+    base_enabled = getattr(settings, "DEBUG", False) or getattr(settings, "E2E_TESTING", False)
+    allow_test_login = os.getenv("ALLOW_TEST_LOGIN") == "true"
+    return base_enabled and allow_test_login
 
 
 @csrf_exempt
@@ -233,5 +239,89 @@ def e2e_seed_business(request):
                 "business": biz_created,
                 "location": loc_created,
             },
+        }
+    )
+
+
+@csrf_exempt
+@require_http_methods(["POST"])
+def e2e_test_login(request):
+    """
+    Test-only login endpoint for Cypress E2E tests (SAFE, gated).
+
+    Endpoint: POST /__e2e__/test-login/
+    Body: {
+        "email": "test@example.com",
+        "password": "password123"
+    }
+
+    Returns:
+        {
+            "ok": true,
+            "user_id": 123,
+            "username": "test@example.com",
+            "session_id": "..."
+        }
+
+    Security:
+        - Only enabled when DEBUG=True or E2E_TESTING=True AND ALLOW_TEST_LOGIN=true
+        - Returns 403 in production or if ALLOW_TEST_LOGIN is not set
+        - Bypasses 2FA challenge for test users (only in test mode)
+        - Uses Django's authenticate() and login() for proper session handling
+    """
+    if not _is_e2e_enabled():
+        return HttpResponseForbidden(
+            "Test login endpoint disabled. Set ALLOW_TEST_LOGIN=true in test environment only."
+        )
+
+    import json
+
+    try:
+        data = json.loads(request.body)
+    except json.JSONDecodeError:
+        return JsonResponse({"ok": False, "error": "Invalid JSON"}, status=400)
+
+    email = data.get("email", "").strip().lower()
+    password = data.get("password", "")
+
+    if not email or not password:
+        return JsonResponse({"ok": False, "error": "email and password required"}, status=400)
+
+    # Authenticate user
+    user = authenticate(request, username=email, password=password)
+
+    if not user:
+        # Try with email as username
+        try:
+            user = User.objects.get(email=email)
+            user = authenticate(request, username=user.username, password=password)
+        except User.DoesNotExist:
+            pass
+
+    if not user:
+        return JsonResponse({"ok": False, "error": "Invalid credentials"}, status=401)
+
+    if not user.is_active:
+        return JsonResponse({"ok": False, "error": "User account is inactive"}, status=403)
+
+    # In test mode, we can optionally disable 2FA challenge for test users
+    # This is safe because it's gated by ALLOW_TEST_LOGIN env var
+    tf = get_or_create_twofactor(user)
+    if tf.is_enabled:
+        # For test login, we can bypass 2FA by setting session flags
+        # This is ONLY safe because ALLOW_TEST_LOGIN is required
+        request.session["twofa_required"] = False
+        request.session["twofa_passed"] = True
+
+    # Log the user in (creates session)
+    login(request, user)
+
+    return JsonResponse(
+        {
+            "ok": True,
+            "user_id": user.id,
+            "username": user.username,
+            "email": user.email,
+            "session_id": request.session.session_key,
         }
     )

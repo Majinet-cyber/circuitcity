@@ -1,7 +1,7 @@
 // cypress/e2e/pharmacy_full_journey.cy.js
 /**
  * End-to-end test for Pharmacy vertical
- * 
+ *
  * Tests:
  * - Login and navigate to pharmacy dashboard
  * - Add product with batches
@@ -257,4 +257,3 @@ describe('Pharmacy Full Journey', () => {
     });
   });
 });
-

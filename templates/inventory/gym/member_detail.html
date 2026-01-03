@@ -427,14 +427,43 @@
                 </div>
                 {% if member_is_active %}
                 <div class="mb-3">
-                    <label class="text-muted small">Days Attended (Current Period)</label>
+                    <label class="text-muted small">Attendance Progress (Current Period)</label>
                     <div>
+                        {% if member_duration_days > 0 %}
+                        {% widthratio member_days_attended member_duration_days 100 as progress_percent %}
+                        <div class="progress" style="height: 24px; border-radius: 12px; background: #f1f5f9;">
+                            <div class="progress-bar bg-primary" role="progressbar"
+                                 style="width: {{ progress_percent }}%; border-radius: 12px;"
+                                 aria-valuenow="{{ progress_percent }}"
+                                 aria-valuemin="0"
+                                 aria-valuemax="100">
+                                {{ member_days_attended }} / {{ member_duration_days }} days
+                            </div>
+                        </div>
+                        {% else %}
                         <span class="badge bg-primary-subtle text-primary">
-                            {{ member_days_attended }} / {{ member_duration_days }} days
+                            {{ member_days_attended }} days attended
                         </span>
+                        {% endif %}
                     </div>
                 </div>
                 {% endif %}
+
+                <!-- Gamification Badges -->
+                {% with badges=member.get_gamification_badges %}
+                {% if badges %}
+                <div class="mb-3">
+                    <label class="text-muted small">Achievements</label>
+                    <div class="d-flex flex-wrap gap-2">
+                        {% for badge in badges %}
+                        <span class="badge bg-{{ badge.color }}-subtle text-{{ badge.color }}" title="{{ badge.description }}">
+                            {{ badge.icon }} {{ badge.name }}
+                        </span>
+                        {% endfor %}
+                    </div>
+                </div>
+                {% endif %}
+                {% endwith %}
                 {% if member.notes %}
                 <div>
                     <label class="text-muted small">Notes</label>
@@ -450,7 +479,32 @@
                     Member QR Code
                 </h5>
                 <div class="text-center">
-                    {% if member_code %}
+                    {% if member.qr_uuid %}
+                        <div class="qr-container mx-auto" style="max-width: 320px; margin-bottom: 20px;" onclick="enlargeQR()">
+                            <img src="{% url 'gym:member_qr_png' qr_uuid=member.qr_uuid %}"
+                                 id="memberQR"
+                                 alt="QR Code for {{ member.full_name|default:member.name }}"
+                                 width="280" height="280"
+                                 style="image-rendering: pixelated; border-radius: 14px;">
+                        </div>
+                        <div class="mt-3 fw-semibold" style="color: #667eea; font-size: 1.125rem; letter-spacing: 0.05em;">
+                            {{ member.member_number|default:member.member_code|default:"N/A" }}
+                        </div>
+                        <div class="mt-3 d-flex gap-2 justify-content-center flex-wrap">
+                            <a href="{% url 'gym:member_qr_card_pdf' member.qr_uuid %}" class="premium-btn btn-sm">
+                                <i class="bi bi-download me-2"></i> Download PDF
+                            </a>
+                            <a href="{% url 'gym:member_qr_print' member.qr_uuid %}" target="_blank" class="btn btn-sm btn-outline-primary">
+                                <i class="bi bi-printer me-2"></i> Print QR
+                            </a>
+                        </div>
+                        <div class="mt-2">
+                            <a href="{% url 'gym:member_qr_status_public' member.qr_uuid %}" target="_blank" class="btn btn-sm btn-outline-secondary">
+                                <i class="bi bi-eye me-2"></i> View Public Status Page
+                            </a>
+                        </div>
+                    {% elif member_code %}
+                        <!-- Fallback for legacy members without qr_uuid -->
                         {% if member_qr_code %}
                             <div class="qr-container mx-auto" style="max-width: 220px;" onclick="enlargeQR()">
                                 <img src="{{ member_qr_code }}"
@@ -466,6 +520,10 @@
                             <button class="premium-btn btn-sm" onclick="printQR()">
                                 <i class="bi bi-printer me-2"></i> Print QR
                             </button>
+                        </div>
+                        <div class="mt-2 text-warning small">
+                            <i class="bi bi-exclamation-triangle me-1"></i>
+                            Legacy QR code. Please refresh page to generate new QR.
                         </div>
                     {% else %}
                         <div class="text-muted small">No QR code generated yet</div>

@@ -1,0 +1,25 @@
+{
+  "managers": {
+    "phones": {
+      "email": "empire@gmai.com",
+      "password": "@Lincoln1863?"
+    },
+    "pharmacy": {
+      "email": "samantha@gmail.com",
+      "password": "@Lincoln1863?"
+    },
+    "liquor": {
+      "email": "nimue@gmail.com",
+      "password": "@Lincoln1863?"
+    },
+    "gym": {
+      "email": "yuji@gmail.com",
+      "password": "@Lincoln1863?"
+    },
+    "clothing": {
+      "email": "motouch@gmail.com",
+      "password": "@Lincoln1863?"
+    }
+  },
+  "agents": {}
+}

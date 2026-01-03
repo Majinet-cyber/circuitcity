@@ -5,6 +5,7 @@ These models extend the base MerchProduct system with vertical-specific function
 """
 from __future__ import annotations
 
+import uuid
 from datetime import timedelta
 from decimal import Decimal
 from typing import Optional
@@ -660,6 +661,13 @@ class GymMember(models.Model):
         db_index=True,
         help_text="Stable unique QR token for scanning (UUID-based)",
     )
+    qr_uuid = models.UUIDField(
+        unique=True,
+        db_index=True,
+        editable=False,
+        default=uuid.uuid4,
+        help_text="Immutable UUID for QR code scanning (preferred over qr_token)",
+    )
 
     # Legacy member_code (kept for backward compatibility)
     member_code = models.CharField(
@@ -745,6 +753,7 @@ class GymMember(models.Model):
             models.Index(fields=["member_code"]),
             models.Index(fields=["member_number"]),
             models.Index(fields=["qr_token"]),
+            models.Index(fields=["qr_uuid"]),
             models.Index(fields=["badge_level"]),
         ]
 
@@ -752,11 +761,29 @@ class GymMember(models.Model):
         return f"{self.name} ({self.phone})"
 
     def save(self, *args, **kwargs):
-        """Auto-generate member_number, qr_token, and legacy member_code if not present"""
+        """Auto-generate member_number, qr_token, qr_uuid, and legacy member_code if not present"""
         if not self.member_number and self.business_id:
             self.member_number = self._generate_unique_member_number()
         if not self.qr_token:
             self.qr_token = self._generate_unique_qr_token()
+        # Generate qr_uuid if not present (from qr_token or new UUID)
+        if not self.qr_uuid:
+            import uuid
+
+            if self.qr_token:
+                try:
+                    # Try to convert existing qr_token to UUID
+                    self.qr_uuid = uuid.UUID(self.qr_token)
+                except (ValueError, AttributeError):
+                    # If qr_token is not a valid UUID, generate new UUID
+                    self.qr_uuid = uuid.uuid4()
+                    # Update qr_token to match
+                    if not self.qr_token:
+                        self.qr_token = str(self.qr_uuid)
+            else:
+                # Generate new UUID
+                self.qr_uuid = uuid.uuid4()
+                self.qr_token = str(self.qr_uuid)
         # Legacy: also generate member_code for backward compatibility
         if not self.member_code and self.business_id:
             self.member_code = self._generate_unique_member_code()
@@ -1319,6 +1346,48 @@ class GymMember(models.Model):
             "platinum": {"label": "Platinum Member", "color": "primary", "icon": "💎"},
         }
         return badges.get(self.badge_level, badges["none"])
+
+    def get_level_display(self):
+        """Get level based on lifetime check-ins: 0-9 Bronze, 10-29 Silver, 30+ Gold"""
+        if self.total_checkins >= 30:
+            return {"name": "Gold", "icon": "🥇", "color": "warning"}
+        elif self.total_checkins >= 10:
+            return {"name": "Silver", "icon": "🥈", "color": "secondary"}
+        elif self.total_checkins > 0:
+            return {"name": "Bronze", "icon": "🥉", "color": "warning"}
+        else:
+            return {"name": "Newbie", "icon": "🌱", "color": "info"}
+
+    def get_gamification_badges(self):
+        """Get list of achievement badges for member detail page"""
+        badges = []
+
+        # On Fire: streak >= 5
+        if self.streak_days >= 5:
+            badges.append(
+                {"name": "On Fire", "icon": "🔥", "color": "danger", "description": f"{self.streak_days}-day streak!"}
+            )
+
+        # Consistent: >= 12 check-ins this month
+        if self.monthly_checkins >= 12:
+            badges.append(
+                {
+                    "name": "Consistent",
+                    "icon": "⭐",
+                    "color": "warning",
+                    "description": f"{self.monthly_checkins} check-ins this month",
+                }
+            )
+
+        # Newbie: first week (joined within last 7 days)
+        if self.joined_at:
+            from datetime import timedelta
+
+            days_since_join = (timezone.now().date() - self.joined_at.date()).days
+            if days_since_join <= 7:
+                badges.append({"name": "Newbie", "icon": "🌱", "color": "info", "description": "First week!"})
+
+        return badges
 
 
 class GymPayment(models.Model):

@@ -1,7 +1,7 @@
 // cypress/e2e/liquor_full_journey.cy.js
 /**
  * End-to-end test for Liquor vertical
- * 
+ *
  * Tests:
  * - Login and navigate to liquor dashboard
  * - Add liquor product
@@ -174,4 +174,3 @@ describe('Liquor Full Journey', () => {
     });
   });
 });
-

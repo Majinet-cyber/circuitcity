@@ -1,7 +1,7 @@
 ﻿# circuitcity/accounts/urls.py
 from django.conf import settings
-from django.urls import path, reverse_lazy
 from django.contrib.auth.views import LogoutView
+from django.urls import path, reverse_lazy
 from django.views.generic import RedirectView
 
 from . import views
@@ -128,4 +128,5 @@ if settings.DEBUG or getattr(settings, "E2E_TESTING", False):
         path("__e2e__/latest-otp/", views_e2e.e2e_latest_otp, name="e2e_latest_otp"),
         path("__e2e__/verify-otp-bypass/", views_e2e.e2e_verify_otp_bypass, name="e2e_verify_otp_bypass"),
         path("__e2e__/seed-business/", views_e2e.e2e_seed_business, name="e2e_seed_business"),
+        path("__e2e__/test-login/", views_e2e.e2e_test_login, name="e2e_test_login"),
     ]

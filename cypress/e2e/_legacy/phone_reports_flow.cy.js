@@ -1,7 +1,7 @@
 // cypress/e2e/phone_reports_flow.cy.js
 /**
  * E2E Flow 2 – Costs + Reports
- * 
+ *
  * Tests:
  * - Login as manager and select phone business
  * - Add a cost (fixed, e.g., rent)
@@ -42,7 +42,7 @@ describe('Phone Reports Flow - Costs and Business Intelligence', () => {
     // 2. Add a cost
     // ==========================================
     cy.log('💰 Adding a fixed cost...');
-    
+
     // Visit admin costs page
     cy.visit('/wallet/admin/costs/');
     cy.url().should('include', '/wallet/admin/costs');
@@ -142,7 +142,7 @@ describe('Phone Reports Flow - Costs and Business Intelligence', () => {
     // 3. Verify cost appears in costs table
     // ==========================================
     cy.log('📋 Verifying cost in costs table...');
-    
+
     cy.visit('/wallet/admin/costs/');
     cy.wait(1000);
 
@@ -154,7 +154,7 @@ describe('Phone Reports Flow - Costs and Business Intelligence', () => {
     // 4. Business spend trend chart
     // ==========================================
     cy.log('📊 Checking Business Spend Trend chart...');
-    
+
     cy.visit('/wallet/admin/');
     cy.wait(2000);  // Give charts time to load
 
@@ -168,7 +168,7 @@ describe('Phone Reports Flow - Costs and Business Intelligence', () => {
       const hasCanvas = $body.find('canvas').length > 0;
       if (hasCanvas) {
         cy.log('✓ Business Spend Trend chart rendered successfully');
-        
+
         // Optional: check for data points
         if ($body.text().includes('MWK') || $body.text().match(/\d{1,3}(,\d{3})*(\.\d{2})?/)) {
           cy.log('✓ Chart displays financial data');
@@ -182,7 +182,7 @@ describe('Phone Reports Flow - Costs and Business Intelligence', () => {
     // 5. Reports page (/reports/)
     // ==========================================
     cy.log('📈 Testing /reports/ page...');
-    
+
     cy.visit('/reports/');
     cy.wait(1500);
 
@@ -197,7 +197,7 @@ describe('Phone Reports Flow - Costs and Business Intelligence', () => {
     cy.log('📊 Checking summary cards...');
     cy.get('body').then(($body) => {
       const bodyText = $body.text();
-      
+
       // Look for revenue/profit/cost indicators
       if (bodyText.includes('Revenue') || bodyText.includes('revenue')) {
         cy.log('✓ Reports page shows revenue metric');
@@ -224,7 +224,7 @@ describe('Phone Reports Flow - Costs and Business Intelligence', () => {
       if ($body.find('canvas').length > 0) {
         cy.log('✓ Payment mix chart canvas exists');
       }
-      
+
       // Look for payment method labels
       const paymentMethods = ['Cash', 'Bank', 'Mobile'];
       paymentMethods.forEach((method) => {
@@ -261,7 +261,7 @@ describe('Phone Reports Flow - Costs and Business Intelligence', () => {
       expect(response.status).to.eq(200);
       expect(response.headers['content-type']).to.include('text/csv');
       cy.log('✓ /reports/export/sales/ returns CSV');
-      
+
       // Verify CSV contains expected headers or data
       if (response.body) {
         cy.log(`CSV preview: ${response.body.substring(0, 100)}...`);
@@ -276,7 +276,7 @@ describe('Phone Reports Flow - Costs and Business Intelligence', () => {
       expect(response.status).to.eq(200);
       expect(response.headers['content-type']).to.include('text/csv');
       cy.log('✓ /reports/export/costs/ returns CSV');
-      
+
       // Verify our test cost is in the export
       if (response.body && response.body.includes(testCost.note)) {
         cy.log('✓ Cost export includes our test cost');
@@ -296,4 +296,3 @@ describe('Phone Reports Flow - Costs and Business Intelligence', () => {
     cy.log('✅ Reports flow completed successfully!');
   });
 });
-

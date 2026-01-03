@@ -1,7 +1,7 @@
 // cypress/e2e/phones_dashboard_wallet.cy.js
 /**
  * End-to-end test for Phones Dashboard + Wallet Integration
- * 
+ *
  * Tests:
  * - Login works
  * - Phones dashboard loads
@@ -13,37 +13,37 @@ describe('Phones Dashboard Wallet Integration', () => {
   // Test user credentials from environment
   const email = Cypress.env('TEST_EMAIL');
   const password = Cypress.env('TEST_PASSWORD');
-  
+
   beforeEach(() => {
     // Clear cookies and local storage before each test
     cy.clearCookies();
     cy.clearLocalStorage();
   });
-  
+
   it('logs in and sees phones dashboard', () => {
     // Visit login page
     cy.visit('/accounts/login/');
-    
+
     // Verify we're on login page
     cy.url().should('include', '/accounts/login/');
-    
+
     // Fill in credentials
     cy.get('input[name="username"], input[name="email"], [data-cy=login-email]')
       .should('be.visible')
       .clear()
       .type(email);
-    
+
     cy.get('input[name="password"], [data-cy=login-password]')
       .should('be.visible')
       .clear()
       .type(password);
-    
+
     // Submit login form
     cy.get('button[type="submit"], [data-cy=login-submit]').click();
-    
+
     // Wait for redirect after login
     cy.url({ timeout: 10000 }).should('not.include', '/accounts/login/');
-    
+
     // If there's a business chooser, select the first business
     cy.url().then((url) => {
       if (url.includes('/choose') || url.includes('/select') || url.includes('/business')) {
@@ -51,35 +51,35 @@ describe('Phones Dashboard Wallet Integration', () => {
       }
     });
   });
-  
+
   it('navigates to phones dashboard', () => {
     // Login first
     cy.visit('/accounts/login/');
     cy.get('input[name="username"], input[name="email"]').type(email);
     cy.get('input[name="password"]').type(password);
     cy.get('button[type="submit"]').click();
-    
+
     // Navigate to phones dashboard
     // Try multiple possible routes
     cy.visit('/inventory/verticals/phones/', { failOnStatusCode: false });
-    
+
     // Alternative routes if the above doesn't exist
     cy.url().then((url) => {
       if (url.includes('404') || url.includes('error')) {
         cy.visit('/inventory/dashboard/', { failOnStatusCode: false });
       }
     });
-    
+
     cy.url().then((url) => {
       if (url.includes('404') || url.includes('error')) {
         cy.visit('/dashboard/', { failOnStatusCode: false });
       }
     });
-    
+
     // Check that we're on some dashboard page
     cy.get('body').should('be.visible');
   });
-  
+
   it('checks for profit panel on dashboard', () => {
     // Login
     cy.visit('/accounts/login/');
@@ -87,10 +87,10 @@ describe('Phones Dashboard Wallet Integration', () => {
     cy.get('input[name="password"]').type(password);
     cy.get('button[type="submit"]').click();
     cy.wait(2000);
-    
+
     // Try to visit phones dashboard
     cy.visit('/inventory/verticals/phones/', { failOnStatusCode: false });
-    
+
     // Look for profit panel elements
     // Use flexible selectors that might exist
     const profitSelectors = [
@@ -101,7 +101,7 @@ describe('Phones Dashboard Wallet Integration', () => {
       'h6:contains("Profit")',
       'h3:contains("MK")',  // Currency indicator
     ];
-    
+
     // Check if at least one profit-related element exists
     cy.get('body').then(($body) => {
       let found = false;
@@ -111,7 +111,7 @@ describe('Phones Dashboard Wallet Integration', () => {
           cy.log(`Found profit element: ${selector}`);
         }
       });
-      
+
       if (found) {
         cy.log('✓ Profit panel elements detected');
       } else {
@@ -119,7 +119,7 @@ describe('Phones Dashboard Wallet Integration', () => {
       }
     });
   });
-  
+
   it('checks for payment mix panel on dashboard', () => {
     // Login
     cy.visit('/accounts/login/');
@@ -127,10 +127,10 @@ describe('Phones Dashboard Wallet Integration', () => {
     cy.get('input[name="password"]').type(password);
     cy.get('button[type="submit"]').click();
     cy.wait(2000);
-    
+
     // Visit dashboard
     cy.visit('/inventory/verticals/phones/', { failOnStatusCode: false });
-    
+
     // Look for payment mix elements
     const paymentSelectors = [
       '[data-cy=payment-mix-panel]',
@@ -143,7 +143,7 @@ describe('Phones Dashboard Wallet Integration', () => {
       'i.bi-bank',
       'i.bi-phone',
     ];
-    
+
     // Check if at least one payment mix element exists
     cy.get('body').then(($body) => {
       let found = false;
@@ -153,7 +153,7 @@ describe('Phones Dashboard Wallet Integration', () => {
           cy.log(`Found payment mix element: ${selector}`);
         }
       });
-      
+
       if (found) {
         cy.log('✓ Payment mix panel elements detected');
       } else {
@@ -161,7 +161,7 @@ describe('Phones Dashboard Wallet Integration', () => {
       }
     });
   });
-  
+
   it('verifies dashboard has data', () => {
     // Login
     cy.visit('/accounts/login/');
@@ -169,16 +169,16 @@ describe('Phones Dashboard Wallet Integration', () => {
     cy.get('input[name="password"]').type(password);
     cy.get('button[type="submit"]').click();
     cy.wait(2000);
-    
+
     // Visit dashboard
     cy.visit('/inventory/verticals/phones/', { failOnStatusCode: false });
-    
+
     // Check for currency symbols (indicates financial data)
     cy.get('body').then(($body) => {
       if ($body.text().includes('MK') || $body.text().includes('$')) {
         cy.log('✓ Currency symbols found - financial data present');
       }
-      
+
       // Check for numbers (any financial metric)
       const hasNumbers = /\d{1,3}(,\d{3})*(\.\d{2})?/.test($body.text());
       if (hasNumbers) {
@@ -186,7 +186,7 @@ describe('Phones Dashboard Wallet Integration', () => {
       }
     });
   });
-  
+
   it('checks page loads without errors', () => {
     // Login
     cy.visit('/accounts/login/');
@@ -194,13 +194,13 @@ describe('Phones Dashboard Wallet Integration', () => {
     cy.get('input[name="password"]').type(password);
     cy.get('button[type="submit"]').click();
     cy.wait(2000);
-    
+
     // Visit dashboard
     cy.visit('/inventory/verticals/phones/', { failOnStatusCode: false });
-    
+
     // Check that page loaded successfully
     cy.get('body').should('be.visible');
-    
+
     // Check for common error indicators
     cy.get('body').should('not.contain', '500 Internal Server Error');
     cy.get('body').should('not.contain', '404 Not Found');
@@ -239,4 +239,3 @@ describe('Dashboard Data-CY Attributes (Optional Enhancement)', () => {
     cy.log('='.repeat(60));
   });
 });
-

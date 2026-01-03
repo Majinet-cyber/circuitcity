@@ -11,9 +11,9 @@ SECURITY REQUIREMENTS:
 - Do not break tenant scoping or other security boundaries
 - Handle Twilio outages gracefully (don't lock users out permanently)
 """
-from django.shortcuts import redirect
-from django.urls import reverse, resolve, Resolver404
 from django.conf import settings
+from django.shortcuts import redirect
+from django.urls import Resolver404, resolve, reverse
 
 
 class TwoFactorAuthMiddleware:
@@ -51,6 +51,8 @@ class TwoFactorAuthMiddleware:
         "/ping/",
         # API version check (used by app)
         "/api/version/",
+        # Public gym QR code endpoints (no auth required)
+        "/gym/qr/",
     ]
 
     # URL patterns that are public (no auth required)

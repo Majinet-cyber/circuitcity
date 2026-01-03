@@ -13,6 +13,8 @@ from typing import Optional
 from django.conf import settings
 from django.utils import timezone
 
+from .models import PaymentTransaction
+
 logger = logging.getLogger(__name__)
 
 # Graceful ReportLab imports
@@ -291,3 +293,229 @@ def generate_and_save_invoice_pdf(invoice) -> bool:
     logger.info(f"Invoice PDF saved: {invoice.number} -> {invoice.pdf_file.name}")
 
     return True
+
+
+def generate_payment_receipt_pdf(payment) -> Optional[bytes]:
+    """
+    Generate receipt PDF for a Payment.
+
+    Args:
+        payment: Payment model instance
+
+    Returns:
+        PDF bytes or None
+    """
+    if not REPORTLAB_AVAILABLE:
+        logger.error("ReportLab not installed. Cannot generate receipt PDF.")
+        return None
+
+    buffer = io.BytesIO()
+
+    doc = SimpleDocTemplate(
+        buffer,
+        pagesize=A4,
+        rightMargin=2 * cm,
+        leftMargin=2 * cm,
+        topMargin=2 * cm,
+        bottomMargin=2 * cm,
+    )
+
+    story = []
+    styles = getSampleStyleSheet()
+
+    # Custom styles
+    title_style = ParagraphStyle(
+        "CustomTitle",
+        parent=styles["Heading1"],
+        fontSize=24,
+        textColor=colors.HexColor("#1a1a1a"),
+        spaceAfter=12,
+        alignment=TA_LEFT,
+    )
+
+    heading_style = ParagraphStyle(
+        "CustomHeading",
+        parent=styles["Heading2"],
+        fontSize=14,
+        textColor=colors.HexColor("#333333"),
+        spaceAfter=6,
+        spaceBefore=12,
+    )
+
+    normal_style = ParagraphStyle(
+        "CustomNormal",
+        parent=styles["Normal"],
+        fontSize=10,
+        textColor=colors.HexColor("#333333"),
+    )
+
+    small_style = ParagraphStyle(
+        "CustomSmall",
+        parent=styles["Normal"],
+        fontSize=8,
+        textColor=colors.HexColor("#666666"),
+    )
+
+    # Header
+    story.append(Paragraph("Emajinet / Circuit City", title_style))
+    story.append(Paragraph("Payment Receipt", heading_style))
+    story.append(Spacer(1, 0.5 * cm))
+
+    # Payment details
+    story.append(Paragraph("<b>Payment Details:</b>", heading_style))
+    story.append(Paragraph(f"Payment Reference: {payment.reference or payment.external_id or 'N/A'}", normal_style))
+    story.append(Paragraph(f"Amount: {payment.currency} {payment.amount:,.2f}", normal_style))
+    story.append(Paragraph(f"Status: {payment.get_status_display()}", normal_style))
+    story.append(Paragraph(f"Provider: {payment.get_provider_display()}", normal_style))
+    story.append(
+        Paragraph(
+            f"Date: {payment.processed_at.strftime('%B %d, %Y at %H:%M') if payment.processed_at else payment.created_at.strftime('%B %d, %Y at %H:%M')}",
+            normal_style,
+        )
+    )
+
+    story.append(Spacer(1, 0.5 * cm))
+
+    # Business info
+    if payment.business:
+        story.append(Paragraph("<b>Business:</b>", heading_style))
+        story.append(Paragraph(payment.business.name, normal_style))
+
+    story.append(Spacer(1, 0.5 * cm))
+
+    # Invoice link
+    if payment.invoice:
+        story.append(Paragraph("<b>Related Invoice:</b>", heading_style))
+        story.append(Paragraph(f"Invoice Number: {payment.invoice.number}", normal_style))
+        if payment.invoice.billing_period_start and payment.invoice.billing_period_end:
+            story.append(
+                Paragraph(
+                    f"Period: {payment.invoice.billing_period_start.strftime('%B %d, %Y')} - "
+                    f"{payment.invoice.billing_period_end.strftime('%B %d, %Y')}",
+                    normal_style,
+                )
+            )
+
+    story.append(Spacer(1, 1 * cm))
+
+    # Footer
+    footer_text = f"Generated on {timezone.now().strftime('%B %d, %Y at %H:%M')}"
+    story.append(Paragraph(footer_text, small_style))
+
+    try:
+        doc.build(story)
+        pdf_bytes = buffer.getvalue()
+        buffer.close()
+        logger.info(f"Payment receipt PDF generated: payment {payment.id} ({len(pdf_bytes)} bytes)")
+        return pdf_bytes
+    except Exception as e:
+        logger.error(f"Error generating receipt PDF for payment {payment.id}: {e}", exc_info=True)
+        buffer.close()
+        return None
+
+
+def generate_transaction_receipt_pdf(transaction) -> Optional[bytes]:
+    """
+    Generate receipt PDF for a PaymentTransaction.
+
+    Args:
+        transaction: PaymentTransaction model instance
+
+    Returns:
+        PDF bytes or None
+    """
+    if not REPORTLAB_AVAILABLE:
+        logger.error("ReportLab not installed. Cannot generate receipt PDF.")
+        return None
+
+    buffer = io.BytesIO()
+
+    doc = SimpleDocTemplate(
+        buffer,
+        pagesize=A4,
+        rightMargin=2 * cm,
+        leftMargin=2 * cm,
+        topMargin=2 * cm,
+        bottomMargin=2 * cm,
+    )
+
+    story = []
+    styles = getSampleStyleSheet()
+
+    # Custom styles (same as payment receipt)
+    title_style = ParagraphStyle(
+        "CustomTitle",
+        parent=styles["Heading1"],
+        fontSize=24,
+        textColor=colors.HexColor("#1a1a1a"),
+        spaceAfter=12,
+        alignment=TA_LEFT,
+    )
+
+    heading_style = ParagraphStyle(
+        "CustomHeading",
+        parent=styles["Heading2"],
+        fontSize=14,
+        textColor=colors.HexColor("#333333"),
+        spaceAfter=6,
+        spaceBefore=12,
+    )
+
+    normal_style = ParagraphStyle(
+        "CustomNormal",
+        parent=styles["Normal"],
+        fontSize=10,
+        textColor=colors.HexColor("#333333"),
+    )
+
+    small_style = ParagraphStyle(
+        "CustomSmall",
+        parent=styles["Normal"],
+        fontSize=8,
+        textColor=colors.HexColor("#666666"),
+    )
+
+    # Header
+    story.append(Paragraph("Emajinet / Circuit City", title_style))
+    story.append(Paragraph("Payment Receipt", heading_style))
+    story.append(Spacer(1, 0.5 * cm))
+
+    # Transaction details
+    story.append(Paragraph("<b>Transaction Details:</b>", heading_style))
+    story.append(Paragraph(f"Transaction Reference: {transaction.tx_ref}", normal_style))
+    story.append(Paragraph(f"Amount: {transaction.currency} {transaction.amount:,.2f}", normal_style))
+    story.append(Paragraph(f"Status: {transaction.get_status_display()}", normal_style))
+    story.append(Paragraph(f"Provider: {transaction.provider.title()}", normal_style))
+    story.append(
+        Paragraph(
+            f"Date: {transaction.updated_at.strftime('%B %d, %Y at %H:%M') if transaction.status == PaymentTransaction.Status.SUCCESS else transaction.created_at.strftime('%B %d, %Y at %H:%M')}",
+            normal_style,
+        )
+    )
+
+    if transaction.charge_id:
+        story.append(Paragraph(f"Charge ID: {transaction.charge_id}", normal_style))
+
+    story.append(Spacer(1, 0.5 * cm))
+
+    # Business info
+    if transaction.business:
+        story.append(Paragraph("<b>Business:</b>", heading_style))
+        story.append(Paragraph(transaction.business.name, normal_style))
+
+    story.append(Spacer(1, 1 * cm))
+
+    # Footer
+    footer_text = f"Generated on {timezone.now().strftime('%B %d, %Y at %H:%M')}"
+    story.append(Paragraph(footer_text, small_style))
+
+    try:
+        doc.build(story)
+        pdf_bytes = buffer.getvalue()
+        buffer.close()
+        logger.info(f"Transaction receipt PDF generated: transaction {transaction.id} ({len(pdf_bytes)} bytes)")
+        return pdf_bytes
+    except Exception as e:
+        logger.error(f"Error generating receipt PDF for transaction {transaction.id}: {e}", exc_info=True)
+        buffer.close()
+        return None

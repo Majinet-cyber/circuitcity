@@ -5,7 +5,7 @@ URL patterns for gym operations.
 from django.urls import path, reverse_lazy
 from django.views.generic import RedirectView
 
-from . import views_gym, views_gym_wizard
+from . import views_gym, views_gym_qr, views_gym_wizard
 
 app_name = "gym"
 
@@ -28,6 +28,11 @@ urlpatterns = [
     path("member/<int:member_id>/restore/", views_gym.member_restore, name="member_restore"),
     path("member/<int:member_id>/set-paid/", views_gym.member_set_paid, name="member_set_paid"),
     path("member/<int:member_id>/checkin/", views_gym.member_checkin, name="member_checkin"),
+    # QR Code routes (public, no auth required)
+    path("qr/<uuid:qr_uuid>/", views_gym_qr.member_qr_status_public, name="member_qr_status_public"),
+    path("qr/<uuid:qr_uuid>/image.png", views_gym_qr.member_qr_png, name="member_qr_png"),
+    path("qr/<uuid:qr_uuid>/card.pdf", views_gym_qr.member_qr_card_pdf, name="member_qr_card_pdf"),
+    path("qr/<uuid:qr_uuid>/print/", views_gym_qr.member_qr_print, name="member_qr_print"),
     # Check-in
     path("checkin/", views_gym.checkin_page, name="checkin_page"),
     # Leaderboard

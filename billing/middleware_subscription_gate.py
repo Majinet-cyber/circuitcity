@@ -4,11 +4,10 @@ Subscription gating middleware - enforces subscription status across the app.
 Blocks access for businesses with revoked or expired subscriptions.
 """
 from django.http import HttpResponse
-from django.shortcuts import render, redirect
+from django.shortcuts import redirect, render
 from django.urls import reverse
 from django.utils import timezone
 from django.utils.deprecation import MiddlewareMixin
-
 
 # URLs that should always be accessible (even for revoked businesses)
 ALWAYS_ALLOWED_URLS = [
@@ -30,6 +29,7 @@ BYPASS_PREFIXES = [
     "/admin/",
     "/accounts/",
     "/api/public/",
+    "/gym/qr/",  # Public gym QR code endpoints (no subscription gate)
 ]
 
 

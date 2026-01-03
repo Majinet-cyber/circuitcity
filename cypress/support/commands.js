@@ -100,40 +100,75 @@ Cypress.Commands.add("waitForAppShell", () => {
 });
 
 /**
+ * Test-only login via API endpoint (faster, bypasses 2FA in test mode).
+ * Only works when ALLOW_TEST_LOGIN=true is set in Django environment.
+ * @param {string} email
+ * @param {string} password
+ */
+Cypress.Commands.add("testLogin", (email, password) => {
+  cy.request({
+    method: "POST",
+    url: "/accounts/__e2e__/test-login/",
+    body: { email, password },
+    failOnStatusCode: false,
+  }).then((response) => {
+    if (response.status === 403) {
+      // Test login not enabled, fall back to UI login
+      cy.log("Test login endpoint not available, using UI login");
+      return cy.login(email, password);
+    }
+    if (!response.body.ok) {
+      throw new Error(`Test login failed: ${response.body.error || "Unknown error"}`);
+    }
+    // Session cookie is set automatically by cy.request
+    // Visit a page to establish session
+    cy.visit("/", { failOnStatusCode: false });
+    cy.waitForAppShell();
+  });
+});
+
+/**
  * Login using provided credentials (no vertical assumptions).
+ * Falls back to UI login if test login is not available.
  * @param {string} email
  * @param {string} password
  */
 Cypress.Commands.add("login", (email, password) => {
-  cy.visit("/accounts/login/", { timeout: 60000 });
+  // Try test login first (faster)
+  cy.testLogin(email, password).then(() => {
+    // If testLogin succeeded, we're done
+  }).catch(() => {
+    // Fall back to UI login
+    cy.visit("/accounts/login/", { timeout: 60000 });
 
-  // Email / username
-  cy.get('input[name="username"], input[name="email"], [data-cy=login-email]', {
-    timeout: 30000,
-  })
-    .first()
-    .clear()
-    .type(email);
+    // Email / username
+    cy.get('input[name="username"], input[name="email"], [data-cy=login-email]', {
+      timeout: 30000,
+    })
+      .first()
+      .clear()
+      .type(email);
 
-  // Password
-  cy.get('input[name="password"], [data-cy=login-password]', {
-    timeout: 30000,
-  })
-    .first()
-    .clear()
-    .type(password, { log: false });
+    // Password
+    cy.get('input[name="password"], [data-cy=login-password]', {
+      timeout: 30000,
+    })
+      .first()
+      .clear()
+      .type(password, { log: false });
 
-  // Submit
-  cy.get('button[type="submit"], [data-cy=login-submit]', { timeout: 30000 })
-    .first()
-    .click();
+    // Submit
+    cy.get('button[type="submit"], [data-cy=login-submit]', { timeout: 30000 })
+      .first()
+      .click();
 
-  // Must leave login page
-  cy.location("pathname", { timeout: 60000 }).should((path) => {
-    expect(path).to.not.eq("/accounts/login/");
+    // Must leave login page
+    cy.location("pathname", { timeout: 60000 }).should((path) => {
+      expect(path).to.not.eq("/accounts/login/");
+    });
+
+    cy.waitForAppShell();
   });
-
-  cy.waitForAppShell();
 });
 
 /**
@@ -152,11 +187,36 @@ Cypress.Commands.add("loginAsOwner", () => {
 
 /**
  * Manager login per vertical (ONLY managers use these fixed creds).
+ * Uses cy.session() to cache login and speed up tests.
  * @param {string} kind - phones|pharmacy|liquor|gym|clothing
  */
 Cypress.Commands.add("loginAsManager", (kind = "phones") => {
   const { email, password } = getManagerCreds(kind);
-  cy.login(email, password);
+
+  cy.session(
+    `manager-${kind}`,
+    () => {
+      cy.testLogin(email, password).catch(() => {
+        // Fall back to UI login if test login fails
+        cy.login(email, password);
+      });
+    },
+    {
+      validate: () => {
+        // Validate session is still valid
+        cy.request({
+          url: "/",
+          failOnStatusCode: false,
+        }).then((response) => {
+          expect(response.status).to.be.oneOf([200, 302]);
+        });
+      },
+    }
+  );
+
+  // After session is established, visit a page
+  cy.visit("/", { failOnStatusCode: false });
+  cy.waitForAppShell();
 });
 
 /**
@@ -471,7 +531,7 @@ Cypress.Commands.add("createBusinessAndLocation", (options = {}) => {
  */
 Cypress.Commands.add("switchVertical", (vertical = "phones") => {
   const v = String(vertical).toLowerCase();
-  
+
   // For now, we'll visit the vertical dashboard directly
   // In a real scenario, you might need to create a new business or switch context
   const verticalUrls = {
@@ -514,18 +574,18 @@ Cypress.Commands.add("sidebarSmokeClickAll", () => {
     // Click each link and verify page loads
     links.forEach((link, index) => {
       cy.log(`Clicking sidebar item ${index + 1}/${links.length}: ${link.text || link.dataCy || link.href}`);
-      
+
       cy.get(`[data-cy="${link.dataCy}"], a[href="${link.href}"]`).first().click();
-      
+
       // Wait for navigation
       cy.url({ timeout: 10000 }).should("include", link.href.split("?")[0]);
-      
+
       // Verify no server errors
       cy.assertNoServerError();
-      
+
       // Verify page has content (not a blank page)
       cy.get("body").should("not.be.empty");
-      
+
       // Go back to sidebar (if we navigated away)
       cy.get("body").then(($body) => {
         if (!$body.find('[data-cy="sidebar"]').length) {

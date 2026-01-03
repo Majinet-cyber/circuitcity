@@ -26,7 +26,7 @@ describe("Accessories smoke: navigation and minimal flow", () => {
     cy.loginAsOwner();
 
     cy.log("▶ Navigating to Accessories dashboard");
-    
+
     // Try clicking sidebar link (if visible)
     cy.get("body").then(($body) => {
       const $accessoriesLink = $body.find('[data-testid="nav-phones-accessories"]');
@@ -53,7 +53,7 @@ describe("Accessories smoke: navigation and minimal flow", () => {
     cy.loginAsOwner();
 
     cy.log("▶ Navigating to Stock In Accessories");
-    
+
     // Try clicking sidebar link (if visible)
     cy.get("body").then(($body) => {
       const $stockInLink = $body.find('[data-testid="nav-phones-accessories-stockin"]');
@@ -134,7 +134,7 @@ describe("Accessories smoke: navigation and minimal flow", () => {
     // Quick stock-in (reuse previous flow)
     cy.contains("Powerbank", { matchCase: false, timeout: 10000 }).click({ force: true });
     cy.wait(1000);
-    
+
     // Try to select existing product or create new
     cy.get("body").then(($body) => {
       const $productCards = $body.find(".choice-card");
@@ -186,4 +186,3 @@ describe("Accessories smoke: navigation and minimal flow", () => {
     cy.log("✓ Minimal fast sell flow completed successfully");
   });
 });
-
