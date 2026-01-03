@@ -42,15 +42,17 @@ class InvoiceEmailIdempotencyTest(TestCase):
         self.business.save()
 
         # Create plan
-        self.starter = SubscriptionPlan.objects.create(
+        self.starter, _ = SubscriptionPlan.objects.get_or_create(
             code="starter",
-            name="Starter",
-            amount=Decimal("20000.00"),
-            currency="MWK",
-            interval=SubscriptionPlan.Interval.MONTH,
-            max_stores=1,
-            max_agents=3,
-            is_active=True,
+            defaults={
+                "name": "Starter",
+                "amount": Decimal("20000.00"),
+                "currency": "MWK",
+                "interval": SubscriptionPlan.Interval.MONTH,
+                "max_stores": 1,
+                "max_agents": 3,
+                "is_active": True,
+            },
         )
 
         # Create subscription

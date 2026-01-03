@@ -49,35 +49,41 @@ class UpgradeFlowTest(TestCase):
         self.business.save()
 
         # Create plans
-        self.starter = SubscriptionPlan.objects.create(
+        self.starter, _ = SubscriptionPlan.objects.get_or_create(
             code="starter",
-            name="Starter",
-            amount=Decimal("20000.00"),
-            currency="MWK",
-            interval=SubscriptionPlan.Interval.MONTH,
-            max_stores=1,
-            max_agents=3,
-            is_active=True,
+            defaults={
+                "name": "Starter",
+                "amount": Decimal("20000.00"),
+                "currency": "MWK",
+                "interval": SubscriptionPlan.Interval.MONTH,
+                "max_stores": 1,
+                "max_agents": 3,
+                "is_active": True,
+            },
         )
-        self.growth = SubscriptionPlan.objects.create(
+        self.growth, _ = SubscriptionPlan.objects.get_or_create(
             code="growth",
-            name="Growth",
-            amount=Decimal("60000.00"),
-            currency="MWK",
-            interval=SubscriptionPlan.Interval.MONTH,
-            max_stores=5,
-            max_agents=15,
-            is_active=True,
+            defaults={
+                "name": "Growth",
+                "amount": Decimal("60000.00"),
+                "currency": "MWK",
+                "interval": SubscriptionPlan.Interval.MONTH,
+                "max_stores": 5,
+                "max_agents": 15,
+                "is_active": True,
+            },
         )
-        self.pro = SubscriptionPlan.objects.create(
+        self.pro, _ = SubscriptionPlan.objects.get_or_create(
             code="pro",
-            name="Pro",
-            amount=Decimal("120000.00"),
-            currency="MWK",
-            interval=SubscriptionPlan.Interval.MONTH,
-            max_stores=-1,
-            max_agents=-1,
-            is_active=True,
+            defaults={
+                "name": "Pro",
+                "amount": Decimal("120000.00"),
+                "currency": "MWK",
+                "interval": SubscriptionPlan.Interval.MONTH,
+                "max_stores": -1,
+                "max_agents": -1,
+                "is_active": True,
+            },
         )
 
         # Create active subscription on Starter plan
