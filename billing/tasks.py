@@ -105,6 +105,12 @@ def send_invoice_paid_email(invoice_id):
     if invoice.status != Invoice.Status.PAID:
         logger.warning(f"Invoice {invoice_id} is not PAID (status={invoice.status}), skipping email")
         return
+    
+    # Idempotency check: only send email once per invoice
+    # Use meta field to track if email was sent
+    if invoice.meta.get("email_sent"):
+        logger.info(f"Email already sent for invoice {invoice.number} (idempotent), skipping")
+        return
 
     # Get recipient email
     business = invoice.business
@@ -191,6 +197,12 @@ def send_invoice_paid_email(invoice_id):
     try:
         email.send(fail_silently=False)
         logger.info(f"Invoice paid email sent successfully to {recipient_email} for invoice {invoice.number}")
+        
+        # Mark email as sent (idempotency)
+        invoice.meta["email_sent"] = True
+        invoice.meta["email_sent_at"] = timezone.now().isoformat()
+        invoice.meta["email_sent_to"] = recipient_email
+        invoice.save(update_fields=["meta", "updated_at"])
     except Exception as e:
         logger.error(f"Failed to send invoice paid email for {invoice.number}: {e}", exc_info=True)
         raise  # Re-raise so Celery can retry if configured
