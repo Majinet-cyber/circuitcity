@@ -333,6 +333,16 @@ def apply_payment_to_invoice(
         logger.error(f"Failed to generate PDF for invoice {invoice.number}: {e}", exc_info=True)
         # Don't fail the payment if PDF generation fails
 
+    # Queue email notification (non-blocking)
+    try:
+        from . import tasks
+
+        tasks.send_invoice_paid_email.delay(invoice.id)
+        logger.info(f"Queued invoice paid email for invoice {invoice.number}")
+    except Exception as e:
+        logger.error(f"Failed to queue invoice email for {invoice.number}: {e}", exc_info=True)
+        # Don't fail the payment if email queueing fails
+
     return invoice
 
 
