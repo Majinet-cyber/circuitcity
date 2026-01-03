@@ -26,7 +26,7 @@
             <div class="glass-card p-4">
                 <form method="post">
                     {% csrf_token %}
-                    
+
                     <div class="mb-3">
                         <label for="{{ form.member.id_for_label }}" class="form-label">
                             Member <span class="text-danger">*</span>
@@ -125,14 +125,14 @@
                     </div>
                 </form>
             </div>
-            
+
             <script>
             // Real-time days calculation preview
             document.addEventListener('DOMContentLoaded', function() {
                 const amountInput = document.querySelector('input[name="membership_amount"]');
                 const daysPreview = document.getElementById('days-preview');
                 const daysCount = document.getElementById('days-count');
-                
+
                 if (amountInput) {
                     amountInput.addEventListener('input', function() {
                         const amount = parseFloat(this.value) || 0;
@@ -145,7 +145,7 @@
                             daysPreview.style.display = 'none';
                         }
                     });
-                    
+
                     // Trigger on page load if value exists
                     if (amountInput.value) {
                         amountInput.dispatchEvent(new Event('input'));
@@ -171,7 +171,7 @@
                         <tbody>
                             {% for payment in recent_payments %}
                             <tr>
-                                <td>{{ payment.member.name }}</td>
+                                <td><a href="{% url 'gym:member_detail' payment.member.id %}" class="text-decoration-none text-primary">{{ payment.member.name }}</a></td>
                                 <td class="fw-semibold">MWK {{ payment.amount|floatformat:2 }}</td>
                                 <td>{{ payment.end_date|date:"d M Y" }}</td>
                                 <td class="small text-muted">{{ payment.paid_at|date:"d M Y" }}</td>
@@ -227,4 +227,3 @@
     </div>
 </div>
 {% endblock %}
-

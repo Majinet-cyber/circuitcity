@@ -5,9 +5,9 @@ These models extend the base MerchProduct system with vertical-specific function
 """
 from __future__ import annotations
 
+from datetime import timedelta
 from decimal import Decimal
 from typing import Optional
-from datetime import timedelta
 
 from django.conf import settings
 from django.core.validators import MinValueValidator
@@ -644,13 +644,30 @@ class GymMember(models.Model):
     phone = models.CharField(max_length=20, blank=True, default="")
     email = models.EmailField(blank=True, default="")
 
-    # Unique member barcode/QR code for scanning
+    # Unique identifiers for member
+    member_number = models.CharField(
+        max_length=20,
+        blank=True,
+        default="",
+        db_index=True,
+        help_text="Human-friendly member number (e.g., EW-000123)",
+    )
+    qr_token = models.CharField(
+        max_length=64,
+        blank=True,
+        default="",
+        unique=True,
+        db_index=True,
+        help_text="Stable unique QR token for scanning (UUID-based)",
+    )
+
+    # Legacy member_code (kept for backward compatibility)
     member_code = models.CharField(
         max_length=20,
         blank=True,
         default="",
         db_index=True,
-        help_text="Unique barcode/QR code for member scanning (auto-generated)",
+        help_text="Legacy barcode/QR code (deprecated, use qr_token)",
     )
 
     # Trainer assignment
@@ -726,6 +743,8 @@ class GymMember(models.Model):
             models.Index(fields=["business", "is_active", "is_archived"]),
             models.Index(fields=["phone"]),
             models.Index(fields=["member_code"]),
+            models.Index(fields=["member_number"]),
+            models.Index(fields=["qr_token"]),
             models.Index(fields=["badge_level"]),
         ]
 
@@ -733,15 +752,70 @@ class GymMember(models.Model):
         return f"{self.name} ({self.phone})"
 
     def save(self, *args, **kwargs):
-        """Auto-generate member_code if not present"""
+        """Auto-generate member_number, qr_token, and legacy member_code if not present"""
+        if not self.member_number and self.business_id:
+            self.member_number = self._generate_unique_member_number()
+        if not self.qr_token:
+            self.qr_token = self._generate_unique_qr_token()
+        # Legacy: also generate member_code for backward compatibility
         if not self.member_code and self.business_id:
             self.member_code = self._generate_unique_member_code()
         super().save(*args, **kwargs)
+
+    def _generate_unique_member_number(self) -> str:
+        """
+        Generate a unique human-friendly member number.
+        Format: EW-000123 (location prefix + sequential number)
+        """
+        # Try to get location prefix from business
+        prefix = "GYM"
+        try:
+            if hasattr(self.business, "name"):
+                # Use first 2-3 letters of business name as prefix
+                business_name = self.business.name.upper().replace(" ", "")
+                prefix = business_name[:3] if len(business_name) >= 3 else business_name[:2]
+        except Exception:
+            pass
+
+        # Find the highest existing member number for this business
+        import re
+
+        from django.db.models import Max
+
+        existing_members = GymMember.objects.filter(
+            business=self.business, member_number__startswith=f"{prefix}-"
+        ).exclude(member_number="")
+
+        max_number = 0
+        for member in existing_members:
+            try:
+                # Extract number from format "PREFIX-XXXXXX"
+                match = re.search(r"-(\d+)$", member.member_number)
+                if match:
+                    num = int(match.group(1))
+                    if num > max_number:
+                        max_number = num
+            except Exception:
+                continue
+
+        # Generate next number
+        next_number = max_number + 1
+        return f"{prefix}-{next_number:06d}"
+
+    def _generate_unique_qr_token(self) -> str:
+        """
+        Generate a stable unique QR token using UUID.
+        This token is used for QR code scanning and is globally unique.
+        """
+        import uuid
+
+        return str(uuid.uuid4())
 
     def _generate_unique_member_code(self) -> str:
         """
         Generate a unique member code in format: GYM-XXXXXX
         Retries up to 20 times to avoid collisions.
+        LEGACY: Kept for backward compatibility.
         """
         import random
 
@@ -755,12 +829,16 @@ class GymMember(models.Model):
         return f"GYM-{uuid.uuid4().hex[:6].upper()}"
 
     def get_qr_code_data_url(self) -> str:
-        """Get QR code as base64 data URL for this member"""
-        if not self.member_code:
+        """
+        Get QR code as base64 data URL for this member.
+        Uses qr_token (preferred) or falls back to member_code for legacy support.
+        """
+        token = self.qr_token or self.member_code
+        if not token:
             return ""
         from inventory.utils_gym_barcode import generate_member_qr_code_url
 
-        return generate_member_qr_code_url(self.member_code)
+        return generate_member_qr_code_url(token)
 
     # ==============================================================================
     # CENTRALIZED MEMBERSHIP CALCULATION PROPERTIES
@@ -936,7 +1014,7 @@ class GymMember(models.Model):
 
         DEPRECATED: Use days_left property instead for the new centralized logic.
         """
-        from inventory.utils_gym import compute_membership_days, GYM_MEMBERSHIP_DAYS
+        from inventory.utils_gym import GYM_MEMBERSHIP_DAYS, compute_membership_days
 
         payment = self.current_payment
         if not payment:
@@ -989,7 +1067,7 @@ class GymMember(models.Model):
         Returns:
             Date when next payment is due, or None if member has never paid
         """
-        from inventory.utils_gym import compute_next_payment_date, GYM_MEMBERSHIP_DAYS
+        from inventory.utils_gym import GYM_MEMBERSHIP_DAYS, compute_next_payment_date
 
         if not self.last_payment_date:
             return None
@@ -1050,6 +1128,7 @@ class GymMember(models.Model):
             amount: Total payment amount for proration calculation (if None, uses membership_fee + trainer_fee)
         """
         from datetime import timedelta
+
         from inventory.utils_gym import calculate_membership_period
 
         if payment_date is None:
@@ -1119,9 +1198,10 @@ class GymMember(models.Model):
             return None
 
         try:
-            import qrcode
-            import io
             import base64
+            import io
+
+            import qrcode
 
             # Create QR code with member code
             qr = qrcode.QRCode(

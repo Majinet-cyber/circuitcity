@@ -3,155 +3,645 @@
 
 {% block title %}Check-In - {{ business.name }}{% endblock %}
 
+{% block extra_css %}
+<style>
+/* ========== GYM CHECK-IN: MOBILE-FIRST PREMIUM STYLES ========== */
+
+/* Mobile-first: Sticky header with actions */
+.gym-checkin-header {
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    padding: 1rem;
+    margin: -1rem -1rem 1rem -1rem;
+    box-shadow: 0 4px 12px rgba(102, 126, 234, 0.15);
+}
+
+@media (min-width: 768px) {
+    .gym-checkin-header {
+        position: static;
+        margin: 0 0 1.5rem 0;
+        border-radius: 16px;
+        padding: 1.5rem;
+    }
+}
+
+.gym-checkin-header h1 {
+    color: white;
+    font-size: 1.5rem;
+    font-weight: 700;
+    margin: 0 0 0.25rem 0;
+}
+
+.gym-checkin-header p {
+    color: rgba(255, 255, 255, 0.9);
+    font-size: 0.875rem;
+    margin: 0;
+}
+
+/* Search + Scan actions */
+.gym-checkin-actions {
+    display: flex;
+    gap: 0.5rem;
+    margin-top: 1rem;
+}
+
+.gym-checkin-actions .gym-search {
+    flex: 1;
+    min-width: 0;
+}
+
+.gym-checkin-actions .gym-search input {
+    width: 100%;
+    padding: 0.75rem 1rem;
+    border: none;
+    border-radius: 12px;
+    font-size: 0.95rem;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.gym-checkin-actions .gym-scan-btn {
+    background: white;
+    color: #667eea;
+    border: none;
+    padding: 0.75rem 1.25rem;
+    border-radius: 12px;
+    font-weight: 600;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    white-space: nowrap;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    transition: transform 0.2s;
+}
+
+.gym-checkin-actions .gym-scan-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+/* Filter chips */
+.gym-filter-chips {
+    display: flex;
+    gap: 0.5rem;
+    overflow-x: auto;
+    padding: 0.5rem 0;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+}
+
+.gym-filter-chips::-webkit-scrollbar {
+    display: none;
+}
+
+.gym-filter-chip {
+    padding: 0.5rem 1rem;
+    border-radius: 50px;
+    background: white;
+    border: 2px solid #e2e8f0;
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: #64748b;
+    white-space: nowrap;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.gym-filter-chip.active {
+    background: #667eea;
+    color: white;
+    border-color: #667eea;
+}
+
+/* ========== MOBILE: MEMBER CARDS ========== */
+.gym-member-cards {
+    display: grid;
+    gap: 1rem;
+}
+
+@media (min-width: 768px) {
+    .gym-member-cards {
+        display: none; /* Hide on desktop */
+    }
+}
+
+.gym-member-card {
+    background: white;
+    border-radius: 16px;
+    padding: 1rem;
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
+    border: 2px solid transparent;
+    transition: all 0.2s;
+}
+
+.gym-member-card:active {
+    transform: scale(0.98);
+}
+
+.gym-member-card.checked-in {
+    border-color: #10b981;
+    background: linear-gradient(135deg, #f0fdf4 0%, white 100%);
+}
+
+.gym-member-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: start;
+    margin-bottom: 0.75rem;
+}
+
+.gym-member-card-info h3 {
+    font-size: 1.125rem;
+    font-weight: 700;
+    color: #0f172a;
+    margin: 0 0 0.25rem 0;
+}
+
+.gym-member-card-info p {
+    font-size: 0.875rem;
+    color: #64748b;
+    margin: 0;
+}
+
+.gym-member-card-status {
+    flex-shrink: 0;
+}
+
+.gym-member-card-stats {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 0.75rem;
+    margin-bottom: 0.75rem;
+    padding: 0.75rem;
+    background: #f8fafc;
+    border-radius: 12px;
+}
+
+.gym-stat-item {
+    text-align: center;
+}
+
+.gym-stat-label {
+    font-size: 0.75rem;
+    color: #64748b;
+    text-transform: uppercase;
+    font-weight: 600;
+    margin-bottom: 0.25rem;
+}
+
+.gym-stat-value {
+    font-size: 1rem;
+    font-weight: 700;
+    color: #0f172a;
+}
+
+.gym-stat-value.highlight {
+    color: #667eea;
+}
+
+/* Gamification badges on cards */
+.gym-card-badges {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin-bottom: 0.75rem;
+}
+
+.gym-card-badges .badge {
+    font-size: 0.75rem;
+    padding: 0.375rem 0.75rem;
+}
+
+/* Check-in button (big touch target) */
+.gym-checkin-btn {
+    width: 100%;
+    padding: 0.875rem;
+    border: none;
+    border-radius: 12px;
+    font-weight: 700;
+    font-size: 1rem;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+}
+
+.gym-checkin-btn.btn-primary {
+    background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+    color: white;
+    box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
+}
+
+.gym-checkin-btn.btn-primary:active {
+    transform: scale(0.98);
+}
+
+.gym-checkin-btn.btn-checked {
+    background: #f1f5f9;
+    color: #10b981;
+    border: 2px solid #10b981;
+}
+
+.gym-checkin-btn.btn-inactive {
+    background: #f8fafc;
+    color: #94a3b8;
+    border: 2px solid #e2e8f0;
+    cursor: not-allowed;
+}
+
+.gym-checkin-btn.btn-renew {
+    background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+    color: white;
+}
+
+/* ========== DESKTOP: TABLE VIEW ========== */
+.gym-table-desktop {
+    display: none; /* Hide on mobile */
+}
+
+@media (min-width: 768px) {
+    .gym-table-desktop {
+        display: block;
+    }
+}
+
+.gym-table-responsive {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+}
+
+.gym-table-responsive table {
+    min-width: 800px;
+}
+
+/* ========== EMPTY STATE ========== */
+.gym-empty-state {
+    text-align: center;
+    padding: 3rem 1rem;
+}
+
+.gym-empty-state i {
+    font-size: 4rem;
+    color: #cbd5e1;
+    margin-bottom: 1rem;
+}
+
+.gym-empty-state h5 {
+    color: #64748b;
+    margin-bottom: 0.5rem;
+}
+
+.gym-empty-state p {
+    color: #94a3b8;
+    margin-bottom: 1.5rem;
+}
+</style>
+{% endblock %}
+
 {% block content %}
-<div class="container-fluid py-4">
-    <!-- Header -->
-    <div class="row mb-4">
-        <div class="col">
-            <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
-                <div>
-                    <h2>Member Check-In</h2>
-                    <p class="text-muted mb-0">Track member attendance</p>
-                </div>
-                <div class="d-flex gap-2">
-                    <a href="{% url 'gym:dashboard' %}" class="btn btn-outline-secondary">
-                        <i class="bi bi-speedometer2"></i> Dashboard
-                    </a>
-                    <a href="{% url 'gym:members_list' %}" class="btn btn-outline-primary">
-                        <i class="bi bi-people"></i> All Members
-                    </a>
-                </div>
+<div class="container-fluid py-3 py-md-4">
+    <!-- Mobile-First Header -->
+    <div class="gym-checkin-header">
+        <h1>Member Check-In</h1>
+        <p>Track attendance & celebrate streaks</p>
+
+        <!-- Search + Scan Actions (Always Visible) -->
+        <div class="gym-checkin-actions">
+            <div class="gym-search">
+                <input type="text" id="memberSearch" placeholder="🔍 Search member..."
+                       class="form-control" onkeyup="filterMembers()">
             </div>
+            <a href="{% url 'gym:scan_member' %}" class="gym-scan-btn">
+                <i class="bi bi-qr-code-scan"></i>
+                <span class="d-none d-sm-inline">Scan QR</span>
+            </a>
+        </div>
+
+        <!-- Filter Chips -->
+        <div class="gym-filter-chips">
+            <button class="gym-filter-chip active" onclick="filterByStatus('all')">
+                All
+            </button>
+            <button class="gym-filter-chip" onclick="filterByStatus('active')">
+                ✓ Active
+            </button>
+            <button class="gym-filter-chip" onclick="filterByStatus('expired')">
+                ⚠ Expired
+            </button>
+            <button class="gym-filter-chip" onclick="filterByStatus('pending')">
+                ⏳ Pending
+            </button>
         </div>
     </div>
 
-    <!-- Check-in Table -->
-    <div class="glass-card p-0">
-        {% if member_data %}
-            <div class="gym-table-responsive">
-                <table class="table table-hover mb-0">
-                    <thead>
-                        <tr>
-                            <th>Name</th>
-                            <th>Trainer</th>
-                            <th>Membership Status</th>
-                            <th>Days Left</th>
-                            <th>Days Attended</th>
-                            <th>Streak & Badge</th>
-                            <th>Next Payment</th>
-                            <th>Today</th>
-                            <th>Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for data in member_data %}
-                        <tr>
-                            <td>
-                                <div class="fw-semibold">{{ data.member.name }}</div>
-                                <div class="small text-muted">{{ data.member.phone }}</div>
-                            </td>
-                            <td>
-                                {% if data.member.trainer %}
-                                    <span class="badge bg-info-subtle text-info">{{ data.member.trainer.name }}</span>
-                                {% else %}
-                                    <span class="text-muted">-</span>
-                                {% endif %}
-                            </td>
-                            <td>
-                                {% if data.is_active %}
-                                    <span class="badge bg-success-subtle text-success">{{ data.status_label }}</span>
-                                {% else %}
-                                    <span class="badge bg-warning-subtle text-warning">{{ data.status_label }}</span>
-                                {% endif %}
-                            </td>
-                            <td>
-                                {% if data.days_left > 0 %}
-                                    <span class="fw-semibold">{{ data.days_left }} / {{ data.total_days }} days</span>
-                                {% else %}
-                                    <span class="text-danger">0 / {{ data.total_days }} days</span>
-                                {% endif %}
-                            </td>
-                            <td>
-                                <span class="badge bg-primary-subtle text-primary">
-                                    {{ data.days_attended }} / {{ data.total_days }}
-                                </span>
-                            </td>
-                            <td>
-                                <!-- Gamification: Streak & Badge -->
-                                <div class="d-flex flex-column gap-1">
-                                    {% if data.streak_days > 0 %}
-                                        <span class="badge bg-warning-subtle text-warning">
-                                            🔥 {{ data.streak_days }}-day streak
-                                        </span>
-                                    {% endif %}
-                                    {% if data.badge_display.icon %}
-                                        <span class="badge bg-{{ data.badge_display.color }}-subtle text-{{ data.badge_display.color }}">
-                                            {{ data.badge_display.icon }} {{ data.badge_display.label }}
-                                        </span>
-                                    {% endif %}
-                                    {% if not data.streak_days and not data.badge_display.icon %}
-                                        <span class="text-muted small">No streak yet</span>
-                                    {% endif %}
-                                </div>
-                            </td>
-                            <td>
-                                {% if data.next_payment %}
-                                    {{ data.next_payment|date:"d M Y" }}
-                                {% else %}
-                                    <span class="text-muted">-</span>
-                                {% endif %}
-                            </td>
-                            <td>
-                                {% if data.today_status == "present" %}
-                                    <span class="badge bg-success text-white fw-semibold px-3 py-2">✓ {{ data.today_label }}</span>
-                                {% elif data.today_status == "absent" %}
-                                    <span class="badge bg-secondary-subtle text-secondary">{{ data.today_label }}</span>
-                                {% else %}
-                                    <span class="badge bg-danger-subtle text-danger">{{ data.today_label }}</span>
-                                {% endif %}
-                            </td>
-                            <td>
-                                {% if data.is_active %}
-                                    {% if data.checked_in_today %}
-                                        <button class="btn btn-sm btn-outline-success" disabled>
-                                            <i class="bi bi-check-circle"></i> Checked In
-                                        </button>
-                                    {% else %}
-                                        <form method="post" action="{% url 'gym:member_checkin' data.member.id %}" style="display: inline;">
-                                            {% csrf_token %}
-                                            <input type="hidden" name="next" value="{% url 'gym:checkin_page' %}">
-                                            <button type="submit" class="btn btn-sm btn-success">
-                                                <i class="bi bi-box-arrow-in-right"></i> Check In
-                                            </button>
-                                        </form>
-                                    {% endif %}
-                                {% else %}
-                                    <button class="btn btn-sm btn-outline-secondary" disabled title="Membership inactive. Record payment first.">
-                                        <i class="bi bi-lock"></i> Inactive
-                                    </button>
-                                {% endif %}
-                            </td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-            </div>
-        {% else %}
-            <!-- Empty State -->
-            <div class="text-center py-5">
-                <div class="mb-3">
-                    <i class="bi bi-people" style="font-size: 3rem; opacity: 0.3;"></i>
+    {% if member_data %}
+        <!-- MOBILE: Member Cards -->
+        <div class="gym-member-cards">
+            {% for data in member_data %}
+            <div class="gym-member-card {% if data.checked_in_today %}checked-in{% endif %}"
+                 data-name="{{ data.member.name|lower }}"
+                 data-status="{% if data.is_active %}active{% elif data.status_label == 'Expired' or data.status_label == 'In Arrears' %}expired{% else %}pending{% endif %}">
+
+                <div class="gym-member-card-header">
+                    <div class="gym-member-card-info">
+                        <h3><a href="{% url 'gym:member_detail' data.member.id %}" class="text-decoration-none text-dark">{{ data.member.name }}</a></h3>
+                        <p><i class="bi bi-telephone"></i> {{ data.member.phone }}</p>
+                    </div>
+                    <div class="gym-member-card-status">
+                        {% if data.is_active %}
+                            <span class="badge bg-success-subtle text-success">{{ data.status_label }}</span>
+                        {% else %}
+                            <span class="badge bg-warning-subtle text-warning">{{ data.status_label }}</span>
+                        {% endif %}
+                    </div>
                 </div>
-                <h5 class="text-muted mb-2">No Members Found</h5>
-                <p class="text-muted mb-4">
-                    Add members to start tracking attendance.
-                </p>
+
+                <!-- Stats Grid -->
+                <div class="gym-member-card-stats">
+                    <div class="gym-stat-item">
+                        <div class="gym-stat-label">Days Left</div>
+                        <div class="gym-stat-value {% if data.days_left <= 0 %}text-danger{% endif %}">
+                            {{ data.days_left }}/{{ data.total_days }}
+                        </div>
+                    </div>
+                    <div class="gym-stat-item">
+                        <div class="gym-stat-label">Attended</div>
+                        <div class="gym-stat-value highlight">
+                            {{ data.days_attended }}/{{ data.total_days }}
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Gamification Badges -->
+                {% if data.streak_days > 0 or data.badge_display.icon %}
+                <div class="gym-card-badges">
+                    {% if data.streak_days > 0 %}
+                        <span class="badge bg-warning-subtle text-warning">
+                            🔥 {{ data.streak_days }}-day streak
+                        </span>
+                    {% endif %}
+                    {% if data.badge_display.icon %}
+                        <span class="badge bg-{{ data.badge_display.color }}-subtle text-{{ data.badge_display.color }}">
+                            {{ data.badge_display.icon }} {{ data.badge_display.label }}
+                        </span>
+                    {% endif %}
+                </div>
+                {% endif %}
+
+                <!-- Check-in Action -->
+                {% if data.is_active %}
+                    {% if data.checked_in_today %}
+                        <button class="gym-checkin-btn btn-checked" disabled>
+                            <i class="bi bi-check-circle-fill"></i> Checked In Today
+                        </button>
+                    {% else %}
+                        <form method="post" action="{% url 'gym:member_checkin' data.member.id %}" class="gym-checkin-form">
+                            {% csrf_token %}
+                            <input type="hidden" name="next" value="{% url 'gym:checkin_page' %}">
+                            <button type="submit" class="gym-checkin-btn btn-primary">
+                                <i class="bi bi-box-arrow-in-right"></i> Check In
+                            </button>
+                        </form>
+                    {% endif %}
+                {% else %}
+                    <a href="{% url 'gym:add_payment' %}?member={{ data.member.id }}" class="gym-checkin-btn btn-renew">
+                        <i class="bi bi-credit-card"></i> Renew Membership
+                    </a>
+                {% endif %}
+
+                <!-- Quick Link to Details -->
+                <a href="{% url 'gym:member_detail' data.member.id %}"
+                   class="btn btn-sm btn-outline-secondary w-100 mt-2">
+                    <i class="bi bi-eye"></i> View Details
+                </a>
+            </div>
+            {% endfor %}
+        </div>
+
+        <!-- DESKTOP: Table View -->
+        <div class="gym-table-desktop">
+            <div class="glass-card p-0">
+                <div class="gym-table-responsive">
+                    <table class="table table-hover mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Name</th>
+                                <th>Trainer</th>
+                                <th>Status</th>
+                                <th>Days Left</th>
+                                <th>Attended</th>
+                                <th>Streak & Badge</th>
+                                <th>Next Payment</th>
+                                <th>Today</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for data in member_data %}
+                            <tr data-name="{{ data.member.name|lower }}"
+                                data-status="{% if data.is_active %}active{% elif data.status_label == 'Expired' or data.status_label == 'In Arrears' %}expired{% else %}pending{% endif %}">
+                                <td>
+                                    <div class="fw-semibold"><a href="{% url 'gym:member_detail' data.member.id %}" class="text-decoration-none text-primary">{{ data.member.name }}</a></div>
+                                    <div class="small text-muted">{{ data.member.phone }}</div>
+                                </td>
+                                <td>
+                                    {% if data.member.trainer %}
+                                        <span class="badge bg-info-subtle text-info">{{ data.member.trainer.name }}</span>
+                                    {% else %}
+                                        <span class="text-muted">-</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if data.is_active %}
+                                        <span class="badge bg-success-subtle text-success">{{ data.status_label }}</span>
+                                    {% else %}
+                                        <span class="badge bg-warning-subtle text-warning">{{ data.status_label }}</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if data.days_left > 0 %}
+                                        <span class="fw-semibold">{{ data.days_left }} / {{ data.total_days }}</span>
+                                    {% else %}
+                                        <span class="text-danger">0 / {{ data.total_days }}</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <span class="badge bg-primary-subtle text-primary">
+                                        {{ data.days_attended }} / {{ data.total_days }}
+                                    </span>
+                                </td>
+                                <td>
+                                    <div class="d-flex flex-column gap-1">
+                                        {% if data.streak_days > 0 %}
+                                            <span class="badge bg-warning-subtle text-warning">
+                                                🔥 {{ data.streak_days }}-day
+                                            </span>
+                                        {% endif %}
+                                        {% if data.badge_display.icon %}
+                                            <span class="badge bg-{{ data.badge_display.color }}-subtle text-{{ data.badge_display.color }}">
+                                                {{ data.badge_display.icon }}
+                                            </span>
+                                        {% endif %}
+                                    </div>
+                                </td>
+                                <td>
+                                    {% if data.next_payment %}
+                                        <small>{{ data.next_payment|date:"d M Y" }}</small>
+                                    {% else %}
+                                        <span class="text-muted">-</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if data.today_status == "present" %}
+                                        <span class="badge bg-success text-white">✓ Present</span>
+                                    {% elif data.today_status == "absent" %}
+                                        <span class="badge bg-secondary-subtle text-secondary">Absent</span>
+                                    {% else %}
+                                        <span class="badge bg-danger-subtle text-danger">Inactive</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if data.is_active %}
+                                        {% if data.checked_in_today %}
+                                            <button class="btn btn-sm btn-outline-success" disabled>
+                                                <i class="bi bi-check-circle"></i> Checked In
+                                            </button>
+                                        {% else %}
+                                            <form method="post" action="{% url 'gym:member_checkin' data.member.id %}" style="display: inline;">
+                                                {% csrf_token %}
+                                                <input type="hidden" name="next" value="{% url 'gym:checkin_page' %}">
+                                                <button type="submit" class="btn btn-sm btn-success">
+                                                    <i class="bi bi-box-arrow-in-right"></i> Check In
+                                                </button>
+                                            </form>
+                                        {% endif %}
+                                    {% else %}
+                                        <a href="{% url 'gym:add_payment' %}?member={{ data.member.id }}"
+                                           class="btn btn-sm btn-warning">
+                                            <i class="bi bi-credit-card"></i> Renew
+                                        </a>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    {% else %}
+        <!-- Empty State -->
+        <div class="glass-card">
+            <div class="gym-empty-state">
+                <i class="bi bi-people"></i>
+                <h5>No Members Found</h5>
+                <p>Add members to start tracking attendance.</p>
                 <a href="{% url 'gym:member_add' %}" class="btn btn-primary">
                     <i class="bi bi-plus-circle"></i> Add First Member
                 </a>
             </div>
-        {% endif %}
+        </div>
+    {% endif %}
+
+    <!-- Quick Stats (Desktop only) -->
+    <div class="d-none d-md-flex gap-3 mt-4">
+        <a href="{% url 'gym:dashboard' %}" class="btn btn-outline-secondary">
+            <i class="bi bi-speedometer2"></i> Dashboard
+        </a>
+        <a href="{% url 'gym:members_list' %}" class="btn btn-outline-primary">
+            <i class="bi bi-people"></i> All Members
+        </a>
+        <a href="{% url 'gym:leaderboard' %}" class="btn btn-outline-success">
+            <i class="bi bi-trophy"></i> Leaderboard
+        </a>
     </div>
 </div>
+
+{% include "components/celebration_modal.html" %}
 {% endblock %}
 
+{% block extra_js %}
+<script>
+// Filter members by search
+function filterMembers() {
+    const searchTerm = document.getElementById('memberSearch').value.toLowerCase();
+    const cards = document.querySelectorAll('.gym-member-card');
+    const rows = document.querySelectorAll('.gym-table-desktop tbody tr');
+
+    // Filter cards (mobile)
+    cards.forEach(card => {
+        const name = card.dataset.name;
+        if (name.includes(searchTerm)) {
+            card.style.display = '';
+        } else {
+            card.style.display = 'none';
+        }
+    });
+
+    // Filter rows (desktop)
+    rows.forEach(row => {
+        const name = row.dataset.name;
+        if (name.includes(searchTerm)) {
+            row.style.display = '';
+        } else {
+            row.style.display = 'none';
+        }
+    });
+}
+
+// Filter by status
+let currentFilter = 'all';
+function filterByStatus(status) {
+    currentFilter = status;
+
+    // Update chip styles
+    document.querySelectorAll('.gym-filter-chip').forEach(chip => {
+        chip.classList.remove('active');
+    });
+    event.target.classList.add('active');
+
+    const cards = document.querySelectorAll('.gym-member-card');
+    const rows = document.querySelectorAll('.gym-table-desktop tbody tr');
+
+    // Filter cards (mobile)
+    cards.forEach(card => {
+        const cardStatus = card.dataset.status;
+        if (status === 'all' || cardStatus === status) {
+            card.style.display = '';
+        } else {
+            card.style.display = 'none';
+        }
+    });
+
+    // Filter rows (desktop)
+    rows.forEach(row => {
+        const rowStatus = row.dataset.status;
+        if (status === 'all' || rowStatus === status) {
+            row.style.display = '';
+        } else {
+            row.style.display = 'none';
+        }
+    });
+}
+
+// Show celebration modal after check-in (if gamification data in URL)
+document.addEventListener('DOMContentLoaded', function() {
+    const urlParams = new URLSearchParams(window.location.search);
+    const celebration = urlParams.get('celebration');
+
+    if (celebration) {
+        try {
+            const gamificationData = JSON.parse(decodeURIComponent(celebration));
+            if (typeof showCelebrationModal === 'function') {
+                showCelebrationModal(gamificationData);
+            }
+        } catch (e) {
+            console.log('Could not parse celebration data');
+        }
+    }
+});
+</script>
+{% endblock %}

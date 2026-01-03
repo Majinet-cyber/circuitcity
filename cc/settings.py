@@ -1,12 +1,13 @@
 ﻿"""
 Django settings for cc project.
 """
-from pathlib import Path
-from urllib.parse import urlparse
-import os
-import sys
 import importlib
 import mimetypes
+import os
+import sys
+from pathlib import Path
+from urllib.parse import urlparse
+
 from django.core.exceptions import ImproperlyConfigured
 
 # Register .webmanifest MIME type for PWA installability
@@ -594,6 +595,29 @@ USE_I18N = True
 USE_TZ = True
 # Celery timezone
 CELERY_TIMEZONE = "Africa/Blantyre"
+
+# Celery Beat Schedule - Gym Email Automation
+try:
+    from celery.schedules import crontab
+
+    CELERY_BEAT_SCHEDULE = {
+        # Daily inactivity reminders at 3:00 PM Malawi time
+        "gym-daily-inactivity-reminders": {
+            "task": "inventory.tasks_gym_emails.send_gym_inactivity_reminders",
+            "schedule": crontab(hour=15, minute=0, day_of_week="*"),
+            "options": {"timezone": "Africa/Blantyre"},
+        },
+        # Weekly manager summary every Monday at 3:00 PM Malawi time
+        "gym-weekly-manager-summary": {
+            "task": "inventory.tasks_gym_emails.send_gym_weekly_manager_summary",
+            "schedule": crontab(hour=15, minute=0, day_of_week="monday"),
+            "options": {"timezone": "Africa/Blantyre"},
+        },
+    }
+except ImportError:
+    # Celery not installed (e.g., in CI or minimal environments)
+    CELERY_BEAT_SCHEDULE = {}
+
 # Celery eager mode in CI (no external broker needed)
 if CI:
     CELERY_TASK_ALWAYS_EAGER = True

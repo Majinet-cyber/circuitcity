@@ -4,14 +4,15 @@ Views for gym operations: member management, payments, 30-day memberships.
 """
 from __future__ import annotations
 
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 from decimal import Decimal
 
 from django import forms
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.db import transaction
-from django.shortcuts import render, redirect, get_object_or_404
+from django.shortcuts import get_object_or_404, redirect, render
+from django.urls import reverse
 from django.utils import timezone
 from django.views.decorators.http import require_POST
 
@@ -20,19 +21,18 @@ from inventory.authz import require_business_kind
 from inventory.business_kinds import BusinessKind
 from inventory.helpers import get_active_business
 from inventory.models_verticals import (
-    GymMember,
-    GymPayment,
-    GymMemberLog,
-    GymSettings,
-    GymWalletEntry,
-    GymMemberAction,
     GymCheckIn,
+    GymMember,
+    GymMemberAction,
+    GymMemberLog,
     GymMemberStatus,
+    GymPayment,
+    GymSettings,
     GymTrainer,
+    GymWalletEntry,
     TrainerFee,
 )
 from tenants.utils import require_business
-
 
 # ==============================================================================
 # GYM MEMBER CRUD
@@ -295,7 +295,7 @@ def member_edit(request, member_id):
 def member_detail(request, member_id):
     """View member details with payment history and logs"""
     try:
-        from inventory.utils_gym import get_membership_status, GYM_MEMBERSHIP_DAYS
+        from inventory.utils_gym import GYM_MEMBERSHIP_DAYS, get_membership_status
     except ImportError:
         # Fallback if utils_gym not available
         def get_membership_status(member):
@@ -575,7 +575,7 @@ def member_set_paid(request, member_id):
 @require_business_kind(BusinessKind.GYM)
 def checkin_page(request):
     """Dedicated check-in page showing all members with attendance tracking"""
-    from inventory.utils_gym import get_membership_status, GYM_MEMBERSHIP_DAYS
+    from inventory.utils_gym import GYM_MEMBERSHIP_DAYS, get_membership_status
 
     business = get_active_business(request)
     today = timezone.now().date()
@@ -665,7 +665,12 @@ def member_checkin(request, member_id):
 
     if existing:
         messages.info(request, f"Member '{member.name}' already checked in today.")
+        celebration_data = None
     else:
+        # Store old stats for comparison
+        old_streak = member.streak_days
+        old_badge = member.badge_level
+
         # Create check-in
         checkin = GymCheckIn.objects.create(
             business=business, member=member, checked_in_by=request.user, notes=request.POST.get("notes", "")
@@ -674,6 +679,9 @@ def member_checkin(request, member_id):
         # Update gamification stats
         member.update_checkin_stats(checkin_date=timezone.now().date())
 
+        # Refresh from DB
+        member.refresh_from_db()
+
         # Success message with gamification feedback
         badge_info = member.get_badge_display()
         streak_msg = f" 🔥 {member.streak_days}-day streak!" if member.streak_days > 1 else ""
@@ -681,9 +689,53 @@ def member_checkin(request, member_id):
 
         messages.success(request, f"✓ {member.name} checked in!{streak_msg}{badge_msg}")
 
+        # Prepare celebration data for modal (if milestone reached)
+        celebration_data = None
+        show_celebration = False
+
+        # Check for celebration-worthy events
+        badges_earned = []
+        if old_badge != member.badge_level and member.badge_level != "none":
+            badges_earned.append(
+                {
+                    "icon": badge_info["icon"],
+                    "name": badge_info["label"],
+                    "description": f"Earned for {member.total_checkins}+ check-ins!",
+                }
+            )
+            show_celebration = True
+
+        # Streak milestones (3, 7, 14, 30)
+        if member.streak_days in [3, 7, 14, 30] and member.streak_days > old_streak:
+            show_celebration = True
+
+        # First check-in milestone
+        if member.total_checkins == 1:
+            show_celebration = True
+
+        if show_celebration:
+            celebration_data = {
+                "show_celebration": True,
+                "streak_days": member.streak_days,
+                "monthly_checkins": member.monthly_checkins,
+                "total_checkins": member.total_checkins,
+                "badge_level": member.badge_level,
+                "badge_display": badge_info,
+                "badges_earned": badges_earned,
+                "member_name": member.name,
+            }
+
     # Return to checkin page or member detail based on referrer
     next_url = request.POST.get("next") or request.META.get("HTTP_REFERER") or "gym:checkin_page"
-    if "checkin" in next_url:
+
+    # Build redirect URL with celebration data if applicable
+    if celebration_data and "checkin" in next_url:
+        import json
+        from urllib.parse import quote
+
+        celebration_json = quote(json.dumps(celebration_data))
+        return redirect(f"{reverse('gym:checkin_page')}?celebration={celebration_json}")
+    elif "checkin" in next_url:
         return redirect("gym:checkin_page")
     elif "member_detail" in next_url or f"/member/{member_id}/" in next_url:
         return redirect("gym:member_detail", member_id=member.id)
@@ -872,12 +924,23 @@ def add_payment(request):
                     created_by=request.user,
                 )
 
+                # Send instant payment notification to managers (async)
+                try:
+                    from inventory.tasks_gym_emails import notify_gym_payment_to_managers
+
+                    notify_gym_payment_to_managers.delay(payment.id)
+                except Exception as e:
+                    import logging
+
+                    logger = logging.getLogger(__name__)
+                    logger.error(f"Failed to queue payment notification: {e}")
+
                 # Credit trainer's wallet if trainer_fee > 0 and trainer has linked user
                 if trainer and trainer_fee > 0:
                     if trainer.user:
                         try:
                             # Use the wallet transaction system to credit trainer
-                            from wallet.models import WalletTransaction, TxnType, Ledger
+                            from wallet.models import Ledger, TxnType, WalletTransaction
 
                             WalletTransaction.objects.create(
                                 ledger=Ledger.AGENT,
@@ -1037,7 +1100,8 @@ def gym_dashboard(request):
         conversion_percentage = 0
 
     # Payment mix (filtered by date range)
-    from django.db.models import Sum, Count
+    from django.db.models import Count, Sum
+
     from inventory.models_verticals import PaymentMethod
 
     start_dt = timezone.make_aware(datetime.combine(start_date, datetime.min.time()))
@@ -1543,6 +1607,74 @@ def gym_scan_page(request):
 @login_required
 @require_business
 @require_business_kind(BusinessKind.GYM)
+def gym_leaderboard(request):
+    """
+    Display gym leaderboard showing top attendees by check-ins.
+    Supports period filtering: week, month, all-time.
+    """
+    business = get_active_business(request)
+    today = timezone.now().date()
+
+    # Period filtering
+    period = request.GET.get("period", "month")
+
+    if period == "week":
+        start_date = today - timedelta(days=7)
+        period_label = "This Week"
+    elif period == "month":
+        start_date = today - timedelta(days=30)
+        period_label = "This Month"
+    else:  # all
+        start_date = None
+        period_label = "All Time"
+
+    # Get all active members
+    members = GymMember.objects.filter(business=business, is_active=True, is_archived=False)
+
+    # Build leaderboard data
+    leaderboard_data = []
+    for member in members:
+        # Count check-ins in period
+        checkins_query = GymCheckIn.objects.filter(business=business, member=member)
+        if start_date:
+            start_dt = timezone.make_aware(datetime.combine(start_date, datetime.min.time()))
+            checkins_query = checkins_query.filter(timestamp__gte=start_dt)
+
+        checkin_count = checkins_query.count()
+
+        if checkin_count > 0:  # Only include members with check-ins
+            leaderboard_data.append(
+                {
+                    "member": member,
+                    "checkins": checkin_count,
+                }
+            )
+
+    # Sort by check-ins (descending)
+    leaderboard_data.sort(key=lambda x: x["checkins"], reverse=True)
+
+    # Add rank
+    for idx, entry in enumerate(leaderboard_data, start=1):
+        entry["rank"] = idx
+
+    # Limit to top 50
+    leaderboard_data = leaderboard_data[:50]
+
+    return render(
+        request,
+        "inventory/gym/leaderboard.html",
+        {
+            "business": business,
+            "leaderboard": leaderboard_data,
+            "period": period,
+            "period_label": period_label,
+        },
+    )
+
+
+@login_required
+@require_business
+@require_business_kind(BusinessKind.GYM)
 def gym_scan_lookup(request):
     """
     API endpoint to lookup member by scanned code.
@@ -1568,10 +1700,16 @@ def gym_scan_lookup(request):
         return JsonResponse({"ok": False, "error": "No code provided"}, status=400)
 
     # Lookup member by code (tenant-safe)
+    # Try qr_token first (preferred), then fall back to member_code for legacy support
     try:
-        member = GymMember.objects.get(business=business, member_code=member_code, is_archived=False)
+        member = GymMember.objects.get(business=business, qr_token=member_code, is_archived=False)
     except GymMember.DoesNotExist:
-        return JsonResponse({"ok": False, "error": f"Member not found: {member_code}", "code": member_code}, status=404)
+        try:
+            member = GymMember.objects.get(business=business, member_code=member_code, is_archived=False)
+        except GymMember.DoesNotExist:
+            return JsonResponse(
+                {"ok": False, "error": f"Member not found: {member_code}", "code": member_code}, status=404
+            )
 
     # Calculate status and days remaining
     today = timezone.now().date()

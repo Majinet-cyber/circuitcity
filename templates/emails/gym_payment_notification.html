@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <style>
+        body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+        .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+        .header { background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: white; padding: 30px; text-align: center; border-radius: 8px 8px 0 0; }
+        .content { background: #f9fafb; padding: 30px; border-radius: 0 0 8px 8px; }
+        .emoji { font-size: 48px; }
+        .detail-row { display: flex; justify-content: space-between; padding: 12px 0; border-bottom: 1px solid #e2e8f0; }
+        .detail-label { font-weight: 600; color: #64748b; }
+        .detail-value { color: #1e293b; }
+        .amount { font-size: 32px; font-weight: bold; color: #10b981; text-align: center; margin: 20px 0; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="emoji">💰</div>
+            <h1>Payment Received</h1>
+        </div>
+        <div class="content">
+            <div class="amount">MWK {{ payment.amount|floatformat:2 }}</div>
+
+            <div class="detail-row">
+                <span class="detail-label">Member:</span>
+                <span class="detail-value">{{ member.name }}</span>
+            </div>
+            <div class="detail-row">
+                <span class="detail-label">Member Number:</span>
+                <span class="detail-value">{{ member.member_number }}</span>
+            </div>
+            <div class="detail-row">
+                <span class="detail-label">Payment Method:</span>
+                <span class="detail-value">{{ payment.get_payment_method_display }}</span>
+            </div>
+            <div class="detail-row">
+                <span class="detail-label">Date:</span>
+                <span class="detail-value">{{ payment.paid_at|date:"d M Y, H:i" }}</span>
+            </div>
+
+            <h3 style="margin-top: 30px; color: #1e293b;">Membership Details</h3>
+
+            <div class="detail-row">
+                <span class="detail-label">Plan:</span>
+                <span class="detail-value">{% if payment.trainer %}With Trainer ({{ payment.trainer.name }}){% else %}Standard Membership{% endif %}</span>
+            </div>
+            <div class="detail-row">
+                <span class="detail-label">Membership Fee:</span>
+                <span class="detail-value">MWK {{ payment.membership_amount|floatformat:2 }}</span>
+            </div>
+            {% if payment.trainer_fee > 0 %}
+            <div class="detail-row">
+                <span class="detail-label">Trainer Fee:</span>
+                <span class="detail-value">MWK {{ payment.trainer_fee|floatformat:2 }}</span>
+            </div>
+            {% endif %}
+            <div class="detail-row">
+                <span class="detail-label">New Expiry:</span>
+                <span class="detail-value">{{ payment.end_date|date:"d M Y" }}</span>
+            </div>
+
+            <p style="margin-top: 30px; color: #64748b; font-size: 14px;">
+                This is an automated notification from {{ business.name }}.
+            </p>
+        </div>
+    </div>
+</body>
+</html>

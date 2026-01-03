@@ -4,8 +4,8 @@ URL patterns for gym operations.
 """
 from django.urls import path, reverse_lazy
 from django.views.generic import RedirectView
-from . import views_gym
-from . import views_gym_wizard
+
+from . import views_gym, views_gym_wizard
 
 app_name = "gym"
 
@@ -30,6 +30,8 @@ urlpatterns = [
     path("member/<int:member_id>/checkin/", views_gym.member_checkin, name="member_checkin"),
     # Check-in
     path("checkin/", views_gym.checkin_page, name="checkin_page"),
+    # Leaderboard
+    path("leaderboard/", views_gym.gym_leaderboard, name="leaderboard"),
     # Payments
     path("payment/add/", views_gym.add_payment, name="add_payment"),
     # Settings

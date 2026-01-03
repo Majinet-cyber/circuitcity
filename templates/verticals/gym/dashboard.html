@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% load humanize %}
 
 {% block title %}Gym · Emajinet{% endblock %}
 
@@ -61,15 +62,15 @@
   <section class="metrics-grid">
     <article class="metric-card">
       <h3>Total Members</h3>
-      <p>{{ total_members|default:"0" }}</p>
+      <p>{{ total_members|default:"0"|intcomma }}</p>
     </article>
     <article class="metric-card">
       <h3>Active Members</h3>
-      <p style="color:#16a34a">{{ members_active_count|default:"0" }}</p>
+      <p style="color:#16a34a">{{ members_active_count|default:"0"|intcomma }}</p>
     </article>
     <article class="metric-card">
       <h3>In Arrears</h3>
-      <p style="color:#dc2626">{{ members_in_arrears|default:"0" }}</p>
+      <p style="color:#dc2626">{{ members_in_arrears|default:"0"|intcomma }}</p>
     </article>
   </section>
 
@@ -79,22 +80,22 @@
     <div class="metrics-grid">
       <article class="metric-card">
         <h3>Monthly Revenue</h3>
-        <p>{{ revenue|default:0|money }}</p>
-        <small>{{ payment_count|default:"0" }} payment{{ payment_count|pluralize }}</small>
+        <p>{{ revenue|default:0|floatformat:2|intcomma|money }}</p>
+        <small>{{ payment_count|default:"0"|intcomma }} payment{{ payment_count|pluralize }}</small>
       </article>
       <article class="metric-card">
         <h3>Costs</h3>
-        <p>{{ costs|default:0|money }}</p>
+        <p>{{ costs|default:0|floatformat:2|intcomma|money }}</p>
         <small>From admin wallet</small>
       </article>
       <article class="metric-card">
         <h3>Profit</h3>
-        <p style="{% if profit < 0 %}color:#dc2626{% else %}color:#16a34a{% endif %}">{{ profit|default:0|money }}</p>
+        <p style="{% if profit < 0 %}color:#dc2626{% else %}color:#16a34a{% endif %}">{{ profit|default:0|floatformat:2|intcomma|money }}</p>
         <small>Revenue - Costs</small>
       </article>
       <article class="metric-card">
         <h3>MRR</h3>
-        <p>{{ mrr|default:0|money }}</p>
+        <p>{{ mrr|default:0|floatformat:2|intcomma|money }}</p>
         <small>Monthly Recurring Revenue</small>
       </article>
     </div>
@@ -108,8 +109,8 @@
       {% for pm in payment_mix %}
       <article class="metric-card">
         <h3>{{ pm.method }}</h3>
-        <p>{{ pm.amount|money }}</p>
-        <small>{{ pm.count }} payment{{ pm.count|pluralize }}</small>
+        <p>{{ pm.amount|floatformat:2|intcomma|money }}</p>
+        <small>{{ pm.count|intcomma }} payment{{ pm.count|pluralize }}</small>
       </article>
       {% endfor %}
     </div>
@@ -124,7 +125,7 @@
       {% for method_code, method_data in payments_by_method_month.items %}
       <article class="metric-card">
         <h3>{{ method_data.label }}</h3>
-        <p>{{ method_data.total|money }}</p>
+        <p>{{ method_data.total|floatformat:2|intcomma|money }}</p>
         <small>This month</small>
       </article>
       {% endfor %}
@@ -138,12 +139,12 @@
     <div class="metrics-grid">
       <article class="metric-card">
         <h3>Today</h3>
-        <p>{{ sessions_today|default:"0" }}</p>
+        <p>{{ sessions_today|default:"0"|intcomma }}</p>
         <small>check-ins</small>
       </article>
       <article class="metric-card">
         <h3>This Week</h3>
-        <p>{{ sessions_this_week|default:"0" }}</p>
+        <p>{{ sessions_this_week|default:"0"|intcomma }}</p>
         <small>check-ins</small>
       </article>
     </div>
@@ -161,7 +162,7 @@
           <li class="recent-item">
             <div>
               <strong>{{ payment.member.name }}</strong>
-              <small style="display:block;color:#64748b">{{ payment.amount|money }}</small>
+              <small style="display:block;color:#64748b">{{ payment.amount|floatformat:2|intcomma|money }}</small>
             </div>
             <small style="color:#94a3b8">{{ payment.paid_at|date:"M j, Y" }}</small>
           </li>
