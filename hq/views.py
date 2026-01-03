@@ -3,32 +3,33 @@ from __future__ import annotations
 
 import datetime
 import json
-from datetime import datetime as dt, timedelta
-from decimal import Decimal
 from collections import deque
+from datetime import datetime as dt
+from datetime import timedelta
+from decimal import Decimal
 
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import FieldError
 from django.core.paginator import Paginator
 from django.db import models
-from django.db.models import Count, Sum, Value, DecimalField, Q
-from django.db.models.functions import TruncDate, TruncMonth, Coalesce, Cast
+from django.db.models import Count, DecimalField, Q, Sum, Value
+from django.db.models.functions import Cast, Coalesce, TruncDate, TruncMonth
 from django.http import HttpResponse, JsonResponse
-from django.shortcuts import render, get_object_or_404, redirect
-from django.template import loader, TemplateDoesNotExist
+from django.shortcuts import get_object_or_404, redirect, render
+from django.template import TemplateDoesNotExist, loader
 from django.template.loader import select_template
 from django.urls import reverse
 from django.utils import timezone
 
+from billing.models import Invoice, Subscription  # BusinessSubscription alias
 from hq.permissions import hq_admin_required
-from hq.utils_dates import get_period_from_request, get_year_from_request, get_month_range
+from hq.services.hq_analytics import get_hq_analytics_data
+from hq.utils_dates import get_month_range, get_period_from_request, get_year_from_request
 from hq.utils_gamification import get_agent_rankings
-from tenants.models import Business, Membership
-from billing.models import Subscription, Invoice  # BusinessSubscription alias
 from inventory.models import InventoryItem, Location
 from sales.models import Sale
-from hq.services.hq_analytics import get_hq_analytics_data
+from tenants.models import Business, Membership
 
 # Try to import Plan model if you have one
 try:
@@ -46,31 +47,9 @@ except ImportError:
 
 
 # -------------------------------------------------------------------
-# Plan catalog (single source of truth for names, prices, limits)
+# Plan catalog - IMPORT FROM BILLING.PRICING (SINGLE SOURCE OF TRUTH)
 # -------------------------------------------------------------------
-PLAN_CATALOG = {
-    "starter": {
-        "code": "starter",
-        "name": "Starter",
-        "amount": Decimal("20000.00"),
-        "max_agents": 0,  # cannot add agents
-        "max_stores": 1,  # one store
-    },
-    "pro": {
-        "code": "pro",
-        "name": "Pro",
-        "amount": Decimal("35000.00"),
-        "max_agents": 5,  # up to 5 agents
-        "max_stores": None,  # unlimited
-    },
-    "promax": {
-        "code": "promax",
-        "name": "Pro Max",
-        "amount": Decimal("50000.00"),
-        "max_agents": None,  # unlimited
-        "max_stores": None,  # unlimited
-    },
-}
+from billing.pricing import PLAN_CATALOG
 
 
 # -------------------------------------------------------------------
@@ -1422,8 +1401,8 @@ def wallet_mark_paid(request):
     if request.method != "POST":
         return JsonResponse({"ok": False, "error": "POST required"}, status=405)
 
-    from hq.models import HQPaymentMark
     from audit.utils import log_hq_action
+    from hq.models import HQPaymentMark
 
     try:
         business_id = int(request.POST.get("business_id"))

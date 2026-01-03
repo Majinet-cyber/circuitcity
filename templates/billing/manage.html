@@ -12,7 +12,7 @@
   <h2 style="margin-top:1rem;">Available plans</h2>
   <ul>
     {% for p in plans %}
-      <li>{{ p.name }} — MWK {{ p.price_mwk }} / {{ p.period }}</li>
+      <li>{{ p.name }} — {{ p.currency }} {{ p.amount|floatformat:0 }} / {{ p.get_interval_display|lower }}</li>
     {% endfor %}
   </ul>
 </div>
