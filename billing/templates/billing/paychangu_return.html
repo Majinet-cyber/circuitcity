@@ -96,8 +96,19 @@
     <div id="success-state" class="hidden">
       <div class="icon success">✓</div>
       <h1>Payment Confirmed!</h1>
-      <p>Your subscription is now active.</p>
+      <p id="success-message">Your subscription is now active.</p>
       <a href="/" class="btn" id="dashboard-link">Go to Dashboard</a>
+    </div>
+
+    <div id="processing-verified-state" class="hidden">
+      <div class="spinner"></div>
+      <h1>Payment Received!</h1>
+      <p id="processing-verified-message">
+        We received your payment and are activating your subscription.
+        You'll receive an email confirmation shortly.
+      </p>
+      <a href="/" class="btn" id="dashboard-link-processing">Go to Dashboard</a>
+      <div class="ref" id="processing-ref"></div>
     </div>
 
     <div id="failed-state" class="hidden">
@@ -127,7 +138,7 @@
       let pollInterval;
 
       function checkStatus() {
-        fetch(`/billing/api/payment-status/?tx_ref=${encodeURIComponent(txRef)}`)
+        fetch(`/billing/paychangu/payment-status/?tx_ref=${encodeURIComponent(txRef)}`)
           .then(response => {
             if (!response.ok) throw new Error(`HTTP ${response.status}`);
             return response.json();
@@ -138,6 +149,14 @@
             if (data.status === 'success') {
               clearInterval(pollInterval);
               showSuccess(data);
+            } else if (data.status === 'processing') {
+              // Payment verified, but waiting for webhook to activate
+              showProcessingVerified(data);
+              pollCount++;
+              if (pollCount >= maxPolls) {
+                clearInterval(pollInterval);
+                showTimeoutVerified();
+              }
             } else if (data.status === 'failed') {
               clearInterval(pollInterval);
               showFailed(data);
@@ -165,9 +184,14 @@
 
       function showSuccess(data) {
         document.getElementById('processing-state').classList.add('hidden');
+        document.getElementById('processing-verified-state').classList.add('hidden');
         document.getElementById('failed-state').classList.add('hidden');
         document.getElementById('processing-note').classList.add('hidden');
         document.getElementById('success-state').classList.remove('hidden');
+        
+        if (data.message) {
+          document.getElementById('success-message').textContent = data.message;
+        }
         
         if (data.next_url) {
           document.getElementById('dashboard-link').href = data.next_url;
@@ -178,8 +202,26 @@
         }
       }
 
+      function showProcessingVerified(data) {
+        document.getElementById('processing-state').classList.add('hidden');
+        document.getElementById('success-state').classList.add('hidden');
+        document.getElementById('failed-state').classList.add('hidden');
+        document.getElementById('processing-verified-state').classList.remove('hidden');
+        document.getElementById('processing-note').classList.remove('hidden');
+        
+        if (data.message) {
+          document.getElementById('processing-verified-message').textContent = data.message;
+        }
+        
+        document.getElementById('processing-ref').textContent = `Reference: ${txRef}`;
+        document.getElementById('processing-note').innerHTML = 
+          '✅ <strong>Payment Received!</strong> We\'re activating your subscription now. ' +
+          'You\'ll receive an email confirmation when complete.';
+      }
+
       function showFailed(data) {
         document.getElementById('processing-state').classList.add('hidden');
+        document.getElementById('processing-verified-state').classList.add('hidden');
         document.getElementById('success-state').classList.add('hidden');
         document.getElementById('processing-note').classList.add('hidden');
         document.getElementById('failed-state').classList.remove('hidden');
@@ -195,6 +237,15 @@
         document.getElementById('processing-note').innerHTML = 
           '⚠️ <strong>Taking too long?</strong> The payment may still complete. ' +
           'Check your email or contact support with reference: ' + txRef;
+      }
+
+      function showTimeoutVerified() {
+        document.getElementById('processing-verified-message').textContent = 
+          'Payment received! Activation is taking longer than expected.';
+        document.getElementById('processing-note').innerHTML = 
+          '✅ <strong>Don\'t worry!</strong> We received your payment. ' +
+          'Activation may take a few more minutes. You\'ll receive an email confirmation. ' +
+          'You can also go to your dashboard now.';
       }
 
       function showError(message) {

@@ -427,43 +427,47 @@ def paychangu_payment_status(request: HttpRequest) -> JsonResponse:
 
     else:
         # Still pending - check with PayChangu API for latest status
+        # NOTE: We do NOT activate subscriptions here - only webhook does that
+        # This endpoint only reports status for user feedback
         verify_result = paychangu_service.verify_payment(tx_ref)
 
         if verify_result.get("status") == "SUCCESS":
-            # Update transaction immediately
-            transaction.mark_success(verify_result.get("raw_response", {}))
-
-            # Activate invoice and subscription (same logic as webhook)
-            if invoice and invoice.status != Invoice.Status.PAID:
-                invoice.mark_paid()
-
-            if subscription and subscription.status != BusinessSubscription.Status.ACTIVE:
-                subscription.status = BusinessSubscription.Status.ACTIVE
-                subscription.last_payment_at = timezone.now()
-                subscription.advance_period()
-                subscription.save()
-
+            # Transaction appears successful according to PayChangu API
+            # But we wait for webhook to do the actual activation (source of truth)
             return JsonResponse(
                 {
-                    "status": "success",
-                    "transaction_status": "success",
+                    "status": "processing",
+                    "transaction_status": "verified",
                     "invoice_status": invoice.status if invoice else None,
                     "subscription_status": subscription.status if subscription else None,
-                    "next_url": "/inventory/dashboard/",
-                    "message": "Payment confirmed! Your subscription is now active.",
+                    "message": (
+                        "Payment received! We're processing your subscription. "
+                        "You'll receive an email confirmation shortly."
+                    ),
                 }
             )
 
         elif verify_result.get("status") == "FAILED":
             transaction.mark_failed(verify_result.get("raw_response", {}))
             return JsonResponse(
-                {"status": "failed", "transaction_status": "failed", "message": "Payment failed. Please try again."}
+                {
+                    "status": "failed",
+                    "transaction_status": "failed",
+                    "message": "Payment failed. Please try again or contact support.",
+                }
             )
 
         else:
             # Still pending
             return JsonResponse(
-                {"status": "pending", "transaction_status": "pending", "message": "Payment is being processed..."}
+                {
+                    "status": "pending",
+                    "transaction_status": "pending",
+                    "message": (
+                        "Waiting for payment confirmation... "
+                        "This usually takes 1-2 minutes. We'll email you when complete."
+                    ),
+                }
             )
 
 

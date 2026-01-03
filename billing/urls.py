@@ -44,6 +44,7 @@ urlpatterns = [
     path("paychangu/webhook/", vpc.paychangu_webhook, name="paychangu_webhook"),
     path("paychangu/return/", vpc.paychangu_return, name="paychangu_return"),
     path("paychangu/callback/", vpc.paychangu_callback, name="paychangu_callback"),
+    path("paychangu/payment-status/", vpc.paychangu_payment_status, name="paychangu_payment_status"),
     path("api/payment-status/", v.payment_status_api, name="payment_status_api"),
     # Invoice utilities (inline preview/actions)
     path("invoice/<uuid:pk>/send/", vi.invoice_send, name="invoice_send"),
