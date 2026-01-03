@@ -6,27 +6,27 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Pricing Plans - Emajinet | Business Management SaaS</title>
   <meta name="description" content="Choose the perfect plan for your business. Start with a 30-day free trial, no commitment required. All plans include 30-day money-back guarantee.">
-  
+
   <!-- Open Graph / Social Media -->
   <meta property="og:type" content="website">
   <meta property="og:title" content="Pricing Plans - Emajinet | Business Management SaaS">
   <meta property="og:description" content="Choose the perfect plan for your business. Start with a 30-day free trial, no commitment required.">
   <meta property="og:site_name" content="Emajinet">
-  
+
   <!-- Twitter Card -->
   <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:title" content="Pricing Plans - Emajinet">
   <meta name="twitter:description" content="Choose the perfect plan for your business. Start with a 30-day free trial.">
-  
+
   <!-- SEO: Canonical URL -->
   <link rel="canonical" href="https://www.emajinet.africa{{ request.path }}">
-  
+
   <meta name="theme-color" content="#0b1220">
   <link rel="icon" href="{% static 'favicon.ico' %}">
-  
+
   <!-- Bootstrap Icons -->
-  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
-  
+  <link rel="stylesheet" href="{% static 'vendor/bootstrap-icons/bootstrap-icons.min.css' %}">
+
   <style>
     :root {
       --primary: #4f46e5;
@@ -212,13 +212,13 @@
       color: var(--white);
       transform: translateY(-2px);
     }
-    
+
     .btn-outline {
       background: transparent;
       color: var(--primary);
       border: 2px solid var(--primary);
     }
-    
+
     .btn-outline:hover {
       background: var(--primary);
       color: var(--white);
@@ -495,7 +495,7 @@
         <img src="{% static 'img/majn.png' %}" alt="Emajinet Logo" class="logo">
         <span class="logo-text">Emajinet</span>
       </div>
-      
+
       <!-- Desktop Nav -->
       <div class="nav-actions">
         <a href="{% url 'staticpages:home' %}" class="btn btn-text">Home</a>
@@ -535,7 +535,7 @@
       </div>
       <h1 class="pricing-title">Choose the Perfect Plan for Your Business</h1>
       <p class="pricing-subtitle">
-        Start with a free trial, scale as you grow. All plans include 
+        Start with a free trial, scale as you grow. All plans include
         <a href="{% url 'staticpages:terms' %}#refund-policy" style="color: var(--primary); text-decoration: underline;">30-day money-back guarantee</a>.
       </p>
     </div>
@@ -544,7 +544,7 @@
   <!-- Pricing Tiers -->
   <section class="pricing-section">
     <div class="pricing-grid">
-      
+
       {% for plan in PRICING_PLANS %}
       <div class="pricing-card{% if plan.code == 'growth' %} popular{% endif %}">
         {% if plan.code == 'growth' %}
@@ -598,7 +598,7 @@
     document.addEventListener('DOMContentLoaded', function() {
       const mobileMenuToggle = document.getElementById('mobileMenuToggle');
       const mobileMenu = document.getElementById('mobileMenu');
-      
+
       if (mobileMenuToggle && mobileMenu) {
         mobileMenuToggle.addEventListener('click', function() {
           mobileMenuToggle.classList.toggle('active');
@@ -638,4 +638,3 @@
   </script>
 </body>
 </html>
-
